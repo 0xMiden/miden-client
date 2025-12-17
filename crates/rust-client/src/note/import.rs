@@ -27,7 +27,7 @@ use miden_tx::auth::TransactionAuthenticator;
 use crate::rpc::RpcError;
 use crate::rpc::domain::note::FetchedNote;
 use crate::store::input_note_states::ExpectedNoteState;
-use crate::store::{InputNoteRecord, InputNoteState};
+use crate::store::{InputNoteRecord, InputNoteState, NoteFilter};
 use crate::sync::NoteTagRecord;
 use crate::{Client, ClientError};
 
@@ -61,11 +61,9 @@ where
         &mut self,
         note_files: &[NoteFile],
     ) -> Result<Vec<NoteId>, ClientError> {
+        let mut foo = BTreeMap::new();
         let mut ids = vec![];
 
-        let mut requests_by_id = BTreeMap::new();
-        let mut requests_by_details = vec![];
-        let mut requests_by_proof = vec![];
         for note_file in note_files {
             let id = match &note_file {
                 NoteFile::NoteId(id) => *id,
@@ -73,14 +71,30 @@ where
                 NoteFile::NoteWithProof(note, _) => note.id(),
             };
             ids.push(id);
+            foo.insert(id, note_file);
+        }
 
-            let previous_note = self.get_input_note(id).await?;
+        let previous_notes: Vec<InputNoteRecord> = self.get_input_notes(NoteFilter::List(ids.clone())).await?;
+        let previous_notes_map: BTreeMap<NoteId, InputNoteRecord> = previous_notes
+            .into_iter()
+            .map(|note| (note.id(), note))
+            .collect();
+
+        let mut requests_by_id = BTreeMap::new();
+        let mut requests_by_details = vec![];
+        let mut requests_by_proof = vec![];
+
+        for (note_id, note_file) in foo {
+            let previous_note = match previous_notes_map.get(&note_id) {
+                Some(note) => Some(note.clone()),
+                None => None
+            };
 
             // If the note is already in the store and is in the state processing we return an
             // error.
             if let Some(true) = previous_note.as_ref().map(InputNoteRecord::is_processing) {
                 return Err(ClientError::NoteImportError(format!(
-                    "Can't overwrite note with id {id} as it's currently being processed",
+                    "Can't overwrite note with id {note_id} as it's currently being processed",
                 )));
             }
 
@@ -153,6 +167,7 @@ where
         }
 
         let mut note_records = BTreeMap::new();
+        let mut notes_to_request = vec![];
         for fetched_note in fetched_notes {
             let note_id = fetched_note.id();
             let inclusion_proof = fetched_note.inclusion_proof().clone();
@@ -179,17 +194,15 @@ where
                     },
                 };
 
-                let requested_note = (previous_note, fetched_note, inclusion_proof);
-                // TODO: batch requested notes?
-                let note_record = self
-                    .import_note_records_by_proof(vec![requested_note])
-                    .await?
-                    .first()
-                    .ok_or(ClientError::NoteImportError(
-                        "Node should have retrieved requested proof or specify missing".to_string(),
-                    ))?
-                    .clone();
-                note_records.insert(note_id, note_record);
+                let note_request = (previous_note, fetched_note, inclusion_proof);
+                notes_to_request.push(note_request);
+            }
+        }
+
+        if !notes_to_request.is_empty() {
+            let note_records_by_proof = self.import_note_records_by_proof(notes_to_request).await?;
+            for note_record in note_records_by_proof.iter().flatten().cloned() {
+                note_records.insert(note_record.id(), Some(note_record));
             }
         }
         Ok(note_records)
@@ -304,7 +317,8 @@ where
                 }
             }
         }
-        let mut committed_notes_data = self.check_expected_notes(lowest_request_block, note_requests).await?;
+        let mut committed_notes_data =
+            self.check_expected_notes(lowest_request_block, note_requests).await?;
 
         let mut note_records = vec![];
         for (previous_note, details, after_block_num, tag) in requested_notes {
