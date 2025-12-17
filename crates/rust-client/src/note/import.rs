@@ -294,27 +294,17 @@ where
         &mut self,
         requested_notes: Vec<(Option<InputNoteRecord>, NoteDetails, BlockNumber, Option<NoteTag>)>,
     ) -> Result<Vec<Option<InputNoteRecord>>, ClientError> {
-        // TODO: refactor to only call from a single block?
-        let mut block_number_tag_requests: BTreeMap<&BlockNumber, Vec<(NoteId, &NoteTag)>> =
-            BTreeMap::new();
+        let mut lowest_request_block: BlockNumber = u32::MAX.into();
+        let mut note_requests = vec![];
         for (_, details, after_block_num, tag) in &requested_notes {
             if let Some(tag) = tag {
-                block_number_tag_requests
-                    .entry(after_block_num)
-                    .or_default()
-                    .push((details.id(), tag));
+                note_requests.push((details.id(), tag));
+                if after_block_num < &lowest_request_block {
+                    lowest_request_block = *after_block_num;
+                }
             }
         }
-
-        let mut committed_notes_data: BTreeMap<NoteId, Option<(NoteMetadata, NoteInclusionProof)>> =
-            BTreeMap::new();
-        for (block_number, note_requests) in block_number_tag_requests {
-            let committed_notes_data_in_block =
-                self.check_expected_notes(*block_number, note_requests).await?;
-            for (note_id, metadata_and_proof) in committed_notes_data_in_block {
-                committed_notes_data.insert(note_id, metadata_and_proof);
-            }
-        }
+        let mut committed_notes_data = self.check_expected_notes(lowest_request_block, note_requests).await?;
 
         let mut note_records = vec![];
         for (previous_note, details, after_block_num, tag) in requested_notes {
