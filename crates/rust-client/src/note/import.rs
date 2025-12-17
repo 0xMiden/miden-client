@@ -61,34 +61,28 @@ where
         &mut self,
         note_files: &[NoteFile],
     ) -> Result<Vec<NoteId>, ClientError> {
-        let mut foo = BTreeMap::new();
-        let mut ids = vec![];
-
+        let mut note_ids_map = BTreeMap::new();
         for note_file in note_files {
             let id = match &note_file {
                 NoteFile::NoteId(id) => *id,
                 NoteFile::NoteDetails { details, .. } => details.id(),
                 NoteFile::NoteWithProof(note, _) => note.id(),
             };
-            ids.push(id);
-            foo.insert(id, note_file);
+            note_ids_map.insert(id, note_file);
         }
 
-        let previous_notes: Vec<InputNoteRecord> = self.get_input_notes(NoteFilter::List(ids.clone())).await?;
-        let previous_notes_map: BTreeMap<NoteId, InputNoteRecord> = previous_notes
-            .into_iter()
-            .map(|note| (note.id(), note))
-            .collect();
+        let note_ids: Vec<NoteId> = note_ids_map.keys().copied().collect();
+        let previous_notes: Vec<InputNoteRecord> =
+            self.get_input_notes(NoteFilter::List(note_ids.clone())).await?;
+        let previous_notes_map: BTreeMap<NoteId, InputNoteRecord> =
+            previous_notes.into_iter().map(|note| (note.id(), note)).collect();
 
         let mut requests_by_id = BTreeMap::new();
         let mut requests_by_details = vec![];
         let mut requests_by_proof = vec![];
 
-        for (note_id, note_file) in foo {
-            let previous_note = match previous_notes_map.get(&note_id) {
-                Some(note) => Some(note.clone()),
-                None => None
-            };
+        for (note_id, note_file) in note_ids_map {
+            let previous_note = previous_notes_map.get(&note_id).cloned();
 
             // If the note is already in the store and is in the state processing we return an
             // error.
@@ -135,7 +129,7 @@ where
             self.store.upsert_input_notes(&[note]).await?;
         }
 
-        Ok(ids)
+        Ok(note_ids)
     }
 
     // HELPERS
@@ -161,9 +155,7 @@ where
             })?;
 
         if fetched_notes.is_empty() {
-            return Err(ClientError::NoteNotFoundOnChain(
-                *note_ids.first().expect("at least a single note should be present"),
-            ));
+            return Err(ClientError::NoteImportError("No notes fetched from node".to_string()));
         }
 
         let mut note_records = BTreeMap::new();
@@ -173,7 +165,9 @@ where
             let inclusion_proof = fetched_note.inclusion_proof().clone();
 
             let previous_note =
-                notes.get(&note_id).cloned().expect("note id should be present in map");
+                notes.get(&note_id).cloned().ok_or(ClientError::NoteImportError(format!(
+                    "Failed to retrieve note with id {note_id} from node"
+                )))?;
             if let Some(mut previous_note) = previous_note {
                 if previous_note
                     .inclusion_proof_received(inclusion_proof, *fetched_note.metadata())?
