@@ -126,7 +126,7 @@ Builds an auth component from a secret key, inferring the auth scheme from the k
 
 ##### secret\_key
 
-[`SecretKey`](SecretKey.md)
+[`AuthSecretKey`](AuthSecretKey.md)
 
 #### Returns
 

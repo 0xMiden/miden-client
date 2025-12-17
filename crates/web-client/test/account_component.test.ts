@@ -19,7 +19,7 @@ test.describe("account component auth constructors", () => {
     }) => {
       const digestsMatch = await page.evaluate(
         ({ _secretKeyFn, _authSchemeKey }) => {
-          const secretKey = window.SecretKey[_secretKeyFn]();
+          const secretKey = window.AuthSecretKey[_secretKeyFn]();
           const commitment = secretKey.publicKey().toCommitment();
 
           const fromSecret =
