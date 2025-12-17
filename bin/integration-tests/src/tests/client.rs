@@ -205,7 +205,11 @@ pub async fn test_import_expected_notes(client_config: ClientConfig) -> Result<(
 
     // Importing a public note before it's committed onchain should fail
     assert_eq!(
-        client_2.import_notes(&[NoteFile::NoteId(note.id())]).await.unwrap_err().to_string(),
+        client_2
+            .import_notes(&[NoteFile::NoteId(note.id())])
+            .await
+            .unwrap_err()
+            .to_string(),
         "note import error: No notes fetched from node".to_string()
     );
     execute_tx_and_sync(&mut client_1, faucet_account.id(), tx_request).await?;
