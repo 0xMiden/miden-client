@@ -79,7 +79,8 @@ async fn import_account<AUTH>(
     let AccountFile { account, auth_secret_keys } = account_data;
 
     for key in auth_secret_keys {
-        keystore.add_key(&key, &account.id()).map_err(CliError::KeyStore)?;
+        keystore.add_key(&key).map_err(CliError::KeyStore)?;
+        client.map_account_to_public_key(account_id, key.public_key()).await?;
     }
 
     client.add_account(&account, overwrite).await?;
