@@ -183,34 +183,6 @@ applications as it uses a mock chain that simulates the behavior of a real node.
 
 ***
 
-### executeTransaction()
-
-> **executeTransaction**(`account_id`, `transaction_request`): `Promise`\<[`TransactionResult`](TransactionResult.md)\>
-
-Executes a transaction specified by the request against the specified account but does not
-submit it to the network nor update the local database. The returned [`TransactionResult`]
-retains the execution artifacts needed to continue with the transaction lifecycle.
-
-If the transaction utilizes foreign account data, there is a chance that the client doesn't
-have the required block header in the local database. In these scenarios, a sync to
-the chain tip is performed, and the required block header is retrieved.
-
-#### Parameters
-
-##### account\_id
-
-[`AccountId`](AccountId.md)
-
-##### transaction\_request
-
-[`TransactionRequest`](TransactionRequest.md)
-
-#### Returns
-
-`Promise`\<[`TransactionResult`](TransactionResult.md)\>
-
-***
-
 ### executeForSummary()
 
 > **executeForSummary**(`account_id`, `transaction_request`): `Promise`\<[`TransactionSummary`](TransactionSummary.md)\>
@@ -238,6 +210,34 @@ request as the salt (or a zero salt if not provided).
 #### Returns
 
 `Promise`\<[`TransactionSummary`](TransactionSummary.md)\>
+
+***
+
+### executeTransaction()
+
+> **executeTransaction**(`account_id`, `transaction_request`): `Promise`\<[`TransactionResult`](TransactionResult.md)\>
+
+Executes a transaction specified by the request against the specified account but does not
+submit it to the network nor update the local database. The returned [`TransactionResult`]
+retains the execution artifacts needed to continue with the transaction lifecycle.
+
+If the transaction utilizes foreign account data, there is a chance that the client doesn't
+have the required block header in the local database. In these scenarios, a sync to
+the chain tip is performed, and the required block header is retrieved.
+
+#### Parameters
+
+##### account\_id
+
+[`AccountId`](AccountId.md)
+
+##### transaction\_request
+
+[`TransactionRequest`](TransactionRequest.md)
+
+#### Returns
+
+`Promise`\<[`TransactionResult`](TransactionResult.md)\>
 
 ***
 
