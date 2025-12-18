@@ -1,8 +1,14 @@
 use alloc::boxed::Box;
+use alloc::sync::Arc;
 
-use miden_client::ClientError;
 use miden_client::auth::{AuthSecretKey, RPO_FALCON_SCHEME_ID};
-use miden_client::transaction::{TransactionExecutorError, TransactionRequestBuilder};
+use miden_client::transaction::{
+    TransactionExecutorError,
+    TransactionProver,
+    TransactionProverError,
+    TransactionRequestBuilder,
+};
+use miden_client::{ClientError, async_trait};
 use miden_lib::account::auth::AuthRpoFalcon512;
 use miden_lib::transaction::TransactionKernel;
 use miden_objects::Word;
@@ -21,6 +27,7 @@ use miden_objects::testing::account_id::{
     ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
     ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
 };
+use miden_objects::transaction::{ProvenTransaction, TransactionInputs};
 
 use super::PaymentNoteDescription;
 use crate::tests::{create_test_client, setup_wallet_and_faucet};
@@ -128,4 +135,65 @@ async fn transaction_error_reports_source_line() {
         },
         other => panic!("unexpected error variant: {other:?}"),
     }
+}
+
+// MOCK PROVERS
+// ================================================================================================
+
+/// A prover that always fails with a `TransactionProverError`.
+/// Used to test the prover fallback pattern.
+struct AlwaysFailingProver;
+
+#[async_trait]
+impl TransactionProver for AlwaysFailingProver {
+    async fn prove(
+        &self,
+        _inputs: TransactionInputs,
+    ) -> Result<ProvenTransaction, TransactionProverError> {
+        Err(TransactionProverError::other("simulated remote prover failure"))
+    }
+}
+
+// PROVER FALLBACK TESTS
+// ================================================================================================
+
+/// Tests the prover fallback pattern: when a remote prover fails, the same transaction
+/// request can be retried with a different (local) prover.
+#[tokio::test]
+async fn prover_fallback_pattern_allows_retry_with_different_prover() {
+    let (mut client, _, keystore) = Box::pin(create_test_client()).await;
+    let (wallet, faucet) = setup_wallet_and_faucet(
+        &mut client,
+        AccountStorageMode::Private,
+        &keystore,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await
+    .unwrap();
+
+    let fungible_asset = FungibleAsset::new(faucet.id(), 100).unwrap();
+
+    let tx_request = TransactionRequestBuilder::new()
+        .build_mint_fungible_asset(fungible_asset, wallet.id(), NoteType::Private, client.rng())
+        .unwrap();
+
+    // First attempt with failing prover
+    let failing_prover = Arc::new(AlwaysFailingProver);
+    let result = Box::pin(client.submit_new_transaction_with_prover(
+        faucet.id(),
+        tx_request.clone(),
+        failing_prover,
+    ))
+    .await;
+
+    // Verify first attempt fails with TransactionProvingError
+    assert!(
+        matches!(result, Err(ClientError::TransactionProvingError(_))),
+        "expected TransactionProvingError on first attempt"
+    );
+
+    // Retry with the client's default prover (which should work)
+    let tx_id = Box::pin(client.submit_new_transaction(faucet.id(), tx_request)).await;
+
+    assert!(tx_id.is_ok(), "fallback to default prover should succeed");
 }

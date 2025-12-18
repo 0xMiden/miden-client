@@ -146,6 +146,50 @@ try {
 Using a remote prover can significantly improve performance for complex transactions by offloading the computationally intensive proving work to a dedicated server. This is particularly useful when dealing with large transactions or when running in resource-constrained environments.
 :::
 
+### Prover Fallback Pattern
+
+When using a remote prover, network issues or server errors may cause proving to fail. A common pattern is to fall back to local proving when remote proving fails. Use `submitNewTransactionWithProver` for this:
+
+```typescript
+import { NoteType, TransactionProver, WebClient } from "@demox-labs/miden-sdk";
+
+const webClient = await WebClient.createClient();
+
+const transactionRequest = webClient.newMintTransactionRequest(
+    targetAccountId,
+    faucetId,
+    NoteType.Private,
+    1000
+);
+
+// Create provers
+const remoteProver = TransactionProver.newRemoteProver("https://prover.example.com", 10_000);
+const localProver = TransactionProver.newLocalProver();
+
+try {
+    // Try remote prover first via submitNewTransactionWithProver
+    const transactionId = await webClient.submitNewTransactionWithProver(
+        faucetId,
+        transactionRequest,
+        remoteProver
+    );
+    console.log("Transaction submitted with remote prover:", transactionId.toString());
+} catch (error) {
+    // Check if it's a proving error and fall back to local
+    if (error.message?.includes("proving")) {
+        console.log("Remote proving failed, falling back to local prover...");
+        const transactionId = await webClient.submitNewTransactionWithProver(
+            faucetId,
+            transactionRequest,
+            localProver
+        );
+        console.log("Transaction submitted with local prover:", transactionId.toString());
+    } else {
+        throw error;
+    }
+}
+```
+
 ## Sending Transactions
 
 To send tokens between accounts:
