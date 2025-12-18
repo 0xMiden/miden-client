@@ -78,14 +78,32 @@ pub use miden_lib::note::{WellKnownNote, create_p2id_note, create_p2ide_note, cr
 pub use miden_objects::NoteError;
 pub use miden_objects::block::BlockNumber;
 pub use miden_objects::note::{
-    Note, NoteAssets, NoteDetails, NoteExecutionHint, NoteExecutionMode, NoteFile, NoteHeader,
-    NoteId, NoteInclusionProof, NoteInputs, NoteLocation, NoteMetadata, NoteRecipient, NoteScript,
-    NoteTag, NoteType, Nullifier, PartialNote,
+    Note,
+    NoteAssets,
+    NoteDetails,
+    NoteExecutionHint,
+    NoteExecutionMode,
+    NoteFile,
+    NoteHeader,
+    NoteId,
+    NoteInclusionProof,
+    NoteInputs,
+    NoteLocation,
+    NoteMetadata,
+    NoteRecipient,
+    NoteScript,
+    NoteTag,
+    NoteType,
+    Nullifier,
+    PartialNote,
 };
 pub use miden_objects::transaction::ToInputNoteCommitments;
 pub use note_screener::{NoteConsumability, NoteRelevance, NoteScreener, NoteScreenerError};
 pub use note_update_tracker::{
-    InputNoteUpdate, NoteUpdateTracker, NoteUpdateType, OutputNoteUpdate,
+    InputNoteUpdate,
+    NoteUpdateTracker,
+    NoteUpdateType,
+    OutputNoteUpdate,
 };
 /// Note retrieval methods.
 impl<AUTH> Client<AUTH>
