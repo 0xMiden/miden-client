@@ -1395,8 +1395,8 @@ test.describe("storage map test", () => {
   });
 });
 
-test.describe("executeUnauthorized tests", () => {
-  test("executeUnauthorized returns TransactionSummary for unauthorized transaction", async ({
+test.describe("executeForSummary tests", () => {
+  test("executeForSummary returns TransactionSummary for unauthorized transaction", async ({
     page,
   }) => {
     const result = await page.evaluate(async () => {
@@ -1519,7 +1519,7 @@ end
       const consumeSentNoteRequest =
         client.newConsumeTransactionRequest(sentNoteIds);
 
-      const summary = await client.executeUnauthorized(
+      const summary = await client.executeForSummary(
         accountBuilderResult.account.id(),
         consumeSentNoteRequest
       );
@@ -1540,7 +1540,7 @@ end
     expect(result.inputNoteIds).toEqual(result.sentNoteIds);
   });
 
-  test("executeUnauthorized returns TransactionSummary for authorized transaction with matching salt", async ({
+  test("executeForSummary returns TransactionSummary for authorized transaction with matching salt", async ({
     page,
   }) => {
     const result = await page.evaluate(async () => {
@@ -1564,7 +1564,7 @@ end
         .withAuthArg(expectedSalt)
         .build();
 
-      const summary = await client.executeUnauthorized(
+      const summary = await client.executeForSummary(
         senderAccount.id(),
         transactionRequest
       );

@@ -211,9 +211,9 @@ the chain tip is performed, and the required block header is retrieved.
 
 ***
 
-### executeUnauthorized()
+### executeForSummary()
 
-> **executeUnauthorized**(`account_id`, `transaction_request`): `Promise`\<[`TransactionSummary`](TransactionSummary.md)\>
+> **executeForSummary**(`account_id`, `transaction_request`): `Promise`\<[`TransactionSummary`](TransactionSummary.md)\>
 
 Executes a transaction and returns the `TransactionSummary`.
 

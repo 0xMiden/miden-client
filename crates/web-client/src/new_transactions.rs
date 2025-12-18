@@ -83,8 +83,8 @@ impl WebClient {
     ///
     /// # Errors
     /// - If there is an internal failure during execution.
-    #[wasm_bindgen(js_name = "executeUnauthorized")]
-    pub async fn execute_unauthorized(
+    #[wasm_bindgen(js_name = "executeForSummary")]
+    pub async fn execute_for_summary(
         &mut self,
         account_id: &AccountId,
         transaction_request: &TransactionRequest,
