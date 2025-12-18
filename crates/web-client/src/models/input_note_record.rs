@@ -1,3 +1,4 @@
+use miden_client::note::Note as NativeNote;
 use miden_client::store::InputNoteRecord as NativeInputNoteRecord;
 use miden_client::transaction::InputNote as NativeInputNote;
 use wasm_bindgen::prelude::*;
@@ -10,6 +11,7 @@ use super::note_metadata::NoteMetadata;
 use super::word::Word;
 use crate::js_error_with_context;
 use crate::models::input_note::InputNote;
+use crate::models::note::Note;
 
 /// Represents a Note of which the Store can keep track and retrieve.
 ///
@@ -95,6 +97,15 @@ impl InputNoteRecord {
             js_error_with_context(err, "could not create InputNote from InputNoteRecord")
         })?;
         Ok(InputNote(input_note))
+    }
+
+    /// Converts the record into a `Note` (including proof when available).
+    #[wasm_bindgen(js_name = "toNote")]
+    pub fn to_note(&self) -> Result<Note, JsValue> {
+        let note: NativeNote = self.0.clone().try_into().map_err(|err| {
+            js_error_with_context(err, "could not create InputNote from InputNoteRecord")
+        })?;
+        Ok(Note(note))
     }
 }
 

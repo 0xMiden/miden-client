@@ -685,10 +685,7 @@ async fn import_processing_note_returns_error() {
     let note = client.get_input_note(note_id).await.unwrap().unwrap();
 
     let input = [(note.try_into().unwrap(), None)];
-    let consume_note_request = TransactionRequestBuilder::new()
-        .unauthenticated_input_notes(input)
-        .build()
-        .unwrap();
+    let consume_note_request = TransactionRequestBuilder::new().input_notes(input).build().unwrap();
     Box::pin(client.submit_new_transaction(account.id(), consume_note_request))
         .await
         .unwrap();
@@ -865,8 +862,9 @@ async fn real_note_roundtrip() {
     assert!(matches!(note.state(), &InputNoteState::Committed(_)));
 
     // Consume note
-    let transaction_request =
-        TransactionRequestBuilder::new().build_consume_notes(vec![note_id]).unwrap();
+    let transaction_request = TransactionRequestBuilder::new()
+        .build_consume_notes(vec![note.clone().try_into().unwrap()])
+        .unwrap();
 
     Box::pin(client.submit_new_transaction(wallet.id(), transaction_request))
         .await
@@ -988,7 +986,7 @@ async fn p2id_transfer() {
     // Consume P2ID note
     println!("Consuming Note...");
     let tx_request = TransactionRequestBuilder::new()
-        .build_consume_notes(vec![notes[0].id()])
+        .build_consume_notes(vec![notes[0].clone().try_into().unwrap()])
         .unwrap();
     Box::pin(client.submit_new_transaction(to_account_id, tx_request))
         .await
@@ -1027,7 +1025,12 @@ async fn p2id_transfer() {
         panic!("Error: Account should have a fungible asset");
     }
 
-    assert_note_cannot_be_consumed_twice(&mut client, to_account_id, notes[0].id()).await;
+    assert_note_cannot_be_consumed_twice(
+        &mut client,
+        to_account_id,
+        notes[0].clone().try_into().unwrap(),
+    )
+    .await;
 }
 
 #[tokio::test]
@@ -1166,8 +1169,10 @@ async fn p2ide_transfer_consumed_by_target() {
     assert!(!notes.is_empty());
 
     // Make the `to_account_id` consume P2IDE note
-    let note_id = tx_request.expected_output_own_notes().pop().unwrap().id();
-    let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![note_id]).unwrap();
+    let note = tx_request.expected_output_own_notes().pop().unwrap();
+    let tx_request = TransactionRequestBuilder::new()
+        .build_consume_notes(vec![note.clone()])
+        .unwrap();
     Box::pin(client.submit_new_transaction(to_account_id, tx_request))
         .await
         .unwrap();
@@ -1199,7 +1204,7 @@ async fn p2ide_transfer_consumed_by_target() {
         panic!("Error: Account should have a fungible asset");
     }
 
-    assert_note_cannot_be_consumed_twice(&mut client, to_account_id, note_id).await;
+    assert_note_cannot_be_consumed_twice(&mut client, to_account_id, note).await;
 }
 
 #[tokio::test]
@@ -1259,7 +1264,7 @@ async fn p2ide_transfer_consumed_by_sender() {
     // Check that it's still too early to consume
     println!("Consuming Note (too early)...");
     let tx_request = TransactionRequestBuilder::new()
-        .build_consume_notes(vec![notes[0].id()])
+        .build_consume_notes(vec![notes[0].clone().try_into().unwrap()])
         .unwrap();
     let transaction_execution_result =
         Box::pin(client.execute_transaction(from_account_id, tx_request)).await;
@@ -1280,7 +1285,7 @@ async fn p2ide_transfer_consumed_by_sender() {
     // Consume the note with the sender account
     println!("Consuming Note...");
     let tx_request = TransactionRequestBuilder::new()
-        .build_consume_notes(vec![notes[0].id()])
+        .build_consume_notes(vec![notes[0].clone().try_into().unwrap()])
         .unwrap();
     Box::pin(client.submit_new_transaction(from_account_id, tx_request))
         .await
@@ -1307,7 +1312,12 @@ async fn p2ide_transfer_consumed_by_sender() {
     assert_eq!(regular_account.vault().assets().count(), 0);
 
     // Check that the target can't consume the note anymore
-    assert_note_cannot_be_consumed_twice(&mut client, to_account_id, notes[0].id()).await;
+    assert_note_cannot_be_consumed_twice(
+        &mut client,
+        to_account_id,
+        notes[0].clone().try_into().unwrap(),
+    )
+    .await;
 }
 
 #[tokio::test]
@@ -1358,7 +1368,9 @@ async fn p2ide_timelocked() {
     client.sync_state().await.unwrap();
 
     // Check that it's still too early to consume by both accounts
-    let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![note.id()]).unwrap();
+    let tx_request = TransactionRequestBuilder::new()
+        .build_consume_notes(vec![note.clone()])
+        .unwrap();
     let results = [
         Box::pin(client.execute_transaction(from_account_id, tx_request.clone())).await,
         Box::pin(client.execute_transaction(to_account_id, tx_request)).await,
@@ -1379,7 +1391,9 @@ async fn p2ide_timelocked() {
     client.sync_state().await.unwrap();
 
     // Consume the note with the target account
-    let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![note.id()]).unwrap();
+    let tx_request = TransactionRequestBuilder::new()
+        .build_consume_notes(vec![note.clone()])
+        .unwrap();
     Box::pin(client.submit_new_transaction(to_account_id, tx_request))
         .await
         .unwrap();
@@ -1898,7 +1912,7 @@ async fn input_note_checks() {
     }
 
     let duplicate_note_tx_request = TransactionRequestBuilder::new()
-        .build_consume_notes(vec![mint_notes[0].id(), mint_notes[0].id()]);
+        .build_consume_notes(vec![mint_notes[0].clone(), mint_notes[0].clone()]);
 
     assert!(matches!(
         duplicate_note_tx_request,
@@ -1906,7 +1920,7 @@ async fn input_note_checks() {
     ));
 
     let tx_request = TransactionRequestBuilder::new()
-        .build_consume_notes(mint_notes.iter().map(Note::id).collect())
+        .build_consume_notes(mint_notes.clone())
         .unwrap();
 
     let transaction_result =
@@ -1933,7 +1947,7 @@ async fn input_note_checks() {
 
     // Check that using consumed notes will return an error
     let consumed_note_tx_request = TransactionRequestBuilder::new()
-        .build_consume_notes(vec![mint_notes[0].id()])
+        .build_consume_notes(vec![mint_notes[0].clone()])
         .unwrap();
     let error = Box::pin(client.submit_new_transaction(wallet.id(), consumed_note_tx_request))
         .await
@@ -1944,22 +1958,25 @@ async fn input_note_checks() {
         ClientError::TransactionRequestError(TransactionRequestError::InputNoteAlreadyConsumed(_))
     ));
 
+    // TODO: remove deprecated check
+    // No longer errors if the Note passed is not authenticated,
+    // It will just not get marked as such.
     // Check that adding an authenticated note that is not tracked by the client will return an
     // error
-    let missing_authenticated_note_tx_request = TransactionRequestBuilder::new()
-        .build_consume_notes(vec![NoteId::from_raw(EMPTY_WORD)])
-        .unwrap();
-    let error =
-        Box::pin(client.submit_new_transaction(wallet.id(), missing_authenticated_note_tx_request))
-            .await
-            .unwrap_err();
+    // let missing_authenticated_note_tx_request = TransactionRequestBuilder::new()
+    //     .build_consume_notes(vec![NoteId::from_raw(EMPTY_WORD)])
+    //     .unwrap();
+    // let error =
+    //     Box::pin(client.submit_new_transaction(wallet.id(),
+    // missing_authenticated_note_tx_request))         .await
+    //         .unwrap_err();
 
-    assert!(matches!(
-        error,
-        ClientError::TransactionRequestError(
-            TransactionRequestError::MissingAuthenticatedInputNote(_)
-        )
-    ));
+    // assert!(matches!(
+    //     error,
+    //     ClientError::TransactionRequestError(
+    //         TransactionRequestError::MissingAuthenticatedInputNote(_)
+    //     )
+    // ));
 }
 
 #[tokio::test]
@@ -2020,7 +2037,7 @@ async fn swap_chain_test() {
 
         // The notes are inserted in reverse order because the first note to be consumed will be the
         // last one generated.
-        swap_notes.insert(0, tx_request.expected_output_own_notes()[0].id());
+        swap_notes.insert(0, tx_request.expected_output_own_notes()[0].clone());
         Box::pin(client.submit_new_transaction(pairs[0].0.id(), tx_request))
             .await
             .unwrap();
@@ -2034,7 +2051,7 @@ async fn swap_chain_test() {
 
     // Trying to consume the notes in another order will fail.
     let tx_request = TransactionRequestBuilder::new()
-        .build_consume_notes(swap_notes.iter().rev().copied().collect())
+        .build_consume_notes(swap_notes.iter().rev().cloned().collect())
         .unwrap();
     let error = Box::pin(client.submit_new_transaction(last_wallet, tx_request))
         .await
@@ -2392,7 +2409,7 @@ async fn consume_note_with_custom_script() {
 
     // Consume note
     let transaction_request = TransactionRequestBuilder::new()
-        .build_consume_notes(vec![custom_note.id()])
+        .build_consume_notes(vec![custom_note.clone()])
         .unwrap();
 
     // The transaction should be submitted successfully

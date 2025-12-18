@@ -104,7 +104,7 @@ pub async fn test_transaction_request(client_config: ClientConfig) -> Result<()>
 
     // FAILURE ATTEMPT
     let transaction_request = TransactionRequestBuilder::new()
-        .unauthenticated_input_notes(note_args_map.clone())
+        .input_notes(note_args_map.clone())
         .custom_script(tx_script.clone())
         .script_arg(Word::empty())
         .extend_advice_map(advice_map.clone())
@@ -120,7 +120,7 @@ pub async fn test_transaction_request(client_config: ClientConfig) -> Result<()>
 
     // SUCCESS EXECUTION
     let transaction_request = TransactionRequestBuilder::new()
-        .unauthenticated_input_notes(note_args_map)
+        .input_notes(note_args_map)
         .custom_script(tx_script)
         .script_arg([Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)].into())
         .extend_advice_map(advice_map)
@@ -239,7 +239,7 @@ pub async fn test_merkle_store(client_config: ClientConfig) -> Result<()> {
     let tx_script = client.script_builder().compile_tx_script(&code)?;
 
     let transaction_request = TransactionRequestBuilder::new()
-        .unauthenticated_input_notes(note_args_map)
+        .input_notes(note_args_map)
         .custom_script(tx_script)
         .extend_advice_map(advice_map)
         .extend_merkle_store(merkle_store.inner_nodes())

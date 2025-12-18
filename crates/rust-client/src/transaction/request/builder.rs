@@ -39,6 +39,7 @@ use crate::ClientRng;
 /// scripts, and setting other transaction parameters.
 #[derive(Clone, Debug)]
 pub struct TransactionRequestBuilder {
+    // TODO: merge `unauthenticated_input_notes` & `unauthenticated_input_notes` into one
     /// Notes to be consumed by the transaction that aren't authenticated.
     unauthenticated_input_notes: Vec<Note>,
     /// Notes to be consumed by the transaction together with their (optional) arguments. This
@@ -103,27 +104,15 @@ impl TransactionRequestBuilder {
         }
     }
 
-    /// Adds the specified notes as unauthenticated input notes to the transaction request.
+    /// TODO: docs
     #[must_use]
-    pub fn unauthenticated_input_notes(
+    pub fn input_notes(
         mut self,
         notes: impl IntoIterator<Item = (Note, Option<NoteArgs>)>,
     ) -> Self {
         for (note, argument) in notes {
             self.input_notes.push((note.id(), argument));
             self.unauthenticated_input_notes.push(note);
-        }
-        self
-    }
-
-    /// Adds the specified notes as authenticated input notes to the transaction request.
-    #[must_use]
-    pub fn authenticated_input_notes(
-        mut self,
-        notes: impl IntoIterator<Item = (NoteId, Option<NoteArgs>)>,
-    ) -> Self {
-        for (note_id, argument) in notes {
-            self.input_notes.push((note_id, argument));
         }
         self
     }
@@ -269,13 +258,13 @@ impl TransactionRequestBuilder {
     /// Consumes the builder and returns a [`TransactionRequest`] for a transaction to consume the
     /// specified notes.
     ///
-    /// - `note_ids` is a list of note IDs to be consumed.
+    /// - `notes` is a list of notes to be consumed.
     pub fn build_consume_notes(
         self,
-        note_ids: Vec<NoteId>,
+        notes: Vec<Note>, // TODO: SHOULD BE NOTE
     ) -> Result<TransactionRequest, TransactionRequestError> {
-        let input_notes = note_ids.into_iter().map(|id| (id, None));
-        self.authenticated_input_notes(input_notes).build()
+        let input_notes = notes.into_iter().map(|id| (id, None));
+        self.input_notes(input_notes).build()
     }
 
     /// Consumes the builder and returns a [`TransactionRequest`] for a transaction to mint fungible
@@ -424,8 +413,8 @@ impl TransactionRequestBuilder {
         };
 
         Ok(TransactionRequest {
-            unauthenticated_input_notes: self.unauthenticated_input_notes,
-            input_notes: self.input_notes,
+            input_notes: self.unauthenticated_input_notes,
+            input_notes_args: self.input_notes,
             script_template,
             expected_output_recipients: self.expected_output_recipients,
             expected_future_notes: self.expected_future_notes,

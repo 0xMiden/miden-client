@@ -12,7 +12,7 @@ use anyhow::{Context, Result};
 use miden_objects::account::auth::AuthSecretKey;
 use miden_objects::account::{Account, AccountId, AccountStorageMode};
 use miden_objects::asset::{Asset, FungibleAsset, TokenSymbol};
-use miden_objects::note::{NoteId, NoteType};
+use miden_objects::note::NoteType;
 use miden_objects::transaction::{OutputNote, TransactionId};
 use miden_objects::{Felt, FieldElement};
 use rand::RngCore;
@@ -427,7 +427,7 @@ pub async fn consume_notes(
 ) -> TransactionId {
     println!("Consuming Note...");
     let tx_request = TransactionRequestBuilder::new()
-        .build_consume_notes(input_notes.iter().map(Note::id).collect())
+        .build_consume_notes(input_notes.to_vec())
         .unwrap();
     Box::pin(client.submit_new_transaction(account_id, tx_request)).await.unwrap()
 }
@@ -457,14 +457,14 @@ pub async fn assert_account_has_single_asset(
 pub async fn assert_note_cannot_be_consumed_twice(
     client: &mut TestClient,
     consuming_account_id: AccountId,
-    note_to_consume_id: NoteId,
+    note_to_consume: Note,
 ) {
     // Check that we can't consume the P2ID note again
     println!("Consuming Note...");
 
     // Double-spend error expected to be received since we are consuming the same note
     let tx_request = TransactionRequestBuilder::new()
-        .build_consume_notes(vec![note_to_consume_id])
+        .build_consume_notes(vec![note_to_consume.clone()])
         .unwrap();
 
     match Box::pin(client.submit_new_transaction(consuming_account_id, tx_request)).await {
@@ -472,7 +472,7 @@ pub async fn assert_note_cannot_be_consumed_twice(
             TransactionRequestError::InputNoteAlreadyConsumed(_),
         )) => {},
         Ok(_) => panic!("Double-spend error: Note should not be consumable!"),
-        err => panic!("Unexpected error {:?} for note ID: {}", err, note_to_consume_id.to_hex()),
+        err => panic!("Unexpected error {:?} for note ID: {}", err, note_to_consume.id().to_hex()),
     }
 }
 
@@ -519,10 +519,7 @@ pub async fn execute_tx_and_consume_output_notes(
 
     Box::pin(client.submit_new_transaction(executor, tx_request)).await.unwrap();
 
-    let tx_request = TransactionRequestBuilder::new()
-        .unauthenticated_input_notes(output_notes)
-        .build()
-        .unwrap();
+    let tx_request = TransactionRequestBuilder::new().input_notes(output_notes).build().unwrap();
     Box::pin(client.submit_new_transaction(consumer, tx_request)).await.unwrap()
 }
 

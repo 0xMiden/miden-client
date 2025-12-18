@@ -201,7 +201,7 @@ pub async fn test_recall_note_before_ntx_consumes_it(client_config: ClientConfig
     client.apply_transaction(&bump_result, current_height).await?;
 
     let tx_request = TransactionRequestBuilder::new()
-        .unauthenticated_input_notes(vec![(network_note, None)])
+        .input_notes(vec![(network_note, None)])
         .build()?;
 
     let consume_result = client.execute_transaction(native_account.id(), tx_request).await?;

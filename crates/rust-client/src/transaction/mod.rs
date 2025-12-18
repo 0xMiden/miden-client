@@ -211,20 +211,29 @@ where
         // Validates the transaction request before executing
         self.validate_request(account_id, &transaction_request).await?;
 
-        // Ensure authenticated notes have their inclusion proofs (a.k.a they're in a committed
-        // state)
-        let authenticated_input_note_ids: Vec<NoteId> =
-            transaction_request.authenticated_input_note_ids().collect::<Vec<_>>();
-
-        let authenticated_note_records = self
+        // Retrieve all input notes from the store.
+        // But only mark as authenticated if they are committed or consumed.
+        let mut authenticated_note_records = self
             .store
-            .get_input_notes(NoteFilter::List(authenticated_input_note_ids))
+            .get_input_notes(NoteFilter::List(transaction_request.get_input_note_ids()))
             .await?;
+        authenticated_note_records.retain(|note| {
+            matches!(
+                note.state(),
+                InputNoteState::Committed(_)
+                    | InputNoteState::ConsumedAuthenticatedLocal(_)
+                    | InputNoteState::ConsumedExternal(_)
+            )
+        });
+
+        let authenticated_note_ids =
+            authenticated_note_records.iter().map(InputNoteRecord::id).collect::<Vec<_>>();
 
         // If tx request contains unauthenticated_input_notes we should insert them
         let unauthenticated_input_notes = transaction_request
             .unauthenticated_input_notes()
             .iter()
+            .filter(|n| !authenticated_note_ids.contains(&n.id()))
             .cloned()
             .map(Into::into)
             .collect::<Vec<_>>();
@@ -296,7 +305,6 @@ where
             .await?;
 
         validate_executed_transaction(&executed_transaction, &output_recipients)?;
-
         TransactionResult::new(executed_transaction, future_notes)
     }
 
@@ -592,17 +600,17 @@ where
     {
         // Get incoming asset notes excluding unauthenticated ones
         let incoming_notes_ids: Vec<_> = transaction_request
-            .input_notes()
+            .unauthenticated_input_notes()
             .iter()
-            .filter_map(|(note_id, _)| {
+            .filter_map(|note| {
                 if transaction_request
                     .unauthenticated_input_notes()
                     .iter()
-                    .any(|note| note.id() == *note_id)
+                    .any(|n| n.id() == note.id())
                 {
                     None
                 } else {
-                    Some(*note_id)
+                    Some(note.id())
                 }
             })
             .collect();

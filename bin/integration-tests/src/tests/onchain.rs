@@ -129,7 +129,7 @@ pub async fn test_onchain_notes_flow(client_config: ClientConfig) -> Result<()> 
         .clone();
     execute_tx_and_sync(&mut client_2, basic_wallet_1.id(), tx_request).await?;
 
-    let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![note.id()])?;
+    let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![note.clone()])?;
     execute_tx_and_sync(&mut client_2, basic_wallet_1.id(), tx_request).await?;
 
     // sync client 3 (basic account 2)
@@ -301,7 +301,8 @@ pub async fn test_onchain_accounts(client_config: ClientConfig) -> Result<()> {
 
     // Consume the note
     println!("Consuming note on second client...");
-    let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![notes[0].id()])?;
+    let tx_request = TransactionRequestBuilder::new()
+        .build_consume_notes(vec![notes[0].clone().try_into().unwrap()])?;
     execute_tx_and_sync(&mut client_2, to_account_id, tx_request).await?;
 
     // sync on first client

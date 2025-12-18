@@ -484,7 +484,7 @@ pub async fn test_sync_detail_values(client_config: ClientConfig) -> Result<()> 
         NoteType::Public,
         client1.rng(),
     )?;
-    let note_id = tx_request.expected_output_own_notes().pop().unwrap().id();
+    let note = tx_request.expected_output_own_notes().pop().unwrap();
     execute_tx_and_sync(&mut client1, from_account_id, tx_request).await?;
 
     // Second client sync should have new note
@@ -495,7 +495,7 @@ pub async fn test_sync_detail_values(client_config: ClientConfig) -> Result<()> 
     assert_eq!(new_details.updated_accounts.len(), 0);
 
     // Consume the note with the second account
-    let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![note_id]).unwrap();
+    let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![note]).unwrap();
     execute_tx_and_sync(&mut client2, to_account_id, tx_request).await?;
 
     // First client sync should have a new nullifier as the note was consumed
@@ -715,11 +715,11 @@ pub async fn test_consume_multiple_expected_notes(client_config: ClientConfig) -
 
     // Create and execute transactions
     let tx_request_1 = TransactionRequestBuilder::new()
-        .authenticated_input_notes(client_owned_notes.iter().map(|note| (note.id(), None)))
+        .input_notes(client_owned_notes.iter().map(|note| (note.clone(), None)))
         .build()?;
 
     let tx_request_2 = TransactionRequestBuilder::new()
-        .unauthenticated_input_notes(unauth_owned_notes.iter().map(|note| ((*note).clone(), None)))
+        .input_notes(unauth_owned_notes.iter().map(|note| ((*note).clone(), None)))
         .build()?;
 
     let tx_id_1 = client.submit_new_transaction(to_account_ids[0], tx_request_1).await.unwrap();
@@ -816,7 +816,9 @@ pub async fn test_import_consumed_note_with_proof(client_config: ClientConfig) -
     // Consume the note with the sender account
 
     println!("Consuming Note...");
-    let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![note.id()]).unwrap();
+    let tx_request = TransactionRequestBuilder::new()
+        .build_consume_notes(vec![note.clone().try_into().unwrap()])
+        .unwrap();
     execute_tx_and_sync(&mut client_1, from_account_id, tx_request).await?;
 
     // Import the consumed note
@@ -881,7 +883,9 @@ pub async fn test_import_consumed_note_with_id(client_config: ClientConfig) -> R
     // Consume the note with the sender account
 
     println!("Consuming Note...");
-    let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![note.id()]).unwrap();
+    let tx_request = TransactionRequestBuilder::new()
+        .build_consume_notes(vec![note.clone().try_into().unwrap()])
+        .unwrap();
     execute_tx_and_sync(&mut client_1, from_account_id, tx_request).await?;
     client_2.sync_state().await.unwrap();
 
@@ -1012,7 +1016,9 @@ pub async fn test_discarded_transaction(client_config: ClientConfig) -> Result<(
         .clone();
 
     println!("Consuming Note...");
-    let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![note.id()]).unwrap();
+    let tx_request = TransactionRequestBuilder::new()
+        .build_consume_notes(vec![note.clone().try_into().unwrap()])
+        .unwrap();
 
     // Consume the note in client 1 but dont submit it to the node
     let transaction_result =
@@ -1390,10 +1396,10 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
         NoteType::Public,
         client.rng(),
     )?;
-    let note_id = tx_request.expected_output_own_notes().pop().unwrap().id();
+    let note = tx_request.expected_output_own_notes().pop().unwrap();
     execute_tx_and_sync(&mut client, fungible_asset.faucet_id(), tx_request.clone()).await?;
 
-    let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![note_id])?;
+    let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![note.clone()])?;
     execute_tx_and_sync(&mut client, first_basic_account.id(), tx_request).await?;
 
     let nullifier = note.nullifier();
@@ -1483,7 +1489,12 @@ pub async fn test_ignore_invalid_notes(client_config: ClientConfig) -> Result<()
     // Create a transaction to consume all 4 notes but ignore the invalid ones
     let tx_request = TransactionRequestBuilder::new()
         .ignore_invalid_input_notes()
-        .build_consume_notes(vec![note_1.id(), note_3.id(), note_2.id(), note_4.id()])?;
+        .build_consume_notes(vec![
+            note_1.clone(),
+            note_3.clone(),
+            note_2.clone(),
+            note_4.clone(),
+        ])?;
 
     execute_tx_and_sync(&mut client, account_id, tx_request).await?;
 
