@@ -272,23 +272,29 @@ impl DataStore for ClientDataStore {
             match store.get_note_script(script_root).await {
                 Ok(note_script) => Ok(note_script),
                 Err(_) => {
-                    // If not found locally and RPC client is available, try fetching from the network
+                    // If not found locally and RPC client is available, try fetching from the
+                    // network
                     if let Some(rpc) = rpc_client {
                         match rpc.get_note_script_by_root(script_root).await {
                             Ok(note_script) => {
-                                // Cache the fetched script in the local store for future use
-                                if let Err(err) = store
+                                // Cache the fetched script in the local store for future use.
+                                // Since we know the script wasn't in the local store
+                                // (get_note_script failed),
+                                // upsert should effectively be an insert. If it fails (e.g., due to
+                                // database issues or concurrent
+                                // writes), we continue anyway since caching is just an
+                                // optimization - we still have the valid script to return.
+                                if let Err(_err) = store
                                     .upsert_note_scripts(core::slice::from_ref(&note_script))
                                     .await
                                 {
-                                    // Log but don't fail - we still have the script to return
-                                    // In a no_std environment, we can't easily log, so we just continue
-                                    let _ = err;
+                                    // In a no_std environment, we can't easily log, so we just
+                                    // continue
                                 }
                                 Ok(note_script)
                             },
                             Err(rpc_err) => Err(DataStoreError::other(format!(
-                                "Note script with root {script_root} not found locally or via RPC: {rpc_err}",
+                                "Note script with root {script_root} not found via RPC: {rpc_err}",
                             ))),
                         }
                     } else {
