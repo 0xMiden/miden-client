@@ -48,7 +48,6 @@ import {
   PublicKey,
   Rpo256,
   RpcClient,
-  SecretKey,
   Signature,
   SigningInputs,
   SigningInputsType,
@@ -136,7 +135,6 @@ declare global {
     Package: typeof Package;
     PublicKey: typeof PublicKey;
     Rpo256: typeof Rpo256;
-    SecretKey: typeof SecretKey;
     Signature: typeof Signature;
     SigningInputs: typeof SigningInputs;
     SigningInputsType: typeof SigningInputsType;
@@ -155,6 +153,7 @@ declare global {
     TransactionScript: typeof TransactionScript;
     TransactionScriptInputPair: typeof TransactionScriptInputPair;
     TransactionScriptInputPairArray: typeof TransactionScriptInputPairArray;
+    TransactionSummary: typeof TransactionSummary;
     RpcClient: typeof RpcClient;
     WebClient: typeof WebClient;
     Word: typeof Word;
@@ -174,6 +173,7 @@ declare global {
       waitForBlocks: (amountOfBlocks: number) => Promise<void>;
       refreshClient: (initSeed?: Uint8Array) => Promise<void>;
       parseNetworkId: (networkId: string) => NetworkId;
+      generateKeyWithScheme: (signatureScheme: string) => AuthSecretKey;
     };
   }
 }

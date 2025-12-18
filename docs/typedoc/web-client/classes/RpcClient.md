@@ -68,11 +68,10 @@ Array of [`NoteId`] objects to fetch
 
 `Promise`\<[`FetchedNote`](FetchedNote.md)[]\>
 
-Promise that resolves to  different data depending on the note type:
-- Private notes: Returns only `note_id` and `metadata`. The `input_note` field will be
-  `null`.
-- Public notes: Returns the full `input_note` with inclusion proof, alongside metadata and
-  ID.
+Promise that resolves to different data depending on the note type:
+- Private notes: Returns the `noteHeader`, and the  `inclusionProof`. The `note` field will
+  be `null`.
+- Public notes: Returns the full `note` with `inclusionProof`, alongside its header.
 
 ***
 
@@ -88,8 +87,10 @@ Fetches a note script by its root hash from the connected Miden node.
 
 [`Word`](Word.md)
 
+The root hash of the note script to fetch.
+
 #### Returns
 
 `Promise`\<[`NoteScript`](NoteScript.md)\>
 
-Promise that resolves to the `NoteScript`
+Promise that resolves to the `NoteScript`.

@@ -5,6 +5,7 @@ edition.workspace      = true
 keywords               = ["miden", "node", "protobuf", "rpc", "testing"]
 license.workspace      = true
 name                   = "node-builder"
+publish                = false
 readme                 = "README.md"
 repository.workspace   = true
 rust-version.workspace = true
@@ -22,6 +23,7 @@ miden-node-ntx-builder    = { workspace = true }
 miden-node-rpc            = { workspace = true }
 miden-node-store          = { workspace = true }
 miden-node-utils          = { features = ["testing", "tracing-forest"], workspace = true }
+miden-node-validator      = { workspace = true }
 miden-objects             = { workspace = true }
 
 # External dependencies

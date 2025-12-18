@@ -469,6 +469,8 @@ pub enum TransactionRequestError {
     StorageMapError(#[from] StorageMapError),
     #[error("asset vault error")]
     AssetVaultError(#[from] AssetVaultError),
+    #[error("unsupported authentication scheme ID: {0}")]
+    UnsupportedAuthSchemeId(u8),
 }
 
 // TESTS
@@ -478,11 +480,11 @@ pub enum TransactionRequestError {
 mod tests {
     use std::vec::Vec;
 
-    use miden_lib::account::auth::AuthRpoFalcon512;
+    use miden_lib::account::auth::{AuthEcdsaK256Keccak, AuthRpoFalcon512};
     use miden_lib::note::create_p2id_note;
     use miden_lib::testing::account_component::MockAccountComponent;
     use miden_objects::account::auth::PublicKeyCommitment;
-    use miden_objects::account::{AccountBuilder, AccountId, AccountType};
+    use miden_objects::account::{AccountBuilder, AccountComponent, AccountId, AccountType};
     use miden_objects::asset::FungibleAsset;
     use miden_objects::crypto::rand::{FeltRng, RpoRandomCoin};
     use miden_objects::note::{NoteTag, NoteType};
@@ -501,6 +503,22 @@ mod tests {
 
     #[test]
     fn transaction_request_serialization() {
+        assert_transaction_request_serialization_with(|| {
+            AuthRpoFalcon512::new(PublicKeyCommitment::from(EMPTY_WORD)).into()
+        });
+    }
+
+    #[test]
+    fn transaction_request_serialization_ecdsa() {
+        assert_transaction_request_serialization_with(|| {
+            AuthEcdsaK256Keccak::new(PublicKeyCommitment::from(EMPTY_WORD)).into()
+        });
+    }
+
+    fn assert_transaction_request_serialization_with<F>(auth_component: F)
+    where
+        F: FnOnce() -> AccountComponent,
+    {
         let sender_id = AccountId::try_from(ACCOUNT_ID_SENDER).unwrap();
         let target_id =
             AccountId::try_from(ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE).unwrap();
@@ -528,7 +546,7 @@ mod tests {
 
         let account = AccountBuilder::new(Default::default())
             .with_component(MockAccountComponent::with_empty_slots())
-            .with_auth_component(AuthRpoFalcon512::new(PublicKeyCommitment::from(EMPTY_WORD)))
+            .with_auth_component(auth_component())
             .account_type(AccountType::RegularAccountImmutableCode)
             .storage_mode(miden_objects::account::AccountStorageMode::Private)
             .build_existing()

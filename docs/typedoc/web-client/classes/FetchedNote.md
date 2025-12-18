@@ -6,15 +6,18 @@
 
 # Class: FetchedNote
 
-Represents a note fetched from a Miden node via RPC.
+Wrapper for a note fetched over RPC.
+
+It contains the note header and inclusion proof. The note details are only present for
+public notes.
 
 ## Constructors
 
 ### Constructor
 
-> **new FetchedNote**(`note_id`, `metadata`, `input_note?`): `FetchedNote`
+> **new FetchedNote**(`note_id`, `metadata`, `inclusion_proof`, `note?`): `FetchedNote`
 
-Create a note with an optional `InputNote`.
+Create a `FetchedNote` with an optional [`Note`].
 
 #### Parameters
 
@@ -26,9 +29,13 @@ Create a note with an optional `InputNote`.
 
 [`NoteMetadata`](NoteMetadata.md)
 
-##### input\_note?
+##### inclusion\_proof
 
-[`InputNote`](InputNote.md)
+[`NoteInclusionProof`](NoteInclusionProof.md)
+
+##### note?
+
+[`Note`](Note.md)
 
 #### Returns
 
@@ -36,14 +43,21 @@ Create a note with an optional `InputNote`.
 
 ## Properties
 
-### inputNote
+### header
 
-> `readonly` **inputNote**: [`InputNote`](InputNote.md)
+> `readonly` **header**: [`NoteHeader`](NoteHeader.md)
 
-The full [`InputNote`] with inclusion proof.
+The note's header, containing the ID and metadata.
 
-For public notes, it contains the complete note data and inclusion proof.
-For private notes, it will be ``None`.
+***
+
+### inclusionProof
+
+> `readonly` **inclusionProof**: [`NoteInclusionProof`](NoteInclusionProof.md)
+
+The note's inclusion proof.
+
+Contains the data required to prove inclusion of the note in the canonical chain.
 
 ***
 
@@ -53,6 +67,17 @@ For private notes, it will be ``None`.
 
 The note's metadata, including sender, tag, and other properties.
 Available for both private and public notes.
+
+***
+
+### note
+
+> `readonly` **note**: [`Note`](Note.md)
+
+The full [`Note`] data.
+
+For public notes, it contains the complete note data.
+For private notes, it will be undefined.
 
 ***
 
@@ -68,6 +93,8 @@ The unique identifier of the note.
 
 > `readonly` **noteType**: [`NoteType`](../enumerations/NoteType.md)
 
+Returns whether the note is private, encrypted, or public.
+
 ## Methods
 
 ### \[dispose\]()
@@ -77,6 +104,21 @@ The unique identifier of the note.
 #### Returns
 
 `void`
+
+***
+
+### asInputNote()
+
+> **asInputNote**(): [`InputNote`](InputNote.md)
+
+Returns an [`InputNote`] when the fetched note is public.
+
+Returns `undefined` when the note body is missing (e.g. private notes); in that case build
+an `InputNote` manually using the inclusion proof and note data obtained elsewhere.
+
+#### Returns
+
+[`InputNote`](InputNote.md)
 
 ***
 

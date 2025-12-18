@@ -10,7 +10,7 @@
 
 ### blockNum
 
-> **blockNum**: `string`
+> **blockNum**: `number`
 
 ***
 

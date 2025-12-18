@@ -52,6 +52,7 @@ test.describe("remote keystore", () => {
       await client.newWallet(
         window.AccountStorageMode.private(),
         true,
+        0,
         undefined
       );
 
@@ -97,6 +98,7 @@ test.describe("remote keystore", () => {
       const wallet = await client.newWallet(
         window.AccountStorageMode.private(),
         true,
+        0,
         undefined
       );
 
@@ -140,7 +142,9 @@ test.describe("remote keystore", () => {
         signPubKey = Array.from(publicKeyCommitment);
         const wasmSigningInputs =
           window.SigningInputs.deserialize(signingInputs);
-        const wasmSecretKey = window.SecretKey.deserialize(faucetSecretKey!);
+        const wasmSecretKey = window.AuthSecretKey.deserialize(
+          faucetSecretKey!
+        );
         const signature = wasmSecretKey.signData(wasmSigningInputs);
         const serializedSig = signature.serialize();
         return serializedSig;
@@ -169,6 +173,7 @@ test.describe("remote keystore", () => {
       const wallet = await client.newWallet(
         window.AccountStorageMode.private(),
         true,
+        0,
         undefined
       );
 

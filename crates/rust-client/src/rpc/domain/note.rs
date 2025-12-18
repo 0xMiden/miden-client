@@ -5,6 +5,7 @@ use miden_objects::crypto::merkle::{MerklePath, SparseMerklePath};
 use miden_objects::note::{
     Note,
     NoteDetails,
+    NoteHeader,
     NoteId,
     NoteInclusionProof,
     NoteMetadata,
@@ -28,8 +29,9 @@ impl TryFrom<proto::note::NoteId> for NoteId {
     type Error = RpcConversionError;
 
     fn try_from(value: proto::note::NoteId) -> Result<Self, Self::Error> {
-        Word::try_from(value.id.ok_or(proto::note::NoteId::missing_field(stringify!(id)))?)
-            .map(Into::into)
+        let word =
+            Word::try_from(value.id.ok_or(proto::note::NoteId::missing_field(stringify!(id)))?)?;
+        Ok(Self::from_raw(word))
     }
 }
 
@@ -104,24 +106,24 @@ pub struct NoteSyncInfo {
     pub notes: Vec<CommittedNote>,
 }
 
-impl TryFrom<proto::rpc_store::SyncNotesResponse> for NoteSyncInfo {
+impl TryFrom<proto::rpc::SyncNotesResponse> for NoteSyncInfo {
     type Error = RpcError;
 
-    fn try_from(value: proto::rpc_store::SyncNotesResponse) -> Result<Self, Self::Error> {
+    fn try_from(value: proto::rpc::SyncNotesResponse) -> Result<Self, Self::Error> {
         let chain_tip = value
             .pagination_info
-            .ok_or(proto::rpc_store::SyncNotesResponse::missing_field(stringify!(pagination_info)))?
+            .ok_or(proto::rpc::SyncNotesResponse::missing_field(stringify!(pagination_info)))?
             .chain_tip;
 
         // Validate and convert block header
         let block_header = value
             .block_header
-            .ok_or(proto::rpc_store::SyncNotesResponse::missing_field(stringify!(block_header)))?
+            .ok_or(proto::rpc::SyncNotesResponse::missing_field(stringify!(block_header)))?
             .try_into()?;
 
         let mmr_path = value
             .mmr_path
-            .ok_or(proto::rpc_store::SyncNotesResponse::missing_field(stringify!(mmr_path)))?
+            .ok_or(proto::rpc::SyncNotesResponse::missing_field(stringify!(mmr_path)))?
             .try_into()?;
 
         // Validate and convert account note inclusions into an (AccountId, Word) tuple
@@ -129,23 +131,19 @@ impl TryFrom<proto::rpc_store::SyncNotesResponse> for NoteSyncInfo {
         for note in value.notes {
             let note_id: NoteId = note
                 .note_id
-                .ok_or(proto::rpc_store::SyncNotesResponse::missing_field(stringify!(
-                    notes.note_id
-                )))?
+                .ok_or(proto::rpc::SyncNotesResponse::missing_field(stringify!(notes.note_id)))?
                 .try_into()?;
 
             let inclusion_path = note
                 .inclusion_path
-                .ok_or(proto::rpc_store::SyncNotesResponse::missing_field(stringify!(
+                .ok_or(proto::rpc::SyncNotesResponse::missing_field(stringify!(
                     notes.inclusion_path
                 )))?
                 .try_into()?;
 
             let metadata = note
                 .metadata
-                .ok_or(proto::rpc_store::SyncNotesResponse::missing_field(stringify!(
-                    notes.metadata
-                )))?
+                .ok_or(proto::rpc::SyncNotesResponse::missing_field(stringify!(notes.metadata)))?
                 .try_into()?;
 
             let committed_note = CommittedNote::new(
@@ -221,9 +219,9 @@ impl CommittedNote {
 /// Describes the possible responses from the `GetNotesById` endpoint for a single note.
 #[allow(clippy::large_enum_variant)]
 pub enum FetchedNote {
-    /// Details for a private note only include its [`NoteMetadata`] and [`NoteInclusionProof`].
+    /// Details for a private note only include its [`NoteHeader`] and [`NoteInclusionProof`].
     /// Other details needed to consume the note are expected to be stored locally, off-chain.
-    Private(NoteId, NoteMetadata, NoteInclusionProof),
+    Private(NoteHeader, NoteInclusionProof),
     /// Contains the full [`Note`] object alongside its [`NoteInclusionProof`].
     Public(Note, NoteInclusionProof),
 }
@@ -232,15 +230,16 @@ impl FetchedNote {
     /// Returns the note's inclusion details.
     pub fn inclusion_proof(&self) -> &NoteInclusionProof {
         match self {
-            FetchedNote::Private(_, _, inclusion_proof)
-            | FetchedNote::Public(_, inclusion_proof) => inclusion_proof,
+            FetchedNote::Private(_, inclusion_proof) | FetchedNote::Public(_, inclusion_proof) => {
+                inclusion_proof
+            },
         }
     }
 
     /// Returns the note's metadata.
     pub fn metadata(&self) -> &NoteMetadata {
         match self {
-            FetchedNote::Private(_, metadata, _) => metadata,
+            FetchedNote::Private(header, _) => header.metadata(),
             FetchedNote::Public(note, _) => note.metadata(),
         }
     }
@@ -248,7 +247,7 @@ impl FetchedNote {
     /// Returns the note's ID.
     pub fn id(&self) -> NoteId {
         match self {
-            FetchedNote::Private(id, ..) => *id,
+            FetchedNote::Private(header, _) => header.id(),
             FetchedNote::Public(note, _) => note.id(),
         }
     }
@@ -286,7 +285,8 @@ impl TryFrom<proto::note::CommittedNote> for FetchedNote {
 
             Ok(FetchedNote::Public(Note::new(assets, metadata, recipient), inclusion_proof))
         } else {
-            Ok(FetchedNote::Private(note_id, metadata, inclusion_proof))
+            let note_header = NoteHeader::new(note_id, metadata);
+            Ok(FetchedNote::Private(note_header, inclusion_proof))
         }
     }
 }

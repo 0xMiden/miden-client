@@ -1,6 +1,5 @@
 [package]
 authors.workspace      = true
-build                  = "build.rs"
 description            = "IndexedDB-backed Store implementation for miden-client (WASM)"
 edition.workspace      = true
 license.workspace      = true
@@ -14,7 +13,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 # Miden dependencies
-miden-client = { default-features = false, path = "../rust-client", version = "0.12" }
+miden-client = { default-features = false, path = "../rust-client" }
 
 # Workspace dependencies
 async-trait = { workspace = true }

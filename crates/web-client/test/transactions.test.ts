@@ -221,7 +221,8 @@ export const compileTxScript = async (
 
     let walletAccount = await client.newWallet(
       window.AccountStorageMode.private(),
-      true
+      true,
+      0
     );
 
     let builder = client.createScriptBuilder();

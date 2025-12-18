@@ -1,3 +1,4 @@
+use js_sys::Uint8Array;
 use miden_client::account::AccountId as NativeAccountId;
 use miden_client::address::{
     Address as NativeAddress,
@@ -12,7 +13,9 @@ use wasm_bindgen::prelude::wasm_bindgen;
 use super::account_id::{AccountId, NetworkId};
 use super::note_tag::NoteTag;
 use crate::js_error_with_context;
+use crate::utils::deserialize_from_uint8array;
 
+/// Representation of a Miden address (account ID plus routing parameters).
 #[wasm_bindgen(inspectable)]
 #[derive(Clone, Debug)]
 pub struct Address(NativeAddress);
@@ -25,10 +28,17 @@ pub enum AddressInterface {
 
 #[wasm_bindgen]
 impl Address {
+    /// Deserializes a byte array into an `Address`.
+    pub fn deserialize(bytes: &Uint8Array) -> Result<Address, JsValue> {
+        let native_address: NativeAddress = deserialize_from_uint8array(bytes)?;
+        Ok(Self(native_address))
+    }
+
     #[wasm_bindgen(js_name = "fromAccountId")]
     // Can't pass the proper AddressInterface enum here since wasm_bindgen does not derive the ref
     // trait for enum types. But we can still leave its definition since it gets exported as a
     // constant for the JS SDK.
+    /// Builds an address from an account ID and optional interface.
     pub fn from_account_id(
         account_id: &AccountId,
         interface: Option<String>,
@@ -44,7 +54,7 @@ impl Address {
             },
             Some(other_interface) => {
                 return Err(JsValue::from_str(&format!(
-                    "failed to build address from account id, wrong interface value given: {other_interface}"
+                    "Failed to build address from account id, wrong interface value given: {other_interface}"
                 )));
             },
         };
@@ -52,6 +62,7 @@ impl Address {
         Ok(Self(native_address))
     }
 
+    /// Builds an address from a bech32-encoded string.
     #[wasm_bindgen(js_name = fromBech32)]
     pub fn from_bech32(bech32: &str) -> Result<Self, JsValue> {
         let (_net_id, address) = NativeAddress::decode(bech32).map_err(|err| {
@@ -60,13 +71,15 @@ impl Address {
         Ok(Self(address))
     }
 
+    /// Returns the address interface.
     pub fn interface(&self) -> Result<AddressInterface, JsValue> {
         match self.0.interface() {
             Some(interface) => interface.try_into(),
-            None => Err(JsValue::from_str("address has no specified interface")),
+            None => Err(JsValue::from_str("Address has no specified interface")),
         }
     }
 
+    /// Returns the account ID embedded in the address.
     #[wasm_bindgen(js_name = "accountId")]
     pub fn account_id(&self) -> Result<AccountId, JsValue> {
         match &self.0.id() {
@@ -75,11 +88,13 @@ impl Address {
         }
     }
 
+    /// Converts the address into a note tag.
     #[wasm_bindgen(js_name = "toNoteTag")]
     pub fn to_note_tag(&self) -> NoteTag {
         self.0.to_note_tag().into()
     }
 
+    /// Encodes the address using the provided network prefix.
     #[wasm_bindgen(js_name = "toBech32")]
     pub fn to_bech32(&self, network_id: NetworkId) -> Result<String, JsValue> {
         let net_id: NativeNetworkId = network_id.into();

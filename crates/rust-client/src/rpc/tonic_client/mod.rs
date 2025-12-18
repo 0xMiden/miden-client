@@ -18,7 +18,7 @@ use miden_tx::utils::sync::RwLock;
 use tonic::Status;
 use tracing::info;
 
-use super::domain::account::{AccountProof, AccountProofs, AccountUpdateSummary};
+use super::domain::account::{AccountProof, AccountUpdateSummary};
 use super::domain::note::FetchedNote;
 use super::domain::nullifier::NullifierUpdate;
 use super::{
@@ -34,9 +34,9 @@ use crate::rpc::domain::account_vault::AccountVaultInfo;
 use crate::rpc::domain::storage_map::StorageMapInfo;
 use crate::rpc::domain::transaction::TransactionsInfo;
 use crate::rpc::errors::{AcceptHeaderError, GrpcError, RpcConversionError};
-use crate::rpc::generated as proto;
-use crate::rpc::generated::rpc_store::BlockRange;
-use crate::rpc::generated::rpc_store::account_proof_request::account_detail_request::StorageMapDetailRequest;
+use crate::rpc::generated::rpc::BlockRange;
+use crate::rpc::generated::rpc::account_proof_request::account_detail_request::StorageMapDetailRequest;
+use crate::rpc::{AccountStateAt, NOTE_IDS_LIMIT, NULLIFIER_PREFIXES_LIMIT, generated as proto};
 use crate::transaction::ForeignAccount;
 
 mod api_client;
@@ -103,19 +103,20 @@ impl GrpcClient {
 impl NodeRpcClient for GrpcClient {
     /// Sets the genesis commitment for the client. If the client is already connected, it will be
     /// updated to use the new commitment on subsequent requests. If the client is not connected,
-    /// the commitment will be used when it connects. If the genesis commitment is already set,
-    /// this method does nothing.
+    /// the commitment will be stored and used when the client connects. If the genesis commitment
+    /// is already set, this method does nothing.
     async fn set_genesis_commitment(&self, commitment: Word) -> Result<(), RpcError> {
-        self.ensure_connected().await?;
-
+        // Check if already set before doing anything else
         if self.genesis_commitment.read().is_some() {
             // Genesis commitment is already set, ignoring the new value.
             return Ok(());
         }
 
+        // Store the commitment for future connections
         self.genesis_commitment.write().replace(commitment);
 
-        // If a client is connected, we modify it to use the new genesis commitment.
+        // If a client is already connected, update it to use the new genesis commitment.
+        // If not connected, the commitment will be used when connect() is called.
         let mut client_guard = self.client.write();
         if let Some(client) = client_guard.as_mut() {
             client.set_genesis_commitment(commitment);
@@ -140,7 +141,7 @@ impl NodeRpcClient for GrpcClient {
             RpcError::from_grpc_error(NodeRpcClientEndpoint::SubmitProvenTx, status)
         })?;
 
-        Ok(BlockNumber::from(api_response.into_inner().block_height))
+        Ok(BlockNumber::from(api_response.into_inner().block_num))
     }
 
     async fn get_block_header_by_number(
@@ -148,7 +149,7 @@ impl NodeRpcClient for GrpcClient {
         block_num: Option<BlockNumber>,
         include_mmr_proof: bool,
     ) -> Result<(BlockHeader, Option<MmrProof>), RpcError> {
-        let request = proto::shared::BlockHeaderByNumberRequest {
+        let request = proto::rpc::BlockHeaderByNumberRequest {
             block_num: block_num.as_ref().map(BlockNumber::as_u32),
             include_mmr_proof: Some(include_mmr_proof),
         };
@@ -190,24 +191,28 @@ impl NodeRpcClient for GrpcClient {
     }
 
     async fn get_notes_by_id(&self, note_ids: &[NoteId]) -> Result<Vec<FetchedNote>, RpcError> {
-        let request = proto::note::NoteIdList {
-            ids: note_ids.iter().map(|id| (*id).into()).collect(),
-        };
+        let mut notes = Vec::with_capacity(note_ids.len());
+        for chunk in note_ids.chunks(NOTE_IDS_LIMIT) {
+            let request = proto::note::NoteIdList {
+                ids: chunk.iter().map(|id| (*id).into()).collect(),
+            };
 
-        let mut rpc_api = self.ensure_connected().await?;
+            let mut rpc_api = self.ensure_connected().await?;
 
-        let api_response = rpc_api.get_notes_by_id(request).await.map_err(|status| {
-            RpcError::from_grpc_error(NodeRpcClientEndpoint::GetNotesById, status)
-        })?;
+            let api_response = rpc_api.get_notes_by_id(request).await.map_err(|status| {
+                RpcError::from_grpc_error(NodeRpcClientEndpoint::GetNotesById, status)
+            })?;
 
-        let response_notes = api_response
-            .into_inner()
-            .notes
-            .into_iter()
-            .map(FetchedNote::try_from)
-            .collect::<Result<Vec<FetchedNote>, RpcConversionError>>()?;
+            let response_notes = api_response
+                .into_inner()
+                .notes
+                .into_iter()
+                .map(FetchedNote::try_from)
+                .collect::<Result<Vec<FetchedNote>, RpcConversionError>>()?;
 
-        Ok(response_notes)
+            notes.extend(response_notes);
+        }
+        Ok(notes)
     }
 
     /// Sends a sync state request to the Miden node, validates and converts the response
@@ -222,7 +227,7 @@ impl NodeRpcClient for GrpcClient {
 
         let note_tags = note_tags.iter().map(|&note_tag| note_tag.into()).collect();
 
-        let request = proto::rpc_store::SyncStateRequest {
+        let request = proto::rpc::SyncStateRequest {
             block_num: block_num.as_u32(),
             account_ids,
             note_tags,
@@ -282,93 +287,96 @@ impl NodeRpcClient for GrpcClient {
         }
     }
 
-    /// Sends a `GetAccountProofs` request to the Miden node, and extracts a list of [AccountProof]
-    /// from the response, as well as the block number that they were retrieved for.
+    /// Sends a `GetAccountProof` request to the Miden node, and extracts the [AccountProof]
+    /// from the response, as well as the block number that it was retrieved for.
     ///
     /// # Errors
     ///
     /// This function will return an error if:
     ///
-    /// - One of the requested Accounts isn't returned by the node.
+    /// - The requested Account isn't returned by the node.
     /// - There was an error sending the request to the node.
     /// - The answer had a `None` for one of the expected fields.
     /// - There is an error during storage deserialization.
-    async fn get_account_proofs(
+    async fn get_account_proof(
         &self,
-        account_requests: &BTreeSet<ForeignAccount>,
-        known_account_codes: BTreeMap<AccountId, AccountCode>,
-    ) -> Result<AccountProofs, RpcError> {
-        let (header, _) = self.get_block_header_by_number(None, false).await?;
-        if account_requests.is_empty() {
-            return Ok((header.block_num(), Vec::new()));
+        foreign_account: ForeignAccount,
+        account_state: AccountStateAt,
+        known_account_code: Option<AccountCode>,
+    ) -> Result<(BlockNumber, AccountProof), RpcError> {
+        let mut known_codes_by_commitment: BTreeMap<Word, AccountCode> = BTreeMap::new();
+        if let Some(account_code) = known_account_code {
+            known_codes_by_commitment.insert(account_code.commitment(), account_code);
         }
-
-        let known_codes_by_commitment: BTreeMap<Word, AccountCode> =
-            known_account_codes.values().cloned().map(|c| (c.commitment(), c)).collect();
 
         let mut rpc_api = self.ensure_connected().await?;
 
-        let block_num = header.block_num();
-        let mut account_proofs = Vec::with_capacity(account_requests.len());
-
         // Request proofs one-by-one using the singular API
-        for foreign_account in account_requests {
-            let account_id = foreign_account.account_id();
-            let storage_requirements = foreign_account.storage_slot_requirements();
+        let account_id = foreign_account.account_id();
+        let storage_requirements = foreign_account.storage_slot_requirements();
 
-            let storage_maps: Vec<StorageMapDetailRequest> = storage_requirements.clone().into();
+        let storage_maps: Vec<StorageMapDetailRequest> = storage_requirements.clone().into();
 
-            // Only request details for public accounts; include known code commitment for this
-            // account when available
-            let account_details = if account_id.is_public() {
-                Some(proto::rpc_store::account_proof_request::AccountDetailRequest {
-                    code_commitment: Some(EMPTY_WORD.into()),
-                    // TODO: implement a way to request asset vaults
-                    // https://github.com/0xMiden/miden-client/issues/1412
-                    asset_vault_commitment: None,
-                    storage_maps,
-                })
-            } else {
-                None
-            };
+        // Only request details for public accounts; include known code commitment for this
+        // account when available
+        let account_details = if account_id.is_public() {
+            Some(proto::rpc::account_proof_request::AccountDetailRequest {
+                code_commitment: Some(EMPTY_WORD.into()),
+                // TODO: implement a way to request asset vaults
+                // https://github.com/0xMiden/miden-client/issues/1412
+                asset_vault_commitment: None,
+                storage_maps,
+            })
+        } else {
+            None
+        };
 
-            let request = proto::rpc_store::AccountProofRequest {
-                account_id: Some(account_id.into()),
-                block_num: Some(block_num.into()),
-                details: account_details,
-            };
+        let block_num = match account_state {
+            AccountStateAt::Block(number) => Some(number.into()),
+            AccountStateAt::ChainTip => None,
+        };
 
-            let response = rpc_api
-                .get_account_proof(request)
-                .await
-                .map_err(|status| {
-                    RpcError::from_grpc_error(NodeRpcClientEndpoint::GetAccountProofs, status)
-                })?
-                .into_inner();
+        let request = proto::rpc::AccountProofRequest {
+            account_id: Some(account_id.into()),
+            block_num,
+            details: account_details,
+        };
 
-            let account_witness: AccountWitness = response
-                .witness
-                .ok_or(RpcError::ExpectedDataMissing("AccountWitness".to_string()))?
-                .try_into()?;
+        let response = rpc_api
+            .get_account_proof(request)
+            .await
+            .map_err(|status| {
+                RpcError::from_grpc_error(NodeRpcClientEndpoint::GetAccountProofs, status)
+            })?
+            .into_inner();
 
-            // For public accounts, details should be present when requested
-            let headers = if account_witness.id().is_public() {
-                Some(
-                    response
-                        .details
-                        .ok_or(RpcError::ExpectedDataMissing("Account.Details".to_string()))?
-                        .into_domain(&known_codes_by_commitment)?,
-                )
-            } else {
-                None
-            };
+        let account_witness: AccountWitness = response
+            .witness
+            .ok_or(RpcError::ExpectedDataMissing("AccountWitness".to_string()))?
+            .try_into()?;
 
-            let proof = AccountProof::new(account_witness, headers)
-                .map_err(|err| RpcError::InvalidResponse(err.to_string()))?;
-            account_proofs.push(proof);
-        }
+        // For public accounts, details should be present when requested
+        let headers = if account_witness.id().is_public() {
+            Some(
+                response
+                    .details
+                    .ok_or(RpcError::ExpectedDataMissing("Account.Details".to_string()))?
+                    .into_domain(&known_codes_by_commitment)?,
+            )
+        } else {
+            None
+        };
 
-        Ok((block_num, account_proofs))
+        let proof = AccountProof::new(account_witness, headers)
+            .map_err(|err| RpcError::InvalidResponse(err.to_string()))?;
+
+        let block_num = response
+            .block_num
+            .ok_or(RpcError::ExpectedDataMissing("response block num".to_string()))?
+            .block_num
+            .into();
+
+        Ok((block_num, proof))
     }
 
     /// Sends a `SyncNoteRequest` to the Miden node, and extracts a [`NoteSyncInfo`] from the
@@ -386,7 +394,7 @@ impl NodeRpcClient for GrpcClient {
             block_to: block_to.map(|b| b.as_u32()),
         });
 
-        let request = proto::rpc_store::SyncNotesRequest { block_range, note_tags };
+        let request = proto::rpc::SyncNotesRequest { block_range, note_tags };
 
         let mut rpc_api = self.ensure_connected().await?;
 
@@ -405,92 +413,90 @@ impl NodeRpcClient for GrpcClient {
     ) -> Result<Vec<NullifierUpdate>, RpcError> {
         const MAX_ITERATIONS: u32 = 1000; // Safety limit to prevent infinite loops
 
-        let mut all_nullifiers = Vec::new();
-        let mut seen_nullifiers = BTreeSet::new();
-        let mut current_block_from = block_num.as_u32();
+        let mut all_nullifiers = BTreeSet::new();
 
         // Establish RPC connection once before the loop
         let mut rpc_api = self.ensure_connected().await?;
 
-        for _ in 0..MAX_ITERATIONS {
-            let request = proto::rpc_store::SyncNullifiersRequest {
-                nullifiers: prefixes.iter().map(|&x| u32::from(x)).collect(),
-                prefix_len: 16,
-                block_range: Some(BlockRange {
-                    block_from: current_block_from,
-                    block_to: block_to.map(|b| b.as_u32()),
-                }),
-            };
+        // If the prefixes are too many, we need to chunk them into smaller groups to avoid
+        // violating the RPC limit.
+        'chunk_nullifiers: for chunk in prefixes.chunks(NULLIFIER_PREFIXES_LIMIT) {
+            let mut current_block_from = block_num.as_u32();
 
-            let response = rpc_api.sync_nullifiers(request).await.map_err(|status| {
-                RpcError::from_grpc_error(NodeRpcClientEndpoint::SyncNullifiers, status)
-            })?;
-            let response = response.into_inner();
+            for _ in 0..MAX_ITERATIONS {
+                let request = proto::rpc::SyncNullifiersRequest {
+                    nullifiers: chunk.iter().map(|&x| u32::from(x)).collect(),
+                    prefix_len: 16,
+                    block_range: Some(BlockRange {
+                        block_from: current_block_from,
+                        block_to: block_to.map(|b| b.as_u32()),
+                    }),
+                };
 
-            // Convert nullifiers for this batch
-            let batch_nullifiers = response
-                .nullifiers
-                .iter()
-                .map(TryFrom::try_from)
-                .collect::<Result<Vec<NullifierUpdate>, _>>()
-                .map_err(|err| RpcError::InvalidResponse(err.to_string()))?;
+                let response = rpc_api.sync_nullifiers(request).await.map_err(|status| {
+                    RpcError::from_grpc_error(NodeRpcClientEndpoint::SyncNullifiers, status)
+                })?;
+                let response = response.into_inner();
 
-            // Check for duplicates and add to results
-            for nullifier_update in batch_nullifiers {
-                if !seen_nullifiers.insert(nullifier_update.nullifier) {
-                    return Err(RpcError::InvalidResponse(
-                        "duplicate nullifier found in response".to_string(),
-                    ));
-                }
-                all_nullifiers.push(nullifier_update);
-            }
+                // Convert nullifiers for this batch
+                let batch_nullifiers = response
+                    .nullifiers
+                    .iter()
+                    .map(TryFrom::try_from)
+                    .collect::<Result<Vec<NullifierUpdate>, _>>()
+                    .map_err(|err| RpcError::InvalidResponse(err.to_string()))?;
 
-            // Check if we need to fetch more pages
-            if let Some(page) = response.pagination_info {
-                // Ensure we're making progress to avoid infinite loops
-                if page.block_num < current_block_from {
-                    return Err(RpcError::InvalidResponse(
-                        "invalid pagination: block_num went backwards".to_string(),
-                    ));
-                }
+                all_nullifiers.extend(batch_nullifiers);
 
-                // Calculate target block as minimum between block_to and chain_tip
-                let target_block =
-                    block_to.map_or(page.chain_tip, |b| b.as_u32().min(page.chain_tip));
+                // Check if we need to fetch more pages
+                if let Some(page) = response.pagination_info {
+                    // Ensure we're making progress to avoid infinite loops
+                    if page.block_num < current_block_from {
+                        return Err(RpcError::InvalidResponse(
+                            "invalid pagination: block_num went backwards".to_string(),
+                        ));
+                    }
 
-                if page.block_num < target_block {
+                    // Calculate target block as minimum between block_to and chain_tip
+                    let target_block =
+                        block_to.map_or(page.chain_tip, |b| b.as_u32().min(page.chain_tip));
+
+                    if page.block_num >= target_block {
+                        // No pagination info or we've reached/passed the target so we're done
+                        continue 'chunk_nullifiers;
+                    }
                     current_block_from = page.block_num + 1;
-                    continue;
                 }
             }
-            // No pagination info or we've reached/passed the target so we're done
-            return Ok(all_nullifiers);
+            // If we exit the loop, we've hit the iteration limit
+            return Err(RpcError::InvalidResponse(
+                "too many pagination iterations, possible infinite loop".to_string(),
+            ));
         }
-
-        // If we exit the loop, we've hit the iteration limit
-        Err(RpcError::InvalidResponse(
-            "too many pagination iterations, possible infinite loop".to_string(),
-        ))
+        Ok(all_nullifiers.into_iter().collect::<Vec<_>>())
     }
 
     async fn check_nullifiers(&self, nullifiers: &[Nullifier]) -> Result<Vec<SmtProof>, RpcError> {
-        let request = proto::rpc_store::NullifierList {
-            nullifiers: nullifiers.iter().map(|nul| nul.as_word().into()).collect(),
-        };
+        let mut proofs: Vec<SmtProof> = Vec::with_capacity(nullifiers.len());
+        for chunk in nullifiers.chunks(NULLIFIER_PREFIXES_LIMIT) {
+            let request = proto::rpc::NullifierList {
+                nullifiers: chunk.iter().map(|nul| nul.as_word().into()).collect(),
+            };
 
-        let mut rpc_api = self.ensure_connected().await?;
+            let mut rpc_api = self.ensure_connected().await?;
 
-        let response = rpc_api.check_nullifiers(request).await.map_err(|status| {
-            RpcError::from_grpc_error(NodeRpcClientEndpoint::CheckNullifiers, status)
-        })?;
+            let response = rpc_api.check_nullifiers(request).await.map_err(|status| {
+                RpcError::from_grpc_error(NodeRpcClientEndpoint::CheckNullifiers, status)
+            })?;
 
-        let mut response = response.into_inner();
-        let proofs = response
-            .proofs
-            .iter_mut()
-            .map(|r| r.to_owned().try_into())
-            .collect::<Result<_, _>>()?;
-
+            let mut response = response.into_inner();
+            let chunk_proofs = response
+                .proofs
+                .iter_mut()
+                .map(|r| r.to_owned().try_into())
+                .collect::<Result<Vec<SmtProof>, RpcConversionError>>()?;
+            proofs.extend(chunk_proofs);
+        }
         Ok(proofs)
     }
 
@@ -542,7 +548,7 @@ impl NodeRpcClient for GrpcClient {
             block_to: block_to.map(|b| b.as_u32()),
         });
 
-        let request = proto::rpc_store::SyncStorageMapsRequest {
+        let request = proto::rpc::SyncStorageMapsRequest {
             block_range,
             account_id: Some(account_id.into()),
         };
@@ -567,7 +573,7 @@ impl NodeRpcClient for GrpcClient {
             block_to: block_to.map(|b| b.as_u32()),
         });
 
-        let request = proto::rpc_store::SyncAccountVaultRequest {
+        let request = proto::rpc::SyncAccountVaultRequest {
             block_range,
             account_id: Some(account_id.into()),
         };
@@ -594,7 +600,7 @@ impl NodeRpcClient for GrpcClient {
 
         let account_ids = account_ids.iter().map(|acc_id| (*acc_id).into()).collect();
 
-        let request = proto::rpc_store::SyncTransactionsRequest { block_range, account_ids };
+        let request = proto::rpc::SyncTransactionsRequest { block_range, account_ids };
 
         let mut rpc_api = self.ensure_connected().await?;
 

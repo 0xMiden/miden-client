@@ -6,6 +6,7 @@ use miden_client::account::Account;
 use miden_client::store::{StoreError, TransactionFilter};
 use miden_client::transaction::{
     TransactionDetails,
+    TransactionId,
     TransactionRecord,
     TransactionScript,
     TransactionStatus,
@@ -70,7 +71,12 @@ impl WebStore {
 
                 let status = TransactionStatus::read_from_bytes(&tx_idxdb.status)?;
 
-                Ok(TransactionRecord { id: id.into(), details, script, status })
+                Ok(TransactionRecord {
+                    id: TransactionId::from_raw(id),
+                    details,
+                    script,
+                    status,
+                })
             })
             .collect();
 
@@ -95,7 +101,8 @@ impl WebStore {
             .get_account(delta.id())
             .await?
             .ok_or(StoreError::AccountDataNotFound(delta.id()))?
-            .into();
+            .try_into()
+            .map_err(|_| StoreError::AccountDataNotFound(delta.id()))?;
 
         if delta.is_full_state() {
             account =

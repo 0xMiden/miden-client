@@ -6,6 +6,8 @@
 
 # Class: Signature
 
+Cryptographic signature produced by supported auth schemes.
+
 ## Methods
 
 ### \[dispose\]()
@@ -32,6 +34,8 @@
 
 > **serialize**(): `Uint8Array`
 
+Serializes the signature into bytes.
+
 #### Returns
 
 `Uint8Array`
@@ -40,7 +44,15 @@
 
 ### toPreparedSignature()
 
-> **toPreparedSignature**(): [`Felt`](Felt.md)[]
+> **toPreparedSignature**(`message`): [`Felt`](Felt.md)[]
+
+Converts the signature to the prepared field elements expected by verifying code.
+
+#### Parameters
+
+##### message
+
+[`Word`](Word.md)
 
 #### Returns
 
@@ -51,6 +63,8 @@
 ### deserialize()
 
 > `static` **deserialize**(`bytes`): `Signature`
+
+Deserializes a signature from bytes.
 
 #### Parameters
 

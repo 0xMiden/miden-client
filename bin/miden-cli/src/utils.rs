@@ -6,9 +6,9 @@ use miden_client::Client;
 use miden_client::account::AccountId;
 use miden_client::address::{Address, AddressId};
 
-use super::config::CliConfig;
 use super::{CLIENT_CONFIG_FILE_NAME, get_account_with_id_prefix};
 use crate::commands::account::DEFAULT_ACCOUNT_ID_KEY;
+use crate::config::{CliConfig, get_global_miden_dir, get_local_miden_dir};
 use crate::errors::CliError;
 use crate::faucet_details_map::FaucetDetailsMap;
 
@@ -77,18 +77,55 @@ pub(crate) async fn parse_account_id<AUTH>(
     }
 }
 
-/// Loads config file from current directory and default filename and returns it alongside its path.
+/// Loads config file from .miden directory with priority: local miden directory first, then global
+/// fallback.
 ///
-/// This function will look for the configuration file at the provided path. If the path is
-/// relative, searches in parent directories all the way to the root as well.
+/// This function will look for the configuration file at the .miden/miden-client.toml path in the
+/// following order:
+///   - Local miden directory in current working directory
+///   - Global miden directory in home directory
+///
+/// Note: Relative paths in the config are resolved relative to the .miden directory.
 pub(super) fn load_config_file() -> Result<(CliConfig, PathBuf), CliError> {
-    let mut current_dir = std::env::current_dir()?;
-    current_dir.push(CLIENT_CONFIG_FILE_NAME);
-    let config_path = current_dir.as_path();
+    let local_miden_dir = get_local_miden_dir()?;
+    let mut config_path = local_miden_dir.join(CLIENT_CONFIG_FILE_NAME);
 
-    let cli_config = load_config(config_path)?;
+    if !config_path.exists() {
+        let global_miden_dir = get_global_miden_dir().map_err(|e| {
+            CliError::Config(Box::new(e), "Failed to determine global config directory".to_string())
+        })?;
+        config_path = global_miden_dir.join(CLIENT_CONFIG_FILE_NAME);
 
-    Ok((cli_config, config_path.into()))
+        if !config_path.exists() {
+            return Err(CliError::Config(
+                "No configuration file found".to_string().into(),
+                    "Neither local nor global config file exists. Run 'miden-client init' to create one.".to_string()
+            ));
+        }
+    }
+    let mut cli_config = load_config(config_path.as_path())?;
+    let config_dir = config_path.parent().unwrap();
+
+    resolve_relative_path(&mut cli_config.store_filepath, config_dir);
+    resolve_relative_path(&mut cli_config.secret_keys_directory, config_dir);
+    resolve_relative_path(&mut cli_config.token_symbol_map_filepath, config_dir);
+    resolve_relative_path(&mut cli_config.package_directory, config_dir);
+
+    Ok((cli_config, config_path))
+}
+
+/// Checks if either local or global configuration file exists.
+pub(super) fn config_file_exists() -> Result<bool, CliError> {
+    let local_miden_dir = get_local_miden_dir()?;
+    if local_miden_dir.join(CLIENT_CONFIG_FILE_NAME).exists() {
+        return Ok(true);
+    }
+
+    let global_miden_dir = get_global_miden_dir().map_err(|e| {
+        CliError::Config(Box::new(e), "Failed to determine global config directory".to_string())
+    })?;
+
+    Ok(global_miden_dir.join(CLIENT_CONFIG_FILE_NAME).exists())
 }
 
 /// Loads the client configuration.
@@ -102,4 +139,12 @@ fn load_config(config_file: &Path) -> Result<CliConfig, CliError> {
 pub fn load_faucet_details_map() -> Result<FaucetDetailsMap, CliError> {
     let (config, _) = load_config_file()?;
     FaucetDetailsMap::new(config.token_symbol_map_filepath)
+}
+
+/// Resolves a relative path against a base directory.
+/// If the path is already absolute, it remains unchanged.
+fn resolve_relative_path(path: &mut PathBuf, base_dir: &Path) {
+    if path.is_relative() {
+        *path = base_dir.join(&*path);
+    }
 }

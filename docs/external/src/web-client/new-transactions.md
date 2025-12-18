@@ -108,7 +108,7 @@ import { NoteType, TransactionProver, WebClient } from "@demox-labs/miden-sdk";
 try {
     const webClient = await WebClient.createClient();
 
-    const remoteProver = TransactionProver.newRemoteProver("https://prover.example.com");
+    const remoteProver = TransactionProver.newRemoteProver("https://prover.example.com", 10_000);
 
     const transactionRequest = webClient.newMintTransactionRequest(
         targetAccountId,
@@ -263,7 +263,7 @@ import {
     NoteMetadata,
     NoteTag,
     NoteType,
-    OutputNotesArray,
+    OutputNoteArray,
     TransactionProver,
     TransactionRequestBuilder,
     TransactionScript,
@@ -302,7 +302,7 @@ try {
     const transactionScript = new TransactionScript(noteScript);
 
     // Create output notes array
-    const outputNotes = new OutputNotesArray();
+    const outputNotes = new OutputNoteArray();
     // Add your output notes here
 
     // Create expected notes array

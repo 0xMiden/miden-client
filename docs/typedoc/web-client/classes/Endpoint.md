@@ -6,10 +6,10 @@
 
 # Class: Endpoint
 
-Represents a network endpoint for connecting to Miden nodes.
+The `Endpoint` struct represents a network endpoint, consisting of a protocol, a host, and a
+port.
 
-An endpoint consists of a protocol (http/https), host, and optional port.
-Provides convenient constructors for common network configurations.
+This struct is used to define the address of a Miden node that the client will connect to.
 
 ## Constructors
 

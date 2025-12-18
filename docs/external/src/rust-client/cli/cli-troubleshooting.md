@@ -1,3 +1,8 @@
+---
+title: Troubleshooting
+sidebar-position: 3
+---
+
 ## Troubleshooting and transaction lifecycle (CLI)
 
 This guide helps you troubleshoot common issues and understand the end-to-end lifecycle of transactions and notes in the Miden client.
@@ -6,9 +11,9 @@ This guide helps you troubleshoot common issues and understand the end-to-end li
 
 > Note: This section applies to the Miden CLI client. Guidance for the Rust and Web clients may differ.
 
-- Ensure you are running commands in the same directory that contains `miden-client.toml`.
-- If you need a clean local state, delete the SQLite store file referenced by `store_filepath` (default: `store.sqlite3`). It will be recreated automatically on the next command.
-- Verify your node RPC endpoint is reachable and correct in `miden-client.toml`.
+- Ensure you have a proper configuration setup: either a global config at `~/.miden/miden-client.toml` or a local config at `./.miden/miden-client.toml`. Local config takes priority if both exist.
+- If you need a clean local state, delete the SQLite store file referenced by `store_filepath` (default: `.miden/store.sqlite3`). It will be recreated automatically on the next command.
+- Verify your node RPC endpoint is reachable and correct in your configuration file (local `.miden/miden-client.toml` or global `~/.miden/miden-client.toml`).
 - Run with debug output when troubleshooting: add `--debug` or set `MIDEN_DEBUG=true`.
 - Run `miden-client sync` to refresh local state after errors involving missing data or outdated heights.
 
@@ -40,7 +45,7 @@ Below are representative errors you may encounter, their likely causes, and sugg
 
 #### `RpcError.GrpcError: Unavailable` / `DeadlineExceeded`
 - Cause: Node is down, unreachable, or behind a load balancer that blocked the request.
-- Fix: Check `rpc.endpoint` in `miden-client.toml`, verify the node is running/accessible, and retry.
+- Fix: Check `rpc.endpoint` in your configuration file (local `.miden/miden-client.toml` or global `~/.miden/miden-client.toml`), verify the node is running/accessible, and retry.
 
 #### `RpcError.InvalidArgument` / `ExpectedDataMissing` / `InvalidResponse`
 - Cause: Malformed request parameters or unexpected server response.
@@ -112,14 +117,28 @@ Key states the CLI surfaces:
 - Transaction status: `Pending` (after execution), `Committed` (after node inclusion), `Discarded` (not included).
 - Input notes: `Expected` → `Processing` → `Consumed` (after sync) or `Committed` if fetched with inclusion.
 
+### Configuration troubleshooting
+
+#### Config priority confusion
+- **Issue**: Unclear which configuration is being used (local vs global)
+- **Check**: Run commands from different directories to see if behavior changes
+- **Local priority**: If `./.miden/miden-client.toml` exists, it overrides `~/.miden/miden-client.toml`
+- **Fix**: Use `miden-client clear-config` to remove unwanted configurations, or `miden-client clear-config --global` to remove only global config. Note: Running `miden-client clear-config` without flags follows priority: if a local .miden folder exists, it removes only that one; if no local folder exists, it removes the global one. Use `--global` to specifically target the global configuration regardless of local config presence.
+
+#### Clean configuration reset
+- **Complete reset**: Use `miden-client clear-config` to remove the active configuration (follows priority: local first, then global)
+- **Selective reset**: Use `miden-client clear-config --global` to remove only global configuration while preserving local
+- **Fresh start**: After clearing, run `miden-client init` (global) or `miden-client init --local` (local) to recreate
+
 ### Recovery flow
 
 1. Re-run with `--debug` or `MIDEN_DEBUG=true` for richer logs.
 2. Verify `rpc.endpoint` connectivity and timeouts.
 3. Run `miden-client sync` to refresh local headers/notes.
-4. If local DB is inconsistent for development purposes, delete `store.sqlite3` (or configured path) and retry.
-5. Adjust `max_block_number_delta` if strict recency checks block validation.
-6. If proving errors persist with a remote prover, confirm `remote_prover_endpoint` and consider running locally to isolate the issue.
+4. If local DB is inconsistent for development purposes, delete the store file (`.miden/store.sqlite3` in local config or `~/.miden/store.sqlite3` in global config) and retry.
+5. For configuration issues, use `miden-client clear-config` to reset config and `miden-client init` to recreate.
+6. Adjust `max_block_number_delta` if strict recency checks block validation.
+7. If proving errors persist with a remote prover, confirm `remote_prover_endpoint` and consider running locally to isolate the issue.
 
 ### References
 

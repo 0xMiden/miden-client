@@ -11,8 +11,11 @@ use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
 #[wasm_bindgen]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum SigningInputsType {
+    /// Signing commitment over a transaction summary.
     TransactionSummary,
+    /// Arbitrary field elements supplied by caller.
     Arbitrary,
+    /// Blind commitment derived from a single word.
     Blind,
 }
 
@@ -24,6 +27,7 @@ pub struct SigningInputs {
 
 #[wasm_bindgen]
 impl SigningInputs {
+    /// Creates signing inputs from a transaction summary.
     #[wasm_bindgen(js_name = "newTransactionSummary")]
     pub fn new_transaction_summary(summary: TransactionSummary) -> Self {
         Self {
@@ -31,6 +35,7 @@ impl SigningInputs {
         }
     }
 
+    /// Creates signing inputs from arbitrary field elements.
     #[wasm_bindgen(js_name = "newArbitrary")]
     pub fn new_arbitrary(felts: Vec<Felt>) -> Self {
         Self {
@@ -38,6 +43,7 @@ impl SigningInputs {
         }
     }
 
+    /// Creates blind signing inputs from a single word.
     #[wasm_bindgen(js_name = "newBlind")]
     pub fn new_blind(word: &Word) -> Self {
         Self {
@@ -45,6 +51,7 @@ impl SigningInputs {
         }
     }
 
+    /// Returns the transaction summary payload if this variant contains one.
     #[wasm_bindgen(js_name = "transactionSummaryPayload")]
     pub fn transaction_summary_payload(&self) -> Result<TransactionSummary, JsValue> {
         match &self.inner {
@@ -52,12 +59,13 @@ impl SigningInputs {
                 Ok(TransactionSummary::from((**ts).clone()))
             },
             _ => Err(JsValue::from_str(&format!(
-                "transactionSummaryPayload requires SigningInputs::TransactionSummary (found {:?})",
+                "TransactionSummaryPayload requires SigningInputs::TransactionSummary (found {:?})",
                 self.variant_type()
             ))),
         }
     }
 
+    /// Returns the arbitrary payload as an array of felts.
     #[wasm_bindgen(js_name = "arbitraryPayload")]
     pub fn arbitrary_payload(&self) -> Result<FeltArray, JsValue> {
         match &self.inner {
@@ -65,23 +73,25 @@ impl SigningInputs {
                 Ok(felts.iter().copied().map(Felt::from).collect::<Vec<_>>().into())
             },
             _ => Err(JsValue::from_str(&format!(
-                "arbitraryPayload requires SigningInputs::Arbitrary (found {:?})",
+                "ArbitraryPayload requires SigningInputs::Arbitrary (found {:?})",
                 self.variant_type()
             ))),
         }
     }
 
+    /// Returns the blind payload as a word.
     #[wasm_bindgen(js_name = "blindPayload")]
     pub fn blind_payload(&self) -> Result<Word, JsValue> {
         match &self.inner {
             NativeSigningInputs::Blind(word) => Ok(Word::from(*word)),
             _ => Err(JsValue::from_str(&format!(
-                "blindPayload requires SigningInputs::Blind (found {:?})",
+                "BlindPayload requires SigningInputs::Blind (found {:?})",
                 self.variant_type()
             ))),
         }
     }
 
+    /// Returns which variant these signing inputs represent.
     #[wasm_bindgen(getter, js_name = "variantType")]
     pub fn variant_type(&self) -> SigningInputsType {
         match &self.inner {
@@ -91,20 +101,24 @@ impl SigningInputs {
         }
     }
 
+    /// Returns the commitment to these signing inputs.
     #[wasm_bindgen(js_name = "toCommitment")]
     pub fn to_commitment(&self) -> Word {
         self.inner.to_commitment().into()
     }
 
+    /// Returns the inputs as field elements.
     #[wasm_bindgen(js_name = "toElements")]
     pub fn to_elements(&self) -> FeltArray {
         self.inner.to_elements().into_iter().map(Into::into).collect::<Vec<_>>().into()
     }
 
+    /// Serializes the signing inputs into bytes.
     pub fn serialize(&self) -> Uint8Array {
         serialize_to_uint8array(&self.inner)
     }
 
+    /// Deserializes signing inputs from bytes.
     pub fn deserialize(bytes: &Uint8Array) -> Result<SigningInputs, JsValue> {
         let native_signing_inputs = deserialize_from_uint8array::<NativeSigningInputs>(bytes)?;
         Ok(native_signing_inputs.into())

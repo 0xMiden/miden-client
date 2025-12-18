@@ -5,6 +5,7 @@ use anyhow::{Context, Result, anyhow};
 use miden_client::account::component::AccountComponent;
 use miden_client::account::{Account, AccountBuilder, AccountId, AccountStorageMode, StorageSlot};
 use miden_client::assembly::{DefaultSourceManager, Library, LibraryPath, Module, ModuleKind};
+use miden_client::auth::RPO_FALCON_SCHEME_ID;
 use miden_client::note::{
     Note,
     NoteAssets,
@@ -137,19 +138,16 @@ pub async fn test_counter_contract_ntx(client_config: ClientConfig) -> Result<()
 
     let network_account = deploy_counter_contract(&mut client, AccountStorageMode::Network).await?;
 
-    assert_eq!(
-        client
-            .get_account(network_account.id())
-            .await?
-            .context("failed to find network account after deployment")?
-            .account()
-            .storage()
-            .get_item(0)?,
-        Word::from([ZERO, ZERO, ZERO, Felt::new(1)])
-    );
+    let account: Account = client
+        .get_account(network_account.id())
+        .await?
+        .context("failed to find network account after deployment")?
+        .try_into()?;
+    assert_eq!(account.storage().get_item(0)?, Word::from([ZERO, ZERO, ZERO, Felt::new(1)]));
 
     let (native_account, ..) =
-        insert_new_wallet(&mut client, AccountStorageMode::Public, &keystore).await?;
+        insert_new_wallet(&mut client, AccountStorageMode::Public, &keystore, RPO_FALCON_SCHEME_ID)
+            .await?;
 
     let mut network_notes = vec![];
 
@@ -186,7 +184,11 @@ pub async fn test_recall_note_before_ntx_consumes_it(client_config: ClientConfig
 
     let network_account = deploy_counter_contract(&mut client, AccountStorageMode::Network).await?;
     let native_account = deploy_counter_contract(&mut client, AccountStorageMode::Public).await?;
-    let wallet = insert_new_wallet(&mut client, AccountStorageMode::Public, &keystore).await?.0;
+
+    let wallet =
+        insert_new_wallet(&mut client, AccountStorageMode::Public, &keystore, RPO_FALCON_SCHEME_ID)
+            .await?
+            .0;
 
     let network_note = get_network_note(wallet.id(), network_account.id(), &mut client.rng())?;
     // Prepare both transactions
@@ -217,28 +219,21 @@ pub async fn test_recall_note_before_ntx_consumes_it(client_config: ClientConfig
     wait_for_blocks(&mut client, 2).await;
 
     // The network account should have original value
-    assert_eq!(
-        client
-            .get_account(network_account.id())
-            .await?
-            .context("failed to find network account after recall test")?
-            .account()
-            .storage()
-            .get_item(0)?,
-        Word::from([ZERO, ZERO, ZERO, Felt::new(1)])
-    );
+    let account: Account = client
+        .get_account(network_account.id())
+        .await?
+        .context("failed to find network account after recall test")?
+        .try_into()?;
+    assert_eq!(account.storage().get_item(0)?, Word::from([ZERO, ZERO, ZERO, Felt::new(1)]));
 
     // The native account should have the incremented value
-    assert_eq!(
-        client
-            .get_account(native_account.id())
-            .await?
-            .context("failed to find native account after recall test")?
-            .account()
-            .storage()
-            .get_item(0)?,
-        Word::from([ZERO, ZERO, ZERO, Felt::new(2)])
-    );
+    let account: Account = client
+        .get_account(native_account.id())
+        .await?
+        .context("failed to find native account after recall test")?
+        .try_into()
+        .unwrap();
+    assert_eq!(account.storage().get_item(0)?, Word::from([ZERO, ZERO, ZERO, Felt::new(2)]));
     Ok(())
 }
 

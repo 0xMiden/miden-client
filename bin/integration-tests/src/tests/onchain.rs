@@ -1,8 +1,8 @@
 use anyhow::{Context, Result};
 use miden_client::EMPTY_WORD;
-use miden_client::account::{AccountStorageMode, build_wallet_id};
+use miden_client::account::{Account, AccountStorageMode, build_wallet_id};
 use miden_client::asset::{Asset, FungibleAsset};
-use miden_client::auth::AuthSecretKey;
+use miden_client::auth::RPO_FALCON_SCHEME_ID;
 use miden_client::note::{NoteFile, NoteType};
 use miden_client::rpc::{AcceptHeaderError, RpcError};
 use miden_client::store::{InputNoteState, NoteFilter};
@@ -31,17 +31,30 @@ pub async fn test_onchain_notes_flow(client_config: ClientConfig) -> Result<()> 
     wait_for_node(&mut client_3).await;
 
     // Create faucet account
-    let (faucet_account, _) =
-        insert_new_fungible_faucet(&mut client_1, AccountStorageMode::Private, &keystore_1).await?;
+    let (faucet_account, _) = insert_new_fungible_faucet(
+        &mut client_1,
+        AccountStorageMode::Private,
+        &keystore_1,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
+    // Create regular accounts
+    let (basic_wallet_1, ..) = insert_new_wallet(
+        &mut client_2,
+        AccountStorageMode::Private,
+        &keystore_2,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
 
     // Create regular accounts
-    let (basic_wallet_1, ..) =
-        insert_new_wallet(&mut client_2, AccountStorageMode::Private, &keystore_2).await?;
-
-    // Create regular accounts
-    let (basic_wallet_2, ..) =
-        insert_new_wallet(&mut client_3, AccountStorageMode::Private, &keystore_3).await?;
-
+    let (basic_wallet_2, ..) = insert_new_wallet(
+        &mut client_3,
+        AccountStorageMode::Private,
+        &keystore_3,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
     client_1.sync_state().await?;
     client_2.sync_state().await?;
 
@@ -155,20 +168,35 @@ pub async fn test_onchain_accounts(client_config: ClientConfig) -> Result<()> {
         .await?;
     wait_for_node(&mut client_2).await;
 
-    let (faucet_account_header, secret_key) =
-        insert_new_fungible_faucet(&mut client_1, AccountStorageMode::Public, &keystore_1).await?;
+    let (faucet_account_header, secret_key) = insert_new_fungible_faucet(
+        &mut client_1,
+        AccountStorageMode::Public,
+        &keystore_1,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
 
-    let (first_regular_account, ..) =
-        insert_new_wallet(&mut client_1, AccountStorageMode::Private, &keystore_1).await?;
+    let (first_regular_account, ..) = insert_new_wallet(
+        &mut client_1,
+        AccountStorageMode::Private,
+        &keystore_1,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
 
-    let (second_client_first_regular_account, ..) =
-        insert_new_wallet(&mut client_2, AccountStorageMode::Private, &keystore_2).await?;
+    let (second_client_first_regular_account, ..) = insert_new_wallet(
+        &mut client_2,
+        AccountStorageMode::Private,
+        &keystore_2,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
 
     let target_account_id = first_regular_account.id();
     let second_client_target_account_id = second_client_first_regular_account.id();
     let faucet_account_id = faucet_account_header.id();
 
-    keystore_2.add_key(&AuthSecretKey::RpoFalcon512(secret_key))?;
+    keystore_2.add_key(&secret_key)?;
     client_2.add_account(&faucet_account_header, false).await?;
 
     // First Mint necessary token
@@ -240,22 +268,18 @@ pub async fn test_onchain_accounts(client_config: ClientConfig) -> Result<()> {
     let to_account_id = second_client_target_account_id;
 
     // get initial balances
-    let from_account_balance = client_1
+    let account_client_1: Account = client_1
         .get_account(from_account_id)
         .await?
         .context("failed to find from account for balance check")?
-        .account()
-        .vault()
-        .get_balance(faucet_account_id)
-        .unwrap_or(0);
-    let to_account_balance = client_2
+        .try_into()?;
+    let from_account_balance = account_client_1.vault().get_balance(faucet_account_id).unwrap_or(0);
+    let account_client_2: Account = client_2
         .get_account(to_account_id)
         .await?
-        .context("failed to find to account for balance check")?
-        .account()
-        .vault()
-        .get_balance(faucet_account_id)
-        .unwrap_or(0);
+        .context("failed to find from account for balance check")?
+        .try_into()?;
+    let to_account_balance = account_client_2.vault().get_balance(faucet_account_id).unwrap_or(0);
 
     let asset = FungibleAsset::new(faucet_account_id, TRANSFER_AMOUNT)?;
 
@@ -291,22 +315,20 @@ pub async fn test_onchain_accounts(client_config: ClientConfig) -> Result<()> {
         .with_context(|| format!("input note {} not found", notes[0].id()))?;
     assert!(matches!(input_note.state(), InputNoteState::ConsumedExternal { .. }));
 
-    let new_from_account_balance = client_1
+    let account_client_1: Account = client_1
         .get_account(from_account_id)
         .await?
         .context("failed to find from account after transfer")?
-        .account()
-        .vault()
-        .get_balance(faucet_account_id)
-        .unwrap_or(0);
-    let new_to_account_balance = client_2
+        .try_into()?;
+    let new_from_account_balance =
+        account_client_1.vault().get_balance(faucet_account_id).unwrap_or(0);
+    let account_client_2: Account = client_2
         .get_account(to_account_id)
         .await?
-        .context("failed to find to account after transfer")?
-        .account()
-        .vault()
-        .get_balance(faucet_account_id)
-        .unwrap_or(0);
+        .context("failed to find from account after transfer")?
+        .try_into()?;
+    let new_to_account_balance =
+        account_client_2.vault().get_balance(faucet_account_id).unwrap_or(0);
 
     assert_eq!(new_from_account_balance, from_account_balance - TRANSFER_AMOUNT);
     assert_eq!(new_to_account_balance, to_account_balance + TRANSFER_AMOUNT);
@@ -324,14 +346,20 @@ pub async fn test_import_account_by_id(client_config: ClientConfig) -> Result<()
     let mut user_seed = [0u8; 32];
     client_1.rng().fill_bytes(&mut user_seed);
 
-    let (faucet_account_header, _) =
-        insert_new_fungible_faucet(&mut client_1, AccountStorageMode::Public, &keystore_1).await?;
+    let (faucet_account_header, _) = insert_new_fungible_faucet(
+        &mut client_1,
+        AccountStorageMode::Public,
+        &keystore_1,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
 
     let (first_regular_account, secret_key) = insert_new_wallet_with_seed(
         &mut client_1,
         AccountStorageMode::Public,
         &keystore_1,
         user_seed,
+        RPO_FALCON_SCHEME_ID,
     )
     .await?;
 
@@ -351,10 +379,10 @@ pub async fn test_import_account_by_id(client_config: ClientConfig) -> Result<()
 
     // Import the public account by id
     let built_wallet_id =
-        build_wallet_id(user_seed, secret_key.public_key(), AccountStorageMode::Public, false)?;
+        build_wallet_id(user_seed, &secret_key.public_key(), AccountStorageMode::Public, false)?;
     assert_eq!(built_wallet_id, first_regular_account.id());
     client_2.import_account_by_id(built_wallet_id).await?;
-    keystore_2.add_key(&AuthSecretKey::RpoFalcon512(secret_key))?;
+    keystore_2.add_key(&secret_key)?;
 
     let original_account =
         client_1.get_account(first_regular_account.id()).await?.with_context(|| {
@@ -364,7 +392,7 @@ pub async fn test_import_account_by_id(client_config: ClientConfig) -> Result<()
         client_2.get_account(first_regular_account.id()).await?.with_context(|| {
             format!("Imported account {} not found in client_2", first_regular_account.id())
         })?;
-    assert_eq!(imported_account.account().commitment(), original_account.account().commitment());
+    assert_eq!(imported_account.commitment(), original_account.commitment());
 
     // Now use the wallet in the second client to consume the generated note
     println!("Second client consuming note");

@@ -173,27 +173,36 @@ impl WebClient {
 
         let keystore = WebKeyStore::new_with_callbacks(rng, get_key_cb, insert_key_cb, sign_cb);
 
-        self.inner = Some(
-            Client::new(
-                rpc_client,
-                Box::new(rng),
-                web_store.clone(),
-                Some(Arc::new(keystore.clone())),
-                ExecutionOptions::new(
-                    Some(MAX_TX_EXECUTION_CYCLES),
-                    MIN_TX_EXECUTION_CYCLES,
-                    false,
-                    false,
-                )
-                .expect("Default executor's options should always be valid"),
-                None,
-                None,
-                note_transport_client,
+        let mut client = Client::new(
+            rpc_client,
+            Box::new(rng),
+            web_store.clone(),
+            Some(Arc::new(keystore.clone())),
+            ExecutionOptions::new(
+                Some(MAX_TX_EXECUTION_CYCLES),
+                MIN_TX_EXECUTION_CYCLES,
+                false,
+                false,
             )
-            .await
-            .map_err(|err| js_error_with_context(err, "Failed to create client"))?,
-        );
+            .expect("Default executor's options should always be valid"),
+            None,
+            None,
+            note_transport_client,
+            None,
+        )
+        .await
+        .map_err(|err| js_error_with_context(err, "Failed to create client"))?;
 
+        // Ensure genesis block is fetched and stored in IndexedDB.
+        // This is important for web workers that create their own client instances -
+        // they will read the genesis from the shared IndexedDB and automatically
+        // set the genesis commitment on their RPC client.
+        client
+            .ensure_genesis_in_place()
+            .await
+            .map_err(|err| js_error_with_context(err, "Failed to ensure genesis in place"))?;
+
+        self.inner = Some(client);
         self.store = Some(web_store);
         self.keystore = Some(keystore);
 

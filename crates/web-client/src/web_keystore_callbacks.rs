@@ -3,7 +3,6 @@ use miden_client::auth::{
     Signature as NativeSignature,
     SigningInputs as NativeSigningInputs,
 };
-use miden_client::crypto::rpo_falcon512::PublicKey as NativePublicKey;
 use miden_client::keystore::KeyStoreError;
 use miden_client::utils::Deserializable;
 use miden_client::{AuthenticationError, Word as NativeWord};
@@ -11,7 +10,7 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
 use wasm_bindgen_futures::js_sys::{Function, Promise, Uint8Array};
 
-use crate::models::secret_key::SecretKey;
+use crate::models::auth_secret_key::AuthSecretKey as WebAuthSecretKey;
 use crate::models::signature::Signature;
 use crate::models::signing_inputs::SigningInputs;
 
@@ -60,9 +59,11 @@ impl GetKeyCallback {
 pub(crate) struct InsertKeyCallback(pub(crate) Function);
 
 impl InsertKeyCallback {
-    pub(crate) async fn insert_key(&self, secret_key: &SecretKey) -> Result<(), KeyStoreError> {
-        let pub_key: NativePublicKey = secret_key.public_key().into();
-        let pub_key_commitment = pub_key.to_commitment();
+    pub(crate) async fn insert_key(
+        &self,
+        secret_key: &WebAuthSecretKey,
+    ) -> Result<(), KeyStoreError> {
+        let pub_key_commitment: NativeWord = secret_key.public_key().to_commitment().into();
         let result = self
             .0
             .call2(

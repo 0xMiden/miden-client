@@ -41,12 +41,12 @@
 //! [`NodeRpcClient`] trait.
 
 use alloc::boxed::Box;
-use alloc::collections::{BTreeMap, BTreeSet};
+use alloc::collections::BTreeSet;
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::fmt;
 
-use domain::account::{AccountProofs, FetchedAccount};
+use domain::account::{AccountProof, FetchedAccount};
 use domain::note::{FetchedNote, NoteSyncInfo};
 use domain::nullifier::NullifierUpdate;
 use domain::sync::StateSyncInfo;
@@ -84,6 +84,23 @@ use crate::rpc::domain::transaction::TransactionsInfo;
 use crate::store::InputNoteRecord;
 use crate::store::input_note_states::UnverifiedNoteState;
 use crate::transaction::ForeignAccount;
+
+/// Represents the state that we want to retrieve from the network
+pub enum AccountStateAt {
+    /// Gets the latest state, for the current chain tip
+    ChainTip,
+    /// Gets the state at a specific block number
+    Block(BlockNumber),
+}
+
+// RPC ENDPOINT LIMITS
+// ================================================================================================
+
+// TODO: We need a better structured way of getting limits as defined by the node (#1139)
+pub const NOTE_IDS_LIMIT: usize = 100;
+pub const NULLIFIER_PREFIXES_LIMIT: usize = 100;
+pub const ACCOUNT_ID_LIMIT: usize = 500;
+pub const NOTE_TAG_LIMIT: usize = 500;
 
 // NODE RPC CLIENT TRAIT
 // ================================================================================================
@@ -125,11 +142,17 @@ pub trait NodeRpcClient: Send + Sync {
     /// the `/GetBlockByNumber` RPC endpoint.
     async fn get_block_by_number(&self, block_num: BlockNumber) -> Result<ProvenBlock, RpcError>;
 
-    /// Fetches note-related data for a list of [`NoteId`] using the `/GetNotesById` rpc endpoint.
+    /// Fetches note-related data for a list of [`NoteId`] using the `/GetNotesById`
+    /// RPC endpoint.
     ///
-    /// For any [`miden_objects::note::NoteType::Private`] note, the return data is only the
-    /// [`miden_objects::note::NoteMetadata`], whereas for [`miden_objects::note::NoteType::Public`]
-    /// notes, the return data includes all details.
+    /// For [`miden_objects::note::NoteType::Private`] notes, the response includes only the
+    /// [`miden_objects::note::NoteMetadata`].
+    ///
+    /// For [`miden_objects::note::NoteType::Public`] notes, the response includes all note details
+    /// (recipient, assets, script, etc.).
+    ///
+    /// In both cases, a [`miden_objects::note::NoteInclusionProof`] is returned so the caller can
+    /// verify that each note is part of the block's note tree.
     async fn get_notes_by_id(&self, note_ids: &[NoteId]) -> Result<Vec<FetchedNote>, RpcError>;
 
     /// Fetches info from the node necessary to perform a state sync using the
@@ -188,16 +211,20 @@ pub trait NodeRpcClient: Send + Sync {
     async fn check_nullifiers(&self, nullifiers: &[Nullifier]) -> Result<Vec<SmtProof>, RpcError>;
 
     /// Fetches the account data needed to perform a Foreign Procedure Invocation (FPI) on the
-    /// specified foreign accounts, using the `GetAccountProofs` endpoint.
+    /// specified foreign account, using the `GetAccountProof` endpoint.
     ///
-    /// The `code_commitments` parameter is a list of known code commitments
+    /// The `account_state` parameter specifies the block number from which to retrieve
+    /// the account proof from (the state of the account at that block).
+    ///
+    /// The `known_account_code` parameter is the known code commitment
     /// to prevent unnecessary data fetching. Returns the block number and the FPI account data. If
-    /// one of the tracked accounts is not found in the node, the method will return an error.
-    async fn get_account_proofs(
+    /// the tracked account is not found in the node, the method will return an error.
+    async fn get_account_proof(
         &self,
-        account_storage_requests: &BTreeSet<ForeignAccount>,
-        known_account_codes: BTreeMap<AccountId, AccountCode>,
-    ) -> Result<AccountProofs, RpcError>;
+        foreign_account: ForeignAccount,
+        account_state: AccountStateAt,
+        known_account_code: Option<AccountCode>,
+    ) -> Result<(BlockNumber, AccountProof), RpcError>;
 
     /// Fetches the commit height where the nullifier was consumed. If the nullifier isn't found,
     /// then `None` is returned.
@@ -233,21 +260,18 @@ pub trait NodeRpcClient: Send + Sync {
         }
 
         let mut public_notes = Vec::with_capacity(note_ids.len());
-        // TODO: We need a better structured way of getting limits as defined by the node (#1139)
-        for chunk in note_ids.chunks(1_000) {
-            let note_details = self.get_notes_by_id(chunk).await?;
+        let note_details = self.get_notes_by_id(note_ids).await?;
 
-            for detail in note_details {
-                if let FetchedNote::Public(note, inclusion_proof) = detail {
-                    let state = UnverifiedNoteState {
-                        metadata: *note.metadata(),
-                        inclusion_proof,
-                    }
-                    .into();
-                    let note = InputNoteRecord::new(note.into(), current_timestamp, state);
-
-                    public_notes.push(note);
+        for detail in note_details {
+            if let FetchedNote::Public(note, inclusion_proof) = detail {
+                let state = UnverifiedNoteState {
+                    metadata: *note.metadata(),
+                    inclusion_proof,
                 }
+                .into();
+                let note = InputNoteRecord::new(note.into(), current_timestamp, state);
+
+                public_notes.push(note);
             }
         }
 

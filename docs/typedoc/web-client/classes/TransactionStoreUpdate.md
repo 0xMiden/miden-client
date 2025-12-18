@@ -6,6 +6,9 @@
 
 # Class: TransactionStoreUpdate
 
+Represents the changes that need to be applied to the client store as a result of a transaction
+execution.
+
 ## Methods
 
 ### \[dispose\]()
@@ -22,6 +25,8 @@
 
 > **accountDelta**(): [`AccountDelta`](AccountDelta.md)
 
+Returns the account delta applied by the transaction.
+
 #### Returns
 
 [`AccountDelta`](AccountDelta.md)
@@ -32,6 +37,8 @@
 
 > **createdNotes**(): [`OutputNotes`](OutputNotes.md)
 
+Returns the notes created by the transaction.
+
 #### Returns
 
 [`OutputNotes`](OutputNotes.md)
@@ -41,6 +48,8 @@
 ### executedTransaction()
 
 > **executedTransaction**(): [`ExecutedTransaction`](ExecutedTransaction.md)
+
+Returns the executed transaction associated with this update.
 
 #### Returns
 
@@ -62,6 +71,8 @@
 
 > **futureNotes**(): [`NoteDetailsAndTag`](NoteDetailsAndTag.md)[]
 
+Returns notes expected to be created in follow-up executions.
+
 #### Returns
 
 [`NoteDetailsAndTag`](NoteDetailsAndTag.md)[]
@@ -71,6 +82,8 @@
 ### serialize()
 
 > **serialize**(): `Uint8Array`
+
+Serializes the update into bytes.
 
 #### Returns
 
@@ -82,6 +95,8 @@
 
 > **submissionHeight**(): `number`
 
+Returns the block height at which the transaction was submitted.
+
 #### Returns
 
 `number`
@@ -91,6 +106,8 @@
 ### deserialize()
 
 > `static` **deserialize**(`bytes`): `TransactionStoreUpdate`
+
+Deserializes an update from bytes.
 
 #### Parameters
 

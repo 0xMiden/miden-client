@@ -13,8 +13,8 @@ MerkleStore cache for fast proof queries.
 Add to `Cargo.toml`:
 
 ```toml
-miden-client              = { version = "0.12" }
-miden-client-sqlite-store = { version = "0.12" }
+miden-client              = { version = "0.13" }
+miden-client-sqlite-store = { version = "0.13" }
 ```
 
 ## License
