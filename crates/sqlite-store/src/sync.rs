@@ -5,11 +5,11 @@ use std::sync::{Arc, RwLock};
 use std::vec::Vec;
 
 use miden_client::Word;
-use miden_client::crypto::MerkleStore;
 use miden_client::note::{BlockNumber, NoteTag};
 use miden_client::store::StoreError;
 use miden_client::sync::{NoteTagRecord, NoteTagSource, StateSyncUpdate};
 use miden_client::utils::{Deserializable, Serializable};
+use miden_objects::crypto::merkle::SmtForest;
 use rusqlite::{Connection, Transaction, params};
 
 use super::SqliteStore;
@@ -99,7 +99,7 @@ impl SqliteStore {
 
     pub(super) fn apply_state_sync(
         conn: &mut Connection,
-        merkle_store: &Arc<RwLock<MerkleStore>>,
+        smt_forest: &Arc<RwLock<SmtForest>>,
         state_sync_update: StateSyncUpdate,
     ) -> Result<(), StoreError> {
         let StateSyncUpdate {
@@ -169,11 +169,11 @@ impl SqliteStore {
         Self::undo_account_state(&tx, &account_hashes_to_delete)?;
 
         // Update public accounts on the db that have been updated onchain
-        let mut merkle_store = merkle_store.write().expect("merkle_store write lock not poisoned");
+        let mut smt_forest = smt_forest.write().expect("smt_forest write lock not poisoned");
         for account in account_updates.updated_public_accounts() {
-            Self::update_account_state(&tx, &mut merkle_store, account)?;
+            Self::update_account_state(&tx, &mut smt_forest, account)?;
         }
-        drop(merkle_store);
+        drop(smt_forest);
 
         for (account_id, digest) in account_updates.mismatched_private_accounts() {
             Self::lock_account_on_unexpected_commitment(&tx, account_id, digest)?;
