@@ -264,10 +264,10 @@ test.describe("AccountStorage.getMapEntries tests", () => {
       const storage = accountRecord.storage();
 
       // Test non-map storage slot (slot 0 should be empty for a new account)
-      const nonMapResult = storage.getMapEntries(0);
+      const nonMapResult = storage.getMapEntriesByIndex(0);
 
       // Test out of bounds index
-      const outOfBoundsResult = storage.getMapEntries(255);
+      const outOfBoundsResult = storage.getMapEntriesByIndex(255);
 
       return {
         nonMap: nonMapResult,

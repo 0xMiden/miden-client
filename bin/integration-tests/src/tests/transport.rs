@@ -35,21 +35,21 @@ pub async fn test_note_transport_flow(client_config: ClientConfig) -> Result<()>
     let recipient_config = ClientConfig::new(rpc_endpoint, rpc_timeout);
 
     // Build sender client with transport
-    let (sender_builder, mut sender_keystore) = builder_with_transport(sender_config)
+    let (sender_builder, sender_keystore) = builder_with_transport(sender_config)
         .await
         .context("failed to get sender builder")?;
     let sender = sender_builder.build().await.context("failed to build sender client")?;
     // Build recipient client with transport
-    let (recipient_builder, mut recipient_keystore) = builder_with_transport(recipient_config)
+    let (recipient_builder, recipient_keystore) = builder_with_transport(recipient_config)
         .await
         .context("failed to get recipient builder")?;
     let recipient = recipient_builder.build().await.context("failed to build recipient client")?;
 
     run_flow(
         sender,
-        &mut sender_keystore,
+        &sender_keystore,
         recipient,
-        &mut recipient_keystore,
+        &recipient_keystore,
         true,
         RPO_FALCON_SCHEME_ID,
     )
@@ -70,22 +70,22 @@ pub async fn test_note_transport_sender_only(client_config: ClientConfig) -> Res
     let recipient_config = ClientConfig::new(rpc_endpoint, rpc_timeout);
 
     // Sender with transport
-    let (sender_builder, mut sender_keystore) = builder_with_transport(sender_config)
+    let (sender_builder, sender_keystore) = builder_with_transport(sender_config)
         .await
         .context("failed to get sender builder")?;
     let sender = sender_builder.build().await.context("failed to build sender client")?;
 
     // Recipient WITHOUT transport
-    let (recipient_builder, mut recipient_keystore) = builder_without_transport(recipient_config)
+    let (recipient_builder, recipient_keystore) = builder_without_transport(recipient_config)
         .await
         .context("failed to get recipient builder without transport")?;
     let recipient = recipient_builder.build().await.context("failed to build recipient client")?;
 
     run_flow(
         sender,
-        &mut sender_keystore,
+        &sender_keystore,
         recipient,
-        &mut recipient_keystore,
+        &recipient_keystore,
         false,
         RPO_FALCON_SCHEME_ID,
     )
@@ -130,9 +130,9 @@ async fn builder_without_transport(
 
 async fn run_flow(
     mut sender: TestClient,
-    sender_keystore: &mut FilesystemKeyStore,
+    sender_keystore: &FilesystemKeyStore,
     mut recipient: TestClient,
-    recipient_keystore: &mut FilesystemKeyStore,
+    recipient_keystore: &FilesystemKeyStore,
     recipient_should_receive: bool,
     auth_scheme: AuthSchemeId,
 ) -> Result<()> {
