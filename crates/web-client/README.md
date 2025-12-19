@@ -164,11 +164,11 @@ await webClient.syncState();
 
 // Query the client for consumable notes, and retrieve the id of the new note to be consumed
 let consumableNotes = await webClient.getConsumableNotes(account);
-const noteIdToConsume = consumableNotes[0].inputNoteRecord().id();
+const noteToConsume = consumableNotes[0].inputNoteRecord().toNote();
 
 // Create a consume transaction request object
 const consumeTransactionRequest = webClient.newConsumeTransactionRequest([
-  noteIdToConsume,
+  noteToConsume,
 ]);
 
 // Execute, prove, submit, and apply the transaction in one step
