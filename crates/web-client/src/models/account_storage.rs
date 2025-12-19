@@ -64,27 +64,6 @@ impl AccountStorage {
                 .collect(),
         )
     }
-
-    /// Get all key-value pairs from the map slot at `index`.
-    /// Returns `undefined` if the slot isn't a map or `index` is out of bounds (0-255).
-    /// Returns `[]` if the map exists but is empty.
-    #[wasm_bindgen(js_name = "getMapEntriesByIndex")]
-    pub fn get_map_entries_by_index(&self, index: u8) -> Option<Vec<JsStorageMapEntry>> {
-        let slot = self.0.slots().get(index as usize)?;
-        let StorageSlotContent::Map(map) = slot.content() else {
-            return None;
-        };
-
-        Some(
-            map.entries()
-                .map(|(key, value)| JsStorageMapEntry {
-                    root: map.root().to_hex(),
-                    key: key.to_hex(),
-                    value: value.to_hex(),
-                })
-                .collect(),
-        )
-    }
 }
 
 // CONVERSIONS

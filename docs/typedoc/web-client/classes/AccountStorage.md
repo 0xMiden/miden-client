@@ -88,26 +88,6 @@ Returns `[]` if the map exists but is empty.
 
 ***
 
-### getMapEntriesByIndex()
-
-> **getMapEntriesByIndex**(`index`): [`JsStorageMapEntry`](JsStorageMapEntry.md)[]
-
-Get all key-value pairs from the map slot at `index`.
-Returns `undefined` if the slot isn't a map or `index` is out of bounds (0-255).
-Returns `[]` if the map exists but is empty.
-
-#### Parameters
-
-##### index
-
-`number`
-
-#### Returns
-
-[`JsStorageMapEntry`](JsStorageMapEntry.md)[]
-
-***
-
 ### getMapItem()
 
 > **getMapItem**(`slot_name`, `key`): [`Word`](Word.md)

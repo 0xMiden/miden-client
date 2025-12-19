@@ -242,41 +242,70 @@ test.describe("new_faucet tests", () => {
 // =======================================================================================================
 
 test.describe("AccountStorage.getMapEntries tests", () => {
-  test("returns null for invalid indices and adds test for storage map", async ({
+  test("returns undefined for missing/non-map slots and [] for empty maps", async ({
     page,
   }) => {
     const result = await page.evaluate(async () => {
       const client = window.client;
 
-      // Create a new wallet with private storage
-      const account = await client.newWallet(
-        window.AccountStorageMode.private(),
-        true,
-        0
+      const VALUE_SLOT_NAME = "miden::testing::account_storage_tests::value";
+      const MAP_SLOT_NAME = "miden::testing::account_storage_tests::map";
+      const MISSING_SLOT_NAME =
+        "miden::testing::account_storage_tests::missing";
+
+      const testPackageBytes =
+        window.TestUtils.createMockSerializedLibraryPackage();
+      const deserializedPackage = window.Package.deserialize(testPackageBytes);
+
+      const valueSlot = window.StorageSlot.emptyValue(VALUE_SLOT_NAME);
+      const storageMap = new window.StorageMap();
+      const mapSlot = window.StorageSlot.map(MAP_SLOT_NAME, storageMap);
+
+      const component = window.AccountComponent.fromPackage(
+        deserializedPackage,
+        new window.MidenArrays.StorageSlotArray([valueSlot, mapSlot])
       );
 
-      // Get the account to access its storage
-      const accountRecord = await client.getAccount(account.id());
+      const walletSeed = new Uint8Array(32);
+      crypto.getRandomValues(walletSeed);
+
+      const secretKey = window.AuthSecretKey.rpoFalconWithRNG(walletSeed);
+      const authComponent =
+        window.AccountComponent.createAuthComponentFromSecretKey(secretKey);
+
+      const accountBuilderResult = new window.AccountBuilder(walletSeed)
+        .accountType(window.AccountType.RegularAccountImmutableCode)
+        .storageMode(window.AccountStorageMode.private())
+        .withAuthComponent(authComponent)
+        .withComponent(component)
+        .build();
+
+      await client.addAccountSecretKeyToWebStore(secretKey);
+      await client.newAccount(accountBuilderResult.account, false);
+      await client.syncState();
+
+      const accountRecord = await client.getAccount(
+        accountBuilderResult.account.id()
+      );
       if (!accountRecord) {
         throw new Error("Account not found");
       }
 
       const storage = accountRecord.storage();
 
-      // Test non-map storage slot (slot 0 should be empty for a new account)
-      const nonMapResult = storage.getMapEntriesByIndex(0);
-
-      // Test out of bounds index
-      const outOfBoundsResult = storage.getMapEntriesByIndex(255);
+      const nonMapResult = storage.getMapEntries(VALUE_SLOT_NAME);
+      const missingSlotResult = storage.getMapEntries(MISSING_SLOT_NAME);
+      const emptyMapResult = storage.getMapEntries(MAP_SLOT_NAME);
 
       return {
         nonMap: nonMapResult,
-        outOfBounds: outOfBoundsResult,
+        missing: missingSlotResult,
+        emptyMap: emptyMapResult,
       };
     });
 
-    // For invalid cases, getMapEntries should return undefined
     expect(result.nonMap).toBeUndefined();
-    expect(result.outOfBounds).toBeUndefined();
+    expect(result.missing).toBeUndefined();
+    expect(result.emptyMap).toEqual([]);
   });
 });
