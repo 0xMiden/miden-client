@@ -217,14 +217,7 @@ where
             .store
             .get_input_notes(NoteFilter::List(transaction_request.get_input_note_ids()))
             .await?;
-        authenticated_note_records.retain(|note| {
-            matches!(
-                note.state(),
-                InputNoteState::Committed(_)
-                    | InputNoteState::ConsumedAuthenticatedLocal(_)
-                    | InputNoteState::ConsumedExternal(_)
-            )
-        });
+        authenticated_note_records.retain(InputNoteRecord::is_authenticated);
 
         let authenticated_note_ids =
             authenticated_note_records.iter().map(InputNoteRecord::id).collect::<Vec<_>>();
@@ -598,7 +591,6 @@ where
         transaction_request: &TransactionRequest,
     ) -> Result<(BTreeMap<AccountId, u64>, BTreeSet<NonFungibleAsset>), TransactionRequestError>
     {
-        // Get incoming asset notes excluding unauthenticated ones
         let incoming_notes_ids: Vec<_> = transaction_request
             .input_notes()
             .iter()
@@ -611,10 +603,13 @@ where
             })
             .collect();
 
-        let store_input_notes = self
+        let mut store_input_notes = self
             .get_input_notes(NoteFilter::List(incoming_notes_ids))
             .await
             .map_err(|err| TransactionRequestError::NoteNotFound(err.to_string()))?;
+
+        // Get incoming asset notes excluding unauthenticated ones
+        store_input_notes.retain(InputNoteRecord::is_authenticated);
 
         let all_incoming_assets = store_input_notes
             .iter()
