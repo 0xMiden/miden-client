@@ -24,7 +24,7 @@ impl WebClient {
     /// Executes a transaction specified by the request against the specified account,
     /// proves it, submits it to the network, and updates the local database.
     ///
-    /// Uses the client's default prover.
+    /// Uses the prover configured for this client.
     ///
     /// If the transaction utilizes foreign account data, there is a chance that the client doesn't
     /// have the required block header in the local database. In these scenarios, a sync to
@@ -48,16 +48,12 @@ impl WebClient {
         Ok(tx_id)
     }
 
-    /// Executes a transaction specified by the request against the specified account,
-    /// proves it with the provided prover, submits it to the network, and updates the local
-    /// database.
-    ///
-    /// This is useful for falling back to a different prover (e.g., local) when the default
-    /// prover (e.g., remote) fails with a proving error.
+    /// Executes a transaction specified by the request against the specified account, proves it
+    /// with the user provided prover, submits it to the network, and updates the local database.
     ///
     /// If the transaction utilizes foreign account data, there is a chance that the client doesn't
-    /// have the required block header in the local database. In these scenarios, a sync to
-    /// the chain tip is performed, and the required block header is retrieved.
+    /// have the required block header in the local database. In these scenarios, a sync to the
+    /// chain tip is performed, and the required block header is retrieved.
     #[wasm_bindgen(js_name = "submitNewTransactionWithProver")]
     pub async fn submit_new_transaction_with_prover(
         &mut self,
