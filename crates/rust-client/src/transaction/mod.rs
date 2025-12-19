@@ -231,7 +231,7 @@ where
 
         // If tx request contains unauthenticated_input_notes we should insert them
         let unauthenticated_input_notes = transaction_request
-            .unauthenticated_input_notes()
+            .input_notes()
             .iter()
             .filter(|n| !authenticated_note_ids.contains(&n.id()))
             .cloned()
@@ -600,14 +600,10 @@ where
     {
         // Get incoming asset notes excluding unauthenticated ones
         let incoming_notes_ids: Vec<_> = transaction_request
-            .unauthenticated_input_notes()
+            .input_notes()
             .iter()
             .filter_map(|note| {
-                if transaction_request
-                    .unauthenticated_input_notes()
-                    .iter()
-                    .any(|n| n.id() == note.id())
-                {
+                if transaction_request.input_notes().iter().any(|n| n.id() == note.id()) {
                     None
                 } else {
                     Some(note.id())
@@ -620,13 +616,10 @@ where
             .await
             .map_err(|err| TransactionRequestError::NoteNotFound(err.to_string()))?;
 
-        let all_incoming_assets =
-            store_input_notes.iter().flat_map(|note| note.assets().iter()).chain(
-                transaction_request
-                    .unauthenticated_input_notes()
-                    .iter()
-                    .flat_map(|note| note.assets().iter()),
-            );
+        let all_incoming_assets = store_input_notes
+            .iter()
+            .flat_map(|note| note.assets().iter())
+            .chain(transaction_request.input_notes().iter().flat_map(|note| note.assets().iter()));
 
         Ok(collect_assets(all_incoming_assets))
     }

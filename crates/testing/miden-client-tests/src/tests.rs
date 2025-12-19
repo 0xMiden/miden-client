@@ -1957,26 +1957,6 @@ async fn input_note_checks() {
         error,
         ClientError::TransactionRequestError(TransactionRequestError::InputNoteAlreadyConsumed(_))
     ));
-
-    // TODO: remove deprecated check
-    // No longer errors if the Note passed is not authenticated,
-    // It will just not get marked as such.
-    // Check that adding an authenticated note that is not tracked by the client will return an
-    // error
-    // let missing_authenticated_note_tx_request = TransactionRequestBuilder::new()
-    //     .build_consume_notes(vec![NoteId::from_raw(EMPTY_WORD)])
-    //     .unwrap();
-    // let error =
-    //     Box::pin(client.submit_new_transaction(wallet.id(),
-    // missing_authenticated_note_tx_request))         .await
-    //         .unwrap_err();
-
-    // assert!(matches!(
-    //     error,
-    //     ClientError::TransactionRequestError(
-    //         TransactionRequestError::MissingAuthenticatedInputNote(_)
-    //     )
-    // ));
 }
 
 #[tokio::test]

@@ -103,9 +103,8 @@ impl TransactionRequest {
     // PUBLIC ACCESSORS
     // --------------------------------------------------------------------------------------------
 
-    // TODO: RENAME
     /// Returns a reference to the transaction request's unauthenticated note list.
-    pub fn unauthenticated_input_notes(&self) -> &[Note] {
+    pub fn input_notes(&self) -> &[Note] {
         &self.input_notes
     }
 
@@ -417,8 +416,6 @@ pub enum TransactionRequestError {
     InvalidTransactionScript(#[from] TransactionScriptError),
     #[error("merkle error")]
     MerkleError(#[from] MerkleError),
-    #[error("specified authenticated input note with id {0} is missing")]
-    MissingAuthenticatedInputNote(NoteId), // TODO: REMOVE UNUSED ERROR
     #[error("a transaction without output notes must have at least one input note")]
     NoInputNotesNorAccountChange,
     #[error("note not found: {0}")]

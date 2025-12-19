@@ -39,12 +39,11 @@ use crate::ClientRng;
 /// scripts, and setting other transaction parameters.
 #[derive(Clone, Debug)]
 pub struct TransactionRequestBuilder {
-    // TODO: merge `unauthenticated_input_notes` & `unauthenticated_input_notes` into one
-    /// Notes to be consumed by the transaction that aren't authenticated.
-    unauthenticated_input_notes: Vec<Note>,
-    /// Notes to be consumed by the transaction together with their (optional) arguments. This
+    /// Notes to be consumed by the transaction.
+    authenticated_input_notes: Vec<Note>,
+    /// Optional arguments of the Notes to be consumed by the transaction. This
     /// includes both authenticated and unauthenticated notes.
-    input_notes: Vec<(NoteId, Option<NoteArgs>)>,
+    input_notes_args: Vec<(NoteId, Option<NoteArgs>)>,
     /// Notes to be created by the transaction. This includes both full and partial output notes.
     /// The transaction script will be generated based on these notes.
     own_output_notes: Vec<OutputNote>,
@@ -88,8 +87,8 @@ impl TransactionRequestBuilder {
     /// Creates a new, empty [`TransactionRequestBuilder`].
     pub fn new() -> Self {
         Self {
-            unauthenticated_input_notes: vec![],
-            input_notes: vec![],
+            authenticated_input_notes: vec![],
+            input_notes_args: vec![],
             own_output_notes: Vec::new(),
             expected_output_recipients: BTreeMap::new(),
             expected_future_notes: BTreeMap::new(),
@@ -104,15 +103,15 @@ impl TransactionRequestBuilder {
         }
     }
 
-    /// TODO: docs
+    // Adds the specified notes as input notes to the transaction request.
     #[must_use]
     pub fn input_notes(
         mut self,
         notes: impl IntoIterator<Item = (Note, Option<NoteArgs>)>,
     ) -> Self {
         for (note, argument) in notes {
-            self.input_notes.push((note.id(), argument));
-            self.unauthenticated_input_notes.push(note);
+            self.input_notes_args.push((note.id(), argument));
+            self.authenticated_input_notes.push(note);
         }
         self
     }
@@ -261,7 +260,7 @@ impl TransactionRequestBuilder {
     /// - `notes` is a list of notes to be consumed.
     pub fn build_consume_notes(
         self,
-        notes: Vec<Note>, // TODO: SHOULD BE NOTE
+        notes: Vec<Note>,
     ) -> Result<TransactionRequest, TransactionRequestError> {
         let input_notes = notes.into_iter().map(|id| (id, None));
         self.input_notes(input_notes).build()
@@ -375,7 +374,7 @@ impl TransactionRequestBuilder {
     /// - If an invalid note variant is encountered in the own output notes.
     pub fn build(self) -> Result<TransactionRequest, TransactionRequestError> {
         let mut seen_input_notes = BTreeSet::new();
-        for (note_id, _) in &self.input_notes {
+        for (note_id, _) in &self.input_notes_args {
             if !seen_input_notes.insert(note_id) {
                 return Err(TransactionRequestError::DuplicateInputNote(*note_id));
             }
@@ -413,8 +412,8 @@ impl TransactionRequestBuilder {
         };
 
         Ok(TransactionRequest {
-            input_notes: self.unauthenticated_input_notes,
-            input_notes_args: self.input_notes,
+            input_notes: self.authenticated_input_notes,
+            input_notes_args: self.input_notes_args,
             script_template,
             expected_output_recipients: self.expected_output_recipients,
             expected_future_notes: self.expected_future_notes,
