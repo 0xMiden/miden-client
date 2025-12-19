@@ -32,7 +32,7 @@ impl WebClient {
 
             let keystore = keystore.expect("KeyStore should be initialized");
             for key in auth_secret_keys {
-                keystore.add_key(&key).await.map_err(|err| err.to_string())?;
+                keystore.add_key(&key, &account.id()).await.map_err(|err| err.to_string())?;
             }
 
             Ok(JsValue::from_str(&format!("Imported account with ID: {account_id}")))

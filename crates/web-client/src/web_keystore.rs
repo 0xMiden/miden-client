@@ -4,7 +4,11 @@ use alloc::sync::Arc;
 use idxdb_store::auth::{get_account_auth_by_pub_key, insert_account_auth};
 use miden_client::account::AccountId;
 use miden_client::auth::{
-    AuthSecretKey, PublicKeyCommitment, Signature, SigningInputs, TransactionAuthenticator,
+    AuthSecretKey,
+    PublicKeyCommitment,
+    Signature,
+    SigningInputs,
+    TransactionAuthenticator,
 };
 use miden_client::keystore::KeyStoreError;
 use miden_client::utils::{RwLock, Serializable};
@@ -14,7 +18,10 @@ use wasm_bindgen_futures::js_sys::Function;
 
 use crate::models::secret_key::SecretKey;
 use crate::web_keystore_callbacks::{
-    GetKeyCallback, InsertKeyCallback, SignCallback, decode_secret_key_from_bytes,
+    GetKeyCallback,
+    InsertKeyCallback,
+    SignCallback,
+    decode_secret_key_from_bytes,
 };
 
 /// A web-based keystore that stores keys in [browser's local storage](https://developer.mozilla.org/en-US/docs/Web/API/Web_Storage_API)
@@ -97,12 +104,12 @@ impl<R: Rng> WebKeyStore<R> {
 
     pub async fn get_key(
         &self,
-        pub_key: NativeWord,
+        pub_key: PublicKeyCommitment,
     ) -> Result<Option<AuthSecretKey>, KeyStoreError> {
         if let Some(get_key_cb) = &self.callbacks.as_ref().get_key {
             return get_key_cb.get_secret_key(pub_key).await;
         }
-        let pub_key_str = pub_key.to_hex();
+        let pub_key_str = NativeWord::from(pub_key).to_hex();
         let secret_key_hex = get_account_auth_by_pub_key(pub_key_str).await.map_err(|err| {
             KeyStoreError::StorageError(format!("failed to get item from IndexedDB: {err:?}"))
         })?;
@@ -137,7 +144,7 @@ impl<R: Rng> TransactionAuthenticator for WebKeyStore<R> {
         let message = signing_inputs.to_commitment();
 
         let secret_key = self
-            .get_key(pub_key.into())
+            .get_key(pub_key)
             .await
             .map_err(|err| AuthenticationError::other(err.to_string()))?;
 

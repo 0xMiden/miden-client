@@ -80,7 +80,7 @@ async fn import_account<AUTH>(
 
     for key in auth_secret_keys {
         keystore.add_key(&key).map_err(CliError::KeyStore)?;
-        client.map_account_to_public_key(account_id, key.public_key()).await?;
+        client.map_account_to_public_keys(&account_id, &[key.public_key()]).await?;
     }
 
     client.add_account(&account, overwrite).await?;

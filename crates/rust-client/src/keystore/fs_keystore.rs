@@ -26,7 +26,7 @@ pub struct FilesystemKeyStore<R: Rng + Send + Sync> {
     /// The random number generator used to generate signatures.
     rng: Arc<RwLock<R>>,
     /// The directory where the keys are stored and read from.
-    keys_directory: PathBuf,
+    pub keys_directory: PathBuf,
 }
 
 impl<R: Rng + Send + Sync> FilesystemKeyStore<R> {
@@ -72,9 +72,12 @@ impl<R: Rng + Send + Sync> FilesystemKeyStore<R> {
         Ok(())
     }
 
-    /// Retrieves a secret key from the keystore given its public key.
-    pub fn get_key(&self, pub_key: Word) -> Result<Option<AuthSecretKey>, KeyStoreError> {
-        let filename = hash_pub_key(pub_key);
+    /// Retrieves a secret key from the keystore given the commitment of a public key.
+    pub fn get_key(
+        &self,
+        pub_key: PublicKeyCommitment,
+    ) -> Result<Option<AuthSecretKey>, KeyStoreError> {
+        let filename = hash_pub_key(pub_key.into());
 
         let file_path = self.keys_directory.join(filename);
         if !file_path.exists() {
@@ -134,7 +137,7 @@ impl<R: Rng + Send + Sync> TransactionAuthenticator for FilesystemKeyStore<R> {
         let message = signing_info.to_commitment();
 
         let secret_key = self
-            .get_key(pub_key.into())
+            .get_key(pub_key)
             .map_err(|err| AuthenticationError::other(err.to_string()))?;
 
         let signature = match secret_key {

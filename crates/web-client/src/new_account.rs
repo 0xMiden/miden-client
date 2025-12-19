@@ -13,6 +13,7 @@ use super::models::account_storage_mode::AccountStorageMode;
 use super::models::auth::AuthScheme;
 use super::models::secret_key::SecretKey;
 use crate::helpers::generate_wallet;
+use crate::models::account_id::AccountId;
 use crate::{WebClient, js_error_with_context};
 
 #[wasm_bindgen]
@@ -37,7 +38,7 @@ impl WebClient {
 
             keystore
                 .expect("KeyStore should be initialized")
-                .add_key(&key_pair)
+                .add_key(&key_pair, &new_account.id())
                 .await
                 .map_err(|err| err.to_string())?;
 
@@ -115,7 +116,7 @@ impl WebClient {
 
             keystore
                 .expect("KeyStore should be initialized")
-                .add_key(&key_pair)
+                .add_key(&key_pair, &new_account.id())
                 .await
                 .map_err(|err| err.to_string())?;
 
@@ -149,10 +150,14 @@ impl WebClient {
     #[wasm_bindgen(js_name = "addAccountSecretKeyToWebStore")]
     pub async fn add_account_secret_key_to_web_store(
         &mut self,
+        account_id: &AccountId,
         secret_key: &SecretKey,
     ) -> Result<(), JsValue> {
         let keystore = self.keystore.as_mut().expect("KeyStore should be initialized");
-        keystore.add_key(secret_key.into()).await.map_err(|err| err.to_string())?;
+        keystore
+            .add_key(secret_key.into(), &account_id.into())
+            .await
+            .map_err(|err| err.to_string())?;
         Ok(())
     }
 }

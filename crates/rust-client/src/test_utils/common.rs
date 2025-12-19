@@ -20,7 +20,11 @@ use rand::rngs::StdRng;
 use uuid::Uuid;
 
 use crate::account::component::{
-    AccountComponent, AuthEcdsaK256Keccak, AuthRpoFalcon512, BasicFungibleFaucet, BasicWallet,
+    AccountComponent,
+    AuthEcdsaK256Keccak,
+    AuthRpoFalcon512,
+    BasicFungibleFaucet,
+    BasicWallet,
 };
 use crate::account::{AccountBuilder, AccountType, StorageSlot};
 use crate::auth::AuthSchemeId;
@@ -32,8 +36,12 @@ use crate::store::{NoteFilter, TransactionFilter};
 use crate::sync::SyncSummary;
 use crate::testing::account_id::ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE;
 use crate::transaction::{
-    NoteArgs, TransactionKernel, TransactionRequest, TransactionRequestBuilder,
-    TransactionRequestError, TransactionStatus,
+    NoteArgs,
+    TransactionKernel,
+    TransactionRequest,
+    TransactionRequestBuilder,
+    TransactionRequestError,
+    TransactionStatus,
 };
 use crate::{Client, ClientError};
 
@@ -103,7 +111,7 @@ pub async fn insert_new_wallet_with_seed(
         .build()
         .unwrap();
 
-    keystore.add_key(&key_pair, &account.id()).unwrap();
+    keystore.add_key(&key_pair).unwrap();
 
     client.add_account(&account, false).await?;
 
@@ -153,7 +161,7 @@ pub async fn insert_new_fungible_faucet(
         .build()
         .unwrap();
 
-    keystore.add_key(&key_pair, &account.id()).unwrap();
+    keystore.add_key(&key_pair).unwrap();
 
     client.add_account(&account, false).await?;
     Ok((account, key_pair))
@@ -548,7 +556,7 @@ pub async fn insert_account_with_custom_component(
         .build()
         .map_err(ClientError::AccountError)?;
 
-    keystore.add_key(&key_pair, &account.id()).unwrap();
+    keystore.add_key(&key_pair).unwrap();
     client.add_account(&account, false).await?;
 
     Ok((account, key_pair))

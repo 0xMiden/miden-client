@@ -30,9 +30,13 @@
 
 ### addAccountSecretKeyToWebStore()
 
-> **addAccountSecretKeyToWebStore**(`secret_key`): `Promise`\<`void`\>
+> **addAccountSecretKeyToWebStore**(`account_id`, `secret_key`): `Promise`\<`void`\>
 
 #### Parameters
+
+##### account\_id
+
+[`AccountId`](AccountId.md)
 
 ##### secret\_key
 
@@ -341,7 +345,7 @@ Uses an internal pagination mechanism to avoid fetching duplicate notes.
 
 ##### pub\_key
 
-[`Word`](Word.md)
+[`PublicKey`](PublicKey.md)
 
 #### Returns
 

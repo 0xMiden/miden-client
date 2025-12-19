@@ -1,7 +1,7 @@
 use miden_client::Word;
 use miden_client::account::AccountFile as NativeAccountFile;
 use miden_client::store::NoteExportType;
-use miden_client::utils::get_public_keys_from_account;
+use miden_client::utils::public_key_commitments_of_account;
 use wasm_bindgen::prelude::*;
 
 use crate::models::account_file::AccountFile;
@@ -100,7 +100,7 @@ impl WebClient {
 
             let mut key_pairs = vec![];
 
-            for pub_key in get_public_keys_from_account(&account) {
+            for pub_key in public_key_commitments_of_account(&account) {
                 key_pairs.push(
                     keystore
                         .get_key(pub_key)

@@ -318,12 +318,13 @@ export async function upsertAccountRecord(accountId, codeRoot, storageRoot, vaul
         logWebStoreError(error, `Error inserting account: ${accountId}`);
     }
 }
-export async function insertAccountAuth(pubKey, secretKey) {
+export async function insertAccountAuth(pubKey, secretKey, accountIdHex) {
     try {
         // Prepare the data object to insert
         const data = {
-            pubKey: pubKey,
-            secretKey: secretKey,
+            pubKey,
+            secretKey,
+            accountIdHex,
         };
         // Perform the insert using Dexie
         await accountAuths.add(data);

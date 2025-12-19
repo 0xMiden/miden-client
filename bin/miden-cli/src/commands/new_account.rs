@@ -7,7 +7,10 @@ use std::path::PathBuf;
 use clap::{Parser, ValueEnum};
 use miden_client::Client;
 use miden_client::account::component::{
-    AccountComponent, AccountComponentMetadata, InitStorageData, MIDEN_PACKAGE_EXTENSION,
+    AccountComponent,
+    AccountComponentMetadata,
+    InitStorageData,
+    MIDEN_PACKAGE_EXTENSION,
 };
 use miden_client::account::{Account, AccountBuilder, AccountStorageMode, AccountType};
 use miden_client::auth::{AuthRpoFalcon512, AuthSecretKey, TransactionAuthenticator};
@@ -403,7 +406,9 @@ async fn create_client_account<AUTH: TransactionAuthenticator + Sync + 'static>(
     // Only add the key to the keystore if we generated a default key type (Falcon)
     if let Some(key_pair) = key_pair {
         keystore.add_key(&key_pair).map_err(CliError::KeyStore)?;
-        client.map_account_to_public_key(account.id(), key_pair.public_key().into());
+        client
+            .map_account_to_public_keys(&account.id(), &[key_pair.public_key()])
+            .await?;
         println!("Generated and stored Falcon512 authentication key in keystore.");
     } else {
         println!("Using custom authentication component from package (no key generated).");

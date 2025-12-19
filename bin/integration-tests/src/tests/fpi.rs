@@ -1,16 +1,28 @@
 use anyhow::{Context, Result};
 use miden_client::account::component::AccountComponent;
 use miden_client::account::{
-    Account, AccountBuilder, AccountStorageMode, PartialAccount, PartialStorage, StorageMap,
+    Account,
+    AccountBuilder,
+    AccountStorageMode,
+    PartialAccount,
+    PartialStorage,
+    StorageMap,
     StorageSlot,
 };
 use miden_client::auth::{
-    AuthEcdsaK256Keccak, AuthRpoFalcon512, AuthSchemeId, AuthSecretKey, RPO_FALCON_SCHEME_ID,
+    AuthEcdsaK256Keccak,
+    AuthRpoFalcon512,
+    AuthSchemeId,
+    AuthSecretKey,
+    RPO_FALCON_SCHEME_ID,
 };
 use miden_client::rpc::domain::account::{AccountStorageRequirements, StorageMapKey};
 use miden_client::testing::common::*;
 use miden_client::transaction::{
-    AdviceInputs, ForeignAccount, TransactionKernel, TransactionRequestBuilder,
+    AdviceInputs,
+    ForeignAccount,
+    TransactionKernel,
+    TransactionRequestBuilder,
 };
 use miden_client::{Felt, ScriptBuilder, Word};
 
@@ -440,9 +452,7 @@ async fn deploy_foreign_account(
         foreign_account_with_code(storage_mode, code, auth_scheme)?;
     let foreign_account_id = foreign_account.id();
 
-    keystore
-        .add_key(&secret_key, &foreign_account_id)
-        .with_context(|| "failed to add key to keystore")?;
+    keystore.add_key(&secret_key).with_context(|| "failed to add key to keystore")?;
     client.add_account(&foreign_account, false).await?;
 
     println!("Deploying foreign account");

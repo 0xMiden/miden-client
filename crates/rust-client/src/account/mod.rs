@@ -38,22 +38,37 @@ use alloc::vec::Vec;
 
 use miden_lib::account::auth::{AuthEcdsaK256Keccak, AuthRpoFalcon512};
 use miden_lib::account::wallets::BasicWallet;
-use miden_objects::Word;
 use miden_objects::account::auth::PublicKey;
 use miden_objects::note::NoteTag;
+use miden_objects::utils::{Deserializable, Serializable};
 // RE-EXPORTS
 // ================================================================================================
 pub use miden_objects::{
-    AccountIdError, AddressError, NetworkIdError,
+    AccountIdError,
+    AddressError,
+    NetworkIdError,
     account::{
-        Account, AccountBuilder, AccountCode, AccountComponent, AccountDelta, AccountFile,
-        AccountHeader, AccountId, AccountIdPrefix, AccountStorage, AccountStorageMode, AccountType,
-        PartialAccount, PartialStorage, PartialStorageMap, StorageMap, StorageSlot,
+        Account,
+        AccountBuilder,
+        AccountCode,
+        AccountComponent,
+        AccountDelta,
+        AccountFile,
+        AccountHeader,
+        AccountId,
+        AccountIdPrefix,
+        AccountStorage,
+        AccountStorageMode,
+        AccountType,
+        PartialAccount,
+        PartialStorage,
+        PartialStorageMap,
+        StorageMap,
+        StorageSlot,
         StorageSlotType,
     },
     address::{Address, AddressInterface, AddressType, NetworkId},
 };
-use miden_tx::utils::Serializable;
 
 use super::Client;
 use crate::auth::AuthSchemeId;
@@ -67,17 +82,30 @@ pub mod component {
 
     pub use miden_lib::account::auth::*;
     pub use miden_lib::account::components::{
-        basic_fungible_faucet_library, basic_wallet_library, ecdsa_k256_keccak_library,
-        network_fungible_faucet_library, no_auth_library, rpo_falcon_512_acl_library,
-        rpo_falcon_512_library, rpo_falcon_512_multisig_library,
+        basic_fungible_faucet_library,
+        basic_wallet_library,
+        ecdsa_k256_keccak_library,
+        network_fungible_faucet_library,
+        no_auth_library,
+        rpo_falcon_512_acl_library,
+        rpo_falcon_512_library,
+        rpo_falcon_512_multisig_library,
     };
     pub use miden_lib::account::faucets::{
-        BasicFungibleFaucet, FungibleFaucetExt, NetworkFungibleFaucet,
+        BasicFungibleFaucet,
+        FungibleFaucetExt,
+        NetworkFungibleFaucet,
     };
     pub use miden_lib::account::wallets::BasicWallet;
     pub use miden_objects::account::{
-        AccountComponent, AccountComponentMetadata, FeltRepresentation, InitStorageData,
-        StorageEntry, StorageValueName, TemplateType, WordRepresentation,
+        AccountComponent,
+        AccountComponentMetadata,
+        FeltRepresentation,
+        InitStorageData,
+        StorageEntry,
+        StorageValueName,
+        TemplateType,
+        WordRepresentation,
     };
 }
 
@@ -327,15 +355,37 @@ impl<AUTH> Client<AUTH> {
             .ok_or(ClientError::AccountDataNotFound(account_id))
     }
 
-    pub async fn map_account_to_public_key(
+    pub async fn map_account_to_public_keys(
         &self,
-        account_id: AccountId,
-        pub_key: PublicKey,
+        account_id: &AccountId,
+        pub_keys: &[PublicKey],
     ) -> Result<(), ClientError> {
+        let account_id = account_id.to_hex();
+        let pub_key_list = match self.store.get_setting(account_id.clone()).await? {
+            Some(known_pub_keys) => {
+                let mut known_pub_keys: Vec<PublicKey> =
+                    Deserializable::read_from_bytes(&known_pub_keys)?;
+                known_pub_keys.extend_from_slice(pub_keys);
+                known_pub_keys
+            },
+            None => pub_keys.to_vec(),
+        };
         self.store
-            .set_setting(account_id.to_hex(), pub_key.to_bytes())
+            .set_setting(account_id, Serializable::to_bytes(&pub_key_list))
             .await
-            .map_err(|err| ClientError::StoreError(err))
+            .map_err(ClientError::StoreError)
+    }
+
+    pub async fn public_keys_of_account(
+        &self,
+        account_id: &AccountId,
+    ) -> Result<Vec<PublicKey>, ClientError> {
+        let pks: Option<Vec<u8>> = self.store.get_setting(account_id.to_hex()).await?;
+        match pks {
+            Some(known_pks) => Deserializable::read_from_bytes(&known_pks)
+                .map_err(ClientError::DataDeserializationError),
+            None => Ok(vec![]),
+        }
     }
 }
 
