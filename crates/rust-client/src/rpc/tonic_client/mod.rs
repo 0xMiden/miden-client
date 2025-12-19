@@ -7,7 +7,8 @@ use core::error::Error;
 
 use miden_objects::account::{Account, AccountCode, AccountId};
 use miden_objects::address::NetworkId;
-use miden_objects::block::{AccountWitness, BlockHeader, BlockNumber, ProvenBlock};
+use miden_objects::block::account_tree::AccountWitness;
+use miden_objects::block::{BlockHeader, BlockNumber, ProvenBlock};
 use miden_objects::crypto::merkle::{Forest, MerklePath, MmrProof, SmtProof};
 use miden_objects::note::{NoteId, NoteScript, NoteTag, Nullifier};
 use miden_objects::transaction::{ProvenTransaction, TransactionInputs};

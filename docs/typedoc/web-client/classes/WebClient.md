@@ -173,13 +173,13 @@ applications as it uses a mock chain that simulates the behavior of a real node.
 
 ***
 
-### createScriptBuilder()
+### createCodeBuilder()
 
-> **createScriptBuilder**(): [`ScriptBuilder`](ScriptBuilder.md)
+> **createCodeBuilder**(): [`CodeBuilder`](CodeBuilder.md)
 
 #### Returns
 
-[`ScriptBuilder`](ScriptBuilder.md)
+[`CodeBuilder`](CodeBuilder.md)
 
 ***
 

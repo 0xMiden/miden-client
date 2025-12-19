@@ -148,6 +148,9 @@ pub struct JsStorageSlot {
     /// The index of the storage slot.
     #[wasm_bindgen(js_name = "slotIndex")]
     pub slot_index: u8,
+    /// The name of the storage slot.
+    #[wasm_bindgen(js_name = "slotName")]
+    pub slot_name: String,
     /// The value stored in the storage slot.
     #[wasm_bindgen(js_name = "slotValue")]
     pub slot_value: String,
@@ -161,6 +164,7 @@ impl JsStorageSlot {
         Self {
             commitment: storage_commitment.to_hex(),
             slot_index: index,
+            slot_name: slot.name().to_string(),
             slot_value: slot.value().to_hex(),
             slot_type: slot.slot_type().to_bytes()[0],
         }

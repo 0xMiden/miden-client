@@ -1,6 +1,6 @@
 use clap::Parser;
 use comfy_table::{Cell, ContentArrangement, presets};
-use miden_client::account::{Account, AccountId, AccountType, StorageSlot};
+use miden_client::account::{Account, AccountId, AccountType, StorageSlotContent};
 use miden_client::address::{Address, AddressInterface, RoutingParameters};
 use miden_client::asset::Asset;
 use miden_client::rpc::{GrpcClient, NodeRpcClient};
@@ -191,26 +191,25 @@ pub async fn show_account<AUTH>(
 
         println!("Storage: \n");
 
-        let mut table =
-            create_dynamic_table(&["Item Slot Index", "Item Slot Type", "Value/Commitment"]);
+        let mut table = create_dynamic_table(&["Slot Name", "Slot Type", "Value/Commitment"]);
 
-        for (idx, entry) in account_storage.slots().iter().enumerate() {
-            let item = account_storage
-                .get_item(u8::try_from(idx).expect("there are no more than 256 slots"))
-                .map_err(|err| CliError::Account(err, "Index out of bounds".to_string()))?;
+        for (_idx, entry) in account_storage.slots().iter().enumerate() {
+            let item = account_storage.get_item(entry.name()).map_err(|err| {
+                CliError::Account(err, format!("failed to fetch slot {}", entry.name()))
+            })?;
 
             // Last entry is reserved so I don't think the user cares about it. Also, to keep the
             // output smaller, if the [StorageSlot] is a value and it's 0 we assume it's not
             // initialized and skip it
-            if matches!(entry, StorageSlot::Value { .. }) && item == [ZERO; 4].into() {
+            if matches!(entry.content(), StorageSlotContent::Value(_)) && item == [ZERO; 4].into() {
                 continue;
             }
 
-            let slot_type = match entry {
-                StorageSlot::Value(..) => "Value",
-                StorageSlot::Map(..) => "Map",
+            let slot_type = match entry.content() {
+                StorageSlotContent::Value(_) => "Value",
+                StorageSlotContent::Map(_) => "Map",
             };
-            table.add_row(vec![&idx.to_string(), slot_type, &item.to_hex()]);
+            table.add_row(vec![entry.name().as_str(), slot_type, &item.to_hex()]);
         }
         println!("{table}\n");
     }
@@ -262,7 +261,7 @@ async fn print_summary_table<AUTH>(
     table.add_row(vec![Cell::new("Vault Root"), Cell::new(account.vault().root().to_string())]);
     table.add_row(vec![
         Cell::new("Storage Root"),
-        Cell::new(account.storage().commitment().to_string()),
+        Cell::new(account.storage().to_commitment().to_string()),
     ]);
     table.add_row(vec![Cell::new("Nonce"), Cell::new(account.nonce().as_int().to_string())]);
 

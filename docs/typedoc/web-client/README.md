@@ -102,7 +102,7 @@
 - [PublicKey](classes/PublicKey.md)
 - [RpcClient](classes/RpcClient.md)
 - [Rpo256](classes/Rpo256.md)
-- [ScriptBuilder](classes/ScriptBuilder.md)
+- [CodeBuilder](classes/CodeBuilder.md)
 - [SerializedInputNoteData](classes/SerializedInputNoteData.md)
 - [SerializedOutputNoteData](classes/SerializedOutputNoteData.md)
 - [SerializedTransactionData](classes/SerializedTransactionData.md)

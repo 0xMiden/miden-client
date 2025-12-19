@@ -100,7 +100,7 @@ pub async fn test_transaction_request(client_config: ClientConfig) -> Result<()>
             assert_eqw
         end
         ";
-    let tx_script = client.script_builder().compile_tx_script(code)?;
+    let tx_script = client.code_builder().compile_tx_script(code)?;
 
     // FAILURE ATTEMPT
     let transaction_request = TransactionRequestBuilder::new()
@@ -236,7 +236,7 @@ pub async fn test_merkle_store(client_config: ClientConfig) -> Result<()> {
     }
     code += "end";
     // Build the transaction
-    let tx_script = client.script_builder().compile_tx_script(&code)?;
+    let tx_script = client.code_builder().compile_tx_script(&code)?;
 
     let transaction_request = TransactionRequestBuilder::new()
         .unauthenticated_input_notes(note_args_map)
@@ -253,10 +253,10 @@ pub async fn test_merkle_store(client_config: ClientConfig) -> Result<()> {
 
 pub async fn test_onchain_notes_sync_with_tag(client_config: ClientConfig) -> Result<()> {
     // Client 1 has an private faucet which will mint an onchain note for client 2
-    let (mut client_1, keystore_1) = client_config.clone().into_client().await?;
+    let (mut client_1, mut keystore_1) = client_config.clone().into_client().await?;
     // Client 2 will be used to sync and check that by adding the tag we can still fetch notes
     // whose tag doesn't necessarily match any of its accounts
-    let (mut client_2, keystore_2) = ClientConfig::default()
+    let (mut client_2, mut keystore_2) = ClientConfig::default()
         .with_rpc_endpoint(client_config.rpc_endpoint())
         .into_client()
         .await?;
@@ -272,14 +272,14 @@ pub async fn test_onchain_notes_sync_with_tag(client_config: ClientConfig) -> Re
     let (basic_account_1, ..) = insert_new_wallet(
         &mut client_1,
         AccountStorageMode::Private,
-        &keystore_1,
+        &mut keystore_1,
         RPO_FALCON_SCHEME_ID,
     )
     .await?;
     insert_new_wallet(
         &mut client_2,
         AccountStorageMode::Private,
-        &keystore_2,
+        &mut keystore_2,
         RPO_FALCON_SCHEME_ID,
     )
     .await?;
@@ -295,7 +295,7 @@ pub async fn test_onchain_notes_sync_with_tag(client_config: ClientConfig) -> Re
                 assert_eq
             end
             ";
-    let note_script = client_1.script_builder().compile_note_script(note_script)?;
+    let note_script = client_1.code_builder().compile_note_script(note_script)?;
     let inputs = NoteInputs::new(vec![])?;
     let serial_num = client_1.rng().draw_word();
     let note_metadata = NoteMetadata::new(
@@ -377,7 +377,7 @@ fn create_custom_note(
         .replace("{mem_address}", &mem_addr.to_string())
         .replace("{mem_address_2}", &(mem_addr + 4).to_string());
     let note_script = client
-        .script_builder()
+        .code_builder()
         .compile_note_script(&note_script)
         .context("failed to compile custom note script")?;
 

@@ -13,7 +13,6 @@ use miden_client::note_transport::grpc::GrpcNoteTransportClient;
 use miden_client::store::{NoteFilter as ClientNoteFilter, OutputNoteRecord};
 use miden_client::{Client, ClientError, DebugMode, IdPrefixFetchError};
 use miden_client_sqlite_store::ClientBuilderSqliteExt;
-use rand::rngs::StdRng;
 mod commands;
 use commands::account::AccountCmd;
 use commands::clear_config::ClearConfigCmd;
@@ -31,7 +30,7 @@ use commands::transactions::TransactionCmd;
 use self::utils::{config_file_exists, load_config_file};
 use crate::commands::address::AddressCmd;
 
-pub type CliKeyStore = FilesystemKeyStore<StdRng>;
+pub type CliKeyStore = FilesystemKeyStore;
 
 mod config;
 mod errors;

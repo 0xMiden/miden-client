@@ -1,5 +1,5 @@
 use idxdb_store::account::JsStorageMapEntry;
-use miden_client::account::{AccountStorage as NativeAccountStorage, StorageSlot};
+use miden_client::account::{AccountStorage as NativeAccountStorage, StorageSlotContent};
 use wasm_bindgen::prelude::*;
 
 use crate::models::word::Word;
@@ -21,19 +21,21 @@ pub struct AccountStorage(NativeAccountStorage);
 impl AccountStorage {
     /// Returns the commitment to the full account storage.
     pub fn commitment(&self) -> Word {
-        self.0.commitment().into()
+        self.0.to_commitment().into()
     }
 
     /// Returns the value stored at the given slot index, if any.
     #[wasm_bindgen(js_name = "getItem")]
     pub fn get_item(&self, index: u8) -> Option<Word> {
-        self.0.get_item(index).ok().map(Into::into)
+        let slot = self.0.slots().get(index as usize)?;
+        self.0.get_item(slot.name()).ok().map(Into::into)
     }
 
     /// Returns the value for a key in the map stored at the given slot, if any.
     #[wasm_bindgen(js_name = "getMapItem")]
     pub fn get_map_item(&self, index: u8, key: &Word) -> Option<Word> {
-        self.0.get_map_item(index, key.into()).ok().map(Into::into)
+        let slot = self.0.slots().get(index as usize)?;
+        self.0.get_map_item(slot.name(), key.into()).ok().map(Into::into)
     }
 
     /// Get all key-value pairs from the map slot at `index`.
@@ -41,19 +43,20 @@ impl AccountStorage {
     /// Returns `[]` if the map exists but is empty.
     #[wasm_bindgen(js_name = "getMapEntries")]
     pub fn get_map_entries(&self, index: u8) -> Option<Vec<JsStorageMapEntry>> {
-        let slots = self.0.slots();
-        match slots.get(index as usize) {
-            Some(StorageSlot::Map(map)) => Some(
-                map.entries()
-                    .map(|(key, value)| JsStorageMapEntry {
-                        root: map.root().to_hex(),
-                        key: key.to_hex(),
-                        value: value.to_hex(),
-                    })
-                    .collect(),
-            ),
-            _ => None,
-        }
+        let slot = self.0.slots().get(index as usize)?;
+        let StorageSlotContent::Map(map) = slot.content() else {
+            return None;
+        };
+
+        Some(
+            map.entries()
+                .map(|(key, value)| JsStorageMapEntry {
+                    root: map.root().to_hex(),
+                    key: key.to_hex(),
+                    value: value.to_hex(),
+                })
+                .collect(),
+        )
     }
 }
 

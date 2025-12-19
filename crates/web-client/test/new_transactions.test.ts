@@ -474,7 +474,7 @@ export const customTransaction = async (
             end
         `;
 
-      let builder = client.createScriptBuilder();
+      let builder = client.createCodeBuilder();
       let compiledNoteScript = builder.compileNoteScript(noteScript);
       let noteInputs = new window.NoteInputs(
         new window.MidenArrays.FeltArray([
@@ -719,19 +719,22 @@ export const customAccountComponent = async (
 ): Promise<void> => {
   return await testingPage.evaluate(
     async ({ schemeSecretKeyFunction }) => {
+      const MAP_SLOT_NAME =
+        "miden::testing::mapping_example_contract::map_slot";
+
       const accountCode = `
         use.miden::active_account
         use.miden::native_account
+        use.std::word
         use.std::sys
+
+        const MAP_SLOT = word("${MAP_SLOT_NAME}")
 
         # Inputs: [KEY, VALUE]
         # Outputs: []
         export.write_to_map
-            # The storage map is in storage slot 1
-            push.0
-            # => [index, KEY, VALUE]
-
             # Setting the key value pair in the map
+            push.MAP_SLOT[0..2]
             exec.native_account::set_map_item
             # => [OLD_MAP_ROOT, OLD_MAP_VALUE]
 
@@ -742,10 +745,7 @@ export const customAccountComponent = async (
         # Inputs: [KEY]
         # Outputs: [VALUE]
         export.get_value_in_map
-            # The storage map is in storage slot 1
-            push.0
-            # => [index, KEY]
-
+            push.MAP_SLOT[0..2]
             exec.active_account::get_map_item
             # => [VALUE]
         end
@@ -753,8 +753,7 @@ export const customAccountComponent = async (
         # Inputs: []
         # Outputs: [CURRENT_ROOT]
         export.get_current_map_root
-            # Getting the current root from slot 1
-            push.0 exec.active_account::get_item
+            push.MAP_SLOT[0..2] exec.active_account::get_item
             # => [CURRENT_ROOT]
 
             exec.sys::truncate_stack
@@ -789,9 +788,9 @@ export const customAccountComponent = async (
         end
       `;
       const client = window.client;
-      let builder = client.createScriptBuilder();
+      let builder = client.createCodeBuilder();
       let storageMap = new window.StorageMap();
-      let storageSlotMap = window.StorageSlot.map(storageMap);
+      let storageSlotMap = window.StorageSlot.map(MAP_SLOT_NAME, storageMap);
 
       let mappingAccountComponent = window.AccountComponent.compile(
         accountCode,
@@ -1074,29 +1073,29 @@ export const counterAccountComponent = async (
   hasCounterComponent: boolean;
 }> => {
   return await testingPage.evaluate(async () => {
+    const COUNTER_SLOT_NAME = "miden::testing::counter_contract::counter";
+
     const accountCode = `
         use.miden::active_account
         use.miden::native_account
+        use.std::word
         use.std::sys
+
+        const COUNTER_SLOT = word("${COUNTER_SLOT_NAME}")
 
         # => []
         export.get_count
-            push.0
-            exec.active_account::get_item
+            push.COUNTER_SLOT[0..2] exec.active_account::get_item
             exec.sys::truncate_stack
         end
 
         # => []
         export.increment_count
-            push.0
-            # => [index]
-            exec.active_account::get_item
+            push.COUNTER_SLOT[0..2] exec.active_account::get_item
             # => [count]
             push.1 add
             # => [count+1]
-            push.0
-            # [index, count+1]
-            exec.native_account::set_item
+            push.COUNTER_SLOT[0..2] exec.native_account::set_item
             # => []
             exec.sys::truncate_stack
             # => []
@@ -1111,9 +1110,9 @@ export const counterAccountComponent = async (
     const client = window.client;
 
     // Create counter account
-    let emptyStorageSlot = window.StorageSlot.emptyValue();
+    let emptyStorageSlot = window.StorageSlot.emptyValue(COUNTER_SLOT_NAME);
 
-    let builder = client.createScriptBuilder();
+    let builder = client.createCodeBuilder();
 
     let counterAccountComponent = window.AccountComponent.compile(
       accountCode,
@@ -1243,6 +1242,8 @@ export const testStorageMap = async (page: Page): Promise<any> => {
     const client = window.client;
     await client.syncState();
 
+    const MAP_SLOT_NAME = "miden::testing::bump_item_contract::map_slot";
+
     const normalizeHexWord = (hex) => {
       if (!hex) return undefined;
       const normalized = hex.replace(/^0x/, "").replace(/^0+|0+$/g, "");
@@ -1264,28 +1265,30 @@ export const testStorageMap = async (page: Page): Promise<any> => {
       new window.Word(new BigUint64Array([0n, 0n, 0n, 9n]))
     );
 
-    const accountCode = `export.bump_map_item
+    const accountCode = `
+                    use.std::word
+
+                    const MAP_SLOT = word("${MAP_SLOT_NAME}")
+
+                    export.bump_map_item
                     # map key
                     push.1.1.1.1 # Map key
-                    # item index
-                    push.0
-                    # => [index, KEY]
+                    push.MAP_SLOT[0..2]
                     exec.::miden::active_account::get_map_item
                     add.1
                     push.1.1.1.1 # Map key
-                    push.0
-                    # => [index, KEY, BUMPED_VALUE]
+                    push.MAP_SLOT[0..2]
                     exec.::miden::native_account::set_map_item
                     # => [OLD_MAP_ROOT, OLD_VALUE]
                     dropw dropw
                 end
         `;
 
-    let builder = client.createScriptBuilder();
+    let builder = client.createCodeBuilder();
     let bumpItemComponent = window.AccountComponent.compile(
       accountCode,
       builder,
-      [window.StorageSlot.map(storageMap)]
+      [window.StorageSlot.map(MAP_SLOT_NAME, storageMap)]
     ).withSupportsAllTypes();
 
     const walletSeed = new Uint8Array(32);

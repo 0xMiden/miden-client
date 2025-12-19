@@ -35,6 +35,8 @@ use miden_objects::account::{
     AccountStorage,
     StorageMapWitness,
     StorageSlot,
+    StorageSlotContent,
+    StorageSlotName,
 };
 use miden_objects::address::Address;
 use miden_objects::asset::{Asset, AssetVault, AssetWitness};
@@ -483,20 +485,23 @@ pub trait Store: Send + Sync {
     async fn get_account_map_item(
         &self,
         account_id: AccountId,
-        index: u8,
+        slot_name: StorageSlotName,
         key: Word,
     ) -> Result<(Word, StorageMapWitness), StoreError> {
         let storage = self
-            .get_account_storage(account_id, AccountStorageFilter::Index(index as usize))
+            .get_account_storage(account_id, AccountStorageFilter::SlotName(slot_name.clone()))
             .await?;
-        match storage.slots().first() {
-            Some(StorageSlot::Map(map)) => {
+        match storage.get(&slot_name).map(StorageSlot::content) {
+            Some(StorageSlotContent::Map(map)) => {
                 let value = map.get(&key);
                 let witness = map.open(&key);
 
                 Ok((value, witness))
             },
-            _ => Err(StoreError::AccountError(AccountError::StorageSlotNotMap(index))),
+            Some(_) => Err(StoreError::AccountError(AccountError::StorageSlotNotMap(slot_name))),
+            None => {
+                Err(StoreError::AccountError(AccountError::StorageSlotNameNotFound { slot_name }))
+            },
         }
     }
 
@@ -651,6 +656,6 @@ pub enum AccountStorageFilter {
     All,
     /// Return an [`AccountStorage`] with a single slot that matches the provided [`Word`] map root.
     Root(Word),
-    /// Return an [`AccountStorage`] with a single slot that matches the provided index.
-    Index(usize),
+    /// Return an [`AccountStorage`] with a single slot that matches the provided slot name.
+    SlotName(StorageSlotName),
 }

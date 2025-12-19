@@ -5,14 +5,13 @@ use miden_client::account::AccountStorageMode;
 use miden_client::address::{Address, AddressInterface, RoutingParameters};
 use miden_client::asset::FungibleAsset;
 use miden_client::auth::{AuthSchemeId, RPO_FALCON_SCHEME_ID};
-use miden_client::keystore::FilesystemKeyStore;
 use miden_client::note::NoteType;
 use miden_client::note_transport::NOTE_TRANSPORT_DEFAULT_ENDPOINT;
 use miden_client::note_transport::grpc::GrpcNoteTransportClient;
 use miden_client::store::NoteFilter;
 use miden_client::testing::common::{
+    FilesystemKeyStore,
     TestClient,
-    TestClientKeyStore,
     execute_tx_and_sync,
     insert_new_fungible_faucet,
     insert_new_wallet,
@@ -36,21 +35,21 @@ pub async fn test_note_transport_flow(client_config: ClientConfig) -> Result<()>
     let recipient_config = ClientConfig::new(rpc_endpoint, rpc_timeout);
 
     // Build sender client with transport
-    let (sender_builder, sender_keystore) = builder_with_transport(sender_config)
+    let (sender_builder, mut sender_keystore) = builder_with_transport(sender_config)
         .await
         .context("failed to get sender builder")?;
     let sender = sender_builder.build().await.context("failed to build sender client")?;
     // Build recipient client with transport
-    let (recipient_builder, recipient_keystore) = builder_with_transport(recipient_config)
+    let (recipient_builder, mut recipient_keystore) = builder_with_transport(recipient_config)
         .await
         .context("failed to get recipient builder")?;
     let recipient = recipient_builder.build().await.context("failed to build recipient client")?;
 
     run_flow(
         sender,
-        &sender_keystore,
+        &mut sender_keystore,
         recipient,
-        &recipient_keystore,
+        &mut recipient_keystore,
         true,
         RPO_FALCON_SCHEME_ID,
     )
@@ -71,22 +70,22 @@ pub async fn test_note_transport_sender_only(client_config: ClientConfig) -> Res
     let recipient_config = ClientConfig::new(rpc_endpoint, rpc_timeout);
 
     // Sender with transport
-    let (sender_builder, sender_keystore) = builder_with_transport(sender_config)
+    let (sender_builder, mut sender_keystore) = builder_with_transport(sender_config)
         .await
         .context("failed to get sender builder")?;
     let sender = sender_builder.build().await.context("failed to build sender client")?;
 
     // Recipient WITHOUT transport
-    let (recipient_builder, recipient_keystore) = builder_without_transport(recipient_config)
+    let (recipient_builder, mut recipient_keystore) = builder_without_transport(recipient_config)
         .await
         .context("failed to get recipient builder without transport")?;
     let recipient = recipient_builder.build().await.context("failed to build recipient client")?;
 
     run_flow(
         sender,
-        &sender_keystore,
+        &mut sender_keystore,
         recipient,
-        &recipient_keystore,
+        &mut recipient_keystore,
         false,
         RPO_FALCON_SCHEME_ID,
     )
@@ -95,10 +94,7 @@ pub async fn test_note_transport_sender_only(client_config: ClientConfig) -> Res
 
 async fn builder_with_transport(
     client_config: ClientConfig,
-) -> Result<(
-    miden_client::builder::ClientBuilder<FilesystemKeyStore<rand::rngs::StdRng>>,
-    FilesystemKeyStore<rand::rngs::StdRng>,
-)> {
+) -> Result<(miden_client::builder::ClientBuilder<FilesystemKeyStore>, FilesystemKeyStore)> {
     let (mut builder, keystore) = client_config
         .into_client_builder()
         .await
@@ -124,10 +120,7 @@ async fn builder_with_transport(
 
 async fn builder_without_transport(
     client_config: ClientConfig,
-) -> Result<(
-    miden_client::builder::ClientBuilder<FilesystemKeyStore<rand::rngs::StdRng>>,
-    FilesystemKeyStore<rand::rngs::StdRng>,
-)> {
+) -> Result<(miden_client::builder::ClientBuilder<FilesystemKeyStore>, FilesystemKeyStore)> {
     let (builder, keystore) = client_config
         .into_client_builder()
         .await
@@ -137,9 +130,9 @@ async fn builder_without_transport(
 
 async fn run_flow(
     mut sender: TestClient,
-    sender_keystore: &TestClientKeyStore,
+    sender_keystore: &mut FilesystemKeyStore,
     mut recipient: TestClient,
-    recipient_keystore: &TestClientKeyStore,
+    recipient_keystore: &mut FilesystemKeyStore,
     recipient_should_receive: bool,
     auth_scheme: AuthSchemeId,
 ) -> Result<()> {

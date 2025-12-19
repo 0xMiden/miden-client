@@ -70,8 +70,8 @@ import {
   NoteAndArgs,
   NoteAndArgsArray,
   MidenArrays,
-  ScriptBuilder,
-  ScriptBuilderMode,
+  CodeBuilder,
+  CodeBuilderMode,
 } from "../dist/index";
 import { MockWebClient, WebClient } from "../js";
 
@@ -159,8 +159,8 @@ declare global {
     Word: typeof Word;
     Address: typeof Address;
     MidenArrays: typeof MidenArrays;
-    ScriptBuilder: typeof ScriptBuilder;
-    ScriptBuilderMode: typeof ScriptBuilderMode;
+    CodeBuilder: typeof CodeBuilder;
+    CodeBuilderMode: typeof CodeBuilderMode;
     createClient: () => Promise<void>;
 
     // Add the helpers namespace

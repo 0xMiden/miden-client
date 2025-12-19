@@ -17,14 +17,14 @@ use crate::tests::config::ClientConfig;
 
 pub async fn test_onchain_notes_flow(client_config: ClientConfig) -> Result<()> {
     // Client 1 is an private faucet which will mint an onchain note for client 2
-    let (mut client_1, keystore_1) = client_config.clone().into_client().await?;
+    let (mut client_1, mut keystore_1) = client_config.clone().into_client().await?;
     // Client 2 is an private account which will consume the note that it will sync from the node
-    let (mut client_2, keystore_2) = ClientConfig::default()
+    let (mut client_2, mut keystore_2) = ClientConfig::default()
         .with_rpc_endpoint(client_config.rpc_endpoint())
         .into_client()
         .await?;
     // Client 3 will be transferred part of the assets by client 2's account
-    let (mut client_3, keystore_3) = ClientConfig::default()
+    let (mut client_3, mut keystore_3) = ClientConfig::default()
         .with_rpc_endpoint(client_config.rpc_endpoint())
         .into_client()
         .await?;
@@ -34,7 +34,7 @@ pub async fn test_onchain_notes_flow(client_config: ClientConfig) -> Result<()> 
     let (faucet_account, _) = insert_new_fungible_faucet(
         &mut client_1,
         AccountStorageMode::Private,
-        &keystore_1,
+        &mut keystore_1,
         RPO_FALCON_SCHEME_ID,
     )
     .await?;
@@ -42,7 +42,7 @@ pub async fn test_onchain_notes_flow(client_config: ClientConfig) -> Result<()> 
     let (basic_wallet_1, ..) = insert_new_wallet(
         &mut client_2,
         AccountStorageMode::Private,
-        &keystore_2,
+        &mut keystore_2,
         RPO_FALCON_SCHEME_ID,
     )
     .await?;
@@ -51,7 +51,7 @@ pub async fn test_onchain_notes_flow(client_config: ClientConfig) -> Result<()> 
     let (basic_wallet_2, ..) = insert_new_wallet(
         &mut client_3,
         AccountStorageMode::Private,
-        &keystore_3,
+        &mut keystore_3,
         RPO_FALCON_SCHEME_ID,
     )
     .await?;
@@ -161,8 +161,8 @@ pub async fn test_onchain_notes_flow(client_config: ClientConfig) -> Result<()> 
 }
 
 pub async fn test_onchain_accounts(client_config: ClientConfig) -> Result<()> {
-    let (mut client_1, keystore_1) = client_config.clone().into_client().await?;
-    let (mut client_2, keystore_2) = ClientConfig::default()
+    let (mut client_1, mut keystore_1) = client_config.clone().into_client().await?;
+    let (mut client_2, mut keystore_2) = ClientConfig::default()
         .with_rpc_endpoint(client_config.rpc_endpoint())
         .into_client()
         .await?;
@@ -171,7 +171,7 @@ pub async fn test_onchain_accounts(client_config: ClientConfig) -> Result<()> {
     let (faucet_account_header, secret_key) = insert_new_fungible_faucet(
         &mut client_1,
         AccountStorageMode::Public,
-        &keystore_1,
+        &mut keystore_1,
         RPO_FALCON_SCHEME_ID,
     )
     .await?;
@@ -179,7 +179,7 @@ pub async fn test_onchain_accounts(client_config: ClientConfig) -> Result<()> {
     let (first_regular_account, ..) = insert_new_wallet(
         &mut client_1,
         AccountStorageMode::Private,
-        &keystore_1,
+        &mut keystore_1,
         RPO_FALCON_SCHEME_ID,
     )
     .await?;
@@ -187,7 +187,7 @@ pub async fn test_onchain_accounts(client_config: ClientConfig) -> Result<()> {
     let (second_client_first_regular_account, ..) = insert_new_wallet(
         &mut client_2,
         AccountStorageMode::Private,
-        &keystore_2,
+        &mut keystore_2,
         RPO_FALCON_SCHEME_ID,
     )
     .await?;
@@ -336,7 +336,7 @@ pub async fn test_onchain_accounts(client_config: ClientConfig) -> Result<()> {
 }
 
 pub async fn test_import_account_by_id(client_config: ClientConfig) -> Result<()> {
-    let (mut client_1, keystore_1) = client_config.clone().into_client().await?;
+    let (mut client_1, mut keystore_1) = client_config.clone().into_client().await?;
     let (mut client_2, keystore_2) = ClientConfig::default()
         .with_rpc_endpoint(client_config.rpc_endpoint())
         .into_client()
@@ -349,7 +349,7 @@ pub async fn test_import_account_by_id(client_config: ClientConfig) -> Result<()
     let (faucet_account_header, _) = insert_new_fungible_faucet(
         &mut client_1,
         AccountStorageMode::Public,
-        &keystore_1,
+        &mut keystore_1,
         RPO_FALCON_SCHEME_ID,
     )
     .await?;
@@ -357,7 +357,7 @@ pub async fn test_import_account_by_id(client_config: ClientConfig) -> Result<()
     let (first_regular_account, secret_key) = insert_new_wallet_with_seed(
         &mut client_1,
         AccountStorageMode::Public,
-        &keystore_1,
+        &mut keystore_1,
         user_seed,
         RPO_FALCON_SCHEME_ID,
     )

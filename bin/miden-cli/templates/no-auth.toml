@@ -2,4 +2,3 @@ name = "no_auth"
 description = "No authentication component. Nonce is incremented on first transaction and when the account state is changed. Provides no cryptographic authentication."
 version = "0.1.0"
 supported-types = ["RegularAccountUpdatableCode", "RegularAccountImmutableCode", "FungibleFaucet", "NonFungibleFaucet"]
-storage = []

@@ -28,7 +28,7 @@ impl ImportCmd {
     pub async fn execute<AUTH: TransactionAuthenticator + Sync + 'static>(
         &self,
         mut client: Client<AUTH>,
-        keystore: CliKeyStore,
+        mut keystore: CliKeyStore,
     ) -> Result<(), CliError> {
         validate_paths(&self.filenames)?;
         for filename in &self.filenames {
@@ -46,7 +46,7 @@ impl ImportCmd {
 
                 let account_id = import_account(
                     &mut client,
-                    &keystore,
+                    &mut keystore,
                     &account_data_file_contents,
                     self.overwrite,
                 )
@@ -68,7 +68,7 @@ impl ImportCmd {
 
 async fn import_account<AUTH>(
     client: &mut Client<AUTH>,
-    keystore: &CliKeyStore,
+    keystore: &mut CliKeyStore,
     account_data_file_contents: &[u8],
     overwrite: bool,
 ) -> Result<AccountId, CliError> {

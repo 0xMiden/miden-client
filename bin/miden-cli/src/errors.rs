@@ -2,7 +2,7 @@ use std::error::Error;
 
 use miden_client::account::{AccountId, AddressError};
 use miden_client::keystore::KeyStoreError;
-use miden_client::utils::ScriptBuilderError;
+use miden_client::utils::CodeBuilderError;
 use miden_client::{
     AccountError,
     AccountIdError,
@@ -34,7 +34,7 @@ pub enum CliError {
     #[error("asset error")]
     #[diagnostic(code(cli::asset_error))]
     Asset(#[source] AssetError),
-    #[error("client error")]
+    #[error("client error: {error}")]
     #[diagnostic(code(cli::client_error))]
     Client {
         #[source]
@@ -90,7 +90,7 @@ pub enum CliError {
     Parse(#[source] SourceError, String),
     #[error("script builder error")]
     #[diagnostic(code(cli::script_builder_error))]
-    ScriptBuilder(#[from] ScriptBuilderError),
+    CodeBuilder(#[from] CodeBuilderError),
     #[error("transaction error: {1}")]
     #[diagnostic(code(cli::transaction_error))]
     Transaction(#[source] SourceError, String),
