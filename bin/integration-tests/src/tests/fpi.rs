@@ -42,13 +42,13 @@ pub async fn test_standard_fpi_private(client_config: ClientConfig) -> Result<()
 }
 
 pub async fn test_fpi_execute_program(client_config: ClientConfig) -> Result<()> {
-    let (mut client, mut keystore) = client_config.clone().into_client().await?;
+    let (mut client, keystore) = client_config.clone().into_client().await?;
     client.sync_state().await?;
 
     // Deploy a foreign account
     let (foreign_account, proc_root) = deploy_foreign_account(
         &mut client,
-        &mut keystore,
+        &keystore,
         AccountStorageMode::Public,
         format!(
             r#"
@@ -99,7 +99,7 @@ pub async fn test_fpi_execute_program(client_config: ClientConfig) -> Result<()>
 
     // We create a new client here to force the creation of a new, fresh prover with no previous
     // MAST forest data.
-    let (mut client2, mut keystore2) =
+    let (mut client2, keystore2) =
         ClientConfig::new(client_config.rpc_endpoint, client_config.rpc_timeout_ms)
             .into_client()
             .await?;
@@ -107,7 +107,7 @@ pub async fn test_fpi_execute_program(client_config: ClientConfig) -> Result<()>
     let (wallet, ..) = insert_new_wallet(
         &mut client2,
         AccountStorageMode::Private,
-        &mut keystore2,
+        &keystore2,
         RPO_FALCON_SCHEME_ID,
     )
     .await?;
@@ -132,12 +132,12 @@ pub async fn test_fpi_execute_program(client_config: ClientConfig) -> Result<()>
 }
 
 pub async fn test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
-    let (mut client, mut keystore) = client_config.clone().into_client().await?;
+    let (mut client, keystore) = client_config.clone().into_client().await?;
     wait_for_node(&mut client).await;
 
     let (inner_foreign_account, inner_proc_root) = deploy_foreign_account(
         &mut client,
-        &mut keystore,
+        &keystore,
         AccountStorageMode::Public,
         format!(
             r#"
@@ -162,7 +162,7 @@ pub async fn test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
 
     let (outer_foreign_account, outer_proc_root) = deploy_foreign_account(
         &mut client,
-        &mut keystore,
+        &keystore,
         AccountStorageMode::Public,
         format!(
             "
@@ -235,7 +235,7 @@ pub async fn test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
 
     // We create a new client here to force the creation of a new, fresh prover with no previous
     // MAST forest data.
-    let (mut client2, mut keystore2) =
+    let (mut client2, keystore2) =
         ClientConfig::new(client_config.rpc_endpoint, client_config.rpc_timeout_ms)
             .into_client()
             .await?;
@@ -243,7 +243,7 @@ pub async fn test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
     let (native_account, ..) = insert_new_wallet(
         &mut client2,
         AccountStorageMode::Public,
-        &mut keystore2,
+        &keystore2,
         RPO_FALCON_SCHEME_ID,
     )
     .await?;
@@ -267,12 +267,12 @@ async fn standard_fpi(
     client_config: ClientConfig,
     auth_scheme: AuthSchemeId,
 ) -> Result<()> {
-    let (mut client, mut keystore) = client_config.clone().into_client().await?;
+    let (mut client, keystore) = client_config.clone().into_client().await?;
     wait_for_node(&mut client).await;
 
     let (foreign_account, proc_root) = deploy_foreign_account(
         &mut client,
-        &mut keystore,
+        &keystore,
         storage_mode,
         format!(
             r#"
@@ -364,7 +364,7 @@ async fn standard_fpi(
 
     // We create a new client here to force the creation of a new, fresh prover with no previous
     // MAST forest data.
-    let (mut client2, mut keystore2) =
+    let (mut client2, keystore2) =
         ClientConfig::new(client_config.rpc_endpoint, client_config.rpc_timeout_ms)
             .into_client()
             .await?;
@@ -372,7 +372,7 @@ async fn standard_fpi(
     let (native_account, ..) = insert_new_wallet(
         &mut client2,
         AccountStorageMode::Public,
-        &mut keystore2,
+        &keystore2,
         RPO_FALCON_SCHEME_ID,
     )
     .await?;
@@ -476,7 +476,7 @@ fn foreign_account_with_code(
 /// - `Word` - The procedure root of the foreign account.
 async fn deploy_foreign_account(
     client: &mut TestClient,
-    keystore: &mut FilesystemKeyStore,
+    keystore: &FilesystemKeyStore,
     storage_mode: AccountStorageMode,
     code: String,
     auth_scheme: AuthSchemeId,

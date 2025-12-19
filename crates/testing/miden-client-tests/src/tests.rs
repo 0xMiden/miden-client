@@ -2138,6 +2138,7 @@ const BUMP_MAP_CODE: &str = "
                     dropw dropw
                 end";
 
+#[allow(clippy::too_many_lines)]
 #[tokio::test]
 async fn storage_and_vault_proofs() {
     let (mut client, mock_rpc_api, keystore) = create_test_client().await;
@@ -2152,7 +2153,7 @@ async fn storage_and_vault_proofs() {
     let bump_component_code = CodeBuilder::default()
         .compile_component_code(
             "miden::testing::bump_map_component",
-            &BUMP_MAP_CODE.replace("{map_key}", &Word::from(MAP_KEY).to_hex()),
+            BUMP_MAP_CODE.replace("{map_key}", &Word::from(MAP_KEY).to_hex()),
         )
         .unwrap();
     let bump_map_slot_name = StorageSlotName::new(BUMP_MAP_SLOT_NAME).unwrap();
@@ -2711,6 +2712,7 @@ async fn insert_new_ecdsa_fungible_faucet(
     Ok(account)
 }
 
+#[allow(clippy::too_many_lines)]
 #[tokio::test]
 async fn storage_and_vault_proofs_ecdsa() {
     let (mut client, mock_rpc_api, keystore) = create_test_client().await;
@@ -2728,7 +2730,7 @@ async fn storage_and_vault_proofs_ecdsa() {
     let bump_component_code = CodeBuilder::default()
         .compile_component_code(
             "miden::testing::bump_map_component",
-            &BUMP_MAP_CODE.replace("{map_key}", &Word::from(MAP_KEY).to_hex()),
+            BUMP_MAP_CODE.replace("{map_key}", &Word::from(MAP_KEY).to_hex()),
         )
         .unwrap();
     let bump_map_slot_name = StorageSlotName::new(BUMP_MAP_SLOT_NAME).unwrap();

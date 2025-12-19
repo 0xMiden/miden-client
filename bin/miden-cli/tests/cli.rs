@@ -42,7 +42,7 @@ use miden_client::{
     MAX_TX_EXECUTION_CYCLES,
     MIN_TX_EXECUTION_CYCLES,
 };
-use miden_client_cli::{CliKeyStore, MIDEN_DIR};
+use miden_client_cli::MIDEN_DIR;
 use miden_client_sqlite_store::SqliteStore;
 use predicates::str::contains;
 use rand::Rng;
@@ -1066,7 +1066,7 @@ pub type TestClient = Client<FilesystemKeyStore>;
 async fn create_rust_client_with_store_path(
     store_path: &Path,
     endpoint: Endpoint,
-) -> Result<(TestClient, CliKeyStore)> {
+) -> Result<(TestClient, FilesystemKeyStore)> {
     let store = {
         let sqlite_store = SqliteStore::new(PathBuf::from(store_path)).await?;
         std::sync::Arc::new(sqlite_store)
@@ -1077,7 +1077,7 @@ async fn create_rust_client_with_store_path(
 
     let rng = Box::new(RpoRandomCoin::new(coin_seed.map(Felt::new).into()));
 
-    let keystore = CliKeyStore::new(temp_dir())?;
+    let keystore = FilesystemKeyStore::new(temp_dir())?;
 
     Ok((
         TestClient::new(

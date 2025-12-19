@@ -846,7 +846,9 @@ export const customAccountComponent = async (
 
       // Read a map value from storage slot 1 with key 0x0
       const keyZero = new window.Word(new BigUint64Array([0n, 0n, 0n, 0n]));
-      const retrieveMapKey = updated?.storage().getMapItem(1, keyZero);
+      const retrieveMapKey = updated
+        ?.storage()
+        .getMapItem(MAP_SLOT_NAME, keyZero);
 
       const expected = new window.Word(new BigUint64Array([1n, 2n, 3n, 4n]));
 
@@ -1312,7 +1314,7 @@ export const testStorageMap = async (page: Page): Promise<any> => {
       await client.getAccount(bumpItemAccountBuilderResult.account.id())
     )
       ?.storage()
-      .getMapItem(1, MAP_KEY)
+      .getMapItem(MAP_SLOT_NAME, MAP_KEY)
       ?.toHex();
 
     // Deploy counter account
@@ -1347,14 +1349,14 @@ export const testStorageMap = async (page: Page): Promise<any> => {
       await client.getAccount(bumpItemAccountBuilderResult.account.id())
     )
       ?.storage()
-      .getMapItem(1, MAP_KEY)
+      .getMapItem(MAP_SLOT_NAME, MAP_KEY)
       ?.toHex();
 
     // Test getMapEntries() functionality
     let accountStorage = (
       await client.getAccount(bumpItemAccountBuilderResult.account.id())
     )?.storage();
-    let mapEntries = accountStorage?.getMapEntries(1);
+    let mapEntries = accountStorage?.getMapEntries(MAP_SLOT_NAME);
 
     // Verify we get the expected entries
     let expectedKey = MAP_KEY.toHex();

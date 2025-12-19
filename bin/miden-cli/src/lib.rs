@@ -30,8 +30,6 @@ use commands::transactions::TransactionCmd;
 use self::utils::{config_file_exists, load_config_file};
 use crate::commands::address::AddressCmd;
 
-pub type CliKeyStore = FilesystemKeyStore;
-
 mod config;
 mod errors;
 mod faucet_details_map;
@@ -185,7 +183,7 @@ impl Cli {
         // Create the client
         let (cli_config, _config_path) = load_config_file()?;
 
-        let keystore = CliKeyStore::new(cli_config.secret_keys_directory.clone())
+        let keystore = FilesystemKeyStore::new(cli_config.secret_keys_directory.clone())
             .map_err(CliError::KeyStore)?;
 
         let mut builder = ClientBuilder::new()

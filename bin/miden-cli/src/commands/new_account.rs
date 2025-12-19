@@ -14,6 +14,7 @@ use miden_client::account::component::{
 };
 use miden_client::account::{Account, AccountBuilder, AccountStorageMode, AccountType};
 use miden_client::auth::{AuthRpoFalcon512, AuthSecretKey, TransactionAuthenticator};
+use miden_client::keystore::FilesystemKeyStore;
 use miden_client::transaction::TransactionRequestBuilder;
 use miden_client::utils::Deserializable;
 use miden_client::vm::{Package, SectionId};
@@ -23,7 +24,7 @@ use tracing::debug;
 use crate::commands::account::set_default_account_if_unset;
 use crate::config::CliConfig;
 use crate::errors::CliError;
-use crate::{CliKeyStore, client_binary_name, load_config_file};
+use crate::{client_binary_name, load_config_file};
 
 // CLI TYPES
 // ================================================================================================
@@ -100,7 +101,7 @@ impl NewWalletCmd {
     pub async fn execute<AUTH: TransactionAuthenticator + Sync + 'static>(
         &self,
         mut client: Client<AUTH>,
-        mut keystore: CliKeyStore,
+        keystore: FilesystemKeyStore,
     ) -> Result<(), CliError> {
         let package_paths: Vec<PathBuf> = [PathBuf::from("basic-wallet")]
             .into_iter()
@@ -116,7 +117,7 @@ impl NewWalletCmd {
 
         let new_account = create_client_account(
             &mut client,
-            &mut keystore,
+            &keystore,
             account_type,
             self.storage_mode.into(),
             &package_paths,
@@ -195,11 +196,11 @@ impl NewAccountCmd {
     pub async fn execute<AUTH: TransactionAuthenticator + Sync + 'static>(
         &self,
         mut client: Client<AUTH>,
-        mut keystore: CliKeyStore,
+        keystore: FilesystemKeyStore,
     ) -> Result<(), CliError> {
         let new_account = create_client_account(
             &mut client,
-            &mut keystore,
+            &keystore,
             self.account_type.into(),
             self.storage_mode.into(),
             &self.packages,
@@ -346,7 +347,7 @@ fn separate_auth_components(
 /// If no auth component is detected in the packages, a Falcon-based auth component will be added.
 async fn create_client_account<AUTH: TransactionAuthenticator + Sync + 'static>(
     client: &mut Client<AUTH>,
-    keystore: &mut CliKeyStore,
+    keystore: &FilesystemKeyStore,
     account_type: AccountType,
     storage_mode: AccountStorageMode,
     package_paths: &[PathBuf],

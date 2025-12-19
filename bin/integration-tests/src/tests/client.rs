@@ -1287,12 +1287,12 @@ pub async fn test_expired_transaction_fails(client_config: ClientConfig) -> Resu
 /// Tests that RPC methods that are not directly related to the client logic
 /// (like GetBlockByNumber) work correctly
 pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
-    let (mut client, mut keystore) = client_config.into_client().await?;
+    let (mut client, keystore) = client_config.into_client().await?;
 
     let (first_basic_account, faucet_account) = setup_wallet_and_faucet(
         &mut client,
         AccountStorageMode::Public,
-        &mut keystore,
+        &keystore,
         RPO_FALCON_SCHEME_ID,
     )
     .await?;
@@ -1351,7 +1351,7 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
         custom_code,
         storage_slots,
         AccountStorageMode::Public,
-        &mut keystore,
+        &keystore,
     )
     .await?;
 
@@ -1388,7 +1388,7 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
     let faucet = insert_new_fungible_faucet(
         &mut client,
         AccountStorageMode::Private,
-        &mut keystore,
+        &keystore,
         RPO_FALCON_SCHEME_ID,
     )
     .await?
