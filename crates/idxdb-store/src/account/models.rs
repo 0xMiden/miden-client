@@ -18,7 +18,6 @@ pub struct AccountCodeIdxdbObject {
 #[allow(clippy::struct_field_names)]
 pub struct AccountStorageIdxdbObject {
     pub slot_index: u8,
-    #[serde(default)]
     pub slot_name: String,
     pub slot_value: String,
     pub slot_type: u8,

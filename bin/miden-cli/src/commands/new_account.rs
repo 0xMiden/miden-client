@@ -11,6 +11,8 @@ use miden_client::account::component::{
     AccountComponentMetadata,
     InitStorageData,
     MIDEN_PACKAGE_EXTENSION,
+    StorageSlotSchema,
+    StorageValueName,
 };
 use miden_client::account::{Account, AccountBuilder, AccountStorageMode, AccountType};
 use miden_client::auth::{AuthRpoFalcon512, AuthSecretKey, TransactionAuthenticator};
@@ -491,9 +493,8 @@ fn process_packages(
 
         // Preserve any provided map entries for map slots.
         for (slot_name, schema) in component_metadata.storage_schema().iter() {
-            if matches!(schema, miden_client::account::component::StorageSlotSchema::Map(_)) {
-                let value_name =
-                    miden_client::account::component::StorageValueName::from_slot_name(slot_name);
+            if matches!(schema, StorageSlotSchema::Map(_)) {
+                let value_name = StorageValueName::from_slot_name(slot_name);
                 if let Some(entries) = init_storage_data.map_entries(&value_name) {
                     map_entries.insert(value_name, entries.clone());
                 }

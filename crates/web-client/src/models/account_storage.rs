@@ -39,7 +39,7 @@ impl AccountStorage {
     #[wasm_bindgen(js_name = "getMapItem")]
     pub fn get_map_item(&self, slot_name: &str, key: &Word) -> Option<Word> {
         match StorageSlotName::new(slot_name) {
-            Ok(slot_name) => self.0.get_map_item(slot_name, key.into()).ok().map(Into::into),
+            Ok(slot_name) => self.0.get_map_item(&slot_name, key.into()).ok().map(Into::into),
             Err(_) => None,
         }
     }
