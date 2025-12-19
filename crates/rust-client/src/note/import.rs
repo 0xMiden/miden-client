@@ -265,6 +265,9 @@ where
                     note_record.inclusion_proof_received(inclusion_proof, metadata)?;
 
                 if block_height <= current_block_num {
+                    // FIXME: We should be able to build the mmr only once (outside the for loop).
+                    // For some reason this leads to error, probably related to:
+                    // https://github.com/0xMiden/miden-client/issues/1205
                     // If the note is committed in the past we need to manually fetch the block
                     // header and MMR proof to verify the inclusion proof.
                     let mut current_partial_mmr = self.store.get_current_partial_mmr().await?;
@@ -326,6 +329,9 @@ where
 
             match committed_notes_data.remove(&note_record.id()) {
                 Some(Some((metadata, inclusion_proof))) => {
+                    // FIXME: We should be able to build the mmr only once (outside the for loop).
+                    // For some reason this leads to error, probably related to:
+                    // https://github.com/0xMiden/miden-client/issues/1205
                     let mut current_partial_mmr = self.store.get_current_partial_mmr().await?;
                     let block_header = self
                         .get_and_store_authenticated_block(
