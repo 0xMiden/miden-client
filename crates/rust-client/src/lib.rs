@@ -197,17 +197,19 @@ pub mod asset {
 /// Provides authentication-related types and functionalities for the Miden
 /// network.
 pub mod auth {
-    pub const RPO_FALCON_SCHEME_ID: u8 = 0;
-    pub const ECDSA_K256_KECCAK_SCHEME_ID: u8 = 1;
     pub use miden_lib::AuthScheme;
     pub use miden_lib::account::auth::{AuthEcdsaK256Keccak, AuthRpoFalcon512, NoAuth};
     pub use miden_objects::account::auth::{
+        AuthScheme as AuthSchemeId,
         AuthSecretKey,
         PublicKey,
         PublicKeyCommitment,
         Signature,
     };
     pub use miden_tx::auth::{BasicAuthenticator, SigningInputs, TransactionAuthenticator};
+
+    pub const RPO_FALCON_SCHEME_ID: AuthSchemeId = AuthSchemeId::RpoFalcon512;
+    pub const ECDSA_K256_KECCAK_SCHEME_ID: AuthSchemeId = AuthSchemeId::EcdsaK256Keccak;
 }
 
 /// Provides types for working with blocks within the Miden network.
@@ -310,6 +312,7 @@ use rpc::NodeRpcClient;
 use store::Store;
 
 use crate::note_transport::{NoteTransportClient, init_note_transport_cursor};
+use crate::rpc::{ACCOUNT_ID_LIMIT, NOTE_TAG_LIMIT};
 use crate::transaction::TransactionProver;
 
 // MIDEN CLIENT
@@ -405,8 +408,8 @@ where
             rpc_api.set_genesis_commitment(genesis.commitment()).await?;
         }
 
+        // Initialize the note transport cursor if the client uses it
         if note_transport_api.is_some() {
-            // Initialize the note transport cursor
             init_note_transport_cursor(store.clone()).await?;
         }
 
@@ -444,6 +447,27 @@ where
 
     pub fn prover(&self) -> Arc<dyn TransactionProver + Send + Sync> {
         self.tx_prover.clone()
+    }
+}
+
+impl<AUTH> Client<AUTH> {
+    // LIMITS
+    // --------------------------------------------------------------------------------------------
+
+    /// Checks if the note tag limit has been exceeded.
+    pub async fn check_note_tag_limit(&self) -> Result<(), ClientError> {
+        if self.store.get_unique_note_tags().await?.len() >= NOTE_TAG_LIMIT {
+            return Err(ClientError::NoteTagsLimitExceeded(NOTE_TAG_LIMIT));
+        }
+        Ok(())
+    }
+
+    /// Checks if the account limit has been exceeded.
+    pub async fn check_account_limit(&self) -> Result<(), ClientError> {
+        if self.store.get_account_ids().await?.len() >= ACCOUNT_ID_LIMIT {
+            return Err(ClientError::AccountsLimitExceeded(ACCOUNT_ID_LIMIT));
+        }
+        Ok(())
     }
 
     // TEST HELPERS

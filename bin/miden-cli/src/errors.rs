@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use miden_client::account::AddressError;
+use miden_client::account::{AccountId, AddressError};
 use miden_client::keystore::KeyStoreError;
 use miden_client::utils::ScriptBuilderError;
 use miden_client::{
@@ -94,6 +94,8 @@ pub enum CliError {
     #[error("transaction error: {1}")]
     #[diagnostic(code(cli::transaction_error))]
     Transaction(#[source] SourceError, String),
+    #[error("expected full account, but got partial account: {0}")]
+    InvalidAccount(AccountId),
 }
 
 impl From<ClientError> for CliError {

@@ -12,6 +12,8 @@
 
 > **new AccountBuilder**(`init_seed`): `AccountBuilder`
 
+Creates a new account builder from a 32-byte initial seed.
+
 #### Parameters
 
 ##### init\_seed
@@ -38,6 +40,8 @@
 
 > **accountType**(`account_type`): `AccountBuilder`
 
+Sets the account type (regular, faucet, etc.).
+
 #### Parameters
 
 ##### account\_type
@@ -53,6 +57,8 @@
 ### build()
 
 > **build**(): [`AccountBuilderResult`](AccountBuilderResult.md)
+
+Builds the account and returns it together with the derived seed.
 
 #### Returns
 
@@ -74,6 +80,8 @@
 
 > **storageMode**(`storage_mode`): `AccountBuilder`
 
+Sets the storage mode (public/private) for the account.
+
 #### Parameters
 
 ##### storage\_mode
@@ -90,6 +98,8 @@
 
 > **withAuthComponent**(`account_component`): `AccountBuilder`
 
+Adds an authentication component to the account.
+
 #### Parameters
 
 ##### account\_component
@@ -102,9 +112,21 @@
 
 ***
 
+### withBasicWalletComponent()
+
+> **withBasicWalletComponent**(): `AccountBuilder`
+
+#### Returns
+
+`AccountBuilder`
+
+***
+
 ### withComponent()
 
 > **withComponent**(`account_component`): `AccountBuilder`
+
+Adds a component to the account.
 
 #### Parameters
 
@@ -121,6 +143,8 @@
 ### withNoAuthComponent()
 
 > **withNoAuthComponent**(): `AccountBuilder`
+
+Adds a no-auth component to the account (for public accounts).
 
 #### Returns
 

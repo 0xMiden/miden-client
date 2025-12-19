@@ -6,11 +6,15 @@
 
 # Class: NoteDetailsAndTag
 
+Pair of note details and tag used when declaring expected notes.
+
 ## Constructors
 
 ### Constructor
 
 > **new NoteDetailsAndTag**(`note_details`, `tag`): `NoteDetailsAndTag`
+
+Creates a new pair from note details and tag.
 
 #### Parameters
 
@@ -32,11 +36,15 @@
 
 > `readonly` **noteDetails**: [`NoteDetails`](NoteDetails.md)
 
+Returns the note details.
+
 ***
 
 ### tag
 
 > `readonly` **tag**: [`NoteTag`](NoteTag.md)
+
+Returns the note tag.
 
 ## Methods
 

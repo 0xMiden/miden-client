@@ -12,6 +12,7 @@ use miden_client::account::{
 use miden_client::auth::{
     AuthEcdsaK256Keccak,
     AuthRpoFalcon512,
+    AuthSchemeId,
     AuthSecretKey,
     RPO_FALCON_SCHEME_ID,
 };
@@ -255,7 +256,7 @@ pub async fn test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
 async fn standard_fpi(
     storage_mode: AccountStorageMode,
     client_config: ClientConfig,
-    auth_scheme_id: u8,
+    auth_scheme: AuthSchemeId,
 ) -> Result<()> {
     let (mut client, mut keystore) = client_config.clone().into_client().await?;
     wait_for_node(&mut client).await;
@@ -275,7 +276,7 @@ async fn standard_fpi(
             end",
             map_key = Word::from(MAP_KEY)
         ),
-        auth_scheme_id,
+        auth_scheme,
     )
     .await?;
 
@@ -330,7 +331,7 @@ async fn standard_fpi(
             .get_account(foreign_account_id)
             .await?
             .context("failed to find foreign account after deploiyng")?
-            .into();
+            .try_into()?;
 
         let (id, _vault, storage, code, nonce, seed) = foreign_account.into_parts();
         let acc = PartialAccount::new(
@@ -362,7 +363,12 @@ async fn standard_fpi(
     )
     .await?;
 
-    _ = client2.submit_new_transaction(native_account.id(), tx_request).await?;
+    let block_before_wait = client2.get_sync_height().await.unwrap();
+    wait_for_blocks_no_sync(&mut client2, 2).await;
+
+    // Second client should be able to submit a transaction
+    // Without being synced to latest state
+    let _ = client2.submit_new_transaction(native_account.id(), tx_request).await?;
 
     // After the transaction the foreign account should be cached (for public accounts only)
     if storage_mode == AccountStorageMode::Public {
@@ -370,6 +376,18 @@ async fn standard_fpi(
             client2.test_store().get_foreign_account_code(vec![foreign_account_id]).await?;
         assert_eq!(foreign_accounts.len(), 1);
     }
+
+    let block_after_wait = client2.get_sync_height().await.unwrap();
+
+    // Submitted transaction should not have provoked a sync
+    assert_eq!(block_before_wait, block_after_wait);
+
+    client2.sync_state().await?;
+    let block_after_sync = client2.get_sync_height().await.unwrap();
+
+    // After syncing with the network, the client should be synced to the latest block
+    assert!(block_after_wait < block_after_sync);
+
     Ok(())
 }
 
@@ -385,7 +403,7 @@ async fn standard_fpi(
 fn foreign_account_with_code(
     storage_mode: AccountStorageMode,
     code: String,
-    auth_scheme_id: u8,
+    auth_scheme: AuthSchemeId,
 ) -> Result<(Account, Word, AuthSecretKey)> {
     // store our expected value on map from slot 0 (map key 15)
     let mut storage_map = StorageMap::new();
@@ -399,21 +417,21 @@ fn foreign_account_with_code(
     .context("failed to compile foreign account component")?
     .with_supports_all_types();
 
-    let (key_pair, auth_component) = match auth_scheme_id {
-        0 => {
+    let (key_pair, auth_component) = match auth_scheme {
+        AuthSchemeId::RpoFalcon512 => {
             let key_pair = AuthSecretKey::new_rpo_falcon512();
             let auth_component: AccountComponent =
                 AuthRpoFalcon512::new(key_pair.public_key().to_commitment()).into();
             (key_pair, auth_component)
         },
-        1 => {
+        AuthSchemeId::EcdsaK256Keccak => {
             let key_pair = AuthSecretKey::new_ecdsa_k256_keccak();
             let auth_component: AccountComponent =
                 AuthEcdsaK256Keccak::new(key_pair.public_key().to_commitment()).into();
             (key_pair, auth_component)
         },
-        _ => {
-            return Err(anyhow::anyhow!("Unsupported auth scheme ID"));
+        scheme => {
+            return Err(anyhow::anyhow!(format!("Unsupported auth scheme ID {}", scheme.as_u8())));
         },
     };
 
@@ -445,10 +463,10 @@ async fn deploy_foreign_account(
     keystore: &mut TestClientKeyStore,
     storage_mode: AccountStorageMode,
     code: String,
-    auth_scheme_id: u8,
+    auth_scheme: AuthSchemeId,
 ) -> Result<(Account, Word)> {
     let (foreign_account, proc_root, secret_key) =
-        foreign_account_with_code(storage_mode, code, auth_scheme_id)?;
+        foreign_account_with_code(storage_mode, code, auth_scheme)?;
     let foreign_account_id = foreign_account.id();
 
     keystore.add_key(&secret_key).with_context(|| "failed to add key to keystore")?;
@@ -468,7 +486,8 @@ async fn deploy_foreign_account(
 
     // NOTE: We get the new account state here since the first transaction updates the nonce from
     // to 1
-    let foreign_account: Account = client.get_account(foreign_account_id).await?.unwrap().into();
+    let foreign_account: Account =
+        client.get_account(foreign_account_id).await?.unwrap().try_into().unwrap();
 
     Ok((foreign_account, proc_root))
 }

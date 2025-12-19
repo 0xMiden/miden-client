@@ -6,11 +6,15 @@
 
 # Class: NoteFilter
 
+Filter options for querying notes from the store.
+
 ## Constructors
 
 ### Constructor
 
 > **new NoteFilter**(`note_type`, `note_ids?`): `NoteFilter`
+
+Creates a new filter for the given type and optional note IDs.
 
 #### Parameters
 

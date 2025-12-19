@@ -5,12 +5,14 @@ use crate::js_error_with_context;
 use crate::models::account_id::AccountId;
 use crate::models::account_storage_requirements::AccountStorageRequirements;
 
+/// Description of a foreign account referenced by a transaction.
 #[wasm_bindgen]
 #[derive(Clone)]
 pub struct ForeignAccount(NativeForeignAccount);
 
 #[wasm_bindgen]
 impl ForeignAccount {
+    /// Creates a foreign account entry for a public account with given storage requirements.
     pub fn public(
         account_id: AccountId,
         storage_requirements: AccountStorageRequirements,
@@ -22,10 +24,12 @@ impl ForeignAccount {
         Ok(ForeignAccount(native_foreign_account?))
     }
 
+    /// Returns the required storage slots/keys for this foreign account.
     pub fn storage_slot_requirements(&self) -> AccountStorageRequirements {
         self.0.storage_slot_requirements().into()
     }
 
+    /// Returns the ID of the foreign account.
     pub fn account_id(&self) -> AccountId {
         self.0.account_id().into()
     }

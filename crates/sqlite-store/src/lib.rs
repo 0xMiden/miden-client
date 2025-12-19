@@ -36,6 +36,7 @@ use miden_client::note::{BlockNumber, NoteScript, NoteTag, Nullifier};
 use miden_client::store::{
     AccountRecord,
     AccountStatus,
+    AccountStorageFilter,
     BlockRelevance,
     InputNoteRecord,
     NoteFilter,
@@ -105,7 +106,7 @@ impl SqliteStore {
         // Initialize merkle store
         for id in store.get_account_ids().await? {
             let vault = store.get_account_vault(id).await?;
-            let storage = store.get_account_storage(id).await?;
+            let storage = store.get_account_storage(id, AccountStorageFilter::All).await?;
 
             let mut smt_forest = store.smt_forest.write().expect("smt write lock not poisoned");
             insert_asset_nodes(&mut smt_forest, &vault);
@@ -421,9 +422,10 @@ impl Store for SqliteStore {
     async fn get_account_storage(
         &self,
         account_id: AccountId,
+        filter: AccountStorageFilter,
     ) -> Result<AccountStorage, StoreError> {
         self.interact_with_connection(move |conn| {
-            SqliteStore::get_account_storage(conn, account_id)
+            SqliteStore::get_account_storage(conn, account_id, &filter)
         })
         .await
     }
@@ -472,6 +474,18 @@ impl Store for SqliteStore {
     ) -> Result<(), StoreError> {
         self.interact_with_connection(move |conn| {
             SqliteStore::remove_address(conn, &address, account_id)
+        })
+        .await
+    }
+
+    async fn get_minimal_partial_account(
+        &self,
+        account_id: AccountId,
+    ) -> Result<Option<AccountRecord>, StoreError> {
+        let smt_forest = self.smt_forest.clone();
+
+        self.interact_with_connection(move |conn| {
+            SqliteStore::get_minimal_partial_account(conn, &smt_forest, account_id)
         })
         .await
     }
