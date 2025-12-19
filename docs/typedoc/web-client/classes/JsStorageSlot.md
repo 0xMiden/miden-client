@@ -26,6 +26,14 @@ The index of the storage slot.
 
 ***
 
+### slotName
+
+> **slotName**: `string`
+
+The name of the storage slot.
+
+***
+
 ### slotType
 
 > **slotType**: `number`

@@ -47,7 +47,7 @@
 //!
 //! // Compile the note script
 //! let script_src = "begin push.9 push.12 add end";
-//! let note_script = client.script_builder().compile_note_script(script_src)?;
+//! let note_script = client.code_builder().compile_note_script(script_src)?;
 //! println!("Compiled note script successfully.");
 //!
 //! # Ok(())

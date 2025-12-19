@@ -12,15 +12,15 @@ Storage slot index paired with map keys that must be present.
 
 ### Constructor
 
-> **new SlotAndKeys**(`storage_slot_index`, `storage_map_keys`): `SlotAndKeys`
+> **new SlotAndKeys**(`storage_slot_name`, `storage_map_keys`): `SlotAndKeys`
 
 Creates a new slot-and-keys entry.
 
 #### Parameters
 
-##### storage\_slot\_index
+##### storage\_slot\_name
 
-`number`
+`string`
 
 ##### storage\_map\_keys
 
@@ -64,12 +64,12 @@ Returns the storage map keys required for this slot.
 
 ***
 
-### storage\_slot\_index()
+### storage\_slot\_name()
 
-> **storage\_slot\_index**(): `number`
+> **storage\_slot\_name**(): `string`
 
-Returns the slot index.
+Returns the slot name.
 
 #### Returns
 
-`number`
+`string`

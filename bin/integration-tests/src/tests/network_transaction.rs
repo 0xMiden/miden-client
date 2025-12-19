@@ -148,7 +148,7 @@ async fn get_counter_contract_account(
 
 pub async fn test_counter_contract_ntx(client_config: ClientConfig) -> Result<()> {
     const BUMP_NOTE_NUMBER: u64 = 5;
-    let (mut client, mut keystore) = client_config.into_client().await?;
+    let (mut client, keystore) = client_config.into_client().await?;
     client.sync_state().await?;
 
     let network_account = deploy_counter_contract(&mut client, AccountStorageMode::Network).await?;
@@ -163,13 +163,9 @@ pub async fn test_counter_contract_ntx(client_config: ClientConfig) -> Result<()
         Word::from([ZERO, ZERO, ZERO, Felt::new(1)])
     );
 
-    let (native_account, ..) = insert_new_wallet(
-        &mut client,
-        AccountStorageMode::Public,
-        &mut keystore,
-        RPO_FALCON_SCHEME_ID,
-    )
-    .await?;
+    let (native_account, ..) =
+        insert_new_wallet(&mut client, AccountStorageMode::Public, &keystore, RPO_FALCON_SCHEME_ID)
+            .await?;
 
     let mut network_notes = vec![];
 
@@ -201,20 +197,16 @@ pub async fn test_counter_contract_ntx(client_config: ClientConfig) -> Result<()
 }
 
 pub async fn test_recall_note_before_ntx_consumes_it(client_config: ClientConfig) -> Result<()> {
-    let (mut client, mut keystore) = client_config.into_client().await?;
+    let (mut client, keystore) = client_config.into_client().await?;
     client.sync_state().await?;
 
     let network_account = deploy_counter_contract(&mut client, AccountStorageMode::Network).await?;
     let native_account = deploy_counter_contract(&mut client, AccountStorageMode::Public).await?;
 
-    let wallet = insert_new_wallet(
-        &mut client,
-        AccountStorageMode::Public,
-        &mut keystore,
-        RPO_FALCON_SCHEME_ID,
-    )
-    .await?
-    .0;
+    let wallet =
+        insert_new_wallet(&mut client, AccountStorageMode::Public, &keystore, RPO_FALCON_SCHEME_ID)
+            .await?
+            .0;
 
     let network_note = get_network_note(wallet.id(), network_account.id(), &mut client.rng())?;
     // Prepare both transactions
@@ -309,7 +301,7 @@ fn get_network_note<T: Rng>(
     )?;
 
     let script = CodeBuilder::new(true)
-        .with_dynamically_linked_library(&counter_contract_library())?
+        .with_dynamically_linked_library(counter_contract_library())?
         .compile_note_script(INCR_SCRIPT_CODE)?;
     let recipient = NoteRecipient::new(
         Word::new([

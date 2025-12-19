@@ -253,10 +253,10 @@ pub async fn test_merkle_store(client_config: ClientConfig) -> Result<()> {
 
 pub async fn test_onchain_notes_sync_with_tag(client_config: ClientConfig) -> Result<()> {
     // Client 1 has an private faucet which will mint an onchain note for client 2
-    let (mut client_1, mut keystore_1) = client_config.clone().into_client().await?;
+    let (mut client_1, keystore_1) = client_config.clone().into_client().await?;
     // Client 2 will be used to sync and check that by adding the tag we can still fetch notes
     // whose tag doesn't necessarily match any of its accounts
-    let (mut client_2, mut keystore_2) = ClientConfig::default()
+    let (mut client_2, keystore_2) = ClientConfig::default()
         .with_rpc_endpoint(client_config.rpc_endpoint())
         .into_client()
         .await?;
@@ -272,14 +272,14 @@ pub async fn test_onchain_notes_sync_with_tag(client_config: ClientConfig) -> Re
     let (basic_account_1, ..) = insert_new_wallet(
         &mut client_1,
         AccountStorageMode::Private,
-        &mut keystore_1,
+        &keystore_1,
         RPO_FALCON_SCHEME_ID,
     )
     .await?;
     insert_new_wallet(
         &mut client_2,
         AccountStorageMode::Private,
-        &mut keystore_2,
+        &keystore_2,
         RPO_FALCON_SCHEME_ID,
     )
     .await?;

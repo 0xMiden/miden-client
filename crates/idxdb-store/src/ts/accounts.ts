@@ -327,6 +327,7 @@ export async function upsertAccountStorage(storageSlots: JsStorageSlot[]) {
     let processedSlots = storageSlots.map((slot) => {
       return {
         commitment: slot.commitment,
+        slotIndex: slot.slotIndex,
         slotName: slot.slotName,
         slotValue: slot.slotValue,
         slotType: slot.slotType,

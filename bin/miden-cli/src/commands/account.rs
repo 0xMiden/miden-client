@@ -193,7 +193,7 @@ pub async fn show_account<AUTH>(
 
         let mut table = create_dynamic_table(&["Slot Name", "Slot Type", "Value/Commitment"]);
 
-        for (_idx, entry) in account_storage.slots().iter().enumerate() {
+        for entry in account_storage.slots().iter() {
             let item = account_storage.get_item(entry.name()).map_err(|err| {
                 CliError::Account(err, format!("failed to fetch slot {}", entry.name()))
             })?;
