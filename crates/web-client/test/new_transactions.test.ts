@@ -1402,36 +1402,29 @@ test.describe("executeForSummary tests", () => {
     const result = await page.evaluate(async () => {
       const client = window.client;
 
-      const alwaysUnauthorizedAuthMasm = `
-use.miden::native_account
-use.miden::auth
-
-const AUTH_UNAUTHORIZED_EVENT = event("miden::auth::unauthorized")
-
-pub proc auth_tx.1(salt: struct @bigendian { a: felt, b: felt, c: felt, d: felt })
-  exec.native_account::incr_nonce drop
-  exec.auth::create_tx_summary
-  exec.auth::adv_insert_hqword
-  exec.auth::hash_tx_summary
-  emit.AUTH_UNAUTHORIZED_EVENT
-  push.0 assert
-end
-      `;
-
       const walletSeed = new Uint8Array(32);
       crypto.getRandomValues(walletSeed);
 
-      const builder = client.createScriptBuilder();
-      const alwaysUnauthorizedComponent = window.AccountComponent.compile(
-        alwaysUnauthorizedAuthMasm,
-        builder,
-        []
-      ).withSupportsAllTypes();
+      const approverKeys = [
+        window.SecretKey.rpoFalconWithRNG(),
+        window.SecretKey.rpoFalconWithRNG(),
+        window.SecretKey.rpoFalconWithRNG(),
+      ];
+      const approverCommitments = approverKeys.map((key) =>
+        key.publicKey().toCommitment()
+      );
+      const multisigConfig = new window.AuthRpoFalcon512MultisigConfig(
+        approverCommitments,
+        2
+      );
+      const multisigComponent = window.createAuthRpoFalcon512Multisig(
+        multisigConfig
+      );
 
       const accountBuilderResult = new window.AccountBuilder(walletSeed)
         .accountType(window.AccountType.RegularAccountImmutableCode)
         .storageMode(window.AccountStorageMode.private())
-        .withAuthComponent(alwaysUnauthorizedComponent)
+        .withAuthComponent(multisigComponent)
         .withBasicWalletComponent()
         .build();
 

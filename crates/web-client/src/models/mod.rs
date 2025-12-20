@@ -42,6 +42,7 @@ pub mod account_type;
 pub mod address;
 pub mod advice_inputs;
 pub mod advice_map;
+pub mod components;
 pub mod asset_vault;
 pub mod auth_secret_key;
 pub mod basic_fungible_faucet_component;
