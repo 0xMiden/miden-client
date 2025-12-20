@@ -132,10 +132,8 @@ pub fn create_auth_rpo_falcon512_multisig(
 ) -> Result<AccountComponent, JsValue> {
     let native_config: NativeAuthRpoFalcon512MultisigConfig = config.into();
 
-    // Build storage slots manually so we can surface errors instead of panicking.
     let mut storage_slots = Vec::with_capacity(4);
 
-    // Slot 0: [threshold, num_approvers, 0, 0]
     let num_approvers = u32::try_from(native_config.approvers().len()).map_err(|e| {
         js_error_with_context(e, "Too many approvers (would truncate num_approvers)")
     })?;
@@ -146,7 +144,6 @@ pub fn create_auth_rpo_falcon512_multisig(
         0,
     ])));
 
-    // Slot 1: Approver public keys map
     let map_entries: Vec<_> = native_config
         .approvers()
         .iter()
@@ -162,10 +159,8 @@ pub fn create_auth_rpo_falcon512_multisig(
         .map_err(|e| js_error_with_context(e, "Failed to build approver map"))?;
     storage_slots.push(NativeStorageSlot::Map(approver_map));
 
-    // Slot 2: Executed transactions map (empty)
     storage_slots.push(NativeStorageSlot::Map(NativeStorageMap::default()));
 
-    // Slot 3: Procedure thresholds map
     let proc_map = NativeStorageMap::with_entries(
         native_config
             .proc_thresholds()
