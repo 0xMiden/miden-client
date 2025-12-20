@@ -82,7 +82,7 @@
 
 > **toCommitment**(): [`Word`](Word.md)
 
-Computes the commitment to this TransactionSummary.
+Computes the commitment to this `TransactionSummary`.
 
 #### Returns
 

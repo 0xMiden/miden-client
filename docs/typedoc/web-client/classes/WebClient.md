@@ -191,7 +191,7 @@ Executes a transaction and returns the `TransactionSummary`.
 
 If the transaction is unauthorized (auth script emits the unauthorized event),
 returns the summary from the error. If the transaction succeeds, constructs
-a summary from the executed transaction using the auth_arg from the transaction
+a summary from the executed transaction using the `auth_arg` from the transaction
 request as the salt (or a zero salt if not provided).
 
 # Errors

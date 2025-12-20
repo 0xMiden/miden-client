@@ -1,6 +1,5 @@
 use miden_client::account::component::{
     AccountComponent as NativeAccountComponent,
-    AuthRpoFalcon512Multisig as NativeAuthRpoFalcon512Multisig,
     AuthRpoFalcon512MultisigConfig as NativeAuthRpoFalcon512MultisigConfig,
     rpo_falcon_512_multisig_library,
 };
@@ -41,7 +40,7 @@ impl ProcedureThreshold {
     }
 }
 
-/// Multisig auth configuration for RpoFalcon512 signatures.
+/// Multisig auth configuration for `RpoFalcon512` signatures.
 #[wasm_bindgen]
 #[derive(Clone)]
 pub struct AuthRpoFalcon512MultisigConfig(NativeAuthRpoFalcon512MultisigConfig);
@@ -50,7 +49,7 @@ pub struct AuthRpoFalcon512MultisigConfig(NativeAuthRpoFalcon512MultisigConfig);
 impl AuthRpoFalcon512MultisigConfig {
     /// Build a configuration with a list of approver public key commitments and a default threshold.
     ///
-    /// `default_threshold` must be >= 1 and <= approvers.len().
+    /// `default_threshold` must be >= 1 and <= `approvers.length`.
     #[wasm_bindgen(constructor)]
     pub fn new(
         approvers: Vec<Word>,
@@ -72,7 +71,7 @@ impl AuthRpoFalcon512MultisigConfig {
         Ok(AuthRpoFalcon512MultisigConfig(config))
     }
 
-    /// Attach per-procedure thresholds. Each threshold must be >= 1 and <= approvers.len().
+    /// Attach per-procedure thresholds. Each threshold must be >= 1 and <= `approvers.length`.
     #[wasm_bindgen(js_name = "withProcThresholds")]
     pub fn with_proc_thresholds(
         self,
@@ -126,7 +125,7 @@ impl AuthRpoFalcon512MultisigConfig {
     }
 }
 
-/// Create an auth component for RpoFalcon512 multisig.
+/// Create an auth component for `RpoFalcon512` multisig.
 #[wasm_bindgen(js_name = "createAuthRpoFalcon512Multisig")]
 pub fn create_auth_rpo_falcon512_multisig(
     config: AuthRpoFalcon512MultisigConfig,
@@ -137,7 +136,9 @@ pub fn create_auth_rpo_falcon512_multisig(
     let mut storage_slots = Vec::with_capacity(4);
 
     // Slot 0: [threshold, num_approvers, 0, 0]
-    let num_approvers = native_config.approvers().len() as u32;
+    let num_approvers = u32::try_from(native_config.approvers().len()).map_err(|e| {
+        js_error_with_context(e, "Too many approvers (would truncate num_approvers)")
+    })?;
     storage_slots.push(NativeStorageSlot::Value(NativeWord::from([
         native_config.default_threshold(),
         num_approvers,
@@ -146,12 +147,18 @@ pub fn create_auth_rpo_falcon512_multisig(
     ])));
 
     // Slot 1: Approver public keys map
-    let map_entries = native_config
+    let map_entries: Vec<_> = native_config
         .approvers()
         .iter()
         .enumerate()
-        .map(|(i, pk)| (NativeWord::from([i as u32, 0, 0, 0]), (*pk).into()));
-    let approver_map = NativeStorageMap::with_entries(map_entries)
+        .map(|(i, pk)| {
+            let idx = u32::try_from(i).map_err(|e| {
+                js_error_with_context(e, "Too many approvers (would truncate approver index)")
+            })?;
+            Ok((NativeWord::from([idx, 0, 0, 0]), (*pk).into()))
+        })
+        .collect::<Result<_, JsValue>>()?;
+    let approver_map = NativeStorageMap::with_entries(map_entries.into_iter())
         .map_err(|e| js_error_with_context(e, "Failed to build approver map"))?;
     storage_slots.push(NativeStorageSlot::Map(approver_map));
 
