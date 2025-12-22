@@ -26,7 +26,7 @@ use miden_client::note::{
 use miden_client::store::{InputNoteState, TransactionFilter};
 use miden_client::testing::common::*;
 use miden_client::transaction::{OutputNote, TransactionRequestBuilder};
-use miden_client::{Client, ClientRng, Felt, ScriptBuilder, Word};
+use miden_client::{Client, ClientRng, CodeBuilder, Felt, Word};
 use rand::RngCore;
 
 use crate::tests::config::ClientConfig;
@@ -54,17 +54,31 @@ pub async fn test_pass_through(client_config: ClientConfig) -> Result<()> {
     client_2.sync_state().await?;
 
     // Create Client basic wallet (We'll call it accountA)
-    let (sender, ..) =
-        insert_new_wallet(&mut client, AccountStorageMode::Private, &authenticator_1, miden_client::auth::AuthSchemeId::RpoFalcon512).await?;
-    let (target, ..) =
-        insert_new_wallet(&mut client_2, AccountStorageMode::Private, &authenticator_2, miden_client::auth::AuthSchemeId::RpoFalcon512).await?;
+    let (sender, ..) = insert_new_wallet(
+        &mut client,
+        AccountStorageMode::Private,
+        &authenticator_1,
+        miden_client::auth::AuthSchemeId::RpoFalcon512,
+    )
+    .await?;
+    let (target, ..) = insert_new_wallet(
+        &mut client_2,
+        AccountStorageMode::Private,
+        &authenticator_2,
+        miden_client::auth::AuthSchemeId::RpoFalcon512,
+    )
+    .await?;
 
     let pass_through_account = create_pass_through_account(&mut client).await?;
 
     // Create client with faucets BTC faucet
-    let (btc_faucet_account, ..) =
-        insert_new_fungible_faucet(&mut client, AccountStorageMode::Private, &authenticator_1, miden_client::auth::AuthSchemeId::RpoFalcon512)
-            .await?;
+    let (btc_faucet_account, ..) = insert_new_fungible_faucet(
+        &mut client,
+        AccountStorageMode::Private,
+        &authenticator_1,
+        miden_client::auth::AuthSchemeId::RpoFalcon512,
+    )
+    .await?;
 
     // mint 1000 BTC for accountA
     println!("minting 1000 btc for account A");
@@ -203,7 +217,7 @@ async fn create_pass_through_account<AUTH: TransactionAuthenticator>(
 fn get_pass_through_note_script() -> NoteScript {
     let note_script_code = include_str!("../asm/PASS_THROUGH.masm");
 
-    ScriptBuilder::new(true).compile_note_script(note_script_code).unwrap()
+    CodeBuilder::new(true).compile_note_script(note_script_code).unwrap()
 }
 
 // Creates a note eventually meant for the target account.
