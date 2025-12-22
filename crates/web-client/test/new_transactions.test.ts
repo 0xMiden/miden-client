@@ -1210,7 +1210,7 @@ export const counterAccountComponent = async (
     await window.helpers.waitForBlocks(2);
 
     let account = await client.getAccount(accountBuilderResult.account.id());
-    let counter = account?.storage().getItem(0)?.toHex();
+    let counter = account?.storage().getItem(COUNTER_SLOT_NAME)?.toHex();
     let finalCounter = counter?.replace(/^0x/, "").replace(/^0+|0+$/g, "");
 
     let code = account?.code();
