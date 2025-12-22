@@ -6,6 +6,8 @@ export const testStandardFpi = async (page: Page): Promise<void> => {
     const client = window.client;
     await client.syncState();
 
+    const MAP_SLOT_NAME = "miden::testing::fpi::map_slot";
+
     // BUILD FOREIGN ACCOUNT WITH CUSTOM COMPONENT
     // --------------------------------------------------------------------------
 
@@ -22,18 +24,21 @@ export const testStandardFpi = async (page: Page): Promise<void> => {
     storageMap.insert(MAP_KEY, FPI_STORAGE_VALUE);
 
     const code = `
+            use.std::word
+
+            const MAP_SLOT = word("${MAP_SLOT_NAME}")
+
             export.get_fpi_map_item
                 # map key
                 push.15.15.15.15
-                # item index
-                push.0
+                push.MAP_SLOT[0..2]
                 exec.::miden::active_account::get_map_item
                 swapw dropw
             end
         `;
-    let builder = client.createScriptBuilder();
+    let builder = client.createCodeBuilder();
     let getItemComponent = window.AccountComponent.compile(code, builder, [
-      window.StorageSlot.map(storageMap),
+      window.StorageSlot.map(MAP_SLOT_NAME, storageMap),
     ]).withSupportsAllTypes();
 
     const walletSeed = new Uint8Array(32);
@@ -112,7 +117,7 @@ export const testStandardFpi = async (page: Page): Promise<void> => {
 
     await window.helpers.waitForBlocks(2);
 
-    let slotAndKeys = new window.SlotAndKeys(1, [MAP_KEY]);
+    let slotAndKeys = new window.SlotAndKeys(MAP_SLOT_NAME, [MAP_KEY]);
     let storageRequirements =
       window.AccountStorageRequirements.fromSlotAndKeysArray([slotAndKeys]);
 

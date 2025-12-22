@@ -10,15 +10,8 @@ use miden_client::transaction::{
 };
 use miden_client::{ClientError, async_trait};
 use miden_lib::account::auth::AuthRpoFalcon512;
-use miden_lib::transaction::TransactionKernel;
-use miden_objects::Word;
-use miden_objects::account::{
-    AccountBuilder,
-    AccountComponent,
-    AccountStorageMode,
-    StorageMap,
-    StorageSlot,
-};
+use miden_lib::account::wallets::BasicWallet;
+use miden_objects::account::{AccountBuilder, AccountStorageMode};
 use miden_objects::assembly::diagnostics::miette::GraphicalReportHandler;
 use miden_objects::asset::{Asset, FungibleAsset};
 use miden_objects::note::NoteType;
@@ -48,19 +41,8 @@ async fn transaction_creates_two_notes() {
     let pub_key = secret_key.public_key();
     keystore.add_key(&secret_key).unwrap();
 
-    let wallet_component = AccountComponent::compile(
-        "
-            export.::miden::contracts::wallets::basic::receive_asset
-            export.::miden::contracts::wallets::basic::move_asset_to_note
-        ",
-        TransactionKernel::assembler(),
-        vec![StorageSlot::Value(Word::default()), StorageSlot::Map(StorageMap::default())],
-    )
-    .unwrap()
-    .with_supports_all_types();
-
     let account = AccountBuilder::new(Default::default())
-        .with_component(wallet_component)
+        .with_component(BasicWallet)
         .with_auth_component(AuthRpoFalcon512::new(pub_key.to_commitment()))
         .with_assets([asset_1, asset_2])
         .build_existing()
@@ -107,7 +89,7 @@ async fn transaction_error_reports_source_line() {
     .unwrap();
 
     let failing_script = client
-        .script_builder()
+        .code_builder()
         .compile_tx_script("begin push.0 push.2 assert_eq end")
         .unwrap();
 

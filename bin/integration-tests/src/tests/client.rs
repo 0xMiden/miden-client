@@ -2,7 +2,14 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
-use miden_client::account::{Account, AccountId, AccountStorageMode, StorageMap, StorageSlot};
+use miden_client::account::{
+    Account,
+    AccountId,
+    AccountStorageMode,
+    StorageMap,
+    StorageSlot,
+    StorageSlotName,
+};
 use miden_client::assembly::{DefaultSourceManager, LibraryPath, Module, ModuleKind};
 use miden_client::asset::{Asset, FungibleAsset};
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
@@ -29,7 +36,7 @@ use miden_client::transaction::{
     TransactionRequestBuilder,
     TransactionStatus,
 };
-use miden_client::{ClientError, Felt, ScriptBuilder};
+use miden_client::{ClientError, CodeBuilder, Felt};
 use miden_client_sqlite_store::ClientBuilderSqliteExt;
 
 use crate::tests::config::ClientConfig;
@@ -39,7 +46,7 @@ pub async fn test_client_builder_initializes_client_with_endpoint(
 ) -> Result<()> {
     let (endpoint, _, store_config, auth_path) = client_config.as_parts();
 
-    let mut client = ClientBuilder::<FilesystemKeyStore<_>>::new()
+    let mut client = ClientBuilder::<FilesystemKeyStore>::new()
         .grpc_client(&endpoint, Some(10_000))
         .filesystem_keystore(auth_path.to_str().context("failed to convert auth path to string")?)
         .sqlite_store(store_config)
@@ -1315,14 +1322,16 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
     // Define the account code for the custom library
     let custom_code = "
         use.miden::native_account
+        use.std::word
+
+        const MAP_SLOT = word(\"miden::testing::client::map\")
 
         export.update_map
             push.1.2.3.4
             # => [VALUE]
             push.0.0.0.0
             # => [KEY, VALUE]
-            push.0
-            # => [index, KEY, VALUE]
+            push.MAP_SLOT[0..2]
             exec.native_account::set_map_item
             dropw dropw dropw dropw
         end
@@ -1334,7 +1343,9 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
         [Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(1)].into(),
     )?;
 
-    let storage_slots = vec![StorageSlot::Map(storage_map)];
+    let map_slot_name =
+        StorageSlotName::new("miden::testing::client::map").expect("slot name should be valid");
+    let storage_slots = vec![StorageSlot::with_map(map_slot_name, storage_map)];
     let (account_with_map_item, _) = insert_account_with_custom_component(
         &mut client,
         custom_code,
@@ -1358,7 +1369,7 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
         .unwrap();
     let custom_lib = assembler.assemble_library([module]).unwrap();
 
-    let tx_script = ScriptBuilder::new(true)
+    let tx_script = CodeBuilder::new(true)
         .with_statically_linked_library(&custom_lib)?
         .compile_tx_script(
             "

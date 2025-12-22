@@ -43,7 +43,7 @@ var Table;
 const db = new Dexie(DATABASE_NAME);
 db.version(1).stores({
     [Table.AccountCode]: indexes("root"),
-    [Table.AccountStorage]: indexes("[commitment+slotIndex]", "commitment"),
+    [Table.AccountStorage]: indexes("[commitment+slotName]", "commitment"),
     [Table.StorageMapEntries]: indexes("[root+key]", "root"),
     [Table.AccountAssets]: indexes("[root+vaultKey]", "root", "faucetIdPrefix"),
     [Table.AccountAuth]: indexes("pubKey"),

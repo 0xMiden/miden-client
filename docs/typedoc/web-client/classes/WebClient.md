@@ -146,6 +146,16 @@ callbacks. If `node_url` is `None`, it defaults to the testnet endpoint.
 
 ***
 
+### createCodeBuilder()
+
+> **createCodeBuilder**(): [`CodeBuilder`](CodeBuilder.md)
+
+#### Returns
+
+[`CodeBuilder`](CodeBuilder.md)
+
+***
+
 ### createMockClient()
 
 > **createMockClient**(`seed?`, `serialized_mock_chain?`, `serialized_mock_note_transport_node?`): `Promise`\<`any`\>
@@ -170,16 +180,6 @@ applications as it uses a mock chain that simulates the behavior of a real node.
 #### Returns
 
 `Promise`\<`any`\>
-
-***
-
-### createScriptBuilder()
-
-> **createScriptBuilder**(): [`ScriptBuilder`](ScriptBuilder.md)
-
-#### Returns
-
-[`ScriptBuilder`](ScriptBuilder.md)
 
 ***
 

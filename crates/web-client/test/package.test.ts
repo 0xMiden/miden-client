@@ -18,9 +18,14 @@ export const createAccountComponentFromPackage = async (
     const testPackageBytes =
       window.TestUtils.createMockSerializedLibraryPackage();
     const deserializedPackage = window.Package.deserialize(testPackageBytes);
-    let emptyStorageSlot = window.StorageSlot.emptyValue();
+    let emptyStorageSlot = window.StorageSlot.emptyValue(
+      "miden::testing::package_tests::empty_value"
+    );
     let storageMap = new window.StorageMap();
-    let storageSlotMap = window.StorageSlot.map(storageMap);
+    let storageSlotMap = window.StorageSlot.map(
+      "miden::testing::package_tests::map_slot",
+      storageMap
+    );
 
     window.AccountComponent.fromPackage(
       deserializedPackage,
