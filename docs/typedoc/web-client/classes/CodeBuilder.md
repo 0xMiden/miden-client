@@ -49,7 +49,7 @@ previous example: `use.miden::my_contract'.
 
 > **compileAccountComponent**(`account_code`, `storage_slots`): [`AccountComponent`](AccountComponent.md)
 
-Given an `AccountComponentCode`, and it's storage slots, compiles it
+Given an `AccountComponentCode`, and its storage slots, compiles it
 with the available modules under this builder. Returns the compiled account component code.
 
 #### Parameters
