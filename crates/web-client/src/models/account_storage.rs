@@ -28,11 +28,17 @@ impl AccountStorage {
         self.0.to_commitment().into()
     }
 
-    /// Returns the value stored at the given slot index, if any.
+    /// Returns the value stored at the given slot name, if any.
     #[wasm_bindgen(js_name = "getItem")]
-    pub fn get_item(&self, index: u8) -> Option<Word> {
-        let slot = self.0.slots().get(index as usize)?;
-        self.0.get_item(slot.name()).ok().map(Into::into)
+    pub fn get_item(&self, slot_name: &str) -> Option<Word> {
+        let slot_name = StorageSlotName::new(slot_name).ok()?;
+        self.0.get_item(&slot_name).ok().map(Into::into)
+    }
+
+    /// Returns the names of all storage slots on this account.
+    #[wasm_bindgen(js_name = "getSlotNames")]
+    pub fn get_slot_names(&self) -> Vec<String> {
+        self.0.slots().iter().map(|slot| slot.name().as_str().to_string()).collect()
     }
 
     /// Returns the value for a key in the map stored at the given slot, if any.

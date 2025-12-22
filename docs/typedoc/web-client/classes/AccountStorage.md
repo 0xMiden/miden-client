@@ -52,15 +52,15 @@ Returns the commitment to the full account storage.
 
 ### getItem()
 
-> **getItem**(`index`): [`Word`](Word.md)
+> **getItem**(`slot_name`): [`Word`](Word.md)
 
-Returns the value stored at the given slot index, if any.
+Returns the value stored at the given slot name, if any.
 
 #### Parameters
 
-##### index
+##### slot\_name
 
-`number`
+`string`
 
 #### Returns
 
@@ -107,3 +107,15 @@ Returns the value for a key in the map stored at the given slot, if any.
 #### Returns
 
 [`Word`](Word.md)
+
+***
+
+### getSlotNames()
+
+> **getSlotNames**(): `string`[]
+
+Returns the names of all storage slots on this account.
+
+#### Returns
+
+`string`[]
