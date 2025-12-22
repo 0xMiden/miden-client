@@ -70,8 +70,8 @@ pub fn build_package(metadata_path: &Path, library: Library, subdirectory: Optio
         .unwrap_or_else(|_| panic!("Failed to read file {}", metadata_path.display()));
 
     let template_metadata =
-        AccountComponentMetadata::from_toml(&toml_string).unwrap_or_else(|_| {
-            panic!("Failed to deserialize component metadata in {}", metadata_path.display())
+        AccountComponentMetadata::from_toml(&toml_string).unwrap_or_else(|err| {
+            panic!("Failed to deserialize component metadata in {}: {err}", metadata_path.display())
         });
 
     // NOTE: Taken from the miden-compiler's build_package function:

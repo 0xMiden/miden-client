@@ -2,9 +2,9 @@
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / ScriptBuilder
+[@demox-labs/miden-sdk](../README.md) / CodeBuilder
 
-# Class: ScriptBuilder
+# Class: CodeBuilder
 
 Utility for linking libraries and compiling transaction/note scripts.
 

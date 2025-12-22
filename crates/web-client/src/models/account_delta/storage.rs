@@ -36,7 +36,12 @@ impl AccountStorageDelta {
 
     /// Returns the new values for modified storage slots.
     pub fn values(&self) -> Vec<Word> {
-        self.0.values().values().copied().map(Into::into).collect()
+        self.0
+            .values()
+            .map(|(_slot_name, value)| value)
+            .copied()
+            .map(Into::into)
+            .collect()
     }
 }
 

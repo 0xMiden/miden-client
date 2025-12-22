@@ -1,5 +1,9 @@
 use idxdb_store::account::JsStorageMapEntry;
-use miden_client::account::{AccountStorage as NativeAccountStorage, StorageSlot};
+use miden_client::account::{
+    AccountStorage as NativeAccountStorage,
+    StorageSlotContent,
+    StorageSlotName,
+};
 use wasm_bindgen::prelude::*;
 
 use crate::models::word::Word;
@@ -21,39 +25,50 @@ pub struct AccountStorage(NativeAccountStorage);
 impl AccountStorage {
     /// Returns the commitment to the full account storage.
     pub fn commitment(&self) -> Word {
-        self.0.commitment().into()
+        self.0.to_commitment().into()
     }
 
-    /// Returns the value stored at the given slot index, if any.
+    /// Returns the value stored at the given slot name, if any.
     #[wasm_bindgen(js_name = "getItem")]
-    pub fn get_item(&self, index: u8) -> Option<Word> {
-        self.0.get_item(index).ok().map(Into::into)
+    pub fn get_item(&self, slot_name: &str) -> Option<Word> {
+        let slot_name = StorageSlotName::new(slot_name).ok()?;
+        self.0.get_item(&slot_name).ok().map(Into::into)
+    }
+
+    /// Returns the names of all storage slots on this account.
+    #[wasm_bindgen(js_name = "getSlotNames")]
+    pub fn get_slot_names(&self) -> Vec<String> {
+        self.0.slots().iter().map(|slot| slot.name().as_str().to_string()).collect()
     }
 
     /// Returns the value for a key in the map stored at the given slot, if any.
     #[wasm_bindgen(js_name = "getMapItem")]
-    pub fn get_map_item(&self, index: u8, key: &Word) -> Option<Word> {
-        self.0.get_map_item(index, key.into()).ok().map(Into::into)
+    pub fn get_map_item(&self, slot_name: &str, key: &Word) -> Option<Word> {
+        match StorageSlotName::new(slot_name) {
+            Ok(slot_name) => self.0.get_map_item(&slot_name, key.into()).ok().map(Into::into),
+            Err(_) => None,
+        }
     }
 
-    /// Get all key-value pairs from the map slot at `index`.
-    /// Returns `undefined` if the slot isn't a map or `index` is out of bounds (0-255).
+    /// Get all key-value pairs from the map slot identified by `slot_name`.
+    /// Returns `undefined` if the slot isn't a map or doesn't exist.
     /// Returns `[]` if the map exists but is empty.
     #[wasm_bindgen(js_name = "getMapEntries")]
-    pub fn get_map_entries(&self, index: u8) -> Option<Vec<JsStorageMapEntry>> {
-        let slots = self.0.slots();
-        match slots.get(index as usize) {
-            Some(StorageSlot::Map(map)) => Some(
-                map.entries()
-                    .map(|(key, value)| JsStorageMapEntry {
-                        root: map.root().to_hex(),
-                        key: key.to_hex(),
-                        value: value.to_hex(),
-                    })
-                    .collect(),
-            ),
-            _ => None,
-        }
+    pub fn get_map_entries(&self, slot_name: &str) -> Option<Vec<JsStorageMapEntry>> {
+        let slot = self.0.slots().iter().find(|slot| slot.name().as_str() == slot_name)?;
+        let StorageSlotContent::Map(map) = slot.content() else {
+            return None;
+        };
+
+        Some(
+            map.entries()
+                .map(|(key, value)| JsStorageMapEntry {
+                    root: map.root().to_hex(),
+                    key: key.to_hex(),
+                    value: value.to_hex(),
+                })
+                .collect(),
+        )
     }
 }
 

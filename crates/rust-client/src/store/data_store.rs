@@ -3,7 +3,7 @@ use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
-use miden_objects::account::{AccountId, PartialAccount, StorageSlot};
+use miden_objects::account::{AccountId, PartialAccount, StorageSlot, StorageSlotContent};
 use miden_objects::asset::{AssetVaultKey, AssetWitness};
 use miden_objects::block::{BlockHeader, BlockNumber};
 use miden_objects::crypto::merkle::{InOrderIndex, MerklePath, PartialMmr};
@@ -157,13 +157,14 @@ impl DataStore for ClientDataStore {
             .get_account_storage(account_id, AccountStorageFilter::Root(map_root))
             .await?;
 
-        match account_storage.slots().first() {
-            Some(StorageSlot::Map(map)) => {
+        match account_storage.slots().first().map(StorageSlot::content) {
+            Some(StorageSlotContent::Map(map)) => {
                 let witness = map.open(&map_key);
                 Ok(witness)
             },
-            Some(StorageSlot::Value(value)) => Err(DataStoreError::Other {
-                error_msg: format!("found StorageSlot::Value with {value} as its value.").into(),
+            Some(StorageSlotContent::Value(value)) => Err(DataStoreError::Other {
+                error_msg: format!("found StorageSlotContent::Value with {value} as its value.")
+                    .into(),
                 source: None,
             }),
             _ => Err(DataStoreError::Other {

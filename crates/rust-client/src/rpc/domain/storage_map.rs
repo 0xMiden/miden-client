@@ -1,6 +1,8 @@
+use alloc::string::ToString;
 use alloc::vec::Vec;
 
 use miden_objects::Word;
+use miden_objects::account::StorageSlotName;
 use miden_objects::block::BlockNumber;
 
 use crate::rpc::domain::MissingFieldHelper;
@@ -36,8 +38,8 @@ impl TryFrom<proto::rpc::SyncStorageMapsResponse> for StorageMapInfo {
 
         let updates = value
             .updates
-            .iter()
-            .map(|update| (*update).try_into())
+            .into_iter()
+            .map(TryInto::try_into)
             .collect::<Result<Vec<_>, _>>()?;
 
         Ok(Self {
@@ -55,8 +57,8 @@ impl TryFrom<proto::rpc::SyncStorageMapsResponse> for StorageMapInfo {
 pub struct StorageMapUpdate {
     /// Block number in which the slot was updated.
     pub block_num: BlockNumber,
-    /// Slot index ([0..255]).
-    pub slot_index: u8,
+    /// Name of the storage slot.
+    pub slot_name: StorageSlotName,
     /// The storage map key
     pub key: Word,
     /// The storage map value.
@@ -72,7 +74,8 @@ impl TryFrom<proto::rpc::StorageMapUpdate> for StorageMapUpdate {
     fn try_from(value: proto::rpc::StorageMapUpdate) -> Result<Self, Self::Error> {
         let block_num = value.block_num;
 
-        let slot_index = value.slot_index;
+        let slot_name = StorageSlotName::new(value.slot_name)
+            .map_err(|err| RpcConversionError::InvalidField(err.to_string()))?;
 
         let key: Word = value
             .key
@@ -86,7 +89,7 @@ impl TryFrom<proto::rpc::StorageMapUpdate> for StorageMapUpdate {
 
         Ok(Self {
             block_num: block_num.into(),
-            slot_index: u8::try_from(slot_index)?,
+            slot_name,
             key,
             value,
         })

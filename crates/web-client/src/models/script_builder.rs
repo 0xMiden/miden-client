@@ -1,6 +1,6 @@
 use alloc::sync::Arc;
 
-use miden_client::ScriptBuilder as NativeScriptBuilder;
+use miden_client::CodeBuilder as NativeCodeBuilder;
 use miden_client::assembly::{
     Assembler,
     Library as NativeLibrary,
@@ -22,19 +22,19 @@ use crate::models::transaction_script::TransactionScript;
 /// Utility for linking libraries and compiling transaction/note scripts.
 #[derive(Clone)]
 #[wasm_bindgen(inspectable)]
-pub struct ScriptBuilder {
+pub struct CodeBuilder {
     // We need both a builder and an assembler  since we want the capability of linking libraries,
-    // and compiling scripts. This can be done by the NativeScriptBuilder alone, but we still
+    // and compiling scripts. This can be done by the NativeCodeBuilder alone, but we still
     // need an assembler to compile an AccountComponent. After miden-base issue #1756 is complete
-    // we will be able to remove the Assembler and only use the NativeScriptBuilder.
-    builder: NativeScriptBuilder,
+    // we will be able to remove the Assembler and only use the NativeCodeBuilder.
+    builder: NativeCodeBuilder,
     assembler: Assembler,
 }
 
 #[wasm_bindgen]
-impl ScriptBuilder {
+impl CodeBuilder {
     pub(crate) fn from_source_manager(source_manager: Arc<dyn SourceManagerSync>) -> Self {
-        let builder = NativeScriptBuilder::with_source_manager(source_manager);
+        let builder = NativeCodeBuilder::with_source_manager(source_manager);
         let assembler = TransactionKernel::assembler_with_source_manager(builder.source_manager().clone())
                 // When instanced with a source manager, the builder has debug mode on by default.
                 .with_debug_mode(true);

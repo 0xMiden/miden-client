@@ -2,11 +2,21 @@
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / NetworkId
+[@demox-labs/miden-sdk](../README.md) / NetworkType
 
-# Enumeration: NetworkId
+# Enumeration: NetworkType
+
+The type of a Miden network.
 
 ## Enumeration Members
+
+### Custom
+
+> **Custom**: `3`
+
+Custom network prefix.
+
+***
 
 ### Devnet
 

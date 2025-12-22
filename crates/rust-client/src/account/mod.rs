@@ -64,6 +64,9 @@ pub use miden_objects::{
         PartialStorageMap,
         StorageMap,
         StorageSlot,
+        StorageSlotContent,
+        StorageSlotId,
+        StorageSlotName,
         StorageSlotType,
     },
     address::{Address, AddressInterface, AddressType, NetworkId},
@@ -96,16 +99,12 @@ pub mod component {
         NetworkFungibleFaucet,
     };
     pub use miden_lib::account::wallets::BasicWallet;
-    pub use miden_objects::account::{
-        AccountComponent,
-        AccountComponentMetadata,
-        FeltRepresentation,
+    pub use miden_objects::account::component::{
         InitStorageData,
-        StorageEntry,
+        StorageSlotSchema,
         StorageValueName,
-        TemplateType,
-        WordRepresentation,
     };
+    pub use miden_objects::account::{AccountComponent, AccountComponentMetadata};
 }
 
 // CLIENT METHODS

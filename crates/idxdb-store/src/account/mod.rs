@@ -12,6 +12,7 @@ use miden_client::account::{
     Address,
     StorageMap,
     StorageSlot,
+    StorageSlotName,
     StorageSlotType,
 };
 use miden_client::asset::{Asset, AssetVault};
@@ -23,7 +24,7 @@ use miden_client::store::{
     StoreError,
 };
 use miden_client::utils::Serializable;
-use miden_client::{Felt, Word};
+use miden_client::{AccountError, Word};
 
 use super::WebStore;
 use crate::account::js_bindings::idxdb_get_account_addresses;
@@ -244,26 +245,48 @@ impl WebStore {
         let account_storage_idxdb: Vec<AccountStorageIdxdbObject> =
             await_js(promise, "failed to fetch account storage").await?;
 
-        let roots = match filter {
-            AccountStorageFilter::All => account_storage_idxdb
-                .iter()
-                .map(|s| s.slot_value.clone())
-                .collect::<Vec<String>>(),
+        if account_storage_idxdb.iter().any(|s| s.slot_name.is_empty()) {
+            return Err(StoreError::DatabaseError(
+                "account storage entries are missing `slotName`; clear IndexedDB and re-sync"
+                    .to_string(),
+            ));
+        }
+
+        let filtered_slots: Vec<AccountStorageIdxdbObject> = match filter {
+            AccountStorageFilter::All => account_storage_idxdb,
             AccountStorageFilter::Root(map_root) => {
-                if !account_storage_idxdb.iter().any(|a| a.slot_value == map_root.to_hex()) {
-                    return Err(StoreError::AccountStorageRootNotFound(map_root));
+                let map_root_hex = map_root.to_hex();
+                let slot = account_storage_idxdb.into_iter().find(|s| {
+                    s.slot_value == map_root_hex
+                        && StorageSlotType::try_from(s.slot_type).ok() == Some(StorageSlotType::Map)
+                });
+                match slot {
+                    Some(slot) => vec![slot],
+                    None => return Err(StoreError::AccountStorageRootNotFound(map_root)),
                 }
-                vec![map_root.to_hex()]
             },
-            AccountStorageFilter::Index(index) => {
-                match account_storage_idxdb.iter().find(|a| a.slot_index as usize == index) {
-                    Some(account_storage) => {
-                        vec![account_storage.slot_value.clone()]
+            AccountStorageFilter::SlotName(name) => {
+                let wanted_name = name.as_str();
+                let slot =
+                    account_storage_idxdb.into_iter().find(|s| s.slot_name.as_str() == wanted_name);
+                match slot {
+                    Some(slot) => vec![slot],
+                    None => {
+                        return Err(StoreError::AccountError(
+                            AccountError::StorageSlotNameNotFound { slot_name: name },
+                        ));
                     },
-                    None => return Err(StoreError::AccountStorageIndexNotFound(index)),
                 }
             },
         };
+
+        let mut roots = Vec::new();
+        for slot in &filtered_slots {
+            let slot_type = StorageSlotType::try_from(slot.slot_type)?;
+            if slot_type == StorageSlotType::Map {
+                roots.push(slot.slot_value.clone());
+            }
+        }
 
         let promise = idxdb_get_account_storage_maps(roots);
         let account_maps_idxdb: Vec<StorageMapEntryIdxdbObject> =
@@ -272,18 +295,32 @@ impl WebStore {
         let mut maps = BTreeMap::new();
         for entry in account_maps_idxdb {
             let map = maps.entry(entry.root).or_insert_with(StorageMap::new);
-            map.insert(Word::try_from(entry.key)?, Word::try_from(entry.value)?)?;
+            map.insert(Word::try_from(entry.key.as_str())?, Word::try_from(entry.value.as_str())?)?;
         }
 
-        let slots: Vec<StorageSlot> = account_storage_idxdb
+        let slots: Vec<StorageSlot> = filtered_slots
             .into_iter()
             .map(|slot| {
-                let slot_type = StorageSlotType::try_from(Felt::new(slot.slot_type))
-                    .map_err(StoreError::DatabaseError)?;
+                let slot_name = StorageSlotName::new(slot.slot_name).map_err(|err| {
+                    StoreError::DatabaseError(format!("invalid storage slot name in db: {err}"))
+                })?;
+
+                let slot_type = StorageSlotType::try_from(slot.slot_type)?;
+
                 Ok(match slot_type {
-                    StorageSlotType::Value => StorageSlot::Value(Word::try_from(&slot.slot_value)?),
+                    StorageSlotType::Value => {
+                        StorageSlot::with_value(slot_name, Word::try_from(slot.slot_value.as_str())?)
+                    },
                     StorageSlotType::Map => {
-                        StorageSlot::Map(maps.remove(&slot.slot_value).unwrap_or_default())
+                        let map = maps.remove(&slot.slot_value).unwrap_or_else(StorageMap::new);
+                        if map.root().to_hex() != slot.slot_value {
+                            return Err(StoreError::DatabaseError(format!(
+                                "incomplete storage map for slot {slot_name} (expected root {}, got {})",
+                                slot.slot_value,
+                                map.root().to_hex(),
+                            )));
+                        }
+                        StorageSlot::with_map(slot_name, map)
                     },
                 })
             })

@@ -60,7 +60,7 @@ pub trait StoreFactory {
 ///
 /// This builder allows you to configure the various components required by the client, such as the
 /// RPC endpoint, store, RNG, and keystore. It is generic over the keystore type. By default, it
-/// uses `FilesystemKeyStore<rand::rngs::StdRng>`.
+/// uses [`FilesystemKeyStore`].
 pub struct ClientBuilder<AUTH> {
     /// An optional custom RPC client. If provided, this takes precedence over `rpc_endpoint`.
     rpc_api: Option<Arc<dyn NodeRpcClient>>,
@@ -273,10 +273,10 @@ where
 /// Marker trait to capture the bounds the builder requires for the authenticator type
 /// parameter
 pub trait BuilderAuthenticator:
-    TransactionAuthenticator + From<FilesystemKeyStore<rand::rngs::StdRng>> + 'static
+    TransactionAuthenticator + From<FilesystemKeyStore> + 'static
 {
 }
 impl<T> BuilderAuthenticator for T where
-    T: TransactionAuthenticator + From<FilesystemKeyStore<rand::rngs::StdRng>> + 'static
+    T: TransactionAuthenticator + From<FilesystemKeyStore> + 'static
 {
 }
