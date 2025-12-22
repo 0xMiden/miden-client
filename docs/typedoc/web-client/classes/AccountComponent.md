@@ -70,32 +70,6 @@ Marks the component as supporting all account types.
 
 ***
 
-### compile()
-
-> `static` **compile**(`account_code`, `builder`, `storage_slots`): `AccountComponent`
-
-Compiles account code with the given storage slots using the provided assembler.
-
-#### Parameters
-
-##### account\_code
-
-`string`
-
-##### builder
-
-[`CodeBuilder`](CodeBuilder.md)
-
-##### storage\_slots
-
-[`StorageSlot`](StorageSlot.md)[]
-
-#### Returns
-
-`AccountComponent`
-
-***
-
 ### createAuthComponentFromCommitment()
 
 > `static` **createAuthComponentFromCommitment**(`commitment`, `auth_scheme`): `AccountComponent`
