@@ -162,11 +162,26 @@ test.describe("getAccounts tests", () => {
 
 test.describe("get account with details", () => {
   test("get account with details", async ({ page }) => {
-    await page.evaluate(() => {
+    const [assetCount, balances] = await page.evaluate(async () => {
+      // This account is inserted into the genesis block when test node is started,
+      // it starts with assets from 1500 faucets, the function "build_test_faucets_and_accoung"
+      // is called when the node starts and does the setup for this account, you can find it
+      // in: miden-client/crates/testing/node-builder/src/lib.rs
       const accountID = window.AccountId.fromHex(
         "0x0a0a0a0a0a0a0a100a0a0a0a0a0a0a"
       );
-      window.client.importAccountById(accountID);
+      await window.client.importAccountById(accountID);
+      const account = await window.client.getAccount(accountID);
+      const vault = account?.vault();
+      const assets = vault?.fungibleAssets()!;
+      const assetCount = assets.length;
+      const balances = [];
+      for (const asset of assets) {
+        balances.push(vault?.getBalance(asset.faucetId()).toString());
+      }
+      return [assetCount, balances];
     }, {});
+    expect(assetCount).toBe(1501);
+    expect(balances.every((balance) => balance === "100")).toBe(true);
   });
 });

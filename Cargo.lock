@@ -2842,7 +2842,7 @@ dependencies = [
 [[package]]
 name = "miden-node-block-producer"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-node.git?branch=igamigo-refresh-lock#6b637b94ae598f2ad2a784ff76445003042d3180"
+source = "git+https://github.com/0xMiden/miden-node.git?branch=next#8b262f928c369d20f4c9cdb1032f21edb13969dc"
 dependencies = [
  "anyhow",
  "futures",
@@ -2870,7 +2870,7 @@ dependencies = [
 [[package]]
 name = "miden-node-grpc-error-macro"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-node.git?branch=igamigo-refresh-lock#6b637b94ae598f2ad2a784ff76445003042d3180"
+source = "git+https://github.com/0xMiden/miden-node.git?branch=next#8b262f928c369d20f4c9cdb1032f21edb13969dc"
 dependencies = [
  "quote",
  "syn 2.0.111",
@@ -2879,7 +2879,7 @@ dependencies = [
 [[package]]
 name = "miden-node-ntx-builder"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-node.git?branch=igamigo-refresh-lock#6b637b94ae598f2ad2a784ff76445003042d3180"
+source = "git+https://github.com/0xMiden/miden-node.git?branch=next#8b262f928c369d20f4c9cdb1032f21edb13969dc"
 dependencies = [
  "anyhow",
  "futures",
@@ -2901,7 +2901,7 @@ dependencies = [
 [[package]]
 name = "miden-node-proto"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-node.git?branch=igamigo-refresh-lock#6b637b94ae598f2ad2a784ff76445003042d3180"
+source = "git+https://github.com/0xMiden/miden-node.git?branch=next#8b262f928c369d20f4c9cdb1032f21edb13969dc"
 dependencies = [
  "anyhow",
  "fs-err",
@@ -2923,7 +2923,7 @@ dependencies = [
 [[package]]
 name = "miden-node-proto-build"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-node.git?branch=igamigo-refresh-lock#6b637b94ae598f2ad2a784ff76445003042d3180"
+source = "git+https://github.com/0xMiden/miden-node.git?branch=next#8b262f928c369d20f4c9cdb1032f21edb13969dc"
 dependencies = [
  "fs-err",
  "miette",
@@ -2934,7 +2934,7 @@ dependencies = [
 [[package]]
 name = "miden-node-rpc"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-node.git?branch=igamigo-refresh-lock#6b637b94ae598f2ad2a784ff76445003042d3180"
+source = "git+https://github.com/0xMiden/miden-node.git?branch=next#8b262f928c369d20f4c9cdb1032f21edb13969dc"
 dependencies = [
  "anyhow",
  "futures",
@@ -2961,7 +2961,7 @@ dependencies = [
 [[package]]
 name = "miden-node-store"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-node.git?branch=igamigo-refresh-lock#6b637b94ae598f2ad2a784ff76445003042d3180"
+source = "git+https://github.com/0xMiden/miden-node.git?branch=next#8b262f928c369d20f4c9cdb1032f21edb13969dc"
 dependencies = [
  "anyhow",
  "deadpool",
@@ -2994,7 +2994,7 @@ dependencies = [
 [[package]]
 name = "miden-node-utils"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-node.git?branch=igamigo-refresh-lock#6b637b94ae598f2ad2a784ff76445003042d3180"
+source = "git+https://github.com/0xMiden/miden-node.git?branch=next#8b262f928c369d20f4c9cdb1032f21edb13969dc"
 dependencies = [
  "anyhow",
  "bytes",
@@ -3024,7 +3024,7 @@ dependencies = [
 [[package]]
 name = "miden-node-validator"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-node.git?branch=igamigo-refresh-lock#6b637b94ae598f2ad2a784ff76445003042d3180"
+source = "git+https://github.com/0xMiden/miden-node.git?branch=next#8b262f928c369d20f4c9cdb1032f21edb13969dc"
 dependencies = [
  "anyhow",
  "miden-lib",
@@ -3127,7 +3127,7 @@ dependencies = [
 [[package]]
 name = "miden-remote-prover"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-node.git?branch=igamigo-refresh-lock#6b637b94ae598f2ad2a784ff76445003042d3180"
+source = "git+https://github.com/0xMiden/miden-node.git?branch=next#8b262f928c369d20f4c9cdb1032f21edb13969dc"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3172,7 +3172,7 @@ dependencies = [
 [[package]]
 name = "miden-remote-prover-client"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-node.git?branch=igamigo-refresh-lock#6b637b94ae598f2ad2a784ff76445003042d3180"
+source = "git+https://github.com/0xMiden/miden-node.git?branch=next#8b262f928c369d20f4c9cdb1032f21edb13969dc"
 dependencies = [
  "fs-err",
  "getrandom 0.3.4",

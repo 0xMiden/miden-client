@@ -321,7 +321,7 @@ impl NodeRpcClient for GrpcClient {
                 if details.vault_details.too_many_assets {
                     let req = SyncAccountVaultRequest {
                         // FIXME: What should this parameter be?
-                        block_range: None,
+                        block_range: Some(BlockRange { block_from: 0, block_to: None }),
                         account_id: Some(details.header.id().clone().into()),
                     };
                     rpc_api
