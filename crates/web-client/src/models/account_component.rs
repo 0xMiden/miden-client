@@ -16,8 +16,6 @@ use crate::models::auth::AuthScheme;
 use crate::models::auth_secret_key::AuthSecretKey;
 use crate::models::miden_arrays::StorageSlotArray;
 use crate::models::package::Package;
-use crate::models::script_builder::CodeBuilder;
-use crate::models::storage_slot::StorageSlot;
 use crate::models::word::Word;
 
 /// Procedure digest paired with whether it is an auth procedure.
@@ -58,25 +56,6 @@ pub struct AccountComponent(NativeAccountComponent);
 
 #[wasm_bindgen]
 impl AccountComponent {
-    /// Compiles account code with the given storage slots using the provided assembler.
-    pub fn compile(
-        account_code: &str,
-        builder: &CodeBuilder,
-        storage_slots: Vec<StorageSlot>,
-    ) -> Result<AccountComponent, JsValue> {
-        let native_slots: Vec<NativeStorageSlot> =
-            storage_slots.into_iter().map(Into::into).collect();
-
-        let native_library = builder
-            .clone_assembler()
-            .assemble_library([account_code])
-            .map_err(|e| JsValue::from_str(&format!("Failed to compile account component: {e}")))?;
-
-        NativeAccountComponent::new(native_library, native_slots)
-            .map(AccountComponent)
-            .map_err(|e| js_error_with_context(e, "Failed to compile account component"))
-    }
-
     /// Marks the component as supporting all account types.
     #[wasm_bindgen(js_name = "withSupportsAllTypes")]
     pub fn with_supports_all_types(mut self) -> Self {
@@ -203,5 +182,11 @@ impl From<AccountComponent> for NativeAccountComponent {
 impl From<&AccountComponent> for NativeAccountComponent {
     fn from(account_component: &AccountComponent) -> Self {
         account_component.0.clone()
+    }
+}
+
+impl From<NativeAccountComponent> for AccountComponent {
+    fn from(native: NativeAccountComponent) -> Self {
+        AccountComponent(native)
     }
 }
