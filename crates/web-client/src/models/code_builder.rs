@@ -140,7 +140,7 @@ impl CodeBuilder {
         }
     }
 
-    /// Given an `AccountComponentCode`, and it's storage slots, compiles it
+    /// Given an `AccountComponentCode`, and its storage slots, compiles it
     /// with the available modules under this builder. Returns the compiled account component code.
     #[wasm_bindgen(js_name = "compileAccountComponent")]
     pub fn compile_account_component(
