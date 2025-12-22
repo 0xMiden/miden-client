@@ -21,6 +21,7 @@
 * [BREAKING] Removed `toBech32Custom` and implemented custom id conversion for wasm derived class `NetworkId` ([#1612](https://github.com/0xMiden/miden-client/pull/1612)).
 * [BREAKING] Remove `SecretKey` model and consolidated functionality into `AuthSecretKey` ([#1592](https://github.com/0xMiden/miden-client/issues/1380))
 * Incremented the limits for various RPC calls to accommodate larger data sets ([#1621](https://github.com/0xMiden/miden-client/pull/1621)).
+* [BREAKING] Introduced named storage slots, changed `FilesystemKeystore` to not be generic over RNG ([#1626](https://github.com/0xMiden/miden-client/pull/1626)).
 
 ## 0.12.5 (2025-12-01)
 

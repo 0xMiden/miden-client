@@ -4,6 +4,7 @@ use alloc::sync::Arc;
 use idxdb_store::auth::{get_account_auth_by_pub_key, insert_account_auth};
 use miden_client::auth::{
     AuthSecretKey,
+    PublicKey,
     PublicKeyCommitment,
     Signature,
     SigningInputs,
@@ -155,5 +156,10 @@ impl<R: Rng> TransactionAuthenticator for WebKeyStore<R> {
         };
 
         Ok(signature)
+    }
+
+    // TODO: add this (related to #1417)
+    async fn get_public_key(&self, _pub_key_commitment: PublicKeyCommitment) -> Option<&PublicKey> {
+        None
     }
 }
