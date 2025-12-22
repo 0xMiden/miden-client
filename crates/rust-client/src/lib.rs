@@ -67,7 +67,6 @@
 //! use miden_objects::crypto::rand::FeltRng;
 //! use miden_objects::{MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES};
 //! use rand::Rng;
-//! use rand::rngs::StdRng;
 //!
 //! # pub async fn create_test_client() -> Result<(), Box<dyn std::error::Error>> {
 //! // Create the SQLite store from the client configuration.
@@ -96,7 +95,7 @@
 //!
 //! // Instantiate the client using a gRPC client
 //! let endpoint = Endpoint::new("https".into(), "localhost".into(), Some(57291));
-//! let client: Client<FilesystemKeyStore<StdRng>> = Client::new(
+//! let client: Client<FilesystemKeyStore> = Client::new(
 //!     Arc::new(GrpcClient::new(&endpoint, 10_000)),
 //!     Box::new(rng),
 //!     store,
@@ -302,7 +301,7 @@ pub mod testing {
 
 use alloc::sync::Arc;
 
-pub use miden_lib::utils::{Deserializable, ScriptBuilder, Serializable, SliceReader};
+pub use miden_lib::utils::{CodeBuilder, Deserializable, Serializable, SliceReader};
 pub use miden_objects::block::BlockNumber;
 use miden_objects::crypto::rand::FeltRng;
 use miden_tx::LocalTransactionProver;
@@ -434,9 +433,9 @@ where
         self.exec_options.enable_debugging()
     }
 
-    /// Returns an instance of the `ScriptBuilder`
-    pub fn script_builder(&self) -> ScriptBuilder {
-        ScriptBuilder::with_source_manager(self.source_manager.clone())
+    /// Returns an instance of the `CodeBuilder`
+    pub fn code_builder(&self) -> CodeBuilder {
+        CodeBuilder::with_source_manager(self.source_manager.clone())
     }
 
     /// Returns a reference to the client's random number generator. This can be used to generate

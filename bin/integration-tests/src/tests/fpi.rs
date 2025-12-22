@@ -8,6 +8,7 @@ use miden_client::account::{
     PartialStorage,
     StorageMap,
     StorageSlot,
+    StorageSlotName,
 };
 use miden_client::auth::{
     AuthEcdsaK256Keccak,
@@ -16,15 +17,11 @@ use miden_client::auth::{
     AuthSecretKey,
     RPO_FALCON_SCHEME_ID,
 };
+use miden_client::keystore::FilesystemKeyStore;
 use miden_client::rpc::domain::account::{AccountStorageRequirements, StorageMapKey};
 use miden_client::testing::common::*;
-use miden_client::transaction::{
-    AdviceInputs,
-    ForeignAccount,
-    TransactionKernel,
-    TransactionRequestBuilder,
-};
-use miden_client::{Felt, ScriptBuilder, Word};
+use miden_client::transaction::{AdviceInputs, ForeignAccount, TransactionRequestBuilder};
+use miden_client::{CodeBuilder, Felt, Word};
 
 use crate::tests::config::ClientConfig;
 
@@ -32,6 +29,7 @@ use crate::tests::config::ClientConfig;
 // ================================================================================================
 
 const MAP_KEY: [Felt; 4] = [Felt::new(15), Felt::new(15), Felt::new(15), Felt::new(15)];
+const MAP_SLOT_NAME: &str = "miden::testing::fpi::map";
 const FPI_STORAGE_VALUE: [Felt; 4] =
     [Felt::new(9u64), Felt::new(12u64), Felt::new(18u64), Felt::new(30u64)];
 
@@ -44,23 +42,27 @@ pub async fn test_standard_fpi_private(client_config: ClientConfig) -> Result<()
 }
 
 pub async fn test_fpi_execute_program(client_config: ClientConfig) -> Result<()> {
-    let (mut client, mut keystore) = client_config.clone().into_client().await?;
+    let (mut client, keystore) = client_config.clone().into_client().await?;
     client.sync_state().await?;
 
     // Deploy a foreign account
     let (foreign_account, proc_root) = deploy_foreign_account(
         &mut client,
-        &mut keystore,
+        &keystore,
         AccountStorageMode::Public,
         format!(
-            "export.get_fpi_map_item
+            r#"
+            const MAP_STORAGE_SLOT = word("{MAP_SLOT_NAME}")
+            export.get_fpi_map_item
                 # map key
                 push.{map_key}
-                # item index
-                push.0
+
+                # item slot
+                push.MAP_STORAGE_SLOT[0..2]
+                
                 exec.::miden::active_account::get_map_item
                 swapw dropw
-            end",
+            end"#,
             map_key = Word::from(MAP_KEY)
         ),
         RPO_FALCON_SCHEME_ID,
@@ -85,14 +87,15 @@ pub async fn test_fpi_execute_program(client_config: ClientConfig) -> Result<()>
         account_id_suffix = foreign_account_id.suffix(),
     );
 
-    let tx_script = client.script_builder().compile_tx_script(&code)?;
+    let tx_script = client.code_builder().compile_tx_script(&code)?;
     client.sync_state().await?;
 
     // Wait for a couple of blocks so that the account gets committed
     wait_for_blocks(&mut client, 2).await;
 
+    let map_slot_name = StorageSlotName::new(MAP_SLOT_NAME).expect("slot name should be valid");
     let storage_requirements =
-        AccountStorageRequirements::new([(1u8, &[StorageMapKey::from(MAP_KEY)])]);
+        AccountStorageRequirements::new([(map_slot_name, &[StorageMapKey::from(MAP_KEY)])]);
 
     // We create a new client here to force the creation of a new, fresh prover with no previous
     // MAST forest data.
@@ -129,22 +132,27 @@ pub async fn test_fpi_execute_program(client_config: ClientConfig) -> Result<()>
 }
 
 pub async fn test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
-    let (mut client, mut keystore) = client_config.clone().into_client().await?;
+    let (mut client, keystore) = client_config.clone().into_client().await?;
     wait_for_node(&mut client).await;
 
     let (inner_foreign_account, inner_proc_root) = deploy_foreign_account(
         &mut client,
-        &mut keystore,
+        &keystore,
         AccountStorageMode::Public,
         format!(
-            "export.get_fpi_map_item
+            r#"
+            const STORAGE_MAP_SLOT = word("{MAP_SLOT_NAME}")
+            export.get_fpi_map_item
                 # map key
                 push.{map_key}
-                # item index
-                push.0
+
+                # push item slot
+                push.STORAGE_MAP_SLOT[0..2]
+
+                # get item
                 exec.::miden::active_account::get_map_item
                 swapw dropw
-            end",
+            end"#,
             map_key = Word::from(MAP_KEY)
         ),
         RPO_FALCON_SCHEME_ID,
@@ -154,7 +162,7 @@ pub async fn test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
 
     let (outer_foreign_account, outer_proc_root) = deploy_foreign_account(
         &mut client,
-        &mut keystore,
+        &keystore,
         AccountStorageMode::Public,
         format!(
             "
@@ -204,7 +212,7 @@ pub async fn test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
         account_id_suffix = outer_foreign_account_id.suffix(),
     );
 
-    let tx_script = ScriptBuilder::new(true).compile_tx_script(tx_script)?;
+    let tx_script = client.code_builder().compile_tx_script(&tx_script)?;
     client.sync_state().await?;
 
     // Wait for a couple of blocks so that the account gets committed
@@ -214,8 +222,9 @@ pub async fn test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
     let builder = TransactionRequestBuilder::new().custom_script(tx_script);
 
     // We will require slot 0, key `MAP_KEY` as well as account proof
+    let map_slot_name = StorageSlotName::new(MAP_SLOT_NAME).expect("slot name should be valid");
     let storage_requirements =
-        AccountStorageRequirements::new([(1u8, &[StorageMapKey::from(MAP_KEY)])]);
+        AccountStorageRequirements::new([(map_slot_name, &[StorageMapKey::from(MAP_KEY)])]);
 
     let foreign_accounts = [
         ForeignAccount::public(inner_foreign_account_id, storage_requirements.clone())?,
@@ -258,22 +267,26 @@ async fn standard_fpi(
     client_config: ClientConfig,
     auth_scheme: AuthSchemeId,
 ) -> Result<()> {
-    let (mut client, mut keystore) = client_config.clone().into_client().await?;
+    let (mut client, keystore) = client_config.clone().into_client().await?;
     wait_for_node(&mut client).await;
 
     let (foreign_account, proc_root) = deploy_foreign_account(
         &mut client,
-        &mut keystore,
+        &keystore,
         storage_mode,
         format!(
-            "export.get_fpi_map_item
+            r#"
+            const STORAGE_MAP_SLOT = word("{MAP_SLOT_NAME}")
+            export.get_fpi_map_item
                 # map key
                 push.{map_key}
-                # item index
-                push.0
+
+                # push item slot name 
+                push.STORAGE_MAP_SLOT[0..2]
+                
                 exec.::miden::active_account::get_map_item
                 swapw dropw
-            end",
+            end"#,
             map_key = Word::from(MAP_KEY)
         ),
         auth_scheme,
@@ -305,7 +318,7 @@ async fn standard_fpi(
         account_id_suffix = foreign_account_id.suffix(),
     );
 
-    let tx_script = ScriptBuilder::new(true).compile_tx_script(tx_script)?;
+    let tx_script = client.code_builder().compile_tx_script(&tx_script)?;
     client.sync_state().await?;
 
     // Wait for a couple of blocks so that the account gets committed
@@ -320,8 +333,9 @@ async fn standard_fpi(
     let builder = TransactionRequestBuilder::new().custom_script(tx_script);
 
     // We will require slot 0, key `MAP_KEY` as well as account proof
+    let map_slot_name = StorageSlotName::new(MAP_SLOT_NAME).expect("slot name should be valid");
     let storage_requirements =
-        AccountStorageRequirements::new([(1u8, &[StorageMapKey::from(MAP_KEY)])]);
+        AccountStorageRequirements::new([(map_slot_name, &[StorageMapKey::from(MAP_KEY)])]);
 
     let foreign_account = if storage_mode == AccountStorageMode::Public {
         ForeignAccount::public(foreign_account_id, storage_requirements)
@@ -363,7 +377,12 @@ async fn standard_fpi(
     )
     .await?;
 
-    _ = client2.submit_new_transaction(native_account.id(), tx_request).await?;
+    let block_before_wait = client2.get_sync_height().await.unwrap();
+    wait_for_blocks_no_sync(&mut client2, 2).await;
+
+    // Second client should be able to submit a transaction
+    // Without being synced to latest state
+    let _ = client2.submit_new_transaction(native_account.id(), tx_request).await?;
 
     // After the transaction the foreign account should be cached (for public accounts only)
     if storage_mode == AccountStorageMode::Public {
@@ -371,6 +390,18 @@ async fn standard_fpi(
             client2.test_store().get_foreign_account_code(vec![foreign_account_id]).await?;
         assert_eq!(foreign_accounts.len(), 1);
     }
+
+    let block_after_wait = client2.get_sync_height().await.unwrap();
+
+    // Submitted transaction should not have provoked a sync
+    assert_eq!(block_before_wait, block_after_wait);
+
+    client2.sync_state().await?;
+    let block_after_sync = client2.get_sync_height().await.unwrap();
+
+    // After syncing with the network, the client should be synced to the latest block
+    assert!(block_after_wait < block_after_sync);
+
     Ok(())
 }
 
@@ -392,13 +423,15 @@ fn foreign_account_with_code(
     let mut storage_map = StorageMap::new();
     storage_map.insert(MAP_KEY.into(), FPI_STORAGE_VALUE.into())?;
 
-    let get_item_component = AccountComponent::compile(
-        code,
-        TransactionKernel::assembler(),
-        vec![StorageSlot::Map(storage_map)],
-    )
-    .context("failed to compile foreign account component")?
-    .with_supports_all_types();
+    let map_slot_name = StorageSlotName::new(MAP_SLOT_NAME).expect("slot name should be valid");
+    let map_slot = StorageSlot::with_map(map_slot_name, storage_map);
+    let component_code = CodeBuilder::default()
+        .compile_component_code("miden::testing::fpi_component", code)
+        .context("failed to compile foreign account component code")?;
+    let get_item_component = AccountComponent::new(component_code, vec![map_slot])
+        .map_err(|err| anyhow::anyhow!(err))
+        .context("failed to create foreign account component")?
+        .with_supports_all_types();
 
     let (key_pair, auth_component) = match auth_scheme {
         AuthSchemeId::RpoFalcon512 => {
@@ -443,7 +476,7 @@ fn foreign_account_with_code(
 /// - `Word` - The procedure root of the foreign account.
 async fn deploy_foreign_account(
     client: &mut TestClient,
-    keystore: &mut TestClientKeyStore,
+    keystore: &FilesystemKeyStore,
     storage_mode: AccountStorageMode,
     code: String,
     auth_scheme: AuthSchemeId,

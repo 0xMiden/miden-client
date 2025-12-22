@@ -177,7 +177,7 @@ export interface JsVaultAsset {
 
 export interface JsStorageSlot {
   commitment: string;
-  slotIndex: number;
+  slotName: string;
   slotValue: string;
   slotType: number;
 }

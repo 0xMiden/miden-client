@@ -70,17 +70,17 @@ Returns the value stored at the given slot index, if any.
 
 ### getMapEntries()
 
-> **getMapEntries**(`index`): [`JsStorageMapEntry`](JsStorageMapEntry.md)[]
+> **getMapEntries**(`slot_name`): [`JsStorageMapEntry`](JsStorageMapEntry.md)[]
 
-Get all key-value pairs from the map slot at `index`.
-Returns `undefined` if the slot isn't a map or `index` is out of bounds (0-255).
+Get all key-value pairs from the map slot identified by `slot_name`.
+Returns `undefined` if the slot isn't a map or doesn't exist.
 Returns `[]` if the map exists but is empty.
 
 #### Parameters
 
-##### index
+##### slot\_name
 
-`number`
+`string`
 
 #### Returns
 
@@ -90,15 +90,15 @@ Returns `[]` if the map exists but is empty.
 
 ### getMapItem()
 
-> **getMapItem**(`index`, `key`): [`Word`](Word.md)
+> **getMapItem**(`slot_name`, `key`): [`Word`](Word.md)
 
 Returns the value for a key in the map stored at the given slot, if any.
 
 #### Parameters
 
-##### index
+##### slot\_name
 
-`number`
+`string`
 
 ##### key
 

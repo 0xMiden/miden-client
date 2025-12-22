@@ -84,7 +84,7 @@ impl BlockHeader {
     /// Returns the proof commitment.
     #[wasm_bindgen(js_name = "proofCommitment")]
     pub fn proof_commitment(&self) -> Word {
-        self.0.proof_commitment().into()
+        self.0.commitment().into()
     }
 
     /// Returns the block timestamp.

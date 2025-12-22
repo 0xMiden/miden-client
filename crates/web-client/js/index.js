@@ -106,15 +106,15 @@ export class WebClient {
    *   parameter is the serialized public key (from `PublicKey.serialize()`). Return the
    *   corresponding secret key as a `Uint8Array`, or `null`/`undefined` if not found. The
    *   return value may be provided synchronously or via a `Promise`.
-   * @param {(pubKey: Uint8Array, secretKey: Uint8Array) => Promise<void> | void} [insertKeyCb]
+   * @param {(pubKey: Uint8Array, AuthSecretKey: Uint8Array) => Promise<void> | void} [insertKeyCb]
    *   - Callback to persist a secret key. `pubKey` is the serialized public key, and
-   *   `secretKey` is the serialized secret key (from `SecretKey.serialize()`). May return
+   *   `authSecretKey` is the serialized secret key (from `AuthSecretKey.serialize()`). May return
    *   `void` or a `Promise<void>`.
-   * @param {(pubKey: Uint8Array, signingInputs: Uint8Array) => Promise<Array<number | string>> | Array<number | string>} [signCb]
-   *   - Callback to produce signature elements for the provided inputs. `pubKey` is the
+   * @param {(pubKey: Uint8Array, signingInputs: Uint8Array) => Promise<Uint8Array> | Uint8Array} [signCb]
+   *   - Callback to produce serialized signature bytes for the provided inputs. `pubKey` is the
    *   serialized public key, and `signingInputs` is a `Uint8Array` produced by
-   *   `SigningInputs.serialize()`. Must return an array of numeric values (numbers or numeric
-   *   strings) representing the signature elements, either directly or wrapped in a `Promise`.
+   *   `SigningInputs.serialize()`. Must return a `Uint8Array` containing the serialized
+   *   signature, either directly or wrapped in a `Promise`.
    */
   constructor(rpcUrl, noteTransportUrl, seed, getKeyCb, insertKeyCb, signCb) {
     this.rpcUrl = rpcUrl;

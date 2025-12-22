@@ -8,7 +8,7 @@ use miden_client::account::{
     AccountId,
     AccountStorage,
     Address,
-    StorageSlot,
+    StorageSlotContent,
 };
 use miden_client::asset::AssetVault;
 use miden_client::store::{AccountStatus, StoreError};
@@ -43,13 +43,9 @@ pub async fn upsert_account_code(account_code: &AccountCode) -> Result<(), JsVal
 pub async fn upsert_account_storage(account_storage: &AccountStorage) -> Result<(), JsValue> {
     let mut slots = vec![];
     let mut maps = vec![];
-    for (index, slot) in account_storage.slots().iter().enumerate() {
-        slots.push(JsStorageSlot::from_slot(
-            slot,
-            u8::try_from(index).expect("Indexes in account storage should be less than 256"),
-            account_storage.commitment(),
-        ));
-        if let StorageSlot::Map(map) = slot {
+    for slot in account_storage.slots() {
+        slots.push(JsStorageSlot::from_slot(slot, account_storage.to_commitment()));
+        if let StorageSlotContent::Map(map) = slot.content() {
             maps.extend(JsStorageMapEntry::from_map(map));
         }
     }
@@ -75,7 +71,7 @@ pub async fn upsert_account_asset_vault(asset_vault: &AssetVault) -> Result<(), 
 pub async fn upsert_account_record(account: &Account) -> Result<(), JsValue> {
     let account_id_str = account.id().to_string();
     let code_root = account.code().commitment().to_string();
-    let storage_root = account.storage().commitment().to_string();
+    let storage_root = account.storage().to_commitment().to_string();
     let vault_root = account.vault().root().to_string();
     let committed = account.is_public();
     let nonce = account.nonce().to_string();

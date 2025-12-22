@@ -1,4 +1,6 @@
 use miden_objects::block::{BlockHeader, BlockNumber, FeeParameters};
+use miden_objects::crypto::dsa::ecdsa_k256_keccak;
+use miden_objects::utils::{Deserializable, Serializable};
 
 use crate::rpc::domain::MissingFieldHelper;
 use crate::rpc::errors::RpcConversionError;
@@ -18,10 +20,12 @@ impl From<&BlockHeader> for proto::blockchain::BlockHeader {
             nullifier_root: Some(header.nullifier_root().into()),
             note_root: Some(header.note_root().into()),
             tx_commitment: Some(header.tx_commitment().into()),
+            validator_key: Some(proto::blockchain::ValidatorPublicKey {
+                validator_key: header.validator_key().to_bytes(),
+            }),
             tx_kernel_commitment: Some(header.tx_kernel_commitment().into()),
-            proof_commitment: Some(header.proof_commitment().into()),
-            timestamp: header.timestamp(),
             fee_parameters: Some(header.fee_parameters().into()),
+            timestamp: header.timestamp(),
         }
     }
 }
@@ -51,6 +55,12 @@ impl TryFrom<proto::blockchain::BlockHeader> for BlockHeader {
     type Error = RpcConversionError;
 
     fn try_from(value: proto::blockchain::BlockHeader) -> Result<Self, Self::Error> {
+        let validator_key_bytes = value
+            .validator_key
+            .ok_or(proto::blockchain::BlockHeader::missing_field(stringify!(validator_key)))?
+            .validator_key;
+        let validator_key = ecdsa_k256_keccak::PublicKey::read_from_bytes(&validator_key_bytes)?;
+
         Ok(BlockHeader::new(
             value.version,
             value
@@ -86,10 +96,7 @@ impl TryFrom<proto::blockchain::BlockHeader> for BlockHeader {
                     tx_kernel_commitment
                 )))?
                 .try_into()?,
-            value
-                .proof_commitment
-                .ok_or(proto::blockchain::BlockHeader::missing_field(stringify!(proof_commitment)))?
-                .try_into()?,
+            validator_key,
             value
                 .fee_parameters
                 .ok_or(proto::blockchain::BlockHeader::missing_field(stringify!(fee_parameters)))?

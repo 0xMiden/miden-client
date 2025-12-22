@@ -6,7 +6,7 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
 use miden_lib::account::interface::{AccountInterface, AccountInterfaceError};
-use miden_lib::utils::{ScriptBuilder, ScriptBuilderError};
+use miden_lib::utils::{CodeBuilder, CodeBuilderError};
 use miden_objects::account::AccountId;
 use miden_objects::crypto::merkle::{MerkleError, MerkleStore};
 use miden_objects::note::{Note, NoteDetails, NoteId, NoteRecipient, NoteTag, PartialNote};
@@ -323,7 +323,7 @@ impl TransactionRequest {
             Some(TransactionScriptTemplate::SendNotes(notes)) => Ok(account_interface
                 .build_send_notes_script(notes, self.expiration_delta, in_debug_mode.into())?),
             None => {
-                let empty_script = ScriptBuilder::new(true).compile_tx_script("begin nop end")?;
+                let empty_script = CodeBuilder::new(true).compile_tx_script("begin nop end")?;
 
                 Ok(empty_script)
             },
@@ -458,7 +458,7 @@ pub enum TransactionRequestError {
     #[error("pay to id note doesn't contain at least one asset")]
     P2IDNoteWithoutAsset,
     #[error("error building script: {0}")]
-    ScriptBuilderError(#[from] ScriptBuilderError),
+    CodeBuilderError(#[from] CodeBuilderError),
     #[error("transaction script template error: {0}")]
     ScriptTemplateError(String),
     #[error("storage slot {0} not found in account ID {1}")]
@@ -484,7 +484,13 @@ mod tests {
     use miden_lib::note::create_p2id_note;
     use miden_lib::testing::account_component::MockAccountComponent;
     use miden_objects::account::auth::PublicKeyCommitment;
-    use miden_objects::account::{AccountBuilder, AccountComponent, AccountId, AccountType};
+    use miden_objects::account::{
+        AccountBuilder,
+        AccountComponent,
+        AccountId,
+        AccountType,
+        StorageSlotName,
+    };
     use miden_objects::asset::FungibleAsset;
     use miden_objects::crypto::rand::{FeltRng, RpoRandomCoin};
     use miden_objects::note::{NoteTag, NoteType};
@@ -565,7 +571,10 @@ mod tests {
             .foreign_accounts([
                 ForeignAccount::public(
                     target_id,
-                    AccountStorageRequirements::new([(5u8, &[Word::default()])]),
+                    AccountStorageRequirements::new([(
+                        StorageSlotName::new("demo::storage_slot").unwrap(),
+                        &[Word::default()],
+                    )]),
                 )
                 .unwrap(),
                 ForeignAccount::private(&account).unwrap(),

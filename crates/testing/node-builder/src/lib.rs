@@ -28,6 +28,7 @@ use miden_objects::account::auth::AuthSecretKey;
 use miden_objects::account::{Account, AccountBuilder, AccountComponent, AccountFile};
 use miden_objects::asset::{Asset, FungibleAsset, TokenSymbol};
 use miden_objects::block::FeeParameters;
+use miden_objects::crypto::dsa::ecdsa_k256_keccak;
 use miden_objects::testing::account_id::ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET;
 use miden_objects::{Felt, ONE};
 use rand_chacha::ChaCha20Rng;
@@ -117,12 +118,15 @@ impl NodeBuilder {
             .as_secs()
             .try_into()
             .expect("timestamp should fit into u32");
+        let validator_signer = ecdsa_k256_keccak::SecretKey::new();
+
         let genesis_state = GenesisState::new(
             [&[account_file.account][..], &test_faucets_and_account[..]].concat(),
             FeeParameters::new(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET.try_into().unwrap(), 0u32)
                 .unwrap(),
             version,
             timestamp,
+            validator_signer.clone(),
         );
 
         // Bootstrap the store database
@@ -197,6 +201,7 @@ impl NodeBuilder {
                     Validator {
                         address: validator_address,
                         grpc_timeout: DEFAULT_TIMEOUT_DURATION,
+                        signer: validator_signer,
                     }
                     .serve()
                     .await
@@ -213,11 +218,14 @@ impl NodeBuilder {
                     Url::parse(&format!("http://{block_producer_address}"))
                         .context("Failed to parse URL")?,
                 );
+                let validator_url = Url::parse(&format!("http://{validator_address}"))
+                    .context("Failed to parse URL")?;
 
                 Rpc {
                     listener: grpc_rpc,
                     store_url,
                     block_producer_url,
+                    validator_url,
                     grpc_timeout: DEFAULT_TIMEOUT_DURATION,
                 }
                 .serve()
@@ -349,7 +357,7 @@ impl NodeBuilder {
                     Duration::from_millis(200),
                     production_checkpoint,
                 )
-                .serve_new()
+                .run()
                 .await
                 .context("failed while serving ntx builder component")
             })

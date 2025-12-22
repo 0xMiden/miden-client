@@ -10,7 +10,8 @@ use miden_objects::account::{
     Account, AccountCode, AccountId, AccountStorage, StorageMap, StorageSlot, StorageSlotType,
 };
 use miden_objects::address::NetworkId;
-use miden_objects::block::{AccountWitness, BlockHeader, BlockNumber, ProvenBlock};
+use miden_objects::block::account_tree::AccountWitness;
+use miden_objects::block::{BlockHeader, BlockNumber, ProvenBlock};
 use miden_objects::crypto::merkle::{Forest, MerklePath, MmrProof, SmtProof};
 use miden_objects::note::{NoteId, NoteScript, NoteTag, Nullifier};
 use miden_objects::transaction::{ProvenTransaction, TransactionInputs};
@@ -21,10 +22,11 @@ use miden_tx::utils::sync::RwLock;
 use tonic::Status;
 use tracing::info;
 
-use super::domain::account::{AccountProof, AccountProofs, AccountUpdateSummary};
+use super::domain::account::{AccountProof, AccountUpdateSummary};
 use super::domain::note::FetchedNote;
 use super::domain::nullifier::NullifierUpdate;
 use super::generated::rpc::account_proof_request::AccountDetailRequest;
+use super::generated::rpc::account_proof_request::account_detail_request::storage_map_detail_request;
 use super::generated::rpc::{AccountProofRequest, SyncAccountVaultRequest};
 use super::{
     Endpoint, FetchedAccount, NodeRpcClient, NodeRpcClientEndpoint, NoteSyncInfo, RpcError,
@@ -36,7 +38,7 @@ use crate::rpc::domain::transaction::TransactionsInfo;
 use crate::rpc::errors::{AcceptHeaderError, GrpcError, RpcConversionError};
 use crate::rpc::generated::rpc::account_proof_request::account_detail_request::StorageMapDetailRequest;
 use crate::rpc::generated::rpc::{BlockRange, SyncStorageMapsRequest};
-use crate::rpc::{NOTE_IDS_LIMIT, NULLIFIER_PREFIXES_LIMIT, generated as proto};
+use crate::rpc::{AccountStateAt, NOTE_IDS_LIMIT, NULLIFIER_PREFIXES_LIMIT, generated as proto};
 use crate::transaction::ForeignAccount;
 
 mod api_client;
@@ -342,9 +344,17 @@ impl NodeRpcClient for GrpcClient {
                 }
             };
             let response_slots = details.storage_details.header.slots();
+            let map_details = details
+                .storage_details
+                .map_details
+                .into_iter()
+                .map(|map_detail| {
+                    (map_detail.slot_name, (map_detail.too_many_entries, map_detail.entries))
+                })
+                .collect::<BTreeMap<_, _>>();
             let mut slots = vec![];
-            for (index, (slot_type, slot_value)) in response_slots.enumerate() {
-                match slot_type {
+            for (index, slot_header) in response_slots.enumerate() {
+                match slot_header.slot_type() {
                     // FIXME:
                     // - Should we specify a BlockRange?.
                     // - Remove unwraps.
@@ -352,11 +362,19 @@ impl NodeRpcClient for GrpcClient {
                     // - Each entry from the storage details has a
                     // 'too_many_entries' should this be only a single request?
                     // - Avoid using 'extend' 2 times.
-                    StorageSlotType::Value => slots.push(StorageSlot::Value(*slot_value)),
+                    StorageSlotType::Value => {
+                        slots.push(miden_objects::account::StorageSlot::with_value(
+                            slot_header.name().clone(),
+                            slot_header.value(),
+                        ))
+                    },
                     StorageSlotType::Map => {
-                        let map_details = &details.storage_details.map_details[index];
+                        let (too_many_entries, entries) = map_details
+                            .get(slot_header.name())
+                            // FIXME: Remove unwrap
+                            .unwrap();
                         let mut map_entries = vec![];
-                        if map_details.too_many_entries {
+                        if *too_many_entries {
                             map_entries.extend(
                                 rpc_api
                             .sync_storage_maps(SyncStorageMapsRequest {
@@ -385,14 +403,17 @@ impl NodeRpcClient for GrpcClient {
                             }),
                             )
                         } else {
-                            map_entries.extend(map_details.entries.iter().map(|e| {
+                            map_entries.extend(entries.into_iter().map(|e| {
                                 let key: Word = e.key.into();
                                 let value: Word = e.value.into();
                                 (key, value)
                             }))
                         }
 
-                        slots.push(StorageSlot::Map(StorageMap::with_entries(map_entries).unwrap()))
+                        slots.push(miden_objects::account::StorageSlot::with_map(
+                            slot_header.name().clone(),
+                            StorageMap::with_entries(map_entries).unwrap(),
+                        ));
                     },
                 }
             }
@@ -412,93 +433,96 @@ impl NodeRpcClient for GrpcClient {
         }
     }
 
-    /// Sends a `GetAccountProofs` request to the Miden node, and extracts a list of [AccountProof]
-    /// from the response, as well as the block number that they were retrieved for.
+    /// Sends a `GetAccountProof` request to the Miden node, and extracts the [AccountProof]
+    /// from the response, as well as the block number that it was retrieved for.
     ///
     /// # Errors
     ///
     /// This function will return an error if:
     ///
-    /// - One of the requested Accounts isn't returned by the node.
+    /// - The requested Account isn't returned by the node.
     /// - There was an error sending the request to the node.
     /// - The answer had a `None` for one of the expected fields.
     /// - There is an error during storage deserialization.
-    async fn get_account_proofs(
+    async fn get_account_proof(
         &self,
-        account_requests: &BTreeSet<ForeignAccount>,
-        known_account_codes: BTreeMap<AccountId, AccountCode>,
-    ) -> Result<AccountProofs, RpcError> {
-        let (header, _) = self.get_block_header_by_number(None, false).await?;
-        if account_requests.is_empty() {
-            return Ok((header.block_num(), Vec::new()));
+        foreign_account: ForeignAccount,
+        account_state: AccountStateAt,
+        known_account_code: Option<AccountCode>,
+    ) -> Result<(BlockNumber, AccountProof), RpcError> {
+        let mut known_codes_by_commitment: BTreeMap<Word, AccountCode> = BTreeMap::new();
+        if let Some(account_code) = known_account_code {
+            known_codes_by_commitment.insert(account_code.commitment(), account_code);
         }
-
-        let known_codes_by_commitment: BTreeMap<Word, AccountCode> =
-            known_account_codes.values().cloned().map(|c| (c.commitment(), c)).collect();
 
         let mut rpc_api = self.ensure_connected().await?;
 
-        let block_num = header.block_num();
-        let mut account_proofs = Vec::with_capacity(account_requests.len());
-
         // Request proofs one-by-one using the singular API
-        for foreign_account in account_requests {
-            let account_id = foreign_account.account_id();
-            let storage_requirements = foreign_account.storage_slot_requirements();
+        let account_id = foreign_account.account_id();
+        let storage_requirements = foreign_account.storage_slot_requirements();
 
-            let storage_maps: Vec<StorageMapDetailRequest> = storage_requirements.clone().into();
+        let storage_maps: Vec<StorageMapDetailRequest> = storage_requirements.clone().into();
 
-            // Only request details for public accounts; include known code commitment for this
-            // account when available
-            let account_details = if account_id.is_public() {
-                Some(proto::rpc::account_proof_request::AccountDetailRequest {
-                    code_commitment: Some(EMPTY_WORD.into()),
-                    // TODO: implement a way to request asset vaults
-                    // https://github.com/0xMiden/miden-client/issues/1412
-                    asset_vault_commitment: None,
-                    storage_maps,
-                })
-            } else {
-                None
-            };
+        // Only request details for public accounts; include known code commitment for this
+        // account when available
+        let account_details = if account_id.is_public() {
+            Some(proto::rpc::account_proof_request::AccountDetailRequest {
+                code_commitment: Some(EMPTY_WORD.into()),
+                // TODO: implement a way to request asset vaults
+                // https://github.com/0xMiden/miden-client/issues/1412
+                asset_vault_commitment: None,
+                storage_maps,
+            })
+        } else {
+            None
+        };
 
-            let request = proto::rpc::AccountProofRequest {
-                account_id: Some(account_id.into()),
-                block_num: Some(block_num.into()),
-                details: account_details,
-            };
+        let block_num = match account_state {
+            AccountStateAt::Block(number) => Some(number.into()),
+            AccountStateAt::ChainTip => None,
+        };
 
-            let response = rpc_api
-                .get_account_proof(request)
-                .await
-                .map_err(|status| {
-                    RpcError::from_grpc_error(NodeRpcClientEndpoint::GetAccountProofs, status)
-                })?
-                .into_inner();
+        let request = proto::rpc::AccountProofRequest {
+            account_id: Some(account_id.into()),
+            block_num,
+            details: account_details,
+        };
 
-            let account_witness: AccountWitness = response
-                .witness
-                .ok_or(RpcError::ExpectedDataMissing("AccountWitness".to_string()))?
-                .try_into()?;
+        let response = rpc_api
+            .get_account_proof(request)
+            .await
+            .map_err(|status| {
+                RpcError::from_grpc_error(NodeRpcClientEndpoint::GetAccountProofs, status)
+            })?
+            .into_inner();
 
-            // For public accounts, details should be present when requested
-            let headers = if account_witness.id().is_public() {
-                Some(
-                    response
-                        .details
-                        .ok_or(RpcError::ExpectedDataMissing("Account.Details".to_string()))?
-                        .into_domain(&known_codes_by_commitment)?,
-                )
-            } else {
-                None
-            };
+        let account_witness: AccountWitness = response
+            .witness
+            .ok_or(RpcError::ExpectedDataMissing("AccountWitness".to_string()))?
+            .try_into()?;
 
-            let proof = AccountProof::new(account_witness, headers)
-                .map_err(|err| RpcError::InvalidResponse(err.to_string()))?;
-            account_proofs.push(proof);
-        }
+        // For public accounts, details should be present when requested
+        let headers = if account_witness.id().is_public() {
+            Some(
+                response
+                    .details
+                    .ok_or(RpcError::ExpectedDataMissing("Account.Details".to_string()))?
+                    .into_domain(&known_codes_by_commitment)?,
+            )
+        } else {
+            None
+        };
 
-        Ok((block_num, account_proofs))
+        let proof = AccountProof::new(account_witness, headers)
+            .map_err(|err| RpcError::InvalidResponse(err.to_string()))?;
+
+        let block_num = response
+            .block_num
+            .ok_or(RpcError::ExpectedDataMissing("response block num".to_string()))?
+            .block_num
+            .into();
+
+        Ok((block_num, proof))
     }
 
     /// Sends a `SyncNoteRequest` to the Miden node, and extracts a [`NoteSyncInfo`] from the
