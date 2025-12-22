@@ -158,6 +158,7 @@ impl<R: Rng> TransactionAuthenticator for WebKeyStore<R> {
         Ok(signature)
     }
 
+    // TODO: add this (related to #1417)
     async fn get_public_key(&self, _pub_key_commitment: PublicKeyCommitment) -> Option<&PublicKey> {
         None
     }

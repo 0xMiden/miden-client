@@ -28,6 +28,7 @@ use miden_client::account::{
     AccountIdPrefix,
     AccountStorage,
     Address,
+    StorageSlotName,
 };
 use miden_client::asset::{Asset, AssetVault, AssetWitness};
 use miden_client::block::BlockHeader;
@@ -433,7 +434,7 @@ impl Store for SqliteStore {
     async fn get_account_map_item(
         &self,
         account_id: AccountId,
-        slot_name: miden_client::account::StorageSlotName,
+        slot_name: StorageSlotName,
         key: Word,
     ) -> Result<(Word, StorageMapWitness), StoreError> {
         let merkle_store = self.merkle_store.clone();

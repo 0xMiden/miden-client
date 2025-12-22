@@ -169,11 +169,8 @@ impl JsAccountUpdate {
                 .storage()
                 .slots()
                 .iter()
-                .enumerate()
-                .map(|(index, slot)| JsStorageSlot {
+                .map(|slot| JsStorageSlot {
                     commitment: account.storage().to_commitment().to_hex(),
-                    slot_index: u8::try_from(index)
-                        .expect("Indexes in account storage should be less than 256"),
                     slot_name: slot.name().to_string(),
                     slot_value: slot.value().to_hex(),
                     slot_type: slot.slot_type().to_bytes()[0],

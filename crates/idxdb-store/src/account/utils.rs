@@ -43,12 +43,8 @@ pub async fn upsert_account_code(account_code: &AccountCode) -> Result<(), JsVal
 pub async fn upsert_account_storage(account_storage: &AccountStorage) -> Result<(), JsValue> {
     let mut slots = vec![];
     let mut maps = vec![];
-    for (index, slot) in account_storage.slots().iter().enumerate() {
-        slots.push(JsStorageSlot::from_slot(
-            slot,
-            u8::try_from(index).expect("Indexes in account storage should be less than 256"),
-            account_storage.to_commitment(),
-        ));
+    for slot in account_storage.slots() {
+        slots.push(JsStorageSlot::from_slot(slot, account_storage.to_commitment()));
         if let StorageSlotContent::Map(map) = slot.content() {
             maps.extend(JsStorageMapEntry::from_map(map));
         }

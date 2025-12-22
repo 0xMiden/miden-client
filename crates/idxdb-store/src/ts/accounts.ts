@@ -209,7 +209,6 @@ export async function getAccountStorage(storageCommitment: string) {
 
     const slots = allMatchingRecords.map((record) => {
       return {
-        slotIndex: record.slotIndex,
         slotName: record.slotName,
         slotValue: record.slotValue,
         slotType: record.slotType,
@@ -327,7 +326,6 @@ export async function upsertAccountStorage(storageSlots: JsStorageSlot[]) {
     let processedSlots = storageSlots.map((slot) => {
       return {
         commitment: slot.commitment,
-        slotIndex: slot.slotIndex,
         slotName: slot.slotName,
         slotValue: slot.slotValue,
         slotType: slot.slotType,

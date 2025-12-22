@@ -111,9 +111,7 @@ async fn get_counter_contract_account(
     client: &mut TestClient,
     storage_mode: AccountStorageMode,
 ) -> Result<Account> {
-    let counter_slot_name = StorageSlotName::new("miden::testing::counter_contract::counter")
-        .expect("slot name should be valid");
-    let counter_slot = StorageSlot::with_empty_value(counter_slot_name);
+    let counter_slot = StorageSlot::with_empty_value(COUNTER_SLOT_NAME.clone());
     let counter_code = CodeBuilder::default()
         .compile_component_code("miden::testing::counter_contract", COUNTER_CONTRACT)
         .context("failed to compile counter contract component code")?;
