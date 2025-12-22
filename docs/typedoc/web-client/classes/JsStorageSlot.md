@@ -18,14 +18,6 @@ Commitment of the whole account storage
 
 ***
 
-### slotIndex
-
-> **slotIndex**: `number`
-
-The index of the storage slot.
-
-***
-
 ### slotName
 
 > **slotName**: `string`
