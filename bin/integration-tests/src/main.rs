@@ -180,6 +180,7 @@ enum TestCategory {
     Fpi,
     NetworkTransaction,
     Onchain,
+    PassThrough,
     SwapTransaction,
     Transport,
 }
@@ -192,6 +193,7 @@ impl AsRef<str> for TestCategory {
             TestCategory::Fpi => "fpi",
             TestCategory::NetworkTransaction => "network_transaction",
             TestCategory::Onchain => "onchain",
+            TestCategory::PassThrough => "pass_through",
             TestCategory::SwapTransaction => "swap_transaction",
             TestCategory::Transport => "transport",
         }

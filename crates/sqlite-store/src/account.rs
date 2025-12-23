@@ -225,11 +225,10 @@ impl SqliteStore {
             if slot_type == StorageSlotType::Map {
                 // TODO: querying the database for a single map is not performant
                 // consider retrieving all storage maps in a single transaction.
-                let storage_map_root = value;
-                let mut query = query_storage_maps(conn, "root = ?", [storage_map_root.to_hex()])?;
-                if let Some(map) = query.remove(&value) {
-                    let mut partial_storage_map = PartialStorageMap::new(value);
+                let mut partial_storage_map = PartialStorageMap::new(value);
+                let mut query = query_storage_maps(conn, "root = ?", [value.to_hex()])?;
 
+                if let Some(map) = query.remove(&value) {
                     for (k, v) in map.entries() {
                         let (_, path) = get_storage_map_item_proof(&merkle_store, value, *k)?;
                         let path = SparseMerklePath::try_from(path)
@@ -241,8 +240,9 @@ impl SqliteStore {
                             .map_err(StoreError::StorageMapError)?;
                         partial_storage_map.add(witness).map_err(StoreError::MerkleStoreError)?;
                     }
-                    maps.push(partial_storage_map);
                 }
+
+                maps.push(partial_storage_map);
             }
         }
         storage_header.sort_by_key(StorageSlotHeader::id);
