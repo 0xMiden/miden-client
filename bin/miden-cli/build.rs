@@ -82,8 +82,7 @@ pub fn build_package(metadata_path: &Path, library: Library, subdirectory: Optio
     let mut exports: Vec<PackageExport> = Vec::new();
     for module_info in library.module_infos() {
         for (_, proc_info) in module_info.procedures() {
-            let name =
-                QualifiedProcedureName::new(module_info.path().clone(), proc_info.name.clone());
+            let name = QualifiedProcedureName::new(module_info.path(), proc_info.name.clone());
             let export = ProcedureExport {
                 path: name.into_inner(),
                 digest: proc_info.digest,

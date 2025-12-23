@@ -2,12 +2,12 @@ use std::error::Error;
 
 use miden_client::account::{AccountId, AddressError};
 use miden_client::keystore::KeyStoreError;
-use miden_client::utils::CodeBuilderError;
 use miden_client::{
     AccountError,
     AccountIdError,
     AssetError,
     ClientError,
+    CodeBuilderError,
     ErrorHint,
     NetworkIdError,
 };

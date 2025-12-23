@@ -17,7 +17,7 @@ type = [
 [[storage.slots]]
 name = "miden::standards::auth::rpo_falcon512_multisig::approver_public_keys"
 description = "Map with approver public keys (index -> pubkey)"
-type = { key = "word", value = "miden::standards::auth::rpo_falcon512::pub_key" }
+type = { key = "word", value = "miden::standards::auth::falcon512_rpo::pub_key" }
 
 [[storage.slots]]
 name = "miden::standards::auth::rpo_falcon512_multisig::executed_transactions"

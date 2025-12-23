@@ -154,6 +154,7 @@ pub use miden_protocol::block::BlockNumber;
 pub use miden_protocol::utils::{Deserializable, Serializable, SliceReader};
 pub use miden_standards::account::interface::AccountInterfaceExt;
 pub use miden_standards::code_builder::CodeBuilder;
+pub use miden_standards::errors::CodeBuilderError;
 
 // RE-EXPORTS
 // ================================================================================================

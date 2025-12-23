@@ -14,6 +14,7 @@ use miden_protocol::{
     Word,
 };
 use miden_standards::account::interface::AccountInterfaceError;
+pub use miden_standards::errors::CodeBuilderError;
 // RE-EXPORTS
 // ================================================================================================
 pub use miden_tx::AuthenticationError;

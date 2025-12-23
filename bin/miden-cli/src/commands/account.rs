@@ -5,7 +5,7 @@ use miden_client::address::{Address, AddressInterface, RoutingParameters};
 use miden_client::asset::Asset;
 use miden_client::rpc::{GrpcClient, NodeRpcClient};
 use miden_client::transaction::{AccountComponentInterface, AccountInterface};
-use miden_client::{Client, PrettyPrint, ZERO};
+use miden_client::{AccountInterfaceExt, Client, PrettyPrint, ZERO};
 
 use crate::config::CliConfig;
 use crate::errors::CliError;
@@ -316,7 +316,7 @@ async fn account_bech_32<AUTH>(
     let account_record = client.try_get_account(account_id).await?;
     let account: Account =
         account_record.try_into().map_err(|_| CliError::InvalidAccount(account_id))?;
-    let account_interface: AccountInterface = (&account).into();
+    let account_interface = AccountInterface::from_account(&account);
 
     let mut address = Address::new(account_id);
     if account_interface

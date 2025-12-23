@@ -435,7 +435,7 @@ fn foreign_account_with_code(
 
     let (key_pair, auth_component) = match auth_scheme {
         AuthSchemeId::RpoFalcon512 => {
-            let key_pair = AuthSecretKey::new_rpo_falcon512();
+            let key_pair = AuthSecretKey::new_falcon512_rpo();
             let auth_component: AccountComponent =
                 AuthRpoFalcon512::new(key_pair.public_key().to_commitment()).into();
             (key_pair, auth_component)

@@ -1360,16 +1360,11 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
     let assembler = TransactionKernel::assembler();
     let source_manager = Arc::new(DefaultSourceManager::default());
     let module = Module::parser(ModuleKind::Library)
-        .parse_str(
-            Path::new("custom_library::set_map_item_library")
-                .context("failed to create library path for custom library")?,
-            custom_code,
-            &source_manager,
-        )
+        .parse_str(Path::new("custom_library::set_map_item_library"), custom_code, source_manager)
         .unwrap();
     let custom_lib = assembler.assemble_library([module]).unwrap();
 
-    let tx_script = CodeBuilder::new(true)
+    let tx_script = CodeBuilder::new()
         .with_statically_linked_library(&custom_lib)?
         .compile_tx_script(
             "
