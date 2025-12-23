@@ -255,7 +255,7 @@ fn create_pass_through_note(
     let metadata = NoteMetadata::new(
         sender,
         NoteType::Public,
-        NoteTag::from_account_id(target),
+        NoteTag::from_account_id(target), // this needs to change
         NoteExecutionHint::always(),
         Felt::new(0u64),
     )?;
