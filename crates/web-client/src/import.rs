@@ -92,9 +92,9 @@ impl WebClient {
     pub async fn import_note_file(&mut self, note_file: NoteFile) -> Result<NoteId, JsValue> {
         if let Some(client) = self.get_mut_inner() {
             Ok(client
-                .import_note(note_file.into())
+                .import_notes(&[note_file.into()])
                 .await
-                .map_err(|err| js_error_with_context(err, "failed to import note"))?
+                .map_err(|err| js_error_with_context(err, "failed to import note"))?[0]
                 .into())
         } else {
             Err(JsValue::from_str("Client not initialized"))
