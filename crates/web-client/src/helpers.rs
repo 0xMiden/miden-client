@@ -1,7 +1,7 @@
 use miden_client::account::component::{AccountComponent, BasicWallet};
 use miden_client::account::{Account, AccountBuilder, AccountType};
 use miden_client::auth::{AuthEcdsaK256Keccak, AuthRpoFalcon512, AuthSecretKey};
-use miden_objects::account::auth::AuthScheme as NativeAuthScheme;
+use miden_standards::account::auth::AuthScheme as NativeAuthScheme;
 use rand::rngs::StdRng;
 use rand::{RngCore, SeedableRng};
 use wasm_bindgen::JsValue;

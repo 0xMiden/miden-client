@@ -1,11 +1,10 @@
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
-use crypto::merkle::{InOrderIndex, MmrPeaks, PartialMmr};
-use miden_objects::Word;
-use miden_objects::block::{BlockHeader, BlockNumber};
-use miden_objects::crypto::merkle::{Forest, MerklePath};
-use miden_objects::crypto::{self};
+use miden_protocol::Word;
+use miden_protocol::block::{BlockHeader, BlockNumber};
+use miden_protocol::crypto::merkle::MerklePath;
+use miden_protocol::crypto::merkle::mmr::{Forest, InOrderIndex, MmrPeaks, PartialMmr};
 use tracing::warn;
 
 use crate::rpc::NodeRpcClient;

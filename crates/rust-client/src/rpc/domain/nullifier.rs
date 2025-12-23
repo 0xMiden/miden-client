@@ -1,6 +1,6 @@
-use miden_objects::Word;
-use miden_objects::block::BlockNumber;
-use miden_objects::note::Nullifier;
+use miden_protocol::Word;
+use miden_protocol::block::BlockNumber;
+use miden_protocol::note::Nullifier;
 
 use crate::rpc::domain::MissingFieldHelper;
 use crate::rpc::errors::RpcConversionError;

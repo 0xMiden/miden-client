@@ -2,7 +2,7 @@ use alloc::boxed::Box;
 use alloc::string::String;
 use core::error::Error;
 
-use miden_lib::utils::DeserializationError;
+use miden_protocol::utils::DeserializationError;
 use thiserror::Error;
 
 #[derive(Debug, Error)]

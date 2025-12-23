@@ -24,11 +24,11 @@ export const testStandardFpi = async (page: Page): Promise<void> => {
     storageMap.insert(MAP_KEY, FPI_STORAGE_VALUE);
 
     const code = `
-            use.std::word
+            use std::word
 
             const MAP_SLOT = word("${MAP_SLOT_NAME}")
 
-            export.get_fpi_map_item
+            pub proc get_fpi_map_item
                 # map key
                 push.15.15.15.15
                 push.MAP_SLOT[0..2]
@@ -88,8 +88,8 @@ export const testStandardFpi = async (page: Page): Promise<void> => {
     );
 
     let txScript = `
-            use.miden::tx
-            use.miden::account
+            use miden::tx
+            use miden::account
             begin
                 # push the hash of the {} account procedure
                 push.{proc_root}

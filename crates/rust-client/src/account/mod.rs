@@ -15,7 +15,7 @@
 //! #   account::{Account, AccountBuilder, AccountType, component::BasicWallet},
 //! #   crypto::FeltRng
 //! # };
-//! # use miden_objects::account::AccountStorageMode;
+//! # use miden_protocol::account::AccountStorageMode;
 //! # async fn add_new_account_example<AUTH>(
 //! #     client: &mut miden_client::Client<AUTH>
 //! # ) -> Result<(), miden_client::ClientError> {
@@ -36,13 +36,11 @@
 
 use alloc::vec::Vec;
 
-use miden_lib::account::auth::{AuthEcdsaK256Keccak, AuthRpoFalcon512};
-use miden_lib::account::wallets::BasicWallet;
-use miden_objects::account::auth::PublicKey;
-use miden_objects::note::NoteTag;
+use miden_protocol::account::auth::PublicKey;
+use miden_protocol::note::NoteTag;
 // RE-EXPORTS
 // ================================================================================================
-pub use miden_objects::{
+pub use miden_protocol::{
     AccountIdError,
     AddressError,
     NetworkIdError,
@@ -71,6 +69,8 @@ pub use miden_objects::{
     },
     address::{Address, AddressInterface, AddressType, NetworkId},
 };
+use miden_standards::account::auth::{AuthEcdsaK256Keccak, AuthRpoFalcon512};
+use miden_standards::account::wallets::BasicWallet;
 
 use super::Client;
 use crate::auth::AuthSchemeId;
@@ -82,8 +82,14 @@ use crate::sync::NoteTagRecord;
 pub mod component {
     pub const MIDEN_PACKAGE_EXTENSION: &str = "masp";
 
-    pub use miden_lib::account::auth::*;
-    pub use miden_lib::account::components::{
+    pub use miden_protocol::account::auth::*;
+    pub use miden_protocol::account::component::{
+        InitStorageData,
+        StorageSlotSchema,
+        StorageValueName,
+    };
+    pub use miden_protocol::account::{AccountComponent, AccountComponentMetadata};
+    pub use miden_standards::account::components::{
         basic_fungible_faucet_library,
         basic_wallet_library,
         ecdsa_k256_keccak_library,
@@ -93,18 +99,12 @@ pub mod component {
         rpo_falcon_512_library,
         rpo_falcon_512_multisig_library,
     };
-    pub use miden_lib::account::faucets::{
+    pub use miden_standards::account::faucets::{
         BasicFungibleFaucet,
         FungibleFaucetExt,
         NetworkFungibleFaucet,
     };
-    pub use miden_lib::account::wallets::BasicWallet;
-    pub use miden_objects::account::component::{
-        InitStorageData,
-        StorageSlotSchema,
-        StorageValueName,
-    };
-    pub use miden_objects::account::{AccountComponent, AccountComponentMetadata};
+    pub use miden_standards::account::wallets::BasicWallet;
 }
 
 // CLIENT METHODS

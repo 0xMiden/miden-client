@@ -14,7 +14,7 @@ crate-type = ["lib"]
 [dependencies]
 # Miden dependencies
 miden-client  = { path = "../rust-client" }
-miden-objects = { workspace = true }
+miden-protocol = { workspace = true }
 
 # Workspace dependencies
 anyhow      = { workspace = true }
@@ -35,4 +35,4 @@ workspace = true
 [dev-dependencies]
 # Enable client testing utilities only for tests
 miden-client = { features = ["testing"], path = "../rust-client" }
-miden-lib    = { features = ["testing"], workspace = true }
+miden-standards    = { features = ["testing"], workspace = true }

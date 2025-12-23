@@ -411,10 +411,10 @@ export const customTransaction = async (
             # This note script is based off of the P2ID note script because notes currently need to have
             # assets, otherwise it could have been boiled down to the assert.
 
-            use.miden::native_account
-            use.miden::active_note
-            use.miden::contracts::wallets::basic->wallet
-            use.std::mem
+            use miden::native_account
+            use miden::active_note
+            use miden::contracts::wallets::basic->wallet
+            use std::mem
 
             begin
                 # push data from the advice map into the advice stack
@@ -523,8 +523,8 @@ export const customTransaction = async (
       // Just like in the miden test, you can modify this script to get the execution to fail
       // by modifying the assert
       let txScript = `
-            use.miden::kernels::tx::prologue
-            use.miden::kernels::tx::memory
+            use miden::kernels::tx::prologue
+            use miden::kernels::tx::memory
 
             begin
                 push.0 push.${assertedValue}
@@ -723,16 +723,16 @@ export const customAccountComponent = async (
         "miden::testing::mapping_example_contract::map_slot";
 
       const accountCode = `
-        use.miden::active_account
-        use.miden::native_account
-        use.std::word
-        use.std::sys
+        use miden::active_account
+        use miden::native_account
+        use std::word
+        use std::sys
 
         const MAP_SLOT = word("${MAP_SLOT_NAME}")
 
         # Inputs: [KEY, VALUE]
         # Outputs: []
-        export.write_to_map
+        pub proc write_to_map
             # Setting the key value pair in the map
             push.MAP_SLOT[0..2]
             exec.native_account::set_map_item
@@ -744,7 +744,7 @@ export const customAccountComponent = async (
 
         # Inputs: [KEY]
         # Outputs: [VALUE]
-        export.get_value_in_map
+        pub proc get_value_in_map
             push.MAP_SLOT[0..2]
             exec.active_account::get_map_item
             # => [VALUE]
@@ -752,7 +752,7 @@ export const customAccountComponent = async (
 
         # Inputs: []
         # Outputs: [CURRENT_ROOT]
-        export.get_current_map_root
+        pub proc get_current_map_root
             push.MAP_SLOT[0..2] exec.active_account::get_item
             # => [CURRENT_ROOT]
 
@@ -761,8 +761,8 @@ export const customAccountComponent = async (
         end
       `;
       const scriptCode = `
-        use.miden_by_example::mapping_example_contract
-        use.std::sys
+        use miden_by_example::mapping_example_contract
+        use std::sys
 
         begin
             push.1.2.3.4
@@ -1078,21 +1078,21 @@ export const counterAccountComponent = async (
     const COUNTER_SLOT_NAME = "miden::testing::counter_contract::counter";
 
     const accountCode = `
-        use.miden::active_account
-        use.miden::native_account
-        use.std::word
-        use.std::sys
+        use miden::active_account
+        use miden::native_account
+        use std::word
+        use std::sys
 
         const COUNTER_SLOT = word("${COUNTER_SLOT_NAME}")
 
         # => []
-        export.get_count
+        pub proc get_count
             push.COUNTER_SLOT[0..2] exec.active_account::get_item
             exec.sys::truncate_stack
         end
 
         # => []
-        export.increment_count
+        pub proc increment_count
             push.COUNTER_SLOT[0..2] exec.active_account::get_item
             # => [count]
             push.1 add
@@ -1104,7 +1104,7 @@ export const counterAccountComponent = async (
         end
       `;
     const scriptCode = `
-        use.external_contract::counter_contract
+        use external_contract::counter_contract
         begin
             call.counter_contract::increment_count
         end
@@ -1268,11 +1268,11 @@ export const testStorageMap = async (page: Page): Promise<any> => {
     );
 
     const accountCode = `
-                    use.std::word
+                    use std::word
 
                     const MAP_SLOT = word("${MAP_SLOT_NAME}")
 
-                    export.bump_map_item
+                    pub proc bump_map_item
                     # map key
                     push.1.1.1.1 # Map key
                     push.MAP_SLOT[0..2]
@@ -1327,7 +1327,7 @@ export const testStorageMap = async (page: Page): Promise<any> => {
     builder.linkDynamicLibrary(accountComponentLib);
 
     let txScript = builder.compileTxScript(
-      `use.external_contract::bump_item_contract
+      `use external_contract::bump_item_contract
       begin
           call.bump_item_contract::bump_map_item
       end`

@@ -14,13 +14,13 @@
 //!
 //! ## Type conversion
 //!
-//! We also facilitate converting from/into [`InputNote`](miden_objects::transaction::InputNote) /
-//! [`Note`](miden_objects::note::Note), although this is not always possible. Check both
+//! We also facilitate converting from/into [`InputNote`](miden_protocol::transaction::InputNote) /
+//! [`Note`](miden_protocol::note::Note), although this is not always possible. Check both
 //! [`InputNoteRecord`]'s and [`OutputNoteRecord`]'s documentation for more details about this.
 
 use alloc::string::{String, ToString};
 
-use miden_objects::NoteError;
+use miden_protocol::NoteError;
 use thiserror::Error;
 
 mod input_note_record;

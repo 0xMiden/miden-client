@@ -3,13 +3,15 @@ use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
-use miden_objects::Word;
-use miden_objects::account::{AccountCode, AccountId, StorageSlot, StorageSlotContent};
-use miden_objects::address::NetworkId;
-use miden_objects::block::{BlockHeader, BlockNumber, ProvenBlock};
-use miden_objects::crypto::merkle::{Forest, Mmr, MmrProof, SmtProof};
-use miden_objects::note::{NoteHeader, NoteId, NoteScript, NoteTag, Nullifier};
-use miden_objects::transaction::{ProvenTransaction, TransactionInputs};
+use miden_protocol::Word;
+use miden_protocol::account::delta::AccountUpdateDetails;
+use miden_protocol::account::{AccountCode, AccountId, StorageSlot, StorageSlotContent};
+use miden_protocol::address::NetworkId;
+use miden_protocol::block::{BlockHeader, BlockNumber, ProvenBlock};
+use miden_protocol::crypto::merkle::mmr::{Forest, Mmr, MmrProof};
+use miden_protocol::crypto::merkle::smt::SmtProof;
+use miden_protocol::note::{NoteHeader, NoteId, NoteScript, NoteTag, Nullifier};
+use miden_protocol::transaction::{ProvenTransaction, TransactionInputs};
 use miden_testing::{MockChain, MockChainNote};
 use miden_tx::utils::sync::RwLock;
 
@@ -213,9 +215,7 @@ impl MockRpcApi {
                 .iter()
                 .filter(|block_acc_update| block_acc_update.account_id() == account_id)
             {
-                let miden_objects::account::delta::AccountUpdateDetails::Delta(account_delta) =
-                    update.details().clone()
-                else {
+                let AccountUpdateDetails::Delta(account_delta) = update.details().clone() else {
                     continue;
                 };
 
@@ -302,9 +302,7 @@ impl MockRpcApi {
                 .iter()
                 .filter(|block_acc_update| block_acc_update.account_id() == account_id)
             {
-                let miden_objects::account::delta::AccountUpdateDetails::Delta(account_delta) =
-                    update.details().clone()
-                else {
+                let AccountUpdateDetails::Delta(account_delta) = update.details().clone() else {
                     continue;
                 };
 

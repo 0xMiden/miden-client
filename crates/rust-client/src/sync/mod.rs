@@ -29,8 +29,8 @@
 //! # use miden_client::auth::TransactionAuthenticator;
 //! # use miden_client::sync::SyncSummary;
 //! # use miden_client::{Client, ClientError};
-//! # use miden_objects::{block::BlockHeader, Felt, Word, StarkField};
-//! # use miden_objects::crypto::rand::FeltRng;
+//! # use miden_protocol::{block::BlockHeader, Felt, Word, StarkField};
+//! # use miden_protocol::crypto::rand::FeltRng;
 //! # async fn run_sync<AUTH: TransactionAuthenticator + Sync + 'static>(client: &mut Client<AUTH>) -> Result<(), ClientError> {
 //! // Attempt to synchronize the client's state with the Miden network.
 //! // The requested data is based on the client's state: it gets updates for accounts, relevant
@@ -60,10 +60,10 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::cmp::max;
 
-use miden_objects::account::AccountId;
-use miden_objects::block::BlockNumber;
-use miden_objects::note::{NoteId, NoteTag};
-use miden_objects::transaction::TransactionId;
+use miden_protocol::account::AccountId;
+use miden_protocol::block::BlockNumber;
+use miden_protocol::note::{NoteId, NoteTag};
+use miden_protocol::transaction::TransactionId;
 use miden_tx::auth::TransactionAuthenticator;
 use miden_tx::utils::{Deserializable, DeserializationError, Serializable};
 use tracing::{debug, info};

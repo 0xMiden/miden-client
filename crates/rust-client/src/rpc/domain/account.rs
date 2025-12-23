@@ -3,8 +3,8 @@ use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 use core::fmt::{self, Debug, Display, Formatter};
 
-use miden_objects::Word;
-use miden_objects::account::{
+use miden_protocol::Word;
+use miden_protocol::account::{
     Account,
     AccountCode,
     AccountHeader,
@@ -14,10 +14,10 @@ use miden_objects::account::{
     StorageSlotName,
     StorageSlotType,
 };
-use miden_objects::asset::Asset;
-use miden_objects::block::BlockNumber;
-use miden_objects::block::account_tree::AccountWitness;
-use miden_objects::crypto::merkle::SparseMerklePath;
+use miden_protocol::asset::Asset;
+use miden_protocol::block::BlockNumber;
+use miden_protocol::block::account_tree::AccountWitness;
+use miden_protocol::crypto::merkle::SparseMerklePath;
 use miden_tx::utils::{Deserializable, Serializable, ToHex};
 use thiserror::Error;
 
@@ -160,7 +160,7 @@ impl TryInto<AccountHeader> for proto::account::AccountHeader {
     type Error = crate::rpc::RpcError;
 
     fn try_into(self) -> Result<AccountHeader, Self::Error> {
-        use miden_objects::Felt;
+        use miden_protocol::Felt;
 
         use crate::rpc::domain::MissingFieldHelper;
 

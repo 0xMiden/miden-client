@@ -10,8 +10,8 @@
 //! [`Client::import_note()`].
 use alloc::string::ToString;
 
-use miden_objects::block::BlockNumber;
-use miden_objects::note::{
+use miden_protocol::block::BlockNumber;
+use miden_protocol::note::{
     Note,
     NoteDetails,
     NoteFile,
@@ -266,7 +266,7 @@ where
         &mut self,
         mut request_block_num: BlockNumber,
         tag: NoteTag,
-        expected_note: &miden_objects::note::NoteDetails,
+        expected_note: &NoteDetails,
     ) -> Result<Option<(NoteMetadata, NoteInclusionProof)>, ClientError> {
         let current_block_num = self.get_sync_height().await?;
         loop {

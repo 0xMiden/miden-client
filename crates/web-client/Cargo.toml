@@ -25,7 +25,7 @@ testing = ["miden-client/testing"]
 # Workspace dependencies
 idxdb-store   = { package = "miden-idxdb-store", path = "../idxdb-store" }
 miden-client  = { default-features = false, features = ["testing", "tonic"], path = "../rust-client" }
-miden-objects = { workspace = true }
+miden-protocol = { workspace = true }
 
 # External dependencies
 console_error_panic_hook = { version = "0.1.7" }

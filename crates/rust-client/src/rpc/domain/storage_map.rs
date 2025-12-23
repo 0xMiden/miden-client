@@ -1,9 +1,9 @@
 use alloc::string::ToString;
 use alloc::vec::Vec;
 
-use miden_objects::Word;
-use miden_objects::account::StorageSlotName;
-use miden_objects::block::BlockNumber;
+use miden_protocol::Word;
+use miden_protocol::account::StorageSlotName;
+use miden_protocol::block::BlockNumber;
 
 use crate::rpc::domain::MissingFieldHelper;
 use crate::rpc::{RpcConversionError, RpcError, generated as proto};

@@ -2,10 +2,10 @@ use alloc::string::ToString;
 use core::fmt::{self, Display};
 
 use chrono::{Local, TimeZone};
-use miden_objects::account::AccountId;
-use miden_objects::block::{BlockHeader, BlockNumber};
-use miden_objects::note::{NoteId, NoteInclusionProof, NoteMetadata};
-use miden_objects::transaction::TransactionId;
+use miden_protocol::account::AccountId;
+use miden_protocol::block::{BlockHeader, BlockNumber};
+use miden_protocol::note::{NoteId, NoteInclusionProof, NoteMetadata};
+use miden_protocol::transaction::TransactionId;
 pub use miden_tx::utils::{
     ByteReader,
     ByteWriter,

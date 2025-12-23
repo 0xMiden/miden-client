@@ -3,11 +3,11 @@ use alloc::string::{String, ToString};
 use core::error::Error;
 use core::num::TryFromIntError;
 
-use miden_objects::NoteError;
-use miden_objects::account::AccountId;
-use miden_objects::crypto::merkle::MerkleError;
-use miden_objects::note::NoteId;
-use miden_objects::utils::DeserializationError;
+use miden_protocol::NoteError;
+use miden_protocol::account::AccountId;
+use miden_protocol::crypto::merkle::MerkleError;
+use miden_protocol::note::NoteId;
+use miden_protocol::utils::DeserializationError;
 use thiserror::Error;
 
 use super::NodeRpcClientEndpoint;

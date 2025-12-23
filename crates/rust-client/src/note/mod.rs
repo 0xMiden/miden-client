@@ -25,7 +25,7 @@
 //!     note::{NoteScreener, get_input_note_with_id_prefix},
 //!     store::NoteFilter,
 //! };
-//! use miden_objects::account::AccountId;
+//! use miden_protocol::account::AccountId;
 //!
 //! # async fn example<AUTH: TransactionAuthenticator + Sync>(client: &Client<AUTH>) -> Result<(), Box<dyn std::error::Error>> {
 //! // Retrieve all committed input notes
@@ -60,7 +60,7 @@
 use alloc::string::ToString;
 use alloc::vec::Vec;
 
-use miden_objects::account::AccountId;
+use miden_protocol::account::AccountId;
 use miden_tx::auth::TransactionAuthenticator;
 
 use crate::store::{InputNoteRecord, NoteFilter, OutputNoteRecord};
@@ -73,11 +73,9 @@ mod note_update_tracker;
 // RE-EXPORTS
 // ================================================================================================
 
-pub use miden_lib::note::utils::{build_p2id_recipient, build_swap_tag};
-pub use miden_lib::note::{WellKnownNote, create_p2id_note, create_p2ide_note, create_swap_note};
-pub use miden_objects::NoteError;
-pub use miden_objects::block::BlockNumber;
-pub use miden_objects::note::{
+pub use miden_protocol::NoteError;
+pub use miden_protocol::block::BlockNumber;
+pub use miden_protocol::note::{
     Note,
     NoteAssets,
     NoteDetails,
@@ -97,7 +95,14 @@ pub use miden_objects::note::{
     Nullifier,
     PartialNote,
 };
-pub use miden_objects::transaction::ToInputNoteCommitments;
+pub use miden_protocol::transaction::ToInputNoteCommitments;
+pub use miden_standards::note::utils::{build_p2id_recipient, build_swap_tag};
+pub use miden_standards::note::{
+    WellKnownNote,
+    create_p2id_note,
+    create_p2ide_note,
+    create_swap_note,
+};
 pub use note_screener::{NoteConsumability, NoteRelevance, NoteScreener, NoteScreenerError};
 pub use note_update_tracker::{
     InputNoteUpdate,

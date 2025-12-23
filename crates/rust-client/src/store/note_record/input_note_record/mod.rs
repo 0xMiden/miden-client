@@ -1,9 +1,9 @@
 use alloc::string::ToString;
 
-use miden_objects::Word;
-use miden_objects::account::AccountId;
-use miden_objects::block::{BlockHeader, BlockNumber};
-use miden_objects::note::{
+use miden_protocol::Word;
+use miden_protocol::account::AccountId;
+use miden_protocol::block::{BlockHeader, BlockNumber};
+use miden_protocol::note::{
     Note,
     NoteAssets,
     NoteDetails,
@@ -13,8 +13,8 @@ use miden_objects::note::{
     NoteMetadata,
     Nullifier,
 };
-use miden_objects::transaction::{InputNote, TransactionId};
-use miden_objects::utils::{
+use miden_protocol::transaction::{InputNote, TransactionId};
+use miden_protocol::utils::{
     ByteReader,
     ByteWriter,
     Deserializable,
