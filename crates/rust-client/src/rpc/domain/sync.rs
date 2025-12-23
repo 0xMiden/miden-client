@@ -1,11 +1,11 @@
 use alloc::vec::Vec;
 
-use miden_objects::Word;
-use miden_objects::account::AccountId;
-use miden_objects::block::{BlockHeader, BlockNumber};
-use miden_objects::crypto::merkle::MmrDelta;
-use miden_objects::note::NoteId;
-use miden_objects::transaction::TransactionId;
+use miden_protocol::Word;
+use miden_protocol::account::AccountId;
+use miden_protocol::block::{BlockHeader, BlockNumber};
+use miden_protocol::crypto::merkle::mmr::MmrDelta;
+use miden_protocol::note::NoteId;
+use miden_protocol::transaction::TransactionId;
 
 use super::note::CommittedNote;
 use super::transaction::TransactionInclusion;

@@ -1,13 +1,13 @@
 use alloc::string::ToString;
 use alloc::vec::Vec;
 
-use miden_objects::Word;
-use miden_objects::account::AccountId;
-use miden_objects::asset::FungibleAsset;
-use miden_objects::block::BlockNumber;
-use miden_objects::note::{NoteHeader, Nullifier};
-use miden_objects::testing::account_id::ACCOUNT_ID_NATIVE_ASSET_FAUCET;
-use miden_objects::transaction::{
+use miden_protocol::Word;
+use miden_protocol::account::AccountId;
+use miden_protocol::asset::FungibleAsset;
+use miden_protocol::block::BlockNumber;
+use miden_protocol::note::{NoteHeader, Nullifier};
+use miden_protocol::testing::account_id::ACCOUNT_ID_NATIVE_ASSET_FAUCET;
+use miden_protocol::transaction::{
     InputNoteCommitment,
     InputNotes,
     TransactionHeader,
@@ -185,7 +185,8 @@ impl TryFrom<proto::transaction::TransactionHeader> for TransactionHeader {
             input_notes,
             output_notes,
             // TODO: handle this; should we open an issue in miden-node?
-            FungibleAsset::new(ACCOUNT_ID_NATIVE_ASSET_FAUCET.try_into().unwrap(), 0u64).unwrap(),
+            FungibleAsset::new(ACCOUNT_ID_NATIVE_ASSET_FAUCET.try_into().expect("is valid"), 0u64)
+                .unwrap(),
         );
         Ok(transaction_header)
     }

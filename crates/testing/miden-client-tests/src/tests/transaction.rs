@@ -1,19 +1,18 @@
 use alloc::boxed::Box;
 
 use miden_client::ClientError;
-use miden_client::auth::{AuthSecretKey, RPO_FALCON_SCHEME_ID};
+use miden_client::auth::{AuthRpoFalcon512, AuthSecretKey, RPO_FALCON_SCHEME_ID};
 use miden_client::transaction::{TransactionExecutorError, TransactionRequestBuilder};
-use miden_lib::account::auth::AuthRpoFalcon512;
-use miden_lib::account::wallets::BasicWallet;
-use miden_objects::account::{AccountBuilder, AccountStorageMode};
-use miden_objects::assembly::diagnostics::miette::GraphicalReportHandler;
-use miden_objects::asset::{Asset, FungibleAsset};
-use miden_objects::note::NoteType;
-use miden_objects::testing::account_id::{
+use miden_protocol::account::{AccountBuilder, AccountStorageMode};
+use miden_protocol::assembly::diagnostics::miette::GraphicalReportHandler;
+use miden_protocol::asset::{Asset, FungibleAsset};
+use miden_protocol::note::NoteType;
+use miden_protocol::testing::account_id::{
     ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
     ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
     ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
 };
+use miden_standards::account::wallets::BasicWallet;
 
 use super::PaymentNoteDescription;
 use crate::tests::{create_test_client, setup_wallet_and_faucet};
@@ -30,7 +29,7 @@ async fn transaction_creates_two_notes() {
             .unwrap()
             .into();
 
-    let secret_key = AuthSecretKey::new_rpo_falcon512();
+    let secret_key = AuthSecretKey::new_falcon512_rpo();
     let pub_key = secret_key.public_key();
     keystore.add_key(&secret_key).unwrap();
 

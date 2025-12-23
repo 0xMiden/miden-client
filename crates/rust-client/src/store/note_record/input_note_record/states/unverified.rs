@@ -1,8 +1,8 @@
 use alloc::string::ToString;
 
-use miden_objects::block::{BlockHeader, BlockNumber};
-use miden_objects::note::{NoteId, NoteInclusionProof, NoteMetadata, compute_note_commitment};
-use miden_objects::transaction::TransactionId;
+use miden_protocol::block::{BlockHeader, BlockNumber};
+use miden_protocol::note::{NoteId, NoteInclusionProof, NoteMetadata, compute_note_commitment};
+use miden_protocol::transaction::TransactionId;
 
 use super::{
     CommittedNoteState,
@@ -78,8 +78,8 @@ impl NoteStateHandler for UnverifiedNoteState {
 
     fn consumed_locally(
         &self,
-        consumer_account: miden_objects::account::AccountId,
-        consumer_transaction: miden_objects::transaction::TransactionId,
+        consumer_account: miden_protocol::account::AccountId,
+        consumer_transaction: miden_protocol::transaction::TransactionId,
         _current_timestamp: Option<u64>,
     ) -> Result<Option<InputNoteState>, NoteRecordError> {
         let submission_data = NoteSubmissionData {

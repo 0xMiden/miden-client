@@ -8,8 +8,10 @@ use std::sync::Arc;
 
 use miden_client::account::{Address, AddressInterface};
 use miden_client::address::RoutingParameters;
+use miden_client::assembly::{Assembler, DefaultSourceManager, Module, ModuleKind, Path};
 use miden_client::auth::{
     AuthEcdsaK256Keccak,
+    AuthRpoFalcon512,
     AuthSecretKey,
     PublicKeyCommitment,
     RPO_FALCON_SCHEME_ID,
@@ -27,7 +29,6 @@ use miden_client::store::{
     TransactionFilter,
 };
 use miden_client::sync::{NoteTagRecord, NoteTagSource};
-use miden_client::testing::account_id::ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET;
 use miden_client::testing::common::{
     ACCOUNT_ID_REGULAR,
     MINT_AMOUNT,
@@ -54,18 +55,9 @@ use miden_client::transaction::{
     TransactionRequestError,
     TransactionStatus,
 };
-use miden_client::{ClientError, DebugMode};
+use miden_client::{ClientError, CodeBuilder, DebugMode};
 use miden_client_sqlite_store::ClientBuilderSqliteExt;
-use miden_lib::account::auth::AuthRpoFalcon512;
-use miden_lib::account::faucets::BasicFungibleFaucet;
-use miden_lib::account::interface::AccountInterfaceError;
-use miden_lib::account::wallets::BasicWallet;
-use miden_lib::note::{WellKnownNote, utils};
-use miden_lib::testing::mock_account::MockAccountExt;
-use miden_lib::testing::note::NoteBuilder;
-use miden_lib::transaction::TransactionKernel;
-use miden_lib::utils::{CodeBuilder, Deserializable, Serializable};
-use miden_objects::account::{
+use miden_protocol::account::{
     Account,
     AccountBuilder,
     AccountCode,
@@ -79,10 +71,9 @@ use miden_objects::account::{
     StorageSlotContent,
     StorageSlotName,
 };
-use miden_objects::assembly::{Assembler, DefaultSourceManager, LibraryPath, Module, ModuleKind};
-use miden_objects::asset::{Asset, AssetWitness, FungibleAsset, TokenSymbol};
-use miden_objects::crypto::rand::{FeltRng, RpoRandomCoin};
-use miden_objects::note::{
+use miden_protocol::asset::{Asset, AssetWitness, FungibleAsset, TokenSymbol};
+use miden_protocol::crypto::rand::{FeltRng, RpoRandomCoin};
+use miden_protocol::note::{
     Note,
     NoteAssets,
     NoteExecutionHint,
@@ -94,17 +85,25 @@ use miden_objects::note::{
     NoteTag,
     NoteType,
 };
-use miden_objects::testing::account_id::{
+use miden_protocol::testing::account_id::{
     ACCOUNT_ID_PRIVATE_SENDER,
     ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1,
     ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_2,
+    ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET,
     ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE,
     ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
     ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_UPDATABLE_CODE,
 };
-use miden_objects::transaction::OutputNote;
-use miden_objects::vm::AdviceInputs;
-use miden_objects::{EMPTY_WORD, Felt, ONE, Word, ZERO};
+use miden_protocol::transaction::{OutputNote, TransactionKernel};
+use miden_protocol::utils::{Deserializable, Serializable};
+use miden_protocol::vm::AdviceInputs;
+use miden_protocol::{EMPTY_WORD, Felt, ONE, Word, ZERO};
+use miden_standards::account::faucets::BasicFungibleFaucet;
+use miden_standards::account::interface::AccountInterfaceError;
+use miden_standards::account::wallets::BasicWallet;
+use miden_standards::note::{WellKnownNote, utils};
+use miden_standards::testing::mock_account::MockAccountExt;
+use miden_standards::testing::note::NoteBuilder;
 use miden_testing::{MockChain, MockChainBuilder, TxContextInput};
 use rand::rngs::StdRng;
 use rand::{Rng, RngCore, SeedableRng};
@@ -542,7 +541,7 @@ async fn mint_transaction() {
         .build_mint_fungible_asset(
             FungibleAsset::new(faucet.id(), 5u64).unwrap(),
             AccountId::try_from(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1).unwrap(),
-            miden_objects::note::NoteType::Private,
+            miden_protocol::note::NoteType::Private,
             client.rng(),
         )
         .unwrap();
@@ -637,7 +636,7 @@ async fn transaction_request_expiration() {
         .build_mint_fungible_asset(
             FungibleAsset::new(faucet.id(), 5u64).unwrap(),
             AccountId::try_from(ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE).unwrap(),
-            miden_objects::note::NoteType::Private,
+            miden_protocol::note::NoteType::Private,
             client.rng(),
         )
         .unwrap();
@@ -672,7 +671,7 @@ async fn import_processing_note_returns_error() {
         .build_mint_fungible_asset(
             FungibleAsset::new(faucet.id(), 5u64).unwrap(),
             account.id(),
-            miden_objects::note::NoteType::Public,
+            miden_protocol::note::NoteType::Public,
             client.rng(),
         )
         .unwrap();
@@ -797,7 +796,7 @@ async fn execute_program() {
         .unwrap();
 
     let code = "
-        use.std::sys
+        use std::sys
 
         begin
             push.16
@@ -845,7 +844,7 @@ async fn real_note_roundtrip() {
         .build_mint_fungible_asset(
             FungibleAsset::new(faucet.id(), 5u64).unwrap(),
             wallet.id(),
-            miden_objects::note::NoteType::Public,
+            miden_protocol::note::NoteType::Public,
             client.rng(),
         )
         .unwrap();
@@ -1071,7 +1070,7 @@ async fn p2id_transfer_failing_not_enough_balance() {
         &mut client,
         from_account_id,
         tx_request,
-        ClientError::AssetError(miden_objects::AssetError::FungibleAssetAmountNotSufficient {
+        ClientError::AssetError(miden_protocol::AssetError::FungibleAssetAmountNotSufficient {
             minuend: MINT_AMOUNT,
             subtrahend: MINT_AMOUNT + 1,
         }),
@@ -2064,7 +2063,7 @@ async fn empty_storage_map() {
     let component_code = CodeBuilder::default()
         .compile_component_code(
             "miden::testing::dummy_component",
-            "export.dummy
+            "pub proc dummy
                 nop
             end",
         )
@@ -2075,7 +2074,7 @@ async fn empty_storage_map() {
         .unwrap()
         .with_supports_all_types();
 
-    let key_pair = AuthSecretKey::new_rpo_falcon512();
+    let key_pair = AuthSecretKey::new_falcon512_rpo();
     let pub_key = key_pair.public_key();
 
     keystore.add_key(&key_pair).unwrap();
@@ -2107,11 +2106,11 @@ const BUMP_MAP_SLOT_NAME: &str = "miden::testing::bump_map::map";
 const EMPTY_STORAGE_MAP_SLOT_NAME: &str = "miden::testing::empty_storage_map::map";
 // MASM code used by `storage_and_vault_proofs*` tests to mutate a storage map.
 const BUMP_MAP_CODE: &str = "
-                use.std::word
+                use std::word
 
                 const MAP_SLOT = word(\"miden::testing::bump_map::map\")
 
-                export.bump_map_item
+                pub proc bump_map_item
                     # map key
                     push.{map_key}
                     
@@ -2163,28 +2162,28 @@ async fn storage_and_vault_proofs() {
         .with_supports_all_types();
 
     // Build script that bumps the storage map item and adds a new one each time.
-    let assembler: Assembler = TransactionKernel::assembler().with_debug_mode(true);
+    let assembler: Assembler = TransactionKernel::assembler();
     let source_manager = Arc::new(DefaultSourceManager::default());
     let module = Module::parser(ModuleKind::Library)
         .parse_str(
-            LibraryPath::new("external_contract::bump_item_contract").unwrap(),
+            Path::new("external_contract::bump_item_contract"),
             BUMP_MAP_CODE.replace("{map_key}", &Word::from(MAP_KEY).to_hex()),
-            &source_manager,
+            source_manager.clone(),
         )
         .unwrap();
-    let library = assembler.clone().assemble_library([module]).unwrap();
-    let tx_script = CodeBuilder::new(true)
-        .with_dynamically_linked_library(&library)
+    let library = assembler.assemble_library([module]).unwrap();
+    let tx_script = CodeBuilder::new()
+        .with_dynamically_linked_library(library)
         .unwrap()
         .compile_tx_script(
-            "use.external_contract::bump_item_contract
+            "use external_contract::bump_item_contract
             begin
                 call.bump_item_contract::bump_map_item
             end",
         )
         .unwrap();
 
-    let key_pair = AuthSecretKey::new_rpo_falcon512();
+    let key_pair = AuthSecretKey::new_falcon512_rpo();
     let pub_key = key_pair.public_key();
 
     keystore.add_key(&key_pair).unwrap();
@@ -2602,7 +2601,7 @@ async fn insert_new_wallet(
     storage_mode: AccountStorageMode,
     keystore: &FilesystemKeyStore,
 ) -> Result<Account, ClientError> {
-    let key_pair = AuthSecretKey::new_rpo_falcon512_with_rng(client.rng());
+    let key_pair = AuthSecretKey::new_falcon512_rpo_with_rng(client.rng());
     let pub_key = key_pair.public_key();
 
     keystore.add_key(&key_pair).unwrap();
@@ -2654,7 +2653,7 @@ async fn insert_new_fungible_faucet(
     storage_mode: AccountStorageMode,
     keystore: &FilesystemKeyStore,
 ) -> Result<Account, ClientError> {
-    let key_pair = AuthSecretKey::new_rpo_falcon512_with_rng(client.rng());
+    let key_pair = AuthSecretKey::new_falcon512_rpo_with_rng(client.rng());
     let pub_key = key_pair.public_key();
 
     keystore.add_key(&key_pair).unwrap();
@@ -2740,21 +2739,21 @@ async fn storage_and_vault_proofs_ecdsa() {
         .with_supports_all_types();
 
     // Build script that bumps the storage map item and adds a new one each time.
-    let assembler: Assembler = TransactionKernel::assembler().with_debug_mode(true);
+    let assembler: Assembler = TransactionKernel::assembler();
     let source_manager = Arc::new(DefaultSourceManager::default());
     let module = Module::parser(ModuleKind::Library)
         .parse_str(
-            LibraryPath::new("external_contract::bump_item_contract").unwrap(),
+            Path::new("external_contract::bump_item_contract"),
             BUMP_MAP_CODE.replace("{map_key}", &Word::from(MAP_KEY).to_hex()),
-            &source_manager,
+            source_manager.clone(),
         )
         .unwrap();
     let library = assembler.clone().assemble_library([module]).unwrap();
-    let tx_script = CodeBuilder::new(true)
+    let tx_script = CodeBuilder::new()
         .with_dynamically_linked_library(&library)
         .unwrap()
         .compile_tx_script(
-            "use.external_contract::bump_item_contract
+            "use external_contract::bump_item_contract
             begin
                 call.bump_item_contract::bump_map_item
             end",

@@ -1,7 +1,7 @@
 use core::convert::TryFrom;
 use core::fmt::Debug;
 
-use miden_objects::account::auth::AuthScheme as NativeAuthScheme;
+use miden_client::auth::AuthSchemeId as NativeAuthScheme;
 use wasm_bindgen::prelude::*;
 
 /// Authentication schemes supported by the web client.

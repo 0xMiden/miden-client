@@ -8,7 +8,7 @@ use miden_client::auth::{
     PublicKeyCommitment,
 };
 use miden_client::vm::Package as NativePackage;
-use miden_core::mast::MastNodeExt;
+use miden_protocol::assembly::mast::MastNodeExt;
 use wasm_bindgen::prelude::*;
 
 use crate::js_error_with_context;
@@ -91,14 +91,18 @@ impl AccountComponent {
 
         let get_proc_export = library
             .exports()
-            .find(|export| export.name.name.as_str() == procedure_name)
+            .find(|export| {
+                export.as_procedure().is_some()
+                    && (export.path().as_ref().as_str() == procedure_name
+                        || export.path().as_ref().to_relative().as_str() == procedure_name)
+            })
             .ok_or_else(|| {
                 JsValue::from_str(&format!(
                     "Procedure {procedure_name} not found in the account component library"
                 ))
             })?;
 
-        let get_proc_mast_id = library.get_export_node_id(&get_proc_export.name);
+        let get_proc_mast_id = library.get_export_node_id(get_proc_export.path());
 
         let digest_hex = library
             .mast_forest()

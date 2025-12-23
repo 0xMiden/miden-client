@@ -11,7 +11,7 @@ use miden_client::account::{
     StorageSlot,
     StorageSlotName,
 };
-use miden_client::assembly::{DefaultSourceManager, Library, LibraryPath, Module, ModuleKind};
+use miden_client::assembly::{DefaultSourceManager, Library, Module, ModuleKind, Path};
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
 use miden_client::note::{
     Note,
@@ -44,21 +44,21 @@ static COUNTER_SLOT_NAME: LazyLock<StorageSlotName> = LazyLock::new(|| {
 });
 
 const COUNTER_CONTRACT: &str = "
-        use.miden::active_account
-        use.miden::native_account
-        use.std::word
-        use.std::sys
+        use miden::active_account
+        use miden::native_account
+        use std::word
+        use std::sys
 
         const COUNTER_SLOT = word(\"miden::testing::counter_contract::counter\")
 
         # => []
-        export.get_count
+        pub proc get_count
             push.COUNTER_SLOT[0..2] exec.active_account::get_item
             exec.sys::truncate_stack
         end
 
         # => []
-        export.increment_count
+        pub proc increment_count
             push.COUNTER_SLOT[0..2] exec.active_account::get_item
             # => [count]
             push.1 add
@@ -70,15 +70,15 @@ const COUNTER_CONTRACT: &str = "
         end";
 
 const INCR_NONCE_AUTH_CODE: &str = "
-    use.miden::native_account
-    export.auth__basic
+    use miden::native_account
+    pub proc auth__basic
         exec.native_account::incr_nonce
         drop
     end
 ";
 
 const INCR_SCRIPT_CODE: &str = "
-    use.external_contract::counter_contract
+    use external_contract::counter_contract
     begin
         call.counter_contract::increment_count
     end
@@ -93,7 +93,7 @@ async fn deploy_counter_contract(
 
     client.add_account(&acc, false).await?;
 
-    let mut script_builder = CodeBuilder::new(true);
+    let mut script_builder = CodeBuilder::new();
     script_builder.link_dynamic_library(&counter_contract_library())?;
     let tx_script = script_builder.compile_tx_script(INCR_SCRIPT_CODE)?;
 
@@ -261,15 +261,13 @@ pub async fn test_recall_note_before_ntx_consumes_it(client_config: ClientConfig
 
 // Initialize the Basic Fungible Faucet library only once.
 static COUNTER_CONTRACT_LIBRARY: LazyLock<Library> = LazyLock::new(|| {
-    let assembler = TransactionKernel::assembler().with_debug_mode(true);
+    let assembler = TransactionKernel::assembler();
     let source_manager = Arc::new(DefaultSourceManager::default());
     let module = Module::parser(ModuleKind::Library)
         .parse_str(
-            LibraryPath::new("external_contract::counter_contract")
-                .context("failed to create library path for counter contract")
-                .unwrap(),
+            Path::new("external_contract::counter_contract"),
             COUNTER_CONTRACT,
-            &source_manager,
+            source_manager,
         )
         .map_err(|err| anyhow!(err))
         .unwrap();
@@ -298,7 +296,7 @@ fn get_network_note<T: Rng>(
         ZERO,
     )?;
 
-    let script = CodeBuilder::new(true)
+    let script = CodeBuilder::new()
         .with_dynamically_linked_library(counter_contract_library())?
         .compile_note_script(INCR_SCRIPT_CODE)?;
     let recipient = NoteRecipient::new(

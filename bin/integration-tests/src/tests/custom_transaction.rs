@@ -91,7 +91,7 @@ pub async fn test_transaction_request(client_config: ClientConfig) -> Result<()>
     advice_map.insert(note_args_commitment, NOTE_ARGS.to_vec());
 
     let code = "
-        use.miden::contracts::auth::basic->auth_tx
+        use miden::contracts::auth::basic->auth_tx
 
         begin
             # We use the script argument to store the expected value to be compared
@@ -205,10 +205,10 @@ pub async fn test_merkle_store(client_config: ClientConfig) -> Result<()> {
 
     let mut code = format!(
         "
-         use.std::collections::mmr
-         use.miden::contracts::auth::basic->auth_tx
-         use.miden::kernels::tx::prologue
-         use.miden::kernels::tx::memory
+         use std::collections::mmr
+         use miden::contracts::auth::basic->auth_tx
+         use miden::kernels::tx::prologue
+         use miden::kernels::tx::memory
 
          begin
              # leaf count -> mem[4000][0]

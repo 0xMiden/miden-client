@@ -1,9 +1,9 @@
 use alloc::vec::Vec;
 
-use miden_objects::account::AccountDelta;
-use miden_objects::block::BlockNumber;
-use miden_objects::note::{NoteDetails, NoteTag};
-use miden_objects::transaction::{
+use miden_protocol::account::AccountDelta;
+use miden_protocol::block::BlockNumber;
+use miden_protocol::note::{NoteDetails, NoteTag};
+use miden_protocol::transaction::{
     ExecutedTransaction,
     InputNote,
     InputNotes,

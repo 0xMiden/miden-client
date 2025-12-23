@@ -24,9 +24,9 @@
 //! use miden_client::auth::TransactionAuthenticator;
 //! use miden_client::crypto::FeltRng;
 //! use miden_client::transaction::{PaymentNoteDescription, TransactionRequestBuilder};
-//! use miden_objects::account::AccountId;
-//! use miden_objects::asset::FungibleAsset;
-//! use miden_objects::note::NoteType;
+//! use miden_protocol::account::AccountId;
+//! use miden_protocol::asset::FungibleAsset;
+//! use miden_protocol::note::NoteType;
 //! # use std::error::Error;
 //!
 //! /// Executes, proves and submits a P2ID transaction.
@@ -67,12 +67,13 @@ use alloc::string::ToString;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
-use miden_objects::account::{Account, AccountId};
-use miden_objects::asset::{Asset, NonFungibleAsset};
-use miden_objects::block::BlockNumber;
-use miden_objects::note::{Note, NoteDetails, NoteId, NoteRecipient, NoteScript, NoteTag};
-use miden_objects::transaction::AccountInputs;
-use miden_objects::{AssetError, Felt, Word};
+use miden_protocol::account::{Account, AccountId};
+use miden_protocol::asset::{Asset, NonFungibleAsset};
+use miden_protocol::block::BlockNumber;
+use miden_protocol::note::{Note, NoteDetails, NoteId, NoteRecipient, NoteScript, NoteTag};
+use miden_protocol::transaction::AccountInputs;
+use miden_protocol::{AssetError, Felt, Word};
+use miden_standards::account::interface::AccountInterfaceExt;
 use miden_tx::{DataStore, NoteConsumptionChecker, TransactionExecutor};
 use tracing::info;
 
@@ -122,9 +123,7 @@ pub use request::{
 mod result;
 // RE-EXPORTS
 // ================================================================================================
-pub use miden_lib::account::interface::{AccountComponentInterface, AccountInterface};
-pub use miden_lib::transaction::TransactionKernel;
-pub use miden_objects::transaction::{
+pub use miden_protocol::transaction::{
     ExecutedTransaction,
     InputNote,
     InputNotes,
@@ -134,10 +133,12 @@ pub use miden_objects::transaction::{
     TransactionArgs,
     TransactionId,
     TransactionInputs,
+    TransactionKernel,
     TransactionScript,
     TransactionSummary,
 };
-pub use miden_objects::vm::{AdviceInputs, AdviceMap};
+pub use miden_protocol::vm::{AdviceInputs, AdviceMap};
+pub use miden_standards::account::interface::{AccountComponentInterface, AccountInterface};
 pub use miden_tx::auth::TransactionAuthenticator;
 pub use miden_tx::{
     DataStoreError,
@@ -239,10 +240,8 @@ where
         let future_notes: Vec<(NoteDetails, NoteTag)> =
             transaction_request.expected_future_notes().cloned().collect();
 
-        let tx_script = transaction_request.build_transaction_script(
-            &self.get_account_interface(account_id).await?,
-            self.in_debug_mode().into(),
-        )?;
+        let tx_script = transaction_request
+            .build_transaction_script(&self.get_account_interface(account_id).await?)?;
 
         let foreign_accounts = transaction_request.foreign_accounts().clone();
 
@@ -761,7 +760,7 @@ where
     ) -> Result<AccountInterface, ClientError> {
         let account: Account = self.try_get_account(account_id).await?.try_into()?;
 
-        Ok(AccountInterface::from(&account))
+        Ok(AccountInterface::from_account(&account))
     }
 
     /// Returns foreign account inputs for the required foreign accounts specified by the

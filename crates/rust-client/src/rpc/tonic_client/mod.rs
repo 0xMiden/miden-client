@@ -5,15 +5,17 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::error::Error;
 
-use miden_objects::account::{Account, AccountCode, AccountId};
-use miden_objects::address::NetworkId;
-use miden_objects::block::account_tree::AccountWitness;
-use miden_objects::block::{BlockHeader, BlockNumber, ProvenBlock};
-use miden_objects::crypto::merkle::{Forest, MerklePath, MmrProof, SmtProof};
-use miden_objects::note::{NoteId, NoteScript, NoteTag, Nullifier};
-use miden_objects::transaction::{ProvenTransaction, TransactionInputs};
-use miden_objects::utils::Deserializable;
-use miden_objects::{EMPTY_WORD, Word};
+use miden_protocol::account::{Account, AccountCode, AccountId};
+use miden_protocol::address::NetworkId;
+use miden_protocol::block::account_tree::AccountWitness;
+use miden_protocol::block::{BlockHeader, BlockNumber, ProvenBlock};
+use miden_protocol::crypto::merkle::MerklePath;
+use miden_protocol::crypto::merkle::mmr::{Forest, MmrProof};
+use miden_protocol::crypto::merkle::smt::SmtProof;
+use miden_protocol::note::{NoteId, NoteScript, NoteTag, Nullifier};
+use miden_protocol::transaction::{ProvenTransaction, TransactionInputs};
+use miden_protocol::utils::Deserializable;
+use miden_protocol::{EMPTY_WORD, Word};
 use miden_tx::utils::Serializable;
 use miden_tx::utils::sync::RwLock;
 use tonic::Status;
@@ -650,7 +652,7 @@ impl From<&Status> for GrpcError {
 mod tests {
     use std::boxed::Box;
 
-    use miden_objects::Word;
+    use miden_protocol::Word;
 
     use super::GrpcClient;
     use crate::rpc::{Endpoint, NodeRpcClient};
@@ -693,7 +695,7 @@ mod tests {
 
     #[tokio::test]
     async fn set_genesis_commitment_does_nothing_if_the_commitment_is_already_set() {
-        use miden_objects::Felt;
+        use miden_protocol::Felt;
 
         let endpoint = &Endpoint::devnet();
         let client = GrpcClient::new(endpoint, 10000);

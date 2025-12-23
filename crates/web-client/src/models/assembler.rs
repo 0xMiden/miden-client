@@ -29,7 +29,7 @@ impl Assembler {
     /// Enables or disables debug mode.
     #[wasm_bindgen(js_name = "withDebugMode")]
     pub fn with_debug_mode(mut self, yes: bool) -> Assembler {
-        self.0 = self.0.with_debug_mode(yes);
+        let _ = yes;
         self
     }
 
