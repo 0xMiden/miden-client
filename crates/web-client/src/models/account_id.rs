@@ -8,7 +8,7 @@ use miden_client::address::{
     AddressInterface as NativeAccountInterface,
     RoutingParameters,
 };
-use miden_objects::address::CustomNetworkId;
+use miden_protocol::address::CustomNetworkId;
 use wasm_bindgen::prelude::*;
 
 use super::felt::Felt;

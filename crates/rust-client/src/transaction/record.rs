@@ -2,10 +2,10 @@ use alloc::string::ToString;
 use alloc::vec::Vec;
 use core::fmt;
 
-use miden_objects::Word;
-use miden_objects::account::AccountId;
-use miden_objects::block::BlockNumber;
-use miden_objects::transaction::{OutputNotes, TransactionId, TransactionScript};
+use miden_protocol::Word;
+use miden_protocol::account::AccountId;
+use miden_protocol::block::BlockNumber;
+use miden_protocol::transaction::{OutputNotes, TransactionId, TransactionScript};
 use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 
 // TRANSACTION RECORD

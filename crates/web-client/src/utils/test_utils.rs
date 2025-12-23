@@ -29,11 +29,11 @@ impl TestUtils {
     #[wasm_bindgen(js_name = "createMockSerializedLibraryPackage")]
     pub fn create_mock_serialized_library_package() -> Uint8Array {
         pub const CODE: &str = "
-            export.foo
+            pub proc foo
                 push.1.2 mul
             end
 
-            export.bar
+            pub proc bar
                 push.1.2 add
             end
         ";

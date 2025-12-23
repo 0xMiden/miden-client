@@ -3,13 +3,13 @@ use alloc::boxed::Box;
 use miden_client::ClientError;
 use miden_client::auth::{AuthSecretKey, RPO_FALCON_SCHEME_ID};
 use miden_client::transaction::{TransactionExecutorError, TransactionRequestBuilder};
-use miden_lib::account::auth::AuthRpoFalcon512;
-use miden_lib::account::wallets::BasicWallet;
-use miden_objects::account::{AccountBuilder, AccountStorageMode};
-use miden_objects::assembly::diagnostics::miette::GraphicalReportHandler;
-use miden_objects::asset::{Asset, FungibleAsset};
-use miden_objects::note::NoteType;
-use miden_objects::testing::account_id::{
+use miden_protocol::account::auth::AuthRpoFalcon512;
+use miden_protocol::account::wallets::BasicWallet;
+use miden_protocol::account::{AccountBuilder, AccountStorageMode};
+use miden_protocol::assembly::diagnostics::miette::GraphicalReportHandler;
+use miden_protocol::asset::{Asset, FungibleAsset};
+use miden_protocol::note::NoteType;
+use miden_standards::testing::account_id::{
     ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
     ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
     ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,

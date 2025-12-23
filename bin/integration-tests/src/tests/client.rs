@@ -10,7 +10,7 @@ use miden_client::account::{
     StorageSlot,
     StorageSlotName,
 };
-use miden_client::assembly::{DefaultSourceManager, LibraryPath, Module, ModuleKind};
+use miden_client::assembly::{DefaultSourceManager, Module, ModuleKind, Path};
 use miden_client::asset::{Asset, FungibleAsset};
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
 use miden_client::builder::ClientBuilder;
@@ -1321,12 +1321,12 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
 
     // Define the account code for the custom library
     let custom_code = "
-        use.miden::native_account
-        use.std::word
+        use miden::native_account
+        use std::word
 
         const MAP_SLOT = word(\"miden::testing::client::map\")
 
-        export.update_map
+        pub proc update_map
             push.1.2.3.4
             # => [VALUE]
             push.0.0.0.0
@@ -1360,20 +1360,15 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
     let assembler = TransactionKernel::assembler();
     let source_manager = Arc::new(DefaultSourceManager::default());
     let module = Module::parser(ModuleKind::Library)
-        .parse_str(
-            LibraryPath::new("custom_library::set_map_item_library")
-                .context("failed to create library path for custom library")?,
-            custom_code,
-            &source_manager,
-        )
+        .parse_str(Path::new("custom_library::set_map_item_library"), custom_code, source_manager)
         .unwrap();
     let custom_lib = assembler.assemble_library([module]).unwrap();
 
-    let tx_script = CodeBuilder::new(true)
+    let tx_script = CodeBuilder::new()
         .with_statically_linked_library(&custom_lib)?
         .compile_tx_script(
             "
-        use.custom_library::set_map_item_library
+        use custom_library::set_map_item_library
 
         begin
              call.set_map_item_library::update_map

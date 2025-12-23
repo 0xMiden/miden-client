@@ -10,8 +10,8 @@ use miden_client::address::{
 use wasm_bindgen::JsValue;
 use wasm_bindgen::prelude::wasm_bindgen;
 
+use super::NoteTag;
 use super::account_id::{AccountId, NetworkId};
-use super::note_tag::NoteTag;
 use crate::js_error_with_context;
 use crate::utils::deserialize_from_uint8array;
 
@@ -145,7 +145,7 @@ impl TryFrom<NativeAddressInterface> for AddressInterface {
         match value {
             NativeAddressInterface::BasicWallet => Ok(AddressInterface::BasicWallet),
             _other => {
-                Err("AddressInterface from miden-objects crate was instantiated with an unsupported value"
+                Err("AddressInterface from miden-protocol crate was instantiated with an unsupported value"
                     .into())
             },
         }

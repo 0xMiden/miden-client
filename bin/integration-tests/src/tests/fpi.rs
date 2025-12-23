@@ -53,7 +53,7 @@ pub async fn test_fpi_execute_program(client_config: ClientConfig) -> Result<()>
         format!(
             r#"
             const MAP_STORAGE_SLOT = word("{MAP_SLOT_NAME}")
-            export.get_fpi_map_item
+            pub proc get_fpi_map_item
                 # map key
                 push.{map_key}
 
@@ -71,7 +71,7 @@ pub async fn test_fpi_execute_program(client_config: ClientConfig) -> Result<()>
     let foreign_account_id = foreign_account.id();
     let code = format!(
         "
-        use.miden::tx
+        use miden::tx
         begin
             # push the root of the `get_fpi_item` account procedure
             push.{proc_root}
@@ -142,7 +142,7 @@ pub async fn test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
         format!(
             r#"
             const STORAGE_MAP_SLOT = word("{MAP_SLOT_NAME}")
-            export.get_fpi_map_item
+            pub proc get_fpi_map_item
                 # map key
                 push.{map_key}
 
@@ -166,8 +166,8 @@ pub async fn test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
         AccountStorageMode::Public,
         format!(
             "
-            use.miden::tx
-            export.get_fpi_map_item
+            use miden::tx
+            pub proc get_fpi_map_item
                 # push the hash of the `get_fpi_item` account procedure
                 push.{inner_proc_root}
 
@@ -193,8 +193,8 @@ pub async fn test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
 
     let tx_script = format!(
         "
-        use.miden::tx
-        use.miden::account
+        use miden::tx
+        use miden::account
         begin
             # push the hash of the `get_fpi_item` account procedure
             push.{outer_proc_root}
@@ -277,7 +277,7 @@ async fn standard_fpi(
         format!(
             r#"
             const STORAGE_MAP_SLOT = word("{MAP_SLOT_NAME}")
-            export.get_fpi_map_item
+            pub proc get_fpi_map_item
                 # map key
                 push.{map_key}
 
@@ -299,8 +299,8 @@ async fn standard_fpi(
 
     let tx_script = format!(
         "
-        use.miden::tx
-        use.miden::account
+        use miden::tx
+        use miden::account
         begin
             # push the hash of the `get_fpi_item` account procedure
             push.{proc_root}
@@ -435,7 +435,7 @@ fn foreign_account_with_code(
 
     let (key_pair, auth_component) = match auth_scheme {
         AuthSchemeId::RpoFalcon512 => {
-            let key_pair = AuthSecretKey::new_rpo_falcon512();
+            let key_pair = AuthSecretKey::new_falcon512_rpo();
             let auth_component: AccountComponent =
                 AuthRpoFalcon512::new(key_pair.public_key().to_commitment()).into();
             (key_pair, auth_component)

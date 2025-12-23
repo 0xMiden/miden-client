@@ -9,8 +9,8 @@ use miden_client::transaction::{
 };
 use wasm_bindgen::prelude::*;
 
+use crate::models::NoteType;
 use crate::models::account_id::AccountId;
-use crate::models::note_type::NoteType;
 use crate::models::proven_transaction::ProvenTransaction;
 use crate::models::provers::TransactionProver;
 use crate::models::transaction_id::TransactionId;

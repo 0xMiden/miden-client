@@ -5,8 +5,8 @@ use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::path::PathBuf;
 use std::string::ToString;
 
-use miden_objects::Word;
-use miden_objects::account::auth::{AuthSecretKey, PublicKey, PublicKeyCommitment, Signature};
+use miden_protocol::Word;
+use miden_protocol::account::auth::{AuthSecretKey, PublicKey, PublicKeyCommitment, Signature};
 use miden_tx::AuthenticationError;
 use miden_tx::auth::{SigningInputs, TransactionAuthenticator};
 use miden_tx::utils::{Deserializable, Serializable};
