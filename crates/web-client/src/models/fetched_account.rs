@@ -1,0 +1,50 @@
+use miden_client::rpc::domain::account::FetchedAccount as NativeFetchedAccount;
+use wasm_bindgen::prelude::wasm_bindgen;
+
+use crate::models::account::Account;
+use crate::models::account_id::AccountId;
+use crate::models::word::Word;
+
+#[wasm_bindgen]
+pub struct FetchedAccount(NativeFetchedAccount);
+
+#[wasm_bindgen]
+impl FetchedAccount {
+    #[wasm_bindgen(js_name = "isPrivate")]
+    pub fn is_private(&self) -> bool {
+        matches!(&self.0, NativeFetchedAccount::Private(_, _))
+    }
+
+    #[wasm_bindgen(js_name = "isPublic")]
+    pub fn is_public(&self) -> bool {
+        matches!(&self.0, NativeFetchedAccount::Public(_, _))
+    }
+
+    pub fn account(&self) -> Option<Account> {
+        self.0.account().map(|account| account.into())
+    }
+
+    #[wasm_bindgen(js_name = "accountId")]
+    pub fn account_id(&self) -> AccountId {
+        self.0.account_id().into()
+    }
+
+    pub fn commitment(&self) -> Word {
+        self.0.commitment().into()
+    }
+}
+
+// CONVERSIONS
+// ================================================================================================
+
+impl From<NativeFetchedAccount> for FetchedAccount {
+    fn from(native_account: NativeFetchedAccount) -> Self {
+        FetchedAccount(native_account)
+    }
+}
+
+impl From<FetchedAccount> for NativeFetchedAccount {
+    fn from(fetched_account: FetchedAccount) -> Self {
+        fetched_account.0
+    }
+}

@@ -52,6 +52,7 @@ pub mod consumable_note_record;
 pub mod endpoint;
 pub mod executed_transaction;
 pub mod felt;
+pub mod fetched_account;
 pub mod foreign_account;
 pub mod fungible_asset;
 pub mod input_note;

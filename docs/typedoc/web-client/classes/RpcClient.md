@@ -50,6 +50,22 @@ Endpoint to connect to.
 
 ***
 
+### getAccountDetails()
+
+> **getAccountDetails**(`account_id`): `Promise`\<[`FetchedAccount`](FetchedAccount.md)\>
+
+#### Parameters
+
+##### account\_id
+
+[`AccountId`](AccountId.md)
+
+#### Returns
+
+`Promise`\<[`FetchedAccount`](FetchedAccount.md)\>
+
+***
+
 ### getNotesById()
 
 > **getNotesById**(`note_ids`): `Promise`\<[`FetchedNote`](FetchedNote.md)[]\>

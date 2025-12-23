@@ -46,6 +46,7 @@
 - [ExecutedTransaction](classes/ExecutedTransaction.md)
 - [Felt](classes/Felt.md)
 - [FeltArray](classes/FeltArray.md)
+- [FetchedAccount](classes/FetchedAccount.md)
 - [FetchedNote](classes/FetchedNote.md)
 - [FlattenedU8Vec](classes/FlattenedU8Vec.md)
 - [ForeignAccount](classes/ForeignAccount.md)

@@ -1,5 +1,12 @@
 import { Page, expect } from "@playwright/test";
 import test from "./playwright.global.setup";
+import {
+  createNewFaucet,
+  createNewWallet,
+  fundAccountFromFaucet,
+  getAccount,
+  StorageMode,
+} from "./webClientTestUtils";
 
 // GET_ACCOUNT TESTS
 // =======================================================================================================
@@ -157,5 +164,92 @@ test.describe("getAccounts tests", () => {
     expect(result.commitmentsOfCreatedAccounts.length).toEqual(0);
     expect(result.commitmentsOfGetAccountsResult.length).toEqual(0);
     expect(result.resultTypes.length).toEqual(0);
+  });
+});
+
+test.describe("fetch account tests", () => {
+  test("retrieves a public account", async ({ page }) => {
+    const walletSeed = new Uint8Array(32);
+    crypto.getRandomValues(walletSeed);
+
+    const mutable = false;
+    const storageMode = StorageMode.PUBLIC;
+    const authSchemeId = 0;
+    const initialWallet = await createNewWallet(page, {
+      storageMode,
+      mutable,
+      authSchemeId,
+      walletSeed,
+    });
+    const faucet = await createNewFaucet(page);
+
+    const { targetAccountBalance: initialBalance } =
+      await fundAccountFromFaucet(page, initialWallet.id, faucet.id);
+    const { commitment } = await getAccount(page, initialWallet.id);
+
+    const { isPublic, accountIsDefined, fetchedCommitment, balance } =
+      await page.evaluate(async (accountId: string) => {
+        const endpoint = new window.Endpoint(window.rpcUrl);
+        const rpcClient = new window.RpcClient(endpoint);
+
+        const fetchedAccount = await rpcClient.getAccountDetails(
+          window.AccountId.fromHex(accountId)
+        );
+        return {
+          isPublic: fetchedAccount.isPublic(),
+          accountIsDefined: !!fetchedAccount.account(),
+          fetchedCommitment: fetchedAccount.commitment().toHex(),
+          balance: fetchedAccount.account()
+            ? fetchedAccount
+                .account()!
+                .vault()
+                .fungibleAssets()[0]
+                .amount()
+                .toString()
+            : undefined,
+        };
+      }, initialWallet.id);
+    expect(isPublic).toBe(true);
+    expect(accountIsDefined).toBe(true);
+    expect(fetchedCommitment).toBe(commitment);
+    expect(balance).toBe(initialBalance);
+  });
+
+  test("retrieves a private account", async ({ page }) => {
+    const walletSeed = new Uint8Array(32);
+    crypto.getRandomValues(walletSeed);
+
+    const mutable = false;
+    const storageMode = StorageMode.PRIVATE;
+    const authSchemeId = 0;
+    const initialWallet = await createNewWallet(page, {
+      storageMode,
+      mutable,
+      authSchemeId,
+      walletSeed,
+    });
+    const faucet = await createNewFaucet(page);
+
+    await fundAccountFromFaucet(page, initialWallet.id, faucet.id);
+
+    const { commitment } = await getAccount(page, initialWallet.id);
+
+    const { isPrivate, accountIsDefined, fetchedCommitment } =
+      await page.evaluate(async (accountId: string) => {
+        const endpoint = new window.Endpoint(window.rpcUrl);
+        const rpcClient = new window.RpcClient(endpoint);
+
+        const fetchedAccount = await rpcClient.getAccountDetails(
+          window.AccountId.fromHex(accountId)
+        );
+        return {
+          isPrivate: fetchedAccount.isPrivate(),
+          accountIsDefined: !!fetchedAccount.account(),
+          fetchedCommitment: fetchedAccount.commitment().toHex(),
+        };
+      }, initialWallet.id);
+    expect(isPrivate).toBe(true);
+    expect(accountIsDefined).toBe(false);
+    expect(fetchedCommitment).toBe(commitment);
   });
 });

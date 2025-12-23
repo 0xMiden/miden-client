@@ -39,6 +39,7 @@ export {
   FeltArray,
   FetchedNote,
   FlattenedU8Vec,
+  FetchedAccount,
   ForeignAccount,
   ForeignAccountArray,
   FungibleAsset,

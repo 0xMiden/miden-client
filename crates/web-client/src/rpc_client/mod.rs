@@ -12,7 +12,9 @@ use note::FetchedNote;
 use wasm_bindgen::prelude::*;
 
 use crate::js_error_with_context;
+use crate::models::account_id::AccountId;
 use crate::models::endpoint::Endpoint;
+use crate::models::fetched_account::FetchedAccount;
 use crate::models::note_id::NoteId;
 use crate::models::note_script::NoteScript;
 use crate::models::word::Word;
@@ -91,5 +93,20 @@ impl RpcClient {
             .map_err(|err| js_error_with_context(err, "failed to get note script by root"))?;
 
         Ok(note_script.into())
+    }
+
+    #[wasm_bindgen(js_name = "getAccountDetails")]
+    pub async fn get_account_details(
+        &self,
+        account_id: AccountId,
+    ) -> Result<FetchedAccount, JsValue> {
+        let native_account_id = account_id.into();
+
+        let fetched_account =
+            self.inner.get_account_details(native_account_id).await.map_err(|err| {
+                js_error_with_context(err, "failed to get account for the given account id")
+            })?;
+
+        Ok(fetched_account.into())
     }
 }
