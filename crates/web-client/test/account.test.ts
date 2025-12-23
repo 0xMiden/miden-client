@@ -160,8 +160,10 @@ test.describe("getAccounts tests", () => {
   });
 });
 
-test.describe("get account with details", () => {
-  test("get account with details", async ({ page }) => {
+test.describe("get public account with details", () => {
+  test("assets and storage with too many assets/entries are retrieved", async ({
+    page,
+  }) => {
     const [assetCount, balances] = await page.evaluate(async () => {
       // This account is inserted into the genesis block when test node is started,
       // it starts with assets from 1500 faucets, the function "build_test_faucets_and_accoung"
@@ -172,6 +174,10 @@ test.describe("get account with details", () => {
       );
       await window.client.importAccountById(accountID);
       const account = await window.client.getAccount(accountID);
+      const storage = account
+        ?.storage()
+        .getMapEntries("miden::test_account::map::too_many_entries");
+      console.log("Storage length", storage?.length);
       const vault = account?.vault();
       const assets = vault?.fungibleAssets()!;
       const assetCount = assets.length;

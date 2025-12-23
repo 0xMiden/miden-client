@@ -1,6 +1,6 @@
 #![recursion_limit = "256"]
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fs::File;
 use std::io::Write;
 use std::net::SocketAddr;
@@ -12,6 +12,7 @@ use ::rand::{Rng, random};
 use anyhow::{Context, Error, Result, bail};
 use miden_lib::AuthScheme;
 use miden_lib::account::auth::AuthRpoFalcon512;
+use miden_lib::account::components::basic_wallet_library;
 use miden_lib::account::faucets::{self, create_basic_fungible_faucet};
 use miden_lib::account::wallets::BasicWallet;
 use miden_lib::utils::Serializable;
@@ -25,12 +26,14 @@ use miden_node_store::{GenesisState, Store};
 use miden_node_utils::crypto::get_rpo_random_coin;
 use miden_node_validator::Validator;
 use miden_objects::account::auth::AuthSecretKey;
-use miden_objects::account::{Account, AccountBuilder, AccountComponent, AccountFile};
+use miden_objects::account::{
+    Account, AccountBuilder, AccountComponent, AccountFile, StorageMap, StorageSlot,
+};
 use miden_objects::asset::{Asset, FungibleAsset, TokenSymbol};
 use miden_objects::block::FeeParameters;
 use miden_objects::crypto::dsa::ecdsa_k256_keccak;
 use miden_objects::testing::account_id::ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET;
-use miden_objects::{Felt, ONE};
+use miden_objects::{Felt, ONE, Word};
 use rand_chacha::ChaCha20Rng;
 use rand_chacha::rand_core::SeedableRng;
 use tokio::net::TcpListener;
@@ -395,6 +398,8 @@ impl NodeHandle {
 // ================================================================================================
 const TEST_ACCOUNT_ID: &str = "0x0a0a0a0a0a0a0a100a0a0a0a0a0a0a";
 
+// Builds an account that triggers the "too_many_assets" boolean
+// flag when requested from the node.
 fn build_test_faucets_and_account() -> anyhow::Result<Vec<Account>> {
     let mut rng = ChaCha20Rng::from_seed(random());
     let secret = AuthSecretKey::new_rpo_falcon512_with_rng(&mut get_rpo_random_coin(&mut rng));
@@ -428,12 +433,27 @@ fn build_test_faucets_and_account() -> anyhow::Result<Vec<Account>> {
 
     let seed = [0xA; 32];
     let sk = AuthSecretKey::new_rpo_falcon512_with_rng(&mut ChaCha20Rng::from_seed(seed));
+
+    let map_entries = ((0_32..2000_u32).map(|i| (Word::from([i; 4]), Word::from([i; 4]))));
+
+    let storage_map = miden_objects::account::StorageSlot::with_map(
+        miden_objects::account::StorageSlotName::new("miden::test_account::map::too_many_entries")
+            .expect("should be a valid slot name"),
+        StorageMap::with_entries(map_entries).expect("should be a valid map"),
+    );
+
+    let acc_component = AccountComponent::new(basic_wallet_library(), vec![storage_map])
+        .expect(
+            "basic wallet component should satisfy the requirements of a valid account component",
+        )
+        .with_supports_all_types();
+
     let account = AccountBuilder::new(seed)
         .with_auth_component(miden_lib::account::auth::AuthRpoFalcon512::new(
             sk.public_key().to_commitment(),
         ))
         .account_type(miden_objects::account::AccountType::RegularAccountUpdatableCode)
-        .with_component(BasicWallet)
+        .with_component(acc_component)
         .storage_mode(miden_objects::account::AccountStorageMode::Public)
         .with_assets(faucets.iter().map(|faucet| {
             Asset::Fungible(FungibleAsset::new(faucet.id(), 100).expect("should be a valid faucet"))
