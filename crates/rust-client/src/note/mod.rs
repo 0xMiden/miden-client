@@ -74,7 +74,13 @@ mod note_update_tracker;
 // ================================================================================================
 
 pub use miden_lib::note::utils::{build_p2id_recipient, build_swap_tag};
-pub use miden_lib::note::{WellKnownNote, create_p2id_note, create_p2ide_note, create_swap_note};
+pub use miden_lib::note::{
+    NoteConsumptionStatus,
+    WellKnownNote,
+    create_p2id_note,
+    create_p2ide_note,
+    create_swap_note,
+};
 pub use miden_objects::NoteError;
 pub use miden_objects::block::BlockNumber;
 pub use miden_objects::note::{
@@ -98,7 +104,7 @@ pub use miden_objects::note::{
     PartialNote,
 };
 pub use miden_objects::transaction::ToInputNoteCommitments;
-pub use note_screener::{NoteConsumability, NoteRelevance, NoteScreener, NoteScreenerError};
+pub use note_screener::{NoteConsumability, NoteScreener, NoteScreenerError};
 pub use note_update_tracker::{
     InputNoteUpdate,
     NoteUpdateTracker,
