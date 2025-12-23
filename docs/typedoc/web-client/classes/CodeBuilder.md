@@ -45,11 +45,11 @@ previous example: `use.miden::my_contract'.
 
 ***
 
-### compileAccountComponent()
+### compileAccountComponentCode()
 
-> **compileAccountComponent**(`account_code`, `storage_slots`): [`AccountComponent`](AccountComponent.md)
+> **compileAccountComponentCode**(`account_code`): [`AccountComponentCode`](AccountComponentCode.md)
 
-Given an `AccountComponentCode`, and its storage slots, compiles it
+Given an `AccountComponentCode`, compiles it
 with the available modules under this builder. Returns the compiled account component code.
 
 #### Parameters
@@ -58,13 +58,9 @@ with the available modules under this builder. Returns the compiled account comp
 
 `string`
 
-##### storage\_slots
-
-[`StorageSlot`](StorageSlot.md)[]
-
 #### Returns
 
-[`AccountComponent`](AccountComponent.md)
+[`AccountComponentCode`](AccountComponentCode.md)
 
 ***
 

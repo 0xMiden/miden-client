@@ -1,8 +1,7 @@
 use alloc::sync::Arc;
 
 use miden_client::CodeBuilder as NativeCodeBuilder;
-use miden_client::account::StorageSlot as NativeStorageSlot;
-use miden_client::account::component::AccountComponent as NativeAccountComponent;
+use miden_client::account::component::AccountComponentCode as NativeAccountComponentCode;
 use miden_client::assembly::{
     Assembler,
     Library as NativeLibrary,
@@ -16,10 +15,9 @@ use miden_client::assembly::{
 use wasm_bindgen::prelude::*;
 
 use crate::js_error_with_context;
-use crate::models::account_component::AccountComponent;
+use crate::models::account_component_code::AccountComponentCode;
 use crate::models::library::Library;
 use crate::models::note_script::NoteScript;
-use crate::models::storage_slot::StorageSlot;
 use crate::models::transaction_script::TransactionScript;
 
 /// Utility for linking libraries and compiling transaction/note scripts.
@@ -140,17 +138,13 @@ impl CodeBuilder {
         }
     }
 
-    /// Given an `AccountComponentCode`, and its storage slots, compiles it
+    /// Given an `AccountComponentCode`, compiles it
     /// with the available modules under this builder. Returns the compiled account component code.
-    #[wasm_bindgen(js_name = "compileAccountComponent")]
-    pub fn compile_account_component(
+    #[wasm_bindgen(js_name = "compileAccountComponentCode")]
+    pub fn compile_account_component_code(
         &self,
         account_code: &str,
-        storage_slots: Vec<StorageSlot>,
-    ) -> Result<AccountComponent, JsValue> {
-        let native_slots: Vec<NativeStorageSlot> =
-            storage_slots.into_iter().map(Into::into).collect();
-
+    ) -> Result<AccountComponentCode, JsValue> {
         let assembler: Assembler = self.builder.clone().into();
         let native_library = assembler.assemble_library([account_code]).map_err(|e| {
             JsValue::from_str(&format!(
@@ -159,9 +153,8 @@ impl CodeBuilder {
             ))
         })?;
 
-        NativeAccountComponent::new(native_library, native_slots)
-            .map(AccountComponent::from)
-            .map_err(|e| js_error_with_context(e, "Failed to compile account component"))
+        let native_code: NativeAccountComponentCode = native_library.into();
+        Ok(native_code.into())
     }
 }
 

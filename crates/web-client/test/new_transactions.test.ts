@@ -792,9 +792,12 @@ export const customAccountComponent = async (
       let storageMap = new window.StorageMap();
       let storageSlotMap = window.StorageSlot.map(MAP_SLOT_NAME, storageMap);
 
-      let mappingAccountComponent = builder
-        .compileAccountComponent(accountCode, [storageSlotMap])
-        .withSupportsAllTypes();
+      let accountComponentCode =
+        builder.compileAccountComponentCode(accountCode);
+      let mappingAccountComponent = window.AccountComponent.compile(
+        accountComponentCode,
+        [storageSlotMap]
+      ).withSupportsAllTypes();
 
       const walletSeed = new Uint8Array(32);
       crypto.getRandomValues(walletSeed);
@@ -1114,9 +1117,11 @@ export const counterAccountComponent = async (
 
     let builder = client.createCodeBuilder();
 
-    let counterAccountComponent = builder
-      .compileAccountComponent(accountCode, [emptyStorageSlot])
-      .withSupportsAllTypes();
+    let accountComponentCode = builder.compileAccountComponentCode(accountCode);
+    let counterAccountComponent = window.AccountComponent.compile(
+      accountComponentCode,
+      [emptyStorageSlot]
+    ).withSupportsAllTypes();
 
     const walletSeed = new Uint8Array(32);
     crypto.getRandomValues(walletSeed);
@@ -1283,11 +1288,11 @@ export const testStorageMap = async (page: Page): Promise<any> => {
         `;
 
     let builder = client.createCodeBuilder();
-    let bumpItemComponent = builder
-      .compileAccountComponent(accountCode, [
-        window.StorageSlot.map(MAP_SLOT_NAME, storageMap),
-      ])
-      .withSupportsAllTypes();
+    let accountComponentCode = builder.compileAccountComponentCode(accountCode);
+    let bumpItemComponent = window.AccountComponent.compile(
+      accountComponentCode,
+      [window.StorageSlot.map(MAP_SLOT_NAME, storageMap)]
+    ).withSupportsAllTypes();
 
     const walletSeed = new Uint8Array(32);
     crypto.getRandomValues(walletSeed);

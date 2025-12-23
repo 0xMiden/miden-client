@@ -1,6 +1,9 @@
 use miden_client::Word as NativeWord;
 use miden_client::account::StorageSlot as NativeStorageSlot;
-use miden_client::account::component::AccountComponent as NativeAccountComponent;
+use miden_client::account::component::{
+    AccountComponent as NativeAccountComponent,
+    AccountComponentCode as NativeAccountComponentCode,
+};
 use miden_client::auth::{
     AuthEcdsaK256Keccak as NativeEcdsaK256Keccak,
     AuthRpoFalcon512 as NativeRpoFalcon512,
@@ -12,10 +15,12 @@ use miden_core::mast::MastNodeExt;
 use wasm_bindgen::prelude::*;
 
 use crate::js_error_with_context;
+use crate::models::account_component_code::AccountComponentCode;
 use crate::models::auth::AuthScheme;
 use crate::models::auth_secret_key::AuthSecretKey;
 use crate::models::miden_arrays::StorageSlotArray;
 use crate::models::package::Package;
+use crate::models::storage_slot::StorageSlot;
 use crate::models::word::Word;
 
 /// Procedure digest paired with whether it is an auth procedure.
@@ -56,6 +61,21 @@ pub struct AccountComponent(NativeAccountComponent);
 
 #[wasm_bindgen]
 impl AccountComponent {
+    /// Compiles account code with the given storage slots using the provided assembler.
+    pub fn compile(
+        account_code: AccountComponentCode,
+        storage_slots: Vec<StorageSlot>,
+    ) -> Result<AccountComponent, JsValue> {
+        let native_slots: Vec<NativeStorageSlot> =
+            storage_slots.into_iter().map(Into::into).collect();
+
+        let native_account_code: NativeAccountComponentCode = account_code.into();
+
+        NativeAccountComponent::new(native_account_code, native_slots)
+            .map(AccountComponent)
+            .map_err(|e| js_error_with_context(e, "Failed to compile account component"))
+    }
+
     /// Marks the component as supporting all account types.
     #[wasm_bindgen(js_name = "withSupportsAllTypes")]
     pub fn with_supports_all_types(mut self) -> Self {
@@ -182,11 +202,5 @@ impl From<AccountComponent> for NativeAccountComponent {
 impl From<&AccountComponent> for NativeAccountComponent {
     fn from(account_component: &AccountComponent) -> Self {
         account_component.0.clone()
-    }
-}
-
-impl From<NativeAccountComponent> for AccountComponent {
-    fn from(native: NativeAccountComponent) -> Self {
-        AccountComponent(native)
     }
 }

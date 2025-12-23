@@ -31,6 +31,7 @@ pub mod account;
 pub mod account_builder;
 pub mod account_code;
 pub mod account_component;
+pub mod account_component_code;
 pub mod account_delta;
 pub mod account_file;
 pub mod account_header;

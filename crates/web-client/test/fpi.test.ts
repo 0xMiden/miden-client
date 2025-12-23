@@ -37,11 +37,11 @@ export const testStandardFpi = async (page: Page): Promise<void> => {
             end
         `;
     let builder = client.createCodeBuilder();
-    let getItemComponent = builder
-      .compileAccountComponent(code, [
-        window.StorageSlot.map(MAP_SLOT_NAME, storageMap),
-      ])
-      .withSupportsAllTypes();
+    let accountCode = builder.compileAccountComponentCode(code);
+
+    let getItemComponent = window.AccountComponent.compile(accountCode, [
+      window.StorageSlot.map(MAP_SLOT_NAME, storageMap),
+    ]).withSupportsAllTypes();
 
     const walletSeed = new Uint8Array(32);
     crypto.getRandomValues(walletSeed);
