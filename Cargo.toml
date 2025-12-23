@@ -29,11 +29,11 @@ opt-level = 1
 
 [workspace.dependencies]
 # Miden protocol dependencies
-miden-protocol = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base.git" }
-miden-standards = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base.git" }
-miden-testing = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base.git" }
-miden-tx = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base.git" }
-miden-mast-package = { version = "0.20.1", default-features = false }
+miden-mast-package = { default-features = false, version = "0.20.1" }
+miden-protocol     = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base.git" }
+miden-standards    = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base.git" }
+miden-testing      = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base.git" }
+miden-tx           = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base.git" }
 
 # Miden node dependencies
 miden-node-block-producer = { branch = "santiagopittella-update-base-vm", git = "https://github.com/0xMiden/miden-node.git" }
@@ -44,7 +44,9 @@ miden-node-store = { branch = "santiagopittella-update-base-vm", git = "https://
 miden-node-utils = { branch = "santiagopittella-update-base-vm", git = "https://github.com/0xMiden/miden-node.git" }
 miden-node-validator = { branch = "santiagopittella-update-base-vm", git = "https://github.com/0xMiden/miden-node.git" }
 miden-note-transport-proto-build = { branch = "main", default-features = false, git = "https://github.com/0xMiden/miden-note-transport.git" }
-miden-remote-prover = { branch = "santiagopittella-update-base-vm", features = ["concurrent"], git = "https://github.com/0xMiden/miden-node.git" }
+miden-remote-prover = { branch = "santiagopittella-update-base-vm", features = [
+  "concurrent",
+], git = "https://github.com/0xMiden/miden-node.git" }
 miden-remote-prover-client = { branch = "santiagopittella-update-base-vm", default-features = false, features = [
   "tx-prover",
 ], git = "https://github.com/0xMiden/miden-node.git" }
