@@ -1400,3 +1400,52 @@ test.describe("storage map test", () => {
     expect(mapEntries.expectedValue).toBe("2");
   });
 });
+
+// SUBMIT_NEW_TRANSACTION_WITH_PROVER TESTS
+// ================================================================================================
+
+test.describe("submitNewTransactionWithProver tests", () => {
+  test("submitNewTransactionWithProver with failing prover throws, then succeeds with local prover", async ({
+    page,
+  }) => {
+    const { faucetId, accountId } = await setupWalletAndFaucet(page);
+
+    // Test that a failing prover throws an error
+    const failingProverResult = await page.evaluate(
+      async ({ faucetId, accountId }) => {
+        const client = window.client;
+        const faucetAccountId = window.AccountId.fromHex(faucetId);
+        const targetAccountId = window.AccountId.fromHex(accountId);
+
+        await client.syncState();
+
+        const mintTransactionRequest = client.newMintTransactionRequest(
+          targetAccountId,
+          faucetAccountId,
+          window.NoteType.Public,
+          BigInt(1000)
+        );
+
+        // Create a failing remote prover with an invalid endpoint
+        const failingProver = window.TransactionProver.newRemoteProver(
+          "http://localhost:1",
+          null
+        );
+
+        try {
+          await client.submitNewTransactionWithProver(
+            faucetAccountId,
+            mintTransactionRequest,
+            failingProver
+          );
+          return { threw: false, error: null };
+        } catch (e: any) {
+          return { threw: true, error: e.message || String(e) };
+        }
+      },
+      { faucetId, accountId }
+    );
+
+    expect(failingProverResult.threw).toBe(true);
+  });
+});

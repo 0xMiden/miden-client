@@ -451,6 +451,41 @@ export class WebClient {
     }
   }
 
+  async submitNewTransactionWithProver(accountId, transactionRequest, prover) {
+    try {
+      if (!this.worker) {
+        const wasmWebClient = await this.getWasmWebClient();
+        return await wasmWebClient.submitNewTransactionWithProver(
+          accountId,
+          transactionRequest,
+          prover
+        );
+      }
+
+      const wasm = await getWasmOrThrow();
+      const serializedTransactionRequest = transactionRequest.serialize();
+      const proverPayload = prover.serialize();
+      const result = await this.callMethodWithWorker(
+        MethodName.SUBMIT_NEW_TRANSACTION_WITH_PROVER,
+        accountId.toString(),
+        serializedTransactionRequest,
+        proverPayload
+      );
+
+      const transactionResult = wasm.TransactionResult.deserialize(
+        new Uint8Array(result.serializedTransactionResult)
+      );
+
+      return transactionResult.id();
+    } catch (error) {
+      console.error(
+        "INDEX.JS: Error in submitNewTransactionWithProver:",
+        error
+      );
+      throw error;
+    }
+  }
+
   async executeTransaction(accountId, transactionRequest) {
     try {
       if (!this.worker) {
@@ -657,6 +692,64 @@ export class MockWebClient extends WebClient {
       return transactionResult.id();
     } catch (error) {
       console.error("INDEX.JS: Error in submitNewTransaction:", error);
+      throw error;
+    }
+  }
+
+  async submitNewTransactionWithProver(accountId, transactionRequest, prover) {
+    try {
+      if (!this.worker) {
+        return await super.submitNewTransactionWithProver(
+          accountId,
+          transactionRequest,
+          prover
+        );
+      }
+
+      const wasmWebClient = await this.getWasmWebClient();
+      const wasm = await getWasmOrThrow();
+      const serializedTransactionRequest = transactionRequest.serialize();
+      const proverPayload = prover.serialize();
+      const serializedMockChain = wasmWebClient.serializeMockChain().buffer;
+      const serializedMockNoteTransportNode =
+        wasmWebClient.serializeMockNoteTransportNode().buffer;
+
+      const result = await this.callMethodWithWorker(
+        MethodName.SUBMIT_NEW_TRANSACTION_WITH_PROVER_MOCK,
+        accountId.toString(),
+        serializedTransactionRequest,
+        proverPayload,
+        serializedMockChain,
+        serializedMockNoteTransportNode
+      );
+
+      const newMockChain = new Uint8Array(result.serializedMockChain);
+      const newMockNoteTransportNode = result.serializedMockNoteTransportNode
+        ? new Uint8Array(result.serializedMockNoteTransportNode)
+        : undefined;
+
+      const transactionResult = wasm.TransactionResult.deserialize(
+        new Uint8Array(result.serializedTransactionResult)
+      );
+
+      if (!(this instanceof MockWebClient)) {
+        return transactionResult.id();
+      }
+
+      this.wasmWebClient = new wasm.WebClient();
+      this.wasmWebClientPromise = Promise.resolve(this.wasmWebClient);
+      await this.wasmWebClient.createMockClient(
+        this.seed,
+        newMockChain,
+        newMockNoteTransportNode
+      );
+
+      return transactionResult.id();
+    } catch (error) {
+      console.error(
+        "INDEX.JS: Error in submitNewTransactionWithProver:",
+        error
+      );
       throw error;
     }
   }
