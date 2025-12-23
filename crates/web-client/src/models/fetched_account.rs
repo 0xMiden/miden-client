@@ -21,7 +21,7 @@ impl FetchedAccount {
     }
 
     pub fn account(&self) -> Option<Account> {
-        self.0.account().map(|account| account.into())
+        self.0.account().map(Into::into)
     }
 
     #[wasm_bindgen(js_name = "accountId")]
