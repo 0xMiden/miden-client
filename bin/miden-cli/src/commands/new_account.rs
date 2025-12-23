@@ -11,9 +11,12 @@ use miden_client::account::component::{
     AccountComponentMetadata,
     InitStorageData,
     MIDEN_PACKAGE_EXTENSION,
+    StorageSlotSchema,
+    StorageValueName,
 };
 use miden_client::account::{Account, AccountBuilder, AccountStorageMode, AccountType};
 use miden_client::auth::{AuthRpoFalcon512, AuthSecretKey, TransactionAuthenticator};
+use miden_client::keystore::FilesystemKeyStore;
 use miden_client::transaction::TransactionRequestBuilder;
 use miden_client::utils::Deserializable;
 use miden_client::vm::{Package, SectionId};
@@ -23,7 +26,7 @@ use tracing::debug;
 use crate::commands::account::set_default_account_if_unset;
 use crate::config::CliConfig;
 use crate::errors::CliError;
-use crate::{CliKeyStore, client_binary_name, load_config_file};
+use crate::{client_binary_name, load_config_file};
 
 // CLI TYPES
 // ================================================================================================
@@ -100,7 +103,7 @@ impl NewWalletCmd {
     pub async fn execute<AUTH: TransactionAuthenticator + Sync + 'static>(
         &self,
         mut client: Client<AUTH>,
-        keystore: CliKeyStore,
+        keystore: FilesystemKeyStore,
     ) -> Result<(), CliError> {
         let package_paths: Vec<PathBuf> = [PathBuf::from("basic-wallet")]
             .into_iter()
@@ -195,7 +198,7 @@ impl NewAccountCmd {
     pub async fn execute<AUTH: TransactionAuthenticator + Sync + 'static>(
         &self,
         mut client: Client<AUTH>,
-        keystore: CliKeyStore,
+        keystore: FilesystemKeyStore,
     ) -> Result<(), CliError> {
         let new_account = create_client_account(
             &mut client,
@@ -346,7 +349,7 @@ fn separate_auth_components(
 /// If no auth component is detected in the packages, a Falcon-based auth component will be added.
 async fn create_client_account<AUTH: TransactionAuthenticator + Sync + 'static>(
     client: &mut Client<AUTH>,
-    keystore: &CliKeyStore,
+    keystore: &FilesystemKeyStore,
     account_type: AccountType,
     storage_mode: AccountStorageMode,
     package_paths: &[PathBuf],
@@ -428,10 +431,14 @@ async fn deploy_account<AUTH: TransactionAuthenticator + Sync + 'static>(
     // Retrieve the auth procedure mast root pointer and call it in the transaction script.
     // We only use AuthRpoFalcon512 for the auth component so this may be overkill but it lets us
     // use different auth components in the future.
-    let auth_procedure_mast_root = account.code().get_procedure_by_index(0).mast_root();
+    let auth_procedure_mast_root = account
+        .code()
+        .get(0)
+        .expect("account code should contain at least one procedure")
+        .mast_root();
 
     let auth_script = client
-        .script_builder()
+        .code_builder()
         .compile_tx_script(
             "
                     begin
@@ -462,7 +469,7 @@ fn process_packages(
     let mut account_components = Vec::with_capacity(packages.len());
 
     for package in packages {
-        let mut placeholders = init_storage_data.placeholders().clone();
+        let mut value_entries = init_storage_data.values().clone();
         let mut map_entries = BTreeMap::new();
 
         let Some(component_metadata_section) = package.sections.iter().find(|section| {
@@ -484,34 +491,38 @@ fn process_packages(
             )
         })?;
 
-        for (placeholder_key, placeholder_type) in component_metadata.get_placeholder_requirements()
-        {
-            if placeholders.contains_key(&placeholder_key) {
-                // The use provided it through the TOML file, so we can skip it
+        // Preserve any provided map entries for map slots.
+        for (slot_name, schema) in component_metadata.storage_schema().iter() {
+            if matches!(schema, StorageSlotSchema::Map(_)) {
+                let value_name = StorageValueName::from_slot_name(slot_name);
+                if let Some(entries) = init_storage_data.map_entries(&value_name) {
+                    map_entries.insert(value_name, entries.clone());
+                }
+            }
+        }
+
+        for (value_name, requirement) in component_metadata.schema_requirements() {
+            if value_entries.contains_key(&value_name) {
+                // The user provided it through the TOML file, so we can skip it
                 continue;
             }
 
-            if let Some(entries) = init_storage_data.map_entries(&placeholder_key) {
-                map_entries.insert(placeholder_key.clone(), entries.clone());
-                continue;
-            }
-
-            let description = placeholder_type.description.unwrap_or("[No description]".into());
+            let description = requirement.description.unwrap_or("[No description]".into());
             println!(
-                "Enter value for '{placeholder_key}' - {description} (type: {}): ",
-                placeholder_type.r#type
+                "Enter value for '{value_name}' - {description} (type: {}): ",
+                requirement.r#type
             );
             std::io::stdout().flush()?;
 
             let mut input_value = String::new();
             std::io::stdin().read_line(&mut input_value)?;
             let input_value = input_value.trim();
-            placeholders.insert(placeholder_key, input_value.to_string());
+            value_entries.insert(value_name, input_value.to_string().into());
         }
 
         let account_component = AccountComponent::from_package(
             &package,
-            &InitStorageData::new(placeholders, map_entries),
+            &InitStorageData::new(value_entries, map_entries),
         )
         .map_err(|e| {
             CliError::Account(

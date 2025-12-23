@@ -3,8 +3,8 @@ description = "Ecdsa authentication component, for verifying ECDSA K256 Keccak s
 version = "0.1.0"
 supported-types = ["RegularAccountUpdatableCode", "RegularAccountImmutableCode", "FungibleFaucet", "NonFungibleFaucet"]
 
-[[storage]]
-name = "ecdsa_pubkey"
+[storage]
+[[storage.slots]]
+name = "miden::standards::auth::ecdsa_k256_keccak::public_key"
 description = "ECDSA K256 Keccak public key"
-slot = 0
-type = "auth::ecdsa_k256_keccak::pub_key"
+type = "miden::standards::auth::ecdsa_k256_keccak::pub_key"

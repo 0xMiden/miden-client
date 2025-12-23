@@ -84,7 +84,7 @@ Compiles account code with the given storage slots using the provided assembler.
 
 ##### builder
 
-[`ScriptBuilder`](ScriptBuilder.md)
+[`CodeBuilder`](CodeBuilder.md)
 
 ##### storage\_slots
 

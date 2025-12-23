@@ -10,10 +10,13 @@ use miden_objects::account::{
     AccountHeader,
     AccountId,
     AccountStorageHeader,
+    StorageSlotHeader,
+    StorageSlotName,
     StorageSlotType,
 };
 use miden_objects::asset::Asset;
-use miden_objects::block::{AccountWitness, BlockNumber};
+use miden_objects::block::BlockNumber;
+use miden_objects::block::account_tree::AccountWitness;
 use miden_objects::crypto::merkle::SparseMerklePath;
 use miden_tx::utils::{Deserializable, Serializable, ToHex};
 use thiserror::Error;
@@ -199,12 +202,13 @@ impl TryInto<AccountStorageHeader> for proto::account::AccountStorageHeader {
     type Error = crate::rpc::RpcError;
 
     fn try_into(self) -> Result<AccountStorageHeader, Self::Error> {
+        use crate::rpc::RpcError;
         use crate::rpc::domain::MissingFieldHelper;
 
-        let mut header_slots: Vec<(StorageSlotType, Word)> = Vec::with_capacity(self.slots.len());
+        let mut header_slots: Vec<StorageSlotHeader> = Vec::with_capacity(self.slots.len());
 
         for slot in self.slots {
-            let commitment: Word = slot
+            let slot_value: Word = slot
                 .commitment
                 .ok_or(proto::account::account_storage_header::StorageSlot::missing_field(
                     stringify!(commitment),
@@ -212,11 +216,15 @@ impl TryInto<AccountStorageHeader> for proto::account::AccountStorageHeader {
                 .try_into()?;
 
             let slot_type: StorageSlotType = SlotTypeProto(slot.slot_type).try_into()?;
+            let slot_name = StorageSlotName::new(slot.slot_name)
+                .map_err(|err| RpcError::InvalidResponse(err.to_string()))?;
 
-            header_slots.push((slot_type, commitment));
+            header_slots.push(StorageSlotHeader::new(slot_name, slot_type, slot_value));
         }
 
-        Ok(AccountStorageHeader::new(header_slots))
+        header_slots.sort_by_key(StorageSlotHeader::id);
+        AccountStorageHeader::new(header_slots)
+            .map_err(|err| RpcError::InvalidResponse(err.to_string()))
     }
 }
 
@@ -342,8 +350,8 @@ impl TryFrom<proto::rpc::AccountStorageDetails> for AccountStorageDetails {
 
 #[derive(Clone, Debug)]
 pub struct AccountStorageMapDetails {
-    /// slot index of the storage map
-    pub slot_index: u32,
+    /// Storage slot name of the storage map.
+    pub slot_name: StorageSlotName,
     /// A flag that is set to `true` if the number of to-be-returned entries in the
     /// storage map would exceed a threshold. This indicates to the user that `SyncStorageMaps`
     /// endpoint should be used to get all storage map data.
@@ -360,7 +368,8 @@ impl TryFrom<proto::rpc::account_storage_details::AccountStorageMapDetails>
     fn try_from(
         value: proto::rpc::account_storage_details::AccountStorageMapDetails,
     ) -> Result<Self, Self::Error> {
-        let slot_index = value.slot_index;
+        let slot_name = StorageSlotName::new(value.slot_name)
+            .map_err(|err| RpcError::ExpectedDataMissing(err.to_string()))?;
         let too_many_entries = value.too_many_entries;
 
         let entries = value
@@ -373,7 +382,7 @@ impl TryFrom<proto::rpc::account_storage_details::AccountStorageMapDetails>
             .map(|entry| entry.to_owned().try_into())
             .collect::<Result<Vec<StorageMapEntry>, RpcError>>()?;
 
-        Ok(Self { slot_index, too_many_entries, entries })
+        Ok(Self { slot_name, too_many_entries, entries })
     }
 }
 
@@ -563,32 +572,31 @@ impl TryFrom<proto::account::AccountWitness> for AccountWitness {
 // ACCOUNT STORAGE REQUEST
 // ================================================================================================
 
-pub type StorageSlotIndex = u8;
 pub type StorageMapKey = Word;
 
 /// Describes storage slots indices to be requested, as well as a list of keys for each of those
 /// slots.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub struct AccountStorageRequirements(BTreeMap<StorageSlotIndex, Vec<StorageMapKey>>);
+pub struct AccountStorageRequirements(BTreeMap<StorageSlotName, Vec<StorageMapKey>>);
 
 impl AccountStorageRequirements {
     pub fn new<'a>(
         slots_and_keys: impl IntoIterator<
-            Item = (StorageSlotIndex, impl IntoIterator<Item = &'a StorageMapKey>),
+            Item = (StorageSlotName, impl IntoIterator<Item = &'a StorageMapKey>),
         >,
     ) -> Self {
         let map = slots_and_keys
             .into_iter()
-            .map(|(slot_index, keys_iter)| {
+            .map(|(slot_name, keys_iter)| {
                 let keys_vec: Vec<StorageMapKey> = keys_iter.into_iter().copied().collect();
-                (slot_index, keys_vec)
+                (slot_name, keys_vec)
             })
             .collect();
 
         AccountStorageRequirements(map)
     }
 
-    pub fn inner(&self) -> &BTreeMap<StorageSlotIndex, Vec<StorageMapKey>> {
+    pub fn inner(&self) -> &BTreeMap<StorageSlotName, Vec<StorageMapKey>> {
         &self.0
     }
 }
@@ -604,7 +612,7 @@ impl From<AccountStorageRequirements>
         use proto::rpc::account_proof_request::account_detail_request::storage_map_detail_request;
         let request_map = value.0;
         let mut requests = Vec::with_capacity(request_map.len());
-        for (slot_index, map_keys) in request_map {
+        for (slot_name, map_keys) in request_map {
             let map_keys = storage_map_detail_request::MapKeys {
                 map_keys: map_keys
                     .into_iter()
@@ -613,7 +621,7 @@ impl From<AccountStorageRequirements>
             };
             let slot_data = Some(storage_map_detail_request::SlotData::MapKeys(map_keys));
             requests.push(account_detail_request::StorageMapDetailRequest {
-                slot_index: u32::from(slot_index),
+                slot_name: slot_name.to_string(),
                 slot_data,
             });
         }
