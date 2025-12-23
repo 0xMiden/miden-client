@@ -75,12 +75,12 @@ try {
     // Get consumable notes for a specific account
     const accountId = AccountId.fromHex(accountIdHex);
     const records = await webClient.getConsumableNotes(accountId);
-    
+
     records.forEach(record => {
         console.log("Note ID:", record.inputNoteRecord().id().toString());
         record.noteConsumability().forEach(consumability => {
             console.log("Account ID:", consumability.accountId().toString());
-            console.log("Consumable after block:", consumability.consumableAfterBlock());
+            console.log("Consumable after block:", consumability.consumptionStatus().consumableAfterBlock());
         });
     });
 
@@ -111,7 +111,7 @@ try {
     // Script builder can be instanced in either debug or normal mode using one of:
     // - CodeBuilderMode.Debug
     // - CodeBuilderMode.Normal
-    
+
     const noteScript = new CodeBuilder(CodeBuilderMode.Debug);
     // Use the compiled script in your transaction
 } catch (error) {
@@ -158,4 +158,4 @@ const consumedNotes = await webClient.getInputNotes(consumedFilter);
 const noteIds = [noteId1, noteId2];
 const listFilter = new NoteFilter(NoteFilterTypes.List, noteIds);
 const specificNotes = await webClient.getInputNotes(listFilter);
-``` 
+```

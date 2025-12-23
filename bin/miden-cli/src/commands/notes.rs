@@ -395,7 +395,8 @@ where
             table.add_row(vec![
                 note.id().to_hex(),
                 relevance.0.to_string(),
-                relevance.1.to_string(),
+                // relevance.1.to_string(),
+                "TODO".to_string(),
             ]);
         }
     }
