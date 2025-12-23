@@ -1,7 +1,6 @@
 use alloc::boxed::Box;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
-use core::fmt;
 
 use async_trait::async_trait;
 use miden_protocol::account::{Account, AccountId};
@@ -20,29 +19,11 @@ use crate::store::{InputNoteRecord, NoteFilter, Store, StoreError};
 use crate::sync::{NoteUpdateAction, OnNoteReceived};
 use crate::transaction::{InputNote, TransactionRequestBuilder, TransactionRequestError};
 
-/// Describes the relevance of a note based on the screening.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub enum NoteRelevance {
-    /// The note can be consumed in the client's current block.
-    Now,
-    /// The note can be consumed after the block with the specified number.
-    After(u32),
-}
-
 /// Represents the consumability of a note by a specific account.
 ///
 /// The tuple contains the account ID that may consume the note and the moment it will become
 /// relevant.
-pub type NoteConsumability = (AccountId, NoteRelevance);
-
-impl fmt::Display for NoteRelevance {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            NoteRelevance::Now => write!(f, "Now"),
-            NoteRelevance::After(height) => write!(f, "After block {height}"),
-        }
-    }
-}
+pub type NoteConsumability = (AccountId, NoteConsumptionStatus);
 
 /// Provides functionality for testing whether a note is relevant to the client or not.
 ///
@@ -115,7 +96,7 @@ where
         &self,
         account: &Account,
         note: &Note,
-    ) -> Result<Option<NoteRelevance>, NoteScreenerError> {
+    ) -> Result<Option<NoteConsumptionStatus>, NoteScreenerError> {
         let transaction_request =
             TransactionRequestBuilder::new().build_consume_notes(vec![note.id()])?;
 
@@ -142,19 +123,7 @@ where
             )
             .await?;
 
-        let result = match note_consumption_check {
-            NoteConsumptionStatus::ConsumableAfter(block_number) => {
-                Some(NoteRelevance::After(block_number.as_u32()))
-            },
-            NoteConsumptionStatus::Consumable
-            | NoteConsumptionStatus::ConsumableWithAuthorization => Some(NoteRelevance::Now),
-            // NOTE: NoteConsumptionStatus::UnconsumableConditions means that state-related context
-            // does not allow for consumption, so don't keep for now. In the next
-            // version, we should be more careful about this
-            NoteConsumptionStatus::UnconsumableConditions
-            | NoteConsumptionStatus::NeverConsumable(_) => None,
-        };
-        Ok(result)
+        Ok(Some(note_consumption_check))
     }
 
     /// Special relevance check for P2IDE notes. It checks if the sender account can consume and
@@ -162,7 +131,7 @@ where
     fn check_p2ide_recall_consumability(
         note: &Note,
         account_id: &AccountId,
-    ) -> Result<Option<NoteRelevance>, NoteScreenerError> {
+    ) -> Result<Option<NoteConsumptionStatus>, NoteScreenerError> {
         let note_inputs = note.inputs().values();
         // TODO: this needs to be removed (see note screener refactor issue)
 
@@ -178,7 +147,7 @@ where
         })?;
 
         if sender == *account_id {
-            Ok(Some(NoteRelevance::After(recall_height)))
+            Ok(Some(NoteConsumptionStatus::ConsumableAfter(recall_height.into())))
         } else {
             Ok(None)
         }

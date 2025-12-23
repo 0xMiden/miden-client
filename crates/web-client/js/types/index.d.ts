@@ -67,6 +67,7 @@ export {
   NoteAndArgsArray,
   NoteAssets,
   NoteConsumability,
+  NoteConsumptionStatus,
   NoteDetails,
   NoteDetailsAndTag,
   NoteDetailsAndTagArray,
