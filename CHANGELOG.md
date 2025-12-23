@@ -23,6 +23,7 @@
 * Incremented the limits for various RPC calls to accommodate larger data sets ([#1621](https://github.com/0xMiden/miden-client/pull/1621)).
 * [BREAKING] Introduced named storage slots, changed `FilesystemKeystore` to not be generic over RNG ([#1626](https://github.com/0xMiden/miden-client/pull/1626)).
 * Added `submit_new_transaction_with_prover` to the Rust client and `submitNewTransactionWithProver` to the WebClient([#1622](https://github.com/0xMiden/miden-client/pull/1622)).
+* Added `getAccountDetails` to WebClient's `RpcClient` ([#1628](https://github.com/0xMiden/miden-client/pull/1628))
 
 ## 0.12.5 (2025-12-01)
 
