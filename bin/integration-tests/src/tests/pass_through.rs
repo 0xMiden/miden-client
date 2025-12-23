@@ -126,7 +126,6 @@ pub async fn test_pass_through(client_config: ClientConfig) -> Result<()> {
         .await?;
 
     wait_for_tx(&mut client, tx_id).await?;
-    //wait_for_blocks(&mut client, 7).await;
 
     let tx_record = client
         .get_transactions(TransactionFilter::Ids(vec![tx_id]))
@@ -256,7 +255,7 @@ fn create_pass_through_note(
     let metadata = NoteMetadata::new(
         sender,
         NoteType::Public,
-        NoteTag::from_account_id(sender), // this needs to change
+        NoteTag::from_account_id(target),
         NoteExecutionHint::always(),
         Felt::new(0u64),
     )?;
