@@ -1079,12 +1079,15 @@ async fn create_rust_client_with_store_path(
 
     let keystore = FilesystemKeyStore::new(temp_dir())?;
 
+    let encryption_keystore = Arc::new(keystore.clone());
+
     Ok((
         TestClient::new(
             Arc::new(GrpcClient::new(&endpoint, 10_000)),
             rng,
             store,
             Some(std::sync::Arc::new(keystore.clone())),
+            Some(encryption_keystore),
             ExecutionOptions::new(
                 Some(MAX_TX_EXECUTION_CYCLES),
                 MIN_TX_EXECUTION_CYCLES,

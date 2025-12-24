@@ -2289,10 +2289,13 @@ async fn account_addresses_basic_wallet() {
     client.add_account(&account, false).await.unwrap();
     let retrieved_acc = client.get_account(account.id()).await.unwrap().unwrap();
 
-    let unspecified_default_address = Address::new(account.id());
-    assert!(retrieved_acc.addresses().contains(&unspecified_default_address));
+    // The default address should have an encryption key (auto-generated)
+    let addresses = retrieved_acc.addresses();
+    assert_eq!(addresses.len(), 1);
+    let default_address = &addresses[0];
+    assert!(default_address.encryption_key().is_some());
 
-    // Even when the account has a basic wallet, the address list should not contain it by default
+    // An address with only BasicWallet routing params (no encryption key) should not be present
     let routing_params = RoutingParameters::new(AddressInterface::BasicWallet);
     let basic_wallet_address =
         Address::new(account.id()).with_routing_parameters(routing_params).unwrap();
@@ -2309,9 +2312,13 @@ async fn account_addresses_non_basic_wallet() {
     client.add_account(&account, false).await.unwrap();
     let retrieved_acc = client.get_account(account.id()).await.unwrap().unwrap();
 
-    let unspecified_default_address = Address::new(account.id());
-    assert!(retrieved_acc.addresses().contains(&unspecified_default_address));
+    // The default address should have an encryption key
+    let addresses = retrieved_acc.addresses();
+    assert_eq!(addresses.len(), 1);
+    let default_address = &addresses[0];
+    assert!(default_address.encryption_key().is_some());
 
+    // An address with only BasicWallet routing params (no encryption key) should not be present
     let routing_params = RoutingParameters::new(AddressInterface::BasicWallet);
     let basic_wallet_address =
         Address::new(account.id()).with_routing_parameters(routing_params).unwrap();
@@ -2330,30 +2337,25 @@ async fn account_add_address_after_creation() {
 
     client.add_account(&account, false).await.unwrap();
 
-    let unspecified_default_address = Address::new(account.id());
+    // Get the default address (has an encryption key)
+    let retrieved_acc = client.get_account(account.id()).await.unwrap().unwrap();
+    let default_address = retrieved_acc.addresses()[0].clone();
+    assert!(default_address.encryption_key().is_some());
 
-    // The default unspecified address cannot be added
-    // as it is already present after account creation
-    assert!(client.add_address(unspecified_default_address, account.id()).await.is_err());
+    // The default address cannot be added again as it is already present
+    assert!(client.add_address(default_address.clone(), account.id()).await.is_err());
 
-    // The basic wallet address cannot be added
-    // as it is already present after account creation
-    let routing_params = RoutingParameters::new(AddressInterface::BasicWallet);
-    let basic_wallet_address =
-        Address::new(account.id()).with_routing_parameters(routing_params).unwrap();
-    assert!(client.add_address(basic_wallet_address.clone(), account.id()).await.is_err());
-
-    // We can remove the basic wallet address
-    assert!(client.remove_address(basic_wallet_address.clone(), account.id()).await.is_ok());
+    // We can remove the default address
+    assert!(client.remove_address(default_address.clone(), account.id()).await.is_ok());
 
     // Derived note tag should also be removed
-    let derived_note_tag = basic_wallet_address.to_note_tag();
+    let derived_note_tag = default_address.to_note_tag();
     let note_tag_record = NoteTagRecord::with_account_source(derived_note_tag, account.id());
     let note_tags = client.get_note_tags().await.unwrap();
     assert!(!note_tags.contains(&note_tag_record));
 
     // Then add it again
-    assert!(client.add_address(basic_wallet_address, account.id()).await.is_ok());
+    assert!(client.add_address(default_address.clone(), account.id()).await.is_ok());
 
     // Derived note tag should now be available
     let note_tags = client.get_note_tags().await.unwrap();

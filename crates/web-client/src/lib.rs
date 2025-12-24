@@ -178,6 +178,7 @@ impl WebClient {
             Box::new(rng),
             web_store.clone(),
             Some(Arc::new(keystore.clone())),
+            None, // Encryption keystore not yet supported in WASM
             ExecutionOptions::new(
                 Some(MAX_TX_EXECUTION_CYCLES),
                 MIN_TX_EXECUTION_CYCLES,

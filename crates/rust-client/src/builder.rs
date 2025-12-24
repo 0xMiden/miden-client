@@ -8,7 +8,7 @@ use miden_tx::ExecutionOptions;
 use miden_tx::auth::TransactionAuthenticator;
 use rand::Rng;
 
-use crate::keystore::FilesystemKeyStore;
+use crate::keystore::{EncryptionKeyStore, FilesystemKeyStore};
 use crate::note_transport::NoteTransportClient;
 use crate::rpc::NodeRpcClient;
 use crate::store::{Store, StoreError};
@@ -34,6 +34,16 @@ const TX_GRACEFUL_BLOCKS: u32 = 20;
 enum AuthenticatorConfig<AUTH> {
     Path(String),
     Instance(Arc<AUTH>),
+}
+
+/// Represents the configuration for an encryption keystore.
+///
+/// This enum defers encryption keystore instantiation until the build phase.
+enum EncryptionKeystoreConfig {
+    /// Use a filesystem keystore at the given path.
+    Path(String),
+    /// Use a custom encryption keystore instance.
+    Instance(Arc<dyn EncryptionKeyStore + Send + Sync>),
 }
 
 // STORE BUILDER
@@ -70,6 +80,8 @@ pub struct ClientBuilder<AUTH> {
     rng: Option<Box<dyn FeltRng>>,
     /// The keystore configuration provided by the user.
     keystore: Option<AuthenticatorConfig<AUTH>>,
+    /// The encryption keystore configuration.
+    encryption_keystore: Option<EncryptionKeystoreConfig>,
     /// A flag to enable debug mode.
     in_debug_mode: DebugMode,
     /// The number of blocks that are considered old enough to discard pending transactions. If
@@ -91,6 +103,7 @@ impl<AUTH> Default for ClientBuilder<AUTH> {
             store: None,
             rng: None,
             keystore: None,
+            encryption_keystore: None,
             in_debug_mode: DebugMode::Disabled,
             tx_graceful_blocks: Some(TX_GRACEFUL_BLOCKS),
             max_block_number_delta: None,
@@ -154,6 +167,16 @@ where
         self
     }
 
+    /// Optionally provide a custom encryption keystore instance.
+    #[must_use]
+    pub fn encryption_keystore<ENC>(mut self, keystore: Arc<ENC>) -> Self
+    where
+        ENC: EncryptionKeyStore + Send + Sync + 'static,
+    {
+        self.encryption_keystore = Some(EncryptionKeystoreConfig::Instance(keystore));
+        self
+    }
+
     /// Optionally set a maximum number of blocks that the client can be behind the network.
     /// By default, there's no maximum.
     #[must_use]
@@ -175,9 +198,11 @@ where
     ///
     /// This stores the keystore path as a configuration option so that actual keystore
     /// initialization is deferred until `build()`. This avoids panicking during builder chaining.
+    /// The same directory will be used for both authentication and encryption keys.
     #[must_use]
     pub fn filesystem_keystore(mut self, keystore_path: &str) -> Self {
         self.keystore = Some(AuthenticatorConfig::Path(keystore_path.to_string()));
+        self.encryption_keystore = Some(EncryptionKeystoreConfig::Path(keystore_path.to_string()));
         self
     }
 
@@ -246,11 +271,24 @@ where
             None => None,
         };
 
+        // Initialize the encryption keystore.
+        let encryption_keystore: Option<Arc<dyn EncryptionKeyStore + Send + Sync>> =
+            match self.encryption_keystore {
+                Some(EncryptionKeystoreConfig::Instance(ks)) => Some(ks),
+                Some(EncryptionKeystoreConfig::Path(ref path)) => {
+                    let keystore = FilesystemKeyStore::new(path.into())
+                        .map_err(|err| ClientError::ClientInitializationError(err.to_string()))?;
+                    Some(Arc::new(keystore))
+                },
+                None => None,
+            };
+
         Client::new(
             rpc_api,
             rng,
             store,
             authenticator,
+            encryption_keystore,
             ExecutionOptions::new(
                 Some(MAX_TX_EXECUTION_CYCLES),
                 MIN_TX_EXECUTION_CYCLES,
@@ -271,7 +309,7 @@ where
 // ================================================================================================
 
 /// Marker trait to capture the bounds the builder requires for the authenticator type
-/// parameter
+/// parameter.
 pub trait BuilderAuthenticator:
     TransactionAuthenticator + From<FilesystemKeyStore> + 'static
 {

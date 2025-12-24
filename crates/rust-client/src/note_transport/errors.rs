@@ -15,4 +15,12 @@ pub enum NoteTransportError {
     Deserialization(#[from] DeserializationError),
     #[error("note transport network error: {0}")]
     Network(String),
+    #[error("recipient address does not contain an encryption key")]
+    MissingEncryptionKey,
+    #[error("encryption error: {0}")]
+    EncryptionError(String),
+    #[error("note decoding error: {0}")]
+    NoteDecodingError(String),
+    #[error("note reconstruction error: {0}")]
+    NoteReconstructionError(String),
 }

@@ -80,6 +80,8 @@
 //! // Initialize the random coin using the generated seed.
 //! let rng = RpoRandomCoin::new(coin_seed.map(Felt::new).into());
 //! let keystore = FilesystemKeyStore::new("path/to/keys/directory".try_into()?)?;
+//! // Create a separate keystore instance for encryption (can share the same directory)
+//! let encryption_keystore = FilesystemKeyStore::new("path/to/keys/directory".try_into()?)?;
 //!
 //! // Determine the number of blocks to consider a transaction stale.
 //! // 20 is simply an example value.
@@ -100,6 +102,7 @@
 //!     Box::new(rng),
 //!     store,
 //!     Some(Arc::new(keystore)), // or None if no authenticator is needed
+//!     Some(Arc::new(encryption_keystore)), // or None if no encryption is needed
 //!     ExecutionOptions::new(
 //!         Some(MAX_TX_EXECUTION_CYCLES),
 //!         MIN_TX_EXECUTION_CYCLES,
@@ -339,6 +342,9 @@ pub struct Client<AUTH> {
     /// An instance of a [`TransactionAuthenticator`] which will be used by the transaction
     /// executor whenever a signature is requested from within the VM.
     authenticator: Option<Arc<AUTH>>,
+    /// An instance of an [`EncryptionKeyStore`] which provides encryption keys for
+    /// end-to-end encryption of private notes.
+    encryption_keystore: Option<Arc<dyn keystore::EncryptionKeyStore + Send + Sync>>,
     /// Shared source manager used to retain MASM source information for assembled programs.
     source_manager: Arc<dyn SourceManagerSync>,
     /// Options that control the transaction executor’s runtime behaviour (e.g. debug mode).
@@ -373,7 +379,9 @@ where
     ///   provide persistence.
     /// - `authenticator`: Defines the transaction authenticator that will be used by the
     ///   transaction executor whenever a signature is requested from within the VM.
-    /// - `exec_options`: Options that control the transaction executor’s runtime behaviour (e.g.
+    /// - `encryption_keystore`: An optional instance of [`keystore::EncryptionKeyStore`] which
+    ///   provides encryption keys for end-to-end encryption of notes in the note transport layer.
+    /// - `exec_options`: Options that control the transaction executor's runtime behaviour (e.g.
     ///   debug mode).
     /// - `tx_graceful_blocks`: The number of blocks that are considered old enough to discard
     ///   pending transactions.
@@ -393,6 +401,7 @@ where
         rng: Box<dyn FeltRng>,
         store: Arc<dyn Store>,
         authenticator: Option<Arc<AUTH>>,
+        encryption_keystore: Option<Arc<dyn keystore::EncryptionKeyStore + Send + Sync>>,
         exec_options: ExecutionOptions,
         tx_graceful_blocks: Option<u32>,
         max_block_number_delta: Option<u32>,
@@ -420,6 +429,7 @@ where
             rpc_api,
             tx_prover,
             authenticator,
+            encryption_keystore,
             source_manager,
             exec_options,
             tx_graceful_blocks,
