@@ -1,4 +1,4 @@
-import { accountCodes, accountStorages, accountAssets, accountAuths, accounts, addresses, foreignAccountCode, storageMapEntries, trackedAccounts, } from "./schema.js";
+import { accountCodes, accountStorages, accountAssets, accountAuths, accounts, addresses, foreignAccountCode, storageMapEntries, trackedAccounts, encryptionKeys, } from "./schema.js";
 import { logWebStoreError, uint8ArrayToBase64 } from "./utils.js";
 // GET FUNCTIONS
 export async function getAccountIds() {
@@ -420,5 +420,34 @@ export async function undoAccountStates(accountCommitments) {
     }
     catch (error) {
         logWebStoreError(error, `Error undoing account states: ${accountCommitments.join(",")}`);
+    }
+}
+// ENCRYPTION KEY FUNCTIONS
+export async function insertEncryptionKey(addressHash, key) {
+    try {
+        const data = {
+            addressHash: addressHash,
+            key: key,
+        };
+        await encryptionKeys.put(data);
+    }
+    catch (error) {
+        logWebStoreError(error, `Error inserting encryption key for address hash: ${addressHash}`);
+    }
+}
+export async function getEncryptionKeyByAddressHash(addressHash) {
+    try {
+        const encryptionKey = await encryptionKeys
+            .where("addressHash")
+            .equals(addressHash)
+            .first();
+        if (!encryptionKey) {
+            return null;
+        }
+        return { key: encryptionKey.key };
+    }
+    catch (error) {
+        logWebStoreError(error, `Error getting encryption key for address hash: ${addressHash}`);
+        return null;
     }
 }

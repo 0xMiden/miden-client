@@ -98,4 +98,20 @@ impl WebClient {
             Err(JsValue::from_str("Client not initialized"))
         }
     }
+
+    #[wasm_bindgen(js_name = "getAccountAddresses")]
+    pub async fn get_account_addresses(
+        &mut self,
+        account_id: &AccountId,
+    ) -> Result<Vec<Address>, JsValue> {
+        if let Some(client) = self.get_mut_inner() {
+            let addresses = client
+                .get_addresses(account_id.into())
+                .await
+                .map_err(|err| js_error_with_context(err, "failed to get account addresses"))?;
+            Ok(addresses.into_iter().map(Into::into).collect())
+        } else {
+            Err(JsValue::from_str("Client not initialized"))
+        }
+    }
 }

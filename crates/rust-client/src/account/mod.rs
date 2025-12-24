@@ -39,6 +39,9 @@ use alloc::vec::Vec;
 use miden_lib::account::auth::{AuthEcdsaK256Keccak, AuthRpoFalcon512};
 use miden_lib::account::wallets::BasicWallet;
 use miden_objects::account::auth::PublicKey;
+use miden_objects::address::RoutingParameters;
+use miden_objects::crypto::dsa::eddsa_25519::SecretKey;
+use miden_objects::crypto::ies::{SealingKey, UnsealingKey};
 use miden_objects::note::NoteTag;
 // RE-EXPORTS
 // ================================================================================================
@@ -172,7 +175,40 @@ impl<AUTH> Client<AUTH> {
 
         match tracked_account {
             None => {
-                let default_address = Address::new(account.id());
+                // Generate encryption key pair and create default address with public key
+                let default_address = if let Some(ref keystore) = self.encryption_keystore {
+                    // Generate encryption X25519 key pair
+                    let mut rng = rand::rng();
+                    let secret_key = SecretKey::with_rng(&mut rng);
+                    let public_key = secret_key.public_key();
+
+                    let sealing_key = SealingKey::X25519XChaCha20Poly1305(public_key);
+                    let unsealing_key = UnsealingKey::X25519XChaCha20Poly1305(secret_key);
+
+                    // Create address with encryption key
+                    let address = Address::new(account.id())
+                        .with_routing_parameters(
+                            RoutingParameters::new(AddressInterface::BasicWallet)
+                                .with_encryption_key(sealing_key),
+                        )
+                        .map_err(|e| {
+                            ClientError::ClientInitializationError(format!(
+                                "Failed to create address with encryption key: {e}"
+                            ))
+                        })?;
+
+                    // Store key in keystore by address
+                    keystore.add_encryption_key(&address, &unsealing_key).await.map_err(|e| {
+                        ClientError::ClientInitializationError(format!(
+                            "Failed to store encryption key: {e}"
+                        ))
+                    })?;
+
+                    address
+                } else {
+                    // No keystore - use plain address
+                    Address::new(account.id())
+                };
 
                 // If the account is not being tracked, insert it into the store regardless of the
                 // `overwrite` flag
@@ -287,6 +323,14 @@ impl<AUTH> Client<AUTH> {
     ) -> Result<(), ClientError> {
         self.store.remove_address(address, account_id).await?;
         Ok(())
+    }
+
+    /// Returns all addresses associated with the given [`AccountId`].
+    ///
+    /// # Errors
+    /// - If there is an issue retrieving addresses from the store.
+    pub async fn get_addresses(&self, account_id: AccountId) -> Result<Vec<Address>, ClientError> {
+        Ok(self.store.get_addresses_by_account_id(account_id).await?)
     }
 
     // ACCOUNT DATA RETRIEVAL

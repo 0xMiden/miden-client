@@ -40,6 +40,7 @@ enum Table {
   ForeignAccountCode = "foreignAccountCode",
   Settings = "settings",
   TrackedAccounts = "trackedAccounts",
+  EncryptionKeys = "encryptionKeys",
 }
 
 export interface IAccountCode {
@@ -169,6 +170,11 @@ export interface ITrackedAccount {
   id: string;
 }
 
+export interface IEncryptionKey {
+  addressHash: string;
+  key: string;
+}
+
 const db = new Dexie(DATABASE_NAME) as Dexie & {
   accountCodes: Dexie.Table<IAccountCode, string>;
   accountStorages: Dexie.Table<IAccountStorage, string>;
@@ -189,6 +195,7 @@ const db = new Dexie(DATABASE_NAME) as Dexie & {
   foreignAccountCode: Dexie.Table<IForeignAccountCode, string>;
   settings: Dexie.Table<ISetting, string>;
   trackedAccounts: Dexie.Table<ITrackedAccount, string>;
+  encryptionKeys: Dexie.Table<IEncryptionKey, string>;
 };
 
 db.version(1).stores({
@@ -223,6 +230,7 @@ db.version(1).stores({
   [Table.ForeignAccountCode]: indexes("accountId"),
   [Table.Settings]: indexes("key"),
   [Table.TrackedAccounts]: indexes("&id"),
+  [Table.EncryptionKeys]: indexes("&addressHash"),
 });
 
 function indexes(...items: string[]): string {
@@ -265,6 +273,7 @@ const settings = db.table<ISetting, string>(Table.Settings);
 const trackedAccounts = db.table<ITrackedAccount, string>(
   Table.TrackedAccounts
 );
+const encryptionKeys = db.table<IEncryptionKey, string>(Table.EncryptionKeys);
 
 async function ensureClientVersion(clientVersion: string): Promise<void> {
   if (!clientVersion) {
@@ -347,4 +356,5 @@ export {
   foreignAccountCode,
   settings,
   trackedAccounts,
+  encryptionKeys,
 };

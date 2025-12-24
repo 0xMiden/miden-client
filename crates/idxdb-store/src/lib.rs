@@ -50,6 +50,7 @@ use wasm_bindgen_futures::{JsFuture, js_sys};
 pub mod account;
 pub mod auth;
 pub mod chain_data;
+pub mod encryption;
 pub mod export;
 pub mod import;
 pub mod note;

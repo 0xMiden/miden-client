@@ -172,12 +172,14 @@ impl WebClient {
         );
 
         let keystore = WebKeyStore::new_with_callbacks(rng, get_key_cb, insert_key_cb, sign_cb);
+        let keystore_arc = Arc::new(keystore.clone());
 
         let mut client = Client::new(
             rpc_client,
             Box::new(rng),
             web_store.clone(),
-            Some(Arc::new(keystore.clone())),
+            Some(keystore_arc.clone()),
+            Some(keystore_arc.clone()),
             ExecutionOptions::new(
                 Some(MAX_TX_EXECUTION_CYCLES),
                 MIN_TX_EXECUTION_CYCLES,

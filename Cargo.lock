@@ -2650,6 +2650,7 @@ dependencies = [
 name = "miden-client-web"
 version = "0.13.0"
 dependencies = [
+ "async-trait",
  "console_error_panic_hook",
  "hex",
  "js-sys",
