@@ -36,7 +36,7 @@ impl ToHex for &proto::primitives::Digest {
 
 impl ToHex for proto::primitives::Digest {
     fn encode_hex<T: FromIterator<char>>(&self) -> T {
-        let mut data: Vec<char> = Vec::with_capacity(Word::SERIALIZED_SIZE);
+        let mut data: Vec<char> = Vec::with_capacity(Word::SERIALIZED_SIZE * 2);
         data.extend(format!("{:016x}", self.d0).chars());
         data.extend(format!("{:016x}", self.d1).chars());
         data.extend(format!("{:016x}", self.d2).chars());
@@ -45,7 +45,7 @@ impl ToHex for proto::primitives::Digest {
     }
 
     fn encode_hex_upper<T: FromIterator<char>>(&self) -> T {
-        let mut data: Vec<char> = Vec::with_capacity(Word::SERIALIZED_SIZE);
+        let mut data: Vec<char> = Vec::with_capacity(Word::SERIALIZED_SIZE * 2);
         data.extend(format!("{:016X}", self.d0).chars());
         data.extend(format!("{:016X}", self.d1).chars());
         data.extend(format!("{:016X}", self.d2).chars());
