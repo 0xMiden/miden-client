@@ -9,7 +9,7 @@ use crate::rpc::{errors::RpcConversionError, generated::word};
 // CONSTANTS
 // ================================================================================================
 
-pub const WORD_DATA_SIZE: usize = 32;
+pub const WORD_DATA_SIZE: usize = Word::SERIALIZED_SIZE * 2;
 
 // FORMATTING
 // ================================================================================================
