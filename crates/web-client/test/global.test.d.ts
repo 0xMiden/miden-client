@@ -15,6 +15,7 @@ import {
   Address,
   AddressInterface,
   AdviceMap,
+  AuthRpoFalcon512MultisigConfig,
   AuthSecretKey,
   BasicFungibleFaucetComponent,
   ConsumableNoteRecord,
@@ -45,6 +46,7 @@ import {
   OutputNote,
   OutputNotesArray,
   Package,
+  ProcedureThreshold,
   PublicKey,
   Rpo256,
   RpcClient,
@@ -67,12 +69,14 @@ import {
   TransactionScript,
   TransactionScriptInputPair,
   TransactionScriptInputPairArray,
+  TransactionSummary,
   Word,
   NoteAndArgs,
   NoteAndArgsArray,
   MidenArrays,
   ScriptBuilder,
   ScriptBuilderMode,
+  createAuthRpoFalcon512Multisig,
 } from "../dist/index";
 import { MockWebClient, WebClient } from "../js";
 
@@ -100,6 +104,7 @@ declare global {
     Address: typeof Address;
     AddressInterface: typeof AddressInterface;
     AdviceMap: typeof AdviceMap;
+    AuthRpoFalcon512MultisigConfig: typeof AuthRpoFalcon512MultisigConfig;
     AuthSecretKey: typeof AuthSecretKey;
     BasicFungibleFaucetComponent: typeof BasicFungibleFaucetComponent;
     ConsumableNoteRecord: typeof ConsumableNoteRecord;
@@ -134,6 +139,7 @@ declare global {
     OutputNote: typeof OutputNote;
     OutputNotesArray: typeof OutputNotesArray;
     Package: typeof Package;
+    ProcedureThreshold: typeof ProcedureThreshold;
     PublicKey: typeof PublicKey;
     Rpo256: typeof Rpo256;
     SecretKey: typeof SecretKey;
@@ -163,6 +169,7 @@ declare global {
     MidenArrays: typeof MidenArrays;
     ScriptBuilder: typeof ScriptBuilder;
     ScriptBuilderMode: typeof ScriptBuilderMode;
+    createAuthRpoFalcon512Multisig: typeof createAuthRpoFalcon512Multisig;
     createClient: () => Promise<void>;
 
     // Add the helpers namespace

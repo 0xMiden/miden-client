@@ -17,6 +17,7 @@ export {
   Address,
   AddressInterface,
   AdviceMap,
+  AuthRpoFalcon512MultisigConfig,
   Assembler,
   AssemblerUtils,
   AuthSecretKey,
@@ -56,6 +57,7 @@ export {
   OutputNote,
   OutputNotesArray,
   Package,
+  ProcedureThreshold,
   PublicKey,
   Rpo256,
   RpcClient,
@@ -85,6 +87,7 @@ export {
   TransactionScriptInputPairArray,
   TransactionSummary,
   Word,
+  createAuthRpoFalcon512Multisig,
 } from "./crates/miden_client_web";
 
 // Extend WASM WebClient but override methods that use workers
