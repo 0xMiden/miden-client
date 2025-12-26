@@ -1,3 +1,4 @@
+use miden_client::Word as NativeWord;
 use miden_client::account::component::{
     AccountComponent as NativeAccountComponent,
     AuthRpoFalcon512MultisigConfig as NativeAuthRpoFalcon512MultisigConfig,
@@ -5,7 +6,6 @@ use miden_client::account::component::{
 };
 use miden_client::account::{StorageMap as NativeStorageMap, StorageSlot as NativeStorageSlot};
 use miden_client::auth::PublicKeyCommitment;
-use miden_client::Word as NativeWord;
 use wasm_bindgen::prelude::*;
 
 use crate::js_error_with_context;
@@ -23,10 +23,7 @@ pub struct ProcedureThreshold {
 impl ProcedureThreshold {
     #[wasm_bindgen(constructor)]
     pub fn new(proc_root: &Word, threshold: u32) -> ProcedureThreshold {
-        ProcedureThreshold {
-            proc_root: proc_root.clone(),
-            threshold,
-        }
+        ProcedureThreshold { proc_root: proc_root.clone(), threshold }
     }
 
     #[wasm_bindgen(getter, js_name = "procRoot")]
@@ -47,7 +44,8 @@ pub struct AuthRpoFalcon512MultisigConfig(NativeAuthRpoFalcon512MultisigConfig);
 
 #[wasm_bindgen]
 impl AuthRpoFalcon512MultisigConfig {
-    /// Build a configuration with a list of approver public key commitments and a default threshold.
+    /// Build a configuration with a list of approver public key commitments and a default
+    /// threshold.
     ///
     /// `default_threshold` must be >= 1 and <= `approvers.length`.
     #[wasm_bindgen(constructor)]
@@ -63,10 +61,8 @@ impl AuthRpoFalcon512MultisigConfig {
             })
             .collect();
 
-        let config =
-            NativeAuthRpoFalcon512MultisigConfig::new(native_approvers, default_threshold).map_err(
-                |e| js_error_with_context(e, "Invalid multisig config"),
-            )?;
+        let config = NativeAuthRpoFalcon512MultisigConfig::new(native_approvers, default_threshold)
+            .map_err(|e| js_error_with_context(e, "Invalid multisig config"))?;
 
         Ok(AuthRpoFalcon512MultisigConfig(config))
     }
@@ -170,9 +166,10 @@ pub fn create_auth_rpo_falcon512_multisig(
     .map_err(|e| js_error_with_context(e, "Failed to build proc thresholds map"))?;
     storage_slots.push(NativeStorageSlot::Map(proc_map));
 
-    let native_component = NativeAccountComponent::new(rpo_falcon_512_multisig_library(), storage_slots)
-        .map_err(|e| js_error_with_context(e, "Failed to create multisig account component"))?
-        .with_supports_all_types();
+    let native_component =
+        NativeAccountComponent::new(rpo_falcon_512_multisig_library(), storage_slots)
+            .map_err(|e| js_error_with_context(e, "Failed to create multisig account component"))?
+            .with_supports_all_types();
 
     Ok(native_component.into())
 }
