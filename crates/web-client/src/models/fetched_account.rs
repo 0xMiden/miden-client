@@ -5,6 +5,12 @@ use crate::models::account::Account;
 use crate::models::account_id::AccountId;
 use crate::models::word::Word;
 
+/// Describes the response from the `GetAccountDetails` endpoint.
+///
+/// The content varies based on account visibility:
+/// - **Public accounts**: Contains the complete [`Account`] details, as these are stored on-chain
+/// - **Private accounts**: Contains only the state commitment, since full account data is stored
+///   off-chain
 #[wasm_bindgen]
 pub struct FetchedAccount(NativeFetchedAccount);
 

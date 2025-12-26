@@ -95,6 +95,11 @@ impl RpcClient {
         Ok(note_script.into())
     }
 
+    /// Fetches the current state of an account from the node using the `/GetAccountDetails` RPC
+    /// endpoint.
+    ///
+    /// @param `account_id` - the ID of the wanted account.
+    /// @returns Promise that resolves to the [`FetchedAccount`].
     #[wasm_bindgen(js_name = "getAccountDetails")]
     pub async fn get_account_details(
         &self,
