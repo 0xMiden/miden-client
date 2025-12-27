@@ -50,6 +50,27 @@ Endpoint to connect to.
 
 ***
 
+### getAccountDetails()
+
+> **getAccountDetails**(`account_id`): `Promise`\<[`FetchedAccount`](FetchedAccount.md)\>
+
+Fetches the current state of an account from the node using the `/GetAccountDetails` RPC
+endpoint.
+
+#### Parameters
+
+##### account\_id
+
+[`AccountId`](AccountId.md)
+
+#### Returns
+
+`Promise`\<[`FetchedAccount`](FetchedAccount.md)\>
+
+Promise that resolves to the [`FetchedAccount`].
+
+***
+
 ### getNotesById()
 
 > **getNotesById**(`note_ids`): `Promise`\<[`FetchedNote`](FetchedNote.md)[]\>
