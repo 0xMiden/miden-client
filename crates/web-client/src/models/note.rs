@@ -31,7 +31,7 @@ use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
 /// happen. See `NoteRecipient` for the shape of the recipient data.
 #[wasm_bindgen]
 #[derive(Clone)]
-pub struct Note(NativeNote);
+pub struct Note(pub(crate) NativeNote);
 
 #[wasm_bindgen]
 impl Note {

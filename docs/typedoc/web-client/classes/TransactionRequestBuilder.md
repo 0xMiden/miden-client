@@ -93,24 +93,6 @@ Adds an authentication argument.
 
 ***
 
-### withAuthenticatedInputNotes()
-
-> **withAuthenticatedInputNotes**(`notes`): `TransactionRequestBuilder`
-
-Adds authenticated input notes (identified by ID) with optional arguments.
-
-#### Parameters
-
-##### notes
-
-[`NoteIdAndArgsArray`](NoteIdAndArgsArray.md)
-
-#### Returns
-
-`TransactionRequestBuilder`
-
-***
-
 ### withCustomScript()
 
 > **withCustomScript**(`script`): `TransactionRequestBuilder`
@@ -183,6 +165,24 @@ Registers foreign accounts referenced by the transaction.
 
 ***
 
+### withInputNotes()
+
+> **withInputNotes**(`notes`): `TransactionRequestBuilder`
+
+Adds input notes with optional arguments.
+
+#### Parameters
+
+##### notes
+
+[`NoteAndArgsArray`](NoteAndArgsArray.md)
+
+#### Returns
+
+`TransactionRequestBuilder`
+
+***
+
 ### withOwnOutputNotes()
 
 > **withOwnOutputNotes**(`notes`): `TransactionRequestBuilder`
@@ -212,24 +212,6 @@ Adds a transaction script argument.
 ##### script\_arg
 
 [`Word`](Word.md)
-
-#### Returns
-
-`TransactionRequestBuilder`
-
-***
-
-### withUnauthenticatedInputNotes()
-
-> **withUnauthenticatedInputNotes**(`notes`): `TransactionRequestBuilder`
-
-Adds unauthenticated input notes with optional arguments.
-
-#### Parameters
-
-##### notes
-
-[`NoteAndArgsArray`](NoteAndArgsArray.md)
 
 #### Returns
 

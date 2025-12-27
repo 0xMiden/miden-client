@@ -238,7 +238,7 @@ export const sendTransaction = async (
       let noteAndArgsArray = new window.NoteAndArgsArray([noteAndArgs]);
 
       let txRequest = new window.TransactionRequestBuilder()
-        .withUnauthenticatedInputNotes(noteAndArgsArray)
+        .withInputNotes(noteAndArgsArray)
         .build();
 
       let consumeTransactionUpdate =
@@ -379,9 +379,14 @@ export const swapTransaction = async (
 
       // Consuming swap note for account B
 
-      let txRequest1 = client.newConsumeTransactionRequest([
-        expectedOutputNotes[0].id().toString(),
-      ]);
+      let noteId = expectedOutputNotes[0].id().toString();
+      let inputNoteRecord = await client.getInputNote(noteId);
+      if (!inputNoteRecord) {
+        throw new Error(`Note with ID ${noteId} not found`);
+      }
+
+      let note = inputNoteRecord.toNote();
+      let txRequest1 = client.newConsumeTransactionRequest([note]);
 
       let consumeTransaction1Result =
         await window.helpers.executeAndApplyTransaction(
@@ -396,9 +401,14 @@ export const swapTransaction = async (
 
       // Consuming payback note for account A
 
-      let txRequest2 = client.newConsumeTransactionRequest([
-        expectedPaybackNoteDetails[0].id().toString(),
-      ]);
+      noteId = expectedPaybackNoteDetails[0].id().toString();
+      inputNoteRecord = await client.getInputNote(noteId);
+      if (!inputNoteRecord) {
+        throw new Error(`Note with ID ${noteId} not found`);
+      }
+
+      note = inputNoteRecord.toNote();
+      let txRequest2 = client.newConsumeTransactionRequest([note]);
 
       let consumeTransaction2Result =
         await window.helpers.executeAndApplyTransaction(
@@ -679,8 +689,14 @@ export const consumeTransaction = async (
       const targetAccountId = window.AccountId.fromHex(_targetAccountId);
       const faucetId = window.AccountId.fromHex(_faucetId);
 
+      const inputNoteRecord = await client.getInputNote(_noteId);
+      if (!inputNoteRecord) {
+        throw new Error(`Note with ID ${_noteId} not found`);
+      }
+
+      const note = inputNoteRecord.toNote();
       const consumeTransactionRequest = client.newConsumeTransactionRequest([
-        _noteId,
+        note,
       ]);
       const prover =
         _withRemoteProver && window.remoteProverUrl != null
@@ -786,7 +802,7 @@ export const mintAndConsumeTransaction = async (
       let noteAndArgsArray = new window.NoteAndArgsArray([noteAndArgs]);
 
       let txRequest = new window.TransactionRequestBuilder()
-        .withUnauthenticatedInputNotes(noteAndArgsArray)
+        .withInputNotes(noteAndArgsArray)
         .build();
 
       let consumeTransactionUpdate =

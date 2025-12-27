@@ -235,27 +235,39 @@ where
         // Validates the transaction request before executing
         self.validate_request(account_id, &transaction_request).await?;
 
-        // Ensure authenticated notes have their inclusion proofs (a.k.a they're in a committed
-        // state)
-        let authenticated_input_note_ids: Vec<NoteId> =
-            transaction_request.authenticated_input_note_ids().collect::<Vec<_>>();
-
-        let authenticated_note_records = self
+        // Retrieve all input notes from the store.
+        let mut authenticated_note_records = self
             .store
-            .get_input_notes(NoteFilter::List(authenticated_input_note_ids))
+            .get_input_notes(NoteFilter::List(transaction_request.input_note_ids().collect()))
             .await?;
+
+        // Verify that none of the authenticated input notes are already consumed.
+        for note in &authenticated_note_records {
+            if note.is_consumed() {
+                return Err(ClientError::TransactionRequestError(
+                    TransactionRequestError::InputNoteAlreadyConsumed(note.id()),
+                ));
+            }
+        }
+
+        // Only keep authenticated input notes from the store.
+        authenticated_note_records.retain(InputNoteRecord::is_authenticated);
+
+        let authenticated_note_ids =
+            authenticated_note_records.iter().map(InputNoteRecord::id).collect::<Vec<_>>();
 
         // If tx request contains unauthenticated_input_notes we should insert them
         let unauthenticated_input_notes = transaction_request
-            .unauthenticated_input_notes()
+            .input_notes()
             .iter()
+            .filter(|n| !authenticated_note_ids.contains(&n.id()))
             .cloned()
             .map(Into::into)
             .collect::<Vec<_>>();
 
         self.store.upsert_input_notes(&unauthenticated_input_notes).await?;
 
-        let mut notes = transaction_request.build_input_notes(authenticated_note_records)?;
+        let mut notes = transaction_request.build_input_notes(&authenticated_note_records)?;
 
         let output_recipients =
             transaction_request.expected_output_recipients().cloned().collect::<Vec<_>>();
@@ -320,7 +332,6 @@ where
             .await?;
 
         validate_executed_transaction(&executed_transaction, &output_recipients)?;
-
         TransactionResult::new(executed_transaction, future_notes)
     }
 
@@ -614,35 +625,30 @@ where
         transaction_request: &TransactionRequest,
     ) -> Result<(BTreeMap<AccountId, u64>, BTreeSet<NonFungibleAsset>), TransactionRequestError>
     {
-        // Get incoming asset notes excluding unauthenticated ones
         let incoming_notes_ids: Vec<_> = transaction_request
             .input_notes()
             .iter()
-            .filter_map(|(note_id, _)| {
-                if transaction_request
-                    .unauthenticated_input_notes()
-                    .iter()
-                    .any(|note| note.id() == *note_id)
-                {
+            .filter_map(|note| {
+                if transaction_request.input_notes().iter().any(|n| n.id() == note.id()) {
                     None
                 } else {
-                    Some(*note_id)
+                    Some(note.id())
                 }
             })
             .collect();
 
-        let store_input_notes = self
+        let mut store_input_notes = self
             .get_input_notes(NoteFilter::List(incoming_notes_ids))
             .await
             .map_err(|err| TransactionRequestError::NoteNotFound(err.to_string()))?;
 
-        let all_incoming_assets =
-            store_input_notes.iter().flat_map(|note| note.assets().iter()).chain(
-                transaction_request
-                    .unauthenticated_input_notes()
-                    .iter()
-                    .flat_map(|note| note.assets().iter()),
-            );
+        // Get incoming asset notes excluding unauthenticated ones
+        store_input_notes.retain(InputNoteRecord::is_authenticated);
+
+        let all_incoming_assets = store_input_notes
+            .iter()
+            .flat_map(|note| note.assets().iter())
+            .chain(transaction_request.input_notes().iter().flat_map(|note| note.assets().iter()));
 
         Ok(collect_assets(all_incoming_assets))
     }

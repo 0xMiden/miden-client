@@ -2,7 +2,6 @@ use miden_client::Word as NativeWord;
 use miden_client::note::{
     Note as NativeNote,
     NoteDetails as NativeNoteDetails,
-    NoteId as NativeNoteId,
     NoteRecipient as NativeNoteRecipient,
     NoteTag as NativeNoteTag,
 };
@@ -21,7 +20,6 @@ use crate::models::miden_arrays::{
     ForeignAccountArray,
     NoteAndArgsArray,
     NoteDetailsAndTagArray,
-    NoteIdAndArgsArray,
     NoteRecipientArray,
     OutputNoteArray,
 };
@@ -46,20 +44,11 @@ impl TransactionRequestBuilder {
         TransactionRequestBuilder(native_transaction_request)
     }
 
-    /// Adds unauthenticated input notes with optional arguments.
-    #[wasm_bindgen(js_name = "withUnauthenticatedInputNotes")]
-    pub fn with_unauthenticated_input_notes(mut self, notes: &NoteAndArgsArray) -> Self {
+    /// Adds input notes with optional arguments.
+    #[wasm_bindgen(js_name = "withInputNotes")]
+    pub fn with_input_notes(mut self, notes: &NoteAndArgsArray) -> Self {
         let native_note_and_note_args: Vec<(NativeNote, Option<NativeNoteArgs>)> = notes.into();
-        self.0 = self.0.unauthenticated_input_notes(native_note_and_note_args);
-        self
-    }
-
-    /// Adds authenticated input notes (identified by ID) with optional arguments.
-    #[wasm_bindgen(js_name = "withAuthenticatedInputNotes")]
-    pub fn with_authenticated_input_notes(mut self, notes: &NoteIdAndArgsArray) -> Self {
-        let native_note_id_and_note_args: Vec<(NativeNoteId, Option<NativeNoteArgs>)> =
-            notes.into();
-        self.0 = self.0.authenticated_input_notes(native_note_id_and_note_args);
+        self.0 = self.0.input_notes(native_note_and_note_args);
         self
     }
 

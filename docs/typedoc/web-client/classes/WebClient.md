@@ -619,13 +619,13 @@ Returns all the existing setting keys from the store.
 
 ### newConsumeTransactionRequest()
 
-> **newConsumeTransactionRequest**(`list_of_note_ids`): [`TransactionRequest`](TransactionRequest.md)
+> **newConsumeTransactionRequest**(`list_of_notes`): [`TransactionRequest`](TransactionRequest.md)
 
 #### Parameters
 
-##### list\_of\_note\_ids
+##### list\_of\_notes
 
-`string`[]
+[`Note`](Note.md)[]
 
 #### Returns
 
