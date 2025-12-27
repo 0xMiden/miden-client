@@ -63,6 +63,8 @@ pub enum TransactionScriptTemplate {
 pub struct TransactionRequest {
     /// Notes to be consumed by the transaction.
     /// includes both authenticated and unauthenticated notes.
+    /// Notes which ID is present in the store are considered authenticated,
+    /// the ones which ID is does not exist are considered unauthenticated.
     input_notes: Vec<Note>,
     /// Optional arguments of the input notes to be consumed by the transaction. This
     /// includes both authenticated and unauthenticated notes.
@@ -103,14 +105,14 @@ impl TransactionRequest {
     // PUBLIC ACCESSORS
     // --------------------------------------------------------------------------------------------
 
-    /// Returns a reference to the transaction request's unauthenticated note list.
+    /// Returns a reference to the transaction request's input note list.
     pub fn input_notes(&self) -> &[Note] {
         &self.input_notes
     }
 
     /// Returns a list of all input note IDs.
-    pub fn get_input_note_ids(&self) -> Vec<NoteId> {
-        self.input_notes.iter().map(Note::id).collect()
+    pub fn input_note_ids(&self) -> impl Iterator<Item = NoteId> {
+        self.input_notes.iter().map(Note::id)
     }
 
     /// Returns a map of note IDs to their respective [`NoteArgs`]. The result will include
@@ -202,7 +204,7 @@ impl TransactionRequest {
     /// order they were provided in the transaction request.
     pub(crate) fn build_input_notes(
         &self,
-        authenticated_note_records: Vec<InputNoteRecord>,
+        authenticated_note_records: &[InputNoteRecord],
     ) -> Result<InputNotes<InputNote>, TransactionRequestError> {
         let mut input_notes: BTreeMap<NoteId, InputNote> = BTreeMap::new();
 
@@ -223,27 +225,26 @@ impl TransactionRequest {
             input_notes.insert(
                 authenticated_note_record.id(),
                 authenticated_note_record
+                    .clone()
                     .try_into()
                     .expect("Authenticated note record should be convertible to InputNote"),
             );
         }
 
         // Add unauthenticated input notes to the input notes map.
-        for unauthenticated_input_notes in &self.input_notes {
-            input_notes.insert(
-                unauthenticated_input_notes.id(),
-                InputNote::Unauthenticated {
-                    note: unauthenticated_input_notes.clone(),
-                },
-            );
+        for note in self
+            .input_notes()
+            .iter()
+            .filter(|n| !authenticated_note_records.iter().any(|a| a.id() == n.id()))
+        {
+            input_notes.insert(note.id(), InputNote::Unauthenticated { note: note.clone() });
         }
 
         Ok(InputNotes::new(
-            self.get_input_note_ids()
-                .iter()
+            self.input_note_ids()
                 .map(|note_id| {
                     input_notes
-                        .remove(note_id)
+                        .remove(&note_id)
                         .expect("The input note map was checked to contain all input notes")
                 })
                 .collect(),
@@ -332,8 +333,8 @@ impl Serializable for TransactionRequest {
 
 impl Deserializable for TransactionRequest {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
-        let unauthenticated_input_notes = Vec::<Note>::read_from(source)?;
-        let input_notes = Vec::<(NoteId, Option<NoteArgs>)>::read_from(source)?;
+        let input_notes = Vec::<Note>::read_from(source)?;
+        let input_notes_args = Vec::<(NoteId, Option<NoteArgs>)>::read_from(source)?;
 
         let script_template = match source.read_u8()? {
             0 => None,
@@ -364,8 +365,8 @@ impl Deserializable for TransactionRequest {
         let auth_arg = Option::<Word>::read_from(source)?;
 
         Ok(TransactionRequest {
-            input_notes: unauthenticated_input_notes,
-            input_notes_args: input_notes,
+            input_notes,
+            input_notes_args,
             script_template,
             expected_output_recipients,
             expected_future_notes,

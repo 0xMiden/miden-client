@@ -212,11 +212,21 @@ where
         self.validate_request(account_id, &transaction_request).await?;
 
         // Retrieve all input notes from the store.
-        // But only mark as authenticated if they are committed or consumed.
         let mut authenticated_note_records = self
             .store
-            .get_input_notes(NoteFilter::List(transaction_request.get_input_note_ids()))
+            .get_input_notes(NoteFilter::List(transaction_request.input_note_ids().collect()))
             .await?;
+
+        // Verify that none of the authenticated input notes are already consumed.
+        for note in &authenticated_note_records {
+            if note.is_consumed() {
+                return Err(ClientError::TransactionRequestError(
+                    TransactionRequestError::InputNoteAlreadyConsumed(note.id()),
+                ));
+            }
+        }
+
+        // Only keep authenticated input notes from the store.
         authenticated_note_records.retain(InputNoteRecord::is_authenticated);
 
         let authenticated_note_ids =
@@ -233,7 +243,7 @@ where
 
         self.store.upsert_input_notes(&unauthenticated_input_notes).await?;
 
-        let mut notes = transaction_request.build_input_notes(authenticated_note_records)?;
+        let mut notes = transaction_request.build_input_notes(&authenticated_note_records)?;
 
         let output_recipients =
             transaction_request.expected_output_recipients().cloned().collect::<Vec<_>>();

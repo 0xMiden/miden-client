@@ -40,6 +40,8 @@ use crate::ClientRng;
 #[derive(Clone, Debug)]
 pub struct TransactionRequestBuilder {
     /// Notes to be consumed by the transaction.
+    /// Notes which ID is present in the store are considered authenticated,
+    /// the ones which ID is does not exist are considered unauthenticated.
     input_notes: Vec<Note>,
     /// Optional arguments of the Notes to be consumed by the transaction. This
     /// includes both authenticated and unauthenticated notes.
@@ -103,7 +105,7 @@ impl TransactionRequestBuilder {
         }
     }
 
-    // Adds the specified notes as input notes to the transaction request.
+    /// Adds the specified notes as input notes to the transaction request.
     #[must_use]
     pub fn input_notes(
         mut self,
