@@ -23,6 +23,7 @@
 - [AccountBuilderResult](classes/AccountBuilderResult.md)
 - [AccountCode](classes/AccountCode.md)
 - [AccountComponent](classes/AccountComponent.md)
+- [AccountComponentCode](classes/AccountComponentCode.md)
 - [AccountDelta](classes/AccountDelta.md)
 - [AccountFile](classes/AccountFile.md)
 - [AccountHeader](classes/AccountHeader.md)

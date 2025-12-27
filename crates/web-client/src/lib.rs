@@ -20,7 +20,7 @@ use miden_client::{
     MAX_TX_EXECUTION_CYCLES,
     MIN_TX_EXECUTION_CYCLES,
 };
-use models::script_builder::CodeBuilder;
+use models::code_builder::CodeBuilder;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use wasm_bindgen::prelude::*;

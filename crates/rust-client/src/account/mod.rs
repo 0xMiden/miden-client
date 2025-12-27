@@ -104,7 +104,11 @@ pub mod component {
         StorageSlotSchema,
         StorageValueName,
     };
-    pub use miden_objects::account::{AccountComponent, AccountComponentMetadata};
+    pub use miden_objects::account::{
+        AccountComponent,
+        AccountComponentCode,
+        AccountComponentMetadata,
+    };
 }
 
 // CLIENT METHODS

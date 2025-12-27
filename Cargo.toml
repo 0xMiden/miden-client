@@ -46,7 +46,7 @@ miden-node-utils = { branch = "next", git = "https://github.com/0xMiden/miden-no
 miden-node-validator = { branch = "next", git = "https://github.com/0xMiden/miden-node.git" }
 miden-note-transport-proto-build = { branch = "main", default-features = false, git = "https://github.com/0xMiden/miden-note-transport.git" }
 miden-remote-prover = { branch = "next", features = ["concurrent"], git = "https://github.com/0xMiden/miden-node.git" }
-miden-remote-prover-client = { branch = "igamigo-refresh-lock", default-features = false, features = [
+miden-remote-prover-client = { branch = "next", default-features = false, features = [
   "tx-prover",
 ], git = "https://github.com/0xMiden/miden-node.git" }
 

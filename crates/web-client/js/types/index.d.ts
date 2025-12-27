@@ -12,6 +12,7 @@ export {
   AccountBuilderResult,
   AccountCode,
   AccountComponent,
+  AccountComponentCode,
   AccountDelta,
   AccountFile,
   AccountHeader,

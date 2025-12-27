@@ -792,9 +792,10 @@ export const customAccountComponent = async (
       let storageMap = new window.StorageMap();
       let storageSlotMap = window.StorageSlot.map(MAP_SLOT_NAME, storageMap);
 
+      let accountComponentCode =
+        builder.compileAccountComponentCode(accountCode);
       let mappingAccountComponent = window.AccountComponent.compile(
-        accountCode,
-        builder,
+        accountComponentCode,
         [storageSlotMap]
       ).withSupportsAllTypes();
 
@@ -1116,9 +1117,9 @@ export const counterAccountComponent = async (
 
     let builder = client.createCodeBuilder();
 
+    let accountComponentCode = builder.compileAccountComponentCode(accountCode);
     let counterAccountComponent = window.AccountComponent.compile(
-      accountCode,
-      builder,
+      accountComponentCode,
       [emptyStorageSlot]
     ).withSupportsAllTypes();
 
@@ -1287,9 +1288,9 @@ export const testStorageMap = async (page: Page): Promise<any> => {
         `;
 
     let builder = client.createCodeBuilder();
+    let accountComponentCode = builder.compileAccountComponentCode(accountCode);
     let bumpItemComponent = window.AccountComponent.compile(
-      accountCode,
-      builder,
+      accountComponentCode,
       [window.StorageSlot.map(MAP_SLOT_NAME, storageMap)]
     ).withSupportsAllTypes();
 
