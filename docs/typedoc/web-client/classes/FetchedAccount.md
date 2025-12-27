@@ -9,7 +9,7 @@
 Describes the response from the `GetAccountDetails` endpoint.
 
 The content varies based on account visibility:
-- **Public accounts**: Contains the complete [`Account`] details, as these are stored on-chain
+- **Public or Network accounts**: Contains the complete [`Account`] details, as these are stored on-chain
 - **Private accounts**: Contains only the state commitment, since full account data is stored
   off-chain
 
@@ -29,6 +29,8 @@ The content varies based on account visibility:
 
 > **account**(): [`Account`](Account.md)
 
+Returns the associated [`Account`] if the account is public, otherwise none
+
 #### Returns
 
 [`Account`](Account.md)
@@ -39,6 +41,8 @@ The content varies based on account visibility:
 
 > **accountId**(): [`AccountId`](AccountId.md)
 
+Returns the account identifier
+
 #### Returns
 
 [`AccountId`](AccountId.md)
@@ -48,6 +52,8 @@ The content varies based on account visibility:
 ### commitment()
 
 > **commitment**(): [`Word`](Word.md)
+
+Returns the account update summary commitment
 
 #### Returns
 
@@ -69,6 +75,8 @@ The content varies based on account visibility:
 
 > **isPrivate**(): `boolean`
 
+Returns true if the fetched account is private
+
 #### Returns
 
 `boolean`
@@ -78,6 +86,8 @@ The content varies based on account visibility:
 ### isPublic()
 
 > **isPublic**(): `boolean`
+
+Returns true if the fetched account is public
 
 #### Returns
 
