@@ -6,6 +6,8 @@
 
 # Class: AccountComponentCode
 
+A Library that has been assembled for use as component code.
+
 ## Methods
 
 ### \[dispose\]()
@@ -15,6 +17,18 @@
 #### Returns
 
 `void`
+
+***
+
+### asLibrary()
+
+> **asLibrary**(): [`Library`](Library.md)
+
+Returns the underlying Library
+
+#### Returns
+
+[`Library`](Library.md)
 
 ***
 
