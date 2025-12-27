@@ -9,7 +9,8 @@
 Describes the response from the `GetAccountDetails` endpoint.
 
 The content varies based on account visibility:
-- **Public or Network accounts**: Contains the complete [`Account`] details, as these are stored on-chain
+- **Public or Network accounts**: Contains the complete [`Account`] details, as these are stored
+  on-chain
 - **Private accounts**: Contains only the state commitment, since full account data is stored
   off-chain
 
