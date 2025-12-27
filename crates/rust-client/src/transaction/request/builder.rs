@@ -40,7 +40,7 @@ use crate::ClientRng;
 #[derive(Clone, Debug)]
 pub struct TransactionRequestBuilder {
     /// Notes to be consumed by the transaction.
-    authenticated_input_notes: Vec<Note>,
+    input_notes: Vec<Note>,
     /// Optional arguments of the Notes to be consumed by the transaction. This
     /// includes both authenticated and unauthenticated notes.
     input_notes_args: Vec<(NoteId, Option<NoteArgs>)>,
@@ -87,7 +87,7 @@ impl TransactionRequestBuilder {
     /// Creates a new, empty [`TransactionRequestBuilder`].
     pub fn new() -> Self {
         Self {
-            authenticated_input_notes: vec![],
+            input_notes: vec![],
             input_notes_args: vec![],
             own_output_notes: Vec::new(),
             expected_output_recipients: BTreeMap::new(),
@@ -111,7 +111,7 @@ impl TransactionRequestBuilder {
     ) -> Self {
         for (note, argument) in notes {
             self.input_notes_args.push((note.id(), argument));
-            self.authenticated_input_notes.push(note);
+            self.input_notes.push(note);
         }
         self
     }
@@ -412,7 +412,7 @@ impl TransactionRequestBuilder {
         };
 
         Ok(TransactionRequest {
-            input_notes: self.authenticated_input_notes,
+            input_notes: self.input_notes,
             input_notes_args: self.input_notes_args,
             script_template,
             expected_output_recipients: self.expected_output_recipients,
