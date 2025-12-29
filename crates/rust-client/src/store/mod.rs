@@ -438,8 +438,12 @@ pub trait Store: Send + Sync {
         let has_client_notes = has_client_notes.into();
         current_partial_mmr.add(current_block.commitment(), has_client_notes);
 
+        // Only track the latest leaf if it is relevant (it has client notes) _and_ the forest
+        // actually has a single leaf tree bit
+        let track_latest = has_client_notes && current_partial_mmr.forest().has_single_leaf_tree();
+
         let current_partial_mmr =
-            PartialMmr::from_parts(current_partial_mmr.peaks(), tracked_nodes, has_client_notes);
+            PartialMmr::from_parts(current_partial_mmr.peaks(), tracked_nodes, track_latest);
 
         Ok(current_partial_mmr)
     }

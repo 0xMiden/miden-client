@@ -149,6 +149,14 @@ integration-test-full: ## Run the integration test binary with ignored tests inc
 	TEST_WITH_NOTE_TRANSPORT=1 cargo nextest run --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --release --test=integration
 	cargo nextest run --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --release --test=integration --run-ignored ignored-only -- import_genesis_accounts_can_be_used_for_transactions
 
+.PHONY: test-dev
+test-dev: ## Run tests with debug assertions enabled via test-dev profile
+	cargo nextest run --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --cargo-profile test-dev --lib $(FEATURES_CLIENT)
+
+.PHONY: integration-test-dev
+integration-test-dev: ## Run integration tests with debug assertions enabled via test-dev profile
+	cargo nextest run --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --cargo-profile test-dev --test=integration
+
 .PHONY: integration-test-binary
 integration-test-binary: ## Run the integration tests using the standalone binary (requires note transport service)
 	TEST_WITH_NOTE_TRANSPORT=1 cargo run --package miden-client-integration-tests --release --locked
