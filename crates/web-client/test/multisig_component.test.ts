@@ -2,7 +2,9 @@ import test from "./playwright.global.setup";
 import { expect } from "@playwright/test";
 
 test.describe("multisig auth component", () => {
-  test("creates a multisig component with default threshold", async ({ page }) => {
+  test("creates a multisig component with default threshold", async ({
+    page,
+  }) => {
     const result = await page.evaluate(() => {
       const commitments = [
         new window.Word(new BigUint64Array([1n, 0n, 0n, 0n])),
@@ -10,10 +12,7 @@ test.describe("multisig auth component", () => {
         new window.Word(new BigUint64Array([3n, 0n, 0n, 0n])),
       ];
 
-      const config = new window.AuthRpoFalcon512MultisigConfig(
-        commitments,
-        2
-      );
+      const config = new window.AuthRpoFalcon512MultisigConfig(commitments, 2);
       const defaultThreshold = config.defaultThreshold;
       const approvers = config.approvers.length;
       window.createAuthRpoFalcon512Multisig(config);
@@ -34,9 +33,7 @@ test.describe("multisig auth component", () => {
         new window.Word(new BigUint64Array([10n, 0n, 0n, 0n])),
         new window.Word(new BigUint64Array([11n, 0n, 0n, 0n])),
       ];
-      const procRoot = new window.Word(
-        new BigUint64Array([10n, 0n, 0n, 0n])
-      );
+      const procRoot = new window.Word(new BigUint64Array([10n, 0n, 0n, 0n]));
 
       const config = new window.AuthRpoFalcon512MultisigConfig(
         commitments,
@@ -77,4 +74,3 @@ test.describe("multisig auth component", () => {
     expect(throws).toBe(true);
   });
 });
-

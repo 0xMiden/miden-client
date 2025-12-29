@@ -1417,9 +1417,8 @@ test.describe("executeForSummary tests", () => {
         approverCommitments,
         2
       );
-      const multisigComponent = window.createAuthRpoFalcon512Multisig(
-        multisigConfig
-      );
+      const multisigComponent =
+        window.createAuthRpoFalcon512Multisig(multisigConfig);
 
       const accountBuilderResult = new window.AccountBuilder(walletSeed)
         .accountType(window.AccountType.RegularAccountImmutableCode)

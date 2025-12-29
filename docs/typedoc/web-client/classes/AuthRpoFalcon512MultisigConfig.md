@@ -14,9 +14,10 @@ Multisig auth configuration for `RpoFalcon512` signatures.
 
 > **new AuthRpoFalcon512MultisigConfig**(`approvers`, `default_threshold`): `AuthRpoFalcon512MultisigConfig`
 
-Build a configuration with a list of approver public key commitments and a default threshold.
+Build a configuration with a list of approver public key commitments and a default
+threshold.
 
-`default_threshold` must be >= 1 and <= `approvers.len()`.
+`default_threshold` must be >= 1 and <= `approvers.length`.
 
 #### Parameters
 
@@ -84,7 +85,7 @@ Per-procedure thresholds.
 
 > **withProcThresholds**(`proc_thresholds`): `AuthRpoFalcon512MultisigConfig`
 
-Attach per-procedure thresholds. Each threshold must be >= 1 and <= `approvers.len()`.
+Attach per-procedure thresholds. Each threshold must be >= 1 and <= `approvers.length`.
 
 #### Parameters
 
