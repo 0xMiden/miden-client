@@ -1,7 +1,12 @@
 use alloc::string::ToString;
 use alloc::sync::Arc;
+use alloc::vec::Vec;
+use core::hash::{Hash, Hasher};
+use std::collections::hash_map::DefaultHasher;
 
 use idxdb_store::auth::{get_account_auth_by_pub_key, insert_account_auth};
+use idxdb_store::encryption::{get_encryption_key, insert_encryption_key};
+use miden_client::account::Address;
 use miden_client::auth::{
     AuthSecretKey,
     PublicKey,
@@ -10,9 +15,12 @@ use miden_client::auth::{
     SigningInputs,
     TransactionAuthenticator,
 };
-use miden_client::keystore::KeyStoreError;
+use miden_client::keystore::{EncryptionKeyStore, KeyStoreError};
 use miden_client::utils::{RwLock, Serializable};
-use miden_client::{AuthenticationError, Word, Word as NativeWord};
+use miden_client::{AuthenticationError, Deserializable, Word, Word as NativeWord};
+use miden_objects::crypto::dsa::ecdsa_k256_keccak::SecretKey as K256SecretKey;
+use miden_objects::crypto::dsa::eddsa_25519::SecretKey as X25519SecretKey;
+use miden_objects::crypto::ies::UnsealingKey;
 use rand::Rng;
 use wasm_bindgen_futures::js_sys::Function;
 
@@ -161,5 +169,138 @@ impl<R: Rng> TransactionAuthenticator for WebKeyStore<R> {
     // TODO: add this (related to #1417)
     async fn get_public_key(&self, _pub_key_commitment: PublicKeyCommitment) -> Option<&PublicKey> {
         None
+    }
+}
+
+#[async_trait::async_trait(?Send)]
+impl<R: Rng + Send + Sync> EncryptionKeyStore for WebKeyStore<R> {
+    async fn add_encryption_key(
+        &self,
+        address: &Address,
+        key: &UnsealingKey,
+    ) -> Result<(), KeyStoreError> {
+        let address_hash = hash_address(address);
+        let key_bytes = serialize_unsealing_key(key);
+        let key_hex = hex::encode(key_bytes);
+
+        insert_encryption_key(address_hash, key_hex).await.map_err(|e| {
+            KeyStoreError::StorageError(format!("Failed to insert encryption key: {e:?}"))
+        })?;
+
+        Ok(())
+    }
+
+    async fn get_encryption_key(
+        &self,
+        address: &Address,
+    ) -> Result<Option<UnsealingKey>, KeyStoreError> {
+        let address_hash = hash_address(address);
+
+        let key_hex = get_encryption_key(address_hash).await.map_err(|e| {
+            KeyStoreError::StorageError(format!("Failed to get encryption key: {e:?}"))
+        })?;
+
+        match key_hex {
+            Some(hex) => {
+                let bytes =
+                    hex::decode(hex).map_err(|e| KeyStoreError::DecodingError(format!("{e:?}")))?;
+                let key = deserialize_unsealing_key(&bytes)?;
+                Ok(Some(key))
+            },
+            None => Ok(None),
+        }
+    }
+}
+
+// HELPER FUNCTIONS
+// ================================================================================================
+
+/// Hashes an address to a string representation for use as a key.
+fn hash_address(address: &Address) -> String {
+    let address_bytes = address.to_bytes();
+    let mut hasher = DefaultHasher::new();
+    address_bytes.hash(&mut hasher);
+    hasher.finish().to_string()
+}
+
+// UNSEALING KEY SERIALIZATION
+// ================================================================================================
+
+// IES scheme discriminants - must match miden-crypto's IesScheme enum order.
+// TODO: use miden-crypto v0.19 when available.
+const IES_SCHEME_K256_XCHACHA20_POLY1305: u8 = 0;
+const IES_SCHEME_X25519_XCHACHA20_POLY1305: u8 = 1;
+const IES_SCHEME_K256_AEAD_RPO: u8 = 2;
+const IES_SCHEME_X25519_AEAD_RPO: u8 = 3;
+
+/// Serializes an [`UnsealingKey`] to bytes.
+fn serialize_unsealing_key(key: &UnsealingKey) -> Vec<u8> {
+    let mut bytes = Vec::new();
+
+    match key {
+        UnsealingKey::K256XChaCha20Poly1305(secret_key) => {
+            bytes.push(IES_SCHEME_K256_XCHACHA20_POLY1305);
+            bytes.extend_from_slice(&secret_key.to_bytes());
+        },
+        UnsealingKey::X25519XChaCha20Poly1305(secret_key) => {
+            bytes.push(IES_SCHEME_X25519_XCHACHA20_POLY1305);
+            bytes.extend_from_slice(&secret_key.to_bytes());
+        },
+        UnsealingKey::K256AeadRpo(secret_key) => {
+            bytes.push(IES_SCHEME_K256_AEAD_RPO);
+            bytes.extend_from_slice(&secret_key.to_bytes());
+        },
+        UnsealingKey::X25519AeadRpo(secret_key) => {
+            bytes.push(IES_SCHEME_X25519_AEAD_RPO);
+            bytes.extend_from_slice(&secret_key.to_bytes());
+        },
+    }
+
+    bytes
+}
+
+/// Deserializes an [`UnsealingKey`] from bytes.
+fn deserialize_unsealing_key(bytes: &[u8]) -> Result<UnsealingKey, KeyStoreError> {
+    if bytes.is_empty() {
+        return Err(KeyStoreError::DecodingError("empty bytes for unsealing key".to_string()));
+    }
+
+    let scheme = bytes[0];
+    let key_bytes = &bytes[1..];
+
+    match scheme {
+        IES_SCHEME_K256_XCHACHA20_POLY1305 => {
+            let secret_key = K256SecretKey::read_from_bytes(key_bytes).map_err(|e| {
+                KeyStoreError::DecodingError(format!(
+                    "failed to deserialize K256 secret key: {e:?}"
+                ))
+            })?;
+            Ok(UnsealingKey::K256XChaCha20Poly1305(secret_key))
+        },
+        IES_SCHEME_X25519_XCHACHA20_POLY1305 => {
+            let secret_key = X25519SecretKey::read_from_bytes(key_bytes).map_err(|e| {
+                KeyStoreError::DecodingError(format!(
+                    "failed to deserialize X25519 secret key: {e:?}"
+                ))
+            })?;
+            Ok(UnsealingKey::X25519XChaCha20Poly1305(secret_key))
+        },
+        IES_SCHEME_K256_AEAD_RPO => {
+            let secret_key = K256SecretKey::read_from_bytes(key_bytes).map_err(|e| {
+                KeyStoreError::DecodingError(format!(
+                    "failed to deserialize K256 secret key: {e:?}"
+                ))
+            })?;
+            Ok(UnsealingKey::K256AeadRpo(secret_key))
+        },
+        IES_SCHEME_X25519_AEAD_RPO => {
+            let secret_key = X25519SecretKey::read_from_bytes(key_bytes).map_err(|e| {
+                KeyStoreError::DecodingError(format!(
+                    "failed to deserialize X25519 secret key: {e:?}"
+                ))
+            })?;
+            Ok(UnsealingKey::X25519AeadRpo(secret_key))
+        },
+        _ => Err(KeyStoreError::DecodingError(format!("unsupported IES scheme: {scheme}"))),
     }
 }

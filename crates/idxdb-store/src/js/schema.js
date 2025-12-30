@@ -25,6 +25,7 @@ var Table;
     Table["AccountAssets"] = "accountAssets";
     Table["StorageMapEntries"] = "storageMapEntries";
     Table["AccountAuth"] = "accountAuth";
+    Table["EncryptionKeys"] = "encryptionKeys";
     Table["Accounts"] = "accounts";
     Table["Addresses"] = "addresses";
     Table["Transactions"] = "transactions";
@@ -47,6 +48,7 @@ db.version(1).stores({
     [Table.StorageMapEntries]: indexes("[root+key]", "root"),
     [Table.AccountAssets]: indexes("[root+vaultKey]", "root", "faucetIdPrefix"),
     [Table.AccountAuth]: indexes("pubKey"),
+    [Table.EncryptionKeys]: indexes("&addressHash"),
     [Table.Accounts]: indexes("&accountCommitment", "id", "[id+nonce]", "codeRoot", "storageRoot", "vaultRoot"),
     [Table.Addresses]: indexes("address", "id"),
     [Table.Transactions]: indexes("id", "statusVariant"),
@@ -76,6 +78,7 @@ const accountStorages = db.table(Table.AccountStorage);
 const storageMapEntries = db.table(Table.StorageMapEntries);
 const accountAssets = db.table(Table.AccountAssets);
 const accountAuths = db.table(Table.AccountAuth);
+const encryptionKeys = db.table(Table.EncryptionKeys);
 const accounts = db.table(Table.Accounts);
 const addresses = db.table(Table.Addresses);
 const transactions = db.table(Table.Transactions);
@@ -137,4 +140,4 @@ async function persistClientVersion(clientVersion) {
         value: textEncoder.encode(clientVersion),
     });
 }
-export { db, accountCodes, accountStorages, storageMapEntries, accountAssets, accountAuths, accounts, addresses, transactions, transactionScripts, inputNotes, outputNotes, notesScripts, stateSync, blockHeaders, partialBlockchainNodes, tags, foreignAccountCode, settings, trackedAccounts, };
+export { db, accountCodes, accountStorages, storageMapEntries, accountAssets, accountAuths, encryptionKeys, accounts, addresses, transactions, transactionScripts, inputNotes, outputNotes, notesScripts, stateSync, blockHeaders, partialBlockchainNodes, tags, foreignAccountCode, settings, trackedAccounts, };

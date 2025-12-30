@@ -26,6 +26,7 @@ enum Table {
   AccountAssets = "accountAssets",
   StorageMapEntries = "storageMapEntries",
   AccountAuth = "accountAuth",
+  EncryptionKeys = "encryptionKeys",
   Accounts = "accounts",
   Addresses = "addresses",
   Transactions = "transactions",
@@ -70,6 +71,11 @@ export interface IAccountAsset {
 export interface IAccountAuth {
   pubKey: string;
   secretKey: string;
+}
+
+export interface IEncryptionKey {
+  addressHash: string;
+  key: string;
 }
 
 export interface IAccount {
@@ -175,6 +181,7 @@ const db = new Dexie(DATABASE_NAME) as Dexie & {
   accountAssets: Dexie.Table<IAccountAsset, string>;
   storageMapEntries: Dexie.Table<IStorageMapEntry, string>;
   accountAuths: Dexie.Table<IAccountAuth, string>;
+  encryptionKeys: Dexie.Table<IEncryptionKey, string>;
   accounts: Dexie.Table<IAccount, string>;
   addresses: Dexie.Table<IAddress, string>;
   transactions: Dexie.Table<ITransaction, string>;
@@ -197,6 +204,7 @@ db.version(1).stores({
   [Table.StorageMapEntries]: indexes("[root+key]", "root"),
   [Table.AccountAssets]: indexes("[root+vaultKey]", "root", "faucetIdPrefix"),
   [Table.AccountAuth]: indexes("pubKey"),
+  [Table.EncryptionKeys]: indexes("&addressHash"),
   [Table.Accounts]: indexes(
     "&accountCommitment",
     "id",
@@ -243,6 +251,7 @@ const storageMapEntries = db.table<IStorageMapEntry, string>(
 );
 const accountAssets = db.table<IAccountAsset, string>(Table.AccountAssets);
 const accountAuths = db.table<IAccountAuth, string>(Table.AccountAuth);
+const encryptionKeys = db.table<IEncryptionKey, string>(Table.EncryptionKeys);
 const accounts = db.table<IAccount, string>(Table.Accounts);
 const addresses = db.table<IAddress, string>(Table.Addresses);
 const transactions = db.table<ITransaction, string>(Table.Transactions);
@@ -333,6 +342,7 @@ export {
   storageMapEntries,
   accountAssets,
   accountAuths,
+  encryptionKeys,
   accounts,
   addresses,
   transactions,

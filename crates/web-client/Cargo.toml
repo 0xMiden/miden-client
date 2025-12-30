@@ -28,6 +28,7 @@ miden-client  = { default-features = false, features = ["testing", "tonic"], pat
 miden-objects = { workspace = true }
 
 # External dependencies
+async-trait = { workspace = true }
 console_error_panic_hook = { version = "0.1.7" }
 hex = { version = "0.4" }
 js-sys = { version = "0.3" }

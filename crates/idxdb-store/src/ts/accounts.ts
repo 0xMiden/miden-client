@@ -3,6 +3,7 @@ import {
   accountStorages,
   accountAssets,
   accountAuths,
+  encryptionKeys,
   accounts,
   addresses,
   foreignAccountCode,
@@ -537,4 +538,38 @@ export async function undoAccountStates(accountCommitments: string[]) {
       `Error undoing account states: ${accountCommitments.join(",")}`
     );
   }
+}
+
+// ENCRYPTION KEYS
+// ================================================================================================
+
+export async function insertEncryptionKey(addressHash: string, keyHex: string) {
+  try {
+    const data = {
+      addressHash: addressHash,
+      key: keyHex,
+    };
+
+    await encryptionKeys.put(data);
+  } catch (error) {
+    logWebStoreError(
+      error,
+      `Error inserting encryption key for address hash: ${addressHash}`
+    );
+  }
+}
+
+export async function getEncryptionKeyByAddressHash(addressHash: string) {
+  const encryptionKey = await encryptionKeys
+    .where("addressHash")
+    .equals(addressHash)
+    .first();
+
+  if (!encryptionKey) {
+    return null;
+  }
+
+  return {
+    key: encryptionKey.key,
+  };
 }
