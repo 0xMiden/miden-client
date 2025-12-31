@@ -23,11 +23,11 @@ test("transport basic", async ({ page }) => {
       recipientSeed
     );
 
-    // Create recipient address
-    const recipientAddress = window.Address.fromAccountId(
-      recipientAccount.id(),
-      "BasicWallet"
+    // Get recipient address
+    const recipientAddresses = await client.getAccountAddresses(
+      recipientAccount.id()
     );
+    const recipientAddress = recipientAddresses[0];
 
     // Create note
     const noteAssets = new window.NoteAssets([]);

@@ -13,6 +13,7 @@ import {
   storageMapEntries,
   IStorageMapEntry,
   trackedAccounts,
+  encryptionKeys,
 } from "./schema.js";
 import { JsStorageMapEntry, JsStorageSlot, JsVaultAsset } from "./sync.js";
 import { logWebStoreError, uint8ArrayToBase64 } from "./utils.js";
@@ -536,5 +537,42 @@ export async function undoAccountStates(accountCommitments: string[]) {
       error,
       `Error undoing account states: ${accountCommitments.join(",")}`
     );
+  }
+}
+
+// ENCRYPTION KEY FUNCTIONS
+export async function insertEncryptionKey(addressHash: string, key: string) {
+  try {
+    const data = {
+      addressHash: addressHash,
+      key: key,
+    };
+    await encryptionKeys.put(data);
+  } catch (error) {
+    logWebStoreError(
+      error,
+      `Error inserting encryption key for address hash: ${addressHash}`
+    );
+  }
+}
+
+export async function getEncryptionKeyByAddressHash(addressHash: string) {
+  try {
+    const encryptionKey = await encryptionKeys
+      .where("addressHash")
+      .equals(addressHash)
+      .first();
+
+    if (!encryptionKey) {
+      return null;
+    }
+
+    return { key: encryptionKey.key };
+  } catch (error) {
+    logWebStoreError(
+      error,
+      `Error getting encryption key for address hash: ${addressHash}`
+    );
+    return null;
   }
 }

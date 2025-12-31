@@ -186,10 +186,15 @@ impl Cli {
         let keystore = FilesystemKeyStore::new(cli_config.secret_keys_directory.clone())
             .map_err(CliError::KeyStore)?;
 
+        // Create encryption keystore (shares directory with auth keystore)
+        let encryption_keystore = FilesystemKeyStore::new(cli_config.secret_keys_directory.clone())
+            .map_err(CliError::KeyStore)?;
+
         let mut builder = ClientBuilder::new()
             .sqlite_store(cli_config.store_filepath.clone())
             .grpc_client(&cli_config.rpc.endpoint.clone().into(), Some(cli_config.rpc.timeout_ms))
             .authenticator(Arc::new(keystore.clone()))
+            .encryption_keystore(Arc::new(encryption_keystore))
             .in_debug_mode(in_debug_mode)
             .tx_graceful_blocks(Some(TX_GRACEFUL_BLOCK_DELTA));
 

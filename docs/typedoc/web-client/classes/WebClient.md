@@ -333,6 +333,22 @@ Uses an internal pagination mechanism to avoid fetching duplicate notes.
 
 ***
 
+### getAccountAddresses()
+
+> **getAccountAddresses**(`account_id`): `Promise`\<[`Address`](Address.md)[]\>
+
+#### Parameters
+
+##### account\_id
+
+[`AccountId`](AccountId.md)
+
+#### Returns
+
+`Promise`\<[`Address`](Address.md)[]\>
+
+***
+
 ### getAccountAuthByPubKey()
 
 > **getAccountAuthByPubKey**(`pub_key`): `Promise`\<[`AuthSecretKey`](AuthSecretKey.md)\>

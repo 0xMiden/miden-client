@@ -46,3 +46,41 @@ pub async fn get_account_auth_by_pub_key(pub_key: String) -> Result<String, JsVa
         None => Err(JsValue::from_str(&format!("Pub key {pub_key} not found in the store"))),
     }
 }
+
+// ENCRYPTION KEY STORAGE
+// ================================================================================================
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EncryptionKeyIdxdbObject {
+    pub key: String,
+}
+
+#[wasm_bindgen(module = "/src/js/accounts.js")]
+extern "C" {
+    #[wasm_bindgen(js_name = insertEncryptionKey)]
+    pub fn idxdb_insert_encryption_key(address_hash: String, key: String) -> js_sys::Promise;
+
+    #[wasm_bindgen(js_name = getEncryptionKeyByAddressHash)]
+    pub fn idxdb_get_encryption_key_by_address_hash(address_hash: String) -> js_sys::Promise;
+}
+
+pub async fn insert_encryption_key(address_hash: String, key: String) -> Result<(), JsValue> {
+    let promise = idxdb_insert_encryption_key(address_hash, key);
+    JsFuture::from(promise).await?;
+    Ok(())
+}
+
+pub async fn get_encryption_key_by_address_hash(
+    address_hash: String,
+) -> Result<Option<String>, JsValue> {
+    let promise = idxdb_get_encryption_key_by_address_hash(address_hash.clone());
+    let js_key = JsFuture::from(promise).await?;
+
+    let encryption_key_idxdb: Option<EncryptionKeyIdxdbObject> =
+        from_value(js_key).map_err(|err| {
+            JsValue::from_str(&format!("Error: failed to deserialize encryption key: {err}"))
+        })?;
+
+    Ok(encryption_key_idxdb.map(|k| k.key))
+}

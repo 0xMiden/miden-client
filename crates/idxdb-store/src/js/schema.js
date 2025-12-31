@@ -39,6 +39,7 @@ var Table;
     Table["ForeignAccountCode"] = "foreignAccountCode";
     Table["Settings"] = "settings";
     Table["TrackedAccounts"] = "trackedAccounts";
+    Table["EncryptionKeys"] = "encryptionKeys";
 })(Table || (Table = {}));
 const db = new Dexie(DATABASE_NAME);
 db.version(1).stores({
@@ -61,6 +62,7 @@ db.version(1).stores({
     [Table.ForeignAccountCode]: indexes("accountId"),
     [Table.Settings]: indexes("key"),
     [Table.TrackedAccounts]: indexes("&id"),
+    [Table.EncryptionKeys]: indexes("&addressHash"),
 });
 function indexes(...items) {
     return items.join(",");
@@ -90,6 +92,7 @@ const tags = db.table(Table.Tags);
 const foreignAccountCode = db.table(Table.ForeignAccountCode);
 const settings = db.table(Table.Settings);
 const trackedAccounts = db.table(Table.TrackedAccounts);
+const encryptionKeys = db.table(Table.EncryptionKeys);
 async function ensureClientVersion(clientVersion) {
     if (!clientVersion) {
         console.warn("openDatabase called without a client version; skipping version enforcement.");
@@ -137,4 +140,4 @@ async function persistClientVersion(clientVersion) {
         value: textEncoder.encode(clientVersion),
     });
 }
-export { db, accountCodes, accountStorages, storageMapEntries, accountAssets, accountAuths, accounts, addresses, transactions, transactionScripts, inputNotes, outputNotes, notesScripts, stateSync, blockHeaders, partialBlockchainNodes, tags, foreignAccountCode, settings, trackedAccounts, };
+export { db, accountCodes, accountStorages, storageMapEntries, accountAssets, accountAuths, accounts, addresses, transactions, transactionScripts, inputNotes, outputNotes, notesScripts, stateSync, blockHeaders, partialBlockchainNodes, tags, foreignAccountCode, settings, trackedAccounts, encryptionKeys, };

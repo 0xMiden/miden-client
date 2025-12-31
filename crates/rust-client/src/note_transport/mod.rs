@@ -4,18 +4,22 @@ pub mod generated;
 pub mod grpc;
 
 use alloc::boxed::Box;
+use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use futures::Stream;
 use miden_lib::utils::Serializable;
 use miden_objects::address::Address;
+use miden_objects::crypto::ies::SealedMessage;
 use miden_objects::note::{Note, NoteDetails, NoteFile, NoteHeader, NoteTag};
 use miden_tx::auth::TransactionAuthenticator;
-use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, SliceReader};
+use miden_tx::utils::Deserializable;
+use tracing::debug;
 
 pub use self::errors::NoteTransportError;
 use crate::store::Store;
+use crate::sync::NoteTagSource;
 use crate::{Client, ClientError};
 
 pub const NOTE_TRANSPORT_DEFAULT_ENDPOINT: &str = "https://transport.miden.io";
@@ -39,22 +43,37 @@ impl<AUTH> Client<AUTH> {
 
     /// Send a note through the note transport network.
     ///
-    /// The note will be end-to-end encrypted (unimplemented, currently plaintext)
-    /// using the provided recipient's `address` details.
+    /// The note will be end-to-end encrypted using the provided recipient's `address` details.
     /// The recipient will be able to retrieve this note through the note's [`NoteTag`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The note transport is not configured
+    /// - The recipient's address does not contain an encryption key
+    /// - Encryption fails
+    /// - Note transport fails
     pub async fn send_private_note(
         &mut self,
         note: Note,
-        _address: &Address,
+        address: &Address,
     ) -> Result<(), ClientError> {
         let api = self.get_note_transport_api()?;
 
         let header = *note.header();
         let details = NoteDetails::from(note);
         let details_bytes = details.to_bytes();
-        // e2ee impl hint:
-        // address.key().encrypt(details_bytes)
-        api.send_note(header, details_bytes).await?;
+
+        // Encrypt the note details using the recipient's address encryption key
+        let encryption_key =
+            address.encryption_key().ok_or(NoteTransportError::MissingEncryptionKey)?;
+
+        let mut rng = rand::rng();
+        let sealed_message = encryption_key
+            .seal_bytes(&mut rng, &details_bytes)
+            .map_err(|e| NoteTransportError::EncryptionError(format!("{e:#}")))?;
+
+        api.send_note(header, sealed_message.to_bytes()).await?;
 
         Ok(())
     }
@@ -70,7 +89,7 @@ where
     /// To list tracked tags please use [`Client::get_note_tags`]. To add a new note tag please use
     /// [`Client::add_note_tag`].
     /// Only notes directed at your addresses will be stored and readable given the use of
-    /// end-to-end encryption (unimplemented).
+    /// end-to-end encryption. Notes that cannot be decrypted are silently ignored.
     /// Fetched notes will be stored into the client's store.
     ///
     /// An internal pagination mechanism is employed to reduce the number of downloaded notes.
@@ -103,6 +122,7 @@ where
     /// Fetch notes from the note transport network for provided note tags
     ///
     /// Pagination is employed, where only notes after the provided cursor are requested.
+    /// Trial decryption is performed using the encryption key of the address that owns the tag.
     /// Downloaded notes are imported.
     pub(crate) async fn fetch_transport_notes<I>(
         &mut self,
@@ -112,21 +132,33 @@ where
     where
         I: IntoIterator<Item = NoteTag>,
     {
+        let tags: Vec<NoteTag> = tags.into_iter().collect();
+
+        // Build a mapping from tag -> address that owns that tag
+        let tag_to_address = self.build_tag_to_address_map(&tags).await?;
+
         let mut notes = Vec::new();
+
         // Fetch notes
-        let (note_infos, rcursor) = self
-            .get_note_transport_api()?
-            .fetch_notes(&tags.into_iter().collect::<Vec<_>>(), cursor)
-            .await?;
+        let (note_infos, rcursor) =
+            self.get_note_transport_api()?.fetch_notes(&tags, cursor).await?;
+
         for note_info in &note_infos {
-            // e2ee impl hint:
-            // for key in self.store.decryption_keys() try
-            // key.decrypt(details_bytes_encrypted)
-            let note = rejoin_note(&note_info.header, &note_info.details_bytes)?;
-            notes.push(note);
+            // Get the tag from the note header metadata
+            let tag = note_info.header.metadata().tag();
+
+            // Try to decrypt with the key of the address that owns this tag
+            if let Some(address) = tag_to_address.get(&tag)
+                && let Some(note) = self
+                    .try_decrypt_note(&note_info.header, &note_info.details_bytes, address)
+                    .await
+            {
+                notes.push(note);
+            }
         }
 
         let sync_height = self.get_sync_height().await?;
+
         // Import fetched notes
         for note in notes {
             let tag = note.metadata().tag();
@@ -142,6 +174,65 @@ where
         self.store.update_note_transport_cursor(rcursor).await?;
 
         Ok(())
+    }
+
+    /// Builds a mapping from `NoteTag` to the address that owns that tag.
+    async fn build_tag_to_address_map(
+        &self,
+        tags: &[NoteTag],
+    ) -> Result<BTreeMap<NoteTag, Address>, ClientError> {
+        let note_tag_records = self.store.get_note_tags().await?;
+        let mut tag_to_address: BTreeMap<NoteTag, Address> = BTreeMap::new();
+
+        for record in note_tag_records {
+            // Only process tags that are in our query set
+            if !tags.contains(&record.tag) {
+                continue;
+            }
+
+            // Get the account that owns this tag
+            if let NoteTagSource::Account(account_id) = record.source {
+                // Find the address that matches this tag
+                let addresses = self.store.get_addresses_by_account_id(account_id).await?;
+                for address in addresses {
+                    if address.to_note_tag() == record.tag {
+                        tag_to_address.insert(record.tag, address);
+                        break;
+                    }
+                }
+            }
+        }
+
+        Ok(tag_to_address)
+    }
+
+    /// Attempts to decrypt a note using the encryption key for the provided address.
+    /// Returns `Some(Note)` if decryption succeeds, `None` otherwise.
+    async fn try_decrypt_note(
+        &self,
+        header: &NoteHeader,
+        encrypted_details: &[u8],
+        address: &Address,
+    ) -> Option<Note> {
+        let encryption_keystore = self.encryption_keystore.as_ref()?;
+
+        // Parse the sealed message
+        let sealed_message = SealedMessage::read_from_bytes(encrypted_details).ok()?;
+
+        // Try decrypt
+        let unsealing_key = encryption_keystore.get_encryption_key(address).await.ok()??;
+        let details_bytes = unsealing_key.unseal_bytes(sealed_message).ok()?;
+
+        match rejoin_note(header, &details_bytes) {
+            Ok(note) => {
+                debug!("Successfully decrypted note {}", note.id());
+                Some(note)
+            },
+            Err(e) => {
+                debug!("Failed to parse decrypted note details: {:?}", e);
+                None
+            },
+        }
     }
 }
 
@@ -161,14 +252,6 @@ pub(crate) async fn init_note_transport_cursor(store: Arc<dyn Store>) -> Result<
 /// avoiding duplicate downloads.
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Eq, Ord)]
 pub struct NoteTransportCursor(u64);
-
-/// Note Transport update
-pub struct NoteTransportUpdate {
-    /// Pagination cursor for next fetch
-    pub cursor: NoteTransportCursor,
-    /// Fetched notes
-    pub notes: Vec<Note>,
-}
 
 impl NoteTransportCursor {
     pub fn new(value: u64) -> Self {
@@ -190,6 +273,21 @@ impl From<u64> for NoteTransportCursor {
     }
 }
 
+impl miden_tx::utils::Serializable for NoteTransportCursor {
+    fn write_into<W: miden_tx::utils::ByteWriter>(&self, target: &mut W) {
+        target.write_u64(self.0);
+    }
+}
+
+impl miden_tx::utils::Deserializable for NoteTransportCursor {
+    fn read_from<R: miden_tx::utils::ByteReader>(
+        source: &mut R,
+    ) -> Result<Self, miden_tx::utils::DeserializationError> {
+        let value = source.read_u64()?;
+        Ok(Self::new(value))
+    }
+}
+
 /// The main transport client trait for sending and receiving encrypted notes
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
@@ -207,7 +305,7 @@ pub trait NoteTransportClient: Send + Sync {
     /// Returns notes labelled after the provided cursor (pagination), and an updated cursor.
     async fn fetch_notes(
         &self,
-        tag: &[NoteTag],
+        tags: &[NoteTag],
         cursor: NoteTransportCursor,
     ) -> Result<(Vec<NoteInfo>, NoteTransportCursor), NoteTransportError>;
 
@@ -225,49 +323,53 @@ pub trait NoteStream:
 {
 }
 
-/// Information about a note fetched from the note transport network
-#[derive(Debug, Clone)]
+/// Represents a note info returned from the note transport layer.
+#[derive(Clone)]
 pub struct NoteInfo {
-    /// Note header
+    /// Note header (metadata + id).
     pub header: NoteHeader,
-    /// Note details, can be encrypted
+    /// Note details serialized as bytes (may be encrypted).
     pub details_bytes: Vec<u8>,
 }
 
 // SERIALIZATION
 // ================================================================================================
 
-impl Serializable for NoteInfo {
-    fn write_into<W: ByteWriter>(&self, target: &mut W) {
+impl miden_tx::utils::Serializable for NoteInfo {
+    fn write_into<W: miden_tx::utils::ByteWriter>(&self, target: &mut W) {
         self.header.write_into(target);
         self.details_bytes.write_into(target);
     }
 }
 
-impl Deserializable for NoteInfo {
-    fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
+impl miden_tx::utils::Deserializable for NoteInfo {
+    fn read_from<R: miden_tx::utils::ByteReader>(
+        source: &mut R,
+    ) -> Result<Self, miden_tx::utils::DeserializationError> {
         let header = NoteHeader::read_from(source)?;
         let details_bytes = Vec::<u8>::read_from(source)?;
-        Ok(NoteInfo { header, details_bytes })
+        Ok(Self { header, details_bytes })
     }
 }
 
-impl Serializable for NoteTransportCursor {
-    fn write_into<W: ByteWriter>(&self, target: &mut W) {
-        self.0.write_into(target);
-    }
-}
+// HELPER FUNCTIONS
+// ================================================================================================
 
-impl Deserializable for NoteTransportCursor {
-    fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
-        let value = u64::read_from(source)?;
-        Ok(Self::new(value))
-    }
-}
+/// Reconstructs a full Note from header and decrypted details bytes.
+fn rejoin_note(header: &NoteHeader, details_bytes: &[u8]) -> Result<Note, NoteTransportError> {
+    let details = NoteDetails::read_from_bytes(details_bytes)
+        .map_err(|e| NoteTransportError::NoteDecodingError(format!("{e:#}")))?;
 
-fn rejoin_note(header: &NoteHeader, details_bytes: &[u8]) -> Result<Note, DeserializationError> {
-    let mut reader = SliceReader::new(details_bytes);
-    let details = NoteDetails::read_from(&mut reader)?;
-    let metadata = *header.metadata();
-    Ok(Note::new(details.assets().clone(), metadata, details.recipient().clone()))
+    let note = Note::new(details.assets().clone(), *header.metadata(), details.recipient().clone());
+
+    // Verify that the reconstructed note matches the header
+    if *note.header() != *header {
+        return Err(NoteTransportError::NoteReconstructionError(format!(
+            "Reconstructed note header doesn't match received header. Got {:?}, expected {:?}",
+            note.header(),
+            header
+        )));
+    }
+
+    Ok(note)
 }
