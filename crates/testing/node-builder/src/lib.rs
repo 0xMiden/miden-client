@@ -434,7 +434,7 @@ fn build_test_faucets_and_account() -> anyhow::Result<Vec<Account>> {
     let seed = [0xA; 32];
     let sk = AuthSecretKey::new_rpo_falcon512_with_rng(&mut ChaCha20Rng::from_seed(seed));
 
-    let map_entries = ((0_32..2000_u32).map(|i| (Word::from([i; 4]), Word::from([i; 4]))));
+    let map_entries = ((0_u32..2001_u32).map(|i| (Word::from([i; 4]), Word::from([i; 4]))));
 
     let storage_map = miden_objects::account::StorageSlot::with_map(
         miden_objects::account::StorageSlotName::new("miden::test_account::map::too_many_entries")

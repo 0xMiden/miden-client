@@ -391,10 +391,7 @@ impl NodeRpcClient for GrpcClient {
             let response_slots = details.storage_details.header.slots().collect::<Vec<_>>();
 
             for (i, s) in response_slots.iter().enumerate() {
-                console::log_1(&JsValue::from_str(&format!(
-                    "INDEX --> {i}, SLOTS --> ",
-                    details.storage_details
-                )));
+                console::log_1(&JsValue::from_str(&format!("INDEX --> {i}, SLOTS --> {s:?}",)));
             }
 
             let map_details = details
@@ -413,78 +410,7 @@ impl NodeRpcClient for GrpcClient {
                 .iter()
                 .any(|map_detail| map_detail.too_many_entries);
 
-            let mut slots: Vec<miden_objects::account::StorageSlot> = {
-                if needs_storage_sync {
-                    let storage_maps_data = self
-                        .sync_storage_maps(0_u32.into(), None, account_id.clone())
-                        .await?
-                        .updates;
-
-                    response_slots
-                        .clone()
-                        .into_iter()
-                        .map(|slot_header| {
-                            console::log_1(&JsValue::from_str(&format!(
-                                "SLOT HEADER NAME: --> {:?}",
-                                slot_header.name()
-                            )));
-                            match slot_header.slot_type() {
-                                StorageSlotType::Value => {
-                                    return miden_objects::account::StorageSlot::with_value(
-                                        slot_header.name().clone(),
-                                        slot_header.value(),
-                                    );
-                                },
-
-                                StorageSlotType::Map => {
-                                    return miden_objects::account::StorageSlot::with_map(
-                                        slot_header.name().clone(),
-                                        StorageMap::with_entries(
-                                            storage_maps_data
-                                                .iter()
-                                                .filter(|storage_map| {
-                                                    storage_map.slot_name == *slot_header.name()
-                                                })
-                                                .map(|storage_map| {
-                                                    (
-                                                        storage_map.key.into(),
-                                                        storage_map.value.into(),
-                                                    )
-                                                })
-                                                .collect::<Vec<_>>()
-                                                .into_iter(),
-                                        )
-                                        .unwrap(),
-                                    );
-                                },
-                            }
-                        })
-                        .collect()
-                } else {
-                    response_slots
-                        .clone()
-                        .into_iter()
-                        .map(|slot_header| match slot_header.slot_type() {
-                            StorageSlotType::Value => {
-                                miden_objects::account::StorageSlot::with_value(
-                                    slot_header.name().clone(),
-                                    slot_header.value(),
-                                )
-                            },
-                            StorageSlotType::Map => todo!(), //     miden_objects::account::StorageSlot::with_map(
-                                                             //     slot_header.name().clone(),
-                                                             //     StorageMap::with_entries(todo!()).unwrap(),
-                                                             // ),
-                        })
-                        .collect()
-                }
-            };
-
-            console::log_1(&JsValue::from_str(&format!(
-                "MAP DETAILS AS BTREE --> {:?}",
-                map_details.clone()
-            )));
-
+            let mut slots = vec![];
             for (index, slot_header) in response_slots.into_iter().enumerate() {
                 console::log_1(&JsValue::from_str(&format!(
                     "SLOT HEADER NAME: --> {:?}",
@@ -816,7 +742,7 @@ impl NodeRpcClient for GrpcClient {
         block_to: Option<BlockNumber>,
         account_id: AccountId,
     ) -> Result<StorageMapInfo, RpcError> {
-        let block_range = Some(BlockRange {
+        let mut block_range = Some(BlockRange {
             block_from: block_from.as_u32(),
             block_to: block_to.map(|b| b.as_u32()),
         });
@@ -838,15 +764,25 @@ impl NodeRpcClient for GrpcClient {
 
         let mut map_info: StorageMapInfo = response.try_into()?;
 
+        console::log_1(&JsValue::from_str(&format!("NUMBER: {:?}", &map_info.block_number)));
+        console::log_1(&JsValue::from_str(&format!("TIP: {:?}", &map_info.chain_tip)));
+        console::log_1(&JsValue::from_str(&format!("UPDATES: {:?}", &map_info.updates.len())));
+
         let should_fetch_more = (block_to.is_none() && map_info.block_number < map_info.chain_tip)
             || (block_to.is_some() && block_to.unwrap() > map_info.block_number);
 
+        console::log_1(&JsValue::from_str(&format!("SHOULD FETCH MORE: {}", &should_fetch_more)));
         if should_fetch_more {
             let block_target = block_to.unwrap_or(map_info.chain_tip);
             let mut fetched_height = map_info.block_number;
 
             while map_info.block_number < block_target {
                 // FIXME: Remove unwraps
+                console::log_1(&JsValue::from_str(&format!(
+                    "BLOCK RANGE REQUEST: --> {:?}",
+                    &block_range
+                )));
+
                 let update: StorageMapInfo = rpc_api
                     .sync_storage_maps(proto::rpc::SyncStorageMapsRequest {
                         block_range,
@@ -859,6 +795,10 @@ impl NodeRpcClient for GrpcClient {
                     .unwrap();
                 map_info.block_number = update.block_number;
                 map_info.updates.extend(update.updates.into_iter());
+                block_range = Some(BlockRange {
+                    block_from: update.block_number.as_u32(),
+                    block_to: Some(update.block_number.as_u32()),
+                })
             }
         }
         return Ok(map_info);

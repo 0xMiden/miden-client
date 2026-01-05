@@ -164,30 +164,37 @@ test.describe("get public account with details", () => {
   test("assets and storage with too many assets/entries are retrieved", async ({
     page,
   }) => {
-    const [assetCount, balances] = await page.evaluate(async () => {
-      // This account is inserted into the genesis block when test node is started,
-      // it starts with assets from 1500 faucets, the function "build_test_faucets_and_accoung"
-      // is called when the node starts and does the setup for this account, you can find it
-      // in: miden-client/crates/testing/node-builder/src/lib.rs
-      const accountID = window.AccountId.fromHex(
-        "0x0a0a0a0a0a0a0a100a0a0a0a0a0a0a"
-      );
-      await window.client.importAccountById(accountID);
-      const account = await window.client.getAccount(accountID);
-      const storage = account
-        ?.storage()
-        .getMapEntries("miden::test_account::map::too_many_entries");
-      console.log("Storage length", storage?.length);
-      const vault = account?.vault();
-      const assets = vault?.fungibleAssets()!;
-      const assetCount = assets.length;
-      const balances = [];
-      for (const asset of assets) {
-        balances.push(vault?.getBalance(asset.faucetId()).toString());
-      }
-      return [assetCount, balances];
-    }, {});
+    const [assetCount, balances, mapEntriesCount] = await page.evaluate(
+      async () => {
+        // This account is inserted into the genesis block when test node is started,
+        // it starts with assets from 1500 faucets, the function "build_test_faucets_and_accoung"
+        // is called when the node starts and does the setup for this account, you can find it
+        // in: miden-client/crates/testing/node-builder/src/lib.rs
+        const accountID = window.AccountId.fromHex(
+          "0x0a0a0a0a0a0a0a100a0a0a0a0a0a0a"
+        );
+        await window.client.importAccountById(accountID);
+        const account = await window.client.getAccount(accountID);
+        const storage = account
+          ?.storage()
+          .getMapEntries("miden::test_account::map::too_many_entries");
+        console.log("Storage length", storage?.length);
+        const vault = account?.vault();
+        const assets = vault?.fungibleAssets()!;
+        const assetCount = assets.length;
+        const balances = [];
+        for (const asset of assets) {
+          balances.push(vault?.getBalance(asset.faucetId()).toString());
+        }
+        const mapEntries = account
+          ?.storage()
+          .getMapEntries("miden::test_account::map::too_many_entries");
+        return [assetCount, balances, mapEntries?.length];
+      },
+      {}
+    );
     expect(assetCount).toBe(1501);
     expect(balances.every((balance) => balance === "100")).toBe(true);
+    expect(mapEntriesCount).toBe(2000);
   });
 });
