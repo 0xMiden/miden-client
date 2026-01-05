@@ -112,7 +112,7 @@ pub(crate) fn adjust_merkle_path_for_forest(
     let rightmost_index = InOrderIndex::from_leaf_pos(forest.num_leaves() - 1);
 
     let mut idx = InOrderIndex::from_leaf_pos(block_num.as_usize());
-    let mut path_nodes = vec![];
+    let mut path_nodes = Vec::with_capacity(expected_depth);
     for node in merkle_path.nodes().iter().take(expected_depth) {
         let sibling = idx.sibling();
         // NOTE: For a leaf that's in a smaller forest, all siblings within the tree depth should be
