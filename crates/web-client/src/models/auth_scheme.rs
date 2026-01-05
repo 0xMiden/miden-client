@@ -1,7 +1,7 @@
 use core::convert::TryFrom;
 use core::fmt::Debug;
 
-use miden_client::auth::AuthSchemeId as NativeAuthScheme;
+use miden_client::auth::AuthSchemeId as NativeAuthSchemeId;
 use wasm_bindgen::prelude::*;
 
 /// Authentication schemes supported by the web client.
@@ -15,28 +15,28 @@ pub enum AuthScheme {
 
 // Compile-time check to ensure both enums stay aligned.
 const _: () = {
-    assert!(NativeAuthScheme::RpoFalcon512 as u8 == AuthScheme::AuthRpoFalcon512 as u8);
-    assert!(NativeAuthScheme::EcdsaK256Keccak as u8 == AuthScheme::AuthEcdsaK256Keccak as u8);
+    assert!(NativeAuthSchemeId::RpoFalcon512 as u8 == AuthScheme::AuthRpoFalcon512 as u8);
+    assert!(NativeAuthSchemeId::EcdsaK256Keccak as u8 == AuthScheme::AuthEcdsaK256Keccak as u8);
 };
 
-impl TryFrom<AuthScheme> for NativeAuthScheme {
+impl TryFrom<AuthScheme> for NativeAuthSchemeId {
     type Error = JsValue;
 
     fn try_from(value: AuthScheme) -> Result<Self, Self::Error> {
         match value {
-            AuthScheme::AuthRpoFalcon512 => Ok(NativeAuthScheme::RpoFalcon512),
-            AuthScheme::AuthEcdsaK256Keccak => Ok(NativeAuthScheme::EcdsaK256Keccak),
+            AuthScheme::AuthRpoFalcon512 => Ok(NativeAuthSchemeId::RpoFalcon512),
+            AuthScheme::AuthEcdsaK256Keccak => Ok(NativeAuthSchemeId::EcdsaK256Keccak),
         }
     }
 }
 
-impl TryFrom<NativeAuthScheme> for AuthScheme {
+impl TryFrom<NativeAuthSchemeId> for AuthScheme {
     type Error = JsValue;
 
-    fn try_from(value: NativeAuthScheme) -> Result<Self, Self::Error> {
+    fn try_from(value: NativeAuthSchemeId) -> Result<Self, Self::Error> {
         match value {
-            NativeAuthScheme::RpoFalcon512 => Ok(AuthScheme::AuthRpoFalcon512),
-            NativeAuthScheme::EcdsaK256Keccak => Ok(AuthScheme::AuthEcdsaK256Keccak),
+            NativeAuthSchemeId::RpoFalcon512 => Ok(AuthScheme::AuthRpoFalcon512),
+            NativeAuthSchemeId::EcdsaK256Keccak => Ok(AuthScheme::AuthEcdsaK256Keccak),
             _ => Err(unsupported_scheme_error(value)),
         }
     }

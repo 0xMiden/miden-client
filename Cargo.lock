@@ -29,17 +29,6 @@ dependencies = [
 
 [[package]]
 name = "ahash"
-version = "0.7.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "891477e0c6a8957309ee5c45a6368af3ae14bb510732d2684ffa19af310920f9"
-dependencies = [
- "getrandom 0.2.16",
- "once_cell",
- "version_check",
-]
-
-[[package]]
-name = "ahash"
 version = "0.8.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5a15f179cd60c4584b8a8c596927aadc462e27f2ca70c04e0071964a73ba7a75"
@@ -1325,7 +1314,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -1672,9 +1661,6 @@ name = "hashbrown"
 version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a9ee70c43aaf417c914396645a0fa852624801b24ebb7ae78fe8272889ac888"
-dependencies = [
- "ahash 0.7.8",
-]
 
 [[package]]
 name = "hashbrown"
@@ -2522,7 +2508,7 @@ dependencies = [
 [[package]]
 name = "miden-block-prover"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-base.git?branch=next#eb0c396d48506c30c3fdc859ddaabbb8bfaf6b00"
+source = "git+https://github.com/0xMiden/miden-base.git?branch=next#5ae7b8a68ad1d933783a667c425226b79defd86f"
 dependencies = [
  "miden-protocol",
  "thiserror 2.0.17",
@@ -2843,7 +2829,7 @@ dependencies = [
 [[package]]
 name = "miden-node-block-producer"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-node.git?branch=santiagopittella-update-base-vm#e1c119574184f757f0350c196fa144c53d4e1df5"
+source = "git+https://github.com/0xMiden/miden-node.git?branch=next#84a488a3d2915f1828616c0cb60658616f178497"
 dependencies = [
  "anyhow",
  "futures",
@@ -2871,7 +2857,7 @@ dependencies = [
 [[package]]
 name = "miden-node-grpc-error-macro"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-node.git?branch=santiagopittella-update-base-vm#e1c119574184f757f0350c196fa144c53d4e1df5"
+source = "git+https://github.com/0xMiden/miden-node.git?branch=next#84a488a3d2915f1828616c0cb60658616f178497"
 dependencies = [
  "quote",
  "syn 2.0.111",
@@ -2880,7 +2866,7 @@ dependencies = [
 [[package]]
 name = "miden-node-ntx-builder"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-node.git?branch=santiagopittella-update-base-vm#e1c119574184f757f0350c196fa144c53d4e1df5"
+source = "git+https://github.com/0xMiden/miden-node.git?branch=next#84a488a3d2915f1828616c0cb60658616f178497"
 dependencies = [
  "anyhow",
  "futures",
@@ -2902,7 +2888,7 @@ dependencies = [
 [[package]]
 name = "miden-node-proto"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-node.git?branch=santiagopittella-update-base-vm#e1c119574184f757f0350c196fa144c53d4e1df5"
+source = "git+https://github.com/0xMiden/miden-node.git?branch=next#84a488a3d2915f1828616c0cb60658616f178497"
 dependencies = [
  "anyhow",
  "fs-err",
@@ -2924,7 +2910,7 @@ dependencies = [
 [[package]]
 name = "miden-node-proto-build"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-node.git?branch=santiagopittella-update-base-vm#e1c119574184f757f0350c196fa144c53d4e1df5"
+source = "git+https://github.com/0xMiden/miden-node.git?branch=next#84a488a3d2915f1828616c0cb60658616f178497"
 dependencies = [
  "fs-err",
  "miette",
@@ -2935,7 +2921,7 @@ dependencies = [
 [[package]]
 name = "miden-node-rpc"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-node.git?branch=santiagopittella-update-base-vm#e1c119574184f757f0350c196fa144c53d4e1df5"
+source = "git+https://github.com/0xMiden/miden-node.git?branch=next#84a488a3d2915f1828616c0cb60658616f178497"
 dependencies = [
  "anyhow",
  "futures",
@@ -2962,7 +2948,7 @@ dependencies = [
 [[package]]
 name = "miden-node-store"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-node.git?branch=santiagopittella-update-base-vm#e1c119574184f757f0350c196fa144c53d4e1df5"
+source = "git+https://github.com/0xMiden/miden-node.git?branch=next#84a488a3d2915f1828616c0cb60658616f178497"
 dependencies = [
  "anyhow",
  "deadpool",
@@ -2995,7 +2981,7 @@ dependencies = [
 [[package]]
 name = "miden-node-utils"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-node.git?branch=santiagopittella-update-base-vm#e1c119574184f757f0350c196fa144c53d4e1df5"
+source = "git+https://github.com/0xMiden/miden-node.git?branch=next#84a488a3d2915f1828616c0cb60658616f178497"
 dependencies = [
  "anyhow",
  "bytes",
@@ -3025,7 +3011,7 @@ dependencies = [
 [[package]]
 name = "miden-node-validator"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-node.git?branch=santiagopittella-update-base-vm#e1c119574184f757f0350c196fa144c53d4e1df5"
+source = "git+https://github.com/0xMiden/miden-node.git?branch=next#84a488a3d2915f1828616c0cb60658616f178497"
 dependencies = [
  "anyhow",
  "miden-node-proto",
@@ -3076,7 +3062,7 @@ dependencies = [
 [[package]]
 name = "miden-protocol"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-base.git?branch=next#eb0c396d48506c30c3fdc859ddaabbb8bfaf6b00"
+source = "git+https://github.com/0xMiden/miden-base.git?branch=next#5ae7b8a68ad1d933783a667c425226b79defd86f"
 dependencies = [
  "bech32",
  "fs-err",
@@ -3106,7 +3092,7 @@ dependencies = [
 [[package]]
 name = "miden-protocol-macros"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-base.git?branch=next#eb0c396d48506c30c3fdc859ddaabbb8bfaf6b00"
+source = "git+https://github.com/0xMiden/miden-base.git?branch=next#5ae7b8a68ad1d933783a667c425226b79defd86f"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3130,7 +3116,7 @@ dependencies = [
 [[package]]
 name = "miden-remote-prover"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-node.git?branch=santiagopittella-update-base-vm#e1c119574184f757f0350c196fa144c53d4e1df5"
+source = "git+https://github.com/0xMiden/miden-node.git?branch=next#84a488a3d2915f1828616c0cb60658616f178497"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3175,7 +3161,7 @@ dependencies = [
 [[package]]
 name = "miden-remote-prover-client"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-node.git?branch=santiagopittella-update-base-vm#e1c119574184f757f0350c196fa144c53d4e1df5"
+source = "git+https://github.com/0xMiden/miden-node.git?branch=next#84a488a3d2915f1828616c0cb60658616f178497"
 dependencies = [
  "fs-err",
  "getrandom 0.3.4",
@@ -3195,7 +3181,7 @@ dependencies = [
 [[package]]
 name = "miden-standards"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-base.git?branch=next#eb0c396d48506c30c3fdc859ddaabbb8bfaf6b00"
+source = "git+https://github.com/0xMiden/miden-base.git?branch=next#5ae7b8a68ad1d933783a667c425226b79defd86f"
 dependencies = [
  "fs-err",
  "miden-assembly",
@@ -3230,7 +3216,7 @@ dependencies = [
 [[package]]
 name = "miden-tx"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-base.git?branch=next#eb0c396d48506c30c3fdc859ddaabbb8bfaf6b00"
+source = "git+https://github.com/0xMiden/miden-base.git?branch=next#5ae7b8a68ad1d933783a667c425226b79defd86f"
 dependencies = [
  "miden-processor",
  "miden-protocol",
@@ -3243,7 +3229,7 @@ dependencies = [
 [[package]]
 name = "miden-tx-batch-prover"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-base.git?branch=next#eb0c396d48506c30c3fdc859ddaabbb8bfaf6b00"
+source = "git+https://github.com/0xMiden/miden-base.git?branch=next#5ae7b8a68ad1d933783a667c425226b79defd86f"
 dependencies = [
  "miden-protocol",
  "miden-tx",
@@ -3887,7 +3873,7 @@ version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7ef622051fbb2cb98a524df3a8112f02d0919ccda600a44d705ec550f1a28fe2"
 dependencies = [
- "ahash 0.8.12",
+ "ahash",
  "async-trait",
  "blake2",
  "bytes",
@@ -3923,7 +3909,7 @@ version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "76f63d3f67d99c95a1f85623fc43242fd644dd12ccbaa18c38a54e1580c6846a"
 dependencies = [
- "ahash 0.8.12",
+ "ahash",
  "async-trait",
  "brotli",
  "bytes",
@@ -4013,7 +3999,7 @@ version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b93c897e8cc04ff0d077ee2a655142910618222aeefc83f7f99f5b9fc59ccb13"
 dependencies = [
- "ahash 0.8.12",
+ "ahash",
 ]
 
 [[package]]
@@ -4045,7 +4031,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ba89e4400cb978f0d7be1c14bd7ab4168c8e2c00d97ff19f964fc0048780237c"
 dependencies = [
  "arrayvec",
- "hashbrown 0.12.3",
+ "hashbrown 0.16.1",
  "parking_lot",
  "rand 0.8.5",
 ]
@@ -4894,7 +4880,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.4.15",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -4907,7 +4893,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.11.0",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -5537,7 +5523,7 @@ dependencies = [
  "getrandom 0.3.4",
  "once_cell",
  "rustix 1.1.3",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -6515,7 +6501,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
