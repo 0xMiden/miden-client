@@ -279,27 +279,20 @@ test.describe("send transaction tests", () => {
 // =======================================================================================================
 
 test.describe("swap transaction tests", () => {
-  const testCases = [
-    { flag: false, description: "swap transaction completes successfully" },
-    {
-      flag: true,
-      description: "swap transaction with remote prover completes successfully",
-    },
-  ];
+  test("swap transaction completes successfully", async ({ page }) => {
+    const { accountId: accountA, faucetId: faucetA } =
+      await setupWalletAndFaucet(page);
+    const { accountId: accountB, faucetId: faucetB } =
+      await setupWalletAndFaucet(page);
 
-  testCases.forEach(({ flag, description }) => {
-    test(description, async ({ page }) => {
-      const { accountId: accountA, faucetId: faucetA } =
-        await setupWalletAndFaucet(page);
-      const { accountId: accountB, faucetId: faucetB } =
-        await setupWalletAndFaucet(page);
+    const assetAAmount = BigInt(1);
+    const assetBAmount = BigInt(25);
 
-      const assetAAmount = BigInt(1);
-      const assetBAmount = BigInt(25);
+    // Mint/consume once and reuse the setup for both prover modes.
+    await mintAndConsumeTransaction(page, accountA, faucetA, false);
+    await mintAndConsumeTransaction(page, accountB, faucetB, false);
 
-      await mintAndConsumeTransaction(page, accountA, faucetA, flag);
-      await mintAndConsumeTransaction(page, accountB, faucetB, flag);
-
+    const runSwapAssertions = async (withRemoteProver: boolean) => {
       const { accountAAssets, accountBAssets } = await swapTransaction(
         page,
         accountA,
@@ -310,27 +303,42 @@ test.describe("swap transaction tests", () => {
         assetBAmount,
         "private",
         "private",
-        flag
+        withRemoteProver
       );
 
       // --- assertions for Account A ---
       const aA = accountAAssets!.find((a) => a.assetId === faucetA);
-      expect(aA, `Expected to find asset ${faucetA} on Account A`).toBeTruthy();
+      expect(
+        aA,
+        `Expected to find asset ${faucetA} on Account A`
+      ).toBeTruthy();
       expect(BigInt(aA!.amount)).toEqual(999n);
 
       const aB = accountAAssets!.find((a) => a.assetId === faucetB);
-      expect(aB, `Expected to find asset ${faucetB} on Account A`).toBeTruthy();
+      expect(
+        aB,
+        `Expected to find asset ${faucetB} on Account A`
+      ).toBeTruthy();
       expect(BigInt(aB!.amount)).toEqual(25n);
 
       // --- assertions for Account B ---
       const bA = accountBAssets!.find((a) => a.assetId === faucetA);
-      expect(bA, `Expected to find asset ${faucetA} on Account B`).toBeTruthy();
+      expect(
+        bA,
+        `Expected to find asset ${faucetA} on Account B`
+      ).toBeTruthy();
       expect(BigInt(bA!.amount)).toEqual(1n);
 
       const bB = accountBAssets!.find((a) => a.assetId === faucetB);
-      expect(bB, `Expected to find asset ${faucetB} on Account B`).toBeTruthy();
+      expect(
+        bB,
+        `Expected to find asset ${faucetB} on Account B`
+      ).toBeTruthy();
       expect(BigInt(bB!.amount)).toEqual(975n);
-    });
+    };
+
+    await runSwapAssertions(false);
+    await runSwapAssertions(true);
   });
 });
 
