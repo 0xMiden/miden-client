@@ -7,7 +7,7 @@
 # This note script is based off of the P2ID note script because notes currently need to have
 # assets, otherwise it could have been boiled down to the assert.
 
-use miden::native_account
+miden::protocol::native_account
 use miden::active_note
 use miden::contracts::wallets::basic->wallet
 use std::mem

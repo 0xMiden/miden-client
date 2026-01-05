@@ -796,7 +796,7 @@ async fn execute_program() {
         .unwrap();
 
     let code = "
-        use std::sys
+        use miden::core::sys
 
         begin
             push.16
@@ -2106,7 +2106,7 @@ const BUMP_MAP_SLOT_NAME: &str = "miden::testing::bump_map::map";
 const EMPTY_STORAGE_MAP_SLOT_NAME: &str = "miden::testing::empty_storage_map::map";
 // MASM code used by `storage_and_vault_proofs*` tests to mutate a storage map.
 const BUMP_MAP_CODE: &str = "
-                use std::word
+                use miden::core::word
 
                 const MAP_SLOT = word(\"miden::testing::bump_map::map\")
 
@@ -2117,13 +2117,13 @@ const BUMP_MAP_CODE: &str = "
                     # push slot_id_prefix, slot_id_suffix for the map slot
                     push.MAP_SLOT[0..2]
 
-                    exec.::miden::active_account::get_map_item
+                    exec.::miden::protocol::active_account::get_map_item
                     add.1
                     push.{map_key}
                     
                     # push slot_id_prefix, slot_id_suffix for the map slot
                     push.MAP_SLOT[0..2]
-                    exec.::miden::native_account::set_map_item
+                    exec.::miden::protocol::native_account::set_map_item
                     dropw
                     # => [OLD_VALUE]
                     
@@ -2133,7 +2133,7 @@ const BUMP_MAP_CODE: &str = "
                     push.MAP_SLOT[0..2]
                     
                     # Set a new item each time as the value keeps changing
-                    exec.::miden::native_account::set_map_item
+                    exec.::miden::protocol::native_account::set_map_item
                     dropw dropw
                 end";
 

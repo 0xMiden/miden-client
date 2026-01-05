@@ -1321,8 +1321,8 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
 
     // Define the account code for the custom library
     let custom_code = "
-        use miden::native_account
-        use std::word
+        miden::protocol::native_account
+        use miden::core::word
 
         const MAP_SLOT = word(\"miden::testing::client::map\")
 

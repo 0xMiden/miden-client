@@ -411,7 +411,7 @@ export const customTransaction = async (
             # This note script is based off of the P2ID note script because notes currently need to have
             # assets, otherwise it could have been boiled down to the assert.
 
-            use miden::native_account
+            miden::protocol::native_account
             use miden::active_note
             use miden::contracts::wallets::basic->wallet
             use std::mem
@@ -723,9 +723,9 @@ export const customAccountComponent = async (
         "miden::testing::mapping_example_contract::map_slot";
 
       const accountCode = `
-        use miden::active_account
-        use miden::native_account
-        use std::word
+        miden::protocol::active_account
+        miden::protocol::native_account
+        use miden::core::word
         use std::sys
 
         const MAP_SLOT = word("${MAP_SLOT_NAME}")
@@ -1078,9 +1078,9 @@ export const counterAccountComponent = async (
     const COUNTER_SLOT_NAME = "miden::testing::counter_contract::counter";
 
     const accountCode = `
-        use miden::active_account
-        use miden::native_account
-        use std::word
+        miden::protocol::active_account
+        miden::protocol::native_account
+        use miden::core::word
         use std::sys
 
         const COUNTER_SLOT = word("${COUNTER_SLOT_NAME}")
@@ -1268,7 +1268,7 @@ export const testStorageMap = async (page: Page): Promise<any> => {
     );
 
     const accountCode = `
-                    use std::word
+                    use miden::core::word
 
                     const MAP_SLOT = word("${MAP_SLOT_NAME}")
 
@@ -1276,11 +1276,11 @@ export const testStorageMap = async (page: Page): Promise<any> => {
                     # map key
                     push.1.1.1.1 # Map key
                     push.MAP_SLOT[0..2]
-                    exec.::miden::active_account::get_map_item
+                    exec.::miden::protocol::active_account::get_map_item
                     add.1
                     push.1.1.1.1 # Map key
                     push.MAP_SLOT[0..2]
-                    exec.::miden::native_account::set_map_item
+                    exec.::miden::protocol::native_account::set_map_item
                     # => [OLD_MAP_ROOT, OLD_VALUE]
                     dropw dropw
                 end

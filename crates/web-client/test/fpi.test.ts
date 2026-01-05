@@ -24,7 +24,7 @@ export const testStandardFpi = async (page: Page): Promise<void> => {
     storageMap.insert(MAP_KEY, FPI_STORAGE_VALUE);
 
     const code = `
-            use std::word
+            use miden::core::word
 
             const MAP_SLOT = word("${MAP_SLOT_NAME}")
 
@@ -32,7 +32,7 @@ export const testStandardFpi = async (page: Page): Promise<void> => {
                 # map key
                 push.15.15.15.15
                 push.MAP_SLOT[0..2]
-                exec.::miden::active_account::get_map_item
+                exec.::miden::protocol::active_account::get_map_item
                 swapw dropw
             end
         `;

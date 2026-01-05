@@ -44,9 +44,9 @@ static COUNTER_SLOT_NAME: LazyLock<StorageSlotName> = LazyLock::new(|| {
 });
 
 const COUNTER_CONTRACT: &str = "
-        use miden::active_account
-        use miden::native_account
-        use std::word
+        miden::protocol::active_account
+        miden::protocol::native_account
+        use miden::core::word
         use std::sys
 
         const COUNTER_SLOT = word(\"miden::testing::counter_contract::counter\")
@@ -70,7 +70,7 @@ const COUNTER_CONTRACT: &str = "
         end";
 
 const INCR_NONCE_AUTH_CODE: &str = "
-    use miden::native_account
+    miden::protocol::native_account
     pub proc auth__basic
         exec.native_account::incr_nonce
         drop
