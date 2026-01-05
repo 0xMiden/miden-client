@@ -1282,6 +1282,7 @@ mod tests {
         StorageSlotContent,
         StorageSlotName,
     };
+    use miden_client::assembly::CodeBuilder;
     use miden_client::asset::{
         AccountStorageDelta,
         AccountVaultDelta,
@@ -1292,7 +1293,7 @@ mod tests {
     };
     use miden_client::auth::{AuthRpoFalcon512, PublicKeyCommitment};
     use miden_client::store::Store;
-    use miden_client::{CodeBuilder, EMPTY_WORD, ONE, ZERO};
+    use miden_client::{EMPTY_WORD, ONE, ZERO};
     use miden_protocol::testing::account_id::{
         ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
         ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET,

@@ -38,7 +38,7 @@ tonic = []
 [dependencies]
 # Miden dependencies
 miden-mast-package         = { workspace = true }
-miden-protocol             = { features = ["testing"], workspace = true }
+miden-protocol             = { workspace = true }
 miden-remote-prover-client = { default-features = false, features = ["tx-prover"], workspace = true }
 miden-standards            = { workspace = true }
 miden-testing              = { optional = true, workspace = true }

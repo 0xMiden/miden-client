@@ -8,7 +8,14 @@ use std::sync::Arc;
 
 use miden_client::account::{Address, AddressInterface};
 use miden_client::address::RoutingParameters;
-use miden_client::assembly::{Assembler, DefaultSourceManager, Module, ModuleKind, Path};
+use miden_client::assembly::{
+    Assembler,
+    CodeBuilder,
+    DefaultSourceManager,
+    Module,
+    ModuleKind,
+    Path,
+};
 use miden_client::auth::{
     AuthEcdsaK256Keccak,
     AuthRpoFalcon512,
@@ -55,7 +62,7 @@ use miden_client::transaction::{
     TransactionRequestError,
     TransactionStatus,
 };
-use miden_client::{ClientError, CodeBuilder, DebugMode};
+use miden_client::{ClientError, DebugMode};
 use miden_client_sqlite_store::ClientBuilderSqliteExt;
 use miden_protocol::account::{
     Account,
@@ -2105,10 +2112,10 @@ const MAP_KEY: [Felt; 4] = [Felt::new(42), Felt::new(42), Felt::new(42), Felt::n
 const BUMP_MAP_SLOT_NAME: &str = "miden::testing::bump_map::map";
 const EMPTY_STORAGE_MAP_SLOT_NAME: &str = "miden::testing::empty_storage_map::map";
 // MASM code used by `storage_and_vault_proofs*` tests to mutate a storage map.
-const BUMP_MAP_CODE: &str = "
+const BUMP_MAP_CODE: &str = r#"
                 use miden::core::word
 
-                const MAP_SLOT = word(\"miden::testing::bump_map::map\")
+                const MAP_SLOT = word("miden::testing::bump_map::map")
 
                 pub proc bump_map_item
                     # map key
@@ -2135,7 +2142,7 @@ const BUMP_MAP_CODE: &str = "
                     # Set a new item each time as the value keeps changing
                     exec.::miden::protocol::native_account::set_map_item
                     dropw dropw
-                end";
+                end"#;
 
 #[allow(clippy::too_many_lines)]
 #[tokio::test]

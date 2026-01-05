@@ -11,7 +11,14 @@ use miden_client::account::{
     StorageSlot,
     StorageSlotName,
 };
-use miden_client::assembly::{DefaultSourceManager, Library, Module, ModuleKind, Path};
+use miden_client::assembly::{
+    CodeBuilder,
+    DefaultSourceManager,
+    Library,
+    Module,
+    ModuleKind,
+    Path,
+};
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
 use miden_client::note::{
     Note,
@@ -31,7 +38,7 @@ use miden_client::testing::common::{
     wait_for_tx,
 };
 use miden_client::transaction::{OutputNote, TransactionKernel, TransactionRequestBuilder};
-use miden_client::{CodeBuilder, Felt, Word, ZERO};
+use miden_client::{Felt, Word, ZERO};
 use rand::{Rng, RngCore};
 
 use crate::tests::config::ClientConfig;
@@ -43,13 +50,13 @@ static COUNTER_SLOT_NAME: LazyLock<StorageSlotName> = LazyLock::new(|| {
     StorageSlotName::new("miden::testing::counter_contract::counter").expect("slot name is valid")
 });
 
-const COUNTER_CONTRACT: &str = "
-        miden::protocol::active_account
-        miden::protocol::native_account
+const COUNTER_CONTRACT: &str = r#"
+        use miden::protocol::active_account
+        use miden::protocol::native_account
         use miden::core::word
-        use std::sys
+        use miden::core::sys
 
-        const COUNTER_SLOT = word(\"miden::testing::counter_contract::counter\")
+        const COUNTER_SLOT = word("miden::testing::counter_contract::counter")
 
         # => []
         pub proc get_count
@@ -67,10 +74,10 @@ const COUNTER_CONTRACT: &str = "
             # => []
             exec.sys::truncate_stack
             # => []
-        end";
+        end"#;
 
 const INCR_NONCE_AUTH_CODE: &str = "
-    miden::protocol::native_account
+    use miden::protocol::native_account
     pub proc auth__basic
         exec.native_account::incr_nonce
         drop

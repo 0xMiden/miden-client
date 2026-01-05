@@ -7,10 +7,11 @@
 # This note script is based off of the P2ID note script because notes currently need to have
 # assets, otherwise it could have been boiled down to the assert.
 
-miden::protocol::native_account
-use miden::active_note
-use miden::contracts::wallets::basic->wallet
-use std::mem
+use miden::protocol::native_account
+use miden::protocol::active_note
+use miden::core::sys
+use miden::core::mem
+use miden::standards::wallets::basic->basic_wallet
 
 begin
     # push data from the advice map into the advice stack
@@ -65,6 +66,6 @@ begin
     assert_eq.err="P2ID's target account address and transaction address do not match"
     # => [...]
 
-    exec.active_note::add_assets_to_account
+    exec.basic_wallet::add_assets_to_account
     # => [...]
 end

@@ -1,8 +1,8 @@
 use alloc::sync::Arc;
 
-use miden_client::CodeBuilder as NativeCodeBuilder;
 use miden_client::assembly::{
     Assembler,
+    CodeBuilder as NativeCodeBuilder,
     Library as NativeLibrary,
     Module,
     ModuleKind,

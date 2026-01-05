@@ -150,11 +150,8 @@ mod test_utils;
 
 pub mod errors;
 
-pub use miden_protocol::block::BlockNumber;
+use miden_protocol::block::BlockNumber;
 pub use miden_protocol::utils::{Deserializable, Serializable, SliceReader};
-pub use miden_standards::account::interface::AccountInterfaceExt;
-pub use miden_standards::code_builder::CodeBuilder;
-pub use miden_standards::errors::CodeBuilderError;
 
 // RE-EXPORTS
 // ================================================================================================
@@ -165,6 +162,7 @@ pub mod notes {
 
 /// Provides types and utilities for working with Miden Assembly.
 pub mod assembly {
+    pub use miden_protocol::MastForest;
     pub use miden_protocol::assembly::debuginfo::SourceManagerSync;
     pub use miden_protocol::assembly::diagnostics::Report;
     pub use miden_protocol::assembly::diagnostics::reporting::PrintDiagnostic;
@@ -176,6 +174,7 @@ pub mod assembly {
         ModuleKind,
         Path,
     };
+    pub use miden_standards::code_builder::CodeBuilder;
 }
 
 /// Provides types and utilities for working with assets within the Miden network.
@@ -219,7 +218,7 @@ pub mod auth {
 
 /// Provides types for working with blocks within the Miden network.
 pub mod block {
-    pub use miden_protocol::block::BlockHeader;
+    pub use miden_protocol::block::{BlockHeader, BlockNumber};
 }
 
 /// Provides cryptographic types and utilities used within the Miden rollup
@@ -436,8 +435,8 @@ where
     }
 
     /// Returns an instance of the `CodeBuilder`
-    pub fn code_builder(&self) -> CodeBuilder {
-        CodeBuilder::with_source_manager(self.source_manager.clone())
+    pub fn code_builder(&self) -> assembly::CodeBuilder {
+        assembly::CodeBuilder::with_source_manager(self.source_manager.clone())
     }
 
     /// Returns a reference to the client's random number generator. This can be used to generate

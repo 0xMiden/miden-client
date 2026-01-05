@@ -7,6 +7,7 @@ export const testStandardFpi = async (page: Page): Promise<void> => {
     await client.syncState();
 
     const MAP_SLOT_NAME = "miden::testing::fpi::map_slot";
+    const COMPONENT_LIB_PATH = "miden::testing::fpi_component";
 
     // BUILD FOREIGN ACCOUNT WITH CUSTOM COMPONENT
     // --------------------------------------------------------------------------
@@ -37,9 +38,11 @@ export const testStandardFpi = async (page: Page): Promise<void> => {
             end
         `;
     let builder = client.createCodeBuilder();
-    let getItemComponent = window.AccountComponent.compile(code, builder, [
-      window.StorageSlot.map(MAP_SLOT_NAME, storageMap),
-    ]).withSupportsAllTypes();
+    let componentLibrary = builder.buildLibrary(COMPONENT_LIB_PATH, code);
+    let getItemComponent = window.AccountComponent.fromLibrary(
+      componentLibrary,
+      [window.StorageSlot.map(MAP_SLOT_NAME, storageMap)]
+    ).withSupportsAllTypes();
 
     const walletSeed = new Uint8Array(32);
     crypto.getRandomValues(walletSeed);
@@ -55,8 +58,7 @@ export const testStandardFpi = async (page: Page): Promise<void> => {
       .storageMode(window.AccountStorageMode.public())
       .build();
 
-    let getFpiMapItemProcedureHash =
-      getItemComponent.getProcedureHash("get_fpi_map_item");
+    builder.linkDynamicLibrary(componentLibrary);
 
     // DEPLOY FOREIGN ACCOUNT
     // --------------------------------------------------------------------------
@@ -88,11 +90,10 @@ export const testStandardFpi = async (page: Page): Promise<void> => {
     );
 
     let txScript = `
-            use miden::tx
-            use miden::account
+            use miden::protocol::tx
             begin
-                # push the hash of the {} account procedure
-                push.{proc_root}
+                # push the hash of the component procedure
+                procref.::miden::testing::fpi_component::get_fpi_map_item
 
                 # push the foreign account id
                 push.{account_id_suffix} push.{account_id_prefix}
@@ -104,7 +105,6 @@ export const testStandardFpi = async (page: Page): Promise<void> => {
         `;
 
     txScript = txScript
-      .replace("{proc_root}", getFpiMapItemProcedureHash)
       .replace("{account_id_suffix}", foreignAccountId.suffix().toString())
       .replace(
         "{account_id_prefix}",

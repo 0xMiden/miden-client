@@ -2,11 +2,10 @@ use alloc::string::ToString;
 use alloc::vec::Vec;
 
 use miden_protocol::Word;
-use miden_protocol::account::AccountId;
+use miden_protocol::account::{AccountId, AccountStorageMode, AccountType};
 use miden_protocol::asset::FungibleAsset;
 use miden_protocol::block::BlockNumber;
 use miden_protocol::note::{NoteHeader, Nullifier};
-use miden_protocol::testing::account_id::ACCOUNT_ID_NATIVE_ASSET_FAUCET;
 use miden_protocol::transaction::{
     InputNoteCommitment,
     InputNotes,
@@ -15,6 +14,41 @@ use miden_protocol::transaction::{
 };
 
 use crate::rpc::{RpcConversionError, RpcError, generated as proto};
+
+// TODO: Remove this when we turn on fees and the node informs the correct asset account ID
+
+/// A native asset faucet ID for use in testing scenarios.
+pub const ACCOUNT_ID_NATIVE_ASSET_FAUCET: u128 =
+    account_id(AccountType::FungibleFaucet, AccountStorageMode::Public, 0xabcd_acde);
+
+/// Produces a valid account ID with the given account type and storage mode.
+pub const fn account_id(
+    account_type: AccountType,
+    storage_mode: AccountStorageMode,
+    random: u32,
+) -> u128 {
+    let mut prefix: u64 = 0;
+
+    prefix |= (account_type as u64) << 4;
+    prefix |= (storage_mode as u64) << 6;
+
+    // Produce non-trivial IDs by distributing the random value.
+    let random_first_felt_upper = random & 0xff00_0000;
+    let random_first_felt_lower = random & 0x00ff_0000;
+    let random_second_felt_upper = random & 0x0000_ff00;
+    let random_second_felt_lower = random & 0x0000_00ff;
+
+    // Shift the random part of the ID to start at the most significant end.
+    prefix |= (random_first_felt_upper as u64) << 32;
+    prefix |= (random_first_felt_lower as u64) >> 8;
+
+    let mut id = (prefix as u128) << 64;
+
+    id |= (random_second_felt_upper as u128) << 32;
+    id |= (random_second_felt_lower as u128) << 8;
+
+    id
+}
 
 // INTO TRANSACTION ID
 // ================================================================================================

@@ -10,7 +10,14 @@ use miden_client::account::{
     StorageSlot,
     StorageSlotName,
 };
-use miden_client::assembly::{DefaultSourceManager, Module, ModuleKind, Path};
+use miden_client::assembly::{
+    CodeBuilder,
+    DefaultSourceManager,
+    MastForest,
+    Module,
+    ModuleKind,
+    Path,
+};
 use miden_client::asset::{Asset, FungibleAsset};
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
 use miden_client::builder::ClientBuilder;
@@ -36,7 +43,7 @@ use miden_client::transaction::{
     TransactionRequestBuilder,
     TransactionStatus,
 };
-use miden_client::{ClientError, CodeBuilder, Felt};
+use miden_client::{ClientError, Deserializable, Felt, Serializable};
 use miden_client_sqlite_store::ClientBuilderSqliteExt;
 
 use crate::tests::config::ClientConfig;
@@ -1320,11 +1327,11 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
     wait_for_tx(&mut client, tx_id).await?;
 
     // Define the account code for the custom library
-    let custom_code = "
-        miden::protocol::native_account
+    let custom_code = r#"
+        use miden::protocol::native_account
         use miden::core::word
 
-        const MAP_SLOT = word(\"miden::testing::client::map\")
+        const MAP_SLOT = word("miden::testing::client::map")
 
         pub proc update_map
             push.1.2.3.4
@@ -1335,7 +1342,7 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
             exec.native_account::set_map_item
             dropw dropw dropw dropw
         end
-    ";
+    "#;
 
     let mut storage_map = StorageMap::new();
     storage_map.insert(
@@ -1440,9 +1447,13 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
         .unwrap();
 
     // Remove debug decorators from original note script, as they are not persisted on submission
-    // https://github.com/0xMiden/miden-base/issues/1812
+    // (https://github.com/0xMiden/miden-base/issues/1812)
     let mut mast = (*note.script().mast()).clone();
     mast.strip_decorators();
+
+    // normalize CSR storage to match deserialized form
+    let mast_bytes = mast.to_bytes();
+    let mast = MastForest::read_from_bytes(&mast_bytes)?;
     let note_script = NoteScript::from_parts(Arc::new(mast), note.script().entrypoint());
 
     assert_eq!(node_nullifier.nullifier, nullifier);

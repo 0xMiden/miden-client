@@ -37,39 +37,36 @@
 use alloc::vec::Vec;
 
 use miden_protocol::account::auth::PublicKey;
+pub use miden_protocol::account::{
+    Account,
+    AccountBuilder,
+    AccountCode,
+    AccountComponent,
+    AccountDelta,
+    AccountFile,
+    AccountHeader,
+    AccountId,
+    AccountIdPrefix,
+    AccountStorage,
+    AccountStorageMode,
+    AccountType,
+    PartialAccount,
+    PartialStorage,
+    PartialStorageMap,
+    StorageMap,
+    StorageSlot,
+    StorageSlotContent,
+    StorageSlotId,
+    StorageSlotName,
+    StorageSlotType,
+};
+pub use miden_protocol::address::{Address, AddressInterface, AddressType, NetworkId};
 use miden_protocol::note::NoteTag;
+pub use miden_protocol::{AccountIdError, AddressError, NetworkIdError};
+use miden_standards::account::auth::{AuthEcdsaK256Keccak, AuthRpoFalcon512};
 // RE-EXPORTS
 // ================================================================================================
-pub use miden_protocol::{
-    AccountIdError,
-    AddressError,
-    NetworkIdError,
-    account::{
-        Account,
-        AccountBuilder,
-        AccountCode,
-        AccountComponent,
-        AccountDelta,
-        AccountFile,
-        AccountHeader,
-        AccountId,
-        AccountIdPrefix,
-        AccountStorage,
-        AccountStorageMode,
-        AccountType,
-        PartialAccount,
-        PartialStorage,
-        PartialStorageMap,
-        StorageMap,
-        StorageSlot,
-        StorageSlotContent,
-        StorageSlotId,
-        StorageSlotName,
-        StorageSlotType,
-    },
-    address::{Address, AddressInterface, AddressType, NetworkId},
-};
-use miden_standards::account::auth::{AuthEcdsaK256Keccak, AuthRpoFalcon512};
+pub use miden_standards::account::interface::AccountInterfaceExt;
 use miden_standards::account::wallets::BasicWallet;
 
 use super::Client;

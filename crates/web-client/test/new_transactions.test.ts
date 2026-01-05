@@ -411,10 +411,11 @@ export const customTransaction = async (
             # This note script is based off of the P2ID note script because notes currently need to have
             # assets, otherwise it could have been boiled down to the assert.
 
-            miden::protocol::native_account
-            use miden::active_note
-            use miden::contracts::wallets::basic->wallet
-            use std::mem
+            use miden::protocol::native_account
+            use miden::protocol::active_note
+            use miden::core::sys
+            use miden::core::mem
+            use miden::standards::wallets::basic->basic_wallet
 
             begin
                 # push data from the advice map into the advice stack
@@ -469,7 +470,7 @@ export const customTransaction = async (
                 assert_eq.err="P2ID's target account address and transaction address do not match"
                 # => [...]
 
-                exec.active_note::add_assets_to_account
+                exec.basic_wallet::add_assets_to_account
                 # => [...]
             end
         `;
@@ -523,9 +524,6 @@ export const customTransaction = async (
       // Just like in the miden test, you can modify this script to get the execution to fail
       // by modifying the assert
       let txScript = `
-            use miden::kernels::tx::prologue
-            use miden::kernels::tx::memory
-
             begin
                 push.0 push.${assertedValue}
                 # => [0, ${assertedValue}]
@@ -723,10 +721,10 @@ export const customAccountComponent = async (
         "miden::testing::mapping_example_contract::map_slot";
 
       const accountCode = `
-        miden::protocol::active_account
-        miden::protocol::native_account
+        use miden::protocol::active_account
+        use miden::protocol::native_account
         use miden::core::word
-        use std::sys
+        use miden::core::sys
 
         const MAP_SLOT = word("${MAP_SLOT_NAME}")
 
@@ -762,7 +760,7 @@ export const customAccountComponent = async (
       `;
       const scriptCode = `
         use miden_by_example::mapping_example_contract
-        use std::sys
+        use miden::core::sys
 
         begin
             push.1.2.3.4
@@ -1078,10 +1076,10 @@ export const counterAccountComponent = async (
     const COUNTER_SLOT_NAME = "miden::testing::counter_contract::counter";
 
     const accountCode = `
-        miden::protocol::active_account
-        miden::protocol::native_account
+        use miden::protocol::active_account
+        use miden::protocol::native_account
         use miden::core::word
-        use std::sys
+        use miden::core::sys
 
         const COUNTER_SLOT = word("${COUNTER_SLOT_NAME}")
 
