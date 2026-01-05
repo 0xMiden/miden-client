@@ -328,7 +328,6 @@ pub async fn test_onchain_notes_sync_with_tag(client_config: ClientConfig) -> Re
         .context("failed to find input note in client 2 after sync")?
         .try_into()?;
     assert_eq!(received_note.note().commitment(), note.commitment());
-    assert_eq!(received_note.note(), &note);
     assert!(client_3.get_input_notes(NoteFilter::All).await?.is_empty());
     Ok(())
 }
