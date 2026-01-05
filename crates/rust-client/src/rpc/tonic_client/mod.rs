@@ -5,6 +5,8 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::error::Error;
 use miden_objects::asset::{Asset, AssetVault};
+use web_sys::console;
+use web_sys::wasm_bindgen::JsValue;
 
 use miden_objects::account::{
     Account, AccountCode, AccountId, AccountStorage, StorageMap, StorageSlot, StorageSlotType,
@@ -36,6 +38,7 @@ use crate::rpc::domain::account_vault::AccountVaultInfo;
 use crate::rpc::domain::storage_map::StorageMapInfo;
 use crate::rpc::domain::transaction::TransactionsInfo;
 use crate::rpc::errors::{AcceptHeaderError, GrpcError, RpcConversionError};
+use crate::rpc::generated::rpc::account_proof_request::account_detail_request::storage_map_detail_request::SlotData;
 use crate::rpc::generated::rpc::account_proof_request::account_detail_request::StorageMapDetailRequest;
 use crate::rpc::generated::rpc::{BlockRange, SyncStorageMapsRequest};
 use crate::rpc::{AccountStateAt, NOTE_IDS_LIMIT, NULLIFIER_PREFIXES_LIMIT, generated as proto};
@@ -262,7 +265,10 @@ impl NodeRpcClient for GrpcClient {
                 Some(AccountDetailRequest {
                     code_commitment: Some(EMPTY_WORD.into()),
                     asset_vault_commitment: Some(EMPTY_WORD.into()),
-                    storage_maps: vec![],
+                    storage_maps: vec![StorageMapDetailRequest {
+                        slot_name: "miden::test_account::map::too_many_entries".to_owned(),
+                        slot_data: Some(SlotData::AllEntries(true)),
+                    }],
                 })
             }
         };
@@ -279,7 +285,40 @@ impl NodeRpcClient for GrpcClient {
             RpcError::from_grpc_error(NodeRpcClientEndpoint::GetAccountDetails, status)
         });
 
-        let response = response?.into_inner();
+        let response = {
+            if !account_id.has_public_state() {
+                response?.into_inner()
+            } else {
+                // FIXME: Remove unwraps
+                let response = response?
+                    .into_inner()
+                    .details
+                    .unwrap()
+                    .into_domain(&Default::default())
+                    .unwrap();
+                let maps_to_request = response
+                    .storage_details
+                    .header
+                    .slots()
+                    .filter(|header| header.slot_type().is_map())
+                    .map(|map| map.name().to_string());
+                let request = AccountProofRequest {
+                    account_id: Some(account_id.into()),
+                    block_num: None,
+                    details: Some(AccountDetailRequest {
+                        code_commitment: Some(EMPTY_WORD.into()),
+                        asset_vault_commitment: Some(EMPTY_WORD.into()),
+                        storage_maps: maps_to_request
+                            .map(|slot_name| StorageMapDetailRequest {
+                                slot_name,
+                                slot_data: Some(SlotData::AllEntries(true)),
+                            })
+                            .collect(),
+                    }),
+                };
+                rpc_api.get_account_proof(request).await.unwrap().into_inner()
+            }
+        };
 
         let Some(witness) = response.witness else {
             return Err(RpcError::ExpectedDataMissing(
@@ -343,17 +382,114 @@ impl NodeRpcClient for GrpcClient {
                     details.vault_details.assets
                 }
             };
-            let response_slots = details.storage_details.header.slots();
+
+            console::log_1(&JsValue::from_str(&format!(
+                "DETAILS --> {:?}",
+                details.storage_details
+            )));
+
+            let response_slots = details.storage_details.header.slots().collect::<Vec<_>>();
+
+            for (i, s) in response_slots.iter().enumerate() {
+                console::log_1(&JsValue::from_str(&format!(
+                    "INDEX --> {i}, SLOTS --> ",
+                    details.storage_details
+                )));
+            }
+
             let map_details = details
                 .storage_details
                 .map_details
+                .clone()
                 .into_iter()
                 .map(|map_detail| {
                     (map_detail.slot_name, (map_detail.too_many_entries, map_detail.entries))
                 })
                 .collect::<BTreeMap<_, _>>();
-            let mut slots = vec![];
-            for (index, slot_header) in response_slots.enumerate() {
+
+            let needs_storage_sync = details
+                .storage_details
+                .map_details
+                .iter()
+                .any(|map_detail| map_detail.too_many_entries);
+
+            let mut slots: Vec<miden_objects::account::StorageSlot> = {
+                if needs_storage_sync {
+                    let storage_maps_data = self
+                        .sync_storage_maps(0_u32.into(), None, account_id.clone())
+                        .await?
+                        .updates;
+
+                    response_slots
+                        .clone()
+                        .into_iter()
+                        .map(|slot_header| {
+                            console::log_1(&JsValue::from_str(&format!(
+                                "SLOT HEADER NAME: --> {:?}",
+                                slot_header.name()
+                            )));
+                            match slot_header.slot_type() {
+                                StorageSlotType::Value => {
+                                    return miden_objects::account::StorageSlot::with_value(
+                                        slot_header.name().clone(),
+                                        slot_header.value(),
+                                    );
+                                },
+
+                                StorageSlotType::Map => {
+                                    return miden_objects::account::StorageSlot::with_map(
+                                        slot_header.name().clone(),
+                                        StorageMap::with_entries(
+                                            storage_maps_data
+                                                .iter()
+                                                .filter(|storage_map| {
+                                                    storage_map.slot_name == *slot_header.name()
+                                                })
+                                                .map(|storage_map| {
+                                                    (
+                                                        storage_map.key.into(),
+                                                        storage_map.value.into(),
+                                                    )
+                                                })
+                                                .collect::<Vec<_>>()
+                                                .into_iter(),
+                                        )
+                                        .unwrap(),
+                                    );
+                                },
+                            }
+                        })
+                        .collect()
+                } else {
+                    response_slots
+                        .clone()
+                        .into_iter()
+                        .map(|slot_header| match slot_header.slot_type() {
+                            StorageSlotType::Value => {
+                                miden_objects::account::StorageSlot::with_value(
+                                    slot_header.name().clone(),
+                                    slot_header.value(),
+                                )
+                            },
+                            StorageSlotType::Map => todo!(), //     miden_objects::account::StorageSlot::with_map(
+                                                             //     slot_header.name().clone(),
+                                                             //     StorageMap::with_entries(todo!()).unwrap(),
+                                                             // ),
+                        })
+                        .collect()
+                }
+            };
+
+            console::log_1(&JsValue::from_str(&format!(
+                "MAP DETAILS AS BTREE --> {:?}",
+                map_details.clone()
+            )));
+
+            for (index, slot_header) in response_slots.into_iter().enumerate() {
+                console::log_1(&JsValue::from_str(&format!(
+                    "SLOT HEADER NAME: --> {:?}",
+                    slot_header.name()
+                )));
                 match slot_header.slot_type() {
                     // FIXME:
                     // - Should we specify a BlockRange?.
@@ -376,31 +512,13 @@ impl NodeRpcClient for GrpcClient {
                         let mut map_entries = vec![];
                         if *too_many_entries {
                             map_entries.extend(
-                                rpc_api
-                            .sync_storage_maps(SyncStorageMapsRequest {
-                                block_range: None,
-                                account_id: Some(account_id.clone().into()),
-                            })
-                            .await
-                        .map_err(|status| {
-                            RpcError::from_grpc_error(
-                                NodeRpcClientEndpoint::SyncAccountVault,
-                                status,
-                            )
-                        })?
-                        // FIXME: SyncStorageMapsResponse has 'pagination' field, should we
-                        // do something with it?
-                            .into_inner()
-                            .updates
-                            .into_iter()
-                        // FIXME:
-                        // - Avoid these unwraps
-                        // - Use better names
-                            .map(|u| {
-                                let key: Word = u.key.unwrap().try_into().unwrap();
-                                let value: Word = u.value.unwrap().try_into().unwrap();
-                                (key, value)
-                            }),
+                                self.sync_storage_maps(0_u32.into(), None, account_id)
+                                    .await
+                                    .unwrap()
+                                    .updates
+                                    .into_iter()
+                                    .filter(|slot_info| slot_info.slot_name == *slot_header.name())
+                                    .map(|slot_info| (slot_info.key, slot_info.value)),
                             )
                         } else {
                             map_entries.extend(entries.into_iter().map(|e| {
@@ -419,6 +537,15 @@ impl NodeRpcClient for GrpcClient {
             }
             // FIXME: Is this correct?
             let seed = None;
+
+            for (index, s) in slots.clone().into_iter().enumerate() {
+                console::log_1(&JsValue::from_str(&format!(
+                    "INDEX --> {:?}, SLOT --> {:?}",
+                    index,
+                    s.id()
+                )));
+            }
+
             let account = Account::new(
                 account_id,
                 // FIXME: Remove unwraps
@@ -695,17 +822,46 @@ impl NodeRpcClient for GrpcClient {
         });
 
         let request = proto::rpc::SyncStorageMapsRequest {
-            block_range,
-            account_id: Some(account_id.into()),
+            block_range: block_range.clone(),
+            account_id: Some(account_id.clone().into()),
         };
 
         let mut rpc_api = self.ensure_connected().await?;
 
-        let response = rpc_api.sync_storage_maps(request).await.map_err(|status| {
-            RpcError::from_grpc_error(NodeRpcClientEndpoint::SyncStorageMaps, status)
-        })?;
+        let response = rpc_api
+            .sync_storage_maps(request)
+            .await
+            .map_err(|status| {
+                RpcError::from_grpc_error(NodeRpcClientEndpoint::SyncStorageMaps, status)
+            })?
+            .into_inner();
 
-        response.into_inner().try_into()
+        let mut map_info: StorageMapInfo = response.try_into()?;
+
+        let should_fetch_more = (block_to.is_none() && map_info.block_number < map_info.chain_tip)
+            || (block_to.is_some() && block_to.unwrap() > map_info.block_number);
+
+        if should_fetch_more {
+            let block_target = block_to.unwrap_or(map_info.chain_tip);
+            let mut fetched_height = map_info.block_number;
+
+            while map_info.block_number < block_target {
+                // FIXME: Remove unwraps
+                let update: StorageMapInfo = rpc_api
+                    .sync_storage_maps(proto::rpc::SyncStorageMapsRequest {
+                        block_range,
+                        account_id: Some(account_id.clone().try_into().unwrap()),
+                    })
+                    .await
+                    .unwrap()
+                    .into_inner()
+                    .try_into()
+                    .unwrap();
+                map_info.block_number = update.block_number;
+                map_info.updates.extend(update.updates.into_iter());
+            }
+        }
+        return Ok(map_info);
     }
 
     async fn sync_account_vault(
