@@ -171,6 +171,9 @@ where
     /// Executes a transaction specified by the request against the specified account,
     /// proves it, submits it to the network, and updates the local database.
     ///
+    /// Uses the client's default prover (configured via
+    /// [`crate::builder::ClientBuilder::prover`]).
+    ///
     /// If the transaction utilizes foreign account data, there is a chance that the client
     /// doesn't have the required block header in the local database. In these scenarios, a sync to
     /// the chain tip is performed, and the required block header is retrieved.
@@ -179,10 +182,31 @@ where
         account_id: AccountId,
         transaction_request: TransactionRequest,
     ) -> Result<TransactionId, ClientError> {
+        let prover = self.tx_prover.clone();
+        self.submit_new_transaction_with_prover(account_id, transaction_request, prover)
+            .await
+    }
+
+    /// Executes a transaction specified by the request against the specified account,
+    /// proves it with the provided prover, submits it to the network, and updates the local
+    /// database.
+    ///
+    /// This is useful for falling back to a different prover (e.g., local) when the default
+    /// prover (e.g., remote) fails with a [`ClientError::TransactionProvingError`].
+    ///
+    /// If the transaction utilizes foreign account data, there is a chance that the client
+    /// doesn't have the required block header in the local database. In these scenarios, a sync to
+    /// the chain tip is performed, and the required block header is retrieved.
+    pub async fn submit_new_transaction_with_prover(
+        &mut self,
+        account_id: AccountId,
+        transaction_request: TransactionRequest,
+        tx_prover: Arc<dyn TransactionProver>,
+    ) -> Result<TransactionId, ClientError> {
         let tx_result = self.execute_transaction(account_id, transaction_request).await?;
         let tx_id = tx_result.executed_transaction().id();
 
-        let proven_transaction = self.prove_transaction(&tx_result).await?;
+        let proven_transaction = self.prove_transaction_with(&tx_result, tx_prover).await?;
         let submission_height =
             self.submit_proven_transaction(proven_transaction, &tx_result).await?;
 
