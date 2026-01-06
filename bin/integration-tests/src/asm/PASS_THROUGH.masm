@@ -39,14 +39,10 @@ begin
 
     padw mem_loadw_be.8
     # => [tag, aux, note_type, execution_hint, RECIPIENT, ASSET]
-    debug.stack
 
     # create a note using inputs
     exec.output_note::create
-    debug.stack.5
     # => [note_idx, ASSET]
-
-    debug.stack
 
     movdn.4
     # => [ASSET, note_idx, pad(11)]
