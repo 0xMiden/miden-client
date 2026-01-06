@@ -5,6 +5,7 @@ use miden_client::account::component::{
     BasicWallet,
 };
 use miden_client::account::{Account, AccountBuilder, AccountId, AccountStorageMode, AccountType};
+use miden_client::assembly::CodeBuilder;
 use miden_client::asset::{Asset, FungibleAsset};
 use miden_client::auth::TransactionAuthenticator;
 use miden_client::crypto::FeltRng;
@@ -26,7 +27,7 @@ use miden_client::note::{
 use miden_client::store::{InputNoteState, TransactionFilter};
 use miden_client::testing::common::*;
 use miden_client::transaction::{OutputNote, TransactionRequestBuilder};
-use miden_client::{Client, ClientRng, CodeBuilder, Felt, Word};
+use miden_client::{Client, ClientRng, Felt, Word};
 use rand::RngCore;
 
 use crate::tests::config::ClientConfig;
@@ -216,7 +217,7 @@ async fn create_pass_through_account<AUTH: TransactionAuthenticator>(
 fn get_pass_through_note_script() -> NoteScript {
     let note_script_code = include_str!("../asm/PASS_THROUGH.masm");
 
-    CodeBuilder::new(true).compile_note_script(note_script_code).unwrap()
+    CodeBuilder::new().compile_note_script(note_script_code).unwrap()
 }
 
 // Creates a note eventually meant for the target account.
