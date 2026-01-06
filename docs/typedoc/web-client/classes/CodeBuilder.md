@@ -45,6 +45,25 @@ previous example: `use miden::my_contract'.
 
 ***
 
+### compileAccountComponentCode()
+
+> **compileAccountComponentCode**(`account_code`): [`AccountComponentCode`](AccountComponentCode.md)
+
+Given an `AccountComponentCode`, compiles it
+with the available modules under this builder. Returns the compiled account component code.
+
+#### Parameters
+
+##### account\_code
+
+`string`
+
+#### Returns
+
+[`AccountComponentCode`](AccountComponentCode.md)
+
+***
+
 ### compileNoteScript()
 
 > **compileNoteScript**(`program`): [`NoteScript`](NoteScript.md)

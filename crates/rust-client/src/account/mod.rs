@@ -42,6 +42,7 @@ pub use miden_protocol::account::{
     AccountBuilder,
     AccountCode,
     AccountComponent,
+    AccountComponentCode,
     AccountDelta,
     AccountFile,
     AccountHeader,

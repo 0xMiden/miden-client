@@ -166,6 +166,7 @@ pub mod assembly {
     pub use miden_protocol::assembly::debuginfo::SourceManagerSync;
     pub use miden_protocol::assembly::diagnostics::Report;
     pub use miden_protocol::assembly::diagnostics::reporting::PrintDiagnostic;
+    pub use miden_protocol::assembly::mast::MastNodeExt;
     pub use miden_protocol::assembly::{
         Assembler,
         DefaultSourceManager,
@@ -250,6 +251,7 @@ pub mod address {
         Address,
         AddressId,
         AddressInterface,
+        CustomNetworkId,
         NetworkId,
         RoutingParameters,
     };
@@ -266,6 +268,7 @@ pub mod vm {
         Package,
         PackageExport,
         PackageManifest,
+        Program,
         QualifiedProcedureName,
         Section,
         SectionId,
