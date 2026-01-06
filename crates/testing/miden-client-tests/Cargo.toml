@@ -8,8 +8,8 @@ version.workspace      = true
 [dev-dependencies]
 miden-client              = { features = ["std", "testing"], path = "../../rust-client" }
 miden-client-sqlite-store = { path = "../../sqlite-store" }
-miden-lib                 = { features = ["testing"], workspace = true }
-miden-objects             = { default-features = false, features = ["testing"], workspace = true }
+miden-protocol            = { default-features = false, features = ["testing"], workspace = true }
+miden-standards           = { features = ["testing"], workspace = true }
 miden-testing             = { default-features = false, workspace = true }
 rand                      = { workspace = true }
 tokio                     = { workspace = true }

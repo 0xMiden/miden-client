@@ -2,4 +2,3 @@ name = "basic_wallet"
 description = "The basic wallet component exposes methods for receiving and sending assets."
 version = "0.1.0"
 supported-types = ["RegularAccountImmutableCode", "RegularAccountUpdatableCode"]
-storage = []

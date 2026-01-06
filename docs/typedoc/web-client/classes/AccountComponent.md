@@ -84,7 +84,7 @@ Compiles account code with the given storage slots using the provided assembler.
 
 ##### builder
 
-[`ScriptBuilder`](ScriptBuilder.md)
+[`CodeBuilder`](CodeBuilder.md)
 
 ##### storage\_slots
 
@@ -127,6 +127,28 @@ Builds an auth component from a secret key, inferring the auth scheme from the k
 ##### secret\_key
 
 [`AuthSecretKey`](AuthSecretKey.md)
+
+#### Returns
+
+`AccountComponent`
+
+***
+
+### fromLibrary()
+
+> `static` **fromLibrary**(`library`, `storage_slots`): `AccountComponent`
+
+Creates an account component from a compiled library and storage slots.
+
+#### Parameters
+
+##### library
+
+[`Library`](Library.md)
+
+##### storage\_slots
+
+[`StorageSlot`](StorageSlot.md)[]
 
 #### Returns
 

@@ -32,9 +32,15 @@ A single storage slot value or map for an account component.
 
 ### emptyValue()
 
-> `static` **emptyValue**(): `StorageSlot`
+> `static` **emptyValue**(`name`): `StorageSlot`
 
 Returns an empty value slot (zeroed).
+
+#### Parameters
+
+##### name
+
+`string`
 
 #### Returns
 
@@ -44,11 +50,15 @@ Returns an empty value slot (zeroed).
 
 ### fromValue()
 
-> `static` **fromValue**(`value`): `StorageSlot`
+> `static` **fromValue**(`name`, `value`): `StorageSlot`
 
 Creates a storage slot holding a single value.
 
 #### Parameters
+
+##### name
+
+`string`
 
 ##### value
 
@@ -62,11 +72,15 @@ Creates a storage slot holding a single value.
 
 ### map()
 
-> `static` **map**(`storage_map`): `StorageSlot`
+> `static` **map**(`name`, `storage_map`): `StorageSlot`
 
 Creates a storage slot backed by a map.
 
 #### Parameters
+
+##### name
+
+`string`
 
 ##### storage\_map
 

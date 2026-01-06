@@ -3,32 +3,28 @@ description = "Multisig authentication component based on RPO Falcon512 signatur
 version = "0.1.0"
 supported-types = ["RegularAccountUpdatableCode", "RegularAccountImmutableCode", "FungibleFaucet", "NonFungibleFaucet"]
 
-[[storage]]
-name = "threshold_and_count"
+[storage]
+[[storage.slots]]
+name = "miden::standards::auth::rpo_falcon512_multisig::threshold_config"
 description = "Contains default threshold and number of approvers: [threshold, num_approvers, 0, 0]"
-slot = 0
-value = [
+type = [
     { name = "threshold", type = "u32", description = "Default threshold of signatures required" },
     { name = "num_approvers", type = "u32", description = "Number of approvers" },
-    { value = "0" },
-    { value = "0" },
+    { type = "void" },
+    { type = "void" },
 ]
 
-[[storage]]
-name = "approvers"
+[[storage.slots]]
+name = "miden::standards::auth::rpo_falcon512_multisig::approver_public_keys"
 description = "Map with approver public keys (index -> pubkey)"
-slot = 1
-type = "map"
+type = { key = "word", value = "miden::standards::auth::falcon512_rpo::pub_key" }
 
-[[storage]]
-name = "executed_transactions"
+[[storage.slots]]
+name = "miden::standards::auth::rpo_falcon512_multisig::executed_transactions"
 description = "Map which stores executed transactions"
-slot = 2
-type = "map"
-values = []
+type = { key = "word", value = "word" }
 
-[[storage]]
-name = "proc_thresholds"
+[[storage.slots]]
+name = "miden::standards::auth::rpo_falcon512_multisig::procedure_thresholds"
 description = "Map which stores procedure thresholds (PROC_ROOT -> threshold)"
-slot = 3
-type = "map"
+type = { key = "word", value = "u32" }

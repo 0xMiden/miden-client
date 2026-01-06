@@ -2,7 +2,7 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
 use miden_client::Word;
-use miden_client::account::{Account, StorageSlot};
+use miden_client::account::{Account, StorageSlotContent};
 use miden_client::utils::Serializable;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys;
@@ -164,16 +164,14 @@ impl JsAccountUpdate {
     pub fn from_account(account: &Account, account_seed: Option<Word>) -> Self {
         let asset_vault = account.vault();
         Self {
-            storage_root: account.storage().commitment().to_string(),
+            storage_root: account.storage().to_commitment().to_string(),
             storage_slots: account
                 .storage()
                 .slots()
                 .iter()
-                .enumerate()
-                .map(|(index, slot)| JsStorageSlot {
-                    commitment: account.storage().commitment().to_hex(),
-                    slot_index: u8::try_from(index)
-                        .expect("Indexes in account storage should be less than 256"),
+                .map(|slot| JsStorageSlot {
+                    commitment: account.storage().to_commitment().to_hex(),
+                    slot_name: slot.name().to_string(),
                     slot_value: slot.value().to_hex(),
                     slot_type: slot.slot_type().to_bytes()[0],
                 })
@@ -183,7 +181,7 @@ impl JsAccountUpdate {
                 .slots()
                 .iter()
                 .filter_map(|slot| {
-                    if let StorageSlot::Map(map) = slot {
+                    if let StorageSlotContent::Map(map) = slot.content() {
                         Some(JsStorageMapEntry::from_map(map))
                     } else {
                         None

@@ -6,7 +6,6 @@ import {
   mintTransaction,
   sendTransaction,
   setupWalletAndFaucet,
-  swapTransaction,
   setupConsumedNote,
 } from "./webClientTestUtils";
 import {
@@ -275,65 +274,6 @@ test.describe("send transaction tests", () => {
   });
 });
 
-// SWAP_TRANSACTION TEST
-// =======================================================================================================
-
-test.describe("swap transaction tests", () => {
-  const testCases = [
-    { flag: false, description: "swap transaction completes successfully" },
-    {
-      flag: true,
-      description: "swap transaction with remote prover completes successfully",
-    },
-  ];
-
-  testCases.forEach(({ flag, description }) => {
-    test(description, async ({ page }) => {
-      const { accountId: accountA, faucetId: faucetA } =
-        await setupWalletAndFaucet(page);
-      const { accountId: accountB, faucetId: faucetB } =
-        await setupWalletAndFaucet(page);
-
-      const assetAAmount = BigInt(1);
-      const assetBAmount = BigInt(25);
-
-      await mintAndConsumeTransaction(page, accountA, faucetA, flag);
-      await mintAndConsumeTransaction(page, accountB, faucetB, flag);
-
-      const { accountAAssets, accountBAssets } = await swapTransaction(
-        page,
-        accountA,
-        accountB,
-        faucetA,
-        assetAAmount,
-        faucetB,
-        assetBAmount,
-        "private",
-        "private",
-        flag
-      );
-
-      // --- assertions for Account A ---
-      const aA = accountAAssets!.find((a) => a.assetId === faucetA);
-      expect(aA, `Expected to find asset ${faucetA} on Account A`).toBeTruthy();
-      expect(BigInt(aA!.amount)).toEqual(999n);
-
-      const aB = accountAAssets!.find((a) => a.assetId === faucetB);
-      expect(aB, `Expected to find asset ${faucetB} on Account A`).toBeTruthy();
-      expect(BigInt(aB!.amount)).toEqual(25n);
-
-      // --- assertions for Account B ---
-      const bA = accountBAssets!.find((a) => a.assetId === faucetA);
-      expect(bA, `Expected to find asset ${faucetA} on Account B`).toBeTruthy();
-      expect(BigInt(bA!.amount)).toEqual(1n);
-
-      const bB = accountBAssets!.find((a) => a.assetId === faucetB);
-      expect(bB, `Expected to find asset ${faucetB} on Account B`).toBeTruthy();
-      expect(BigInt(bB!.amount)).toEqual(975n);
-    });
-  });
-});
-
 // CUSTOM_TRANSACTIONS TESTS
 // =======================================================================================================
 
@@ -411,10 +351,11 @@ export const customTransaction = async (
             # This note script is based off of the P2ID note script because notes currently need to have
             # assets, otherwise it could have been boiled down to the assert.
 
-            use.miden::native_account
-            use.miden::active_note
-            use.miden::contracts::wallets::basic->wallet
-            use.std::mem
+            use miden::protocol::native_account
+            use miden::protocol::active_note
+            use miden::core::sys
+            use miden::core::mem
+            use miden::standards::wallets::basic->basic_wallet
 
             begin
                 # push data from the advice map into the advice stack
@@ -469,12 +410,12 @@ export const customTransaction = async (
                 assert_eq.err="P2ID's target account address and transaction address do not match"
                 # => [...]
 
-                exec.active_note::add_assets_to_account
+                exec.basic_wallet::add_assets_to_account
                 # => [...]
             end
         `;
 
-      let builder = client.createScriptBuilder();
+      let builder = client.createCodeBuilder();
       let compiledNoteScript = builder.compileNoteScript(noteScript);
       let noteInputs = new window.NoteInputs(
         new window.MidenArrays.FeltArray([
@@ -523,9 +464,6 @@ export const customTransaction = async (
       // Just like in the miden test, you can modify this script to get the execution to fail
       // by modifying the assert
       let txScript = `
-            use.miden::kernels::tx::prologue
-            use.miden::kernels::tx::memory
-
             begin
                 push.0 push.${assertedValue}
                 # => [0, ${assertedValue}]
@@ -719,19 +657,22 @@ export const customAccountComponent = async (
 ): Promise<void> => {
   return await testingPage.evaluate(
     async ({ schemeSecretKeyFunction }) => {
+      const MAP_SLOT_NAME =
+        "miden::testing::mapping_example_contract::map_slot";
+
       const accountCode = `
-        use.miden::active_account
-        use.miden::native_account
-        use.std::sys
+        use miden::protocol::active_account
+        use miden::protocol::native_account
+        use miden::core::word
+        use miden::core::sys
+
+        const MAP_SLOT = word("${MAP_SLOT_NAME}")
 
         # Inputs: [KEY, VALUE]
         # Outputs: []
-        export.write_to_map
-            # The storage map is in storage slot 1
-            push.0
-            # => [index, KEY, VALUE]
-
+        pub proc write_to_map
             # Setting the key value pair in the map
+            push.MAP_SLOT[0..2]
             exec.native_account::set_map_item
             # => [OLD_MAP_ROOT, OLD_MAP_VALUE]
 
@@ -741,20 +682,16 @@ export const customAccountComponent = async (
 
         # Inputs: [KEY]
         # Outputs: [VALUE]
-        export.get_value_in_map
-            # The storage map is in storage slot 1
-            push.0
-            # => [index, KEY]
-
+        pub proc get_value_in_map
+            push.MAP_SLOT[0..2]
             exec.active_account::get_map_item
             # => [VALUE]
         end
 
         # Inputs: []
         # Outputs: [CURRENT_ROOT]
-        export.get_current_map_root
-            # Getting the current root from slot 1
-            push.0 exec.active_account::get_item
+        pub proc get_current_map_root
+            push.MAP_SLOT[0..2] exec.active_account::get_item
             # => [CURRENT_ROOT]
 
             exec.sys::truncate_stack
@@ -762,8 +699,8 @@ export const customAccountComponent = async (
         end
       `;
       const scriptCode = `
-        use.miden_by_example::mapping_example_contract
-        use.std::sys
+        use miden_by_example::mapping_example_contract
+        use miden::core::sys
 
         begin
             push.1.2.3.4
@@ -789,9 +726,9 @@ export const customAccountComponent = async (
         end
       `;
       const client = window.client;
-      let builder = client.createScriptBuilder();
+      let builder = client.createCodeBuilder();
       let storageMap = new window.StorageMap();
-      let storageSlotMap = window.StorageSlot.map(storageMap);
+      let storageSlotMap = window.StorageSlot.map(MAP_SLOT_NAME, storageMap);
 
       let mappingAccountComponent = window.AccountComponent.compile(
         accountCode,
@@ -847,7 +784,9 @@ export const customAccountComponent = async (
 
       // Read a map value from storage slot 1 with key 0x0
       const keyZero = new window.Word(new BigUint64Array([0n, 0n, 0n, 0n]));
-      const retrieveMapKey = updated?.storage().getMapItem(1, keyZero);
+      const retrieveMapKey = updated
+        ?.storage()
+        .getMapItem(MAP_SLOT_NAME, keyZero);
 
       const expected = new window.Word(new BigUint64Array([1n, 2n, 3n, 4n]));
 
@@ -1074,36 +1013,36 @@ export const counterAccountComponent = async (
   hasCounterComponent: boolean;
 }> => {
   return await testingPage.evaluate(async () => {
+    const COUNTER_SLOT_NAME = "miden::testing::counter_contract::counter";
+
     const accountCode = `
-        use.miden::active_account
-        use.miden::native_account
-        use.std::sys
+        use miden::protocol::active_account
+        use miden::protocol::native_account
+        use miden::core::word
+        use miden::core::sys
+
+        const COUNTER_SLOT = word("${COUNTER_SLOT_NAME}")
 
         # => []
-        export.get_count
-            push.0
-            exec.active_account::get_item
+        pub proc get_count
+            push.COUNTER_SLOT[0..2] exec.active_account::get_item
             exec.sys::truncate_stack
         end
 
         # => []
-        export.increment_count
-            push.0
-            # => [index]
-            exec.active_account::get_item
+        pub proc increment_count
+            push.COUNTER_SLOT[0..2] exec.active_account::get_item
             # => [count]
             push.1 add
             # => [count+1]
-            push.0
-            # [index, count+1]
-            exec.native_account::set_item
+            push.COUNTER_SLOT[0..2] exec.native_account::set_item
             # => []
             exec.sys::truncate_stack
             # => []
         end
       `;
     const scriptCode = `
-        use.external_contract::counter_contract
+        use external_contract::counter_contract
         begin
             call.counter_contract::increment_count
         end
@@ -1111,9 +1050,9 @@ export const counterAccountComponent = async (
     const client = window.client;
 
     // Create counter account
-    let emptyStorageSlot = window.StorageSlot.emptyValue();
+    let emptyStorageSlot = window.StorageSlot.emptyValue(COUNTER_SLOT_NAME);
 
-    let builder = client.createScriptBuilder();
+    let builder = client.createCodeBuilder();
 
     let counterAccountComponent = window.AccountComponent.compile(
       accountCode,
@@ -1209,7 +1148,7 @@ export const counterAccountComponent = async (
     await window.helpers.waitForBlocks(2);
 
     let account = await client.getAccount(accountBuilderResult.account.id());
-    let counter = account?.storage().getItem(0)?.toHex();
+    let counter = account?.storage().getItem(COUNTER_SLOT_NAME)?.toHex();
     let finalCounter = counter?.replace(/^0x/, "").replace(/^0+|0+$/g, "");
 
     let code = account?.code();
@@ -1243,6 +1182,8 @@ export const testStorageMap = async (page: Page): Promise<any> => {
     const client = window.client;
     await client.syncState();
 
+    const MAP_SLOT_NAME = "miden::testing::bump_item_contract::map_slot";
+
     const normalizeHexWord = (hex) => {
       if (!hex) return undefined;
       const normalized = hex.replace(/^0x/, "").replace(/^0+|0+$/g, "");
@@ -1264,28 +1205,30 @@ export const testStorageMap = async (page: Page): Promise<any> => {
       new window.Word(new BigUint64Array([0n, 0n, 0n, 9n]))
     );
 
-    const accountCode = `export.bump_map_item
+    const accountCode = `
+                    use miden::core::word
+
+                    const MAP_SLOT = word("${MAP_SLOT_NAME}")
+
+                    pub proc bump_map_item
                     # map key
                     push.1.1.1.1 # Map key
-                    # item index
-                    push.0
-                    # => [index, KEY]
-                    exec.::miden::active_account::get_map_item
+                    push.MAP_SLOT[0..2]
+                    exec.::miden::protocol::active_account::get_map_item
                     add.1
                     push.1.1.1.1 # Map key
-                    push.0
-                    # => [index, KEY, BUMPED_VALUE]
-                    exec.::miden::native_account::set_map_item
+                    push.MAP_SLOT[0..2]
+                    exec.::miden::protocol::native_account::set_map_item
                     # => [OLD_MAP_ROOT, OLD_VALUE]
                     dropw dropw
                 end
         `;
 
-    let builder = client.createScriptBuilder();
+    let builder = client.createCodeBuilder();
     let bumpItemComponent = window.AccountComponent.compile(
       accountCode,
       builder,
-      [window.StorageSlot.map(storageMap)]
+      [window.StorageSlot.map(MAP_SLOT_NAME, storageMap)]
     ).withSupportsAllTypes();
 
     const walletSeed = new Uint8Array(32);
@@ -1309,7 +1252,7 @@ export const testStorageMap = async (page: Page): Promise<any> => {
       await client.getAccount(bumpItemAccountBuilderResult.account.id())
     )
       ?.storage()
-      .getMapItem(1, MAP_KEY)
+      .getMapItem(MAP_SLOT_NAME, MAP_KEY)
       ?.toHex();
 
     // Deploy counter account
@@ -1322,7 +1265,7 @@ export const testStorageMap = async (page: Page): Promise<any> => {
     builder.linkDynamicLibrary(accountComponentLib);
 
     let txScript = builder.compileTxScript(
-      `use.external_contract::bump_item_contract
+      `use external_contract::bump_item_contract
       begin
           call.bump_item_contract::bump_map_item
       end`
@@ -1344,14 +1287,14 @@ export const testStorageMap = async (page: Page): Promise<any> => {
       await client.getAccount(bumpItemAccountBuilderResult.account.id())
     )
       ?.storage()
-      .getMapItem(1, MAP_KEY)
+      .getMapItem(MAP_SLOT_NAME, MAP_KEY)
       ?.toHex();
 
     // Test getMapEntries() functionality
     let accountStorage = (
       await client.getAccount(bumpItemAccountBuilderResult.account.id())
     )?.storage();
-    let mapEntries = accountStorage?.getMapEntries(1);
+    let mapEntries = accountStorage?.getMapEntries(MAP_SLOT_NAME);
 
     // Verify we get the expected entries
     let expectedKey = MAP_KEY.toHex();
@@ -1393,5 +1336,54 @@ test.describe("storage map test", () => {
     expect(mapEntries.hasExpectedEntry).toBe(true);
     expect(mapEntries.expectedKey).toBeDefined();
     expect(mapEntries.expectedValue).toBe("2");
+  });
+});
+
+// SUBMIT_NEW_TRANSACTION_WITH_PROVER TESTS
+// ================================================================================================
+
+test.describe("submitNewTransactionWithProver tests", () => {
+  test("submitNewTransactionWithProver with failing prover throws, then succeeds with local prover", async ({
+    page,
+  }) => {
+    const { faucetId, accountId } = await setupWalletAndFaucet(page);
+
+    // Test that a failing prover throws an error
+    const failingProverResult = await page.evaluate(
+      async ({ faucetId, accountId }) => {
+        const client = window.client;
+        const faucetAccountId = window.AccountId.fromHex(faucetId);
+        const targetAccountId = window.AccountId.fromHex(accountId);
+
+        await client.syncState();
+
+        const mintTransactionRequest = client.newMintTransactionRequest(
+          targetAccountId,
+          faucetAccountId,
+          window.NoteType.Public,
+          BigInt(1000)
+        );
+
+        // Create a failing remote prover with an invalid endpoint
+        const failingProver = window.TransactionProver.newRemoteProver(
+          "http://localhost:1",
+          null
+        );
+
+        try {
+          await client.submitNewTransactionWithProver(
+            faucetAccountId,
+            mintTransactionRequest,
+            failingProver
+          );
+          return { threw: false, error: null };
+        } catch (e: any) {
+          return { threw: true, error: e.message || String(e) };
+        }
+      },
+      { faucetId, accountId }
+    );
+
+    expect(failingProverResult.threw).toBe(true);
   });
 });

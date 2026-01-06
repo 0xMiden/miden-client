@@ -3,13 +3,15 @@ use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
-use miden_objects::Word;
-use miden_objects::account::{AccountCode, AccountId, StorageSlot};
-use miden_objects::address::NetworkId;
-use miden_objects::block::{BlockHeader, BlockNumber, ProvenBlock};
-use miden_objects::crypto::merkle::{Forest, Mmr, MmrProof, SmtProof};
-use miden_objects::note::{NoteHeader, NoteId, NoteScript, NoteTag, Nullifier};
-use miden_objects::transaction::{ProvenTransaction, TransactionInputs};
+use miden_protocol::Word;
+use miden_protocol::account::delta::AccountUpdateDetails;
+use miden_protocol::account::{AccountCode, AccountId, StorageSlot, StorageSlotContent};
+use miden_protocol::address::NetworkId;
+use miden_protocol::block::{BlockHeader, BlockNumber, ProvenBlock};
+use miden_protocol::crypto::merkle::mmr::{Forest, Mmr, MmrProof};
+use miden_protocol::crypto::merkle::smt::SmtProof;
+use miden_protocol::note::{NoteHeader, NoteId, NoteScript, NoteTag, Nullifier};
+use miden_protocol::transaction::{ProvenTransaction, TransactionInputs};
 use miden_testing::{MockChain, MockChainNote};
 use miden_tx::utils::sync::RwLock;
 
@@ -213,9 +215,7 @@ impl MockRpcApi {
                 .iter()
                 .filter(|block_acc_update| block_acc_update.account_id() == account_id)
             {
-                let miden_objects::account::delta::AccountUpdateDetails::Delta(account_delta) =
-                    update.details().clone()
-                else {
+                let AccountUpdateDetails::Delta(account_delta) = update.details().clone() else {
                     continue;
                 };
 
@@ -302,21 +302,17 @@ impl MockRpcApi {
                 .iter()
                 .filter(|block_acc_update| block_acc_update.account_id() == account_id)
             {
-                let miden_objects::account::delta::AccountUpdateDetails::Delta(account_delta) =
-                    update.details().clone()
-                else {
+                let AccountUpdateDetails::Delta(account_delta) = update.details().clone() else {
                     continue;
                 };
 
                 let storage_delta = account_delta.storage();
 
-                for (slot_index, map_delta) in storage_delta.maps() {
-                    let slot_index = u32::from(*slot_index);
-
+                for (slot_name, map_delta) in storage_delta.maps() {
                     for (key, value) in map_delta.entries() {
                         let storage_map_info = StorageMapUpdate {
                             block_num: block_number,
-                            slot_index: u8::try_from(slot_index).unwrap(),
+                            slot_name: slot_name.clone(),
                             key: (*key).into(),
                             value: *value,
                         };
@@ -559,9 +555,9 @@ impl NodeRpcClient for MockRpcApi {
                 let account = mock_chain.committed_account(*account_id).unwrap();
 
                 let mut map_details = vec![];
-                for index in account_storage_requirements.inner().keys() {
-                    if let Some(StorageSlot::Map(storage_map)) =
-                        account.storage().slots().get(*index as usize)
+                for slot_name in account_storage_requirements.inner().keys() {
+                    if let Some(StorageSlotContent::Map(storage_map)) =
+                        account.storage().get(slot_name).map(StorageSlot::content)
                     {
                         let entries = storage_map
                             .entries()
@@ -570,14 +566,14 @@ impl NodeRpcClient for MockRpcApi {
 
                         let too_many_entries = entries.len() > 1000;
                         let account_storage_map_detail = AccountStorageMapDetails {
-                            slot_index: u32::from(*index),
+                            slot_name: slot_name.clone(),
                             too_many_entries,
                             entries,
                         };
 
                         map_details.push(account_storage_map_detail);
                     } else {
-                        panic!("Storage slot at index {} is not a map", index);
+                        panic!("Storage slot {slot_name} is not a map");
                     }
                 }
 

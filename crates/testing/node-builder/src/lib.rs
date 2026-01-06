@@ -10,9 +10,6 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use ::rand::{Rng, random};
 use anyhow::{Context, Result};
-use miden_lib::AuthScheme;
-use miden_lib::account::faucets::create_basic_fungible_faucet;
-use miden_lib::utils::Serializable;
 use miden_node_block_producer::{
     BlockProducer,
     DEFAULT_MAX_BATCHES_PER_BLOCK,
@@ -24,12 +21,16 @@ use miden_node_rpc::Rpc;
 use miden_node_store::{GenesisState, Store};
 use miden_node_utils::crypto::get_rpo_random_coin;
 use miden_node_validator::Validator;
-use miden_objects::account::auth::AuthSecretKey;
-use miden_objects::account::{Account, AccountFile};
-use miden_objects::asset::TokenSymbol;
-use miden_objects::block::FeeParameters;
-use miden_objects::testing::account_id::ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET;
-use miden_objects::{Felt, ONE};
+use miden_protocol::account::auth::AuthSecretKey;
+use miden_protocol::account::{Account, AccountFile};
+use miden_protocol::asset::TokenSymbol;
+use miden_protocol::block::FeeParameters;
+use miden_protocol::crypto::dsa::ecdsa_k256_keccak;
+use miden_protocol::testing::account_id::ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET;
+use miden_protocol::utils::Serializable;
+use miden_protocol::{Felt, ONE};
+use miden_standards::AuthScheme;
+use miden_standards::account::faucets::create_basic_fungible_faucet;
 use rand_chacha::ChaCha20Rng;
 use rand_chacha::rand_core::SeedableRng;
 use tokio::net::TcpListener;
@@ -115,12 +116,15 @@ impl NodeBuilder {
             .as_secs()
             .try_into()
             .expect("timestamp should fit into u32");
+        let validator_signer = ecdsa_k256_keccak::SecretKey::new();
+
         let genesis_state = GenesisState::new(
             vec![account_file.account],
             FeeParameters::new(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET.try_into().unwrap(), 0u32)
                 .unwrap(),
             version,
             timestamp,
+            validator_signer.clone(),
         );
 
         // Bootstrap the store database
@@ -195,6 +199,7 @@ impl NodeBuilder {
                     Validator {
                         address: validator_address,
                         grpc_timeout: DEFAULT_TIMEOUT_DURATION,
+                        signer: validator_signer,
                     }
                     .serve()
                     .await
@@ -211,11 +216,14 @@ impl NodeBuilder {
                     Url::parse(&format!("http://{block_producer_address}"))
                         .context("Failed to parse URL")?,
                 );
+                let validator_url = Url::parse(&format!("http://{validator_address}"))
+                    .context("Failed to parse URL")?;
 
                 Rpc {
                     listener: grpc_rpc,
                     store_url,
                     block_producer_url,
+                    validator_url,
                     grpc_timeout: DEFAULT_TIMEOUT_DURATION,
                 }
                 .serve()
@@ -347,7 +355,7 @@ impl NodeBuilder {
                     Duration::from_millis(200),
                     production_checkpoint,
                 )
-                .serve_new()
+                .run()
                 .await
                 .context("failed while serving ntx builder component")
             })
@@ -386,14 +394,14 @@ impl NodeHandle {
 
 fn generate_genesis_account() -> anyhow::Result<AccountFile> {
     let mut rng = ChaCha20Rng::from_seed(random());
-    let secret = AuthSecretKey::new_rpo_falcon512_with_rng(&mut get_rpo_random_coin(&mut rng));
+    let secret = AuthSecretKey::new_falcon512_rpo_with_rng(&mut get_rpo_random_coin(&mut rng));
 
     let account = create_basic_fungible_faucet(
         rng.random(),
         TokenSymbol::try_from("TST").expect("TST should be a valid token symbol"),
         12,
         Felt::from(1_000_000u32),
-        miden_objects::account::AccountStorageMode::Public,
+        miden_protocol::account::AccountStorageMode::Public,
         AuthScheme::RpoFalcon512 {
             pub_key: secret.public_key().to_commitment(),
         },

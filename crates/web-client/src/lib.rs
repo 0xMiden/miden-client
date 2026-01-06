@@ -20,7 +20,7 @@ use miden_client::{
     MAX_TX_EXECUTION_CYCLES,
     MIN_TX_EXECUTION_CYCLES,
 };
-use models::script_builder::ScriptBuilder;
+use models::script_builder::CodeBuilder;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use wasm_bindgen::prelude::*;
@@ -209,14 +209,12 @@ impl WebClient {
         Ok(())
     }
 
-    #[wasm_bindgen(js_name = "createScriptBuilder")]
-    pub fn create_script_builder(&self) -> Result<ScriptBuilder, JsValue> {
+    #[wasm_bindgen(js_name = "createCodeBuilder")]
+    pub fn create_code_builder(&self) -> Result<CodeBuilder, JsValue> {
         let Some(client) = &self.inner else {
-            return Err("client was not initialized before instancing ScriptBuilder".into());
+            return Err("client was not initialized before instancing CodeBuilder".into());
         };
-        Ok(ScriptBuilder::from_source_manager(
-            client.script_builder().source_manager().clone(),
-        ))
+        Ok(CodeBuilder::from_source_manager(client.code_builder().source_manager().clone()))
     }
 }
 

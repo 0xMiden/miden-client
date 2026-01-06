@@ -28,6 +28,7 @@ use miden_client::account::{
     AccountIdPrefix,
     AccountStorage,
     Address,
+    StorageSlotName,
 };
 use miden_client::asset::{Asset, AssetVault, AssetWitness};
 use miden_client::block::BlockHeader;
@@ -48,7 +49,7 @@ use miden_client::store::{
 };
 use miden_client::sync::{NoteTagRecord, StateSyncUpdate};
 use miden_client::transaction::{TransactionRecord, TransactionStoreUpdate};
-use miden_objects::account::StorageMapWitness;
+use miden_protocol::account::StorageMapWitness;
 use rusqlite::Connection;
 use rusqlite::types::Value;
 use sql_error::SqlResultExt;
@@ -433,13 +434,13 @@ impl Store for SqliteStore {
     async fn get_account_map_item(
         &self,
         account_id: AccountId,
-        index: u8,
+        slot_name: StorageSlotName,
         key: Word,
     ) -> Result<(Word, StorageMapWitness), StoreError> {
         let merkle_store = self.merkle_store.clone();
 
         self.interact_with_connection(move |conn| {
-            SqliteStore::get_account_map_item(conn, &merkle_store, account_id, index, key)
+            SqliteStore::get_account_map_item(conn, &merkle_store, account_id, slot_name, key)
         })
         .await
     }

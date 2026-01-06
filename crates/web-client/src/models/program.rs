@@ -1,4 +1,4 @@
-use miden_core::Program as NativeProgram;
+use miden_protocol::vm::Program as NativeProgram;
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]

@@ -98,7 +98,7 @@ export {
   PublicKey,
   RpcClient,
   Rpo256,
-  ScriptBuilder,
+  CodeBuilder,
   SecretKey,
   SerializedInputNoteData,
   SerializedOutputNoteData,

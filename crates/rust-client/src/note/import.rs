@@ -12,8 +12,8 @@ use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::string::ToString;
 use alloc::vec::Vec;
 
-use miden_objects::block::BlockNumber;
-use miden_objects::note::{
+use miden_protocol::block::BlockNumber;
+use miden_protocol::note::{
     Note,
     NoteDetails,
     NoteFile,

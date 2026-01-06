@@ -2,8 +2,22 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
-use miden_client::account::{Account, AccountId, AccountStorageMode, StorageMap, StorageSlot};
-use miden_client::assembly::{DefaultSourceManager, LibraryPath, Module, ModuleKind};
+use miden_client::account::{
+    Account,
+    AccountId,
+    AccountStorageMode,
+    StorageMap,
+    StorageSlot,
+    StorageSlotName,
+};
+use miden_client::assembly::{
+    CodeBuilder,
+    DefaultSourceManager,
+    MastForest,
+    Module,
+    ModuleKind,
+    Path,
+};
 use miden_client::asset::{Asset, FungibleAsset};
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
 use miden_client::builder::ClientBuilder;
@@ -29,7 +43,7 @@ use miden_client::transaction::{
     TransactionRequestBuilder,
     TransactionStatus,
 };
-use miden_client::{ClientError, Felt, ScriptBuilder};
+use miden_client::{ClientError, Deserializable, Felt, Serializable};
 use miden_client_sqlite_store::ClientBuilderSqliteExt;
 
 use crate::tests::config::ClientConfig;
@@ -39,7 +53,7 @@ pub async fn test_client_builder_initializes_client_with_endpoint(
 ) -> Result<()> {
     let (endpoint, _, store_config, auth_path) = client_config.as_parts();
 
-    let mut client = ClientBuilder::<FilesystemKeyStore<_>>::new()
+    let mut client = ClientBuilder::<FilesystemKeyStore>::new()
         .grpc_client(&endpoint, Some(10_000))
         .filesystem_keystore(auth_path.to_str().context("failed to convert auth path to string")?)
         .sqlite_store(store_config)
@@ -1317,20 +1331,22 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
     wait_for_tx(&mut client, tx_id).await?;
 
     // Define the account code for the custom library
-    let custom_code = "
-        use.miden::native_account
+    let custom_code = r#"
+        use miden::protocol::native_account
+        use miden::core::word
 
-        export.update_map
+        const MAP_SLOT = word("miden::testing::client::map")
+
+        pub proc update_map
             push.1.2.3.4
             # => [VALUE]
             push.0.0.0.0
             # => [KEY, VALUE]
-            push.0
-            # => [index, KEY, VALUE]
+            push.MAP_SLOT[0..2]
             exec.native_account::set_map_item
             dropw dropw dropw dropw
         end
-    ";
+    "#;
 
     let mut storage_map = StorageMap::new();
     storage_map.insert(
@@ -1338,7 +1354,9 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
         [Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(1)].into(),
     )?;
 
-    let storage_slots = vec![StorageSlot::Map(storage_map)];
+    let map_slot_name =
+        StorageSlotName::new("miden::testing::client::map").expect("slot name should be valid");
+    let storage_slots = vec![StorageSlot::with_map(map_slot_name, storage_map)];
     let (account_with_map_item, _) = insert_account_with_custom_component(
         &mut client,
         custom_code,
@@ -1353,20 +1371,15 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
     let assembler = TransactionKernel::assembler();
     let source_manager = Arc::new(DefaultSourceManager::default());
     let module = Module::parser(ModuleKind::Library)
-        .parse_str(
-            LibraryPath::new("custom_library::set_map_item_library")
-                .context("failed to create library path for custom library")?,
-            custom_code,
-            &source_manager,
-        )
+        .parse_str(Path::new("custom_library::set_map_item_library"), custom_code, source_manager)
         .unwrap();
     let custom_lib = assembler.assemble_library([module]).unwrap();
 
-    let tx_script = ScriptBuilder::new(true)
+    let tx_script = CodeBuilder::new()
         .with_statically_linked_library(&custom_lib)?
         .compile_tx_script(
             "
-        use.custom_library::set_map_item_library
+        use custom_library::set_map_item_library
 
         begin
              call.set_map_item_library::update_map
@@ -1438,9 +1451,13 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
         .unwrap();
 
     // Remove debug decorators from original note script, as they are not persisted on submission
-    // https://github.com/0xMiden/miden-base/issues/1812
+    // (https://github.com/0xMiden/miden-base/issues/1812)
     let mut mast = (*note.script().mast()).clone();
     mast.strip_decorators();
+
+    // normalize CSR storage to match deserialized form
+    let mast_bytes = mast.to_bytes();
+    let mast = MastForest::read_from_bytes(&mast_bytes)?;
     let note_script = NoteScript::from_parts(Arc::new(mast), note.script().entrypoint());
 
     assert_eq!(node_nullifier.nullifier, nullifier);

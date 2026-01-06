@@ -13,7 +13,6 @@ use miden_client::note_transport::grpc::GrpcNoteTransportClient;
 use miden_client::store::{NoteFilter as ClientNoteFilter, OutputNoteRecord};
 use miden_client::{Client, ClientError, DebugMode, IdPrefixFetchError};
 use miden_client_sqlite_store::ClientBuilderSqliteExt;
-use rand::rngs::StdRng;
 mod commands;
 use commands::account::AccountCmd;
 use commands::clear_config::ClearConfigCmd;
@@ -30,8 +29,6 @@ use commands::transactions::TransactionCmd;
 
 use self::utils::{config_file_exists, load_config_file};
 use crate::commands::address::AddressCmd;
-
-pub type CliKeyStore = FilesystemKeyStore<StdRng>;
 
 mod config;
 mod errors;
@@ -186,7 +183,7 @@ impl Cli {
         // Create the client
         let (cli_config, _config_path) = load_config_file()?;
 
-        let keystore = CliKeyStore::new(cli_config.secret_keys_directory.clone())
+        let keystore = FilesystemKeyStore::new(cli_config.secret_keys_directory.clone())
             .map_err(CliError::KeyStore)?;
 
         let mut builder = ClientBuilder::new()
