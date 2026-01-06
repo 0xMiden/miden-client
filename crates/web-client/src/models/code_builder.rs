@@ -1,13 +1,13 @@
 use alloc::sync::Arc;
 
-use miden_client::CodeBuilder as NativeCodeBuilder;
 use miden_client::account::component::AccountComponentCode as NativeAccountComponentCode;
 use miden_client::assembly::{
     Assembler,
+    CodeBuilder as NativeCodeBuilder,
     Library as NativeLibrary,
-    LibraryPath,
     Module,
     ModuleKind,
+    Path,
     PrintDiagnostic,
     Report,
     SourceManagerSync,
@@ -111,16 +111,17 @@ impl CodeBuilder {
     /// Given a Library Path, and a source code, turn it into a Library.
     /// E.g. A path library can be `miden::my_contract`. When turned into a library,
     /// this can be used from another script with an import statement, following the
-    /// previous example: `use.miden::my_contract'.
+    /// previous example: `use miden::my_contract'.
     #[wasm_bindgen(js_name = "buildLibrary")]
     pub fn build_library(&self, library_path: &str, source_code: &str) -> Result<Library, JsValue> {
-        let library_path = LibraryPath::new(library_path).map_err(|e| {
+        let library_path = Path::validate(library_path).map_err(|e| {
             js_error_with_context(
-                e, "script builder: failed to build library -- could not create library_path with path {library_path}",
+                e,
+                &format!("script builder: failed to build library -- invalid path {library_path}"),
             )
         })?;
         let module = Module::parser(ModuleKind::Library)
-            .parse_str(library_path, source_code, self.builder.source_manager().as_ref())
+            .parse_str(library_path, source_code, self.builder.source_manager())
             .map_err(|e| {
                 let err_msg = format_assembler_error(&e, "error while parsing module");
                 JsValue::from(err_msg)

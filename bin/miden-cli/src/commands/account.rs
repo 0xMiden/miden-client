@@ -1,6 +1,12 @@
 use clap::Parser;
 use comfy_table::{Cell, ContentArrangement, presets};
-use miden_client::account::{Account, AccountId, AccountType, StorageSlotContent};
+use miden_client::account::{
+    Account,
+    AccountId,
+    AccountInterfaceExt,
+    AccountType,
+    StorageSlotContent,
+};
 use miden_client::address::{Address, AddressInterface, RoutingParameters};
 use miden_client::asset::Asset;
 use miden_client::rpc::{GrpcClient, NodeRpcClient};
@@ -316,7 +322,7 @@ async fn account_bech_32<AUTH>(
     let account_record = client.try_get_account(account_id).await?;
     let account: Account =
         account_record.try_into().map_err(|_| CliError::InvalidAccount(account_id))?;
-    let account_interface: AccountInterface = (&account).into();
+    let account_interface = AccountInterface::from_account(&account);
 
     let mut address = Address::new(account_id);
     if account_interface

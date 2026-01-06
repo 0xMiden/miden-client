@@ -543,6 +543,27 @@ pub struct TransactionRecord {
     #[prost(message, optional, tag = "2")]
     pub header: ::core::option::Option<super::transaction::TransactionHeader>,
 }
+/// Represents the query parameter limits for RPC endpoints.
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct RpcLimits {
+    /// Maps RPC endpoint names to their parameter limits.
+    /// Key: endpoint name (e.g., "CheckNullifiers", "SyncState")
+    /// Value: map of parameter names to their limit values
+    #[prost(map = "string, message", tag = "1")]
+    pub endpoints: ::std::collections::HashMap<
+        ::prost::alloc::string::String,
+        EndpointLimits,
+    >,
+}
+/// Represents the parameter limits for a single endpoint.
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct EndpointLimits {
+    /// Maps parameter names to their limit values.
+    /// Key: parameter name (e.g., "nullifier", "account_id")
+    /// Value: limit value
+    #[prost(map = "string, uint32", tag = "1")]
+    pub parameters: ::std::collections::HashMap<::prost::alloc::string::String, u32>,
+}
 /// Generated client implementations.
 pub mod api_client {
     #![allow(
@@ -1047,6 +1068,29 @@ pub mod api_client {
             let path = http::uri::PathAndQuery::from_static("/rpc.Api/SyncTransactions");
             let mut req = request.into_request();
             req.extensions_mut().insert(GrpcMethod::new("rpc.Api", "SyncTransactions"));
+            self.inner.unary(req, path, codec).await
+        }
+        /// Returns the query parameter limits configured for RPC methods.
+        ///
+        /// These define the maximum number of each parameter a method will accept.
+        /// Exceeding the limit will result in the request being rejected and you should instead send
+        /// multiple smaller requests.
+        pub async fn get_limits(
+            &mut self,
+            request: impl tonic::IntoRequest<()>,
+        ) -> std::result::Result<tonic::Response<super::RpcLimits>, tonic::Status> {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic_prost::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static("/rpc.Api/GetLimits");
+            let mut req = request.into_request();
+            req.extensions_mut().insert(GrpcMethod::new("rpc.Api", "GetLimits"));
             self.inner.unary(req, path, codec).await
         }
     }

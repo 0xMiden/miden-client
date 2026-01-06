@@ -126,8 +126,8 @@ jobs:
     needs: [ build-web-client-dist-folder ]
     strategy:
       matrix:
-        shard_index: [1, 2, 3, 4]
-        shard_total: [4]
+        shard_index: [1, 2, 3, 4, 5, 6]
+        shard_total: [6]
     steps:
       - uses: actions/checkout@main
       - name: Install Rust

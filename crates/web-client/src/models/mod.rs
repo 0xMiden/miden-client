@@ -107,6 +107,9 @@ pub mod transaction_store_update;
 pub mod transaction_summary;
 pub mod word;
 
+pub use crate::models::note_tag::NoteTag;
+pub use crate::models::note_type::NoteType;
+
 declare_js_miden_arrays! {
     (crate::models::account::Account) -> AccountArray,
     (crate::models::account_id::AccountId) -> AccountIdArray,

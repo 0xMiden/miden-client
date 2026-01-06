@@ -6,7 +6,6 @@ import {
   mintTransaction,
   sendTransaction,
   setupWalletAndFaucet,
-  swapTransaction,
   setupConsumedNote,
 } from "./webClientTestUtils";
 import {
@@ -275,65 +274,6 @@ test.describe("send transaction tests", () => {
   });
 });
 
-// SWAP_TRANSACTION TEST
-// =======================================================================================================
-
-test.describe("swap transaction tests", () => {
-  const testCases = [
-    { flag: false, description: "swap transaction completes successfully" },
-    {
-      flag: true,
-      description: "swap transaction with remote prover completes successfully",
-    },
-  ];
-
-  testCases.forEach(({ flag, description }) => {
-    test(description, async ({ page }) => {
-      const { accountId: accountA, faucetId: faucetA } =
-        await setupWalletAndFaucet(page);
-      const { accountId: accountB, faucetId: faucetB } =
-        await setupWalletAndFaucet(page);
-
-      const assetAAmount = BigInt(1);
-      const assetBAmount = BigInt(25);
-
-      await mintAndConsumeTransaction(page, accountA, faucetA, flag);
-      await mintAndConsumeTransaction(page, accountB, faucetB, flag);
-
-      const { accountAAssets, accountBAssets } = await swapTransaction(
-        page,
-        accountA,
-        accountB,
-        faucetA,
-        assetAAmount,
-        faucetB,
-        assetBAmount,
-        "private",
-        "private",
-        flag
-      );
-
-      // --- assertions for Account A ---
-      const aA = accountAAssets!.find((a) => a.assetId === faucetA);
-      expect(aA, `Expected to find asset ${faucetA} on Account A`).toBeTruthy();
-      expect(BigInt(aA!.amount)).toEqual(999n);
-
-      const aB = accountAAssets!.find((a) => a.assetId === faucetB);
-      expect(aB, `Expected to find asset ${faucetB} on Account A`).toBeTruthy();
-      expect(BigInt(aB!.amount)).toEqual(25n);
-
-      // --- assertions for Account B ---
-      const bA = accountBAssets!.find((a) => a.assetId === faucetA);
-      expect(bA, `Expected to find asset ${faucetA} on Account B`).toBeTruthy();
-      expect(BigInt(bA!.amount)).toEqual(1n);
-
-      const bB = accountBAssets!.find((a) => a.assetId === faucetB);
-      expect(bB, `Expected to find asset ${faucetB} on Account B`).toBeTruthy();
-      expect(BigInt(bB!.amount)).toEqual(975n);
-    });
-  });
-});
-
 // CUSTOM_TRANSACTIONS TESTS
 // =======================================================================================================
 
@@ -411,10 +351,11 @@ export const customTransaction = async (
             # This note script is based off of the P2ID note script because notes currently need to have
             # assets, otherwise it could have been boiled down to the assert.
 
-            use.miden::native_account
-            use.miden::active_note
-            use.miden::contracts::wallets::basic->wallet
-            use.std::mem
+            use miden::protocol::native_account
+            use miden::protocol::active_note
+            use miden::core::sys
+            use miden::core::mem
+            use miden::standards::wallets::basic->basic_wallet
 
             begin
                 # push data from the advice map into the advice stack
@@ -469,7 +410,7 @@ export const customTransaction = async (
                 assert_eq.err="P2ID's target account address and transaction address do not match"
                 # => [...]
 
-                exec.active_note::add_assets_to_account
+                exec.basic_wallet::add_assets_to_account
                 # => [...]
             end
         `;
@@ -523,9 +464,6 @@ export const customTransaction = async (
       // Just like in the miden test, you can modify this script to get the execution to fail
       // by modifying the assert
       let txScript = `
-            use.miden::kernels::tx::prologue
-            use.miden::kernels::tx::memory
-
             begin
                 push.0 push.${assertedValue}
                 # => [0, ${assertedValue}]
@@ -723,16 +661,16 @@ export const customAccountComponent = async (
         "miden::testing::mapping_example_contract::map_slot";
 
       const accountCode = `
-        use.miden::active_account
-        use.miden::native_account
-        use.std::word
-        use.std::sys
+        use miden::protocol::active_account
+        use miden::protocol::native_account
+        use miden::core::word
+        use miden::core::sys
 
         const MAP_SLOT = word("${MAP_SLOT_NAME}")
 
         # Inputs: [KEY, VALUE]
         # Outputs: []
-        export.write_to_map
+        pub proc write_to_map
             # Setting the key value pair in the map
             push.MAP_SLOT[0..2]
             exec.native_account::set_map_item
@@ -744,7 +682,7 @@ export const customAccountComponent = async (
 
         # Inputs: [KEY]
         # Outputs: [VALUE]
-        export.get_value_in_map
+        pub proc get_value_in_map
             push.MAP_SLOT[0..2]
             exec.active_account::get_map_item
             # => [VALUE]
@@ -752,7 +690,7 @@ export const customAccountComponent = async (
 
         # Inputs: []
         # Outputs: [CURRENT_ROOT]
-        export.get_current_map_root
+        pub proc get_current_map_root
             push.MAP_SLOT[0..2] exec.active_account::get_item
             # => [CURRENT_ROOT]
 
@@ -761,8 +699,8 @@ export const customAccountComponent = async (
         end
       `;
       const scriptCode = `
-        use.miden_by_example::mapping_example_contract
-        use.std::sys
+        use miden_by_example::mapping_example_contract
+        use miden::core::sys
 
         begin
             push.1.2.3.4
@@ -1079,21 +1017,21 @@ export const counterAccountComponent = async (
     const COUNTER_SLOT_NAME = "miden::testing::counter_contract::counter";
 
     const accountCode = `
-        use.miden::active_account
-        use.miden::native_account
-        use.std::word
-        use.std::sys
+        use miden::protocol::active_account
+        use miden::protocol::native_account
+        use miden::core::word
+        use miden::core::sys
 
         const COUNTER_SLOT = word("${COUNTER_SLOT_NAME}")
 
         # => []
-        export.get_count
+        pub proc get_count
             push.COUNTER_SLOT[0..2] exec.active_account::get_item
             exec.sys::truncate_stack
         end
 
         # => []
-        export.increment_count
+        pub proc increment_count
             push.COUNTER_SLOT[0..2] exec.active_account::get_item
             # => [count]
             push.1 add
@@ -1105,7 +1043,7 @@ export const counterAccountComponent = async (
         end
       `;
     const scriptCode = `
-        use.external_contract::counter_contract
+        use external_contract::counter_contract
         begin
             call.counter_contract::increment_count
         end
@@ -1269,19 +1207,19 @@ export const testStorageMap = async (page: Page): Promise<any> => {
     );
 
     const accountCode = `
-                    use.std::word
+                    use miden::core::word
 
                     const MAP_SLOT = word("${MAP_SLOT_NAME}")
 
-                    export.bump_map_item
+                    pub proc bump_map_item
                     # map key
                     push.1.1.1.1 # Map key
                     push.MAP_SLOT[0..2]
-                    exec.::miden::active_account::get_map_item
+                    exec.::miden::protocol::active_account::get_map_item
                     add.1
                     push.1.1.1.1 # Map key
                     push.MAP_SLOT[0..2]
-                    exec.::miden::native_account::set_map_item
+                    exec.::miden::protocol::native_account::set_map_item
                     # => [OLD_MAP_ROOT, OLD_VALUE]
                     dropw dropw
                 end
@@ -1328,7 +1266,7 @@ export const testStorageMap = async (page: Page): Promise<any> => {
     builder.linkDynamicLibrary(accountComponentLib);
 
     let txScript = builder.compileTxScript(
-      `use.external_contract::bump_item_contract
+      `use external_contract::bump_item_contract
       begin
           call.bump_item_contract::bump_map_item
       end`

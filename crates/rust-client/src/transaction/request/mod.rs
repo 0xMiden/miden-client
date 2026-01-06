@@ -5,14 +5,13 @@ use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
-use miden_lib::account::interface::{AccountInterface, AccountInterfaceError};
-use miden_lib::utils::{CodeBuilder, CodeBuilderError};
-use miden_objects::account::AccountId;
-use miden_objects::crypto::merkle::{MerkleError, MerkleStore};
-use miden_objects::note::{Note, NoteDetails, NoteId, NoteRecipient, NoteTag, PartialNote};
-use miden_objects::transaction::{InputNote, InputNotes, TransactionArgs, TransactionScript};
-use miden_objects::vm::AdviceMap;
-use miden_objects::{
+use miden_protocol::account::AccountId;
+use miden_protocol::crypto::merkle::MerkleError;
+use miden_protocol::crypto::merkle::store::MerkleStore;
+use miden_protocol::note::{Note, NoteDetails, NoteId, NoteRecipient, NoteTag, PartialNote};
+use miden_protocol::transaction::{InputNote, InputNotes, TransactionArgs, TransactionScript};
+use miden_protocol::vm::AdviceMap;
+use miden_protocol::{
     AccountError,
     AssetVaultError,
     NoteError,
@@ -21,6 +20,9 @@ use miden_objects::{
     TransactionScriptError,
     Word,
 };
+use miden_standards::account::interface::{AccountInterface, AccountInterfaceError};
+use miden_standards::code_builder::CodeBuilder;
+use miden_standards::errors::CodeBuilderError;
 use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 use thiserror::Error;
 
@@ -30,7 +32,6 @@ pub use builder::{PaymentNoteDescription, SwapTransactionData, TransactionReques
 mod foreign;
 pub use foreign::ForeignAccount;
 
-use crate::DebugMode;
 use crate::store::InputNoteRecord;
 
 // TRANSACTION REQUEST
@@ -316,14 +317,14 @@ impl TransactionRequest {
     pub(crate) fn build_transaction_script(
         &self,
         account_interface: &AccountInterface,
-        in_debug_mode: DebugMode,
     ) -> Result<TransactionScript, TransactionRequestError> {
         match &self.script_template {
             Some(TransactionScriptTemplate::CustomScript(script)) => Ok(script.clone()),
-            Some(TransactionScriptTemplate::SendNotes(notes)) => Ok(account_interface
-                .build_send_notes_script(notes, self.expiration_delta, in_debug_mode.into())?),
+            Some(TransactionScriptTemplate::SendNotes(notes)) => {
+                Ok(account_interface.build_send_notes_script(notes, self.expiration_delta)?)
+            },
             None => {
-                let empty_script = CodeBuilder::new(true).compile_tx_script("begin nop end")?;
+                let empty_script = CodeBuilder::new().compile_tx_script("begin nop end")?;
 
                 Ok(empty_script)
             },
@@ -480,27 +481,27 @@ pub enum TransactionRequestError {
 mod tests {
     use std::vec::Vec;
 
-    use miden_lib::account::auth::{AuthEcdsaK256Keccak, AuthRpoFalcon512};
-    use miden_lib::note::create_p2id_note;
-    use miden_lib::testing::account_component::MockAccountComponent;
-    use miden_objects::account::auth::PublicKeyCommitment;
-    use miden_objects::account::{
+    use miden_protocol::account::auth::PublicKeyCommitment;
+    use miden_protocol::account::{
         AccountBuilder,
         AccountComponent,
         AccountId,
         AccountType,
         StorageSlotName,
     };
-    use miden_objects::asset::FungibleAsset;
-    use miden_objects::crypto::rand::{FeltRng, RpoRandomCoin};
-    use miden_objects::note::{NoteTag, NoteType};
-    use miden_objects::testing::account_id::{
+    use miden_protocol::asset::FungibleAsset;
+    use miden_protocol::crypto::rand::{FeltRng, RpoRandomCoin};
+    use miden_protocol::note::{NoteTag, NoteType};
+    use miden_protocol::testing::account_id::{
         ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
         ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
         ACCOUNT_ID_SENDER,
     };
-    use miden_objects::transaction::OutputNote;
-    use miden_objects::{EMPTY_WORD, Felt, Word, ZERO};
+    use miden_protocol::transaction::OutputNote;
+    use miden_protocol::{EMPTY_WORD, Felt, Word, ZERO};
+    use miden_standards::account::auth::{AuthEcdsaK256Keccak, AuthRpoFalcon512};
+    use miden_standards::note::create_p2id_note;
+    use miden_standards::testing::account_component::MockAccountComponent;
     use miden_tx::utils::{Deserializable, Serializable};
 
     use super::{TransactionRequest, TransactionRequestBuilder};
@@ -554,7 +555,7 @@ mod tests {
             .with_component(MockAccountComponent::with_empty_slots())
             .with_auth_component(auth_component())
             .account_type(AccountType::RegularAccountImmutableCode)
-            .storage_mode(miden_objects::account::AccountStorageMode::Private)
+            .storage_mode(miden_protocol::account::AccountStorageMode::Private)
             .build_existing()
             .unwrap();
 

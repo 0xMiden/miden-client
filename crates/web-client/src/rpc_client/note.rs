@@ -4,13 +4,13 @@ use miden_client::note::{
 };
 use wasm_bindgen::prelude::wasm_bindgen;
 
+use crate::models::NoteType;
 use crate::models::input_note::InputNote;
 use crate::models::note::Note;
 use crate::models::note_header::NoteHeader;
 use crate::models::note_id::NoteId;
 use crate::models::note_inclusion_proof::NoteInclusionProof;
 use crate::models::note_metadata::NoteMetadata;
-use crate::models::note_type::NoteType;
 
 /// Wrapper for a note fetched over RPC.
 ///
