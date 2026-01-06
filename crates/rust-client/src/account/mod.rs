@@ -42,6 +42,7 @@ pub use miden_protocol::account::{
     AccountBuilder,
     AccountCode,
     AccountComponent,
+    AccountComponentCode,
     AccountDelta,
     AccountFile,
     AccountHeader,
@@ -85,11 +86,8 @@ pub mod component {
         StorageSlotSchema,
         StorageValueName,
     };
-    pub use miden_protocol::account::{
-        AccountComponent,
-        AccountComponentCode,
-        AccountComponentMetadata,
-    };
+    pub use miden_protocol::account::{AccountComponent, AccountComponentMetadata};
+    pub use miden_standards::account::auth::*;
     pub use miden_standards::account::components::{
         basic_fungible_faucet_library,
         basic_wallet_library,

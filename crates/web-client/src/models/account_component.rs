@@ -1,10 +1,10 @@
 use miden_client::Word as NativeWord;
-use miden_client::account::StorageSlot as NativeStorageSlot;
-use miden_client::account::component::{
-    AccountComponent as NativeAccountComponent,
+use miden_client::account::component::AccountComponent as NativeAccountComponent;
+use miden_client::account::{
     AccountComponentCode as NativeAccountComponentCode,
+    StorageSlot as NativeStorageSlot,
 };
-use miden_client::assembly::Library as NativeLibrary;
+use miden_client::assembly::{Library as NativeLibrary, MastNodeExt};
 use miden_client::auth::{
     AuthEcdsaK256Keccak as NativeEcdsaK256Keccak,
     AuthRpoFalcon512 as NativeRpoFalcon512,
@@ -12,7 +12,6 @@ use miden_client::auth::{
     PublicKeyCommitment,
 };
 use miden_client::vm::Package as NativePackage;
-use miden_protocol::assembly::mast::MastNodeExt;
 use wasm_bindgen::prelude::*;
 
 use crate::js_error_with_context;

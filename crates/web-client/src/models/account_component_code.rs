@@ -1,4 +1,4 @@
-use miden_client::account::component::AccountComponentCode as NativeAccountComponentCode;
+use miden_client::account::AccountComponentCode as NativeAccountComponentCode;
 use wasm_bindgen::prelude::*;
 
 use crate::models::library::Library;
