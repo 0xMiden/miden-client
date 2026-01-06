@@ -1,6 +1,6 @@
-use.miden::active_note
-use.miden::output_note
-use.miden::tx
+use miden::active_note
+use miden::output_note
+use miden::tx
 
 # ERRORS
 # =================================================================================================
