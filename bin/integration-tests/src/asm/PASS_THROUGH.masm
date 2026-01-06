@@ -6,7 +6,7 @@ use miden::tx
 # =================================================================================================
 
 # PASS_THROUGH script expects exactly 12 note inputs
-const.ERR_PASS_THROUGH_WRONG_NUMBER_OF_INPUTS="wrong number of inputs"
+const ERR_PASS_THROUGH_WRONG_NUMBER_OF_INPUTS="wrong number of inputs"
 
 #! PASS_THROUGH script:
 #! Creates a note consumable by pass-through, containing the same asset.
