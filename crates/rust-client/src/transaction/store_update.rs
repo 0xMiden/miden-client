@@ -1,8 +1,8 @@
 use alloc::vec::Vec;
 
-use miden_objects::block::BlockNumber;
-use miden_objects::note::{NoteDetails, NoteTag};
-use miden_objects::transaction::ExecutedTransaction;
+use miden_protocol::block::BlockNumber;
+use miden_protocol::note::{NoteDetails, NoteTag};
+use miden_protocol::transaction::ExecutedTransaction;
 use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 
 use crate::note::NoteUpdateTracker;

@@ -22,7 +22,7 @@ impl AuthSecretKey {
     #[wasm_bindgen(js_name = "rpoFalconWithRNG")]
     pub fn rpo_falcon_with_rng(seed: Option<Vec<u8>>) -> Result<AuthSecretKey, JsValue> {
         let mut rng = Self::try_rng_from_seed(seed)?;
-        Ok(NativeAuthSecretKey::new_rpo_falcon512_with_rng(&mut rng).into())
+        Ok(NativeAuthSecretKey::new_falcon512_rpo_with_rng(&mut rng).into())
     }
 
     #[wasm_bindgen(js_name = "ecdsaWithRNG")]

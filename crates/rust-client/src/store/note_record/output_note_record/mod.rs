@@ -1,9 +1,9 @@
 use alloc::string::ToString;
 use core::fmt::{self, Display};
 
-use miden_objects::Word;
-use miden_objects::block::BlockNumber;
-use miden_objects::note::{
+use miden_protocol::Word;
+use miden_protocol::block::BlockNumber;
+use miden_protocol::note::{
     Note,
     NoteAssets,
     NoteDetails,
@@ -15,7 +15,7 @@ use miden_objects::note::{
     Nullifier,
     PartialNote,
 };
-use miden_objects::transaction::OutputNote;
+use miden_protocol::transaction::OutputNote;
 use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 
 use super::NoteRecordError;

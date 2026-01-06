@@ -9,22 +9,19 @@ use std::time::{Duration, Instant};
 use std::vec::Vec;
 
 use anyhow::{Context, Result};
-use miden_objects::account::auth::AuthSecretKey;
-use miden_objects::account::{Account, AccountId, AccountStorageMode};
-use miden_objects::asset::{Asset, FungibleAsset, TokenSymbol};
-use miden_objects::note::{NoteId, NoteType};
-use miden_objects::transaction::{OutputNote, TransactionId};
-use miden_objects::{Felt, FieldElement};
+use miden_protocol::account::auth::AuthSecretKey;
+use miden_protocol::account::{Account, AccountId, AccountStorageMode};
+use miden_protocol::asset::{Asset, FungibleAsset, TokenSymbol};
+use miden_protocol::note::{NoteId, NoteType};
+use miden_protocol::testing::account_id::ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE;
+use miden_protocol::transaction::{OutputNote, TransactionId};
+use miden_protocol::{Felt, FieldElement};
+use miden_standards::account::auth::{AuthEcdsaK256Keccak, AuthRpoFalcon512};
+use miden_standards::code_builder::CodeBuilder;
 use rand::RngCore;
 use uuid::Uuid;
 
-use crate::account::component::{
-    AccountComponent,
-    AuthEcdsaK256Keccak,
-    AuthRpoFalcon512,
-    BasicFungibleFaucet,
-    BasicWallet,
-};
+use crate::account::component::{AccountComponent, BasicFungibleFaucet, BasicWallet};
 use crate::account::{AccountBuilder, AccountType, StorageSlot};
 use crate::auth::AuthSchemeId;
 use crate::crypto::FeltRng;
@@ -33,7 +30,6 @@ use crate::note::{Note, create_p2id_note};
 use crate::rpc::RpcError;
 use crate::store::{NoteFilter, TransactionFilter};
 use crate::sync::SyncSummary;
-use crate::testing::account_id::ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE;
 use crate::transaction::{
     NoteArgs,
     TransactionRequest,
@@ -82,7 +78,7 @@ pub async fn insert_new_wallet_with_seed(
 ) -> Result<(Account, AuthSecretKey), ClientError> {
     let (key_pair, auth_component) = match auth_scheme {
         AuthSchemeId::RpoFalcon512 => {
-            let key_pair = AuthSecretKey::new_rpo_falcon512();
+            let key_pair = AuthSecretKey::new_falcon512_rpo();
             let auth_component: AccountComponent =
                 AuthRpoFalcon512::new(key_pair.public_key().to_commitment()).into();
             (key_pair, auth_component)
@@ -124,7 +120,7 @@ pub async fn insert_new_fungible_faucet(
 ) -> Result<(Account, AuthSecretKey), ClientError> {
     let (key_pair, auth_component) = match auth_scheme {
         AuthSchemeId::RpoFalcon512 => {
-            let key_pair = AuthSecretKey::new_rpo_falcon512();
+            let key_pair = AuthSecretKey::new_falcon512_rpo();
             let auth_component: AccountComponent =
                 AuthRpoFalcon512::new(key_pair.public_key().to_commitment()).into();
             (key_pair, auth_component)
@@ -557,7 +553,7 @@ pub async fn insert_account_with_custom_component(
     storage_mode: AccountStorageMode,
     keystore: &FilesystemKeyStore,
 ) -> Result<(Account, AuthSecretKey), ClientError> {
-    let component_code = miden_lib::utils::CodeBuilder::default()
+    let component_code = CodeBuilder::default()
         .compile_component_code("custom::component", custom_code)
         .map_err(|err| ClientError::TransactionRequestError(err.into()))?;
     let custom_component = AccountComponent::new(component_code, storage_slots)
@@ -567,7 +563,7 @@ pub async fn insert_account_with_custom_component(
     let mut init_seed = [0u8; 32];
     client.rng().fill_bytes(&mut init_seed);
 
-    let key_pair = AuthSecretKey::new_rpo_falcon512_with_rng(client.rng());
+    let key_pair = AuthSecretKey::new_falcon512_rpo_with_rng(client.rng());
     let pub_key = key_pair.public_key();
     keystore.add_key(&key_pair).unwrap();
 

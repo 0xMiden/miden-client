@@ -3,9 +3,9 @@
 use alloc::vec::Vec;
 use core::fmt::Display;
 
-use miden_objects::account::{Account, AccountCode, AccountId, PartialAccount};
-use miden_objects::address::Address;
-use miden_objects::{Felt, Word};
+use miden_protocol::account::{Account, AccountCode, AccountId, PartialAccount};
+use miden_protocol::address::Address;
+use miden_protocol::{Felt, Word};
 
 use crate::ClientError;
 

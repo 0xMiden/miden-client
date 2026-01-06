@@ -1,7 +1,7 @@
 use alloc::collections::BTreeMap;
 
-use miden_objects::block::BlockHeader;
-use miden_objects::note::{NoteId, NoteInclusionProof, Nullifier};
+use miden_protocol::block::BlockHeader;
+use miden_protocol::note::{NoteId, NoteInclusionProof, Nullifier};
 
 use crate::ClientError;
 use crate::rpc::domain::note::CommittedNote;
