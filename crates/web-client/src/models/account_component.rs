@@ -1,6 +1,7 @@
 use miden_client::Word as NativeWord;
 use miden_client::account::StorageSlot as NativeStorageSlot;
 use miden_client::account::component::AccountComponent as NativeAccountComponent;
+use miden_client::assembly::Library as NativeLibrary;
 use miden_client::auth::{
     AuthEcdsaK256Keccak as NativeEcdsaK256Keccak,
     AuthRpoFalcon512 as NativeRpoFalcon512,
@@ -8,12 +9,13 @@ use miden_client::auth::{
     PublicKeyCommitment,
 };
 use miden_client::vm::Package as NativePackage;
-use miden_core::mast::MastNodeExt;
+use miden_protocol::assembly::mast::MastNodeExt;
 use wasm_bindgen::prelude::*;
 
 use crate::js_error_with_context;
 use crate::models::auth::AuthScheme;
 use crate::models::auth_secret_key::AuthSecretKey;
+use crate::models::library::Library;
 use crate::models::miden_arrays::StorageSlotArray;
 use crate::models::package::Package;
 use crate::models::script_builder::CodeBuilder;
@@ -91,14 +93,18 @@ impl AccountComponent {
 
         let get_proc_export = library
             .exports()
-            .find(|export| export.name.name.as_str() == procedure_name)
+            .find(|export| {
+                export.as_procedure().is_some()
+                    && (export.path().as_ref().as_str() == procedure_name
+                        || export.path().as_ref().to_relative().as_str() == procedure_name)
+            })
             .ok_or_else(|| {
                 JsValue::from_str(&format!(
                     "Procedure {procedure_name} not found in the account component library"
                 ))
             })?;
 
-        let get_proc_mast_id = library.get_export_node_id(&get_proc_export.name);
+        let get_proc_mast_id = library.get_export_node_id(get_proc_export.path());
 
         let digest_hex = library
             .mast_forest()
@@ -187,6 +193,23 @@ impl AccountComponent {
             .map(AccountComponent)
             .map_err(|e| {
                 js_error_with_context(e, "Failed to create account component from package")
+            })
+    }
+
+    /// Creates an account component from a compiled library and storage slots.
+    #[wasm_bindgen(js_name = "fromLibrary")]
+    pub fn from_library(
+        library: &Library,
+        storage_slots: Vec<StorageSlot>,
+    ) -> Result<AccountComponent, JsValue> {
+        let native_library: NativeLibrary = library.into();
+        let native_slots: Vec<NativeStorageSlot> =
+            storage_slots.into_iter().map(Into::into).collect();
+
+        NativeAccountComponent::new(native_library, native_slots)
+            .map(AccountComponent)
+            .map_err(|e| {
+                js_error_with_context(e, "Failed to create account component from library")
             })
     }
 }

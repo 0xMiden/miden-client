@@ -3,12 +3,12 @@ use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::string::ToString;
 use alloc::vec::Vec;
 
-use miden_lib::note::{create_p2id_note, create_p2ide_note, create_swap_note};
-use miden_objects::account::AccountId;
-use miden_objects::asset::{Asset, FungibleAsset};
-use miden_objects::block::BlockNumber;
-use miden_objects::crypto::merkle::{InnerNodeInfo, MerkleStore};
-use miden_objects::note::{
+use miden_protocol::account::AccountId;
+use miden_protocol::asset::{Asset, FungibleAsset};
+use miden_protocol::block::BlockNumber;
+use miden_protocol::crypto::merkle::InnerNodeInfo;
+use miden_protocol::crypto::merkle::store::MerkleStore;
+use miden_protocol::note::{
     Note,
     NoteDetails,
     NoteId,
@@ -17,9 +17,10 @@ use miden_objects::note::{
     NoteType,
     PartialNote,
 };
-use miden_objects::transaction::{OutputNote, TransactionScript};
-use miden_objects::vm::AdviceMap;
-use miden_objects::{Felt, FieldElement, NoteError, Word};
+use miden_protocol::transaction::{OutputNote, TransactionScript};
+use miden_protocol::vm::AdviceMap;
+use miden_protocol::{Felt, FieldElement, NoteError, Word};
+use miden_standards::note::{create_p2id_note, create_p2ide_note, create_swap_note};
 
 use super::{
     ForeignAccount,

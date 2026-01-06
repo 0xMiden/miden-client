@@ -45,6 +45,8 @@ fn compile_tonic_note_transport_proto() -> miette::Result<()> {
 
     let mut web_tonic_prost_config = tonic_prost_build::Config::new();
     web_tonic_prost_config.skip_debug(["AccountId", "Digest"]);
+    // Use BTreeMap so the no_std bindings don't depend on std::collections::HashMap.
+    web_tonic_prost_config.btree_map(["."]);
 
     // Generate the header of the user facing server from its proto file
     tonic_prost_build::configure()
@@ -75,6 +77,9 @@ fn compile_tonic_client_proto() -> miette::Result<()> {
 
     let mut web_tonic_prost_config = tonic_prost_build::Config::new();
     web_tonic_prost_config.skip_debug(["AccountId", "Digest"]);
+
+    // Use BTreeMap so the no_std bindings don't depend on std::collections::HashMap
+    web_tonic_prost_config.btree_map(["."]);
 
     // Generate the header of the user facing server from its proto file
     tonic_prost_build::configure()

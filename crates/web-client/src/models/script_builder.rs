@@ -1,12 +1,12 @@
 use alloc::sync::Arc;
 
-use miden_client::CodeBuilder as NativeCodeBuilder;
 use miden_client::assembly::{
     Assembler,
+    CodeBuilder as NativeCodeBuilder,
     Library as NativeLibrary,
-    LibraryPath,
     Module,
     ModuleKind,
+    Path,
     PrintDiagnostic,
     Report,
     SourceManagerSync,
@@ -35,9 +35,8 @@ pub struct CodeBuilder {
 impl CodeBuilder {
     pub(crate) fn from_source_manager(source_manager: Arc<dyn SourceManagerSync>) -> Self {
         let builder = NativeCodeBuilder::with_source_manager(source_manager);
-        let assembler = TransactionKernel::assembler_with_source_manager(builder.source_manager().clone())
-                // When instanced with a source manager, the builder has debug mode on by default.
-                .with_debug_mode(true);
+        let assembler =
+            TransactionKernel::assembler_with_source_manager(builder.source_manager().clone());
         Self { builder, assembler }
     }
 
@@ -133,16 +132,17 @@ impl CodeBuilder {
     /// Given a Library Path, and a source code, turn it into a Library.
     /// E.g. A path library can be `miden::my_contract`. When turned into a library,
     /// this can be used from another script with an import statement, following the
-    /// previous example: `use.miden::my_contract'.
+    /// previous example: `use miden::my_contract'.
     #[wasm_bindgen(js_name = "buildLibrary")]
     pub fn build_library(&self, library_path: &str, source_code: &str) -> Result<Library, JsValue> {
-        let library_path = LibraryPath::new(library_path).map_err(|e| {
+        let library_path = Path::validate(library_path).map_err(|e| {
             js_error_with_context(
-                e, "script builder: failed to build library -- could not create library_path with path {library_path}",
+                e,
+                &format!("script builder: failed to build library -- invalid path {library_path}"),
             )
         })?;
         let module = Module::parser(ModuleKind::Library)
-            .parse_str(library_path, source_code, self.builder.source_manager().as_ref())
+            .parse_str(library_path, source_code, self.builder.source_manager())
             .map_err(|e| {
                 let err_msg = format_assembler_error(&e, "error while parsing module");
                 JsValue::from(err_msg)
@@ -160,7 +160,7 @@ impl CodeBuilder {
     }
 
     /// Returns the inner assembler . This is because multiple "compile" functions
-    /// in `miden_lib` to consume an Assembler, so we need to clone the value.
+    /// in `miden_protocol` to consume an Assembler, so we need to clone the value.
     pub(crate) fn clone_assembler(&self) -> Assembler {
         self.assembler.clone()
     }

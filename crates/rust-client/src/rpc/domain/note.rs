@@ -1,8 +1,8 @@
 use alloc::vec::Vec;
 
-use miden_objects::block::{BlockHeader, BlockNumber};
-use miden_objects::crypto::merkle::{MerklePath, SparseMerklePath};
-use miden_objects::note::{
+use miden_protocol::block::{BlockHeader, BlockNumber};
+use miden_protocol::crypto::merkle::{MerklePath, SparseMerklePath};
+use miden_protocol::note::{
     Note,
     NoteDetails,
     NoteHeader,
@@ -13,7 +13,7 @@ use miden_objects::note::{
     NoteTag,
     NoteType,
 };
-use miden_objects::{Felt, MastForest, MastNodeId, Word};
+use miden_protocol::{Felt, MastForest, MastNodeId, Word};
 use miden_tx::utils::Deserializable;
 
 use super::{MissingFieldHelper, RpcConversionError};

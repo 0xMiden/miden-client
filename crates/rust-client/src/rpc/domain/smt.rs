@@ -1,7 +1,7 @@
 use alloc::string::ToString;
 
-use miden_objects::Word;
-use miden_objects::crypto::merkle::{LeafIndex, SMT_DEPTH, SmtLeaf, SmtProof};
+use miden_protocol::Word;
+use miden_protocol::crypto::merkle::smt::{LeafIndex, SMT_DEPTH, SmtLeaf, SmtProof};
 
 use crate::rpc::domain::MissingFieldHelper;
 use crate::rpc::errors::RpcConversionError;

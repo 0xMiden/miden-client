@@ -2,8 +2,8 @@ use alloc::string::{String, ToString};
 use alloc::sync::Arc;
 use std::boxed::Box;
 
-use miden_objects::crypto::rand::{FeltRng, RpoRandomCoin};
-use miden_objects::{Felt, MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES};
+use miden_protocol::crypto::rand::{FeltRng, RpoRandomCoin};
+use miden_protocol::{Felt, MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES};
 use miden_tx::ExecutionOptions;
 use miden_tx::auth::TransactionAuthenticator;
 use rand::Rng;

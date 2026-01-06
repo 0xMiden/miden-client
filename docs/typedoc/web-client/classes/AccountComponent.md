@@ -134,6 +134,28 @@ Builds an auth component from a secret key, inferring the auth scheme from the k
 
 ***
 
+### fromLibrary()
+
+> `static` **fromLibrary**(`library`, `storage_slots`): `AccountComponent`
+
+Creates an account component from a compiled library and storage slots.
+
+#### Parameters
+
+##### library
+
+[`Library`](Library.md)
+
+##### storage\_slots
+
+[`StorageSlot`](StorageSlot.md)[]
+
+#### Returns
+
+`AccountComponent`
+
+***
+
 ### fromPackage()
 
 > `static` **fromPackage**(`_package`, `storage_slots`): `AccountComponent`
