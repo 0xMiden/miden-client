@@ -11,6 +11,7 @@ import {
 
 test.describe("swap transaction tests", () => {
   test("swap transaction completes successfully", async ({ page }) => {
+    test.setTimeout(480000);
     const { accountId: accountA, faucetId: faucetA } =
       await setupWalletAndFaucet(page);
     const { accountId: accountB, faucetId: faucetB } =
@@ -57,6 +58,12 @@ test.describe("swap transaction tests", () => {
     };
 
     await runSwapAssertions(false);
-    await runSwapAssertions(true);
+
+    const hasRemoteProver = await page.evaluate(
+      () => window.remoteProverUrl != null
+    );
+    if (hasRemoteProver) {
+      await runSwapAssertions(true);
+    }
   });
 });

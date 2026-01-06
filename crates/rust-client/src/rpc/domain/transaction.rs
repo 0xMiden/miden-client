@@ -2,7 +2,7 @@ use alloc::string::ToString;
 use alloc::vec::Vec;
 
 use miden_protocol::Word;
-use miden_protocol::account::{AccountId, AccountStorageMode, AccountType};
+use miden_protocol::account::AccountId;
 use miden_protocol::asset::FungibleAsset;
 use miden_protocol::block::BlockNumber;
 use miden_protocol::note::{NoteHeader, Nullifier};
@@ -18,7 +18,7 @@ use crate::rpc::{RpcConversionError, RpcError, generated as proto};
 // TODO: Remove this when we turn on fees and the node informs the correct asset account ID
 
 /// A native asset faucet ID for use in testing scenarios.
-pub const ACCOUNT_ID_NATIVE_ASSET_FAUCET: u128 = 0xab0000000000cd200000ac000000de00u128;
+pub const ACCOUNT_ID_NATIVE_ASSET_FAUCET: u128 = 0xab00_0000_0000_cd20_0000_ac00_0000_de00_u128;
 
 // INTO TRANSACTION ID
 // ================================================================================================
