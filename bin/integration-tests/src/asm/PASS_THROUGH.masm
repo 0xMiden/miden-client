@@ -1,12 +1,11 @@
-use.miden::active_note
-use.miden::output_note
-use.miden::tx
+use miden::protocol::active_note
+use miden::protocol::output_note
 
 # ERRORS
 # =================================================================================================
 
 # PASS_THROUGH script expects exactly 12 note inputs
-const.ERR_PASS_THROUGH_WRONG_NUMBER_OF_INPUTS="wrong number of inputs"
+const ERR_PASS_THROUGH_WRONG_NUMBER_OF_INPUTS="wrong number of inputs"
 
 #! PASS_THROUGH script:
 #! Creates a note consumable by pass-through, containing the same asset.
@@ -40,14 +39,10 @@ begin
 
     padw mem_loadw_be.8
     # => [tag, aux, note_type, execution_hint, RECIPIENT, ASSET]
-    debug.stack
 
     # create a note using inputs
     exec.output_note::create
-    debug.stack.5
     # => [note_idx, ASSET]
-
-    debug.stack
 
     movdn.4
     # => [ASSET, note_idx, pad(11)]
