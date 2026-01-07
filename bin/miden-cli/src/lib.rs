@@ -45,7 +45,7 @@ pub type CliKeyStore = FilesystemKeyStore<StdRng>;
 ///
 /// ```no_run
 /// use miden_client::DebugMode;
-/// use miden_client::transaction::TransactionRequest;
+/// use miden_client::transaction::TransactionRequestBuilder;
 /// use miden_client_cli::CliClient;
 ///
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
@@ -56,7 +56,7 @@ pub type CliKeyStore = FilesystemKeyStore<StdRng>;
 /// client.sync_state().await?;
 ///
 /// // Build and submit transactions
-/// let req = TransactionRequest::builder()
+/// let req = TransactionRequestBuilder::new()
 ///     // ... configure transaction
 ///     .build()?;
 ///
@@ -105,7 +105,7 @@ impl CliClient {
     ///
     /// ```no_run
     /// use miden_client::DebugMode;
-    /// use miden_client::transaction::TransactionRequest;
+    /// use miden_client::transaction::TransactionRequestBuilder;
     /// use miden_client_cli::CliClient;
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
@@ -119,7 +119,7 @@ impl CliClient {
     /// client.sync_state().await?;
     ///
     /// // Build and submit transactions
-    /// let req = TransactionRequest::builder()
+    /// let req = TransactionRequestBuilder::new()
     ///     // ... configure transaction
     ///     .build()?;
     ///
