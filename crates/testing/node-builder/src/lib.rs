@@ -1,6 +1,6 @@
 #![recursion_limit = "256"]
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
 use std::net::SocketAddr;
@@ -9,15 +9,15 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use ::rand::{Rng, random};
-use anyhow::{Context, Error, Result, bail};
+use anyhow::{Context, Error, Result};
 use miden_lib::AuthScheme;
-use miden_lib::account::auth::AuthRpoFalcon512;
 use miden_lib::account::components::basic_wallet_library;
-use miden_lib::account::faucets::{self, create_basic_fungible_faucet};
-use miden_lib::account::wallets::BasicWallet;
+use miden_lib::account::faucets::create_basic_fungible_faucet;
 use miden_lib::utils::Serializable;
 use miden_node_block_producer::{
-    BlockProducer, DEFAULT_MAX_BATCHES_PER_BLOCK, DEFAULT_MAX_TXS_PER_BATCH,
+    BlockProducer,
+    DEFAULT_MAX_BATCHES_PER_BLOCK,
+    DEFAULT_MAX_TXS_PER_BATCH,
     DEFAULT_MEMPOOL_TX_CAPACITY,
 };
 use miden_node_ntx_builder::NetworkTransactionBuilder;
@@ -26,9 +26,7 @@ use miden_node_store::{GenesisState, Store};
 use miden_node_utils::crypto::get_rpo_random_coin;
 use miden_node_validator::Validator;
 use miden_objects::account::auth::AuthSecretKey;
-use miden_objects::account::{
-    Account, AccountBuilder, AccountComponent, AccountFile, StorageMap, StorageSlot,
-};
+use miden_objects::account::{Account, AccountBuilder, AccountComponent, AccountFile, StorageMap};
 use miden_objects::asset::{Asset, FungibleAsset, TokenSymbol};
 use miden_objects::block::FeeParameters;
 use miden_objects::crypto::dsa::ecdsa_k256_keccak;
@@ -429,12 +427,12 @@ fn build_test_faucets_and_account() -> anyhow::Result<Vec<Account>> {
             Ok(Account::new_unchecked(id, vault, storage, code, ONE, None))
         })
         .collect::<Result<Vec<_>>>()
-        .map_err(|err| Error::msg(format!("could not instance tests faucets got: {}", err)))?;
+        .map_err(|err| Error::msg(format!("could not instance tests faucets got: {err}")))?;
 
-    let seed = [0xA; 32];
+    let seed = [0xa; 32];
     let sk = AuthSecretKey::new_rpo_falcon512_with_rng(&mut ChaCha20Rng::from_seed(seed));
 
-    let map_entries = ((0_u32..2001_u32).map(|i| (Word::from([i; 4]), Word::from([i; 4]))));
+    let map_entries = (0_u32..2001_u32).map(|i| (Word::from([i; 4]), Word::from([i; 4])));
 
     let storage_map = miden_objects::account::StorageSlot::with_map(
         miden_objects::account::StorageSlotName::new("miden::test_account::map::too_many_entries")

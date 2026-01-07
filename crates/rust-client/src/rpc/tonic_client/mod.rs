@@ -4,7 +4,6 @@ use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::error::Error;
-use core::ops::Deref;
 use miden_objects::asset::{Asset, AssetVault};
 
 use miden_objects::account::{
@@ -23,13 +22,10 @@ use miden_tx::utils::sync::RwLock;
 use tonic::Status;
 use tracing::info;
 
-use super::domain::account::{AccountDetails, AccountProof, AccountStorageDetails, AccountUpdateSummary};
-use super::domain::note::FetchedNote;
-use super::domain::nullifier::NullifierUpdate;
+use super::domain::account::{AccountProof, AccountStorageDetails, AccountUpdateSummary};
+use super::domain::{note::FetchedNote, nullifier::NullifierUpdate};
 use super::generated::rpc::account_proof_request::AccountDetailRequest;
-use super::generated::rpc::account_proof_request::account_detail_request::storage_map_detail_request;
-use super::generated::rpc::{AccountProofRequest, AccountProofResponse, SyncAccountVaultRequest};
-use super::generated::rpc_store::AccountResponse;
+use super::generated::rpc::AccountProofRequest;
 use super::{
     Endpoint, FetchedAccount, NodeRpcClient, NodeRpcClientEndpoint, NoteSyncInfo, RpcError,
     StateSyncInfo,
@@ -40,11 +36,10 @@ use crate::rpc::domain::transaction::TransactionsInfo;
 use crate::rpc::errors::{AcceptHeaderError, GrpcError, RpcConversionError};
 use crate::rpc::generated::rpc::account_proof_request::account_detail_request::storage_map_detail_request::SlotData;
 use crate::rpc::generated::rpc::account_proof_request::account_detail_request::StorageMapDetailRequest;
-use crate::rpc::generated::rpc::{BlockRange, SyncStorageMapsRequest};
+use crate::rpc::generated::rpc::BlockRange;
 use crate::rpc::{AccountStateAt, NOTE_IDS_LIMIT, NULLIFIER_PREFIXES_LIMIT, generated as proto};
 use crate::transaction::ForeignAccount;
 
-mod account_fetcher;
 mod api_client;
 use api_client::api_client_wrapper::ApiClient;
 
@@ -108,7 +103,9 @@ impl GrpcClient {
         Ok(())
     }
 
-    /// Given an id, return its
+    /// Given an id, return the proof for the account.
+    /// If the account also has public state, the details for it
+    /// will also be retrieve as part of the proof.
     pub async fn fetch_full_account_proof(
         &self,
         account_id: AccountId,
@@ -120,9 +117,7 @@ impl GrpcClient {
                 account_id: Some(account_id.into()),
                 block_num: None,
                 details: {
-                    if !has_public_state {
-                        None
-                    } else {
+                    if has_public_state {
                         // Since we have to request the storage maps for an account
                         // we *dont know* anything about, we'll have to do first this
                         // request, which will tell us about the account's storage slots,
@@ -132,6 +127,8 @@ impl GrpcClient {
                             asset_vault_commitment: Some(EMPTY_WORD.into()),
                             storage_maps: vec![],
                         })
+                    } else {
+                        None
                     }
                 },
             }
@@ -148,9 +145,7 @@ impl GrpcClient {
                 .to_owned(),
         ))?;
         let account_proof = {
-            if !has_public_state {
-                account_response.try_into()
-            } else {
+            if has_public_state {
                 let account_details = account_response
                     .details
                     .ok_or(RpcError::ExpectedDataMissing("details in public account".to_owned()))?
@@ -161,7 +156,6 @@ impl GrpcClient {
                 // since we now know the names of each storage slot.
                 let maps_to_request = storage_header
                     .slots()
-                    .into_iter()
                     .filter(|header| header.slot_type().is_map())
                     .map(|map| map.name().to_string());
                 let account_request = AccountProofRequest {
@@ -187,16 +181,17 @@ impl GrpcClient {
                         .into(),
                     )),
                 }
+            } else {
+                account_response.try_into()
             }
         };
         Ok((block_number.block_num.into(), account_proof?))
     }
 
-    /// Given the details for an account, returns a vector
-    /// with all of its storage slots. Keep in mind that if an
-    /// account triggers the 'too_many_entries' flag, it has the
-    /// potential multiple requests.
-    async fn build_storage_slots(
+    /// Given the storage details for an account and its id, returns a vector
+    /// with all of its storage slots. Keep in mind that if an account triggers
+    /// the `too_many_entries` flag, there will potentially be multiple requests.
+    pub async fn build_storage_slots(
         &self,
         account_id: AccountId,
         storage_details: &AccountStorageDetails,
@@ -218,7 +213,7 @@ impl GrpcClient {
                     slots.push(miden_objects::account::StorageSlot::with_value(
                         slot_header.name().clone(),
                         slot_header.value(),
-                    ))
+                    ));
                 },
                 StorageSlotType::Map => {
                     let map_details = storage_details.find_map_details(slot_header.name()).ok_or(
@@ -230,13 +225,12 @@ impl GrpcClient {
 
                     let mut map_entries = vec![];
                     if map_details.too_many_entries {
-                        let map_info = match map_cache {
-                            Some(ref info) => info,
-                            None => {
-                                let fetched_data =
-                                    self.sync_storage_maps(0_u32.into(), None, account_id).await?;
-                                map_cache.insert(fetched_data)
-                            },
+                        let map_info = if let Some(ref info) = map_cache {
+                            info
+                        } else {
+                            let fetched_data =
+                                self.sync_storage_maps(0_u32.into(), None, account_id).await?;
+                            map_cache.insert(fetched_data)
                         };
                         map_entries.extend(
                             map_info
@@ -244,13 +238,13 @@ impl GrpcClient {
                                 .iter()
                                 .filter(|slot_info| slot_info.slot_name == *slot_header.name())
                                 .map(|slot_info| (slot_info.key, slot_info.value)),
-                        )
+                        );
                     } else {
                         map_entries.extend(map_details.entries.iter().map(|e| {
-                            let key: Word = e.key.into();
-                            let value: Word = e.value.into();
+                            let key: Word = e.key;
+                            let value: Word = e.value;
                             (key, value)
-                        }))
+                        }));
                     }
 
                     slots.push(miden_objects::account::StorageSlot::with_map(
@@ -423,8 +417,6 @@ impl NodeRpcClient for GrpcClient {
     ///   `account_commitment`, `details`).
     /// - There is an error during [Account] deserialization.
     async fn get_account_details(&self, account_id: AccountId) -> Result<FetchedAccount, RpcError> {
-        let mut rpc_api = self.ensure_connected().await?;
-
         let (block_number, full_account_proof) = self.fetch_full_account_proof(account_id).await?;
 
         let update_summary =
@@ -450,14 +442,14 @@ impl NodeRpcClient for GrpcClient {
                         .await?
                         .updates
                         .into_iter()
-                        .flat_map(|update| update.asset)
+                        .filter_map(|update| update.asset)
                         .collect()
                 } else {
                     details.vault_details.assets
                 }
             };
 
-            let mut slots = self.build_storage_slots(account_id, &details.storage_details).await?;
+            let slots = self.build_storage_slots(account_id, &details.storage_details).await?;
             let seed = None;
             let asset_vault = AssetVault::new(&assets).map_err(|err| {
                 RpcError::InvalidResponse(format!("api rpc returned non-valid assets: {err}"))
