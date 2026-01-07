@@ -20,6 +20,18 @@ A serialized representation of a note.
 
 ***
 
+### afterBlockNum()
+
+> **afterBlockNum**(): `number`
+
+Returns the after-block hint when present.
+
+#### Returns
+
+`number`
+
+***
+
 ### free()
 
 > **free**(): `void`
@@ -30,11 +42,83 @@ A serialized representation of a note.
 
 ***
 
+### inclusionProof()
+
+> **inclusionProof**(): [`NoteInclusionProof`](NoteInclusionProof.md)
+
+Returns the inclusion proof if present.
+
+#### Returns
+
+[`NoteInclusionProof`](NoteInclusionProof.md)
+
+***
+
+### note()
+
+> **note**(): [`Note`](Note.md)
+
+Returns the full note when the file includes it.
+
+#### Returns
+
+[`Note`](Note.md)
+
+***
+
+### noteDetails()
+
+> **noteDetails**(): [`NoteDetails`](NoteDetails.md)
+
+Returns the note details if present.
+
+#### Returns
+
+[`NoteDetails`](NoteDetails.md)
+
+***
+
+### noteId()
+
+> **noteId**(): [`NoteId`](NoteId.md)
+
+Returns the note ID for any `NoteFile` variant.
+
+#### Returns
+
+[`NoteId`](NoteId.md)
+
+***
+
+### noteTag()
+
+> **noteTag**(): [`NoteTag`](NoteTag.md)
+
+Returns the note tag hint when present.
+
+#### Returns
+
+[`NoteTag`](NoteTag.md)
+
+***
+
 ### noteType()
 
 > **noteType**(): `string`
 
 Returns this `NoteFile`'s types.
+
+#### Returns
+
+`string`
+
+***
+
+### nullifier()
+
+> **nullifier**(): `string`
+
+Returns the note nullifier when present.
 
 #### Returns
 

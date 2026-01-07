@@ -356,7 +356,6 @@ export const customTransaction = async (
             use miden::core::sys
             use miden::core::mem
             use miden::standards::wallets::basic->basic_wallet
-
             begin
                 # push data from the advice map into the advice stack
                 adv.push_mapval
