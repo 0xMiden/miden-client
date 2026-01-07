@@ -36,9 +36,9 @@ use miden_client::store::{
 use miden_client::sync::NoteTagRecord;
 use miden_client::utils::{Deserializable, Serializable};
 use miden_client::{AccountError, Felt, Word};
-use miden_objects::account::{AccountStorageHeader, StorageMapWitness, StorageSlotHeader};
-use miden_objects::asset::{AssetVaultKey, PartialVault};
-use miden_objects::crypto::merkle::SparseMerklePath;
+use miden_protocol::account::{AccountStorageHeader, StorageMapWitness, StorageSlotHeader};
+use miden_protocol::asset::{AssetVaultKey, PartialVault};
+use miden_protocol::crypto::merkle::SparseMerklePath;
 use rusqlite::types::Value;
 use rusqlite::{Connection, Params, Transaction, named_params, params};
 
@@ -225,11 +225,10 @@ impl SqliteStore {
             if slot_type == StorageSlotType::Map {
                 // TODO: querying the database for a single map is not performant
                 // consider retrieving all storage maps in a single transaction.
-                let storage_map_root = value;
-                let mut query = query_storage_maps(conn, "root = ?", [storage_map_root.to_hex()])?;
-                if let Some(map) = query.remove(&value) {
-                    let mut partial_storage_map = PartialStorageMap::new(value);
+                let mut partial_storage_map = PartialStorageMap::new(value);
+                let mut query = query_storage_maps(conn, "root = ?", [value.to_hex()])?;
 
+                if let Some(map) = query.remove(&value) {
                     for (k, v) in map.entries() {
                         let (_, path) = get_storage_map_item_proof(&merkle_store, value, *k)?;
                         let path = SparseMerklePath::try_from(path)
@@ -241,8 +240,9 @@ impl SqliteStore {
                             .map_err(StoreError::StorageMapError)?;
                         partial_storage_map.add(witness).map_err(StoreError::MerkleStoreError)?;
                     }
-                    maps.push(partial_storage_map);
                 }
+
+                maps.push(partial_storage_map);
             }
         }
         storage_header.sort_by_key(StorageSlotHeader::id);
@@ -1267,7 +1267,7 @@ mod tests {
     use std::vec::Vec;
 
     use anyhow::Context;
-    use miden_client::account::component::AccountComponent;
+    use miden_client::account::component::{AccountComponent, basic_wallet_library};
     use miden_client::account::{
         Account,
         AccountBuilder,
@@ -1282,6 +1282,7 @@ mod tests {
         StorageSlotContent,
         StorageSlotName,
     };
+    use miden_client::assembly::CodeBuilder;
     use miden_client::asset::{
         AccountStorageDelta,
         AccountVaultDelta,
@@ -1290,16 +1291,14 @@ mod tests {
         NonFungibleAsset,
         NonFungibleAssetDetails,
     };
+    use miden_client::auth::{AuthRpoFalcon512, PublicKeyCommitment};
     use miden_client::store::Store;
-    use miden_client::testing::account_id::{
+    use miden_client::{EMPTY_WORD, ONE, ZERO};
+    use miden_protocol::testing::account_id::{
         ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
         ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET,
     };
-    use miden_client::testing::constants::NON_FUNGIBLE_ASSET_DATA;
-    use miden_client::{CodeBuilder, EMPTY_WORD, ONE, ZERO};
-    use miden_lib::account::auth::AuthRpoFalcon512;
-    use miden_lib::account::components::basic_wallet_library;
-    use miden_objects::account::auth::PublicKeyCommitment;
+    use miden_protocol::testing::constants::NON_FUNGIBLE_ASSET_DATA;
 
     use crate::SqliteStore;
     use crate::sql_error::SqlResultExt;
@@ -1309,7 +1308,7 @@ mod tests {
     async fn account_code_insertion_no_duplicates() -> anyhow::Result<()> {
         let store = create_test_store().await;
         let component_code = CodeBuilder::default()
-            .compile_component_code("miden::testing::dummy_component", "export.dummy nop end")?;
+            .compile_component_code("miden::testing::dummy_component", "pub proc dummy nop end")?;
         let account_component =
             AccountComponent::new(component_code, vec![])?.with_supports_all_types();
         let account_code = AccountCode::from_components(

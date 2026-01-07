@@ -10,6 +10,7 @@ use miden_client::account::{
     StorageSlot,
     StorageSlotName,
 };
+use miden_client::assembly::CodeBuilder;
 use miden_client::auth::{
     AuthEcdsaK256Keccak,
     AuthRpoFalcon512,
@@ -21,7 +22,7 @@ use miden_client::keystore::FilesystemKeyStore;
 use miden_client::rpc::domain::account::{AccountStorageRequirements, StorageMapKey};
 use miden_client::testing::common::*;
 use miden_client::transaction::{AdviceInputs, ForeignAccount, TransactionRequestBuilder};
-use miden_client::{CodeBuilder, Felt, Word};
+use miden_client::{Felt, Word};
 
 use crate::tests::config::ClientConfig;
 
@@ -53,14 +54,14 @@ pub async fn test_fpi_execute_program(client_config: ClientConfig) -> Result<()>
         format!(
             r#"
             const MAP_STORAGE_SLOT = word("{MAP_SLOT_NAME}")
-            export.get_fpi_map_item
+            pub proc get_fpi_map_item
                 # map key
                 push.{map_key}
 
                 # item slot
                 push.MAP_STORAGE_SLOT[0..2]
                 
-                exec.::miden::active_account::get_map_item
+                exec.::miden::protocol::active_account::get_map_item
                 swapw dropw
             end"#,
             map_key = Word::from(MAP_KEY)
@@ -71,7 +72,7 @@ pub async fn test_fpi_execute_program(client_config: ClientConfig) -> Result<()>
     let foreign_account_id = foreign_account.id();
     let code = format!(
         "
-        use.miden::tx
+        use miden::protocol::tx
         begin
             # push the root of the `get_fpi_item` account procedure
             push.{proc_root}
@@ -142,7 +143,7 @@ pub async fn test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
         format!(
             r#"
             const STORAGE_MAP_SLOT = word("{MAP_SLOT_NAME}")
-            export.get_fpi_map_item
+            pub proc get_fpi_map_item
                 # map key
                 push.{map_key}
 
@@ -150,7 +151,7 @@ pub async fn test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
                 push.STORAGE_MAP_SLOT[0..2]
 
                 # get item
-                exec.::miden::active_account::get_map_item
+                exec.::miden::protocol::active_account::get_map_item
                 swapw dropw
             end"#,
             map_key = Word::from(MAP_KEY)
@@ -166,8 +167,8 @@ pub async fn test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
         AccountStorageMode::Public,
         format!(
             "
-            use.miden::tx
-            export.get_fpi_map_item
+            use miden::protocol::tx
+            pub proc get_fpi_map_item
                 # push the hash of the `get_fpi_item` account procedure
                 push.{inner_proc_root}
 
@@ -193,8 +194,8 @@ pub async fn test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
 
     let tx_script = format!(
         "
-        use.miden::tx
-        use.miden::account
+        use miden::protocol::tx
+        use miden::protocol::native_account
         begin
             # push the hash of the `get_fpi_item` account procedure
             push.{outer_proc_root}
@@ -277,14 +278,14 @@ async fn standard_fpi(
         format!(
             r#"
             const STORAGE_MAP_SLOT = word("{MAP_SLOT_NAME}")
-            export.get_fpi_map_item
+            pub proc get_fpi_map_item
                 # map key
                 push.{map_key}
 
                 # push item slot name 
                 push.STORAGE_MAP_SLOT[0..2]
                 
-                exec.::miden::active_account::get_map_item
+                exec.::miden::protocol::active_account::get_map_item
                 swapw dropw
             end"#,
             map_key = Word::from(MAP_KEY)
@@ -299,8 +300,7 @@ async fn standard_fpi(
 
     let tx_script = format!(
         "
-        use.miden::tx
-        use.miden::account
+        use miden::protocol::tx
         begin
             # push the hash of the `get_fpi_item` account procedure
             push.{proc_root}
@@ -435,7 +435,7 @@ fn foreign_account_with_code(
 
     let (key_pair, auth_component) = match auth_scheme {
         AuthSchemeId::RpoFalcon512 => {
-            let key_pair = AuthSecretKey::new_rpo_falcon512();
+            let key_pair = AuthSecretKey::new_falcon512_rpo();
             let auth_component: AccountComponent =
                 AuthRpoFalcon512::new(key_pair.public_key().to_commitment()).into();
             (key_pair, auth_component)

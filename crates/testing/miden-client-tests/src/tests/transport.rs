@@ -9,7 +9,7 @@ use miden_client::store::NoteFilter;
 use miden_client::testing::mock::MockClient;
 use miden_client::testing::note_transport::{MockNoteTransportApi, MockNoteTransportNode};
 use miden_client::utils::RwLock;
-use miden_lib::note::create_p2id_note;
+use miden_standards::note::create_p2id_note;
 
 use crate::tests::{create_test_client_builder, insert_new_wallet};
 

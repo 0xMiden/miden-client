@@ -3,8 +3,8 @@ use miden_client::account::{AccountStorage, StorageMap, StorageSlotContent};
 use miden_client::asset::{Asset, AssetVault};
 use miden_client::crypto::{MerklePath, MerkleStore, NodeIndex, SMT_DEPTH, SmtLeaf, SmtProof};
 use miden_client::store::StoreError;
-use miden_objects::asset::AssetVaultKey;
-use miden_objects::crypto::merkle::Smt;
+use miden_protocol::asset::AssetVaultKey;
+use miden_protocol::crypto::merkle::smt::Smt;
 
 /// Retrieves the Merkle proof for a specific asset in the merkle store.
 pub fn get_asset_proof(
@@ -96,10 +96,10 @@ pub fn insert_storage_map_nodes(merkle_store: &mut MerkleStore, storage: &Accoun
 
 /// Builds the merkle node index for the given key.
 ///
-/// This logic is based on the way [`miden_objects::crypto::merkle::Smt`] is structured internally.
+/// This logic is based on the way [`miden_protocol::crypto::merkle::Smt`] is structured internally.
 /// It has a set depth and uses the third felt as the position. The reason we want to copy the smt's
 /// internal structure is so that merkle paths and roots match. For more information, see the
-/// [`miden_objects::crypto::merkle::Smt`] documentation and implementation.
+/// [`miden_protocol::crypto::merkle::Smt`] documentation and implementation.
 fn get_node_index(key: AssetVaultKey) -> Result<NodeIndex, StoreError> {
     let vault_key_word: Word = key.into();
     Ok(NodeIndex::new(SMT_DEPTH, vault_key_word[3].as_int())?)
@@ -107,7 +107,7 @@ fn get_node_index(key: AssetVaultKey) -> Result<NodeIndex, StoreError> {
 
 /// Builds the merkle node value for the given key and value.
 ///
-/// This logic is based on the way [`miden_objects::crypto::merkle::Smt`] generates the values for
+/// This logic is based on the way [`miden_protocol::crypto::merkle::Smt`] generates the values for
 /// its internal merkle tree. It generates an [`SmtLeaf`] from the key and value, and then hashes it
 /// to produce the node value.
 fn get_node_value(key: AssetVaultKey, value: Word) -> Word {

@@ -22,6 +22,8 @@
 * [BREAKING] Remove `SecretKey` model and consolidated functionality into `AuthSecretKey` ([#1592](https://github.com/0xMiden/miden-client/issues/1380))
 * Incremented the limits for various RPC calls to accommodate larger data sets ([#1621](https://github.com/0xMiden/miden-client/pull/1621)).
 * [BREAKING] Introduced named storage slots, changed `FilesystemKeystore` to not be generic over RNG ([#1626](https://github.com/0xMiden/miden-client/pull/1626)).
+* Added `submit_new_transaction_with_prover` to the Rust client and `submitNewTransactionWithProver` to the WebClient([#1622](https://github.com/0xMiden/miden-client/pull/1622)).
+* [BREAKING] Modified JS binding for `AccountComponent::compile` which now takes an `AccountComponentCode` built with the newly added binding `CodeBuilder::compile_account_component_code` ([#1627](https://github.com/0xMiden/miden-client/pull/1627)).
 
 ## 0.12.5 (2025-12-01)
 
@@ -106,6 +108,7 @@
 * Updated Dexie indexes and SQL schema; fixed sync-related transaction state bug ([#1452](https://github.com/0xMiden/miden-client/pull/1452)).
 * Started syncing output note nullifiers by default, to track when they are consumed ([#1452](https://github.com/0xMiden/miden-client/pull/1452)).
 * Expanded some `ClientError` variants to contain explanations and hints about the errors ([#1462](https://github.com/0xMiden/miden-client/pull/1462)).
+* [BREAKING] Removed debug mode from the client, migrated to VM 0.20 ([#1629](https://github.com/0xMiden/miden-client/pull/1629)).
 
 ## 0.11.11 (2025-10-16)
 

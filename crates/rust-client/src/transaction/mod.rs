@@ -24,9 +24,9 @@
 //! use miden_client::auth::TransactionAuthenticator;
 //! use miden_client::crypto::FeltRng;
 //! use miden_client::transaction::{PaymentNoteDescription, TransactionRequestBuilder};
-//! use miden_objects::account::AccountId;
-//! use miden_objects::asset::FungibleAsset;
-//! use miden_objects::note::NoteType;
+//! use miden_protocol::account::AccountId;
+//! use miden_protocol::asset::FungibleAsset;
+//! use miden_protocol::note::NoteType;
 //! # use std::error::Error;
 //!
 //! /// Executes, proves and submits a P2ID transaction.
@@ -67,12 +67,13 @@ use alloc::string::ToString;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
-use miden_objects::account::{Account, AccountId};
-use miden_objects::asset::{Asset, NonFungibleAsset};
-use miden_objects::block::BlockNumber;
-use miden_objects::note::{Note, NoteDetails, NoteId, NoteRecipient, NoteScript, NoteTag};
-use miden_objects::transaction::AccountInputs;
-use miden_objects::{AssetError, Felt, Word};
+use miden_protocol::account::{Account, AccountId};
+use miden_protocol::asset::{Asset, NonFungibleAsset};
+use miden_protocol::block::BlockNumber;
+use miden_protocol::note::{Note, NoteDetails, NoteId, NoteRecipient, NoteScript, NoteTag};
+use miden_protocol::transaction::AccountInputs;
+use miden_protocol::{AssetError, Felt, Word};
+use miden_standards::account::interface::AccountInterfaceExt;
 use miden_tx::{DataStore, NoteConsumptionChecker, TransactionExecutor};
 use tracing::info;
 
@@ -87,7 +88,6 @@ use crate::store::{
     InputNoteState,
     NoteFilter,
     OutputNoteRecord,
-    StoreError,
     TransactionFilter,
 };
 use crate::sync::NoteTagRecord;
@@ -122,9 +122,7 @@ pub use request::{
 mod result;
 // RE-EXPORTS
 // ================================================================================================
-pub use miden_lib::account::interface::{AccountComponentInterface, AccountInterface};
-pub use miden_lib::transaction::TransactionKernel;
-pub use miden_objects::transaction::{
+pub use miden_protocol::transaction::{
     ExecutedTransaction,
     InputNote,
     InputNotes,
@@ -134,10 +132,12 @@ pub use miden_objects::transaction::{
     TransactionArgs,
     TransactionId,
     TransactionInputs,
+    TransactionKernel,
     TransactionScript,
     TransactionSummary,
 };
-pub use miden_objects::vm::{AdviceInputs, AdviceMap};
+pub use miden_protocol::vm::{AdviceInputs, AdviceMap};
+pub use miden_standards::account::interface::{AccountComponentInterface, AccountInterface};
 pub use miden_tx::auth::TransactionAuthenticator;
 pub use miden_tx::{
     DataStoreError,
@@ -170,6 +170,9 @@ where
     /// Executes a transaction specified by the request against the specified account,
     /// proves it, submits it to the network, and updates the local database.
     ///
+    /// Uses the client's default prover (configured via
+    /// [`crate::builder::ClientBuilder::prover`]).
+    ///
     /// If the transaction utilizes foreign account data, there is a chance that the client
     /// doesn't have the required block header in the local database. In these scenarios, a sync to
     /// the chain tip is performed, and the required block header is retrieved.
@@ -178,10 +181,31 @@ where
         account_id: AccountId,
         transaction_request: TransactionRequest,
     ) -> Result<TransactionId, ClientError> {
+        let prover = self.tx_prover.clone();
+        self.submit_new_transaction_with_prover(account_id, transaction_request, prover)
+            .await
+    }
+
+    /// Executes a transaction specified by the request against the specified account,
+    /// proves it with the provided prover, submits it to the network, and updates the local
+    /// database.
+    ///
+    /// This is useful for falling back to a different prover (e.g., local) when the default
+    /// prover (e.g., remote) fails with a [`ClientError::TransactionProvingError`].
+    ///
+    /// If the transaction utilizes foreign account data, there is a chance that the client
+    /// doesn't have the required block header in the local database. In these scenarios, a sync to
+    /// the chain tip is performed, and the required block header is retrieved.
+    pub async fn submit_new_transaction_with_prover(
+        &mut self,
+        account_id: AccountId,
+        transaction_request: TransactionRequest,
+        tx_prover: Arc<dyn TransactionProver>,
+    ) -> Result<TransactionId, ClientError> {
         let tx_result = self.execute_transaction(account_id, transaction_request).await?;
         let tx_id = tx_result.executed_transaction().id();
 
-        let proven_transaction = self.prove_transaction(&tx_result).await?;
+        let proven_transaction = self.prove_transaction_with(&tx_result, tx_prover).await?;
         let submission_height =
             self.submit_proven_transaction(proven_transaction, &tx_result).await?;
 
@@ -239,10 +263,8 @@ where
         let future_notes: Vec<(NoteDetails, NoteTag)> =
             transaction_request.expected_future_notes().cloned().collect();
 
-        let tx_script = transaction_request.build_transaction_script(
-            &self.get_account_interface(account_id).await?,
-            self.in_debug_mode().into(),
-        )?;
+        let tx_script = transaction_request
+            .build_transaction_script(&self.get_account_interface(account_id).await?)?;
 
         let foreign_accounts = transaction_request.foreign_accounts().clone();
 
@@ -400,13 +422,6 @@ where
 
         if account_record.is_locked() {
             return Err(ClientError::AccountLocked(account_id));
-        }
-
-        let final_commitment = executed_transaction.final_account().commitment();
-        if self.store.get_account_header_by_commitment(final_commitment).await?.is_some() {
-            return Err(ClientError::StoreError(StoreError::AccountCommitmentAlreadyExists(
-                final_commitment,
-            )));
         }
 
         self.store.apply_transaction(tx_update).await?;
@@ -761,7 +776,7 @@ where
     ) -> Result<AccountInterface, ClientError> {
         let account: Account = self.try_get_account(account_id).await?.try_into()?;
 
-        Ok(AccountInterface::from(&account))
+        Ok(AccountInterface::from_account(&account))
     }
 
     /// Returns foreign account inputs for the required foreign accounts specified by the

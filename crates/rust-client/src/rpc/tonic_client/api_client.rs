@@ -3,7 +3,7 @@ use core::fmt::Write;
 use core::ops::{Deref, DerefMut};
 
 use api_client_wrapper::{ApiClient, InnerClient};
-use miden_objects::Word;
+use miden_protocol::Word;
 use tonic::metadata::AsciiMetadataValue;
 use tonic::metadata::errors::InvalidMetadataValue;
 use tonic::service::Interceptor;
@@ -15,7 +15,7 @@ use tonic::service::Interceptor;
 pub(crate) mod api_client_wrapper {
     use alloc::string::String;
 
-    use miden_objects::Word;
+    use miden_protocol::Word;
     use tonic::service::interceptor::InterceptedService;
 
     use super::{MetadataInterceptor, accept_header_interceptor};
@@ -65,7 +65,7 @@ pub(crate) mod api_client_wrapper {
     use alloc::string::String;
     use core::time::Duration;
 
-    use miden_objects::Word;
+    use miden_protocol::Word;
     use tonic::service::interceptor::InterceptedService;
     use tonic::transport::Channel;
 

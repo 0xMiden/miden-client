@@ -9,11 +9,7 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use ::rand::{Rng, random};
-use anyhow::{Context, Error, Result};
-use miden_lib::AuthScheme;
-use miden_lib::account::components::basic_wallet_library;
-use miden_lib::account::faucets::create_basic_fungible_faucet;
-use miden_lib::utils::Serializable;
+use anyhow::{Context, Result};
 use miden_node_block_producer::{
     BlockProducer,
     DEFAULT_MAX_BATCHES_PER_BLOCK,
@@ -25,13 +21,16 @@ use miden_node_rpc::Rpc;
 use miden_node_store::{GenesisState, Store};
 use miden_node_utils::crypto::get_rpo_random_coin;
 use miden_node_validator::Validator;
-use miden_objects::account::auth::AuthSecretKey;
-use miden_objects::account::{Account, AccountBuilder, AccountComponent, AccountFile, StorageMap};
-use miden_objects::asset::{Asset, FungibleAsset, TokenSymbol};
-use miden_objects::block::FeeParameters;
-use miden_objects::crypto::dsa::ecdsa_k256_keccak;
-use miden_objects::testing::account_id::ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET;
-use miden_objects::{Felt, ONE, Word};
+use miden_protocol::account::auth::AuthSecretKey;
+use miden_protocol::account::{Account, AccountFile};
+use miden_protocol::asset::TokenSymbol;
+use miden_protocol::block::FeeParameters;
+use miden_protocol::crypto::dsa::ecdsa_k256_keccak;
+use miden_protocol::testing::account_id::ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET;
+use miden_protocol::utils::Serializable;
+use miden_protocol::{Felt, ONE};
+use miden_standards::AuthScheme;
+use miden_standards::account::faucets::create_basic_fungible_faucet;
 use rand_chacha::ChaCha20Rng;
 use rand_chacha::rand_core::SeedableRng;
 use tokio::net::TcpListener;
@@ -96,8 +95,6 @@ impl NodeBuilder {
             miden_node_utils::logging::OpenTelemetry::Disabled,
         )?;
 
-        let test_faucets_and_account = build_test_faucets_and_account()?;
-
         let account_file =
             generate_genesis_account().context("failed to create genesis account")?;
 
@@ -122,7 +119,7 @@ impl NodeBuilder {
         let validator_signer = ecdsa_k256_keccak::SecretKey::new();
 
         let genesis_state = GenesisState::new(
-            [&[account_file.account][..], &test_faucets_and_account[..]].concat(),
+            vec![account_file.account],
             FeeParameters::new(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET.try_into().unwrap(), 0u32)
                 .unwrap(),
             version,
@@ -394,89 +391,17 @@ impl NodeHandle {
 
 // UTILS
 // ================================================================================================
-const TEST_ACCOUNT_ID: &str = "0x0a0a0a0a0a0a0a100a0a0a0a0a0a0a";
-
-// Builds an account that triggers the "too_many_assets" boolean
-// flag when requested from the node.
-fn build_test_faucets_and_account() -> anyhow::Result<Vec<Account>> {
-    let mut rng = ChaCha20Rng::from_seed(random());
-    let secret = AuthSecretKey::new_rpo_falcon512_with_rng(&mut get_rpo_random_coin(&mut rng));
-    let faucets = (0_u128..=1500_u128)
-        .map(|i| -> anyhow::Result<Account> {
-            let init_seed = [i.to_be_bytes(), i.to_be_bytes()]
-                .concat()
-                .try_into()
-                .expect("this won't fail because we have exactly 32 bytes");
-            let symbol = TokenSymbol::new("TKN")?;
-            let decimals = 12;
-            let max_supply = Felt::from(1_u32 << 30);
-            let account_storage_mode = miden_objects::account::AccountStorageMode::Public;
-
-            let auth_scheme = AuthScheme::RpoFalcon512 {
-                pub_key: secret.public_key().to_commitment(),
-            };
-            let faucet = create_basic_fungible_faucet(
-                init_seed,
-                symbol,
-                decimals,
-                max_supply,
-                account_storage_mode,
-                auth_scheme,
-            )?;
-            let (id, vault, storage, code, ..) = faucet.into_parts();
-            Ok(Account::new_unchecked(id, vault, storage, code, ONE, None))
-        })
-        .collect::<Result<Vec<_>>>()
-        .map_err(|err| Error::msg(format!("could not instance tests faucets got: {err}")))?;
-
-    let seed = [0xa; 32];
-    let sk = AuthSecretKey::new_rpo_falcon512_with_rng(&mut ChaCha20Rng::from_seed(seed));
-
-    let map_entries = (0_u32..2001_u32).map(|i| (Word::from([i; 4]), Word::from([i; 4])));
-
-    let storage_map = miden_objects::account::StorageSlot::with_map(
-        miden_objects::account::StorageSlotName::new("miden::test_account::map::too_many_entries")
-            .expect("should be a valid slot name"),
-        StorageMap::with_entries(map_entries).expect("should be a valid map"),
-    );
-
-    let acc_component = AccountComponent::new(basic_wallet_library(), vec![storage_map])
-        .expect(
-            "basic wallet component should satisfy the requirements of a valid account component",
-        )
-        .with_supports_all_types();
-
-    let account = AccountBuilder::new(seed)
-        .with_auth_component(miden_lib::account::auth::AuthRpoFalcon512::new(
-            sk.public_key().to_commitment(),
-        ))
-        .account_type(miden_objects::account::AccountType::RegularAccountUpdatableCode)
-        .with_component(acc_component)
-        .storage_mode(miden_objects::account::AccountStorageMode::Public)
-        .with_assets(faucets.iter().map(|faucet| {
-            Asset::Fungible(FungibleAsset::new(faucet.id(), 100).expect("should be a valid faucet"))
-        }))
-        .build_existing()?;
-
-    assert_eq!(
-        account.id().to_hex(),
-        TEST_ACCOUNT_ID,
-        "test account with a large number of assets was generated with a different id than the one expected"
-    );
-
-    Ok([&faucets[..], &[account][..]].concat())
-}
 
 fn generate_genesis_account() -> anyhow::Result<AccountFile> {
     let mut rng = ChaCha20Rng::from_seed(random());
-    let secret = AuthSecretKey::new_rpo_falcon512_with_rng(&mut get_rpo_random_coin(&mut rng));
+    let secret = AuthSecretKey::new_falcon512_rpo_with_rng(&mut get_rpo_random_coin(&mut rng));
 
     let account = create_basic_fungible_faucet(
         rng.random(),
         TokenSymbol::try_from("TST").expect("TST should be a valid token symbol"),
         12,
         Felt::from(1_000_000u32),
-        miden_objects::account::AccountStorageMode::Public,
+        miden_protocol::account::AccountStorageMode::Public,
         AuthScheme::RpoFalcon512 {
             pub_key: secret.public_key().to_commitment(),
         },
