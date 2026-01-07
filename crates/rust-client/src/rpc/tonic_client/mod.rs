@@ -4,9 +4,11 @@ use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::error::Error;
-use miden_objects::asset::{Asset, AssetVault};
+use miden_protocol::asset::{Asset, AssetVault};
 
-use miden_protocol::account::{Account, AccountCode, AccountId};
+use miden_protocol::account::{
+    Account, AccountCode, AccountId, AccountStorage, StorageMap, StorageSlot, StorageSlotType,
+};
 use miden_protocol::address::NetworkId;
 use miden_protocol::block::account_tree::AccountWitness;
 use miden_protocol::block::{BlockHeader, BlockNumber, ProvenBlock};
@@ -210,7 +212,7 @@ impl GrpcClient {
             // With the current setup, one RPC call should be enough.
             match slot_header.slot_type() {
                 StorageSlotType::Value => {
-                    slots.push(miden_objects::account::StorageSlot::with_value(
+                    slots.push(miden_protocol::account::StorageSlot::with_value(
                         slot_header.name().clone(),
                         slot_header.value(),
                     ));
@@ -247,7 +249,7 @@ impl GrpcClient {
                         }));
                     }
 
-                    slots.push(miden_objects::account::StorageSlot::with_map(
+                    slots.push(miden_protocol::account::StorageSlot::with_map(
                         slot_header.name().clone(),
                         StorageMap::with_entries(map_entries).map_err(|err| {
                             RpcError::InvalidResponse(format!(
