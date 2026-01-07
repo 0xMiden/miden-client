@@ -2,7 +2,7 @@ use alloc::string::ToString;
 use alloc::sync::Arc;
 
 use idxdb_store::auth::{
-    get_account_auth_by_pub_key, get_raw_secret_keys_from_account_id, insert_account_auth,
+    get_account_auth_by_pub_key, get_public_commitments_for_account, insert_account_auth,
 };
 use miden_client::account::AccountId;
 use miden_client::auth::{
@@ -98,20 +98,29 @@ impl<R: Rng> WebKeyStore<R> {
         Ok(())
     }
 
-    pub async fn get_secret_keys_for_account_id(
+    pub async fn get_public_commitments_for_account(
         &self,
         account_id: &AccountId,
-    ) -> Result<Vec<WebAuthSecretKey>, KeyStoreError> {
-        let native_secret_keys = get_raw_secret_keys_from_account_id(*account_id)
+    ) -> Result<Vec<PublicKeyCommitment>, KeyStoreError> {
+        let hex_public_keys = get_public_commitments_for_account(*account_id)
             .await
             .map_err(|err| {
                 KeyStoreError::StorageError(err.as_string().unwrap_or_else(|| format!("{err:?}")))
             })?
-            .into_iter()
-            .map(|sk| decode_secret_key_from_bytes(sk.as_bytes()))
-            .collect::<Result<Vec<_>, _>>()?;
-        let secret_keys = native_secret_keys.into_iter().map(WebAuthSecretKey::from).collect();
-        Ok(secret_keys)
+            .into_iter();
+
+        let mut pks = vec![];
+
+        for hex in hex_public_keys {
+            let parsed = Word::parse(&hex).map_err(|err| {
+                KeyStoreError::StorageError(format!(
+                    "the auth storage contains an invalid public key commitment: {err}, its value is: {hex}"
+                ))
+            })?;
+
+            pks.push(PublicKeyCommitment::from(parsed))
+        }
+        Ok(pks)
     }
 
     pub async fn get_key(

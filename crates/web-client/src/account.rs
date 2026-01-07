@@ -1,4 +1,5 @@
 use miden_client::account::Account as NativeAccount;
+use miden_client::keystore;
 use wasm_bindgen::prelude::*;
 
 use crate::models::account::Account;
@@ -64,6 +65,21 @@ impl WebClient {
             .ok_or(JsValue::from_str("Auth not found for account"))?;
 
         Ok(auth_secret_key.into())
+    }
+
+    #[wasm_bindgen(js_name = "getPublicKeysOfAccount")]
+    pub async fn get_public_keys_of(
+        &mut self,
+        account_id: &AccountId,
+    ) -> Result<AuthSecretKey, JsValue> {
+        let keystore = self.keystore.clone().ok_or(JsValue::from("keystore is not initialized"))?;
+
+        Ok(todo!())
+
+        // Ok(keystore
+        //     .get_public_commitments_for_account(account_id.as_native())
+        //     .await
+        //     .unwrap())
     }
 
     #[wasm_bindgen(js_name = "insertAccountAddress")]

@@ -3,10 +3,7 @@ use alloc::str::FromStr;
 use miden_client::Felt as NativeFelt;
 use miden_client::account::{AccountId as NativeAccountId, NetworkId as NativeNetworkId};
 use miden_client::address::{
-    Address,
-    AddressId,
-    AddressInterface as NativeAccountInterface,
-    CustomNetworkId,
+    Address, AddressId, AddressInterface as NativeAccountInterface, CustomNetworkId,
     RoutingParameters,
 };
 use wasm_bindgen::prelude::*;
@@ -177,6 +174,10 @@ impl AccountId {
     pub fn suffix(&self) -> Felt {
         let native_felt: NativeFelt = self.0.suffix();
         native_felt.into()
+    }
+
+    pub(crate) fn as_native(&self) -> &NativeAccountId {
+        &self.0
     }
 }
 

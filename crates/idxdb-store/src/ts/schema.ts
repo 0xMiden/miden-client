@@ -68,8 +68,8 @@ export interface IAccountAsset {
 }
 
 export interface IAccountAuth {
-  pubKey: string;
-  secretKey: string;
+  pubKeyCommitmentHex: string;
+  secretKeyHex: string;
   accountIdHex: string;
 }
 

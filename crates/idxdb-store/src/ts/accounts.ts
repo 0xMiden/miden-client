@@ -263,11 +263,13 @@ export async function getAccountVaultAssets(vaultRoot: string) {
   }
 }
 
-export async function getAccountAuthByPubKey(pubKey: string) {
+export async function getAccountAuthByPubKeyCommitment(
+  pubKeyCommitmentHex: string
+) {
   // Try to get the account auth from the store
   const accountSecretKey = await accountAuths
-    .where("pubKey")
-    .equals(pubKey)
+    .where("pubKeyCommitmentHex")
+    .equals(pubKeyCommitmentHex)
     .first();
 
   // If it's not in the cache, throw an error
@@ -276,7 +278,7 @@ export async function getAccountAuthByPubKey(pubKey: string) {
   }
 
   const data = {
-    secretKey: accountSecretKey.secretKey,
+    secretKey: accountSecretKey.secretKeyHex,
   };
 
   return data;
@@ -304,14 +306,14 @@ export async function getAccountAddresses(accountId: string) {
   }
 }
 
-export async function getSecretKeysForAccountId(accountIdHex: string) {
+export async function getPublicKeysForAccountId(accountIdHex: string) {
   try {
     let secretKeys = await accountAuths
       .where("accountIdHex")
       .equals(accountIdHex)
       .toArray();
 
-    secretKeys.map((auth) => auth.secretKey);
+    secretKeys.map((auth) => auth.pubKeyCommitmentHex);
 
     return secretKeys;
   } catch (error) {
@@ -419,24 +421,22 @@ export async function upsertAccountRecord(
 }
 
 export async function insertAccountAuth(
-  pubKey: string,
-  secretKey: string,
+  pubKeyCommitmentHex: string,
+  secretKeyHex: string,
   accountIdHex: string
 ) {
   try {
-    // Prepare the data object to insert
     const data = {
-      pubKey,
-      secretKey,
+      pubKeyCommitmentHex,
+      secretKeyHex,
       accountIdHex,
     };
 
-    // Perform the insert using Dexie
     await accountAuths.add(data);
   } catch (error) {
     logWebStoreError(
       error,
-      `Error inserting account auth for pubKey: ${pubKey}`
+      `Error inserting account auth for pubKey: ${pubKeyCommitmentHex}`
     );
   }
 }

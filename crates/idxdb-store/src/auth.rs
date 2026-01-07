@@ -21,8 +21,8 @@ pub struct AccountAuthIdxdbObject {
 extern "C" {
     #[wasm_bindgen(js_name = insertAccountAuth)]
     pub fn idxdb_insert_account_auth(
-        pub_key: String,
-        secret_key: String,
+        pub_key_hex_commitment: String,
+        secret_key_hex: String,
         account_id: String,
     ) -> js_sys::Promise;
 
@@ -30,16 +30,16 @@ extern "C" {
     pub fn idxdb_get_account_auth_by_pub_key(pub_key: String) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = getSecretKeysForAccountId)]
-    pub fn idxdb_get_secret_keys_for_account(account_id_hex: String) -> js_sys::Promise;
+    pub fn idxdb_get_public_keys_for_account(account_id_hex: String) -> js_sys::Promise;
 }
 
 pub async fn insert_account_auth(
-    pub_key: String,
-    secret_key: String,
+    pub_key_commitment_hex: String,
+    secret_key_hex: String,
     account_id: &AccountId,
 ) -> Result<(), JsValue> {
     let account_id_hex = account_id.to_hex();
-    let promise = idxdb_insert_account_auth(pub_key, secret_key, account_id_hex);
+    let promise = idxdb_insert_account_auth(pub_key_commitment_hex, secret_key_hex, account_id_hex);
     JsFuture::from(promise).await?;
 
     Ok(())
@@ -60,20 +60,20 @@ pub async fn get_account_auth_by_pub_key(pub_key: String) -> Result<String, JsVa
     }
 }
 
-pub async fn get_raw_secret_keys_from_account_id(
+pub async fn get_public_commitments_for_account(
     account_id: AccountId,
 ) -> Result<Vec<String>, JsValue> {
     let account_id_hex = account_id.to_hex();
 
-    let promise = idxdb_get_secret_keys_for_account(account_id_hex);
+    let promise = idxdb_get_public_keys_for_account(account_id_hex);
 
     let js_secret_keys = JsFuture::from(promise).await?;
 
-    let raw_secret_keys: Vec<String> = from_value(js_secret_keys).map_err(|err| {
+    let raw_public_keys: Vec<String> = from_value(js_secret_keys).map_err(|err| {
         JsValue::from_str(&format!(
             "Error: failed to deserialize secret keys for account: {account_id}, got error: {err} "
         ))
     })?;
 
-    Ok(raw_secret_keys)
+    Ok(raw_public_keys)
 }
