@@ -44,8 +44,8 @@ pub type CliKeyStore = FilesystemKeyStore<StdRng>;
 /// # Examples
 ///
 /// ```no_run
-/// use miden_client::transaction::TransactionRequest;
 /// use miden_client::DebugMode;
+/// use miden_client::transaction::TransactionRequest;
 /// use miden_client_cli::CliClient;
 ///
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
@@ -77,8 +77,8 @@ impl CliClient {
     /// 2. Global `.miden/miden-client.toml` in the home directory
     ///
     /// The client is initialized with:
-    /// - SQLite store from the configured path
-    /// - gRPC client connection to the configured RPC endpoint
+    /// - `SQLite` store from the configured path
+    /// - `gRPC` client connection to the configured RPC endpoint
     /// - Filesystem-based keystore authenticator
     /// - Optional note transport client (if configured)
     /// - Transaction graceful blocks delta
@@ -86,7 +86,7 @@ impl CliClient {
     ///
     /// # Arguments
     ///
-    /// * `debug_mode` - The debug mode setting (DebugMode::Enabled or DebugMode::Disabled).
+    /// * `debug_mode` - The debug mode setting (`DebugMode::Enabled` or `DebugMode::Disabled`).
     ///
     /// # Returns
     ///
@@ -104,8 +104,8 @@ impl CliClient {
     /// # Examples
     ///
     /// ```no_run
-    /// use miden_client::transaction::TransactionRequest;
     /// use miden_client::DebugMode;
+    /// use miden_client::transaction::TransactionRequest;
     /// use miden_client_cli::CliClient;
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {

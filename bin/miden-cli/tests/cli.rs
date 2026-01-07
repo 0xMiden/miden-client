@@ -10,7 +10,6 @@ use assert_cmd::cargo::cargo_bin_cmd;
 use miden_client::account::{AccountId, AccountStorageMode};
 use miden_client::address::AddressInterface;
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
-use miden_client::DebugMode;
 use miden_client::crypto::{FeltRng, RpoRandomCoin};
 use miden_client::note::{
     Note,
@@ -38,6 +37,7 @@ use miden_client::utils::Serializable;
 use miden_client::{
     self,
     Client,
+    DebugMode,
     ExecutionOptions,
     Felt,
     MAX_TX_EXECUTION_CYCLES,
@@ -1316,11 +1316,7 @@ async fn test_from_system_user_config_with_local_config() -> Result<()> {
 
     // Verify the client is functional by syncing
     let sync_result = client.sync_state().await;
-    assert!(
-        sync_result.is_ok(),
-        "Client sync failed: {:?}",
-        sync_result.err()
-    );
+    assert!(sync_result.is_ok(), "Client sync failed: {:?}", sync_result.err());
 
     Ok(())
 }
@@ -1403,11 +1399,7 @@ async fn test_from_system_user_config_with_global_config() -> Result<()> {
     cleanup_global_config();
 
     // Assert the client was created successfully using global config
-    assert!(
-        client.is_ok(),
-        "Failed to create client from global config: {:?}",
-        client.err()
-    );
+    assert!(client.is_ok(), "Failed to create client from global config: {:?}", client.err());
 
     Ok(())
 }
@@ -1457,11 +1449,7 @@ async fn test_from_system_user_config_local_priority() -> Result<()> {
     cleanup_global_config();
 
     // Assert client was created with local config
-    assert!(
-        client.is_ok(),
-        "Failed to create client with local config: {:?}",
-        client.err()
-    );
+    assert!(client.is_ok(), "Failed to create client with local config: {:?}", client.err());
 
     Ok(())
 }
