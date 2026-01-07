@@ -10,6 +10,7 @@ use assert_cmd::cargo::cargo_bin_cmd;
 use miden_client::account::{AccountId, AccountStorageMode};
 use miden_client::address::AddressInterface;
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
+use miden_client::DebugMode;
 use miden_client::crypto::{FeltRng, RpoRandomCoin};
 use miden_client::note::{
     Note,
@@ -1282,4 +1283,185 @@ fn create_account_with_ecdsa_auth() {
     ]);
 
     create_account_cmd.current_dir(&temp_dir).assert().success();
+}
+
+// FROM_SYSTEM_USER_CONFIG TESTS
+// ================================================================================================
+
+/// Tests that `CliClient::from_system_user_config()` successfully creates a client with the same
+/// configuration as the CLI tool.
+#[tokio::test]
+async fn test_from_system_user_config_with_local_config() -> Result<()> {
+    // Initialize a local CLI configuration
+    let (_store_path, temp_dir, _endpoint) = init_cli();
+
+    // Change to the temp directory to ensure the local config is picked up
+    let original_dir = env::current_dir().unwrap();
+    env::set_current_dir(&temp_dir)?;
+
+    // Create a client using the new from_system_user_config method
+    let client = miden_client_cli::CliClient::from_system_user_config(DebugMode::Disabled).await;
+
+    // Restore original directory
+    env::set_current_dir(original_dir)?;
+
+    // Assert the client was created successfully
+    assert!(
+        client.is_ok(),
+        "Failed to create client from system user config: {:?}",
+        client.err()
+    );
+
+    let mut client = client.unwrap();
+
+    // Verify the client is functional by syncing
+    let sync_result = client.sync_state().await;
+    assert!(
+        sync_result.is_ok(),
+        "Client sync failed: {:?}",
+        sync_result.err()
+    );
+
+    Ok(())
+}
+
+/// Tests that `CliClient::from_system_user_config()` fails gracefully when no config exists.
+#[tokio::test]
+async fn test_from_system_user_config_no_config() -> Result<()> {
+    // Create a temporary directory with no .miden configuration
+    let temp_dir = temp_dir().join(format!("cli-test-no-config-{}", rand::rng().random::<u64>()));
+    std::fs::create_dir_all(&temp_dir)?;
+
+    // Ensure no global config exists
+    cleanup_global_config();
+
+    // Change to the temp directory
+    let original_dir = env::current_dir().unwrap();
+    env::set_current_dir(&temp_dir)?;
+
+    // Attempt to create a client (should fail)
+    let client = miden_client_cli::CliClient::from_system_user_config(DebugMode::Disabled).await;
+
+    // Restore original directory
+    env::set_current_dir(original_dir)?;
+
+    // Clean up temp directory
+    let _ = std::fs::remove_dir_all(&temp_dir);
+
+    // Assert the client creation failed
+    assert!(
+        client.is_err(),
+        "Expected error when no config exists, but client was created successfully"
+    );
+
+    Ok(())
+}
+
+/// Tests that `CliClient::from_system_user_config()` works with global config when no local
+/// config exists.
+#[tokio::test]
+async fn test_from_system_user_config_with_global_config() -> Result<()> {
+    // Clean up any existing global config first
+    cleanup_global_config();
+
+    // Create a global config
+    let store_path = create_test_store_path();
+    let endpoint = Endpoint::localhost();
+
+    // Initialize global config (not local)
+    let temp_dir = temp_dir().join(format!("cli-test-global-{}", rand::rng().random::<u64>()));
+    std::fs::create_dir_all(&temp_dir)?;
+
+    let mut init_cmd = cargo_bin_cmd!("miden-client");
+    init_cmd.args([
+        "init",
+        "--network",
+        endpoint.to_string().as_str(),
+        "--store-path",
+        store_path.to_str().unwrap(),
+    ]);
+    init_cmd.current_dir(&temp_dir).assert().success();
+
+    // Create a different temporary directory (without local config)
+    let temp_dir_no_config =
+        std::env::temp_dir().join(format!("cli-test-no-local-{}", rand::rng().random::<u64>()));
+    std::fs::create_dir_all(&temp_dir_no_config)?;
+
+    // Change to directory without local config
+    let original_dir = env::current_dir().unwrap();
+    env::set_current_dir(&temp_dir_no_config)?;
+
+    // Create a client using the global config
+    let client = miden_client_cli::CliClient::from_system_user_config(DebugMode::Disabled).await;
+
+    // Restore original directory
+    env::set_current_dir(original_dir)?;
+
+    // Clean up
+    let _ = std::fs::remove_dir_all(&temp_dir);
+    let _ = std::fs::remove_dir_all(&temp_dir_no_config);
+    cleanup_global_config();
+
+    // Assert the client was created successfully using global config
+    assert!(
+        client.is_ok(),
+        "Failed to create client from global config: {:?}",
+        client.err()
+    );
+
+    Ok(())
+}
+
+/// Tests that local config takes priority over global config.
+#[tokio::test]
+async fn test_from_system_user_config_local_priority() -> Result<()> {
+    // Clean up any existing global config
+    cleanup_global_config();
+
+    // Create a global config with testnet endpoint
+    let global_store_path = create_test_store_path();
+    let global_endpoint = Endpoint::testnet();
+
+    let temp_dir_for_global =
+        temp_dir().join(format!("cli-test-global-init-{}", rand::rng().random::<u64>()));
+    std::fs::create_dir_all(&temp_dir_for_global)?;
+
+    let mut init_global_cmd = cargo_bin_cmd!("miden-client");
+    init_global_cmd.args([
+        "init",
+        "--network",
+        global_endpoint.to_string().as_str(),
+        "--store-path",
+        global_store_path.to_str().unwrap(),
+    ]);
+    init_global_cmd.current_dir(&temp_dir_for_global).assert().success();
+
+    // Create a local config with localhost endpoint
+    let local_store_path = create_test_store_path();
+    let local_endpoint = Endpoint::localhost();
+    let local_temp_dir = init_cli_with_store_path(&local_store_path, &local_endpoint);
+
+    // Change to local directory
+    let original_dir = env::current_dir().unwrap();
+    env::set_current_dir(&local_temp_dir)?;
+
+    // Create client (should use local config)
+    let client = miden_client_cli::CliClient::from_system_user_config(DebugMode::Disabled).await;
+
+    // Restore original directory
+    env::set_current_dir(original_dir)?;
+
+    // Clean up
+    let _ = std::fs::remove_dir_all(&temp_dir_for_global);
+    let _ = std::fs::remove_dir_all(&local_temp_dir);
+    cleanup_global_config();
+
+    // Assert client was created with local config
+    assert!(
+        client.is_ok(),
+        "Failed to create client with local config: {:?}",
+        client.err()
+    );
+
+    Ok(())
 }
