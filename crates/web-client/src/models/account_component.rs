@@ -1,7 +1,10 @@
 use miden_client::Word as NativeWord;
-use miden_client::account::StorageSlot as NativeStorageSlot;
 use miden_client::account::component::AccountComponent as NativeAccountComponent;
-use miden_client::assembly::Library as NativeLibrary;
+use miden_client::account::{
+    AccountComponentCode as NativeAccountComponentCode,
+    StorageSlot as NativeStorageSlot,
+};
+use miden_client::assembly::{Library as NativeLibrary, MastNodeExt};
 use miden_client::auth::{
     AuthEcdsaK256Keccak as NativeEcdsaK256Keccak,
     AuthRpoFalcon512 as NativeRpoFalcon512,
@@ -9,16 +12,15 @@ use miden_client::auth::{
     PublicKeyCommitment,
 };
 use miden_client::vm::Package as NativePackage;
-use miden_protocol::assembly::mast::MastNodeExt;
 use wasm_bindgen::prelude::*;
 
 use crate::js_error_with_context;
+use crate::models::account_component_code::AccountComponentCode;
 use crate::models::auth::AuthScheme;
 use crate::models::auth_secret_key::AuthSecretKey;
 use crate::models::library::Library;
 use crate::models::miden_arrays::StorageSlotArray;
 use crate::models::package::Package;
-use crate::models::script_builder::CodeBuilder;
 use crate::models::storage_slot::StorageSlot;
 use crate::models::word::Word;
 
@@ -62,19 +64,15 @@ pub struct AccountComponent(NativeAccountComponent);
 impl AccountComponent {
     /// Compiles account code with the given storage slots using the provided assembler.
     pub fn compile(
-        account_code: &str,
-        builder: &CodeBuilder,
+        account_code: AccountComponentCode,
         storage_slots: Vec<StorageSlot>,
     ) -> Result<AccountComponent, JsValue> {
         let native_slots: Vec<NativeStorageSlot> =
             storage_slots.into_iter().map(Into::into).collect();
 
-        let native_library = builder
-            .clone_assembler()
-            .assemble_library([account_code])
-            .map_err(|e| JsValue::from_str(&format!("Failed to compile account component: {e}")))?;
+        let native_account_code: NativeAccountComponentCode = account_code.into();
 
-        NativeAccountComponent::new(native_library, native_slots)
+        NativeAccountComponent::new(native_account_code, native_slots)
             .map(AccountComponent)
             .map_err(|e| js_error_with_context(e, "Failed to compile account component"))
     }
