@@ -233,23 +233,23 @@ pub trait NodeRpcClient: Send + Sync {
     ///
     /// The default implementation of this method uses
     /// [`NodeRpcClient::sync_nullifiers`].
-    async fn get_nullifiers_commit_height(
+    async fn get_nullifier_commit_heights(
         &self,
-        requested_nullifiers: &[Nullifier],
-        block_num: BlockNumber,
+        requested_nullifiers: BTreeSet<Nullifier>,
+        block_from: BlockNumber,
     ) -> Result<BTreeMap<Nullifier, Option<BlockNumber>>, RpcError> {
         let prefixes: Vec<u16> =
             requested_nullifiers.iter().map(crate::note::Nullifier::prefix).collect();
-        let retrieved_nullifiers = self.sync_nullifiers(&prefixes, block_num, None).await?;
+        let retrieved_nullifiers = self.sync_nullifiers(&prefixes, block_from, None).await?;
 
         let mut nullifiers_height = BTreeMap::new();
         for nullifier in requested_nullifiers {
             if let Some(update) =
-                retrieved_nullifiers.iter().find(|update| update.nullifier == *nullifier)
+                retrieved_nullifiers.iter().find(|update| update.nullifier == nullifier)
             {
-                nullifiers_height.insert(*nullifier, Some(update.block_num));
+                nullifiers_height.insert(nullifier, Some(update.block_num));
             } else {
-                nullifiers_height.insert(*nullifier, None);
+                nullifiers_height.insert(nullifier, None);
             }
         }
 

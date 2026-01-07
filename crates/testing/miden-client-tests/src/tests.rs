@@ -575,8 +575,8 @@ async fn import_note_validation() {
     for note in &available_notes {
         let Some(public_note) = note.note() else { continue };
         let nullifiers = rpc_api
-            .get_nullifiers_commit_height(
-                &[public_note.nullifier()],
+            .get_nullifier_commit_heights(
+                BTreeSet::from([public_note.nullifier()]),
                 note.inclusion_proof().location().block_num(),
             )
             .await
@@ -2121,25 +2121,25 @@ const BUMP_MAP_CODE: &str = r#"
                 pub proc bump_map_item
                     # map key
                     push.{map_key}
-                    
+
                     # push slot_id_prefix, slot_id_suffix for the map slot
                     push.MAP_SLOT[0..2]
 
                     exec.::miden::protocol::active_account::get_map_item
                     add.1
                     push.{map_key}
-                    
+
                     # push slot_id_prefix, slot_id_suffix for the map slot
                     push.MAP_SLOT[0..2]
                     exec.::miden::protocol::native_account::set_map_item
                     dropw
                     # => [OLD_VALUE]
-                    
+
                     dupw
-                    
+
                     # push slot_id_prefix, slot_id_suffix for the map slot
                     push.MAP_SLOT[0..2]
-                    
+
                     # Set a new item each time as the value keeps changing
                     exec.::miden::protocol::native_account::set_map_item
                     dropw dropw

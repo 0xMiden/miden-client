@@ -42,7 +42,7 @@ where
     /// Imports a batch of new input notes into the client's store. The information stored depends
     /// on the type of note files provided. If the notes existed previously, it will be updated
     /// with the new information. The tags specified by the `NoteFile`s will start being
-    /// tracked.
+    /// tracked. Returns the IDs of notes that were successfully imported or updated.
     ///
     /// - If the note files are [`NoteFile::NoteId`], the notes are fetched from the node and stored
     ///   in the client's store. If the note is private or doesn't exist, an error is returned.
@@ -57,6 +57,9 @@ where
     /// - If an attempt is made to overwrite a note that is currently processing.
     /// - If the client has reached the note tags limit
     ///   ([`NOTE_TAG_LIMIT`](crate::rpc::NOTE_TAG_LIMIT)).
+    ///
+    /// Note: This operation is atomic. If any note file is invalid or any existing note is in the
+    /// processing state, the entire operation fails and no notes are imported.
     pub async fn import_notes(
         &mut self,
         note_files: &[NoteFile],
@@ -73,7 +76,7 @@ where
 
         let note_ids: Vec<NoteId> = note_ids_map.keys().copied().collect();
         let previous_notes: Vec<InputNoteRecord> =
-            self.get_input_notes(NoteFilter::List(note_ids.clone())).await?;
+            self.get_input_notes(NoteFilter::List(note_ids)).await?;
         let previous_notes_map: BTreeMap<NoteId, InputNoteRecord> =
             previous_notes.into_iter().map(|note| (note.id(), note)).collect();
 
@@ -121,7 +124,9 @@ where
             imported_notes.extend(notes_by_proof);
         }
 
+        let mut imported_note_ids = vec![];
         for note in imported_notes.into_iter().flatten() {
+            imported_note_ids.push(note.id());
             if let InputNoteState::Expected(ExpectedNoteState { tag: Some(tag), .. }) = note.state()
             {
                 self.insert_note_tag(NoteTagRecord::with_note_source(*tag, note.id())).await?;
@@ -129,7 +134,7 @@ where
             self.store.upsert_input_notes(&[note]).await?;
         }
 
-        Ok(note_ids)
+        Ok(imported_note_ids)
     }
 
     // HELPERS
@@ -216,16 +221,16 @@ where
         // TODO: iterating twice over requested notes
         let mut note_records = vec![];
 
-        let mut nullifier_requests = vec![];
+        let mut nullifier_requests = BTreeSet::new();
         let mut lowest_block_height: BlockNumber = u32::MAX.into();
         for (previous_note, note, inclusion_proof) in &requested_notes {
             if let Some(previous_note) = previous_note {
-                nullifier_requests.push(previous_note.nullifier());
+                nullifier_requests.insert(previous_note.nullifier());
                 if inclusion_proof.location().block_num() < lowest_block_height {
                     lowest_block_height = inclusion_proof.location().block_num();
                 }
             } else {
-                nullifier_requests.push(note.nullifier());
+                nullifier_requests.insert(note.nullifier());
                 if inclusion_proof.location().block_num() < lowest_block_height {
                     lowest_block_height = inclusion_proof.location().block_num();
                 }
@@ -234,7 +239,7 @@ where
 
         let nullifier_commit_heights = self
             .rpc_api
-            .get_nullifiers_commit_height(&nullifier_requests, lowest_block_height)
+            .get_nullifier_commit_heights(nullifier_requests, lowest_block_height)
             .await?;
 
         for (previous_note, note, inclusion_proof) in requested_notes {

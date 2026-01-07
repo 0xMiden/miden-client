@@ -109,8 +109,12 @@ pub async fn test_pass_through(client_config: ClientConfig) -> Result<()> {
 
     println!("consuming pass-through note");
 
-    client.import_note(NoteFile::NoteId(pass_through_note_1.id())).await?;
-    client.import_note(NoteFile::NoteId(pass_through_note_2.id())).await?;
+    client
+        .import_notes(&[
+            NoteFile::NoteId(pass_through_note_1.id()),
+            NoteFile::NoteId(pass_through_note_2.id()),
+        ])
+        .await?;
     client.sync_state().await?;
     let input_note_record = client.get_input_note(pass_through_note_1.id()).await?.unwrap();
     assert!(matches!(input_note_record.state(), InputNoteState::Committed { .. }));

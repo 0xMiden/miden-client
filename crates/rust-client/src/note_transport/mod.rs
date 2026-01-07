@@ -128,7 +128,7 @@ where
 
         let sync_height = self.get_sync_height().await?;
         // Import fetched notes
-        let mut note_requests = vec![];
+        let mut note_requests = Vec::with_capacity(notes.len());
         for note in notes {
             let tag = note.metadata().tag();
             let note_file = NoteFile::NoteDetails {
