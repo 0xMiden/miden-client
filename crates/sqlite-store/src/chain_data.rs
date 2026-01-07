@@ -361,7 +361,7 @@ mod test {
     use miden_client::block::BlockHeader;
     use miden_client::crypto::{Forest, MmrPeaks};
     use miden_client::store::Store;
-    use miden_lib::transaction::TransactionKernel;
+    use miden_protocol::transaction::TransactionKernel;
 
     use crate::SqliteStore;
     use crate::tests::create_test_store;

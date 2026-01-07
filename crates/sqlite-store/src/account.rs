@@ -15,18 +15,30 @@ use miden_client::account::{
     AccountIdPrefix,
     AccountStorage,
     Address,
+    PartialAccount,
+    PartialStorage,
+    PartialStorageMap,
     StorageMap,
     StorageSlot,
+    StorageSlotContent,
+    StorageSlotName,
     StorageSlotType,
 };
 use miden_client::asset::{Asset, AssetVault, AssetWitness, FungibleAsset, NonFungibleDeltaAction};
 use miden_client::crypto::{MerkleStore, SmtLeaf, SmtProof};
-use miden_client::store::{AccountRecord, AccountStatus, StoreError};
+use miden_client::store::{
+    AccountRecord,
+    AccountRecordData,
+    AccountStatus,
+    AccountStorageFilter,
+    StoreError,
+};
 use miden_client::sync::NoteTagRecord;
 use miden_client::utils::{Deserializable, Serializable};
 use miden_client::{AccountError, Felt, Word};
-use miden_objects::account::StorageMapWitness;
-use miden_objects::asset::AssetVaultKey;
+use miden_protocol::account::{AccountStorageHeader, StorageMapWitness, StorageSlotHeader};
+use miden_protocol::asset::{AssetVaultKey, PartialVault};
+use miden_protocol::crypto::merkle::SparseMerklePath;
 use rusqlite::types::Value;
 use rusqlite::{Connection, Params, Transaction, named_params, params};
 
@@ -181,7 +193,79 @@ impl SqliteStore {
         );
 
         let addresses = query_account_addresses(conn, header.id())?;
-        Ok(Some(AccountRecord::new(account, status, addresses)))
+        let account_data = AccountRecordData::Full(account);
+        Ok(Some(AccountRecord::new(account_data, status, addresses)))
+    }
+
+    pub(crate) fn get_minimal_partial_account(
+        conn: &mut Connection,
+        merkle_store: &Arc<RwLock<MerkleStore>>,
+        account_id: AccountId,
+    ) -> Result<Option<AccountRecord>, StoreError> {
+        let Some((header, status)) = Self::get_account_header(conn, account_id)? else {
+            return Ok(None);
+        };
+
+        // Partial vault retrieval
+        let merkle_store = merkle_store.read().expect("merkle_store read lock not poisoned");
+        let partial_vault = PartialVault::new(header.vault_root());
+
+        // Partial storage retrieval
+        let mut storage_header = Vec::new();
+        let mut maps = vec![];
+
+        let storage_values = query_storage_values(
+            conn,
+            "commitment = ?",
+            params![header.storage_commitment().to_hex()],
+        )?;
+
+        for (slot_name, (slot_type, value)) in storage_values {
+            storage_header.push(StorageSlotHeader::new(slot_name.clone(), slot_type, value));
+            if slot_type == StorageSlotType::Map {
+                // TODO: querying the database for a single map is not performant
+                // consider retrieving all storage maps in a single transaction.
+                let mut partial_storage_map = PartialStorageMap::new(value);
+                let mut query = query_storage_maps(conn, "root = ?", [value.to_hex()])?;
+
+                if let Some(map) = query.remove(&value) {
+                    for (k, v) in map.entries() {
+                        let (_, path) = get_storage_map_item_proof(&merkle_store, value, *k)?;
+                        let path = SparseMerklePath::try_from(path)
+                            .map_err(StoreError::MerkleStoreError)?;
+                        let leaf = SmtLeaf::Single((StorageMap::hash_key(*k), *v));
+                        let proof = SmtProof::new(path, leaf).map_err(StoreError::SmtProofError)?;
+
+                        let witness = StorageMapWitness::new(proof, vec![*k])
+                            .map_err(StoreError::StorageMapError)?;
+                        partial_storage_map.add(witness).map_err(StoreError::MerkleStoreError)?;
+                    }
+                }
+
+                maps.push(partial_storage_map);
+            }
+        }
+        storage_header.sort_by_key(StorageSlotHeader::id);
+        let storage_header =
+            AccountStorageHeader::new(storage_header).map_err(StoreError::AccountError)?;
+        let partial_storage =
+            PartialStorage::new(storage_header, maps).map_err(StoreError::AccountError)?;
+
+        let Some(account_code) = query_account_code(conn, header.code_commitment())? else {
+            return Ok(None);
+        };
+
+        let partial_account = PartialAccount::new(
+            header.id(),
+            header.nonce(),
+            account_code,
+            partial_storage,
+            partial_vault,
+            status.seed().copied(),
+        )?;
+        let account_record_data = AccountRecordData::Partial(partial_account);
+        let addresses = query_account_addresses(conn, header.id())?;
+        Ok(Some(AccountRecord::new(account_record_data, status, addresses)))
     }
 
     pub(crate) fn insert_account(
@@ -196,8 +280,8 @@ impl SqliteStore {
 
         Self::insert_storage_slots(
             &tx,
-            account.storage().commitment(),
-            account.storage().slots().iter().enumerate(),
+            account.storage().to_commitment(),
+            account.storage().slots().iter(),
         )?;
 
         Self::insert_assets(&tx, account.vault().root(), account.vault().assets())?;
@@ -317,14 +401,24 @@ impl SqliteStore {
     pub fn get_account_storage(
         conn: &Connection,
         account_id: AccountId,
+        filter: &AccountStorageFilter,
     ) -> Result<AccountStorage, StoreError> {
-        let slots = query_storage_slots(
-            conn,
-            "commitment = (SELECT storage_commitment FROM accounts WHERE id = ? ORDER BY nonce DESC LIMIT 1)",
-            params![account_id.to_hex()],
-        )?
-        .into_values()
-        .collect();
+        let (where_clause, params) = match filter {
+            AccountStorageFilter::All => (
+                "commitment = (SELECT storage_commitment FROM accounts WHERE id = ? ORDER BY nonce DESC LIMIT 1)",
+                params![account_id.to_hex()],
+            ),
+            AccountStorageFilter::Root(root) => (
+                "commitment = (SELECT storage_commitment FROM accounts WHERE id = ? ORDER BY nonce DESC LIMIT 1) AND slot_value = ?",
+                params![account_id.to_hex(), root.to_hex()],
+            ),
+            AccountStorageFilter::SlotName(slot_name) => (
+                "commitment = (SELECT storage_commitment FROM accounts WHERE id = ? ORDER BY nonce DESC LIMIT 1) AND slot_name = ?",
+                params![account_id.to_hex(), slot_name.to_string()],
+            ),
+        };
+
+        let slots = query_storage_slots(conn, where_clause, params)?.into_values().collect();
 
         Ok(AccountStorage::new(slots)?)
     }
@@ -365,22 +459,24 @@ impl SqliteStore {
         conn: &mut Connection,
         merkle_store: &Arc<RwLock<MerkleStore>>,
         account_id: AccountId,
-        index: u8,
+        slot_name: StorageSlotName,
         key: Word,
     ) -> Result<(Word, StorageMapWitness), StoreError> {
         let header = Self::get_account_header(conn, account_id)?
             .ok_or(StoreError::AccountDataNotFound(account_id))?
             .0;
 
-        let StorageSlot::Map(map) = query_storage_slots(
+        let StorageSlotContent::Map(map) = query_storage_slots(
             conn,
-            "commitment = ? AND slot_index = ?",
-            params![header.storage_commitment().to_hex(), index],
+            "commitment = ? AND slot_name = ?",
+            params![header.storage_commitment().to_hex(), slot_name.to_string()],
         )?
-        .remove(&index)
-        .ok_or(StoreError::AccountStorageNotFound(header.storage_commitment()))?
+        .remove(&slot_name)
+        .ok_or(StoreError::AccountStorageRootNotFound(header.storage_commitment()))?
+        .into_parts()
+        .1
         else {
-            return Err(StoreError::AccountError(AccountError::StorageSlotNotMap(index)));
+            return Err(StoreError::AccountError(AccountError::StorageSlotNotMap(slot_name)));
         };
 
         let item = map.get(&key);
@@ -448,7 +544,7 @@ impl SqliteStore {
         init_account_state: &AccountHeader,
         final_account_state: &AccountHeader,
         mut updated_fungible_assets: BTreeMap<AccountIdPrefix, FungibleAsset>,
-        mut updated_storage_maps: BTreeMap<u8, StorageMap>,
+        mut updated_storage_maps: BTreeMap<StorageSlotName, StorageMap>,
         delta: &AccountDelta,
     ) -> Result<(), StoreError> {
         // Copy over the storage and vault from the previous state. Non-relevant data will not be
@@ -533,17 +629,18 @@ impl SqliteStore {
         // Apply storage delta. This map will contain all updated storage slots, both values and
         // maps. It gets initialized with value type updates which contain the new value and
         // don't depend on previous state.
-        let mut updated_storage_slots: BTreeMap<u8, StorageSlot> = delta
+        let mut updated_storage_slots: BTreeMap<StorageSlotName, StorageSlot> = delta
             .storage()
             .values()
-            .iter()
-            .map(|(index, slot)| (*index, StorageSlot::Value(*slot)))
+            .map(|(slot_name, slot)| {
+                (slot_name.clone(), StorageSlot::with_value(slot_name.clone(), *slot))
+            })
             .collect();
 
         // For storage map deltas, we only updated the keys in the delta, this is why we need the
         // previously retrieved storage maps.
-        for (index, map_delta) in delta.storage().maps() {
-            let mut map = updated_storage_maps.remove(index).unwrap_or_default();
+        for (slot_name, map_delta) in delta.storage().maps() {
+            let mut map = updated_storage_maps.remove(slot_name).unwrap_or_default();
 
             update_storage_map_nodes(
                 merkle_store,
@@ -555,13 +652,14 @@ impl SqliteStore {
                 map.insert((*key).into(), *value)?;
             }
 
-            updated_storage_slots.insert(*index, StorageSlot::Map(map));
+            updated_storage_slots
+                .insert(slot_name.clone(), StorageSlot::with_map(slot_name.clone(), map));
         }
 
         Self::insert_storage_slots(
             tx,
             final_account_state.storage_commitment(),
-            updated_storage_slots.iter().map(|(index, slot)| (*index as usize, slot)),
+            updated_storage_slots.values(),
         )?;
 
         Ok(())
@@ -598,26 +696,25 @@ impl SqliteStore {
         conn: &Connection,
         header: &AccountHeader,
         delta: &AccountDelta,
-    ) -> Result<BTreeMap<u8, StorageMap>, StoreError> {
-        let updated_map_indexes = delta
+    ) -> Result<BTreeMap<StorageSlotName, StorageMap>, StoreError> {
+        let updated_map_names = delta
             .storage()
             .maps()
-            .keys()
-            .map(|k| Value::Integer(i64::from(*k)))
+            .map(|(slot_name, _)| Value::Text(slot_name.to_string()))
             .collect::<Vec<Value>>();
 
         query_storage_slots(
             conn,
-            "commitment = ? AND slot_index IN rarray(?)",
-            params![header.storage_commitment().to_hex(), Rc::new(updated_map_indexes)],
+            "commitment = ? AND slot_name IN rarray(?)",
+            params![header.storage_commitment().to_hex(), Rc::new(updated_map_names)],
         )?
         .into_iter()
-        .map(|(index, slot)| {
-            let StorageSlot::Map(map) = slot else {
-                return Err(StoreError::AccountError(AccountError::StorageSlotNotMap(index)));
+        .map(|(slot_name, slot)| {
+            let StorageSlotContent::Map(map) = slot.into_parts().1 else {
+                return Err(StoreError::AccountError(AccountError::StorageSlotNotMap(slot_name)));
             };
 
-            Ok((index, map))
+            Ok((slot_name, map))
         })
         .collect()
     }
@@ -662,13 +759,13 @@ impl SqliteStore {
             const STORAGE_QUERY: &str = "
                 INSERT OR IGNORE INTO account_storage (
                     commitment,
-                    slot_index,
+                    slot_name,
                     slot_value,
                     slot_type
                 )
                 SELECT
                     ?, -- new commitment
-                    slot_index,
+                    slot_name,
                     slot_value,
                     slot_type
                 FROM account_storage
@@ -706,8 +803,8 @@ impl SqliteStore {
         insert_storage_map_nodes(merkle_store, new_account_state.storage());
         Self::insert_storage_slots(
             tx,
-            new_account_state.storage().commitment(),
-            new_account_state.storage().slots().iter().enumerate(),
+            new_account_state.storage().to_commitment(),
+            new_account_state.storage().slots().iter(),
         )?;
         insert_asset_nodes(merkle_store, new_account_state.vault());
         Self::insert_assets(
@@ -829,13 +926,13 @@ impl SqliteStore {
     fn insert_storage_slots<'a>(
         tx: &Transaction<'_>,
         commitment: Word,
-        account_storage: impl Iterator<Item = (usize, &'a StorageSlot)>,
+        account_storage: impl Iterator<Item = &'a StorageSlot>,
     ) -> Result<(), StoreError> {
-        for (index, slot) in account_storage {
+        for slot in account_storage {
             const QUERY: &str = insert_sql!(
                 account_storage {
                     commitment,
-                    slot_index,
+                    slot_name,
                     slot_value,
                     slot_type
                 } | REPLACE
@@ -845,14 +942,14 @@ impl SqliteStore {
                 QUERY,
                 params![
                     commitment.to_hex(),
-                    index,
+                    slot.name().to_string(),
                     slot.value().to_hex(),
                     slot.slot_type().to_bytes()
                 ],
             )
             .into_store_error()?;
 
-            if let StorageSlot::Map(map) = slot {
+            if let StorageSlotContent::Map(map) = slot.content() {
                 const MAP_QUERY: &str =
                     insert_sql!(storage_map_entries { root, key, value } | REPLACE);
                 for (key, value) in map.entries() {
@@ -956,25 +1053,27 @@ fn query_storage_slots(
     conn: &Connection,
     where_clause: &str,
     params: impl Params,
-) -> Result<BTreeMap<u8, StorageSlot>, StoreError> {
-    const STORAGE_QUERY: &str = "SELECT slot_index, slot_value, slot_type FROM account_storage";
+) -> Result<BTreeMap<StorageSlotName, StorageSlot>, StoreError> {
+    const STORAGE_QUERY: &str = "SELECT slot_name, slot_value, slot_type FROM account_storage";
 
     let query = format!("{STORAGE_QUERY} WHERE {where_clause}");
     let storage_values = conn
         .prepare(&query)
         .into_store_error()?
         .query_map(params, |row| {
-            let index: u8 = row.get(0)?;
+            let slot_name: String = row.get(0)?;
             let value: String = row.get(1)?;
             let slot_type: Vec<u8> = row.get(2)?;
-            Ok((index, value, slot_type))
+            Ok((slot_name, value, slot_type))
         })
         .into_store_error()?
         .map(|result| {
-            let (index, value, slot_type) = result.into_store_error()?;
-            Ok((index, Word::try_from(value)?, StorageSlotType::read_from_bytes(&slot_type)?))
+            let (slot_name, value, slot_type) = result.into_store_error()?;
+            let slot_name = StorageSlotName::new(slot_name)
+                .map_err(|err| StoreError::ParsingError(err.to_string()))?;
+            Ok((slot_name, Word::try_from(value)?, StorageSlotType::read_from_bytes(&slot_type)?))
         })
-        .collect::<Result<Vec<(u8, Word, StorageSlotType)>, StoreError>>()?;
+        .collect::<Result<Vec<(StorageSlotName, Word, StorageSlotType)>, StoreError>>()?;
 
     let possible_roots: Vec<Value> =
         storage_values.iter().map(|(_, value, _)| Value::from(value.to_hex())).collect();
@@ -984,14 +1083,15 @@ fn query_storage_slots(
 
     Ok(storage_values
         .into_iter()
-        .map(|(index, value, slot_type)| {
+        .map(|(slot_name, value, slot_type)| {
             let slot = match slot_type {
-                StorageSlotType::Value => StorageSlot::Value(value),
-                StorageSlotType::Map => {
-                    StorageSlot::Map(storage_maps.remove(&value).unwrap_or_default())
-                },
+                StorageSlotType::Value => StorageSlot::with_value(slot_name.clone(), value),
+                StorageSlotType::Map => StorageSlot::with_map(
+                    slot_name.clone(),
+                    storage_maps.remove(&value).unwrap_or_default(),
+                ),
             };
-            (index, slot)
+            (slot_name, slot)
         })
         .collect())
 }
@@ -1028,6 +1128,35 @@ fn query_storage_maps(
     }
 
     Ok(maps)
+}
+
+fn query_storage_values(
+    conn: &Connection,
+    where_clause: &str,
+    params: impl Params,
+) -> Result<BTreeMap<StorageSlotName, (StorageSlotType, Word)>, StoreError> {
+    const STORAGE_QUERY: &str = "SELECT slot_name, slot_value, slot_type FROM account_storage";
+
+    let query = format!("{STORAGE_QUERY} WHERE {where_clause}");
+    conn.prepare(&query)
+        .into_store_error()?
+        .query_map(params, |row| {
+            let slot_name: String = row.get(0)?;
+            let value: String = row.get(1)?;
+            let slot_type: Vec<u8> = row.get(2)?;
+            Ok((slot_name, value, slot_type))
+        })
+        .into_store_error()?
+        .map(|result| {
+            let (slot_name, value, slot_type) = result.into_store_error()?;
+            let slot_name = StorageSlotName::new(slot_name)
+                .map_err(|err| StoreError::ParsingError(err.to_string()))?;
+            Ok((
+                slot_name,
+                (StorageSlotType::read_from_bytes(&slot_type)?, Word::try_from(value)?),
+            ))
+        })
+        .collect()
 }
 
 fn query_vault_assets(
@@ -1138,7 +1267,7 @@ mod tests {
     use std::vec::Vec;
 
     use anyhow::Context;
-    use miden_client::account::component::AccountComponent;
+    use miden_client::account::component::{AccountComponent, basic_wallet_library};
     use miden_client::account::{
         Account,
         AccountBuilder,
@@ -1150,7 +1279,10 @@ mod tests {
         Address,
         StorageMap,
         StorageSlot,
+        StorageSlotContent,
+        StorageSlotName,
     };
+    use miden_client::assembly::CodeBuilder;
     use miden_client::asset::{
         AccountStorageDelta,
         AccountVaultDelta,
@@ -1159,17 +1291,14 @@ mod tests {
         NonFungibleAsset,
         NonFungibleAssetDetails,
     };
+    use miden_client::auth::{AuthRpoFalcon512, PublicKeyCommitment};
     use miden_client::store::Store;
-    use miden_client::testing::account_id::{
+    use miden_client::{EMPTY_WORD, ONE, ZERO};
+    use miden_protocol::testing::account_id::{
         ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
         ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET,
     };
-    use miden_client::testing::constants::NON_FUNGIBLE_ASSET_DATA;
-    use miden_client::transaction::TransactionKernel;
-    use miden_client::{EMPTY_WORD, ONE, ZERO};
-    use miden_lib::account::auth::AuthRpoFalcon512;
-    use miden_lib::account::components::basic_wallet_library;
-    use miden_objects::account::auth::PublicKeyCommitment;
+    use miden_protocol::testing::constants::NON_FUNGIBLE_ASSET_DATA;
 
     use crate::SqliteStore;
     use crate::sql_error::SqlResultExt;
@@ -1178,16 +1307,10 @@ mod tests {
     #[tokio::test]
     async fn account_code_insertion_no_duplicates() -> anyhow::Result<()> {
         let store = create_test_store().await;
-        let assembler = TransactionKernel::assembler();
-        let account_component = AccountComponent::compile(
-            "
-                export.::miden::contracts::wallets::basic::receive_asset
-                export.::miden::contracts::wallets::basic::move_asset_to_note
-            ",
-            assembler,
-            vec![],
-        )?
-        .with_supports_all_types();
+        let component_code = CodeBuilder::default()
+            .compile_component_code("miden::testing::dummy_component", "pub proc dummy nop end")?;
+        let account_component =
+            AccountComponent::new(component_code, vec![])?.with_supports_all_types();
         let account_code = AccountCode::from_components(
             &[
                 AuthRpoFalcon512::new(PublicKeyCommitment::from(EMPTY_WORD)).into(),
@@ -1231,9 +1354,17 @@ mod tests {
     async fn apply_account_delta_additions() -> anyhow::Result<()> {
         let store = create_test_store().await;
 
+        let value_slot_name =
+            StorageSlotName::new("miden::testing::sqlite_store::value").expect("valid slot name");
+        let map_slot_name =
+            StorageSlotName::new("miden::testing::sqlite_store::map").expect("valid slot name");
+
         let dummy_component = AccountComponent::new(
             basic_wallet_library(),
-            vec![StorageSlot::empty_value(), StorageSlot::empty_map()],
+            vec![
+                StorageSlot::with_empty_value(value_slot_name.clone()),
+                StorageSlot::with_empty_map(map_slot_name.clone()),
+            ],
         )?
         .with_supports_all_types();
 
@@ -1248,8 +1379,12 @@ mod tests {
         store.insert_account(&account, default_address).await?;
 
         let mut storage_delta = AccountStorageDelta::new();
-        storage_delta.set_item(1, [ZERO, ZERO, ZERO, ONE].into());
-        storage_delta.set_map_item(2, [ONE, ZERO, ZERO, ZERO].into(), [ONE, ONE, ONE, ONE].into());
+        storage_delta.set_item(value_slot_name.clone(), [ZERO, ZERO, ZERO, ONE].into())?;
+        storage_delta.set_map_item(
+            map_slot_name.clone(),
+            [ONE, ZERO, ZERO, ZERO].into(),
+            [ONE, ONE, ONE, ONE].into(),
+        )?;
 
         let vault_delta = AccountVaultDelta::from_iters(
             vec![
@@ -1297,7 +1432,7 @@ mod tests {
             .get_account(account_id)
             .await?
             .context("failed to find inserted account")?
-            .into();
+            .try_into()?;
 
         assert_eq!(updated_account, account_after_delta);
 
@@ -1308,12 +1443,20 @@ mod tests {
     async fn apply_account_delta_removals() -> anyhow::Result<()> {
         let store = create_test_store().await;
 
+        let value_slot_name =
+            StorageSlotName::new("miden::testing::sqlite_store::value").expect("valid slot name");
+        let map_slot_name =
+            StorageSlotName::new("miden::testing::sqlite_store::map").expect("valid slot name");
+
         let mut dummy_map = StorageMap::new();
         dummy_map.insert([ONE, ZERO, ZERO, ZERO].into(), [ONE, ONE, ONE, ONE].into())?;
 
         let dummy_component = AccountComponent::new(
             basic_wallet_library(),
-            vec![StorageSlot::Value([ZERO, ZERO, ZERO, ONE].into()), StorageSlot::Map(dummy_map)],
+            vec![
+                StorageSlot::with_value(value_slot_name.clone(), [ZERO, ZERO, ZERO, ONE].into()),
+                StorageSlot::with_map(map_slot_name.clone(), dummy_map),
+            ],
         )?
         .with_supports_all_types();
 
@@ -1337,8 +1480,12 @@ mod tests {
         store.insert_account(&account, default_address).await?;
 
         let mut storage_delta = AccountStorageDelta::new();
-        storage_delta.set_item(1, EMPTY_WORD);
-        storage_delta.set_map_item(2, [ONE, ZERO, ZERO, ZERO].into(), EMPTY_WORD);
+        storage_delta.set_item(value_slot_name.clone(), EMPTY_WORD)?;
+        storage_delta.set_map_item(
+            map_slot_name.clone(),
+            [ONE, ZERO, ZERO, ZERO].into(),
+            EMPTY_WORD,
+        )?;
 
         let vault_delta = AccountVaultDelta::from_iters([], assets.clone());
 
@@ -1386,13 +1533,19 @@ mod tests {
             .get_account(account_id)
             .await?
             .context("failed to find inserted account")?
-            .into();
+            .try_into()?;
 
         assert_eq!(updated_account, account_after_delta);
         assert!(updated_account.vault().is_empty());
-        assert_eq!(updated_account.storage().get_item(1)?, EMPTY_WORD);
-        let StorageSlot::Map(ref updated_map) = updated_account.storage().slots()[2] else {
-            panic!("Expected map slot");
+        assert_eq!(updated_account.storage().get_item(&value_slot_name)?, EMPTY_WORD);
+        let map_slot = updated_account
+            .storage()
+            .slots()
+            .iter()
+            .find(|slot| slot.name() == &map_slot_name)
+            .expect("storage should contain map slot");
+        let StorageSlotContent::Map(updated_map) = map_slot.content() else {
+            panic!("Expected map slot content");
         };
         assert_eq!(updated_map.entries().count(), 0);
 

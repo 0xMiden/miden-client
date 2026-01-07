@@ -77,7 +77,7 @@ test.describe("get_input_note", () => {
         noteId: note.noteId.toString(),
         hasMetadata: !!note.metadata,
         noteType: note.noteType,
-        hasInputNote: !!note.inputNote,
+        hasNote: !!note.note,
       }));
     }, consumedNoteId);
 
@@ -85,7 +85,7 @@ test.describe("get_input_note", () => {
     expect(rpcResult).toHaveLength(1);
     expect(rpcResult[0].noteId).toEqual(consumedNoteId);
     expect(rpcResult[0].hasMetadata).toBe(true);
-    expect(rpcResult[0].hasInputNote).toBe(false); // Private notes don't include input_note
+    expect(rpcResult[0].hasNote).toBe(false); // Private notes don't include note
   });
 
   test("get note script by root", async ({ page }) => {
@@ -102,8 +102,8 @@ test.describe("get_input_note", () => {
       const noteId = window.NoteId.fromHex(_consumedNoteId);
       const fetchedNotes = await rpcClient.getNotesById([noteId]);
 
-      if (fetchedNotes.length > 0 && fetchedNotes[0].inputNote) {
-        const scriptRoot = fetchedNotes[0].inputNote.note().script().root();
+      if (fetchedNotes.length > 0 && fetchedNotes[0].note) {
+        const scriptRoot = fetchedNotes[0].note.script().root();
         return {
           scriptRoot: scriptRoot.toHex(),
           hasScript: true,

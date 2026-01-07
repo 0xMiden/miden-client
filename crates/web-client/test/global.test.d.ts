@@ -48,7 +48,6 @@ import {
   PublicKey,
   Rpo256,
   RpcClient,
-  SecretKey,
   Signature,
   SigningInputs,
   SigningInputsType,
@@ -71,8 +70,8 @@ import {
   NoteAndArgs,
   NoteAndArgsArray,
   MidenArrays,
-  ScriptBuilder,
-  ScriptBuilderMode,
+  CodeBuilder,
+  CodeBuilderMode,
 } from "../dist/index";
 import { MockWebClient, WebClient } from "../js";
 
@@ -136,7 +135,6 @@ declare global {
     Package: typeof Package;
     PublicKey: typeof PublicKey;
     Rpo256: typeof Rpo256;
-    SecretKey: typeof SecretKey;
     Signature: typeof Signature;
     SigningInputs: typeof SigningInputs;
     SigningInputsType: typeof SigningInputsType;
@@ -161,8 +159,8 @@ declare global {
     Word: typeof Word;
     Address: typeof Address;
     MidenArrays: typeof MidenArrays;
-    ScriptBuilder: typeof ScriptBuilder;
-    ScriptBuilderMode: typeof ScriptBuilderMode;
+    CodeBuilder: typeof CodeBuilder;
+    CodeBuilderMode: typeof CodeBuilderMode;
     createClient: () => Promise<void>;
 
     // Add the helpers namespace
@@ -175,7 +173,7 @@ declare global {
       waitForBlocks: (amountOfBlocks: number) => Promise<void>;
       refreshClient: (initSeed?: Uint8Array) => Promise<void>;
       parseNetworkId: (networkId: string) => NetworkId;
-      generateKeyWithScheme: (signatureScheme: string) => SecretKey;
+      generateKeyWithScheme: (signatureScheme: string) => AuthSecretKey;
     };
   }
 }

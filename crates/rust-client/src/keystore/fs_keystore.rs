@@ -4,54 +4,42 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::path::PathBuf;
 use std::string::ToString;
-use std::sync::{Arc, RwLock};
 
-use miden_objects::Word;
-use miden_objects::account::auth::{AuthSecretKey, PublicKeyCommitment, Signature};
+use miden_protocol::Word;
+use miden_protocol::account::auth::{AuthSecretKey, PublicKey, PublicKeyCommitment, Signature};
 use miden_tx::AuthenticationError;
 use miden_tx::auth::{SigningInputs, TransactionAuthenticator};
 use miden_tx::utils::{Deserializable, Serializable};
-use rand::{Rng, SeedableRng};
 
 use super::KeyStoreError;
 
 /// A filesystem-based keystore that stores keys in separate files and provides transaction
 /// authentication functionality. The public key is hashed and the result is used as the filename
 /// and the contents of the file are the serialized public and secret key.
-///
-/// The keystore requires an RNG component for generating Falcon signatures at the moment of
-/// transaction signing.
 #[derive(Debug, Clone)]
-pub struct FilesystemKeyStore<R: Rng + Send + Sync> {
-    /// The random number generator used to generate signatures.
-    rng: Arc<RwLock<R>>,
+pub struct FilesystemKeyStore {
     /// The directory where the keys are stored and read from.
     pub keys_directory: PathBuf,
 }
 
-impl<R: Rng + Send + Sync> FilesystemKeyStore<R> {
-    pub fn with_rng(keys_directory: PathBuf, rng: R) -> Result<Self, KeyStoreError> {
+impl FilesystemKeyStore {
+    /// Creates a [`FilesystemKeyStore`] on a specific directory.
+    pub fn new(keys_directory: PathBuf) -> Result<Self, KeyStoreError> {
         if !keys_directory.exists() {
             std::fs::create_dir_all(&keys_directory).map_err(|err| {
                 KeyStoreError::StorageError(format!("error creating keys directory: {err:?}"))
             })?;
         }
 
-        Ok(FilesystemKeyStore {
-            keys_directory,
-            rng: Arc::new(RwLock::new(rng)),
-        })
+        Ok(FilesystemKeyStore { keys_directory })
     }
 
     /// Adds a secret key to the keystore.
     pub fn add_key(&self, key: &AuthSecretKey) -> Result<(), KeyStoreError> {
-        let pub_key = match key {
-            AuthSecretKey::RpoFalcon512(k) => k.public_key().to_commitment(),
-            AuthSecretKey::EcdsaK256Keccak(k) => k.public_key().to_commitment(),
-            other_key => other_key.public_key().to_commitment().into(),
-        };
+        let public_key = key.public_key();
+        let pub_key_commitment = public_key.to_commitment();
 
-        let filename = hash_pub_key(pub_key);
+        let filename = hash_pub_key(pub_key_commitment.into());
 
         let file_path = self.keys_directory.join(filename);
         let file = OpenOptions::new()
@@ -107,19 +95,7 @@ impl<R: Rng + Send + Sync> FilesystemKeyStore<R> {
     }
 }
 
-// Provide a default implementation for `StdRng` so you can call FilesystemKeyStore::new() without
-// type annotations.
-impl FilesystemKeyStore<rand::rngs::StdRng> {
-    /// Creates a new [`FilesystemKeyStore`] using [`rand::rngs::StdRng`] as the RNG.
-    pub fn new(keys_directory: PathBuf) -> Result<Self, KeyStoreError> {
-        use rand::rngs::StdRng;
-        let rng = StdRng::from_os_rng();
-
-        FilesystemKeyStore::with_rng(keys_directory, rng)
-    }
-}
-
-impl<R: Rng + Send + Sync> TransactionAuthenticator for FilesystemKeyStore<R> {
+impl TransactionAuthenticator for FilesystemKeyStore {
     /// Gets a signature over a message, given a public key.
     ///
     /// The public key should correspond to one of the keys tracked by the keystore.
@@ -132,24 +108,22 @@ impl<R: Rng + Send + Sync> TransactionAuthenticator for FilesystemKeyStore<R> {
         pub_key: PublicKeyCommitment,
         signing_info: &SigningInputs,
     ) -> Result<Signature, AuthenticationError> {
-        let mut rng = self.rng.write().expect("poisoned lock");
-
         let message = signing_info.to_commitment();
 
         let secret_key = self
             .get_key(pub_key)
-            .map_err(|err| AuthenticationError::other(err.to_string()))?;
+            .map_err(|err| {
+                AuthenticationError::other_with_source("failed to load secret key", err)
+            })?
+            .ok_or(AuthenticationError::UnknownPublicKey(pub_key))?;
 
-        let signature = match secret_key {
-            Some(AuthSecretKey::RpoFalcon512(k)) => {
-                Signature::RpoFalcon512(k.sign_with_rng(message, &mut rng))
-            },
-            Some(AuthSecretKey::EcdsaK256Keccak(k)) => Signature::EcdsaK256Keccak(k.sign(message)),
-            Some(other_k) => other_k.sign(message),
-            None => return Err(AuthenticationError::other("missing secret key".to_string())),
-        };
+        let signature = secret_key.sign(message);
 
         Ok(signature)
+    }
+
+    async fn get_public_key(&self, _pub_key_commitment: PublicKeyCommitment) -> Option<&PublicKey> {
+        None
     }
 }
 

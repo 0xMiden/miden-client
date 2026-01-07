@@ -28,6 +28,7 @@ use miden_client::account::{
     AccountIdPrefix,
     AccountStorage,
     Address,
+    StorageSlotName,
 };
 use miden_client::asset::{Asset, AssetVault, AssetWitness};
 use miden_client::block::BlockHeader;
@@ -36,6 +37,7 @@ use miden_client::note::{BlockNumber, NoteScript, NoteTag, Nullifier};
 use miden_client::store::{
     AccountRecord,
     AccountStatus,
+    AccountStorageFilter,
     BlockRelevance,
     InputNoteRecord,
     NoteFilter,
@@ -47,7 +49,7 @@ use miden_client::store::{
 };
 use miden_client::sync::{NoteTagRecord, StateSyncUpdate};
 use miden_client::transaction::{TransactionRecord, TransactionStoreUpdate};
-use miden_objects::account::StorageMapWitness;
+use miden_protocol::account::StorageMapWitness;
 use rusqlite::Connection;
 use rusqlite::types::Value;
 use sql_error::SqlResultExt;
@@ -104,7 +106,7 @@ impl SqliteStore {
         // Initialize merkle store
         for id in store.get_account_ids().await? {
             let vault = store.get_account_vault(id).await?;
-            let storage = store.get_account_storage(id).await?;
+            let storage = store.get_account_storage(id, AccountStorageFilter::All).await?;
 
             let mut merkle_store =
                 store.merkle_store.write().expect("merkle_store write lock not poisoned");
@@ -421,9 +423,10 @@ impl Store for SqliteStore {
     async fn get_account_storage(
         &self,
         account_id: AccountId,
+        filter: AccountStorageFilter,
     ) -> Result<AccountStorage, StoreError> {
         self.interact_with_connection(move |conn| {
-            SqliteStore::get_account_storage(conn, account_id)
+            SqliteStore::get_account_storage(conn, account_id, &filter)
         })
         .await
     }
@@ -431,13 +434,13 @@ impl Store for SqliteStore {
     async fn get_account_map_item(
         &self,
         account_id: AccountId,
-        index: u8,
+        slot_name: StorageSlotName,
         key: Word,
     ) -> Result<(Word, StorageMapWitness), StoreError> {
         let merkle_store = self.merkle_store.clone();
 
         self.interact_with_connection(move |conn| {
-            SqliteStore::get_account_map_item(conn, &merkle_store, account_id, index, key)
+            SqliteStore::get_account_map_item(conn, &merkle_store, account_id, slot_name, key)
         })
         .await
     }
@@ -472,6 +475,18 @@ impl Store for SqliteStore {
     ) -> Result<(), StoreError> {
         self.interact_with_connection(move |conn| {
             SqliteStore::remove_address(conn, &address, account_id)
+        })
+        .await
+    }
+
+    async fn get_minimal_partial_account(
+        &self,
+        account_id: AccountId,
+    ) -> Result<Option<AccountRecord>, StoreError> {
+        let merkle_store = self.merkle_store.clone();
+
+        self.interact_with_connection(move |conn| {
+            SqliteStore::get_minimal_partial_account(conn, &merkle_store, account_id)
         })
         .await
     }

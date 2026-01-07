@@ -12,37 +12,21 @@ use miden_client::address::AddressInterface;
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
 use miden_client::crypto::{FeltRng, RpoRandomCoin};
 use miden_client::note::{
-    Note,
-    NoteAssets,
-    NoteExecutionHint,
-    NoteFile,
-    NoteId,
-    NoteInputs,
-    NoteMetadata,
-    NoteRecipient,
-    NoteTag,
-    NoteType,
+    Note, NoteAssets, NoteExecutionHint, NoteFile, NoteId, NoteInputs, NoteMetadata, NoteRecipient,
+    NoteTag, NoteType,
 };
 use miden_client::rpc::{Endpoint, GrpcClient};
 use miden_client::testing::account_id::ACCOUNT_ID_PRIVATE_SENDER;
 use miden_client::testing::common::{
-    ACCOUNT_ID_REGULAR,
-    TestClientKeyStore,
-    create_test_store_path,
-    execute_tx_and_sync,
+    ACCOUNT_ID_REGULAR, FilesystemKeyStore, create_test_store_path, execute_tx_and_sync,
     insert_new_wallet,
 };
 use miden_client::transaction::{OutputNote, TransactionRequestBuilder};
 use miden_client::utils::Serializable;
 use miden_client::{
-    self,
-    Client,
-    ExecutionOptions,
-    Felt,
-    MAX_TX_EXECUTION_CYCLES,
-    MIN_TX_EXECUTION_CYCLES,
+    self, Client, ExecutionOptions, Felt, MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES,
 };
-use miden_client_cli::{CliKeyStore, MIDEN_DIR};
+use miden_client_cli::MIDEN_DIR;
 use miden_client_sqlite_store::SqliteStore;
 use predicates::str::contains;
 use rand::Rng;
@@ -697,7 +681,7 @@ async fn debug_mode_outputs_logs() -> Result<()> {
                 assert_eq
             end
             ";
-    let note_script = client.script_builder().compile_note_script(note_script).unwrap();
+    let note_script = client.code_builder().compile_note_script(note_script).unwrap();
     let inputs = NoteInputs::new(vec![]).unwrap();
     let serial_num = client.rng().draw_word();
     let note_metadata = NoteMetadata::new(
@@ -1033,9 +1017,10 @@ fn new_faucet_cli(cli_path: &Path, storage_mode: AccountStorageMode) -> String {
 
     // Create a TOML file with the InitStorageData
     let init_storage_data_toml = r#"
-        token_metadata.decimals=10
-        token_metadata.max_supply=10000000
-        token_metadata.ticker="BTC"
+        ["miden::standards::fungible_faucets::metadata"]
+        decimals="10"
+        max_supply="10000000"
+        ticker="BTC"
         "#;
     let file_path = cli_path.join(INIT_DATA_FILENAME);
     fs::write(&file_path, init_storage_data_toml).unwrap();
@@ -1088,14 +1073,14 @@ fn new_wallet_cli(cli_path: &Path, storage_mode: AccountStorageMode) -> String {
         .to_string()
 }
 
-pub type TestClient = Client<TestClientKeyStore>;
+pub type TestClient = Client<FilesystemKeyStore>;
 
 /// Creates a new [`Client`] with a given store. Also returns the keystore associated with it.
 async fn create_rust_client_with_store_path(
     store_path: &Path,
     keystore_path: Option<PathBuf>,
     endpoint: Endpoint,
-) -> Result<(TestClient, CliKeyStore)> {
+) -> Result<(TestClient, FilesystemKeyStore)> {
     let store = {
         let sqlite_store = SqliteStore::new(PathBuf::from(store_path)).await?;
         std::sync::Arc::new(sqlite_store)
@@ -1106,7 +1091,7 @@ async fn create_rust_client_with_store_path(
 
     let rng = Box::new(RpoRandomCoin::new(coin_seed.map(Felt::new).into()));
 
-    let keystore = CliKeyStore::new(keystore_path.unwrap_or_else(temp_dir))?;
+    let keystore = FilesystemKeyStore::new(temp_dir())?;
 
     Ok((
         TestClient::new(
@@ -1213,17 +1198,17 @@ fn create_account_with_multisig_auth() {
 
     // Create init storage data file for multisig
     let init_storage_data_toml = r#"
+        ["miden::standards::auth::rpo_falcon512_multisig::threshold_config"]
         approvers = [
-        { key = "0x0000000000000000000000000000000000000000000000000000000000000001", value = "0x0000000000000000000000000000000000000000000000000000000000000001" }
+            { key = "0x0000000000000000000000000000000000000000000000000000000000000001", value = "0x0000000000000000000000000000000000000000000000000000000000000001" }
         ]
 
         proc_thresholds = [
-        { key = "0xd2d1b6229d7cfb9f2ada31c5cb61453cf464f91828e124437c708eec55b9cd07", value = "0x00000000000000000000000000000000000000000000000000000000000001" }
+            { key = "0xd2d1b6229d7cfb9f2ada31c5cb61453cf464f91828e124437c708eec55b9cd07", value = "0x00000000000000000000000000000000000000000000000000000000000001" }
         ]
 
-        [threshold_and_count]
-        threshold=2
-        num_approvers=3
+        threshold="2"
+        num_approvers="3"
         "#;
     let file_path = temp_dir.join("multisig_init_data.toml");
     fs::write(&file_path, init_storage_data_toml).unwrap();
@@ -1253,14 +1238,14 @@ fn create_account_with_acl_auth() {
 
     // Create init storage data file for acl-auth with a test public key
     let init_storage_data_toml = r#"
-        proc_roots = [
-        { key = "0x0000000000000000000000000000000000000000000000000000000000000000", value = "0xd2d1b6229d7cfb9f2ada31c5cb61453cf464f91828e124437c708eec55b9cd07" }
-        ]
+        "miden::standards::auth::rpo_falcon512_acl::public_key" = "0x0000000000000000000000000000000000000000000000000000000000000001"
+        "miden::standards::auth::rpo_falcon512_acl::config.num_tracked_procs" = "1"
+        "miden::standards::auth::rpo_falcon512_acl::config.allow_unauthorized_output_notes" = "0"
+        "miden::standards::auth::rpo_falcon512_acl::config.allow_unauthorized_input_notes" = "0"
 
-        falcon_pubkey="0x0000000000000000000000000000000000000000000000000000000000000001"
-        acl_config.num_tracked_procs=1
-        acl_config.allow_unauthorized_output_notes=0
-        acl_config.allow_unauthorized_input_notes=0
+        "miden::standards::auth::rpo_falcon512_acl::trigger_procedure_roots" = [
+            { key = ["0", "0", "0", "0"], value = "0xd2d1b6229d7cfb9f2ada31c5cb61453cf464f91828e124437c708eec55b9cd07" }
+        ]
         "#;
     let file_path = temp_dir.join("acl_init_data.toml");
     fs::write(&file_path, init_storage_data_toml).unwrap();
@@ -1290,7 +1275,7 @@ fn create_account_with_ecdsa_auth() {
 
     // Create init storage data file for ecdsa-auth with a test public key
     let init_storage_data_toml = r#"
-        ecdsa_pubkey="0x0000000000000000000000000000000000000000000000000000000000000001"
+        "miden::standards::auth::ecdsa_k256_keccak::public_key"="0x0000000000000000000000000000000000000000000000000000000000000001"
         "#;
     let file_path = temp_dir.join("ecdsa_init_data.toml");
     fs::write(&file_path, init_storage_data_toml).unwrap();

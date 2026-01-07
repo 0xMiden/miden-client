@@ -1,13 +1,12 @@
 use alloc::string::ToString;
 use alloc::sync::Arc;
 
-use idxdb_store::auth::{get_account_auth_by_pub_key, insert_account_auth};
+use idxdb_store::auth::{
+    get_account_auth_by_pub_key, get_raw_secret_keys_from_account_id, insert_account_auth,
+};
 use miden_client::account::AccountId;
 use miden_client::auth::{
-    AuthSecretKey,
-    PublicKeyCommitment,
-    Signature,
-    SigningInputs,
+    AuthSecretKey, PublicKey, PublicKeyCommitment, Signature, SigningInputs,
     TransactionAuthenticator,
 };
 use miden_client::keystore::KeyStoreError;
@@ -16,12 +15,9 @@ use miden_client::{AuthenticationError, Word, Word as NativeWord};
 use rand::Rng;
 use wasm_bindgen_futures::js_sys::Function;
 
-use crate::models::secret_key::SecretKey;
+use crate::models::auth_secret_key::AuthSecretKey as WebAuthSecretKey;
 use crate::web_keystore_callbacks::{
-    GetKeyCallback,
-    InsertKeyCallback,
-    SignCallback,
-    decode_secret_key_from_bytes,
+    GetKeyCallback, InsertKeyCallback, SignCallback, decode_secret_key_from_bytes,
 };
 
 /// A web-based keystore that stores keys in [browser's local storage](https://developer.mozilla.org/en-US/docs/Web/API/Web_Storage_API)
@@ -81,7 +77,7 @@ impl<R: Rng> WebKeyStore<R> {
         account_id: &AccountId,
     ) -> Result<(), KeyStoreError> {
         if let Some(insert_key_cb) = &self.callbacks.as_ref().insert_key {
-            let sk = SecretKey::from(key.clone());
+            let sk = WebAuthSecretKey::from(key.clone());
             insert_key_cb.insert_key(&sk).await?;
             return Ok(());
         }
@@ -100,6 +96,22 @@ impl<R: Rng> WebKeyStore<R> {
         })?;
 
         Ok(())
+    }
+
+    pub async fn get_secret_keys_for_account_id(
+        &self,
+        account_id: &AccountId,
+    ) -> Result<Vec<WebAuthSecretKey>, KeyStoreError> {
+        let native_secret_keys = get_raw_secret_keys_from_account_id(*account_id)
+            .await
+            .map_err(|err| {
+                KeyStoreError::StorageError(err.as_string().unwrap_or_else(|| format!("{err:?}")))
+            })?
+            .into_iter()
+            .map(|sk| decode_secret_key_from_bytes(sk.as_bytes()))
+            .collect::<Result<Vec<_>, _>>()?;
+        let secret_keys = native_secret_keys.into_iter().map(WebAuthSecretKey::from).collect();
+        Ok(secret_keys)
     }
 
     pub async fn get_key(
@@ -160,5 +172,10 @@ impl<R: Rng> TransactionAuthenticator for WebKeyStore<R> {
         };
 
         Ok(signature)
+    }
+
+    // TODO: add this (related to #1417)
+    async fn get_public_key(&self, _pub_key_commitment: PublicKeyCommitment) -> Option<&PublicKey> {
+        None
     }
 }

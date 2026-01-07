@@ -87,3 +87,49 @@ Returns the inclusion proof if the note is authenticated.
 #### Returns
 
 [`NoteInclusionProof`](NoteInclusionProof.md)
+
+***
+
+### authenticated()
+
+> `static` **authenticated**(`note`, `inclusion_proof`): `InputNote`
+
+Creates an authenticated input note from a note and its inclusion proof.
+
+An authenticated note has a proof of inclusion in the block's note tree,
+which is required for consuming the note in a transaction.
+
+#### Parameters
+
+##### note
+
+[`Note`](Note.md)
+
+##### inclusion\_proof
+
+[`NoteInclusionProof`](NoteInclusionProof.md)
+
+#### Returns
+
+`InputNote`
+
+***
+
+### unauthenticated()
+
+> `static` **unauthenticated**(`note`): `InputNote`
+
+Creates an unauthenticated input note from note details.
+
+An unauthenticated note can be consumed in a transaction as long as the note exists in the
+network as of the transaction batch in which the consume transaction is included.
+
+#### Parameters
+
+##### note
+
+[`Note`](Note.md)
+
+#### Returns
+
+`InputNote`

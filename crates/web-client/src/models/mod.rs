@@ -31,6 +31,7 @@ pub mod account;
 pub mod account_builder;
 pub mod account_code;
 pub mod account_component;
+pub mod account_component_code;
 pub mod account_delta;
 pub mod account_file;
 pub mod account_header;
@@ -48,6 +49,7 @@ pub mod auth_scheme;
 pub mod auth_secret_key;
 pub mod basic_fungible_faucet_component;
 pub mod block_header;
+pub mod code_builder;
 pub mod consumable_note_record;
 pub mod endpoint;
 pub mod executed_transaction;
@@ -86,8 +88,6 @@ pub mod proven_transaction;
 pub mod provers;
 pub mod public_key;
 pub mod rpo256;
-pub mod script_builder;
-pub mod secret_key;
 pub mod signature;
 pub mod signing_inputs;
 pub mod storage_map;
@@ -106,6 +106,9 @@ pub mod transaction_status;
 pub mod transaction_store_update;
 pub mod transaction_summary;
 pub mod word;
+
+pub use crate::models::note_tag::NoteTag;
+pub use crate::models::note_type::NoteType;
 
 declare_js_miden_arrays! {
     (crate::models::account::Account) -> AccountArray,

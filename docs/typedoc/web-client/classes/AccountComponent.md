@@ -72,7 +72,7 @@ Marks the component as supporting all account types.
 
 ### compile()
 
-> `static` **compile**(`account_code`, `builder`, `storage_slots`): `AccountComponent`
+> `static` **compile**(`account_code`, `storage_slots`): `AccountComponent`
 
 Compiles account code with the given storage slots using the provided assembler.
 
@@ -80,11 +80,7 @@ Compiles account code with the given storage slots using the provided assembler.
 
 ##### account\_code
 
-`string`
-
-##### builder
-
-[`ScriptBuilder`](ScriptBuilder.md)
+[`AccountComponentCode`](AccountComponentCode.md)
 
 ##### storage\_slots
 
@@ -96,27 +92,9 @@ Compiles account code with the given storage slots using the provided assembler.
 
 ***
 
-### createAuthComponent()
-
-> `static` **createAuthComponent**(`secret_key`): `AccountComponent`
-
-Builds an auth component from a secret key (`RpoFalcon512` or ECDSA k256 Keccak).
-
-#### Parameters
-
-##### secret\_key
-
-[`SecretKey`](SecretKey.md)
-
-#### Returns
-
-`AccountComponent`
-
-***
-
 ### createAuthComponentFromCommitment()
 
-> `static` **createAuthComponentFromCommitment**(`commitment`, `auth_scheme_id`): `AccountComponent`
+> `static` **createAuthComponentFromCommitment**(`commitment`, `auth_scheme`): `AccountComponent`
 
 #### Parameters
 
@@ -124,9 +102,49 @@ Builds an auth component from a secret key (`RpoFalcon512` or ECDSA k256 Keccak)
 
 [`Word`](Word.md)
 
-##### auth\_scheme\_id
+##### auth\_scheme
 
-`number`
+[`AuthScheme`](../enumerations/AuthScheme.md)
+
+#### Returns
+
+`AccountComponent`
+
+***
+
+### createAuthComponentFromSecretKey()
+
+> `static` **createAuthComponentFromSecretKey**(`secret_key`): `AccountComponent`
+
+Builds an auth component from a secret key, inferring the auth scheme from the key type.
+
+#### Parameters
+
+##### secret\_key
+
+[`AuthSecretKey`](AuthSecretKey.md)
+
+#### Returns
+
+`AccountComponent`
+
+***
+
+### fromLibrary()
+
+> `static` **fromLibrary**(`library`, `storage_slots`): `AccountComponent`
+
+Creates an account component from a compiled library and storage slots.
+
+#### Parameters
+
+##### library
+
+[`Library`](Library.md)
+
+##### storage\_slots
+
+[`StorageSlot`](StorageSlot.md)[]
 
 #### Returns
 

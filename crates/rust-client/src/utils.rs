@@ -4,23 +4,16 @@
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::num::ParseIntError;
+use miden_protocol::account::auth::PublicKeyCommitment;
 
-use miden_lib::AuthScheme;
-use miden_lib::account::faucets::BasicFungibleFaucet;
-use miden_lib::account::interface::AccountInterface;
-pub use miden_lib::utils::ScriptBuilderError;
-use miden_objects::account::Account;
-use miden_objects::account::auth::PublicKeyCommitment;
+use miden_protocol::account::Account;
+use miden_standards::AuthScheme;
+use miden_standards::account::faucets::BasicFungibleFaucet;
+use miden_standards::account::interface::{AccountInterface, AccountInterfaceExt};
 pub use miden_tx::utils::sync::{LazyLock, RwLock, RwLockReadGuard, RwLockWriteGuard};
 pub use miden_tx::utils::{
-    ByteReader,
-    ByteWriter,
-    Deserializable,
-    DeserializationError,
-    Serializable,
-    ToHex,
-    bytes_to_hex_string,
-    hex_to_bytes,
+    ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable, ToHex,
+    bytes_to_hex_string, hex_to_bytes,
 };
 
 use crate::alloc::borrow::ToOwned;
@@ -112,9 +105,9 @@ pub fn tokens_to_base_units(decimal_str: &str, n_decimals: u8) -> Result<u64, To
 ///
 /// # Arguments
 /// - `account`: The Accounts from which to extract the public keys.
-pub fn public_key_commitments_of_account(account: &Account) -> Vec<PublicKeyCommitment> {
+pub fn get_public_keys_from_account(account: &Account) -> Vec<PublicKeyCommitment> {
     let mut pks = vec![];
-    let interface: AccountInterface = account.into();
+    let interface: AccountInterface = AccountInterface::from_account(account);
 
     for auth in interface.auth() {
         match auth {

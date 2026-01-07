@@ -3,8 +3,22 @@ use std::vec;
 
 use anyhow::{Context, Result, anyhow};
 use miden_client::account::component::AccountComponent;
-use miden_client::account::{Account, AccountBuilder, AccountId, AccountStorageMode, StorageSlot};
-use miden_client::assembly::{DefaultSourceManager, Library, LibraryPath, Module, ModuleKind};
+use miden_client::account::{
+    Account,
+    AccountBuilder,
+    AccountId,
+    AccountStorageMode,
+    StorageSlot,
+    StorageSlotName,
+};
+use miden_client::assembly::{
+    CodeBuilder,
+    DefaultSourceManager,
+    Library,
+    Module,
+    ModuleKind,
+    Path,
+};
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
 use miden_client::note::{
     Note,
@@ -24,7 +38,7 @@ use miden_client::testing::common::{
     wait_for_tx,
 };
 use miden_client::transaction::{OutputNote, TransactionKernel, TransactionRequestBuilder};
-use miden_client::{Felt, ScriptBuilder, Word, ZERO};
+use miden_client::{Felt, Word, ZERO};
 use rand::{Rng, RngCore};
 
 use crate::tests::config::ClientConfig;
@@ -32,44 +46,46 @@ use crate::tests::config::ClientConfig;
 // HELPERS
 // ================================================================================================
 
-const COUNTER_CONTRACT: &str = "
-        use.miden::active_account
-        use.miden::native_account
-        use.std::sys
+static COUNTER_SLOT_NAME: LazyLock<StorageSlotName> = LazyLock::new(|| {
+    StorageSlotName::new("miden::testing::counter_contract::counter").expect("slot name is valid")
+});
+
+const COUNTER_CONTRACT: &str = r#"
+        use miden::protocol::active_account
+        use miden::protocol::native_account
+        use miden::core::word
+        use miden::core::sys
+
+        const COUNTER_SLOT = word("miden::testing::counter_contract::counter")
 
         # => []
-        export.get_count
-            push.0
-            exec.active_account::get_item
+        pub proc get_count
+            push.COUNTER_SLOT[0..2] exec.active_account::get_item
             exec.sys::truncate_stack
         end
 
         # => []
-        export.increment_count
-            push.0
-            # => [index]
-            exec.active_account::get_item
+        pub proc increment_count
+            push.COUNTER_SLOT[0..2] exec.active_account::get_item
             # => [count]
             push.1 add
             # => [count+1]
-            push.0
-            # [index, count+1]
-            exec.native_account::set_item
+            push.COUNTER_SLOT[0..2] exec.native_account::set_item
             # => []
             exec.sys::truncate_stack
             # => []
-        end";
+        end"#;
 
 const INCR_NONCE_AUTH_CODE: &str = "
-    use.miden::native_account
-    export.auth__basic
+    use miden::protocol::native_account
+    pub proc auth__basic
         exec.native_account::incr_nonce
         drop
     end
 ";
 
 const INCR_SCRIPT_CODE: &str = "
-    use.external_contract::counter_contract
+    use external_contract::counter_contract
     begin
         call.counter_contract::increment_count
     end
@@ -84,7 +100,7 @@ async fn deploy_counter_contract(
 
     client.add_account(&acc, false).await?;
 
-    let mut script_builder = ScriptBuilder::new(true);
+    let mut script_builder = CodeBuilder::new();
     script_builder.link_dynamic_library(&counter_contract_library())?;
     let tx_script = script_builder.compile_tx_script(INCR_SCRIPT_CODE)?;
 
@@ -102,18 +118,22 @@ async fn get_counter_contract_account(
     client: &mut TestClient,
     storage_mode: AccountStorageMode,
 ) -> Result<Account> {
-    let counter_component = AccountComponent::compile(
-        COUNTER_CONTRACT,
-        TransactionKernel::assembler(),
-        vec![StorageSlot::empty_value()],
-    )
-    .context("failed to compile counter contract component")?
-    .with_supports_all_types();
+    let counter_slot = StorageSlot::with_empty_value(COUNTER_SLOT_NAME.clone());
+    let counter_code = CodeBuilder::default()
+        .compile_component_code("miden::testing::counter_contract", COUNTER_CONTRACT)
+        .context("failed to compile counter contract component code")?;
+    let counter_component = AccountComponent::new(counter_code, vec![counter_slot])
+        .map_err(|err| anyhow::anyhow!(err))
+        .context("failed to create counter contract component")?
+        .with_supports_all_types();
 
-    let incr_nonce_auth =
-        AccountComponent::compile(INCR_NONCE_AUTH_CODE, TransactionKernel::assembler(), vec![])
-            .context("failed to compile increment nonce auth component")?
-            .with_supports_all_types();
+    let incr_nonce_auth_code = CodeBuilder::default()
+        .compile_component_code("miden::testing::incr_nonce_auth", INCR_NONCE_AUTH_CODE)
+        .context("failed to compile increment nonce auth component code")?;
+    let incr_nonce_auth = AccountComponent::new(incr_nonce_auth_code, vec![])
+        .map_err(|err| anyhow::anyhow!(err))
+        .context("failed to create increment nonce auth component")?
+        .with_supports_all_types();
 
     let mut init_seed = [0u8; 32];
     client.rng().fill_bytes(&mut init_seed);
@@ -138,14 +158,13 @@ pub async fn test_counter_contract_ntx(client_config: ClientConfig) -> Result<()
 
     let network_account = deploy_counter_contract(&mut client, AccountStorageMode::Network).await?;
 
+    let account: Account = client
+        .get_account(network_account.id())
+        .await?
+        .context("failed to find network account after deployment")?
+        .try_into()?;
     assert_eq!(
-        client
-            .get_account(network_account.id())
-            .await?
-            .context("failed to find network account after deployment")?
-            .account()
-            .storage()
-            .get_item(0)?,
+        account.storage().get_item(&COUNTER_SLOT_NAME)?,
         Word::from([ZERO, ZERO, ZERO, Felt::new(1)])
     );
 
@@ -176,7 +195,7 @@ pub async fn test_counter_contract_ntx(client_config: ClientConfig) -> Result<()
         .with_context(|| "account details not available")?;
 
     assert_eq!(
-        a.storage().get_item(0)?,
+        a.storage().get_item(&COUNTER_SLOT_NAME)?,
         Word::from([ZERO, ZERO, ZERO, Felt::new(1 + BUMP_NOTE_NUMBER)])
     );
     Ok(())
@@ -223,26 +242,25 @@ pub async fn test_recall_note_before_ntx_consumes_it(client_config: ClientConfig
     wait_for_blocks(&mut client, 2).await;
 
     // The network account should have original value
+    let account: Account = client
+        .get_account(network_account.id())
+        .await?
+        .context("failed to find network account after recall test")?
+        .try_into()?;
     assert_eq!(
-        client
-            .get_account(network_account.id())
-            .await?
-            .context("failed to find network account after recall test")?
-            .account()
-            .storage()
-            .get_item(0)?,
+        account.storage().get_item(&COUNTER_SLOT_NAME)?,
         Word::from([ZERO, ZERO, ZERO, Felt::new(1)])
     );
 
     // The native account should have the incremented value
+    let account: Account = client
+        .get_account(native_account.id())
+        .await?
+        .context("failed to find native account after recall test")?
+        .try_into()
+        .unwrap();
     assert_eq!(
-        client
-            .get_account(native_account.id())
-            .await?
-            .context("failed to find native account after recall test")?
-            .account()
-            .storage()
-            .get_item(0)?,
+        account.storage().get_item(&COUNTER_SLOT_NAME)?,
         Word::from([ZERO, ZERO, ZERO, Felt::new(2)])
     );
     Ok(())
@@ -250,15 +268,13 @@ pub async fn test_recall_note_before_ntx_consumes_it(client_config: ClientConfig
 
 // Initialize the Basic Fungible Faucet library only once.
 static COUNTER_CONTRACT_LIBRARY: LazyLock<Library> = LazyLock::new(|| {
-    let assembler = TransactionKernel::assembler().with_debug_mode(true);
+    let assembler = TransactionKernel::assembler();
     let source_manager = Arc::new(DefaultSourceManager::default());
     let module = Module::parser(ModuleKind::Library)
         .parse_str(
-            LibraryPath::new("external_contract::counter_contract")
-                .context("failed to create library path for counter contract")
-                .unwrap(),
+            Path::new("external_contract::counter_contract"),
             COUNTER_CONTRACT,
-            &source_manager,
+            source_manager,
         )
         .map_err(|err| anyhow!(err))
         .unwrap();
@@ -287,8 +303,8 @@ fn get_network_note<T: Rng>(
         ZERO,
     )?;
 
-    let script = ScriptBuilder::new(true)
-        .with_dynamically_linked_library(&counter_contract_library())?
+    let script = CodeBuilder::new()
+        .with_dynamically_linked_library(counter_contract_library())?
         .compile_note_script(INCR_SCRIPT_CODE)?;
     let recipient = NoteRecipient::new(
         Word::new([

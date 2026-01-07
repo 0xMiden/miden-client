@@ -209,7 +209,7 @@ export async function getAccountStorage(storageCommitment: string) {
 
     const slots = allMatchingRecords.map((record) => {
       return {
-        slotIndex: record.slotIndex,
+        slotName: record.slotName,
         slotValue: record.slotValue,
         slotType: record.slotType,
       };
@@ -304,6 +304,24 @@ export async function getAccountAddresses(accountId: string) {
   }
 }
 
+export async function getSecretKeysForAccountId(accountIdHex: string) {
+  try {
+    let secretKeys = await accountAuths
+      .where("accountIdHex")
+      .equals(accountIdHex)
+      .toArray();
+
+    secretKeys.map((auth) => auth.secretKey);
+
+    return secretKeys;
+  } catch (error) {
+    logWebStoreError(
+      error,
+      `Error while fetching secret keys for id: ${accountIdHex}`
+    );
+  }
+}
+
 // INSERT FUNCTIONS
 
 export async function upsertAccountCode(codeRoot: string, code: Uint8Array) {
@@ -326,7 +344,7 @@ export async function upsertAccountStorage(storageSlots: JsStorageSlot[]) {
     let processedSlots = storageSlots.map((slot) => {
       return {
         commitment: slot.commitment,
-        slotIndex: slot.slotIndex,
+        slotName: slot.slotName,
         slotValue: slot.slotValue,
         slotType: slot.slotType,
       } as IAccountStorage;

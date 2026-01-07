@@ -1,11 +1,10 @@
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
-use crypto::merkle::{InOrderIndex, MmrPeaks, PartialMmr};
-use miden_objects::Word;
-use miden_objects::block::{BlockHeader, BlockNumber};
-use miden_objects::crypto::merkle::{Forest, MerklePath};
-use miden_objects::crypto::{self};
+use miden_protocol::Word;
+use miden_protocol::block::{BlockHeader, BlockNumber};
+use miden_protocol::crypto::merkle::MerklePath;
+use miden_protocol::crypto::merkle::mmr::{Forest, InOrderIndex, MmrPeaks, PartialMmr};
 use tracing::warn;
 
 use crate::rpc::NodeRpcClient;
@@ -17,9 +16,13 @@ impl<AUTH> Client<AUTH> {
     /// Attempts to retrieve the genesis block from the store. If not found,
     /// it requests it from the node and store it.
     pub async fn ensure_genesis_in_place(&mut self) -> Result<BlockHeader, ClientError> {
-        let genesis = match self.store.get_block_header_by_num(0.into()).await? {
-            Some((block, _)) => block,
-            None => self.retrieve_and_store_genesis().await?,
+        let genesis = if let Some((block, _)) = self.store.get_block_header_by_num(0.into()).await?
+        {
+            block
+        } else {
+            let genesis = self.retrieve_and_store_genesis().await?;
+            self.rpc_api.set_genesis_commitment(genesis.commitment()).await?;
+            genesis
         };
 
         Ok(genesis)

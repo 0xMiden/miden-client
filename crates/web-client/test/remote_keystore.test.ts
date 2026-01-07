@@ -142,7 +142,9 @@ test.describe("remote keystore", () => {
         signPubKey = Array.from(publicKeyCommitment);
         const wasmSigningInputs =
           window.SigningInputs.deserialize(signingInputs);
-        const wasmSecretKey = window.SecretKey.deserialize(faucetSecretKey!);
+        const wasmSecretKey = window.AuthSecretKey.deserialize(
+          faucetSecretKey!
+        );
         const signature = wasmSecretKey.signData(wasmSigningInputs);
         const serializedSig = signature.serialize();
         return serializedSig;

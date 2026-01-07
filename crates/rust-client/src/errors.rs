@@ -2,20 +2,21 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::fmt;
 
-use miden_lib::account::interface::AccountInterfaceError;
-use miden_objects::account::AccountId;
-use miden_objects::crypto::merkle::MerkleError;
-use miden_objects::note::{NoteId, NoteTag};
-pub use miden_objects::{AccountError, AccountIdError, AssetError, NetworkIdError};
-use miden_objects::{
+use miden_protocol::account::AccountId;
+use miden_protocol::crypto::merkle::MerkleError;
+use miden_protocol::note::{NoteId, NoteTag};
+pub use miden_protocol::{AccountError, AccountIdError, AssetError, NetworkIdError};
+use miden_protocol::{
     NoteError,
     PartialBlockchainError,
     TransactionInputError,
     TransactionScriptError,
     Word,
 };
+use miden_standards::account::interface::AccountInterfaceError;
 // RE-EXPORTS
 // ================================================================================================
+pub use miden_standards::errors::CodeBuilderError;
 pub use miden_tx::AuthenticationError;
 use miden_tx::utils::{DeserializationError, HexParseError};
 use miden_tx::{NoteCheckerError, TransactionExecutorError, TransactionProverError};
@@ -139,6 +140,10 @@ pub enum ClientError {
     AccountsLimitExceeded(usize),
     #[error("unsupported authentication scheme ID: {0}")]
     UnsupportedAuthSchemeId(u8),
+    #[error("account error is not full: {0}")]
+    AccountRecordNotFull(AccountId),
+    #[error("account error is not partial: {0}")]
+    AccountRecordNotPartial(AccountId),
 }
 
 // CONVERSIONS
@@ -164,14 +169,6 @@ impl From<&ClientError> for Option<ErrorHint> {
                 ),
                 docs_url: Some(TROUBLESHOOTING_DOC),
             }),
-            ClientError::StoreError(StoreError::AccountCommitmentAlreadyExists(commitment)) => {
-                Some(ErrorHint {
-                    message: format!(
-                        "Account commitment {commitment:?} already exists locally. Sync to confirm the transaction status and avoid resubmitting it; if you need a clean slate for development, reset the store."
-                    ),
-                    docs_url: Some(TROUBLESHOOTING_DOC),
-                })
-            },
             _ => None,
         }
     }

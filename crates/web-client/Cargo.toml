@@ -2,7 +2,7 @@
 authors.workspace      = true
 categories             = ["no-std"]
 description            = "Web Client library that facilitates interaction with the Miden network"
-documentation          = "https://docs.rs/miden-client-web/0.12.0"
+documentation          = "https://docs.rs/miden-client-web"
 edition.workspace      = true
 keywords               = ["client", "miden", "wasm", "web"]
 license.workspace      = true
@@ -23,20 +23,20 @@ testing = ["miden-client/testing"]
 
 [dependencies]
 # Workspace dependencies
-idxdb-store   = { package = "miden-idxdb-store", path = "../idxdb-store", version = "0.12" }
-miden-client  = { default-features = false, features = ["testing", "tonic"], path = "../rust-client", version = "0.12" }
-miden-objects = { workspace = true }
+idxdb-store  = { package = "miden-idxdb-store", path = "../idxdb-store" }
+miden-client = { default-features = false, features = ["testing", "tonic"], path = "../rust-client" }
 
 # External dependencies
 console_error_panic_hook = { version = "0.1.7" }
-hex                      = { version = "0.4" }
-js-sys                   = { version = "0.3" }
-miden-core               = { version = "0.19.0" }                              # TODO: used only to access MastNodeExt trait, consider re-exporting through base/client crate
-rand                     = { workspace = true }
-serde-wasm-bindgen       = { version = "0.6" }
-thiserror.workspace      = true
-wasm-bindgen             = { features = ["serde-serialize"], version = "0.2" }
-wasm-bindgen-futures     = { version = "0.4" }
+hex = { version = "0.4" }
+js-sys = { version = "0.3" }
+rand = { workspace = true }
+serde-wasm-bindgen = { version = "0.6" }
+thiserror.workspace = true
+wasm-bindgen = { features = [
+  "serde-serialize",
+], version = "=0.2.105" } # Lock version as .106 removed doc generation for structs
+wasm-bindgen-futures = { version = "0.4" }
 
 [dev-dependencies]
 web-sys = { features = ["console"], version = "0.3" }

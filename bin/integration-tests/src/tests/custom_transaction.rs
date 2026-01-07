@@ -91,8 +91,6 @@ pub async fn test_transaction_request(client_config: ClientConfig) -> Result<()>
     advice_map.insert(note_args_commitment, NOTE_ARGS.to_vec());
 
     let code = "
-        use.miden::contracts::auth::basic->auth_tx
-
         begin
             # We use the script argument to store the expected value to be compared
             push.1.2.3.4
@@ -100,7 +98,7 @@ pub async fn test_transaction_request(client_config: ClientConfig) -> Result<()>
             assert_eqw
         end
         ";
-    let tx_script = client.script_builder().compile_tx_script(code)?;
+    let tx_script = client.code_builder().compile_tx_script(code)?;
 
     // FAILURE ATTEMPT
     let transaction_request = TransactionRequestBuilder::new()
@@ -205,11 +203,6 @@ pub async fn test_merkle_store(client_config: ClientConfig) -> Result<()> {
 
     let mut code = format!(
         "
-         use.std::collections::mmr
-         use.miden::contracts::auth::basic->auth_tx
-         use.miden::kernels::tx::prologue
-         use.miden::kernels::tx::memory
-
          begin
              # leaf count -> mem[4000][0]
              push.{num_leaves} push.4000 mem_store
@@ -226,7 +219,7 @@ pub async fn test_merkle_store(client_config: ClientConfig) -> Result<()> {
         code += format!(
             "
             # get element at index `pos` from the merkle store in mem[1000] and push it to stack
-            push.4000 push.{pos} exec.mmr::get
+            push.4000 push.{pos} exec.::miden::core::collections::mmr::get
 
             # check the element matches what was inserted at `pos`
             push.{expected_element} assert_eqw.err=\"element in merkle store didn't match expected\"
@@ -236,7 +229,7 @@ pub async fn test_merkle_store(client_config: ClientConfig) -> Result<()> {
     }
     code += "end";
     // Build the transaction
-    let tx_script = client.script_builder().compile_tx_script(&code)?;
+    let tx_script = client.code_builder().compile_tx_script(&code)?;
 
     let transaction_request = TransactionRequestBuilder::new()
         .unauthenticated_input_notes(note_args_map)
@@ -295,7 +288,7 @@ pub async fn test_onchain_notes_sync_with_tag(client_config: ClientConfig) -> Re
                 assert_eq
             end
             ";
-    let note_script = client_1.script_builder().compile_note_script(note_script)?;
+    let note_script = client_1.code_builder().compile_note_script(note_script)?;
     let inputs = NoteInputs::new(vec![])?;
     let serial_num = client_1.rng().draw_word();
     let note_metadata = NoteMetadata::new(
@@ -335,8 +328,6 @@ pub async fn test_onchain_notes_sync_with_tag(client_config: ClientConfig) -> Re
         .context("failed to find input note in client 2 after sync")?
         .try_into()?;
     assert_eq!(received_note.note().commitment(), note.commitment());
-    // TODO: Uncomment once debug decorators are stripped out in the node
-    // assert_eq!(received_note.note(), &note);
     assert!(client_3.get_input_notes(NoteFilter::All).await?.is_empty());
     Ok(())
 }
@@ -377,7 +368,7 @@ fn create_custom_note(
         .replace("{mem_address}", &mem_addr.to_string())
         .replace("{mem_address_2}", &(mem_addr + 4).to_string());
     let note_script = client
-        .script_builder()
+        .code_builder()
         .compile_note_script(&note_script)
         .context("failed to compile custom note script")?;
 

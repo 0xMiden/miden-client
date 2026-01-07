@@ -112,7 +112,7 @@ test.describe("Address instantiation tests", () => {
 test.describe("Bech32 tests", () => {
   test("to bech32 fails with non-valid-prefix", async ({ page }) => {
     await expect(
-      instanceNewAddressBech32(page, "non-valid-prefix")
+      instanceNewAddressBech32(page, "non valid prefix")
     ).rejects.toThrow();
   });
   test("encoding from bech32 and going back results in the same address", async ({
@@ -140,6 +140,30 @@ test.describe("Bech32 tests", () => {
       49
     );
   });
+
+  test("bech32 succeeds with custom prefix", async ({ page }) => {
+    await expect(instanceNewAddressBech32(page, "cstm")).resolves.toHaveLength(
+      49
+    );
+  });
+
+  test("fromBech32 returns correct account id", async ({ page }) => {
+    const success = await page.evaluate(async () => {
+      const newAccount = await window.client.newWallet(
+        window.AccountStorageMode.private(),
+        true,
+        0
+      );
+      const accountId = newAccount.id();
+      const asBech32 = accountId.toBech32(
+        window.NetworkId.mainnet(),
+        window.AccountInterface.BasicWallet
+      );
+      const fromBech32 = window.AccountId.fromBech32(asBech32).toString();
+      return accountId == fromBech32;
+    });
+    expect(success).toBe(true);
+  });
 });
 
 test.describe("Note tag tests", () => {
@@ -154,7 +178,6 @@ test.describe("Note tag tests", () => {
 const instanceAddressRemoveThenInsert = async (page: Page) => {
   return await page.evaluate(async () => {
     const client = window.client;
-    const parsedNetworkId = window.helpers.parseNetworkId("mtst");
     const newAccount = await client.newWallet(
       window.AccountStorageMode.private(),
       true,
@@ -179,9 +202,9 @@ const instanceAddressRemoveThenInsert = async (page: Page) => {
 
     return {
       accountId: accountId,
-      address: address.toBech32(parsedNetworkId),
+      address: address.toBech32(window.NetworkId.testnet()),
       retrievedAccountId: retrievedId,
-      retrievedAddress: retrievedAddress.toBech32(parsedNetworkId),
+      retrievedAddress: retrievedAddress.toBech32(window.NetworkId.testnet()),
     };
   });
 };

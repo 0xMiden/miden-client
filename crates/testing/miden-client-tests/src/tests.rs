@@ -4,13 +4,21 @@ use std::boxed::Box;
 use std::collections::BTreeSet;
 use std::env::temp_dir;
 use std::println;
-use std::string::ToString;
 use std::sync::Arc;
 
 use miden_client::account::{Address, AddressInterface};
 use miden_client::address::RoutingParameters;
+use miden_client::assembly::{
+    Assembler,
+    CodeBuilder,
+    DefaultSourceManager,
+    Module,
+    ModuleKind,
+    Path,
+};
 use miden_client::auth::{
     AuthEcdsaK256Keccak,
+    AuthRpoFalcon512,
     AuthSecretKey,
     PublicKeyCommitment,
     RPO_FALCON_SCHEME_ID,
@@ -20,16 +28,20 @@ use miden_client::keystore::FilesystemKeyStore;
 use miden_client::note::{BlockNumber, NoteId, NoteRelevance};
 use miden_client::rpc::{ACCOUNT_ID_LIMIT, NOTE_TAG_LIMIT, NodeRpcClient};
 use miden_client::store::input_note_states::ConsumedAuthenticatedLocalNoteState;
-use miden_client::store::{InputNoteRecord, InputNoteState, NoteFilter, TransactionFilter};
+use miden_client::store::{
+    AccountStorageFilter,
+    InputNoteRecord,
+    InputNoteState,
+    NoteFilter,
+    TransactionFilter,
+};
 use miden_client::sync::{NoteTagRecord, NoteTagSource};
-use miden_client::testing::account_id::ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET;
 use miden_client::testing::common::{
     ACCOUNT_ID_REGULAR,
     MINT_AMOUNT,
     RECALL_HEIGHT_DELTA,
     TRANSFER_AMOUNT,
     TestClient,
-    TestClientKeyStore,
     assert_account_has_single_asset,
     assert_note_cannot_be_consumed_twice,
     consume_notes,
@@ -52,16 +64,7 @@ use miden_client::transaction::{
 };
 use miden_client::{ClientError, DebugMode};
 use miden_client_sqlite_store::ClientBuilderSqliteExt;
-use miden_lib::account::auth::AuthRpoFalcon512;
-use miden_lib::account::faucets::BasicFungibleFaucet;
-use miden_lib::account::interface::AccountInterfaceError;
-use miden_lib::account::wallets::BasicWallet;
-use miden_lib::note::{WellKnownNote, utils};
-use miden_lib::testing::mock_account::MockAccountExt;
-use miden_lib::testing::note::NoteBuilder;
-use miden_lib::transaction::TransactionKernel;
-use miden_lib::utils::{Deserializable, ScriptBuilder, Serializable};
-use miden_objects::account::{
+use miden_protocol::account::{
     Account,
     AccountBuilder,
     AccountCode,
@@ -72,11 +75,12 @@ use miden_objects::account::{
     AccountType,
     StorageMap,
     StorageSlot,
+    StorageSlotContent,
+    StorageSlotName,
 };
-use miden_objects::assembly::{Assembler, DefaultSourceManager, LibraryPath, Module, ModuleKind};
-use miden_objects::asset::{Asset, AssetWitness, FungibleAsset, TokenSymbol};
-use miden_objects::crypto::rand::{FeltRng, RpoRandomCoin};
-use miden_objects::note::{
+use miden_protocol::asset::{Asset, AssetWitness, FungibleAsset, TokenSymbol};
+use miden_protocol::crypto::rand::{FeltRng, RpoRandomCoin};
+use miden_protocol::note::{
     Note,
     NoteAssets,
     NoteExecutionHint,
@@ -88,17 +92,25 @@ use miden_objects::note::{
     NoteTag,
     NoteType,
 };
-use miden_objects::testing::account_id::{
+use miden_protocol::testing::account_id::{
     ACCOUNT_ID_PRIVATE_SENDER,
     ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1,
     ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_2,
+    ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET,
     ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE,
     ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
     ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_UPDATABLE_CODE,
 };
-use miden_objects::transaction::OutputNote;
-use miden_objects::vm::AdviceInputs;
-use miden_objects::{EMPTY_WORD, Felt, ONE, Word, ZERO};
+use miden_protocol::transaction::{OutputNote, TransactionKernel};
+use miden_protocol::utils::{Deserializable, Serializable};
+use miden_protocol::vm::AdviceInputs;
+use miden_protocol::{EMPTY_WORD, Felt, ONE, Word, ZERO};
+use miden_standards::account::faucets::BasicFungibleFaucet;
+use miden_standards::account::interface::AccountInterfaceError;
+use miden_standards::account::wallets::BasicWallet;
+use miden_standards::note::{WellKnownNote, utils};
+use miden_standards::testing::mock_account::MockAccountExt;
+use miden_standards::testing::note::NoteBuilder;
 use miden_testing::{MockChain, MockChainBuilder, TxContextInput};
 use rand::rngs::StdRng;
 use rand::{Rng, RngCore, SeedableRng};
@@ -185,7 +197,7 @@ where
     F: for<'client> FnOnce(
         &'client mut TestClient,
         AccountStorageMode,
-        &'client FilesystemKeyStore<StdRng>,
+        &'client FilesystemKeyStore,
     ) -> InsertAccountFuture<'client>,
     AssertFn: Fn(&Account, &Account),
 {
@@ -197,7 +209,7 @@ where
 
     let fetched_record = client.get_account(account.id()).await.unwrap().unwrap();
     let fetched_seed = fetched_record.seed();
-    let fetched_account: Account = fetched_record.into();
+    let fetched_account: Account = fetched_record.try_into().unwrap();
 
     assert_eq!(account.id(), fetched_account.id());
     assert_eq!(account.nonce(), fetched_account.nonce());
@@ -216,11 +228,11 @@ where
     F: for<'client> FnOnce(
         &'client mut TestClient,
         AccountStorageMode,
-        &'client FilesystemKeyStore<StdRng>,
+        &'client FilesystemKeyStore,
     ) -> InsertAccountFuture<'client>,
 {
     assert_account_insertion(insert_fn, |account, fetched_account| {
-        assert_eq!(account.storage().commitment(), fetched_account.storage().commitment());
+        assert_eq!(account.storage().to_commitment(), fetched_account.storage().to_commitment());
     })
     .await;
 }
@@ -230,7 +242,7 @@ where
     F: for<'client> FnOnce(
         &'client mut TestClient,
         AccountStorageMode,
-        &'client FilesystemKeyStore<StdRng>,
+        &'client FilesystemKeyStore,
     ) -> InsertAccountFuture<'client>,
 {
     assert_account_insertion(insert_fn, |account, fetched_account| {
@@ -304,7 +316,7 @@ async fn account_code() {
 
     client.add_account(&account, false).await.unwrap();
     let retrieved_acc = client.get_account(account.id()).await.unwrap().unwrap();
-    assert_eq!(*account.code(), *retrieved_acc.account().code());
+    assert_eq!(*account.code(), retrieved_acc.code());
 }
 
 #[tokio::test]
@@ -536,7 +548,7 @@ async fn mint_transaction() {
         .build_mint_fungible_asset(
             FungibleAsset::new(faucet.id(), 5u64).unwrap(),
             AccountId::try_from(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1).unwrap(),
-            miden_objects::note::NoteType::Private,
+            miden_protocol::note::NoteType::Private,
             client.rng(),
         )
         .unwrap();
@@ -631,7 +643,7 @@ async fn transaction_request_expiration() {
         .build_mint_fungible_asset(
             FungibleAsset::new(faucet.id(), 5u64).unwrap(),
             AccountId::try_from(ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE).unwrap(),
-            miden_objects::note::NoteType::Private,
+            miden_protocol::note::NoteType::Private,
             client.rng(),
         )
         .unwrap();
@@ -666,7 +678,7 @@ async fn import_processing_note_returns_error() {
         .build_mint_fungible_asset(
             FungibleAsset::new(faucet.id(), 5u64).unwrap(),
             account.id(),
-            miden_objects::note::NoteType::Public,
+            miden_protocol::note::NoteType::Public,
             client.rng(),
         )
         .unwrap();
@@ -791,7 +803,7 @@ async fn execute_program() {
         .unwrap();
 
     let code = "
-        use.std::sys
+        use miden::core::sys
 
         begin
             push.16
@@ -802,7 +814,7 @@ async fn execute_program() {
         end
         ";
 
-    let tx_script = client.script_builder().compile_tx_script(code).unwrap();
+    let tx_script = client.code_builder().compile_tx_script(code).unwrap();
 
     let output_stack = Box::pin(client.execute_program(
         wallet.id(),
@@ -839,7 +851,7 @@ async fn real_note_roundtrip() {
         .build_mint_fungible_asset(
             FungibleAsset::new(faucet.id(), 5u64).unwrap(),
             wallet.id(),
-            miden_objects::note::NoteType::Public,
+            miden_protocol::note::NoteType::Public,
             client.rng(),
         )
         .unwrap();
@@ -996,7 +1008,7 @@ async fn p2id_transfer() {
 
     let regular_account = client.get_account(from_account_id).await.unwrap().unwrap();
     let seed = regular_account.seed();
-    let regular_account: Account = regular_account.into();
+    let regular_account: Account = regular_account.try_into().unwrap();
 
     // The seed should not be retrieved due to the account not being new
     assert!(!regular_account.is_new() && seed.is_none());
@@ -1010,7 +1022,8 @@ async fn p2id_transfer() {
         panic!("Error: Account should have a fungible asset");
     }
 
-    let regular_account: Account = client.get_account(to_account_id).await.unwrap().unwrap().into();
+    let regular_account: Account =
+        client.get_account(to_account_id).await.unwrap().unwrap().try_into().unwrap();
     assert_eq!(regular_account.vault().assets().count(), 1);
     let asset = regular_account.vault().assets().next().unwrap();
 
@@ -1064,7 +1077,7 @@ async fn p2id_transfer_failing_not_enough_balance() {
         &mut client,
         from_account_id,
         tx_request,
-        ClientError::AssetError(miden_objects::AssetError::FungibleAssetAmountNotSufficient {
+        ClientError::AssetError(miden_protocol::AssetError::FungibleAssetAmountNotSufficient {
             minuend: MINT_AMOUNT,
             subtrahend: MINT_AMOUNT + 1,
         }),
@@ -1125,24 +1138,12 @@ async fn p2ide_transfer_consumed_by_target() {
 
     // Do a transfer from first account to second account with Recall. In this situation we'll do
     // the happy path where the `to_account_id` consumes the note
-    let from_account_balance = client
-        .get_account(from_account_id)
-        .await
-        .unwrap()
-        .unwrap()
-        .account()
-        .vault()
-        .get_balance(faucet_account_id)
-        .unwrap_or(0);
-    let to_account_balance = client
-        .get_account(to_account_id)
-        .await
-        .unwrap()
-        .unwrap()
-        .account()
-        .vault()
-        .get_balance(faucet_account_id)
-        .unwrap_or(0);
+    let from_account: Account =
+        client.get_account(from_account_id).await.unwrap().unwrap().try_into().unwrap();
+    let from_account_balance = from_account.vault().get_balance(faucet_account_id).unwrap_or(0);
+    let to_account: Account =
+        client.get_account(to_account_id).await.unwrap().unwrap().try_into().unwrap();
+    let to_account_balance = to_account.vault().get_balance(faucet_account_id).unwrap_or(0);
     let current_block_num = client.get_sync_height().await.unwrap();
     let asset = FungibleAsset::new(faucet_account_id, TRANSFER_AMOUNT).unwrap();
     println!("Running P2IDE tx...");
@@ -1178,12 +1179,13 @@ async fn p2ide_transfer_consumed_by_target() {
         .unwrap();
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
-    let regular_account = client.get_account(from_account_id).await.unwrap().unwrap();
+    let regular_account: Account =
+        client.get_account(from_account_id).await.unwrap().unwrap().try_into().unwrap();
 
     // The seed should not be retrieved due to the account not being new
-    assert!(!regular_account.account().is_new() && regular_account.seed().is_none());
-    assert_eq!(regular_account.account().vault().assets().count(), 1);
-    let asset = regular_account.account().vault().assets().next().unwrap();
+    assert!(!regular_account.is_new() && regular_account.seed().is_none());
+    assert_eq!(regular_account.vault().assets().count(), 1);
+    let asset = regular_account.vault().assets().next().unwrap();
 
     // Validate the transferred amounts
     if let Asset::Fungible(fungible_asset) = asset {
@@ -1192,7 +1194,8 @@ async fn p2ide_transfer_consumed_by_target() {
         panic!("Error: Account should have a fungible asset");
     }
 
-    let regular_account: Account = client.get_account(to_account_id).await.unwrap().unwrap().into();
+    let regular_account: Account =
+        client.get_account(to_account_id).await.unwrap().unwrap().try_into().unwrap();
     assert_eq!(regular_account.vault().assets().count(), 1);
     let asset = regular_account.vault().assets().next().unwrap();
 
@@ -1230,15 +1233,9 @@ async fn p2ide_transfer_consumed_by_sender() {
 
     // Do a transfer from first account to second account with Recall. In this situation we'll do
     // the happy path where the `to_account_id` consumes the note
-    let from_account_balance = client
-        .get_account(from_account_id)
-        .await
-        .unwrap()
-        .unwrap()
-        .account()
-        .vault()
-        .get_balance(faucet_account_id)
-        .unwrap_or(0);
+    let from_account: Account =
+        client.get_account(from_account_id).await.unwrap().unwrap().try_into().unwrap();
+    let from_account_balance = from_account.vault().get_balance(faucet_account_id).unwrap_or(0);
     let current_block_num = client.get_sync_height().await.unwrap();
     let asset = FungibleAsset::new(faucet_account_id, TRANSFER_AMOUNT).unwrap();
     println!("Running P2IDE tx...");
@@ -1297,11 +1294,12 @@ async fn p2ide_transfer_consumed_by_sender() {
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
 
-    let regular_account = client.get_account(from_account_id).await.unwrap().unwrap();
+    let regular_account: Account =
+        client.get_account(from_account_id).await.unwrap().unwrap().try_into().unwrap();
     // The seed should not be retrieved due to the account not being new
-    assert!(!regular_account.account().is_new() && regular_account.seed().is_none());
-    assert_eq!(regular_account.account().vault().assets().count(), 1);
-    let asset = regular_account.account().vault().assets().next().unwrap();
+    assert!(!regular_account.is_new() && regular_account.seed().is_none());
+    assert_eq!(regular_account.vault().assets().count(), 1);
+    let asset = regular_account.vault().assets().next().unwrap();
 
     // Validate the sender hasn't lost funds
     if let Asset::Fungible(fungible_asset) = asset {
@@ -1310,7 +1308,8 @@ async fn p2ide_transfer_consumed_by_sender() {
         panic!("Error: Account should have a fungible asset");
     }
 
-    let regular_account: Account = client.get_account(to_account_id).await.unwrap().unwrap().into();
+    let regular_account: Account =
+        client.get_account(to_account_id).await.unwrap().unwrap().try_into().unwrap();
     assert_eq!(regular_account.vault().assets().count(), 0);
 
     // Check that the target can't consume the note anymore
@@ -1393,7 +1392,8 @@ async fn p2ide_timelocked() {
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
 
-    let target_account: Account = client.get_account(to_account_id).await.unwrap().unwrap().into();
+    let target_account: Account =
+        client.get_account(to_account_id).await.unwrap().unwrap().try_into().unwrap();
     assert_eq!(target_account.vault().get_balance(faucet_account_id).unwrap(), TRANSFER_AMOUNT);
 }
 
@@ -1621,7 +1621,7 @@ async fn account_rollback() {
 
     // Store the account state before applying the transaction
     let account_before_tx = client.get_account(account_id).await.unwrap().unwrap();
-    let account_commitment_before_tx = account_before_tx.account().commitment();
+    let account_commitment_before_tx = account_before_tx.commitment();
 
     // Apply the transaction
     let submission_height = client.get_sync_height().await.unwrap();
@@ -1631,7 +1631,7 @@ async fn account_rollback() {
 
     // Check that the account state has changed after applying the transaction
     let account_after_tx = client.get_account(account_id).await.unwrap().unwrap();
-    let account_commitment_after_tx = account_after_tx.account().commitment();
+    let account_commitment_after_tx = account_after_tx.commitment();
 
     assert_ne!(
         account_commitment_before_tx, account_commitment_after_tx,
@@ -1665,7 +1665,7 @@ async fn account_rollback() {
 
     // Check that the account state has been rolled back after the transaction was discarded
     let account_after_sync = client.get_account(account_id).await.unwrap().unwrap();
-    let account_commitment_after_sync = account_after_sync.account().commitment();
+    let account_commitment_after_sync = account_after_sync.commitment();
 
     assert_ne!(
         account_commitment_after_sync, account_commitment_after_tx,
@@ -1680,7 +1680,7 @@ async fn account_rollback() {
 
     // Store the account state before applying the transaction
     let account_before_tx = client.get_account(account_id).await.unwrap().unwrap();
-    let account_commitment_before_tx = account_before_tx.account().commitment();
+    let account_commitment_before_tx = account_before_tx.commitment();
 
     // Apply a new transaction
     let tx_request = TransactionRequestBuilder::new()
@@ -1700,7 +1700,7 @@ async fn account_rollback() {
 
     // Check that the account state has changed after applying the transaction
     let account_after_tx = client.get_account(account_id).await.unwrap().unwrap();
-    let account_commitment_after_tx = account_after_tx.account().commitment();
+    let account_commitment_after_tx = account_after_tx.commitment();
 
     assert_ne!(
         account_commitment_after_tx, account_commitment_before_tx,
@@ -1730,7 +1730,7 @@ async fn account_rollback() {
 
     // Check that the account state has not been updated
     let account_after_sync = client.get_account(account_id).await.unwrap().unwrap();
-    let account_commitment_after_sync = account_after_sync.account().commitment();
+    let account_commitment_after_sync = account_after_sync.commitment();
 
     assert_ne!(
         account_commitment_after_sync, account_commitment_before_tx,
@@ -1844,10 +1844,7 @@ async fn subsequent_discarded_transactions() {
     ));
 
     // Check that the account state has been rolled back to the value before both transactions
-    assert_eq!(
-        account_after_sync.account().commitment(),
-        account_before_tx.account().commitment(),
-    );
+    assert_eq!(account_after_sync.commitment(), account_before_tx.commitment(),);
 }
 
 #[tokio::test]
@@ -1956,7 +1953,7 @@ async fn input_note_checks() {
     // Check that adding an authenticated note that is not tracked by the client will return an
     // error
     let missing_authenticated_note_tx_request = TransactionRequestBuilder::new()
-        .build_consume_notes(vec![EMPTY_WORD.into()])
+        .build_consume_notes(vec![NoteId::from_raw(EMPTY_WORD)])
         .unwrap();
     let error =
         Box::pin(client.submit_new_transaction(wallet.id(), missing_authenticated_note_tx_request))
@@ -2059,15 +2056,9 @@ async fn swap_chain_test() {
     Box::pin(client.submit_new_transaction(last_wallet, tx_request)).await.unwrap();
 
     // At the end, the last wallet should have the asset of the first wallet.
-    let last_wallet_account = client.get_account(last_wallet).await.unwrap().unwrap();
-    assert_eq!(
-        last_wallet_account
-            .account()
-            .vault()
-            .get_balance(account_pairs[0].1.id())
-            .unwrap(),
-        1
-    );
+    let last_wallet_account: Account =
+        client.get_account(last_wallet).await.unwrap().unwrap().try_into().unwrap();
+    assert_eq!(last_wallet_account.vault().get_balance(account_pairs[0].1.id()).unwrap(), 1);
 }
 
 #[tokio::test]
@@ -2076,18 +2067,21 @@ async fn empty_storage_map() {
 
     let storage_map = StorageMap::new();
 
-    let component = AccountComponent::compile(
-        "export.dummy
+    let component_code = CodeBuilder::default()
+        .compile_component_code(
+            "miden::testing::dummy_component",
+            "pub proc dummy
                 nop
-            end"
-        .to_string(),
-        TransactionKernel::assembler(),
-        vec![StorageSlot::Map(storage_map)],
-    )
-    .unwrap()
-    .with_supports_all_types();
+            end",
+        )
+        .unwrap();
+    let map_slot_name = StorageSlotName::new(EMPTY_STORAGE_MAP_SLOT_NAME).unwrap();
+    let map_slot = StorageSlot::with_map(map_slot_name, storage_map);
+    let component = AccountComponent::new(component_code, vec![map_slot])
+        .unwrap()
+        .with_supports_all_types();
 
-    let key_pair = AuthSecretKey::new_rpo_falcon512();
+    let key_pair = AuthSecretKey::new_falcon512_rpo();
     let pub_key = key_pair.public_key();
 
     let mut init_seed = [0u8; 32];
@@ -2108,33 +2102,49 @@ async fn empty_storage_map() {
 
     client.add_account(&account, false).await.unwrap();
 
-    let fetched_account = client.get_account(account_id).await.unwrap().unwrap();
+    let fetched_account: Account =
+        client.get_account(account_id).await.unwrap().unwrap().try_into().unwrap();
 
-    assert_eq!(account.storage(), fetched_account.account().storage());
+    assert_eq!(account.storage(), fetched_account.storage());
 }
 
 const MAP_KEY: [Felt; 4] = [Felt::new(42), Felt::new(42), Felt::new(42), Felt::new(42)];
-const BUMP_MAP_CODE: &str = "export.bump_map_item
+const BUMP_MAP_SLOT_NAME: &str = "miden::testing::bump_map::map";
+const EMPTY_STORAGE_MAP_SLOT_NAME: &str = "miden::testing::empty_storage_map::map";
+// MASM code used by `storage_and_vault_proofs*` tests to mutate a storage map.
+const BUMP_MAP_CODE: &str = r#"
+                use miden::core::word
+
+                const MAP_SLOT = word("miden::testing::bump_map::map")
+
+                pub proc bump_map_item
                     # map key
                     push.{map_key}
-                    # item index
-                    push.0
-                    # => [index, KEY]
-                    exec.::miden::active_account::get_map_item
+                    
+                    # push slot_id_prefix, slot_id_suffix for the map slot
+                    push.MAP_SLOT[0..2]
+
+                    exec.::miden::protocol::active_account::get_map_item
                     add.1
                     push.{map_key}
-                    push.0
-                    # => [index, KEY, BUMPED_VALUE]
-                    exec.::miden::native_account::set_map_item
+                    
+                    # push slot_id_prefix, slot_id_suffix for the map slot
+                    push.MAP_SLOT[0..2]
+                    exec.::miden::protocol::native_account::set_map_item
                     dropw
                     # => [OLD_VALUE]
+                    
                     dupw
-                    push.0
+                    
+                    # push slot_id_prefix, slot_id_suffix for the map slot
+                    push.MAP_SLOT[0..2]
+                    
                     # Set a new item each time as the value keeps changing
-                    exec.::miden::native_account::set_map_item
+                    exec.::miden::protocol::native_account::set_map_item
                     dropw dropw
-                end";
+                end"#;
 
+#[allow(clippy::too_many_lines)]
 #[tokio::test]
 async fn storage_and_vault_proofs() {
     let (mut client, mock_rpc_api, keystore) = create_test_client().await;
@@ -2146,37 +2156,41 @@ async fn storage_and_vault_proofs() {
         .insert(MAP_KEY.into(), [Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(1)].into())
         .unwrap();
 
-    let bump_item_component = AccountComponent::compile(
-        BUMP_MAP_CODE.replace("{map_key}", &Word::from(MAP_KEY).to_hex()),
-        TransactionKernel::assembler(),
-        vec![StorageSlot::Map(storage_map)],
-    )
-    .unwrap()
-    .with_supports_all_types();
+    let bump_component_code = CodeBuilder::default()
+        .compile_component_code(
+            "miden::testing::bump_map_component",
+            BUMP_MAP_CODE.replace("{map_key}", &Word::from(MAP_KEY).to_hex()),
+        )
+        .unwrap();
+    let bump_map_slot_name = StorageSlotName::new(BUMP_MAP_SLOT_NAME).unwrap();
+    let bump_map_slot = StorageSlot::with_map(bump_map_slot_name.clone(), storage_map);
+    let bump_item_component = AccountComponent::new(bump_component_code, vec![bump_map_slot])
+        .unwrap()
+        .with_supports_all_types();
 
     // Build script that bumps the storage map item and adds a new one each time.
-    let assembler: Assembler = TransactionKernel::assembler().with_debug_mode(true);
+    let assembler: Assembler = TransactionKernel::assembler();
     let source_manager = Arc::new(DefaultSourceManager::default());
     let module = Module::parser(ModuleKind::Library)
         .parse_str(
-            LibraryPath::new("external_contract::bump_item_contract").unwrap(),
+            Path::new("external_contract::bump_item_contract"),
             BUMP_MAP_CODE.replace("{map_key}", &Word::from(MAP_KEY).to_hex()),
-            &source_manager,
+            source_manager.clone(),
         )
         .unwrap();
-    let library = assembler.clone().assemble_library([module]).unwrap();
-    let tx_script = ScriptBuilder::new(true)
-        .with_dynamically_linked_library(&library)
+    let library = assembler.assemble_library([module]).unwrap();
+    let tx_script = CodeBuilder::new()
+        .with_dynamically_linked_library(library)
         .unwrap()
         .compile_tx_script(
-            "use.external_contract::bump_item_contract
+            "use external_contract::bump_item_contract
             begin
                 call.bump_item_contract::bump_map_item
             end",
         )
         .unwrap();
 
-    let key_pair = AuthSecretKey::new_rpo_falcon512();
+    let key_pair = AuthSecretKey::new_falcon512_rpo();
     let pub_key = key_pair.public_key();
 
     let mut init_seed = [0u8; 32];
@@ -2191,9 +2205,19 @@ async fn storage_and_vault_proofs() {
         .build()
         .unwrap();
 
+<<<<<<< HEAD
     keystore.add_key(&key_pair).unwrap();
 
     client.add_account(&account, false).await.unwrap();
+||||||| 61ea3f79
+    client.add_account(&account, false).await.unwrap();
+=======
+    client
+        .test_store()
+        .insert_account(&account, Address::new(account.id()))
+        .await
+        .unwrap();
+>>>>>>> next
 
     let account_id = account.id();
 
@@ -2219,12 +2243,17 @@ async fn storage_and_vault_proofs() {
         client.sync_state().await.unwrap();
 
         // Check that retrieved vault and storage match with the account.
-        let account: Account = client.get_account(account_id).await.unwrap().unwrap().into();
+        let account: Account =
+            client.get_account(account_id).await.unwrap().unwrap().try_into().unwrap();
 
-        let storage = client.test_store().get_account_storage(account_id).await.unwrap();
+        let storage = client
+            .test_store()
+            .get_account_storage(account_id, AccountStorageFilter::All)
+            .await
+            .unwrap();
         let vault = client.test_store().get_account_vault(account_id).await.unwrap();
 
-        assert_eq!(account.storage().commitment(), storage.commitment());
+        assert_eq!(account.storage().to_commitment(), storage.to_commitment());
         assert_eq!(account.vault().root(), vault.root());
 
         // Check that specific asset proof matches the one in the vault
@@ -2241,12 +2270,17 @@ async fn storage_and_vault_proofs() {
         // Check that specific map item proof matches the one in the storage
         let (value, proof) = client
             .test_store()
-            .get_account_map_item(account_id, 1, MAP_KEY.into())
+            .get_account_map_item(account_id, bump_map_slot_name.clone(), MAP_KEY.into())
             .await
             .unwrap();
 
-        let StorageSlot::Map(map) = storage.slots().get(1).unwrap() else {
-            panic!("Expected a map storage slot");
+        let map_slot = storage
+            .slots()
+            .iter()
+            .find(|slot| slot.name() == &bump_map_slot_name)
+            .expect("storage should contain bump map slot");
+        let StorageSlotContent::Map(map) = map_slot.content() else {
+            panic!("Expected bump map slot content to be a map");
         };
 
         assert_eq!(value, map.get(&MAP_KEY.into()));
@@ -2364,7 +2398,7 @@ async fn consume_note_with_custom_script() {
             nop
         end
     ";
-    let note_script = client.script_builder().compile_note_script(custom_note_script).unwrap();
+    let note_script = client.code_builder().compile_note_script(custom_note_script).unwrap();
 
     let note_inputs = NoteInputs::new(vec![]).unwrap();
     let serial_num = client.rng().draw_word();
@@ -2461,8 +2495,8 @@ async fn add_account_fails_if_accounts_limit_is_exceeded() {
 // HELPERS
 // ================================================================================================
 
-pub async fn create_test_client()
--> (MockClient<FilesystemKeyStore<StdRng>>, MockRpcApi, FilesystemKeyStore<StdRng>) {
+pub async fn create_test_client() -> (MockClient<FilesystemKeyStore>, MockRpcApi, FilesystemKeyStore)
+{
     let (builder, rpc_api, keystore) = Box::pin(create_test_client_builder()).await;
     let mut client = builder.build().await.unwrap();
     client.ensure_genesis_in_place().await.unwrap();
@@ -2471,7 +2505,7 @@ pub async fn create_test_client()
 }
 
 pub async fn create_test_client_builder()
--> (ClientBuilder<TestClientKeyStore>, MockRpcApi, FilesystemKeyStore<StdRng>) {
+-> (ClientBuilder<FilesystemKeyStore>, MockRpcApi, FilesystemKeyStore) {
     let mut rng = rand::rng();
     let coin_seed: [u64; 4] = rng.random();
 
@@ -2578,9 +2612,9 @@ pub async fn create_prebuilt_mock_chain() -> MockChain {
 async fn insert_new_wallet(
     client: &mut TestClient,
     storage_mode: AccountStorageMode,
-    keystore: &FilesystemKeyStore<StdRng>,
+    keystore: &FilesystemKeyStore,
 ) -> Result<Account, ClientError> {
-    let key_pair = AuthSecretKey::new_rpo_falcon512_with_rng(client.rng());
+    let key_pair = AuthSecretKey::new_falcon512_rpo_with_rng(client.rng());
     let pub_key = key_pair.public_key();
 
     let mut init_seed = [0u8; 32];
@@ -2604,7 +2638,7 @@ async fn insert_new_wallet(
 async fn insert_new_ecdsa_wallet(
     client: &mut TestClient,
     storage_mode: AccountStorageMode,
-    keystore: &FilesystemKeyStore<StdRng>,
+    keystore: &FilesystemKeyStore,
 ) -> Result<Account, ClientError> {
     let init_seed = [0u8; 32];
     let mut rng = StdRng::from_seed(init_seed);
@@ -2630,9 +2664,9 @@ async fn insert_new_ecdsa_wallet(
 async fn insert_new_fungible_faucet(
     client: &mut TestClient,
     storage_mode: AccountStorageMode,
-    keystore: &FilesystemKeyStore<StdRng>,
+    keystore: &FilesystemKeyStore,
 ) -> Result<Account, ClientError> {
-    let key_pair = AuthSecretKey::new_rpo_falcon512_with_rng(client.rng());
+    let key_pair = AuthSecretKey::new_falcon512_rpo_with_rng(client.rng());
     let pub_key = key_pair.public_key();
 
     // we need to use an initial seed to create the wallet account
@@ -2660,7 +2694,7 @@ async fn insert_new_fungible_faucet(
 async fn insert_new_ecdsa_fungible_faucet(
     client: &mut TestClient,
     storage_mode: AccountStorageMode,
-    keystore: &FilesystemKeyStore<StdRng>,
+    keystore: &FilesystemKeyStore,
 ) -> Result<Account, ClientError> {
     let init_seed = [0u8; 32];
     let mut rng = StdRng::from_seed(init_seed);
@@ -2690,41 +2724,49 @@ async fn insert_new_ecdsa_fungible_faucet(
     Ok(account)
 }
 
+#[allow(clippy::too_many_lines)]
 #[tokio::test]
 async fn storage_and_vault_proofs_ecdsa() {
     let (mut client, mock_rpc_api, keystore) = create_test_client().await;
 
     // Create an account that will accept assets (basic wallet) but also that has a storage map that
     // can be updated.
+    //
+    // Same setup as `storage_and_vault_proofs`, but using ECDSA auth instead of RPO Falcon.
+    // The storage map is still updated via named-slot access in `BUMP_MAP_CODE`.
     let mut storage_map = StorageMap::new();
     storage_map
         .insert(MAP_KEY.into(), [Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(1)].into())
         .unwrap();
 
-    let bump_item_component = AccountComponent::compile(
-        BUMP_MAP_CODE.replace("{map_key}", &Word::from(MAP_KEY).to_hex()),
-        TransactionKernel::assembler(),
-        vec![StorageSlot::Map(storage_map)],
-    )
-    .unwrap()
-    .with_supports_all_types();
+    let bump_component_code = CodeBuilder::default()
+        .compile_component_code(
+            "miden::testing::bump_map_component",
+            BUMP_MAP_CODE.replace("{map_key}", &Word::from(MAP_KEY).to_hex()),
+        )
+        .unwrap();
+    let bump_map_slot_name = StorageSlotName::new(BUMP_MAP_SLOT_NAME).unwrap();
+    let bump_map_slot = StorageSlot::with_map(bump_map_slot_name.clone(), storage_map);
+    let bump_item_component = AccountComponent::new(bump_component_code, vec![bump_map_slot])
+        .unwrap()
+        .with_supports_all_types();
 
     // Build script that bumps the storage map item and adds a new one each time.
-    let assembler: Assembler = TransactionKernel::assembler().with_debug_mode(true);
+    let assembler: Assembler = TransactionKernel::assembler();
     let source_manager = Arc::new(DefaultSourceManager::default());
     let module = Module::parser(ModuleKind::Library)
         .parse_str(
-            LibraryPath::new("external_contract::bump_item_contract").unwrap(),
+            Path::new("external_contract::bump_item_contract"),
             BUMP_MAP_CODE.replace("{map_key}", &Word::from(MAP_KEY).to_hex()),
-            &source_manager,
+            source_manager.clone(),
         )
         .unwrap();
     let library = assembler.clone().assemble_library([module]).unwrap();
-    let tx_script = ScriptBuilder::new(true)
+    let tx_script = CodeBuilder::new()
         .with_dynamically_linked_library(&library)
         .unwrap()
         .compile_tx_script(
-            "use.external_contract::bump_item_contract
+            "use external_contract::bump_item_contract
             begin
                 call.bump_item_contract::bump_map_item
             end",
@@ -2774,12 +2816,17 @@ async fn storage_and_vault_proofs_ecdsa() {
         client.sync_state().await.unwrap();
 
         // Check that retrieved vault and storage match with the account.
-        let account: Account = client.get_account(account_id).await.unwrap().unwrap().into();
+        let account: Account =
+            client.get_account(account_id).await.unwrap().unwrap().try_into().unwrap();
 
-        let storage = client.test_store().get_account_storage(account_id).await.unwrap();
+        let storage = client
+            .test_store()
+            .get_account_storage(account_id, AccountStorageFilter::All)
+            .await
+            .unwrap();
         let vault = client.test_store().get_account_vault(account_id).await.unwrap();
 
-        assert_eq!(account.storage().commitment(), storage.commitment());
+        assert_eq!(account.storage().to_commitment(), storage.to_commitment());
         assert_eq!(account.vault().root(), vault.root());
 
         // Check that specific asset proof matches the one in the vault
@@ -2796,12 +2843,17 @@ async fn storage_and_vault_proofs_ecdsa() {
         // Check that specific map item proof matches the one in the storage
         let (value, proof) = client
             .test_store()
-            .get_account_map_item(account_id, 1, MAP_KEY.into())
+            .get_account_map_item(account_id, bump_map_slot_name.clone(), MAP_KEY.into())
             .await
             .unwrap();
 
-        let StorageSlot::Map(map) = storage.slots().get(1).unwrap() else {
-            panic!("Expected a map storage slot");
+        let map_slot = storage
+            .slots()
+            .iter()
+            .find(|slot| slot.name() == &bump_map_slot_name)
+            .expect("storage should contain bump map slot");
+        let StorageSlotContent::Map(map) = map_slot.content() else {
+            panic!("Expected bump map slot content to be a map");
         };
 
         assert_eq!(value, map.get(&MAP_KEY.into()));

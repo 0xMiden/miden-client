@@ -1,9 +1,9 @@
 use miden_client::note::{NoteDetails as NativeNoteDetails, NoteTag as NativeNoteTag};
 use wasm_bindgen::prelude::*;
 
+use crate::models::NoteTag;
 use crate::models::miden_arrays::NoteDetailsAndTagArray;
 use crate::models::note_details::NoteDetails;
-use crate::models::note_tag::NoteTag;
 
 /// Pair of note details and tag used when declaring expected notes.
 #[derive(Clone)]

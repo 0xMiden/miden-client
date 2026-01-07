@@ -15,7 +15,7 @@
 //! #   account::{Account, AccountBuilder, AccountType, component::BasicWallet},
 //! #   crypto::FeltRng
 //! # };
-//! # use miden_objects::account::AccountStorageMode;
+//! # use miden_protocol::account::AccountStorageMode;
 //! # async fn add_new_account_example<AUTH>(
 //! #     client: &mut miden_client::Client<AUTH>
 //! # ) -> Result<(), miden_client::ClientError> {
@@ -36,39 +36,22 @@
 
 use alloc::vec::Vec;
 
-use miden_lib::account::auth::{AuthEcdsaK256Keccak, AuthRpoFalcon512};
-use miden_lib::account::wallets::BasicWallet;
-use miden_objects::account::auth::PublicKey;
-use miden_objects::note::NoteTag;
-use miden_objects::utils::{Deserializable, Serializable};
+use miden_protocol::account::auth::PublicKey;
+pub use miden_protocol::account::{
+    Account, AccountBuilder, AccountCode, AccountComponent, AccountComponentCode, AccountDelta,
+    AccountFile, AccountHeader, AccountId, AccountIdPrefix, AccountStorage, AccountStorageMode,
+    AccountType, PartialAccount, PartialStorage, PartialStorageMap, StorageMap, StorageSlot,
+    StorageSlotContent, StorageSlotId, StorageSlotName, StorageSlotType,
+};
+pub use miden_protocol::address::{Address, AddressInterface, AddressType, NetworkId};
+use miden_protocol::note::NoteTag;
+pub use miden_protocol::{AccountIdError, AddressError, NetworkIdError};
+use miden_standards::account::auth::{AuthEcdsaK256Keccak, AuthRpoFalcon512};
 // RE-EXPORTS
 // ================================================================================================
-pub use miden_objects::{
-    AccountIdError,
-    AddressError,
-    NetworkIdError,
-    account::{
-        Account,
-        AccountBuilder,
-        AccountCode,
-        AccountComponent,
-        AccountDelta,
-        AccountFile,
-        AccountHeader,
-        AccountId,
-        AccountIdPrefix,
-        AccountStorage,
-        AccountStorageMode,
-        AccountType,
-        PartialAccount,
-        PartialStorage,
-        PartialStorageMap,
-        StorageMap,
-        StorageSlot,
-        StorageSlotType,
-    },
-    address::{Address, AddressInterface, AddressType, NetworkId},
-};
+pub use miden_standards::account::interface::AccountInterfaceExt;
+use miden_standards::account::wallets::BasicWallet;
+use miden_tx::utils::{Deserializable, Serializable};
 
 use super::Client;
 use crate::auth::AuthSchemeId;
@@ -80,33 +63,21 @@ use crate::sync::NoteTagRecord;
 pub mod component {
     pub const MIDEN_PACKAGE_EXTENSION: &str = "masp";
 
-    pub use miden_lib::account::auth::*;
-    pub use miden_lib::account::components::{
-        basic_fungible_faucet_library,
-        basic_wallet_library,
-        ecdsa_k256_keccak_library,
-        network_fungible_faucet_library,
-        no_auth_library,
-        rpo_falcon_512_acl_library,
-        rpo_falcon_512_library,
-        rpo_falcon_512_multisig_library,
+    pub use miden_protocol::account::auth::*;
+    pub use miden_protocol::account::component::{
+        InitStorageData, StorageSlotSchema, StorageValueName,
     };
-    pub use miden_lib::account::faucets::{
-        BasicFungibleFaucet,
-        FungibleFaucetExt,
-        NetworkFungibleFaucet,
+    pub use miden_protocol::account::{AccountComponent, AccountComponentMetadata};
+    pub use miden_standards::account::auth::*;
+    pub use miden_standards::account::components::{
+        basic_fungible_faucet_library, basic_wallet_library, ecdsa_k256_keccak_library,
+        network_fungible_faucet_library, no_auth_library, rpo_falcon_512_acl_library,
+        rpo_falcon_512_library, rpo_falcon_512_multisig_library,
     };
-    pub use miden_lib::account::wallets::BasicWallet;
-    pub use miden_objects::account::{
-        AccountComponent,
-        AccountComponentMetadata,
-        FeltRepresentation,
-        InitStorageData,
-        StorageEntry,
-        StorageValueName,
-        TemplateType,
-        WordRepresentation,
+    pub use miden_standards::account::faucets::{
+        BasicFungibleFaucet, FungibleFaucetExt, NetworkFungibleFaucet,
     };
+    pub use miden_standards::account::wallets::BasicWallet;
 }
 
 // CLIENT METHODS
@@ -194,7 +165,7 @@ impl<AUTH> Client<AUTH> {
                     return Err(ClientError::AccountAlreadyTracked(account.id()));
                 }
 
-                if tracked_account.account().nonce().as_int() > account.nonce().as_int() {
+                if tracked_account.nonce().as_int() > account.nonce().as_int() {
                     // If the new account is older than the one being tracked, return an error
                     return Err(ClientError::AccountNonceTooLow);
                 }

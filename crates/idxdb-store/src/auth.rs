@@ -28,6 +28,9 @@ extern "C" {
 
     #[wasm_bindgen(js_name = getAccountAuthByPubKey)]
     pub fn idxdb_get_account_auth_by_pub_key(pub_key: String) -> js_sys::Promise;
+
+    #[wasm_bindgen(js_name = getSecretKeysForAccountId)]
+    pub fn idxdb_get_secret_keys_for_account(account_id_hex: String) -> js_sys::Promise;
 }
 
 pub async fn insert_account_auth(
@@ -55,4 +58,22 @@ pub async fn get_account_auth_by_pub_key(pub_key: String) -> Result<String, JsVa
         Some(account_auth) => Ok(account_auth.secret_key),
         None => Err(JsValue::from_str(&format!("Pub key {pub_key} not found in the store"))),
     }
+}
+
+pub async fn get_raw_secret_keys_from_account_id(
+    account_id: AccountId,
+) -> Result<Vec<String>, JsValue> {
+    let account_id_hex = account_id.to_hex();
+
+    let promise = idxdb_get_secret_keys_for_account(account_id_hex);
+
+    let js_secret_keys = JsFuture::from(promise).await?;
+
+    let raw_secret_keys: Vec<String> = from_value(js_secret_keys).map_err(|err| {
+        JsValue::from_str(&format!(
+            "Error: failed to deserialize secret keys for account: {account_id}, got error: {err} "
+        ))
+    })?;
+
+    Ok(raw_secret_keys)
 }

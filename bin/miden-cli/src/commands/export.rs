@@ -6,12 +6,12 @@ use miden_client::Client;
 use miden_client::account::{Account, AccountFile};
 use miden_client::auth::TransactionAuthenticator;
 use miden_client::store::NoteExportType;
-use miden_client::utils::{Serializable, public_key_commitments_of_account};
+use miden_client::utils::{Serializable, get_public_keys_from_account};
 use tracing::info;
 
 use crate::errors::CliError;
 use crate::utils::parse_account_id;
-use crate::{CliKeyStore, Parser, get_output_note_with_id_prefix};
+use crate::{FilesystemKeyStore, Parser, get_output_note_with_id_prefix};
 
 #[derive(Debug, Parser, Clone)]
 #[command(about = "Export client output notes, or account data")]
@@ -58,7 +58,7 @@ impl ExportCmd {
     pub async fn execute<AUTH: TransactionAuthenticator + Sync>(
         &self,
         mut client: Client<AUTH>,
-        keystore: CliKeyStore,
+        keystore: FilesystemKeyStore,
     ) -> Result<(), CliError> {
         if self.account {
             export_account(&client, &keystore, self.id.as_str(), self.filename.clone()).await?;
@@ -78,7 +78,7 @@ impl ExportCmd {
 
 async fn export_account<AUTH>(
     client: &Client<AUTH>,
-    keystore: &CliKeyStore,
+    keystore: &FilesystemKeyStore,
     account_id: &str,
     filename: Option<PathBuf>,
 ) -> Result<File, CliError> {
@@ -89,7 +89,7 @@ async fn export_account<AUTH>(
         .await?
         .ok_or(CliError::Export(format!("Account with ID {account_id} not found")))?;
 
-    let account: Account = account.into();
+    let account: Account = account.try_into()?;
 
     let mut key_pairs = vec![];
 

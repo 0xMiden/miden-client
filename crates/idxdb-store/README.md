@@ -12,8 +12,8 @@ Add to `Cargo.toml` and build for `wasm32-unknown-unknown`:
 
 ```toml
 [dependencies]
-miden-client       = { version = "0.12", default-features = false }
-miden-idxdb-store  = { version = "0.12" }
+miden-client       = { version = "0.13", default-features = false }
+miden-idxdb-store  = { version = "0.13" }
 ```
 
 ## License

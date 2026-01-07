@@ -2,8 +2,8 @@ use alloc::string::{String, ToString};
 use alloc::sync::Arc;
 use std::boxed::Box;
 
-use miden_objects::crypto::rand::{FeltRng, RpoRandomCoin};
-use miden_objects::{Felt, MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES};
+use miden_protocol::crypto::rand::{FeltRng, RpoRandomCoin};
+use miden_protocol::{Felt, MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES};
 use miden_tx::ExecutionOptions;
 use miden_tx::auth::TransactionAuthenticator;
 use rand::Rng;
@@ -60,7 +60,7 @@ pub trait StoreFactory {
 ///
 /// This builder allows you to configure the various components required by the client, such as the
 /// RPC endpoint, store, RNG, and keystore. It is generic over the keystore type. By default, it
-/// uses `FilesystemKeyStore<rand::rngs::StdRng>`.
+/// uses [`FilesystemKeyStore`].
 pub struct ClientBuilder<AUTH> {
     /// An optional custom RPC client. If provided, this takes precedence over `rpc_endpoint`.
     rpc_api: Option<Arc<dyn NodeRpcClient>>,
@@ -273,10 +273,10 @@ where
 /// Marker trait to capture the bounds the builder requires for the authenticator type
 /// parameter
 pub trait BuilderAuthenticator:
-    TransactionAuthenticator + From<FilesystemKeyStore<rand::rngs::StdRng>> + 'static
+    TransactionAuthenticator + From<FilesystemKeyStore> + 'static
 {
 }
 impl<T> BuilderAuthenticator for T where
-    T: TransactionAuthenticator + From<FilesystemKeyStore<rand::rngs::StdRng>> + 'static
+    T: TransactionAuthenticator + From<FilesystemKeyStore> + 'static
 {
 }

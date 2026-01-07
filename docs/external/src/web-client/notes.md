@@ -97,7 +97,7 @@ try {
 You can compile custom note scripts for advanced use cases:
 
 ```typescript
-import { ScriptBuilder, ScriptBuilderMode } from "@demox-labs/miden-sdk";
+import { CodeBuilder, CodeBuilderMode } from "@demox-labs/miden-sdk";
 
 try {
     // Instance a script builder
@@ -109,10 +109,10 @@ try {
     `;
 
     // Script builder can be instanced in either debug or normal mode using one of:
-    // - ScriptBuilderMode.Debug
-    // - ScriptBuilderMode.Normal
+    // - CodeBuilderMode.Debug
+    // - CodeBuilderMode.Normal
     
-    const noteScript = new ScriptBuilder(ScriptBuilderMode.Debug);
+    const noteScript = new CodeBuilder(CodeBuilderMode.Debug);
     // Use the compiled script in your transaction
 } catch (error) {
     console.error("Failed to compile note script:", error.message);

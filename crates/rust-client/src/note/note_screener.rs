@@ -4,11 +4,11 @@ use alloc::vec::Vec;
 use core::fmt;
 
 use async_trait::async_trait;
-use miden_lib::account::interface::AccountInterface;
-use miden_lib::note::{NoteConsumptionStatus, WellKnownNote};
-use miden_objects::account::{Account, AccountId};
-use miden_objects::note::{Note, NoteId};
-use miden_objects::{AccountError, AssetError};
+use miden_protocol::account::{Account, AccountId};
+use miden_protocol::note::{Note, NoteId};
+use miden_protocol::{AccountError, AssetError};
+use miden_standards::account::interface::{AccountInterface, AccountInterfaceExt};
+use miden_standards::note::{NoteConsumptionStatus, WellKnownNote};
 use miden_tx::auth::TransactionAuthenticator;
 use miden_tx::{NoteCheckerError, NoteConsumptionChecker, TransactionExecutor};
 use thiserror::Error;
@@ -81,8 +81,11 @@ where
                 .get_account(id)
                 .await?
                 .ok_or(NoteScreenerError::AccountDataNotFound(id))?;
+            let account: Account = account_record
+                .try_into()
+                .map_err(|_| NoteScreenerError::AccountDataNotFound(id))?;
 
-            match self.check_standard_consumability(account_record.account(), note).await {
+            match self.check_standard_consumability(&account, note).await {
                 Ok(Some(relevance)) => {
                     note_relevances.push((id, relevance));
                 },
@@ -116,10 +119,8 @@ where
         let transaction_request =
             TransactionRequestBuilder::new().build_consume_notes(vec![note.id()])?;
 
-        let tx_script = transaction_request.build_transaction_script(
-            &AccountInterface::from(account),
-            crate::DebugMode::Disabled,
-        )?;
+        let tx_script = transaction_request
+            .build_transaction_script(&AccountInterface::from_account(account))?;
 
         let tx_args = transaction_request.clone().into_transaction_args(tx_script);
 
