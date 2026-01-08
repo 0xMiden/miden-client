@@ -2,7 +2,7 @@
 authors.workspace      = true
 categories             = ["command-line-utilities"]
 description            = "The official command line client for interacting with the Miden network"
-documentation          = "https://docs.rs/miden-client-cli/0.12.0"
+documentation          = "https://docs.rs/miden-client-cli"
 edition.workspace      = true
 keywords               = ["cli", "client", "miden"]
 license.workspace      = true
