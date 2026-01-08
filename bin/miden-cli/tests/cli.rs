@@ -1094,7 +1094,7 @@ pub type TestClient = Client<FilesystemKeyStore>;
 /// Creates a new [`Client`] with a given store. Also returns the keystore associated with it.
 async fn create_rust_client_with_store_path(
     store_path: &Path,
-    _keystore_path: Option<PathBuf>,
+    keystore_path: Option<PathBuf>,
     endpoint: Endpoint,
 ) -> Result<(TestClient, FilesystemKeyStore)> {
     let store = {
@@ -1107,7 +1107,7 @@ async fn create_rust_client_with_store_path(
 
     let rng = Box::new(RpoRandomCoin::new(coin_seed.map(Felt::new).into()));
 
-    let keystore = FilesystemKeyStore::new(temp_dir())?;
+    let keystore = FilesystemKeyStore::new(keystore_path.unwrap_or_else(temp_dir))?;
 
     Ok((
         TestClient::new(
