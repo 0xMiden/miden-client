@@ -306,16 +306,14 @@ export async function getAccountAddresses(accountId: string) {
   }
 }
 
-export async function getPublicKeysForAccountId(accountIdHex: string) {
+export async function getPublicCommitmentsForAccountId(accountIdHex: string) {
   try {
     let secretKeys = await accountAuths
       .where("accountIdHex")
       .equals(accountIdHex)
       .toArray();
 
-    secretKeys.map((auth) => auth.pubKeyCommitmentHex);
-
-    return secretKeys;
+    return secretKeys.map((auth) => auth.pubKeyCommitmentHex);
   } catch (error) {
     logWebStoreError(
       error,

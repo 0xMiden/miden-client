@@ -2,11 +2,17 @@ use alloc::string::ToString;
 use alloc::sync::Arc;
 
 use idxdb_store::auth::{
-    get_account_auth_by_pub_key, get_public_commitments_for_account, insert_account_auth,
+    get_account_auth_by_pub_key,
+    get_public_commitments_for_account,
+    insert_account_auth,
 };
 use miden_client::account::AccountId;
 use miden_client::auth::{
-    AuthSecretKey, PublicKey, PublicKeyCommitment, Signature, SigningInputs,
+    AuthSecretKey,
+    PublicKey,
+    PublicKeyCommitment,
+    Signature,
+    SigningInputs,
     TransactionAuthenticator,
 };
 use miden_client::keystore::KeyStoreError;
@@ -17,7 +23,10 @@ use wasm_bindgen_futures::js_sys::Function;
 
 use crate::models::auth_secret_key::AuthSecretKey as WebAuthSecretKey;
 use crate::web_keystore_callbacks::{
-    GetKeyCallback, InsertKeyCallback, SignCallback, decode_secret_key_from_bytes,
+    GetKeyCallback,
+    InsertKeyCallback,
+    SignCallback,
+    decode_secret_key_from_bytes,
 };
 
 /// A web-based keystore that stores keys in [browser's local storage](https://developer.mozilla.org/en-US/docs/Web/API/Web_Storage_API)
@@ -118,7 +127,7 @@ impl<R: Rng> WebKeyStore<R> {
                 ))
             })?;
 
-            pks.push(PublicKeyCommitment::from(parsed))
+            pks.push(PublicKeyCommitment::from(parsed));
         }
         Ok(pks)
     }

@@ -26,11 +26,11 @@ extern "C" {
         account_id: String,
     ) -> js_sys::Promise;
 
-    #[wasm_bindgen(js_name = getAccountAuthByPubKey)]
-    pub fn idxdb_get_account_auth_by_pub_key(pub_key: String) -> js_sys::Promise;
+    #[wasm_bindgen(js_name = getAccountAuthByPubKeyCommitment)]
+    pub fn idxdb_get_account_auth_by_pub_key(pub_key_commitment_hex: String) -> js_sys::Promise;
 
-    #[wasm_bindgen(js_name = getSecretKeysForAccountId)]
-    pub fn idxdb_get_public_keys_for_account(account_id_hex: String) -> js_sys::Promise;
+    #[wasm_bindgen(js_name = getPublicCommitmentsForAccountId)]
+    pub fn idxdb_get_public_key_commitments_for_account(account_id_hex: String) -> js_sys::Promise;
 }
 
 pub async fn insert_account_auth(
@@ -65,11 +65,9 @@ pub async fn get_public_commitments_for_account(
 ) -> Result<Vec<String>, JsValue> {
     let account_id_hex = account_id.to_hex();
 
-    let promise = idxdb_get_public_keys_for_account(account_id_hex);
+    let promise = idxdb_get_public_key_commitments_for_account(account_id_hex);
 
-    let js_secret_keys = JsFuture::from(promise).await?;
-
-    let raw_public_keys: Vec<String> = from_value(js_secret_keys).map_err(|err| {
+    let raw_public_keys: Vec<String> = from_value(JsFuture::from(promise).await?).map_err(|err| {
         JsValue::from_str(&format!(
             "Error: failed to deserialize secret keys for account: {account_id}, got error: {err} "
         ))

@@ -337,15 +337,15 @@ Uses an internal pagination mechanism to avoid fetching duplicate notes.
 
 ***
 
-### getAccountAuthByPubKey()
+### getAccountAuthByPubKeyCommitment()
 
-> **getAccountAuthByPubKey**(`pub_key`): `Promise`\<[`AuthSecretKey`](AuthSecretKey.md)\>
+> **getAccountAuthByPubKeyCommitment**(`pub_key_commitment`): `Promise`\<[`AuthSecretKey`](AuthSecretKey.md)\>
 
 #### Parameters
 
-##### pub\_key
+##### pub\_key\_commitment
 
-[`PublicKey`](PublicKey.md)
+[`Word`](Word.md)
 
 #### Returns
 
@@ -440,6 +440,22 @@ Uses an internal pagination mechanism to avoid fetching duplicate notes.
 #### Returns
 
 `Promise`\<`any`\>
+
+***
+
+### getPublicKeyCommitmentsOfAccount()
+
+> **getPublicKeyCommitmentsOfAccount**(`account_id`): `Promise`\<[`Word`](Word.md)[]\>
+
+#### Parameters
+
+##### account\_id
+
+[`AccountId`](AccountId.md)
+
+#### Returns
+
+`Promise`\<[`Word`](Word.md)[]\>
 
 ***
 

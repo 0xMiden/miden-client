@@ -197,7 +197,7 @@ db.version(1).stores({
   [Table.AccountStorage]: indexes("[commitment+slotName]", "commitment"),
   [Table.StorageMapEntries]: indexes("[root+key]", "root"),
   [Table.AccountAssets]: indexes("[root+vaultKey]", "root", "faucetIdPrefix"),
-  [Table.AccountAuth]: indexes("pubKey"),
+  [Table.AccountAuth]: indexes("pubKeyCommitmentHex", "accountIdHex"),
   [Table.Accounts]: indexes(
     "&accountCommitment",
     "id",

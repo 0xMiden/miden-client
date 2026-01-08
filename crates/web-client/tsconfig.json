@@ -20,7 +20,10 @@
   "files": [
     "./test/global.test.d.ts",
     "tsconfig.json",
-    "./test/playwright.global.setup.ts"
+    "./test/playwright.global.setup.ts",
+    "./test/newFile.2.ts",
+    "./test/newFile.1.ts",
+    "./test/newFile.ts"
   ],
   "exclude": ["node_modules", "js"],
   "ts-node": {

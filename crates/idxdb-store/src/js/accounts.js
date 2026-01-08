@@ -236,14 +236,13 @@ export async function getAccountAddresses(accountId) {
         logWebStoreError(error, `Error while fetching account addresses for id: ${accountId}`);
     }
 }
-export async function getPublicKeysForAccountId(accountIdHex) {
+export async function getPublicCommitmentsForAccountId(accountIdHex) {
     try {
         let secretKeys = await accountAuths
             .where("accountIdHex")
             .equals(accountIdHex)
             .toArray();
-        secretKeys.map((auth) => auth.pubKeyCommitmentHex);
-        return secretKeys;
+        return secretKeys.map((auth) => auth.pubKeyCommitmentHex);
     }
     catch (error) {
         logWebStoreError(error, `Error while fetching secret keys for id: ${accountIdHex}`);

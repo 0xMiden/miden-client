@@ -12,19 +12,35 @@ use miden_client::address::AddressInterface;
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
 use miden_client::crypto::{FeltRng, RpoRandomCoin};
 use miden_client::note::{
-    Note, NoteAssets, NoteExecutionHint, NoteFile, NoteId, NoteInputs, NoteMetadata, NoteRecipient,
-    NoteTag, NoteType,
+    Note,
+    NoteAssets,
+    NoteExecutionHint,
+    NoteFile,
+    NoteId,
+    NoteInputs,
+    NoteMetadata,
+    NoteRecipient,
+    NoteTag,
+    NoteType,
 };
 use miden_client::rpc::{Endpoint, GrpcClient};
 use miden_client::testing::account_id::ACCOUNT_ID_PRIVATE_SENDER;
 use miden_client::testing::common::{
-    ACCOUNT_ID_REGULAR, FilesystemKeyStore, create_test_store_path, execute_tx_and_sync,
+    ACCOUNT_ID_REGULAR,
+    FilesystemKeyStore,
+    create_test_store_path,
+    execute_tx_and_sync,
     insert_new_wallet,
 };
 use miden_client::transaction::{OutputNote, TransactionRequestBuilder};
 use miden_client::utils::Serializable;
 use miden_client::{
-    self, Client, ExecutionOptions, Felt, MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES,
+    self,
+    Client,
+    ExecutionOptions,
+    Felt,
+    MAX_TX_EXECUTION_CYCLES,
+    MIN_TX_EXECUTION_CYCLES,
 };
 use miden_client_cli::MIDEN_DIR;
 use miden_client_sqlite_store::SqliteStore;
@@ -1078,7 +1094,7 @@ pub type TestClient = Client<FilesystemKeyStore>;
 /// Creates a new [`Client`] with a given store. Also returns the keystore associated with it.
 async fn create_rust_client_with_store_path(
     store_path: &Path,
-    keystore_path: Option<PathBuf>,
+    _keystore_path: Option<PathBuf>,
     endpoint: Endpoint,
 ) -> Result<(TestClient, FilesystemKeyStore)> {
     let store = {

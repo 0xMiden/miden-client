@@ -1,5 +1,5 @@
+use miden_client::Word as NativeWord;
 use miden_client::account::Account as NativeAccount;
-use miden_client::keystore;
 use wasm_bindgen::prelude::*;
 
 use crate::models::account::Account;
@@ -7,7 +7,7 @@ use crate::models::account_header::AccountHeader;
 use crate::models::account_id::AccountId;
 use crate::models::address::Address;
 use crate::models::auth_secret_key::AuthSecretKey;
-use crate::models::public_key::PublicKey;
+use crate::models::word::Word;
 use crate::{WebClient, js_error_with_context};
 
 #[wasm_bindgen]
@@ -51,35 +51,45 @@ impl WebClient {
         }
     }
 
-    #[wasm_bindgen(js_name = "getAccountAuthByPubKey")]
-    pub async fn get_account_secret_key_by_pub_key(
+    #[wasm_bindgen(js_name = "getAccountAuthByPubKeyCommitment")]
+    pub async fn get_account_secret_key_by_pub_key_commitment(
         &mut self,
-        pub_key: &PublicKey,
+        pub_key_commitment: &Word,
     ) -> Result<AuthSecretKey, JsValue> {
         let keystore = self.keystore.clone().expect("Keystore not initialized");
 
         let auth_secret_key = keystore
-            .get_key(pub_key.0.to_commitment())
+            .get_key((*pub_key_commitment.as_native()).into())
             .await
-            .map_err(|err| js_error_with_context(err, "failed to get public key for account"))?
+            .map_err(|err| js_error_with_context(err, "failed to get auth key for account"))?
             .ok_or(JsValue::from_str("Auth not found for account"))?;
 
         Ok(auth_secret_key.into())
     }
 
-    #[wasm_bindgen(js_name = "getPublicKeysOfAccount")]
-    pub async fn get_public_keys_of(
+    #[wasm_bindgen(js_name = "getPublicKeyCommitmentsOfAccount")]
+    pub async fn get_public_commitments_of(
         &mut self,
         account_id: &AccountId,
-    ) -> Result<AuthSecretKey, JsValue> {
+    ) -> Result<Vec<Word>, JsValue> {
         let keystore = self.keystore.clone().ok_or(JsValue::from("keystore is not initialized"))?;
 
-        Ok(todo!())
-
-        // Ok(keystore
-        //     .get_public_commitments_for_account(account_id.as_native())
-        //     .await
-        //     .unwrap())
+        Ok(keystore
+            .get_public_commitments_for_account(account_id.as_native())
+            .await
+            .map_err(|err| {
+                js_error_with_context(
+                    err,
+                    &format!(
+                        "failed to fetch public key commitemnts for account: {}",
+                        account_id.as_native()
+                    ),
+                )
+            })?
+            .into_iter()
+            .map(NativeWord::from)
+            .map(Into::into)
+            .collect())
     }
 
     #[wasm_bindgen(js_name = "insertAccountAddress")]

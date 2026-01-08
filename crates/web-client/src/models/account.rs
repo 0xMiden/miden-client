@@ -1,6 +1,6 @@
 use miden_client::Word as NativeWord;
 use miden_client::account::{Account as NativeAccount, AccountType as NativeAccountType};
-use miden_client::utils::get_public_keys_from_account;
+use miden_client::utils::get_public_key_commitments_of;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys::Uint8Array;
 
@@ -121,7 +121,7 @@ impl Account {
     /// Returns the public keys derived from the account's authentication scheme.
     #[wasm_bindgen(js_name = "getPublicKeys")]
     pub fn get_public_keys(&self) -> Vec<Word> {
-        get_public_keys_from_account(&self.0)
+        get_public_key_commitments_of(&self.0)
             .into_iter()
             .map(NativeWord::from)
             .map(Into::into)

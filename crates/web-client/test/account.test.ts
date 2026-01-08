@@ -159,3 +159,133 @@ test.describe("getAccounts tests", () => {
     expect(result.resultTypes.length).toEqual(0);
   });
 });
+
+test.describe("account public commitments", () => {
+  test("properly stores public commitments", async ({ page }) => {
+    const commitments = await page.evaluate(async () => {
+      const newAccount = await window.client.newWallet(
+        window.AccountStorageMode.private(),
+        true,
+        0
+      );
+      const accountId = newAccount.id();
+
+      const sk1 = window.AuthSecretKey.ecdsaWithRNG(null);
+      const sk2 = window.AuthSecretKey.rpoFalconWithRNG(null);
+
+      await window.client.addAccountSecretKeyToWebStore(accountId, sk1);
+      await window.client.addAccountSecretKeyToWebStore(accountId, sk2);
+
+      const commitments =
+        await window.client.getPublicKeyCommitmentsOfAccount(accountId);
+
+      return commitments.length;
+    }, {});
+    expect(commitments).toBe(3);
+  });
+
+  test("retrieve auth keys with pk commitments and verify signatures", async ({
+    page,
+  }) => {
+    const allSksRetrieved = await page.evaluate(async () => {
+      const accountId = window.AccountId.fromHex(
+        "0x69817bcc6fb9f99027c2245f6979c5"
+      );
+
+      const sk1 = window.AuthSecretKey.ecdsaWithRNG(null);
+      const sk2 = window.AuthSecretKey.rpoFalconWithRNG(null);
+      const sk3 = window.AuthSecretKey.rpoFalconWithRNG(null);
+
+      await window.client.addAccountSecretKeyToWebStore(accountId, sk1);
+      await window.client.addAccountSecretKeyToWebStore(accountId, sk2);
+      await window.client.addAccountSecretKeyToWebStore(accountId, sk3);
+
+      const commitments =
+        await window.client.getPublicKeyCommitmentsOfAccount(accountId);
+
+      let sk1Retrieved = false;
+      let sk2Retrieved = false;
+      let sk3Retrieved = false;
+
+      const message = new window.Word(new BigUint64Array([1n, 2n, 3n, 4n]));
+      const signingInputs = window.SigningInputs.newBlind(message);
+
+      for (const commitment of commitments) {
+        const retrievedSk =
+          await window.client.getAccountAuthByPubKeyCommitment(commitment);
+        const signature = retrievedSk.signData(signingInputs);
+
+        sk1Retrieved =
+          sk1Retrieved || sk1.publicKey().verify(message, signature);
+        sk2Retrieved =
+          sk2Retrieved || sk2.publicKey().verify(message, signature);
+        sk3Retrieved =
+          sk3Retrieved || sk3.publicKey().verify(message, signature);
+      }
+      return sk1Retrieved && sk2Retrieved && sk3Retrieved;
+    }, {});
+    expect(allSksRetrieved).toBe(true);
+  });
+
+  test("non-registered account id does not have any commitments", async ({
+    page,
+  }) => {
+    const allSksRetrieved = await page.evaluate(async () => {
+      const accountId = window.AccountId.fromHex(
+        "0x69817bcc6fb9f99027c2245f6979c5"
+      );
+      const commitments =
+        await window.client.getPublicKeyCommitmentsOfAccount(accountId);
+      return commitments.length;
+    }, {});
+    expect(allSksRetrieved).toBe(0);
+  });
+
+  test("can retrieve pk commitment after wallet creation", async ({ page }) => {
+    const allSksRetrieved = await page.evaluate(async () => {
+      const account = await window.client.newWallet(
+        window.AccountStorageMode.private(),
+        true,
+        0
+      );
+      const commitments = await window.client.getPublicKeyCommitmentsOfAccount(
+        account.id()
+      );
+      return commitments.length == 1;
+    }, {});
+    expect(allSksRetrieved).toBe(true);
+  });
+
+  test("separate account ids get their respective pk commitments", async ({
+    page,
+  }) => {
+    const allSksRetrieved = await page.evaluate(async () => {
+      const accountId1 = window.AccountId.fromHex(
+        "0x69817bcc6fb9f99027c2245f6979c5"
+      );
+
+      const sk1 = window.AuthSecretKey.ecdsaWithRNG(null);
+      const sk2 = window.AuthSecretKey.rpoFalconWithRNG(null);
+
+      await window.client.addAccountSecretKeyToWebStore(accountId1, sk1);
+      await window.client.addAccountSecretKeyToWebStore(accountId1, sk2);
+
+      const account1Commitments =
+        await window.client.getPublicKeyCommitmentsOfAccount(accountId1);
+
+      const accountId2 = window.AccountId.fromHex(
+        "0x79817bcc6fb9f99027c2245f6979ef"
+      );
+
+      const sk3 = window.AuthSecretKey.rpoFalconWithRNG(null);
+
+      await window.client.addAccountSecretKeyToWebStore(accountId2, sk3);
+
+      const account2Commitments =
+        await window.client.getPublicKeyCommitmentsOfAccount(accountId2);
+
+      return account1Commitments.length == 2 && account2Commitments.length == 1;
+    }, {});
+    expect(allSksRetrieved).toBe(true);
+  });
+});

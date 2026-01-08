@@ -2,7 +2,7 @@ use miden_client::Word;
 use miden_client::account::AccountFile as NativeAccountFile;
 use miden_client::note::NoteId;
 use miden_client::store::NoteExportType;
-use miden_client::utils::get_public_keys_from_account;
+use miden_client::utils::get_public_key_commitments_of;
 use wasm_bindgen::prelude::*;
 
 use crate::models::account_file::AccountFile;
@@ -101,10 +101,10 @@ impl WebClient {
 
             let mut key_pairs = vec![];
 
-            for pub_key in get_public_keys_from_account(&account) {
+            for commitment in get_public_key_commitments_of(&account) {
                 key_pairs.push(
                     keystore
-                        .get_key(pub_key)
+                        .get_key(commitment)
                         .await
                         .map_err(|err| {
                             js_error_with_context(err, "failed to get public key for account")
