@@ -24,6 +24,9 @@
 * [BREAKING] Introduced named storage slots, changed `FilesystemKeystore` to not be generic over RNG ([#1626](https://github.com/0xMiden/miden-client/pull/1626)).
 * Added `submit_new_transaction_with_prover` to the Rust client and `submitNewTransactionWithProver` to the WebClient([#1622](https://github.com/0xMiden/miden-client/pull/1622)).
 * [BREAKING] Modified JS binding for `AccountComponent::compile` which now takes an `AccountComponentCode` built with the newly added binding `CodeBuilder::compile_account_component_code` ([#1627](https://github.com/0xMiden/miden-client/pull/1627)).
+* [BREAKING] `WebClient.addAccountSecretKeyToWebStore` now takes an additional parameter: an account id. This will link the id with the secret key in the web 
+store. Added `WebClient.getPublicKeyCommitmentsOfAccount` method that will return
+a list of related public key commitments for the given account id ([#1608](https://github.com/0xMiden/miden-client/pull/1608)).
 
 ## 0.12.5 (2025-12-01)
 
