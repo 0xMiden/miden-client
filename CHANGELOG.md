@@ -1,9 +1,9 @@
 # Changelog
 
-## 0.12.6 (TBD)
+## 0.12.6 (2026-01-08)
 
-* Enables Workers with `createClientWithExternalKeystore` via callbacks ([#1569](https://github.com/0xMiden/miden-client/pull/1569))
-* Added `executeForSummary` method to WebClient that executes a transaction and returns a `TransactionSummary`, handling both authorized and unauthorized transactions ([#1620](https://github.com/0xMiden/miden-client/pull/1620))
+* Enabled Workers with `createClientWithExternalKeystore` via callbacks ([#1569](https://github.com/0xMiden/miden-client/pull/1569)).
+* Added `executeForSummary` method to WebClient that executes a transaction and returns a `TransactionSummary`, handling both authorized and unauthorized transactions ([#1620](https://github.com/0xMiden/miden-client/pull/1620)).
 * Added WebClient bindings for the RPO Falcon512 multisig auth component ([#1620](https://github.com/0xMiden/miden-client/pull/1620)).
 
 ## 0.12.5 (2025-12-01)
