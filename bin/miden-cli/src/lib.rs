@@ -67,6 +67,102 @@ pub type CliKeyStore = FilesystemKeyStore<StdRng>;
 pub struct CliClient(Client<CliKeyStore>);
 
 impl CliClient {
+    /// Creates a new `CliClient` instance from an existing `CliConfig`.
+    ///
+    ///
+    /// **⚠️ WARNING: This method bypasses the standard CLI configuration discovery logic and should
+    /// only be used in specific scenarios such as testing or when you have explicit control
+    /// requirements.**
+    ///
+    /// ## When NOT to use this method
+    ///
+    /// - **DO NOT** use this method if you want your application to behave like the CLI tool
+    /// - **DO NOT** use this for general-purpose client initialization
+    /// - **DO NOT** use this if you expect automatic local/global config resolution
+    ///
+    /// ## When to use this method
+    ///
+    /// - **Testing**: When you need to test with a specific configuration
+    /// - **Explicit Control**: When you must load config from a non-standard location
+    /// - **Programmatic Config**: When you're constructing configuration programmatically
+    ///
+    /// ## Recommended Alternative
+    ///
+    /// For standard client initialization that matches CLI behavior, use:
+    /// ```ignore
+    /// CliClient::from_system_user_config(debug_mode).await?
+    /// ```
+    ///
+    /// This method **does not** follow the CLI's configuration priority logic (local → global).
+    /// Instead, it uses exactly the configuration provided, which may not be what you expect.
+    ///
+    /// # Arguments
+    ///
+    /// * `config` - The CLI configuration to use (bypasses standard config discovery)
+    /// * `debug_mode` - The debug mode setting (`DebugMode::Enabled` or `DebugMode::Disabled`)
+    ///
+    /// # Returns
+    ///
+    /// A configured `CliClient` instance.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `CliError` if:
+    /// - Keystore initialization fails
+    /// - Client builder fails to construct the client
+    /// - Note transport connection fails (if configured)
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use std::path::PathBuf;
+    ///
+    /// use miden_client::DebugMode;
+    /// use miden_client_cli::{CliClient, CliConfig};
+    ///
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// // BEWARE: This bypasses standard config discovery!
+    /// // Only use if you know what you're doing.
+    /// let config = CliConfig::from_dir(&PathBuf::from("/path/to/.miden"))?;
+    /// let client = CliClient::from_config(config, DebugMode::Disabled).await?;
+    ///
+    /// // Prefer this for standard CLI-like behavior:
+    /// let client = CliClient::from_system_user_config(DebugMode::Disabled).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn from_config(config: CliConfig, debug_mode: DebugMode) -> Result<Self, CliError> {
+        // Create keystore
+        let keystore =
+            CliKeyStore::new(config.secret_keys_directory.clone()).map_err(CliError::KeyStore)?;
+
+        // Build client with the provided configuration
+        let mut builder = ClientBuilder::new()
+            .sqlite_store(config.store_filepath.clone())
+            .grpc_client(&config.rpc.endpoint.clone().into(), Some(config.rpc.timeout_ms))
+            .authenticator(Arc::new(keystore))
+            .in_debug_mode(debug_mode)
+            .tx_graceful_blocks(Some(TX_GRACEFUL_BLOCK_DELTA));
+
+        // Add optional max_block_number_delta
+        if let Some(delta) = config.max_block_number_delta {
+            builder = builder.max_block_number_delta(delta);
+        }
+
+        // Add optional note transport client
+        if let Some(tl_config) = config.note_transport {
+            let note_transport_client =
+                GrpcNoteTransportClient::connect(tl_config.endpoint.clone(), tl_config.timeout_ms)
+                    .await
+                    .map_err(|e| CliError::from(ClientError::from(e)))?;
+            builder = builder.note_transport(Arc::new(note_transport_client));
+        }
+
+        // Build and return the wrapped client
+        let client = builder.build().await.map_err(CliError::from)?;
+        Ok(CliClient(client))
+    }
+
     /// Creates a new `CliClient` instance configured using the system user configuration.
     ///
     /// This method implements the configuration logic used by the CLI tool, allowing external
@@ -128,38 +224,17 @@ impl CliClient {
     /// # }
     /// ```
     pub async fn from_system_user_config(debug_mode: DebugMode) -> Result<Self, CliError> {
-        // Load configuration file
-        let (cli_config, _config_path) = load_config_file()?;
-
-        // Create keystore
-        let keystore = CliKeyStore::new(cli_config.secret_keys_directory.clone())
-            .map_err(CliError::KeyStore)?;
-
-        // Build client with the default CLI configuration
-        let mut builder = ClientBuilder::new()
-            .sqlite_store(cli_config.store_filepath.clone())
-            .grpc_client(&cli_config.rpc.endpoint.clone().into(), Some(cli_config.rpc.timeout_ms))
-            .authenticator(Arc::new(keystore))
-            .in_debug_mode(debug_mode)
-            .tx_graceful_blocks(Some(TX_GRACEFUL_BLOCK_DELTA));
-
-        // Add optional max_block_number_delta
-        if let Some(delta) = cli_config.max_block_number_delta {
-            builder = builder.max_block_number_delta(delta);
+        // Check if client is not yet initialized => silently initialize the client
+        if !config_file_exists()? {
+            let init_cmd = InitCmd::default();
+            init_cmd.execute()?;
         }
 
-        // Add optional note transport client
-        if let Some(tl_config) = cli_config.note_transport {
-            let note_transport_client =
-                GrpcNoteTransportClient::connect(tl_config.endpoint.clone(), tl_config.timeout_ms)
-                    .await
-                    .map_err(|e| CliError::from(ClientError::from(e)))?;
-            builder = builder.note_transport(Arc::new(note_transport_client));
-        }
+        // Load configuration from system
+        let config = CliConfig::from_system()?;
 
-        // Build and return the wrapped client
-        let client = builder.build().await.map_err(CliError::from)?;
-        Ok(CliClient(client))
+        // Create client using the loaded configuration
+        Self::from_config(config, debug_mode).await
     }
 
     /// Unwraps the `CliClient` to get the inner `Client<CliKeyStore>`.
@@ -211,7 +286,7 @@ impl DerefMut for CliClient {
     }
 }
 
-mod config;
+pub mod config;
 mod errors;
 mod faucet_details_map;
 mod info;
@@ -220,10 +295,8 @@ mod utils;
 /// Re-export `MIDEN_DIR` for use in tests
 pub use config::MIDEN_DIR;
 /// Re-export common types for external projects
+pub use config::{CLIENT_CONFIG_FILE_NAME, CliConfig};
 pub use errors::CliError as Error;
-
-/// Config file name.
-const CLIENT_CONFIG_FILE_NAME: &str = "miden-client.toml";
 
 /// Client binary name.
 ///
@@ -363,13 +436,15 @@ impl Cli {
             _ => DebugMode::Disabled,
         };
 
-        // Create the client
-        let (cli_config, _config_path) = load_config_file()?;
+        // Load configuration
+        let cli_config = CliConfig::from_system()?;
 
-        let keystore = FilesystemKeyStore::new(cli_config.secret_keys_directory.clone())
+        // Create keystore for commands that need it
+        let keystore = CliKeyStore::new(cli_config.secret_keys_directory.clone())
             .map_err(CliError::KeyStore)?;
 
-        let cli_client = CliClient::from_system_user_config(in_debug_mode).await?;
+        // Create the client
+        let cli_client = CliClient::from_config(cli_config, in_debug_mode).await?;
 
         // Extract the inner client for command execution
         let client = cli_client.into_inner();
