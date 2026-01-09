@@ -45,6 +45,7 @@ test.describe("Store Isolation Tests", () => {
     expect(result.dbNames).toContain("MidenClientDB_Client1");
     expect(result.dbNames).toContain("MidenClientDB_Client2");
 
+    // TODO: fix this
     expect(result.accounts1Len).toBe(1);
     expect(result.accounts2Len).toBe(0);
   });

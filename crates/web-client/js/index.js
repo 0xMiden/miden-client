@@ -246,7 +246,7 @@ export class WebClient {
    * @param {string} rpcUrl - The RPC URL.
    * @param {string} noteTransportUrl - The note transport URL (optional).
    * @param {string} seed - The seed for the account.
-   * @param {string} storeName - Optional name for the store. Setting this allows multiple clients to be used in the same browser.
+   * @param {string | undefined} storeName - Optional name for the store. Setting this allows multiple clients to be used in the same browser.
    * @returns {Promise<WebClient>} The fully initialized WebClient.
    */
   static async createClient(rpcUrl, noteTransportUrl, seed, storeName) {
@@ -287,6 +287,7 @@ export class WebClient {
    * @param {string} rpcUrl - The RPC URL.
    * @param {string | undefined} noteTransportUrl - The note transport URL (optional).
    * @param {string | undefined} seed - The seed for the account.
+   * @param {string | undefined} storeName - Optional name for the store. Setting this allows multiple clients to be used in the same browser.
    * @param {Function | undefined} getKeyCb - The get key callback.
    * @param {Function | undefined} insertKeyCb - The insert key callback.
    * @param {Function | undefined} signCb - The sign callback.
@@ -296,6 +297,7 @@ export class WebClient {
     rpcUrl,
     noteTransportUrl,
     seed,
+    store_name,
     getKeyCb,
     insertKeyCb,
     signCb
@@ -305,6 +307,7 @@ export class WebClient {
       rpcUrl,
       noteTransportUrl,
       seed,
+      store_name,
       getKeyCb,
       insertKeyCb,
       signCb
@@ -315,6 +318,7 @@ export class WebClient {
       rpcUrl,
       noteTransportUrl,
       seed,
+      store_name,
       getKeyCb,
       insertKeyCb,
       signCb

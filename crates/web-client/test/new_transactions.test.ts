@@ -929,7 +929,7 @@ export const discardedTransaction = async (
       senderTxResult.executedTransaction().id().toHex()
     );
 
-    await client.forceImportStore(preConsumeStore, "ImportedStore");
+    await client.forceImportStore(preConsumeStore, "MidenClientDB_mlcl"); // TODO: fails if name is different, why?
 
     // Get the account state before the transaction is applied
     const accountStateBeforeTx = (await client.getAccount(
@@ -1155,8 +1155,8 @@ export const counterAccountComponent = async (
     let code = account?.code();
     let hasCounterComponent = code
       ? counterAccountComponent
-          .getProcedures()
-          .every((procedure) => code.hasProcedure(procedure.digest))
+        .getProcedures()
+        .every((procedure) => code.hasProcedure(procedure.digest))
       : false;
 
     return {
