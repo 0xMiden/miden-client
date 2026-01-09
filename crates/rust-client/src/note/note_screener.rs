@@ -123,6 +123,14 @@ where
             )
             .await?;
 
+        if matches!(
+            note_consumption_check,
+            NoteConsumptionStatus::NeverConsumable(..)
+                | NoteConsumptionStatus::UnconsumableConditions
+        ) {
+            return Ok(None);
+        }
+
         Ok(Some(note_consumption_check))
     }
 

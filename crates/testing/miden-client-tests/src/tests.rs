@@ -1508,7 +1508,9 @@ async fn get_consumable_notes() {
         .1;
 
     match to_account_relevance {
-        NoteConsumptionStatus::Consumable => {},
+        NoteConsumptionStatus::Consumable
+        | NoteConsumptionStatus::ConsumableAfter(..)
+        | NoteConsumptionStatus::ConsumableWithAuthorization => {},
         _ => panic!("Unexpected NoteConsumptionStatus"),
     }
 }
