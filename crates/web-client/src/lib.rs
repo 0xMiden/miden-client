@@ -89,7 +89,7 @@ impl WebClient {
     /// * `node_url`: The URL of the node RPC endpoint. If `None`, defaults to the testnet endpoint.
     /// * `node_note_transport_url`: Optional URL of the note transport service.
     /// * `seed`: Optional seed for account initialization.
-    /// * `store_name`: Optional name for the IndexedDB store. If `None`, the store name defaults to
+    /// * `store_name`: Optional name for the web store. If `None`, the store name defaults to
     ///   `MidenClientDB_{network_id}`, where `network_id` is derived from the `node_url`.
     ///   Explicitly setting this allows for creating multiple isolated clients.
     #[wasm_bindgen(js_name = "createClient")]
@@ -132,7 +132,7 @@ impl WebClient {
     /// * `node_url`: The URL of the node RPC endpoint. If `None`, defaults to the testnet endpoint.
     /// * `node_note_transport_url`: Optional URL of the note transport service.
     /// * `seed`: Optional seed for account initialization.
-    /// * `store_name`: Optional name for the IndexedDB store. If `None`, the store name defaults to
+    /// * `store_name`: Optional name for the web store. If `None`, the store name defaults to
     ///   `MidenClientDB_{network_id}`, where `network_id` is derived from the `node_url`.
     ///   Explicitly setting this allows for creating multiple isolated clients.
     /// * `get_key_cb`: Callback to retrieve the secret key bytes for a given public key.
