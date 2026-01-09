@@ -24,10 +24,7 @@ use crate::models::transaction_script::TransactionScript;
 #[derive(Clone)]
 #[wasm_bindgen(inspectable)]
 pub struct CodeBuilder {
-    // We need both a builder and an assembler  since we want the capability of linking libraries,
-    // and compiling scripts. This can be done by the NativeCodeBuilder alone, but we still
-    // need an assembler to compile an AccountComponent. After miden-base issue #1756 is complete
-    // we will be able to remove the Assembler and only use the NativeCodeBuilder.
+    // Keep the builder and derive an assembler when compiling account component code.
     builder: NativeCodeBuilder,
 }
 

@@ -1,12 +1,12 @@
 use miden_client::Word;
 use miden_client::note::NoteId;
-use miden_client::store::OutputNoteRecord;
 use wasm_bindgen::prelude::*;
 
 use crate::models::account_id::AccountId;
 use crate::models::consumable_note_record::ConsumableNoteRecord;
 use crate::models::input_note_record::InputNoteRecord;
 use crate::models::note_filter::NoteFilter;
+use crate::models::output_note_record::OutputNoteRecord;
 use crate::{WebClient, js_error_with_context};
 
 #[wasm_bindgen]
@@ -49,35 +49,35 @@ impl WebClient {
     }
 
     #[wasm_bindgen(js_name = "getOutputNotes")]
-    pub async fn get_output_notes(&mut self, filter: NoteFilter) -> Result<JsValue, JsValue> {
+    pub async fn get_output_notes(
+        &mut self,
+        filter: NoteFilter,
+    ) -> Result<Vec<OutputNoteRecord>, JsValue> {
         if let Some(client) = self.get_mut_inner() {
-            let notes: Vec<OutputNoteRecord> = client
+            let notes = client
                 .get_output_notes(filter.into())
                 .await
                 .map_err(|err| js_error_with_context(err, "failed to get output notes"))?;
-            let note_ids = notes.iter().map(|note| note.id().to_string()).collect::<Vec<String>>();
-
-            serde_wasm_bindgen::to_value(&note_ids).map_err(|e| JsValue::from_str(&e.to_string()))
+            Ok(notes.into_iter().map(Into::into).collect())
         } else {
             Err(JsValue::from_str("Client not initialized"))
         }
     }
 
     #[wasm_bindgen(js_name = "getOutputNote")]
-    pub async fn get_output_note(&mut self, note_id: String) -> Result<JsValue, JsValue> {
+    pub async fn get_output_note(&mut self, note_id: String) -> Result<OutputNoteRecord, JsValue> {
         if let Some(client) = self.get_mut_inner() {
             let note_id: NoteId = NoteId::from_raw(
                 Word::try_from(note_id)
                     .map_err(|err| js_error_with_context(err, "failed to parse output note id"))?,
             );
-            let note: OutputNoteRecord = client
+            let note = client
                 .get_output_note(note_id)
                 .await
                 .map_err(|err| js_error_with_context(err, "failed to get output note"))?
                 .ok_or_else(|| JsValue::from_str("Note not found"))?;
 
-            serde_wasm_bindgen::to_value(&note.id().to_string())
-                .map_err(|e| JsValue::from_str(&e.to_string()))
+            Ok(note.into())
         } else {
             Err(JsValue::from_str("Client not initialized"))
         }
