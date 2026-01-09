@@ -49,7 +49,7 @@ impl TransactionProver {
         TransactionProver {
             prover: Arc::new(remote_prover),
             endpoint: Some(endpoint.to_string()),
-            timeout: Duration::from_secs(120),
+            timeout: Some(Duration::from_secs(120)),
         }
     }
 
