@@ -194,13 +194,11 @@ jobs:
         run: make start-node-background
       - name: Start note transport
         run: make start-note-transport-background
-      - name: Start prover
+      - name: Start prover + Run Tests
         run: |
           pushd crates/testing/prover/ ;
           RUST_LOG=info cargo run --release --locked & popd ;
           make integration-test-remote-prover-web-client
-      - name: Run remote prover tests
-        run: make integration-test-remote-prover-web-client
       - name: Stop test node
         if: always()
         run: make stop-node
