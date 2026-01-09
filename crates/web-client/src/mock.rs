@@ -1,5 +1,6 @@
 use alloc::sync::Arc;
 
+use miden_client::address::NetworkId;
 use miden_client::testing::MockChain;
 use miden_client::testing::mock::MockRpcApi;
 use miden_client::testing::note_transport::{MockNoteTransportApi, MockNoteTransportNode};
@@ -40,6 +41,7 @@ impl WebClient {
 
         self.setup_client(
             mock_rpc_api.clone(),
+            NetworkId::new("mock").unwrap(),
             Some(mock_note_transport_api.clone()),
             seed,
             None,

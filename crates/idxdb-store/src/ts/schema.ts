@@ -2,14 +2,28 @@ import Dexie from "dexie";
 import * as semver from "semver";
 import { logWebStoreError } from "./utils.js";
 
-const DATABASE_NAME = "MidenClientDB";
+const BASE_DATABASE_NAME = "MidenClientDB";
 export const CLIENT_VERSION_SETTING_KEY = "clientVersion";
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 
-export async function openDatabase(clientVersion: string): Promise<boolean> {
-  console.log(`Opening database for client version ${clientVersion}...`);
+function getDatabaseName(networkId?: string): string {
+  if (!networkId || networkId === "") {
+    return BASE_DATABASE_NAME;
+  }
+  return `${BASE_DATABASE_NAME}_${networkId}`;
+}
+
+export async function openDatabase(
+  clientVersion: string,
+  networkId?: string
+): Promise<boolean> {
+  const databaseName = getDatabaseName(networkId);
+  console.log(
+    `Opening database ${databaseName} for client version ${clientVersion}...`
+  );
   try {
+    initializeDatabase(networkId);
     await db.open();
     await ensureClientVersion(clientVersion);
     console.log("Database opened successfully");
@@ -169,7 +183,7 @@ export interface ITrackedAccount {
   id: string;
 }
 
-const db = new Dexie(DATABASE_NAME) as Dexie & {
+let db: Dexie & {
   accountCodes: Dexie.Table<IAccountCode, string>;
   accountStorages: Dexie.Table<IAccountStorage, string>;
   accountAssets: Dexie.Table<IAccountAsset, string>;
@@ -191,80 +205,129 @@ const db = new Dexie(DATABASE_NAME) as Dexie & {
   trackedAccounts: Dexie.Table<ITrackedAccount, string>;
 };
 
-db.version(1).stores({
-  [Table.AccountCode]: indexes("root"),
-  [Table.AccountStorage]: indexes("[commitment+slotName]", "commitment"),
-  [Table.StorageMapEntries]: indexes("[root+key]", "root"),
-  [Table.AccountAssets]: indexes("[root+vaultKey]", "root", "faucetIdPrefix"),
-  [Table.AccountAuth]: indexes("pubKey"),
-  [Table.Accounts]: indexes(
-    "&accountCommitment",
-    "id",
-    "[id+nonce]",
-    "codeRoot",
-    "storageRoot",
-    "vaultRoot"
-  ),
-  [Table.Addresses]: indexes("address", "id"),
-  [Table.Transactions]: indexes("id", "statusVariant"),
-  [Table.TransactionScripts]: indexes("scriptRoot"),
-  [Table.InputNotes]: indexes("noteId", "nullifier", "stateDiscriminant"),
-  [Table.OutputNotes]: indexes(
-    "noteId",
-    "recipientDigest",
-    "stateDiscriminant",
-    "nullifier"
-  ),
-  [Table.NotesScripts]: indexes("scriptRoot"),
-  [Table.StateSync]: indexes("id"),
-  [Table.BlockHeaders]: indexes("blockNum", "hasClientNotes"),
-  [Table.PartialBlockchainNodes]: indexes("id"),
-  [Table.Tags]: indexes("id++", "tag", "source_note_id", "source_account_id"),
-  [Table.ForeignAccountCode]: indexes("accountId"),
-  [Table.Settings]: indexes("key"),
-  [Table.TrackedAccounts]: indexes("&id"),
-});
+let accountCodes: Dexie.Table<IAccountCode, string>;
+let accountStorages: Dexie.Table<IAccountStorage, string>;
+let storageMapEntries: Dexie.Table<IStorageMapEntry, string>;
+let accountAssets: Dexie.Table<IAccountAsset, string>;
+let accountAuths: Dexie.Table<IAccountAuth, string>;
+let accounts: Dexie.Table<IAccount, string>;
+let addresses: Dexie.Table<IAddress, string>;
+let transactions: Dexie.Table<ITransaction, string>;
+let transactionScripts: Dexie.Table<ITransactionScript, string>;
+let inputNotes: Dexie.Table<IInputNote, string>;
+let outputNotes: Dexie.Table<IOutputNote, string>;
+let notesScripts: Dexie.Table<INotesScript, string>;
+let stateSync: Dexie.Table<IStateSync, number>;
+let blockHeaders: Dexie.Table<IBlockHeader, string>;
+let partialBlockchainNodes: Dexie.Table<IPartialBlockchainNode, string>;
+let tags: Dexie.Table<ITag, number>;
+let foreignAccountCode: Dexie.Table<IForeignAccountCode, string>;
+let settings: Dexie.Table<ISetting, string>;
+let trackedAccounts: Dexie.Table<ITrackedAccount, string>;
 
 function indexes(...items: string[]): string {
   return items.join(",");
 }
 
-db.on("populate", () => {
-  // Populate the stateSync table with default values
-  stateSync
-    .put({ id: 1, blockNum: "0" } as IStateSync)
-    .catch((err: unknown) => logWebStoreError(err, "Failed to populate DB"));
-});
+function initializeDatabase(networkId?: string): void {
+  const databaseName = getDatabaseName(networkId);
+  if (db && db.name === databaseName) {
+    return;
+  }
+  if (db) {
+    db.close();
+  }
+  db = new Dexie(databaseName) as Dexie & {
+    accountCodes: Dexie.Table<IAccountCode, string>;
+    accountStorages: Dexie.Table<IAccountStorage, string>;
+    accountAssets: Dexie.Table<IAccountAsset, string>;
+    storageMapEntries: Dexie.Table<IStorageMapEntry, string>;
+    accountAuths: Dexie.Table<IAccountAuth, string>;
+    accounts: Dexie.Table<IAccount, string>;
+    addresses: Dexie.Table<IAddress, string>;
+    transactions: Dexie.Table<ITransaction, string>;
+    transactionScripts: Dexie.Table<ITransactionScript, string>;
+    inputNotes: Dexie.Table<IInputNote, string>;
+    outputNotes: Dexie.Table<IOutputNote, string>;
+    notesScripts: Dexie.Table<INotesScript, string>;
+    stateSync: Dexie.Table<IStateSync, number>;
+    blockHeaders: Dexie.Table<IBlockHeader, string>;
+    partialBlockchainNodes: Dexie.Table<IPartialBlockchainNode, string>;
+    tags: Dexie.Table<ITag, number>;
+    foreignAccountCode: Dexie.Table<IForeignAccountCode, string>;
+    settings: Dexie.Table<ISetting, string>;
+    trackedAccounts: Dexie.Table<ITrackedAccount, string>;
+  };
 
-const accountCodes = db.table<IAccountCode, string>(Table.AccountCode);
-const accountStorages = db.table<IAccountStorage, string>(Table.AccountStorage);
-const storageMapEntries = db.table<IStorageMapEntry, string>(
-  Table.StorageMapEntries
-);
-const accountAssets = db.table<IAccountAsset, string>(Table.AccountAssets);
-const accountAuths = db.table<IAccountAuth, string>(Table.AccountAuth);
-const accounts = db.table<IAccount, string>(Table.Accounts);
-const addresses = db.table<IAddress, string>(Table.Addresses);
-const transactions = db.table<ITransaction, string>(Table.Transactions);
-const transactionScripts = db.table<ITransactionScript, string>(
-  Table.TransactionScripts
-);
-const inputNotes = db.table<IInputNote, string>(Table.InputNotes);
-const outputNotes = db.table<IOutputNote, string>(Table.OutputNotes);
-const notesScripts = db.table<INotesScript, string>(Table.NotesScripts);
-const stateSync = db.table<IStateSync, number>(Table.StateSync);
-const blockHeaders = db.table<IBlockHeader, string>(Table.BlockHeaders);
-const partialBlockchainNodes = db.table<IPartialBlockchainNode, string>(
-  Table.PartialBlockchainNodes
-);
-const tags = db.table<ITag, number>(Table.Tags);
-const foreignAccountCode = db.table<IForeignAccountCode, string>(
-  Table.ForeignAccountCode
-);
-const settings = db.table<ISetting, string>(Table.Settings);
-const trackedAccounts = db.table<ITrackedAccount, string>(
-  Table.TrackedAccounts
-);
+  db.version(1).stores({
+    [Table.AccountCode]: indexes("root"),
+    [Table.AccountStorage]: indexes("[commitment+slotName]", "commitment"),
+    [Table.StorageMapEntries]: indexes("[root+key]", "root"),
+    [Table.AccountAssets]: indexes("[root+vaultKey]", "root", "faucetIdPrefix"),
+    [Table.AccountAuth]: indexes("pubKey"),
+    [Table.Accounts]: indexes(
+      "&accountCommitment",
+      "id",
+      "[id+nonce]",
+      "codeRoot",
+      "storageRoot",
+      "vaultRoot"
+    ),
+    [Table.Addresses]: indexes("address", "id"),
+    [Table.Transactions]: indexes("id", "statusVariant"),
+    [Table.TransactionScripts]: indexes("scriptRoot"),
+    [Table.InputNotes]: indexes("noteId", "nullifier", "stateDiscriminant"),
+    [Table.OutputNotes]: indexes(
+      "noteId",
+      "recipientDigest",
+      "stateDiscriminant",
+      "nullifier"
+    ),
+    [Table.NotesScripts]: indexes("scriptRoot"),
+    [Table.StateSync]: indexes("id"),
+    [Table.BlockHeaders]: indexes("blockNum", "hasClientNotes"),
+    [Table.PartialBlockchainNodes]: indexes("id"),
+    [Table.Tags]: indexes("id++", "tag", "source_note_id", "source_account_id"),
+    [Table.ForeignAccountCode]: indexes("accountId"),
+    [Table.Settings]: indexes("key"),
+    [Table.TrackedAccounts]: indexes("&id"),
+  });
+
+  accountCodes = db.table<IAccountCode, string>(Table.AccountCode);
+  accountStorages = db.table<IAccountStorage, string>(Table.AccountStorage);
+  storageMapEntries = db.table<IStorageMapEntry, string>(
+    Table.StorageMapEntries
+  );
+  accountAssets = db.table<IAccountAsset, string>(Table.AccountAssets);
+  accountAuths = db.table<IAccountAuth, string>(Table.AccountAuth);
+  accounts = db.table<IAccount, string>(Table.Accounts);
+  addresses = db.table<IAddress, string>(Table.Addresses);
+  transactions = db.table<ITransaction, string>(Table.Transactions);
+  transactionScripts = db.table<ITransactionScript, string>(
+    Table.TransactionScripts
+  );
+  inputNotes = db.table<IInputNote, string>(Table.InputNotes);
+  outputNotes = db.table<IOutputNote, string>(Table.OutputNotes);
+  notesScripts = db.table<INotesScript, string>(Table.NotesScripts);
+  stateSync = db.table<IStateSync, number>(Table.StateSync);
+  blockHeaders = db.table<IBlockHeader, string>(Table.BlockHeaders);
+  partialBlockchainNodes = db.table<IPartialBlockchainNode, string>(
+    Table.PartialBlockchainNodes
+  );
+  tags = db.table<ITag, number>(Table.Tags);
+  foreignAccountCode = db.table<IForeignAccountCode, string>(
+    Table.ForeignAccountCode
+  );
+  settings = db.table<ISetting, string>(Table.Settings);
+  trackedAccounts = db.table<ITrackedAccount, string>(Table.TrackedAccounts);
+
+  db.on("populate", () => {
+    // Populate the stateSync table with default values
+    stateSync
+      .put({ id: 1, blockNum: "0" } as IStateSync)
+      .catch((err: unknown) => logWebStoreError(err, "Failed to populate DB"));
+  });
+}
 
 async function ensureClientVersion(clientVersion: string): Promise<void> {
   if (!clientVersion) {

@@ -70,14 +70,14 @@ extern "C" {
 #[wasm_bindgen(module = "/src/js/schema.js")]
 extern "C" {
     #[wasm_bindgen(js_name = openDatabase)]
-    fn setup_indexed_db(client_version: &str) -> js_sys::Promise;
+    fn setup_indexed_db(client_version: &str, db_name: &str) -> js_sys::Promise;
 }
 
 pub struct WebStore {}
 
 impl WebStore {
-    pub async fn new() -> Result<WebStore, JsValue> {
-        JsFuture::from(setup_indexed_db(CLIENT_VERSION)).await?;
+    pub async fn new(db_name: &str) -> Result<WebStore, JsValue> {
+        JsFuture::from(setup_indexed_db(CLIENT_VERSION, db_name)).await?;
         Ok(WebStore {})
     }
 }

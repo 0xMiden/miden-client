@@ -1,5 +1,6 @@
 extern crate alloc;
 use alloc::sync::Arc;
+use miden_client::address::NetworkId;
 use core::error::Error;
 use core::fmt::Write;
 
@@ -89,6 +90,7 @@ impl WebClient {
         node_url: Option<String>,
         node_note_transport_url: Option<String>,
         seed: Option<Vec<u8>>,
+        // TODO: add a way for users to set the name of the store?
     ) -> Result<JsValue, JsValue> {
         let endpoint = node_url.map_or(Ok(Endpoint::testnet()), |url| {
             Endpoint::try_from(url.as_str()).map_err(|_| JsValue::from_str("Invalid node URL"))
@@ -99,8 +101,16 @@ impl WebClient {
         let note_transport_client = node_note_transport_url
             .map(|url| Arc::new(GrpcNoteTransportClient::new(url)) as Arc<dyn NoteTransportClient>);
 
-        self.setup_client(web_rpc_client, note_transport_client, seed, None, None, None)
-            .await?;
+        self.setup_client(
+            web_rpc_client,
+            endpoint.to_network_id(),
+            note_transport_client,
+            seed,
+            None,
+            None,
+            None,
+        )
+        .await?;
 
         Ok(JsValue::from_str("Client created successfully"))
     }
@@ -128,6 +138,7 @@ impl WebClient {
 
         self.setup_client(
             web_rpc_client,
+            endpoint.to_network_id(),
             note_transport_client,
             seed,
             get_key_cb,
@@ -143,6 +154,7 @@ impl WebClient {
     async fn setup_client(
         &mut self,
         rpc_client: Arc<dyn NodeRpcClient>,
+        network_id: NetworkId,
         note_transport_client: Option<Arc<dyn NoteTransportClient>>,
         seed: Option<Vec<u8>>,
         get_key_cb: Option<Function>,
@@ -165,8 +177,10 @@ impl WebClient {
 
         let rng = RpoRandomCoin::new(coin_seed.map(Felt::new).into());
 
+        // TODO: make users able to change the store name
+        let store_name = format!("MidenClientDB_{}", network_id.to_string());
         let web_store = Arc::new(
-            WebStore::new()
+            WebStore::new(&store_name)
                 .await
                 .map_err(|_| JsValue::from_str("Failed to initialize WebStore"))?,
         );
