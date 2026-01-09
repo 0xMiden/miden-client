@@ -12,15 +12,22 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CARGO_TERM_COLOR: always
+      # Important: use an absolute path so `cargo publish` verification builds
+      # (which happen from `target/package/...`) don't create nested `target/` dirs.
+      CARGO_TARGET_DIR: ${{ github.workspace }}/target
     steps:
       - name: Check out code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          # Ensure the release tag refers to the latest commit on main.
+          # Compare the commit SHA that triggered the workflow with the HEAD of the branch we just
+          # checked out (main).
           ref: main
-        # Ensure the release tag refers to the latest commit on main.
-        # Compare the commit SHA that triggered the workflow with the HEAD of the branch we just
-        # checked out (main).
+
+      - name: Cleanup large tools for build space
+        uses: ./.github/actions/cleanup-runner
+
       - name: Verify release was triggered from main HEAD
         run: |
           tag_sha="${{ github.sha }}"
@@ -49,6 +56,11 @@ jobs:
           cargo publish --dry-run
           cd ../web-client
           cargo publish --dry-run
+
+      - name: Cleanup cargo package artifacts (after dry-run)
+        if: always()
+        run: |
+          rm -rf "$CARGO_TARGET_DIR/package" || true
 
       - name: Publish crates
         env:
