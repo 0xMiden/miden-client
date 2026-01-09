@@ -395,13 +395,16 @@ pub async fn test_import_expected_notes_from_the_past_as_committed(
     client_2.sync_state().await.unwrap();
 
     // Note already imported
-    assert!(client_2
-        .import_notes(&[NoteFile::NoteDetails {
-            details: note.clone().into(),
-            after_block_num: block_height_before,
-            tag: Some(note.metadata().unwrap().tag()),
-        }])
-        .await?.is_empty());
+    assert!(
+        client_2
+            .import_notes(&[NoteFile::NoteDetails {
+                details: note.clone().into(),
+                after_block_num: block_height_before,
+                tag: Some(note.metadata().unwrap().tag()),
+            }])
+            .await?
+            .is_empty()
+    );
 
     let imported_note = client_2.get_input_note(note_id).await.unwrap().unwrap();
 
