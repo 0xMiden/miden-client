@@ -101,6 +101,7 @@ export class WebClient {
    *
    * @param {string | undefined} rpcUrl - RPC endpoint URL used by the client.
    * @param {Uint8Array | undefined} seed - Optional seed for account initialization.
+   * @param {string | undefined} storeName - Optional name for the store to be used by the client.
    * @param {(pubKey: Uint8Array) => Promise<Uint8Array | null | undefined> | Uint8Array | null | undefined} [getKeyCb]
    *   - Callback to retrieve the secret key bytes for a given public key. The `pubKey`
    *   parameter is the serialized public key (from `PublicKey.serialize()`). Return the
@@ -116,10 +117,19 @@ export class WebClient {
    *   `SigningInputs.serialize()`. Must return a `Uint8Array` containing the serialized
    *   signature, either directly or wrapped in a `Promise`.
    */
-  constructor(rpcUrl, noteTransportUrl, seed, getKeyCb, insertKeyCb, signCb) {
+  constructor(
+    rpcUrl,
+    noteTransportUrl,
+    seed,
+    storeName,
+    getKeyCb,
+    insertKeyCb,
+    signCb
+  ) {
     this.rpcUrl = rpcUrl;
     this.noteTransportUrl = noteTransportUrl;
     this.seed = seed;
+    this.storeName = storeName;
     this.getKeyCb = getKeyCb;
     this.insertKeyCb = insertKeyCb;
     this.signCb = signCb;
@@ -236,15 +246,16 @@ export class WebClient {
    * @param {string} rpcUrl - The RPC URL.
    * @param {string} noteTransportUrl - The note transport URL (optional).
    * @param {string} seed - The seed for the account.
+   * @param {string} storeName - Optional name for the store. Setting this allows multiple clients to be used in the same browser.
    * @returns {Promise<WebClient>} The fully initialized WebClient.
    */
-  static async createClient(rpcUrl, noteTransportUrl, seed) {
+  static async createClient(rpcUrl, noteTransportUrl, seed, storeName) {
     // Construct the instance (synchronously).
-    const instance = new WebClient(rpcUrl, noteTransportUrl, seed);
+    const instance = new WebClient(rpcUrl, noteTransportUrl, seed, storeName);
 
     // Wait for the underlying wasmWebClient to be initialized.
     const wasmWebClient = await instance.getWasmWebClient();
-    await wasmWebClient.createClient(rpcUrl, noteTransportUrl, seed);
+    await wasmWebClient.createClient(rpcUrl, noteTransportUrl, seed, storeName);
 
     // Wait for the worker to be ready
     await instance.ready;

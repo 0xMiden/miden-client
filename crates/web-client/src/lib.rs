@@ -48,6 +48,8 @@ mod web_keystore;
 mod web_keystore_callbacks;
 pub use web_keystore::WebKeyStore;
 
+const BASE_STORE_NAME: &str = "MidenClientDB";
+
 #[wasm_bindgen]
 pub struct WebClient {
     store: Option<Arc<WebStore>>,
@@ -81,8 +83,15 @@ impl WebClient {
         self.inner.as_mut()
     }
 
-    /// Creates a new client with the given node URL and optional seed.
-    /// If `node_url` is `None`, it defaults to the testnet endpoint.
+    /// Creates a new `WebClient` instance with the specified configuration.
+    ///
+    /// # Arguments
+    /// * `node_url`: The URL of the node RPC endpoint. If `None`, defaults to the testnet endpoint.
+    /// * `node_note_transport_url`: Optional URL of the note transport service.
+    /// * `seed`: Optional seed for account initialization.
+    /// * `store_name`: Optional name for the IndexedDB store. If `None`, the store name defaults to
+    ///   `MidenClientDB_{network_id}`, where `network_id` is derived from the `node_url`.
+    ///   Explicitly setting this allows for creating multiple isolated clients.
     #[wasm_bindgen(js_name = "createClient")]
     pub async fn create_client(
         &mut self,
@@ -100,7 +109,11 @@ impl WebClient {
         let note_transport_client = node_note_transport_url
             .map(|url| Arc::new(GrpcNoteTransportClient::new(url)) as Arc<dyn NoteTransportClient>);
 
-        let store_name = store_name.unwrap_or_else(|| format!("MidenClientDB_{}", endpoint.to_network_id().to_string()));
+        let store_name = store_name.unwrap_or(format!(
+            "{}_{}",
+            BASE_STORE_NAME,
+            endpoint.to_network_id().to_string()
+        ));
 
         self.setup_client(
             web_rpc_client,
@@ -116,18 +129,28 @@ impl WebClient {
         Ok(JsValue::from_str("Client created successfully"))
     }
 
-    /// Creates a new client with the given node URL, optional seed, and external keystore
-    /// callbacks. If `node_url` is `None`, it defaults to the testnet endpoint.
+    /// Creates a new `WebClient` instance with external keystore callbacks.
+    ///
+    /// # Arguments
+    /// * `node_url`: The URL of the node RPC endpoint. If `None`, defaults to the testnet endpoint.
+    /// * `node_note_transport_url`: Optional URL of the note transport service.
+    /// * `seed`: Optional seed for account initialization.
+    /// * `store_name`: Optional name for the IndexedDB store. If `None`, the store name defaults to
+    ///   `MidenClientDB_{network_id}`, where `network_id` is derived from the `node_url`.
+    ///   Explicitly setting this allows for creating multiple isolated clients.
+    /// * `get_key_cb`: Callback to retrieve the secret key bytes for a given public key.
+    /// * `insert_key_cb`: Callback to persist a secret key.
+    /// * `sign_cb`: Callback to produce serialized signature bytes for the provided inputs.
     #[wasm_bindgen(js_name = "createClientWithExternalKeystore")]
     pub async fn create_client_with_external_keystore(
         &mut self,
         node_url: Option<String>,
         node_note_transport_url: Option<String>,
         seed: Option<Vec<u8>>,
+        store_name: Option<String>,
         get_key_cb: Option<Function>,
         insert_key_cb: Option<Function>,
         sign_cb: Option<Function>,
-        store_name: Option<String>,
     ) -> Result<JsValue, JsValue> {
         let endpoint = node_url.map_or(Ok(Endpoint::testnet()), |url| {
             Endpoint::try_from(url.as_str()).map_err(|_| JsValue::from_str("Invalid node URL"))
@@ -138,7 +161,12 @@ impl WebClient {
         let note_transport_client = node_note_transport_url
             .map(|url| Arc::new(GrpcNoteTransportClient::new(url)) as Arc<dyn NoteTransportClient>);
 
-        let store_name = store_name.unwrap_or_else(|| format!("MidenClientDB_{}", endpoint.to_network_id().to_string()));
+        let store_name = store_name.unwrap_or(format!(
+            "{}_{}",
+            BASE_STORE_NAME,
+            endpoint.to_network_id().to_string()
+        ));
+
         self.setup_client(
             web_rpc_client,
             store_name,

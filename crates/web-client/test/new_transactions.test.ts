@@ -929,7 +929,7 @@ export const discardedTransaction = async (
       senderTxResult.executedTransaction().id().toHex()
     );
 
-    await client.forceImportStore(preConsumeStore);
+    await client.forceImportStore(preConsumeStore, "ImportedStore");
 
     // Get the account state before the transaction is applied
     const accountStateBeforeTx = (await client.getAccount(

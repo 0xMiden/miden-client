@@ -2,31 +2,50 @@ import { expect } from "@playwright/test";
 import test from "./playwright.global.setup";
 
 test.describe("Store Isolation Tests", () => {
-    test("creates separate stores for localhost using explicit store names", async ({ page }) => {
-        const result = await page.evaluate(async () => {
-            const MIDEN_NODE_PORT = 57291;
-            const rpcUrl = `http://localhost:${MIDEN_NODE_PORT}`;
+  test("creates separate stores with isolated accounts", async ({ page }) => {
+    const result = await page.evaluate(async () => {
+      const MIDEN_NODE_PORT = 57291;
+      const rpcUrl = `http://localhost:${MIDEN_NODE_PORT}`;
 
-            // Create Client A
-            const client1 = await window.WebClient.createClient(rpcUrl, undefined, undefined, "ClientA_Store");
-            await client1.syncState();
+      // Create Client 1
+      const client1 = await window.WebClient.createClient(
+        rpcUrl,
+        undefined,
+        undefined,
+        "Client1"
+      );
+      await client1.syncState();
 
-            // Create Client B
-            const client2 = await window.WebClient.createClient(rpcUrl, undefined, undefined, "ClientB_Store");
-            await client2.syncState();
+      await client1.newWallet(window.AccountStorageMode.private(), true, 0);
 
-            // Check IndexedDB databases
-            const databases = await window.indexedDB.databases();
-            const names = databases.map((db) => db.name);
+      // Create Client 2
+      const client2 = await window.WebClient.createClient(
+        rpcUrl,
+        undefined,
+        undefined,
+        "Client2"
+      );
+      await client2.syncState();
 
-            return {
-                names,
-            };
-        });
+      // Check IndexedDB databases
+      const databases = await window.indexedDB.databases();
+      const dbNames = databases.map((db) => db.name);
 
-        console.log("Found databases:", result.names);
+      // Get accounts
+      const accounts1 = await client1.getAccounts();
+      const accounts2 = await client2.getAccounts();
 
-        expect(result.names).toContain("ClientA_Store");
-        expect(result.names).toContain("ClientB_Store");
+      return {
+        accounts1Len: accounts1.length,
+        accounts2Len: accounts2.length,
+        dbNames,
+      };
     });
+
+    expect(result.dbNames).toContain("MidenClientDB_Client1");
+    expect(result.dbNames).toContain("MidenClientDB_Client2");
+
+    expect(result.accounts1Len).toBe(1);
+    expect(result.accounts2Len).toBe(0);
+  });
 });
