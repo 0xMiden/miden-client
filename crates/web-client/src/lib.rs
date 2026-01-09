@@ -1,6 +1,5 @@
 extern crate alloc;
 use alloc::sync::Arc;
-use miden_client::address::NetworkId;
 use core::error::Error;
 use core::fmt::Write;
 
@@ -90,7 +89,7 @@ impl WebClient {
         node_url: Option<String>,
         node_note_transport_url: Option<String>,
         seed: Option<Vec<u8>>,
-        // TODO: add a way for users to set the name of the store?
+        store_name: Option<String>,
     ) -> Result<JsValue, JsValue> {
         let endpoint = node_url.map_or(Ok(Endpoint::testnet()), |url| {
             Endpoint::try_from(url.as_str()).map_err(|_| JsValue::from_str("Invalid node URL"))
@@ -101,9 +100,11 @@ impl WebClient {
         let note_transport_client = node_note_transport_url
             .map(|url| Arc::new(GrpcNoteTransportClient::new(url)) as Arc<dyn NoteTransportClient>);
 
+        let store_name = store_name.unwrap_or_else(|| format!("MidenClientDB_{}", endpoint.to_network_id().to_string()));
+
         self.setup_client(
             web_rpc_client,
-            endpoint.to_network_id(),
+            store_name,
             note_transport_client,
             seed,
             None,
@@ -126,6 +127,7 @@ impl WebClient {
         get_key_cb: Option<Function>,
         insert_key_cb: Option<Function>,
         sign_cb: Option<Function>,
+        store_name: Option<String>,
     ) -> Result<JsValue, JsValue> {
         let endpoint = node_url.map_or(Ok(Endpoint::testnet()), |url| {
             Endpoint::try_from(url.as_str()).map_err(|_| JsValue::from_str("Invalid node URL"))
@@ -136,9 +138,10 @@ impl WebClient {
         let note_transport_client = node_note_transport_url
             .map(|url| Arc::new(GrpcNoteTransportClient::new(url)) as Arc<dyn NoteTransportClient>);
 
+        let store_name = store_name.unwrap_or_else(|| format!("MidenClientDB_{}", endpoint.to_network_id().to_string()));
         self.setup_client(
             web_rpc_client,
-            endpoint.to_network_id(),
+            store_name,
             note_transport_client,
             seed,
             get_key_cb,
@@ -154,7 +157,7 @@ impl WebClient {
     async fn setup_client(
         &mut self,
         rpc_client: Arc<dyn NodeRpcClient>,
-        network_id: NetworkId,
+        store_name: String,
         note_transport_client: Option<Arc<dyn NoteTransportClient>>,
         seed: Option<Vec<u8>>,
         get_key_cb: Option<Function>,
@@ -177,8 +180,6 @@ impl WebClient {
 
         let rng = RpoRandomCoin::new(coin_seed.map(Felt::new).into());
 
-        // TODO: make users able to change the store name
-        let store_name = format!("MidenClientDB_{}", network_id.to_string());
         let web_store = Arc::new(
             WebStore::new(&store_name)
                 .await

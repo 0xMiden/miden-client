@@ -2,28 +2,19 @@ import Dexie from "dexie";
 import * as semver from "semver";
 import { logWebStoreError } from "./utils.js";
 
-const BASE_DATABASE_NAME = "MidenClientDB";
 export const CLIENT_VERSION_SETTING_KEY = "clientVersion";
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 
-function getDatabaseName(networkId?: string): string {
-  if (!networkId || networkId === "") {
-    return BASE_DATABASE_NAME;
-  }
-  return `${BASE_DATABASE_NAME}_${networkId}`;
-}
-
 export async function openDatabase(
   clientVersion: string,
-  networkId?: string
+  dbName: string
 ): Promise<boolean> {
-  const databaseName = getDatabaseName(networkId);
   console.log(
-    `Opening database ${databaseName} for client version ${clientVersion}...`
+    `Opening database ${dbName} for client version ${clientVersion}...`
   );
   try {
-    initializeDatabase(networkId);
+    initializeDatabase(dbName);
     await db.open();
     await ensureClientVersion(clientVersion);
     console.log("Database opened successfully");
@@ -229,15 +220,14 @@ function indexes(...items: string[]): string {
   return items.join(",");
 }
 
-function initializeDatabase(networkId?: string): void {
-  const databaseName = getDatabaseName(networkId);
-  if (db && db.name === databaseName) {
+function initializeDatabase(dbName: string): void {
+  if (db && db.name === dbName) {
     return;
   }
   if (db) {
     db.close();
   }
-  db = new Dexie(databaseName) as Dexie & {
+  db = new Dexie(dbName) as Dexie & {
     accountCodes: Dexie.Table<IAccountCode, string>;
     accountStorages: Dexie.Table<IAccountStorage, string>;
     accountAssets: Dexie.Table<IAccountAsset, string>;

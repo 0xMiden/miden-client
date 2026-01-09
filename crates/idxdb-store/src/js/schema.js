@@ -4,10 +4,10 @@ import { logWebStoreError } from "./utils.js";
 export const CLIENT_VERSION_SETTING_KEY = "clientVersion";
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
-export async function openDatabase(clientVersion, db_name) {
-    console.log(`Opening database ${db_name} for client version ${clientVersion}...`);
+export async function openDatabase(clientVersion, dbName) {
+    console.log(`Opening database ${dbName} for client version ${clientVersion}...`);
     try {
-        initializeDatabase(db_name);
+        initializeDatabase(dbName);
         await db.open();
         await ensureClientVersion(clientVersion);
         console.log("Database opened successfully");
@@ -63,13 +63,14 @@ let trackedAccounts;
 function indexes(...items) {
     return items.join(",");
 }
-function initializeDatabase(db_name) {
-    if (db && db.name === db_name) {
+function initializeDatabase(dbName) {
+    if (db && db.name === dbName) {
         return;
-    } else if (db) {
+    }
+    if (db) {
         db.close();
     }
-    db = new Dexie(db_name);
+    db = new Dexie(dbName);
     db.version(1).stores({
         [Table.AccountCode]: indexes("root"),
         [Table.AccountStorage]: indexes("[commitment+slotName]", "commitment"),
