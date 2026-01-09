@@ -169,14 +169,6 @@ impl From<&ClientError> for Option<ErrorHint> {
                 ),
                 docs_url: Some(TROUBLESHOOTING_DOC),
             }),
-            ClientError::StoreError(StoreError::AccountCommitmentAlreadyExists(commitment)) => {
-                Some(ErrorHint {
-                    message: format!(
-                        "Account commitment {commitment:?} already exists locally. Sync to confirm the transaction status and avoid resubmitting it; if you need a clean slate for development, reset the store."
-                    ),
-                    docs_url: Some(TROUBLESHOOTING_DOC),
-                })
-            },
             _ => None,
         }
     }

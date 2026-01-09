@@ -72,7 +72,7 @@ Marks the component as supporting all account types.
 
 ### compile()
 
-> `static` **compile**(`account_code`, `builder`, `storage_slots`): `AccountComponent`
+> `static` **compile**(`account_code`, `storage_slots`): `AccountComponent`
 
 Compiles account code with the given storage slots using the provided assembler.
 
@@ -80,11 +80,7 @@ Compiles account code with the given storage slots using the provided assembler.
 
 ##### account\_code
 
-`string`
-
-##### builder
-
-[`CodeBuilder`](CodeBuilder.md)
+[`AccountComponentCode`](AccountComponentCode.md)
 
 ##### storage\_slots
 

@@ -88,7 +88,6 @@ use crate::store::{
     InputNoteState,
     NoteFilter,
     OutputNoteRecord,
-    StoreError,
     TransactionFilter,
 };
 use crate::sync::NoteTagRecord;
@@ -434,13 +433,6 @@ where
 
         if account_record.is_locked() {
             return Err(ClientError::AccountLocked(account_id));
-        }
-
-        let final_commitment = executed_transaction.final_account().commitment();
-        if self.store.get_account_header_by_commitment(final_commitment).await?.is_some() {
-            return Err(ClientError::StoreError(StoreError::AccountCommitmentAlreadyExists(
-                final_commitment,
-            )));
         }
 
         self.store.apply_transaction(tx_update).await?;

@@ -1,5 +1,6 @@
 use alloc::sync::Arc;
 
+use miden_client::account::AccountComponentCode as NativeAccountComponentCode;
 use miden_client::assembly::{
     Assembler,
     CodeBuilder as NativeCodeBuilder,
@@ -11,10 +12,10 @@ use miden_client::assembly::{
     Report,
     SourceManagerSync,
 };
-use miden_client::transaction::TransactionKernel;
 use wasm_bindgen::prelude::*;
 
 use crate::js_error_with_context;
+use crate::models::account_component_code::AccountComponentCode;
 use crate::models::library::Library;
 use crate::models::note_script::NoteScript;
 use crate::models::transaction_script::TransactionScript;
@@ -28,16 +29,13 @@ pub struct CodeBuilder {
     // need an assembler to compile an AccountComponent. After miden-base issue #1756 is complete
     // we will be able to remove the Assembler and only use the NativeCodeBuilder.
     builder: NativeCodeBuilder,
-    assembler: Assembler,
 }
 
 #[wasm_bindgen]
 impl CodeBuilder {
     pub(crate) fn from_source_manager(source_manager: Arc<dyn SourceManagerSync>) -> Self {
         let builder = NativeCodeBuilder::with_source_manager(source_manager);
-        let assembler =
-            TransactionKernel::assembler_with_source_manager(builder.source_manager().clone());
-        Self { builder, assembler }
+        Self { builder }
     }
 
     /// Given a module path (something like `my_lib::module`) and source code, this will
@@ -49,11 +47,6 @@ impl CodeBuilder {
                 e,
                 &format!("script builder: failed to link module with path {module_path}"),
             )
-        })?;
-        self.assembler.compile_and_statically_link(module_code).map_err(|e| {
-            let err_msg =
-                format_assembler_error(&e, "script builder: assembler failed to link module");
-            JsValue::from(err_msg)
         })?;
         Ok(())
     }
@@ -70,13 +63,6 @@ impl CodeBuilder {
         self.builder.link_static_library(&library).map_err(|e| {
             js_error_with_context(e, "script builder: failed to link static library")
         })?;
-        self.assembler.link_static_library(&library).map_err(|e| {
-            let err_msg = format_assembler_error(
-                &e,
-                "script builder: assembler failed to link static library",
-            );
-            JsValue::from_str(&err_msg)
-        })?;
         Ok(())
     }
 
@@ -91,13 +77,6 @@ impl CodeBuilder {
         let library: NativeLibrary = library.into();
         self.builder.link_dynamic_library(&library).map_err(|e| {
             js_error_with_context(e, "script builder: failed to link dynamic library")
-        })?;
-        self.assembler.link_dynamic_library(&library).map_err(|e| {
-            let err_msg = format_assembler_error(
-                &e,
-                "script builder: assembler failed to link dynamic library",
-            );
-            JsValue::from_str(&err_msg)
         })?;
         Ok(())
     }
@@ -148,7 +127,8 @@ impl CodeBuilder {
                 JsValue::from(err_msg)
             })?;
 
-        let native_library_build = self.clone_assembler().assemble_library([module]);
+        let assembler: Assembler = self.builder.clone().into();
+        let native_library_build = assembler.assemble_library([module]);
         match native_library_build {
             Ok(native_library) => Ok(native_library.into()),
             Err(error_report) => {
@@ -159,10 +139,23 @@ impl CodeBuilder {
         }
     }
 
-    /// Returns the inner assembler . This is because multiple "compile" functions
-    /// in `miden_protocol` to consume an Assembler, so we need to clone the value.
-    pub(crate) fn clone_assembler(&self) -> Assembler {
-        self.assembler.clone()
+    /// Given an `AccountComponentCode`, compiles it
+    /// with the available modules under this builder. Returns the compiled account component code.
+    #[wasm_bindgen(js_name = "compileAccountComponentCode")]
+    pub fn compile_account_component_code(
+        &self,
+        account_code: &str,
+    ) -> Result<AccountComponentCode, JsValue> {
+        let assembler: Assembler = self.builder.clone().into();
+        let native_library = assembler.assemble_library([account_code]).map_err(|e| {
+            JsValue::from_str(&format!(
+                "Failed to compile account component:
+        {e}"
+            ))
+        })?;
+
+        let native_code: NativeAccountComponentCode = native_library.into();
+        Ok(native_code.into())
     }
 }
 
