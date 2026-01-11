@@ -4,6 +4,7 @@
 
 * Fixed a race condition in `pruneIrrelevantBlocks` that could delete the current block header when multiple tabs share IndexedDB, causing sync to panic ([#1650](https://github.com/0xMiden/miden-client/pull/1650)).
 * Fixed a race condition where concurrent sync operations could cause sync height to go backwards, leading to block header deletion and subsequent panics ([#1650](https://github.com/0xMiden/miden-client/pull/1650)).
+* Changed `get_current_partial_mmr` to return a `StoreError::BlockHeaderNotFound` error instead of panicking when the block header is missing ([#1650](https://github.com/0xMiden/miden-client/pull/1650)).
 
 ## 0.12.6 (2026-01-08)
 
