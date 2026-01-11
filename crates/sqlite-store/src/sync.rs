@@ -112,10 +112,14 @@ impl SqliteStore {
 
         let tx = conn.transaction().into_store_error()?;
 
-        // Update state sync block number
-        const BLOCK_NUMBER_QUERY: &str = "UPDATE state_sync SET block_num = ?";
-        tx.execute(BLOCK_NUMBER_QUERY, params![i64::from(block_num.as_u32())])
-            .into_store_error()?;
+        // Update state sync block number only if moving forward
+        const BLOCK_NUMBER_QUERY: &str =
+            "UPDATE state_sync SET block_num = ? WHERE block_num < ?";
+        tx.execute(
+            BLOCK_NUMBER_QUERY,
+            params![i64::from(block_num.as_u32()), i64::from(block_num.as_u32())],
+        )
+        .into_store_error()?;
 
         for (block_header, block_has_relevant_notes, new_mmr_peaks) in block_updates.block_headers()
         {
