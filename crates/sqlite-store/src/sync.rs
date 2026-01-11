@@ -113,8 +113,7 @@ impl SqliteStore {
         let tx = conn.transaction().into_store_error()?;
 
         // Update state sync block number only if moving forward
-        const BLOCK_NUMBER_QUERY: &str =
-            "UPDATE state_sync SET block_num = ? WHERE block_num < ?";
+        const BLOCK_NUMBER_QUERY: &str = "UPDATE state_sync SET block_num = ? WHERE block_num < ?";
         tx.execute(
             BLOCK_NUMBER_QUERY,
             params![i64::from(block_num.as_u32()), i64::from(block_num.as_u32())],
