@@ -2,6 +2,7 @@ use alloc::string::String;
 use core::num::TryFromIntError;
 
 use miden_objects::account::AccountId;
+use miden_objects::block::BlockNumber;
 use miden_objects::crypto::merkle::{MerkleError, MmrError, SmtProofError};
 use miden_objects::utils::{DeserializationError, HexParseError};
 use miden_objects::{
@@ -50,6 +51,8 @@ pub enum StoreError {
     AccountKeyNotFound(String),
     #[error("account storage data with root {0} not found")]
     AccountStorageNotFound(Word),
+    #[error("block header for block {0} not found")]
+    BlockHeaderNotFound(BlockNumber),
     #[error("partial blockchain node at index {0} not found")]
     PartialBlockchainNodeNotFound(u64),
     #[error("error deserializing data from the store")]
