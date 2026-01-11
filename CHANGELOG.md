@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.13.0 (TBD)
+
+* Fixed a race condition in `pruneIrrelevantBlocks` that could delete the current block header when multiple tabs share IndexedDB, causing sync to panic ([#1650](https://github.com/0xMiden/miden-client/pull/1650)).
+
 ## 0.12.6 (2026-01-08)
 
 * Enabled Workers with `createClientWithExternalKeystore` via callbacks ([#1569](https://github.com/0xMiden/miden-client/pull/1569)).
