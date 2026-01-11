@@ -1,4 +1,4 @@
-import { db, blockHeaders, partialBlockchainNodes, stateSync } from "./schema.js";
+import { db, blockHeaders, partialBlockchainNodes, stateSync, } from "./schema.js";
 import { logWebStoreError, uint8ArrayToBase64 } from "./utils.js";
 // INSERT FUNCTIONS
 export async function insertBlockHeader(blockNum, header, partialBlockchainPeaks, hasClientNotes) {
