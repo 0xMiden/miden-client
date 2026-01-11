@@ -1,4 +1,4 @@
-import { blockHeaders, partialBlockchainNodes, stateSync } from "./schema.js";
+import { db, blockHeaders, partialBlockchainNodes, stateSync } from "./schema.js";
 import { logWebStoreError, uint8ArrayToBase64 } from "./utils.js";
 // INSERT FUNCTIONS
 export async function insertBlockHeader(blockNum, header, partialBlockchainPeaks, hasClientNotes) {
@@ -138,16 +138,18 @@ export async function getPartialBlockchainNodes(ids) {
 }
 export async function pruneIrrelevantBlocks() {
     try {
-        const syncHeight = await stateSync.get(1);
-        if (syncHeight == undefined) {
-            throw Error("SyncHeight is undefined -- is the state sync table empty?");
-        }
-        const allMatchingRecords = await blockHeaders
-            .where("hasClientNotes")
-            .equals("false")
-            .and((record) => record.blockNum !== "0" && record.blockNum !== syncHeight.blockNum)
-            .toArray();
-        await blockHeaders.bulkDelete(allMatchingRecords.map((r) => r.blockNum));
+        await db.transaction("rw", [stateSync, blockHeaders], async () => {
+            const syncHeight = await stateSync.get(1);
+            if (syncHeight == undefined) {
+                throw Error("SyncHeight is undefined -- is the state sync table empty?");
+            }
+            const allMatchingRecords = await blockHeaders
+                .where("hasClientNotes")
+                .equals("false")
+                .and((record) => record.blockNum !== "0" && record.blockNum !== syncHeight.blockNum)
+                .toArray();
+            await blockHeaders.bulkDelete(allMatchingRecords.map((r) => r.blockNum));
+        });
     }
     catch (err) {
         logWebStoreError(err, "Failed to prune irrelevant blocks");
