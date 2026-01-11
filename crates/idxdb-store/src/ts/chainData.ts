@@ -1,4 +1,9 @@
-import { db, blockHeaders, partialBlockchainNodes, stateSync } from "./schema.js";
+import {
+  db,
+  blockHeaders,
+  partialBlockchainNodes,
+  stateSync,
+} from "./schema.js";
 import { logWebStoreError, uint8ArrayToBase64 } from "./utils.js";
 
 // INSERT FUNCTIONS
@@ -173,7 +178,9 @@ export async function pruneIrrelevantBlocks() {
       const syncHeight = await stateSync.get(1);
 
       if (syncHeight == undefined) {
-        throw Error("SyncHeight is undefined -- is the state sync table empty?");
+        throw Error(
+          "SyncHeight is undefined -- is the state sync table empty?"
+        );
       }
 
       const allMatchingRecords = await blockHeaders
