@@ -101,27 +101,15 @@ pub(crate) fn adjust_merkle_path_for_forest(
     block_num: BlockNumber,
     forest: Forest,
 ) -> Vec<(InOrderIndex, Word)> {
-    assert!(
-        forest.num_leaves() > block_num.as_usize(),
-        "Can't adjust merkle path for a forest that does not include the block number"
-    );
-
-    let expected_depth = forest
+    let expected_path_len = forest
         .leaf_to_corresponding_tree(block_num.as_usize())
         .expect("forest includes block number") as usize;
-    let rightmost_index = InOrderIndex::from_leaf_pos(forest.num_leaves() - 1);
 
     let mut idx = InOrderIndex::from_leaf_pos(block_num.as_usize());
-    let mut path_nodes = vec![];
-    for node in merkle_path.nodes().iter().take(expected_depth) {
-        let sibling = idx.sibling();
-        // NOTE: For a leaf that's in a smaller forest, all siblings within the tree depth should be
-        // in-bounds so this check and break are mostly redundant/should never be hit
-        // (iterating up to `expected_depth` handles it)
-        if sibling > rightmost_index {
-            break;
-        }
-        path_nodes.push((sibling, *node));
+    let mut path_nodes = Vec::with_capacity(expected_path_len);
+
+    for node in merkle_path.nodes().iter().take(expected_path_len) {
+        path_nodes.push((idx.sibling(), *node));
         idx = idx.parent();
     }
 
