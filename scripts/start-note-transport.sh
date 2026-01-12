@@ -1,17 +1,22 @@
 #!/bin/bash
 
 # Starts the external Note Transport service in the foreground.
-# - Clones the note transport repo if missing
-# - Builds it
-# - Runs it in the foreground
+# - Default: clones/updates the note transport repo and runs it via cargo
 
 set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 TRANSPORT_DIR=${TRANSPORT_DIR:-.tmp/miden-note-transport}
 REPO_URL=${REPO_URL:-https://github.com/0xMiden/miden-note-transport}
 RUN_CMD=${TRANSPORT_RUN_CMD:-cargo run --release --locked}
 
+# Shared target directory (important for CI speed: ends up under repo `target/` which is cached)
+TRANSPORT_CARGO_TARGET_DIR=${TRANSPORT_CARGO_TARGET_DIR:-"$REPO_ROOT/target/note-transport"}
+
 mkdir -p "$(dirname "$TRANSPORT_DIR")"
+mkdir -p "$TRANSPORT_CARGO_TARGET_DIR"
 
 if [ ! -d "$TRANSPORT_DIR/.git" ]; then
   echo "Cloning note transport repo into $TRANSPORT_DIR";
@@ -29,8 +34,8 @@ else
 fi
 
 echo "Building note transport service..."
-( cd "$TRANSPORT_DIR" && cargo build --release --locked )
+( cd "$TRANSPORT_DIR" && CARGO_TARGET_DIR="$TRANSPORT_CARGO_TARGET_DIR" cargo build --release --locked )
 
 echo "Starting note transport service in foreground..."
 cd "$TRANSPORT_DIR"
-RUST_LOG=info exec $RUN_CMD
+RUST_LOG=info CARGO_TARGET_DIR="$TRANSPORT_CARGO_TARGET_DIR" exec $RUN_CMD
