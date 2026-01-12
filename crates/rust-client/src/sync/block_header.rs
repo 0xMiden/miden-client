@@ -141,9 +141,10 @@ pub(crate) async fn fetch_block_header(
 
 #[cfg(test)]
 mod tests {
-    use miden_objects::block::BlockNumber;
-    use miden_objects::crypto::merkle::{Forest, InOrderIndex, MerklePath, Mmr, PartialMmr};
-    use miden_objects::{Felt, Word};
+    use miden_protocol::block::BlockNumber;
+    use miden_protocol::crypto::merkle::MerklePath;
+    use miden_protocol::crypto::merkle::mmr::{Forest, InOrderIndex, Mmr, PartialMmr};
+    use miden_protocol::{Felt, Word};
 
     use super::adjust_merkle_path_for_forest;
 
