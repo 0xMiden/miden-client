@@ -29,7 +29,7 @@
 
 ## 0.12.5 (2025-12-01)
 
-* Removed the top-level await from the web-client JS entry point by lazily loading the WASM module, allowing `@demox-labs/miden-sdk` to be imported normally (including in Next.js SSR builds), and updated the worker bootstrap to match.
+* Removed the top-level await from the web-client JS entry point by lazily loading the WASM module, allowing `@miden-sdk/miden-sdk` to be imported normally (including in Next.js SSR builds), and updated the worker bootstrap to match.
 * Changed the default note transport endpoint from `localhost` to `https://transport.miden.io` ([#1574](https://github.com/0xMiden/miden-client/pull/1574)).
 * Fixed a bug where insertions in the `Addresses` table in the IndexedDB Store resulted in the `id` and `address` fields being inverted with each other ([#1532](https://github.com/0xMiden/miden-client/pull/1532)).
 * Changed the note script pre-loading step to include all expected scripts based on specified recipients ([#1539](https://github.com/0xMiden/miden-client/pull/1539)).

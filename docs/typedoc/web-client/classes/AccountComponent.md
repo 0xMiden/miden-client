@@ -1,8 +1,8 @@
-[**@demox-labs/miden-sdk**](../README.md)
+[**@miden-sdk/miden-sdk**](../README.md)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / AccountComponent
+[@miden-sdk/miden-sdk](../README.md) / AccountComponent
 
 # Class: AccountComponent
 

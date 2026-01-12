@@ -1,10 +1,9 @@
 {
-  "name": "@demox-labs/miden-sdk",
+  "name": "@miden-sdk/miden-sdk",
   "version": "0.13.0",
   "description": "Miden Wasm SDK",
   "collaborators": [
-    "Miden",
-    "Demox Labs <hi@demoxlabs.xyz>"
+    "Miden"
   ],
   "type": "module",
   "main": "./dist/index.js",
