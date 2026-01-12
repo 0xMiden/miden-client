@@ -23,6 +23,7 @@
 * Incremented the limits for various RPC calls to accommodate larger data sets ([#1621](https://github.com/0xMiden/miden-client/pull/1621)).
 * [BREAKING] Introduced named storage slots, changed `FilesystemKeystore` to not be generic over RNG ([#1626](https://github.com/0xMiden/miden-client/pull/1626)).
 * Added `submit_new_transaction_with_prover` to the Rust client and `submitNewTransactionWithProver` to the WebClient([#1622](https://github.com/0xMiden/miden-client/pull/1622)).
+* Fixed MMR reconstruction code and fixed how block authentication paths are adjusted ([#1633](https://github.com/0xMiden/miden-client/pull/1633)).
 * Added WebClient bindings and RPC helpers for additional account, note, and validation workflows ([#1638](https://github.com/0xMiden/miden-client/pull/1638)).
 * [BREAKING] Modified JS binding for `AccountComponent::compile` which now takes an `AccountComponentCode` built with the newly added binding `CodeBuilder::compile_account_component_code` ([#1627](https://github.com/0xMiden/miden-client/pull/1627)).
 
