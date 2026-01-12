@@ -1,8 +1,8 @@
-**@demox-labs/miden-sdk**
+**@miden-sdk/miden-sdk**
 
 ***
 
-# @demox-labs/miden-sdk
+# @miden-sdk/miden-sdk
 
 ## Enumerations
 

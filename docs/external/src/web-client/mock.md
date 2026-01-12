@@ -13,7 +13,7 @@ The mock web client mimics the normal `WebClient` interface to allow for seamles
 The mock client also includes a simulated note transport layer, allowing you to test note transport features such as `sendPrivateNote()` and `fetchPrivateNotes()` without requiring a live note transport node.
 
 ```typescript
-import { MockWebClient } from "@demox-labs/miden-sdk";
+import { MockWebClient } from "@miden-sdk/miden-sdk";
 
 try {
   // Initialize the mock web client
@@ -62,7 +62,7 @@ try {
 The mock client includes a built-in note transport layer.
 
 ```typescript
-import { MockWebClient, NoteFilter, NoteFilterTypes } from "@demox-labs/miden-sdk";
+import { MockWebClient, NoteFilter, NoteFilterTypes } from "@miden-sdk/miden-sdk";
 
 try {
   // Initialize the mock web client

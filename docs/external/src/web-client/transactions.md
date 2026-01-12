@@ -12,7 +12,7 @@ This guide demonstrates how to retrieve and work with transaction history using 
 To get a list of all transactions:
 
 ```typescript
-import { TransactionFilter, WebClient } from "@demox-labs/miden-sdk";
+import { TransactionFilter, WebClient } from "@miden-sdk/miden-sdk";
 
 try {
     // Initialize the web client
@@ -55,7 +55,7 @@ try {
 To get transactions that haven't been committed to the blockchain yet:
 
 ```typescript
-import { TransactionFilter, WebClient } from "@demox-labs/miden-sdk";
+import { TransactionFilter, WebClient } from "@miden-sdk/miden-sdk";
 
 try {
     // Initialize the web client
@@ -84,7 +84,7 @@ try {
 Each transaction record contains detailed information about the transaction:
 
 ```typescript
-import { WebClient } from "@demox-labs/miden-sdk";\
+import { WebClient } from "@miden-sdk/miden-sdk";\
 
 try {
     // Initialize the web client
