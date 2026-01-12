@@ -205,7 +205,7 @@ impl TransactionRequest {
     /// order they were provided in the transaction request.
     pub(crate) fn build_input_notes(
         &self,
-        authenticated_note_records: &[InputNoteRecord],
+        authenticated_note_records: Vec<InputNoteRecord>,
     ) -> Result<InputNotes<InputNote>, TransactionRequestError> {
         let mut input_notes: BTreeMap<NoteId, InputNote> = BTreeMap::new();
 
@@ -223,20 +223,18 @@ impl TransactionRequest {
                 ));
             }
 
+            let authenticated_note_id = authenticated_note_record.id();
             input_notes.insert(
-                authenticated_note_record.id(),
+                authenticated_note_id,
                 authenticated_note_record
-                    .clone()
                     .try_into()
                     .expect("Authenticated note record should be convertible to InputNote"),
             );
         }
 
         // Add unauthenticated input notes to the input notes map.
-        for note in self
-            .input_notes()
-            .iter()
-            .filter(|n| !authenticated_note_records.iter().any(|a| a.id() == n.id()))
+        let authenticated_note_ids: BTreeSet<NoteId> = input_notes.keys().copied().collect();
+        for note in self.input_notes().iter().filter(|n| !authenticated_note_ids.contains(&n.id()))
         {
             input_notes.insert(note.id(), InputNote::Unauthenticated { note: note.clone() });
         }
