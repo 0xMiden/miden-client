@@ -13,11 +13,7 @@ import {
   setupPublicConsumedNote,
 } from "./webClientTestUtils";
 import { Page, expect } from "@playwright/test";
-import {
-  ConsumableNoteRecord,
-  NoteConsumability,
-  NoteConsumptionStatus,
-} from "../dist/crates/miden_client_web";
+import { ConsumableNoteRecord } from "../dist/crates/miden_client_web";
 
 const getConsumableNotes = async (
   testingPage: Page,
@@ -27,7 +23,7 @@ const getConsumableNotes = async (
     noteId: string;
     consumability: {
       accountId: string;
-      consumptionStatus: NoteConsumptionStatus | undefined;
+      consumableAfterBlock: number | undefined;
     }[];
   }[]
 > => {
@@ -46,7 +42,7 @@ const getConsumableNotes = async (
       noteId: record.inputNoteRecord().id().toString(),
       consumability: record.noteConsumability().map((c) => ({
         accountId: c.accountId().toString(),
-        consumptionStatus: c.consumptionStatus(),
+        consumableAfterBlock: c.consumptionStatus()?.consumableAfterBlock(),
       })),
     }));
   }, accountId);
@@ -156,9 +152,7 @@ test.describe("get_consumable_notes", () => {
       expect(record.consumability).toHaveLength(1);
       expect(record.consumability[0].accountId).toBe(accountId1);
       expect(record.noteId).toBe(noteId1);
-      expect(
-        record.consumability[0].consumptionStatus().consumableAfterBlock()
-      ).toBeUndefined();
+      expect(record.consumability[0].consumableAfterBlock).toBeUndefined();
     });
   });
 
@@ -204,16 +198,12 @@ test.describe("get_consumable_notes", () => {
     const consumableRecipient = await getConsumableNotes(page, targetAccountId);
     const consumableSender = await getConsumableNotes(page, senderAccountId);
     expect(consumableSender.length).toBe(1);
-    expect(
-      consumableSender[0].consumability[0]
-        .consumptionStatus()
-        .consumableAfterBlock()
-    ).toBe(recallHeight);
+    expect(consumableSender[0].consumability[0].consumableAfterBlock).toBe(
+      recallHeight
+    );
     expect(consumableRecipient.length).toBe(1);
     expect(
-      consumableRecipient[0].consumability[0]
-        .consumptionStatus()
-        .consumableAfterBlock()
+      consumableRecipient[0].consumability[0].consumableAfterBlock
     ).toBeUndefined();
   });
 });
