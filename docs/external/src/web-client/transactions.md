@@ -84,7 +84,7 @@ try {
 Each transaction record contains detailed information about the transaction:
 
 ```typescript
-import { WebClient } from "@miden-sdk/miden-sdk";\
+import { WebClient } from "@miden-sdk/miden-sdk";
 
 try {
     // Initialize the web client
