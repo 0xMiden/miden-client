@@ -146,7 +146,11 @@ export async function applyStateSync(stateUpdate) {
 }
 async function updateSyncHeight(tx, blockNum) {
     try {
-        await tx.stateSync.update(1, { blockNum: blockNum });
+        // Only update if moving forward to prevent race conditions
+        const current = await tx.stateSync.get(1);
+        if (!current || parseInt(current.blockNum) < parseInt(blockNum)) {
+            await tx.stateSync.update(1, { blockNum: blockNum });
+        }
     }
     catch (error) {
         logWebStoreError(error, "Failed to update sync height");

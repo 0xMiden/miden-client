@@ -430,7 +430,7 @@ pub trait Store: Send + Sync {
         let (current_block, has_client_notes) = self
             .get_block_header_by_num(current_block_num)
             .await?
-            .expect("Current block should be in the store");
+            .ok_or(StoreError::BlockHeaderNotFound(current_block_num))?;
 
         let mut current_partial_mmr = PartialMmr::from_peaks(current_peaks);
         let has_client_notes = has_client_notes.into();
