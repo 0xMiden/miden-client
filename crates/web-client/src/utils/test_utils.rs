@@ -7,6 +7,7 @@ use miden_client::testing::account_id::ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATA
 use miden_client::vm::{
     MastArtifact as NativeMastArtifact,
     Package as NativePackage,
+    PackageKind as NativePackageKind,
     PackageManifest as NativePackageManifest,
 };
 use wasm_bindgen::prelude::*;
@@ -29,11 +30,11 @@ impl TestUtils {
     #[wasm_bindgen(js_name = "createMockSerializedLibraryPackage")]
     pub fn create_mock_serialized_library_package() -> Uint8Array {
         pub const CODE: &str = "
-            export.foo
+            pub proc foo
                 push.1.2 mul
             end
 
-            export.bar
+            pub proc bar
                 push.1.2 add
             end
         ";
@@ -47,6 +48,7 @@ impl TestUtils {
             sections: vec![], // No metadata section
             version: Default::default(),
             description: None,
+            kind: NativePackageKind::Library,
         };
 
         let bytes: Vec<u8> = package_without_metadata.to_bytes();
@@ -74,6 +76,7 @@ impl TestUtils {
             sections: vec![], // No metadata section
             version: Default::default(),
             description: None,
+            kind: NativePackageKind::Executable,
         };
 
         let bytes: Vec<u8> = package_without_metadata.to_bytes();

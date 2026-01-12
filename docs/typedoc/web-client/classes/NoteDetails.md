@@ -78,6 +78,18 @@ Returns the note identifier derived from these details.
 
 ***
 
+### nullifier()
+
+> **nullifier**(): [`Word`](Word.md)
+
+Returns the note nullifier as a word.
+
+#### Returns
+
+[`Word`](Word.md)
+
+***
+
 ### recipient()
 
 > **recipient**(): [`NoteRecipient`](NoteRecipient.md)

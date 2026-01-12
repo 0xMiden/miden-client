@@ -26,7 +26,7 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::fmt::Debug;
 
-use miden_objects::account::{
+use miden_protocol::account::{
     Account,
     AccountCode,
     AccountHeader,
@@ -38,13 +38,13 @@ use miden_objects::account::{
     StorageSlotContent,
     StorageSlotName,
 };
-use miden_objects::address::Address;
-use miden_objects::asset::{Asset, AssetVault, AssetWitness};
-use miden_objects::block::{BlockHeader, BlockNumber};
-use miden_objects::crypto::merkle::{InOrderIndex, MmrPeaks, PartialMmr};
-use miden_objects::note::{NoteId, NoteScript, NoteTag, Nullifier};
-use miden_objects::transaction::TransactionId;
-use miden_objects::{AccountError, Word};
+use miden_protocol::address::Address;
+use miden_protocol::asset::{Asset, AssetVault, AssetWitness};
+use miden_protocol::block::{BlockHeader, BlockNumber};
+use miden_protocol::crypto::merkle::mmr::{InOrderIndex, MmrPeaks, PartialMmr};
+use miden_protocol::note::{NoteId, NoteScript, NoteTag, Nullifier};
+use miden_protocol::transaction::TransactionId;
+use miden_protocol::{AccountError, Word};
 
 use crate::note_transport::{NOTE_TRANSPORT_CURSOR_STORE_SETTING, NoteTransportCursor};
 use crate::sync::{NoteTagRecord, StateSyncUpdate};

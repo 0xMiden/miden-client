@@ -43,6 +43,21 @@ impl NoteTag {
         NoteTag(native_note_tag)
     }
 
+    /// Builds a note tag from its raw u32 representation.
+    #[wasm_bindgen(js_name = "fromU32")]
+    pub fn from_u32(raw: u32) -> NoteTag {
+        NoteTag(NativeNoteTag::from(raw))
+    }
+
+    /// Builds a note tag from a hex-encoded string (with or without 0x prefix).
+    #[wasm_bindgen(js_name = "fromHex")]
+    pub fn from_hex(hex: &str) -> Result<NoteTag, JsValue> {
+        let trimmed = hex.strip_prefix("0x").unwrap_or(hex);
+        let raw = u32::from_str_radix(trimmed, 16)
+            .map_err(|err| JsValue::from_str(&format!("invalid note tag hex: {err}")))?;
+        Ok(NoteTag(NativeNoteTag::from(raw)))
+    }
+
     /// Returns true if the tag targets a single account.
     #[wasm_bindgen(js_name = "isSingleTarget")]
     pub fn is_single_target(&self) -> bool {

@@ -1,4 +1,5 @@
 use miden_client::asset::Asset as NativeAsset;
+use miden_client::block::BlockNumber as NativeBlockNumber;
 use miden_client::crypto::RpoRandomCoin;
 use miden_client::note::{
     Note as NativeNote,
@@ -6,12 +7,13 @@ use miden_client::note::{
     create_p2id_note,
     create_p2ide_note,
 };
-use miden_client::{BlockNumber as NativeBlockNumber, Felt as NativeFelt};
+use miden_client::{Felt as NativeFelt, Word as NativeWord};
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys::Uint8Array;
 
+use super::NoteType;
 use super::account_id::AccountId;
 use super::felt::Felt;
 use super::note_assets::NoteAssets;
@@ -19,7 +21,6 @@ use super::note_id::NoteId;
 use super::note_metadata::NoteMetadata;
 use super::note_recipient::NoteRecipient;
 use super::note_script::NoteScript;
-use super::note_type::NoteType;
 use super::word::Word;
 use crate::js_error_with_context;
 use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
@@ -83,6 +84,15 @@ impl Note {
     /// Returns the script that guards the note.
     pub fn script(&self) -> NoteScript {
         self.0.script().clone().into()
+    }
+
+    /// Returns the note nullifier as a word.
+    pub fn nullifier(&self) -> Word {
+        let nullifier = self.0.nullifier();
+        let elements: [miden_client::Felt; 4] =
+            nullifier.as_elements().try_into().expect("nullifier has 4 elements");
+        let native_word: NativeWord = NativeWord::from(&elements);
+        native_word.into()
     }
 
     /// Builds a standard P2ID note that targets the specified account.

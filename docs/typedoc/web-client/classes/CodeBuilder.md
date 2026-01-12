@@ -27,7 +27,7 @@ Utility for linking libraries and compiling transaction/note scripts.
 Given a Library Path, and a source code, turn it into a Library.
 E.g. A path library can be `miden::my_contract`. When turned into a library,
 this can be used from another script with an import statement, following the
-previous example: `use.miden::my_contract'.
+previous example: `use miden::my_contract'.
 
 #### Parameters
 
@@ -42,6 +42,25 @@ previous example: `use.miden::my_contract'.
 #### Returns
 
 [`Library`](Library.md)
+
+***
+
+### compileAccountComponentCode()
+
+> **compileAccountComponentCode**(`account_code`): [`AccountComponentCode`](AccountComponentCode.md)
+
+Given an `AccountComponentCode`, compiles it
+with the available modules under this builder. Returns the compiled account component code.
+
+#### Parameters
+
+##### account\_code
+
+`string`
+
+#### Returns
+
+[`AccountComponentCode`](AccountComponentCode.md)
 
 ***
 

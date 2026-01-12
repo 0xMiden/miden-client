@@ -133,6 +133,56 @@ test.describe("get_input_note", () => {
     expect(retrievedScript.hasScript).toBe(true);
     expect(retrievedScript.scriptRoot).toEqual(noteData.scriptRoot);
   });
+
+  test("sync notes by tag and check nullifier commit height", async ({
+    page,
+  }) => {
+    const { consumedNoteId } = await setupConsumedNote(page, true);
+
+    const result = await page.evaluate(async (_consumedNoteId: string) => {
+      const endpoint = new window.Endpoint(window.rpcUrl);
+      const rpcClient = new window.RpcClient(endpoint);
+
+      const noteId = window.NoteId.fromHex(_consumedNoteId);
+      const fetchedNotes = await rpcClient.getNotesById([noteId]);
+
+      if (fetchedNotes.length === 0) {
+        return { found: false };
+      }
+
+      const note = fetchedNotes[0].note;
+      const tag = fetchedNotes[0].metadata.tag();
+
+      const syncInfo = await rpcClient.syncNotes(0, undefined, [tag]);
+      const syncedNoteIds = syncInfo
+        .notes()
+        .map((synced) => synced.noteId().toString());
+
+      const inputNote = await window.client.getInputNote(_consumedNoteId);
+      const nullifierWord = note
+        ? note.nullifier()
+        : inputNote
+          ? window.Word.fromHex(inputNote.nullifier())
+          : undefined;
+      const commitHeight = nullifierWord
+        ? await rpcClient.getNullifierCommitHeight(nullifierWord, 0)
+        : undefined;
+
+      return {
+        found: true,
+        syncedNoteIds,
+        noteNullifierHex: note ? note.nullifier().toHex() : undefined,
+        noteNullifierWord: note ? note.nullifier().toHex() : undefined,
+        commitHeight,
+      };
+    }, consumedNoteId);
+
+    expect(result.found).toBe(true);
+    expect(result.syncedNoteIds).toContain(consumedNoteId);
+    expect(result.noteNullifierHex).toMatch(/^0x[0-9a-fA-F]+$/);
+    expect(result.noteNullifierWord).toEqual(result.noteNullifierHex);
+    expect(result.commitHeight).not.toBeUndefined();
+  });
 });
 
 test.describe("get_input_notes", () => {
