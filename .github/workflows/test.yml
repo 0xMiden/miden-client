@@ -53,6 +53,8 @@ jobs:
         run: make start-note-transport-background
       - name: Run integration tests
         run: make integration-test-full
+      - name: Run integration tests with debug assertions
+        run: make integration-test-dev
       - name: Stop test node
         if: always()
         run: |
