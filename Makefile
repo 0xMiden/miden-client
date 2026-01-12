@@ -120,7 +120,7 @@ start-note-transport-background: ## Start the note transport service in backgrou
 	./scripts/start-note-transport-bg.sh
 
 .PHONY: stop-note-transport
-stop-transport: ## Stop the note transport service
+stop-note-transport: ## Stop the note transport service
 	./scripts/stop-note-transport.sh
 
 .PHONY: start-note-transport
