@@ -310,17 +310,12 @@ impl ConsumeNotesCmd {
     ) -> Result<(), CliError> {
         let force = self.force;
 
-        let mut authenticated_notes = Vec::new();
         let mut input_notes = Vec::new();
 
         for note_id in &self.list_of_notes {
             let note_record = get_input_note_with_id_prefix(&client, note_id)
                 .await
                 .map_err(|_| CliError::Input(format!("Input note ID {note_id} is neither a valid Note ID nor a prefix of a known Note ID")))?;
-
-            if note_record.is_authenticated() {
-                authenticated_notes.push(note_record.id());
-            }
 
             input_notes.push((
                 note_record.try_into().map_err(|err: NoteRecordError| {
@@ -333,7 +328,7 @@ impl ConsumeNotesCmd {
         let account_id =
             get_input_acc_id_by_prefix_or_default(&client, self.account_id.clone()).await?;
 
-        if authenticated_notes.is_empty() {
+        if input_notes.is_empty() {
             info!("No input note IDs provided, getting all notes consumable by {}", account_id);
             let consumable_notes = client.get_consumable_notes(Some(account_id)).await?;
             for (note_record, _) in consumable_notes {
@@ -349,7 +344,7 @@ impl ConsumeNotesCmd {
             }
         }
 
-        if authenticated_notes.is_empty() && input_notes.is_empty() {
+        if input_notes.is_empty() {
             return Err(CliError::Transaction(
                 "No input notes were provided and the store does not contain any notes consumable by {account_id}".into(),
                 "Input notes check failed".to_string(),

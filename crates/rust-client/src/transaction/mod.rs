@@ -236,13 +236,13 @@ where
         self.validate_request(account_id, &transaction_request).await?;
 
         // Retrieve all input notes from the store.
-        let mut authenticated_note_records = self
+        let mut stored_note_records = self
             .store
             .get_input_notes(NoteFilter::List(transaction_request.input_note_ids().collect()))
             .await?;
 
         // Verify that none of the authenticated input notes are already consumed.
-        for note in &authenticated_note_records {
+        for note in &stored_note_records {
             if note.is_consumed() {
                 return Err(ClientError::TransactionRequestError(
                     TransactionRequestError::InputNoteAlreadyConsumed(note.id()),
@@ -251,12 +251,15 @@ where
         }
 
         // Only keep authenticated input notes from the store.
-        authenticated_note_records.retain(InputNoteRecord::is_authenticated);
+        stored_note_records.retain(InputNoteRecord::is_authenticated);
 
         let authenticated_note_ids =
-            authenticated_note_records.iter().map(InputNoteRecord::id).collect::<Vec<_>>();
+            stored_note_records.iter().map(InputNoteRecord::id).collect::<Vec<_>>();
 
-        // If tx request contains unauthenticated_input_notes we should insert them
+        // Upsert request notes missing from the store so they can be tracked and updated
+        // NOTE: Unauthenticated notes may be stored locally in an unverified/invalid state at this
+        // point. The upsert will replace the state to an InputNoteState::Expected (with
+        // metadata included).
         let unauthenticated_input_notes = transaction_request
             .input_notes()
             .iter()
@@ -267,7 +270,7 @@ where
 
         self.store.upsert_input_notes(&unauthenticated_input_notes).await?;
 
-        let mut notes = transaction_request.build_input_notes(authenticated_note_records)?;
+        let mut notes = transaction_request.build_input_notes(stored_note_records)?;
 
         let output_recipients =
             transaction_request.expected_output_recipients().cloned().collect::<Vec<_>>();
@@ -616,30 +619,8 @@ where
         transaction_request: &TransactionRequest,
     ) -> Result<(BTreeMap<AccountId, u64>, BTreeSet<NonFungibleAsset>), TransactionRequestError>
     {
-        let incoming_notes_ids: Vec<_> = transaction_request
-            .input_notes()
-            .iter()
-            .filter_map(|note| {
-                if transaction_request.input_notes().iter().any(|n| n.id() == note.id()) {
-                    None
-                } else {
-                    Some(note.id())
-                }
-            })
-            .collect();
-
-        let mut store_input_notes = self
-            .get_input_notes(NoteFilter::List(incoming_notes_ids))
-            .await
-            .map_err(|err| TransactionRequestError::NoteNotFound(err.to_string()))?;
-
-        // Get incoming asset notes excluding unauthenticated ones
-        store_input_notes.retain(InputNoteRecord::is_authenticated);
-
-        let all_incoming_assets = store_input_notes
-            .iter()
-            .flat_map(|note| note.assets().iter())
-            .chain(transaction_request.input_notes().iter().flat_map(|note| note.assets().iter()));
+        let all_incoming_assets =
+            transaction_request.input_notes().iter().flat_map(|note| note.assets().iter());
 
         Ok(collect_assets(all_incoming_assets))
     }
