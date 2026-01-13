@@ -199,10 +199,12 @@ impl TransactionRequest {
         &self.auth_arg
     }
 
-    /// Builds the [`InputNotes`] needed for the transaction execution. Full valid notes for the
-    /// specified authenticated notes need to be provided, otherwise an error will be returned.
-    /// The transaction input notes will include both authenticated and unauthenticated notes in the
-    /// order they were provided in the transaction request.
+    /// Builds the [`InputNotes`] needed for the transaction execution.
+    ///
+    /// Authenticated input notes are provided by the caller (typically fetched from the store).
+    /// Any requested notes not present in that authenticated set are treated as unauthenticated.
+    /// The transaction input notes will include both authenticated and unauthenticated notes in
+    /// the order they were provided in the transaction request.
     pub(crate) fn build_input_notes(
         &self,
         authenticated_note_records: Vec<InputNoteRecord>,
