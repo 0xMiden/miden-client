@@ -155,6 +155,7 @@ impl RpcClient {
         Ok(info.into())
     }
 
+    // TODO: This can be generalized to retrieve multiple nullifiers
     /// Fetches the block height at which a nullifier was committed, if any.
     #[wasm_bindgen(js_name = "getNullifierCommitHeight")]
     pub async fn get_nullifier_commit_height(
@@ -167,11 +168,17 @@ impl RpcClient {
         let nullifier = Nullifier::from_raw(native_word);
         let block_num = BlockNumber::from(block_num);
 
+        let mut requested_nullifiers = BTreeSet::new();
+        requested_nullifiers.insert(nullifier);
+
         let height = self
             .inner
-            .get_nullifier_commit_height(&nullifier, block_num)
+            .get_nullifier_commit_heights(requested_nullifiers, block_num)
             .await
-            .map_err(|err| js_error_with_context(err, "failed to get nullifier commit height"))?;
+            .map_err(|err| js_error_with_context(err, "failed to get nullifier commit height"))?
+            .into_iter()
+            .next()
+            .and_then(|(_, height)| height);
 
         Ok(height.map(|height| height.as_u32()))
     }

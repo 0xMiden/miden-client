@@ -309,11 +309,11 @@ pub async fn test_swap_private(client_config: ClientConfig) -> Result<()> {
     )?;
     client2.add_note_tag(tag).await?;
     client2
-        .import_note(NoteFile::NoteDetails {
+        .import_notes(&[NoteFile::NoteDetails {
             details: output_note.try_into()?,
             after_block_num: client1.get_sync_height().await?,
             tag: Some(tag),
-        })
+        }])
         .await?;
 
     // Sync so we get the inclusion proof info

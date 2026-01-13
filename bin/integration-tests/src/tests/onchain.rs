@@ -297,7 +297,7 @@ pub async fn test_onchain_accounts(client_config: ClientConfig) -> Result<()> {
     let notes = client_2.get_input_notes(NoteFilter::Committed).await?;
 
     //Import the note on the first client so that we can later check its consumer account
-    client_1.import_note(NoteFile::NoteId(notes[0].id())).await?;
+    client_1.import_notes(&[NoteFile::NoteId(notes[0].id())]).await?;
 
     // Consume the note
     println!("Consuming note on second client...");

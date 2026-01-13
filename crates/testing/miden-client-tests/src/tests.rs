@@ -140,10 +140,10 @@ async fn input_notes_round_trip() {
     // insert notes into database
     for note in &available_notes {
         client
-            .import_note(NoteFile::NoteWithProof(
+            .import_notes(&[NoteFile::NoteWithProof(
                 note.note().unwrap().clone(),
                 note.inclusion_proof().clone(),
-            ))
+            )])
             .await
             .unwrap();
     }
@@ -174,11 +174,11 @@ async fn get_input_note() {
     // insert Note into database
     let note: InputNoteRecord = original_note.clone().into();
     client
-        .import_note(NoteFile::NoteDetails {
+        .import_notes(&[NoteFile::NoteDetails {
             details: note.into(),
             tag: None,
             after_block_num: 0.into(),
-        })
+        }])
         .await
         .unwrap();
 
@@ -358,11 +358,11 @@ async fn sync_state() {
 
     for note in &expected_notes {
         client
-            .import_note(NoteFile::NoteDetails {
+            .import_notes(&[NoteFile::NoteDetails {
                 details: note.clone().into(),
                 after_block_num: 0.into(),
                 tag: Some(note.metadata().tag()),
-            })
+            }])
             .await
             .unwrap();
     }
@@ -409,11 +409,11 @@ async fn sync_state_mmr() {
 
     for note in &notes {
         client
-            .import_note(NoteFile::NoteDetails {
+            .import_notes(&[NoteFile::NoteDetails {
                 details: note.clone().into(),
                 after_block_num: 0.into(),
                 tag: Some(note.metadata().tag()),
-            })
+            }])
             .await
             .unwrap();
     }
@@ -574,14 +574,15 @@ async fn import_note_validation() {
 
     for note in &available_notes {
         let Some(public_note) = note.note() else { continue };
-        let nullifier_consumed = rpc_api
-            .get_nullifier_commit_height(
-                &public_note.nullifier(),
+        let nullifiers = rpc_api
+            .get_nullifier_commit_heights(
+                BTreeSet::from([public_note.nullifier()]),
                 note.inclusion_proof().location().block_num(),
             )
             .await
             .unwrap();
 
+        let nullifier_consumed = nullifiers.get(&public_note.nullifier()).unwrap();
         if nullifier_consumed.is_some() {
             consumed_note = Some(note.clone());
         } else if expected_note.is_none() {
@@ -597,19 +598,19 @@ async fn import_note_validation() {
     let consumed_note = consumed_note.expect("expected to find at least one consumed note");
 
     client
-        .import_note(NoteFile::NoteWithProof(
+        .import_notes(&[NoteFile::NoteWithProof(
             consumed_note.note().unwrap().clone(),
             consumed_note.inclusion_proof().clone(),
-        ))
+        )])
         .await
         .unwrap();
 
     client
-        .import_note(NoteFile::NoteDetails {
+        .import_notes(&[NoteFile::NoteDetails {
             details: expected_note.note().unwrap().into(),
             after_block_num: 0.into(),
             tag: None,
-        })
+        }])
         .await
         .unwrap();
 
@@ -703,7 +704,7 @@ async fn import_processing_note_returns_error() {
 
     assert!(matches!(
         client
-            .import_note(NoteFile::NoteId(processing_notes[0].id()))
+            .import_notes(&[NoteFile::NoteId(processing_notes[0].id())])
             .await
             .unwrap_err(),
         ClientError::NoteImportError { .. }
@@ -2120,25 +2121,25 @@ const BUMP_MAP_CODE: &str = r#"
                 pub proc bump_map_item
                     # map key
                     push.{map_key}
-                    
+
                     # push slot_id_prefix, slot_id_suffix for the map slot
                     push.MAP_SLOT[0..2]
 
                     exec.::miden::protocol::active_account::get_map_item
                     add.1
                     push.{map_key}
-                    
+
                     # push slot_id_prefix, slot_id_suffix for the map slot
                     push.MAP_SLOT[0..2]
                     exec.::miden::protocol::native_account::set_map_item
                     dropw
                     # => [OLD_VALUE]
-                    
+
                     dupw
-                    
+
                     # push slot_id_prefix, slot_id_suffix for the map slot
                     push.MAP_SLOT[0..2]
-                    
+
                     # Set a new item each time as the value keeps changing
                     exec.::miden::protocol::native_account::set_map_item
                     dropw dropw
