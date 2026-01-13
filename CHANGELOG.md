@@ -23,7 +23,7 @@
 * Incremented the limits for various RPC calls to accommodate larger data sets ([#1621](https://github.com/0xMiden/miden-client/pull/1621)).
 * [BREAKING] Introduced named storage slots, changed `FilesystemKeystore` to not be generic over RNG ([#1626](https://github.com/0xMiden/miden-client/pull/1626)).
 * Added `submit_new_transaction_with_prover` to the Rust client and `submitNewTransactionWithProver` to the WebClient([#1622](https://github.com/0xMiden/miden-client/pull/1622)).
-* [BREAKING] Added E2E encryption for private notes to the Rust client ([#1636](https://github.com/0xMiden/miden-client/pull/1636)).
+* [BREAKING] Added E2E encryption for private notes to the client ([#1636](https://github.com/0xMiden/miden-client/pull/1636)).
 
 ## 0.12.5 (2025-12-01)
 
