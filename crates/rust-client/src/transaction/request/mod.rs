@@ -6,6 +6,7 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
 use miden_protocol::account::AccountId;
+use miden_protocol::asset::{Asset, NonFungibleAsset};
 use miden_protocol::crypto::merkle::MerkleError;
 use miden_protocol::crypto::merkle::store::MerkleStore;
 use miden_protocol::note::{Note, NoteDetails, NoteId, NoteRecipient, NoteTag, PartialNote};
@@ -114,6 +115,11 @@ impl TransactionRequest {
     /// Returns a list of all input note IDs.
     pub fn input_note_ids(&self) -> impl Iterator<Item = NoteId> {
         self.input_notes.iter().map(Note::id)
+    }
+
+    /// Returns the assets held by the transaction's input notes.
+    pub fn incoming_assets(&self) -> (BTreeMap<AccountId, u64>, BTreeSet<NonFungibleAsset>) {
+        collect_assets(self.input_notes.iter().flat_map(|note| note.assets().iter()))
     }
 
     /// Returns a map of note IDs to their respective [`NoteArgs`]. The result will include
@@ -380,6 +386,31 @@ impl Deserializable for TransactionRequest {
             auth_arg,
         })
     }
+}
+
+// HELPERS
+// ================================================================================================
+
+/// Accumulates fungible totals and collectable non-fungible assets from an iterator of assets.
+pub(crate) fn collect_assets<'a>(
+    assets: impl Iterator<Item = &'a Asset>,
+) -> (BTreeMap<AccountId, u64>, BTreeSet<NonFungibleAsset>) {
+    let mut fungible_balance_map = BTreeMap::new();
+    let mut non_fungible_set = BTreeSet::new();
+
+    assets.for_each(|asset| match asset {
+        Asset::Fungible(fungible) => {
+            fungible_balance_map
+                .entry(fungible.faucet_id())
+                .and_modify(|balance| *balance += fungible.amount())
+                .or_insert(fungible.amount());
+        },
+        Asset::NonFungible(non_fungible) => {
+            non_fungible_set.insert(*non_fungible);
+        },
+    });
+
+    (fungible_balance_map, non_fungible_set)
 }
 
 impl Default for TransactionRequestBuilder {

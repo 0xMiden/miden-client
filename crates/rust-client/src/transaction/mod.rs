@@ -63,12 +63,11 @@
 //! documentation.
 
 use alloc::collections::{BTreeMap, BTreeSet};
-use alloc::string::ToString;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use miden_protocol::account::{Account, AccountId};
-use miden_protocol::asset::{Asset, NonFungibleAsset};
+use miden_protocol::asset::NonFungibleAsset;
 use miden_protocol::block::BlockNumber;
 use miden_protocol::note::{Note, NoteDetails, NoteId, NoteRecipient, NoteScript, NoteTag};
 use miden_protocol::transaction::AccountInputs;
@@ -581,108 +580,6 @@ where
         ))
     }
 
-    /// Helper to get the account outgoing assets.
-    ///
-    /// Any outgoing assets resulting from executing note scripts but not present in expected output
-    /// notes wouldn't be included.
-    fn get_outgoing_assets(
-        transaction_request: &TransactionRequest,
-    ) -> (BTreeMap<AccountId, u64>, BTreeSet<NonFungibleAsset>) {
-        // Get own notes assets
-        let mut own_notes_assets = match transaction_request.script_template() {
-            Some(TransactionScriptTemplate::SendNotes(notes)) => notes
-                .iter()
-                .map(|note| (note.id(), note.assets().clone()))
-                .collect::<BTreeMap<_, _>>(),
-            _ => BTreeMap::default(),
-        };
-        // Get transaction output notes assets
-        let mut output_notes_assets = transaction_request
-            .expected_output_own_notes()
-            .into_iter()
-            .map(|note| (note.id(), note.assets().clone()))
-            .collect::<BTreeMap<_, _>>();
-
-        // Merge with own notes assets and delete duplicates
-        output_notes_assets.append(&mut own_notes_assets);
-
-        // Create a map of the fungible and non-fungible assets in the output notes
-        let outgoing_assets =
-            output_notes_assets.values().flat_map(|note_assets| note_assets.iter());
-
-        collect_assets(outgoing_assets)
-    }
-
-    /// Helper to get the account incoming assets.
-    async fn get_incoming_assets(
-        &self,
-        transaction_request: &TransactionRequest,
-    ) -> Result<(BTreeMap<AccountId, u64>, BTreeSet<NonFungibleAsset>), TransactionRequestError>
-    {
-        let all_incoming_assets =
-            transaction_request.input_notes().iter().flat_map(|note| note.assets().iter());
-
-        Ok(collect_assets(all_incoming_assets))
-    }
-
-    /// Ensures a transaction request is compatible with the current account state,
-    /// primarily by checking asset balances against the requested transfers.
-    async fn validate_basic_account_request(
-        &self,
-        transaction_request: &TransactionRequest,
-        account: &Account,
-    ) -> Result<(), ClientError> {
-        // Get outgoing assets
-        let (fungible_balance_map, non_fungible_set) =
-            Client::<AUTH>::get_outgoing_assets(transaction_request);
-
-        // Get incoming assets
-        let (incoming_fungible_balance_map, incoming_non_fungible_balance_set) =
-            self.get_incoming_assets(transaction_request).await?;
-
-        // Check if the account balance plus incoming assets is greater than or equal to the
-        // outgoing fungible assets
-        for (faucet_id, amount) in fungible_balance_map {
-            let account_asset_amount = account.vault().get_balance(faucet_id).unwrap_or(0);
-            let incoming_balance = incoming_fungible_balance_map.get(&faucet_id).unwrap_or(&0);
-            if account_asset_amount + incoming_balance < amount {
-                return Err(ClientError::AssetError(
-                    AssetError::FungibleAssetAmountNotSufficient {
-                        minuend: account_asset_amount,
-                        subtrahend: amount,
-                    },
-                ));
-            }
-        }
-
-        // Check if the account balance plus incoming assets is greater than or equal to the
-        // outgoing non fungible assets
-        for non_fungible in non_fungible_set {
-            match account.vault().has_non_fungible_asset(non_fungible) {
-                Ok(true) => (),
-                Ok(false) => {
-                    // Check if the non fungible asset is in the incoming assets
-                    if !incoming_non_fungible_balance_set.contains(&non_fungible) {
-                        return Err(ClientError::AssetError(
-                            AssetError::NonFungibleFaucetIdTypeMismatch(
-                                non_fungible.faucet_id_prefix(),
-                            ),
-                        ));
-                    }
-                },
-                _ => {
-                    return Err(ClientError::AssetError(
-                        AssetError::NonFungibleFaucetIdTypeMismatch(
-                            non_fungible.faucet_id_prefix(),
-                        ),
-                    ));
-                },
-            }
-        }
-
-        Ok(())
-    }
-
     /// Validates that the specified transaction request can be executed by the specified account.
     ///
     /// This does't guarantee that the transaction will succeed, but it's useful to avoid submitting
@@ -711,7 +608,7 @@ where
             // TODO(SantiagoPittella): Add faucet validations.
             Ok(())
         } else {
-            self.validate_basic_account_request(transaction_request, &account).await
+            validate_basic_account_request(transaction_request, &account)
         }
     }
 
@@ -850,26 +747,87 @@ where
 // HELPERS
 // ================================================================================================
 
-/// Accumulates fungible totals and collectable non-fungible assets from an iterator of assets.
-fn collect_assets<'a>(
-    assets: impl Iterator<Item = &'a Asset>,
+/// Helper to get the account outgoing assets.
+///
+/// Any outgoing assets resulting from executing note scripts but not present in expected output
+/// notes wouldn't be included.
+fn get_outgoing_assets(
+    transaction_request: &TransactionRequest,
 ) -> (BTreeMap<AccountId, u64>, BTreeSet<NonFungibleAsset>) {
-    let mut fungible_balance_map = BTreeMap::new();
-    let mut non_fungible_set = BTreeSet::new();
+    // Get own notes assets
+    let mut own_notes_assets = match transaction_request.script_template() {
+        Some(TransactionScriptTemplate::SendNotes(notes)) => notes
+            .iter()
+            .map(|note| (note.id(), note.assets().clone()))
+            .collect::<BTreeMap<_, _>>(),
+        _ => BTreeMap::default(),
+    };
+    // Get transaction output notes assets
+    let mut output_notes_assets = transaction_request
+        .expected_output_own_notes()
+        .into_iter()
+        .map(|note| (note.id(), note.assets().clone()))
+        .collect::<BTreeMap<_, _>>();
 
-    assets.for_each(|asset| match asset {
-        Asset::Fungible(fungible) => {
-            fungible_balance_map
-                .entry(fungible.faucet_id())
-                .and_modify(|balance| *balance += fungible.amount())
-                .or_insert(fungible.amount());
-        },
-        Asset::NonFungible(non_fungible) => {
-            non_fungible_set.insert(*non_fungible);
-        },
-    });
+    // Merge with own notes assets and delete duplicates
+    output_notes_assets.append(&mut own_notes_assets);
 
-    (fungible_balance_map, non_fungible_set)
+    // Create a map of the fungible and non-fungible assets in the output notes
+    let outgoing_assets = output_notes_assets.values().flat_map(|note_assets| note_assets.iter());
+
+    request::collect_assets(outgoing_assets)
+}
+
+/// Ensures a transaction request is compatible with the current account state,
+/// primarily by checking asset balances against the requested transfers.
+fn validate_basic_account_request(
+    transaction_request: &TransactionRequest,
+    account: &Account,
+) -> Result<(), ClientError> {
+    // Get outgoing assets
+    let (fungible_balance_map, non_fungible_set) = get_outgoing_assets(transaction_request);
+
+    // Get incoming assets
+    let (incoming_fungible_balance_map, incoming_non_fungible_balance_set) =
+        transaction_request.incoming_assets();
+
+    // Check if the account balance plus incoming assets is greater than or equal to the
+    // outgoing fungible assets
+    for (faucet_id, amount) in fungible_balance_map {
+        let account_asset_amount = account.vault().get_balance(faucet_id).unwrap_or(0);
+        let incoming_balance = incoming_fungible_balance_map.get(&faucet_id).unwrap_or(&0);
+        if account_asset_amount + incoming_balance < amount {
+            return Err(ClientError::AssetError(AssetError::FungibleAssetAmountNotSufficient {
+                minuend: account_asset_amount,
+                subtrahend: amount,
+            }));
+        }
+    }
+
+    // Check if the account balance plus incoming assets is greater than or equal to the
+    // outgoing non fungible assets
+    for non_fungible in non_fungible_set {
+        match account.vault().has_non_fungible_asset(non_fungible) {
+            Ok(true) => (),
+            Ok(false) => {
+                // Check if the non fungible asset is in the incoming assets
+                if !incoming_non_fungible_balance_set.contains(&non_fungible) {
+                    return Err(ClientError::AssetError(
+                        AssetError::NonFungibleFaucetIdTypeMismatch(
+                            non_fungible.faucet_id_prefix(),
+                        ),
+                    ));
+                }
+            },
+            _ => {
+                return Err(ClientError::AssetError(AssetError::NonFungibleFaucetIdTypeMismatch(
+                    non_fungible.faucet_id_prefix(),
+                )));
+            },
+        }
+    }
+
+    Ok(())
 }
 
 /// Extracts notes from [`OutputNotes`].
