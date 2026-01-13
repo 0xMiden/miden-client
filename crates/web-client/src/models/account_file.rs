@@ -2,6 +2,8 @@ use miden_client::account::AccountFile as NativeAccountFile;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys::Uint8Array;
 
+use crate::models::account::Account;
+use crate::models::account_id::AccountId;
 use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
 
 #[derive(Debug, Clone)]
@@ -10,6 +12,23 @@ pub struct AccountFile(NativeAccountFile);
 
 #[wasm_bindgen]
 impl AccountFile {
+    /// Returns the account ID.
+    #[wasm_bindgen(js_name = "accountId")]
+    pub fn account_id(&self) -> AccountId {
+        self.0.account.id().into()
+    }
+
+    /// Returns the account data.
+    pub fn account(&self) -> Account {
+        self.0.account.clone().into()
+    }
+
+    /// Returns the number of auth secret keys included.
+    #[wasm_bindgen(js_name = "authSecretKeyCount")]
+    pub fn auth_secret_key_count(&self) -> usize {
+        self.0.auth_secret_keys.len()
+    }
+
     /// Serializes the `AccountFile` into a byte array
     pub fn serialize(&self) -> Uint8Array {
         serialize_to_uint8array(&self.0)

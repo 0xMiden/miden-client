@@ -18,6 +18,9 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Cleanup large tools for build space
+        uses: ./.github/actions/cleanup-runner
+
       - name: Update Rust toolchain
         run: |
           rustup update --no-self-update
