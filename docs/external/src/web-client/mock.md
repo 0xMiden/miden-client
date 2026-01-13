@@ -37,9 +37,13 @@ try {
     .inputNoteRecord()
     .id()
     .toString();
-
+  const inputNoteRecord = await client.getInputNote(noteIdToConsume);
+  if (!inputNoteRecord) {
+    throw new Error(`Note with ID ${noteIdToConsume} not found`);
+  }
+  const noteToConsume = inputNoteRecord.toNote();
   const consumeRequest = mockWebClient.newConsumeTransactionRequest([
-    noteIdToConsume,
+    noteToConsume,
   ]);
 
   const consumeTransactionId = await mockWebClient.submitNewTransaction(
@@ -71,16 +75,16 @@ try {
   // Send a private note (example with placeholders)
   const note = /* create your note */;
   const recipientAddress = /* create recipient address */;
-  
+
   await mockWebClient.sendPrivateNote(note, recipientAddress);
 
   // Fetch private notes
   await mockWebClient.fetchPrivateNotes();
-  
+
   // Retrieve the fetched notes
   const filter = new NoteFilter(NoteFilterTypes.All);
   const notes = await mockWebClient.getInputNotes(filter);
-  
+
   console.log(`Fetched ${notes.length} private notes`);
 } catch (error) {
   console.error("Error:", error.message);

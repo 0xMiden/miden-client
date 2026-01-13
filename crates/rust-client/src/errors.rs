@@ -183,14 +183,6 @@ impl ClientError {
 impl From<&TransactionRequestError> for Option<ErrorHint> {
     fn from(err: &TransactionRequestError) -> Self {
         match err {
-            TransactionRequestError::MissingAuthenticatedInputNote(note_id) => {
-                Some(ErrorHint {
-                    message: format!(
-                        "Note {note_id} was listed via `TransactionRequestBuilder::authenticated_input_notes(...)`, but the store lacks an authenticated `InputNoteRecord`. Import or sync the note so its record and authentication data are available before executing the request."
-                    ),
-                    docs_url: Some(TROUBLESHOOTING_DOC),
-                })
-            },
             TransactionRequestError::NoInputNotesNorAccountChange => Some(ErrorHint {
                 message: "Transactions must consume input notes or mutate tracked account state. Add at least one authenticated/unauthenticated input note or include an explicit account state update in the request.".to_string(),
                 docs_url: Some(TROUBLESHOOTING_DOC),

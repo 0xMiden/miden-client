@@ -260,7 +260,7 @@ try {
     const webClient = await WebClient.createClient();
 
     const transactionRequest = webClient.newConsumeTransactionRequest(
-        [noteId1, noteId2]  // Array of note IDs to consume
+        [note1, note2]  // Array of notes to consume, can be retrieved from the client by their noteID
     );
 
     const result = await webClient.executeTransaction(

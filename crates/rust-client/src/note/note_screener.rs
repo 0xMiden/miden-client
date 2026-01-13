@@ -117,7 +117,7 @@ where
         note: &Note,
     ) -> Result<Option<NoteRelevance>, NoteScreenerError> {
         let transaction_request =
-            TransactionRequestBuilder::new().build_consume_notes(vec![note.id()])?;
+            TransactionRequestBuilder::new().build_consume_notes(vec![note.clone()])?;
 
         let tx_script = transaction_request
             .build_transaction_script(&AccountInterface::from_account(account))?;

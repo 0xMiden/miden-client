@@ -323,8 +323,14 @@ test.describe("createP2IDNote and createP2IDENote", () => {
           .id()
           .toString();
 
+        const inputNoteRecord = await client.getInputNote(createdNoteId);
+        if (!inputNoteRecord) {
+          throw new Error(`Note with ID ${createdNoteId} not found`);
+        }
+
+        const note = inputNoteRecord.toNote();
         let consumeTransactionRequest = client.newConsumeTransactionRequest([
-          createdNoteId,
+          note,
         ]);
 
         let consumeTransactionUpdate =
@@ -426,8 +432,14 @@ test.describe("createP2IDNote and createP2IDENote", () => {
           .id()
           .toString();
 
+        const inputNoteRecord = await client.getInputNote(createdNoteId);
+        if (!inputNoteRecord) {
+          throw new Error(`Note with ID ${createdNoteId} not found`);
+        }
+
+        const note = inputNoteRecord.toNote();
         let consumeTransactionRequest = client.newConsumeTransactionRequest([
-          createdNoteId,
+          note,
         ]);
 
         let consumeTransactionUpdate =

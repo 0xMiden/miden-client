@@ -123,7 +123,7 @@ pub async fn test_pass_through(client_config: ClientConfig) -> Result<()> {
 
     let tx_request = TransactionRequestBuilder::new()
         .expected_output_recipients(vec![pass_through_note_details_1.recipient().clone()])
-        .build_consume_notes(vec![pass_through_note_1.id()])
+        .build_consume_notes(vec![pass_through_note_1])
         .unwrap();
 
     let tx_id = client
@@ -154,7 +154,7 @@ pub async fn test_pass_through(client_config: ClientConfig) -> Result<()> {
     // now try another transaction against the pass-through account
     let tx_request = TransactionRequestBuilder::new()
         .expected_output_recipients(vec![pass_through_note_details_2.recipient().clone()])
-        .build_consume_notes(vec![pass_through_note_2.id()])
+        .build_consume_notes(vec![pass_through_note_2])
         .unwrap();
 
     let tx_id = client
