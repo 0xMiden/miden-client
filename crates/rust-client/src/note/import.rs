@@ -124,7 +124,7 @@ where
             imported_notes.extend(notes_by_proof);
         }
 
-        let mut imported_note_ids = vec![];
+        let mut imported_note_ids = Vec::with_capacity(imported_notes.len());
         for note in imported_notes.into_iter().flatten() {
             imported_note_ids.push(note.id());
             if let InputNoteState::Expected(ExpectedNoteState { tag: Some(tag), .. }) = note.state()
