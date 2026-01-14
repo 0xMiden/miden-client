@@ -77,6 +77,7 @@
 - [NoteAndArgsArray](classes/NoteAndArgsArray.md)
 - [NoteAssets](classes/NoteAssets.md)
 - [NoteConsumability](classes/NoteConsumability.md)
+- [NoteConsumptionStatus](classes/NoteConsumptionStatus.md)
 - [NoteDetails](classes/NoteDetails.md)
 - [NoteDetailsAndTag](classes/NoteDetailsAndTag.md)
 - [NoteDetailsAndTagArray](classes/NoteDetailsAndTagArray.md)
