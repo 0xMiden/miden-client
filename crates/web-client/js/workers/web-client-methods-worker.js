@@ -331,15 +331,23 @@ async function processMessage(event) {
   const { action, args, methodName, requestId } = event.data;
   try {
     if (action === WorkerAction.INIT) {
-      const [rpcUrl, noteTransportUrl, seed] = args;
-      // Initialize the WASM WebClient.
+      const [rpcUrl, noteTransportUrl, seed, storeName] = args;
       const wasm = await getWasmOrThrow();
       wasmWebClient = new wasm.WebClient();
-      await wasmWebClient.createClient(rpcUrl, noteTransportUrl, seed);
+      await wasmWebClient.createClient(rpcUrl, noteTransportUrl, seed, storeName);
 
       wasmSeed = seed;
       ready = true;
-      // Signal that the worker is fully initialized.
+      self.postMessage({ ready: true });
+      return;
+    } else if (action === WorkerAction.INIT_MOCK) {
+      const [seed] = args;
+      const wasm = await getWasmOrThrow();
+      wasmWebClient = new wasm.WebClient();
+      await wasmWebClient.createMockClient(seed);
+
+      wasmSeed = seed;
+      ready = true;
       self.postMessage({ ready: true });
       return;
     } else if (action === WorkerAction.CALL_METHOD) {

@@ -197,19 +197,7 @@ export class WebClient {
       });
 
       // Once the worker script has loaded, initialize the worker.
-      this.loaded.then(() => {
-        this.worker.postMessage({
-          action: WorkerAction.INIT,
-          args: [
-            this.rpcUrl,
-            this.noteTransportUrl,
-            this.seed,
-            this.getKeyCb,
-            this.insertKeyCb,
-            this.signCb,
-          ],
-        });
-      });
+      this.loaded.then(() => this.initializeWorker());
     } else {
       console.log("WebClient: Web Workers are not available.");
       // Worker not available; set up fallback values.
@@ -222,6 +210,13 @@ export class WebClient {
     // Lazy initialize the underlying WASM WebClient when first requested.
     this.wasmWebClient = null;
     this.wasmWebClientPromise = null;
+  }
+
+  initializeWorker() {
+    this.worker.postMessage({
+      action: WorkerAction.INIT,
+      args: [this.rpcUrl, this.noteTransportUrl, this.seed, this.storeName],
+    });
   }
 
   async getWasmWebClient() {
@@ -246,16 +241,16 @@ export class WebClient {
    * @param {string} rpcUrl - The RPC URL.
    * @param {string} noteTransportUrl - The note transport URL (optional).
    * @param {string} seed - The seed for the account.
-   * @param {string | undefined} storeName - Optional name for the store. Setting this allows multiple clients to be used in the same browser.
+   * @param {string | undefined} network - Optional name for the store. Setting this allows multiple clients to be used in the same browser.
    * @returns {Promise<WebClient>} The fully initialized WebClient.
    */
-  static async createClient(rpcUrl, noteTransportUrl, seed, storeName) {
+  static async createClient(rpcUrl, noteTransportUrl, seed, network) {
     // Construct the instance (synchronously).
-    const instance = new WebClient(rpcUrl, noteTransportUrl, seed, storeName);
+    const instance = new WebClient(rpcUrl, noteTransportUrl, seed, network);
 
     // Wait for the underlying wasmWebClient to be initialized.
     const wasmWebClient = await instance.getWasmWebClient();
-    await wasmWebClient.createClient(rpcUrl, noteTransportUrl, seed, storeName);
+    await wasmWebClient.createClient(rpcUrl, noteTransportUrl, seed, network);
 
     // Wait for the worker to be ready
     await instance.ready;
@@ -584,7 +579,14 @@ export class WebClient {
 
 export class MockWebClient extends WebClient {
   constructor(seed) {
-    super(null, null, seed);
+    super(null, null, seed, "mock");
+  }
+
+  initializeWorker() {
+    this.worker.postMessage({
+      action: WorkerAction.INIT_MOCK,
+      args: [this.seed],
+    });
   }
 
   /**

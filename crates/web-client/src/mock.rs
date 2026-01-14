@@ -40,7 +40,7 @@ impl WebClient {
 
         self.setup_client(
             mock_rpc_api.clone(),
-            "MidenClientDB_mlcl".to_string(), // TODO: fails if name is different, why?
+            "mock".to_owned(), // TODO: fails if name is different, why?
             Some(mock_note_transport_api.clone()),
             seed,
             None,

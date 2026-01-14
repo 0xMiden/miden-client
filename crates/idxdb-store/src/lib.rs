@@ -16,29 +16,15 @@ use base64::Engine;
 use base64::engine::general_purpose;
 use miden_client::Word;
 use miden_client::account::{
-    Account,
-    AccountCode,
-    AccountHeader,
-    AccountId,
-    AccountStorage,
-    Address,
+    Account, AccountCode, AccountHeader, AccountId, AccountStorage, Address,
 };
 use miden_client::asset::AssetVault;
 use miden_client::block::BlockHeader;
 use miden_client::crypto::{InOrderIndex, MmrPeaks};
 use miden_client::note::{BlockNumber, NoteScript, Nullifier};
 use miden_client::store::{
-    AccountRecord,
-    AccountStatus,
-    AccountStorageFilter,
-    BlockRelevance,
-    InputNoteRecord,
-    NoteFilter,
-    OutputNoteRecord,
-    PartialBlockchainFilter,
-    Store,
-    StoreError,
-    TransactionFilter,
+    AccountRecord, AccountStatus, AccountStorageFilter, BlockRelevance, InputNoteRecord,
+    NoteFilter, OutputNoteRecord, PartialBlockchainFilter, Store, StoreError, TransactionFilter,
 };
 use miden_client::sync::{NoteTagRecord, StateSyncUpdate};
 use miden_client::transaction::{TransactionRecord, TransactionStoreUpdate};
@@ -70,15 +56,59 @@ extern "C" {
 #[wasm_bindgen(module = "/src/js/schema.js")]
 extern "C" {
     #[wasm_bindgen(js_name = openDatabase)]
-    fn setup_indexed_db(client_version: &str, db_name: &str) -> js_sys::Promise;
+    fn setup_indexed_db(network: &str, client_version: &str) -> js_sys::Promise;
 }
 
-pub struct WebStore {}
+/// Identifier used to name the IndexedDB database instance.
+///
+/// This allows multiple isolated databases for different networks (mainnet, testnet, etc.)
+/// or custom named instances.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DatabaseId {
+    Mainnet,
+    Testnet,
+    Devnet,
+    Custom(String),
+}
+
+impl DatabaseId {
+    pub fn as_str(&self) -> &str {
+        match self {
+            DatabaseId::Mainnet => "Mainnet",
+            DatabaseId::Testnet => "Testnet",
+            DatabaseId::Devnet => "Devnet",
+            DatabaseId::Custom(name) => name,
+        }
+    }
+
+    pub fn from_string(network: String) -> Self {
+        match network.to_lowercase().as_str() {
+            "mainnet" => DatabaseId::Mainnet,
+            "testnet" => DatabaseId::Testnet,
+            "devnet" => DatabaseId::Devnet,
+            _ => DatabaseId::Custom(network),
+        }
+    }
+}
+
+impl core::fmt::Display for DatabaseId {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
+
+pub struct WebStore {
+    database_id: DatabaseId,
+}
 
 impl WebStore {
-    pub async fn new(db_name: &str) -> Result<WebStore, JsValue> {
-        JsFuture::from(setup_indexed_db(CLIENT_VERSION, db_name)).await?;
-        Ok(WebStore {})
+    pub async fn new(database_id: DatabaseId) -> Result<WebStore, JsValue> {
+        JsFuture::from(setup_indexed_db(database_id.as_str(), CLIENT_VERSION)).await?;
+        Ok(WebStore { database_id })
+    }
+
+    pub fn database_id(&self) -> &DatabaseId {
+        &self.database_id
     }
 }
 

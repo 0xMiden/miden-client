@@ -2,9 +2,14 @@ import Dexie from "dexie";
 import * as semver from "semver";
 import { logWebStoreError } from "./utils.js";
 export const CLIENT_VERSION_SETTING_KEY = "clientVersion";
+const DATABASE_NAME_PREFIX = "MidenClientDB";
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
-export async function openDatabase(clientVersion, dbName) {
+function getDatabaseName(network) {
+    return `${DATABASE_NAME_PREFIX}_${network}`;
+}
+export async function openDatabase(network, clientVersion) {
+    const dbName = getDatabaseName(network);
     console.log(`Opening database ${dbName} for client version ${clientVersion}...`);
     try {
         initializeDatabase(dbName);

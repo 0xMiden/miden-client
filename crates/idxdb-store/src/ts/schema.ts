@@ -3,16 +3,20 @@ import * as semver from "semver";
 import { logWebStoreError } from "./utils.js";
 
 export const CLIENT_VERSION_SETTING_KEY = "clientVersion";
+const DATABASE_NAME_PREFIX = "MidenClientDB";
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 
+function getDatabaseName(network: string): string {
+  return `${DATABASE_NAME_PREFIX}_${network}`;
+}
+
 export async function openDatabase(
-  clientVersion: string,
-  dbName: string
+  network: string,
+  clientVersion: string
 ): Promise<boolean> {
-  console.log(
-    `Opening database ${dbName} for client version ${clientVersion}...`
-  );
+  const dbName = getDatabaseName(network);
+  console.log(`Opening database ${dbName} for client version ${clientVersion}...`);
   try {
     initializeDatabase(dbName);
     await db.open();

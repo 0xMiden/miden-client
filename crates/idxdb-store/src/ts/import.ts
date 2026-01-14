@@ -61,7 +61,7 @@ export async function forceImportStore(
 ) {
   try {
     if (!db.isOpen || storeName !== db.name) {
-      await openDatabase(clientVersion, storeName);
+      await openDatabase(storeName, clientVersion);
     }
 
     let dbJson = JSON.parse(jsonStr);

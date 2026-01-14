@@ -7,7 +7,6 @@ test.describe("Store Isolation Tests", () => {
       const MIDEN_NODE_PORT = 57291;
       const rpcUrl = `http://localhost:${MIDEN_NODE_PORT}`;
 
-      // Create Client 1
       const client1 = await window.WebClient.createClient(
         rpcUrl,
         undefined,
@@ -18,7 +17,6 @@ test.describe("Store Isolation Tests", () => {
 
       await client1.newWallet(window.AccountStorageMode.private(), true, 0);
 
-      // Create Client 2
       const client2 = await window.WebClient.createClient(
         rpcUrl,
         undefined,
@@ -27,11 +25,9 @@ test.describe("Store Isolation Tests", () => {
       );
       await client2.syncState();
 
-      // Check IndexedDB databases
       const databases = await window.indexedDB.databases();
       const dbNames = databases.map((db) => db.name);
 
-      // Get accounts
       const accounts1 = await client1.getAccounts();
       const accounts2 = await client2.getAccounts();
 
@@ -45,7 +41,6 @@ test.describe("Store Isolation Tests", () => {
     expect(result.dbNames).toContain("MidenClientDB_Client1");
     expect(result.dbNames).toContain("MidenClientDB_Client2");
 
-    // TODO: fix this
     expect(result.accounts1Len).toBe(1);
     expect(result.accounts2Len).toBe(0);
   });
