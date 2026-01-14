@@ -353,6 +353,12 @@ impl<AUTH> Client<AUTH> {
             .ok_or(ClientError::AccountDataNotFound(account_id))
     }
 
+    /// Stores a list of public keys associated with the given account ID.
+    /// If the account already has known public keys, the new ones are appended.
+    /// This is useful because with a public key commitment, we can retrieve
+    /// its corresponding secret key using, for example, `FilesystemKeyStore::get_key`.
+    /// This yields an indirect mapping from account ID to its secret keys:
+    /// account ID → public keys → secret keys (via keystore).
     pub async fn map_account_to_public_keys(
         &self,
         account_id: &AccountId,
