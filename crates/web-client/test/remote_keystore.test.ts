@@ -19,8 +19,8 @@ test.describe("remote keystore", () => {
         window.rpcUrl!,
         undefined,
         undefined,
-        insertKeyCb,
         getKeyCb,
+        insertKeyCb,
         signCb
       );
       return client;
