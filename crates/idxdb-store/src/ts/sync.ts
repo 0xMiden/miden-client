@@ -3,6 +3,7 @@ import {
   JsVaultAsset,
   JsStorageSlot,
   JsStorageMapEntry,
+  IBlockHeader,
 } from "./schema.js";
 
 import {
@@ -337,7 +338,7 @@ async function updateBlockHeader(
     };
 
     const existingBlockHeader = await (
-      tx as Transaction & { blockHeaders: Dexie.Table }
+      tx as Transaction & { blockHeaders: Dexie.Table<IBlockHeader, string> }
     ).blockHeaders.get(blockNum);
 
     if (!existingBlockHeader) {
