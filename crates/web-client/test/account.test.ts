@@ -187,7 +187,7 @@ test.describe("account public commitments", () => {
   test("retrieve auth keys with pk commitments and verify signatures", async ({
     page,
   }) => {
-    const allSksRetrieved = await page.evaluate(async () => {
+    const commitmentsCount = await page.evaluate(async () => {
       const accountId = window.AccountId.fromHex(
         "0x69817bcc6fb9f99027c2245f6979c5"
       );
