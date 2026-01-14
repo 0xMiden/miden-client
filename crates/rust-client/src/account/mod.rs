@@ -38,28 +38,10 @@ use alloc::vec::Vec;
 
 use miden_protocol::account::auth::PublicKey;
 pub use miden_protocol::account::{
-    Account,
-    AccountBuilder,
-    AccountCode,
-    AccountComponent,
-    AccountComponentCode,
-    AccountDelta,
-    AccountFile,
-    AccountHeader,
-    AccountId,
-    AccountIdPrefix,
-    AccountStorage,
-    AccountStorageMode,
-    AccountType,
-    PartialAccount,
-    PartialStorage,
-    PartialStorageMap,
-    StorageMap,
-    StorageSlot,
-    StorageSlotContent,
-    StorageSlotId,
-    StorageSlotName,
-    StorageSlotType,
+    Account, AccountBuilder, AccountCode, AccountComponent, AccountComponentCode, AccountDelta,
+    AccountFile, AccountHeader, AccountId, AccountIdPrefix, AccountStorage, AccountStorageMode,
+    AccountType, PartialAccount, PartialStorage, PartialStorageMap, StorageMap, StorageSlot,
+    StorageSlotContent, StorageSlotId, StorageSlotName, StorageSlotType,
 };
 pub use miden_protocol::address::{Address, AddressInterface, AddressType, NetworkId};
 use miden_protocol::note::NoteTag;
@@ -83,26 +65,17 @@ pub mod component {
 
     pub use miden_protocol::account::auth::*;
     pub use miden_protocol::account::component::{
-        InitStorageData,
-        StorageSlotSchema,
-        StorageValueName,
+        InitStorageData, StorageSlotSchema, StorageValueName,
     };
     pub use miden_protocol::account::{AccountComponent, AccountComponentMetadata};
     pub use miden_standards::account::auth::*;
     pub use miden_standards::account::components::{
-        basic_fungible_faucet_library,
-        basic_wallet_library,
-        ecdsa_k256_keccak_library,
-        network_fungible_faucet_library,
-        no_auth_library,
-        rpo_falcon_512_acl_library,
-        rpo_falcon_512_library,
-        rpo_falcon_512_multisig_library,
+        basic_fungible_faucet_library, basic_wallet_library, ecdsa_k256_keccak_library,
+        network_fungible_faucet_library, no_auth_library, rpo_falcon_512_acl_library,
+        rpo_falcon_512_library, rpo_falcon_512_multisig_library,
     };
     pub use miden_standards::account::faucets::{
-        BasicFungibleFaucet,
-        FungibleFaucetExt,
-        NetworkFungibleFaucet,
+        BasicFungibleFaucet, FungibleFaucetExt, NetworkFungibleFaucet,
     };
     pub use miden_standards::account::wallets::BasicWallet;
 }
@@ -359,12 +332,14 @@ impl<AUTH> Client<AUTH> {
     /// its corresponding secret key using, for example, `FilesystemKeyStore::get_key`.
     /// This yields an indirect mapping from account ID to its secret keys:
     /// account ID → public keys → secret keys (via keystore).
+    /// To identify this keys and avoid collisions, the account id is turned
+    /// into its hex representation and a suffix is added.
     pub async fn map_account_to_public_keys(
         &self,
         account_id: &AccountId,
         pub_keys: &[PublicKey],
     ) -> Result<(), ClientError> {
-        let account_id = account_id.to_hex();
+        let account_id = format!("{}_public_key_map", account_id.to_hex());
         let pub_key_list = match self.store.get_setting(account_id.clone()).await? {
             Some(known_pub_keys) => {
                 let mut known_pub_keys: Vec<PublicKey> =
@@ -380,11 +355,15 @@ impl<AUTH> Client<AUTH> {
             .map_err(ClientError::StoreError)
     }
 
-    pub async fn public_keys_of_account(
+    /// Given an `AccountId`, this function will return the previously stored (if any)
+    /// public keys associated with this id. Once retrieved, this list of public keys
+    /// can be use in conjuntcion with `FilesystemKeyStore::get_key`, to retrieve secret keys.
+    pub async fn get_account_public_keys(
         &self,
         account_id: &AccountId,
     ) -> Result<Vec<PublicKey>, ClientError> {
-        let pks: Option<Vec<u8>> = self.store.get_setting(account_id.to_hex()).await?;
+        let account_id = format!("{}_public_key_map", account_id.to_hex());
+        let pks: Option<Vec<u8>> = self.store.get_setting(account_id).await?;
         match pks {
             Some(known_pks) => Deserializable::read_from_bytes(&known_pks)
                 .map_err(ClientError::DataDeserializationError),
