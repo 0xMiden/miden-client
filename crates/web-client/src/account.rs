@@ -81,7 +81,7 @@ impl WebClient {
                 js_error_with_context(
                     err,
                     &format!(
-                        "failed to fetch public key commitemnts for account: {}",
+                        "failed to fetch public key commitments for account: {}",
                         account_id.as_native()
                     ),
                 )
