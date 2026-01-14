@@ -93,8 +93,15 @@ const multipleMintsTest = async (
 
       // Consume the minted notes
       for (let i = 0; i < result.createdNoteIds.length; i++) {
+        let noteId = result.createdNoteIds[i];
+        const inputNoteRecord = await client.getInputNote(noteId);
+        if (!inputNoteRecord) {
+          throw new Error(`Note with ID ${noteId} not found`);
+        }
+
+        const note = inputNoteRecord.toNote();
         const consumeTransactionRequest = client.newConsumeTransactionRequest([
-          result.createdNoteIds[i],
+          note,
         ]);
         const consumeTransactionUpdate =
           await window.helpers.executeAndApplyTransaction(
@@ -356,7 +363,6 @@ export const customTransaction = async (
             use miden::core::sys
             use miden::core::mem
             use miden::standards::wallets::basic->basic_wallet
-
             begin
                 # push data from the advice map into the advice stack
                 adv.push_mapval
@@ -485,7 +491,7 @@ export const customTransaction = async (
       adviceMap.insert(noteArgsCommitment2, feltArray);
 
       let transactionRequest2 = new window.TransactionRequestBuilder()
-        .withUnauthenticatedInputNotes(noteAndArgsArray)
+        .withInputNotes(noteAndArgsArray)
         .withCustomScript(transactionScript)
         .extendAdviceMap(adviceMap)
         .build();
@@ -874,8 +880,19 @@ export const discardedTransaction = async (
       mintTransactionUpdate.executedTransaction().id().toHex()
     );
 
+    let notes: Note[] = [];
+    for (const _noteId of createdNoteIds) {
+      const inputNoteRecord = await client.getInputNote(_noteId);
+
+      if (!inputNoteRecord) {
+        throw new Error(`Note with ID ${_noteId} not found`);
+      }
+
+      const note = inputNoteRecord.toNote();
+      notes.push(note);
+    }
     const senderConsumeTransactionRequest =
-      client.newConsumeTransactionRequest(createdNoteIds);
+      client.newConsumeTransactionRequest(notes);
     let senderConsumeTransactionUpdate =
       await window.helpers.executeAndApplyTransaction(
         senderAccount.id(),
@@ -910,20 +927,34 @@ export const discardedTransaction = async (
       sendTransactionUpdate.executedTransaction().id().toHex()
     );
 
-    let noteIdAndArgs = new window.NoteIdAndArgs(
-      sendCreatedNotes[0].id(),
-      null
-    );
-    let noteIdAndArgsArray = new window.NoteIdAndArgsArray([noteIdAndArgs]);
+    const inputNoteRecord = await client.getInputNote(sendCreatedNoteIds[0]);
+    if (!inputNoteRecord) {
+      throw new Error(`Note with ID ${sendCreatedNoteIds[0]} not found`);
+    }
+
+    const note = inputNoteRecord.toNote();
+    let noteAndArgs = new window.NoteAndArgs(note, null);
+    let noteAndArgsArray = new window.NoteAndArgsArray([noteAndArgs]);
     const consumeTransactionRequest = new window.TransactionRequestBuilder()
-      .withAuthenticatedInputNotes(noteIdAndArgsArray)
+      .withInputNotes(noteAndArgsArray)
       .build();
 
     let preConsumeStore = await client.exportStore();
 
     // Sender retrieves the note
-    let senderTxRequest =
-      await client.newConsumeTransactionRequest(sendCreatedNoteIds);
+
+    notes = [];
+    for (const _noteId of sendCreatedNoteIds) {
+      const inputNoteRecord = await client.getInputNote(_noteId);
+
+      if (!inputNoteRecord) {
+        throw new Error(`Note with ID ${_noteId} not found`);
+      }
+
+      const note = inputNoteRecord.toNote();
+      notes.push(note);
+    }
+    let senderTxRequest = client.newConsumeTransactionRequest(notes);
     let senderTxResult = await window.helpers.executeAndApplyTransaction(
       senderAccount.id(),
       senderTxRequest

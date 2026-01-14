@@ -12,7 +12,7 @@ This guide demonstrates how to synchronize your local state with the Miden netwo
 To synchronize your local state with the network:
 
 ```typescript
-import { WebClient } from "@demox-labs/miden-sdk";
+import { WebClient } from "@miden-sdk/miden-sdk";
 
 try {
     // Initialize the web client

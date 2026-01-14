@@ -35,7 +35,7 @@ impl ImportCmd {
             let note_file = read_note_file(filename.clone());
 
             if let Ok(note_file) = note_file {
-                let note_id = client.import_note(note_file).await?;
+                let note_id = client.import_notes(&[note_file]).await?[0];
                 println!("Successfully imported note {}", note_id.to_hex());
             } else {
                 info!(

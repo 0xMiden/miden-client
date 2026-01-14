@@ -1,8 +1,8 @@
-[**@demox-labs/miden-sdk**](../README.md)
+[**@miden-sdk/miden-sdk**](../README.md)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / TransactionRequest
+[@miden-sdk/miden-sdk](../README.md) / TransactionRequest
 
 # Class: TransactionRequest
 

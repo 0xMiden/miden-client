@@ -1,8 +1,8 @@
-[**@demox-labs/miden-sdk**](../README.md)
+[**@miden-sdk/miden-sdk**](../README.md)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / AdviceInputs
+[@miden-sdk/miden-sdk](../README.md) / AdviceInputs
 
 # Class: AdviceInputs
 
