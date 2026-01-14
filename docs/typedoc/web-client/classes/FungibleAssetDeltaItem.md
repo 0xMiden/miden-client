@@ -1,8 +1,8 @@
-[**@demox-labs/miden-sdk**](../README.md)
+[**@miden-sdk/miden-sdk**](../README.md)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / FungibleAssetDeltaItem
+[@miden-sdk/miden-sdk](../README.md) / FungibleAssetDeltaItem
 
 # Class: FungibleAssetDeltaItem
 

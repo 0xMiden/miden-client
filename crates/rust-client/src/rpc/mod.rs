@@ -41,7 +41,7 @@
 //! [`NodeRpcClient`] trait.
 
 use alloc::boxed::Box;
-use alloc::collections::BTreeSet;
+use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::fmt;
@@ -233,17 +233,27 @@ pub trait NodeRpcClient: Send + Sync {
     ///
     /// The default implementation of this method uses
     /// [`NodeRpcClient::sync_nullifiers`].
-    async fn get_nullifier_commit_height(
+    async fn get_nullifier_commit_heights(
         &self,
-        nullifier: &Nullifier,
-        block_num: BlockNumber,
-    ) -> Result<Option<BlockNumber>, RpcError> {
-        let nullifiers = self.sync_nullifiers(&[nullifier.prefix()], block_num, None).await?;
+        requested_nullifiers: BTreeSet<Nullifier>,
+        block_from: BlockNumber,
+    ) -> Result<BTreeMap<Nullifier, Option<BlockNumber>>, RpcError> {
+        let prefixes: Vec<u16> =
+            requested_nullifiers.iter().map(crate::note::Nullifier::prefix).collect();
+        let retrieved_nullifiers = self.sync_nullifiers(&prefixes, block_from, None).await?;
 
-        Ok(nullifiers
-            .iter()
-            .find(|update| update.nullifier == *nullifier)
-            .map(|update| update.block_num))
+        let mut nullifiers_height = BTreeMap::new();
+        for nullifier in requested_nullifiers {
+            if let Some(update) =
+                retrieved_nullifiers.iter().find(|update| update.nullifier == nullifier)
+            {
+                nullifiers_height.insert(nullifier, Some(update.block_num));
+            } else {
+                nullifiers_height.insert(nullifier, None);
+            }
+        }
+
+        Ok(nullifiers_height)
     }
 
     /// Fetches public note-related data for a list of [`NoteId`] and builds [`InputNoteRecord`]s

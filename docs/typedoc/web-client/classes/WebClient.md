@@ -1,8 +1,8 @@
-[**@demox-labs/miden-sdk**](../README.md)
+[**@miden-sdk/miden-sdk**](../README.md)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / WebClient
+[@miden-sdk/miden-sdk](../README.md) / WebClient
 
 # Class: WebClient
 
@@ -409,7 +409,7 @@ Uses an internal pagination mechanism to avoid fetching duplicate notes.
 
 ### getOutputNote()
 
-> **getOutputNote**(`note_id`): `Promise`\<`any`\>
+> **getOutputNote**(`note_id`): `Promise`\<[`OutputNoteRecord`](OutputNoteRecord.md)\>
 
 #### Parameters
 
@@ -419,13 +419,13 @@ Uses an internal pagination mechanism to avoid fetching duplicate notes.
 
 #### Returns
 
-`Promise`\<`any`\>
+`Promise`\<[`OutputNoteRecord`](OutputNoteRecord.md)\>
 
 ***
 
 ### getOutputNotes()
 
-> **getOutputNotes**(`filter`): `Promise`\<`any`\>
+> **getOutputNotes**(`filter`): `Promise`\<[`OutputNoteRecord`](OutputNoteRecord.md)[]\>
 
 #### Parameters
 
@@ -435,7 +435,7 @@ Uses an internal pagination mechanism to avoid fetching duplicate notes.
 
 #### Returns
 
-`Promise`\<`any`\>
+`Promise`\<[`OutputNoteRecord`](OutputNoteRecord.md)[]\>
 
 ***
 
@@ -619,13 +619,13 @@ Returns all the existing setting keys from the store.
 
 ### newConsumeTransactionRequest()
 
-> **newConsumeTransactionRequest**(`list_of_note_ids`): [`TransactionRequest`](TransactionRequest.md)
+> **newConsumeTransactionRequest**(`list_of_notes`): [`TransactionRequest`](TransactionRequest.md)
 
 #### Parameters
 
-##### list\_of\_note\_ids
+##### list\_of\_notes
 
-`string`[]
+[`Note`](Note.md)[]
 
 #### Returns
 

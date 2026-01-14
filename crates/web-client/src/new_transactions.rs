@@ -1,5 +1,5 @@
 use miden_client::asset::FungibleAsset;
-use miden_client::note::{BlockNumber, NoteId as NativeNoteId};
+use miden_client::note::{BlockNumber, Note as NativeNote};
 use miden_client::transaction::{
     PaymentNoteDescription,
     ProvenTransaction as NativeProvenTransaction,
@@ -11,6 +11,7 @@ use wasm_bindgen::prelude::*;
 
 use crate::models::NoteType;
 use crate::models::account_id::AccountId;
+use crate::models::note::Note;
 use crate::models::proven_transaction::ProvenTransaction;
 use crate::models::provers::TransactionProver;
 use crate::models::transaction_id::TransactionId;
@@ -240,21 +241,19 @@ impl WebClient {
     #[wasm_bindgen(js_name = "newConsumeTransactionRequest")]
     pub fn new_consume_transaction_request(
         &mut self,
-        list_of_note_ids: Vec<String>,
+        list_of_notes: Vec<Note>,
     ) -> Result<TransactionRequest, JsValue> {
         let consume_transaction_request = {
-            let native_note_ids = list_of_note_ids
+            let native_notes = list_of_notes
                 .into_iter()
-                .map(|note_id| NativeNoteId::try_from_hex(note_id.as_str()))
+                .map(NativeNote::try_from)
                 .collect::<Result<Vec<_>, _>>()
                 .map_err(|err| {
-                    JsValue::from_str(&format!(
-                        "Failed to convert note id to native note id: {err}"
-                    ))
+                    JsValue::from_str(&format!("Failed to convert note to native note: {err}"))
                 })?;
 
             NativeTransactionRequestBuilder::new()
-                .build_consume_notes(native_note_ids)
+                .build_consume_notes(native_notes)
                 .map_err(|err| {
                     JsValue::from_str(&format!(
                         "Failed to create Consume Transaction Request: {err}"

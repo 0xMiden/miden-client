@@ -23,12 +23,15 @@
 * Incremented the limits for various RPC calls to accommodate larger data sets ([#1621](https://github.com/0xMiden/miden-client/pull/1621)).
 * [BREAKING] Introduced named storage slots, changed `FilesystemKeystore` to not be generic over RNG ([#1626](https://github.com/0xMiden/miden-client/pull/1626)).
 * Added `submit_new_transaction_with_prover` to the Rust client and `submitNewTransactionWithProver` to the WebClient([#1622](https://github.com/0xMiden/miden-client/pull/1622)).
+* Fixed MMR reconstruction code and fixed how block authentication paths are adjusted ([#1633](https://github.com/0xMiden/miden-client/pull/1633)).
+* Added WebClient bindings and RPC helpers for additional account, note, and validation workflows ([#1638](https://github.com/0xMiden/miden-client/pull/1638)).
 * [BREAKING] Modified JS binding for `AccountComponent::compile` which now takes an `AccountComponentCode` built with the newly added binding `CodeBuilder::compile_account_component_code` ([#1627](https://github.com/0xMiden/miden-client/pull/1627)).
 * [BREAKING] Refactored the `NoteScreener` API ([#1630](https://github.com/0xMiden/miden-client/pull/1630)).
+* [BREAKING] Replaced `TransactionRequestBuilder::unauthenticated_input_notes` & `TransactionRequestBuilder::authenticated_input_notes` for `TransactionRequestBuilder::input_notes`, now the user passes a list of notes which the `Client` itself determines the authentication status of ([#1624](https://github.com/0xMiden/miden-client/issues/1624)).
 
 ## 0.12.5 (2025-12-01)
 
-* Removed the top-level await from the web-client JS entry point by lazily loading the WASM module, allowing `@demox-labs/miden-sdk` to be imported normally (including in Next.js SSR builds), and updated the worker bootstrap to match.
+* Removed the top-level await from the web-client JS entry point by lazily loading the WASM module, allowing `@miden-sdk/miden-sdk` to be imported normally (including in Next.js SSR builds), and updated the worker bootstrap to match.
 * Changed the default note transport endpoint from `localhost` to `https://transport.miden.io` ([#1574](https://github.com/0xMiden/miden-client/pull/1574)).
 * Fixed a bug where insertions in the `Addresses` table in the IndexedDB Store resulted in the `id` and `address` fields being inverted with each other ([#1532](https://github.com/0xMiden/miden-client/pull/1532)).
 * Changed the note script pre-loading step to include all expected scripts based on specified recipients ([#1539](https://github.com/0xMiden/miden-client/pull/1539)).
