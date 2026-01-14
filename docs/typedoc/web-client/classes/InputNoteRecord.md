@@ -1,8 +1,8 @@
-[**@demox-labs/miden-sdk**](../README.md)
+[**@miden-sdk/miden-sdk**](../README.md)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / InputNoteRecord
+[@miden-sdk/miden-sdk](../README.md) / InputNoteRecord
 
 # Class: InputNoteRecord
 
@@ -181,3 +181,15 @@ Converts the record into an `InputNote` (including proof when available).
 #### Returns
 
 [`InputNote`](InputNote.md)
+
+***
+
+### toNote()
+
+> **toNote**(): [`Note`](Note.md)
+
+Converts the record into a `Note` (including proof when available).
+
+#### Returns
+
+[`Note`](Note.md)

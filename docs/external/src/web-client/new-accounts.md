@@ -12,7 +12,7 @@ This guide demonstrates how to create and work with different types of accounts 
 Here's how to create a new wallet account with various configuration options:
 
 ```typescript
-import { AccountStorageMode, WebClient } from "@demox-labs/miden-sdk";
+import { AccountStorageMode, WebClient } from "@miden-sdk/miden-sdk";
 
 try {
     // Initialize the web client
@@ -45,7 +45,7 @@ try {
 For creating a token faucet, use the following approach:
 
 ```typescript
-import { AccountStorageMode, WebClient } from "@demox-labs/miden-sdk";
+import { AccountStorageMode, WebClient } from "@miden-sdk/miden-sdk";
 
 try {
     // Initialize the web client

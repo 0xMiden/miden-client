@@ -60,8 +60,14 @@ const mockChainTest = async (testingPage: Page) => {
       .id()
       .toString();
 
+    const mintedNoteRecord = await client.getInputNote(mintedNoteId);
+    if (!mintedNoteRecord) {
+      throw new Error(`Note with ID ${mintedNoteId} not found`);
+    }
+
+    const mintedNote = mintedNoteRecord.toNote();
     const consumeTransactionRequest = client.newConsumeTransactionRequest([
-      mintedNoteId,
+      mintedNote,
     ]);
     await client.submitNewTransaction(account.id(), consumeTransactionRequest);
     await client.proveBlock();

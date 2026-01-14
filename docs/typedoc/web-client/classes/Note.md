@@ -1,8 +1,8 @@
-[**@demox-labs/miden-sdk**](../README.md)
+[**@miden-sdk/miden-sdk**](../README.md)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / Note
+[@miden-sdk/miden-sdk](../README.md) / Note
 
 # Class: Note
 
@@ -105,6 +105,18 @@ Returns the public metadata associated with the note.
 #### Returns
 
 [`NoteMetadata`](NoteMetadata.md)
+
+***
+
+### nullifier()
+
+> **nullifier**(): [`Word`](Word.md)
+
+Returns the note nullifier as a word.
+
+#### Returns
+
+[`Word`](Word.md)
 
 ***
 
