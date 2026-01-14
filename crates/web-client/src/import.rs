@@ -109,7 +109,7 @@ impl WebClient {
     ) -> Result<JsValue, JsValue> {
         let store = self.store.as_ref().ok_or(JsValue::from_str("Store not initialized"))?;
         store
-            .force_import_store(store_dump, store_name)
+            .force_import_store(store_dump)
             .await
             .map_err(|err| js_error_with_context(err, "failed to force import store"))?;
 

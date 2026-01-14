@@ -12,7 +12,12 @@ use miden_client::rpc::{Endpoint, GrpcClient, NodeRpcClient};
 use miden_client::testing::mock::MockRpcApi;
 use miden_client::testing::note_transport::MockNoteTransportApi;
 use miden_client::{
-    Client, ClientError, ErrorHint, ExecutionOptions, Felt, MAX_TX_EXECUTION_CYCLES,
+    Client,
+    ClientError,
+    ErrorHint,
+    ExecutionOptions,
+    Felt,
+    MAX_TX_EXECUTION_CYCLES,
     MIN_TX_EXECUTION_CYCLES,
 };
 use models::code_builder::CodeBuilder;
@@ -198,12 +203,13 @@ impl WebClient {
         let rng = RpoRandomCoin::new(coin_seed.map(Felt::new).into());
 
         let web_store = Arc::new(
-            WebStore::new(DatabaseId::from_string(store_name))
+            WebStore::new(DatabaseId::from_string(store_name.clone()))
                 .await
                 .map_err(|_| JsValue::from_str("Failed to initialize WebStore"))?,
         );
 
-        let keystore = WebKeyStore::new_with_callbacks(rng, get_key_cb, insert_key_cb, sign_cb);
+        let keystore =
+            WebKeyStore::new_with_callbacks(rng, store_name, get_key_cb, insert_key_cb, sign_cb);
 
         let mut client = Client::new(
             rpc_client,

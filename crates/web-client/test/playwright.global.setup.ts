@@ -9,8 +9,6 @@ const REMOTE_TX_PROVER_PORT = 50051;
 export const test = base.extend<{ forEachTest: void }>({
   forEachTest: [
     async ({ page }, use) => {
-      console.log("[SETUP] Starting test setup...");
-
       page.on("console", (msg) => {
         if (msg.type() === "debug") {
           console.log(`PAGE DEBUG: ${msg.text()}`);
@@ -25,21 +23,19 @@ export const test = base.extend<{ forEachTest: void }>({
         console.error("PUPPETEER ERROR:", err);
       });
 
-      console.log("[SETUP] Navigating to http://localhost:8080...");
       await page.goto("http://localhost:8080");
-      console.log("[SETUP] Navigation complete. Starting page.evaluate...");
 
       await page.evaluate(
         async ({ MIDEN_NODE_PORT, remoteProverPort }) => {
-          console.log("[SETUP-PAGE] Inside page.evaluate, starting SDK import...");
+          console.log(
+            "[SETUP-PAGE] Inside page.evaluate, starting SDK import..."
+          );
           // Import the sdk classes and attach them
           // to the window object for testing
           const sdkExports = await import("./index.js");
-          console.log("[SETUP-PAGE] SDK imported, attaching exports to window...");
           for (const [key, value] of Object.entries(sdkExports)) {
             window[key] = value;
           }
-          console.log("[SETUP-PAGE] Exports attached. Keys:", Object.keys(sdkExports).join(", "));
 
           let rpcUrl = `http://localhost:${MIDEN_NODE_PORT}`;
           let proverUrl = remoteProverPort
@@ -52,27 +48,21 @@ export const test = base.extend<{ forEachTest: void }>({
             undefined,
             "tests"
           );
-          console.log("[SETUP-PAGE] WebClient created successfully");
           window.rpcUrl = rpcUrl;
 
           window.client = client;
-          console.log("[SETUP-PAGE] Client assigned to window.client");
 
           // Create a namespace for helper functions
           window.helpers = window.helpers || {};
-          console.log("[SETUP-PAGE] Helpers namespace created");
 
           // Add the remote prover url to window
           window.remoteProverUrl = proverUrl;
-          console.log("[SETUP-PAGE] Remote prover URL:", proverUrl || "not set");
           if (window.remoteProverUrl) {
-            console.log("[SETUP-PAGE] Creating remote prover instance...");
             window.remoteProverInstance =
               window.TransactionProver.newRemoteProver(
                 window.remoteProverUrl,
                 BigInt(10_000)
               );
-            console.log("[SETUP-PAGE] Remote prover instance created");
           }
 
           window.helpers.waitForTransaction = async (
@@ -176,9 +166,6 @@ export const test = base.extend<{ forEachTest: void }>({
             }
             return parsedNetworkId;
           };
-
-          console.log("[SETUP-PAGE] All helper functions defined");
-          console.log("[SETUP-PAGE] Setup complete!");
         },
         {
           MIDEN_NODE_PORT,
@@ -187,10 +174,7 @@ export const test = base.extend<{ forEachTest: void }>({
             : null,
         }
       );
-      console.log("[SETUP] page.evaluate completed successfully");
-      console.log("[SETUP] Calling use() to run the test...");
       await use();
-      console.log("[SETUP] Test completed, cleanup starting...");
     },
     { auto: true },
   ],

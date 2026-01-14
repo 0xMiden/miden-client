@@ -16,15 +16,29 @@ use base64::Engine;
 use base64::engine::general_purpose;
 use miden_client::Word;
 use miden_client::account::{
-    Account, AccountCode, AccountHeader, AccountId, AccountStorage, Address,
+    Account,
+    AccountCode,
+    AccountHeader,
+    AccountId,
+    AccountStorage,
+    Address,
 };
 use miden_client::asset::AssetVault;
 use miden_client::block::BlockHeader;
 use miden_client::crypto::{InOrderIndex, MmrPeaks};
 use miden_client::note::{BlockNumber, NoteScript, Nullifier};
 use miden_client::store::{
-    AccountRecord, AccountStatus, AccountStorageFilter, BlockRelevance, InputNoteRecord,
-    NoteFilter, OutputNoteRecord, PartialBlockchainFilter, Store, StoreError, TransactionFilter,
+    AccountRecord,
+    AccountStatus,
+    AccountStorageFilter,
+    BlockRelevance,
+    InputNoteRecord,
+    NoteFilter,
+    OutputNoteRecord,
+    PartialBlockchainFilter,
+    Store,
+    StoreError,
+    TransactionFilter,
 };
 use miden_client::sync::{NoteTagRecord, StateSyncUpdate};
 use miden_client::transaction::{TransactionRecord, TransactionStoreUpdate};
@@ -55,6 +69,8 @@ extern "C" {
 // Initialize IndexedDB
 #[wasm_bindgen(module = "/src/js/schema.js")]
 extern "C" {
+    /// Opens the database and registers it in the JS registry.
+    /// Returns the database ID (network name) which can be used to look up the database.
     #[wasm_bindgen(js_name = openDatabase)]
     fn setup_indexed_db(network: &str, client_version: &str) -> js_sys::Promise;
 }
@@ -97,18 +113,29 @@ impl core::fmt::Display for DatabaseId {
     }
 }
 
+/// WebStore provides an IndexedDB-backed implementation of the Store trait.
+///
+/// The database reference is stored in a JavaScript registry and looked up by
+/// database_id when needed. This avoids storing JsValue references in Rust
+/// which would prevent the struct from being Send + Sync.
 pub struct WebStore {
     database_id: DatabaseId,
 }
 
 impl WebStore {
     pub async fn new(database_id: DatabaseId) -> Result<WebStore, JsValue> {
-        JsFuture::from(setup_indexed_db(database_id.as_str(), CLIENT_VERSION)).await?;
+        let promise = setup_indexed_db(database_id.as_str(), CLIENT_VERSION);
+        let _db_id = JsFuture::from(promise).await?;
         Ok(WebStore { database_id })
     }
 
     pub fn database_id(&self) -> &DatabaseId {
         &self.database_id
+    }
+
+    /// Returns the database ID as a string slice for passing to JS functions.
+    pub(crate) fn db_id(&self) -> &str {
+        self.database_id.as_str()
     }
 }
 

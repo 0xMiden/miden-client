@@ -292,7 +292,7 @@ export class WebClient {
     rpcUrl,
     noteTransportUrl,
     seed,
-    store_name,
+    storeName,
     getKeyCb,
     insertKeyCb,
     signCb
@@ -302,7 +302,7 @@ export class WebClient {
       rpcUrl,
       noteTransportUrl,
       seed,
-      store_name,
+      storeName,
       getKeyCb,
       insertKeyCb,
       signCb
@@ -313,7 +313,7 @@ export class WebClient {
       rpcUrl,
       noteTransportUrl,
       seed,
-      store_name,
+      storeName,
       getKeyCb,
       insertKeyCb,
       signCb

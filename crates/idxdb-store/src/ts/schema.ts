@@ -7,26 +7,37 @@ const DATABASE_NAME_PREFIX = "MidenClientDB";
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 
-function getDatabaseName(network: string): string {
-  return `${DATABASE_NAME_PREFIX}_${network}`;
+// Since we can't have a pointer to a JS Object from rust, we'll
+// use this instead to keep track of open DBs. A client can have
+// a DB for mainnet, devnet, testnet or a custom one, so this should be ok.
+const databaseRegistry = new Map<string, MidenDatabase>();
+
+/**
+ * Get a database instance from the registry by its ID.
+ * Throws if the database hasn't been opened yet.
+ */
+export function getDatabase(dbId: string): MidenDatabase {
+  const db = databaseRegistry.get(dbId);
+  if (!db) {
+    throw new Error(
+      `Database not found for id: ${dbId}. Call openDatabase first.`
+    );
+  }
+  return db;
 }
 
+/**
+ * Opens a database for the given network and registers it in the registry.
+ * Returns the database ID (network name) which can be used to retrieve the database later.
+ */
 export async function openDatabase(
   network: string,
   clientVersion: string
-): Promise<boolean> {
-  const dbName = getDatabaseName(network);
-  console.log(`Opening database ${dbName} for client version ${clientVersion}...`);
-  try {
-    initializeDatabase(dbName);
-    await db.open();
-    await ensureClientVersion(clientVersion);
-    console.log("Database opened successfully");
-    return true;
-  } catch (err) {
-    logWebStoreError(err, "Failed to open database");
-    return false;
-  }
+): Promise<string> {
+  const db = new MidenDatabase(network);
+  await db.open(clientVersion);
+  databaseRegistry.set(network, db);
+  return network;
 }
 
 enum Table {
@@ -178,7 +189,31 @@ export interface ITrackedAccount {
   id: string;
 }
 
-let db: Dexie & {
+export interface JsVaultAsset {
+  root: string;
+  vaultKey: string;
+  faucetIdPrefix: string;
+  asset: string;
+}
+
+export interface JsStorageSlot {
+  commitment: string;
+  slotName: string;
+  slotValue: string;
+  slotType: number;
+}
+
+export interface JsStorageMapEntry {
+  root: string;
+  key: string;
+  value: string;
+}
+
+function indexes(...items: string[]): string {
+  return items.join(",");
+}
+
+export type MidenDexie = Dexie & {
   accountCodes: Dexie.Table<IAccountCode, string>;
   accountStorages: Dexie.Table<IAccountStorage, string>;
   accountAssets: Dexie.Table<IAccountAsset, string>;
@@ -200,208 +235,190 @@ let db: Dexie & {
   trackedAccounts: Dexie.Table<ITrackedAccount, string>;
 };
 
-let accountCodes: Dexie.Table<IAccountCode, string>;
-let accountStorages: Dexie.Table<IAccountStorage, string>;
-let storageMapEntries: Dexie.Table<IStorageMapEntry, string>;
-let accountAssets: Dexie.Table<IAccountAsset, string>;
-let accountAuths: Dexie.Table<IAccountAuth, string>;
-let accounts: Dexie.Table<IAccount, string>;
-let addresses: Dexie.Table<IAddress, string>;
-let transactions: Dexie.Table<ITransaction, string>;
-let transactionScripts: Dexie.Table<ITransactionScript, string>;
-let inputNotes: Dexie.Table<IInputNote, string>;
-let outputNotes: Dexie.Table<IOutputNote, string>;
-let notesScripts: Dexie.Table<INotesScript, string>;
-let stateSync: Dexie.Table<IStateSync, number>;
-let blockHeaders: Dexie.Table<IBlockHeader, string>;
-let partialBlockchainNodes: Dexie.Table<IPartialBlockchainNode, string>;
-let tags: Dexie.Table<ITag, number>;
-let foreignAccountCode: Dexie.Table<IForeignAccountCode, string>;
-let settings: Dexie.Table<ISetting, string>;
-let trackedAccounts: Dexie.Table<ITrackedAccount, string>;
+export class MidenDatabase {
+  db: MidenDexie;
+  accountCodes: Dexie.Table<IAccountCode, string>;
+  accountStorages: Dexie.Table<IAccountStorage, string>;
+  storageMapEntries: Dexie.Table<IStorageMapEntry, string>;
+  accountAssets: Dexie.Table<IAccountAsset, string>;
+  accountAuths: Dexie.Table<IAccountAuth, string>;
+  accounts: Dexie.Table<IAccount, string>;
+  addresses: Dexie.Table<IAddress, string>;
+  transactions: Dexie.Table<ITransaction, string>;
+  transactionScripts: Dexie.Table<ITransactionScript, string>;
+  inputNotes: Dexie.Table<IInputNote, string>;
+  outputNotes: Dexie.Table<IOutputNote, string>;
+  notesScripts: Dexie.Table<INotesScript, string>;
+  stateSync: Dexie.Table<IStateSync, number>;
+  blockHeaders: Dexie.Table<IBlockHeader, string>;
+  partialBlockchainNodes: Dexie.Table<IPartialBlockchainNode, string>;
+  tags: Dexie.Table<ITag, number>;
+  foreignAccountCode: Dexie.Table<IForeignAccountCode, string>;
+  settings: Dexie.Table<ISetting, string>;
+  trackedAccounts: Dexie.Table<ITrackedAccount, string>;
 
-function indexes(...items: string[]): string {
-  return items.join(",");
-}
+  constructor(network: string) {
+    const dbName = `${DATABASE_NAME_PREFIX}_${network}`;
+    this.db = new Dexie(dbName) as MidenDexie;
 
-function initializeDatabase(dbName: string): void {
-  if (db && db.name === dbName) {
-    return;
-  }
-  if (db) {
-    db.close();
-  }
-  db = new Dexie(dbName) as Dexie & {
-    accountCodes: Dexie.Table<IAccountCode, string>;
-    accountStorages: Dexie.Table<IAccountStorage, string>;
-    accountAssets: Dexie.Table<IAccountAsset, string>;
-    storageMapEntries: Dexie.Table<IStorageMapEntry, string>;
-    accountAuths: Dexie.Table<IAccountAuth, string>;
-    accounts: Dexie.Table<IAccount, string>;
-    addresses: Dexie.Table<IAddress, string>;
-    transactions: Dexie.Table<ITransaction, string>;
-    transactionScripts: Dexie.Table<ITransactionScript, string>;
-    inputNotes: Dexie.Table<IInputNote, string>;
-    outputNotes: Dexie.Table<IOutputNote, string>;
-    notesScripts: Dexie.Table<INotesScript, string>;
-    stateSync: Dexie.Table<IStateSync, number>;
-    blockHeaders: Dexie.Table<IBlockHeader, string>;
-    partialBlockchainNodes: Dexie.Table<IPartialBlockchainNode, string>;
-    tags: Dexie.Table<ITag, number>;
-    foreignAccountCode: Dexie.Table<IForeignAccountCode, string>;
-    settings: Dexie.Table<ISetting, string>;
-    trackedAccounts: Dexie.Table<ITrackedAccount, string>;
-  };
+    this.db.version(1).stores({
+      [Table.AccountCode]: indexes("root"),
+      [Table.AccountStorage]: indexes("[commitment+slotName]", "commitment"),
+      [Table.StorageMapEntries]: indexes("[root+key]", "root"),
+      [Table.AccountAssets]: indexes(
+        "[root+vaultKey]",
+        "root",
+        "faucetIdPrefix"
+      ),
+      [Table.AccountAuth]: indexes("pubKey"),
+      [Table.Accounts]: indexes(
+        "&accountCommitment",
+        "id",
+        "[id+nonce]",
+        "codeRoot",
+        "storageRoot",
+        "vaultRoot"
+      ),
+      [Table.Addresses]: indexes("address", "id"),
+      [Table.Transactions]: indexes("id", "statusVariant"),
+      [Table.TransactionScripts]: indexes("scriptRoot"),
+      [Table.InputNotes]: indexes("noteId", "nullifier", "stateDiscriminant"),
+      [Table.OutputNotes]: indexes(
+        "noteId",
+        "recipientDigest",
+        "stateDiscriminant",
+        "nullifier"
+      ),
+      [Table.NotesScripts]: indexes("scriptRoot"),
+      [Table.StateSync]: indexes("id"),
+      [Table.BlockHeaders]: indexes("blockNum", "hasClientNotes"),
+      [Table.PartialBlockchainNodes]: indexes("id"),
+      [Table.Tags]: indexes(
+        "id++",
+        "tag",
+        "source_note_id",
+        "source_account_id"
+      ),
+      [Table.ForeignAccountCode]: indexes("accountId"),
+      [Table.Settings]: indexes("key"),
+      [Table.TrackedAccounts]: indexes("&id"),
+    });
 
-  db.version(1).stores({
-    [Table.AccountCode]: indexes("root"),
-    [Table.AccountStorage]: indexes("[commitment+slotName]", "commitment"),
-    [Table.StorageMapEntries]: indexes("[root+key]", "root"),
-    [Table.AccountAssets]: indexes("[root+vaultKey]", "root", "faucetIdPrefix"),
-    [Table.AccountAuth]: indexes("pubKey"),
-    [Table.Accounts]: indexes(
-      "&accountCommitment",
-      "id",
-      "[id+nonce]",
-      "codeRoot",
-      "storageRoot",
-      "vaultRoot"
-    ),
-    [Table.Addresses]: indexes("address", "id"),
-    [Table.Transactions]: indexes("id", "statusVariant"),
-    [Table.TransactionScripts]: indexes("scriptRoot"),
-    [Table.InputNotes]: indexes("noteId", "nullifier", "stateDiscriminant"),
-    [Table.OutputNotes]: indexes(
-      "noteId",
-      "recipientDigest",
-      "stateDiscriminant",
-      "nullifier"
-    ),
-    [Table.NotesScripts]: indexes("scriptRoot"),
-    [Table.StateSync]: indexes("id"),
-    [Table.BlockHeaders]: indexes("blockNum", "hasClientNotes"),
-    [Table.PartialBlockchainNodes]: indexes("id"),
-    [Table.Tags]: indexes("id++", "tag", "source_note_id", "source_account_id"),
-    [Table.ForeignAccountCode]: indexes("accountId"),
-    [Table.Settings]: indexes("key"),
-    [Table.TrackedAccounts]: indexes("&id"),
-  });
-
-  accountCodes = db.table<IAccountCode, string>(Table.AccountCode);
-  accountStorages = db.table<IAccountStorage, string>(Table.AccountStorage);
-  storageMapEntries = db.table<IStorageMapEntry, string>(
-    Table.StorageMapEntries
-  );
-  accountAssets = db.table<IAccountAsset, string>(Table.AccountAssets);
-  accountAuths = db.table<IAccountAuth, string>(Table.AccountAuth);
-  accounts = db.table<IAccount, string>(Table.Accounts);
-  addresses = db.table<IAddress, string>(Table.Addresses);
-  transactions = db.table<ITransaction, string>(Table.Transactions);
-  transactionScripts = db.table<ITransactionScript, string>(
-    Table.TransactionScripts
-  );
-  inputNotes = db.table<IInputNote, string>(Table.InputNotes);
-  outputNotes = db.table<IOutputNote, string>(Table.OutputNotes);
-  notesScripts = db.table<INotesScript, string>(Table.NotesScripts);
-  stateSync = db.table<IStateSync, number>(Table.StateSync);
-  blockHeaders = db.table<IBlockHeader, string>(Table.BlockHeaders);
-  partialBlockchainNodes = db.table<IPartialBlockchainNode, string>(
-    Table.PartialBlockchainNodes
-  );
-  tags = db.table<ITag, number>(Table.Tags);
-  foreignAccountCode = db.table<IForeignAccountCode, string>(
-    Table.ForeignAccountCode
-  );
-  settings = db.table<ISetting, string>(Table.Settings);
-  trackedAccounts = db.table<ITrackedAccount, string>(Table.TrackedAccounts);
-
-  db.on("populate", () => {
-    // Populate the stateSync table with default values
-    stateSync
-      .put({ id: 1, blockNum: "0" } as IStateSync)
-      .catch((err: unknown) => logWebStoreError(err, "Failed to populate DB"));
-  });
-}
-
-async function ensureClientVersion(clientVersion: string): Promise<void> {
-  if (!clientVersion) {
-    console.warn(
-      "openDatabase called without a client version; skipping version enforcement."
+    this.accountCodes = this.db.table<IAccountCode, string>(Table.AccountCode);
+    this.accountStorages = this.db.table<IAccountStorage, string>(
+      Table.AccountStorage
     );
-    return;
+    this.storageMapEntries = this.db.table<IStorageMapEntry, string>(
+      Table.StorageMapEntries
+    );
+    this.accountAssets = this.db.table<IAccountAsset, string>(
+      Table.AccountAssets
+    );
+    this.accountAuths = this.db.table<IAccountAuth, string>(Table.AccountAuth);
+    this.accounts = this.db.table<IAccount, string>(Table.Accounts);
+    this.addresses = this.db.table<IAddress, string>(Table.Addresses);
+    this.transactions = this.db.table<ITransaction, string>(Table.Transactions);
+    this.transactionScripts = this.db.table<ITransactionScript, string>(
+      Table.TransactionScripts
+    );
+    this.inputNotes = this.db.table<IInputNote, string>(Table.InputNotes);
+    this.outputNotes = this.db.table<IOutputNote, string>(Table.OutputNotes);
+    this.notesScripts = this.db.table<INotesScript, string>(Table.NotesScripts);
+    this.stateSync = this.db.table<IStateSync, number>(Table.StateSync);
+    this.blockHeaders = this.db.table<IBlockHeader, string>(Table.BlockHeaders);
+    this.partialBlockchainNodes = this.db.table<IPartialBlockchainNode, string>(
+      Table.PartialBlockchainNodes
+    );
+    this.tags = this.db.table<ITag, number>(Table.Tags);
+    this.foreignAccountCode = this.db.table<IForeignAccountCode, string>(
+      Table.ForeignAccountCode
+    );
+    this.settings = this.db.table<ISetting, string>(Table.Settings);
+    this.trackedAccounts = this.db.table<ITrackedAccount, string>(
+      Table.TrackedAccounts
+    );
+
+    this.db.on("populate", () => {
+      this.stateSync
+        .put({ id: 1, blockNum: "0" } as IStateSync)
+        .catch((err: unknown) =>
+          logWebStoreError(err, "Failed to populate DB")
+        );
+    });
   }
 
-  const storedVersion = await getStoredClientVersion();
-  if (!storedVersion) {
-    await persistClientVersion(clientVersion);
-    return;
+  async open(clientVersion: string): Promise<boolean> {
+    console.log(
+      `Opening database ${this.db.name} for client version ${clientVersion}...`
+    );
+    try {
+      await this.db.open();
+      await this.ensureClientVersion(clientVersion);
+      console.log("Database opened successfully");
+      return true;
+    } catch (err) {
+      logWebStoreError(err, "Failed to open database");
+      return false;
+    }
   }
 
-  if (storedVersion === clientVersion) {
-    return;
-  }
-
-  const validCurrent = semver.valid(clientVersion);
-  const validStored = semver.valid(storedVersion);
-  if (validCurrent && validStored) {
-    const parsedCurrent = semver.parse(validCurrent);
-    const parsedStored = semver.parse(validStored);
-    const sameMajorMinor =
-      parsedCurrent?.major === parsedStored?.major &&
-      parsedCurrent?.minor === parsedStored?.minor;
-    if (sameMajorMinor || !semver.gt(clientVersion, storedVersion)) {
-      await persistClientVersion(clientVersion);
+  private async ensureClientVersion(clientVersion: string): Promise<void> {
+    if (!clientVersion) {
+      console.warn(
+        "openDatabase called without a client version; skipping version enforcement."
+      );
       return;
     }
-  } else {
+
+    const storedVersion = await this.getStoredClientVersion();
+    if (!storedVersion) {
+      await this.persistClientVersion(clientVersion);
+      return;
+    }
+
+    if (storedVersion === clientVersion) {
+      return;
+    }
+
+    const validCurrent = semver.valid(clientVersion);
+    const validStored = semver.valid(storedVersion);
+    if (validCurrent && validStored) {
+      const parsedCurrent = semver.parse(validCurrent);
+      const parsedStored = semver.parse(validStored);
+      const sameMajorMinor =
+        parsedCurrent?.major === parsedStored?.major &&
+        parsedCurrent?.minor === parsedStored?.minor;
+      if (sameMajorMinor || !semver.gt(clientVersion, storedVersion)) {
+        await this.persistClientVersion(clientVersion);
+        return;
+      }
+    } else {
+      console.warn(
+        `Failed to parse semver (${storedVersion} vs ${clientVersion}), forcing store reset.`
+      );
+    }
+
     console.warn(
-      `Failed to parse semver (${storedVersion} vs ${clientVersion}), forcing store reset.`
+      `IndexedDB client version mismatch (stored=${storedVersion}, expected=${clientVersion}). Resetting store.`
     );
+    this.db.close();
+    await this.db.delete();
+    await this.db.open();
+    await this.persistClientVersion(clientVersion);
   }
 
-  console.warn(
-    `IndexedDB client version mismatch (stored=${storedVersion}, expected=${clientVersion}). Resetting store.`
-  );
-  db.close();
-  await db.delete();
-  await db.open();
-  await persistClientVersion(clientVersion);
-}
-
-async function getStoredClientVersion(): Promise<string | null> {
-  const record = await settings.get(CLIENT_VERSION_SETTING_KEY);
-  if (!record) {
-    return null;
+  private async getStoredClientVersion(): Promise<string | null> {
+    const record = await this.settings.get(CLIENT_VERSION_SETTING_KEY);
+    if (!record) {
+      return null;
+    }
+    return textDecoder.decode(record.value);
   }
-  return textDecoder.decode(record.value);
-}
 
-async function persistClientVersion(clientVersion: string): Promise<void> {
-  await settings.put({
-    key: CLIENT_VERSION_SETTING_KEY,
-    value: textEncoder.encode(clientVersion),
-  });
+  private async persistClientVersion(clientVersion: string): Promise<void> {
+    await this.settings.put({
+      key: CLIENT_VERSION_SETTING_KEY,
+      value: textEncoder.encode(clientVersion),
+    });
+  }
 }
-
-export {
-  db,
-  accountCodes,
-  accountStorages,
-  storageMapEntries,
-  accountAssets,
-  accountAuths,
-  accounts,
-  addresses,
-  transactions,
-  transactionScripts,
-  inputNotes,
-  outputNotes,
-  notesScripts,
-  stateSync,
-  blockHeaders,
-  partialBlockchainNodes,
-  tags,
-  foreignAccountCode,
-  settings,
-  trackedAccounts,
-};

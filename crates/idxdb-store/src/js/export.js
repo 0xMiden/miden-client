@@ -2,7 +2,7 @@
 /* eslint-disable  @typescript-eslint/no-explicit-any */
 /* eslint-disable  @typescript-eslint/no-unsafe-return */
 /* eslint-disable  @typescript-eslint/no-unsafe-assignment */
-import { db } from "./schema.js";
+import { getDatabase } from "./schema.js";
 import { uint8ArrayToBase64 } from "./utils.js";
 async function recursivelyTransformForExport(obj) {
     switch (obj.type) {
@@ -41,9 +41,10 @@ function getInputType(value) {
 export async function transformForExport(obj) {
     return recursivelyTransformForExport({ type: getInputType(obj), value: obj });
 }
-export async function exportStore() {
+export async function exportStore(dbId) {
+    const db = getDatabase(dbId);
     const dbJson = {};
-    for (const table of db.tables) {
+    for (const table of db.db.tables) {
         const records = await table.toArray();
         dbJson[table.name] = await Promise.all(records.map(transformForExport));
     }

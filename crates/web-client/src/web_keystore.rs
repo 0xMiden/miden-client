@@ -1,4 +1,4 @@
-use alloc::string::ToString;
+use alloc::string::{String, ToString};
 use alloc::sync::Arc;
 
 use idxdb_store::auth::{get_account_auth_by_pub_key, insert_account_auth};
@@ -31,6 +31,8 @@ pub struct WebKeyStore<R: Rng> {
     /// The random number generator used to generate signatures.
     rng: Arc<RwLock<R>>,
     callbacks: Arc<JsCallbacks>,
+    /// The database ID for IndexedDB operations.
+    db_id: String,
 }
 
 struct JsCallbacks {
@@ -46,7 +48,7 @@ unsafe impl Sync for JsCallbacks {}
 
 impl<R: Rng> WebKeyStore<R> {
     /// Creates a new instance of the web keystore with the provided RNG.
-    pub fn new(rng: R) -> Self {
+    pub fn new(rng: R, db_id: String) -> Self {
         WebKeyStore {
             rng: Arc::new(RwLock::new(rng)),
             callbacks: Arc::new(JsCallbacks {
@@ -54,6 +56,7 @@ impl<R: Rng> WebKeyStore<R> {
                 insert_key: None,
                 sign: None,
             }),
+            db_id,
         }
     }
 
@@ -61,6 +64,7 @@ impl<R: Rng> WebKeyStore<R> {
     /// When provided, these callbacks override the default `IndexedDB` storage and local signing.
     pub fn new_with_callbacks(
         rng: R,
+        db_id: String,
         get_key: Option<Function>,
         insert_key: Option<Function>,
         sign: Option<Function>,
@@ -72,6 +76,7 @@ impl<R: Rng> WebKeyStore<R> {
                 insert_key: insert_key.map(InsertKeyCallback),
                 sign: sign.map(SignCallback),
             }),
+            db_id,
         }
     }
 
@@ -91,7 +96,7 @@ impl<R: Rng> WebKeyStore<R> {
         };
         let secret_key_hex = hex::encode(key.to_bytes());
 
-        insert_account_auth(pub_key, secret_key_hex).await.map_err(|_| {
+        insert_account_auth(&self.db_id, pub_key, secret_key_hex).await.map_err(|_| {
             KeyStoreError::StorageError("Failed to insert item into IndexedDB".to_string())
         })?;
 
@@ -106,9 +111,10 @@ impl<R: Rng> WebKeyStore<R> {
             return get_key_cb.get_secret_key(pub_key).await;
         }
         let pub_key_str = pub_key.to_hex();
-        let secret_key_hex = get_account_auth_by_pub_key(pub_key_str).await.map_err(|err| {
-            KeyStoreError::StorageError(format!("failed to get item from IndexedDB: {err:?}"))
-        })?;
+        let secret_key_hex =
+            get_account_auth_by_pub_key(&self.db_id, pub_key_str).await.map_err(|err| {
+                KeyStoreError::StorageError(format!("failed to get item from IndexedDB: {err:?}"))
+            })?;
 
         let secret_key_bytes = hex::decode(secret_key_hex).map_err(|err| {
             KeyStoreError::DecodingError(format!("error decoding secret key hex: {err:?}"))

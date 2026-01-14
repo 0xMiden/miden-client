@@ -19,21 +19,29 @@ pub struct AccountAuthIdxdbObject {
 #[wasm_bindgen(module = "/src/js/accounts.js")]
 extern "C" {
     #[wasm_bindgen(js_name = insertAccountAuth)]
-    pub fn idxdb_insert_account_auth(pub_key: String, secret_key: String) -> js_sys::Promise;
+    pub fn idxdb_insert_account_auth(
+        db_id: &str,
+        pub_key: String,
+        secret_key: String,
+    ) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = getAccountAuthByPubKey)]
-    pub fn idxdb_get_account_auth_by_pub_key(pub_key: String) -> js_sys::Promise;
+    pub fn idxdb_get_account_auth_by_pub_key(db_id: &str, pub_key: String) -> js_sys::Promise;
 }
 
-pub async fn insert_account_auth(pub_key: String, secret_key: String) -> Result<(), JsValue> {
-    let promise = idxdb_insert_account_auth(pub_key, secret_key);
+pub async fn insert_account_auth(
+    db_id: &str,
+    pub_key: String,
+    secret_key: String,
+) -> Result<(), JsValue> {
+    let promise = idxdb_insert_account_auth(db_id, pub_key, secret_key);
     JsFuture::from(promise).await?;
 
     Ok(())
 }
 
-pub async fn get_account_auth_by_pub_key(pub_key: String) -> Result<String, JsValue> {
-    let promise = idxdb_get_account_auth_by_pub_key(pub_key.clone());
+pub async fn get_account_auth_by_pub_key(db_id: &str, pub_key: String) -> Result<String, JsValue> {
+    let promise = idxdb_get_account_auth_by_pub_key(db_id, pub_key.clone());
     let js_secret_key = JsFuture::from(promise).await?;
 
     let account_auth_idxdb: Option<AccountAuthIdxdbObject> =

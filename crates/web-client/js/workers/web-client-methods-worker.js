@@ -334,7 +334,12 @@ async function processMessage(event) {
       const [rpcUrl, noteTransportUrl, seed, storeName] = args;
       const wasm = await getWasmOrThrow();
       wasmWebClient = new wasm.WebClient();
-      await wasmWebClient.createClient(rpcUrl, noteTransportUrl, seed, storeName);
+      await wasmWebClient.createClient(
+        rpcUrl,
+        noteTransportUrl,
+        seed,
+        storeName
+      );
 
       wasmSeed = seed;
       ready = true;

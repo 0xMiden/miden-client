@@ -8,7 +8,7 @@ test.describe("remote keystore", () => {
       const insertKeyCb = async (
         _publicKeyCommitment: string,
         _secretKey: string
-      ) => { };
+      ) => {};
       const getKeyCb = async (_publicKeyCommitment: string) => {
         return undefined;
       };

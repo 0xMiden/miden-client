@@ -2,7 +2,7 @@
 // with importing DB types and we're testing this which
 // should be enough + the TS compiler.
 /* eslint-disable */
-import { db, openDatabase } from "./schema.js";
+import { getDatabase } from "./schema.js";
 import { logWebStoreError } from "./utils.js";
 async function recursivelyTransformForImport(obj) {
     switch (obj.type) {
@@ -38,24 +38,22 @@ export async function transformForImport(obj) {
         value: obj,
     });
 }
-export async function forceImportStore(jsonStr, clientVersion, storeName) {
+export async function forceImportStore(dbId, jsonStr) {
     try {
-        if (!db.isOpen || storeName !== db.name) {
-            await openDatabase(storeName, clientVersion);
-        }
+        const db = getDatabase(dbId);
         let dbJson = JSON.parse(jsonStr);
         if (typeof dbJson === "string") {
             dbJson = JSON.parse(dbJson);
         }
         const jsonTableNames = Object.keys(dbJson);
-        const dbTableNames = db.tables.map((t) => t.name);
+        const dbTableNames = db.db.tables.map((t) => t.name);
         if (jsonTableNames.length === 0) {
             throw new Error("No tables found in the provided JSON.");
         }
-        await db.transaction("rw", dbTableNames, async () => {
-            await Promise.all(db.tables.map((t) => t.clear()));
+        await db.db.transaction("rw", dbTableNames, async () => {
+            await Promise.all(db.db.tables.map((t) => t.clear()));
             for (const tableName of jsonTableNames) {
-                const table = db.table(tableName);
+                const table = db.db.table(tableName);
                 if (!dbTableNames.includes(tableName)) {
                     console.warn(`Table "${tableName}" does not exist in the database schema. Skipping.`);
                     continue;
