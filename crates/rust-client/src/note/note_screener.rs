@@ -7,7 +7,7 @@ use miden_protocol::account::{Account, AccountId};
 use miden_protocol::note::{Note, NoteId};
 use miden_protocol::{AccountError, AssetError};
 use miden_standards::account::interface::{AccountInterface, AccountInterfaceExt};
-use miden_standards::note::{NoteConsumptionStatus, WellKnownNote};
+use miden_standards::note::NoteConsumptionStatus;
 use miden_tx::auth::TransactionAuthenticator;
 use miden_tx::{NoteCheckerError, NoteConsumptionChecker, TransactionExecutor};
 use thiserror::Error;
@@ -50,7 +50,8 @@ where
     /// Returns a vector of tuples describing the relevance of the provided note to the
     /// accounts monitored by this screener.
     ///
-    /// If relevance can't be determined, the screener defaults to setting the note as consumable.
+    /// The relevance is determined by [`NoteConsumptionChecker::can_consume`] and is based on
+    /// current conditions (for example, it takes the latest block in the client as reference).
     pub async fn check_relevance(
         &self,
         note: &Note,
@@ -66,24 +67,12 @@ where
                 .try_into()
                 .map_err(|_| NoteScreenerError::AccountDataNotFound(id))?;
 
-            match self.check_standard_consumability(&account, note).await {
-                Ok(Some(relevance)) => {
+            match self.check_standard_consumability(&account, note).await? {
+                NoteConsumptionStatus::NeverConsumable(_)
+                | NoteConsumptionStatus::UnconsumableConditions => {},
+                relevance => {
                     note_relevances.push((id, relevance));
                 },
-                Ok(None) => {
-                    // The note might be consumable after a certain block height if the note is
-                    // p2ide
-                    let script_root = note.script().root();
-
-                    if script_root == WellKnownNote::P2IDE.script_root()
-                        && let Some(relevance) = Self::check_p2ide_recall_consumability(note, &id)?
-                    {
-                        note_relevances.push((id, relevance));
-                    }
-                },
-                // If an error occurs while checking consumability, we count it as not relevant for
-                // that account
-                Err(_) => {},
             }
         }
 
@@ -92,11 +81,11 @@ where
 
     /// Tries to execute a standard consume transaction to check if the note is consumable by the
     /// account.
-    async fn check_standard_consumability(
+    pub async fn check_standard_consumability(
         &self,
         account: &Account,
         note: &Note,
-    ) -> Result<Option<NoteConsumptionStatus>, NoteScreenerError> {
+    ) -> Result<NoteConsumptionStatus, NoteScreenerError> {
         let transaction_request =
             TransactionRequestBuilder::new().build_consume_notes(vec![note.id()])?;
 
@@ -123,42 +112,7 @@ where
             )
             .await?;
 
-        if matches!(
-            note_consumption_check,
-            NoteConsumptionStatus::NeverConsumable(..)
-                | NoteConsumptionStatus::UnconsumableConditions
-        ) {
-            return Ok(None);
-        }
-
-        Ok(Some(note_consumption_check))
-    }
-
-    /// Special relevance check for P2IDE notes. It checks if the sender account can consume and
-    /// recall the note.
-    fn check_p2ide_recall_consumability(
-        note: &Note,
-        account_id: &AccountId,
-    ) -> Result<Option<NoteConsumptionStatus>, NoteScreenerError> {
-        let note_inputs = note.inputs().values();
-        // TODO: this needs to be removed (see note screener refactor issue)
-
-        if note_inputs.len() != 4 {
-            return Err(InvalidNoteInputsError::WrongNumInputs(note.id(), 4).into());
-        }
-
-        let recall_height_felt = note_inputs[2];
-
-        let sender = note.metadata().sender();
-        let recall_height: u32 = recall_height_felt.as_int().try_into().map_err(|_err| {
-            InvalidNoteInputsError::BlockNumberError(note.id(), recall_height_felt.as_int())
-        })?;
-
-        if sender == *account_id {
-            Ok(Some(NoteConsumptionStatus::ConsumableAfter(recall_height.into())))
-        } else {
-            Ok(None)
-        }
+        Ok(note_consumption_check)
     }
 }
 
