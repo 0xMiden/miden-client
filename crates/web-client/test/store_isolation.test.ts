@@ -226,8 +226,12 @@ test.describe("Store Isolation Tests", () => {
 
       await Promise.all([client1.syncState(), client2.syncState()]);
 
-      const notes1 = await client1.getInputNotes(window.NoteFilterTypes.All);
-      const notes2 = await client2.getInputNotes(window.NoteFilterTypes.All);
+      const notes1 = await client1.getInputNotes(
+        new window.NoteFilter(window.NoteFilterTypes.All, null)
+      );
+      const notes2 = await client2.getInputNotes(
+        new window.NoteFilter(window.NoteFilterTypes.All, null)
+      );
 
       return {
         notes1Len: notes1.length,
