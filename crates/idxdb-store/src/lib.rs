@@ -75,7 +75,7 @@ extern "C" {
     fn setup_indexed_db(network: &str, client_version: &str) -> js_sys::Promise;
 }
 
-/// Identifier used to name the IndexedDB database instance.
+/// Identifier used to name the `IndexedDB` database instance.
 ///
 /// This allows multiple isolated databases for different networks (mainnet, testnet, etc.)
 /// or custom named instances.
@@ -113,10 +113,10 @@ impl core::fmt::Display for DatabaseId {
     }
 }
 
-/// WebStore provides an IndexedDB-backed implementation of the Store trait.
+/// `WebStore` provides an `IndexedDB`-backed implementation of the Store trait.
 ///
 /// The database reference is stored in a JavaScript registry and looked up by
-/// database_id when needed. This avoids storing JsValue references in Rust
+/// `database_id` when needed. This avoids storing `JsValue` references in Rust
 /// which would prevent the struct from being Send + Sync.
 pub struct WebStore {
     database_id: DatabaseId,
