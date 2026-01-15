@@ -26,7 +26,7 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::fmt::Debug;
 
-use miden_objects::account::{
+use miden_protocol::account::{
     Account,
     AccountCode,
     AccountHeader,
@@ -35,14 +35,16 @@ use miden_objects::account::{
     AccountStorage,
     StorageMapWitness,
     StorageSlot,
+    StorageSlotContent,
+    StorageSlotName,
 };
-use miden_objects::address::Address;
-use miden_objects::asset::{Asset, AssetVault, AssetWitness};
-use miden_objects::block::{BlockHeader, BlockNumber};
-use miden_objects::crypto::merkle::{InOrderIndex, MmrPeaks, PartialMmr};
-use miden_objects::note::{NoteId, NoteScript, NoteTag, Nullifier};
-use miden_objects::transaction::TransactionId;
-use miden_objects::{AccountError, Word};
+use miden_protocol::address::Address;
+use miden_protocol::asset::{Asset, AssetVault, AssetWitness};
+use miden_protocol::block::{BlockHeader, BlockNumber};
+use miden_protocol::crypto::merkle::mmr::{InOrderIndex, MmrPeaks, PartialMmr};
+use miden_protocol::note::{NoteId, NoteScript, NoteTag, Nullifier};
+use miden_protocol::transaction::TransactionId;
+use miden_protocol::{AccountError, Word};
 
 use crate::note_transport::{NOTE_TRANSPORT_CURSOR_STORE_SETTING, NoteTransportCursor};
 use crate::sync::{NoteTagRecord, StateSyncUpdate};
@@ -436,8 +438,12 @@ pub trait Store: Send + Sync {
         let has_client_notes = has_client_notes.into();
         current_partial_mmr.add(current_block.commitment(), has_client_notes);
 
+        // Only track the latest leaf if it is relevant (it has client notes) _and_ the forest
+        // actually has a single leaf tree bit
+        let track_latest = has_client_notes && current_partial_mmr.forest().has_single_leaf_tree();
+
         let current_partial_mmr =
-            PartialMmr::from_parts(current_partial_mmr.peaks(), tracked_nodes, has_client_notes);
+            PartialMmr::from_parts(current_partial_mmr.peaks(), tracked_nodes, track_latest);
 
         Ok(current_partial_mmr)
     }
@@ -483,20 +489,23 @@ pub trait Store: Send + Sync {
     async fn get_account_map_item(
         &self,
         account_id: AccountId,
-        index: u8,
+        slot_name: StorageSlotName,
         key: Word,
     ) -> Result<(Word, StorageMapWitness), StoreError> {
         let storage = self
-            .get_account_storage(account_id, AccountStorageFilter::Index(index as usize))
+            .get_account_storage(account_id, AccountStorageFilter::SlotName(slot_name.clone()))
             .await?;
-        match storage.slots().first() {
-            Some(StorageSlot::Map(map)) => {
+        match storage.get(&slot_name).map(StorageSlot::content) {
+            Some(StorageSlotContent::Map(map)) => {
                 let value = map.get(&key);
                 let witness = map.open(&key);
 
                 Ok((value, witness))
             },
-            _ => Err(StoreError::AccountError(AccountError::StorageSlotNotMap(index))),
+            Some(_) => Err(StoreError::AccountError(AccountError::StorageSlotNotMap(slot_name))),
+            None => {
+                Err(StoreError::AccountError(AccountError::StorageSlotNameNotFound { slot_name }))
+            },
         }
     }
 
@@ -651,6 +660,6 @@ pub enum AccountStorageFilter {
     All,
     /// Return an [`AccountStorage`] with a single slot that matches the provided [`Word`] map root.
     Root(Word),
-    /// Return an [`AccountStorage`] with a single slot that matches the provided index.
-    Index(usize),
+    /// Return an [`AccountStorage`] with a single slot that matches the provided slot name.
+    SlotName(StorageSlotName),
 }

@@ -64,10 +64,9 @@
 //! use miden_client::store::Store;
 //! use miden_client::{Client, ExecutionOptions, Felt};
 //! use miden_client_sqlite_store::SqliteStore;
-//! use miden_objects::crypto::rand::FeltRng;
-//! use miden_objects::{MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES};
+//! use miden_protocol::crypto::rand::FeltRng;
+//! use miden_protocol::{MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES};
 //! use rand::Rng;
-//! use rand::rngs::StdRng;
 //!
 //! # pub async fn create_test_client() -> Result<(), Box<dyn std::error::Error>> {
 //! // Create the SQLite store from the client configuration.
@@ -96,7 +95,7 @@
 //!
 //! // Instantiate the client using a gRPC client
 //! let endpoint = Endpoint::new("https".into(), "localhost".into(), Some(57291));
-//! let client: Client<FilesystemKeyStore<StdRng>> = Client::new(
+//! let client: Client<FilesystemKeyStore> = Client::new(
 //!     Arc::new(GrpcClient::new(&endpoint, 10_000)),
 //!     Box::new(rng),
 //!     store,
@@ -151,39 +150,45 @@ mod test_utils;
 
 pub mod errors;
 
+use miden_protocol::block::BlockNumber;
+pub use miden_protocol::utils::{Deserializable, Serializable, SliceReader};
+
 // RE-EXPORTS
 // ================================================================================================
 
 pub mod notes {
-    pub use miden_objects::note::NoteFile;
+    pub use miden_protocol::note::NoteFile;
 }
 
 /// Provides types and utilities for working with Miden Assembly.
 pub mod assembly {
-    pub use miden_objects::assembly::debuginfo::SourceManagerSync;
-    pub use miden_objects::assembly::diagnostics::Report;
-    pub use miden_objects::assembly::diagnostics::reporting::PrintDiagnostic;
-    pub use miden_objects::assembly::{
+    pub use miden_protocol::MastForest;
+    pub use miden_protocol::assembly::debuginfo::SourceManagerSync;
+    pub use miden_protocol::assembly::diagnostics::Report;
+    pub use miden_protocol::assembly::diagnostics::reporting::PrintDiagnostic;
+    pub use miden_protocol::assembly::mast::MastNodeExt;
+    pub use miden_protocol::assembly::{
         Assembler,
         DefaultSourceManager,
         Library,
-        LibraryPath,
         Module,
         ModuleKind,
+        Path,
     };
+    pub use miden_standards::code_builder::CodeBuilder;
 }
 
 /// Provides types and utilities for working with assets within the Miden network.
 pub mod asset {
-    pub use miden_objects::AssetError;
-    pub use miden_objects::account::delta::{
+    pub use miden_protocol::AssetError;
+    pub use miden_protocol::account::delta::{
         AccountStorageDelta,
         AccountVaultDelta,
         FungibleAssetDelta,
         NonFungibleAssetDelta,
         NonFungibleDeltaAction,
     };
-    pub use miden_objects::asset::{
+    pub use miden_protocol::asset::{
         Asset,
         AssetVault,
         AssetWitness,
@@ -197,15 +202,15 @@ pub mod asset {
 /// Provides authentication-related types and functionalities for the Miden
 /// network.
 pub mod auth {
-    pub use miden_lib::AuthScheme;
-    pub use miden_lib::account::auth::{AuthEcdsaK256Keccak, AuthRpoFalcon512, NoAuth};
-    pub use miden_objects::account::auth::{
+    pub use miden_protocol::account::auth::{
         AuthScheme as AuthSchemeId,
         AuthSecretKey,
         PublicKey,
         PublicKeyCommitment,
         Signature,
     };
+    pub use miden_standards::AuthScheme;
+    pub use miden_standards::account::auth::{AuthEcdsaK256Keccak, AuthRpoFalcon512, NoAuth};
     pub use miden_tx::auth::{BasicAuthenticator, SigningInputs, TransactionAuthenticator};
 
     pub const RPO_FALCON_SCHEME_ID: AuthSchemeId = AuthSchemeId::RpoFalcon512;
@@ -214,42 +219,39 @@ pub mod auth {
 
 /// Provides types for working with blocks within the Miden network.
 pub mod block {
-    pub use miden_objects::block::BlockHeader;
+    pub use miden_protocol::block::{BlockHeader, BlockNumber};
 }
 
 /// Provides cryptographic types and utilities used within the Miden rollup
 /// network. It re-exports commonly used types and random number generators like `FeltRng` from
-/// the `miden_objects` crate.
+/// the `miden_standards` crate.
 pub mod crypto {
     pub mod rpo_falcon512 {
-        pub use miden_objects::crypto::dsa::rpo_falcon512::{PublicKey, SecretKey, Signature};
+        pub use miden_protocol::crypto::dsa::falcon512_rpo::{PublicKey, SecretKey, Signature};
     }
-    pub use miden_objects::crypto::hash::blake::{Blake3_160, Blake3Digest};
-    pub use miden_objects::crypto::hash::rpo::Rpo256;
-    pub use miden_objects::crypto::merkle::{
+    pub use miden_protocol::crypto::hash::blake::{Blake3_160, Blake3Digest};
+    pub use miden_protocol::crypto::hash::rpo::Rpo256;
+    pub use miden_protocol::crypto::merkle::mmr::{
         Forest,
         InOrderIndex,
-        LeafIndex,
-        MerklePath,
-        MerkleStore,
-        MerkleTree,
         MmrDelta,
         MmrPeaks,
         MmrProof,
-        NodeIndex,
-        SMT_DEPTH,
-        SmtLeaf,
-        SmtProof,
+        PartialMmr,
     };
-    pub use miden_objects::crypto::rand::{FeltRng, RpoRandomCoin};
+    pub use miden_protocol::crypto::merkle::smt::{LeafIndex, SMT_DEPTH, SmtLeaf, SmtProof};
+    pub use miden_protocol::crypto::merkle::store::MerkleStore;
+    pub use miden_protocol::crypto::merkle::{MerklePath, MerkleTree, NodeIndex};
+    pub use miden_protocol::crypto::rand::{FeltRng, RpoRandomCoin};
 }
 
 /// Provides types for working with addresses within the Miden network.
 pub mod address {
-    pub use miden_objects::address::{
+    pub use miden_protocol::address::{
         Address,
         AddressId,
         AddressInterface,
+        CustomNetworkId,
         NetworkId,
         RoutingParameters,
     };
@@ -257,7 +259,8 @@ pub mod address {
 
 /// Provides types for working with the virtual machine within the Miden network.
 pub mod vm {
-    pub use miden_objects::vm::{
+    pub use miden_mast_package::{PackageKind, ProcedureExport};
+    pub use miden_protocol::vm::{
         AdviceInputs,
         AdviceMap,
         AttributeSet,
@@ -265,6 +268,7 @@ pub mod vm {
         Package,
         PackageExport,
         PackageManifest,
+        Program,
         QualifiedProcedureName,
         Section,
         SectionId,
@@ -273,8 +277,8 @@ pub mod vm {
 
 pub use async_trait::async_trait;
 pub use errors::*;
-use miden_objects::assembly::{DefaultSourceManager, SourceManagerSync};
-pub use miden_objects::{
+use miden_protocol::assembly::{DefaultSourceManager, SourceManagerSync};
+pub use miden_protocol::{
     EMPTY_WORD,
     Felt,
     MAX_TX_EXECUTION_CYCLES,
@@ -293,8 +297,9 @@ pub use miden_tx::ExecutionOptions;
 /// enabled.
 #[cfg(feature = "testing")]
 pub mod testing {
-    pub use miden_lib::testing::note::NoteBuilder;
-    pub use miden_objects::testing::*;
+    pub use miden_protocol::testing::account_id;
+    pub use miden_standards::testing::note::NoteBuilder;
+    pub use miden_standards::testing::*;
     pub use miden_testing::*;
 
     pub use crate::test_utils::*;
@@ -302,9 +307,7 @@ pub mod testing {
 
 use alloc::sync::Arc;
 
-pub use miden_lib::utils::{Deserializable, ScriptBuilder, Serializable, SliceReader};
-pub use miden_objects::block::BlockNumber;
-use miden_objects::crypto::rand::FeltRng;
+use miden_protocol::crypto::rand::FeltRng;
 use miden_tx::LocalTransactionProver;
 use miden_tx::auth::TransactionAuthenticator;
 use rand::RngCore;
@@ -434,9 +437,9 @@ where
         self.exec_options.enable_debugging()
     }
 
-    /// Returns an instance of the `ScriptBuilder`
-    pub fn script_builder(&self) -> ScriptBuilder {
-        ScriptBuilder::with_source_manager(self.source_manager.clone())
+    /// Returns an instance of the `CodeBuilder`
+    pub fn code_builder(&self) -> assembly::CodeBuilder {
+        assembly::CodeBuilder::with_source_manager(self.source_manager.clone())
     }
 
     /// Returns a reference to the client's random number generator. This can be used to generate

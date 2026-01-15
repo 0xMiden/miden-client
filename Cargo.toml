@@ -28,13 +28,12 @@ inherits  = "dev"
 opt-level = 1
 
 [workspace.dependencies]
-# Miden base/protocol dependencies
-miden-lib = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base.git" }
-miden-objects = { branch = "next", default-features = false, features = [
-  "testing",
-], git = "https://github.com/0xMiden/miden-base.git" }
-miden-testing = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base.git" }
-miden-tx = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base.git" }
+# Miden protocol dependencies
+miden-mast-package = { default-features = false, version = "0.20.1" }
+miden-protocol     = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base.git" }
+miden-standards    = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base.git" }
+miden-testing      = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base.git" }
+miden-tx           = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base.git" }
 
 # Miden node dependencies
 miden-node-block-producer = { branch = "next", git = "https://github.com/0xMiden/miden-node.git" }

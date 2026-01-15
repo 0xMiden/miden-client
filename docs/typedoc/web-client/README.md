@@ -1,8 +1,8 @@
-**@demox-labs/miden-sdk**
+**@miden-sdk/miden-sdk**
 
 ***
 
-# @demox-labs/miden-sdk
+# @miden-sdk/miden-sdk
 
 ## Enumerations
 
@@ -13,6 +13,7 @@
 - [NetworkType](enumerations/NetworkType.md)
 - [NoteFilterTypes](enumerations/NoteFilterTypes.md)
 - [NoteType](enumerations/NoteType.md)
+- [OutputNoteState](enumerations/OutputNoteState.md)
 - [SigningInputsType](enumerations/SigningInputsType.md)
 
 ## Classes
@@ -23,6 +24,7 @@
 - [AccountBuilderResult](classes/AccountBuilderResult.md)
 - [AccountCode](classes/AccountCode.md)
 - [AccountComponent](classes/AccountComponent.md)
+- [AccountComponentCode](classes/AccountComponentCode.md)
 - [AccountDelta](classes/AccountDelta.md)
 - [AccountFile](classes/AccountFile.md)
 - [AccountHeader](classes/AccountHeader.md)
@@ -40,11 +42,14 @@
 - [AuthSecretKey](classes/AuthSecretKey.md)
 - [BasicFungibleFaucetComponent](classes/BasicFungibleFaucetComponent.md)
 - [BlockHeader](classes/BlockHeader.md)
+- [CodeBuilder](classes/CodeBuilder.md)
+- [CommittedNote](classes/CommittedNote.md)
 - [ConsumableNoteRecord](classes/ConsumableNoteRecord.md)
 - [Endpoint](classes/Endpoint.md)
 - [ExecutedTransaction](classes/ExecutedTransaction.md)
 - [Felt](classes/Felt.md)
 - [FeltArray](classes/FeltArray.md)
+- [FetchedAccount](classes/FetchedAccount.md)
 - [FetchedNote](classes/FetchedNote.md)
 - [FlattenedU8Vec](classes/FlattenedU8Vec.md)
 - [ForeignAccount](classes/ForeignAccount.md)
@@ -90,9 +95,11 @@
 - [NoteRecipient](classes/NoteRecipient.md)
 - [NoteRecipientArray](classes/NoteRecipientArray.md)
 - [NoteScript](classes/NoteScript.md)
+- [NoteSyncInfo](classes/NoteSyncInfo.md)
 - [NoteTag](classes/NoteTag.md)
 - [OutputNote](classes/OutputNote.md)
 - [OutputNoteArray](classes/OutputNoteArray.md)
+- [OutputNoteRecord](classes/OutputNoteRecord.md)
 - [OutputNotes](classes/OutputNotes.md)
 - [OutputNotesArray](classes/OutputNotesArray.md)
 - [Package](classes/Package.md)
@@ -102,13 +109,13 @@
 - [PublicKey](classes/PublicKey.md)
 - [RpcClient](classes/RpcClient.md)
 - [Rpo256](classes/Rpo256.md)
-- [ScriptBuilder](classes/ScriptBuilder.md)
 - [SerializedInputNoteData](classes/SerializedInputNoteData.md)
 - [SerializedOutputNoteData](classes/SerializedOutputNoteData.md)
 - [SerializedTransactionData](classes/SerializedTransactionData.md)
 - [Signature](classes/Signature.md)
 - [SigningInputs](classes/SigningInputs.md)
 - [SlotAndKeys](classes/SlotAndKeys.md)
+- [SparseMerklePath](classes/SparseMerklePath.md)
 - [StorageMap](classes/StorageMap.md)
 - [StorageSlot](classes/StorageSlot.md)
 - [StorageSlotArray](classes/StorageSlotArray.md)

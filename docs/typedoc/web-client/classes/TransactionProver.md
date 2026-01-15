@@ -1,8 +1,8 @@
-[**@demox-labs/miden-sdk**](../README.md)
+[**@miden-sdk/miden-sdk**](../README.md)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / TransactionProver
+[@miden-sdk/miden-sdk](../README.md) / TransactionProver
 
 # Class: TransactionProver
 
@@ -48,6 +48,13 @@ Returns the endpoint if this is a remote prover.
 
 Serializes the prover configuration into a string descriptor.
 
+Format:
+- `"local"` for local prover
+- `"remote|{endpoint}"` for remote prover without timeout
+- `"remote|{endpoint}|{timeout_ms}"` for remote prover with timeout
+
+Uses `|` as delimiter since it's not a valid URL character.
+
 #### Returns
 
 `string`
@@ -56,23 +63,20 @@ Serializes the prover configuration into a string descriptor.
 
 ### deserialize()
 
-> `static` **deserialize**(`prover_type`, `endpoint?`, `timeout_ms?`): `TransactionProver`
+> `static` **deserialize**(`payload`): `TransactionProver`
 
 Reconstructs a prover from its serialized descriptor.
 
+Parses the format produced by `serialize()`:
+- `"local"` for local prover
+- `"remote|{endpoint}"` for remote prover without timeout
+- `"remote|{endpoint}|{timeout_ms}"` for remote prover with timeout
+
 #### Parameters
 
-##### prover\_type
+##### payload
 
 `string`
-
-##### endpoint?
-
-`string`
-
-##### timeout\_ms?
-
-`bigint`
 
 #### Returns
 

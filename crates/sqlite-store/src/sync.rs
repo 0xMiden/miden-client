@@ -9,7 +9,7 @@ use miden_client::note::{BlockNumber, NoteTag};
 use miden_client::store::StoreError;
 use miden_client::sync::{NoteTagRecord, NoteTagSource, StateSyncUpdate};
 use miden_client::utils::{Deserializable, Serializable};
-use miden_objects::crypto::merkle::SmtForest;
+use miden_protocol::crypto::merkle::smt::SmtForest;
 use rusqlite::{Connection, Transaction, params};
 
 use super::SqliteStore;

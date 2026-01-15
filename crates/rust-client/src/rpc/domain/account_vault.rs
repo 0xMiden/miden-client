@@ -1,9 +1,9 @@
 use alloc::string::ToString;
 use alloc::vec::Vec;
 
-use miden_objects::asset::{Asset, AssetVaultKey};
-use miden_objects::block::BlockNumber;
-use miden_objects::{AssetError, Word};
+use miden_protocol::asset::{Asset, AssetVaultKey};
+use miden_protocol::block::BlockNumber;
+use miden_protocol::{AssetError, Word};
 
 use crate::rpc::domain::MissingFieldHelper;
 use crate::rpc::{RpcError, generated as proto};

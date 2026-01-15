@@ -1,10 +1,11 @@
 use miden_client::Word;
-use miden_client::account::{AccountStorage, StorageMap, StorageSlot};
+use miden_client::account::{AccountStorage, StorageMap, StorageSlotContent};
 use miden_client::asset::{Asset, AssetVault};
 use miden_client::crypto::{MerklePath, SMT_DEPTH, SmtLeaf, SmtProof};
 use miden_client::store::StoreError;
-use miden_objects::asset::AssetVaultKey;
-use miden_objects::crypto::merkle::{EmptySubtreeRoots, Smt, SmtForest};
+use miden_protocol::asset::AssetVaultKey;
+use miden_protocol::crypto::merkle::EmptySubtreeRoots;
+use miden_protocol::crypto::merkle::smt::{Smt, SmtForest};
 
 /// Retrieves the Merkle proof for a specific asset in the merkle store.
 pub fn get_asset_proof(
@@ -79,7 +80,7 @@ pub fn update_storage_map_nodes(
 /// Inserts all storage map SMT nodes to the merkle store.
 pub fn insert_storage_map_nodes(smt_forest: &mut SmtForest, storage: &AccountStorage) {
     let maps = storage.slots().iter().filter_map(|slot| {
-        if let StorageSlot::Map(map) = slot {
+        if let StorageSlotContent::Map(map) = slot.content() {
             Some(map)
         } else {
             None

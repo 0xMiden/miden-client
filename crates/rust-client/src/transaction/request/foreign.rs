@@ -3,15 +3,15 @@ use alloc::string::ToString;
 use alloc::vec::Vec;
 use core::cmp::Ordering;
 
-use miden_objects::account::{
+use miden_protocol::account::{
     AccountId,
     PartialAccount,
     PartialStorage,
     PartialStorageMap,
     StorageMap,
 };
-use miden_objects::asset::{AssetVault, PartialVault};
-use miden_objects::transaction::AccountInputs;
+use miden_protocol::asset::{AssetVault, PartialVault};
+use miden_protocol::transaction::AccountInputs;
 use miden_tx::utils::{Deserializable, DeserializationError, Serializable};
 
 use super::TransactionRequestError;

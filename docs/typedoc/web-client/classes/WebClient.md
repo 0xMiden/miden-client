@@ -1,8 +1,8 @@
-[**@demox-labs/miden-sdk**](../README.md)
+[**@miden-sdk/miden-sdk**](../README.md)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / WebClient
+[@miden-sdk/miden-sdk](../README.md) / WebClient
 
 # Class: WebClient
 
@@ -146,6 +146,16 @@ callbacks. If `node_url` is `None`, it defaults to the testnet endpoint.
 
 ***
 
+### createCodeBuilder()
+
+> **createCodeBuilder**(): [`CodeBuilder`](CodeBuilder.md)
+
+#### Returns
+
+[`CodeBuilder`](CodeBuilder.md)
+
+***
+
 ### createMockClient()
 
 > **createMockClient**(`seed?`, `serialized_mock_chain?`, `serialized_mock_note_transport_node?`): `Promise`\<`any`\>
@@ -170,16 +180,6 @@ applications as it uses a mock chain that simulates the behavior of a real node.
 #### Returns
 
 `Promise`\<`any`\>
-
-***
-
-### createScriptBuilder()
-
-> **createScriptBuilder**(): [`ScriptBuilder`](ScriptBuilder.md)
-
-#### Returns
-
-[`ScriptBuilder`](ScriptBuilder.md)
 
 ***
 
@@ -409,7 +409,7 @@ Uses an internal pagination mechanism to avoid fetching duplicate notes.
 
 ### getOutputNote()
 
-> **getOutputNote**(`note_id`): `Promise`\<`any`\>
+> **getOutputNote**(`note_id`): `Promise`\<[`OutputNoteRecord`](OutputNoteRecord.md)\>
 
 #### Parameters
 
@@ -419,13 +419,13 @@ Uses an internal pagination mechanism to avoid fetching duplicate notes.
 
 #### Returns
 
-`Promise`\<`any`\>
+`Promise`\<[`OutputNoteRecord`](OutputNoteRecord.md)\>
 
 ***
 
 ### getOutputNotes()
 
-> **getOutputNotes**(`filter`): `Promise`\<`any`\>
+> **getOutputNotes**(`filter`): `Promise`\<[`OutputNoteRecord`](OutputNoteRecord.md)[]\>
 
 #### Parameters
 
@@ -435,7 +435,7 @@ Uses an internal pagination mechanism to avoid fetching duplicate notes.
 
 #### Returns
 
-`Promise`\<`any`\>
+`Promise`\<[`OutputNoteRecord`](OutputNoteRecord.md)[]\>
 
 ***
 
@@ -619,13 +619,13 @@ Returns all the existing setting keys from the store.
 
 ### newConsumeTransactionRequest()
 
-> **newConsumeTransactionRequest**(`list_of_note_ids`): [`TransactionRequest`](TransactionRequest.md)
+> **newConsumeTransactionRequest**(`list_of_notes`): [`TransactionRequest`](TransactionRequest.md)
 
 #### Parameters
 
-##### list\_of\_note\_ids
+##### list\_of\_notes
 
-`string`[]
+[`Note`](Note.md)[]
 
 #### Returns
 
@@ -967,6 +967,8 @@ Sets a setting key-value in the store. It can then be retrieved using `get_setti
 Executes a transaction specified by the request against the specified account,
 proves it, submits it to the network, and updates the local database.
 
+Uses the prover configured for this client.
+
 If the transaction utilizes foreign account data, there is a chance that the client doesn't
 have the required block header in the local database. In these scenarios, a sync to
 the chain tip is performed, and the required block header is retrieved.
@@ -980,6 +982,37 @@ the chain tip is performed, and the required block header is retrieved.
 ##### transaction\_request
 
 [`TransactionRequest`](TransactionRequest.md)
+
+#### Returns
+
+`Promise`\<[`TransactionId`](TransactionId.md)\>
+
+***
+
+### submitNewTransactionWithProver()
+
+> **submitNewTransactionWithProver**(`account_id`, `transaction_request`, `prover`): `Promise`\<[`TransactionId`](TransactionId.md)\>
+
+Executes a transaction specified by the request against the specified account, proves it
+with the user provided prover, submits it to the network, and updates the local database.
+
+If the transaction utilizes foreign account data, there is a chance that the client doesn't
+have the required block header in the local database. In these scenarios, a sync to the
+chain tip is performed, and the required block header is retrieved.
+
+#### Parameters
+
+##### account\_id
+
+[`AccountId`](AccountId.md)
+
+##### transaction\_request
+
+[`TransactionRequest`](TransactionRequest.md)
+
+##### prover
+
+[`TransactionProver`](TransactionProver.md)
 
 #### Returns
 

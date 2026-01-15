@@ -2,15 +2,19 @@ use alloc::boxed::Box;
 use alloc::vec::Vec;
 use std::collections::BTreeSet;
 
-use miden_client::auth::{AuthEcdsaK256Keccak, AuthSecretKey, PublicKeyCommitment};
-use miden_lib::account::auth::AuthRpoFalcon512;
-use miden_lib::testing::mock_account::MockAccountExt;
-use miden_objects::account::{Account, AccountFile};
-use miden_objects::testing::account_id::{
+use miden_client::auth::{
+    AuthEcdsaK256Keccak,
+    AuthRpoFalcon512,
+    AuthSecretKey,
+    PublicKeyCommitment,
+};
+use miden_protocol::account::{Account, AccountFile};
+use miden_protocol::testing::account_id::{
     ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
     ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
 };
-use miden_objects::{EMPTY_WORD, Word, ZERO};
+use miden_protocol::{EMPTY_WORD, Word, ZERO};
+use miden_standards::testing::mock_account::MockAccountExt;
 
 use crate::tests::create_test_client;
 
@@ -18,14 +22,14 @@ fn create_account_data(account_id: u128) -> AccountFile {
     let account =
         Account::mock(account_id, AuthRpoFalcon512::new(PublicKeyCommitment::from(EMPTY_WORD)));
 
-    AccountFile::new(account.clone(), vec![AuthSecretKey::new_rpo_falcon512()])
+    AccountFile::new(account.clone(), vec![AuthSecretKey::new_falcon512_rpo()])
 }
 
 fn create_ecdsa_account_data(account_id: u128) -> AccountFile {
     let account =
         Account::mock(account_id, AuthEcdsaK256Keccak::new(PublicKeyCommitment::from(EMPTY_WORD)));
 
-    AccountFile::new(account.clone(), vec![AuthSecretKey::new_rpo_falcon512()])
+    AccountFile::new(account.clone(), vec![AuthSecretKey::new_falcon512_rpo()])
 }
 
 pub fn create_initial_accounts_data() -> Vec<AccountFile> {

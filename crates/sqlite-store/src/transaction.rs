@@ -17,7 +17,7 @@ use miden_client::transaction::{
     TransactionStoreUpdate,
 };
 use miden_client::utils::{Deserializable as _, Serializable as _};
-use miden_objects::crypto::merkle::SmtForest;
+use miden_protocol::crypto::merkle::smt::SmtForest;
 use rusqlite::types::Value;
 use rusqlite::{Connection, Transaction, params};
 

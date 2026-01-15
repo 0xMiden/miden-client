@@ -12,7 +12,7 @@ This guide demonstrates how to work with notes in the Miden SDK. Notes are the p
 Input notes are notes that can be consumed (spent) in transactions. You can retrieve them individually or in bulk:
 
 ```typescript
-import { NoteFilter, NoteFilterTypes, WebClient } from "@demox-labs/miden-sdk";
+import { NoteFilter, NoteFilterTypes, WebClient } from "@miden-sdk/miden-sdk";
 
 try {
     // Initialize the web client
@@ -40,7 +40,7 @@ try {
 Output notes are notes that have been created by transactions. You can retrieve them individually or in bulk:
 
 ```typescript
-import { NoteFilter, NoteFilterTypes, WebClient } from "@demox-labs/miden-sdk";
+import { NoteFilter, NoteFilterTypes, WebClient } from "@miden-sdk/miden-sdk";
 
 try {
     // Initialize the web client
@@ -66,7 +66,7 @@ try {
 Consumable notes are notes that can be spent by a specific account. You can retrieve them with or without filtering by account:
 
 ```typescript
-import { AccountId, WebClient } from "@demox-labs/miden-sdk";
+import { AccountId, WebClient } from "@miden-sdk/miden-sdk";
 
 try {
     // Initialize the web client
@@ -97,7 +97,7 @@ try {
 You can compile custom note scripts for advanced use cases:
 
 ```typescript
-import { ScriptBuilder, ScriptBuilderMode } from "@demox-labs/miden-sdk";
+import { CodeBuilder, CodeBuilderMode } from "@miden-sdk/miden-sdk";
 
 try {
     // Instance a script builder
@@ -109,10 +109,10 @@ try {
     `;
 
     // Script builder can be instanced in either debug or normal mode using one of:
-    // - ScriptBuilderMode.Debug
-    // - ScriptBuilderMode.Normal
+    // - CodeBuilderMode.Debug
+    // - CodeBuilderMode.Normal
     
-    const noteScript = new ScriptBuilder(ScriptBuilderMode.Debug);
+    const noteScript = new CodeBuilder(CodeBuilderMode.Debug);
     // Use the compiled script in your transaction
 } catch (error) {
     console.error("Failed to compile note script:", error.message);
