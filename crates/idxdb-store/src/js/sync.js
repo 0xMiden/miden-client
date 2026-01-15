@@ -161,6 +161,7 @@ async function updatePartialBlockchainNodes(tx, nodeIndexes, nodes) {
             id: nodeIndexes[index],
             node: node,
         }));
+        // Use bulkPut to add/overwrite the entries
         await tx.partialBlockchainNodes.bulkPut(data);
     }
     catch (err) {

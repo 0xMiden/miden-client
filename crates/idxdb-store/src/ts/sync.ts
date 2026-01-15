@@ -371,7 +371,7 @@ async function updatePartialBlockchainNodes(
       id: nodeIndexes[index],
       node: node,
     }));
-
+    // Use bulkPut to add/overwrite the entries
     await (
       tx as Transaction & { partialBlockchainNodes: Dexie.Table }
     ).partialBlockchainNodes.bulkPut(data);

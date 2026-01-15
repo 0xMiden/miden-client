@@ -72,7 +72,7 @@ extern "C" {
     /// Opens the database and registers it in the JS registry.
     /// Returns the database ID (network name) which can be used to look up the database.
     #[wasm_bindgen(js_name = openDatabase)]
-    fn setup_indexed_db(network: &str, client_version: &str) -> js_sys::Promise;
+    fn open_database(network: &str, client_version: &str) -> js_sys::Promise;
 }
 
 /// Identifier used to name the `IndexedDB` database instance.
@@ -124,7 +124,7 @@ pub struct WebStore {
 
 impl WebStore {
     pub async fn new(database_id: DatabaseId) -> Result<WebStore, JsValue> {
-        let promise = setup_indexed_db(database_id.as_str(), CLIENT_VERSION);
+        let promise = open_database(database_id.as_str(), CLIENT_VERSION);
         let _db_id = JsFuture::from(promise).await?;
         Ok(WebStore { database_id })
     }
