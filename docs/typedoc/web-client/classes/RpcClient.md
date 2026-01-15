@@ -1,8 +1,8 @@
-[**@demox-labs/miden-sdk**](../README.md)
+[**@miden-sdk/miden-sdk**](../README.md)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / RpcClient
+[@miden-sdk/miden-sdk](../README.md) / RpcClient
 
 # Class: RpcClient
 
@@ -50,6 +50,42 @@ Endpoint to connect to.
 
 ***
 
+### getAccountDetails()
+
+> **getAccountDetails**(`account_id`): `Promise`\<[`FetchedAccount`](FetchedAccount.md)\>
+
+Fetches account details for a specific account ID.
+
+#### Parameters
+
+##### account\_id
+
+[`AccountId`](AccountId.md)
+
+#### Returns
+
+`Promise`\<[`FetchedAccount`](FetchedAccount.md)\>
+
+***
+
+### getBlockHeaderByNumber()
+
+> **getBlockHeaderByNumber**(`block_num?`): `Promise`\<[`BlockHeader`](BlockHeader.md)\>
+
+Fetches a block header by number. When `block_num` is undefined, returns the latest header.
+
+#### Parameters
+
+##### block\_num?
+
+`number`
+
+#### Returns
+
+`Promise`\<[`BlockHeader`](BlockHeader.md)\>
+
+***
+
 ### getNotesById()
 
 > **getNotesById**(`note_ids`): `Promise`\<[`FetchedNote`](FetchedNote.md)[]\>
@@ -94,3 +130,51 @@ The root hash of the note script to fetch.
 `Promise`\<[`NoteScript`](NoteScript.md)\>
 
 Promise that resolves to the `NoteScript`.
+
+***
+
+### getNullifierCommitHeight()
+
+> **getNullifierCommitHeight**(`nullifier`, `block_num`): `Promise`\<`number`\>
+
+Fetches the block height at which a nullifier was committed, if any.
+
+#### Parameters
+
+##### nullifier
+
+[`Word`](Word.md)
+
+##### block\_num
+
+`number`
+
+#### Returns
+
+`Promise`\<`number`\>
+
+***
+
+### syncNotes()
+
+> **syncNotes**(`block_num`, `block_to`, `note_tags`): `Promise`\<[`NoteSyncInfo`](NoteSyncInfo.md)\>
+
+Fetches notes matching the provided tags from the node.
+
+#### Parameters
+
+##### block\_num
+
+`number`
+
+##### block\_to
+
+`number`
+
+##### note\_tags
+
+[`NoteTag`](NoteTag.md)[]
+
+#### Returns
+
+`Promise`\<[`NoteSyncInfo`](NoteSyncInfo.md)\>

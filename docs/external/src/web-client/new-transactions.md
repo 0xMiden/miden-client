@@ -18,7 +18,7 @@ All transactions follow a similar pattern:
 If you don't need to inspect the transaction intermediate structures manually, the SDK offers `submitNewTransaction` to run steps 2-4 for you:
 
 ```typescript
-import { NoteType, WebClient } from "@demox-labs/miden-sdk";
+import { NoteType, WebClient } from "@miden-sdk/miden-sdk";
 
 try {
     const webClient = await WebClient.createClient();
@@ -48,7 +48,7 @@ try {
 When you need to inspect execution results before proving, fall back to the manual pipeline:
 
 ```typescript
-import { NoteType, TransactionProver, WebClient } from "@demox-labs/miden-sdk";
+import { NoteType, TransactionProver, WebClient } from "@miden-sdk/miden-sdk";
 
 try {
     const webClient = await WebClient.createClient();
@@ -103,7 +103,7 @@ try {
 For better performance, you can offload the work of proving the transaction to a remote prover. This is especially useful for complex transactions:
 
 ```typescript
-import { NoteType, TransactionProver, WebClient } from "@demox-labs/miden-sdk";
+import { NoteType, TransactionProver, WebClient } from "@miden-sdk/miden-sdk";
 
 try {
     const webClient = await WebClient.createClient();
@@ -151,7 +151,7 @@ Using a remote prover can significantly improve performance for complex transact
 When using `submitNewTransaction`, the SDK uses a local prover by default. If you need to use a specific prover (local or remote), use `submitNewTransactionWithProver` instead:
 
 ```typescript
-import { NoteType, TransactionProver, WebClient } from "@demox-labs/miden-sdk";
+import { NoteType, TransactionProver, WebClient } from "@miden-sdk/miden-sdk";
 
 const webClient = await WebClient.createClient();
 
@@ -205,7 +205,7 @@ try {
 To send tokens between accounts:
 
 ```typescript
-import { NoteType, TransactionProver, WebClient } from "@demox-labs/miden-sdk";
+import { NoteType, TransactionProver, WebClient } from "@miden-sdk/miden-sdk";
 
 try {
     // Initialize the web client
@@ -253,14 +253,14 @@ try {
 To consume (spend) notes:
 
 ```typescript
-import { TransactionProver, WebClient } from "@demox-labs/miden-sdk";
+import { TransactionProver, WebClient } from "@miden-sdk/miden-sdk";
 
 try {
     // Initialize the web client
     const webClient = await WebClient.createClient();
 
     const transactionRequest = webClient.newConsumeTransactionRequest(
-        [noteId1, noteId2]  // Array of note IDs to consume
+        [note1, note2]  // Array of notes to consume, can be retrieved from the client by their noteID
     );
 
     const result = await webClient.executeTransaction(
@@ -322,7 +322,7 @@ import {
     TransactionRequestBuilder,
     TransactionScript,
     WebClient
-} from "@demox-labs/miden-sdk";
+} from "@miden-sdk/miden-sdk";
 
 try {
     // Initialize the web client
