@@ -4,20 +4,24 @@ use miden_client_core::vm::AdviceMap as NativeAdviceMap;
 use miden_client_core::{Felt as NativeFelt, Word as NativeWord};
 use wasm_bindgen::prelude::*;
 
-use super::felt::{Felt, FeltArray};
+use super::felt::Felt;
+use crate::models::miden_arrays::FeltArray;
 use crate::models::word::Word;
 
+/// Map of advice values keyed by words for script execution.
 #[derive(Clone)]
 #[wasm_bindgen]
 pub struct AdviceMap(NativeAdviceMap);
 
 #[wasm_bindgen]
 impl AdviceMap {
+    /// Creates an empty advice map.
     #[wasm_bindgen(constructor)]
     pub fn new() -> AdviceMap {
         AdviceMap(NativeAdviceMap::default())
     }
 
+    /// Inserts a value for the given key, returning any previous value.
     pub fn insert(&mut self, key: &Word, value: &FeltArray) -> Option<Vec<Felt>> {
         let native_key: NativeWord = key.into();
         let native_felts: Vec<NativeFelt> = value.into();

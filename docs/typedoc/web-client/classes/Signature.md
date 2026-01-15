@@ -1,12 +1,24 @@
-[**@demox-labs/miden-sdk**](../README.md)
+[**@miden-sdk/miden-sdk**](../README.md)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / Signature
+[@miden-sdk/miden-sdk](../README.md) / Signature
 
 # Class: Signature
 
+Cryptographic signature produced by supported auth schemes.
+
 ## Methods
+
+### \[dispose\]()
+
+> **\[dispose\]**(): `void`
+
+#### Returns
+
+`void`
+
+***
 
 ### free()
 
@@ -22,6 +34,8 @@
 
 > **serialize**(): `Uint8Array`
 
+Serializes the signature into bytes.
+
 #### Returns
 
 `Uint8Array`
@@ -30,7 +44,15 @@
 
 ### toPreparedSignature()
 
-> **toPreparedSignature**(): [`Felt`](Felt.md)[]
+> **toPreparedSignature**(`message`): [`Felt`](Felt.md)[]
+
+Converts the signature to the prepared field elements expected by verifying code.
+
+#### Parameters
+
+##### message
+
+[`Word`](Word.md)
 
 #### Returns
 
@@ -41,6 +63,8 @@
 ### deserialize()
 
 > `static` **deserialize**(`bytes`): `Signature`
+
+Deserializes a signature from bytes.
 
 #### Parameters
 

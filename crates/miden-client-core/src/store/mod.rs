@@ -16,9 +16,9 @@
 //! These are all used by the Miden client to provide transaction execution in the correct contexts.
 //!
 //! In addition to the main [`Store`] trait, the module provides types for filtering queries, such
-//! as [`TransactionFilter`] and [`NoteFilter`], to narrow down the set of returned transactions or
-//! notes. For more advanced usage, see the documentation of individual methods in the [`Store`]
-//! trait.
+//! as [`TransactionFilter`], [`NoteFilter`], `StorageFilter` to narrow down the set of returned
+//! transactions, account data, or notes. For more advanced usage, see the documentation of
+//! individual methods in the [`Store`] trait.
 
 use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, BTreeSet};
@@ -26,7 +26,7 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::fmt::Debug;
 
-use miden_objects::account::{
+use miden_protocol::account::{
     Account,
     AccountCode,
     AccountHeader,
@@ -35,20 +35,18 @@ use miden_objects::account::{
     AccountStorage,
     StorageMapWitness,
     StorageSlot,
+    StorageSlotContent,
+    StorageSlotName,
 };
-use miden_objects::address::Address;
-use miden_objects::asset::{Asset, AssetVault, AssetWitness};
-use miden_objects::block::{BlockHeader, BlockNumber};
-use miden_objects::crypto::merkle::{InOrderIndex, MmrPeaks, PartialMmr};
-use miden_objects::note::{NoteId, NoteTag, Nullifier};
-use miden_objects::transaction::TransactionId;
-use miden_objects::{AccountError, Word};
+use miden_protocol::address::Address;
+use miden_protocol::asset::{Asset, AssetVault, AssetWitness};
+use miden_protocol::block::{BlockHeader, BlockNumber};
+use miden_protocol::crypto::merkle::mmr::{InOrderIndex, MmrPeaks, PartialMmr};
+use miden_protocol::note::{NoteId, NoteScript, NoteTag, Nullifier};
+use miden_protocol::transaction::TransactionId;
+use miden_protocol::{AccountError, Word};
 
-use crate::note_transport::{
-    NOTE_TRANSPORT_CURSOR_STORE_SETTING,
-    NoteTransportCursor,
-    NoteTransportUpdate,
-};
+use crate::note_transport::{NOTE_TRANSPORT_CURSOR_STORE_SETTING, NoteTransportCursor};
 use crate::sync::{NoteTagRecord, StateSyncUpdate};
 use crate::transaction::{TransactionRecord, TransactionStatusVariant, TransactionStoreUpdate};
 
@@ -64,7 +62,7 @@ mod errors;
 pub use errors::*;
 
 mod account;
-pub use account::{AccountRecord, AccountStatus, AccountUpdates};
+pub use account::{AccountRecord, AccountRecordData, AccountStatus, AccountUpdates};
 mod note_record;
 pub use note_record::{
     InputNoteRecord,
@@ -149,6 +147,13 @@ pub trait Store: Send + Sync {
     /// Inserts the provided input notes into the database. If a note with the same ID already
     /// exists, it will be replaced.
     async fn upsert_input_notes(&self, notes: &[InputNoteRecord]) -> Result<(), StoreError>;
+
+    /// Returns the note script associated with the given root.
+    async fn get_note_script(&self, script_root: Word) -> Result<NoteScript, StoreError>;
+
+    /// Inserts the provided note scripts into the database. If a script with the same root already
+    /// exists, it will be replaced.
+    async fn upsert_note_scripts(&self, note_scripts: &[NoteScript]) -> Result<(), StoreError>;
 
     // CHAIN DATA
     // --------------------------------------------------------------------------------------------
@@ -374,7 +379,7 @@ pub trait Store: Send + Sync {
         let cursor_bytes = self
             .get_setting(NOTE_TRANSPORT_CURSOR_STORE_SETTING.into())
             .await?
-            .ok_or_else(|| StoreError::NoteTransportCursorNotFound)?;
+            .ok_or(StoreError::NoteTransportCursorNotFound)?;
         let array: [u8; 8] = cursor_bytes
             .as_slice()
             .try_into()
@@ -394,20 +399,6 @@ pub trait Store: Send + Sync {
         let cursor_bytes = cursor.value().to_be_bytes().to_vec();
         self.set_setting(NOTE_TRANSPORT_CURSOR_STORE_SETTING.into(), cursor_bytes)
             .await?;
-        Ok(())
-    }
-
-    /// Applies a note transport update
-    ///
-    /// An update involves:
-    /// - Insert fetched notes;
-    /// - Update pagination cursor used in note fetching.
-    async fn apply_note_transport_update(
-        &self,
-        note_transport_update: NoteTransportUpdate,
-    ) -> Result<(), StoreError> {
-        self.update_note_transport_cursor(note_transport_update.cursor).await?;
-        self.upsert_input_notes(&note_transport_update.note_updates).await?;
         Ok(())
     }
 
@@ -447,8 +438,12 @@ pub trait Store: Send + Sync {
         let has_client_notes = has_client_notes.into();
         current_partial_mmr.add(current_block.commitment(), has_client_notes);
 
+        // Only track the latest leaf if it is relevant (it has client notes) _and_ the forest
+        // actually has a single leaf tree bit
+        let track_latest = has_client_notes && current_partial_mmr.forest().has_single_leaf_tree();
+
         let current_partial_mmr =
-            PartialMmr::from_parts(current_partial_mmr.peaks(), tracked_nodes, has_client_notes);
+            PartialMmr::from_parts(current_partial_mmr.peaks(), tracked_nodes, track_latest);
 
         Ok(current_partial_mmr)
     }
@@ -478,9 +473,14 @@ pub trait Store: Send + Sync {
     }
 
     /// Retrieves the storage for a specific account.
+    ///
+    /// Can take an optional map root to retrieve only part of the storage,
+    /// If it does, it will either return an account storage with a single
+    /// slot (the one requested), or an error if not found.
     async fn get_account_storage(
         &self,
         account_id: AccountId,
+        filter: AccountStorageFilter,
     ) -> Result<AccountStorage, StoreError>;
 
     /// Retrieves a specific item from the account's storage map along with its Merkle proof.
@@ -489,19 +489,35 @@ pub trait Store: Send + Sync {
     async fn get_account_map_item(
         &self,
         account_id: AccountId,
-        index: u8,
+        slot_name: StorageSlotName,
         key: Word,
     ) -> Result<(Word, StorageMapWitness), StoreError> {
-        let storage = self.get_account_storage(account_id).await?;
-        let Some(StorageSlot::Map(map)) = storage.slots().get(index as usize) else {
-            return Err(StoreError::AccountError(AccountError::StorageSlotNotMap(index)));
-        };
+        let storage = self
+            .get_account_storage(account_id, AccountStorageFilter::SlotName(slot_name.clone()))
+            .await?;
+        match storage.get(&slot_name).map(StorageSlot::content) {
+            Some(StorageSlotContent::Map(map)) => {
+                let value = map.get(&key);
+                let witness = map.open(&key);
 
-        let value = map.get(&key);
-        let witness = map.open(&key);
-
-        Ok((value, witness))
+                Ok((value, witness))
+            },
+            Some(_) => Err(StoreError::AccountError(AccountError::StorageSlotNotMap(slot_name))),
+            None => {
+                Err(StoreError::AccountError(AccountError::StorageSlotNameNotFound { slot_name }))
+            },
+        }
     }
+
+    // PARTIAL ACCOUNTS
+    // --------------------------------------------------------------------------------------------
+
+    /// Retrieves an [`AccountRecord`] object, this contains the account's latest partial
+    /// state along with its status. Returns `None` if the partial account is not found.
+    async fn get_minimal_partial_account(
+        &self,
+        account_id: AccountId,
+    ) -> Result<Option<AccountRecord>, StoreError>;
 }
 
 // PARTIAL BLOCKCHAIN NODE FILTER
@@ -549,9 +565,8 @@ impl TransactionFilter {
         match self {
             TransactionFilter::All => QUERY.to_string(),
             TransactionFilter::Uncommitted => format!(
-                "{QUERY} WHERE tx.status_variant IN ({}, {})",
+                "{QUERY} WHERE tx.status_variant = {}",
                 TransactionStatusVariant::Pending as u8,
-                TransactionStatusVariant::Discarded as u8
             ),
             TransactionFilter::Ids(_) => {
                 // Use SQLite's array parameter binding
@@ -633,4 +648,18 @@ impl From<bool> for BlockRelevance {
             BlockRelevance::Irrelevant
         }
     }
+}
+
+// STORAGE FILTER
+// ================================================================================================
+
+/// Filters for narrowing the storage slots returned by the client's store.
+#[derive(Debug, Clone)]
+pub enum AccountStorageFilter {
+    /// Return an [`AccountStorage`] with all available slots.
+    All,
+    /// Return an [`AccountStorage`] with a single slot that matches the provided [`Word`] map root.
+    Root(Word),
+    /// Return an [`AccountStorage`] with a single slot that matches the provided slot name.
+    SlotName(StorageSlotName),
 }

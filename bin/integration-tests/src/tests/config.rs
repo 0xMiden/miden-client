@@ -5,9 +5,8 @@ use std::sync::Arc;
 use anyhow::{Context, Result};
 use miden_client::builder::ClientBuilder;
 use miden_client::crypto::RpoRandomCoin;
-use miden_client::keystore::FilesystemKeyStore;
 use miden_client::rpc::{Endpoint, GrpcClient};
-use miden_client::testing::common::{TestClient, TestClientKeyStore, create_test_store_path};
+use miden_client::testing::common::{FilesystemKeyStore, TestClient, create_test_store_path};
 use miden_client::{DebugMode, Felt};
 use miden_client_sqlite_store::ClientBuilderSqliteExt;
 use rand::Rng;
@@ -56,7 +55,7 @@ impl ClientConfig {
     /// database at a temporary location determined by the store config.
     pub async fn into_client_builder(
         self,
-    ) -> Result<(ClientBuilder<TestClientKeyStore>, TestClientKeyStore)> {
+    ) -> Result<(ClientBuilder<FilesystemKeyStore>, FilesystemKeyStore)> {
         let (rpc_endpoint, rpc_timeout, store_config, auth_path) = self.as_parts();
 
         let mut rng = rand::rng();
@@ -86,7 +85,7 @@ impl ClientConfig {
     /// Creates the client using the provided [`ClientConfig`]. The store uses a `SQLite` database
     /// at a temporary location determined by the store config. The client is synced to the
     /// current state before being returned.
-    pub async fn into_client(self) -> Result<(TestClient, TestClientKeyStore)> {
+    pub async fn into_client(self) -> Result<(TestClient, FilesystemKeyStore)> {
         let (builder, keystore) = self.into_client_builder().await?;
 
         let mut client = builder.build().await.with_context(|| "failed to build test client")?;

@@ -1,20 +1,22 @@
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
+use core::fmt;
 
-use miden_lib::account::interface::AccountInterfaceError;
-use miden_objects::account::AccountId;
-use miden_objects::crypto::merkle::MerkleError;
-use miden_objects::note::{NoteId, NoteTag};
-pub use miden_objects::{AccountError, AccountIdError, AssetError, NetworkIdError};
-use miden_objects::{
+use miden_protocol::account::AccountId;
+use miden_protocol::crypto::merkle::MerkleError;
+use miden_protocol::note::{NoteId, NoteTag};
+pub use miden_protocol::{AccountError, AccountIdError, AssetError, NetworkIdError};
+use miden_protocol::{
     NoteError,
     PartialBlockchainError,
     TransactionInputError,
     TransactionScriptError,
     Word,
 };
+use miden_standards::account::interface::AccountInterfaceError;
 // RE-EXPORTS
 // ================================================================================================
+pub use miden_standards::errors::CodeBuilderError;
 pub use miden_tx::AuthenticationError;
 use miden_tx::utils::{DeserializationError, HexParseError};
 use miden_tx::{NoteCheckerError, TransactionExecutorError, TransactionProverError};
@@ -25,6 +27,34 @@ use crate::note_transport::NoteTransportError;
 use crate::rpc::RpcError;
 use crate::store::{NoteRecordError, StoreError};
 use crate::transaction::TransactionRequestError;
+
+// ACTIONABLE HINTS
+// ================================================================================================
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ErrorHint {
+    message: String,
+    docs_url: Option<&'static str>,
+}
+
+impl ErrorHint {
+    pub fn into_help_message(self) -> String {
+        self.to_string()
+    }
+}
+
+impl fmt::Display for ErrorHint {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.docs_url {
+            Some(url) => write!(f, "{} See docs: {}", self.message, url),
+            None => f.write_str(self.message.as_str()),
+        }
+    }
+}
+
+// TODO: This is mostly illustrative but we could add a URL with fragemtn identifiers
+// for each error
+const TROUBLESHOOTING_DOC: &str = "https://0xmiden.github.io/miden-client/cli-troubleshooting.html";
 
 // CLIENT ERROR
 // ================================================================================================
@@ -85,7 +115,7 @@ pub enum ClientError {
     #[error("rpc api error")]
     RpcError(#[from] RpcError),
     #[error("recency condition error: {0}")]
-    RecencyConditionError(String),
+    RecencyConditionError(&'static str),
     #[error("note screener error")]
     NoteScreenerError(#[from] NoteScreenerError),
     #[error("store error")]
@@ -104,6 +134,16 @@ pub enum ClientError {
     TransactionScriptError(#[source] TransactionScriptError),
     #[error("client initialization error: {0}")]
     ClientInitializationError(String),
+    #[error("note tags limit exceeded (max {0})")]
+    NoteTagsLimitExceeded(usize),
+    #[error("accounts limit exceeded (max {0})")]
+    AccountsLimitExceeded(usize),
+    #[error("unsupported authentication scheme ID: {0}")]
+    UnsupportedAuthSchemeId(u8),
+    #[error("account error is not full: {0}")]
+    AccountRecordNotFull(AccountId),
+    #[error("account error is not partial: {0}")]
+    AccountRecordNotPartial(AccountId),
 }
 
 // CONVERSIONS
@@ -112,6 +152,90 @@ pub enum ClientError {
 impl From<ClientError> for String {
     fn from(err: ClientError) -> String {
         err.to_string()
+    }
+}
+
+impl From<&ClientError> for Option<ErrorHint> {
+    fn from(err: &ClientError) -> Self {
+        match err {
+            ClientError::MissingOutputRecipients(recipients) => {
+                Some(missing_recipient_hint(recipients))
+            },
+            ClientError::TransactionRequestError(inner) => inner.into(),
+            ClientError::TransactionExecutorError(inner) => transaction_executor_hint(inner),
+            ClientError::NoteNotFoundOnChain(note_id) => Some(ErrorHint {
+                message: format!(
+                    "Note {note_id} has not been found on chain. Double-check the note ID, ensure it has been committed, and run `miden-client sync` before retrying."
+                ),
+                docs_url: Some(TROUBLESHOOTING_DOC),
+            }),
+            _ => None,
+        }
+    }
+}
+
+impl ClientError {
+    pub fn error_hint(&self) -> Option<ErrorHint> {
+        self.into()
+    }
+}
+
+impl From<&TransactionRequestError> for Option<ErrorHint> {
+    fn from(err: &TransactionRequestError) -> Self {
+        match err {
+            TransactionRequestError::NoInputNotesNorAccountChange => Some(ErrorHint {
+                message: "Transactions must consume input notes or mutate tracked account state. Add at least one authenticated/unauthenticated input note or include an explicit account state update in the request.".to_string(),
+                docs_url: Some(TROUBLESHOOTING_DOC),
+            }),
+            TransactionRequestError::StorageSlotNotFound(slot, account_id) => {
+                Some(storage_miss_hint(*slot, *account_id))
+            },
+            _ => None,
+        }
+    }
+}
+
+impl TransactionRequestError {
+    pub fn error_hint(&self) -> Option<ErrorHint> {
+        self.into()
+    }
+}
+
+fn missing_recipient_hint(recipients: &[Word]) -> ErrorHint {
+    let message = format!(
+        "Recipients {recipients:?} were missing from the transaction outputs. Keep `TransactionRequestBuilder::expected_output_recipients(...)` aligned with the MASM program so the declared recipients appear in the outputs."
+    );
+
+    ErrorHint {
+        message,
+        docs_url: Some(TROUBLESHOOTING_DOC),
+    }
+}
+
+fn storage_miss_hint(slot: u8, account_id: AccountId) -> ErrorHint {
+    ErrorHint {
+        message: format!(
+            "Storage slot {slot} was not found on account {account_id}. Verify the account ABI and component ordering, then adjust the slot index used in the transaction."
+        ),
+        docs_url: Some(TROUBLESHOOTING_DOC),
+    }
+}
+
+fn transaction_executor_hint(err: &TransactionExecutorError) -> Option<ErrorHint> {
+    match err {
+        TransactionExecutorError::ForeignAccountNotAnchoredInReference(account_id) => {
+            Some(ErrorHint {
+                message: format!(
+                    "The foreign account proof for {account_id} was built against a different block. Re-fetch the account proof anchored at the request's reference block before retrying."
+                ),
+                docs_url: Some(TROUBLESHOOTING_DOC),
+            })
+        },
+        TransactionExecutorError::TransactionProgramExecutionFailed(_) => Some(ErrorHint {
+            message: "Re-run the transaction with debug mode enabled , capture VM diagnostics, and inspect the source manager output to understand why execution failed.".to_string(),
+            docs_url: Some(TROUBLESHOOTING_DOC),
+        }),
+        _ => None,
     }
 }
 

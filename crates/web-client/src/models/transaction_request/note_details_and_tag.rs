@@ -1,9 +1,11 @@
 use miden_client_core::note::{NoteDetails as NativeNoteDetails, NoteTag as NativeNoteTag};
 use wasm_bindgen::prelude::*;
 
+use crate::models::NoteTag;
+use crate::models::miden_arrays::NoteDetailsAndTagArray;
 use crate::models::note_details::NoteDetails;
-use crate::models::note_tag::NoteTag;
 
+/// Pair of note details and tag used when declaring expected notes.
 #[derive(Clone)]
 #[wasm_bindgen]
 pub struct NoteDetailsAndTag {
@@ -13,17 +15,20 @@ pub struct NoteDetailsAndTag {
 
 #[wasm_bindgen]
 impl NoteDetailsAndTag {
+    /// Creates a new pair from note details and tag.
     #[wasm_bindgen(constructor)]
     pub fn new(note_details: NoteDetails, tag: NoteTag) -> NoteDetailsAndTag {
         NoteDetailsAndTag { note_details, tag }
     }
 
+    /// Returns the note details.
     #[wasm_bindgen(getter)]
     #[wasm_bindgen(js_name = "noteDetails")]
     pub fn note_details(&self) -> NoteDetails {
         self.note_details.clone()
     }
 
+    /// Returns the note tag.
     #[wasm_bindgen(getter)]
     pub fn tag(&self) -> NoteTag {
         self.tag
@@ -47,33 +52,14 @@ impl From<&NoteDetailsAndTag> for (NativeNoteDetails, NativeNoteTag) {
     }
 }
 
-#[derive(Clone)]
-#[wasm_bindgen]
-pub struct NoteDetailsAndTagArray(Vec<NoteDetailsAndTag>);
-
-#[wasm_bindgen]
-impl NoteDetailsAndTagArray {
-    #[wasm_bindgen(constructor)]
-    pub fn new(
-        note_details_and_tag_array: Option<Vec<NoteDetailsAndTag>>,
-    ) -> NoteDetailsAndTagArray {
-        let note_details_and_tag_array = note_details_and_tag_array.unwrap_or_default();
-        NoteDetailsAndTagArray(note_details_and_tag_array)
-    }
-
-    pub fn push(&mut self, note_details_and_tag: &NoteDetailsAndTag) {
-        self.0.push(note_details_and_tag.clone());
-    }
-}
-
 impl From<NoteDetailsAndTagArray> for Vec<(NativeNoteDetails, NativeNoteTag)> {
     fn from(note_details_and_tag_array: NoteDetailsAndTagArray) -> Self {
-        note_details_and_tag_array.0.into_iter().map(Into::into).collect()
+        note_details_and_tag_array.__inner.into_iter().map(Into::into).collect()
     }
 }
 
 impl From<&NoteDetailsAndTagArray> for Vec<(NativeNoteDetails, NativeNoteTag)> {
     fn from(note_details_and_tag_array: &NoteDetailsAndTagArray) -> Self {
-        note_details_and_tag_array.0.iter().map(Into::into).collect()
+        note_details_and_tag_array.__inner.iter().map(Into::into).collect()
     }
 }

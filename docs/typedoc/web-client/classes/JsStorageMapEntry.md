@@ -1,8 +1,8 @@
-[**@demox-labs/miden-sdk**](../README.md)
+[**@miden-sdk/miden-sdk**](../README.md)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / JsStorageMapEntry
+[@miden-sdk/miden-sdk](../README.md) / JsStorageMapEntry
 
 # Class: JsStorageMapEntry
 
@@ -33,6 +33,16 @@ The root of the storage map entry.
 The value of the storage map entry.
 
 ## Methods
+
+### \[dispose\]()
+
+> **\[dispose\]**(): `void`
+
+#### Returns
+
+`void`
+
+***
 
 ### free()
 

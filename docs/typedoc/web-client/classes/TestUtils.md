@@ -1,12 +1,22 @@
-[**@demox-labs/miden-sdk**](../README.md)
+[**@miden-sdk/miden-sdk**](../README.md)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / TestUtils
+[@miden-sdk/miden-sdk](../README.md) / TestUtils
 
 # Class: TestUtils
 
 ## Methods
+
+### \[dispose\]()
+
+> **\[dispose\]**(): `void`
+
+#### Returns
+
+`void`
+
+***
 
 ### free()
 
@@ -25,3 +35,23 @@
 #### Returns
 
 [`AccountId`](AccountId.md)
+
+***
+
+### createMockSerializedLibraryPackage()
+
+> `static` **createMockSerializedLibraryPackage**(): `Uint8Array`
+
+#### Returns
+
+`Uint8Array`
+
+***
+
+### createMockSerializedProgramPackage()
+
+> `static` **createMockSerializedProgramPackage**(): `Uint8Array`
+
+#### Returns
+
+`Uint8Array`

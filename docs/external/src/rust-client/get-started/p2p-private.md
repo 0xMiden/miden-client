@@ -19,13 +19,13 @@ Remember to use the [Miden client documentation](https://0xMiden.github.io/miden
 
 1. Create a second account to send funds with. Previously, we created a type `mutable` account (`Account A`). Now, create another `mutable` (`Account B`) using the following command:
 
-   ```shell
+   ```sh
    miden-client new-wallet --mutable
    ```
 
 2. List and view the newly created accounts with the following command:
 
-   ```shell
+   ```sh
    miden-client account -l
    ```
 
@@ -39,7 +39,7 @@ Remember to use the [Miden client documentation](https://0xMiden.github.io/miden
 
    To do this, run:
 
-   ```shell
+   ```sh
    miden-client send --sender <regular-account-id-A> --target <regular-account-id-B> --asset 50::<faucet-account-id> --note-type private
    ```
 
@@ -51,7 +51,7 @@ Remember to use the [Miden client documentation](https://0xMiden.github.io/miden
 
 2. First, sync the accounts.
 
-   ```shell
+   ```sh
    miden-client sync
    ```
 
@@ -75,7 +75,7 @@ Remember to use the [Miden client documentation](https://0xMiden.github.io/miden
 
 5. Check the second account:
 
-   ```shell
+   ```sh
    miden-client account --show <regular-account-ID-B>
    ```
 

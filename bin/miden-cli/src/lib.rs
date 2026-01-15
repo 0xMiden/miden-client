@@ -11,11 +11,11 @@ use miden_client::builder::ClientBuilder;
 use miden_client::keystore::FilesystemKeyStore;
 use miden_client::note_transport::grpc::GrpcNoteTransportClient;
 use miden_client::store::{NoteFilter as ClientNoteFilter, OutputNoteRecord};
-use miden_client::{Client, DebugMode, IdPrefixFetchError};
+use miden_client::{Client, ClientError, DebugMode, IdPrefixFetchError};
 use miden_client_sqlite_store::ClientBuilderSqliteExt;
-use rand::rngs::StdRng;
 mod commands;
 use commands::account::AccountCmd;
+use commands::clear_config::ClearConfigCmd;
 use commands::exec::ExecCmd;
 use commands::export::ExportCmd;
 use commands::import::ImportCmd;
@@ -27,19 +27,21 @@ use commands::sync::SyncCmd;
 use commands::tags::TagsCmd;
 use commands::transactions::TransactionCmd;
 
-use self::utils::load_config_file;
+use self::utils::{config_file_exists, load_config_file};
 use crate::commands::address::AddressCmd;
 
-pub type CliKeyStore = FilesystemKeyStore<StdRng>;
+pub type CliKeyStore = FilesystemKeyStore;
 
 pub trait CliAuthenticator: TransactionAuthenticator + Send + Sync + 'static {}
 impl<T> CliAuthenticator for T where T: TransactionAuthenticator + Send + Sync + 'static {}
-
 mod config;
 mod errors;
 mod faucet_details_map;
 mod info;
 mod utils;
+
+/// Re-export `MIDEN_DIR` for use in tests
+pub use config::MIDEN_DIR;
 
 /// Config file name.
 const CLIENT_CONFIG_FILE_NAME: &str = "miden-client.toml";
@@ -74,6 +76,7 @@ const TX_GRACEFUL_BLOCK_DELTA: u32 = 20;
     name = "miden-client",
     about = "The Miden client",
     version,
+    propagate_version = true,
     rename_all = "kebab-case"
 )]
 #[command(multicall(true))]
@@ -136,6 +139,7 @@ pub enum Command {
     Import(ImportCmd),
     Export(ExportCmd),
     Init(InitCmd),
+    ClearConfig(ClearConfigCmd),
     Notes(NotesCmd),
     Sync(SyncCmd),
     /// View a summary of the current client state.
@@ -154,15 +158,23 @@ pub enum Command {
 /// CLI entry point.
 impl Cli {
     pub async fn execute(&self) -> Result<(), CliError> {
-        let mut current_dir = std::env::current_dir()?;
-        current_dir.push(CLIENT_CONFIG_FILE_NAME);
+        // Handle commands that don't require client initialization
+        match &self.action {
+            Command::Init(init_cmd) => {
+                init_cmd.execute()?;
+                return Ok(());
+            },
+            Command::ClearConfig(clear_config_cmd) => {
+                clear_config_cmd.execute()?;
+                return Ok(());
+            },
+            _ => {},
+        }
 
-        // Check if it's an init command before anything else. When we run the init command for
-        // the first time we won't have a config file and thus creating the store would not be
-        // possible.
-        if let Command::Init(init_cmd) = &self.action {
-            init_cmd.execute(&current_dir)?;
-            return Ok(());
+        // Check if Client is not yet initialized => silently initialize the client
+        if !config_file_exists()? {
+            let init_cmd = InitCmd::default();
+            init_cmd.execute()?;
         }
 
         // Define whether we want to use the executor's debug mode based on the env var and
@@ -175,7 +187,7 @@ impl Cli {
         // Create the client
         let (cli_config, _config_path) = load_config_file()?;
 
-        let keystore = CliKeyStore::new(cli_config.secret_keys_directory.clone())
+        let keystore = FilesystemKeyStore::new(cli_config.secret_keys_directory.clone())
             .map_err(CliError::KeyStore)?;
 
         let mut builder = ClientBuilder::new()
@@ -190,12 +202,10 @@ impl Cli {
         }
 
         if let Some(tl_config) = cli_config.note_transport {
-            let client = GrpcNoteTransportClient::connect(
-                tl_config.endpoint.to_string(),
-                tl_config.timeout_ms,
-            )
-            .await
-            .map_err(|e| CliError::Client(e.into()))?;
+            let client =
+                GrpcNoteTransportClient::connect(tl_config.endpoint.clone(), tl_config.timeout_ms)
+                    .await
+                    .map_err(|e| CliError::from(ClientError::from(e)))?;
             builder = builder.note_transport(Arc::new(client));
         }
 
@@ -209,7 +219,7 @@ impl Cli {
                 Box::pin(new_account.execute(client, keystore)).await
             },
             Command::Import(import) => import.execute(client, keystore).await,
-            Command::Init(_) => Ok(()),
+            Command::Init(_) | Command::ClearConfig(_) => Ok(()), // Already handled earlier
             Command::Info => info::print_client_info(&client).await,
             Command::Notes(notes) => Box::pin(notes.execute(client)).await,
             Command::Sync(sync) => sync.execute(client).await,

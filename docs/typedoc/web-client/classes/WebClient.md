@@ -1,8 +1,8 @@
-[**@demox-labs/miden-sdk**](../README.md)
+[**@miden-sdk/miden-sdk**](../README.md)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / WebClient
+[@miden-sdk/miden-sdk](../README.md) / WebClient
 
 # Class: WebClient
 
@@ -18,6 +18,16 @@
 
 ## Methods
 
+### \[dispose\]()
+
+> **\[dispose\]**(): `void`
+
+#### Returns
+
+`void`
+
+***
+
 ### addAccountSecretKeyToWebStore()
 
 > **addAccountSecretKeyToWebStore**(`secret_key`): `Promise`\<`void`\>
@@ -26,7 +36,7 @@
 
 ##### secret\_key
 
-[`SecretKey`](SecretKey.md)
+[`AuthSecretKey`](AuthSecretKey.md)
 
 #### Returns
 
@@ -47,6 +57,26 @@
 #### Returns
 
 `Promise`\<`void`\>
+
+***
+
+### applyTransaction()
+
+> **applyTransaction**(`transaction_result`, `submission_height`): `Promise`\<[`TransactionStoreUpdate`](TransactionStoreUpdate.md)\>
+
+#### Parameters
+
+##### transaction\_result
+
+[`TransactionResult`](TransactionResult.md)
+
+##### submission\_height
+
+`number`
+
+#### Returns
+
+`Promise`\<[`TransactionStoreUpdate`](TransactionStoreUpdate.md)\>
 
 ***
 
@@ -116,6 +146,16 @@ callbacks. If `node_url` is `None`, it defaults to the testnet endpoint.
 
 ***
 
+### createCodeBuilder()
+
+> **createCodeBuilder**(): [`CodeBuilder`](CodeBuilder.md)
+
+#### Returns
+
+[`CodeBuilder`](CodeBuilder.md)
+
+***
+
 ### createMockClient()
 
 > **createMockClient**(`seed?`, `serialized_mock_chain?`, `serialized_mock_note_transport_node?`): `Promise`\<`any`\>
@@ -143,13 +183,31 @@ applications as it uses a mock chain that simulates the behavior of a real node.
 
 ***
 
-### createScriptBuilder()
+### executeTransaction()
 
-> **createScriptBuilder**(): [`ScriptBuilder`](ScriptBuilder.md)
+> **executeTransaction**(`account_id`, `transaction_request`): `Promise`\<[`TransactionResult`](TransactionResult.md)\>
+
+Executes a transaction specified by the request against the specified account but does not
+submit it to the network nor update the local database. The returned [`TransactionResult`]
+retains the execution artifacts needed to continue with the transaction lifecycle.
+
+If the transaction utilizes foreign account data, there is a chance that the client doesn't
+have the required block header in the local database. In these scenarios, a sync to
+the chain tip is performed, and the required block header is retrieved.
+
+#### Parameters
+
+##### account\_id
+
+[`AccountId`](AccountId.md)
+
+##### transaction\_request
+
+[`TransactionRequest`](TransactionRequest.md)
 
 #### Returns
 
-[`ScriptBuilder`](ScriptBuilder.md)
+`Promise`\<[`TransactionResult`](TransactionResult.md)\>
 
 ***
 
@@ -277,7 +335,7 @@ Uses an internal pagination mechanism to avoid fetching duplicate notes.
 
 ### getAccountAuthByPubKey()
 
-> **getAccountAuthByPubKey**(`pub_key`): `Promise`\<[`SecretKey`](SecretKey.md)\>
+> **getAccountAuthByPubKey**(`pub_key`): `Promise`\<[`AuthSecretKey`](AuthSecretKey.md)\>
 
 #### Parameters
 
@@ -287,7 +345,7 @@ Uses an internal pagination mechanism to avoid fetching duplicate notes.
 
 #### Returns
 
-`Promise`\<[`SecretKey`](SecretKey.md)\>
+`Promise`\<[`AuthSecretKey`](AuthSecretKey.md)\>
 
 ***
 
@@ -351,7 +409,7 @@ Uses an internal pagination mechanism to avoid fetching duplicate notes.
 
 ### getOutputNote()
 
-> **getOutputNote**(`note_id`): `Promise`\<`any`\>
+> **getOutputNote**(`note_id`): `Promise`\<[`OutputNoteRecord`](OutputNoteRecord.md)\>
 
 #### Parameters
 
@@ -361,13 +419,13 @@ Uses an internal pagination mechanism to avoid fetching duplicate notes.
 
 #### Returns
 
-`Promise`\<`any`\>
+`Promise`\<[`OutputNoteRecord`](OutputNoteRecord.md)\>
 
 ***
 
 ### getOutputNotes()
 
-> **getOutputNotes**(`filter`): `Promise`\<`any`\>
+> **getOutputNotes**(`filter`): `Promise`\<[`OutputNoteRecord`](OutputNoteRecord.md)[]\>
 
 #### Parameters
 
@@ -377,7 +435,7 @@ Uses an internal pagination mechanism to avoid fetching duplicate notes.
 
 #### Returns
 
-`Promise`\<`any`\>
+`Promise`\<[`OutputNoteRecord`](OutputNoteRecord.md)[]\>
 
 ***
 
@@ -475,7 +533,7 @@ Retrieves the setting value for `key`, or `None` if it hasn’t been set.
 
 ### importPublicAccountFromSeed()
 
-> **importPublicAccountFromSeed**(`init_seed`, `mutable`): `Promise`\<[`Account`](Account.md)\>
+> **importPublicAccountFromSeed**(`init_seed`, `mutable`, `auth_scheme`): `Promise`\<[`Account`](Account.md)\>
 
 #### Parameters
 
@@ -486,6 +544,10 @@ Retrieves the setting value for `key`, or `None` if it hasn’t been set.
 ##### mutable
 
 `boolean`
+
+##### auth\_scheme
+
+[`AuthScheme`](../enumerations/AuthScheme.md)
 
 #### Returns
 
@@ -557,13 +619,13 @@ Returns all the existing setting keys from the store.
 
 ### newConsumeTransactionRequest()
 
-> **newConsumeTransactionRequest**(`list_of_note_ids`): [`TransactionRequest`](TransactionRequest.md)
+> **newConsumeTransactionRequest**(`list_of_notes`): [`TransactionRequest`](TransactionRequest.md)
 
 #### Parameters
 
-##### list\_of\_note\_ids
+##### list\_of\_notes
 
-`string`[]
+[`Note`](Note.md)[]
 
 #### Returns
 
@@ -573,7 +635,7 @@ Returns all the existing setting keys from the store.
 
 ### newFaucet()
 
-> **newFaucet**(`storage_mode`, `non_fungible`, `token_symbol`, `decimals`, `max_supply`): `Promise`\<[`Account`](Account.md)\>
+> **newFaucet**(`storage_mode`, `non_fungible`, `token_symbol`, `decimals`, `max_supply`, `auth_scheme`): `Promise`\<[`Account`](Account.md)\>
 
 #### Parameters
 
@@ -596,6 +658,10 @@ Returns all the existing setting keys from the store.
 ##### max\_supply
 
 `bigint`
+
+##### auth\_scheme
+
+[`AuthScheme`](../enumerations/AuthScheme.md)
 
 #### Returns
 
@@ -711,29 +777,9 @@ Returns all the existing setting keys from the store.
 
 ***
 
-### newTransaction()
-
-> **newTransaction**(`account_id`, `transaction_request`): `Promise`\<[`TransactionResult`](TransactionResult.md)\>
-
-#### Parameters
-
-##### account\_id
-
-[`AccountId`](AccountId.md)
-
-##### transaction\_request
-
-[`TransactionRequest`](TransactionRequest.md)
-
-#### Returns
-
-`Promise`\<[`TransactionResult`](TransactionResult.md)\>
-
-***
-
 ### newWallet()
 
-> **newWallet**(`storage_mode`, `mutable`, `init_seed?`): `Promise`\<[`Account`](Account.md)\>
+> **newWallet**(`storage_mode`, `mutable`, `auth_scheme`, `init_seed?`): `Promise`\<[`Account`](Account.md)\>
 
 #### Parameters
 
@@ -744,6 +790,10 @@ Returns all the existing setting keys from the store.
 ##### mutable
 
 `boolean`
+
+##### auth\_scheme
+
+[`AuthScheme`](../enumerations/AuthScheme.md)
 
 ##### init\_seed?
 
@@ -762,6 +812,29 @@ Returns all the existing setting keys from the store.
 #### Returns
 
 `void`
+
+***
+
+### proveTransaction()
+
+> **proveTransaction**(`transaction_result`, `prover?`): `Promise`\<[`ProvenTransaction`](ProvenTransaction.md)\>
+
+Generates a transaction proof using either the provided prover or the client's default
+prover if none is supplied.
+
+#### Parameters
+
+##### transaction\_result
+
+[`TransactionResult`](TransactionResult.md)
+
+##### prover?
+
+[`TransactionProver`](TransactionProver.md)
+
+#### Returns
+
+`Promise`\<[`ProvenTransaction`](ProvenTransaction.md)\>
 
 ***
 
@@ -887,23 +960,83 @@ Sets a setting key-value in the store. It can then be retrieved using `get_setti
 
 ***
 
-### submitTransaction()
+### submitNewTransaction()
 
-> **submitTransaction**(`transaction_result`, `prover?`): `Promise`\<`void`\>
+> **submitNewTransaction**(`account_id`, `transaction_request`): `Promise`\<[`TransactionId`](TransactionId.md)\>
+
+Executes a transaction specified by the request against the specified account,
+proves it, submits it to the network, and updates the local database.
+
+Uses the prover configured for this client.
+
+If the transaction utilizes foreign account data, there is a chance that the client doesn't
+have the required block header in the local database. In these scenarios, a sync to
+the chain tip is performed, and the required block header is retrieved.
 
 #### Parameters
 
-##### transaction\_result
+##### account\_id
 
-[`TransactionResult`](TransactionResult.md)
+[`AccountId`](AccountId.md)
 
-##### prover?
+##### transaction\_request
+
+[`TransactionRequest`](TransactionRequest.md)
+
+#### Returns
+
+`Promise`\<[`TransactionId`](TransactionId.md)\>
+
+***
+
+### submitNewTransactionWithProver()
+
+> **submitNewTransactionWithProver**(`account_id`, `transaction_request`, `prover`): `Promise`\<[`TransactionId`](TransactionId.md)\>
+
+Executes a transaction specified by the request against the specified account, proves it
+with the user provided prover, submits it to the network, and updates the local database.
+
+If the transaction utilizes foreign account data, there is a chance that the client doesn't
+have the required block header in the local database. In these scenarios, a sync to the
+chain tip is performed, and the required block header is retrieved.
+
+#### Parameters
+
+##### account\_id
+
+[`AccountId`](AccountId.md)
+
+##### transaction\_request
+
+[`TransactionRequest`](TransactionRequest.md)
+
+##### prover
 
 [`TransactionProver`](TransactionProver.md)
 
 #### Returns
 
-`Promise`\<`void`\>
+`Promise`\<[`TransactionId`](TransactionId.md)\>
+
+***
+
+### submitProvenTransaction()
+
+> **submitProvenTransaction**(`proven_transaction`, `transaction_result`): `Promise`\<`number`\>
+
+#### Parameters
+
+##### proven\_transaction
+
+[`ProvenTransaction`](ProvenTransaction.md)
+
+##### transaction\_result
+
+[`TransactionResult`](TransactionResult.md)
+
+#### Returns
+
+`Promise`\<`number`\>
 
 ***
 
@@ -914,22 +1047,6 @@ Sets a setting key-value in the store. It can then be retrieved using `get_setti
 #### Returns
 
 `Promise`\<[`SyncSummary`](SyncSummary.md)\>
-
-***
-
-### testingApplyTransaction()
-
-> **testingApplyTransaction**(`tx_result`): `Promise`\<`void`\>
-
-#### Parameters
-
-##### tx\_result
-
-[`TransactionResult`](TransactionResult.md)
-
-#### Returns
-
-`Promise`\<`void`\>
 
 ***
 

@@ -25,7 +25,7 @@
 //!     note::{NoteScreener, get_input_note_with_id_prefix},
 //!     store::NoteFilter,
 //! };
-//! use miden_objects::account::AccountId;
+//! use miden_protocol::account::AccountId;
 //!
 //! # async fn example<AUTH: TransactionAuthenticator + Sync>(client: &Client<AUTH>) -> Result<(), Box<dyn std::error::Error>> {
 //! // Retrieve all committed input notes
@@ -47,7 +47,7 @@
 //!
 //! // Compile the note script
 //! let script_src = "begin push.9 push.12 add end";
-//! let note_script = client.script_builder().compile_note_script(script_src)?;
+//! let note_script = client.code_builder().compile_note_script(script_src)?;
 //! println!("Compiled note script successfully.");
 //!
 //! # Ok(())
@@ -60,7 +60,7 @@
 use alloc::string::ToString;
 use alloc::vec::Vec;
 
-use miden_objects::account::AccountId;
+use miden_protocol::account::AccountId;
 use miden_tx::auth::TransactionAuthenticator;
 
 use crate::store::{InputNoteRecord, NoteFilter, OutputNoteRecord};
@@ -73,12 +73,9 @@ mod note_update_tracker;
 // RE-EXPORTS
 // ================================================================================================
 
-pub use miden_lib::note::utils::{build_p2id_recipient, build_swap_tag};
-pub use miden_lib::note::well_known_note::WellKnownNote;
-pub use miden_lib::note::{create_p2id_note, create_p2ide_note, create_swap_note};
-pub use miden_objects::NoteError;
-pub use miden_objects::block::BlockNumber;
-pub use miden_objects::note::{
+pub use miden_protocol::NoteError;
+pub use miden_protocol::block::BlockNumber;
+pub use miden_protocol::note::{
     Note,
     NoteAssets,
     NoteDetails,
@@ -98,14 +95,16 @@ pub use miden_objects::note::{
     Nullifier,
     PartialNote,
 };
-pub use miden_objects::transaction::ToInputNoteCommitments;
-pub use note_screener::{
-    NoteConsumability,
-    NoteRelevance,
-    NoteScreener,
-    NoteScreenerAuth,
-    NoteScreenerError,
+pub use miden_protocol::transaction::ToInputNoteCommitments;
+pub use miden_standards::note::utils::{build_p2id_recipient, build_swap_tag};
+pub use miden_standards::note::{
+    NoteConsumptionStatus,
+    WellKnownNote,
+    create_p2id_note,
+    create_p2ide_note,
+    create_swap_note,
 };
+pub use note_screener::{NoteConsumability, NoteScreener, NoteScreenerAuth, NoteScreenerError};
 pub use note_update_tracker::{
     InputNoteUpdate,
     NoteUpdateTracker,
@@ -149,11 +148,7 @@ where
     {
         let committed_notes = self.store.get_input_notes(NoteFilter::Committed).await?;
 
-        let note_screener = NoteScreener::new(
-            self.store.clone(),
-            self.authenticator.clone(),
-            self.source_manager.clone(),
-        );
+        let note_screener = NoteScreener::new(self.store.clone(), self.authenticator.clone());
 
         let mut relevant_notes = Vec::new();
         for input_note in committed_notes {
@@ -186,11 +181,7 @@ where
     where
         AUTH: NoteScreenerAuth,
     {
-        let note_screener = NoteScreener::new(
-            self.store.clone(),
-            self.authenticator.clone(),
-            self.source_manager.clone(),
-        );
+        let note_screener = NoteScreener::new(self.store.clone(), self.authenticator.clone());
         note_screener
             .check_relevance(&note.clone().try_into()?)
             .await

@@ -1,12 +1,24 @@
-[**@demox-labs/miden-sdk**](../README.md)
+[**@miden-sdk/miden-sdk**](../README.md)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / NoteInclusionProof
+[@miden-sdk/miden-sdk](../README.md) / NoteInclusionProof
 
 # Class: NoteInclusionProof
 
+Contains the data required to prove inclusion of a note in the canonical chain.
+
 ## Methods
+
+### \[dispose\]()
+
+> **\[dispose\]**(): `void`
+
+#### Returns
+
+`void`
+
+***
 
 ### free()
 
@@ -22,6 +34,8 @@
 
 > **location**(): [`NoteLocation`](NoteLocation.md)
 
+Returns the location of the note within the tree.
+
 #### Returns
 
 [`NoteLocation`](NoteLocation.md)
@@ -31,6 +45,8 @@
 ### notePath()
 
 > **notePath**(): [`MerklePath`](MerklePath.md)
+
+Returns the Merkle authentication path for the note.
 
 #### Returns
 

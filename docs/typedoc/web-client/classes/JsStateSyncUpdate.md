@@ -1,8 +1,8 @@
-[**@demox-labs/miden-sdk**](../README.md)
+[**@miden-sdk/miden-sdk**](../README.md)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / JsStateSyncUpdate
+[@miden-sdk/miden-sdk](../README.md) / JsStateSyncUpdate
 
 # Class: JsStateSyncUpdate
 
@@ -113,6 +113,16 @@ Output notes created in this state update in serialized form.
 Transaction data for transactions included in this update.
 
 ## Methods
+
+### \[dispose\]()
+
+> **\[dispose\]**(): `void`
+
+#### Returns
+
+`void`
+
+***
 
 ### free()
 

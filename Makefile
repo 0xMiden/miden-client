@@ -114,6 +114,18 @@ stop-node: ## Stop the testing node server
 	-pkill -f "node-builder"
 	sleep 1
 
+.PHONY: start-note-transport-background
+start-note-transport-background: ## Start the note transport service in background
+	./scripts/start-note-transport-bg.sh
+
+.PHONY: stop-note-transport
+stop-note-transport: ## Stop the note transport service
+	./scripts/stop-note-transport.sh
+
+.PHONY: start-note-transport
+start-note-transport:
+	./scripts/start-note-transport.sh
+
 .PHONY: integration-test
 integration-test: ## Run integration tests
 	cargo nextest run --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --release --test=integration
@@ -132,13 +144,21 @@ integration-test-remote-prover-web-client: ## Run integration tests for the web 
 	cd ./crates/web-client && yarn run test:remote_prover -- --project=chromium
 
 .PHONY: integration-test-full
-integration-test-full: ## Run the integration test binary with ignored tests included
-	cargo nextest run --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --release --test=integration
+integration-test-full: ## Run the integration test binary with ignored tests included (requires note transport service)
+	TEST_WITH_NOTE_TRANSPORT=1 cargo nextest run --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --release --test=integration
 	cargo nextest run --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --release --test=integration --run-ignored ignored-only -- import_genesis_accounts_can_be_used_for_transactions
 
+.PHONY: test-dev
+test-dev: ## Run tests with debug assertions enabled via test-dev profile
+	cargo nextest run --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --cargo-profile test-dev --lib $(FEATURES_CLIENT)
+
+.PHONY: integration-test-dev
+integration-test-dev: ## Run integration tests with debug assertions enabled via test-dev profile
+	cargo nextest run --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --cargo-profile test-dev --test=integration
+
 .PHONY: integration-test-binary
-integration-test-binary: ## Run the integration tests using the standalone binary
-	cargo run --package miden-client-integration-tests --release --locked
+integration-test-binary: ## Run the integration tests using the standalone binary (requires note transport service)
+	TEST_WITH_NOTE_TRANSPORT=1 cargo run --package miden-client-integration-tests --release --locked
 
 .PHONY: start-prover
 start-prover: ## Start the remote prover
@@ -201,6 +221,12 @@ check-tools: ## Checks if development tools are installed
 .PHONY: install-tools
 install-tools: ## Installs Rust + Node tools required by the Makefile
 	@echo "Installing development tools..."
+	@rustup show active-toolchain >/dev/null 2>&1 || (echo "Rust toolchain not detected. Install rustup + toolchain first." && exit 1)
+	@echo "Ensuring wasm32-unknown-unknown target is installed..."
+	@rustup target add wasm32-unknown-unknown >/dev/null
+	@RUST_TC=$$(rustup show active-toolchain | awk '{print $$1}'); \
+		echo "Ensuring required Rust components are installed for $$RUST_TC..."; \
+		rustup component add --toolchain $$RUST_TC clippy rust-src rustfmt >/dev/null
 	# Rust-related
 	cargo install mdbook --locked
 	cargo install typos-cli --locked
@@ -210,6 +236,7 @@ install-tools: ## Installs Rust + Node tools required by the Makefile
 	command -v yarn >/dev/null 2>&1 || npm install -g yarn
 	yarn --cwd $(WEB_CLIENT_DIR) --silent  # installs prettier, eslint, typedoc, etc.
 	yarn --cwd crates/idxdb-store/src --silent
+	yarn install --prefix docs/external --no-progress
 	yarn --silent
 	yarn
 	@echo "Development tools installation complete!"

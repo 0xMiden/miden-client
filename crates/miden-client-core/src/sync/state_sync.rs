@@ -3,11 +3,11 @@ use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
-use miden_objects::Word;
-use miden_objects::account::{Account, AccountHeader, AccountId};
-use miden_objects::block::{BlockHeader, BlockNumber};
-use miden_objects::crypto::merkle::{InOrderIndex, MmrDelta, MmrPeaks, PartialMmr};
-use miden_objects::note::{NoteId, NoteTag};
+use miden_protocol::Word;
+use miden_protocol::account::{Account, AccountHeader, AccountId};
+use miden_protocol::block::{BlockHeader, BlockNumber};
+use miden_protocol::crypto::merkle::mmr::{InOrderIndex, MmrDelta, MmrPeaks, PartialMmr};
+use miden_protocol::note::{NoteId, NoteTag};
 use tracing::info;
 
 use super::state_sync_update::TransactionUpdateTracker;
@@ -71,6 +71,7 @@ type NoteScreenerHandle = Arc<dyn OnNoteReceived + Send + Sync>;
 #[cfg(not(feature = "std"))]
 type NoteScreenerHandle = Arc<dyn OnNoteReceived>;
 
+#[derive(Clone)]
 pub struct StateSync {
     /// The RPC client used to communicate with the node.
     rpc_api: Arc<dyn NodeRpcClient>,
@@ -129,7 +130,7 @@ impl StateSync {
     /// * `unspent_input_notes` - The current state of unspent input notes tracked by the client.
     /// * `unspent_output_notes` - The current state of unspent output notes tracked by the client.
     pub async fn sync_state(
-        self,
+        &self,
         mut current_partial_mmr: PartialMmr,
         accounts: Vec<AccountHeader>,
         note_tags: BTreeSet<NoteTag>,
@@ -154,17 +155,20 @@ impl StateSync {
         let account_ids: Vec<AccountId> = accounts.iter().map(AccountHeader::id).collect();
         let mut state_sync_steps = Vec::new();
 
-        loop {
-            info!("Performing sync state step.");
+        while let Some(step) = self
+            .sync_state_step(state_sync_update.block_num, &account_ids, &note_tags)
+            .await?
+        {
+            let sync_block_num = step.block_header.block_num();
 
-            let step = self
-                .sync_state_step(state_sync_update.block_num, &account_ids, note_tags.clone())
-                .await?;
-            let Some(step) = step else {
-                break;
-            };
-            state_sync_update.block_num = step.block_header.block_num();
+            let reached_tip = step.chain_tip == sync_block_num;
+
+            state_sync_update.block_num = sync_block_num;
             state_sync_steps.push(step);
+
+            if reached_tip {
+                break;
+            }
         }
 
         // TODO: fetch_public_note_details should take an iterator or btreeset down to the RPC call
@@ -248,8 +252,9 @@ impl StateSync {
         &self,
         current_block_num: BlockNumber,
         account_ids: &[AccountId],
-        note_tags: Arc<BTreeSet<NoteTag>>,
+        note_tags: &Arc<BTreeSet<NoteTag>>,
     ) -> Result<Option<StateSyncInfo>, ClientError> {
+        info!("Performing sync state step.");
         let response = self
             .rpc_api
             .sync_state(current_block_num, account_ids, note_tags.as_ref())

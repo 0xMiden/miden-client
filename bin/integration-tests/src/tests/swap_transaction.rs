@@ -1,6 +1,7 @@
 use anyhow::{Context, Result};
 use miden_client::account::{Account, AccountStorageMode};
 use miden_client::asset::{Asset, FungibleAsset};
+use miden_client::auth::RPO_FALCON_SCHEME_ID;
 use miden_client::note::{Note, NoteDetails, NoteFile, NoteType, build_swap_tag};
 use miden_client::testing::common::*;
 use miden_client::transaction::{SwapTransactionData, TransactionRequestBuilder};
@@ -24,22 +25,39 @@ pub async fn test_swap_fully_onchain(client_config: ClientConfig) -> Result<()> 
     client2.sync_state().await?;
 
     // Create Client 1's basic wallet (We'll call it accountA)
-    let (account_a, ..) =
-        insert_new_wallet(&mut client1, AccountStorageMode::Private, &authenticator_1).await?;
-
+    let (account_a, ..) = insert_new_wallet(
+        &mut client1,
+        AccountStorageMode::Private,
+        &authenticator_1,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
     // Create Client 2's basic wallet (We'll call it accountB)
-    let (account_b, ..) =
-        insert_new_wallet(&mut client2, AccountStorageMode::Private, &authenticator_2).await?;
+    let (account_b, ..) = insert_new_wallet(
+        &mut client2,
+        AccountStorageMode::Private,
+        &authenticator_2,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
 
     // Create client with faucets BTC faucet (note: it's not real BTC)
-    let (btc_faucet_account, _) =
-        insert_new_fungible_faucet(&mut client1, AccountStorageMode::Private, &authenticator_1)
-            .await?;
+    let (btc_faucet_account, _) = insert_new_fungible_faucet(
+        &mut client1,
+        AccountStorageMode::Private,
+        &authenticator_1,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
 
     // Create client with faucets ETH faucet (note: it's not real ETH)
-    let (eth_faucet_account, _) =
-        insert_new_fungible_faucet(&mut client2, AccountStorageMode::Private, &authenticator_2)
-            .await?;
+    let (eth_faucet_account, _) = insert_new_fungible_faucet(
+        &mut client2,
+        AccountStorageMode::Private,
+        &authenticator_2,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
 
     // mint 1000 BTC for accountA
     println!("minting 1000 btc for account A");
@@ -100,8 +118,12 @@ pub async fn test_swap_fully_onchain(client_config: ClientConfig) -> Result<()> 
     client2.sync_state().await?;
     println!("Consuming swap note on second client...");
 
-    let tx_request = TransactionRequestBuilder::new()
-        .build_consume_notes(vec![expected_output_notes[0].id()])?;
+    let note = client2
+        .get_input_note(expected_output_notes[0].id())
+        .await?
+        .unwrap()
+        .try_into()?;
+    let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![note])?;
     execute_tx_and_sync(&mut client2, account_b.id(), tx_request).await?;
 
     // sync on client 1, we should get the missing payback note details.
@@ -109,8 +131,12 @@ pub async fn test_swap_fully_onchain(client_config: ClientConfig) -> Result<()> 
     client1.sync_state().await?;
     println!("Consuming swap payback note on first client...");
 
-    let tx_request = TransactionRequestBuilder::new()
-        .build_consume_notes(vec![expected_payback_note_details[0].id()])?;
+    let note = client1
+        .get_input_note(expected_payback_note_details[0].id())
+        .await?
+        .unwrap()
+        .try_into()?;
+    let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![note])?;
     execute_tx_and_sync(&mut client1, account_a.id(), tx_request).await?;
 
     // At the end we should end up with
@@ -123,7 +149,8 @@ pub async fn test_swap_fully_onchain(client_config: ClientConfig) -> Result<()> 
         .get_account(account_a.id())
         .await?
         .context("failed to find account A after swap transaction")?
-        .into();
+        .try_into()
+        .unwrap();
     let account_a_assets = account_a.vault().assets();
     assert_eq!(account_a_assets.count(), 2);
     let mut account_a_assets = account_a.vault().assets();
@@ -157,7 +184,8 @@ pub async fn test_swap_fully_onchain(client_config: ClientConfig) -> Result<()> 
         .get_account(account_b.id())
         .await?
         .context("failed to find account B after swap transaction")?
-        .into();
+        .try_into()
+        .unwrap();
     let account_b_assets = account_b.vault().assets();
     assert_eq!(account_b_assets.count(), 2);
     let mut account_b_assets = account_b.vault().assets();
@@ -203,21 +231,38 @@ pub async fn test_swap_private(client_config: ClientConfig) -> Result<()> {
     client2.sync_state().await?;
 
     // Create Client 1's basic wallet (We'll call it accountA)
-    let (account_a, ..) =
-        insert_new_wallet(&mut client1, AccountStorageMode::Private, &authenticator_1).await?;
-
+    let (account_a, ..) = insert_new_wallet(
+        &mut client1,
+        AccountStorageMode::Private,
+        &authenticator_1,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
     // Create Client 2's basic wallet (We'll call it accountB)
-    let (account_b, ..) =
-        insert_new_wallet(&mut client2, AccountStorageMode::Private, &authenticator_2).await?;
+    let (account_b, ..) = insert_new_wallet(
+        &mut client2,
+        AccountStorageMode::Private,
+        &authenticator_2,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
 
     // Create client with faucets BTC faucet (note: it's not real BTC)
-    let (btc_faucet_account, _) =
-        insert_new_fungible_faucet(&mut client1, AccountStorageMode::Private, &authenticator_1)
-            .await?;
+    let (btc_faucet_account, _) = insert_new_fungible_faucet(
+        &mut client1,
+        AccountStorageMode::Private,
+        &authenticator_1,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
     // Create client with faucets ETH faucet (note: it's not real ETH)
-    let (eth_faucet_account, _) =
-        insert_new_fungible_faucet(&mut client2, AccountStorageMode::Private, &authenticator_2)
-            .await?;
+    let (eth_faucet_account, _) = insert_new_fungible_faucet(
+        &mut client2,
+        AccountStorageMode::Private,
+        &authenticator_2,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
 
     // mint 1000 BTC for accountA
     println!("minting 1000 btc for account A");
@@ -272,11 +317,11 @@ pub async fn test_swap_private(client_config: ClientConfig) -> Result<()> {
     )?;
     client2.add_note_tag(tag).await?;
     client2
-        .import_note(NoteFile::NoteDetails {
+        .import_notes(&[NoteFile::NoteDetails {
             details: output_note.try_into()?,
             after_block_num: client1.get_sync_height().await?,
             tag: Some(tag),
-        })
+        }])
         .await?;
 
     // Sync so we get the inclusion proof info
@@ -285,8 +330,12 @@ pub async fn test_swap_private(client_config: ClientConfig) -> Result<()> {
     // consume swap note with accountB, and check that the vault changed appropriately
     println!("Consuming swap note on second client...");
 
-    let tx_request = TransactionRequestBuilder::new()
-        .build_consume_notes(vec![expected_output_notes[0].id()])?;
+    let note = client2
+        .get_input_note(expected_output_notes[0].id())
+        .await?
+        .unwrap()
+        .try_into()?;
+    let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![note])?;
     execute_tx_and_sync(&mut client2, account_b.id(), tx_request).await?;
 
     // sync on client 1, we should get the missing payback note details.
@@ -294,8 +343,12 @@ pub async fn test_swap_private(client_config: ClientConfig) -> Result<()> {
     client1.sync_state().await?;
     println!("Consuming swap payback note on first client...");
 
-    let tx_request = TransactionRequestBuilder::new()
-        .build_consume_notes(vec![expected_payback_note_details[0].id()])?;
+    let note = client1
+        .get_input_note(expected_payback_note_details[0].id())
+        .await?
+        .unwrap()
+        .try_into()?;
+    let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![note])?;
     execute_tx_and_sync(&mut client1, account_a.id(), tx_request).await?;
 
     // At the end we should end up with
@@ -308,7 +361,8 @@ pub async fn test_swap_private(client_config: ClientConfig) -> Result<()> {
         .get_account(account_a.id())
         .await?
         .context("failed to find account A after private swap transaction")?
-        .into();
+        .try_into()
+        .unwrap();
     let account_a_assets = account_a.vault().assets();
     assert_eq!(account_a_assets.count(), 2);
     let mut account_a_assets = account_a.vault().assets();
@@ -342,7 +396,8 @@ pub async fn test_swap_private(client_config: ClientConfig) -> Result<()> {
         .get_account(account_b.id())
         .await?
         .context("failed to find account B after swap transaction")?
-        .into();
+        .try_into()
+        .unwrap();
     let account_b_assets = account_b.vault().assets();
     assert_eq!(account_b_assets.count(), 2);
     let mut account_b_assets = account_b.vault().assets();

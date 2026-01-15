@@ -1,8 +1,8 @@
-[**@demox-labs/miden-sdk**](../README.md)
+[**@miden-sdk/miden-sdk**](../README.md)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / SigningInputs
+[@miden-sdk/miden-sdk](../README.md) / SigningInputs
 
 # Class: SigningInputs
 
@@ -12,21 +12,37 @@
 
 > `readonly` **variantType**: [`SigningInputsType`](../enumerations/SigningInputsType.md)
 
+Returns which variant these signing inputs represent.
+
 ## Methods
 
-### arbitraryPayload()
+### \[dispose\]()
 
-> **arbitraryPayload**(): [`Felt`](Felt.md)[]
+> **\[dispose\]**(): `void`
 
 #### Returns
 
-[`Felt`](Felt.md)[]
+`void`
+
+***
+
+### arbitraryPayload()
+
+> **arbitraryPayload**(): [`FeltArray`](FeltArray.md)
+
+Returns the arbitrary payload as an array of felts.
+
+#### Returns
+
+[`FeltArray`](FeltArray.md)
 
 ***
 
 ### blindPayload()
 
 > **blindPayload**(): [`Word`](Word.md)
+
+Returns the blind payload as a word.
 
 #### Returns
 
@@ -48,6 +64,8 @@
 
 > **serialize**(): `Uint8Array`
 
+Serializes the signing inputs into bytes.
+
 #### Returns
 
 `Uint8Array`
@@ -58,6 +76,8 @@
 
 > **toCommitment**(): [`Word`](Word.md)
 
+Returns the commitment to these signing inputs.
+
 #### Returns
 
 [`Word`](Word.md)
@@ -66,17 +86,21 @@
 
 ### toElements()
 
-> **toElements**(): [`Felt`](Felt.md)[]
+> **toElements**(): [`FeltArray`](FeltArray.md)
+
+Returns the inputs as field elements.
 
 #### Returns
 
-[`Felt`](Felt.md)[]
+[`FeltArray`](FeltArray.md)
 
 ***
 
 ### transactionSummaryPayload()
 
 > **transactionSummaryPayload**(): [`TransactionSummary`](TransactionSummary.md)
+
+Returns the transaction summary payload if this variant contains one.
 
 #### Returns
 
@@ -87,6 +111,8 @@
 ### deserialize()
 
 > `static` **deserialize**(`bytes`): `SigningInputs`
+
+Deserializes signing inputs from bytes.
 
 #### Parameters
 
@@ -104,6 +130,8 @@
 
 > `static` **newArbitrary**(`felts`): `SigningInputs`
 
+Creates signing inputs from arbitrary field elements.
+
 #### Parameters
 
 ##### felts
@@ -120,6 +148,8 @@
 
 > `static` **newBlind**(`word`): `SigningInputs`
 
+Creates blind signing inputs from a single word.
+
 #### Parameters
 
 ##### word
@@ -135,6 +165,8 @@
 ### newTransactionSummary()
 
 > `static` **newTransactionSummary**(`summary`): `SigningInputs`
+
+Creates signing inputs from a transaction summary.
 
 #### Parameters
 

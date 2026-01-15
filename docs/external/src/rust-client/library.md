@@ -30,7 +30,7 @@ let rng = RpoRandomCoin::new(coin_seed.map(Felt::new));
 // Create a keystore to manage cryptographic keys.
 let keystore = FilesystemKeyStore::new(path.into())?;
 
-// Instantiate the client using a gRPC client
+// Setup the gRPC endpoint to connect to the local node.
 let endpoint = Endpoint::new("https".into(), "localhost".into(), Some(57291));
 
 // Optionally, setup a connection to the note transport network
@@ -46,6 +46,7 @@ let client:Client = Client::new(
     None, // Set to Some to enable stale transactions after an amount of blocks.
     None, // Set to Some to enable recency checks when executing transactions.
     Some(Arc::new(nt_client)),
+    None, // or Some(Arc::new(prover)) for a custom prover
 );
 ```
 

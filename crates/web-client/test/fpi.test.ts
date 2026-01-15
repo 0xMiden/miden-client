@@ -6,6 +6,9 @@ export const testStandardFpi = async (page: Page): Promise<void> => {
     const client = window.client;
     await client.syncState();
 
+    const MAP_SLOT_NAME = "miden::testing::fpi::map_slot";
+    const COMPONENT_LIB_PATH = "miden::testing::fpi_component";
+
     // BUILD FOREIGN ACCOUNT WITH CUSTOM COMPONENT
     // --------------------------------------------------------------------------
 
@@ -22,25 +25,32 @@ export const testStandardFpi = async (page: Page): Promise<void> => {
     storageMap.insert(MAP_KEY, FPI_STORAGE_VALUE);
 
     const code = `
-            export.get_fpi_map_item
+            use miden::core::word
+
+            const MAP_SLOT = word("${MAP_SLOT_NAME}")
+
+            pub proc get_fpi_map_item
                 # map key
                 push.15.15.15.15
-                # item index
-                push.0
-                exec.::miden::account::get_map_item
+                push.MAP_SLOT[0..2]
+                exec.::miden::protocol::active_account::get_map_item
                 swapw dropw
             end
         `;
-    let builder = client.createScriptBuilder();
-    let getItemComponent = window.AccountComponent.compile(code, builder, [
-      window.StorageSlot.map(storageMap),
-    ]).withSupportsAllTypes();
+    let builder = client.createCodeBuilder();
+    let componentLibrary = builder.buildLibrary(COMPONENT_LIB_PATH, code);
+    let getItemComponent = window.AccountComponent.fromLibrary(
+      componentLibrary,
+      [window.StorageSlot.map(MAP_SLOT_NAME, storageMap)]
+    ).withSupportsAllTypes();
 
     const walletSeed = new Uint8Array(32);
     crypto.getRandomValues(walletSeed);
 
-    let secretKey = window.SecretKey.withRng(walletSeed);
-    let authComponent = window.AccountComponent.createAuthComponent(secretKey);
+    let secretKey = window.AuthSecretKey.rpoFalconWithRNG(walletSeed);
+
+    let authComponent =
+      window.AccountComponent.createAuthComponentFromSecretKey(secretKey);
 
     let getItemAccountBuilderResult = new window.AccountBuilder(walletSeed)
       .withAuthComponent(authComponent)
@@ -48,8 +58,7 @@ export const testStandardFpi = async (page: Page): Promise<void> => {
       .storageMode(window.AccountStorageMode.public())
       .build();
 
-    let getFpiMapItemProcedureHash =
-      getItemComponent.getProcedureHash("get_fpi_map_item");
+    builder.linkDynamicLibrary(componentLibrary);
 
     // DEPLOY FOREIGN ACCOUNT
     // --------------------------------------------------------------------------
@@ -62,11 +71,12 @@ export const testStandardFpi = async (page: Page): Promise<void> => {
 
     let txRequest = new window.TransactionRequestBuilder().build();
 
-    let txResult = await client.newTransaction(foreignAccountId, txRequest);
+    let txResult = await window.helpers.executeAndApplyTransaction(
+      foreignAccountId,
+      txRequest
+    );
 
     let txId = txResult.executedTransaction().id();
-
-    await client.submitTransaction(txResult);
 
     await window.helpers.waitForTransaction(txId.toHex());
 
@@ -75,15 +85,15 @@ export const testStandardFpi = async (page: Page): Promise<void> => {
 
     let newAccount = await client.newWallet(
       window.AccountStorageMode.public(),
-      false
+      false,
+      0
     );
 
     let txScript = `
-            use.miden::tx
-            use.miden::account
+            use miden::protocol::tx
             begin
-                # push the hash of the {} account procedure
-                push.{proc_root}
+                # push the hash of the component procedure
+                procref.::miden::testing::fpi_component::get_fpi_map_item
 
                 # push the foreign account id
                 push.{account_id_suffix} push.{account_id_prefix}
@@ -93,8 +103,8 @@ export const testStandardFpi = async (page: Page): Promise<void> => {
                 push.9.12.18.30 assert_eqw
             end
         `;
+
     txScript = txScript
-      .replace("{proc_root}", getFpiMapItemProcedureHash)
       .replace("{account_id_suffix}", foreignAccountId.suffix().toString())
       .replace(
         "{account_id_prefix}",
@@ -107,7 +117,7 @@ export const testStandardFpi = async (page: Page): Promise<void> => {
 
     await window.helpers.waitForBlocks(2);
 
-    let slotAndKeys = new window.SlotAndKeys(1, [MAP_KEY]);
+    let slotAndKeys = new window.SlotAndKeys(MAP_SLOT_NAME, [MAP_KEY]);
     let storageRequirements =
       window.AccountStorageRequirements.fromSlotAndKeysArray([slotAndKeys]);
 
@@ -118,17 +128,19 @@ export const testStandardFpi = async (page: Page): Promise<void> => {
 
     let txRequest2 = new window.TransactionRequestBuilder()
       .withCustomScript(compiledTxScript)
-      .withForeignAccounts([foreignAccount])
+      .withForeignAccounts(
+        new window.MidenArrays.ForeignAccountArray([foreignAccount])
+      )
       .build();
 
-    let txResult2 = await client.newTransaction(newAccount.id(), txRequest2);
-
-    await client.submitTransaction(txResult2);
+    let txResult2 = await window.helpers.executeAndApplyTransaction(
+      newAccount.id(),
+      txRequest2
+    );
   });
 };
 
 test.describe("fpi test", () => {
-  test.setTimeout(50000);
   test("runs the standard fpi test successfully", async ({ page }) => {
     await expect(testStandardFpi(page)).resolves.toBeUndefined();
   });

@@ -29,8 +29,8 @@
 //! # use miden_client::auth::TransactionAuthenticator;
 //! # use miden_client::sync::SyncSummary;
 //! # use miden_client::{Client, ClientError};
-//! # use miden_objects::{block::BlockHeader, Felt, Word, StarkField};
-//! # use miden_objects::crypto::rand::FeltRng;
+//! # use miden_protocol::{block::BlockHeader, Felt, Word, StarkField};
+//! # use miden_protocol::crypto::rand::FeltRng;
 //! # async fn run_sync<AUTH: TransactionAuthenticator + Sync + 'static>(client: &mut Client<AUTH>) -> Result<(), ClientError> {
 //! // Attempt to synchronize the client's state with the Miden network.
 //! // The requested data is based on the client's state: it gets updates for accounts, relevant
@@ -60,15 +60,14 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::cmp::max;
 
-use miden_objects::account::AccountId;
-use miden_objects::block::BlockNumber;
-use miden_objects::note::{NoteId, NoteTag};
-use miden_objects::transaction::TransactionId;
+use miden_protocol::account::AccountId;
+use miden_protocol::block::BlockNumber;
+use miden_protocol::note::{NoteId, NoteTag};
+use miden_protocol::transaction::TransactionId;
 use miden_tx::utils::{Deserializable, DeserializationError, Serializable};
-use tracing::info;
+use tracing::{debug, info};
 
 use crate::note::{NoteScreener, NoteScreenerAuth};
-use crate::note_transport::NoteTransport;
 use crate::store::{NoteFilter, TransactionFilter};
 use crate::{Client, ClientError};
 mod block_header;
@@ -125,16 +124,9 @@ where
     {
         _ = self.ensure_genesis_in_place().await?;
 
-        let note_screener = NoteScreener::new(
-            self.store.clone(),
-            self.authenticator.clone(),
-            self.source_manager.clone(),
-        );
+        let note_screener = NoteScreener::new(self.store.clone(), self.authenticator.clone());
         let state_sync =
             StateSync::new(self.rpc_api.clone(), Arc::new(note_screener), self.tx_graceful_blocks);
-
-        let note_transport =
-            self.note_transport_api.as_ref().map(|api| NoteTransport::new(api.clone()));
 
         // Get current state of the client
         let accounts = self
@@ -147,8 +139,15 @@ where
 
         let note_tags: BTreeSet<NoteTag> = self.store.get_unique_note_tags().await?;
 
+        // Note Transport update
+        // TODO We can run both sync_state, fetch_transport_notes futures in parallel
+        if self.is_note_transport_enabled() {
+            let cursor = self.store.get_note_transport_cursor().await?;
+            self.fetch_transport_notes(cursor, note_tags.clone()).await?;
+        }
+
         let unspent_input_notes = self.store.get_input_notes(NoteFilter::Unspent).await?;
-        let unspent_output_notes = self.store.get_output_notes(NoteFilter::Expected).await?;
+        let unspent_output_notes = self.store.get_output_notes(NoteFilter::Unspent).await?;
 
         let uncommitted_transactions =
             self.store.get_transactions(TransactionFilter::Uncommitted).await?;
@@ -161,23 +160,15 @@ where
             .sync_state(
                 current_partial_mmr,
                 accounts,
-                note_tags.clone(),
+                note_tags,
                 unspent_input_notes,
                 unspent_output_notes,
                 uncommitted_transactions,
             )
             .await?;
 
-        // Note Transport update
-        // TODO We can run both sync_state, fetch_notes futures in parallel
-        let note_transport_update = if let Some(mut note_transport) = note_transport {
-            let cursor = self.store.get_note_transport_cursor().await?;
-            Some(note_transport.fetch_notes(cursor, note_tags).await?)
-        } else {
-            None
-        };
-
         let sync_summary: SyncSummary = (&state_sync_update).into();
+        debug!(sync_summary = ?sync_summary, "Sync summary computed");
         info!("Applying changes to the store.");
 
         // Apply received and computed updates to the store
@@ -185,13 +176,6 @@ where
             .apply_state_sync(state_sync_update)
             .await
             .map_err(ClientError::StoreError)?;
-
-        if let Some(note_transport_update) = note_transport_update {
-            self.store
-                .apply_note_transport_update(note_transport_update)
-                .await
-                .map_err(ClientError::StoreError)?;
-        }
 
         // Remove irrelevant block headers
         self.store.prune_irrelevant_blocks().await?;

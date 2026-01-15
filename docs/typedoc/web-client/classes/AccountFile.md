@@ -1,12 +1,58 @@
-[**@demox-labs/miden-sdk**](../README.md)
+[**@miden-sdk/miden-sdk**](../README.md)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / AccountFile
+[@miden-sdk/miden-sdk](../README.md) / AccountFile
 
 # Class: AccountFile
 
 ## Methods
+
+### \[dispose\]()
+
+> **\[dispose\]**(): `void`
+
+#### Returns
+
+`void`
+
+***
+
+### account()
+
+> **account**(): [`Account`](Account.md)
+
+Returns the account data.
+
+#### Returns
+
+[`Account`](Account.md)
+
+***
+
+### accountId()
+
+> **accountId**(): [`AccountId`](AccountId.md)
+
+Returns the account ID.
+
+#### Returns
+
+[`AccountId`](AccountId.md)
+
+***
+
+### authSecretKeyCount()
+
+> **authSecretKeyCount**(): `number`
+
+Returns the number of auth secret keys included.
+
+#### Returns
+
+`number`
+
+***
 
 ### free()
 

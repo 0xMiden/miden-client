@@ -1,31 +1,49 @@
+use miden_client_core::Word as NativeWord;
 use miden_client_core::note::NoteDetails as NativeNoteDetails;
 use wasm_bindgen::prelude::*;
 
 use super::note_assets::NoteAssets;
 use super::note_id::NoteId;
 use super::note_recipient::NoteRecipient;
+use super::word::Word;
 
+/// Details of a note consisting of assets, script, inputs, and a serial number.
+///
+/// See the {@link Note} type for more details.
 #[derive(Clone)]
 #[wasm_bindgen]
 pub struct NoteDetails(NativeNoteDetails);
 
 #[wasm_bindgen]
 impl NoteDetails {
+    /// Creates a new set of note details from the given assets and recipient.
     #[wasm_bindgen(constructor)]
     pub fn new(note_assets: &NoteAssets, note_recipient: &NoteRecipient) -> NoteDetails {
         NoteDetails(NativeNoteDetails::new(note_assets.into(), note_recipient.into()))
     }
 
+    /// Returns the note identifier derived from these details.
     pub fn id(&self) -> NoteId {
         self.0.id().into()
     }
 
+    /// Returns the assets locked by the note.
     pub fn assets(&self) -> NoteAssets {
         self.0.assets().into()
     }
 
+    /// Returns the recipient which controls when the note can be consumed.
     pub fn recipient(&self) -> NoteRecipient {
         self.0.recipient().into()
+    }
+
+    /// Returns the note nullifier as a word.
+    pub fn nullifier(&self) -> Word {
+        let nullifier = self.0.nullifier();
+        let elements: [miden_client_core::Felt; 4] =
+            nullifier.as_elements().try_into().expect("nullifier has 4 elements");
+        let native_word: NativeWord = NativeWord::from(&elements);
+        native_word.into()
     }
 }
 
@@ -50,34 +68,5 @@ impl From<NativeNoteDetails> for NoteDetails {
 impl From<&NativeNoteDetails> for NoteDetails {
     fn from(note_details: &NativeNoteDetails) -> NoteDetails {
         NoteDetails(note_details.clone())
-    }
-}
-
-#[derive(Clone)]
-#[wasm_bindgen]
-pub struct NoteDetailsArray(Vec<NoteDetails>);
-
-#[wasm_bindgen]
-impl NoteDetailsArray {
-    #[wasm_bindgen(constructor)]
-    pub fn new(note_details_array: Option<Vec<NoteDetails>>) -> NoteDetailsArray {
-        let note_details_array = note_details_array.unwrap_or_default();
-        NoteDetailsArray(note_details_array)
-    }
-
-    pub fn push(&mut self, note_details: &NoteDetails) {
-        self.0.push(note_details.clone());
-    }
-}
-
-impl From<NoteDetailsArray> for Vec<NativeNoteDetails> {
-    fn from(note_details_array: NoteDetailsArray) -> Self {
-        note_details_array.0.into_iter().map(Into::into).collect()
-    }
-}
-
-impl From<&NoteDetailsArray> for Vec<NativeNoteDetails> {
-    fn from(note_details_array: &NoteDetailsArray) -> Self {
-        note_details_array.0.iter().map(Into::into).collect()
     }
 }

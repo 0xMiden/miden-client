@@ -15,7 +15,7 @@
 //! #   account::{Account, AccountBuilder, AccountType, component::BasicWallet},
 //! #   crypto::FeltRng
 //! # };
-//! # use miden_objects::account::AccountStorageMode;
+//! # use miden_protocol::account::AccountStorageMode;
 //! # async fn add_new_account_example<AUTH>(
 //! #     client: &mut miden_client::Client<AUTH>
 //! # ) -> Result<(), miden_client::ClientError> {
@@ -36,40 +36,43 @@
 
 use alloc::vec::Vec;
 
-use miden_lib::account::auth::AuthRpoFalcon512;
-use miden_lib::account::wallets::BasicWallet;
-use miden_objects::crypto::dsa::rpo_falcon512::PublicKey;
-use miden_objects::note::NoteTag;
+use miden_protocol::account::auth::PublicKey;
+pub use miden_protocol::account::{
+    Account,
+    AccountBuilder,
+    AccountCode,
+    AccountComponent,
+    AccountComponentCode,
+    AccountDelta,
+    AccountFile,
+    AccountHeader,
+    AccountId,
+    AccountIdPrefix,
+    AccountStorage,
+    AccountStorageMode,
+    AccountType,
+    PartialAccount,
+    PartialStorage,
+    PartialStorageMap,
+    StorageMap,
+    StorageSlot,
+    StorageSlotContent,
+    StorageSlotId,
+    StorageSlotName,
+    StorageSlotType,
+};
+pub use miden_protocol::address::{Address, AddressInterface, AddressType, NetworkId};
+use miden_protocol::note::NoteTag;
+pub use miden_protocol::{AccountIdError, AddressError, NetworkIdError};
+use miden_standards::account::auth::{AuthEcdsaK256Keccak, AuthRpoFalcon512};
 // RE-EXPORTS
 // ================================================================================================
-pub use miden_objects::{
-    AccountIdError,
-    AddressError,
-    NetworkIdError,
-    account::{
-        Account,
-        AccountBuilder,
-        AccountCode,
-        AccountDelta,
-        AccountFile,
-        AccountHeader,
-        AccountId,
-        AccountIdPrefix,
-        AccountStorage,
-        AccountStorageMode,
-        AccountType,
-        PartialAccount,
-        PartialStorage,
-        PartialStorageMap,
-        StorageMap,
-        StorageSlot,
-        StorageSlotType,
-    },
-    address::{AccountIdAddress, Address, AddressInterface, AddressType, NetworkId},
-};
+pub use miden_standards::account::interface::AccountInterfaceExt;
+use miden_standards::account::wallets::BasicWallet;
 use miden_tx::auth::TransactionAuthenticator;
 
 use super::Client;
+use crate::auth::AuthSchemeId;
 use crate::errors::ClientError;
 use crate::rpc::domain::account::FetchedAccount;
 use crate::store::{AccountRecord, AccountStatus};
@@ -78,24 +81,30 @@ use crate::sync::NoteTagRecord;
 pub mod component {
     pub const MIDEN_PACKAGE_EXTENSION: &str = "masp";
 
-    pub use miden_lib::account::auth::*;
-    pub use miden_lib::account::components::{
+    pub use miden_protocol::account::auth::*;
+    pub use miden_protocol::account::component::{
+        InitStorageData,
+        StorageSlotSchema,
+        StorageValueName,
+    };
+    pub use miden_protocol::account::{AccountComponent, AccountComponentMetadata};
+    pub use miden_standards::account::auth::*;
+    pub use miden_standards::account::components::{
         basic_fungible_faucet_library,
         basic_wallet_library,
+        ecdsa_k256_keccak_library,
+        network_fungible_faucet_library,
+        no_auth_library,
+        rpo_falcon_512_acl_library,
         rpo_falcon_512_library,
+        rpo_falcon_512_multisig_library,
     };
-    pub use miden_lib::account::faucets::{BasicFungibleFaucet, FungibleFaucetExt};
-    pub use miden_lib::account::wallets::BasicWallet;
-    pub use miden_objects::account::{
-        AccountComponent,
-        AccountComponentMetadata,
-        FeltRepresentation,
-        InitStorageData,
-        StorageEntry,
-        StorageValueName,
-        TemplateType,
-        WordRepresentation,
+    pub use miden_standards::account::faucets::{
+        BasicFungibleFaucet,
+        FungibleFaucetExt,
+        NetworkFungibleFaucet,
     };
+    pub use miden_standards::account::wallets::BasicWallet;
 }
 
 // CLIENT METHODS
@@ -133,11 +142,18 @@ where
     ///   being tracked.
     /// - If `overwrite` is set to `true` and the `account_data` commitment doesn't match the
     ///   network's account commitment.
+    /// - If the client has reached the accounts limit
+    ///   ([`ACCOUNT_ID_LIMIT`](crate::rpc::ACCOUNT_ID_LIMIT)).
+    /// - If the client has reached the note tags limit
+    ///   ([`NOTE_TAG_LIMIT`](crate::rpc::NOTE_TAG_LIMIT)).
     pub async fn add_account(
         &mut self,
         account: &Account,
         overwrite: bool,
     ) -> Result<(), ClientError> {
+        self.check_account_limit().await?;
+        self.check_note_tag_limit().await?;
+
         if account.is_new() {
             if account.seed().is_none() {
                 return Err(ClientError::AddNewAccountWithoutSeed);
@@ -159,10 +175,7 @@ where
 
         match tracked_account {
             None => {
-                let default_address = Address::AccountId(AccountIdAddress::new(
-                    account.id(),
-                    AddressInterface::Unspecified,
-                ));
+                let default_address = Address::new(account.id());
 
                 // If the account is not being tracked, insert it into the store regardless of the
                 // `overwrite` flag
@@ -182,7 +195,7 @@ where
                     return Err(ClientError::AccountAlreadyTracked(account.id()));
                 }
 
-                if tracked_account.account().nonce().as_int() > account.nonce().as_int() {
+                if tracked_account.nonce().as_int() > account.nonce().as_int() {
                     // If the new account is older than the one being tracked, return an error
                     return Err(ClientError::AccountNonceTooLow);
                 }
@@ -230,13 +243,15 @@ where
     /// # Errors
     /// - If the account is not found on the network.
     /// - If the address is already being tracked.
+    /// - If the client has reached the note tags limit
+    ///   ([`NOTE_TAG_LIMIT`](crate::rpc::NOTE_TAG_LIMIT)).
     pub async fn add_address(
         &mut self,
         address: Address,
         account_id: AccountId,
     ) -> Result<(), ClientError> {
         let network_id = self.rpc_api.get_network_id().await?;
-        let address_bench32 = address.to_bech32(network_id);
+        let address_bench32 = address.encode(network_id);
         if self.store.get_addresses_by_account_id(account_id).await?.contains(&address) {
             return Err(ClientError::AddressAlreadyTracked(address_bench32));
         }
@@ -256,6 +271,7 @@ where
                     ));
                 }
 
+                self.check_note_tag_limit().await?;
                 self.store.insert_address(address, account_id).await?;
                 Ok(())
             },
@@ -348,13 +364,13 @@ where
 /// `Client::import_account_by_id` to import a public account from the network (provided that the
 /// used seed is known).
 ///
-/// This function will only work for accounts with the [`BasicWallet`] and [`AuthRpoFalcon512`]
-/// components.
+/// This function currently supports accounts composed of the [`BasicWallet`] component and one of
+/// the supported authentication schemes ([`AuthRpoFalcon512`] or [`AuthEcdsaK256Keccak`]).
 ///
 /// # Arguments
 /// - `init_seed`: Initial seed used to create the account. This is the seed passed to
 ///   [`AccountBuilder::new`].
-/// - `public_key`: Public key of the account used in the [`AuthRpoFalcon512`] component.
+/// - `public_key`: Public key of the account used for the authentication component.
 /// - `storage_mode`: Storage mode of the account.
 /// - `is_mutable`: Whether the account is mutable or not.
 ///
@@ -362,7 +378,7 @@ where
 /// - If the account cannot be built.
 pub fn build_wallet_id(
     init_seed: [u8; 32],
-    public_key: PublicKey,
+    public_key: &PublicKey,
     storage_mode: AccountStorageMode,
     is_mutable: bool,
 ) -> Result<AccountId, ClientError> {
@@ -372,10 +388,27 @@ pub fn build_wallet_id(
         AccountType::RegularAccountImmutableCode
     };
 
+    let auth_scheme = public_key.auth_scheme();
+    let auth_component = match auth_scheme {
+        AuthSchemeId::RpoFalcon512 => {
+            let auth_component: AccountComponent =
+                AuthRpoFalcon512::new(public_key.to_commitment()).into();
+            auth_component
+        },
+        AuthSchemeId::EcdsaK256Keccak => {
+            let auth_component: AccountComponent =
+                AuthEcdsaK256Keccak::new(public_key.to_commitment()).into();
+            auth_component
+        },
+        auth_scheme => {
+            return Err(ClientError::UnsupportedAuthSchemeId(auth_scheme.as_u8()));
+        },
+    };
+
     let account = AccountBuilder::new(init_seed)
         .account_type(account_type)
         .storage_mode(storage_mode)
-        .with_auth_component(AuthRpoFalcon512::new(public_key.into()))
+        .with_auth_component(auth_component)
         .with_component(BasicWallet)
         .build()?;
 

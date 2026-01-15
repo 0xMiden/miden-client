@@ -2,7 +2,7 @@
 authors.workspace      = true
 categories             = ["asynchronous"]
 description            = "Std-enabled orchestration layer for interacting with the Miden network"
-documentation          = "https://docs.rs/miden-client/0.12.0"
+documentation          = "https://docs.rs/miden-client/0.13.0"
 edition.workspace      = true
 keywords               = ["client", "miden", "service"]
 license.workspace      = true
@@ -22,7 +22,7 @@ tonic   = ["miden-client-core/tonic", "std"]
 anyhow            = { workspace = true }
 async-trait       = { workspace = true }
 futures           = { version = "0.3" }
-miden-client-core = { default-features = false, path = "../miden-client-core", version = "0.12" }
+miden-client-core = { default-features = false, path = "../miden-client-core" }
 thiserror         = { workspace = true }
 tokio             = { workspace = true }
 tracing           = { workspace = true }

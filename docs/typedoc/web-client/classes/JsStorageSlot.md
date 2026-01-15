@@ -1,8 +1,8 @@
-[**@demox-labs/miden-sdk**](../README.md)
+[**@miden-sdk/miden-sdk**](../README.md)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / JsStorageSlot
+[@miden-sdk/miden-sdk](../README.md) / JsStorageSlot
 
 # Class: JsStorageSlot
 
@@ -18,11 +18,11 @@ Commitment of the whole account storage
 
 ***
 
-### slotIndex
+### slotName
 
-> **slotIndex**: `number`
+> **slotName**: `string`
 
-The index of the storage slot.
+The name of the storage slot.
 
 ***
 
@@ -41,6 +41,16 @@ The type of the storage slot.
 The value stored in the storage slot.
 
 ## Methods
+
+### \[dispose\]()
+
+> **\[dispose\]**(): `void`
+
+#### Returns
+
+`void`
+
+***
 
 ### free()
 

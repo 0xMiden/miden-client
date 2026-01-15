@@ -9,7 +9,7 @@ sidebar_position: 13
 The RPC client is a separate component that allows direct interaction with a Miden node via its RPC interface. This is useful for advanced users who need to query for specific blockchain data.
 
 ```typescript
-import { Endpoint, RpcClient, NoteId } from "@demox-labs/miden-sdk";
+import { Endpoint, RpcClient, NoteId } from "@miden-sdk/miden-sdk";
 
 try {
   // Create the RPC client. NOTE: this assumes the node is running on localhost

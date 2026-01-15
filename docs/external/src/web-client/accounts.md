@@ -12,7 +12,7 @@ This guide demonstrates how to retrieve and work with existing accounts using th
 To retrieve a specific account by its ID:
 
 ```typescript
-import { AccountId, WebClient } from "@demox-labs/miden-sdk";
+import { AccountId, WebClient } from "@miden-sdk/miden-sdk";
 
 try {
   // Initialize the web client
@@ -34,6 +34,8 @@ try {
   console.log(account.nonce().toString()); // Current account nonce
   console.log(account.commitment().toHex()); // Account commitment hash
   console.log(account.isPublic()); // Whether the account is public
+  console.log(account.isPrivate()); // Whether the account is private
+  console.log(account.isNetwork()); // Whether the account is network
   console.log(account.isUpdatable()); // Whether the account code can be updated
   console.log(account.isFaucet()); // Whether the account is a faucet
   console.log(account.isRegularAccount()); // Whether it's a regular account
@@ -47,7 +49,7 @@ try {
 To retrieve a list of all accounts tracked by the client:
 
 ```typescript
-import { WebClient } from "@demox-labs/miden-sdk";
+import { WebClient } from "@miden-sdk/miden-sdk";
 
 try {
   // Initialize the web client

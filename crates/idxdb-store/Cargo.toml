@@ -1,6 +1,5 @@
 [package]
 authors.workspace      = true
-build                  = "build.rs"
 description            = "IndexedDB-backed Store implementation for miden-client (WASM)"
 edition.workspace      = true
 license.workspace      = true
@@ -14,7 +13,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 # Miden dependencies
-miden-client-core = { default-features = false, path = "../miden-client-core", version = "0.12" }
+miden-client-core = { default-features = false, path = "../miden-client-core" }
 
 # Workspace dependencies
 async-trait = { workspace = true }

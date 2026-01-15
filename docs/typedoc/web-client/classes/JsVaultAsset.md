@@ -1,8 +1,8 @@
-[**@demox-labs/miden-sdk**](../README.md)
+[**@miden-sdk/miden-sdk**](../README.md)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / JsVaultAsset
+[@miden-sdk/miden-sdk](../README.md) / JsVaultAsset
 
 # Class: JsVaultAsset
 
@@ -41,6 +41,16 @@ The merkle root of the vault's assets.
 The vault key associated with the asset.
 
 ## Methods
+
+### \[dispose\]()
+
+> **\[dispose\]**(): `void`
+
+#### Returns
+
+`void`
+
+***
 
 ### free()
 

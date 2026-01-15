@@ -4,7 +4,8 @@
   "license": "MIT",
   "dependencies": {
     "dexie": "^4.0.11",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.2",
+    "semver": "^7.6.3"
   },
   "scripts": {
     "build": "yarn tsc --build --force ./tsconfig.json",
@@ -15,6 +16,7 @@
     "@eslint/js": "^9.33.0",
     "@typescript-eslint/eslint-plugin": "^8.39.1",
     "eslint": "^9.33.0",
-    "typescript-eslint": "^8.39.1"
+    "typescript-eslint": "^8.39.1",
+    "@types/semver": "^7.5.8"
   }
 }

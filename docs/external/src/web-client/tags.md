@@ -14,7 +14,7 @@ Note tags are used to specify how notes should be executed and who can consume t
 To add a tag for the client to track:
 
 ```typescript
-import { WebClient } from "@demox-labs/miden-sdk";
+import { WebClient } from "@miden-sdk/miden-sdk";
 
 try {
     // Initialize the web client
@@ -33,7 +33,7 @@ try {
 To remove a tag that was previously added:
 
 ```typescript
-import { WebClient } from "@demox-labs/miden-sdk";
+import { WebClient } from "@miden-sdk/miden-sdk";
 
 try {
     // Initialize the web client
@@ -52,7 +52,7 @@ try {
 To get all tags currently being tracked:
 
 ```typescript
-import { WebClient } from "@demox-labs/miden-sdk";
+import { WebClient } from "@miden-sdk/miden-sdk";
 
 try {
     // Initialize the web client
@@ -87,7 +87,7 @@ During sync operations, the client uses these tags to:
 You can add and remove multiple tags in a loop:
 
 ```typescript
-import { WebClient } from "@demox-labs/miden-sdk";
+import { WebClient } from "@miden-sdk/miden-sdk";
 
 try {
     // Initialize the web client

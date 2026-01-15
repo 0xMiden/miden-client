@@ -2,10 +2,10 @@ use alloc::string::ToString;
 use alloc::vec::Vec;
 use core::fmt;
 
-use miden_objects::Word;
-use miden_objects::account::AccountId;
-use miden_objects::block::BlockNumber;
-use miden_objects::transaction::{OutputNotes, TransactionId, TransactionScript};
+use miden_protocol::Word;
+use miden_protocol::account::AccountId;
+use miden_protocol::block::BlockNumber;
+use miden_protocol::transaction::{OutputNotes, TransactionId, TransactionScript};
 use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 
 // TRANSACTION RECORD
@@ -51,6 +51,9 @@ impl TransactionRecord {
                 };
                 true
             },
+            // TODO: We need a better strategy here. If a transaction was discarded within this
+            // same chain of updates, it would be better to pass the state to committed and then
+            // remove the account invalid states and make them valid again
             TransactionStatus::Discarded(_) | TransactionStatus::Committed { .. } => false,
         }
     }

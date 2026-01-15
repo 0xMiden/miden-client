@@ -1,12 +1,17 @@
 import Dexie from "dexie";
+import * as semver from "semver";
 import { logWebStoreError } from "./utils.js";
 
 const DATABASE_NAME = "MidenClientDB";
+export const CLIENT_VERSION_SETTING_KEY = "clientVersion";
+const textEncoder = new TextEncoder();
+const textDecoder = new TextDecoder();
 
-export async function openDatabase(): Promise<boolean> {
-  console.log("Opening database...");
+export async function openDatabase(clientVersion: string): Promise<boolean> {
+  console.log(`Opening database for client version ${clientVersion}...`);
   try {
     await db.open();
+    await ensureClientVersion(clientVersion);
     console.log("Database opened successfully");
     return true;
   } catch (err) {
@@ -34,6 +39,7 @@ enum Table {
   Tags = "tags",
   ForeignAccountCode = "foreignAccountCode",
   Settings = "settings",
+  TrackedAccounts = "trackedAccounts",
 }
 
 export interface IAccountCode {
@@ -43,7 +49,7 @@ export interface IAccountCode {
 
 export interface IAccountStorage {
   commitment: string;
-  slotIndex: number;
+  slotName: string;
   slotValue: string;
   slotType: number;
 }
@@ -159,6 +165,10 @@ export interface ISetting {
   value: Uint8Array;
 }
 
+export interface ITrackedAccount {
+  id: string;
+}
+
 const db = new Dexie(DATABASE_NAME) as Dexie & {
   accountCodes: Dexie.Table<IAccountCode, string>;
   accountStorages: Dexie.Table<IAccountStorage, string>;
@@ -178,23 +188,25 @@ const db = new Dexie(DATABASE_NAME) as Dexie & {
   tags: Dexie.Table<ITag, number>;
   foreignAccountCode: Dexie.Table<IForeignAccountCode, string>;
   settings: Dexie.Table<ISetting, string>;
+  trackedAccounts: Dexie.Table<ITrackedAccount, string>;
 };
 
 db.version(1).stores({
   [Table.AccountCode]: indexes("root"),
-  [Table.AccountStorage]: indexes("[commitment+slotIndex]", "commitment"),
+  [Table.AccountStorage]: indexes("[commitment+slotName]", "commitment"),
   [Table.StorageMapEntries]: indexes("[root+key]", "root"),
   [Table.AccountAssets]: indexes("[root+vaultKey]", "root", "faucetIdPrefix"),
   [Table.AccountAuth]: indexes("pubKey"),
   [Table.Accounts]: indexes(
     "&accountCommitment",
     "id",
+    "[id+nonce]",
     "codeRoot",
     "storageRoot",
     "vaultRoot"
   ),
   [Table.Addresses]: indexes("address", "id"),
-  [Table.Transactions]: indexes("id"),
+  [Table.Transactions]: indexes("id", "statusVariant"),
   [Table.TransactionScripts]: indexes("scriptRoot"),
   [Table.InputNotes]: indexes("noteId", "nullifier", "stateDiscriminant"),
   [Table.OutputNotes]: indexes(
@@ -210,6 +222,7 @@ db.version(1).stores({
   [Table.Tags]: indexes("id++", "tag", "source_note_id", "source_account_id"),
   [Table.ForeignAccountCode]: indexes("accountId"),
   [Table.Settings]: indexes("key"),
+  [Table.TrackedAccounts]: indexes("&id"),
 });
 
 function indexes(...items: string[]): string {
@@ -249,6 +262,69 @@ const foreignAccountCode = db.table<IForeignAccountCode, string>(
   Table.ForeignAccountCode
 );
 const settings = db.table<ISetting, string>(Table.Settings);
+const trackedAccounts = db.table<ITrackedAccount, string>(
+  Table.TrackedAccounts
+);
+
+async function ensureClientVersion(clientVersion: string): Promise<void> {
+  if (!clientVersion) {
+    console.warn(
+      "openDatabase called without a client version; skipping version enforcement."
+    );
+    return;
+  }
+
+  const storedVersion = await getStoredClientVersion();
+  if (!storedVersion) {
+    await persistClientVersion(clientVersion);
+    return;
+  }
+
+  if (storedVersion === clientVersion) {
+    return;
+  }
+
+  const validCurrent = semver.valid(clientVersion);
+  const validStored = semver.valid(storedVersion);
+  if (validCurrent && validStored) {
+    const parsedCurrent = semver.parse(validCurrent);
+    const parsedStored = semver.parse(validStored);
+    const sameMajorMinor =
+      parsedCurrent?.major === parsedStored?.major &&
+      parsedCurrent?.minor === parsedStored?.minor;
+    if (sameMajorMinor || !semver.gt(clientVersion, storedVersion)) {
+      await persistClientVersion(clientVersion);
+      return;
+    }
+  } else {
+    console.warn(
+      `Failed to parse semver (${storedVersion} vs ${clientVersion}), forcing store reset.`
+    );
+  }
+
+  console.warn(
+    `IndexedDB client version mismatch (stored=${storedVersion}, expected=${clientVersion}). Resetting store.`
+  );
+  db.close();
+  await db.delete();
+  await db.open();
+  await persistClientVersion(clientVersion);
+}
+
+async function getStoredClientVersion(): Promise<string | null> {
+  const record = await settings.get(CLIENT_VERSION_SETTING_KEY);
+  if (!record) {
+    return null;
+  }
+  return textDecoder.decode(record.value);
+}
+
+async function persistClientVersion(clientVersion: string): Promise<void> {
+  await settings.put({
+    key: CLIENT_VERSION_SETTING_KEY,
+    value: textEncoder.encode(clientVersion),
+  });
+}
 
 export {
   db,
@@ -270,4 +346,5 @@ export {
   tags,
   foreignAccountCode,
   settings,
+  trackedAccounts,
 };

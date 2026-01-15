@@ -2,9 +2,9 @@
 title: Typescript
 ---
 
-## Miden Web SDK (@demox-labs/miden-sdk)
+## Miden Web SDK (@miden-sdk/miden-sdk)
 
-The `@demox-labs/miden-sdk` is a browser-focused toolkit designed to enable full-featured interaction with the Miden blockchain directly from web applications. It wraps core functionality provided by the Miden Rust client and compiles to WebAssembly (WASM) with TypeScript bindings, making it ideal for use in wallets, dApps, or browser-based dev tools.
+The `@miden-sdk/miden-sdk` is a browser-focused toolkit designed to enable full-featured interaction with the Miden blockchain directly from web applications. It wraps core functionality provided by the Miden Rust client and compiles to WebAssembly (WASM) with TypeScript bindings, making it ideal for use in wallets, dApps, or browser-based dev tools.
 
 ## Capabilities
 
@@ -32,9 +32,9 @@ A custom `rollup.config.js` bundles the WASM module, JS bindings, and web worker
 The SDK is published to NPM and can be installed via:
 
 ```
-npm install @demox-labs/miden-sdk
+npm install @miden-sdk/miden-sdk
 # or
-yarn add @demox-labs/miden-sdk
+yarn add @miden-sdk/miden-sdk
 ```
 
 See the [README](https://github.com/0xMiden/miden-client/blob/main/crates/web-client/README) for full installation instructions and some usage instructions, including code examples for wallet creation, transaction execution, and syncing state.

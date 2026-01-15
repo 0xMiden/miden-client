@@ -1,19 +1,20 @@
 use alloc::string::ToString;
 
-use miden_objects::Word;
-use miden_objects::account::AccountId;
-use miden_objects::block::{BlockHeader, BlockNumber};
-use miden_objects::note::{
+use miden_protocol::Word;
+use miden_protocol::account::AccountId;
+use miden_protocol::block::{BlockHeader, BlockNumber};
+use miden_protocol::note::{
     Note,
     NoteAssets,
     NoteDetails,
+    NoteHeader,
     NoteId,
     NoteInclusionProof,
     NoteMetadata,
     Nullifier,
 };
-use miden_objects::transaction::{InputNote, TransactionId};
-use miden_objects::utils::{
+use miden_protocol::transaction::{InputNote, TransactionId};
+use miden_protocol::utils::{
     ByteReader,
     ByteWriter,
     Deserializable,
@@ -81,6 +82,11 @@ impl InputNoteRecord {
     /// Returns the note's recipient.
     pub fn recipient(&self) -> Word {
         self.details.recipient().digest()
+    }
+
+    /// Returns the note's commitment, if the record contains the [`NoteMetadata`].
+    pub fn commitment(&self) -> Option<Word> {
+        self.metadata().map(|m| NoteHeader::new(self.id(), *m).commitment())
     }
 
     /// Returns the note's assets.
@@ -282,6 +288,7 @@ impl Deserializable for InputNoteRecord {
 
 // CONVERSION
 // ================================================================================================
+
 impl From<Note> for InputNoteRecord {
     fn from(value: Note) -> Self {
         let metadata = *value.metadata();

@@ -28,7 +28,7 @@ These actions can also be executed when inside the repository via the Makefile w
 
 To have a fully-functional client CLI, you would need to set it up first. You can accomplish that with:
 
-```shell
+```sh
 miden-client init --network {localhost/devnet/testnet/custom_rpc_endpoint}
 ```
 
@@ -36,7 +36,7 @@ This would generate the `miden-client.toml` file, which contains useful informat
 
 After this, your client should be set and ready to use. Get the available commands with:
 
-```shell
+```sh
 miden-client
 # or
 miden-client --help

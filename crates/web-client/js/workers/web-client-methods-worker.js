@@ -1,6 +1,54 @@
 import loadWasm from "../../dist/wasm.js";
-const wasm = await loadWasm();
 import { MethodName, WorkerAction } from "../constants.js";
+
+let wasmModule = null;
+
+const getWasmOrThrow = async () => {
+  if (!wasmModule) {
+    wasmModule = await loadWasm();
+  }
+  if (!wasmModule) {
+    throw new Error(
+      "Miden WASM bindings are unavailable in the worker environment."
+    );
+  }
+  return wasmModule;
+};
+
+const serializeUnknown = (value) => {
+  if (typeof value === "string") {
+    return value;
+  }
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+};
+
+const serializeError = (error) => {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+      cause: error.cause ? serializeError(error.cause) : undefined,
+      code: error.code,
+    };
+  }
+
+  if (typeof error === "object" && error !== null) {
+    return {
+      name: error.name ?? "Error",
+      message: error.message ?? serializeUnknown(error),
+    };
+  }
+
+  return {
+    name: "Error",
+    message: serializeUnknown(error),
+  };
+};
 
 /**
  * Worker for executing WebClient methods in a separate thread.
@@ -44,24 +92,28 @@ let processing = false; // Flag to ensure one message is processed at a time.
 // Define a mapping from method names to handler functions.
 const methodHandlers = {
   [MethodName.NEW_WALLET]: async (args) => {
-    const [walletStorageModeStr, mutable, seed] = args;
+    const wasm = await getWasmOrThrow();
+    const [walletStorageModeStr, mutable, authSchemeId, seed] = args;
     const walletStorageMode =
       wasm.AccountStorageMode.tryFromStr(walletStorageModeStr);
     const wallet = await wasmWebClient.newWallet(
       walletStorageMode,
       mutable,
+      authSchemeId,
       seed
     );
     const serializedWallet = wallet.serialize();
     return serializedWallet.buffer;
   },
   [MethodName.NEW_FAUCET]: async (args) => {
+    const wasm = await getWasmOrThrow();
     const [
       faucetStorageModeStr,
       nonFungible,
       tokenSymbol,
       decimals,
       maxSupplyStr,
+      authSchemeId,
     ] = args;
     const faucetStorageMode =
       wasm.AccountStorageMode.tryFromStr(faucetStorageModeStr);
@@ -71,53 +123,127 @@ const methodHandlers = {
       nonFungible,
       tokenSymbol,
       decimals,
-      maxSupply
+      maxSupply,
+      authSchemeId
     );
     const serializedFaucet = faucet.serialize();
     return serializedFaucet.buffer;
-  },
-  [MethodName.NEW_TRANSACTION]: async (args) => {
-    const [accountIdStr, serializedTransactionRequest] = args;
-    const accountId = wasm.AccountId.fromHex(accountIdStr);
-    const transactionRequest = wasm.TransactionRequest.deserialize(
-      new Uint8Array(serializedTransactionRequest)
-    );
-
-    const transactionResult = await wasmWebClient.newTransaction(
-      accountId,
-      transactionRequest
-    );
-    const serializedTransactionResult = transactionResult.serialize();
-    return serializedTransactionResult.buffer;
-  },
-  [MethodName.SUBMIT_TRANSACTION]: async (args) => {
-    const [serializedTransactionResult, serializedProver] = args;
-    const transactionResult = wasm.TransactionResult.deserialize(
-      new Uint8Array(serializedTransactionResult)
-    );
-
-    let prover = undefined;
-    if (serializedProver) {
-      if (serializedProver.startsWith("remote:")) {
-        // For a remote prover, extract the endpoint.
-        // For example, "remote:https://my-custom-endpoint.com" becomes "https://my-custom-endpoint.com"
-        const endpoint = serializedProver.split("remote:")[1];
-        prover = wasm.TransactionProver.deserialize("remote", endpoint);
-      } else if (serializedProver === "local") {
-        prover = wasm.TransactionProver.deserialize("local");
-      } else {
-        throw new Error("Invalid prover tag received in worker");
-      }
-    }
-
-    // Call the unified submit_transaction method with an optional prover.
-    await wasmWebClient.submitTransaction(transactionResult, prover);
-    return;
   },
   [MethodName.SYNC_STATE]: async () => {
     const syncSummary = await wasmWebClient.syncState();
     const serializedSyncSummary = syncSummary.serialize();
     return serializedSyncSummary.buffer;
+  },
+  [MethodName.EXECUTE_TRANSACTION]: async (args) => {
+    const wasm = await getWasmOrThrow();
+    const [accountIdHex, serializedTransactionRequest] = args;
+    const accountId = wasm.AccountId.fromHex(accountIdHex);
+    const transactionRequestBytes = new Uint8Array(
+      serializedTransactionRequest
+    );
+    const transactionRequest = wasm.TransactionRequest.deserialize(
+      transactionRequestBytes
+    );
+    const result = await wasmWebClient.executeTransaction(
+      accountId,
+      transactionRequest
+    );
+    const serializedResult = result.serialize();
+    return serializedResult.buffer;
+  },
+  [MethodName.PROVE_TRANSACTION]: async (args) => {
+    const wasm = await getWasmOrThrow();
+    const [serializedTransactionResult, proverPayload] = args;
+    const transactionResultBytes = new Uint8Array(serializedTransactionResult);
+    const transactionResult = wasm.TransactionResult.deserialize(
+      transactionResultBytes
+    );
+
+    const prover = proverPayload
+      ? wasm.TransactionProver.deserialize(proverPayload)
+      : undefined;
+
+    const proven = await wasmWebClient.proveTransaction(
+      transactionResult,
+      prover
+    );
+    const serializedProven = proven.serialize();
+    return serializedProven.buffer;
+  },
+  [MethodName.SUBMIT_NEW_TRANSACTION]: async (args) => {
+    const wasm = await getWasmOrThrow();
+    const [accountIdHex, serializedTransactionRequest] = args;
+    const accountId = wasm.AccountId.fromHex(accountIdHex);
+    const transactionRequestBytes = new Uint8Array(
+      serializedTransactionRequest
+    );
+    const transactionRequest = wasm.TransactionRequest.deserialize(
+      transactionRequestBytes
+    );
+
+    const result = await wasmWebClient.executeTransaction(
+      accountId,
+      transactionRequest
+    );
+
+    const transactionId = result.id().toHex();
+
+    const proven = await wasmWebClient.proveTransaction(result);
+    const submissionHeight = await wasmWebClient.submitProvenTransaction(
+      proven,
+      result
+    );
+    const transactionUpdate = await wasmWebClient.applyTransaction(
+      result,
+      submissionHeight
+    );
+
+    return {
+      transactionId,
+      submissionHeight,
+      serializedTransactionResult: result.serialize().buffer,
+      serializedTransactionUpdate: transactionUpdate.serialize().buffer,
+    };
+  },
+  [MethodName.SUBMIT_NEW_TRANSACTION_WITH_PROVER]: async (args) => {
+    const wasm = await getWasmOrThrow();
+    const [accountIdHex, serializedTransactionRequest, proverPayload] = args;
+    const accountId = wasm.AccountId.fromHex(accountIdHex);
+    const transactionRequestBytes = new Uint8Array(
+      serializedTransactionRequest
+    );
+    const transactionRequest = wasm.TransactionRequest.deserialize(
+      transactionRequestBytes
+    );
+
+    // Deserialize the prover from the serialized payload
+    const prover = proverPayload
+      ? wasm.TransactionProver.deserialize(proverPayload)
+      : undefined;
+
+    const result = await wasmWebClient.executeTransaction(
+      accountId,
+      transactionRequest
+    );
+
+    const transactionId = result.id().toHex();
+
+    const proven = await wasmWebClient.proveTransaction(result, prover);
+    const submissionHeight = await wasmWebClient.submitProvenTransaction(
+      proven,
+      result
+    );
+    const transactionUpdate = await wasmWebClient.applyTransaction(
+      result,
+      submissionHeight
+    );
+
+    return {
+      transactionId,
+      submissionHeight,
+      serializedTransactionResult: result.serialize().buffer,
+      serializedTransactionUpdate: transactionUpdate.serialize().buffer,
+    };
   },
 };
 
@@ -137,13 +263,15 @@ methodHandlers[MethodName.SYNC_STATE_MOCK] = async (args) => {
   return await methodHandlers[MethodName.SYNC_STATE]();
 };
 
-methodHandlers[MethodName.SUBMIT_TRANSACTION_MOCK] = async (args) => {
+methodHandlers[MethodName.SUBMIT_NEW_TRANSACTION_MOCK] = async (args) => {
+  const wasm = await getWasmOrThrow();
   let serializedMockNoteTransportNode = args.pop();
   let serializedMockChain = args.pop();
   serializedMockChain = new Uint8Array(serializedMockChain);
   serializedMockNoteTransportNode = serializedMockNoteTransportNode
     ? new Uint8Array(serializedMockNoteTransportNode)
     : null;
+
   wasmWebClient = new wasm.WebClient();
   await wasmWebClient.createMockClient(
     wasmSeed,
@@ -151,9 +279,45 @@ methodHandlers[MethodName.SUBMIT_TRANSACTION_MOCK] = async (args) => {
     serializedMockNoteTransportNode
   );
 
-  await methodHandlers[MethodName.SUBMIT_TRANSACTION](args);
+  const result = await methodHandlers[MethodName.SUBMIT_NEW_TRANSACTION](args);
 
   return {
+    transactionId: result.transactionId,
+    submissionHeight: result.submissionHeight,
+    serializedTransactionResult: result.serializedTransactionResult,
+    serializedTransactionUpdate: result.serializedTransactionUpdate,
+    serializedMockChain: wasmWebClient.serializeMockChain().buffer,
+    serializedMockNoteTransportNode:
+      wasmWebClient.serializeMockNoteTransportNode().buffer,
+  };
+};
+
+methodHandlers[MethodName.SUBMIT_NEW_TRANSACTION_WITH_PROVER_MOCK] = async (
+  args
+) => {
+  const wasm = await getWasmOrThrow();
+  let serializedMockNoteTransportNode = args.pop();
+  let serializedMockChain = args.pop();
+  serializedMockChain = new Uint8Array(serializedMockChain);
+  serializedMockNoteTransportNode = serializedMockNoteTransportNode
+    ? new Uint8Array(serializedMockNoteTransportNode)
+    : null;
+
+  wasmWebClient = new wasm.WebClient();
+  await wasmWebClient.createMockClient(
+    wasmSeed,
+    serializedMockChain,
+    serializedMockNoteTransportNode
+  );
+
+  const result =
+    await methodHandlers[MethodName.SUBMIT_NEW_TRANSACTION_WITH_PROVER](args);
+
+  return {
+    transactionId: result.transactionId,
+    submissionHeight: result.submissionHeight,
+    serializedTransactionResult: result.serializedTransactionResult,
+    serializedTransactionUpdate: result.serializedTransactionUpdate,
     serializedMockChain: wasmWebClient.serializeMockChain().buffer,
     serializedMockNoteTransportNode:
       wasmWebClient.serializeMockNoteTransportNode().buffer,
@@ -169,6 +333,7 @@ async function processMessage(event) {
     if (action === WorkerAction.INIT) {
       const [rpcUrl, noteTransportUrl, seed] = args;
       // Initialize the WASM WebClient.
+      const wasm = await getWasmOrThrow();
       wasmWebClient = new wasm.WebClient();
       await wasmWebClient.createClient(rpcUrl, noteTransportUrl, seed);
 
@@ -190,14 +355,19 @@ async function processMessage(event) {
         throw new Error(`Unsupported method: ${methodName}`);
       }
       const result = await handler(args);
-      self.postMessage({ requestId, result });
+      self.postMessage({ requestId, result, methodName });
       return;
     } else {
       throw new Error(`Unsupported action: ${action}`);
     }
   } catch (error) {
-    console.error(`WORKER: Error occurred - ${error}`);
-    self.postMessage({ requestId, error: error });
+    const serializedError = serializeError(error);
+    console.error(
+      "WORKER: Error occurred - %s",
+      serializedError.message,
+      error
+    );
+    self.postMessage({ requestId, error: serializedError, methodName });
   }
 }
 

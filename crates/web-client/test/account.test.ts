@@ -17,7 +17,8 @@ export const getAccountOneMatch = async (
     const client = window.client;
     const newAccount = await client.newWallet(
       window.AccountStorageMode.private(),
-      true
+      true,
+      0
     );
     const result = await client.getAccount(newAccount.id());
 
@@ -85,11 +86,13 @@ export const getAccountsManyMatches = async (
     const client = window.client;
     const newAccount1 = await client.newWallet(
       window.AccountStorageMode.private(),
-      true
+      true,
+      0
     );
     const newAccount2 = await client.newWallet(
       window.AccountStorageMode.private(),
-      true
+      true,
+      0
     );
     const commitmentsOfCreatedAccounts = [
       newAccount1.commitment().toHex(),

@@ -85,7 +85,7 @@ impl ExecCmd {
 
         let advice_inputs = AdviceInputs::default().with_map(inputs);
 
-        let tx_script = client.script_builder().compile_tx_script(&program)?;
+        let tx_script = client.code_builder().compile_tx_script(&program)?;
 
         let result = client
             .execute_program(account_id, tx_script, advice_inputs, BTreeSet::new())

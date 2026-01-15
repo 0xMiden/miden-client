@@ -12,13 +12,13 @@ use miden_client::note::{
 };
 use miden_client::store::NoteRecordError;
 use miden_client::transaction::{
+    ExecutedTransaction,
     InputNote,
     OutputNote,
     PaymentNoteDescription,
     SwapTransactionData,
     TransactionRequest,
     TransactionRequestBuilder,
-    TransactionResult,
 };
 use miden_client::{Client, RemoteTransactionProver};
 use tracing::info;
@@ -309,18 +309,29 @@ impl ConsumeNotesCmd {
     ) -> Result<(), CliError> {
         let force = self.force;
 
-        let mut authenticated_notes = Vec::new();
-        let mut unauthenticated_notes = Vec::new();
+        let mut input_notes = Vec::new();
 
         for note_id in &self.list_of_notes {
             let note_record = get_input_note_with_id_prefix(&client, note_id)
                 .await
                 .map_err(|_| CliError::Input(format!("Input note ID {note_id} is neither a valid Note ID nor a prefix of a known Note ID")))?;
 
-            if note_record.is_authenticated() {
-                authenticated_notes.push(note_record.id());
-            } else {
-                unauthenticated_notes.push((
+            input_notes.push((
+                note_record.try_into().map_err(|err: NoteRecordError| {
+                    CliError::Transaction(err.into(), "Failed to convert note record".to_string())
+                })?,
+                None,
+            ));
+        }
+
+        let account_id =
+            get_input_acc_id_by_prefix_or_default(&client, self.account_id.clone()).await?;
+
+        if input_notes.is_empty() {
+            info!("No input note IDs provided, getting all notes consumable by {}", account_id);
+            let consumable_notes = client.get_consumable_notes(Some(account_id)).await?;
+            for (note_record, _) in consumable_notes {
+                input_notes.push((
                     note_record.try_into().map_err(|err: NoteRecordError| {
                         CliError::Transaction(
                             err.into(),
@@ -332,17 +343,7 @@ impl ConsumeNotesCmd {
             }
         }
 
-        let account_id =
-            get_input_acc_id_by_prefix_or_default(&client, self.account_id.clone()).await?;
-
-        if authenticated_notes.is_empty() {
-            info!("No input note IDs provided, getting all notes consumable by {}", account_id);
-            let consumable_notes = client.get_consumable_notes(Some(account_id)).await?;
-
-            authenticated_notes.extend(consumable_notes.iter().map(|(note, _)| note.id()));
-        }
-
-        if authenticated_notes.is_empty() && unauthenticated_notes.is_empty() {
+        if input_notes.is_empty() {
             return Err(CliError::Transaction(
                 "No input notes were provided and the store does not contain any notes consumable by {account_id}".into(),
                 "Input notes check failed".to_string(),
@@ -350,8 +351,7 @@ impl ConsumeNotesCmd {
         }
 
         let transaction_request = TransactionRequestBuilder::new()
-            .authenticated_input_notes(authenticated_notes.into_iter().map(|id| (id, None)))
-            .unauthenticated_input_notes(unauthenticated_notes)
+            .input_notes(input_notes)
             .build()
             .map_err(|err| {
                 CliError::Transaction(
@@ -382,11 +382,12 @@ async fn execute_transaction<AUTH: CliAuthenticator>(
     delegated_proving: bool,
 ) -> Result<(), CliError> {
     println!("Executing transaction...");
-    let transaction_execution_result =
-        client.new_transaction(account_id, transaction_request).await?;
+    let transaction_result = client.execute_transaction(account_id, transaction_request).await?;
+
+    let executed_transaction = transaction_result.executed_transaction().clone();
 
     // Show delta and ask for confirmation
-    print_transaction_details(&transaction_execution_result)?;
+    print_transaction_details(&executed_transaction)?;
     if !force {
         println!(
             "\nContinue with proving and submission? Changes will be irreversible once the proof is finalized on the network (y/N)"
@@ -400,16 +401,16 @@ async fn execute_transaction<AUTH: CliAuthenticator>(
         }
     }
 
-    println!("Proving transaction and then submitting it to node...");
-
-    let transaction_id = transaction_execution_result.executed_transaction().id();
-    let output_notes = transaction_execution_result
-        .created_notes()
+    let transaction_id = executed_transaction.id();
+    let output_notes = executed_transaction
+        .output_notes()
         .iter()
         .map(OutputNote::id)
         .collect::<Vec<_>>();
 
-    if delegated_proving {
+    println!("Proving transaction...");
+
+    let prover = if delegated_proving {
         let (cli_config, _) = load_config_file()?;
         let remote_prover_endpoint =
             cli_config.remote_prover_endpoint.as_ref().ok_or(CliError::Config(
@@ -417,14 +418,23 @@ async fn execute_transaction<AUTH: CliAuthenticator>(
                 "remote prover endpoint is not set in the configuration file".to_string(),
             ))?;
 
-        let remote_prover =
-            Arc::new(RemoteTransactionProver::new(remote_prover_endpoint.to_string()));
-        client
-            .submit_transaction_with_prover(transaction_execution_result, remote_prover)
-            .await?;
+        Arc::new(
+            RemoteTransactionProver::new(remote_prover_endpoint.to_string())
+                .with_timeout(cli_config.remote_prover_timeout),
+        )
     } else {
-        client.submit_transaction(transaction_execution_result).await?;
-    }
+        client.prover()
+    };
+
+    let proven_transaction = client.prove_transaction_with(&transaction_result, prover).await?;
+
+    println!("Submitting transaction to node...");
+
+    let submission_height = client
+        .submit_proven_transaction(proven_transaction, &transaction_result)
+        .await?;
+    println!("Applying transaction to store...");
+    client.apply_transaction(&transaction_result, submission_height).await?;
 
     println!("Successfully created transaction.");
     println!("Transaction ID: {transaction_id}");
@@ -441,16 +451,11 @@ async fn execute_transaction<AUTH: CliAuthenticator>(
     Ok(())
 }
 
-fn print_transaction_details(transaction_result: &TransactionResult) -> Result<(), CliError> {
+fn print_transaction_details(executed_tx: &ExecutedTransaction) -> Result<(), CliError> {
     println!("The transaction will have the following effects:\n");
 
     // INPUT NOTES
-    let input_note_ids = transaction_result
-        .executed_transaction()
-        .input_notes()
-        .iter()
-        .map(InputNote::id)
-        .collect::<Vec<_>>();
+    let input_note_ids = executed_tx.input_notes().iter().map(InputNote::id).collect::<Vec<_>>();
     if input_note_ids.is_empty() {
         println!("No notes will be consumed.");
     } else {
@@ -462,7 +467,7 @@ fn print_transaction_details(transaction_result: &TransactionResult) -> Result<(
     println!();
 
     // OUTPUT NOTES
-    let output_note_count = transaction_result.executed_transaction().output_notes().iter().count();
+    let output_note_count = executed_tx.output_notes().iter().count();
     if output_note_count == 0 {
         println!("No notes will be created as a result of this transaction.");
     } else {
@@ -471,12 +476,9 @@ fn print_transaction_details(transaction_result: &TransactionResult) -> Result<(
     println!();
 
     // ACCOUNT CHANGES
-    println!(
-        "The account with ID {} will be modified as follows:",
-        transaction_result.executed_transaction().account_id()
-    );
+    println!("The account with ID {} will be modified as follows:", executed_tx.account_id());
 
-    let account_delta = transaction_result.account_delta();
+    let account_delta = executed_tx.account_delta();
 
     let has_storage_changes = !account_delta.storage().is_empty();
     if has_storage_changes {

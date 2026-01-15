@@ -2,8 +2,8 @@ use alloc::string::{String, ToString};
 use alloc::sync::Arc;
 use std::boxed::Box;
 
-use miden_objects::crypto::rand::{FeltRng, RpoRandomCoin};
-use miden_objects::{Felt, MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES};
+use miden_protocol::crypto::rand::{FeltRng, RpoRandomCoin};
+use miden_protocol::{Felt, MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES};
 use miden_tx::ExecutionOptions;
 use miden_tx::auth::TransactionAuthenticator;
 use rand::Rng;
@@ -12,6 +12,7 @@ use crate::keystore::FilesystemKeyStore;
 use crate::note_transport::NoteTransportClient;
 use crate::rpc::NodeRpcClient;
 use crate::store::{Store, StoreError};
+use crate::transaction::TransactionProver;
 use crate::{Client, ClientError, DebugMode};
 
 // CONSTANTS
@@ -59,14 +60,14 @@ pub trait StoreFactory {
 ///
 /// This builder allows you to configure the various components required by the client, such as the
 /// RPC endpoint, store, RNG, and keystore. It is generic over the keystore type. By default, it
-/// uses `FilesystemKeyStore<rand::rngs::StdRng>`.
+/// uses [`FilesystemKeyStore`].
 pub struct ClientBuilder<AUTH> {
     /// An optional custom RPC client. If provided, this takes precedence over `rpc_endpoint`.
     rpc_api: Option<Arc<dyn NodeRpcClient>>,
     /// An optional store provided by the user.
     pub store: Option<StoreBuilder>,
     /// An optional RNG provided by the user.
-    rng: Option<Box<dyn FeltRng + Send>>,
+    rng: Option<Box<dyn FeltRng + Send + Sync>>,
     /// The keystore configuration provided by the user.
     keystore: Option<AuthenticatorConfig<AUTH>>,
     /// A flag to enable debug mode.
@@ -79,6 +80,8 @@ pub struct ClientBuilder<AUTH> {
     max_block_number_delta: Option<u32>,
     /// An optional custom note transport client.
     note_transport_api: Option<Arc<dyn NoteTransportClient>>,
+    /// An optional custom transaction prover.
+    tx_prover: Option<Arc<dyn TransactionProver + Send + Sync>>,
 }
 
 impl<AUTH> Default for ClientBuilder<AUTH> {
@@ -92,6 +95,7 @@ impl<AUTH> Default for ClientBuilder<AUTH> {
             tx_graceful_blocks: Some(TX_GRACEFUL_BLOCKS),
             max_block_number_delta: None,
             note_transport_api: None,
+            tx_prover: None,
         }
     }
 }
@@ -138,7 +142,7 @@ where
 
     /// Optionally provide a custom RNG.
     #[must_use]
-    pub fn rng(mut self, rng: Box<dyn FeltRng + Send>) -> Self {
+    pub fn rng(mut self, rng: Box<dyn FeltRng + Send + Sync>) -> Self {
         self.rng = Some(rng);
         self
     }
@@ -181,6 +185,13 @@ where
     #[must_use]
     pub fn note_transport(mut self, client: Arc<dyn NoteTransportClient>) -> Self {
         self.note_transport_api = Some(client);
+        self
+    }
+
+    /// Sets a custom transaction prover.
+    #[must_use]
+    pub fn prover(mut self, prover: Arc<dyn TransactionProver + Send + Sync>) -> Self {
+        self.tx_prover = Some(prover);
         self
     }
 
@@ -250,6 +261,7 @@ where
             self.tx_graceful_blocks,
             self.max_block_number_delta,
             self.note_transport_api,
+            self.tx_prover,
         )
         .await
     }
@@ -261,10 +273,10 @@ where
 /// Marker trait to capture the bounds the builder requires for the authenticator type
 /// parameter
 pub trait BuilderAuthenticator:
-    TransactionAuthenticator + From<FilesystemKeyStore<rand::rngs::StdRng>> + 'static
+    TransactionAuthenticator + From<FilesystemKeyStore> + 'static
 {
 }
 impl<T> BuilderAuthenticator for T where
-    T: TransactionAuthenticator + From<FilesystemKeyStore<rand::rngs::StdRng>> + 'static
+    T: TransactionAuthenticator + From<FilesystemKeyStore> + 'static
 {
 }

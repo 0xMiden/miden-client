@@ -6,6 +6,7 @@ use miden_client_core::account::Account;
 use miden_client_core::store::{StoreError, TransactionFilter};
 use miden_client_core::transaction::{
     TransactionDetails,
+    TransactionId,
     TransactionRecord,
     TransactionScript,
     TransactionStatus,
@@ -70,7 +71,12 @@ impl WebStore {
 
                 let status = TransactionStatus::read_from_bytes(&tx_idxdb.status)?;
 
-                Ok(TransactionRecord { id: id.into(), details, script, status })
+                Ok(TransactionRecord {
+                    id: TransactionId::from_raw(id),
+                    details,
+                    script,
+                    status,
+                })
             })
             .collect();
 
@@ -95,9 +101,15 @@ impl WebStore {
             .get_account(delta.id())
             .await?
             .ok_or(StoreError::AccountDataNotFound(delta.id()))?
-            .into();
+            .try_into()
+            .map_err(|_| StoreError::AccountDataNotFound(delta.id()))?;
 
-        account.apply_delta(delta)?;
+        if delta.is_full_state() {
+            account =
+                delta.try_into().expect("casting account from full state delta should not fail");
+        } else {
+            account.apply_delta(delta)?;
+        }
 
         update_account(&account).await.map_err(|err| {
             StoreError::DatabaseError(format!("failed to update account: {err:?}"))

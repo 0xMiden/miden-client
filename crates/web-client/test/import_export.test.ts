@@ -86,10 +86,12 @@ test.describe("export and import account", () => {
 
     const mutable = false;
     const storageMode = StorageMode.PRIVATE;
+    const authSchemeId = 0;
 
     const initialWallet = await createNewWallet(page, {
       storageMode,
       mutable,
+      authSchemeId,
       walletSeed,
     });
     const faucet = await createNewFaucet(page);
@@ -238,11 +240,13 @@ test.describe("export and import note", () => {
           const client = window.client;
           const account1 = await client.newWallet(
             window.AccountStorageMode.private(),
-            true
+            true,
+            0
           );
           const account2 = await client.newWallet(
             window.AccountStorageMode.private(),
-            true
+            true,
+            0
           );
 
           const p2IdNote = window.Note.createP2IDNote(

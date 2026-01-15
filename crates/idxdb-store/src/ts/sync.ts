@@ -132,7 +132,7 @@ interface SerializedOutputNoteData {
 interface SerializedTransactionData {
   id: string;
   details: Uint8Array;
-  blockNum: string;
+  blockNum: number;
   scriptRoot?: Uint8Array;
   statusVariant: number;
   status: Uint8Array;
@@ -177,7 +177,7 @@ export interface JsVaultAsset {
 
 export interface JsStorageSlot {
   commitment: string;
-  slotIndex: number;
+  slotName: string;
   slotValue: string;
   slotType: number;
 }

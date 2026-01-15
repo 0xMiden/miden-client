@@ -1,8 +1,10 @@
 extern crate alloc;
 use alloc::sync::Arc;
+use core::error::Error;
 use core::fmt::Write;
 
 use idxdb_store::WebStore;
+use js_sys::{Function, Reflect};
 use miden_client_core::crypto::RpoRandomCoin;
 use miden_client_core::note_transport::NoteTransportClient;
 use miden_client_core::note_transport::grpc::GrpcNoteTransportClient;
@@ -11,21 +13,24 @@ use miden_client_core::testing::mock::MockRpcApi;
 use miden_client_core::testing::note_transport::MockNoteTransportApi;
 use miden_client_core::{
     Client,
+    ClientError,
+    ErrorHint,
     ExecutionOptions,
     Felt,
     MAX_TX_EXECUTION_CYCLES,
     MIN_TX_EXECUTION_CYCLES,
 };
-use models::script_builder::ScriptBuilder;
+use models::code_builder::CodeBuilder;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use wasm_bindgen::prelude::*;
-use wasm_bindgen_futures::js_sys::Function;
 
 pub mod account;
 pub mod export;
 pub mod helpers;
 pub mod import;
+#[macro_use]
+pub(crate) mod miden_array;
 pub mod mock;
 pub mod models;
 pub mod new_account;
@@ -168,41 +173,48 @@ impl WebClient {
 
         let keystore = WebKeyStore::new_with_callbacks(rng, get_key_cb, insert_key_cb, sign_cb);
 
-        self.inner = Some(
-            Client::new(
-                rpc_client,
-                Box::new(rng),
-                web_store.clone(),
-                Some(Arc::new(keystore.clone())),
-                ExecutionOptions::new(
-                    Some(MAX_TX_EXECUTION_CYCLES),
-                    MIN_TX_EXECUTION_CYCLES,
-                    false,
-                    false,
-                )
-                .expect("Default executor's options should always be valid"),
-                None,
-                None,
-                note_transport_client,
+        let mut client = Client::new(
+            rpc_client,
+            Box::new(rng),
+            web_store.clone(),
+            Some(Arc::new(keystore.clone())),
+            ExecutionOptions::new(
+                Some(MAX_TX_EXECUTION_CYCLES),
+                MIN_TX_EXECUTION_CYCLES,
+                false,
+                false,
             )
-            .await
-            .map_err(|err| js_error_with_context(err, "Failed to create client"))?,
-        );
+            .expect("Default executor's options should always be valid"),
+            None,
+            None,
+            note_transport_client,
+            None,
+        )
+        .await
+        .map_err(|err| js_error_with_context(err, "Failed to create client"))?;
 
+        // Ensure genesis block is fetched and stored in IndexedDB.
+        // This is important for web workers that create their own client instances -
+        // they will read the genesis from the shared IndexedDB and automatically
+        // set the genesis commitment on their RPC client.
+        client
+            .ensure_genesis_in_place()
+            .await
+            .map_err(|err| js_error_with_context(err, "Failed to ensure genesis in place"))?;
+
+        self.inner = Some(client);
         self.store = Some(web_store);
         self.keystore = Some(keystore);
 
         Ok(())
     }
 
-    #[wasm_bindgen(js_name = "createScriptBuilder")]
-    pub fn create_script_builder(&self) -> Result<ScriptBuilder, JsValue> {
+    #[wasm_bindgen(js_name = "createCodeBuilder")]
+    pub fn create_code_builder(&self) -> Result<CodeBuilder, JsValue> {
         let Some(client) = &self.inner else {
-            return Err("client was not initialized before instancing ScriptBuilder".into());
+            return Err("client was not initialized before instancing CodeBuilder".into());
         };
-        Ok(ScriptBuilder::from_source_manager(
-            client.script_builder().source_manager().clone(),
-        ))
+        Ok(CodeBuilder::from_source_manager(client.code_builder().source_manager().clone()))
     }
 }
 
@@ -211,13 +223,29 @@ impl WebClient {
 
 fn js_error_with_context<T>(err: T, context: &str) -> JsValue
 where
-    T: core::error::Error,
+    T: Error + 'static,
 {
     let mut error_string = context.to_string();
-    let mut source = Some(&err as &dyn core::error::Error);
+    let mut source = Some(&err as &dyn Error);
     while let Some(err) = source {
-        write!(error_string, ": {err}").expect("writing to string should always succeeds");
+        write!(error_string, ": {err}").expect("writing to string should always succeed");
         source = err.source();
     }
-    JsValue::from(error_string)
+
+    let help = hint_from_error(&err);
+    let js_error: JsValue = JsError::new(&error_string).into();
+
+    if let Some(help) = help {
+        let _ = Reflect::set(&js_error, &JsValue::from_str("help"), &JsValue::from_str(&help));
+    }
+
+    js_error
+}
+
+fn hint_from_error(err: &(dyn Error + 'static)) -> Option<String> {
+    if let Some(client_error) = err.downcast_ref::<ClientError>() {
+        return Option::<ErrorHint>::from(client_error).map(ErrorHint::into_help_message);
+    }
+
+    err.source().and_then(hint_from_error)
 }

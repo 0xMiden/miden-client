@@ -5,7 +5,7 @@ sidebar_position: 11
 
 # Miden SDK Examples
 
-This directory contains practical examples demonstrating how to use the `@demox-labs/miden-sdk` in your web applications. These examples cover core functionality and common use cases for interacting with the Miden blockchain and virtual machine.
+This directory contains practical examples demonstrating how to use the `@miden-sdk/miden-sdk` in your web applications. These examples cover core functionality and common use cases for interacting with the Miden blockchain and virtual machine.
 
 ## Overview
 
@@ -47,7 +47,7 @@ Each example is self-contained and includes:
 Most if not all examples require you to initialize the Miden Web Client. You can do this via:
 
 ```typescript
-import { WebClient } from "@demox-labs/miden-sdk";
+import { WebClient } from "@miden-sdk/miden-sdk";
 
 // Initialize the web client
 const webClient = await WebClient.createClient();

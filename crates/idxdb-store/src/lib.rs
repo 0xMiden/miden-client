@@ -26,10 +26,11 @@ use miden_client_core::account::{
 use miden_client_core::asset::AssetVault;
 use miden_client_core::block::BlockHeader;
 use miden_client_core::crypto::{InOrderIndex, MmrPeaks};
-use miden_client_core::note::{BlockNumber, Nullifier};
+use miden_client_core::note::{BlockNumber, NoteScript, Nullifier};
 use miden_client_core::store::{
     AccountRecord,
     AccountStatus,
+    AccountStorageFilter,
     BlockRelevance,
     InputNoteRecord,
     NoteFilter,
@@ -57,6 +58,8 @@ pub mod settings;
 pub mod sync;
 pub mod transaction;
 
+pub(crate) const CLIENT_VERSION: &str = env!("CARGO_PKG_VERSION");
+
 #[wasm_bindgen(module = "/src/js/utils.js")]
 extern "C" {
     #[wasm_bindgen(js_name = logWebStoreError)]
@@ -67,14 +70,14 @@ extern "C" {
 #[wasm_bindgen(module = "/src/js/schema.js")]
 extern "C" {
     #[wasm_bindgen(js_name = openDatabase)]
-    fn setup_indexed_db() -> js_sys::Promise;
+    fn setup_indexed_db(client_version: &str) -> js_sys::Promise;
 }
 
 pub struct WebStore {}
 
 impl WebStore {
     pub async fn new() -> Result<WebStore, JsValue> {
-        JsFuture::from(setup_indexed_db()).await?;
+        JsFuture::from(setup_indexed_db(CLIENT_VERSION)).await?;
         Ok(WebStore {})
     }
 }
@@ -141,6 +144,14 @@ impl Store for WebStore {
 
     async fn upsert_input_notes(&self, notes: &[InputNoteRecord]) -> Result<(), StoreError> {
         self.upsert_input_notes(notes).await
+    }
+
+    async fn get_note_script(&self, script_root: Word) -> Result<NoteScript, StoreError> {
+        self.get_note_script(script_root).await
+    }
+
+    async fn upsert_note_scripts(&self, note_scripts: &[NoteScript]) -> Result<(), StoreError> {
+        self.upsert_note_scripts(note_scripts).await
     }
 
     // CHAIN DATA
@@ -236,6 +247,13 @@ impl Store for WebStore {
         self.get_account(account_id).await
     }
 
+    async fn get_minimal_partial_account(
+        &self,
+        account_id: AccountId,
+    ) -> Result<Option<AccountRecord>, StoreError> {
+        self.get_minimal_partial_account(account_id).await
+    }
+
     async fn upsert_foreign_account_code(
         &self,
         account_id: AccountId,
@@ -262,8 +280,9 @@ impl Store for WebStore {
     async fn get_account_storage(
         &self,
         account_id: AccountId,
+        filter: AccountStorageFilter,
     ) -> Result<AccountStorage, StoreError> {
-        self.get_account_storage(account_id).await
+        self.get_account_storage(account_id, filter).await
     }
 
     async fn get_addresses_by_account_id(

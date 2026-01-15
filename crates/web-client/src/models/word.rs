@@ -11,6 +11,7 @@ pub struct Word(NativeWord);
 
 #[wasm_bindgen]
 impl Word {
+    /// Creates a word from four u64 values.
     #[wasm_bindgen(constructor)]
     pub fn new(u64_vec: Vec<u64>) -> Word {
         let fixed_array_u64: [u64; 4] = u64_vec.try_into().unwrap();
@@ -32,11 +33,12 @@ impl Word {
     #[wasm_bindgen(js_name = "fromHex")]
     pub fn from_hex(hex: &str) -> Result<Word, JsValue> {
         let native_word = NativeWord::try_from(hex).map_err(|err| {
-            JsValue::from_str(&format!("error instantiating Word from hex: {err}"))
+            JsValue::from_str(&format!("Error instantiating Word from hex: {err}"))
         })?;
         Ok(Word(native_word))
     }
 
+    /// Creates a word from four field elements.
     #[wasm_bindgen(js_name = "newFromFelts")]
     #[allow(clippy::needless_pass_by_value)]
     pub fn new_from_felts(felt_vec: Vec<Felt>) -> Word {
@@ -52,25 +54,30 @@ impl Word {
         Word(native_word)
     }
 
+    /// Returns the hex representation of the word.
     #[wasm_bindgen(js_name = "toHex")]
     pub fn to_hex(&self) -> String {
         self.0.to_hex()
     }
 
+    /// Serializes the word into bytes.
     pub fn serialize(&self) -> Uint8Array {
         serialize_to_uint8array(&self.0)
     }
 
+    /// Deserializes a word from bytes.
     pub fn deserialize(bytes: &Uint8Array) -> Result<Word, JsValue> {
         let native_word = deserialize_from_uint8array::<NativeWord>(bytes)?;
         Ok(Word(native_word))
     }
 
+    /// Returns the word as an array of u64 values.
     #[wasm_bindgen(js_name = "toU64s")]
     pub fn to_u64s(&self) -> Vec<u64> {
         self.0.iter().map(NativeFelt::as_int).collect::<Vec<u64>>()
     }
 
+    /// Returns the word as an array of field elements.
     #[wasm_bindgen(js_name = "toFelts")]
     pub fn to_felts(&self) -> Vec<Felt> {
         self.0.iter().map(|felt| Felt::from(*felt)).collect::<Vec<Felt>>()

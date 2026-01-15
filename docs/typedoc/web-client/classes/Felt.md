@@ -1,16 +1,20 @@
-[**@demox-labs/miden-sdk**](../README.md)
+[**@miden-sdk/miden-sdk**](../README.md)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / Felt
+[@miden-sdk/miden-sdk](../README.md) / Felt
 
 # Class: Felt
+
+Field element wrapper exposed to JavaScript.
 
 ## Constructors
 
 ### Constructor
 
 > **new Felt**(`value`): `Felt`
+
+Creates a new field element from a u64 value.
 
 #### Parameters
 
@@ -24,9 +28,21 @@
 
 ## Methods
 
+### \[dispose\]()
+
+> **\[dispose\]**(): `void`
+
+#### Returns
+
+`void`
+
+***
+
 ### asInt()
 
 > **asInt**(): `bigint`
+
+Returns the integer representation of the field element.
 
 #### Returns
 
@@ -47,6 +63,8 @@
 ### toString()
 
 > **toString**(): `string`
+
+Returns the string representation of the field element.
 
 #### Returns
 

@@ -31,6 +31,7 @@ pub mod account;
 pub mod account_builder;
 pub mod account_code;
 pub mod account_component;
+pub mod account_component_code;
 pub mod account_delta;
 pub mod account_file;
 pub mod account_header;
@@ -43,13 +44,18 @@ pub mod address;
 pub mod advice_inputs;
 pub mod advice_map;
 pub mod asset_vault;
+pub mod auth;
+pub mod auth_scheme;
 pub mod auth_secret_key;
 pub mod basic_fungible_faucet_component;
 pub mod block_header;
+pub mod code_builder;
+pub mod committed_note;
 pub mod consumable_note_record;
 pub mod endpoint;
 pub mod executed_transaction;
 pub mod felt;
+pub mod fetched_account;
 pub mod foreign_account;
 pub mod fungible_asset;
 pub mod input_note;
@@ -73,19 +79,23 @@ pub mod note_location;
 pub mod note_metadata;
 pub mod note_recipient;
 pub mod note_script;
+pub mod note_sync_info;
 pub mod note_tag;
 pub mod note_type;
 pub mod output_note;
+pub mod output_note_record;
+pub mod output_note_state;
 pub mod output_notes;
+pub mod package;
 pub mod partial_note;
+pub mod program;
 pub mod proven_transaction;
 pub mod provers;
 pub mod public_key;
 pub mod rpo256;
-pub mod script_builder;
-pub mod secret_key;
 pub mod signature;
 pub mod signing_inputs;
+pub mod sparse_merkle_path;
 pub mod storage_map;
 pub mod storage_slot;
 pub mod sync_summary;
@@ -102,3 +112,21 @@ pub mod transaction_status;
 pub mod transaction_store_update;
 pub mod transaction_summary;
 pub mod word;
+
+pub use crate::models::note_tag::NoteTag;
+pub use crate::models::note_type::NoteType;
+
+declare_js_miden_arrays! {
+    (crate::models::account::Account) -> AccountArray,
+    (crate::models::account_id::AccountId) -> AccountIdArray,
+    (crate::models::foreign_account::ForeignAccount) -> ForeignAccountArray,
+    (crate::models::note_recipient::NoteRecipient) -> NoteRecipientArray,
+    (crate::models::output_note::OutputNote) -> OutputNoteArray,
+    (crate::models::storage_slot::StorageSlot) -> StorageSlotArray,
+    (crate::models::transaction_script_inputs::TransactionScriptInputPair) -> TransactionScriptInputPairArray,
+    (crate::models::felt::Felt) -> FeltArray,
+    (crate::models::output_notes::OutputNotes) -> OutputNotesArray,
+    (crate::models::transaction_request::note_and_args::NoteAndArgs) -> NoteAndArgsArray,
+    (crate::models::transaction_request::note_details_and_tag::NoteDetailsAndTag) -> NoteDetailsAndTagArray,
+    (crate::models::transaction_request::note_id_and_args::NoteIdAndArgs) -> NoteIdAndArgsArray
+}

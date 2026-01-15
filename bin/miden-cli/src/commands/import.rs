@@ -34,7 +34,7 @@ impl ImportCmd {
             let note_file = read_note_file(filename.clone());
 
             if let Ok(note_file) = note_file {
-                let note_id = client.import_note(note_file).await?;
+                let note_id = client.import_notes(&[note_file]).await?[0];
                 println!("Successfully imported note {}", note_id.to_hex());
             } else {
                 info!(
@@ -97,7 +97,7 @@ fn read_note_file(filename: PathBuf) -> Result<NoteFile, CliError> {
     let mut _file = File::open(filename).and_then(|mut f| f.read_to_end(&mut contents))?;
 
     NoteFile::read_from_bytes(&contents)
-        .map_err(|err| CliError::Client(ClientError::DataDeserializationError(err)))
+        .map_err(|err| ClientError::DataDeserializationError(err).into())
 }
 
 // HELPERS

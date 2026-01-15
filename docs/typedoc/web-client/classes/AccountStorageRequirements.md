@@ -1,8 +1,8 @@
-[**@demox-labs/miden-sdk**](../README.md)
+[**@miden-sdk/miden-sdk**](../README.md)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / AccountStorageRequirements
+[@miden-sdk/miden-sdk](../README.md) / AccountStorageRequirements
 
 # Class: AccountStorageRequirements
 
@@ -12,11 +12,23 @@
 
 > **new AccountStorageRequirements**(): `AccountStorageRequirements`
 
+Creates empty storage requirements.
+
 #### Returns
 
 `AccountStorageRequirements`
 
 ## Methods
+
+### \[dispose\]()
+
+> **\[dispose\]**(): `void`
+
+#### Returns
+
+`void`
+
+***
 
 ### free()
 
@@ -31,6 +43,8 @@
 ### fromSlotAndKeysArray()
 
 > `static` **fromSlotAndKeysArray**(`slots_and_keys`): `AccountStorageRequirements`
+
+Builds storage requirements from a list of slot/key pairs.
 
 #### Parameters
 

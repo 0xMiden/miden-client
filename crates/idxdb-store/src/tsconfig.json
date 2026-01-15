@@ -2,9 +2,9 @@
   "compilerOptions": {
     "allowJs": true,
     "checkJs": false,
-    "declaration": true,
+    "declaration": false,
     "incremental": true,
-    "sourceMap": true,
+    "sourceMap": false,
     "noEmitOnError": true,
     "removeComments": false,
     "target": "ESNext",

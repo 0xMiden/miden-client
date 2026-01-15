@@ -1,12 +1,22 @@
-[**@demox-labs/miden-sdk**](../README.md)
+[**@miden-sdk/miden-sdk**](../README.md)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / IntoUnderlyingSink
+[@miden-sdk/miden-sdk](../README.md) / IntoUnderlyingSink
 
 # Class: IntoUnderlyingSink
 
 ## Methods
+
+### \[dispose\]()
+
+> **\[dispose\]**(): `void`
+
+#### Returns
+
+`void`
+
+***
 
 ### abort()
 

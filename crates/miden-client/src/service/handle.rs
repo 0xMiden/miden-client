@@ -3,6 +3,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 
 use miden_client_core::account::AccountId;
+use miden_client_core::block::BlockNumber;
 use miden_client_core::note::NoteTag;
 use miden_client_core::store::Store;
 use miden_client_core::transaction::{
@@ -13,7 +14,7 @@ use miden_client_core::transaction::{
     TransactionRequest,
     TransactionResult,
 };
-use miden_client_core::{BlockNumber, Client, ClientError};
+use miden_client_core::{Client, ClientError};
 
 use super::config::ClientServiceConfig;
 use super::error::{ClientServiceError, HandlerError};
@@ -124,7 +125,7 @@ where
         request: TransactionRequest,
     ) -> Result<TransactionResult, ClientServiceError> {
         self.with_client(move |client| {
-            Box::pin(async move { client.new_transaction(account_id, request).await })
+            Box::pin(async move { client.execute_transaction(account_id, request).await })
         })
         .await
     }
@@ -166,7 +167,7 @@ where
         tx_result: TransactionResult,
     ) -> Result<(), ClientServiceError> {
         self.with_client(move |client| {
-            Box::pin(async move { client.apply_transaction(submission_height, tx_result).await })
+            Box::pin(async move { client.apply_transaction(&tx_result, submission_height).await })
         })
         .await
     }

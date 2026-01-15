@@ -5,7 +5,7 @@ use miden_client::asset::Asset;
 use miden_client::note::{
     Note,
     NoteConsumability,
-    NoteId,
+    NoteConsumptionStatus,
     NoteInputs,
     NoteMetadata,
     WellKnownNote,
@@ -60,8 +60,8 @@ pub struct NotesCmd {
     #[arg(short, long, value_name = "account_id")]
     account_id: Option<String>,
     /// Send a stored private note through the note transport network.
-    /// Define both the note ID (as hex string) and address (as Bech32 string) such as:
-    /// `--send 0xc1234567 mm1qpkdyek2c0ywwvzupakc7zlzty8qn2qnfc`
+    /// Define both the note ID (as hex string, in full or a prefix) and address (as Bech32 string)
+    /// such as: `--send 0xc1234567 mm1qpkdyek2c0ywwvzupakc7zlzty8qn2qnfc`
     #[arg(long, group = "action", num_args = 2, value_names = ["note_id", "address"])]
     send: Option<Vec<String>>,
     /// Fetch notes from the note transport network.
@@ -274,7 +274,7 @@ async fn show_note<AUTH: CliAuthenticator>(
                 1.0.to_string(),
             ),
         };
-        table.add_row(vec![asset_type, &faucet, &amount.to_string()]);
+        table.add_row(vec![asset_type, &faucet, &amount.clone()]);
     }
     println!("{table}");
 
@@ -339,16 +339,13 @@ async fn send<AUTH: CliAuthenticator>(
     note_id: &str,
     address: &str,
 ) -> Result<(), CliError> {
-    let id = NoteId::try_from_hex(note_id).map_err(|e| CliError::Input(e.to_string()))?;
-    let note_record = client
-        .get_input_note(id)
-        .await?
-        .ok_or_else(|| CliError::Input(format!("note {note_id} not found")))?;
+    let note_record = get_input_note_with_id_prefix(client, note_id)
+        .await
+        .map_err(|e| CliError::Input(format!("note not found: {e}")))?;
     let note: Note = note_record
         .try_into()
-        .map_err(|e| CliError::Client(ClientError::NoteRecordConversionError(e)))?;
-    let (_netid, address) =
-        Address::from_bech32(address).map_err(|e| CliError::Input(e.to_string()))?;
+        .map_err(|e| CliError::from(ClientError::NoteRecordConversionError(e)))?;
+    let (_netid, address) = Address::decode(address).map_err(|e| CliError::Input(e.to_string()))?;
 
     client.send_private_note(note, &address).await?;
 
@@ -398,12 +395,29 @@ where
             table.add_row(vec![
                 note.id().to_hex(),
                 relevance.0.to_string(),
-                relevance.1.to_string(),
+                note_consumption_status_type(&relevance.1),
             ]);
         }
     }
 
     println!("{table}");
+}
+
+fn note_consumption_status_type(note_consumption_status: &NoteConsumptionStatus) -> String {
+    match note_consumption_status {
+        NoteConsumptionStatus::Consumable => "Consumable".to_string(),
+        NoteConsumptionStatus::ConsumableAfter(block_number) => {
+            format!("Consumable after block {block_number}")
+        },
+        NoteConsumptionStatus::ConsumableWithAuthorization => {
+            "Consumable with authorization".to_string()
+        },
+        NoteConsumptionStatus::UnconsumableConditions => {
+            "Unconsumable due to conditions".to_string()
+        },
+        NoteConsumptionStatus::NeverConsumable(error) => format!("Never consumable: {error}"),
+    }
+    .to_string()
 }
 
 fn note_record_type(note_record_metadata: Option<&NoteMetadata>) -> String {

@@ -19,7 +19,8 @@ const instanceAddress = async ({
       } else {
         const newAccount = await client.newWallet(
           window.AccountStorageMode.private(),
-          true
+          true,
+          0
         );
         _accountId = newAccount.id();
       }
@@ -36,7 +37,8 @@ const instanceNewAddressBech32 = async (page: Page, networkId: string) => {
     const parsedNetworkId = window.helpers.parseNetworkId(bech32Prefix);
     const newAccount = await client.newWallet(
       window.AccountStorageMode.private(),
-      true
+      true,
+      0
     );
     const address = window.Address.fromAccountId(
       newAccount.id(),
@@ -62,7 +64,8 @@ const instanceAddressTestNoteTag = async (page: Page) => {
     const client = window.client;
     const newAccount = await client.newWallet(
       window.AccountStorageMode.private(),
-      true
+      true,
+      0
     );
     const address = window.Address.fromAccountId(
       newAccount.id(),
@@ -89,7 +92,7 @@ test.describe("Address instantiation tests", () => {
       instanceAddress({
         page,
         accountId: "notAnAccountId",
-        _interface: "Unspecified",
+        _interface: "BasicWallet",
       })
     ).rejects.toThrow();
   });
@@ -100,16 +103,16 @@ test.describe("Address instantiation tests", () => {
     await expect(
       instanceAddress({
         page,
-        _interface: "Unspecified",
+        _interface: "BasicWallet",
       })
-    ).resolves.toBe("Unspecified");
+    ).resolves.toBe("BasicWallet");
   });
 });
 
 test.describe("Bech32 tests", () => {
   test("to bech32 fails with non-valid-prefix", async ({ page }) => {
     await expect(
-      instanceNewAddressBech32(page, "non-valid-prefix")
+      instanceNewAddressBech32(page, "non valid prefix")
     ).rejects.toThrow();
   });
   test("encoding from bech32 and going back results in the same address", async ({
@@ -122,20 +125,44 @@ test.describe("Bech32 tests", () => {
   });
   test("bech32 succeeds with mainnet prefix", async ({ page }) => {
     await expect(instanceNewAddressBech32(page, "mm")).resolves.toHaveLength(
-      38
+      47
     );
   });
 
   test("bech32 succeeds with testnet prefix", async ({ page }) => {
     await expect(instanceNewAddressBech32(page, "mtst")).resolves.toHaveLength(
-      40
+      49
     );
   });
 
   test("bech32 succeeds with dev prefix", async ({ page }) => {
     await expect(instanceNewAddressBech32(page, "mdev")).resolves.toHaveLength(
-      40
+      49
     );
+  });
+
+  test("bech32 succeeds with custom prefix", async ({ page }) => {
+    await expect(instanceNewAddressBech32(page, "cstm")).resolves.toHaveLength(
+      49
+    );
+  });
+
+  test("fromBech32 returns correct account id", async ({ page }) => {
+    const success = await page.evaluate(async () => {
+      const newAccount = await window.client.newWallet(
+        window.AccountStorageMode.private(),
+        true,
+        0
+      );
+      const accountId = newAccount.id();
+      const asBech32 = accountId.toBech32(
+        window.NetworkId.mainnet(),
+        window.AccountInterface.BasicWallet
+      );
+      const fromBech32 = window.AccountId.fromBech32(asBech32).toString();
+      return accountId == fromBech32;
+    });
+    expect(success).toBe(true);
   });
 });
 
@@ -153,28 +180,40 @@ const instanceAddressRemoveThenInsert = async (page: Page) => {
     const client = window.client;
     const newAccount = await client.newWallet(
       window.AccountStorageMode.private(),
-      true
+      true,
+      0
     );
-    console.log("newAccount ID:", newAccount.id());
-
-    const address = window.Address.fromAccountId(
-      newAccount.id(),
-      "Unspecified"
-    );
-
-    console.log("address:", address);
+    const accountId = newAccount.id().toString();
+    const address = window.Address.fromAccountId(newAccount.id(), null);
 
     // First we remove the address tracked by default
     await client.removeAccountAddress(newAccount.id(), address);
 
     // Then we add it again
     await client.insertAccountAddress(newAccount.id(), address);
-    return true;
+
+    const store = await client.exportStore();
+    const parsedStore = JSON.parse(store);
+    const retrievedAddressRecord = parsedStore.addresses[0];
+    const retrievedAddress = window.Address.deserialize(
+      retrievedAddressRecord.address
+    );
+    const retrievedId = retrievedAddressRecord.id;
+
+    return {
+      accountId: accountId,
+      address: address.toBech32(window.NetworkId.testnet()),
+      retrievedAccountId: retrievedId,
+      retrievedAddress: retrievedAddress.toBech32(window.NetworkId.testnet()),
+    };
   });
 };
 
 test.describe("Address insertion & deletion tests", () => {
-  test("address can be remove and then re-inserted", async ({ page }) => {
-    await expect(instanceAddressRemoveThenInsert(page)).resolves.toBeTruthy();
+  test("address can be removed and then re-inserted", async ({ page }) => {
+    const { accountId, address, retrievedAccountId, retrievedAddress } =
+      await instanceAddressRemoveThenInsert(page);
+    expect(retrievedAccountId).toBe(accountId);
+    expect(address).toBe(retrievedAddress);
   });
 });

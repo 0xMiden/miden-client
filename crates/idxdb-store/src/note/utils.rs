@@ -22,8 +22,13 @@ use miden_client_core::store::{
 use miden_client_core::utils::{Deserializable, Serializable};
 use wasm_bindgen::prelude::wasm_bindgen;
 
-use super::js_bindings::{idxdb_upsert_input_note, idxdb_upsert_output_note};
+use super::js_bindings::{
+    idxdb_upsert_input_note,
+    idxdb_upsert_note_script,
+    idxdb_upsert_output_note,
+};
 use super::{InputNoteIdxdbObject, OutputNoteIdxdbObject};
+use crate::note::models::NoteScriptIdxdbObject;
 use crate::promise::await_js_value;
 
 // TYPES
@@ -72,7 +77,7 @@ pub struct SerializedOutputNoteData {
 // ================================================================================================
 
 pub(crate) fn serialize_input_note(note: &InputNoteRecord) -> SerializedInputNoteData {
-    let note_id = note.id().to_hex().to_string();
+    let note_id = note.id().to_hex().clone();
     let note_assets = note.assets().to_bytes();
 
     let details = note.details();
@@ -122,8 +127,18 @@ pub async fn upsert_input_note_tx(note: &InputNoteRecord) -> Result<(), StoreErr
     Ok(())
 }
 
+pub async fn upsert_note_script_tx(note_script: &NoteScript) -> Result<(), StoreError> {
+    let note_script_bytes = note_script.to_bytes();
+    let note_script_root = note_script.root().into();
+
+    let promise = idxdb_upsert_note_script(note_script_root, note_script_bytes);
+    await_js_value(promise, "failed to upsert note script").await?;
+
+    Ok(())
+}
+
 pub(crate) fn serialize_output_note(note: &OutputNoteRecord) -> SerializedOutputNoteData {
-    let note_id = note.id().to_hex().to_string();
+    let note_id = note.id().to_hex().clone();
     let note_assets = note.assets().to_bytes();
     let recipient_digest = note.recipient_digest().to_hex();
     let metadata = note.metadata().to_bytes();
@@ -207,6 +222,18 @@ pub fn parse_output_note_idxdb_object(
         state,
         note_idxdb.expected_height.into(),
     ))
+}
+
+pub fn parse_note_script_idxdb_object(
+    note_script_idxdb: NoteScriptIdxdbObject,
+) -> Result<NoteScript, StoreError> {
+    let NoteScriptIdxdbObject {
+        note_script_root: _,
+        serialized_note_script,
+    } = note_script_idxdb;
+
+    let note_script = NoteScript::read_from_bytes(&serialized_note_script)?;
+    Ok(note_script)
 }
 
 pub(crate) async fn apply_note_updates_tx(

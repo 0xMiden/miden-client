@@ -1,8 +1,8 @@
-[**@demox-labs/miden-sdk**](../README.md)
+[**@miden-sdk/miden-sdk**](../README.md)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / JsAccountUpdate
+[@miden-sdk/miden-sdk](../README.md) / JsAccountUpdate
 
 # Class: JsAccountUpdate
 
@@ -119,6 +119,16 @@ Optional seed data for the account.
 `void`
 
 ## Methods
+
+### \[dispose\]()
+
+> **\[dispose\]**(): `void`
+
+#### Returns
+
+`void`
+
+***
 
 ### free()
 

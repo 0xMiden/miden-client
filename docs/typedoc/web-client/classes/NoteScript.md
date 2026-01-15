@@ -1,12 +1,27 @@
-[**@demox-labs/miden-sdk**](../README.md)
+[**@miden-sdk/miden-sdk**](../README.md)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / NoteScript
+[@miden-sdk/miden-sdk](../README.md) / NoteScript
 
 # Class: NoteScript
 
+An executable program of a note.
+
+A note's script represents a program which must be executed for a note to be consumed. As such
+it defines the rules and side effects of consuming a given note.
+
 ## Methods
+
+### \[dispose\]()
+
+> **\[dispose\]**(): `void`
+
+#### Returns
+
+`void`
+
+***
 
 ### free()
 
@@ -22,6 +37,8 @@
 
 > **root**(): [`Word`](Word.md)
 
+Returns the MAST root of this script.
+
 #### Returns
 
 [`Word`](Word.md)
@@ -31,6 +48,8 @@
 ### serialize()
 
 > **serialize**(): `Uint8Array`
+
+Serializes the script into bytes.
 
 #### Returns
 
@@ -42,7 +61,7 @@
 
 > **toString**(): `string`
 
-Print the MAST source for this script.
+Pretty-prints the MAST source for this script.
 
 #### Returns
 
@@ -53,6 +72,8 @@ Print the MAST source for this script.
 ### deserialize()
 
 > `static` **deserialize**(`bytes`): `NoteScript`
+
+Deserializes a script from bytes.
 
 #### Parameters
 
@@ -66,9 +87,30 @@ Print the MAST source for this script.
 
 ***
 
+### fromPackage()
+
+> `static` **fromPackage**(`_package`): `NoteScript`
+
+Creates a `NoteScript` from the given `Package`.
+Throws if the package is invalid.
+
+#### Parameters
+
+##### \_package
+
+[`Package`](Package.md)
+
+#### Returns
+
+`NoteScript`
+
+***
+
 ### p2id()
 
 > `static` **p2id**(): `NoteScript`
+
+Returns the well-known P2ID script.
 
 #### Returns
 
@@ -80,6 +122,8 @@ Print the MAST source for this script.
 
 > `static` **p2ide**(): `NoteScript`
 
+Returns the well-known P2IDE script (P2ID with execution hint).
+
 #### Returns
 
 `NoteScript`
@@ -89,6 +133,8 @@ Print the MAST source for this script.
 ### swap()
 
 > `static` **swap**(): `NoteScript`
+
+Returns the well-known SWAP script.
 
 #### Returns
 

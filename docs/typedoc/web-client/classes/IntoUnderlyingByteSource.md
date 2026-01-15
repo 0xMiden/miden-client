@@ -1,8 +1,8 @@
-[**@demox-labs/miden-sdk**](../README.md)
+[**@miden-sdk/miden-sdk**](../README.md)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / IntoUnderlyingByteSource
+[@miden-sdk/miden-sdk](../README.md) / IntoUnderlyingByteSource
 
 # Class: IntoUnderlyingByteSource
 
@@ -19,6 +19,16 @@
 > `readonly` **type**: `"bytes"`
 
 ## Methods
+
+### \[dispose\]()
+
+> **\[dispose\]**(): `void`
+
+#### Returns
+
+`void`
+
+***
 
 ### cancel()
 

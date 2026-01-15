@@ -1,56 +1,33 @@
-[**@demox-labs/miden-sdk**](../README.md)
+[**@miden-sdk/miden-sdk**](../README.md)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / TransactionResult
+[@miden-sdk/miden-sdk](../README.md) / TransactionResult
 
 # Class: TransactionResult
 
+Represents the result of executing a transaction by the client.
+
+It contains an `ExecutedTransaction`, and a list of `future_notes`
+that we expect to receive in the future (you can check at swap notes for an example of this).
+
 ## Methods
 
-### accountDelta()
+### \[dispose\]()
 
-> **accountDelta**(): [`AccountDelta`](AccountDelta.md)
-
-#### Returns
-
-[`AccountDelta`](AccountDelta.md)
-
-***
-
-### blockNum()
-
-> **blockNum**(): `number`
+> **\[dispose\]**(): `void`
 
 #### Returns
 
-`number`
-
-***
-
-### consumedNotes()
-
-> **consumedNotes**(): [`InputNotes`](InputNotes.md)
-
-#### Returns
-
-[`InputNotes`](InputNotes.md)
-
-***
-
-### createdNotes()
-
-> **createdNotes**(): [`OutputNotes`](OutputNotes.md)
-
-#### Returns
-
-[`OutputNotes`](OutputNotes.md)
+`void`
 
 ***
 
 ### executedTransaction()
 
 > **executedTransaction**(): [`ExecutedTransaction`](ExecutedTransaction.md)
+
+Returns the executed transaction.
 
 #### Returns
 
@@ -68,9 +45,35 @@
 
 ***
 
+### futureNotes()
+
+> **futureNotes**(): [`NoteDetailsAndTag`](NoteDetailsAndTag.md)[]
+
+Returns notes that are expected to be created as a result of follow-up executions.
+
+#### Returns
+
+[`NoteDetailsAndTag`](NoteDetailsAndTag.md)[]
+
+***
+
+### id()
+
+> **id**(): [`TransactionId`](TransactionId.md)
+
+Returns the ID of the transaction.
+
+#### Returns
+
+[`TransactionId`](TransactionId.md)
+
+***
+
 ### serialize()
 
 > **serialize**(): `Uint8Array`
+
+Serializes the transaction result into bytes.
 
 #### Returns
 
@@ -78,19 +81,11 @@
 
 ***
 
-### transactionArguments()
-
-> **transactionArguments**(): [`TransactionArgs`](TransactionArgs.md)
-
-#### Returns
-
-[`TransactionArgs`](TransactionArgs.md)
-
-***
-
 ### deserialize()
 
 > `static` **deserialize**(`bytes`): `TransactionResult`
+
+Deserializes a transaction result from bytes.
 
 #### Parameters
 

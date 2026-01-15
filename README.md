@@ -33,7 +33,6 @@ For more info check:
 The workspace is organized as follows:
 - The `bin` folder contains crates that are meant to be compiled into binaries (like the CLI).
 - The `crates` folder contains the library crates that are meant to be used as dependencies (like the Rust client library).
-- The `tests` folder contains integration tests for the workspace crates.
 
 ### Makefile
 
@@ -45,11 +44,7 @@ make
 
 ## Testing
 
-To test the project's code, we provide both unit tests (which can be run with `cargo test`) and integration tests. For more info on integration tests, refer to the [integration testing document](./tests/README.md)
-
-The crate also comes with one feature flag that is used exclusively on tests:
-
-- `integration`: only used to run integration tests and separate them from unit tests.
+To test the project's code, we provide both unit tests (which can be run with `cargo test`) and integration tests. For more info on integration tests, refer to the [integration testing document](./bin/integration-tests/README.md)
 
 ## Contributing
 

@@ -13,15 +13,17 @@ import {
 const importWalletFromSeed = async (
   page: Page,
   walletSeed: Uint8Array,
-  mutable: boolean
+  mutable: boolean,
+  authSchemeId: number
 ) => {
   return await page.evaluate(
-    async ({ _walletSeed, mutable }) => {
+    async ({ _walletSeed, mutable, authSchemeId }) => {
       const client = window.client;
       await client.syncState();
       const account = await client.importPublicAccountFromSeed(
         _walletSeed,
-        mutable
+        mutable,
+        authSchemeId
       );
       return {
         accountId: account.id().toString(),
@@ -31,6 +33,7 @@ const importWalletFromSeed = async (
     {
       _walletSeed: walletSeed,
       mutable,
+      authSchemeId,
     }
   );
 };
@@ -55,10 +58,12 @@ test.describe("import from seed", () => {
 
     const mutable = false;
     const storageMode = StorageMode.PUBLIC;
+    const authSchemeId = 0;
 
     const initialWallet = await createNewWallet(page, {
       storageMode,
       mutable,
+      authSchemeId,
       walletSeed,
     });
 
@@ -82,7 +87,8 @@ test.describe("import from seed", () => {
     const { accountId: restoredAccountId } = await importWalletFromSeed(
       page,
       walletSeed,
-      mutable
+      mutable,
+      authSchemeId
     );
 
     expect(restoredAccountId).toEqual(initialWallet.id);
@@ -110,13 +116,17 @@ test.describe("import public account by id", () => {
 
     const mutable = false;
     const storageMode = StorageMode.PUBLIC;
+    const authSchemeId = 0;
 
     const initialWallet = await createNewWallet(page, {
       storageMode,
       mutable,
+      authSchemeId,
       walletSeed,
     });
+
     const faucet = await createNewFaucet(page);
+
     const { targetAccountBalance: initialBalance } =
       await fundAccountFromFaucet(page, initialWallet.id, faucet.id);
     const { commitment: initialCommitment } = await getAccount(

@@ -49,12 +49,18 @@ jobs:
         uses: Swatinem/rust-cache@v2
       - name: Start test node
         run: make start-node-background
+      - name: Start note transport
+        run: make start-note-transport-background
       - name: Run integration tests
         run: make integration-test-full
       - name: Stop test node
         if: always()
         run: |
           make stop-node
+      - name: Stop note transport
+        if: always()
+        run: |
+          make stop-note-transport
 
   build-web-client-dist-folder:
     name: Build Web Client
@@ -75,9 +81,17 @@ jobs:
           node-version: "20"
 
       - name: Install dependencies
+        run: ./scripts/retry-yarn-install.sh crates/web-client
+
+      - name: Check TSC output equals commited JS
         run: |
-          cd ./crates/web-client
-          yarn install
+          cd ./crates/idxdb-store/src/
+          yarn
+          yarn tsc --outDir ci_test_folder
+          pushd ci_test_folder
+          find . -type f ! -name "*.js" -delete
+          popd
+          diff -bur js ci_test_folder
 
       - name: Restore cache - dist folder
         id: dist-cache
@@ -112,8 +126,8 @@ jobs:
     needs: [ build-web-client-dist-folder ]
     strategy:
       matrix:
-        shard_index: [1, 2, 3, 4]
-        shard_total: [4]
+        shard_index: [1, 2, 3, 4, 5, 6]
+        shard_total: [6]
     steps:
       - uses: actions/checkout@main
       - name: Install Rust

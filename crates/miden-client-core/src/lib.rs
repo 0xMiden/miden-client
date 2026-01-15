@@ -1,3 +1,5 @@
+#![cfg_attr(docsrs, feature(doc_cfg))]
+
 //! A no_std-compatible client library for interacting with the Miden network.
 //!
 //! This crate provides a lightweight client that handles connections to the Miden node, manages
@@ -62,10 +64,9 @@
 //! use miden_client::store::Store;
 //! use miden_client::{Client, ExecutionOptions, Felt};
 //! use miden_client_sqlite_store::SqliteStore;
-//! use miden_objects::crypto::rand::FeltRng;
-//! use miden_objects::{MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES};
+//! use miden_protocol::crypto::rand::FeltRng;
+//! use miden_protocol::{MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES};
 //! use rand::Rng;
-//! use rand::rngs::StdRng;
 //!
 //! # pub async fn create_test_client() -> Result<(), Box<dyn std::error::Error>> {
 //! // Create the SQLite store from the client configuration.
@@ -94,7 +95,7 @@
 //!
 //! // Instantiate the client using a gRPC client
 //! let endpoint = Endpoint::new("https".into(), "localhost".into(), Some(57291));
-//! let client: Client<FilesystemKeyStore<StdRng>> = Client::new(
+//! let client: Client<FilesystemKeyStore> = Client::new(
 //!     Arc::new(GrpcClient::new(&endpoint, 10_000)),
 //!     Box::new(rng),
 //!     store,
@@ -109,6 +110,7 @@
 //!     tx_graceful_blocks,
 //!     max_block_number_delta,
 //!     Some(Arc::new(note_transport_api)),
+//!     None, // or Some(Arc::new(prover)) for a custom prover
 //! )
 //! .await
 //! .unwrap();
@@ -146,41 +148,47 @@ pub mod builder;
 #[cfg(feature = "testing")]
 mod test_utils;
 
-mod errors;
+pub mod errors;
+
+use miden_protocol::block::BlockNumber;
+pub use miden_protocol::utils::{Deserializable, Serializable, SliceReader};
 
 // RE-EXPORTS
 // ================================================================================================
 
 pub mod notes {
-    pub use miden_objects::note::NoteFile;
+    pub use miden_protocol::note::NoteFile;
 }
 
 /// Provides types and utilities for working with Miden Assembly.
 pub mod assembly {
-    pub use miden_objects::assembly::debuginfo::SourceManagerSync;
-    pub use miden_objects::assembly::diagnostics::Report;
-    pub use miden_objects::assembly::diagnostics::reporting::PrintDiagnostic;
-    pub use miden_objects::assembly::{
+    pub use miden_protocol::MastForest;
+    pub use miden_protocol::assembly::debuginfo::SourceManagerSync;
+    pub use miden_protocol::assembly::diagnostics::Report;
+    pub use miden_protocol::assembly::diagnostics::reporting::PrintDiagnostic;
+    pub use miden_protocol::assembly::mast::MastNodeExt;
+    pub use miden_protocol::assembly::{
         Assembler,
         DefaultSourceManager,
         Library,
-        LibraryPath,
         Module,
         ModuleKind,
+        Path,
     };
+    pub use miden_standards::code_builder::CodeBuilder;
 }
 
 /// Provides types and utilities for working with assets within the Miden network.
 pub mod asset {
-    pub use miden_objects::AssetError;
-    pub use miden_objects::account::delta::{
+    pub use miden_protocol::AssetError;
+    pub use miden_protocol::account::delta::{
         AccountStorageDelta,
         AccountVaultDelta,
         FungibleAssetDelta,
         NonFungibleAssetDelta,
         NonFungibleDeltaAction,
     };
-    pub use miden_objects::asset::{
+    pub use miden_protocol::asset::{
         Asset,
         AssetVault,
         AssetWitness,
@@ -194,54 +202,65 @@ pub mod asset {
 /// Provides authentication-related types and functionalities for the Miden
 /// network.
 pub mod auth {
-    pub use miden_lib::AuthScheme;
-    pub use miden_lib::account::auth::{AuthRpoFalcon512, NoAuth};
-    pub use miden_objects::account::auth::PublicKeyCommitment;
-    pub use miden_objects::account::{AuthSecretKey, Signature};
+    pub use miden_protocol::account::auth::{
+        AuthScheme as AuthSchemeId,
+        AuthSecretKey,
+        PublicKey,
+        PublicKeyCommitment,
+        Signature,
+    };
+    pub use miden_standards::AuthScheme;
+    pub use miden_standards::account::auth::{AuthEcdsaK256Keccak, AuthRpoFalcon512, NoAuth};
     pub use miden_tx::auth::{BasicAuthenticator, SigningInputs, TransactionAuthenticator};
+
+    pub const RPO_FALCON_SCHEME_ID: AuthSchemeId = AuthSchemeId::RpoFalcon512;
+    pub const ECDSA_K256_KECCAK_SCHEME_ID: AuthSchemeId = AuthSchemeId::EcdsaK256Keccak;
 }
 
 /// Provides types for working with blocks within the Miden network.
 pub mod block {
-    pub use miden_objects::block::BlockHeader;
+    pub use miden_protocol::block::{BlockHeader, BlockNumber};
 }
 
 /// Provides cryptographic types and utilities used within the Miden rollup
 /// network. It re-exports commonly used types and random number generators like `FeltRng` from
-/// the `miden_objects` crate.
+/// the `miden_standards` crate.
 pub mod crypto {
     pub mod rpo_falcon512 {
-        pub use miden_objects::crypto::dsa::rpo_falcon512::{PublicKey, SecretKey, Signature};
+        pub use miden_protocol::crypto::dsa::falcon512_rpo::{PublicKey, SecretKey, Signature};
     }
-
-    pub use miden_objects::crypto::hash::blake::{Blake3_160, Blake3Digest};
-    pub use miden_objects::crypto::hash::rpo::Rpo256;
-    pub use miden_objects::crypto::merkle::{
+    pub use miden_protocol::crypto::hash::blake::{Blake3_160, Blake3Digest};
+    pub use miden_protocol::crypto::hash::rpo::Rpo256;
+    pub use miden_protocol::crypto::merkle::mmr::{
         Forest,
         InOrderIndex,
-        LeafIndex,
-        MerklePath,
-        MerkleStore,
-        MerkleTree,
         MmrDelta,
         MmrPeaks,
         MmrProof,
-        NodeIndex,
-        SMT_DEPTH,
-        SmtLeaf,
-        SmtProof,
+        PartialMmr,
     };
-    pub use miden_objects::crypto::rand::{FeltRng, RpoRandomCoin};
+    pub use miden_protocol::crypto::merkle::smt::{LeafIndex, SMT_DEPTH, SmtLeaf, SmtProof};
+    pub use miden_protocol::crypto::merkle::store::MerkleStore;
+    pub use miden_protocol::crypto::merkle::{MerklePath, MerkleTree, NodeIndex};
+    pub use miden_protocol::crypto::rand::{FeltRng, RpoRandomCoin};
 }
 
 /// Provides types for working with addresses within the Miden network.
 pub mod address {
-    pub use miden_objects::address::{AccountIdAddress, Address, AddressInterface, NetworkId};
+    pub use miden_protocol::address::{
+        Address,
+        AddressId,
+        AddressInterface,
+        CustomNetworkId,
+        NetworkId,
+        RoutingParameters,
+    };
 }
 
 /// Provides types for working with the virtual machine within the Miden network.
 pub mod vm {
-    pub use miden_objects::vm::{
+    pub use miden_mast_package::{PackageKind, ProcedureExport};
+    pub use miden_protocol::vm::{
         AdviceInputs,
         AdviceMap,
         AttributeSet,
@@ -249,15 +268,17 @@ pub mod vm {
         Package,
         PackageExport,
         PackageManifest,
+        Program,
         QualifiedProcedureName,
         Section,
         SectionId,
     };
 }
 
+pub use async_trait::async_trait;
 pub use errors::*;
-use miden_objects::assembly::{DefaultSourceManager, SourceManagerSync};
-pub use miden_objects::{
+use miden_protocol::assembly::{DefaultSourceManager, SourceManagerSync};
+pub use miden_protocol::{
     EMPTY_WORD,
     Felt,
     MAX_TX_EXECUTION_CYCLES,
@@ -276,8 +297,9 @@ pub use miden_tx::ExecutionOptions;
 /// enabled.
 #[cfg(feature = "testing")]
 pub mod testing {
-    pub use miden_lib::testing::note::NoteBuilder;
-    pub use miden_objects::testing::*;
+    pub use miden_protocol::testing::account_id;
+    pub use miden_standards::testing::note::NoteBuilder;
+    pub use miden_standards::testing::*;
     pub use miden_testing::*;
 
     pub use crate::test_utils::*;
@@ -285,16 +307,15 @@ pub mod testing {
 
 use alloc::sync::Arc;
 
-pub use miden_lib::utils::{Deserializable, ScriptBuilder, Serializable, SliceReader};
-pub use miden_objects::block::BlockNumber;
-use miden_objects::crypto::rand::FeltRng;
+use miden_protocol::crypto::rand::FeltRng;
 use miden_tx::LocalTransactionProver;
 use miden_tx::auth::TransactionAuthenticator;
-use note_transport::{NoteTransportClient, init_note_transport_cursor};
 use rand::RngCore;
 use rpc::NodeRpcClient;
 use store::Store;
 
+use crate::note_transport::{NoteTransportClient, init_note_transport_cursor};
+use crate::rpc::{ACCOUNT_ID_LIMIT, NOTE_TAG_LIMIT};
 use crate::transaction::TransactionProver;
 
 // MIDEN CLIENT
@@ -316,9 +337,9 @@ pub struct Client<AUTH> {
     /// An instance of [`NodeRpcClient`] which provides a way for the client to connect to the
     /// Miden node.
     rpc_api: Arc<dyn NodeRpcClient>,
-    /// An instance of a [`LocalTransactionProver`] which will be the default prover for the
+    /// An instance of a [`TransactionProver`] which will be the default prover for the
     /// client.
-    tx_prover: Arc<LocalTransactionProver>,
+    tx_prover: Arc<dyn TransactionProver + Send + Sync>,
     /// An instance of a [`TransactionAuthenticator`] which will be used by the transaction
     /// executor whenever a signature is requested from within the VM.
     authenticator: Option<Arc<AUTH>>,
@@ -364,29 +385,34 @@ where
     ///   behind the network for transactions and account proofs to be considered valid.
     /// - `note_transport_api`: An instance of [`NoteTransportClient`] which provides a way for the
     ///   client to connect to the Miden Note Transport network.
+    /// - `tx_prover`: An optional instance of [`TransactionProver`] which will be used as the
+    ///   default prover for the client. If not provided, a default local prover will be created.
     ///
     /// # Errors
     ///
     /// Returns an error if the client couldn't be instantiated.
+    #[allow(clippy::too_many_arguments)]
     pub async fn new(
         rpc_api: Arc<dyn NodeRpcClient>,
-        rng: Box<dyn FeltRng + Send>,
+        rng: Box<dyn FeltRng + Send + Sync>,
         store: Arc<dyn Store>,
         authenticator: Option<Arc<AUTH>>,
         exec_options: ExecutionOptions,
         tx_graceful_blocks: Option<u32>,
         max_block_number_delta: Option<u32>,
         note_transport_api: Option<Arc<dyn NoteTransportClient>>,
+        tx_prover: Option<Arc<dyn TransactionProver + Send + Sync>>,
     ) -> Result<Self, ClientError> {
-        let tx_prover = Arc::new(LocalTransactionProver::default());
+        let tx_prover: Arc<dyn TransactionProver + Send + Sync> =
+            tx_prover.unwrap_or_else(|| Arc::new(LocalTransactionProver::default()));
 
         if let Some((genesis, _)) = store.get_block_header_by_num(BlockNumber::GENESIS).await? {
             // Set the genesis commitment in the RPC API client for future requests.
             rpc_api.set_genesis_commitment(genesis.commitment()).await?;
         }
 
+        // Initialize the note transport cursor if the client uses it
         if note_transport_api.is_some() {
-            // Initialize the note transport cursor
             init_note_transport_cursor(store.clone()).await?;
         }
 
@@ -441,15 +467,40 @@ where
         self.note_transport_api.clone()
     }
 
-    /// Returns an instance of the `ScriptBuilder`
-    pub fn script_builder(&self) -> ScriptBuilder {
-        ScriptBuilder::with_source_manager(self.source_manager.clone())
+    /// Returns an instance of the `CodeBuilder`
+    pub fn code_builder(&self) -> assembly::CodeBuilder {
+        assembly::CodeBuilder::with_source_manager(self.source_manager.clone())
     }
 
     /// Returns a reference to the client's random number generator. This can be used to generate
     /// randomness for various purposes such as serial numbers, keys, etc.
     pub fn rng(&mut self) -> &mut ClientRng {
         &mut self.rng
+    }
+
+    pub fn prover(&self) -> Arc<dyn TransactionProver + Send + Sync> {
+        self.tx_prover.clone()
+    }
+}
+
+impl<AUTH> Client<AUTH> {
+    // LIMITS
+    // --------------------------------------------------------------------------------------------
+
+    /// Checks if the note tag limit has been exceeded.
+    pub async fn check_note_tag_limit(&self) -> Result<(), ClientError> {
+        if self.store.get_unique_note_tags().await?.len() >= NOTE_TAG_LIMIT {
+            return Err(ClientError::NoteTagsLimitExceeded(NOTE_TAG_LIMIT));
+        }
+        Ok(())
+    }
+
+    /// Checks if the account limit has been exceeded.
+    pub async fn check_account_limit(&self) -> Result<(), ClientError> {
+        if self.store.get_account_ids().await?.len() >= ACCOUNT_ID_LIMIT {
+            return Err(ClientError::AccountsLimitExceeded(ACCOUNT_ID_LIMIT));
+        }
+        Ok(())
     }
 
     // TEST HELPERS
@@ -471,14 +522,14 @@ where
 
 /// A wrapper around a [`FeltRng`] that implements the [`RngCore`] trait.
 /// This allows the user to pass their own generic RNG so that it's used by the client.
-pub struct ClientRng(Box<dyn FeltRng + Send>);
+pub struct ClientRng(Box<dyn FeltRng + Send + Sync>);
 
 impl ClientRng {
-    pub fn new(rng: Box<dyn FeltRng + Send>) -> Self {
+    pub fn new(rng: Box<dyn FeltRng + Send + Sync>) -> Self {
         Self(rng)
     }
 
-    pub fn inner_mut(&mut self) -> &mut Box<dyn FeltRng + Send> {
+    pub fn inner_mut(&mut self) -> &mut Box<dyn FeltRng + Send + Sync> {
         &mut self.0
     }
 }
@@ -508,6 +559,7 @@ impl FeltRng for ClientRng {
 }
 
 /// Indicates whether the client is operating in debug mode.
+#[derive(Debug, Clone, Copy)]
 pub enum DebugMode {
     Enabled,
     Disabled,

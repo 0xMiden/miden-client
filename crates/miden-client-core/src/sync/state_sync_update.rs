@@ -1,12 +1,12 @@
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::vec::Vec;
 
-use miden_objects::Word;
-use miden_objects::account::AccountId;
-use miden_objects::block::{BlockHeader, BlockNumber};
-use miden_objects::crypto::merkle::{InOrderIndex, MmrPeaks};
-use miden_objects::note::{NoteId, Nullifier};
-use miden_objects::transaction::TransactionId;
+use miden_protocol::Word;
+use miden_protocol::account::AccountId;
+use miden_protocol::block::{BlockHeader, BlockNumber};
+use miden_protocol::crypto::merkle::mmr::{InOrderIndex, MmrPeaks};
+use miden_protocol::note::{NoteId, Nullifier};
+use miden_protocol::transaction::TransactionId;
 
 use super::SyncSummary;
 use crate::account::Account;
@@ -223,6 +223,8 @@ impl TransactionUpdateTracker {
             );
         }
 
+        // NOTE: we check for <= new_sync height because at this point we would have committed the
+        // transaction otherwise
         self.discard_transaction_with_predicate(
             |transaction| transaction.details.expiration_block_num <= new_sync_height,
             DiscardCause::Expired,
@@ -263,8 +265,12 @@ impl TransactionUpdateTracker {
         let mut new_invalid_account_states = vec![];
 
         for transaction in self.mutable_pending_transactions() {
-            if predicate(transaction) {
-                transaction.discard_transaction(discard_cause);
+            // Discard transactions, and also push the invalid account state if the transaction
+            // got correctly discarded
+            // NOTE: previous updates in a chain of state syncs could have committed a transaction,
+            // so we need to check that `discard_transaction` returns `true` here (aka, it got
+            // discarded from a valid state)
+            if predicate(transaction) && transaction.discard_transaction(discard_cause) {
                 new_invalid_account_states.push(transaction.details.final_account_state);
             }
         }

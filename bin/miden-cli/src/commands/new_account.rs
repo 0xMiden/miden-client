@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::ffi::OsStr;
 use std::fs::{self, File};
 use std::io::{Read, Write};
@@ -10,10 +11,11 @@ use miden_client::account::component::{
     AccountComponentMetadata,
     InitStorageData,
     MIDEN_PACKAGE_EXTENSION,
+    StorageSlotSchema,
+    StorageValueName,
 };
 use miden_client::account::{Account, AccountBuilder, AccountStorageMode, AccountType};
 use miden_client::auth::{AuthRpoFalcon512, AuthSecretKey};
-use miden_client::crypto::rpo_falcon512::SecretKey;
 use miden_client::transaction::TransactionRequestBuilder;
 use miden_client::utils::Deserializable;
 use miden_client::vm::{Package, SectionId};
@@ -145,6 +147,28 @@ impl NewWalletCmd {
 ///
 /// An account may comprise one or more components, each with its own storage and distinct
 /// functionality.
+///
+/// # Authentication Components
+///
+/// If a package with an authentication component is provided via `-p`, it will be used for
+/// the account. Otherwise, a default `RpoFalcon512` authentication component will be added
+/// automatically.
+///
+/// Each account can only have one authentication component. If multiple packages contain
+/// authentication components, an error will be returned. By default, authentication-related
+/// packages are located in the `auth` subdir in your packages directory.
+///
+/// # Examples
+///
+/// Create an account with default Falcon auth:
+/// ```bash
+/// miden-client new-account --account-type regular-account-immutable-code -p basic-wallet
+/// ```
+///
+/// Create an account with a custom auth component (e.g., NoAuth):
+/// ```bash
+/// miden-client new-account --account-type regular-account-immutable-code -p auth/no-auth -p basic-wallet
+/// ```
 #[derive(Debug, Parser, Clone)]
 pub struct NewAccountCmd {
     /// Storage mode of the account.
@@ -283,11 +307,45 @@ fn load_init_storage_data(path: Option<&PathBuf>) -> Result<InitStorageData, Cli
     }
 }
 
+/// Separates account components into auth and regular components.
+///
+/// Returns a tuple of (`auth_component`, `regular_components`).
+/// Returns an error if multiple auth components are found.
+fn separate_auth_components(
+    components: Vec<AccountComponent>,
+) -> Result<(Option<AccountComponent>, Vec<AccountComponent>), CliError> {
+    let mut auth_component: Option<AccountComponent> = None;
+    let mut regular_components = Vec::new();
+
+    for component in components {
+        let auth_proc_count =
+            component.get_procedures().into_iter().filter(|(_, is_auth)| *is_auth).count();
+
+        match auth_proc_count {
+            0 => regular_components.push(component),
+            1 => {
+                if auth_component.is_some() {
+                    return Err(CliError::InvalidArgument(
+                        "Multiple auth components found in packages. Only one auth component is allowed per account.".to_string()
+                    ));
+                }
+                auth_component = Some(component);
+            },
+            _ => {
+                return Err(CliError::InvalidArgument(
+                    "Component has multiple auth procedures. Only one auth procedure is allowed per component.".to_string()
+                ));
+            },
+        }
+    }
+
+    Ok((auth_component, regular_components))
+}
+
 /// Helper function to create the seed, initialize the account builder, add the given components,
 /// and build the account.
 ///
-/// The created account will have a Falcon-based auth component, additional to any specified
-/// component.
+/// If no auth component is detected in the packages, a Falcon-based auth component will be added.
 async fn create_client_account<AUTH: CliAuthenticator>(
     client: &mut Client<AUTH>,
     keystore: &CliKeyStore,
@@ -317,16 +375,29 @@ async fn create_client_account<AUTH: CliAuthenticator>(
     let mut init_seed = [0u8; 32];
     client.rng().fill_bytes(&mut init_seed);
 
-    let key_pair = SecretKey::with_rng(client.rng());
-
     let mut builder = AccountBuilder::new(init_seed)
         .account_type(account_type)
-        .storage_mode(storage_mode)
-        .with_auth_component(AuthRpoFalcon512::new(key_pair.public_key().into()));
+        .storage_mode(storage_mode);
 
-    // Process packages and add them to the account builder.
+    // Process packages and separate auth components from regular components
     let account_components = process_packages(packages, &init_storage_data)?;
-    for component in account_components {
+    let (auth_component, regular_components) = separate_auth_components(account_components)?;
+
+    // Add the auth component (either from packages or default Falcon)
+    let key_pair = if let Some(auth_component) = auth_component {
+        debug!("Adding auth component from package");
+        builder = builder.with_auth_component(auth_component);
+        None
+    } else {
+        debug!("Adding default Falcon auth component");
+        let kp = AuthSecretKey::new_falcon512_rpo_with_rng(client.rng());
+        builder =
+            builder.with_auth_component(AuthRpoFalcon512::new(kp.public_key().to_commitment()));
+        Some(kp)
+    };
+
+    // Add all regular (non-auth) components
+    for component in regular_components {
         builder = builder.with_component(component);
     }
 
@@ -334,9 +405,13 @@ async fn create_client_account<AUTH: CliAuthenticator>(
         .build()
         .map_err(|err| CliError::Account(err, "failed to build account".into()))?;
 
-    keystore
-        .add_key(&AuthSecretKey::RpoFalcon512(key_pair))
-        .map_err(CliError::KeyStore)?;
+    // Only add the key to the keystore if we generated a default key type (Falcon)
+    if let Some(key_pair) = key_pair {
+        keystore.add_key(&key_pair).map_err(CliError::KeyStore)?;
+        println!("Generated and stored Falcon512 authentication key in keystore.");
+    } else {
+        println!("Using custom authentication component from package (no key generated).");
+    }
 
     client.add_account(&account, false).await?;
 
@@ -355,15 +430,19 @@ async fn deploy_account<AUTH: CliAuthenticator>(
     // Retrieve the auth procedure mast root pointer and call it in the transaction script.
     // We only use AuthRpoFalcon512 for the auth component so this may be overkill but it lets us
     // use different auth components in the future.
-    let auth_procedure_mast_root = account.code().get_procedure_by_index(0).mast_root();
+    let auth_procedure_mast_root = account
+        .code()
+        .get(0)
+        .expect("account code should contain at least one procedure")
+        .mast_root();
 
     let auth_script = client
-        .script_builder()
+        .code_builder()
         .compile_tx_script(
             "
                     begin
                         # [AUTH_PROCEDURE_MAST_ROOT]
-                        mem_storew.4000 push.4000
+                        mem_storew_be.4000 push.4000
                         # [auth_procedure_mast_root_ptr]
                         dyncall
                     end",
@@ -378,8 +457,7 @@ async fn deploy_account<AUTH: CliAuthenticator>(
             CliError::Transaction(err.into(), "Failed to build deploy transaction".to_string())
         })?;
 
-    let tx = client.new_transaction(account.id(), tx_request).await?;
-    client.submit_transaction(tx).await?;
+    client.submit_new_transaction(account.id(), tx_request).await?;
     Ok(())
 }
 
@@ -390,7 +468,8 @@ fn process_packages(
     let mut account_components = Vec::with_capacity(packages.len());
 
     for package in packages {
-        let mut init_storage_data = init_storage_data.placeholders().clone();
+        let mut value_entries = init_storage_data.values().clone();
+        let mut map_entries = BTreeMap::new();
 
         let Some(component_metadata_section) = package.sections.iter().find(|section| {
             section.id.as_str() == (SectionId::ACCOUNT_COMPONENT_METADATA).as_str()
@@ -411,29 +490,38 @@ fn process_packages(
             )
         })?;
 
-        for (placeholder_key, placeholder_type) in component_metadata.get_placeholder_requirements()
-        {
-            if init_storage_data.contains_key(&placeholder_key) {
-                // The use provided it through the TOML file, so we can skip it
+        // Preserve any provided map entries for map slots.
+        for (slot_name, schema) in component_metadata.storage_schema().iter() {
+            if matches!(schema, StorageSlotSchema::Map(_)) {
+                let value_name = StorageValueName::from_slot_name(slot_name);
+                if let Some(entries) = init_storage_data.map_entries(&value_name) {
+                    map_entries.insert(value_name, entries.clone());
+                }
+            }
+        }
+
+        for (value_name, requirement) in component_metadata.schema_requirements() {
+            if value_entries.contains_key(&value_name) {
+                // The user provided it through the TOML file, so we can skip it
                 continue;
             }
 
-            let description = placeholder_type.description.unwrap_or("[No description]".into());
-            print!(
-                "Enter value for '{placeholder_key}' - {description} (type: {}): ",
-                placeholder_type.r#type
+            let description = requirement.description.unwrap_or("[No description]".into());
+            println!(
+                "Enter value for '{value_name}' - {description} (type: {}): ",
+                requirement.r#type
             );
             std::io::stdout().flush()?;
 
             let mut input_value = String::new();
             std::io::stdin().read_line(&mut input_value)?;
             let input_value = input_value.trim();
-            init_storage_data.insert(placeholder_key, input_value.to_string());
+            value_entries.insert(value_name, input_value.to_string().into());
         }
 
-        let account_component = AccountComponent::from_package_with_init_data(
+        let account_component = AccountComponent::from_package(
             &package,
-            &InitStorageData::new(init_storage_data),
+            &InitStorageData::new(value_entries, map_entries),
         )
         .map_err(|e| {
             CliError::Account(

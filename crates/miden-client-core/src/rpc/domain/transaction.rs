@@ -1,12 +1,24 @@
+use alloc::string::ToString;
 use alloc::vec::Vec;
 
-use miden_objects::Word;
-use miden_objects::account::AccountId;
-use miden_objects::block::BlockNumber;
-use miden_objects::note::{NoteHeader, Nullifier};
-use miden_objects::transaction::{InputNotes, TransactionHeader, TransactionId};
+use miden_protocol::Word;
+use miden_protocol::account::AccountId;
+use miden_protocol::asset::FungibleAsset;
+use miden_protocol::block::BlockNumber;
+use miden_protocol::note::{NoteHeader, Nullifier};
+use miden_protocol::transaction::{
+    InputNoteCommitment,
+    InputNotes,
+    TransactionHeader,
+    TransactionId,
+};
 
 use crate::rpc::{RpcConversionError, RpcError, generated as proto};
+
+// TODO: Remove this when we turn on fees and the node informs the correct asset account ID
+
+/// A native asset faucet ID for use in testing scenarios.
+pub const ACCOUNT_ID_NATIVE_ASSET_FAUCET: u128 = 0xab00_0000_0000_cd20_0000_ac00_0000_de00_u128;
 
 // INTO TRANSACTION ID
 // ================================================================================================
@@ -16,7 +28,7 @@ impl TryFrom<proto::primitives::Digest> for TransactionId {
 
     fn try_from(value: proto::primitives::Digest) -> Result<Self, Self::Error> {
         let word: Word = value.try_into()?;
-        Ok(word.into())
+        Ok(Self::from_raw(word))
     }
 }
 
@@ -68,10 +80,10 @@ pub struct TransactionsInfo {
     pub transaction_records: Vec<TransactionRecord>,
 }
 
-impl TryFrom<proto::rpc_store::SyncTransactionsResponse> for TransactionsInfo {
+impl TryFrom<proto::rpc::SyncTransactionsResponse> for TransactionsInfo {
     type Error = RpcError;
 
-    fn try_from(value: proto::rpc_store::SyncTransactionsResponse) -> Result<Self, Self::Error> {
+    fn try_from(value: proto::rpc::SyncTransactionsResponse) -> Result<Self, Self::Error> {
         let pagination_info = value.pagination_info.ok_or(
             RpcConversionError::MissingFieldInProtobufRepresentation {
                 entity: "SyncTransactionsResponse",
@@ -83,7 +95,7 @@ impl TryFrom<proto::rpc_store::SyncTransactionsResponse> for TransactionsInfo {
         let block_num = pagination_info.block_num.into();
 
         let transaction_records = value
-            .transaction_records
+            .transactions
             .into_iter()
             .map(TryInto::try_into)
             .collect::<Result<Vec<TransactionRecord>, RpcError>>()?;
@@ -109,17 +121,16 @@ pub struct TransactionRecord {
     pub transaction_header: TransactionHeader,
 }
 
-impl TryFrom<proto::rpc_store::TransactionRecord> for TransactionRecord {
+impl TryFrom<proto::rpc::TransactionRecord> for TransactionRecord {
     type Error = RpcError;
 
-    fn try_from(value: proto::rpc_store::TransactionRecord) -> Result<Self, Self::Error> {
+    fn try_from(value: proto::rpc::TransactionRecord) -> Result<Self, Self::Error> {
         let block_num = value.block_num.into();
-        let transaction_header = value.transaction_header.ok_or(
-            RpcConversionError::MissingFieldInProtobufRepresentation {
+        let transaction_header =
+            value.header.ok_or(RpcConversionError::MissingFieldInProtobufRepresentation {
                 entity: "TransactionRecord",
                 field_name: "transaction_header",
-            },
-        )?;
+            })?;
 
         Ok(Self {
             block_num,
@@ -154,13 +165,16 @@ impl TryFrom<proto::transaction::TransactionHeader> for TransactionHeader {
             },
         )?;
 
-        let input_notes = InputNotes::new_unchecked(
-            value
-                .input_notes
-                .into_iter()
-                .map(|d| d.try_into().map(Word::into).map(Nullifier::into))
-                .collect::<Result<Vec<_>, _>>()?,
-        );
+        let note_commitments = value
+            .nullifiers
+            .into_iter()
+            .map(|d| {
+                Nullifier::from_hex(&d.to_string())
+                    .map(InputNoteCommitment::from)
+                    .map_err(|e| RpcError::InvalidResponse(e.to_string()))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let input_notes = InputNotes::new_unchecked(note_commitments);
 
         let output_notes = value
             .output_notes
@@ -174,6 +188,9 @@ impl TryFrom<proto::transaction::TransactionHeader> for TransactionHeader {
             final_state_commitment.try_into()?,
             input_notes,
             output_notes,
+            // TODO: handle this; should we open an issue in miden-node?
+            FungibleAsset::new(ACCOUNT_ID_NATIVE_ASSET_FAUCET.try_into().expect("is valid"), 0u64)
+                .unwrap(),
         );
         Ok(transaction_header)
     }

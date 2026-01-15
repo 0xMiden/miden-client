@@ -58,7 +58,7 @@ const baseCargoArgs = [
  */
 export default [
   {
-    input: "./js/wasm.js",
+    input: ["./js/wasm.js", "./js/index.js"],
     output: {
       dir: `dist`,
       format: "es",
@@ -77,7 +77,7 @@ export default [
         experimental: {
           typescriptDeclarationDir: "dist/crates",
         },
-        optimize: { release: true, rustc: true },
+        optimize: { release: true, rustc: !devMode },
       }),
       resolve(),
       commonjs(),
@@ -102,15 +102,5 @@ export default [
         verbose: true,
       }),
     ],
-  },
-  // Build the main entry point
-  {
-    input: "./js/index.js",
-    output: {
-      dir: `dist`,
-      format: "es",
-      sourcemap: true,
-    },
-    plugins: [resolve(), commonjs()],
   },
 ];

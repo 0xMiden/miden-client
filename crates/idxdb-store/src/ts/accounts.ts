@@ -9,8 +9,10 @@ import {
   IAccount,
   IAccountAsset,
   IAccountStorage,
+  ITrackedAccount,
   storageMapEntries,
   IStorageMapEntry,
+  trackedAccounts,
 } from "./schema.js";
 import { JsStorageMapEntry, JsStorageSlot, JsVaultAsset } from "./sync.js";
 import { logWebStoreError, uint8ArrayToBase64 } from "./utils.js";
@@ -18,17 +20,13 @@ import { logWebStoreError, uint8ArrayToBase64 } from "./utils.js";
 // GET FUNCTIONS
 export async function getAccountIds() {
   try {
-    const allIds = new Set(); // Use a Set to ensure uniqueness
-
-    // Iterate over each account entry
-    await accounts.each((account) => {
-      allIds.add(account.id); // Assuming 'account' has an 'id' property
-    });
-
-    return Array.from(allIds); // Convert back to array to return a list of unique IDs
+    const tracked = await trackedAccounts.toArray();
+    return tracked.map((entry) => entry.id);
   } catch (error) {
     logWebStoreError(error, "Error while fetching account IDs");
   }
+
+  return [];
 }
 
 export async function getAllAccountHeaders() {
@@ -211,7 +209,7 @@ export async function getAccountStorage(storageCommitment: string) {
 
     const slots = allMatchingRecords.map((record) => {
       return {
-        slotIndex: record.slotIndex,
+        slotName: record.slotName,
         slotValue: record.slotValue,
         slotType: record.slotType,
       };
@@ -328,7 +326,7 @@ export async function upsertAccountStorage(storageSlots: JsStorageSlot[]) {
     let processedSlots = storageSlots.map((slot) => {
       return {
         commitment: slot.commitment,
-        slotIndex: slot.slotIndex,
+        slotName: slot.slotName,
         slotValue: slot.slotValue,
         slotType: slot.slotType,
       } as IAccountStorage;
@@ -396,6 +394,7 @@ export async function upsertAccountRecord(
     };
 
     await accounts.put(data as IAccount);
+    await trackedAccounts.put({ id: accountId } as ITrackedAccount);
   } catch (error) {
     logWebStoreError(error, `Error inserting account: ${accountId}`);
   }
@@ -420,14 +419,14 @@ export async function insertAccountAuth(pubKey: string, secretKey: string) {
 }
 
 export async function insertAccountAddress(
-  address: Uint8Array,
-  accountId: string
+  accountId: string,
+  address: Uint8Array
 ) {
   try {
     // Prepare the data object to insert
     const data = {
-      address,
       id: accountId,
+      address,
     };
 
     // Perform the insert using Dexie

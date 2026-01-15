@@ -13,20 +13,45 @@ The mock web client mimics the normal `WebClient` interface to allow for seamles
 The mock client also includes a simulated note transport layer, allowing you to test note transport features such as `sendPrivateNote()` and `fetchPrivateNotes()` without requiring a live note transport node.
 
 ```typescript
-import { MockWebClient } from "@demox-labs/miden-sdk";
+import { MockWebClient } from "@miden-sdk/miden-sdk";
 
 try {
   // Initialize the mock web client
   const mockWebClient = await MockWebClient.createClient();
 
-  // Running a mint transaction (assuming the client was setup previously)
-  const mintTransactionResult = await mockWebClient.newTransaction(
+  const mintTransactionId = await mockWebClient.submitNewTransaction(
     faucetAccount.id(),
     mintTransactionRequest
   );
 
-  await mockWebClient.submitTransaction(mintTransactionResult);
-  await mockWebClient.proveBlock(); // Creates a new block that will include the submitted transaction
+  console.log("Mint transaction submitted:", mintTransactionId.toString());
+
+  // Advance the mock chain and refresh local state
+  await mockWebClient.proveBlock();
+  await mockWebClient.syncState();
+
+  const consumableNotes = await mockWebClient.getConsumableNotes(
+    userAccount.id()
+  );
+  const noteIdToConsume = consumableNotes[0]
+    .inputNoteRecord()
+    .id()
+    .toString();
+  const inputNoteRecord = await client.getInputNote(noteIdToConsume);
+  if (!inputNoteRecord) {
+    throw new Error(`Note with ID ${noteIdToConsume} not found`);
+  }
+  const noteToConsume = inputNoteRecord.toNote();
+  const consumeRequest = mockWebClient.newConsumeTransactionRequest([
+    noteToConsume,
+  ]);
+
+  const consumeTransactionId = await mockWebClient.submitNewTransaction(
+    userAccount.id(),
+    consumeRequest
+  );
+
+  await mockWebClient.proveBlock();
   await mockWebClient.syncState();
 } catch (error) {
   console.error(
@@ -41,7 +66,7 @@ try {
 The mock client includes a built-in note transport layer.
 
 ```typescript
-import { MockWebClient, NoteFilter, NoteFilterTypes } from "@demox-labs/miden-sdk";
+import { MockWebClient, NoteFilter, NoteFilterTypes } from "@miden-sdk/miden-sdk";
 
 try {
   // Initialize the mock web client
@@ -50,16 +75,16 @@ try {
   // Send a private note (example with placeholders)
   const note = /* create your note */;
   const recipientAddress = /* create recipient address */;
-  
+
   await mockWebClient.sendPrivateNote(note, recipientAddress);
 
   // Fetch private notes
   await mockWebClient.fetchPrivateNotes();
-  
+
   // Retrieve the fetched notes
   const filter = new NoteFilter(NoteFilterTypes.All);
   const notes = await mockWebClient.getInputNotes(filter);
-  
+
   console.log(`Fetched ${notes.length} private notes`);
 } catch (error) {
   console.error("Error:", error.message);

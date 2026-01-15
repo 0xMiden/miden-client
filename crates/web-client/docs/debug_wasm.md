@@ -37,7 +37,7 @@ make link-web-client-dep
 ```
 2. Then, run this command in the root of the project that needs to be debugged:
 ```
-yarn link "@demox-labs/miden-sdk"
+yarn link "@miden-sdk/miden-sdk"
 ```
 Essentially,`yarn link` makes the project use the local modified version of the sdk instead of the NPM hosted one. Now, when you open the devtools with chrome, you will see an output like this:
 

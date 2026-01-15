@@ -1,11 +1,19 @@
+use alloc::sync::Arc;
+
+use miden_client_core::Serializable;
 use miden_client_core::account::AccountId as NativeAccountId;
+use miden_client_core::assembly::Assembler as NativeAssembler;
 use miden_client_core::testing::account_id::ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE;
-use miden_client_core::transaction::TransactionResult as NativeTransactionResult;
+use miden_client_core::vm::{
+    MastArtifact as NativeMastArtifact,
+    Package as NativePackage,
+    PackageKind as NativePackageKind,
+    PackageManifest as NativePackageManifest,
+};
 use wasm_bindgen::prelude::*;
+use wasm_bindgen_futures::js_sys::Uint8Array;
 
 use crate::models::account_id::AccountId;
-use crate::models::transaction_result::TransactionResult;
-use crate::{WebClient, js_error_with_context};
 
 #[wasm_bindgen]
 pub struct TestUtils;
@@ -18,28 +26,61 @@ impl TestUtils {
             ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE.try_into().unwrap();
         native_account_id.into()
     }
-}
-// WEB CLIENT TESTING HELPERS
-// ================================================================================================
 
-#[cfg(feature = "testing")]
-#[wasm_bindgen]
-impl WebClient {
-    #[wasm_bindgen(js_name = "testingApplyTransaction")]
-    pub async fn testing_apply_transaction(
-        &mut self,
-        tx_result: TransactionResult,
-    ) -> Result<(), JsValue> {
-        let native_transaction_result: NativeTransactionResult = tx_result.into();
+    #[wasm_bindgen(js_name = "createMockSerializedLibraryPackage")]
+    pub fn create_mock_serialized_library_package() -> Uint8Array {
+        pub const CODE: &str = "
+            pub proc foo
+                push.1.2 mul
+            end
 
-        if let Some(client) = self.get_mut_inner() {
-            client
-                .testing_apply_transaction(native_transaction_result)
-                .await
-                .map_err(|err| js_error_with_context(err, "failed to apply transaction"))?;
-            Ok(())
-        } else {
-            Err(JsValue::from_str("Client not initialized"))
-        }
+            pub proc bar
+                push.1.2 add
+            end
+        ";
+
+        let library = NativeAssembler::default().assemble_library([CODE]).unwrap();
+
+        let package_without_metadata = NativePackage {
+            name: "test_package_no_metadata".to_string(),
+            mast: NativeMastArtifact::Library(Arc::new(library)),
+            manifest: NativePackageManifest::new(None),
+            sections: vec![], // No metadata section
+            version: Default::default(),
+            description: None,
+            kind: NativePackageKind::Library,
+        };
+
+        let bytes: Vec<u8> = package_without_metadata.to_bytes();
+
+        Uint8Array::from(bytes.as_slice())
+    }
+
+    #[wasm_bindgen(js_name = "createMockSerializedProgramPackage")]
+    pub fn create_mock_serialized_program_package() -> Uint8Array {
+        pub const CODE: &str = "
+            begin
+                # This code computes 1001st Fibonacci number
+                repeat.1000
+                    swap dup.1 add
+                end
+            end
+        ";
+
+        let program = NativeAssembler::default().assemble_program(CODE).unwrap();
+
+        let package_without_metadata = NativePackage {
+            name: "test_program_package_no_metadata".to_string(),
+            mast: NativeMastArtifact::Executable(Arc::new(program)),
+            manifest: NativePackageManifest::new(None),
+            sections: vec![], // No metadata section
+            version: Default::default(),
+            description: None,
+            kind: NativePackageKind::Executable,
+        };
+
+        let bytes: Vec<u8> = package_without_metadata.to_bytes();
+
+        Uint8Array::from(bytes.as_slice())
     }
 }

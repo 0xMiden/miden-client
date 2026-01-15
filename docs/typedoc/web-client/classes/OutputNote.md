@@ -1,16 +1,30 @@
-[**@demox-labs/miden-sdk**](../README.md)
+[**@miden-sdk/miden-sdk**](../README.md)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / OutputNote
+[@miden-sdk/miden-sdk](../README.md) / OutputNote
 
 # Class: OutputNote
 
+Representation of a note produced by a transaction (full, partial, or header-only).
+
 ## Methods
+
+### \[dispose\]()
+
+> **\[dispose\]**(): `void`
+
+#### Returns
+
+`void`
+
+***
 
 ### assets()
 
 > **assets**(): [`NoteAssets`](NoteAssets.md)
+
+Returns the assets if they are present.
 
 #### Returns
 
@@ -32,6 +46,8 @@
 
 > **id**(): [`NoteId`](NoteId.md)
 
+Returns the note ID for this output.
+
 #### Returns
 
 [`NoteId`](NoteId.md)
@@ -41,6 +57,8 @@
 ### intoFull()
 
 > **intoFull**(): [`Note`](Note.md)
+
+Converts into a full note if the data is present.
 
 #### Returns
 
@@ -52,6 +70,8 @@
 
 > **metadata**(): [`NoteMetadata`](NoteMetadata.md)
 
+Returns the metadata that accompanies this output.
+
 #### Returns
 
 [`NoteMetadata`](NoteMetadata.md)
@@ -61,6 +81,8 @@
 ### recipientDigest()
 
 > **recipientDigest**(): [`Word`](Word.md)
+
+Returns the recipient digest if the recipient is known.
 
 #### Returns
 
@@ -72,6 +94,8 @@
 
 > **shrink**(): `OutputNote`
 
+Returns a more compact representation if possible (e.g. dropping details).
+
 #### Returns
 
 `OutputNote`
@@ -81,6 +105,8 @@
 ### full()
 
 > `static` **full**(`note`): `OutputNote`
+
+Wraps a full note output.
 
 #### Parameters
 
@@ -98,6 +124,8 @@
 
 > `static` **header**(`note_header`): `OutputNote`
 
+Wraps only the header of a note.
+
 #### Parameters
 
 ##### note\_header
@@ -113,6 +141,8 @@
 ### partial()
 
 > `static` **partial**(`partial_note`): `OutputNote`
+
+Wraps a partial note containing assets and recipient only.
 
 #### Parameters
 

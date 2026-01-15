@@ -3,16 +3,16 @@
 ///
 /// A Miden account ID is a 120-bit value derived from the commitments to account code and storage,
 /// and a random user-provided seed.
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 #[prost(skip_debug)]
 pub struct AccountId {
     /// 15 bytes (120 bits) encoded using \[winter_utils::Serializable\] implementation for
-    /// \[miden_objects::account::account_id::AccountId\].
+    /// \[miden_protocol::account::account_id::AccountId\].
     #[prost(bytes = "vec", tag = "1")]
     pub id: ::prost::alloc::vec::Vec<u8>,
 }
 /// The state of an account at a specific block height.
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct AccountSummary {
     /// The account ID.
     #[prost(message, optional, tag = "1")]
@@ -34,29 +34,32 @@ pub struct AccountStorageHeader {
 /// Nested message and enum types in `AccountStorageHeader`.
 pub mod account_storage_header {
     /// A single storage slot in the account storage header.
-    #[derive(Clone, Copy, PartialEq, ::prost::Message)]
+    #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
     pub struct StorageSlot {
+        /// The name of the storage slot.
+        #[prost(string, tag = "1")]
+        pub slot_name: ::prost::alloc::string::String,
         /// The type of the storage slot.
-        #[prost(uint32, tag = "1")]
+        #[prost(uint32, tag = "2")]
         pub slot_type: u32,
         /// The commitment (Word) for this storage slot.
-        #[prost(message, optional, tag = "2")]
+        #[prost(message, optional, tag = "3")]
         pub commitment: ::core::option::Option<super::super::primitives::Digest>,
     }
 }
 /// An account details.
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct AccountDetails {
     /// Account summary.
     #[prost(message, optional, tag = "1")]
     pub summary: ::core::option::Option<AccountSummary>,
     /// Account details encoded using \[winter_utils::Serializable\] implementation for
-    /// \[miden_objects::account::Account\].
+    /// \[miden_protocol::account::Account\].
     #[prost(bytes = "vec", optional, tag = "2")]
     pub details: ::core::option::Option<::prost::alloc::vec::Vec<u8>>,
 }
 /// An account header.
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct AccountHeader {
     /// The account ID.
     #[prost(message, optional, tag = "1")]

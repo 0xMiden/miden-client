@@ -54,10 +54,10 @@ export async function transformForImport(obj: any): Promise<any> {
     value: obj,
   });
 }
-export async function forceImportStore(jsonStr: string) {
+export async function forceImportStore(jsonStr: string, clientVersion: string) {
   try {
     if (!db.isOpen) {
-      await openDatabase();
+      await openDatabase(clientVersion);
     }
 
     let dbJson = JSON.parse(jsonStr);

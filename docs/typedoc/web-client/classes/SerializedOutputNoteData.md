@@ -1,8 +1,8 @@
-[**@demox-labs/miden-sdk**](../README.md)
+[**@miden-sdk/miden-sdk**](../README.md)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / SerializedOutputNoteData
+[@miden-sdk/miden-sdk](../README.md) / SerializedOutputNoteData
 
 # Class: SerializedOutputNoteData
 
@@ -75,6 +75,16 @@
 `void`
 
 ## Methods
+
+### \[dispose\]()
+
+> **\[dispose\]**(): `void`
+
+#### Returns
+
+`void`
+
+***
 
 ### free()
 

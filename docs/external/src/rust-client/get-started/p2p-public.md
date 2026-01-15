@@ -28,24 +28,17 @@ To do this, we use two terminals with their own state (using their own `miden-cl
     mkdir miden-client-2
     cd miden-client-2
     ```
-
-2. Initialize the client. This creates the `miden-client.toml` file line-by-line.
+2. On the new client, create a new [basic account](https://0xMiden.github.io/miden-docs/miden-base/architecture/accounts.html):
 
     ```sh
-    miden-client init --network testnet # Creates a miden-client.toml file configured with the testnet node's IP
-    ```
-
-3. On the new client, create a new [basic account](https://0xMiden.github.io/miden-docs/miden-base/architecture/accounts.html):
-
-    ```shell
     miden-client new-wallet --mutable -s public
     ```
 
     We refer to this account as _Account C_. Note that we set the account's storage mode to `public`, which means that the account details are public and its latest state can be retrieved from the node.
 
-4. List and view the account with the following command:
+3. List and view the account with the following command:
 
-      ```shell
+      ```sh
       miden-client account -l
       ```
 
@@ -55,7 +48,7 @@ To do this, we use two terminals with their own state (using their own `miden-cl
 
     To do this, from the first client run:
 
-    ```shell
+    ```sh
     miden-client send --sender <basic-account-id-A> --target <basic-account-id-C> --asset 50::<faucet-account-id> --note-type public
     ```
 
@@ -67,7 +60,7 @@ To do this, we use two terminals with their own state (using their own `miden-cl
 
 2. First, sync the account on the new client.
 
-    ```shell
+    ```sh
     miden-client sync
     ```
 

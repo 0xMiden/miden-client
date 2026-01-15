@@ -1,10 +1,12 @@
-[**@demox-labs/miden-sdk**](../README.md)
+[**@miden-sdk/miden-sdk**](../README.md)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / NoteType
+[@miden-sdk/miden-sdk](../README.md) / NoteType
 
 # Enumeration: NoteType
+
+Visibility level for note contents when published to the network.
 
 ## Enumeration Members
 

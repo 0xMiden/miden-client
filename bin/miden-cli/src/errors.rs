@@ -1,9 +1,16 @@
 use std::error::Error;
 
-use miden_client::account::AddressError;
+use miden_client::account::{AccountId, AddressError};
 use miden_client::keystore::KeyStoreError;
-use miden_client::utils::ScriptBuilderError;
-use miden_client::{AccountError, AccountIdError, AssetError, ClientError, NetworkIdError};
+use miden_client::{
+    AccountError,
+    AccountIdError,
+    AssetError,
+    ClientError,
+    CodeBuilderError,
+    ErrorHint,
+    NetworkIdError,
+};
 use miette::Diagnostic;
 use thiserror::Error;
 
@@ -27,9 +34,9 @@ pub enum CliError {
     #[error("asset error")]
     #[diagnostic(code(cli::asset_error))]
     Asset(#[source] AssetError),
-    #[error("client error")]
+    #[error("client error: {0}")]
     #[diagnostic(code(cli::client_error))]
-    Client(#[from] ClientError),
+    Client(#[source] ClientError, #[help] Option<String>),
     #[error("config error: {1}")]
     #[diagnostic(
         code(cli::config_error),
@@ -78,8 +85,17 @@ pub enum CliError {
     Parse(#[source] SourceError, String),
     #[error("script builder error")]
     #[diagnostic(code(cli::script_builder_error))]
-    ScriptBuilder(#[from] ScriptBuilderError),
+    CodeBuilder(#[from] CodeBuilderError),
     #[error("transaction error: {1}")]
     #[diagnostic(code(cli::transaction_error))]
     Transaction(#[source] SourceError, String),
+    #[error("expected full account, but got partial account: {0}")]
+    InvalidAccount(AccountId),
+}
+
+impl From<ClientError> for CliError {
+    fn from(error: ClientError) -> Self {
+        let help = Option::<ErrorHint>::from(&error).map(ErrorHint::into_help_message);
+        CliError::Client(error, help)
+    }
 }

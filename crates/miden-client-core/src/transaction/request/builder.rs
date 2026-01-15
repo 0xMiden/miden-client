@@ -3,12 +3,12 @@ use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::string::ToString;
 use alloc::vec::Vec;
 
-use miden_lib::note::{create_p2id_note, create_p2ide_note, create_swap_note};
-use miden_objects::account::AccountId;
-use miden_objects::asset::{Asset, FungibleAsset};
-use miden_objects::block::BlockNumber;
-use miden_objects::crypto::merkle::{InnerNodeInfo, MerkleStore};
-use miden_objects::note::{
+use miden_protocol::account::AccountId;
+use miden_protocol::asset::{Asset, FungibleAsset};
+use miden_protocol::block::BlockNumber;
+use miden_protocol::crypto::merkle::InnerNodeInfo;
+use miden_protocol::crypto::merkle::store::MerkleStore;
+use miden_protocol::note::{
     Note,
     NoteDetails,
     NoteId,
@@ -17,9 +17,10 @@ use miden_objects::note::{
     NoteType,
     PartialNote,
 };
-use miden_objects::transaction::{OutputNote, TransactionScript};
-use miden_objects::vm::AdviceMap;
-use miden_objects::{Felt, FieldElement, NoteError, Word};
+use miden_protocol::transaction::{OutputNote, TransactionScript};
+use miden_protocol::vm::AdviceMap;
+use miden_protocol::{Felt, FieldElement, NoteError, Word};
+use miden_standards::note::{create_p2id_note, create_p2ide_note, create_swap_note};
 
 use super::{
     ForeignAccount,
@@ -39,11 +40,13 @@ use crate::ClientRng;
 /// scripts, and setting other transaction parameters.
 #[derive(Clone, Debug)]
 pub struct TransactionRequestBuilder {
-    /// Notes to be consumed by the transaction that aren't authenticated.
-    unauthenticated_input_notes: Vec<Note>,
-    /// Notes to be consumed by the transaction together with their (optional) arguments. This
+    /// Notes to be consumed by the transaction.
+    /// Notes whose inclusion proof is present in the store are will be consumed as authenticated;
+    /// the ones that do not have proofs will be consumed as unauthenticated.
+    input_notes: Vec<Note>,
+    /// Optional arguments of the Notes to be consumed by the transaction. This
     /// includes both authenticated and unauthenticated notes.
-    input_notes: Vec<(NoteId, Option<NoteArgs>)>,
+    input_notes_args: Vec<(NoteId, Option<NoteArgs>)>,
     /// Notes to be created by the transaction. This includes both full and partial output notes.
     /// The transaction script will be generated based on these notes.
     own_output_notes: Vec<OutputNote>,
@@ -87,8 +90,8 @@ impl TransactionRequestBuilder {
     /// Creates a new, empty [`TransactionRequestBuilder`].
     pub fn new() -> Self {
         Self {
-            unauthenticated_input_notes: vec![],
             input_notes: vec![],
+            input_notes_args: vec![],
             own_output_notes: Vec::new(),
             expected_output_recipients: BTreeMap::new(),
             expected_future_notes: BTreeMap::new(),
@@ -103,27 +106,15 @@ impl TransactionRequestBuilder {
         }
     }
 
-    /// Adds the specified notes as unauthenticated input notes to the transaction request.
+    /// Adds the specified notes as input notes to the transaction request.
     #[must_use]
-    pub fn unauthenticated_input_notes(
+    pub fn input_notes(
         mut self,
         notes: impl IntoIterator<Item = (Note, Option<NoteArgs>)>,
     ) -> Self {
         for (note, argument) in notes {
-            self.input_notes.push((note.id(), argument));
-            self.unauthenticated_input_notes.push(note);
-        }
-        self
-    }
-
-    /// Adds the specified notes as authenticated input notes to the transaction request.
-    #[must_use]
-    pub fn authenticated_input_notes(
-        mut self,
-        notes: impl IntoIterator<Item = (NoteId, Option<NoteArgs>)>,
-    ) -> Self {
-        for (note_id, argument) in notes {
-            self.input_notes.push((note_id, argument));
+            self.input_notes_args.push((note.id(), argument));
+            self.input_notes.push(note);
         }
         self
     }
@@ -269,13 +260,13 @@ impl TransactionRequestBuilder {
     /// Consumes the builder and returns a [`TransactionRequest`] for a transaction to consume the
     /// specified notes.
     ///
-    /// - `note_ids` is a list of note IDs to be consumed.
+    /// - `notes` is a list of notes to be consumed.
     pub fn build_consume_notes(
         self,
-        note_ids: Vec<NoteId>,
+        notes: Vec<Note>,
     ) -> Result<TransactionRequest, TransactionRequestError> {
-        let input_notes = note_ids.into_iter().map(|id| (id, None));
-        self.authenticated_input_notes(input_notes).build()
+        let input_notes = notes.into_iter().map(|id| (id, None));
+        self.input_notes(input_notes).build()
     }
 
     /// Consumes the builder and returns a [`TransactionRequest`] for a transaction to mint fungible
@@ -386,7 +377,7 @@ impl TransactionRequestBuilder {
     /// - If an invalid note variant is encountered in the own output notes.
     pub fn build(self) -> Result<TransactionRequest, TransactionRequestError> {
         let mut seen_input_notes = BTreeSet::new();
-        for (note_id, _) in &self.input_notes {
+        for (note_id, _) in &self.input_notes_args {
             if !seen_input_notes.insert(note_id) {
                 return Err(TransactionRequestError::DuplicateInputNote(*note_id));
             }
@@ -424,8 +415,8 @@ impl TransactionRequestBuilder {
         };
 
         Ok(TransactionRequest {
-            unauthenticated_input_notes: self.unauthenticated_input_notes,
             input_notes: self.input_notes,
+            input_notes_args: self.input_notes_args,
             script_template,
             expected_output_recipients: self.expected_output_recipients,
             expected_future_notes: self.expected_future_notes,

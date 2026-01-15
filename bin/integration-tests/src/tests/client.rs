@@ -2,9 +2,24 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
-use miden_client::account::{AccountId, AccountStorageMode, StorageMap, StorageSlot};
-use miden_client::assembly::{DefaultSourceManager, LibraryPath, Module, ModuleKind};
+use miden_client::account::{
+    Account,
+    AccountId,
+    AccountStorageMode,
+    StorageMap,
+    StorageSlot,
+    StorageSlotName,
+};
+use miden_client::assembly::{
+    CodeBuilder,
+    DefaultSourceManager,
+    MastForest,
+    Module,
+    ModuleKind,
+    Path,
+};
 use miden_client::asset::{Asset, FungibleAsset};
+use miden_client::auth::RPO_FALCON_SCHEME_ID;
 use miden_client::builder::ClientBuilder;
 use miden_client::keystore::FilesystemKeyStore;
 use miden_client::note::{NoteFile, NoteScript, NoteType};
@@ -28,7 +43,7 @@ use miden_client::transaction::{
     TransactionRequestBuilder,
     TransactionStatus,
 };
-use miden_client::{ClientError, Felt, ScriptBuilder};
+use miden_client::{ClientError, Deserializable, Felt, Serializable};
 use miden_client_sqlite_store::ClientBuilderSqliteExt;
 
 use crate::tests::config::ClientConfig;
@@ -38,7 +53,7 @@ pub async fn test_client_builder_initializes_client_with_endpoint(
 ) -> Result<()> {
     let (endpoint, _, store_config, auth_path) = client_config.as_parts();
 
-    let mut client = ClientBuilder::<FilesystemKeyStore<_>>::new()
+    let mut client = ClientBuilder::<FilesystemKeyStore>::new()
         .grpc_client(&endpoint, Some(10_000))
         .filesystem_keystore(auth_path.to_str().context("failed to convert auth path to string")?)
         .sqlite_store(store_config)
@@ -59,9 +74,13 @@ pub async fn test_multiple_tx_on_same_block(client_config: ClientConfig) -> Resu
     wait_for_node(&mut client).await;
 
     let (first_regular_account, second_regular_account, faucet_account_header) =
-        setup_two_wallets_and_faucet(&mut client, AccountStorageMode::Private, &authenticator)
-            .await?;
-
+        setup_two_wallets_and_faucet(
+            &mut client,
+            AccountStorageMode::Private,
+            &authenticator,
+            RPO_FALCON_SCHEME_ID,
+        )
+        .await?;
     let from_account_id = first_regular_account.id();
     let to_account_id = second_regular_account.id();
     let faucet_account_id = faucet_account_header.id();
@@ -99,23 +118,32 @@ pub async fn test_multiple_tx_on_same_block(client_config: ClientConfig) -> Resu
     println!("Running P2ID tx...");
 
     // Create transactions
-    let transaction_execution_result_1 =
-        client.new_transaction(from_account_id, tx_request_1).await.unwrap();
-    let transaction_id_1 = transaction_execution_result_1.executed_transaction().id();
-    let tx_prove_1 =
-        client.testing_prove_transaction(&transaction_execution_result_1).await.unwrap();
+    let transaction_result_1 =
+        client.execute_transaction(from_account_id, tx_request_1).await.unwrap();
+    let transaction_id_1 = transaction_result_1.id();
+    let proven_transaction_1 = client.prove_transaction(&transaction_result_1).await.unwrap();
+
+    // NOTE: we manually construct a [`TransactionStoreUpdate`] because we want to submit both
+    // proofs at the same time, but we can't apply the transaction to the store before submitting
+    // it to the node (since we need the submission height).
+    let current_height = client.get_sync_height().await?;
+    client.apply_transaction(&transaction_result_1, current_height).await?;
+
+    let transaction_result_2 =
+        client.execute_transaction(from_account_id, tx_request_2).await.unwrap();
+    let transaction_id_2 = transaction_result_2.id();
+    let proven_transaction_2 = client.prove_transaction(&transaction_result_2).await.unwrap();
+
     client
-        .testing_apply_transaction(transaction_execution_result_1.clone())
+        .submit_proven_transaction(proven_transaction_1, &transaction_result_1)
+        .await?;
+    let submission_height_2 = client
+        .submit_proven_transaction(proven_transaction_2, &transaction_result_2)
         .await
         .unwrap();
 
-    let transaction_execution_result_2 =
-        client.new_transaction(from_account_id, tx_request_2).await.unwrap();
-    let transaction_id_2 = transaction_execution_result_2.executed_transaction().id();
-    let tx_prove_2 =
-        client.testing_prove_transaction(&transaction_execution_result_2).await.unwrap();
     client
-        .testing_apply_transaction(transaction_execution_result_2.clone())
+        .apply_transaction(&transaction_result_2, submission_height_2)
         .await
         .unwrap();
 
@@ -123,22 +151,6 @@ pub async fn test_multiple_tx_on_same_block(client_config: ClientConfig) -> Resu
 
     // wait for 1 block
     wait_for_blocks(&mut client, 1).await;
-
-    // Submit the proven transactions
-    client
-        .testing_submit_proven_transaction(
-            tx_prove_1,
-            transaction_execution_result_1.executed_transaction().tx_inputs().clone(),
-        )
-        .await
-        .unwrap();
-    client
-        .testing_submit_proven_transaction(
-            tx_prove_2,
-            transaction_execution_result_2.executed_transaction().tx_inputs().clone(),
-        )
-        .await
-        .unwrap();
 
     // wait for 1 block
     wait_for_tx(&mut client, transaction_id_1).await?;
@@ -159,12 +171,14 @@ pub async fn test_multiple_tx_on_same_block(client_config: ClientConfig) -> Resu
     let note = client.get_output_note(note_id).await.unwrap().unwrap();
     assert!(matches!(note.state(), OutputNoteState::CommittedFull { .. }));
 
-    let sender_account = client
+    let sender_account: Account = client
         .get_account(from_account_id)
         .await?
-        .context("failed to find sender account after  transactions")?;
+        .context("failed to find sender account after transactions")?
+        .try_into()
+        .unwrap();
     assert_eq!(
-        sender_account.account().vault().get_balance(faucet_account_id).unwrap(),
+        sender_account.vault().get_balance(faucet_account_id).unwrap(),
         MINT_AMOUNT - (TRANSFER_AMOUNT * 2)
     );
     Ok(())
@@ -172,13 +186,22 @@ pub async fn test_multiple_tx_on_same_block(client_config: ClientConfig) -> Resu
 
 pub async fn test_import_expected_notes(client_config: ClientConfig) -> Result<()> {
     let (mut client_1, authenticator_1) = client_config.clone().into_client().await?;
-    let (first_basic_account, faucet_account) =
-        setup_wallet_and_faucet(&mut client_1, AccountStorageMode::Private, &authenticator_1)
-            .await?;
+    let (first_basic_account, faucet_account) = setup_wallet_and_faucet(
+        &mut client_1,
+        AccountStorageMode::Private,
+        &authenticator_1,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
 
     let (mut client_2, authenticator_2) = client_config.into_client().await?;
-    let (client_2_account, _) =
-        insert_new_wallet(&mut client_2, AccountStorageMode::Private, &authenticator_2).await?;
+    let (client_2_account, _) = insert_new_wallet(
+        &mut client_2,
+        AccountStorageMode::Private,
+        &authenticator_2,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
 
     wait_for_node(&mut client_2).await;
 
@@ -195,10 +218,14 @@ pub async fn test_import_expected_notes(client_config: ClientConfig) -> Result<(
     client_2.sync_state().await.unwrap();
 
     // Importing a public note before it's committed onchain should fail
-    assert!(matches!(
-        client_2.import_note(NoteFile::NoteId(note.id())).await.unwrap_err(),
-        ClientError::NoteNotFoundOnChain(_)
-    ));
+    assert_eq!(
+        client_2
+            .import_notes(&[NoteFile::NoteId(note.id())])
+            .await
+            .unwrap_err()
+            .to_string(),
+        "note import error: No notes fetched from node".to_string()
+    );
     execute_tx_and_sync(&mut client_1, faucet_account.id(), tx_request).await?;
 
     // Use client 1 to wait until a couple of blocks have passed
@@ -207,7 +234,7 @@ pub async fn test_import_expected_notes(client_config: ClientConfig) -> Result<(
     let new_sync_data = client_2.sync_state().await.unwrap();
 
     client_2.add_note_tag(note.metadata().unwrap().tag()).await.unwrap();
-    client_2.import_note(NoteFile::NoteId(note.clone().id())).await.unwrap();
+    client_2.import_notes(&[NoteFile::NoteId(note.clone().id())]).await.unwrap();
     client_2.sync_state().await.unwrap();
     let input_note = client_2.get_input_note(note.id()).await.unwrap().unwrap();
     // If imported after execution and syncing then the inclusion proof should be Some
@@ -237,11 +264,11 @@ pub async fn test_import_expected_notes(client_config: ClientConfig) -> Result<(
     // Import the node before it's committed onchain works if we have full `NoteDetails`
     client_2.add_note_tag(note.metadata().unwrap().tag()).await.unwrap();
     client_2
-        .import_note(NoteFile::NoteDetails {
+        .import_notes(&[NoteFile::NoteDetails {
             details: note.clone().into(),
             after_block_num: client_1.get_sync_height().await.unwrap(),
             tag: Some(note.metadata().unwrap().tag()),
-        })
+        }])
         .await
         .unwrap();
     let input_note = client_2.get_input_note(note.id()).await.unwrap().unwrap();
@@ -267,18 +294,27 @@ pub async fn test_import_expected_notes(client_config: ClientConfig) -> Result<(
 
 pub async fn test_import_expected_note_uncommitted(client_config: ClientConfig) -> Result<()> {
     let (mut client_1, authenticator) = client_config.clone().into_client().await?;
-    let faucet_account =
-        insert_new_fungible_faucet(&mut client_1, AccountStorageMode::Private, &authenticator)
-            .await
-            .unwrap()
-            .0;
+    let faucet_account = insert_new_fungible_faucet(
+        &mut client_1,
+        AccountStorageMode::Private,
+        &authenticator,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await
+    .unwrap()
+    .0;
 
     let (mut client_2, _) = ClientConfig::default()
         .with_rpc_endpoint(client_config.rpc_endpoint())
         .into_client()
         .await?;
-    let (client_2_account, _) =
-        insert_new_wallet(&mut client_2, AccountStorageMode::Private, &authenticator).await?;
+    let (client_2_account, _) = insert_new_wallet(
+        &mut client_2,
+        AccountStorageMode::Private,
+        &authenticator,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
 
     wait_for_node(&mut client_2).await;
 
@@ -295,12 +331,12 @@ pub async fn test_import_expected_note_uncommitted(client_config: ClientConfig) 
 
     // If the verification is requested before execution then the import should fail
     let imported_note_id = client_2
-        .import_note(NoteFile::NoteDetails {
+        .import_notes(&[NoteFile::NoteDetails {
             details: note.into(),
             after_block_num: 0.into(),
             tag: None,
-        })
-        .await?;
+        }])
+        .await?[0];
 
     let imported_note = client_2.get_input_note(imported_note_id).await.unwrap().unwrap();
 
@@ -312,9 +348,13 @@ pub async fn test_import_expected_notes_from_the_past_as_committed(
     client_config: ClientConfig,
 ) -> Result<()> {
     let (mut client_1, authenticator_1) = client_config.clone().into_client().await?;
-    let (first_basic_account, faucet_account) =
-        setup_wallet_and_faucet(&mut client_1, AccountStorageMode::Private, &authenticator_1)
-            .await?;
+    let (first_basic_account, faucet_account) = setup_wallet_and_faucet(
+        &mut client_1,
+        AccountStorageMode::Private,
+        &authenticator_1,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
 
     let (mut client_2, _) = ClientConfig::default()
         .with_rpc_endpoint(client_config.rpc_endpoint())
@@ -341,12 +381,12 @@ pub async fn test_import_expected_notes_from_the_past_as_committed(
 
     // importing the note before client_2 is synced will result in a note with `Expected` state
     let note_id = client_2
-        .import_note(NoteFile::NoteDetails {
+        .import_notes(&[NoteFile::NoteDetails {
             details: note.clone().into(),
             after_block_num: block_height_before,
             tag: Some(note.metadata().unwrap().tag()),
-        })
-        .await?;
+        }])
+        .await?[0];
 
     let imported_note = client_2.get_input_note(note_id).await.unwrap().unwrap();
 
@@ -354,14 +394,17 @@ pub async fn test_import_expected_notes_from_the_past_as_committed(
 
     client_2.sync_state().await.unwrap();
 
-    // import the note after syncing the client
-    let note_id = client_2
-        .import_note(NoteFile::NoteDetails {
-            details: note.clone().into(),
-            after_block_num: block_height_before,
-            tag: Some(note.metadata().unwrap().tag()),
-        })
-        .await?;
+    // Note already imported
+    assert!(
+        client_2
+            .import_notes(&[NoteFile::NoteDetails {
+                details: note.clone().into(),
+                after_block_num: block_height_before,
+                tag: Some(note.metadata().unwrap().tag()),
+            }])
+            .await?
+            .is_empty()
+    );
 
     let imported_note = client_2.get_input_note(note_id).await.unwrap().unwrap();
 
@@ -377,12 +420,22 @@ pub async fn test_get_account_update(client_config: ClientConfig) -> Result<()> 
     // Create a client with both public and private accounts.
     let (mut client, authenticator) = client_config.clone().into_client().await?;
 
-    let (basic_wallet_1, faucet_account) =
-        setup_wallet_and_faucet(&mut client, AccountStorageMode::Private, &authenticator).await?;
+    let (basic_wallet_1, faucet_account) = setup_wallet_and_faucet(
+        &mut client,
+        AccountStorageMode::Private,
+        &authenticator,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
     wait_for_node(&mut client).await;
 
-    let (basic_wallet_2, ..) =
-        insert_new_wallet(&mut client, AccountStorageMode::Public, &authenticator).await?;
+    let (basic_wallet_2, ..) = insert_new_wallet(
+        &mut client,
+        AccountStorageMode::Public,
+        &authenticator,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
 
     // Mint and consume notes with both accounts so they are included in the node.
     let tx_id_1 =
@@ -415,12 +468,21 @@ pub async fn test_sync_detail_values(client_config: ClientConfig) -> Result<()> 
     wait_for_node(&mut client1).await;
     wait_for_node(&mut client2).await;
 
-    let (first_regular_account, faucet_account_header) =
-        setup_wallet_and_faucet(&mut client1, AccountStorageMode::Private, &authenticator_1)
-            .await?;
+    let (first_regular_account, faucet_account_header) = setup_wallet_and_faucet(
+        &mut client1,
+        AccountStorageMode::Private,
+        &authenticator_1,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
 
-    let (second_regular_account, ..) =
-        insert_new_wallet(&mut client2, AccountStorageMode::Private, &authenticator_2).await?;
+    let (second_regular_account, ..) = insert_new_wallet(
+        &mut client2,
+        AccountStorageMode::Private,
+        &authenticator_2,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
 
     let from_account_id = first_regular_account.id();
     let to_account_id = second_regular_account.id();
@@ -443,7 +505,7 @@ pub async fn test_sync_detail_values(client_config: ClientConfig) -> Result<()> 
         NoteType::Public,
         client1.rng(),
     )?;
-    let note_id = tx_request.expected_output_own_notes().pop().unwrap().id();
+    let note = tx_request.expected_output_own_notes().pop().unwrap();
     execute_tx_and_sync(&mut client1, from_account_id, tx_request).await?;
 
     // Second client sync should have new note
@@ -454,7 +516,7 @@ pub async fn test_sync_detail_values(client_config: ClientConfig) -> Result<()> 
     assert_eq!(new_details.updated_accounts.len(), 0);
 
     // Consume the note with the second account
-    let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![note_id]).unwrap();
+    let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![note]).unwrap();
     execute_tx_and_sync(&mut client2, to_account_id, tx_request).await?;
 
     // First client sync should have a new nullifier as the note was consumed
@@ -471,8 +533,13 @@ pub async fn test_multiple_transactions_can_be_committed_in_different_blocks_wit
 ) -> Result<()> {
     let (mut client, authenticator) = client_config.into_client().await?;
 
-    let (first_regular_account, faucet_account_header) =
-        setup_wallet_and_faucet(&mut client, AccountStorageMode::Private, &authenticator).await?;
+    let (first_regular_account, faucet_account_header) = setup_wallet_and_faucet(
+        &mut client,
+        AccountStorageMode::Private,
+        &authenticator,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
 
     let from_account_id = first_regular_account.id();
     let faucet_account_id = faucet_account_header.id();
@@ -491,13 +558,9 @@ pub async fn test_multiple_transactions_can_be_committed_in_different_blocks_wit
         )?;
 
         println!("Executing transaction...");
-        let transaction_execution_result =
-            client.new_transaction(faucet_account_id, tx_request.clone()).await.unwrap();
-        let transaction_id = transaction_execution_result.executed_transaction().id();
-
-        println!("Sending transaction to node");
+        let transaction_id =
+            client.submit_new_transaction(faucet_account_id, tx_request.clone()).await?;
         let note_id = tx_request.expected_output_own_notes().pop().unwrap().id();
-        client.submit_transaction(transaction_execution_result).await.unwrap();
 
         (note_id, transaction_id)
     };
@@ -516,9 +579,9 @@ pub async fn test_multiple_transactions_can_be_committed_in_different_blocks_wit
         )?;
 
         println!("Executing transaction...");
-        let transaction_execution_result =
-            client.new_transaction(faucet_account_id, tx_request.clone()).await.unwrap();
-        let transaction_id = transaction_execution_result.executed_transaction().id();
+        let transaction_result =
+            client.execute_transaction(faucet_account_id, tx_request.clone()).await.unwrap();
+        let transaction_id = transaction_result.id();
 
         println!("Sending transaction to node");
         // May need a few attempts until it gets included
@@ -532,7 +595,12 @@ pub async fn test_multiple_transactions_can_be_committed_in_different_blocks_wit
         {
             std::thread::sleep(Duration::from_secs(3));
         }
-        client.submit_transaction(transaction_execution_result).await.unwrap();
+        let proven_transaction = client.prove_transaction(&transaction_result).await.unwrap();
+        let submission_height = client
+            .submit_proven_transaction(proven_transaction, &transaction_result)
+            .await
+            .unwrap();
+        client.apply_transaction(&transaction_result, submission_height).await.unwrap();
 
         (note_id, transaction_id)
     };
@@ -551,9 +619,9 @@ pub async fn test_multiple_transactions_can_be_committed_in_different_blocks_wit
         )?;
 
         println!("Executing transaction...");
-        let transaction_execution_result =
-            client.new_transaction(faucet_account_id, tx_request.clone()).await.unwrap();
-        let transaction_id = transaction_execution_result.executed_transaction().id();
+        let transaction_result =
+            client.execute_transaction(faucet_account_id, tx_request.clone()).await.unwrap();
+        let transaction_id = transaction_result.id();
 
         println!("Sending transaction to node");
         // May need a few attempts until it gets included
@@ -567,7 +635,12 @@ pub async fn test_multiple_transactions_can_be_committed_in_different_blocks_wit
         {
             std::thread::sleep(Duration::from_secs(3));
         }
-        client.submit_transaction(transaction_execution_result).await.unwrap();
+        let proven_transaction = client.prove_transaction(&transaction_result).await.unwrap();
+        let submission_height = client
+            .submit_proven_transaction(proven_transaction, &transaction_result)
+            .await
+            .unwrap();
+        client.apply_transaction(&transaction_result, submission_height).await.unwrap();
 
         (note_id, transaction_id)
     };
@@ -622,11 +695,20 @@ pub async fn test_consume_multiple_expected_notes(client_config: ClientConfig) -
     wait_for_node(&mut client).await;
 
     // Setup accounts
-    let (target_basic_account_1, faucet_account_header) =
-        setup_wallet_and_faucet(&mut client, AccountStorageMode::Private, &authenticator_1).await?;
-    let (target_basic_account_2, ..) =
-        insert_new_wallet(&mut unauth_client, AccountStorageMode::Private, &authenticator_2)
-            .await?;
+    let (target_basic_account_1, faucet_account_header) = setup_wallet_and_faucet(
+        &mut client,
+        AccountStorageMode::Private,
+        &authenticator_1,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
+    let (target_basic_account_2, ..) = insert_new_wallet(
+        &mut unauth_client,
+        AccountStorageMode::Private,
+        &authenticator_2,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
     unauth_client.sync_state().await.unwrap();
 
     let faucet_account_id = faucet_account_header.id();
@@ -654,15 +736,18 @@ pub async fn test_consume_multiple_expected_notes(client_config: ClientConfig) -
 
     // Create and execute transactions
     let tx_request_1 = TransactionRequestBuilder::new()
-        .authenticated_input_notes(client_owned_notes.iter().map(|note| (note.id(), None)))
+        .input_notes(client_owned_notes.iter().map(|note| (note.clone(), None)))
         .build()?;
 
     let tx_request_2 = TransactionRequestBuilder::new()
-        .unauthenticated_input_notes(unauth_owned_notes.iter().map(|note| ((*note).clone(), None)))
+        .input_notes(unauth_owned_notes.iter().map(|note| ((*note).clone(), None)))
         .build()?;
 
-    let tx_id_1 = execute_tx(&mut client, to_account_ids[0], tx_request_1).await;
-    let tx_id_2 = execute_tx(&mut unauth_client, to_account_ids[1], tx_request_2).await;
+    let tx_id_1 = client.submit_new_transaction(to_account_ids[0], tx_request_1).await.unwrap();
+    let tx_id_2 = unauth_client
+        .submit_new_transaction(to_account_ids[1], tx_request_2)
+        .await
+        .unwrap();
 
     // Ensure notes are processed
     assert!(!client.get_input_notes(NoteFilter::Processing).await.unwrap().is_empty());
@@ -701,16 +786,25 @@ pub async fn test_consume_multiple_expected_notes(client_config: ClientConfig) -
 
 pub async fn test_import_consumed_note_with_proof(client_config: ClientConfig) -> Result<()> {
     let (mut client_1, authenticator_1) = client_config.clone().into_client().await?;
-    let (first_regular_account, faucet_account_header) =
-        setup_wallet_and_faucet(&mut client_1, AccountStorageMode::Private, &authenticator_1)
-            .await?;
+    let (first_regular_account, faucet_account_header) = setup_wallet_and_faucet(
+        &mut client_1,
+        AccountStorageMode::Private,
+        &authenticator_1,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
 
     let (mut client_2, authenticator_2) = ClientConfig::default()
         .with_rpc_endpoint(client_config.rpc_endpoint())
         .into_client()
         .await?;
-    let (client_2_account, _) =
-        insert_new_wallet(&mut client_2, AccountStorageMode::Private, &authenticator_2).await?;
+    let (client_2_account, _) = insert_new_wallet(
+        &mut client_2,
+        AccountStorageMode::Private,
+        &authenticator_2,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
 
     wait_for_node(&mut client_2).await;
 
@@ -745,15 +839,17 @@ pub async fn test_import_consumed_note_with_proof(client_config: ClientConfig) -
     // Consume the note with the sender account
 
     println!("Consuming Note...");
-    let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![note.id()]).unwrap();
+    let tx_request = TransactionRequestBuilder::new()
+        .build_consume_notes(vec![note.clone().try_into().unwrap()])
+        .unwrap();
     execute_tx_and_sync(&mut client_1, from_account_id, tx_request).await?;
 
     // Import the consumed note
     client_2
-        .import_note(NoteFile::NoteWithProof(
+        .import_notes(&[NoteFile::NoteWithProof(
             note.clone().try_into().unwrap(),
             note.inclusion_proof().unwrap().clone(),
-        ))
+        )])
         .await?;
 
     let consumed_note = client_2.get_input_note(note.id()).await.unwrap().unwrap();
@@ -764,8 +860,13 @@ pub async fn test_import_consumed_note_with_proof(client_config: ClientConfig) -
 pub async fn test_import_consumed_note_with_id(client_config: ClientConfig) -> Result<()> {
     let (mut client_1, authenticator) = client_config.clone().into_client().await?;
     let (first_regular_account, second_regular_account, faucet_account_header) =
-        setup_two_wallets_and_faucet(&mut client_1, AccountStorageMode::Private, &authenticator)
-            .await?;
+        setup_two_wallets_and_faucet(
+            &mut client_1,
+            AccountStorageMode::Private,
+            &authenticator,
+            RPO_FALCON_SCHEME_ID,
+        )
+        .await?;
 
     let (mut client_2, _) = ClientConfig::default()
         .with_rpc_endpoint(client_config.rpc_endpoint())
@@ -805,12 +906,14 @@ pub async fn test_import_consumed_note_with_id(client_config: ClientConfig) -> R
     // Consume the note with the sender account
 
     println!("Consuming Note...");
-    let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![note.id()]).unwrap();
+    let tx_request = TransactionRequestBuilder::new()
+        .build_consume_notes(vec![note.clone().try_into().unwrap()])
+        .unwrap();
     execute_tx_and_sync(&mut client_1, from_account_id, tx_request).await?;
     client_2.sync_state().await.unwrap();
 
     // Import the consumed note
-    client_2.import_note(NoteFile::NoteId(note.id())).await.unwrap();
+    client_2.import_notes(&[NoteFile::NoteId(note.id())]).await.unwrap();
 
     let consumed_note = client_2.get_input_note(note.id()).await.unwrap().unwrap();
     assert!(matches!(consumed_note.state(), InputNoteState::ConsumedExternal { .. }));
@@ -820,8 +923,13 @@ pub async fn test_import_consumed_note_with_id(client_config: ClientConfig) -> R
 pub async fn test_import_note_with_proof(client_config: ClientConfig) -> Result<()> {
     let (mut client_1, authenticator) = client_config.clone().into_client().await?;
     let (first_regular_account, second_regular_account, faucet_account_header) =
-        setup_two_wallets_and_faucet(&mut client_1, AccountStorageMode::Private, &authenticator)
-            .await?;
+        setup_two_wallets_and_faucet(
+            &mut client_1,
+            AccountStorageMode::Private,
+            &authenticator,
+            RPO_FALCON_SCHEME_ID,
+        )
+        .await?;
 
     let (mut client_2, _) = ClientConfig::default()
         .with_rpc_endpoint(client_config.rpc_endpoint())
@@ -861,10 +969,10 @@ pub async fn test_import_note_with_proof(client_config: ClientConfig) -> Result<
 
     // Import the consumed note
     client_2
-        .import_note(NoteFile::NoteWithProof(
+        .import_notes(&[NoteFile::NoteWithProof(
             note.clone().try_into().unwrap(),
             note.inclusion_proof().unwrap().clone(),
-        ))
+        )])
         .await?;
 
     let imported_note = client_2.get_input_note(note.id()).await.unwrap().unwrap();
@@ -878,16 +986,25 @@ pub async fn test_import_note_with_proof(client_config: ClientConfig) -> Result<
 
 pub async fn test_discarded_transaction(client_config: ClientConfig) -> Result<()> {
     let (mut client_1, authenticator_1) = client_config.clone().into_client().await?;
-    let (first_regular_account, faucet_account_header) =
-        setup_wallet_and_faucet(&mut client_1, AccountStorageMode::Private, &authenticator_1)
-            .await?;
+    let (first_regular_account, faucet_account_header) = setup_wallet_and_faucet(
+        &mut client_1,
+        AccountStorageMode::Private,
+        &authenticator_1,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
 
     let (mut client_2, authenticator_2) = ClientConfig::default()
         .with_rpc_endpoint(client_config.rpc_endpoint())
         .into_client()
         .await?;
-    let (second_regular_account, ..) =
-        insert_new_wallet(&mut client_2, AccountStorageMode::Private, &authenticator_2).await?;
+    let (second_regular_account, ..) = insert_new_wallet(
+        &mut client_2,
+        AccountStorageMode::Private,
+        &authenticator_2,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
 
     wait_for_node(&mut client_2).await;
 
@@ -922,23 +1039,29 @@ pub async fn test_discarded_transaction(client_config: ClientConfig) -> Result<(
         .clone();
 
     println!("Consuming Note...");
-    let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![note.id()]).unwrap();
+    let tx_request = TransactionRequestBuilder::new()
+        .build_consume_notes(vec![note.clone().try_into().unwrap()])
+        .unwrap();
 
     // Consume the note in client 1 but dont submit it to the node
-    let tx_result = client_1.new_transaction(from_account_id, tx_request.clone()).await.unwrap();
-    let tx_id = tx_result.executed_transaction().id();
-    client_1.testing_prove_transaction(&tx_result).await.unwrap();
+    let transaction_result =
+        client_1.execute_transaction(from_account_id, tx_request.clone()).await.unwrap();
+    let tx_id = transaction_result.id();
 
     // Store the account state before applying the transaction
     let account_before_tx = client_1.get_account(from_account_id).await.unwrap().unwrap();
-    let account_hash_before_tx = account_before_tx.account().commitment();
+    let account_hash_before_tx = account_before_tx.commitment();
 
     // Apply the transaction
-    client_1.testing_apply_transaction(tx_result).await.unwrap();
+    let submission_height = client_1.get_sync_height().await.unwrap();
+    client_1
+        .apply_transaction(&transaction_result, submission_height)
+        .await
+        .unwrap();
 
     // Check that the account state has changed after applying the transaction
     let account_after_tx = client_1.get_account(from_account_id).await.unwrap().unwrap();
-    let account_hash_after_tx = account_after_tx.account().commitment();
+    let account_hash_after_tx = account_after_tx.commitment();
 
     assert_ne!(
         account_hash_before_tx, account_hash_after_tx,
@@ -974,7 +1097,7 @@ pub async fn test_discarded_transaction(client_config: ClientConfig) -> Result<(
 
     // Check that the account state has been rolled back after the transaction was discarded
     let account_after_sync = client_1.get_account(from_account_id).await.unwrap().unwrap();
-    let account_hash_after_sync = account_after_sync.account().commitment();
+    let account_hash_after_sync = account_after_sync.commitment();
 
     assert_ne!(
         account_hash_after_sync, account_hash_after_tx,
@@ -1005,10 +1128,17 @@ impl TransactionProver for AlwaysFailingProver {
     }
 }
 
-pub async fn test_custom_transaction_prover(client_config: ClientConfig) -> Result<()> {
+pub async fn test_custom_transaction_prover_error_caught(
+    client_config: ClientConfig,
+) -> Result<()> {
     let (mut client, authenticator) = client_config.into_client().await?;
-    let (first_regular_account, faucet_account_header) =
-        setup_wallet_and_faucet(&mut client, AccountStorageMode::Private, &authenticator).await?;
+    let (first_regular_account, faucet_account_header) = setup_wallet_and_faucet(
+        &mut client,
+        AccountStorageMode::Private,
+        &authenticator,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
 
     let from_account_id = first_regular_account.id();
     let faucet_account_id = faucet_account_header.id();
@@ -1022,35 +1152,41 @@ pub async fn test_custom_transaction_prover(client_config: ClientConfig) -> Resu
         client.rng(),
     )?;
 
-    let transaction_execution_result =
-        client.new_transaction(faucet_account_id, tx_request.clone()).await.unwrap();
+    let transaction_result =
+        client.execute_transaction(faucet_account_id, tx_request.clone()).await.unwrap();
 
     let result = client
-        .submit_transaction_with_prover(
-            transaction_execution_result,
-            Arc::new(AlwaysFailingProver::new()),
-        )
+        .prove_transaction_with(&transaction_result, Arc::new(AlwaysFailingProver::new()))
         .await;
 
-    assert!(matches!(
-        result,
-        Err(ClientError::TransactionProvingError(TransactionProverError::Other {
-            error_msg: _,
-            source: _
-        }))
-    ));
+    let Err(ClientError::TransactionProvingError(TransactionProverError::Other {
+        error_msg, ..
+    })) = result
+    else {
+        panic!("expected different prover error");
+    };
+    assert_eq!(error_msg.as_ref(), "This prover always fails");
     Ok(())
 }
 
 pub async fn test_locked_account(client_config: ClientConfig) -> Result<()> {
     let (mut client_1, authenticator) = client_config.clone().into_client().await?;
 
-    let (faucet_account, _) =
-        insert_new_fungible_faucet(&mut client_1, AccountStorageMode::Private, &authenticator)
-            .await?;
+    let (faucet_account, _) = insert_new_fungible_faucet(
+        &mut client_1,
+        AccountStorageMode::Private,
+        &authenticator,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
 
-    let (private_account, _) =
-        insert_new_wallet(&mut client_1, AccountStorageMode::Private, &authenticator).await?;
+    let (private_account, _) = insert_new_wallet(
+        &mut client_1,
+        AccountStorageMode::Private,
+        &authenticator,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
 
     let from_account_id = private_account.id();
     let faucet_account_id = faucet_account.id();
@@ -1062,7 +1198,13 @@ pub async fn test_locked_account(client_config: ClientConfig) -> Result<()> {
             .await;
     wait_for_tx(&mut client_1, tx_id).await?;
 
-    let private_account = client_1.get_account(from_account_id).await.unwrap().unwrap().into();
+    let private_account = client_1
+        .get_account(from_account_id)
+        .await
+        .unwrap()
+        .unwrap()
+        .try_into()
+        .unwrap();
 
     // Import private account in client 2
     let (mut client_2, _) = ClientConfig::default()
@@ -1090,8 +1232,13 @@ pub async fn test_locked_account(client_config: ClientConfig) -> Result<()> {
     assert!(account_record.is_locked());
 
     // Get updated account from client 1 and import it in client 2 with `overwrite` flag
-    let updated_private_account =
-        client_1.get_account(from_account_id).await.unwrap().unwrap().into();
+    let updated_private_account = client_1
+        .get_account(from_account_id)
+        .await
+        .unwrap()
+        .unwrap()
+        .try_into()
+        .unwrap();
     client_2.add_account(&updated_private_account, true).await.unwrap();
 
     // After sync the private account shouldn't be locked in client 2
@@ -1103,12 +1250,21 @@ pub async fn test_locked_account(client_config: ClientConfig) -> Result<()> {
 
 pub async fn test_expired_transaction_fails(client_config: ClientConfig) -> Result<()> {
     let (mut client, authenticator) = client_config.into_client().await?;
-    let (faucet_account, _) =
-        insert_new_fungible_faucet(&mut client, AccountStorageMode::Private, &authenticator)
-            .await?;
+    let (faucet_account, _) = insert_new_fungible_faucet(
+        &mut client,
+        AccountStorageMode::Private,
+        &authenticator,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
 
-    let (private_account, ..) =
-        insert_new_wallet(&mut client, AccountStorageMode::Private, &authenticator).await?;
+    let (private_account, ..) = insert_new_wallet(
+        &mut client,
+        AccountStorageMode::Private,
+        &authenticator,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
 
     let from_account_id = private_account.id();
     let faucet_account_id = faucet_account.id();
@@ -1130,14 +1286,21 @@ pub async fn test_expired_transaction_fails(client_config: ClientConfig) -> Resu
         )?;
 
     println!("Executing transaction...");
-    let transaction_execution_result =
-        client.new_transaction(faucet_account_id, tx_request).await.unwrap();
+    let transaction_result =
+        client.execute_transaction(faucet_account_id, tx_request).await.unwrap();
 
     println!("Transaction executed successfully");
     wait_for_blocks(&mut client, (expiration_delta + 1).into()).await;
 
     println!("Sending transaction to node");
-    let submitted_tx_result = client.submit_transaction(transaction_execution_result).await;
+    let proven_transaction = client.prove_transaction(&transaction_result).await.unwrap();
+    let submitted_tx_result =
+        match client.submit_proven_transaction(proven_transaction, &transaction_result).await {
+            Ok(submission_height) => {
+                client.apply_transaction(&transaction_result, submission_height).await
+            },
+            Err(err) => Err(err),
+        };
 
     assert!(submitted_tx_result.is_err());
     Ok(())
@@ -1148,8 +1311,13 @@ pub async fn test_expired_transaction_fails(client_config: ClientConfig) -> Resu
 pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
     let (mut client, keystore) = client_config.into_client().await?;
 
-    let (first_basic_account, faucet_account) =
-        setup_wallet_and_faucet(&mut client, AccountStorageMode::Public, &keystore).await?;
+    let (first_basic_account, faucet_account) = setup_wallet_and_faucet(
+        &mut client,
+        AccountStorageMode::Public,
+        &keystore,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
 
     wait_for_node(&mut client).await;
     client.sync_state().await.unwrap();
@@ -1174,20 +1342,22 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
     wait_for_tx(&mut client, tx_id).await?;
 
     // Define the account code for the custom library
-    let custom_code = "
-        use.miden::account
+    let custom_code = r#"
+        use miden::protocol::native_account
+        use miden::core::word
 
-        export.update_map
+        const MAP_SLOT = word("miden::testing::client::map")
+
+        pub proc update_map
             push.1.2.3.4
             # => [VALUE]
             push.0.0.0.0
             # => [KEY, VALUE]
-            push.1
-            # => [index, KEY, VALUE]
-            exec.account::set_map_item
+            push.MAP_SLOT[0..2]
+            exec.native_account::set_map_item
             dropw dropw dropw dropw
         end
-    ";
+    "#;
 
     let mut storage_map = StorageMap::new();
     storage_map.insert(
@@ -1195,7 +1365,9 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
         [Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(1)].into(),
     )?;
 
-    let storage_slots = vec![StorageSlot::empty_map(), StorageSlot::Map(storage_map)];
+    let map_slot_name =
+        StorageSlotName::new("miden::testing::client::map").expect("slot name should be valid");
+    let storage_slots = vec![StorageSlot::with_map(map_slot_name, storage_map)];
     let (account_with_map_item, _) = insert_account_with_custom_component(
         &mut client,
         custom_code,
@@ -1210,20 +1382,15 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
     let assembler = TransactionKernel::assembler();
     let source_manager = Arc::new(DefaultSourceManager::default());
     let module = Module::parser(ModuleKind::Library)
-        .parse_str(
-            LibraryPath::new("custom_library::set_map_item_library")
-                .context("failed to create library path for custom library")?,
-            custom_code,
-            &source_manager,
-        )
+        .parse_str(Path::new("custom_library::set_map_item_library"), custom_code, source_manager)
         .unwrap();
     let custom_lib = assembler.assemble_library([module]).unwrap();
 
-    let tx_script = ScriptBuilder::new(true)
+    let tx_script = CodeBuilder::new()
         .with_statically_linked_library(&custom_lib)?
         .compile_tx_script(
             "
-        use.custom_library::set_map_item_library
+        use custom_library::set_map_item_library
 
         begin
              call.set_map_item_library::update_map
@@ -1235,9 +1402,14 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
     execute_tx_and_sync(&mut client, account_with_map_item.id(), tx_request.clone()).await?;
 
     // Mint a new fungible asset to check account vault changes
-    let faucet = insert_new_fungible_faucet(&mut client, AccountStorageMode::Private, &keystore)
-        .await?
-        .0;
+    let faucet = insert_new_fungible_faucet(
+        &mut client,
+        AccountStorageMode::Private,
+        &keystore,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?
+    .0;
 
     let fungible_asset = FungibleAsset::new(faucet.id(), MINT_AMOUNT)?;
     let tx_request = TransactionRequestBuilder::new().build_mint_fungible_asset(
@@ -1246,10 +1418,10 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
         NoteType::Public,
         client.rng(),
     )?;
-    let note_id = tx_request.expected_output_own_notes().pop().unwrap().id();
+    let note = tx_request.expected_output_own_notes().pop().unwrap();
     execute_tx_and_sync(&mut client, fungible_asset.faucet_id(), tx_request.clone()).await?;
 
-    let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![note_id])?;
+    let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![note.clone()])?;
     execute_tx_and_sync(&mut client, first_basic_account.id(), tx_request).await?;
 
     let nullifier = note.nullifier();
@@ -1290,9 +1462,13 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
         .unwrap();
 
     // Remove debug decorators from original note script, as they are not persisted on submission
-    // https://github.com/0xMiden/miden-base/issues/1812
+    // (https://github.com/0xMiden/miden-base/issues/1812)
     let mut mast = (*note.script().mast()).clone();
     mast.strip_decorators();
+
+    // normalize CSR storage to match deserialized form
+    let mast_bytes = mast.to_bytes();
+    let mast = MastForest::read_from_bytes(&mast_bytes)?;
     let note_script = NoteScript::from_parts(Arc::new(mast), note.script().entrypoint());
 
     assert_eq!(node_nullifier.nullifier, nullifier);
@@ -1308,8 +1484,13 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
 pub async fn test_ignore_invalid_notes(client_config: ClientConfig) -> Result<()> {
     let (mut client, authenticator) = client_config.into_client().await?;
     let (regular_account, second_regular_account, faucet_account_header) =
-        setup_two_wallets_and_faucet(&mut client, AccountStorageMode::Private, &authenticator)
-            .await?;
+        setup_two_wallets_and_faucet(
+            &mut client,
+            AccountStorageMode::Private,
+            &authenticator,
+            RPO_FALCON_SCHEME_ID,
+        )
+        .await?;
 
     let account_id = regular_account.id();
     let second_account_id = second_regular_account.id();
@@ -1334,7 +1515,12 @@ pub async fn test_ignore_invalid_notes(client_config: ClientConfig) -> Result<()
     // Create a transaction to consume all 4 notes but ignore the invalid ones
     let tx_request = TransactionRequestBuilder::new()
         .ignore_invalid_input_notes()
-        .build_consume_notes(vec![note_1.id(), note_3.id(), note_2.id(), note_4.id()])?;
+        .build_consume_notes(vec![
+            note_1.clone(),
+            note_3.clone(),
+            note_2.clone(),
+            note_4.clone(),
+        ])?;
 
     execute_tx_and_sync(&mut client, account_id, tx_request).await?;
 
@@ -1349,11 +1535,15 @@ pub async fn test_ignore_invalid_notes(client_config: ClientConfig) -> Result<()
 pub async fn test_output_only_note(client_config: ClientConfig) -> Result<()> {
     let (mut client, authenticator) = client_config.into_client().await?;
 
-    let faucet =
-        insert_new_fungible_faucet(&mut client, AccountStorageMode::Private, &authenticator)
-            .await
-            .unwrap()
-            .0;
+    let faucet = insert_new_fungible_faucet(
+        &mut client,
+        AccountStorageMode::Private,
+        &authenticator,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await
+    .unwrap()
+    .0;
 
     let fungible_asset = FungibleAsset::new(faucet.id(), MINT_AMOUNT).unwrap();
     let tx_request = TransactionRequestBuilder::new().build_mint_fungible_asset(

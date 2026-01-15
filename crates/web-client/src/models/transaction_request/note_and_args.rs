@@ -2,6 +2,7 @@ use miden_client_core::note::Note as NativeNote;
 use miden_client_core::transaction::NoteArgs as NativeNoteArgs;
 use wasm_bindgen::prelude::*;
 
+use crate::models::miden_arrays::NoteAndArgsArray;
 use crate::models::note::Note;
 use crate::models::word::Word;
 
@@ -16,6 +17,7 @@ pub struct NoteAndArgs {
 
 #[wasm_bindgen]
 impl NoteAndArgs {
+    /// Creates a new note/args pair for transaction building.
     #[wasm_bindgen(constructor)]
     pub fn new(note: Note, args: Option<NoteArgs>) -> NoteAndArgs {
         NoteAndArgs { note, args }
@@ -38,31 +40,14 @@ impl From<&NoteAndArgs> for (NativeNote, Option<NativeNoteArgs>) {
     }
 }
 
-#[derive(Clone)]
-#[wasm_bindgen]
-pub struct NoteAndArgsArray(Vec<NoteAndArgs>);
-
-#[wasm_bindgen]
-impl NoteAndArgsArray {
-    #[wasm_bindgen(constructor)]
-    pub fn new(note_and_args: Option<Vec<NoteAndArgs>>) -> NoteAndArgsArray {
-        let note_and_args = note_and_args.unwrap_or_default();
-        NoteAndArgsArray(note_and_args)
-    }
-
-    pub fn push(&mut self, note_and_args: &NoteAndArgs) {
-        self.0.push(note_and_args.clone());
-    }
-}
-
 impl From<NoteAndArgsArray> for Vec<(NativeNote, Option<NativeNoteArgs>)> {
     fn from(note_and_args_array: NoteAndArgsArray) -> Self {
-        note_and_args_array.0.into_iter().map(Into::into).collect()
+        note_and_args_array.__inner.into_iter().map(Into::into).collect()
     }
 }
 
 impl From<&NoteAndArgsArray> for Vec<(NativeNote, Option<NativeNoteArgs>)> {
     fn from(note_and_args_array: &NoteAndArgsArray) -> Self {
-        note_and_args_array.0.iter().map(Into::into).collect()
+        note_and_args_array.__inner.iter().map(Into::into).collect()
     }
 }

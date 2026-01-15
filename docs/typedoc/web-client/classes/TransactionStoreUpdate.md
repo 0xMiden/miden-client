@@ -1,16 +1,31 @@
-[**@demox-labs/miden-sdk**](../README.md)
+[**@miden-sdk/miden-sdk**](../README.md)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / TransactionStoreUpdate
+[@miden-sdk/miden-sdk](../README.md) / TransactionStoreUpdate
 
 # Class: TransactionStoreUpdate
 
+Represents the changes that need to be applied to the client store as a result of a transaction
+execution.
+
 ## Methods
+
+### \[dispose\]()
+
+> **\[dispose\]**(): `void`
+
+#### Returns
+
+`void`
+
+***
 
 ### accountDelta()
 
 > **accountDelta**(): [`AccountDelta`](AccountDelta.md)
+
+Returns the account delta applied by the transaction.
 
 #### Returns
 
@@ -22,6 +37,8 @@
 
 > **createdNotes**(): [`OutputNotes`](OutputNotes.md)
 
+Returns the notes created by the transaction.
+
 #### Returns
 
 [`OutputNotes`](OutputNotes.md)
@@ -31,6 +48,8 @@
 ### executedTransaction()
 
 > **executedTransaction**(): [`ExecutedTransaction`](ExecutedTransaction.md)
+
+Returns the executed transaction associated with this update.
 
 #### Returns
 
@@ -48,10 +67,54 @@
 
 ***
 
+### futureNotes()
+
+> **futureNotes**(): [`NoteDetailsAndTag`](NoteDetailsAndTag.md)[]
+
+Returns notes expected to be created in follow-up executions.
+
+#### Returns
+
+[`NoteDetailsAndTag`](NoteDetailsAndTag.md)[]
+
+***
+
+### serialize()
+
+> **serialize**(): `Uint8Array`
+
+Serializes the update into bytes.
+
+#### Returns
+
+`Uint8Array`
+
+***
+
 ### submissionHeight()
 
 > **submissionHeight**(): `number`
 
+Returns the block height at which the transaction was submitted.
+
 #### Returns
 
 `number`
+
+***
+
+### deserialize()
+
+> `static` **deserialize**(`bytes`): `TransactionStoreUpdate`
+
+Deserializes an update from bytes.
+
+#### Parameters
+
+##### bytes
+
+`Uint8Array`
+
+#### Returns
+
+`TransactionStoreUpdate`

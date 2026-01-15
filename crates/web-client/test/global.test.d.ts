@@ -44,10 +44,10 @@ import {
   NoteType,
   OutputNote,
   OutputNotesArray,
+  Package,
   PublicKey,
   Rpo256,
   RpcClient,
-  SecretKey,
   Signature,
   SigningInputs,
   SigningInputsType,
@@ -61,17 +61,17 @@ import {
   TransactionKernel,
   TransactionProver,
   TransactionRequest,
-  TransactionResult,
+  TransactionStoreUpdate,
   TransactionRequestBuilder,
   TransactionScript,
   TransactionScriptInputPair,
   TransactionScriptInputPairArray,
-  TransactionSummary,
   Word,
   NoteAndArgs,
   NoteAndArgsArray,
-  ScriptBuilder,
-  ScriptBuilderMode,
+  MidenArrays,
+  CodeBuilder,
+  CodeBuilderMode,
 } from "../dist/index";
 import { MockWebClient, WebClient } from "../js";
 
@@ -81,7 +81,6 @@ declare global {
     MockWebClient: typeof MockWebClient;
     remoteProverUrl?: string;
     remoteProverInstance: TransactionProver;
-    rpcUrl?: string;
     Account: typeof Account;
     AccountFile: typeof AccountFile;
     AccountBuilder: typeof AccountBuilder;
@@ -133,9 +132,9 @@ declare global {
     NoteType: typeof NoteType;
     OutputNote: typeof OutputNote;
     OutputNotesArray: typeof OutputNotesArray;
+    Package: typeof Package;
     PublicKey: typeof PublicKey;
     Rpo256: typeof Rpo256;
-    SecretKey: typeof SecretKey;
     Signature: typeof Signature;
     SigningInputs: typeof SigningInputs;
     SigningInputsType: typeof SigningInputsType;
@@ -149,7 +148,7 @@ declare global {
     TransactionKernel: typeof TransactionKernel;
     TransactionProver: typeof TransactionProver;
     TransactionRequest: typeof TransactionRequest;
-    TransactionResult: typeof TransactionResult;
+    TransactionStoreUpdate: typeof TransactionStoreUpdate;
     TransactionRequestBuilder: typeof TransactionRequestBuilder;
     TransactionScript: typeof TransactionScript;
     TransactionScriptInputPair: typeof TransactionScriptInputPair;
@@ -159,8 +158,9 @@ declare global {
     WebClient: typeof WebClient;
     Word: typeof Word;
     Address: typeof Address;
-    ScriptBuilder: typeof ScriptBuilder;
-    ScriptBuilderMode: typeof ScriptBuilderMode;
+    MidenArrays: typeof MidenArrays;
+    CodeBuilder: typeof CodeBuilder;
+    CodeBuilderMode: typeof CodeBuilderMode;
     createClient: () => Promise<void>;
 
     // Add the helpers namespace
@@ -173,6 +173,7 @@ declare global {
       waitForBlocks: (amountOfBlocks: number) => Promise<void>;
       refreshClient: (initSeed?: Uint8Array) => Promise<void>;
       parseNetworkId: (networkId: string) => NetworkId;
+      generateKeyWithScheme: (signatureScheme: string) => AuthSecretKey;
     };
   }
 }

@@ -1,8 +1,8 @@
-[**@demox-labs/miden-sdk**](../README.md)
+[**@miden-sdk/miden-sdk**](../README.md)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / SerializedInputNoteData
+[@miden-sdk/miden-sdk](../README.md) / SerializedInputNoteData
 
 # Class: SerializedInputNoteData
 
@@ -67,6 +67,16 @@
 > **stateDiscriminant**: `number`
 
 ## Methods
+
+### \[dispose\]()
+
+> **\[dispose\]**(): `void`
+
+#### Returns
+
+`void`
+
+***
 
 ### free()
 

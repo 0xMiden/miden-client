@@ -42,8 +42,7 @@ jobs:
 
       - name: Install Dependencies
         if: github.event_name == 'push' || steps.bypass.outputs.skip != 'true'
-        working-directory: crates/web-client
-        run: yarn install
+        run: ./scripts/retry-yarn-install.sh crates/web-client
 
       - name: Build Project
         if: github.event_name == 'push' || steps.bypass.outputs.skip != 'true'
