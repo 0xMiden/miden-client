@@ -104,7 +104,7 @@ impl SqliteStore {
             smt_forest: Arc::new(RwLock::new(SmtForest::new())),
         };
 
-        // Initialize merkle store
+        // Initialize SMT forest
         for id in store.get_account_ids().await? {
             let vault = store.get_account_vault(id).await?;
             let storage = store.get_account_storage(id, AccountStorageFilter::All).await?;
@@ -316,10 +316,10 @@ impl Store for SqliteStore {
 
     async fn update_account(&self, account: &Account) -> Result<(), StoreError> {
         let cloned_account = account.clone();
-        let merkle_store = self.smt_forest.clone();
+        let smt_forest = self.smt_forest.clone();
 
         self.interact_with_connection(move |conn| {
-            SqliteStore::update_account(conn, &merkle_store, &cloned_account)
+            SqliteStore::update_account(conn, &smt_forest, &cloned_account)
         })
         .await
     }
