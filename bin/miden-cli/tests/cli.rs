@@ -564,7 +564,7 @@ async fn cli_export_import_account() -> Result<()> {
     // Since importing keys should also store a mapping from
     // the account id to its public keys, we should be able
     // to retrieve them.
-    let faucet_pks = client_2.public_keys_of_account(&AccountId::from_hex(&faucet_id)?).await?;
+    let faucet_pks = client_2.get_account_public_keys(&AccountId::from_hex(&faucet_id)?).await?;
 
     for stored_pk in faucet_pks {
         let matching_secret_key = key_store.get_key(stored_pk.to_commitment()).unwrap();
@@ -573,7 +573,7 @@ async fn cli_export_import_account() -> Result<()> {
         assert!(matching_secret_key.unwrap().public_key().to_bytes() == stored_pk.to_bytes());
     }
 
-    let wallet_pks = client_2.public_keys_of_account(&AccountId::from_hex(&wallet_id)?).await?;
+    let wallet_pks = client_2.get_account_public_keys(&AccountId::from_hex(&wallet_id)?).await?;
 
     for stored_pk in wallet_pks {
         let matching_secret_key = key_store.get_key(stored_pk.to_commitment()).unwrap();

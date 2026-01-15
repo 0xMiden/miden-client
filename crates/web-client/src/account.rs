@@ -68,7 +68,7 @@ impl WebClient {
     }
 
     #[wasm_bindgen(js_name = "getPublicKeyCommitmentsOfAccount")]
-    pub async fn get_public_commitments_of(
+    pub async fn get_public_key_commitments_of(
         &mut self,
         account_id: &AccountId,
     ) -> Result<Vec<Word>, JsValue> {
