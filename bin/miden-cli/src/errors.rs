@@ -52,6 +52,15 @@ pub enum CliError {
         )
     )]
     Config(#[source] SourceError, String),
+    #[error("configuration file not found: {0}")]
+    #[diagnostic(
+        code(cli::config_not_found),
+        help(
+            "Run `{} init` command to create a configuration file.",
+            client_binary_name().display()
+        )
+    )]
+    ConfigNotFound(String),
     #[error("execute program error: {1}")]
     #[diagnostic(code(cli::execute_program_error))]
     Exec(#[source] SourceError, String),

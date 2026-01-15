@@ -130,13 +130,14 @@ impl CliConfig {
     ///
     /// # Returns
     ///
-    /// A configured `CliConfig` instance with resolved paths.
+    /// A configured [`CliConfig`] instance with resolved paths.
     ///
     /// # Errors
     ///
-    /// Returns a `CliError` if:
-    /// - The config file doesn't exist in the specified directory
-    /// - Configuration file parsing fails
+    /// Returns a [`CliError`](crate::errors::CliError):
+    /// - [`CliError::ConfigNotFound`](crate::errors::CliError::ConfigNotFound) if the config file
+    ///   doesn't exist in the specified directory
+    /// - [`CliError::Config`](crate::errors::CliError::Config) if configuration file parsing fails
     ///
     /// # Examples
     ///
@@ -158,13 +159,10 @@ impl CliConfig {
         let config_path = miden_dir.join(CLIENT_CONFIG_FILE_NAME);
 
         if !config_path.exists() {
-            return Err(CliError::Config(
-                "Configuration file not found".to_string().into(),
-                format!(
-                    "Config file does not exist at {}. Run 'miden-client init' to create one.",
-                    config_path.display()
-                ),
-            ));
+            return Err(CliError::ConfigNotFound(format!(
+                "Config file does not exist at {}",
+                config_path.display()
+            )));
         }
 
         let mut cli_config = Self::load_from_file(&config_path)?;
@@ -202,11 +200,11 @@ impl CliConfig {
     ///
     /// # Returns
     ///
-    /// A configured `CliConfig` instance.
+    /// A configured [`CliConfig`] instance.
     ///
     /// # Errors
     ///
-    /// Returns a `CliError` if:
+    /// Returns a [`CliError`](crate::errors::CliError) if:
     /// - Cannot determine current working directory
     /// - The config file doesn't exist locally
     /// - Configuration file parsing fails
@@ -239,11 +237,11 @@ impl CliConfig {
     ///
     /// # Returns
     ///
-    /// A configured `CliConfig` instance.
+    /// A configured [`CliConfig`] instance.
     ///
     /// # Errors
     ///
-    /// Returns a `CliError` if:
+    /// Returns a [`CliError`](crate::errors::CliError) if:
     /// - Cannot determine home directory
     /// - The config file doesn't exist globally
     /// - Configuration file parsing fails
@@ -267,17 +265,22 @@ impl CliConfig {
     /// 2. Global `.miden/miden-client.toml` in the home directory (fallback)
     ///
     /// This matches the CLI's configuration priority logic. For most use cases, you should
-    /// use `CliClient::from_system_user_config()` instead, which uses this method internally.
+    /// use [`CliClient::from_system_user_config()`](crate::CliClient::from_system_user_config)
+    /// instead, which uses this method internally.
     ///
     /// # Returns
     ///
-    /// A configured `CliConfig` instance.
+    /// A configured [`CliConfig`] instance.
     ///
     /// # Errors
     ///
-    /// Returns a `CliError` if:
-    /// - Neither local nor global config file exists
-    /// - Configuration file parsing fails
+    /// Returns a [`CliError`](crate::errors::CliError):
+    /// - [`CliError::ConfigNotFound`](crate::errors::CliError::ConfigNotFound) if neither local nor
+    ///   global config file exists
+    /// - [`CliError::Config`](crate::errors::CliError::Config) if configuration file parsing fails
+    ///
+    /// Note: If a local config file exists but has parse errors, the error is returned
+    /// immediately without falling back to global config.
     ///
     /// # Examples
     ///
@@ -297,15 +300,19 @@ impl CliConfig {
         // Try local first
         match Self::from_local_dir() {
             Ok(config) => Ok(config),
-            Err(_) => {
+            // Only fall back to global if the local config file was not found
+            // (not for parse errors or other issues)
+            Err(CliError::ConfigNotFound(_)) => {
                 // Fall back to global
-                Self::from_global_dir().map_err(|_| {
-                    CliError::Config(
-                        "No configuration file found".to_string().into(),
-                        "Neither local nor global config file exists. Run 'miden-client init' to create one.".to_string()
-                    )
+                Self::from_global_dir().map_err(|e| match e {
+                    CliError::ConfigNotFound(_) => CliError::ConfigNotFound(
+                        "Neither local nor global config file exists".to_string(),
+                    ),
+                    other => other,
                 })
             },
+            // For other errors (like parse errors), propagate them immediately
+            Err(e) => Err(e),
         }
     }
 

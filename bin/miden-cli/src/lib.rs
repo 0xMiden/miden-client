@@ -12,9 +12,7 @@ use miden_client::builder::ClientBuilder;
 use miden_client::keystore::FilesystemKeyStore;
 use miden_client::note_transport::grpc::GrpcNoteTransportClient;
 use miden_client::store::{NoteFilter as ClientNoteFilter, OutputNoteRecord};
-use miden_client::{Client, ClientError, DebugMode, IdPrefixFetchError};
 use miden_client_sqlite_store::ClientBuilderSqliteExt;
-use rand::rngs::StdRng;
 
 mod commands;
 use commands::account::AccountCmd;
@@ -30,10 +28,10 @@ use commands::sync::SyncCmd;
 use commands::tags::TagsCmd;
 use commands::transactions::TransactionCmd;
 
-use self::utils::{config_file_exists, load_config_file};
+use self::utils::config_file_exists;
 use crate::commands::address::AddressCmd;
 
-pub type CliKeyStore = FilesystemKeyStore<StdRng>;
+pub type CliKeyStore = FilesystemKeyStore;
 
 /// A Client configured using the CLI's system user configuration.
 ///
@@ -44,9 +42,8 @@ pub type CliKeyStore = FilesystemKeyStore<StdRng>;
 /// # Examples
 ///
 /// ```no_run
-/// use miden_client::DebugMode;
-/// use miden_client::transaction::TransactionRequestBuilder;
-/// use miden_client_cli::CliClient;
+/// use miden_client_cli::transaction::TransactionRequestBuilder;
+/// use miden_client_cli::{CliClient, DebugMode};
 ///
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 /// // Create a CLI-configured client
@@ -64,7 +61,7 @@ pub type CliKeyStore = FilesystemKeyStore<StdRng>;
 /// # Ok(())
 /// # }
 /// ```
-pub struct CliClient(Client<CliKeyStore>);
+pub struct CliClient(miden_client::Client<CliKeyStore>);
 
 impl CliClient {
     /// Creates a new `CliClient` instance from an existing `CliConfig`.
@@ -99,15 +96,15 @@ impl CliClient {
     /// # Arguments
     ///
     /// * `config` - The CLI configuration to use (bypasses standard config discovery)
-    /// * `debug_mode` - The debug mode setting (`DebugMode::Enabled` or `DebugMode::Disabled`)
+    /// * `debug_mode` - The debug mode setting ([`DebugMode::Enabled`] or [`DebugMode::Disabled`])
     ///
     /// # Returns
     ///
-    /// A configured `CliClient` instance.
+    /// A configured [`CliClient`] instance.
     ///
     /// # Errors
     ///
-    /// Returns a `CliError` if:
+    /// Returns a [`CliError`] if:
     /// - Keystore initialization fails
     /// - Client builder fails to construct the client
     /// - Note transport connection fails (if configured)
@@ -117,8 +114,7 @@ impl CliClient {
     /// ```no_run
     /// use std::path::PathBuf;
     ///
-    /// use miden_client::DebugMode;
-    /// use miden_client_cli::{CliClient, CliConfig};
+    /// use miden_client_cli::{CliClient, CliConfig, DebugMode};
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// // BEWARE: This bypasses standard config discovery!
@@ -131,7 +127,10 @@ impl CliClient {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn from_config(config: CliConfig, debug_mode: DebugMode) -> Result<Self, CliError> {
+    pub async fn from_config(
+        config: CliConfig,
+        debug_mode: miden_client::DebugMode,
+    ) -> Result<Self, CliError> {
         // Create keystore
         let keystore =
             CliKeyStore::new(config.secret_keys_directory.clone()).map_err(CliError::KeyStore)?;
@@ -154,7 +153,7 @@ impl CliClient {
             let note_transport_client =
                 GrpcNoteTransportClient::connect(tl_config.endpoint.clone(), tl_config.timeout_ms)
                     .await
-                    .map_err(|e| CliError::from(ClientError::from(e)))?;
+                    .map_err(|e| CliError::from(miden_client::ClientError::from(e)))?;
             builder = builder.note_transport(Arc::new(note_transport_client));
         }
 
@@ -182,15 +181,15 @@ impl CliClient {
     ///
     /// # Arguments
     ///
-    /// * `debug_mode` - The debug mode setting (`DebugMode::Enabled` or `DebugMode::Disabled`).
+    /// * `debug_mode` - The debug mode setting ([`DebugMode::Enabled`] or [`DebugMode::Disabled`]).
     ///
     /// # Returns
     ///
-    /// A configured `CliClient` instance.
+    /// A configured [`CliClient`] instance.
     ///
     /// # Errors
     ///
-    /// Returns a `CliError` if:
+    /// Returns a [`CliError`] if:
     /// - No configuration file is found (local or global)
     /// - Configuration file parsing fails
     /// - Keystore initialization fails
@@ -200,9 +199,8 @@ impl CliClient {
     /// # Examples
     ///
     /// ```no_run
-    /// use miden_client::DebugMode;
-    /// use miden_client::transaction::TransactionRequestBuilder;
-    /// use miden_client_cli::CliClient;
+    /// use miden_client_cli::transaction::TransactionRequestBuilder;
+    /// use miden_client_cli::{CliClient, DebugMode};
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// // Create a client with default settings (debug disabled)
@@ -223,7 +221,9 @@ impl CliClient {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn from_system_user_config(debug_mode: DebugMode) -> Result<Self, CliError> {
+    pub async fn from_system_user_config(
+        debug_mode: miden_client::DebugMode,
+    ) -> Result<Self, CliError> {
         // Check if client is not yet initialized => silently initialize the client
         if !config_file_exists()? {
             let init_cmd = InitCmd::default();
@@ -244,8 +244,7 @@ impl CliClient {
     /// # Examples
     ///
     /// ```no_run
-    /// use miden_client::DebugMode;
-    /// use miden_client_cli::CliClient;
+    /// use miden_client_cli::{CliClient, DebugMode};
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// let cli_client = CliClient::from_system_user_config(DebugMode::Disabled).await?;
@@ -253,17 +252,17 @@ impl CliClient {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn into_inner(self) -> Client<CliKeyStore> {
+    pub fn into_inner(self) -> miden_client::Client<CliKeyStore> {
         self.0
     }
 
     /// Gets a reference to the inner `Client<CliKeyStore>`.
-    pub fn inner(&self) -> &Client<CliKeyStore> {
+    pub fn inner(&self) -> &miden_client::Client<CliKeyStore> {
         &self.0
     }
 
     /// Gets a mutable reference to the inner `Client<CliKeyStore>`.
-    pub fn inner_mut(&mut self) -> &mut Client<CliKeyStore> {
+    pub fn inner_mut(&mut self) -> &mut miden_client::Client<CliKeyStore> {
         &mut self.0
     }
 }
@@ -272,7 +271,7 @@ impl CliClient {
 ///
 /// This enables calling all `Client` methods on `CliClient` directly.
 impl Deref for CliClient {
-    type Target = Client<CliKeyStore>;
+    type Target = miden_client::Client<CliKeyStore>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -287,9 +286,12 @@ impl DerefMut for CliClient {
 }
 
 pub mod config;
+// These modules intentionally shadow the miden_client re-exports - CLI has its own errors/utils
+#[allow(hidden_glob_reexports)]
 mod errors;
 mod faucet_details_map;
 mod info;
+#[allow(hidden_glob_reexports)]
 mod utils;
 
 /// Re-export `MIDEN_DIR` for use in tests
@@ -297,6 +299,25 @@ pub use config::MIDEN_DIR;
 /// Re-export common types for external projects
 pub use config::{CLIENT_CONFIG_FILE_NAME, CliConfig};
 pub use errors::CliError as Error;
+// Re-export the entire `miden_client` crate so external projects can use a single dependency.
+//
+// This allows consumers of `miden-client-cli` to access all `miden-client` types without
+// adding `miden-client` as a separate dependency, avoiding potential version mismatches.
+//
+// # Examples
+//
+// ```no_run
+// use miden_client_cli::transaction::TransactionRequestBuilder;
+// use miden_client_cli::{CliClient, DebugMode};
+//
+// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+// let mut client = CliClient::from_system_user_config(DebugMode::Disabled).await?;
+// let req = TransactionRequestBuilder::new().build()?;
+// // Use the client...
+// # Ok(())
+// # }
+// ```
+pub use miden_client::*;
 
 /// Client binary name.
 ///
@@ -432,8 +453,8 @@ impl Cli {
         // Define whether we want to use the executor's debug mode based on the env var and
         // the flag override
         let in_debug_mode = match env::var("MIDEN_DEBUG") {
-            Ok(value) if value.to_lowercase() == "true" => DebugMode::Enabled,
-            _ => DebugMode::Disabled,
+            Ok(value) if value.to_lowercase() == "true" => miden_client::DebugMode::Enabled,
+            _ => miden_client::DebugMode::Disabled,
         };
 
         // Load configuration
@@ -498,27 +519,29 @@ pub fn create_dynamic_table(headers: &[&str]) -> Table {
 ///
 /// # Errors
 ///
-/// - Returns [`IdPrefixFetchError::NoMatch`] if we were unable to find any note where
-///   `note_id_prefix` is a prefix of its ID.
-/// - Returns [`IdPrefixFetchError::MultipleMatches`] if there were more than one note found where
-///   `note_id_prefix` is a prefix of its ID.
+/// - Returns [`IdPrefixFetchError::NoMatch`](miden_client::IdPrefixFetchError::NoMatch) if we were
+///   unable to find any note where `note_id_prefix` is a prefix of its ID.
+/// - Returns [`IdPrefixFetchError::MultipleMatches`](miden_client::IdPrefixFetchError::MultipleMatches)
+///   if there were more than one note found where `note_id_prefix` is a prefix of its ID.
 pub(crate) async fn get_output_note_with_id_prefix<AUTH: TransactionAuthenticator + Sync>(
-    client: &Client<AUTH>,
+    client: &miden_client::Client<AUTH>,
     note_id_prefix: &str,
-) -> Result<OutputNoteRecord, IdPrefixFetchError> {
+) -> Result<OutputNoteRecord, miden_client::IdPrefixFetchError> {
     let mut output_note_records = client
         .get_output_notes(ClientNoteFilter::All)
         .await
         .map_err(|err| {
             tracing::error!("Error when fetching all notes from the store: {err}");
-            IdPrefixFetchError::NoMatch(format!("note ID prefix {note_id_prefix}").to_string())
+            miden_client::IdPrefixFetchError::NoMatch(
+                format!("note ID prefix {note_id_prefix}").to_string(),
+            )
         })?
         .into_iter()
         .filter(|note_record| note_record.id().to_hex().starts_with(note_id_prefix))
         .collect::<Vec<_>>();
 
     if output_note_records.is_empty() {
-        return Err(IdPrefixFetchError::NoMatch(
+        return Err(miden_client::IdPrefixFetchError::NoMatch(
             format!("note ID prefix {note_id_prefix}").to_string(),
         ));
     }
@@ -530,7 +553,7 @@ pub(crate) async fn get_output_note_with_id_prefix<AUTH: TransactionAuthenticato
             note_id_prefix,
             output_note_record_ids
         );
-        return Err(IdPrefixFetchError::MultipleMatches(
+        return Err(miden_client::IdPrefixFetchError::MultipleMatches(
             format!("note ID prefix {note_id_prefix}").to_string(),
         ));
     }
@@ -544,20 +567,20 @@ pub(crate) async fn get_output_note_with_id_prefix<AUTH: TransactionAuthenticato
 ///
 /// # Errors
 ///
-/// - Returns [`IdPrefixFetchError::NoMatch`] if we were unable to find any account where
-///   `account_id_prefix` is a prefix of its ID.
-/// - Returns [`IdPrefixFetchError::MultipleMatches`] if there were more than one account found
-///   where `account_id_prefix` is a prefix of its ID.
+/// - Returns [`IdPrefixFetchError::NoMatch`](miden_client::IdPrefixFetchError::NoMatch) if we were
+///   unable to find any account where `account_id_prefix` is a prefix of its ID.
+/// - Returns [`IdPrefixFetchError::MultipleMatches`](miden_client::IdPrefixFetchError::MultipleMatches)
+///   if there were more than one account found where `account_id_prefix` is a prefix of its ID.
 async fn get_account_with_id_prefix<AUTH>(
-    client: &Client<AUTH>,
+    client: &miden_client::Client<AUTH>,
     account_id_prefix: &str,
-) -> Result<AccountHeader, IdPrefixFetchError> {
+) -> Result<AccountHeader, miden_client::IdPrefixFetchError> {
     let mut accounts = client
         .get_account_headers()
         .await
         .map_err(|err| {
             tracing::error!("Error when fetching all accounts from the store: {err}");
-            IdPrefixFetchError::NoMatch(
+            miden_client::IdPrefixFetchError::NoMatch(
                 format!("account ID prefix {account_id_prefix}").to_string(),
             )
         })?
@@ -567,7 +590,7 @@ async fn get_account_with_id_prefix<AUTH>(
         .collect::<Vec<_>>();
 
     if accounts.is_empty() {
-        return Err(IdPrefixFetchError::NoMatch(
+        return Err(miden_client::IdPrefixFetchError::NoMatch(
             format!("account ID prefix {account_id_prefix}").to_string(),
         ));
     }
@@ -578,7 +601,7 @@ async fn get_account_with_id_prefix<AUTH>(
             account_id_prefix,
             account_ids
         );
-        return Err(IdPrefixFetchError::MultipleMatches(
+        return Err(miden_client::IdPrefixFetchError::MultipleMatches(
             format!("account ID prefix {account_id_prefix}").to_string(),
         ));
     }

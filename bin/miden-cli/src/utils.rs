@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use miden_client::Client;
 use miden_client::account::AccountId;
 use miden_client::address::{Address, AddressId};
@@ -73,38 +71,6 @@ pub(crate) async fn parse_account_id<AUTH>(
             ))),
         }
     }
-}
-
-/// Loads config file from .miden directory with priority: local miden directory first, then global
-/// fallback.
-///
-/// This function will look for the configuration file at the .miden/miden-client.toml path in the
-/// following order:
-///   - Local miden directory in current working directory
-///   - Global miden directory in home directory
-///
-/// Note: Relative paths in the config are resolved relative to the .miden directory.
-///
-/// # Deprecated
-/// This function is deprecated in favor of `CliConfig::from_system()` which provides
-/// the same functionality with a cleaner API.
-pub(super) fn load_config_file() -> Result<(CliConfig, PathBuf), CliError> {
-    let config = CliConfig::from_system()?;
-
-    // Determine which config file was loaded by checking existence
-    let local_miden_dir = get_local_miden_dir()?;
-    let local_config_path = local_miden_dir.join(CLIENT_CONFIG_FILE_NAME);
-
-    let config_path = if local_config_path.exists() {
-        local_config_path
-    } else {
-        let global_miden_dir = get_global_miden_dir().map_err(|e| {
-            CliError::Config(Box::new(e), "Failed to determine global config directory".to_string())
-        })?;
-        global_miden_dir.join(CLIENT_CONFIG_FILE_NAME)
-    };
-
-    Ok((config, config_path))
 }
 
 /// Checks if either local or global configuration file exists.

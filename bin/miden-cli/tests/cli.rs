@@ -1288,22 +1288,33 @@ fn create_account_with_ecdsa_auth() {
 // FROM_SYSTEM_USER_CONFIG TESTS
 // ================================================================================================
 /// Tests that `CliClient::from_system_user_config()` successfully creates a client with the same
-/// configuration as the CLI tool.
+/// configuration as the CLI tool when a local config exists.
 #[tokio::test]
 #[serial_test::serial(global_config)]
 async fn test_from_system_user_config_with_local_config() -> Result<()> {
     // Initialize a local CLI configuration
     let (store_path, temp_dir, _endpoint) = init_cli();
 
-    // Load config from the specific local directory (no need to change working directory!)
-    let local_miden_dir = temp_dir.join(MIDEN_DIR);
-    let config = miden_client_cli::CliConfig::from_dir(&local_miden_dir)?;
+    // Ensure no global config exists to verify local config takes priority
+    cleanup_global_config();
 
-    // Create a client using the loaded config
-    let client = miden_client_cli::CliClient::from_config(config, DebugMode::Disabled).await;
+    // Change to the temp directory where local .miden config exists
+    let original_dir = env::current_dir().unwrap();
+    env::set_current_dir(&temp_dir)?;
+
+    // Create a client using from_system_user_config - should pick up local config
+    let client_result =
+        miden_client_cli::CliClient::from_system_user_config(DebugMode::Disabled).await;
+
+    // Restore original directory
+    env::set_current_dir(original_dir)?;
 
     // Assert the client was created successfully
-    assert!(client.is_ok(), "Failed to create client from local config: {:?}", client.err());
+    assert!(
+        client_result.is_ok(),
+        "Failed to create client from local config: {:?}",
+        client_result.err()
+    );
 
     // Verify that the local config was actually used by checking which store file was created.
     // The local store should exist, indicating the local config was used.
