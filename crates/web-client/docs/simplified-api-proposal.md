@@ -2,12 +2,7 @@
 
 ## Overview
 
-Simplify four key APIs in the web-client:
-1. **Client creation** - Options object pattern
-2. **Note creation** - Object syntax with string inputs
-3. **Account creation** - Object syntax with sensible defaults
-4. **Transaction building** - Convenience methods for common operations
-
+Simplify ten key APIs in the web-client.
 All simplified APIs will **coexist** with existing APIs (no breaking changes).
 
 ---
