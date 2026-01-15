@@ -162,7 +162,7 @@ test.describe("getAccounts tests", () => {
 
 test.describe("account public commitments", () => {
   test("properly stores public commitments", async ({ page }) => {
-    const commitments = await page.evaluate(async () => {
+    const commitmentsCount = await page.evaluate(async () => {
       const newAccount = await window.client.newWallet(
         window.AccountStorageMode.private(),
         true,
@@ -181,13 +181,13 @@ test.describe("account public commitments", () => {
 
       return commitments.length;
     }, {});
-    expect(commitments).toBe(3);
+    expect(commitmentsCount).toBe(3);
   });
 
   test("retrieve auth keys with pk commitments and verify signatures", async ({
     page,
   }) => {
-    const commitmentsCount = await page.evaluate(async () => {
+    const allSksRetrieved = await page.evaluate(async () => {
       const accountId = window.AccountId.fromHex(
         "0x69817bcc6fb9f99027c2245f6979c5"
       );

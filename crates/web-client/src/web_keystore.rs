@@ -85,11 +85,6 @@ impl<R: Rng> WebKeyStore<R> {
         key: &AuthSecretKey,
         account_id: &AccountId,
     ) -> Result<(), KeyStoreError> {
-        if let Some(insert_key_cb) = &self.callbacks.as_ref().insert_key {
-            let sk = WebAuthSecretKey::from(key.clone());
-            insert_key_cb.insert_key(&sk).await?;
-            return Ok(());
-        }
         let pub_key = match key {
             AuthSecretKey::RpoFalcon512(k) => k.public_key().to_commitment().to_hex(),
             AuthSecretKey::EcdsaK256Keccak(k) => k.public_key().to_commitment().to_hex(),
@@ -98,6 +93,16 @@ impl<R: Rng> WebKeyStore<R> {
                 commitment.to_hex()
             },
         };
+
+        if let Some(insert_key_cb) = &self.callbacks.as_ref().insert_key {
+            let sk = WebAuthSecretKey::from(key.clone());
+            insert_key_cb.insert_key(&sk).await?;
+            insert_account_auth(pub_key, String::new(), account_id).await.map_err(|_| {
+                KeyStoreError::StorageError("Failed to insert item into IndexedDB".to_string())
+            })?;
+            return Ok(());
+        }
+
         let secret_key_hex = hex::encode(key.to_bytes());
 
         insert_account_auth(pub_key, secret_key_hex, account_id).await.map_err(|_| {
@@ -107,7 +112,7 @@ impl<R: Rng> WebKeyStore<R> {
         Ok(())
     }
 
-    pub async fn get_public_commitments_for_account(
+    pub async fn get_account_public_keys(
         &self,
         account_id: &AccountId,
     ) -> Result<Vec<PublicKeyCommitment>, KeyStoreError> {

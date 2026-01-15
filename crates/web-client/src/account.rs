@@ -51,6 +51,10 @@ impl WebClient {
         }
     }
 
+    /// Retrieves an authentication secret key from the keystore given a public key commitment.
+    ///
+    /// The public key commitment should correspond to one of the keys tracked by the keystore.
+    /// Returns the associated [`AuthSecretKey`] if found, or an error if not found.
     #[wasm_bindgen(js_name = "getAccountAuthByPubKeyCommitment")]
     pub async fn get_account_secret_key_by_pub_key_commitment(
         &mut self,
@@ -67,6 +71,10 @@ impl WebClient {
         Ok(auth_secret_key.into())
     }
 
+    /// Returns all public key commitments associated with the given account ID.
+    ///
+    /// These commitments can be used with [`getPublicKeyCommitmentsOfAccount`]
+    /// to retrieve the corresponding secret keys from the keystore.
     #[wasm_bindgen(js_name = "getPublicKeyCommitmentsOfAccount")]
     pub async fn get_public_key_commitments_of(
         &mut self,
@@ -75,7 +83,7 @@ impl WebClient {
         let keystore = self.keystore.clone().ok_or(JsValue::from("keystore is not initialized"))?;
 
         Ok(keystore
-            .get_public_commitments_for_account(account_id.as_native())
+            .get_account_public_keys(account_id.as_native())
             .await
             .map_err(|err| {
                 js_error_with_context(

@@ -5,11 +5,7 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::num::ParseIntError;
 
-use miden_protocol::account::Account;
-use miden_protocol::account::auth::PublicKeyCommitment;
-use miden_standards::AuthScheme;
 use miden_standards::account::faucets::BasicFungibleFaucet;
-use miden_standards::account::interface::{AccountInterface, AccountInterfaceExt};
 pub use miden_tx::utils::sync::{LazyLock, RwLock, RwLockReadGuard, RwLockWriteGuard};
 pub use miden_tx::utils::{
     ByteReader,
@@ -104,31 +100,6 @@ pub fn tokens_to_base_units(decimal_str: &str, n_decimals: u8) -> Result<u64, To
 
     // Convert the combined string to an integer
     combined.parse::<u64>().map_err(TokenParseError::ParseU64)
-}
-
-/// Gets the public key from the storage of an account. The function is required to create an
-/// `AccountFile` for exporting accounts in the cli and the web client.
-///
-/// # Arguments
-/// - `account`: The Accounts from which to extract the public keys.
-pub fn get_public_key_commitments_of(account: &Account) -> Vec<PublicKeyCommitment> {
-    let mut pks = vec![];
-    let interface: AccountInterface = AccountInterface::from_account(account);
-
-    for auth in interface.auth() {
-        match auth {
-            AuthScheme::NoAuth | AuthScheme::Unknown => {},
-            AuthScheme::RpoFalcon512Multisig { pub_keys, .. }
-            | AuthScheme::EcdsaK256KeccakMultisig { pub_keys, .. } => {
-                pks.extend(pub_keys.iter());
-            },
-            AuthScheme::RpoFalcon512 { pub_key } | AuthScheme::EcdsaK256Keccak { pub_key } => {
-                pks.push(*pub_key);
-            },
-        }
-    }
-
-    pks
 }
 
 // TESTS
