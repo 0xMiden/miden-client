@@ -25,7 +25,7 @@ use miden_client::auth::{
 };
 use miden_client::builder::ClientBuilder;
 use miden_client::keystore::FilesystemKeyStore;
-use miden_client::note::{BlockNumber, NoteId, NoteRelevance};
+use miden_client::note::{BlockNumber, NoteId};
 use miden_client::rpc::{ACCOUNT_ID_LIMIT, NOTE_TAG_LIMIT, NodeRpcClient};
 use miden_client::store::input_note_states::ConsumedAuthenticatedLocalNoteState;
 use miden_client::store::{
@@ -108,7 +108,7 @@ use miden_protocol::{EMPTY_WORD, Felt, ONE, Word, ZERO};
 use miden_standards::account::faucets::BasicFungibleFaucet;
 use miden_standards::account::interface::AccountInterfaceError;
 use miden_standards::account::wallets::BasicWallet;
-use miden_standards::note::{WellKnownNote, utils};
+use miden_standards::note::{NoteConsumptionStatus, WellKnownNote, utils};
 use miden_standards::testing::mock_account::MockAccountExt;
 use miden_standards::testing::note::NoteBuilder;
 use miden_testing::{MockChain, MockChainBuilder, TxContextInput};
@@ -1503,20 +1503,31 @@ async fn get_consumable_notes() {
 
     // Check that the note is only consumable after block 100 for the account that sent the
     // transaction
-    let from_account_relevance = relevant_accounts
+    let from_account_relevance = &relevant_accounts
         .iter()
         .find(|relevance| relevance.0 == from_account_id)
         .unwrap()
         .1;
-    assert_eq!(from_account_relevance, NoteRelevance::After(100));
+    match from_account_relevance {
+        NoteConsumptionStatus::ConsumableAfter(value) => {
+            assert_eq!(value, &(100u32.into()));
+        },
+        _ => panic!("Unexpected NoteConsumptionStatus"),
+    }
 
     // Check that the note is always consumable for the account that received the transaction
-    let to_account_relevance = relevant_accounts
+    let to_account_relevance = &relevant_accounts
         .iter()
         .find(|relevance| relevance.0 == to_account_id)
         .unwrap()
         .1;
-    assert_eq!(to_account_relevance, NoteRelevance::Now);
+
+    match to_account_relevance {
+        NoteConsumptionStatus::Consumable
+        | NoteConsumptionStatus::ConsumableAfter(..)
+        | NoteConsumptionStatus::ConsumableWithAuthorization => {},
+        _ => panic!("Unexpected NoteConsumptionStatus"),
+    }
 }
 
 #[tokio::test]
