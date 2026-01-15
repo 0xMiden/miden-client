@@ -30,15 +30,15 @@ Returns the account that can consume the note.
 
 ***
 
-### consumableAfterBlock()
+### consumptionStatus()
 
-> **consumableAfterBlock**(): `number`
+> **consumptionStatus**(): [`NoteConsumptionStatus`](NoteConsumptionStatus.md)
 
-Returns the block number after which the note becomes consumable (if any).
+Returns the consumption status of the note.
 
 #### Returns
 
-`number`
+[`NoteConsumptionStatus`](NoteConsumptionStatus.md)
 
 ***
 

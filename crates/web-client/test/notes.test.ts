@@ -13,10 +13,7 @@ import {
   setupPublicConsumedNote,
 } from "./webClientTestUtils";
 import { Page, expect } from "@playwright/test";
-import {
-  ConsumableNoteRecord,
-  NoteConsumability,
-} from "../dist/crates/miden_client_web";
+import { ConsumableNoteRecord } from "../dist/crates/miden_client_web";
 
 const getConsumableNotes = async (
   testingPage: Page,
@@ -44,7 +41,7 @@ const getConsumableNotes = async (
       noteId: record.inputNoteRecord().id().toString(),
       consumability: record.noteConsumability().map((c) => ({
         accountId: c.accountId().toString(),
-        consumableAfterBlock: c.consumableAfterBlock(),
+        consumableAfterBlock: c.consumptionStatus()?.consumableAfterBlock(),
       })),
     }));
   }, accountId);
