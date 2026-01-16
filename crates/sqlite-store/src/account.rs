@@ -510,14 +510,43 @@ impl SqliteStore {
         smt_forest: &mut AccountSmtForest,
         init_account_state: &AccountHeader,
         final_account_state: &AccountHeader,
-        mut updated_fungible_assets: BTreeMap<AccountIdPrefix, FungibleAsset>,
-        mut updated_storage_maps: BTreeMap<StorageSlotName, StorageMap>,
+        updated_fungible_assets: BTreeMap<AccountIdPrefix, FungibleAsset>,
+        updated_storage_maps: BTreeMap<StorageSlotName, StorageMap>,
         delta: &AccountDelta,
     ) -> Result<(), StoreError> {
         // Copy over the storage and vault from the previous state. Non-relevant data will not be
         // modified.
         Self::copy_account_state(tx, init_account_state, final_account_state)?;
 
+        Self::apply_account_vault_delta(
+            tx,
+            smt_forest,
+            init_account_state,
+            final_account_state,
+            updated_fungible_assets,
+            delta,
+        )?;
+
+        let updated_storage_slots =
+            Self::apply_account_storage_delta(smt_forest, updated_storage_maps, delta)?;
+
+        Self::insert_storage_slots(
+            tx,
+            final_account_state.storage_commitment(),
+            updated_storage_slots.values(),
+        )?;
+
+        Ok(())
+    }
+
+    fn apply_account_vault_delta(
+        tx: &Transaction<'_>,
+        smt_forest: &mut AccountSmtForest,
+        init_account_state: &AccountHeader,
+        final_account_state: &AccountHeader,
+        mut updated_fungible_assets: BTreeMap<AccountIdPrefix, FungibleAsset>,
+        delta: &AccountDelta,
+    ) -> Result<(), StoreError> {
         // Apply vault delta. This map will contain all updated assets (indexed by vault key), both
         // fungible and non-fungible.
         let mut updated_assets: BTreeMap<AssetVaultKey, Asset> = BTreeMap::new();
@@ -607,7 +636,7 @@ impl SqliteStore {
             }
         } else {
             // TODO: Remove this rebuild once SmtForest treats EMPTY_WORD as deletion.
-            // see https://github.com/0xMiden/crypto/pull/780/changes for more information
+            // See https://github.com/0xMiden/crypto/pull/780/ for more information.
             let assets = query_vault_assets(
                 tx,
                 "root = ?",
@@ -623,6 +652,14 @@ impl SqliteStore {
             smt_forest.insert_asset_nodes(&vault);
         }
 
+        Ok(())
+    }
+
+    fn apply_account_storage_delta(
+        smt_forest: &mut AccountSmtForest,
+        mut updated_storage_maps: BTreeMap<StorageSlotName, StorageMap>,
+        delta: &AccountDelta,
+    ) -> Result<BTreeMap<StorageSlotName, StorageSlot>, StoreError> {
         // Apply storage delta. This map will contain all updated storage slots, both values and
         // maps. It gets initialized with value type updates which contain the new value and
         // don't depend on previous state.
@@ -643,14 +680,14 @@ impl SqliteStore {
                 map_delta.entries().iter().map(|(key, value)| ((*key).into(), *value)).collect();
             let has_removals = entries.iter().any(|(_, value)| *value == EMPTY_WORD);
 
-            for (key, value) in entries.iter() {
+            for (key, value) in &entries {
                 map.insert(*key, *value)?;
             }
 
             let expected_root = map.root();
             if has_removals {
                 // TODO: Remove this rebuild once SmtForest treats EMPTY_WORD as deletion.
-                // see https://github.com/0xMiden/crypto/pull/780/changes for more information
+                // See https://github.com/0xMiden/crypto/pull/780/ for more information.
                 smt_forest.insert_storage_map_nodes_for_map(&map);
             } else {
                 let new_root =
@@ -667,13 +704,7 @@ impl SqliteStore {
                 .insert(slot_name.clone(), StorageSlot::with_map(slot_name.clone(), map));
         }
 
-        Self::insert_storage_slots(
-            tx,
-            final_account_state.storage_commitment(),
-            updated_storage_slots.values(),
-        )?;
-
-        Ok(())
+        Ok(updated_storage_slots)
     }
 
     /// Fetches the relevant fungible assets of an account that will be updated by the account

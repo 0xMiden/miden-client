@@ -7,7 +7,7 @@ use miden_protocol::account::StorageMapWitness;
 use miden_protocol::crypto::merkle::smt::{Smt, SmtForest};
 use miden_protocol::crypto::merkle::{EmptySubtreeRoots, MerkleError};
 
-/// Thin wrapper around SmtForest for account vault/storage proofs and updates.
+/// Thin wrapper around `SmtForest` for account vault/storage proofs and updates.
 #[derive(Debug, Default, Clone, Eq, PartialEq)]
 pub struct AccountSmtForest {
     forest: SmtForest,
@@ -109,7 +109,7 @@ impl AccountSmtForest {
     pub fn insert_storage_map_nodes(&mut self, storage: &AccountStorage) {
         let maps = storage.slots().iter().filter_map(|slot| match slot.content() {
             StorageSlotContent::Map(map) => Some(map),
-            _ => None,
+            StorageSlotContent::Value(_) => None,
         });
 
         for map in maps {
