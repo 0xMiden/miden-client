@@ -137,6 +137,15 @@ export {
   Word,
 } from "./crates/miden_client_web";
 
+export interface WebClientConfig {
+  rpcUrl?: string;
+  noteTransportUrl?: string;
+  seed?: Uint8Array;
+  getKeyCb?: GetKeyCallback;
+  insertKeyCb?: InsertKeyCallback;
+  signCb?: SignCallback;
+}
+
 export type GetKeyCallback = (
   pubKey: Uint8Array
 ) => Promise<Uint8Array | null | undefined> | Uint8Array | null | undefined;
@@ -164,35 +173,21 @@ export declare class WebClient extends WasmWebClient {
   /**
    * Factory method to create and initialize a new wrapped WebClient.
    *
-   * @param rpcUrl - The RPC URL (optional).
-   * @param noteTransportUrl - The note transport URL (optional).
-   * @param seed - The seed for the account (optional).
+   * @param config - The configuration object.
    * @returns A promise that resolves to a fully initialized WebClient.
    */
   static createClient(
-    rpcUrl?: string,
-    noteTransportUrl?: string,
-    seed?: Uint8Array
+    config: WebClientConfig
   ): Promise<WebClient & WasmWebClient>;
 
   /**
    * Factory method to create and initialize a new wrapped WebClient with a remote keystore.
    *
-   * @param rpcUrl - The RPC URL (optional).
-   * @param noteTransportUrl - The note transport URL (optional).
-   * @param seed - The seed for the account (optional).
-   * @param getKeyCb - Callback used to retrieve secret keys for a given public key.
-   * @param insertKeyCb - Callback used to persist secret keys in the external store.
-   * @param signCb - Callback used to create signatures for the provided inputs.
+   * @param config - The configuration object.
    * @returns A promise that resolves to a fully initialized WebClient.
    */
   static createClientWithExternalKeystore(
-    rpcUrl?: string,
-    noteTransportUrl?: string,
-    seed?: Uint8Array,
-    getKeyCb?: GetKeyCallback,
-    insertKeyCb?: InsertKeyCallback,
-    signCb?: SignCallback
+    config: WebClientConfig
   ): Promise<WebClient & WasmWebClient>;
 
   /**
