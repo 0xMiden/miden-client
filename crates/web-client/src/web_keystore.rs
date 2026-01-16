@@ -76,17 +76,13 @@ impl<R: Rng> WebKeyStore<R> {
     }
 
     pub async fn add_key(&self, key: &AuthSecretKey) -> Result<(), KeyStoreError> {
-        let pub_key = NativeWord::from(key.public_key().to_commitment()).to_hex();
-
         if let Some(insert_key_cb) = &self.callbacks.as_ref().insert_key {
             let sk = WebAuthSecretKey::from(key.clone());
             insert_key_cb.insert_key(&sk).await?;
-            insert_account_auth(pub_key, String::new()).await.map_err(|_| {
-                KeyStoreError::StorageError("Failed to insert item into IndexedDB".to_string())
-            })?;
             return Ok(());
         }
 
+        let pub_key = NativeWord::from(key.public_key().to_commitment()).to_hex();
         let secret_key_hex = hex::encode(key.to_bytes());
 
         insert_account_auth(pub_key, secret_key_hex).await.map_err(|_| {
