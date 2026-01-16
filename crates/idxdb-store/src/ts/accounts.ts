@@ -306,22 +306,6 @@ export async function getAccountAddresses(accountId: string) {
   }
 }
 
-export async function getPublicCommitmentsForAccountId(accountIdHex: string) {
-  try {
-    let secretKeys = await accountAuths
-      .where("accountIdHex")
-      .equals(accountIdHex)
-      .toArray();
-
-    return secretKeys.map((auth) => auth.pubKeyCommitmentHex);
-  } catch (error) {
-    logWebStoreError(
-      error,
-      `Error while fetching secret keys for id: ${accountIdHex}`
-    );
-  }
-}
-
 // INSERT FUNCTIONS
 
 export async function upsertAccountCode(codeRoot: string, code: Uint8Array) {
@@ -420,14 +404,12 @@ export async function upsertAccountRecord(
 
 export async function insertAccountAuth(
   pubKeyCommitmentHex: string,
-  secretKeyHex: string,
-  accountIdHex: string
+  secretKeyHex: string
 ) {
   try {
     const data = {
       pubKeyCommitmentHex,
       secretKeyHex,
-      accountIdHex,
     };
 
     await accountAuths.add(data);

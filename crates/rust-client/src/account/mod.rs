@@ -36,30 +36,14 @@
 
 use alloc::vec::Vec;
 
-use miden_protocol::account::auth::PublicKey;
+use miden_protocol::account::auth::{PublicKey, PublicKeyCommitment};
+
+use crate::Word;
 pub use miden_protocol::account::{
-    Account,
-    AccountBuilder,
-    AccountCode,
-    AccountComponent,
-    AccountComponentCode,
-    AccountDelta,
-    AccountFile,
-    AccountHeader,
-    AccountId,
-    AccountIdPrefix,
-    AccountStorage,
-    AccountStorageMode,
-    AccountType,
-    PartialAccount,
-    PartialStorage,
-    PartialStorageMap,
-    StorageMap,
-    StorageSlot,
-    StorageSlotContent,
-    StorageSlotId,
-    StorageSlotName,
-    StorageSlotType,
+    Account, AccountBuilder, AccountCode, AccountComponent, AccountComponentCode, AccountDelta,
+    AccountFile, AccountHeader, AccountId, AccountIdPrefix, AccountStorage, AccountStorageMode,
+    AccountType, PartialAccount, PartialStorage, PartialStorageMap, StorageMap, StorageSlot,
+    StorageSlotContent, StorageSlotId, StorageSlotName, StorageSlotType,
 };
 pub use miden_protocol::address::{Address, AddressInterface, AddressType, NetworkId};
 use miden_protocol::note::NoteTag;
@@ -83,26 +67,17 @@ pub mod component {
 
     pub use miden_protocol::account::auth::*;
     pub use miden_protocol::account::component::{
-        InitStorageData,
-        StorageSlotSchema,
-        StorageValueName,
+        InitStorageData, StorageSlotSchema, StorageValueName,
     };
     pub use miden_protocol::account::{AccountComponent, AccountComponentMetadata};
     pub use miden_standards::account::auth::*;
     pub use miden_standards::account::components::{
-        basic_fungible_faucet_library,
-        basic_wallet_library,
-        ecdsa_k256_keccak_library,
-        network_fungible_faucet_library,
-        no_auth_library,
-        rpo_falcon_512_acl_library,
-        rpo_falcon_512_library,
-        rpo_falcon_512_multisig_library,
+        basic_fungible_faucet_library, basic_wallet_library, ecdsa_k256_keccak_library,
+        network_fungible_faucet_library, no_auth_library, rpo_falcon_512_acl_library,
+        rpo_falcon_512_library, rpo_falcon_512_multisig_library,
     };
     pub use miden_standards::account::faucets::{
-        BasicFungibleFaucet,
-        FungibleFaucetExt,
-        NetworkFungibleFaucet,
+        BasicFungibleFaucet, FungibleFaucetExt, NetworkFungibleFaucet,
     };
     pub use miden_standards::account::wallets::BasicWallet;
 }
@@ -353,47 +328,53 @@ impl<AUTH> Client<AUTH> {
             .ok_or(ClientError::AccountDataNotFound(account_id))
     }
 
-    /// Stores a list of public keys associated with the given account ID.
-    /// If the account already has known public keys, the new ones are appended.
+    /// Stores a list of public key commitments associated with the given account ID.
+    /// If the account already has known public key commitments, the new ones are appended.
     /// This is useful because with a public key commitment, we can retrieve
     /// its corresponding secret key using, for example, `FilesystemKeyStore::get_key`.
     /// This yields an indirect mapping from account ID to its secret keys:
-    /// account ID → public keys → secret keys (via keystore).
-    /// To identify this keys and avoid collisions, the account id is turned
+    /// account ID → public key commitments → secret keys (via keystore).
+    /// To identify these keys and avoid collisions, the account id is turned
     /// into its hex representation and a suffix is added.
-    pub async fn map_account_to_public_keys(
+    pub async fn map_account_to_public_key_commitments(
         &self,
         account_id: &AccountId,
-        pub_keys: &[PublicKey],
+        pub_key_commitments: &[PublicKeyCommitment],
     ) -> Result<(), ClientError> {
-        let account_id = format!("{}_public_key_map", account_id.to_hex());
-        let pub_key_list = match self.store.get_setting(account_id.clone()).await? {
+        let setting_key = format!("{}_public_key_commitment", account_id.to_hex());
+        let pub_key_words: Vec<Word> =
+            pub_key_commitments.iter().map(|pk| Word::from(*pk)).collect();
+        let pub_key_list = match self.store.get_setting(setting_key.clone()).await? {
             Some(known_pub_keys) => {
-                let mut known_pub_keys: Vec<PublicKey> =
+                let mut known_pub_keys: Vec<Word> =
                     Deserializable::read_from_bytes(&known_pub_keys)?;
-                known_pub_keys.extend_from_slice(pub_keys);
+                known_pub_keys.extend(pub_key_words);
                 known_pub_keys
             },
-            None => pub_keys.to_vec(),
+            None => pub_key_words,
         };
         self.store
-            .set_setting(account_id, Serializable::to_bytes(&pub_key_list))
+            .set_setting(setting_key, Serializable::to_bytes(&pub_key_list))
             .await
             .map_err(ClientError::StoreError)
     }
 
     /// Given an `AccountId`, this function will return the previously stored (if any)
-    /// public keys associated with this id. Once retrieved, this list of public keys
-    /// can be use in conjuntcion with `FilesystemKeyStore::get_key`, to retrieve secret keys.
-    pub async fn get_account_public_keys(
+    /// public key commitments associated with this id. Once retrieved, this list of
+    /// public key commitments can be used in conjunction with `FilesystemKeyStore::get_key`,
+    /// to retrieve secret keys.
+    pub async fn get_account_public_key_commitments(
         &self,
         account_id: &AccountId,
-    ) -> Result<Vec<PublicKey>, ClientError> {
-        let account_id = format!("{}_public_key_map", account_id.to_hex());
-        let pks: Option<Vec<u8>> = self.store.get_setting(account_id).await?;
+    ) -> Result<Vec<PublicKeyCommitment>, ClientError> {
+        let setting_key = format!("{}_public_key_commitmen", account_id.to_hex());
+        let pks: Option<Vec<u8>> = self.store.get_setting(setting_key).await?;
         match pks {
-            Some(known_pks) => Deserializable::read_from_bytes(&known_pks)
-                .map_err(ClientError::DataDeserializationError),
+            Some(known_pks) => {
+                let words: Vec<Word> = Deserializable::read_from_bytes(&known_pks)
+                    .map_err(ClientError::DataDeserializationError)?;
+                Ok(words.into_iter().map(PublicKeyCommitment::from).collect())
+            },
             None => Ok(vec![]),
         }
     }

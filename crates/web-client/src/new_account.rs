@@ -42,9 +42,17 @@ impl WebClient {
 
             keystore
                 .expect("KeyStore should be initialized")
-                .add_key(&key_pair, &new_account.id())
+                .add_key(&key_pair)
                 .await
                 .map_err(|err| err.to_string())?;
+
+            client
+                .map_account_to_public_key_commitments(
+                    &new_account.id(),
+                    &[key_pair.public_key().to_commitment()],
+                )
+                .await
+                .map_err(|err| js_error_with_context(err, "failed to map account to public keys"))?;
 
             Ok(new_account.into())
         } else {
@@ -120,9 +128,17 @@ impl WebClient {
 
             keystore
                 .expect("KeyStore should be initialized")
-                .add_key(&key_pair, &new_account.id())
+                .add_key(&key_pair)
                 .await
                 .map_err(|err| err.to_string())?;
+
+            client
+                .map_account_to_public_key_commitments(
+                    &new_account.id(),
+                    &[key_pair.public_key().to_commitment()],
+                )
+                .await
+                .map_err(|err| js_error_with_context(err, "failed to map account to public keys"))?;
 
             match client.add_account(&new_account, false).await {
                 Ok(_) => Ok(new_account.into()),
@@ -157,11 +173,25 @@ impl WebClient {
         account_id: &AccountId,
         secret_key: &WebAuthSecretKey,
     ) -> Result<(), JsValue> {
-        let keystore = self.keystore.as_mut().expect("KeyStore should be initialized");
+        let keystore = self.keystore.as_ref().expect("KeyStore should be initialized");
+        let native_secret_key: AuthSecretKey = secret_key.into();
+        let native_account_id = account_id.into();
+
         keystore
-            .add_key(secret_key.into(), &account_id.into())
+            .add_key(&native_secret_key)
             .await
             .map_err(|err| err.to_string())?;
+
+        if let Some(client) = self.get_mut_inner() {
+            client
+                .map_account_to_public_key_commitments(
+                    &native_account_id,
+                    &[native_secret_key.public_key().to_commitment()],
+                )
+                .await
+                .map_err(|err| js_error_with_context(err, "failed to map account to public keys"))?;
+        }
+
         Ok(())
     }
 }

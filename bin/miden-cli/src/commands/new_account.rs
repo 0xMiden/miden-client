@@ -410,7 +410,7 @@ async fn create_client_account<AUTH: TransactionAuthenticator + Sync + 'static>(
     if let Some(key_pair) = key_pair {
         keystore.add_key(&key_pair).map_err(CliError::KeyStore)?;
         client
-            .map_account_to_public_keys(&account.id(), &[key_pair.public_key()])
+            .map_account_to_public_key_commitments(&account.id(), &[key_pair.public_key().to_commitment()])
             .await?;
         println!("Generated and stored Falcon512 authentication key in keystore.");
     } else {

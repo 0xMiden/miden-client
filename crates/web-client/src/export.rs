@@ -78,6 +78,7 @@ impl WebClient {
         &mut self,
         account_id: AccountId,
     ) -> Result<AccountFile, JsValue> {
+        let keystore = self.keystore.clone().expect("Keystore not initialized");
         if let Some(client) = self.get_mut_inner() {
             let account = client
                 .get_account(account_id.into())
@@ -92,16 +93,16 @@ impl WebClient {
                     )
                 })?
                 .ok_or(JsValue::from_str("No account found"))?;
-
-            let keystore = self.keystore.clone().expect("Keystore not initialized");
             let account = account
                 .try_into()
                 .map_err(|_| JsValue::from_str("partial accounts are still unsupported"))?;
 
             let mut key_pairs = vec![];
 
-            let commitments =
-                keystore.get_account_public_keys(account_id.as_native()).await.map_err(|err| {
+            let commitments = client
+                .get_account_public_key_commitments(account_id.as_native())
+                .await
+                .map_err(|err| {
                     js_error_with_context(
                         err,
                         &format!(

@@ -236,18 +236,6 @@ export async function getAccountAddresses(accountId) {
         logWebStoreError(error, `Error while fetching account addresses for id: ${accountId}`);
     }
 }
-export async function getPublicCommitmentsForAccountId(accountIdHex) {
-    try {
-        let secretKeys = await accountAuths
-            .where("accountIdHex")
-            .equals(accountIdHex)
-            .toArray();
-        return secretKeys.map((auth) => auth.pubKeyCommitmentHex);
-    }
-    catch (error) {
-        logWebStoreError(error, `Error while fetching secret keys for id: ${accountIdHex}`);
-    }
-}
 // INSERT FUNCTIONS
 export async function upsertAccountCode(codeRoot, code) {
     try {
@@ -330,12 +318,11 @@ export async function upsertAccountRecord(accountId, codeRoot, storageRoot, vaul
         logWebStoreError(error, `Error inserting account: ${accountId}`);
     }
 }
-export async function insertAccountAuth(pubKeyCommitmentHex, secretKeyHex, accountIdHex) {
+export async function insertAccountAuth(pubKeyCommitmentHex, secretKeyHex) {
     try {
         const data = {
             pubKeyCommitmentHex,
             secretKeyHex,
-            accountIdHex,
         };
         await accountAuths.add(data);
     }

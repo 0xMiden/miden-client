@@ -91,14 +91,14 @@ async fn export_account<AUTH>(
 
     let account: Account = account.try_into()?;
 
-    let commitments = client.get_account_public_keys(&account_id).await?;
+    let commitments = client.get_account_public_key_commitments(&account_id).await?;
 
     let mut key_pairs = vec![];
 
     for commitment in commitments {
         key_pairs.push(
             keystore
-                .get_key(commitment.to_commitment())
+                .get_key(commitment)
                 .map_err(CliError::KeyStore)?
                 .ok_or(CliError::Export("Auth not found for account".to_string()))?,
         );

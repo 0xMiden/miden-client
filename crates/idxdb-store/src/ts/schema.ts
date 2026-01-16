@@ -70,7 +70,6 @@ export interface IAccountAsset {
 export interface IAccountAuth {
   pubKeyCommitmentHex: string;
   secretKeyHex: string;
-  accountIdHex: string;
 }
 
 export interface IAccount {
@@ -197,7 +196,7 @@ db.version(1).stores({
   [Table.AccountStorage]: indexes("[commitment+slotName]", "commitment"),
   [Table.StorageMapEntries]: indexes("[root+key]", "root"),
   [Table.AccountAssets]: indexes("[root+vaultKey]", "root", "faucetIdPrefix"),
-  [Table.AccountAuth]: indexes("pubKeyCommitmentHex", "accountIdHex"),
+  [Table.AccountAuth]: indexes("pubKeyCommitmentHex"),
   [Table.Accounts]: indexes(
     "&accountCommitment",
     "id",

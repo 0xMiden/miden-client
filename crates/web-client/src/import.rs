@@ -31,9 +31,18 @@ impl WebClient {
                 .map_err(|err| js_error_with_context(err, "failed to import account"))?;
 
             let keystore = keystore.expect("KeyStore should be initialized");
-            for key in auth_secret_keys {
-                keystore.add_key(&key, &account.id()).await.map_err(|err| err.to_string())?;
+            for key in &auth_secret_keys {
+                keystore.add_key(key).await.map_err(|err| err.to_string())?;
             }
+
+            let commitments: Vec<_> = auth_secret_keys
+                .iter()
+                .map(|k| k.public_key().to_commitment())
+                .collect();
+            client
+                .map_account_to_public_key_commitments(&account.id(), &commitments)
+                .await
+                .map_err(|err| js_error_with_context(err, "failed to map account to public keys"))?;
 
             Ok(JsValue::from_str(&format!("Imported account with ID: {account_id}")))
         } else {
@@ -63,9 +72,14 @@ impl WebClient {
 
         keystore
             .expect("KeyStore should be initialized")
-            .add_key(&key_pair, &native_id)
+            .add_key(&key_pair)
             .await
             .map_err(|err| err.to_string())?;
+
+        client
+            .map_account_to_public_key_commitments(&native_id, &[key_pair.public_key().to_commitment()])
+            .await
+            .map_err(|err| js_error_with_context(err, "failed to map account to public keys"))?;
 
         Ok(Account::from(generated_acct))
     }

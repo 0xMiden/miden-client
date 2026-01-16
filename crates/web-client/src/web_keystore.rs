@@ -1,12 +1,7 @@
 use alloc::string::ToString;
 use alloc::sync::Arc;
 
-use idxdb_store::auth::{
-    get_account_auth_by_pub_key,
-    get_public_commitments_for_account,
-    insert_account_auth,
-};
-use miden_client::account::AccountId;
+use idxdb_store::auth::{get_account_auth_by_pub_key, insert_account_auth};
 use miden_client::auth::{
     AuthSecretKey,
     PublicKey,
@@ -17,7 +12,7 @@ use miden_client::auth::{
 };
 use miden_client::keystore::KeyStoreError;
 use miden_client::utils::{RwLock, Serializable};
-use miden_client::{AuthenticationError, Word, Word as NativeWord};
+use miden_client::{AuthenticationError, Word as NativeWord};
 use rand::Rng;
 use wasm_bindgen_futures::js_sys::Function;
 
@@ -80,24 +75,13 @@ impl<R: Rng> WebKeyStore<R> {
         }
     }
 
-    pub async fn add_key(
-        &self,
-        key: &AuthSecretKey,
-        account_id: &AccountId,
-    ) -> Result<(), KeyStoreError> {
-        let pub_key = match key {
-            AuthSecretKey::RpoFalcon512(k) => k.public_key().to_commitment().to_hex(),
-            AuthSecretKey::EcdsaK256Keccak(k) => k.public_key().to_commitment().to_hex(),
-            other => {
-                let commitment: Word = other.public_key().to_commitment().into();
-                commitment.to_hex()
-            },
-        };
+    pub async fn add_key(&self, key: &AuthSecretKey) -> Result<(), KeyStoreError> {
+        let pub_key = NativeWord::from(key.public_key().to_commitment()).to_hex();
 
         if let Some(insert_key_cb) = &self.callbacks.as_ref().insert_key {
             let sk = WebAuthSecretKey::from(key.clone());
             insert_key_cb.insert_key(&sk).await?;
-            insert_account_auth(pub_key, String::new(), account_id).await.map_err(|_| {
+            insert_account_auth(pub_key, String::new()).await.map_err(|_| {
                 KeyStoreError::StorageError("Failed to insert item into IndexedDB".to_string())
             })?;
             return Ok(());
@@ -105,36 +89,11 @@ impl<R: Rng> WebKeyStore<R> {
 
         let secret_key_hex = hex::encode(key.to_bytes());
 
-        insert_account_auth(pub_key, secret_key_hex, account_id).await.map_err(|_| {
+        insert_account_auth(pub_key, secret_key_hex).await.map_err(|_| {
             KeyStoreError::StorageError("Failed to insert item into IndexedDB".to_string())
         })?;
 
         Ok(())
-    }
-
-    pub async fn get_account_public_keys(
-        &self,
-        account_id: &AccountId,
-    ) -> Result<Vec<PublicKeyCommitment>, KeyStoreError> {
-        let hex_public_keys = get_public_commitments_for_account(*account_id)
-            .await
-            .map_err(|err| {
-                KeyStoreError::StorageError(err.as_string().unwrap_or_else(|| format!("{err:?}")))
-            })?
-            .into_iter();
-
-        let mut pks = vec![];
-
-        for hex in hex_public_keys {
-            let parsed = Word::parse(&hex).map_err(|err| {
-                KeyStoreError::StorageError(format!(
-                    "the auth storage contains an invalid public key commitment: {err}, its value is: {hex}"
-                ))
-            })?;
-
-            pks.push(PublicKeyCommitment::from(parsed));
-        }
-        Ok(pks)
     }
 
     pub async fn get_key(
