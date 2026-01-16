@@ -212,6 +212,9 @@ export class WebClient {
     this.wasmWebClientPromise = null;
   }
 
+  // TODO: This will soon conflict with some changes in main.
+  // More context here:
+  // https://github.com/0xMiden/miden-client/pull/1645?notification_referrer_id=NT_kwHOA1yg7NoAJVJlcG9zaXRvcnk7NjU5MzQzNzAyO0lzc3VlOzM3OTY4OTU1Nzk&notifications_query=is%3Aunread#discussion_r2696075480
   initializeWorker() {
     this.worker.postMessage({
       action: WorkerAction.INIT,
