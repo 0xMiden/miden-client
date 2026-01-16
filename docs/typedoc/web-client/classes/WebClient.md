@@ -454,7 +454,7 @@ Returns the associated [`AuthSecretKey`] if found, or an error if not found.
 
 Returns all public key commitments associated with the given account ID.
 
-These commitments can be used with [`getPublicKeyCommitmentsOfAccount`]
+These commitments can be used with [`getAccountAuthByPubKeyCommitment`]
 to retrieve the corresponding secret keys from the keystore.
 
 #### Parameters

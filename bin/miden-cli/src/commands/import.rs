@@ -81,7 +81,7 @@ async fn import_account<AUTH>(
     for key in auth_secret_keys {
         keystore.add_key(&key).map_err(CliError::KeyStore)?;
         client
-            .map_account_to_public_key_commitments(&account_id, &[key.public_key().to_commitment()])
+            .map_account_to_public_key_commitments(&account_id, &[key.public_key()])
             .await?;
     }
 

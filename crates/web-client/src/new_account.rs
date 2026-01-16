@@ -47,12 +47,11 @@ impl WebClient {
                 .map_err(|err| err.to_string())?;
 
             client
-                .map_account_to_public_key_commitments(
-                    &new_account.id(),
-                    &[key_pair.public_key().to_commitment()],
-                )
+                .map_account_to_public_key_commitments(&new_account.id(), &[key_pair.public_key()])
                 .await
-                .map_err(|err| js_error_with_context(err, "failed to map account to public keys"))?;
+                .map_err(|err| {
+                    js_error_with_context(err, "failed to map account to public keys")
+                })?;
 
             Ok(new_account.into())
         } else {
@@ -133,12 +132,11 @@ impl WebClient {
                 .map_err(|err| err.to_string())?;
 
             client
-                .map_account_to_public_key_commitments(
-                    &new_account.id(),
-                    &[key_pair.public_key().to_commitment()],
-                )
+                .map_account_to_public_key_commitments(&new_account.id(), &[key_pair.public_key()])
                 .await
-                .map_err(|err| js_error_with_context(err, "failed to map account to public keys"))?;
+                .map_err(|err| {
+                    js_error_with_context(err, "failed to map account to public keys")
+                })?;
 
             match client.add_account(&new_account, false).await {
                 Ok(_) => Ok(new_account.into()),
@@ -177,19 +175,18 @@ impl WebClient {
         let native_secret_key: AuthSecretKey = secret_key.into();
         let native_account_id = account_id.into();
 
-        keystore
-            .add_key(&native_secret_key)
-            .await
-            .map_err(|err| err.to_string())?;
+        keystore.add_key(&native_secret_key).await.map_err(|err| err.to_string())?;
 
         if let Some(client) = self.get_mut_inner() {
             client
                 .map_account_to_public_key_commitments(
                     &native_account_id,
-                    &[native_secret_key.public_key().to_commitment()],
+                    &[native_secret_key.public_key()],
                 )
                 .await
-                .map_err(|err| js_error_with_context(err, "failed to map account to public keys"))?;
+                .map_err(|err| {
+                    js_error_with_context(err, "failed to map account to public keys")
+                })?;
         }
 
         Ok(())

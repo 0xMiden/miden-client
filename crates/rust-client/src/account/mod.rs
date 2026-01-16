@@ -37,13 +37,29 @@
 use alloc::vec::Vec;
 
 use miden_protocol::account::auth::{PublicKey, PublicKeyCommitment};
-
-use crate::Word;
 pub use miden_protocol::account::{
-    Account, AccountBuilder, AccountCode, AccountComponent, AccountComponentCode, AccountDelta,
-    AccountFile, AccountHeader, AccountId, AccountIdPrefix, AccountStorage, AccountStorageMode,
-    AccountType, PartialAccount, PartialStorage, PartialStorageMap, StorageMap, StorageSlot,
-    StorageSlotContent, StorageSlotId, StorageSlotName, StorageSlotType,
+    Account,
+    AccountBuilder,
+    AccountCode,
+    AccountComponent,
+    AccountComponentCode,
+    AccountDelta,
+    AccountFile,
+    AccountHeader,
+    AccountId,
+    AccountIdPrefix,
+    AccountStorage,
+    AccountStorageMode,
+    AccountType,
+    PartialAccount,
+    PartialStorage,
+    PartialStorageMap,
+    StorageMap,
+    StorageSlot,
+    StorageSlotContent,
+    StorageSlotId,
+    StorageSlotName,
+    StorageSlotType,
 };
 pub use miden_protocol::address::{Address, AddressInterface, AddressType, NetworkId};
 use miden_protocol::note::NoteTag;
@@ -56,6 +72,7 @@ use miden_standards::account::wallets::BasicWallet;
 use miden_tx::utils::{Deserializable, Serializable};
 
 use super::Client;
+use crate::Word;
 use crate::auth::AuthSchemeId;
 use crate::errors::ClientError;
 use crate::rpc::domain::account::FetchedAccount;
@@ -67,17 +84,26 @@ pub mod component {
 
     pub use miden_protocol::account::auth::*;
     pub use miden_protocol::account::component::{
-        InitStorageData, StorageSlotSchema, StorageValueName,
+        InitStorageData,
+        StorageSlotSchema,
+        StorageValueName,
     };
     pub use miden_protocol::account::{AccountComponent, AccountComponentMetadata};
     pub use miden_standards::account::auth::*;
     pub use miden_standards::account::components::{
-        basic_fungible_faucet_library, basic_wallet_library, ecdsa_k256_keccak_library,
-        network_fungible_faucet_library, no_auth_library, rpo_falcon_512_acl_library,
-        rpo_falcon_512_library, rpo_falcon_512_multisig_library,
+        basic_fungible_faucet_library,
+        basic_wallet_library,
+        ecdsa_k256_keccak_library,
+        network_fungible_faucet_library,
+        no_auth_library,
+        rpo_falcon_512_acl_library,
+        rpo_falcon_512_library,
+        rpo_falcon_512_multisig_library,
     };
     pub use miden_standards::account::faucets::{
-        BasicFungibleFaucet, FungibleFaucetExt, NetworkFungibleFaucet,
+        BasicFungibleFaucet,
+        FungibleFaucetExt,
+        NetworkFungibleFaucet,
     };
     pub use miden_standards::account::wallets::BasicWallet;
 }
@@ -339,22 +365,21 @@ impl<AUTH> Client<AUTH> {
     pub async fn map_account_to_public_key_commitments(
         &self,
         account_id: &AccountId,
-        pub_key_commitments: &[PublicKeyCommitment],
+        pub_keys: &[PublicKey],
     ) -> Result<(), ClientError> {
         let setting_key = format!("{}_public_key_commitment", account_id.to_hex());
-        let pub_key_words: Vec<Word> =
-            pub_key_commitments.iter().map(|pk| Word::from(*pk)).collect();
-        let pub_key_list = match self.store.get_setting(setting_key.clone()).await? {
-            Some(known_pub_keys) => {
-                let mut known_pub_keys: Vec<Word> =
-                    Deserializable::read_from_bytes(&known_pub_keys)?;
-                known_pub_keys.extend(pub_key_words);
-                known_pub_keys
+        let new_commitments: Vec<Word> =
+            pub_keys.iter().map(|pk| pk.to_commitment().into()).collect();
+        let commitments = match self.store.get_setting(setting_key.clone()).await? {
+            Some(known) => {
+                let mut known: Vec<Word> = Deserializable::read_from_bytes(&known)?;
+                known.extend(new_commitments);
+                known
             },
-            None => pub_key_words,
+            None => new_commitments,
         };
         self.store
-            .set_setting(setting_key, Serializable::to_bytes(&pub_key_list))
+            .set_setting(setting_key, Serializable::to_bytes(&commitments))
             .await
             .map_err(ClientError::StoreError)
     }
@@ -367,11 +392,10 @@ impl<AUTH> Client<AUTH> {
         &self,
         account_id: &AccountId,
     ) -> Result<Vec<PublicKeyCommitment>, ClientError> {
-        let setting_key = format!("{}_public_key_commitmen", account_id.to_hex());
-        let pks: Option<Vec<u8>> = self.store.get_setting(setting_key).await?;
-        match pks {
-            Some(known_pks) => {
-                let words: Vec<Word> = Deserializable::read_from_bytes(&known_pks)
+        let setting_key = format!("{}_public_key_commitment", account_id.to_hex());
+        match self.store.get_setting(setting_key).await? {
+            Some(known) => {
+                let words: Vec<Word> = Deserializable::read_from_bytes(&known)
                     .map_err(ClientError::DataDeserializationError)?;
                 Ok(words.into_iter().map(PublicKeyCommitment::from).collect())
             },
