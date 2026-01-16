@@ -2,6 +2,32 @@ import { expect } from "@playwright/test";
 import test from "./playwright.global.setup";
 
 test.describe("Store Isolation Tests", () => {
+  test("default store name follows MidenClientDB_{network_id} pattern", async ({
+    page,
+  }) => {
+    const result = await page.evaluate(async () => {
+      const client = await window.WebClient.createClient(
+        window.rpcUrl,
+        undefined,
+        undefined,
+        undefined
+      );
+      await client.syncState();
+
+      const databases = await window.indexedDB.databases();
+      const dbNames = databases.map((db) => db.name);
+
+      return {
+        dbNames,
+      };
+    });
+
+    const hasDefaultPattern = result.dbNames.some(
+      (name) => name && name.startsWith("MidenClientDB_")
+    );
+    expect(hasDefaultPattern).toBe(true);
+  });
+
   test("creates separate stores with isolated accounts", async ({ page }) => {
     const result = await page.evaluate(async () => {
       const client1 = window.client;
@@ -29,8 +55,8 @@ test.describe("Store Isolation Tests", () => {
       };
     });
 
-    expect(result.dbNames).toContain("MidenClientDB_tests");
-    expect(result.dbNames).toContain("MidenClientDB_IsolatedStore1");
+    expect(result.dbNames).toContain("tests");
+    expect(result.dbNames).toContain("IsolatedStore1");
 
     expect(result.accounts1Len).toBe(1);
     expect(result.accounts2Len).toBe(0);
@@ -95,7 +121,7 @@ test.describe("Store Isolation Tests", () => {
 
       return {
         dbNames,
-        expectedDbName: `MidenClientDB_${customStoreName}`,
+        expectedDbName: customStoreName,
         accountCount: accounts.length,
       };
     });

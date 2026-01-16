@@ -27,9 +27,6 @@ export const test = base.extend<{ forEachTest: void }>({
 
       await page.evaluate(
         async ({ MIDEN_NODE_PORT, remoteProverPort }) => {
-          console.log(
-            "[SETUP-PAGE] Inside page.evaluate, starting SDK import..."
-          );
           // Import the sdk classes and attach them
           // to the window object for testing
           const sdkExports = await import("./index.js");
@@ -41,7 +38,6 @@ export const test = base.extend<{ forEachTest: void }>({
           let proverUrl = remoteProverPort
             ? `http://localhost:${remoteProverPort}`
             : undefined;
-          console.log("[SETUP-PAGE] Creating WebClient with rpcUrl:", rpcUrl);
           const client = await window.WebClient.createClient(
             rpcUrl,
             undefined,

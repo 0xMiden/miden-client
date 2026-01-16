@@ -3,7 +3,6 @@ import * as semver from "semver";
 import { logWebStoreError } from "./utils.js";
 
 export const CLIENT_VERSION_SETTING_KEY = "clientVersion";
-const DATABASE_NAME_PREFIX = "MidenClientDB";
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 
@@ -258,8 +257,7 @@ export class MidenDatabase {
   trackedAccounts: Dexie.Table<ITrackedAccount, string>;
 
   constructor(network: string) {
-    const dbName = `${DATABASE_NAME_PREFIX}_${network}`;
-    this.db = new Dexie(dbName) as MidenDexie;
+    this.db = new Dexie(network) as MidenDexie;
 
     this.db.version(1).stores({
       [Table.AccountCode]: indexes("root"),

@@ -2,7 +2,6 @@ import Dexie from "dexie";
 import * as semver from "semver";
 import { logWebStoreError } from "./utils.js";
 export const CLIENT_VERSION_SETTING_KEY = "clientVersion";
-const DATABASE_NAME_PREFIX = "MidenClientDB";
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 // Since we can't have a pointer to a JS Object from rust, we'll
@@ -77,8 +76,7 @@ export class MidenDatabase {
     settings;
     trackedAccounts;
     constructor(network) {
-        const dbName = `${DATABASE_NAME_PREFIX}_${network}`;
-        this.db = new Dexie(dbName);
+        this.db = new Dexie(network);
         this.db.version(1).stores({
             [Table.AccountCode]: indexes("root"),
             [Table.AccountStorage]: indexes("[commitment+slotName]", "commitment"),
