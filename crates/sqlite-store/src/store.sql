@@ -54,6 +54,7 @@ CREATE TABLE account_assets (
 ) WITHOUT ROWID;
 
 CREATE INDEX idx_account_assets_root ON account_assets(root);
+CREATE INDEX idx_account_assets_root_faucet_prefix ON account_assets(root, faucet_id_prefix);
 
 -- Create foreign_account_code table
 CREATE TABLE foreign_account_code(

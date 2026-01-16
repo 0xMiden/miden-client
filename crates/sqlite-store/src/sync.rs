@@ -9,11 +9,11 @@ use miden_client::note::{BlockNumber, NoteTag};
 use miden_client::store::StoreError;
 use miden_client::sync::{NoteTagRecord, NoteTagSource, StateSyncUpdate};
 use miden_client::utils::{Deserializable, Serializable};
-use miden_protocol::crypto::merkle::smt::SmtForest;
 use rusqlite::{Connection, Transaction, params};
 
 use super::SqliteStore;
 use crate::note::apply_note_updates_tx;
+use crate::smt_forest::AccountSmtForest;
 use crate::sql_error::SqlResultExt;
 use crate::transaction::upsert_transaction_record;
 use crate::{insert_sql, subst};
@@ -99,7 +99,7 @@ impl SqliteStore {
 
     pub(super) fn apply_state_sync(
         conn: &mut Connection,
-        smt_forest: &Arc<RwLock<SmtForest>>,
+        smt_forest: &Arc<RwLock<AccountSmtForest>>,
         state_sync_update: StateSyncUpdate,
     ) -> Result<(), StoreError> {
         let StateSyncUpdate {
@@ -166,10 +166,11 @@ impl SqliteStore {
             .map(|tx| tx.details.final_account_state)
             .collect();
 
-        Self::undo_account_state(&tx, &account_hashes_to_delete)?;
+        // Update SMT forest for discarded account states before applying public account updates.
+        let mut smt_forest = smt_forest.write().expect("smt_forest write lock not poisoned");
+        Self::undo_account_state(&tx, &mut smt_forest, &account_hashes_to_delete)?;
 
         // Update public accounts on the db that have been updated onchain
-        let mut smt_forest = smt_forest.write().expect("smt_forest write lock not poisoned");
         for account in account_updates.updated_public_accounts() {
             Self::update_account_state(&tx, &mut smt_forest, account)?;
         }
