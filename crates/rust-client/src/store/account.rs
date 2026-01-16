@@ -74,9 +74,10 @@ pub enum AccountStatus {
     New { seed: Word },
     /// The account is tracked by the node and was used at least once.
     Tracked,
-    /// The local account state doesn't match the node's state, rendering it unusable. Only used
-    /// The seed is preserved for private accounts with nonce=0 that need
-    /// reconstruction via `Account::new()`.
+    /// The local account state doesn't match the node's state, rendering it unusable. 
+    /// Only used for private accounts.
+    /// The seed is preserved for private accounts with nonce=0 that need reconstruction via
+    /// `Account::new()`.
     Locked { seed: Option<Word> },
 }
 
