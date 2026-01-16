@@ -3,7 +3,7 @@ use alloc::sync::Arc;
 use core::error::Error;
 use core::fmt::Write;
 
-use idxdb_store::{DatabaseId, WebStore};
+use idxdb_store::WebStore;
 use js_sys::{Function, Reflect};
 use miden_client::crypto::RpoRandomCoin;
 use miden_client::note_transport::NoteTransportClient;
@@ -203,7 +203,7 @@ impl WebClient {
         let rng = RpoRandomCoin::new(coin_seed.map(Felt::new).into());
 
         let web_store = Arc::new(
-            WebStore::new(DatabaseId::from_string(store_name.clone()))
+            WebStore::new(store_name.clone())
                 .await
                 .map_err(|_| JsValue::from_str("Failed to initialize WebStore"))?,
         );

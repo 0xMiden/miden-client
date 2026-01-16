@@ -75,62 +75,20 @@ extern "C" {
     fn open_database(network: &str, client_version: &str) -> js_sys::Promise;
 }
 
-/// Identifier used to name the `IndexedDB` database instance.
-///
-/// This allows multiple isolated databases for different networks (mainnet, testnet, etc.)
-/// or custom named instances.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum DatabaseId {
-    Mainnet,
-    Testnet,
-    Devnet,
-    Custom(String),
-}
-
-impl DatabaseId {
-    pub fn as_str(&self) -> &str {
-        match self {
-            DatabaseId::Mainnet => "Mainnet",
-            DatabaseId::Testnet => "Testnet",
-            DatabaseId::Devnet => "Devnet",
-            DatabaseId::Custom(name) => name,
-        }
-    }
-
-    pub fn from_string(network: String) -> Self {
-        match network.to_lowercase().as_str() {
-            "mainnet" => DatabaseId::Mainnet,
-            "testnet" => DatabaseId::Testnet,
-            "devnet" => DatabaseId::Devnet,
-            _ => DatabaseId::Custom(network),
-        }
-    }
-}
-
-impl core::fmt::Display for DatabaseId {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "{}", self.as_str())
-    }
-}
-
 /// `WebStore` provides an `IndexedDB`-backed implementation of the Store trait.
 ///
 /// The database reference is stored in a JavaScript registry and looked up by
 /// `database_id` when needed. This avoids storing `JsValue` references in Rust
 /// which would prevent the struct from being Send + Sync.
 pub struct WebStore {
-    database_id: DatabaseId,
+    database_id: String,
 }
 
 impl WebStore {
-    pub async fn new(database_id: DatabaseId) -> Result<WebStore, JsValue> {
-        let promise = open_database(database_id.as_str(), CLIENT_VERSION);
+    pub async fn new(database_name: String) -> Result<WebStore, JsValue> {
+        let promise = open_database(database_name.as_str(), CLIENT_VERSION);
         let _db_id = JsFuture::from(promise).await?;
-        Ok(WebStore { database_id })
-    }
-
-    pub fn database_id(&self) -> &DatabaseId {
-        &self.database_id
+        Ok(WebStore { database_id: database_name })
     }
 
     /// Returns the database ID as a string slice for passing to JS functions.
