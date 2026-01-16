@@ -135,13 +135,13 @@ export class WebClient {
     this.insertKeyCb = insertKeyCb;
     this.signCb = signCb;
 
+    // Check if Web Workers are available.
     if (
       typeof Worker !== "undefined" &&
       !this.getKeyCb &&
       !this.insertKeyCb &&
       !this.signCb
     ) {
-        // ... (保持原样)
       console.log("WebClient: Web Workers are available.");
       // Create the worker.
       this.worker = new Worker(
