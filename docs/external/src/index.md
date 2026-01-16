@@ -13,9 +13,10 @@ The Miden client currently has three main components:
 
 ### Miden client library
 
-The Miden client library is a Rust library that can be integrated into projects, allowing developers to interact with the Miden rollup.
+The Rust libraries are split into:
 
-The library provides a set of APIs and functions for executing transactions, generating proofs, and managing activity on the Miden network.
+- `miden-client-core`, a no_std-compatible crate with the core client logic and APIs for executing transactions, generating proofs, and managing activity on the Miden network.
+- `miden-client`, a std-only facade that re-exports the core APIs and adds a background service for continuous sync and event hooks.
 
 ### Miden client CLI
 
