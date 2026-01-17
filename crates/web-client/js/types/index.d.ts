@@ -138,6 +138,15 @@ export {
   Word,
 } from "./crates/miden_client_web";
 
+export interface WebClientConfig {
+  rpcUrl?: string;
+  noteTransportUrl?: string;
+  seed?: Uint8Array;
+  getKeyCb?: GetKeyCallback;
+  insertKeyCb?: InsertKeyCallback;
+  signCb?: SignCallback;
+}
+
 export type GetKeyCallback = (
   pubKey: Uint8Array
 ) => Promise<Uint8Array | null | undefined> | Uint8Array | null | undefined;
@@ -171,9 +180,7 @@ export declare class WebClient extends WasmWebClient {
    * @returns A promise that resolves to a fully initialized WebClient.
    */
   static createClient(
-    rpcUrl?: string,
-    noteTransportUrl?: string,
-    seed?: Uint8Array
+    config: WebClientConfig
   ): Promise<WebClient & WasmWebClient>;
 
   /**
@@ -188,12 +195,7 @@ export declare class WebClient extends WasmWebClient {
    * @returns A promise that resolves to a fully initialized WebClient.
    */
   static createClientWithExternalKeystore(
-    rpcUrl?: string,
-    noteTransportUrl?: string,
-    seed?: Uint8Array,
-    getKeyCb?: GetKeyCallback,
-    insertKeyCb?: InsertKeyCallback,
-    signCb?: SignCallback
+    config: WebClientConfig
   ): Promise<WebClient & WasmWebClient>;
 
   /**
