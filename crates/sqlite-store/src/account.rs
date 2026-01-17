@@ -861,12 +861,19 @@ impl SqliteStore {
         account_id: AccountId,
     ) -> Result<Vec<Word>, StoreError> {
         const ROOTS_QUERY: &str = "
-            SELECT vault_root FROM accounts WHERE id = ?1 ORDER BY nonce DESC LIMIT 1
+            WITH latest AS (
+                SELECT vault_root, storage_commitment
+                FROM accounts
+                WHERE id = ?1
+                ORDER BY nonce DESC
+                LIMIT 1
+            )
+            SELECT vault_root FROM latest
             UNION ALL
-            SELECT slot_value FROM account_storage
-            WHERE commitment = (
-                SELECT storage_commitment FROM accounts WHERE id = ?1 ORDER BY nonce DESC LIMIT 1
-            ) AND slot_type = ?2";
+            SELECT account_storage.slot_value
+            FROM account_storage
+            JOIN latest ON account_storage.commitment = latest.storage_commitment
+            WHERE account_storage.slot_type = ?2";
 
         let map_slot_type = StorageSlotType::Map as u8;
         let mut stmt = tx.prepare(ROOTS_QUERY).into_store_error()?;
