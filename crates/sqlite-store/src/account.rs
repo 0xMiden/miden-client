@@ -859,21 +859,21 @@ impl SqliteStore {
         tx: &Transaction<'_>,
         account_id: AccountId,
     ) -> Result<Vec<Word>, StoreError> {
-        const LATEST_ACCOUNT_QUERY: &str = r#"
+        const LATEST_ACCOUNT_QUERY: &str = r"
         SELECT vault_root, storage_commitment
         FROM accounts
         WHERE id = ?1
         ORDER BY nonce DESC
         LIMIT 1
-    "#;
+    ";
 
-        const STORAGE_MAP_ROOTS_QUERY: &str = r#"
+        const STORAGE_MAP_ROOTS_QUERY: &str = r"
         SELECT slot_value
         FROM account_storage
         WHERE commitment = ?1
           AND slot_type = ?2
           AND slot_value IS NOT NULL
-    "#;
+    ";
 
         let map_slot_type = StorageSlotType::Map as u8;
 
