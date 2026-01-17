@@ -29,7 +29,7 @@ CREATE TABLE account_storage (
     commitment TEXT NOT NULL,               -- commitment to the account storage
     slot_name TEXT NOT NULL,                -- name of the storage slot
     slot_value TEXT NULL,                   -- top-level value of the slot (e.g., if the slot is a map it contains the root)
-    slot_type BLOB NOT NULL,                -- type of the slot, serialized
+    slot_type INTEGER NOT NULL,             -- type of the slot (0 = Value, 1 = Map)
     PRIMARY KEY (commitment, slot_name)
 ) WITHOUT ROWID;
 
@@ -54,6 +54,7 @@ CREATE TABLE account_assets (
 ) WITHOUT ROWID;
 
 CREATE INDEX idx_account_assets_root ON account_assets(root);
+CREATE INDEX idx_account_assets_root_faucet_prefix ON account_assets(root, faucet_id_prefix);
 
 -- Create foreign_account_code table
 CREATE TABLE foreign_account_code(

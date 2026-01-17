@@ -78,7 +78,7 @@ use miden_protocol::account::{
     StorageSlotContent,
     StorageSlotName,
 };
-use miden_protocol::asset::{Asset, AssetWitness, FungibleAsset, TokenSymbol};
+use miden_protocol::asset::{Asset, AssetVaultKey, AssetWitness, FungibleAsset, TokenSymbol};
 use miden_protocol::crypto::rand::{FeltRng, RpoRandomCoin};
 use miden_protocol::note::{
     Note,
@@ -2249,9 +2249,11 @@ async fn storage_and_vault_proofs() {
         assert_eq!(account.vault().root(), vault.root());
 
         // Check that specific asset proof matches the one in the vault
+        let vault_key =
+            AssetVaultKey::from_account_id(faucet_account_id).expect("faucet id is fungible");
         let (asset, witness) = client
             .test_store()
-            .get_account_asset(account_id, faucet_account_id.prefix())
+            .get_account_asset(account_id, vault_key)
             .await
             .unwrap()
             .unwrap();
@@ -2822,9 +2824,11 @@ async fn storage_and_vault_proofs_ecdsa() {
         assert_eq!(account.vault().root(), vault.root());
 
         // Check that specific asset proof matches the one in the vault
+        let vault_key =
+            AssetVaultKey::from_account_id(faucet_account_id).expect("faucet id is fungible");
         let (asset, witness) = client
             .test_store()
-            .get_account_asset(account_id, faucet_account_id.prefix())
+            .get_account_asset(account_id, vault_key)
             .await
             .unwrap()
             .unwrap();

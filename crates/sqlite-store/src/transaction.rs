@@ -17,13 +17,13 @@ use miden_client::transaction::{
     TransactionStoreUpdate,
 };
 use miden_client::utils::{Deserializable as _, Serializable as _};
-use miden_protocol::crypto::merkle::smt::SmtForest;
 use rusqlite::types::Value;
 use rusqlite::{Connection, Transaction, params};
 
 use super::SqliteStore;
 use super::note::apply_note_updates_tx;
 use super::sync::add_note_tag_tx;
+use crate::smt_forest::AccountSmtForest;
 use crate::sql_error::SqlResultExt;
 use crate::{insert_sql, subst};
 
@@ -107,7 +107,7 @@ impl SqliteStore {
     /// Inserts a transaction and updates the current state based on the `tx_result` changes.
     pub fn apply_transaction(
         conn: &mut Connection,
-        smt_forest: &Arc<RwLock<SmtForest>>,
+        smt_forest: &Arc<RwLock<AccountSmtForest>>,
         tx_update: &TransactionStoreUpdate,
     ) -> Result<(), StoreError> {
         let executed_transaction = tx_update.executed_transaction();

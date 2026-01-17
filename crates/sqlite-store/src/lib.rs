@@ -25,7 +25,6 @@ use miden_client::account::{
     AccountCode,
     AccountHeader,
     AccountId,
-    AccountIdPrefix,
     AccountStorage,
     Address,
     StorageSlotName,
@@ -50,12 +49,12 @@ use miden_client::store::{
 use miden_client::sync::{NoteTagRecord, StateSyncUpdate};
 use miden_client::transaction::{TransactionRecord, TransactionStoreUpdate};
 use miden_protocol::account::StorageMapWitness;
-use miden_protocol::crypto::merkle::smt::SmtForest;
+use miden_protocol::asset::AssetVaultKey;
 use rusqlite::Connection;
 use rusqlite::types::Value;
 use sql_error::SqlResultExt;
 
-use crate::smt_forest::{insert_asset_nodes, insert_storage_map_nodes};
+use crate::smt_forest::AccountSmtForest;
 
 mod account;
 mod builder;
@@ -78,7 +77,7 @@ pub use builder::ClientBuilderSqliteExt;
 /// Current table definitions can be found at `store.sql` migration file.
 pub struct SqliteStore {
     pub(crate) pool: Pool,
-    smt_forest: Arc<RwLock<SmtForest>>,
+    smt_forest: Arc<RwLock<AccountSmtForest>>,
 }
 
 impl SqliteStore {
@@ -101,7 +100,7 @@ impl SqliteStore {
 
         let store = SqliteStore {
             pool,
-            smt_forest: Arc::new(RwLock::new(SmtForest::new())),
+            smt_forest: Arc::new(RwLock::new(AccountSmtForest::new())),
         };
 
         // Initialize SMT forest
@@ -110,8 +109,7 @@ impl SqliteStore {
             let storage = store.get_account_storage(id, AccountStorageFilter::All).await?;
 
             let mut smt_forest = store.smt_forest.write().expect("smt write lock not poisoned");
-            insert_asset_nodes(&mut smt_forest, &vault);
-            insert_storage_map_nodes(&mut smt_forest, &storage);
+            smt_forest.insert_account_state(&vault, &storage)?;
         }
 
         Ok(store)
@@ -411,11 +409,11 @@ impl Store for SqliteStore {
     async fn get_account_asset(
         &self,
         account_id: AccountId,
-        faucet_id_prefix: AccountIdPrefix,
+        vault_key: AssetVaultKey,
     ) -> Result<Option<(Asset, AssetWitness)>, StoreError> {
         let smt_forest = self.smt_forest.clone();
         self.interact_with_connection(move |conn| {
-            SqliteStore::get_account_asset(conn, &smt_forest, account_id, faucet_id_prefix)
+            SqliteStore::get_account_asset(conn, &smt_forest, account_id, vault_key)
         })
         .await
     }
