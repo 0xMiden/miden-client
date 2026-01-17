@@ -49,6 +49,7 @@ use crate::{insert_sql, subst};
 
 // TYPES
 // ================================================================================================
+
 struct SerializedHeaderData {
     id: String,
     nonce: u64,
@@ -809,6 +810,9 @@ impl SqliteStore {
         smt_forest: &mut AccountSmtForest,
         new_account_state: &Account,
     ) -> Result<(), StoreError> {
+        // Get old SMT roots before updating so we can prune them after
+        let old_roots = Self::get_smt_roots_by_account_id(tx, new_account_state.id())?;
+
         smt_forest.insert_account_state(new_account_state.vault(), new_account_state.storage())?;
         Self::insert_storage_slots(
             tx,
@@ -820,7 +824,12 @@ impl SqliteStore {
             new_account_state.vault().root(),
             new_account_state.vault().assets(),
         )?;
-        Self::insert_account_header(tx, &new_account_state.into(), None)
+        Self::insert_account_header(tx, &new_account_state.into(), None)?;
+
+        // Pop old roots to free memory for nodes no longer reachable
+        smt_forest.pop_roots(old_roots);
+
+        Ok(())
     }
 
     /// Locks the account if the mismatched digest doesn't belong to a previous account state (stale
@@ -845,30 +854,87 @@ impl SqliteStore {
         Ok(())
     }
 
-    /// Removes account states with the specified hashes from the database.
+    /// Returns all SMT roots (vault root + storage map roots) for the given account ID's latest
+    /// state.
+    fn get_smt_roots_by_account_id(
+        tx: &Transaction<'_>,
+        account_id: AccountId,
+    ) -> Result<Vec<Word>, StoreError> {
+        const ROOTS_QUERY: &str = "
+            SELECT vault_root FROM accounts WHERE id = ?1 ORDER BY nonce DESC LIMIT 1
+            UNION ALL
+            SELECT slot_value FROM account_storage
+            WHERE commitment = (
+                SELECT storage_commitment FROM accounts WHERE id = ?1 ORDER BY nonce DESC LIMIT 1
+            ) AND slot_type = ?2";
+
+        let map_slot_type = StorageSlotType::Map as u8;
+        let mut stmt = tx.prepare(ROOTS_QUERY).into_store_error()?;
+        let roots = stmt
+            .query_map(params![account_id.to_hex(), map_slot_type], |row| row.get::<_, String>(0))
+            .into_store_error()?
+            .filter_map(Result::ok)
+            .filter_map(|r| Word::try_from(r.as_str()).ok())
+            .collect();
+
+        Ok(roots)
+    }
+
+    /// Returns all SMT roots (vault root + storage map roots) for the given account commitments.
+    fn get_smt_roots_by_account_commitment(
+        tx: &Transaction<'_>,
+        account_hash_params: Rc<Vec<Value>>,
+    ) -> Result<Vec<Word>, StoreError> {
+        const ROOTS_QUERY: &str = "
+            SELECT vault_root FROM accounts WHERE account_commitment IN rarray(?1)
+            UNION ALL
+            SELECT slot_value FROM account_storage
+            WHERE commitment IN (
+                SELECT storage_commitment FROM accounts WHERE account_commitment IN rarray(?1)
+            ) AND slot_type = ?2";
+
+        let map_slot_type = StorageSlotType::Map as u8;
+        let mut stmt = tx.prepare(ROOTS_QUERY).into_store_error()?;
+        let roots = stmt
+            .query_map(params![account_hash_params, map_slot_type], |row| row.get::<_, String>(0))
+            .into_store_error()?
+            .filter_map(Result::ok)
+            .filter_map(|r| Word::try_from(r.as_str()).ok())
+            .collect();
+
+        Ok(roots)
+    }
+
+    /// Removes account states with the specified hashes from the database and pops their
+    /// SMT roots from the forest to free up memory.
     ///
     /// This is used to rollback account changes when a transaction is discarded,
     /// effectively undoing the account state changes that were applied by the transaction.
     ///
     /// Note: This is not part of the Store trait and is only used internally by the `SQLite` store
     /// implementation to handle transaction rollbacks.
-    /// Removes account states with the specified hashes from the database.
-    ///
-    /// Note: The SMT forest nodes for the previous account state are not re-inserted here
-    /// because they are never removed during updates - the forest keeps all historical nodes.
     pub(super) fn undo_account_state(
         tx: &Transaction<'_>,
-        account_hashes: &[Word],
+        smt_forest: &mut AccountSmtForest,
+        account_commitments: &[Word],
     ) -> Result<(), StoreError> {
-        if account_hashes.is_empty() {
+        if account_commitments.is_empty() {
             return Ok(());
         }
 
-        let account_hash_params =
-            Rc::new(account_hashes.iter().map(|h| Value::from(h.to_hex())).collect::<Vec<_>>());
+        let account_hash_params = Rc::new(
+            account_commitments.iter().map(|h| Value::from(h.to_hex())).collect::<Vec<_>>(),
+        );
+
+        // Query all SMT roots before deletion so we can pop them from the forest
+        let smt_roots =
+            Self::get_smt_roots_by_account_commitment(tx, Rc::clone(&account_hash_params))?;
 
         const DELETE_QUERY: &str = "DELETE FROM accounts WHERE account_commitment IN rarray(?)";
         tx.execute(DELETE_QUERY, params![account_hash_params]).into_store_error()?;
+
+        // Pop the roots from the forest to release memory for nodes that are no longer reachable
+        smt_forest.pop_roots(smt_roots);
 
         Ok(())
     }
@@ -961,7 +1027,7 @@ impl SqliteStore {
                     commitment.to_hex(),
                     slot.name().to_string(),
                     slot.value().to_hex(),
-                    slot.slot_type().to_bytes()
+                    slot.slot_type() as u8
                 ],
             )
             .into_store_error()?;
@@ -1080,7 +1146,7 @@ fn query_storage_slots(
         .query_map(params, |row| {
             let slot_name: String = row.get(0)?;
             let value: String = row.get(1)?;
-            let slot_type: Vec<u8> = row.get(2)?;
+            let slot_type: u8 = row.get(2)?;
             Ok((slot_name, value, slot_type))
         })
         .into_store_error()?
@@ -1088,7 +1154,9 @@ fn query_storage_slots(
             let (slot_name, value, slot_type) = result.into_store_error()?;
             let slot_name = StorageSlotName::new(slot_name)
                 .map_err(|err| StoreError::ParsingError(err.to_string()))?;
-            Ok((slot_name, Word::try_from(value)?, StorageSlotType::read_from_bytes(&slot_type)?))
+            let slot_type = StorageSlotType::try_from(slot_type)
+                .map_err(|e| StoreError::ParsingError(e.to_string()))?;
+            Ok((slot_name, Word::try_from(value)?, slot_type))
         })
         .collect::<Result<Vec<(StorageSlotName, Word, StorageSlotType)>, StoreError>>()?;
 
@@ -1160,7 +1228,7 @@ fn query_storage_values(
         .query_map(params, |row| {
             let slot_name: String = row.get(0)?;
             let value: String = row.get(1)?;
-            let slot_type: Vec<u8> = row.get(2)?;
+            let slot_type: u8 = row.get(2)?;
             Ok((slot_name, value, slot_type))
         })
         .into_store_error()?
@@ -1168,10 +1236,9 @@ fn query_storage_values(
             let (slot_name, value, slot_type) = result.into_store_error()?;
             let slot_name = StorageSlotName::new(slot_name)
                 .map_err(|err| StoreError::ParsingError(err.to_string()))?;
-            Ok((
-                slot_name,
-                (StorageSlotType::read_from_bytes(&slot_type)?, Word::try_from(value)?),
-            ))
+            let slot_type = StorageSlotType::try_from(slot_type)
+                .map_err(|e| StoreError::ParsingError(e.to_string()))?;
+            Ok((slot_name, (slot_type, Word::try_from(value)?)))
         })
         .collect()
 }

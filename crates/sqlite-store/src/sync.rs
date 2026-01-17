@@ -166,10 +166,8 @@ impl SqliteStore {
             .map(|tx| tx.details.final_account_state)
             .collect();
 
-        Self::undo_account_state(&tx, &account_hashes_to_delete)?;
-
-        // Update SMT forest for public account updates.
         let mut smt_forest = smt_forest.write().expect("smt_forest write lock not poisoned");
+        Self::undo_account_state(&tx, &mut smt_forest, &account_hashes_to_delete)?;
 
         // Update public accounts on the db that have been updated onchain
         for account in account_updates.updated_public_accounts() {

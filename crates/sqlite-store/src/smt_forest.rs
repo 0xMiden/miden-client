@@ -136,4 +136,10 @@ impl AccountSmtForest {
             map.entries().map(|(k, v)| (StorageMap::hash_key(*k), *v)).collect();
         self.forest.batch_insert(empty_root, entries).unwrap(); // TODO: handle unwrap
     }
+
+    /// Removes the specified SMT roots from the forest, releasing memory used by nodes
+    /// that are no longer reachable from any remaining root.
+    pub fn pop_roots(&mut self, roots: impl IntoIterator<Item = Word>) {
+        self.forest.pop_smts(roots);
+    }
 }
