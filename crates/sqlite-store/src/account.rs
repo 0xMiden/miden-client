@@ -622,34 +622,16 @@ impl SqliteStore {
             updated_assets_values.iter().copied(),
         )?;
 
-        if removed_vault_keys.is_empty() {
-            let new_vault_root = smt_forest.update_asset_nodes(
-                init_account_state.vault_root(),
-                updated_assets_values.iter().copied(),
-                removed_vault_keys.iter().copied(),
-            )?;
-            if new_vault_root != final_account_state.vault_root() {
-                return Err(StoreError::MerkleStoreError(MerkleError::ConflictingRoots {
-                    expected_root: final_account_state.vault_root(),
-                    actual_root: new_vault_root,
-                }));
-            }
-        } else {
-            // TODO: Remove this rebuild once SmtForest treats EMPTY_WORD as deletion.
-            // See https://github.com/0xMiden/crypto/pull/780/ for more information.
-            let assets = query_vault_assets(
-                tx,
-                "root = ?",
-                params![final_account_state.vault_root().to_hex()],
-            )?;
-            let vault = AssetVault::new(&assets)?;
-            if vault.root() != final_account_state.vault_root() {
-                return Err(StoreError::MerkleStoreError(MerkleError::ConflictingRoots {
-                    expected_root: final_account_state.vault_root(),
-                    actual_root: vault.root(),
-                }));
-            }
-            smt_forest.insert_asset_nodes(&vault);
+        let new_vault_root = smt_forest.update_asset_nodes(
+            init_account_state.vault_root(),
+            updated_assets_values.iter().copied(),
+            removed_vault_keys.iter().copied(),
+        )?;
+        if new_vault_root != final_account_state.vault_root() {
+            return Err(StoreError::MerkleStoreError(MerkleError::ConflictingRoots {
+                expected_root: final_account_state.vault_root(),
+                actual_root: new_vault_root,
+            }));
         }
 
         Ok(())
@@ -678,26 +660,18 @@ impl SqliteStore {
             let map_root = map.root();
             let entries: Vec<(Word, Word)> =
                 map_delta.entries().iter().map(|(key, value)| ((*key).into(), *value)).collect();
-            let has_removals = entries.iter().any(|(_, value)| *value == EMPTY_WORD);
 
             for (key, value) in &entries {
                 map.insert(*key, *value)?;
             }
 
             let expected_root = map.root();
-            if has_removals {
-                // TODO: Remove this rebuild once SmtForest treats EMPTY_WORD as deletion.
-                // See https://github.com/0xMiden/crypto/pull/780/ for more information.
-                smt_forest.insert_storage_map_nodes_for_map(&map);
-            } else {
-                let new_root =
-                    smt_forest.update_storage_map_nodes(map_root, entries.into_iter())?;
-                if new_root != expected_root {
-                    return Err(StoreError::MerkleStoreError(MerkleError::ConflictingRoots {
-                        expected_root,
-                        actual_root: new_root,
-                    }));
-                }
+            let new_root = smt_forest.update_storage_map_nodes(map_root, entries.into_iter())?;
+            if new_root != expected_root {
+                return Err(StoreError::MerkleStoreError(MerkleError::ConflictingRoots {
+                    expected_root,
+                    actual_root: new_root,
+                }));
             }
 
             updated_storage_slots
