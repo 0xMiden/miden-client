@@ -55,7 +55,7 @@ function indexes(...items) {
     return items.join(",");
 }
 export class MidenDatabase {
-    db;
+    dexie;
     accountCodes;
     accountStorages;
     storageMapEntries;
@@ -76,8 +76,8 @@ export class MidenDatabase {
     settings;
     trackedAccounts;
     constructor(network) {
-        this.db = new Dexie(network);
-        this.db.version(1).stores({
+        this.dexie = new Dexie(network);
+        this.dexie.version(1).stores({
             [Table.AccountCode]: indexes("root"),
             [Table.AccountStorage]: indexes("[commitment+slotName]", "commitment"),
             [Table.StorageMapEntries]: indexes("[root+key]", "root"),
@@ -98,35 +98,35 @@ export class MidenDatabase {
             [Table.Settings]: indexes("key"),
             [Table.TrackedAccounts]: indexes("&id"),
         });
-        this.accountCodes = this.db.table(Table.AccountCode);
-        this.accountStorages = this.db.table(Table.AccountStorage);
-        this.storageMapEntries = this.db.table(Table.StorageMapEntries);
-        this.accountAssets = this.db.table(Table.AccountAssets);
-        this.accountAuths = this.db.table(Table.AccountAuth);
-        this.accounts = this.db.table(Table.Accounts);
-        this.addresses = this.db.table(Table.Addresses);
-        this.transactions = this.db.table(Table.Transactions);
-        this.transactionScripts = this.db.table(Table.TransactionScripts);
-        this.inputNotes = this.db.table(Table.InputNotes);
-        this.outputNotes = this.db.table(Table.OutputNotes);
-        this.notesScripts = this.db.table(Table.NotesScripts);
-        this.stateSync = this.db.table(Table.StateSync);
-        this.blockHeaders = this.db.table(Table.BlockHeaders);
-        this.partialBlockchainNodes = this.db.table(Table.PartialBlockchainNodes);
-        this.tags = this.db.table(Table.Tags);
-        this.foreignAccountCode = this.db.table(Table.ForeignAccountCode);
-        this.settings = this.db.table(Table.Settings);
-        this.trackedAccounts = this.db.table(Table.TrackedAccounts);
-        this.db.on("populate", () => {
+        this.accountCodes = this.dexie.table(Table.AccountCode);
+        this.accountStorages = this.dexie.table(Table.AccountStorage);
+        this.storageMapEntries = this.dexie.table(Table.StorageMapEntries);
+        this.accountAssets = this.dexie.table(Table.AccountAssets);
+        this.accountAuths = this.dexie.table(Table.AccountAuth);
+        this.accounts = this.dexie.table(Table.Accounts);
+        this.addresses = this.dexie.table(Table.Addresses);
+        this.transactions = this.dexie.table(Table.Transactions);
+        this.transactionScripts = this.dexie.table(Table.TransactionScripts);
+        this.inputNotes = this.dexie.table(Table.InputNotes);
+        this.outputNotes = this.dexie.table(Table.OutputNotes);
+        this.notesScripts = this.dexie.table(Table.NotesScripts);
+        this.stateSync = this.dexie.table(Table.StateSync);
+        this.blockHeaders = this.dexie.table(Table.BlockHeaders);
+        this.partialBlockchainNodes = this.dexie.table(Table.PartialBlockchainNodes);
+        this.tags = this.dexie.table(Table.Tags);
+        this.foreignAccountCode = this.dexie.table(Table.ForeignAccountCode);
+        this.settings = this.dexie.table(Table.Settings);
+        this.trackedAccounts = this.dexie.table(Table.TrackedAccounts);
+        this.dexie.on("populate", () => {
             this.stateSync
                 .put({ id: 1, blockNum: "0" })
                 .catch((err) => logWebStoreError(err, "Failed to populate DB"));
         });
     }
     async open(clientVersion) {
-        console.log(`Opening database ${this.db.name} for client version ${clientVersion}...`);
+        console.log(`Opening database ${this.dexie.name} for client version ${clientVersion}...`);
         try {
-            await this.db.open();
+            await this.dexie.open();
             await this.ensureClientVersion(clientVersion);
             console.log("Database opened successfully");
             return true;
@@ -165,9 +165,9 @@ export class MidenDatabase {
             console.warn(`Failed to parse semver (${storedVersion} vs ${clientVersion}), forcing store reset.`);
         }
         console.warn(`IndexedDB client version mismatch (stored=${storedVersion}, expected=${clientVersion}). Resetting store.`);
-        this.db.close();
-        await this.db.delete();
-        await this.db.open();
+        this.dexie.close();
+        await this.dexie.delete();
+        await this.dexie.open();
         await this.persistClientVersion(clientVersion);
     }
     async getStoredClientVersion() {

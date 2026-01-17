@@ -235,7 +235,7 @@ export type MidenDexie = Dexie & {
 };
 
 export class MidenDatabase {
-  db: MidenDexie;
+  dexie: MidenDexie;
   accountCodes: Dexie.Table<IAccountCode, string>;
   accountStorages: Dexie.Table<IAccountStorage, string>;
   storageMapEntries: Dexie.Table<IStorageMapEntry, string>;
@@ -257,9 +257,9 @@ export class MidenDatabase {
   trackedAccounts: Dexie.Table<ITrackedAccount, string>;
 
   constructor(network: string) {
-    this.db = new Dexie(network) as MidenDexie;
+    this.dexie = new Dexie(network) as MidenDexie;
 
-    this.db.version(1).stores({
+    this.dexie.version(1).stores({
       [Table.AccountCode]: indexes("root"),
       [Table.AccountStorage]: indexes("[commitment+slotName]", "commitment"),
       [Table.StorageMapEntries]: indexes("[root+key]", "root"),
@@ -302,41 +302,41 @@ export class MidenDatabase {
       [Table.TrackedAccounts]: indexes("&id"),
     });
 
-    this.accountCodes = this.db.table<IAccountCode, string>(Table.AccountCode);
-    this.accountStorages = this.db.table<IAccountStorage, string>(
+    this.accountCodes = this.dexie.table<IAccountCode, string>(Table.AccountCode);
+    this.accountStorages = this.dexie.table<IAccountStorage, string>(
       Table.AccountStorage
     );
-    this.storageMapEntries = this.db.table<IStorageMapEntry, string>(
+    this.storageMapEntries = this.dexie.table<IStorageMapEntry, string>(
       Table.StorageMapEntries
     );
-    this.accountAssets = this.db.table<IAccountAsset, string>(
+    this.accountAssets = this.dexie.table<IAccountAsset, string>(
       Table.AccountAssets
     );
-    this.accountAuths = this.db.table<IAccountAuth, string>(Table.AccountAuth);
-    this.accounts = this.db.table<IAccount, string>(Table.Accounts);
-    this.addresses = this.db.table<IAddress, string>(Table.Addresses);
-    this.transactions = this.db.table<ITransaction, string>(Table.Transactions);
-    this.transactionScripts = this.db.table<ITransactionScript, string>(
+    this.accountAuths = this.dexie.table<IAccountAuth, string>(Table.AccountAuth);
+    this.accounts = this.dexie.table<IAccount, string>(Table.Accounts);
+    this.addresses = this.dexie.table<IAddress, string>(Table.Addresses);
+    this.transactions = this.dexie.table<ITransaction, string>(Table.Transactions);
+    this.transactionScripts = this.dexie.table<ITransactionScript, string>(
       Table.TransactionScripts
     );
-    this.inputNotes = this.db.table<IInputNote, string>(Table.InputNotes);
-    this.outputNotes = this.db.table<IOutputNote, string>(Table.OutputNotes);
-    this.notesScripts = this.db.table<INotesScript, string>(Table.NotesScripts);
-    this.stateSync = this.db.table<IStateSync, number>(Table.StateSync);
-    this.blockHeaders = this.db.table<IBlockHeader, string>(Table.BlockHeaders);
-    this.partialBlockchainNodes = this.db.table<IPartialBlockchainNode, string>(
+    this.inputNotes = this.dexie.table<IInputNote, string>(Table.InputNotes);
+    this.outputNotes = this.dexie.table<IOutputNote, string>(Table.OutputNotes);
+    this.notesScripts = this.dexie.table<INotesScript, string>(Table.NotesScripts);
+    this.stateSync = this.dexie.table<IStateSync, number>(Table.StateSync);
+    this.blockHeaders = this.dexie.table<IBlockHeader, string>(Table.BlockHeaders);
+    this.partialBlockchainNodes = this.dexie.table<IPartialBlockchainNode, string>(
       Table.PartialBlockchainNodes
     );
-    this.tags = this.db.table<ITag, number>(Table.Tags);
-    this.foreignAccountCode = this.db.table<IForeignAccountCode, string>(
+    this.tags = this.dexie.table<ITag, number>(Table.Tags);
+    this.foreignAccountCode = this.dexie.table<IForeignAccountCode, string>(
       Table.ForeignAccountCode
     );
-    this.settings = this.db.table<ISetting, string>(Table.Settings);
-    this.trackedAccounts = this.db.table<ITrackedAccount, string>(
+    this.settings = this.dexie.table<ISetting, string>(Table.Settings);
+    this.trackedAccounts = this.dexie.table<ITrackedAccount, string>(
       Table.TrackedAccounts
     );
 
-    this.db.on("populate", () => {
+    this.dexie.on("populate", () => {
       this.stateSync
         .put({ id: 1, blockNum: "0" } as IStateSync)
         .catch((err: unknown) =>
@@ -347,10 +347,10 @@ export class MidenDatabase {
 
   async open(clientVersion: string): Promise<boolean> {
     console.log(
-      `Opening database ${this.db.name} for client version ${clientVersion}...`
+      `Opening database ${this.dexie.name} for client version ${clientVersion}...`
     );
     try {
-      await this.db.open();
+      await this.dexie.open();
       await this.ensureClientVersion(clientVersion);
       console.log("Database opened successfully");
       return true;
@@ -399,9 +399,9 @@ export class MidenDatabase {
     console.warn(
       `IndexedDB client version mismatch (stored=${storedVersion}, expected=${clientVersion}). Resetting store.`
     );
-    this.db.close();
-    await this.db.delete();
-    await this.db.open();
+    this.dexie.close();
+    await this.dexie.delete();
+    await this.dexie.open();
     await this.persistClientVersion(clientVersion);
   }
 

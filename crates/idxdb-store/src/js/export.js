@@ -44,7 +44,7 @@ export async function transformForExport(obj) {
 export async function exportStore(dbId) {
     const db = getDatabase(dbId);
     const dbJson = {};
-    for (const table of db.db.tables) {
+    for (const table of db.dexie.tables) {
         const records = await table.toArray();
         dbJson[table.name] = await Promise.all(records.map(transformForExport));
     }

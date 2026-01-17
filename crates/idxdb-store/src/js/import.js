@@ -46,14 +46,14 @@ export async function forceImportStore(dbId, jsonStr) {
             dbJson = JSON.parse(dbJson);
         }
         const jsonTableNames = Object.keys(dbJson);
-        const dbTableNames = db.db.tables.map((t) => t.name);
+        const dbTableNames = db.dexie.tables.map((t) => t.name);
         if (jsonTableNames.length === 0) {
             throw new Error("No tables found in the provided JSON.");
         }
-        await db.db.transaction("rw", dbTableNames, async () => {
-            await Promise.all(db.db.tables.map((t) => t.clear()));
+        await db.dexie.transaction("rw", dbTableNames, async () => {
+            await Promise.all(db.dexie.tables.map((t) => t.clear()));
             for (const tableName of jsonTableNames) {
-                const table = db.db.table(tableName);
+                const table = db.dexie.table(tableName);
                 if (!dbTableNames.includes(tableName)) {
                     console.warn(`Table "${tableName}" does not exist in the database schema. Skipping.`);
                     continue;

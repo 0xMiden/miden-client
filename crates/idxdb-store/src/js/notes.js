@@ -108,7 +108,7 @@ export async function getNoteScript(dbId, scriptRoot) {
 }
 export async function upsertInputNote(dbId, noteId, assets, serialNumber, inputs, scriptRoot, serializedNoteScript, nullifier, serializedCreatedAt, stateDiscriminant, state) {
     const db = getDatabase(dbId);
-    return db.db.transaction("rw", db.inputNotes, db.notesScripts, async (tx) => {
+    return db.dexie.transaction("rw", db.inputNotes, db.notesScripts, async (tx) => {
         try {
             const data = {
                 noteId,
@@ -135,7 +135,7 @@ export async function upsertInputNote(dbId, noteId, assets, serialNumber, inputs
 }
 export async function upsertOutputNote(dbId, noteId, assets, recipientDigest, metadata, nullifier, expectedHeight, stateDiscriminant, state) {
     const db = getDatabase(dbId);
-    return db.db.transaction("rw", db.outputNotes, db.notesScripts, async (tx) => {
+    return db.dexie.transaction("rw", db.outputNotes, db.notesScripts, async (tx) => {
         try {
             const data = {
                 noteId,
@@ -194,7 +194,7 @@ async function processOutputNotes(notes) {
 }
 export async function upsertNoteScript(dbId, scriptRoot, serializedNoteScript) {
     const db = getDatabase(dbId);
-    return db.db.transaction("rw", db.outputNotes, db.notesScripts, async (tx) => {
+    return db.dexie.transaction("rw", db.outputNotes, db.notesScripts, async (tx) => {
         try {
             const noteScriptData = {
                 scriptRoot,

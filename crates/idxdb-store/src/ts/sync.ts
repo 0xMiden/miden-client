@@ -288,7 +288,7 @@ export async function applyStateSync(
     db.tags,
   ];
 
-  return await db.db.transaction("rw", tablesToAccess, async (tx) => {
+  return await db.dexie.transaction("rw", tablesToAccess, async (tx) => {
     await Promise.all([
       inputNotesWriteOp,
       outputNotesWriteOp,

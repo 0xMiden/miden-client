@@ -131,32 +131,37 @@ export async function upsertInputNote(
   state: Uint8Array
 ) {
   const db = getDatabase(dbId);
-  return db.db.transaction("rw", db.inputNotes, db.notesScripts, async (tx) => {
-    try {
-      const data = {
-        noteId,
-        assets,
-        serialNumber,
-        inputs,
-        scriptRoot,
-        nullifier,
-        state,
-        stateDiscriminant,
-        serializedCreatedAt,
-      };
+  return db.dexie.transaction(
+    "rw",
+    db.inputNotes,
+    db.notesScripts,
+    async (tx) => {
+      try {
+        const data = {
+          noteId,
+          assets,
+          serialNumber,
+          inputs,
+          scriptRoot,
+          nullifier,
+          state,
+          stateDiscriminant,
+          serializedCreatedAt,
+        };
 
-      await tx.inputNotes.put(data);
+        await tx.inputNotes.put(data);
 
-      const noteScriptData = {
-        scriptRoot,
-        serializedNoteScript,
-      };
+        const noteScriptData = {
+          scriptRoot,
+          serializedNoteScript,
+        };
 
-      await tx.notesScripts.put(noteScriptData);
-    } catch (error) {
-      logWebStoreError(error, `Error inserting note: ${noteId}`);
+        await tx.notesScripts.put(noteScriptData);
+      } catch (error) {
+        logWebStoreError(error, `Error inserting note: ${noteId}`);
+      }
     }
-  });
+  );
 }
 
 export async function upsertOutputNote(
@@ -171,7 +176,7 @@ export async function upsertOutputNote(
   state: Uint8Array
 ) {
   const db = getDatabase(dbId);
-  return db.db.transaction(
+  return db.dexie.transaction(
     "rw",
     db.outputNotes,
     db.notesScripts,
@@ -256,7 +261,7 @@ export async function upsertNoteScript(
   serializedNoteScript: Uint8Array
 ) {
   const db = getDatabase(dbId);
-  return db.db.transaction(
+  return db.dexie.transaction(
     "rw",
     db.outputNotes,
     db.notesScripts,
