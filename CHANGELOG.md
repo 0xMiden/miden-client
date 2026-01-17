@@ -8,9 +8,13 @@
 * [BREAKING] WebClient `AccountComponent.createAuthComponentFromCommitment` now takes `AuthScheme` (enum) instead of a numeric scheme id. The old `AccountComponent.createAuthComponent` method was removed; use `createAuthComponentFromSecretKey` instead ([#1578](https://github.com/0xMiden/miden-client/issues/1578)).
 * Changed `blockNum` type from `string` to `number` in WebClient transaction interfaces for better type safety and consistency ([#1528](https://github.com/0xMiden/miden-client/pull/1528)).
 * Consolidated `FetchedNote` fields into `NoteHeader` ([#1536](https://github.com/0xMiden/miden-client/pull/1536)).
+* Added support for handling application-level gRPC errors from the node, exposing structured error codes and messages to clients ([#1564](https://github.com/0xMiden/miden-client/pull/1564)).
 * Tied the web client's IndexedDB schema to the running package version, automatically recreating or wiping stale stores and applying the same guard to `forceImportStore` ([#1576](https://github.com/0xMiden/miden-client/pull/1576)).
 * Added the `--remote-prover-timeout` configuration to the CLI ([#1551](https://github.com/0xMiden/miden-client/pull/1551)).
 * Surface WASM worker errors to the JS wrapper with their original stacks for clearer diagnostics ([#1565](https://github.com/0xMiden/miden-client/issues/1565)).
+* Fixed a bug where insertions in the `Addresses` table in the IndexedDB Store resulted in the `id` and `address` fields being inverted with each other ([#1532](https://github.com/0xMiden/miden-client/pull/1532)).
+
+## 0.12.4 (TBD)
 * Added doc_cfg as top level cfg_attr to turn on feature annotations in docs.rs and added make targets to serve the docs ([#1543](https://github.com/0xMiden/miden-client/pull/1543)).
 * Updated `DataStore` implementation to prevent retrieving whole `vault` and `storage` ([#1419](https://github.com/0xMiden/miden-client/pull/1419))
 * Added RPC limit handling for `sync_nullifiers` endpoint ([#1590](https://github.com/0xMiden/miden-client/pull/1590)).
