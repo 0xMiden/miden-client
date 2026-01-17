@@ -39,7 +39,7 @@ use miden_protocol::account::{AccountStorageHeader, StorageMapWitness, StorageSl
 use miden_protocol::asset::{AssetVaultKey, PartialVault};
 use miden_protocol::crypto::merkle::MerkleError;
 use rusqlite::types::Value;
-use rusqlite::{Connection, OptionalExtension, Params, Transaction, named_params, params};
+use rusqlite::{Connection, Params, Transaction, named_params, params};
 
 use super::{SqliteStore, column_value_as_u64, u64_to_value};
 use crate::smt_forest::AccountSmtForest;
@@ -878,9 +878,12 @@ impl SqliteStore {
     ///
     /// Note: This is not part of the Store trait and is only used internally by the `SQLite` store
     /// implementation to handle transaction rollbacks.
+    /// Removes account states with the specified hashes from the database.
+    ///
+    /// Note: The SMT forest nodes for the previous account state are not re-inserted here
+    /// because they are never removed during updates - the forest keeps all historical nodes.
     pub(super) fn undo_account_state(
         tx: &Transaction<'_>,
-        smt_forest: &mut AccountSmtForest,
         account_hashes: &[Word],
     ) -> Result<(), StoreError> {
         if account_hashes.is_empty() {
@@ -890,40 +893,8 @@ impl SqliteStore {
         let account_hash_params =
             Rc::new(account_hashes.iter().map(|h| Value::from(h.to_hex())).collect::<Vec<_>>());
 
-        const ACCOUNT_QUERY: &str = "SELECT id FROM accounts WHERE account_commitment IN rarray(?)";
-        let mut stmt = tx.prepare(ACCOUNT_QUERY).into_store_error()?;
-        let rows = stmt
-            .query_map([account_hash_params.clone()], |row| row.get(0))
-            .into_store_error()?;
-        let mut account_ids = Vec::new();
-        for row in rows {
-            let id: String = row.into_store_error()?;
-            account_ids.push(id);
-        }
-        account_ids.sort_unstable();
-        account_ids.dedup();
-
         const DELETE_QUERY: &str = "DELETE FROM accounts WHERE account_commitment IN rarray(?)";
         tx.execute(DELETE_QUERY, params![account_hash_params]).into_store_error()?;
-
-        {
-            const EXISTS_QUERY: &str = "SELECT 1 FROM accounts WHERE id = ? LIMIT 1";
-            for id in account_ids {
-                let exists: Option<i32> = tx
-                    .query_row(EXISTS_QUERY, params![id.as_str()], |row| row.get(0))
-                    .optional()
-                    .into_store_error()?;
-                if exists.is_none() {
-                    continue;
-                }
-
-                let account_id = AccountId::from_hex(&id)?;
-                let vault = Self::get_account_vault(tx, account_id)?;
-                let storage =
-                    Self::get_account_storage(tx, account_id, &AccountStorageFilter::All)?;
-                smt_forest.insert_account_state(&vault, &storage)?;
-            }
-        }
 
         Ok(())
     }
