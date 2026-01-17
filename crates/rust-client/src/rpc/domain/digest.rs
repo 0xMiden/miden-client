@@ -1,6 +1,5 @@
 use alloc::string::String;
-use alloc::vec::Vec;
-use core::fmt::{self, Debug, Display, Formatter};
+use core::fmt::{self, Debug, Display, Formatter, Write};
 
 use hex::ToHex;
 use miden_objects::note::NoteId;
@@ -36,21 +35,17 @@ impl ToHex for &proto::primitives::Digest {
 
 impl ToHex for proto::primitives::Digest {
     fn encode_hex<T: FromIterator<char>>(&self) -> T {
-        let mut data: Vec<char> = Vec::with_capacity(Word::SERIALIZED_SIZE * 2);
-        data.extend(format!("{:016x}", self.d0).chars());
-        data.extend(format!("{:016x}", self.d1).chars());
-        data.extend(format!("{:016x}", self.d2).chars());
-        data.extend(format!("{:016x}", self.d3).chars());
-        data.into_iter().collect()
+        let mut data = String::with_capacity(Word::SERIALIZED_SIZE * 2);
+        write!(&mut data, "{:016x}{:016x}{:016x}{:016x}", self.d0, self.d1, self.d2, self.d3)
+            .unwrap();
+        data.chars().collect()
     }
 
     fn encode_hex_upper<T: FromIterator<char>>(&self) -> T {
-        let mut data: Vec<char> = Vec::with_capacity(Word::SERIALIZED_SIZE * 2);
-        data.extend(format!("{:016X}", self.d0).chars());
-        data.extend(format!("{:016X}", self.d1).chars());
-        data.extend(format!("{:016X}", self.d2).chars());
-        data.extend(format!("{:016X}", self.d3).chars());
-        data.into_iter().collect()
+        let mut data = String::with_capacity(Word::SERIALIZED_SIZE * 2);
+        write!(&mut data, "{:016X}{:016X}{:016X}{:016X}", self.d0, self.d1, self.d2, self.d3)
+            .unwrap();
+        data.chars().collect()
     }
 }
 

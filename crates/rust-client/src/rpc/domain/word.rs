@@ -1,5 +1,5 @@
-use alloc::{string::String, vec::Vec};
-use core::fmt::{self, Display, Formatter};
+use alloc::string::String;
+use core::fmt::{self, Display, Formatter, Write};
 
 use hex::ToHex;
 use miden_objects::{Felt, StarkField, Word, note::NoteId};
@@ -32,21 +32,31 @@ impl ToHex for &word::Word {
 
 impl ToHex for word::Word {
     fn encode_hex<T: FromIterator<char>>(&self) -> T {
-        let mut data: Vec<char> = Vec::with_capacity(WORD_DATA_SIZE);
-        data.extend(format!("{:016x}", self.w0).chars());
-        data.extend(format!("{:016x}", self.w1).chars());
-        data.extend(format!("{:016x}", self.w2).chars());
-        data.extend(format!("{:016x}", self.w3).chars());
-        data.into_iter().collect()
+        let mut data = String::with_capacity(WORD_DATA_SIZE);
+        write!(
+            &mut data,
+            "{:016x}{:016x}{:016x}{:016x}",
+            self.w0,
+            self.w1,
+            self.w2,
+            self.w3
+        )
+        .unwrap();
+        data.chars().collect()
     }
 
     fn encode_hex_upper<T: FromIterator<char>>(&self) -> T {
-        let mut data: Vec<char> = Vec::with_capacity(WORD_DATA_SIZE);
-        data.extend(format!("{:016X}", self.w0).chars());
-        data.extend(format!("{:016X}", self.w1).chars());
-        data.extend(format!("{:016X}", self.w2).chars());
-        data.extend(format!("{:016X}", self.w3).chars());
-        data.into_iter().collect()
+        let mut data = String::with_capacity(WORD_DATA_SIZE);
+        write!(
+            &mut data,
+            "{:016X}{:016X}{:016X}{:016X}",
+            self.w0,
+            self.w1,
+            self.w2,
+            self.w3
+        )
+        .unwrap();
+        data.chars().collect()
     }
 }
 
