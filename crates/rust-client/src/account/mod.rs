@@ -151,19 +151,12 @@ impl<AUTH> Client<AUTH> {
         account: &Account,
         overwrite: bool,
     ) -> Result<(), ClientError> {
-        self.check_account_limit().await?;
-        self.check_note_tag_limit().await?;
-
         if account.is_new() {
             if account.seed().is_none() {
                 return Err(ClientError::AddNewAccountWithoutSeed);
             }
         } else {
             // Ignore the seed since it's not a new account
-
-            // TODO: The alternative approach to this is to store the seed anyway, but
-            // ignore it at the point of executing against this transaction, but that
-            // approach seems a little bit more incorrect
             if account.seed().is_some() {
                 tracing::warn!(
                     "Added an existing account and still provided a seed when it is not needed. It's possible that the account's file was incorrectly generated. The seed will be ignored."
@@ -175,6 +168,10 @@ impl<AUTH> Client<AUTH> {
 
         match tracked_account {
             None => {
+                // Check limits since it's a non-tracked account
+                self.check_account_limit().await?;
+                self.check_note_tag_limit().await?;
+
                 let default_address = Address::new(account.id());
 
                 // If the account is not being tracked, insert it into the store regardless of the
