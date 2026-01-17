@@ -11,6 +11,7 @@
 * Enabled Workers with `createClientWithExternalKeystore` via callbacks ([#1569](https://github.com/0xMiden/miden-client/pull/1569)).
 * Added `executeForSummary` method to WebClient that executes a transaction and returns a `TransactionSummary`, handling both authorized and unauthorized transactions ([#1620](https://github.com/0xMiden/miden-client/pull/1620)).
 * Added WebClient bindings for the RPO Falcon512 multisig auth component ([#1620](https://github.com/0xMiden/miden-client/pull/1620)).
+* Added seed to `AccountStatus::Locked` variant in `AccountRecord` to track private accounts that are locked due to a mismatch in the account commitment ([#1665](https://github.com/0xMiden/miden-client/pull/1665)).
 
 ## 0.12.5 (2025-12-01)
 

@@ -140,7 +140,7 @@ pub fn parse_account_record_idxdb_object(
     );
 
     let status = match (account_seed, account_header_idxdb.locked) {
-        (_, true) => AccountStatus::Locked,
+        (seed, true) => AccountStatus::Locked { seed },
         (Some(seed), _) => AccountStatus::New { seed },
         _ => AccountStatus::Tracked,
     };
