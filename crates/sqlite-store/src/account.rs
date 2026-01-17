@@ -277,7 +277,7 @@ impl SqliteStore {
         tx.commit().into_store_error()?;
 
         let mut smt_forest = smt_forest.write().expect("smt_forest write lock not poisoned");
-        smt_forest.insert_account_state(account.vault(), account.storage());
+        smt_forest.insert_account_state(account.vault(), account.storage())?;
 
         Ok(())
     }
@@ -649,7 +649,7 @@ impl SqliteStore {
                     actual_root: vault.root(),
                 }));
             }
-            smt_forest.insert_asset_nodes(&vault);
+            smt_forest.insert_asset_nodes(&vault)?;
         }
 
         Ok(())
@@ -835,7 +835,7 @@ impl SqliteStore {
         smt_forest: &mut AccountSmtForest,
         new_account_state: &Account,
     ) -> Result<(), StoreError> {
-        smt_forest.insert_account_state(new_account_state.vault(), new_account_state.storage());
+        smt_forest.insert_account_state(new_account_state.vault(), new_account_state.storage())?;
         Self::insert_storage_slots(
             tx,
             new_account_state.storage().to_commitment(),
@@ -921,7 +921,7 @@ impl SqliteStore {
                 let vault = Self::get_account_vault(tx, account_id)?;
                 let storage =
                     Self::get_account_storage(tx, account_id, &AccountStorageFilter::All)?;
-                smt_forest.insert_account_state(&vault, &storage);
+                smt_forest.insert_account_state(&vault, &storage)?;
             }
         }
 
