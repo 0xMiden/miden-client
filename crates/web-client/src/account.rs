@@ -56,7 +56,7 @@ impl WebClient {
     /// The public key commitment should correspond to one of the keys tracked by the keystore.
     /// Returns the associated [`AuthSecretKey`] if found, or an error if not found.
     #[wasm_bindgen(js_name = "getAccountAuthByPubKeyCommitment")]
-    pub async fn get_account_secret_key_by_pub_key_commitment(
+    pub async fn get_account_auth_secret_key_by_pub_key_commitment(
         &mut self,
         pub_key_commitment: &Word,
     ) -> Result<AuthSecretKey, JsValue> {

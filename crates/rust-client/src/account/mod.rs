@@ -79,6 +79,8 @@ use crate::rpc::domain::account::FetchedAccount;
 use crate::store::{AccountRecord, AccountStatus};
 use crate::sync::NoteTagRecord;
 
+const PUBLIC_KEY_COMMITMENT_SETTING_SUFFIX: &str = "_public_key_commitments";
+
 pub mod component {
     pub const MIDEN_PACKAGE_EXTENSION: &str = "masp";
 
@@ -355,19 +357,23 @@ impl<AUTH> Client<AUTH> {
     }
 
     /// Stores a list of public key commitments associated with the given account ID.
+    ///
     /// If the account already has known public key commitments, the new ones are appended.
-    /// This is useful because with a public key commitment, we can retrieve
-    /// its corresponding secret key using, for example, `FilesystemKeyStore::get_key`.
-    /// This yields an indirect mapping from account ID to its secret keys:
-    /// account ID → public key commitments → secret keys (via keystore).
-    /// To identify these keys and avoid collisions, the account id is turned
-    /// into its hex representation and a suffix is added.
-    pub async fn map_account_to_public_key_commitments(
+    ///
+    /// This is useful because with a public key commitment, we can retrieve its corresponding
+    /// secret key using, for example, `FilesystemKeyStore::get_key`. This yields an indirect
+    /// mapping from account ID to its secret keys: account ID -> public key commitments -> secret
+    /// keys (via keystore).
+    ///
+    /// To identify these keys and avoid collisions, the account ID is turned into its hex
+    /// representation and a suffix is added.
+    pub async fn add_public_key_commitment_to_account(
         &self,
         account_id: &AccountId,
         pub_keys: &[PublicKey],
     ) -> Result<(), ClientError> {
-        let setting_key = format!("{}_public_key_commitment", account_id.to_hex());
+        let setting_key =
+            format!("{}{}", account_id.to_hex(), PUBLIC_KEY_COMMITMENT_SETTING_SUFFIX);
         let new_commitments: Vec<Word> =
             pub_keys.iter().map(|pk| pk.to_commitment().into()).collect();
         let commitments = match self.store.get_setting(setting_key.clone()).await? {
@@ -384,15 +390,17 @@ impl<AUTH> Client<AUTH> {
             .map_err(ClientError::StoreError)
     }
 
-    /// Given an `AccountId`, this function will return the previously stored (if any)
-    /// public key commitments associated with this id. Once retrieved, this list of
-    /// public key commitments can be used in conjunction with `FilesystemKeyStore::get_key`,
-    /// to retrieve secret keys.
+    /// Returns the previously stored public key commitments associated with the given
+    /// [`AccountId`], if any.
+    ///
+    /// Once retrieved, this list of public key commitments can be used in conjunction with
+    /// `FilesystemKeyStore::get_key` to retrieve secret keys.
     pub async fn get_account_public_key_commitments(
         &self,
         account_id: &AccountId,
     ) -> Result<Vec<PublicKeyCommitment>, ClientError> {
-        let setting_key = format!("{}_public_key_commitment", account_id.to_hex());
+        let setting_key =
+            format!("{}{}", account_id.to_hex(), PUBLIC_KEY_COMMITMENT_SETTING_SUFFIX);
         match self.store.get_setting(setting_key).await? {
             Some(known) => {
                 let words: Vec<Word> = Deserializable::read_from_bytes(&known)
