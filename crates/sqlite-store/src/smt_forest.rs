@@ -91,18 +91,21 @@ impl AccountSmtForest {
     }
 
     /// Inserts the asset vault SMT nodes to the SMT forest.
-    pub fn insert_asset_nodes(&mut self, vault: &AssetVault) {
+    pub fn insert_asset_nodes(&mut self, vault: &AssetVault) -> Result<(), StoreError> {
         // We need to build the SMT from the vault iterable entries as we don't have direct access
         // to the vault's SMT nodes.
-        // SAFETY: Safe to unwrap as we are sure that the vault's SMT nodes are valid.
-        let smt =
-            Smt::with_entries(vault.assets().map(|asset| (asset.vault_key().into(), asset.into())))
-                .unwrap();
+        let smt = Smt::with_entries(vault.assets().map(|asset| {
+            let key: Word = asset.vault_key().into();
+            let value: Word = asset.into();
+            (key, value)
+        }))
+        .map_err(StoreError::from)?;
 
         let empty_root = *EmptySubtreeRoots::entry(SMT_DEPTH, 0);
         let entries: Vec<(Word, Word)> = smt.entries().map(|(k, v)| (*k, *v)).collect();
-        let new_root = self.forest.batch_insert(empty_root, entries).unwrap(); // TODO: handle unwrap
+        let new_root = self.forest.batch_insert(empty_root, entries).map_err(StoreError::from)?;
         debug_assert_eq!(new_root, smt.root());
+        Ok(())
     }
 
     /// Inserts all storage map SMT nodes to the SMT forest.
@@ -117,9 +120,14 @@ impl AccountSmtForest {
         }
     }
 
-    pub fn insert_account_state(&mut self, vault: &AssetVault, storage: &AccountStorage) {
+    pub fn insert_account_state(
+        &mut self,
+        vault: &AssetVault,
+        storage: &AccountStorage,
+    ) -> Result<(), StoreError> {
         self.insert_storage_map_nodes(storage);
-        self.insert_asset_nodes(vault);
+        self.insert_asset_nodes(vault)?;
+        Ok(())
     }
 
     pub fn insert_storage_map_nodes_for_map(&mut self, map: &StorageMap) {

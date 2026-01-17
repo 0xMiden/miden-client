@@ -109,7 +109,7 @@ impl SqliteStore {
             let storage = store.get_account_storage(id, AccountStorageFilter::All).await?;
 
             let mut smt_forest = store.smt_forest.write().expect("smt write lock not poisoned");
-            smt_forest.insert_account_state(&vault, &storage);
+            smt_forest.insert_account_state(&vault, &storage)?;
         }
 
         Ok(store)
