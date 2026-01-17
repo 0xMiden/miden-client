@@ -853,36 +853,51 @@ impl SqliteStore {
         .into_store_error()?;
         Ok(())
     }
-
     /// Returns all SMT roots (vault root + storage map roots) for the given account ID's latest
     /// state.
     fn get_smt_roots_by_account_id(
         tx: &Transaction<'_>,
         account_id: AccountId,
     ) -> Result<Vec<Word>, StoreError> {
-        const ROOTS_QUERY: &str = "
-            WITH latest AS (
-                SELECT vault_root, storage_commitment
-                FROM accounts
-                WHERE id = ?1
-                ORDER BY nonce DESC
-                LIMIT 1
-            )
-            SELECT vault_root FROM latest
-            UNION ALL
-            SELECT account_storage.slot_value
-            FROM account_storage
-            JOIN latest ON account_storage.commitment = latest.storage_commitment
-            WHERE account_storage.slot_type = ?2";
+        const LATEST_ACCOUNT_QUERY: &str = r#"
+        SELECT vault_root, storage_commitment
+        FROM accounts
+        WHERE id = ?1
+        ORDER BY nonce DESC
+        LIMIT 1
+    "#;
+
+        const STORAGE_MAP_ROOTS_QUERY: &str = r#"
+        SELECT slot_value
+        FROM account_storage
+        WHERE commitment = ?1
+          AND slot_type = ?2
+          AND slot_value IS NOT NULL
+    "#;
 
         let map_slot_type = StorageSlotType::Map as u8;
-        let mut stmt = tx.prepare(ROOTS_QUERY).into_store_error()?;
-        let roots = stmt
-            .query_map(params![account_id.to_hex(), map_slot_type], |row| row.get::<_, String>(0))
-            .into_store_error()?
-            .filter_map(Result::ok)
-            .filter_map(|r| Word::try_from(r.as_str()).ok())
-            .collect();
+
+        // 1) Fetch latest vault root + storage commitment.
+        let (vault_root, storage_commitment): (String, String) = tx
+            .query_row(LATEST_ACCOUNT_QUERY, params![account_id.to_hex()], |row| {
+                Ok((row.get(0)?, row.get(1)?))
+            })
+            .into_store_error()?;
+
+        let mut roots = Vec::new();
+
+        // Always include the vault root.
+        if let Ok(root) = Word::try_from(vault_root.as_str()) {
+            roots.push(root);
+        }
+
+        // 2) Fetch storage map roots for the latest storage commitment.
+        let mut stmt = tx.prepare(STORAGE_MAP_ROOTS_QUERY).into_store_error()?;
+        let iter = stmt
+            .query_map(params![storage_commitment, map_slot_type], |row| row.get::<_, String>(0))
+            .into_store_error()?;
+
+        roots.extend(iter.filter_map(Result::ok).filter_map(|r| Word::try_from(r.as_str()).ok()));
 
         Ok(roots)
     }
