@@ -883,7 +883,7 @@ impl SqliteStore {
     /// Returns all SMT roots (vault root + storage map roots) for the given account commitments.
     fn get_smt_roots_by_account_commitment(
         tx: &Transaction<'_>,
-        account_hash_params: Rc<Vec<Value>>,
+        account_hash_params: &Rc<Vec<Value>>,
     ) -> Result<Vec<Word>, StoreError> {
         const ROOTS_QUERY: &str = "
             SELECT vault_root FROM accounts WHERE account_commitment IN rarray(?1)
@@ -927,8 +927,7 @@ impl SqliteStore {
         );
 
         // Query all SMT roots before deletion so we can pop them from the forest
-        let smt_roots =
-            Self::get_smt_roots_by_account_commitment(tx, Rc::clone(&account_hash_params))?;
+        let smt_roots = Self::get_smt_roots_by_account_commitment(tx, &account_hash_params)?;
 
         const DELETE_QUERY: &str = "DELETE FROM accounts WHERE account_commitment IN rarray(?)";
         tx.execute(DELETE_QUERY, params![account_hash_params]).into_store_error()?;
