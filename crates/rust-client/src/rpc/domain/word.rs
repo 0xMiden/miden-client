@@ -1,26 +1,29 @@
 use alloc::string::String;
-use core::fmt::{self, Display, Formatter, Write};
+use core::fmt::{self, Debug, Display, Formatter, Write};
 
 use hex::ToHex;
-use miden_protocol::{Felt, StarkField, Word, note::NoteId};
+use miden_objects::note::NoteId;
+use miden_objects::{Felt, StarkField, Word};
 
-use crate::rpc::{errors::RpcConversionError, generated::word};
-
-// CONSTANTS
-// ================================================================================================
-
-pub const WORD_DATA_SIZE: usize = Word::SERIALIZED_SIZE * 2;
+use crate::rpc::errors::RpcConversionError;
+use crate::rpc::generated as proto;
 
 // FORMATTING
 // ================================================================================================
 
-impl Display for word::Word {
+impl Display for proto::primitives::Digest {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.write_str(&self.encode_hex::<String>())
     }
 }
 
-impl ToHex for &word::Word {
+impl Debug for proto::primitives::Digest {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        Display::fmt(self, f)
+    }
+}
+
+impl ToHex for &proto::primitives::Digest {
     fn encode_hex<T: FromIterator<char>>(&self) -> T {
         (*self).encode_hex()
     }
@@ -30,32 +33,18 @@ impl ToHex for &word::Word {
     }
 }
 
-impl ToHex for word::Word {
+impl ToHex for proto::primitives::Digest {
     fn encode_hex<T: FromIterator<char>>(&self) -> T {
-        let mut data = String::with_capacity(WORD_DATA_SIZE);
-        write!(
-            &mut data,
-            "{:016x}{:016x}{:016x}{:016x}",
-            self.w0,
-            self.w1,
-            self.w2,
-            self.w3
-        )
-        .unwrap();
+        let mut data = String::with_capacity(Word::SERIALIZED_SIZE * 2);
+        write!(&mut data, "{:016x}{:016x}{:016x}{:016x}", self.d0, self.d1, self.d2, self.d3)
+            .unwrap();
         data.chars().collect()
     }
 
     fn encode_hex_upper<T: FromIterator<char>>(&self) -> T {
-        let mut data = String::with_capacity(WORD_DATA_SIZE);
-        write!(
-            &mut data,
-            "{:016X}{:016X}{:016X}{:016X}",
-            self.w0,
-            self.w1,
-            self.w2,
-            self.w3
-        )
-        .unwrap();
+        let mut data = String::with_capacity(Word::SERIALIZED_SIZE * 2);
+        write!(&mut data, "{:016X}{:016X}{:016X}{:016X}", self.d0, self.d1, self.d2, self.d3)
+            .unwrap();
         data.chars().collect()
     }
 }
@@ -63,51 +52,51 @@ impl ToHex for word::Word {
 // INTO
 // ================================================================================================
 
-impl From<Word> for word::Word {
+impl From<Word> for proto::primitives::Digest {
     fn from(value: Word) -> Self {
         Self {
-            w0: value[0].as_int(),
-            w1: value[1].as_int(),
-            w2: value[2].as_int(),
-            w3: value[3].as_int(),
+            d0: value[0].as_int(),
+            d1: value[1].as_int(),
+            d2: value[2].as_int(),
+            d3: value[3].as_int(),
         }
     }
 }
 
-impl From<&Word> for word::Word {
+impl From<&Word> for proto::primitives::Digest {
     fn from(value: &Word) -> Self {
         (*value).into()
     }
 }
 
-impl From<&NoteId> for word::Word {
+impl From<&NoteId> for proto::primitives::Digest {
     fn from(value: &NoteId) -> Self {
-        (*value).as_word().into()
+        value.as_word().into()
     }
 }
 
-impl From<NoteId> for word::Word {
+impl From<NoteId> for proto::primitives::Digest {
     fn from(value: NoteId) -> Self {
         value.as_word().into()
     }
 }
 
-// FROM WORD
+// FROM DIGEST
 // ================================================================================================
 
-impl TryFrom<word::Word> for [Felt; 4] {
+impl TryFrom<proto::primitives::Digest> for [Felt; 4] {
     type Error = RpcConversionError;
 
-    fn try_from(value: word::Word) -> Result<Self, Self::Error> {
-        if [value.w0, value.w1, value.w2, value.w3]
+    fn try_from(value: proto::primitives::Digest) -> Result<Self, Self::Error> {
+        if [value.d0, value.d1, value.d2, value.d3]
             .iter()
             .all(|v| *v < <Felt as StarkField>::MODULUS)
         {
             Ok([
-                Felt::new(value.w0),
-                Felt::new(value.w1),
-                Felt::new(value.w2),
-                Felt::new(value.w3),
+                Felt::new(value.d0),
+                Felt::new(value.d1),
+                Felt::new(value.d2),
+                Felt::new(value.d3),
             ])
         } else {
             Err(RpcConversionError::NotAValidFelt)
@@ -115,26 +104,26 @@ impl TryFrom<word::Word> for [Felt; 4] {
     }
 }
 
-impl TryFrom<word::Word> for Word {
+impl TryFrom<proto::primitives::Digest> for Word {
     type Error = RpcConversionError;
 
-    fn try_from(value: word::Word) -> Result<Self, Self::Error> {
+    fn try_from(value: proto::primitives::Digest) -> Result<Self, Self::Error> {
         Ok(Self::new(value.try_into()?))
     }
 }
 
-impl TryFrom<&word::Word> for [Felt; 4] {
+impl TryFrom<&proto::primitives::Digest> for [Felt; 4] {
     type Error = RpcConversionError;
 
-    fn try_from(value: &word::Word) -> Result<Self, Self::Error> {
+    fn try_from(value: &proto::primitives::Digest) -> Result<Self, Self::Error> {
         (*value).try_into()
     }
 }
 
-impl TryFrom<&word::Word> for Word {
+impl TryFrom<&proto::primitives::Digest> for Word {
     type Error = RpcConversionError;
 
-    fn try_from(value: &word::Word) -> Result<Self, Self::Error> {
+    fn try_from(value: &proto::primitives::Digest) -> Result<Self, Self::Error> {
         (*value).try_into()
     }
 }
