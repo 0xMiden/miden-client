@@ -47,7 +47,7 @@ impl WebClient {
                 .map_err(|err| err.to_string())?;
 
             client
-                .add_public_key_commitment_to_account(&new_account.id(), &[key_pair.public_key()])
+                .register_account_public_key_commitment(&new_account.id(), &[key_pair.public_key()])
                 .await
                 .map_err(|err| {
                     js_error_with_context(err, "failed to map account to public keys")
@@ -132,7 +132,7 @@ impl WebClient {
                 .map_err(|err| err.to_string())?;
 
             client
-                .add_public_key_commitment_to_account(&new_account.id(), &[key_pair.public_key()])
+                .register_account_public_key_commitment(&new_account.id(), &[key_pair.public_key()])
                 .await
                 .map_err(|err| {
                     js_error_with_context(err, "failed to map account to public keys")
@@ -179,7 +179,7 @@ impl WebClient {
 
         if let Some(client) = self.get_mut_inner() {
             client
-                .add_public_key_commitment_to_account(
+                .register_account_public_key_commitment(
                     &native_account_id,
                     &[native_secret_key.public_key()],
                 )
