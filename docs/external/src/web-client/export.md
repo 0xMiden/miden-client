@@ -12,7 +12,7 @@ This guide demonstrates how to export notes and store data using the Miden SDK. 
 You can export a note with different levels of detail using the `exportNoteFile` method:
 
 ```typescript
-import { WebClient } from "@demox-labs/miden-sdk";
+import { WebClient } from "@miden-sdk/miden-sdk";
 
 try {
   // Initialize the web client
@@ -48,7 +48,7 @@ The export types are:
 You can export an account using the `exportAccountFile` method:
 
 ```typescript
-import { WebClient } from "@demox-labs/miden-sdk";
+import { WebClient } from "@miden-sdk/miden-sdk";
 
 try {
   // Initialize the web client
@@ -69,7 +69,7 @@ Account files include all the relevant information about the account, primarily 
 To export the entire store:
 
 ```typescript
-import { WebClient } from "@demox-labs/miden-sdk";
+import { WebClient } from "@miden-sdk/miden-sdk";
 
 try {
   // Initialize the web client

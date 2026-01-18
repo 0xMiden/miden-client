@@ -25,7 +25,6 @@ use miden_client::account::{
     StorageSlotType,
 };
 use miden_client::asset::{Asset, AssetVault, AssetWitness, FungibleAsset, NonFungibleDeltaAction};
-use miden_client::crypto::{MerkleStore, SmtLeaf, SmtProof};
 use miden_client::store::{
     AccountRecord,
     AccountRecordData,
@@ -35,28 +34,22 @@ use miden_client::store::{
 };
 use miden_client::sync::NoteTagRecord;
 use miden_client::utils::{Deserializable, Serializable};
-use miden_client::{AccountError, Felt, Word};
-use miden_objects::account::{AccountStorageHeader, StorageMapWitness, StorageSlotHeader};
-use miden_objects::asset::{AssetVaultKey, PartialVault};
-use miden_objects::crypto::merkle::SparseMerklePath;
+use miden_client::{AccountError, EMPTY_WORD, Felt, Word};
+use miden_protocol::account::{AccountStorageHeader, StorageMapWitness, StorageSlotHeader};
+use miden_protocol::asset::{AssetVaultKey, PartialVault};
+use miden_protocol::crypto::merkle::MerkleError;
 use rusqlite::types::Value;
 use rusqlite::{Connection, Params, Transaction, named_params, params};
 
 use super::{SqliteStore, column_value_as_u64, u64_to_value};
-use crate::merkle_store::{
-    get_asset_proof,
-    get_storage_map_item_proof,
-    insert_asset_nodes,
-    insert_storage_map_nodes,
-    update_asset_nodes,
-    update_storage_map_nodes,
-};
+use crate::smt_forest::AccountSmtForest;
 use crate::sql_error::SqlResultExt;
 use crate::sync::{add_note_tag_tx, remove_note_tag_tx};
 use crate::{insert_sql, subst};
 
 // TYPES
 // ================================================================================================
+
 struct SerializedHeaderData {
     id: String,
     nonce: u64,
@@ -199,7 +192,7 @@ impl SqliteStore {
 
     pub(crate) fn get_minimal_partial_account(
         conn: &mut Connection,
-        merkle_store: &Arc<RwLock<MerkleStore>>,
+        smt_forest: &Arc<RwLock<AccountSmtForest>>,
         account_id: AccountId,
     ) -> Result<Option<AccountRecord>, StoreError> {
         let Some((header, status)) = Self::get_account_header(conn, account_id)? else {
@@ -207,7 +200,6 @@ impl SqliteStore {
         };
 
         // Partial vault retrieval
-        let merkle_store = merkle_store.read().expect("merkle_store read lock not poisoned");
         let partial_vault = PartialVault::new(header.vault_root());
 
         // Partial storage retrieval
@@ -225,24 +217,18 @@ impl SqliteStore {
             if slot_type == StorageSlotType::Map {
                 // TODO: querying the database for a single map is not performant
                 // consider retrieving all storage maps in a single transaction.
-                let storage_map_root = value;
-                let mut query = query_storage_maps(conn, "root = ?", [storage_map_root.to_hex()])?;
+                let mut partial_storage_map = PartialStorageMap::new(value);
+                let mut query = query_storage_maps(conn, "root = ?", [value.to_hex()])?;
+
                 if let Some(map) = query.remove(&value) {
-                    let mut partial_storage_map = PartialStorageMap::new(value);
-
-                    for (k, v) in map.entries() {
-                        let (_, path) = get_storage_map_item_proof(&merkle_store, value, *k)?;
-                        let path = SparseMerklePath::try_from(path)
-                            .map_err(StoreError::MerkleStoreError)?;
-                        let leaf = SmtLeaf::Single((StorageMap::hash_key(*k), *v));
-                        let proof = SmtProof::new(path, leaf).map_err(StoreError::SmtProofError)?;
-
-                        let witness = StorageMapWitness::new(proof, vec![*k])
-                            .map_err(StoreError::StorageMapError)?;
+                    let smt_forest = smt_forest.read().expect("smt_forest read lock not poisoned");
+                    for (k, _v) in map.entries() {
+                        let witness = smt_forest.get_storage_map_item_witness(value, *k)?;
                         partial_storage_map.add(witness).map_err(StoreError::MerkleStoreError)?;
                     }
-                    maps.push(partial_storage_map);
                 }
+
+                maps.push(partial_storage_map);
             }
         }
         storage_header.sort_by_key(StorageSlotHeader::id);
@@ -270,7 +256,7 @@ impl SqliteStore {
 
     pub(crate) fn insert_account(
         conn: &mut Connection,
-        merkle_store: &Arc<RwLock<MerkleStore>>,
+        smt_forest: &Arc<RwLock<AccountSmtForest>>,
         account: &Account,
         initial_address: &Address,
     ) -> Result<(), StoreError> {
@@ -291,16 +277,15 @@ impl SqliteStore {
 
         tx.commit().into_store_error()?;
 
-        let mut merkle_store = merkle_store.write().expect("merkle_store write lock not poisoned");
-        insert_storage_map_nodes(&mut merkle_store, account.storage());
-        insert_asset_nodes(&mut merkle_store, account.vault());
+        let mut smt_forest = smt_forest.write().expect("smt_forest write lock not poisoned");
+        smt_forest.insert_account_state(account.vault(), account.storage())?;
 
         Ok(())
     }
 
     pub(crate) fn update_account(
         conn: &mut Connection,
-        merkle_store: &Arc<RwLock<MerkleStore>>,
+        smt_forest: &Arc<RwLock<AccountSmtForest>>,
         new_account_state: &Account,
     ) -> Result<(), StoreError> {
         const QUERY: &str = "SELECT id FROM accounts WHERE id = ?";
@@ -326,9 +311,9 @@ impl SqliteStore {
             return Err(StoreError::AccountDataNotFound(new_account_state.id()));
         }
 
-        let mut merkle_store = merkle_store.write().expect("merkle_store write lock not poisoned");
+        let mut smt_forest = smt_forest.write().expect("smt_forest write lock not poisoned");
         let tx = conn.transaction().into_store_error()?;
-        Self::update_account_state(&tx, &mut merkle_store, new_account_state)?;
+        Self::update_account_state(&tx, &mut smt_forest, new_account_state)?;
         tx.commit().into_store_error()
     }
 
@@ -424,40 +409,30 @@ impl SqliteStore {
     }
 
     /// Fetches a specific asset from the account's vault without the need of loading the entire
-    /// vault. The Merkle proof is also retrieved from the [`MerkleStore`].
+    /// vault. The witness is retrieved from the [`AccountSmtForest`].
     pub(crate) fn get_account_asset(
         conn: &mut Connection,
-        merkle_store: &Arc<RwLock<MerkleStore>>,
+        smt_forest: &Arc<RwLock<AccountSmtForest>>,
         account_id: AccountId,
-        faucet_id_prefix: AccountIdPrefix,
+        vault_key: AssetVaultKey,
     ) -> Result<Option<(Asset, AssetWitness)>, StoreError> {
         let header = Self::get_account_header(conn, account_id)?
             .ok_or(StoreError::AccountDataNotFound(account_id))?
             .0;
 
-        let Some(asset) = query_vault_assets(
-            conn,
-            "faucet_id_prefix = ? AND root = ?",
-            params![faucet_id_prefix.to_hex(), header.vault_root().to_hex()],
-        )?
-        .into_iter()
-        .next() else {
-            return Ok(None);
-        };
-
-        let merkle_store = merkle_store.read().expect("merkle_store read lock not poisoned");
-
-        let proof = get_asset_proof(&merkle_store, header.vault_root(), &asset)?;
-        let witness = AssetWitness::new(proof)?;
-
-        Ok(Some((asset, witness)))
+        let smt_forest = smt_forest.read().expect("smt_forest read lock not poisoned");
+        match smt_forest.get_asset_and_witness(header.vault_root(), vault_key.into()) {
+            Ok((asset, witness)) => Ok(Some((asset, witness))),
+            Err(StoreError::MerkleStoreError(MerkleError::UntrackedKey(_))) => Ok(None),
+            Err(err) => Err(err),
+        }
     }
 
     /// Retrieves a specific item from the account's storage map without loading the entire storage.
-    /// The Merkle proof is also retrieved from the [`MerkleStore`].
+    /// The witness is retrieved from the [`AccountSmtForest`].
     pub(crate) fn get_account_map_item(
         conn: &mut Connection,
-        merkle_store: &Arc<RwLock<MerkleStore>>,
+        smt_forest: &Arc<RwLock<AccountSmtForest>>,
         account_id: AccountId,
         slot_name: StorageSlotName,
         key: Word,
@@ -466,28 +441,21 @@ impl SqliteStore {
             .ok_or(StoreError::AccountDataNotFound(account_id))?
             .0;
 
-        let StorageSlotContent::Map(map) = query_storage_slots(
+        let mut storage_values = query_storage_values(
             conn,
             "commitment = ? AND slot_name = ?",
             params![header.storage_commitment().to_hex(), slot_name.to_string()],
-        )?
-        .remove(&slot_name)
-        .ok_or(StoreError::AccountStorageRootNotFound(header.storage_commitment()))?
-        .into_parts()
-        .1
-        else {
+        )?;
+        let (slot_type, map_root) = storage_values
+            .remove(&slot_name)
+            .ok_or(StoreError::AccountStorageRootNotFound(header.storage_commitment()))?;
+        if slot_type != StorageSlotType::Map {
             return Err(StoreError::AccountError(AccountError::StorageSlotNotMap(slot_name)));
-        };
+        }
 
-        let item = map.get(&key);
-        let merkle_store = merkle_store.read().expect("merkle_store read lock not poisoned");
-
-        // TODO: change the api of get_storage_map_item_proof
-        let path = get_storage_map_item_proof(&merkle_store, map.root(), key)?.1.try_into()?;
-        let leaf = SmtLeaf::new_single(StorageMap::hash_key(key), item);
-        let proof = SmtProof::new(path, leaf)?;
-
-        let witness = StorageMapWitness::new(proof, [key])?;
+        let smt_forest = smt_forest.read().expect("smt_forest read lock not poisoned");
+        let witness = smt_forest.get_storage_map_item_witness(map_root, key)?;
+        let item = witness.get(&key).unwrap_or(EMPTY_WORD);
 
         Ok((item, witness))
     }
@@ -540,21 +508,50 @@ impl SqliteStore {
     /// `updated_fungible_assets` and `updated_storage_maps` parameters.
     pub(super) fn apply_account_delta(
         tx: &Transaction<'_>,
-        merkle_store: &mut MerkleStore,
+        smt_forest: &mut AccountSmtForest,
         init_account_state: &AccountHeader,
         final_account_state: &AccountHeader,
-        mut updated_fungible_assets: BTreeMap<AccountIdPrefix, FungibleAsset>,
-        mut updated_storage_maps: BTreeMap<StorageSlotName, StorageMap>,
+        updated_fungible_assets: BTreeMap<AccountIdPrefix, FungibleAsset>,
+        updated_storage_maps: BTreeMap<StorageSlotName, StorageMap>,
         delta: &AccountDelta,
     ) -> Result<(), StoreError> {
         // Copy over the storage and vault from the previous state. Non-relevant data will not be
         // modified.
         Self::copy_account_state(tx, init_account_state, final_account_state)?;
 
+        Self::apply_account_vault_delta(
+            tx,
+            smt_forest,
+            init_account_state,
+            final_account_state,
+            updated_fungible_assets,
+            delta,
+        )?;
+
+        let updated_storage_slots =
+            Self::apply_account_storage_delta(smt_forest, updated_storage_maps, delta)?;
+
+        Self::insert_storage_slots(
+            tx,
+            final_account_state.storage_commitment(),
+            updated_storage_slots.values(),
+        )?;
+
+        Ok(())
+    }
+
+    fn apply_account_vault_delta(
+        tx: &Transaction<'_>,
+        smt_forest: &mut AccountSmtForest,
+        init_account_state: &AccountHeader,
+        final_account_state: &AccountHeader,
+        mut updated_fungible_assets: BTreeMap<AccountIdPrefix, FungibleAsset>,
+        delta: &AccountDelta,
+    ) -> Result<(), StoreError> {
         // Apply vault delta. This map will contain all updated assets (indexed by vault key), both
         // fungible and non-fungible.
         let mut updated_assets: BTreeMap<AssetVaultKey, Asset> = BTreeMap::new();
-        let mut removed_vault_keys: Vec<AssetVaultKey> = Vec::new();
+        let mut removed_vault_keys: Vec<Word> = Vec::new();
 
         // We first process the fungible assets. Adding or subtracting them from the vault as
         // requested.
@@ -579,7 +576,7 @@ impl SqliteStore {
             if asset.amount() > 0 {
                 updated_assets.insert(asset.vault_key(), Asset::Fungible(asset));
             } else {
-                removed_vault_keys.push(asset.vault_key());
+                removed_vault_keys.push(Word::from(asset.vault_key()));
             }
         }
 
@@ -596,8 +593,11 @@ impl SqliteStore {
                 .map(|(asset, _)| (asset.vault_key(), Asset::NonFungible(*asset))),
         );
 
-        removed_vault_keys
-            .extend(removed_nonfungible_assets.iter().map(|(asset, _)| asset.vault_key()));
+        removed_vault_keys.extend(
+            removed_nonfungible_assets
+                .iter()
+                .map(|(asset, _)| Word::from(asset.vault_key())),
+        );
 
         const DELETE_QUERY: &str =
             "DELETE FROM account_assets WHERE root = ? AND vault_key IN rarray(?)";
@@ -608,24 +608,41 @@ impl SqliteStore {
                 final_account_state.vault_root().to_hex(),
                 Rc::new(
                     removed_vault_keys
-                        .into_iter()
-                        .map(|k| {
-                            let k_word: Word = k.into();
-                            Value::from(k_word.to_hex())
-                        })
+                        .iter()
+                        .map(|k| Value::from(k.to_hex()))
                         .collect::<Vec<Value>>(),
                 ),
             ],
         )
         .into_store_error()?;
 
-        update_asset_nodes(
-            merkle_store,
-            init_account_state.vault_root(),
-            updated_assets.values().copied(),
+        let updated_assets_values: Vec<Asset> = updated_assets.values().copied().collect();
+        Self::insert_assets(
+            tx,
+            final_account_state.vault_root(),
+            updated_assets_values.iter().copied(),
         )?;
-        Self::insert_assets(tx, final_account_state.vault_root(), updated_assets.into_values())?;
 
+        let new_vault_root = smt_forest.update_asset_nodes(
+            init_account_state.vault_root(),
+            updated_assets_values.iter().copied(),
+            removed_vault_keys.iter().copied(),
+        )?;
+        if new_vault_root != final_account_state.vault_root() {
+            return Err(StoreError::MerkleStoreError(MerkleError::ConflictingRoots {
+                expected_root: final_account_state.vault_root(),
+                actual_root: new_vault_root,
+            }));
+        }
+
+        Ok(())
+    }
+
+    fn apply_account_storage_delta(
+        smt_forest: &mut AccountSmtForest,
+        mut updated_storage_maps: BTreeMap<StorageSlotName, StorageMap>,
+        delta: &AccountDelta,
+    ) -> Result<BTreeMap<StorageSlotName, StorageSlot>, StoreError> {
         // Apply storage delta. This map will contain all updated storage slots, both values and
         // maps. It gets initialized with value type updates which contain the new value and
         // don't depend on previous state.
@@ -641,28 +658,28 @@ impl SqliteStore {
         // previously retrieved storage maps.
         for (slot_name, map_delta) in delta.storage().maps() {
             let mut map = updated_storage_maps.remove(slot_name).unwrap_or_default();
+            let map_root = map.root();
+            let entries: Vec<(Word, Word)> =
+                map_delta.entries().iter().map(|(key, value)| ((*key).into(), *value)).collect();
 
-            update_storage_map_nodes(
-                merkle_store,
-                map.root(),
-                map_delta.entries().iter().map(|(key, value)| ((*key).into(), *value)),
-            )?;
+            for (key, value) in &entries {
+                map.insert(*key, *value)?;
+            }
 
-            for (key, value) in map_delta.entries() {
-                map.insert((*key).into(), *value)?;
+            let expected_root = map.root();
+            let new_root = smt_forest.update_storage_map_nodes(map_root, entries.into_iter())?;
+            if new_root != expected_root {
+                return Err(StoreError::MerkleStoreError(MerkleError::ConflictingRoots {
+                    expected_root,
+                    actual_root: new_root,
+                }));
             }
 
             updated_storage_slots
                 .insert(slot_name.clone(), StorageSlot::with_map(slot_name.clone(), map));
         }
 
-        Self::insert_storage_slots(
-            tx,
-            final_account_state.storage_commitment(),
-            updated_storage_slots.values(),
-        )?;
-
-        Ok(())
+        Ok(updated_storage_slots)
     }
 
     /// Fetches the relevant fungible assets of an account that will be updated by the account
@@ -788,31 +805,31 @@ impl SqliteStore {
     // HELPERS
     // --------------------------------------------------------------------------------------------
 
-    /// Update previously-existing account after a transaction execution. Apart from updating the
-    /// `SQLite` database, this function also updates the [`MerkleStore`] by adding the vault and
-    /// storage SMT's nodes.
-    ///
-    /// Because the Client retrieves the account by account ID before applying the delta, we don't
-    /// need to check that it exists here. This inserts a new row into the accounts table.
-    /// We can later identify the proper account state by looking at the nonce.
     pub(super) fn update_account_state(
         tx: &Transaction<'_>,
-        merkle_store: &mut MerkleStore,
+        smt_forest: &mut AccountSmtForest,
         new_account_state: &Account,
     ) -> Result<(), StoreError> {
-        insert_storage_map_nodes(merkle_store, new_account_state.storage());
+        // Get old SMT roots before updating so we can prune them after
+        let old_roots = Self::get_smt_roots_by_account_id(tx, new_account_state.id())?;
+
+        smt_forest.insert_account_state(new_account_state.vault(), new_account_state.storage())?;
         Self::insert_storage_slots(
             tx,
             new_account_state.storage().to_commitment(),
             new_account_state.storage().slots().iter(),
         )?;
-        insert_asset_nodes(merkle_store, new_account_state.vault());
         Self::insert_assets(
             tx,
             new_account_state.vault().root(),
             new_account_state.vault().assets(),
         )?;
-        Self::insert_account_header(tx, &new_account_state.into(), None)
+        Self::insert_account_header(tx, &new_account_state.into(), None)?;
+
+        // Pop old roots to free memory for nodes no longer reachable
+        smt_forest.pop_roots(old_roots);
+
+        Ok(())
     }
 
     /// Locks the account if the mismatched digest doesn't belong to a previous account state (stale
@@ -836,8 +853,82 @@ impl SqliteStore {
         .into_store_error()?;
         Ok(())
     }
+    /// Returns all SMT roots (vault root + storage map roots) for the given account ID's latest
+    /// state.
+    fn get_smt_roots_by_account_id(
+        tx: &Transaction<'_>,
+        account_id: AccountId,
+    ) -> Result<Vec<Word>, StoreError> {
+        const LATEST_ACCOUNT_QUERY: &str = r"
+        SELECT vault_root, storage_commitment
+        FROM accounts
+        WHERE id = ?1
+        ORDER BY nonce DESC
+        LIMIT 1
+    ";
 
-    /// Removes account states with the specified hashes from the database.
+        const STORAGE_MAP_ROOTS_QUERY: &str = r"
+        SELECT slot_value
+        FROM account_storage
+        WHERE commitment = ?1
+          AND slot_type = ?2
+          AND slot_value IS NOT NULL
+    ";
+
+        let map_slot_type = StorageSlotType::Map as u8;
+
+        // 1) Fetch latest vault root + storage commitment.
+        let (vault_root, storage_commitment): (String, String) = tx
+            .query_row(LATEST_ACCOUNT_QUERY, params![account_id.to_hex()], |row| {
+                Ok((row.get(0)?, row.get(1)?))
+            })
+            .into_store_error()?;
+
+        let mut roots = Vec::new();
+
+        // Always include the vault root.
+        if let Ok(root) = Word::try_from(vault_root.as_str()) {
+            roots.push(root);
+        }
+
+        // 2) Fetch storage map roots for the latest storage commitment.
+        let mut stmt = tx.prepare(STORAGE_MAP_ROOTS_QUERY).into_store_error()?;
+        let iter = stmt
+            .query_map(params![storage_commitment, map_slot_type], |row| row.get::<_, String>(0))
+            .into_store_error()?;
+
+        roots.extend(iter.filter_map(Result::ok).filter_map(|r| Word::try_from(r.as_str()).ok()));
+
+        Ok(roots)
+    }
+
+    /// Returns all SMT roots (vault root + storage map roots) for the given account commitments.
+    fn get_smt_roots_by_account_commitment(
+        tx: &Transaction<'_>,
+        account_hash_params: &Rc<Vec<Value>>,
+    ) -> Result<Vec<Word>, StoreError> {
+        const ROOTS_QUERY: &str = "
+            SELECT vault_root FROM accounts WHERE account_commitment IN rarray(?1)
+            UNION ALL
+            SELECT slot_value FROM account_storage
+            WHERE commitment IN (
+                SELECT storage_commitment FROM accounts WHERE account_commitment IN rarray(?1)
+            ) AND slot_type = ?2";
+
+        let map_slot_type = StorageSlotType::Map as u8;
+        let mut stmt = tx.prepare(ROOTS_QUERY).into_store_error()?;
+        let roots = stmt
+            .query_map(params![account_hash_params, map_slot_type], |row| row.get::<_, String>(0))
+            .into_store_error()?
+            .filter_map(Result::ok)
+            .filter_map(|r| Word::try_from(r.as_str()).ok())
+            .collect();
+
+        Ok(roots)
+    }
+
+    /// Removes account states with the specified hashes from the database and pops their
+    /// SMT roots from the forest to free up memory.
     ///
     /// This is used to rollback account changes when a transaction is discarded,
     /// effectively undoing the account state changes that were applied by the transaction.
@@ -846,12 +937,25 @@ impl SqliteStore {
     /// implementation to handle transaction rollbacks.
     pub(super) fn undo_account_state(
         tx: &Transaction<'_>,
-        account_hashes: &[Word],
+        smt_forest: &mut AccountSmtForest,
+        account_commitments: &[Word],
     ) -> Result<(), StoreError> {
-        const QUERY: &str = "DELETE FROM accounts WHERE account_commitment IN rarray(?)";
+        if account_commitments.is_empty() {
+            return Ok(());
+        }
 
-        let params = account_hashes.iter().map(|h| Value::from(h.to_hex())).collect::<Vec<_>>();
-        tx.execute(QUERY, params![Rc::new(params)]).into_store_error()?;
+        let account_hash_params = Rc::new(
+            account_commitments.iter().map(|h| Value::from(h.to_hex())).collect::<Vec<_>>(),
+        );
+
+        // Query all SMT roots before deletion so we can pop them from the forest
+        let smt_roots = Self::get_smt_roots_by_account_commitment(tx, &account_hash_params)?;
+
+        const DELETE_QUERY: &str = "DELETE FROM accounts WHERE account_commitment IN rarray(?)";
+        tx.execute(DELETE_QUERY, params![account_hash_params]).into_store_error()?;
+
+        // Pop the roots from the forest to release memory for nodes that are no longer reachable
+        smt_forest.pop_roots(smt_roots);
 
         Ok(())
     }
@@ -944,7 +1048,7 @@ impl SqliteStore {
                     commitment.to_hex(),
                     slot.name().to_string(),
                     slot.value().to_hex(),
-                    slot.slot_type().to_bytes()
+                    slot.slot_type() as u8
                 ],
             )
             .into_store_error()?;
@@ -1063,7 +1167,7 @@ fn query_storage_slots(
         .query_map(params, |row| {
             let slot_name: String = row.get(0)?;
             let value: String = row.get(1)?;
-            let slot_type: Vec<u8> = row.get(2)?;
+            let slot_type: u8 = row.get(2)?;
             Ok((slot_name, value, slot_type))
         })
         .into_store_error()?
@@ -1071,7 +1175,9 @@ fn query_storage_slots(
             let (slot_name, value, slot_type) = result.into_store_error()?;
             let slot_name = StorageSlotName::new(slot_name)
                 .map_err(|err| StoreError::ParsingError(err.to_string()))?;
-            Ok((slot_name, Word::try_from(value)?, StorageSlotType::read_from_bytes(&slot_type)?))
+            let slot_type = StorageSlotType::try_from(slot_type)
+                .map_err(|e| StoreError::ParsingError(e.to_string()))?;
+            Ok((slot_name, Word::try_from(value)?, slot_type))
         })
         .collect::<Result<Vec<(StorageSlotName, Word, StorageSlotType)>, StoreError>>()?;
 
@@ -1143,7 +1249,7 @@ fn query_storage_values(
         .query_map(params, |row| {
             let slot_name: String = row.get(0)?;
             let value: String = row.get(1)?;
-            let slot_type: Vec<u8> = row.get(2)?;
+            let slot_type: u8 = row.get(2)?;
             Ok((slot_name, value, slot_type))
         })
         .into_store_error()?
@@ -1151,10 +1257,9 @@ fn query_storage_values(
             let (slot_name, value, slot_type) = result.into_store_error()?;
             let slot_name = StorageSlotName::new(slot_name)
                 .map_err(|err| StoreError::ParsingError(err.to_string()))?;
-            Ok((
-                slot_name,
-                (StorageSlotType::read_from_bytes(&slot_type)?, Word::try_from(value)?),
-            ))
+            let slot_type = StorageSlotType::try_from(slot_type)
+                .map_err(|e| StoreError::ParsingError(e.to_string()))?;
+            Ok((slot_name, (slot_type, Word::try_from(value)?)))
         })
         .collect()
 }
@@ -1267,7 +1372,7 @@ mod tests {
     use std::vec::Vec;
 
     use anyhow::Context;
-    use miden_client::account::component::AccountComponent;
+    use miden_client::account::component::{AccountComponent, basic_wallet_library};
     use miden_client::account::{
         Account,
         AccountBuilder,
@@ -1282,6 +1387,7 @@ mod tests {
         StorageSlotContent,
         StorageSlotName,
     };
+    use miden_client::assembly::CodeBuilder;
     use miden_client::asset::{
         AccountStorageDelta,
         AccountVaultDelta,
@@ -1290,16 +1396,14 @@ mod tests {
         NonFungibleAsset,
         NonFungibleAssetDetails,
     };
+    use miden_client::auth::{AuthRpoFalcon512, PublicKeyCommitment};
     use miden_client::store::Store;
-    use miden_client::testing::account_id::{
+    use miden_client::{EMPTY_WORD, ONE, ZERO};
+    use miden_protocol::testing::account_id::{
         ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
         ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET,
     };
-    use miden_client::testing::constants::NON_FUNGIBLE_ASSET_DATA;
-    use miden_client::{CodeBuilder, EMPTY_WORD, ONE, ZERO};
-    use miden_lib::account::auth::AuthRpoFalcon512;
-    use miden_lib::account::components::basic_wallet_library;
-    use miden_objects::account::auth::PublicKeyCommitment;
+    use miden_protocol::testing::constants::NON_FUNGIBLE_ASSET_DATA;
 
     use crate::SqliteStore;
     use crate::sql_error::SqlResultExt;
@@ -1309,7 +1413,7 @@ mod tests {
     async fn account_code_insertion_no_duplicates() -> anyhow::Result<()> {
         let store = create_test_store().await;
         let component_code = CodeBuilder::default()
-            .compile_component_code("miden::testing::dummy_component", "export.dummy nop end")?;
+            .compile_component_code("miden::testing::dummy_component", "pub proc dummy nop end")?;
         let account_component =
             AccountComponent::new(component_code, vec![])?.with_supports_all_types();
         let account_code = AccountCode::from_components(
@@ -1407,16 +1511,16 @@ mod tests {
 
         let account_id = account.id();
         let final_state: AccountHeader = (&account_after_delta).into();
-        let merkle_store = store.merkle_store.clone();
+        let smt_forest = store.smt_forest.clone();
         store
             .interact_with_connection(move |conn| {
                 let tx = conn.transaction().into_store_error()?;
-                let mut merkle_store =
-                    merkle_store.write().expect("merkle_store write lock not poisoned");
+                let mut smt_forest =
+                    smt_forest.write().expect("smt_forest write lock not poisoned");
 
                 SqliteStore::apply_account_delta(
                     &tx,
-                    &mut merkle_store,
+                    &mut smt_forest,
                     &account.into(),
                     &final_state,
                     BTreeMap::default(),
@@ -1498,7 +1602,7 @@ mod tests {
         let account_id = account.id();
         let final_state: AccountHeader = (&account_after_delta).into();
 
-        let merkle_store = store.merkle_store.clone();
+        let smt_forest = store.smt_forest.clone();
         store
             .interact_with_connection(move |conn| {
                 let fungible_assets = SqliteStore::get_account_fungible_assets_for_delta(
@@ -1512,12 +1616,12 @@ mod tests {
                     &delta,
                 )?;
                 let tx = conn.transaction().into_store_error()?;
-                let mut merkle_store =
-                    merkle_store.write().expect("merkle_store write lock not poisoned");
+                let mut smt_forest =
+                    smt_forest.write().expect("smt_forest write lock not poisoned");
 
                 SqliteStore::apply_account_delta(
                     &tx,
-                    &mut merkle_store,
+                    &mut smt_forest,
                     &account.into(),
                     &final_state,
                     fungible_assets,

@@ -26,25 +26,24 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::fmt::Debug;
 
-use miden_objects::account::{
+use miden_protocol::account::{
     Account,
     AccountCode,
     AccountHeader,
     AccountId,
-    AccountIdPrefix,
     AccountStorage,
     StorageMapWitness,
     StorageSlot,
     StorageSlotContent,
     StorageSlotName,
 };
-use miden_objects::address::Address;
-use miden_objects::asset::{Asset, AssetVault, AssetWitness};
-use miden_objects::block::{BlockHeader, BlockNumber};
-use miden_objects::crypto::merkle::{InOrderIndex, MmrPeaks, PartialMmr};
-use miden_objects::note::{NoteId, NoteScript, NoteTag, Nullifier};
-use miden_objects::transaction::TransactionId;
-use miden_objects::{AccountError, Word};
+use miden_protocol::address::Address;
+use miden_protocol::asset::{Asset, AssetVault, AssetVaultKey, AssetWitness};
+use miden_protocol::block::{BlockHeader, BlockNumber};
+use miden_protocol::crypto::merkle::mmr::{InOrderIndex, MmrPeaks, PartialMmr};
+use miden_protocol::note::{NoteId, NoteScript, NoteTag, Nullifier};
+use miden_protocol::transaction::TransactionId;
+use miden_protocol::{AccountError, Word};
 
 use crate::note_transport::{NOTE_TRANSPORT_CURSOR_STORE_SETTING, NoteTransportCursor};
 use crate::sync::{NoteTagRecord, StateSyncUpdate};
@@ -438,8 +437,12 @@ pub trait Store: Send + Sync {
         let has_client_notes = has_client_notes.into();
         current_partial_mmr.add(current_block.commitment(), has_client_notes);
 
+        // Only track the latest leaf if it is relevant (it has client notes) _and_ the forest
+        // actually has a single leaf tree bit
+        let track_latest = has_client_notes && current_partial_mmr.forest().has_single_leaf_tree();
+
         let current_partial_mmr =
-            PartialMmr::from_parts(current_partial_mmr.peaks(), tracked_nodes, has_client_notes);
+            PartialMmr::from_parts(current_partial_mmr.peaks(), tracked_nodes, track_latest);
 
         Ok(current_partial_mmr)
     }
@@ -450,20 +453,21 @@ pub trait Store: Send + Sync {
     /// Retrieves the asset vault for a specific account.
     async fn get_account_vault(&self, account_id: AccountId) -> Result<AssetVault, StoreError>;
 
-    /// Retrieves a specific asset from the account's vault along with its Merkle witness.
+    /// Retrieves a specific asset (by vault key) from the account's vault along with its Merkle
+    /// witness.
     ///
     /// The default implementation of this method uses [`Store::get_account_vault`].
     async fn get_account_asset(
         &self,
         account_id: AccountId,
-        faucet_id_prefix: AccountIdPrefix,
+        vault_key: AssetVaultKey,
     ) -> Result<Option<(Asset, AssetWitness)>, StoreError> {
         let vault = self.get_account_vault(account_id).await?;
-        let Some(asset) = vault.assets().find(|a| a.faucet_id_prefix() == faucet_id_prefix) else {
+        let Some(asset) = vault.assets().find(|a| a.vault_key() == vault_key) else {
             return Ok(None);
         };
 
-        let witness = AssetWitness::new(vault.open(asset.vault_key()).into())?;
+        let witness = AssetWitness::new(vault.open(vault_key).into())?;
 
         Ok(Some((asset, witness)))
     }

@@ -3,14 +3,15 @@ use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
-use miden_objects::account::{AccountId, PartialAccount, StorageSlot, StorageSlotContent};
-use miden_objects::asset::{AssetVaultKey, AssetWitness};
-use miden_objects::block::{BlockHeader, BlockNumber};
-use miden_objects::crypto::merkle::{InOrderIndex, MerklePath, PartialMmr};
-use miden_objects::note::NoteScript;
-use miden_objects::transaction::{AccountInputs, PartialBlockchain};
-use miden_objects::vm::FutureMaybeSend;
-use miden_objects::{MastForest, Word};
+use miden_protocol::account::{AccountId, PartialAccount, StorageSlot, StorageSlotContent};
+use miden_protocol::asset::{AssetVaultKey, AssetWitness};
+use miden_protocol::block::{BlockHeader, BlockNumber};
+use miden_protocol::crypto::merkle::MerklePath;
+use miden_protocol::crypto::merkle::mmr::{InOrderIndex, PartialMmr};
+use miden_protocol::note::NoteScript;
+use miden_protocol::transaction::{AccountInputs, PartialBlockchain};
+use miden_protocol::vm::FutureMaybeSend;
+use miden_protocol::{MastForest, Word};
 use miden_tx::{DataStore, DataStoreError, MastForestStore, TransactionMastStore};
 
 use super::{AccountStorageFilter, PartialBlockchainFilter, Store};
@@ -112,7 +113,7 @@ impl DataStore for ClientDataStore {
     ) -> Result<Vec<AssetWitness>, DataStoreError> {
         let mut asset_witnesses = vec![];
         for vault_key in vault_keys {
-            match self.store.get_account_asset(account_id, vault_key.faucet_id_prefix()).await {
+            match self.store.get_account_asset(account_id, vault_key).await {
                 Ok(Some((_, asset_witness))) => {
                     asset_witnesses.push(asset_witness);
                 },
@@ -151,7 +152,7 @@ impl DataStore for ClientDataStore {
         account_id: AccountId,
         map_root: Word,
         map_key: Word,
-    ) -> Result<miden_objects::account::StorageMapWitness, DataStoreError> {
+    ) -> Result<miden_protocol::account::StorageMapWitness, DataStoreError> {
         let account_storage = self
             .store
             .get_account_storage(account_id, AccountStorageFilter::Root(map_root))

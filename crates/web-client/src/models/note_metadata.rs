@@ -4,8 +4,7 @@ use wasm_bindgen::prelude::*;
 use super::account_id::AccountId;
 use super::felt::Felt;
 use super::note_execution_hint::NoteExecutionHint;
-use super::note_tag::NoteTag;
-use super::note_type::NoteType;
+use super::{NoteTag, NoteType};
 
 /// Metadata associated with a note.
 ///

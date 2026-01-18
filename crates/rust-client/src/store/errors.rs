@@ -1,10 +1,12 @@
 use alloc::string::String;
 use core::num::TryFromIntError;
 
-use miden_objects::account::AccountId;
-use miden_objects::crypto::merkle::{MerkleError, MmrError, SmtProofError};
-use miden_objects::utils::{DeserializationError, HexParseError};
-use miden_objects::{
+use miden_protocol::account::AccountId;
+use miden_protocol::crypto::merkle::MerkleError;
+use miden_protocol::crypto::merkle::mmr::MmrError;
+use miden_protocol::crypto::merkle::smt::SmtProofError;
+use miden_protocol::utils::{DeserializationError, HexParseError};
+use miden_protocol::{
     AccountError,
     AccountIdError,
     AddressError,
@@ -42,8 +44,6 @@ pub enum StoreError {
     AddressError(#[from] AddressError),
     #[error("account id error")]
     AccountIdError(#[from] AccountIdError),
-    #[error("account commitment {0} already exists")]
-    AccountCommitmentAlreadyExists(Word),
     #[error("account commitment mismatch for account {0}")]
     AccountCommitmentMismatch(AccountId),
     #[error("public key {0} not found")]

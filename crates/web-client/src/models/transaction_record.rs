@@ -59,6 +59,18 @@ impl TransactionRecord {
         self.0.details.block_num.as_u32()
     }
 
+    /// Returns the block height at which the transaction was submitted.
+    #[wasm_bindgen(js_name = "submissionHeight")]
+    pub fn submission_height(&self) -> u32 {
+        self.0.details.submission_height.as_u32()
+    }
+
+    /// Returns the expiration block height for the transaction.
+    #[wasm_bindgen(js_name = "expirationBlockNum")]
+    pub fn expiration_block_num(&self) -> u32 {
+        self.0.details.expiration_block_num.as_u32()
+    }
+
     /// Returns the current status of the transaction.
     #[wasm_bindgen(js_name = "transactionStatus")]
     pub fn transaction_status(&self) -> TransactionStatus {

@@ -1,8 +1,8 @@
-[**@demox-labs/miden-sdk**](../README.md)
+[**@miden-sdk/miden-sdk**](../README.md)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / AccountComponent
+[@miden-sdk/miden-sdk](../README.md) / AccountComponent
 
 # Class: AccountComponent
 
@@ -72,7 +72,7 @@ Marks the component as supporting all account types.
 
 ### compile()
 
-> `static` **compile**(`account_code`, `builder`, `storage_slots`): `AccountComponent`
+> `static` **compile**(`account_code`, `storage_slots`): `AccountComponent`
 
 Compiles account code with the given storage slots using the provided assembler.
 
@@ -80,11 +80,7 @@ Compiles account code with the given storage slots using the provided assembler.
 
 ##### account\_code
 
-`string`
-
-##### builder
-
-[`CodeBuilder`](CodeBuilder.md)
+[`AccountComponentCode`](AccountComponentCode.md)
 
 ##### storage\_slots
 
@@ -127,6 +123,28 @@ Builds an auth component from a secret key, inferring the auth scheme from the k
 ##### secret\_key
 
 [`AuthSecretKey`](AuthSecretKey.md)
+
+#### Returns
+
+`AccountComponent`
+
+***
+
+### fromLibrary()
+
+> `static` **fromLibrary**(`library`, `storage_slots`): `AccountComponent`
+
+Creates an account component from a compiled library and storage slots.
+
+#### Parameters
+
+##### library
+
+[`Library`](Library.md)
+
+##### storage\_slots
+
+[`StorageSlot`](StorageSlot.md)[]
 
 #### Returns
 

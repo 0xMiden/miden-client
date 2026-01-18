@@ -2,7 +2,7 @@ use alloc::string::String;
 use core::fmt::{self, Display, Formatter, Write};
 
 use hex::ToHex;
-use miden_objects::{Felt, StarkField, Word, note::NoteId};
+use miden_protocol::{Felt, StarkField, Word, note::NoteId};
 
 use crate::rpc::{errors::RpcConversionError, generated::word};
 

@@ -2,8 +2,8 @@ use alloc::string::String;
 use core::fmt::{self, Debug, Display, Formatter, Write};
 
 use hex::ToHex;
-use miden_objects::note::NoteId;
-use miden_objects::{Felt, StarkField, Word};
+use miden_protocol::note::NoteId;
+use miden_protocol::{Felt, StarkField, Word};
 
 use crate::rpc::errors::RpcConversionError;
 use crate::rpc::generated as proto;

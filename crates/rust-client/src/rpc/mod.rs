@@ -17,7 +17,7 @@
 //!
 //! ```no_run
 //! # use miden_client::rpc::{Endpoint, NodeRpcClient, GrpcClient};
-//! # use miden_objects::block::BlockNumber;
+//! # use miden_protocol::block::BlockNumber;
 //! # #[tokio::main]
 //! # async fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! // Create a gRPC client instance (assumes default endpoint configuration).
@@ -41,7 +41,7 @@
 //! [`NodeRpcClient`] trait.
 
 use alloc::boxed::Box;
-use alloc::collections::BTreeSet;
+use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::fmt;
@@ -50,13 +50,14 @@ use domain::account::{AccountProof, FetchedAccount};
 use domain::note::{FetchedNote, NoteSyncInfo};
 use domain::nullifier::NullifierUpdate;
 use domain::sync::StateSyncInfo;
-use miden_objects::Word;
-use miden_objects::account::{Account, AccountCode, AccountHeader, AccountId};
-use miden_objects::address::NetworkId;
-use miden_objects::block::{BlockHeader, BlockNumber, ProvenBlock};
-use miden_objects::crypto::merkle::{MmrProof, SmtProof};
-use miden_objects::note::{NoteId, NoteScript, NoteTag, Nullifier};
-use miden_objects::transaction::{ProvenTransaction, TransactionInputs};
+use miden_protocol::Word;
+use miden_protocol::account::{Account, AccountCode, AccountHeader, AccountId};
+use miden_protocol::address::NetworkId;
+use miden_protocol::block::{BlockHeader, BlockNumber, ProvenBlock};
+use miden_protocol::crypto::merkle::mmr::MmrProof;
+use miden_protocol::crypto::merkle::smt::SmtProof;
+use miden_protocol::note::{NoteId, NoteScript, NoteTag, Nullifier};
+use miden_protocol::transaction::{ProvenTransaction, TransactionInputs};
 
 /// Contains domain types related to RPC requests and responses, as well as utility functions
 /// for dealing with them.
@@ -145,13 +146,13 @@ pub trait NodeRpcClient: Send + Sync {
     /// Fetches note-related data for a list of [`NoteId`] using the `/GetNotesById`
     /// RPC endpoint.
     ///
-    /// For [`miden_objects::note::NoteType::Private`] notes, the response includes only the
-    /// [`miden_objects::note::NoteMetadata`].
+    /// For [`miden_protocol::note::NoteType::Private`] notes, the response includes only the
+    /// [`miden_protocol::note::NoteMetadata`].
     ///
-    /// For [`miden_objects::note::NoteType::Public`] notes, the response includes all note details
+    /// For [`miden_protocol::note::NoteType::Public`] notes, the response includes all note details
     /// (recipient, assets, script, etc.).
     ///
-    /// In both cases, a [`miden_objects::note::NoteInclusionProof`] is returned so the caller can
+    /// In both cases, a [`miden_protocol::note::NoteInclusionProof`] is returned so the caller can
     /// verify that each note is part of the block's note tree.
     async fn get_notes_by_id(&self, note_ids: &[NoteId]) -> Result<Vec<FetchedNote>, RpcError>;
 
@@ -232,17 +233,27 @@ pub trait NodeRpcClient: Send + Sync {
     ///
     /// The default implementation of this method uses
     /// [`NodeRpcClient::sync_nullifiers`].
-    async fn get_nullifier_commit_height(
+    async fn get_nullifier_commit_heights(
         &self,
-        nullifier: &Nullifier,
-        block_num: BlockNumber,
-    ) -> Result<Option<BlockNumber>, RpcError> {
-        let nullifiers = self.sync_nullifiers(&[nullifier.prefix()], block_num, None).await?;
+        requested_nullifiers: BTreeSet<Nullifier>,
+        block_from: BlockNumber,
+    ) -> Result<BTreeMap<Nullifier, Option<BlockNumber>>, RpcError> {
+        let prefixes: Vec<u16> =
+            requested_nullifiers.iter().map(crate::note::Nullifier::prefix).collect();
+        let retrieved_nullifiers = self.sync_nullifiers(&prefixes, block_from, None).await?;
 
-        Ok(nullifiers
-            .iter()
-            .find(|update| update.nullifier == *nullifier)
-            .map(|update| update.block_num))
+        let mut nullifiers_height = BTreeMap::new();
+        for nullifier in requested_nullifiers {
+            if let Some(update) =
+                retrieved_nullifiers.iter().find(|update| update.nullifier == nullifier)
+            {
+                nullifiers_height.insert(nullifier, Some(update.block_num));
+            } else {
+                nullifiers_height.insert(nullifier, None);
+            }
+        }
+
+        Ok(nullifiers_height)
     }
 
     /// Fetches public note-related data for a list of [`NoteId`] and builds [`InputNoteRecord`]s

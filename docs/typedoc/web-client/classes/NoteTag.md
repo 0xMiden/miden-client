@@ -1,8 +1,8 @@
-[**@demox-labs/miden-sdk**](../README.md)
+[**@miden-sdk/miden-sdk**](../README.md)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / NoteTag
+[@miden-sdk/miden-sdk](../README.md) / NoteTag
 
 # Class: NoteTag
 
@@ -128,6 +128,42 @@ Builds a single-target tag derived from an account ID.
 ##### account\_id
 
 [`AccountId`](AccountId.md)
+
+#### Returns
+
+`NoteTag`
+
+***
+
+### fromHex()
+
+> `static` **fromHex**(`hex`): `NoteTag`
+
+Builds a note tag from a hex-encoded string (with or without 0x prefix).
+
+#### Parameters
+
+##### hex
+
+`string`
+
+#### Returns
+
+`NoteTag`
+
+***
+
+### fromU32()
+
+> `static` **fromU32**(`raw`): `NoteTag`
+
+Builds a note tag from its raw u32 representation.
+
+#### Parameters
+
+##### raw
+
+`number`
 
 #### Returns
 
