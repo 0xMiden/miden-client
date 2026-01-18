@@ -138,7 +138,7 @@ The following are just a few simple examples to get started. For more details, s
 import { AccountStorageMode, WebClient } from "@miden-sdk/miden-sdk";
 
 // Instantiate web client object
-const webClient = await WebClient.createClient();
+const webClient = await WebClient.createClient({ rpcUrl: "http://localhost:57291" });
 
 // Set up newWallet params
 const accountStorageMode = AccountStorageMode.private();

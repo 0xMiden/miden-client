@@ -245,12 +245,13 @@ export class WebClient {
    * @param {Object} config - The configuration object.
    */
   static async createClient(config) {
+    const { rpcUrl, noteTransportUrl, seed } = config || {};
     // Construct the instance (synchronously).
     const instance = new WebClient(config);
 
     // Wait for the underlying wasmWebClient to be initialized.
     const wasmWebClient = await instance.getWasmWebClient();
-    await wasmWebClient.createClient({...config});
+    await wasmWebClient.createClient(rpcUrl, noteTransportUrl, seed);
 
     // Wait for the worker to be ready
     await instance.ready;
@@ -289,11 +290,20 @@ export class WebClient {
    * @returns {Promise<WebClient>} The fully initialized WebClient.
    */
   static async createClientWithExternalKeystore(config) {
+    const { rpcUrl, noteTransportUrl, seed, getKeyCb, insertKeyCb, signCb } =
+      config || {};
     // Construct the instance (synchronously).
     const instance = new WebClient(config);
     // Wait for the underlying wasmWebClient to be initialized.
     const wasmWebClient = await instance.getWasmWebClient();
-    await wasmWebClient.createClientWithExternalKeystore({...config});
+    await wasmWebClient.createClientWithExternalKeystore(
+      rpcUrl,
+      noteTransportUrl,
+      seed,
+      getKeyCb,
+      insertKeyCb,
+      signCb
+    );
 
     await instance.ready;
     // Return a proxy that forwards missing properties to wasmWebClient.
