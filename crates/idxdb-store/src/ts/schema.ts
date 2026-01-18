@@ -302,7 +302,9 @@ export class MidenDatabase {
       [Table.TrackedAccounts]: indexes("&id"),
     });
 
-    this.accountCodes = this.dexie.table<IAccountCode, string>(Table.AccountCode);
+    this.accountCodes = this.dexie.table<IAccountCode, string>(
+      Table.AccountCode
+    );
     this.accountStorages = this.dexie.table<IAccountStorage, string>(
       Table.AccountStorage
     );
@@ -312,21 +314,30 @@ export class MidenDatabase {
     this.accountAssets = this.dexie.table<IAccountAsset, string>(
       Table.AccountAssets
     );
-    this.accountAuths = this.dexie.table<IAccountAuth, string>(Table.AccountAuth);
+    this.accountAuths = this.dexie.table<IAccountAuth, string>(
+      Table.AccountAuth
+    );
     this.accounts = this.dexie.table<IAccount, string>(Table.Accounts);
     this.addresses = this.dexie.table<IAddress, string>(Table.Addresses);
-    this.transactions = this.dexie.table<ITransaction, string>(Table.Transactions);
+    this.transactions = this.dexie.table<ITransaction, string>(
+      Table.Transactions
+    );
     this.transactionScripts = this.dexie.table<ITransactionScript, string>(
       Table.TransactionScripts
     );
     this.inputNotes = this.dexie.table<IInputNote, string>(Table.InputNotes);
     this.outputNotes = this.dexie.table<IOutputNote, string>(Table.OutputNotes);
-    this.notesScripts = this.dexie.table<INotesScript, string>(Table.NotesScripts);
-    this.stateSync = this.dexie.table<IStateSync, number>(Table.StateSync);
-    this.blockHeaders = this.dexie.table<IBlockHeader, string>(Table.BlockHeaders);
-    this.partialBlockchainNodes = this.dexie.table<IPartialBlockchainNode, string>(
-      Table.PartialBlockchainNodes
+    this.notesScripts = this.dexie.table<INotesScript, string>(
+      Table.NotesScripts
     );
+    this.stateSync = this.dexie.table<IStateSync, number>(Table.StateSync);
+    this.blockHeaders = this.dexie.table<IBlockHeader, string>(
+      Table.BlockHeaders
+    );
+    this.partialBlockchainNodes = this.dexie.table<
+      IPartialBlockchainNode,
+      string
+    >(Table.PartialBlockchainNodes);
     this.tags = this.dexie.table<ITag, number>(Table.Tags);
     this.foreignAccountCode = this.dexie.table<IForeignAccountCode, string>(
       Table.ForeignAccountCode
