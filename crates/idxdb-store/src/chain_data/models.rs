@@ -19,7 +19,7 @@ pub struct BlockHeaderIdxdbObject {
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PartialBlockchainNodeIdxdbObject {
-    pub id: String,
+    pub id: u64,
     pub node: String,
 }
 

@@ -3,7 +3,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::num::NonZeroUsize;
 use std::rc::Rc;
-use std::string::String;
 use std::vec::Vec;
 
 use miden_client::Word;
@@ -39,17 +38,6 @@ struct SerializedPartialBlockchainNodeData {
 struct SerializedPartialBlockchainNodeParts {
     id: u64,
     node: String,
-}
-
-// PARTIAL BLOCKCHAIN NODE FILTER HELPERS
-// --------------------------------------------------------------------------------------------
-
-fn partial_blockchain_filter_to_query(filter: &PartialBlockchainFilter) -> String {
-    let base = String::from("SELECT id, node FROM partial_blockchain_nodes");
-    match filter {
-        PartialBlockchainFilter::All => base,
-        PartialBlockchainFilter::List(_) => format!("{base} WHERE id IN rarray(?)"),
-    }
 }
 
 impl SqliteStore {
@@ -115,27 +103,39 @@ impl SqliteStore {
         conn: &mut Connection,
         filter: &PartialBlockchainFilter,
     ) -> Result<BTreeMap<InOrderIndex, Word>, StoreError> {
-        let mut params = Vec::new();
-        if let PartialBlockchainFilter::List(ids) = &filter {
-            let id_values = ids
-                .iter()
-            // SAFETY: d.inner() is a usize casted to u64, should not fail.
-                .map(|id| Value::Integer(i64::try_from(id.inner()).expect("id is a valid i64")))
-                .collect::<Vec<_>>();
+        match filter {
+            PartialBlockchainFilter::All => query_partial_blockchain_nodes(
+                conn,
+                "SELECT id, node FROM partial_blockchain_nodes",
+                params![],
+            ),
 
-            params.push(Rc::new(id_values));
+            PartialBlockchainFilter::List(ids) if ids.is_empty() => Ok(BTreeMap::new()),
+            PartialBlockchainFilter::List(ids) => {
+                let id_values = ids
+                    .iter()
+                    .map(|id| Value::Integer(i64::try_from(id.inner()).expect("id is a valid i64")))
+                    .collect::<Vec<_>>();
+
+                query_partial_blockchain_nodes(
+                    conn,
+                    "SELECT id, node FROM partial_blockchain_nodes WHERE id IN rarray(?)",
+                    params_from_iter([Rc::new(id_values)]),
+                )
+            },
+
+            PartialBlockchainFilter::Forest(forest) if forest.is_empty() => Ok(BTreeMap::new()),
+            PartialBlockchainFilter::Forest(forest) => {
+                let max_index = i64::try_from(forest.rightmost_in_order_index().inner())
+                    .expect("id is a valid i64");
+
+                query_partial_blockchain_nodes(
+                    conn,
+                    "SELECT id, node FROM partial_blockchain_nodes WHERE id <= ?",
+                    params![max_index],
+                )
+            },
         }
-
-        conn.prepare(&partial_blockchain_filter_to_query(filter))
-            .into_store_error()?
-            .query_map(params_from_iter(params), parse_partial_blockchain_nodes_columns)
-            .into_store_error()?
-            .map(|result| {
-                let serialized_partial_blockchain_node_parts: SerializedPartialBlockchainNodeParts =
-                    result.into_store_error()?;
-                parse_partial_blockchain_nodes(&serialized_partial_blockchain_node_parts)
-            })
-            .collect()
     }
 
     pub(crate) fn get_partial_blockchain_peaks_by_block_num(
@@ -255,6 +255,22 @@ fn insert_partial_blockchain_node(
     const QUERY: &str = insert_sql!(partial_blockchain_nodes { id, node } | IGNORE);
     tx.execute(QUERY, params![id, node]).into_store_error()?;
     Ok(())
+}
+
+fn query_partial_blockchain_nodes<P: rusqlite::Params>(
+    conn: &mut Connection,
+    sql: &str,
+    params: P,
+) -> Result<BTreeMap<InOrderIndex, Word>, StoreError> {
+    let mut stmt = conn.prepare_cached(sql).into_store_error()?;
+
+    stmt.query_map(params, parse_partial_blockchain_nodes_columns)
+        .into_store_error()?
+        .map(|row_res| {
+            let parts: SerializedPartialBlockchainNodeParts = row_res.into_store_error()?;
+            parse_partial_blockchain_nodes(&parts)
+        })
+        .collect()
 }
 
 fn parse_partial_blockchain_peaks(forest: u32, peaks_nodes: &[u8]) -> Result<MmrPeaks, StoreError> {

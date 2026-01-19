@@ -22,6 +22,12 @@ extern "C" {
     #[wasm_bindgen(js_name = getPartialBlockchainNodes)]
     pub fn idxdb_get_partial_blockchain_nodes(db_id: &str, ids: Vec<String>) -> js_sys::Promise;
 
+    #[wasm_bindgen(js_name = getPartialBlockchainNodesUpToInOrderIndex)]
+    pub fn idxdb_get_partial_blockchain_nodes_up_to_inorder_index(
+        db_id: &str,
+        max_in_order_index: String,
+    ) -> js_sys::Promise;
+
     #[wasm_bindgen(js_name = getPartialBlockchainPeaksByBlockNum)]
     pub fn idxdb_get_partial_blockchain_peaks_by_block_num(
         db_id: &str,

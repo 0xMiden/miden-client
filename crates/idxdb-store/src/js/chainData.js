@@ -40,7 +40,7 @@ export async function insertPartialBlockchainNodes(dbId, ids, nodes) {
             return;
         }
         const data = nodes.map((node, index) => ({
-            id: ids[index],
+            id: Number(ids[index]),
             node: node,
         }));
         await db.partialBlockchainNodes.bulkPut(data);
@@ -128,11 +128,26 @@ export async function getPartialBlockchainNodesAll(dbId) {
 export async function getPartialBlockchainNodes(dbId, ids) {
     try {
         const db = getDatabase(dbId);
-        const results = await db.partialBlockchainNodes.bulkGet(ids);
+        const numericIds = ids.map((id) => Number(id));
+        const results = await db.partialBlockchainNodes.bulkGet(numericIds);
         return results;
     }
     catch (err) {
         logWebStoreError(err, "Failed to get partial blockchain nodes");
+    }
+}
+export async function getPartialBlockchainNodesUpToInOrderIndex(dbId, maxInOrderIndex) {
+    try {
+        const db = getDatabase(dbId);
+        const maxNumericId = Number(maxInOrderIndex);
+        const results = await db.partialBlockchainNodes
+            .where("id")
+            .belowOrEqual(maxNumericId)
+            .toArray();
+        return results;
+    }
+    catch (err) {
+        logWebStoreError(err, "Failed to get partial blockchain nodes up to index");
     }
 }
 export async function pruneIrrelevantBlocks(dbId) {

@@ -31,6 +31,7 @@
 * [BREAKING] Simplified the `NoteScreener` API, removing `NoteRelevance` in favor of `NoteConsumptionStatus`; exposed JS bindings for consumption check results ([#1630](https://github.com/0xMiden/miden-client/pull/1630)).
 * [BREAKING] Replaced `TransactionRequestBuilder::unauthenticated_input_notes` & `TransactionRequestBuilder::authenticated_input_notes` for `TransactionRequestBuilder::input_notes`, now the user passes a list of notes which the `Client` itself determines the authentication status of ([#1624](https://github.com/0xMiden/miden-client/issues/1624)).
 * Updated `SqliteStore`: replaced `MerkleStore` with `SmtForest` and introduced `AccountSmtForest`; simplified queries ([#1526](https://github.com/0xMiden/miden-client/pull/1526), [#1663](https://github.com/0xMiden/miden-client/pull/1663)).
+* Added filter to store query to improve how the MMR is built ([#1681](https://github.com/0xMiden/miden-client/pull/1681)).
 
 ## 0.12.5 (2025-12-01)
 

@@ -158,7 +158,7 @@ async function updatePartialBlockchainNodes(tx, nodeIndexes, nodes) {
             return;
         }
         const data = nodes.map((node, index) => ({
-            id: nodeIndexes[index],
+            id: Number(nodeIndexes[index]),
             node: node,
         }));
         // Use bulkPut to add/overwrite the entries

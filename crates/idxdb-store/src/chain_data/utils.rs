@@ -62,10 +62,9 @@ pub fn process_partial_blockchain_nodes_from_js_value(
     let results: Result<BTreeMap<InOrderIndex, Word>, StoreError> = partial_blockchain_nodes_idxdb
         .into_iter()
         .map(|record| {
-            let id_as_u64: u64 = record.id.parse::<u64>().unwrap();
             let id = InOrderIndex::new(
                 NonZeroUsize::new(
-                    usize::try_from(id_as_u64).expect("usize should not fail converting to u64"),
+                    usize::try_from(record.id).expect("usize should not fail converting to u64"),
                 )
                 .unwrap(),
             );
