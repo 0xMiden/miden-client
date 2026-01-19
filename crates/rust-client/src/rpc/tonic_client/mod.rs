@@ -105,9 +105,10 @@ impl GrpcClient {
         Ok(())
     }
 
-    /// Given an id, return the proof for the account.
-    /// If the account also has public state, the details for it
-    /// will also be retrieve as part of the proof.
+    /// Given an [`AccountId`], return the proof for the account.
+    ///
+    /// If the account also has public state, the details for it will also be retrieved as part of 
+    /// the proof.
     pub async fn fetch_full_account_proof(
         &self,
         account_id: AccountId,
