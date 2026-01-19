@@ -29,7 +29,7 @@ export {
   AdviceInputs,
   AdviceMap,
   AssetVault,
-  AuthScheme,
+  AuthRpoFalcon512MultisigConfig,
   AuthSecretKey,
   BasicFungibleFaucetComponent,
   BlockHeader,
@@ -100,6 +100,7 @@ export {
   OutputNoteState,
   Package,
   PartialNote,
+  ProcedureThreshold,
   Program,
   ProvenTransaction,
   PublicKey,
@@ -136,6 +137,7 @@ export {
   TransactionStoreUpdate,
   TransactionSummary,
   Word,
+  createAuthRpoFalcon512Multisig,
 } from "./crates/miden_client_web";
 
 export type GetKeyCallback = (
@@ -195,6 +197,9 @@ export declare class WebClient extends WasmWebClient {
     insertKeyCb?: InsertKeyCallback,
     signCb?: SignCallback
   ): Promise<WebClient & WasmWebClient>;
+
+  /** Returns the default transaction prover configured on the client. */
+  defaultTransactionProver(): TransactionProver;
 
   /**
    * Terminates the underlying worker.

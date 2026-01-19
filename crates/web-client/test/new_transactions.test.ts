@@ -1417,4 +1417,184 @@ test.describe("submitNewTransactionWithProver tests", () => {
 
     expect(failingProverResult.threw).toBe(true);
   });
+
+  test.describe("executeForSummary tests", () => {
+    test("executeForSummary returns TransactionSummary for unauthorized transaction", async ({
+      page,
+    }) => {
+      const result = await page.evaluate(async () => {
+        const client = window.client;
+
+        const walletSeed = new Uint8Array(32);
+        crypto.getRandomValues(walletSeed);
+
+        const approverKeys = [
+          window.SecretKey.rpoFalconWithRNG(),
+          window.SecretKey.rpoFalconWithRNG(),
+          window.SecretKey.rpoFalconWithRNG(),
+        ];
+        const approverCommitments = approverKeys.map((key) =>
+          key.publicKey().toCommitment()
+        );
+        const multisigConfig = new window.AuthRpoFalcon512MultisigConfig(
+          approverCommitments,
+          2
+        );
+        const multisigComponent =
+          window.createAuthRpoFalcon512Multisig(multisigConfig);
+
+        const accountBuilderResult = new window.AccountBuilder(walletSeed)
+          .accountType(window.AccountType.RegularAccountImmutableCode)
+          .storageMode(window.AccountStorageMode.private())
+          .withAuthComponent(multisigComponent)
+          .withBasicWalletComponent()
+          .build();
+
+        await client.newAccount(accountBuilderResult.account, false);
+
+        const targetAccount = await client.newWallet(
+          window.AccountStorageMode.private(),
+          false,
+          0
+        );
+
+        const faucetAccount = await client.newFaucet(
+          window.AccountStorageMode.private(),
+          false,
+          "DAG",
+          8,
+          BigInt(10000000),
+          0
+        );
+
+        await client.syncState();
+
+        const mintTransactionRequest = client.newMintTransactionRequest(
+          targetAccount.id(),
+          faucetAccount.id(),
+          window.NoteType.Public,
+          BigInt(1000)
+        );
+
+        const mintTransactionUpdate =
+          await window.helpers.executeAndApplyTransaction(
+            faucetAccount.id(),
+            mintTransactionRequest
+          );
+
+        const createdNoteIds = mintTransactionUpdate
+          .executedTransaction()
+          .outputNotes()
+          .notes()
+          .map((note: Note) => note.id().toString());
+
+        await window.helpers.waitForTransaction(
+          mintTransactionUpdate.executedTransaction().id().toHex()
+        );
+
+        const consumeTransactionRequest =
+          client.newConsumeTransactionRequest(createdNoteIds);
+
+        const consumeTransactionUpdate =
+          await window.helpers.executeAndApplyTransaction(
+            targetAccount.id(),
+            consumeTransactionRequest
+          );
+
+        await window.helpers.waitForTransaction(
+          consumeTransactionUpdate.executedTransaction().id().toHex()
+        );
+
+        const sendTransactionRequest = client.newSendTransactionRequest(
+          targetAccount.id(),
+          accountBuilderResult.account.id(),
+          faucetAccount.id(),
+          window.NoteType.Public,
+          BigInt(100),
+          null,
+          null
+        );
+
+        const sendTransactionUpdate =
+          await window.helpers.executeAndApplyTransaction(
+            targetAccount.id(),
+            sendTransactionRequest
+          );
+
+        const sentNoteIds = sendTransactionUpdate
+          .executedTransaction()
+          .outputNotes()
+          .notes()
+          .map((note: Note) => note.id().toString());
+
+        await window.helpers.waitForTransaction(
+          sendTransactionUpdate.executedTransaction().id().toHex()
+        );
+
+        const consumeSentNoteRequest =
+          client.newConsumeTransactionRequest(sentNoteIds);
+
+        const summary = await client.executeForSummary(
+          accountBuilderResult.account.id(),
+          consumeSentNoteRequest
+        );
+
+        return {
+          inputNotesCount: summary.inputNotes().numNotes(),
+          outputNotesCount: summary.outputNotes().numNotes(),
+          inputNoteIds: summary
+            .inputNotes()
+            .notes()
+            .map((note: any) => note.id().toString()),
+          sentNoteIds,
+        };
+      });
+
+      expect(result.inputNotesCount).toBe(1);
+      expect(result.outputNotesCount).toBe(0);
+      expect(result.inputNoteIds).toEqual(result.sentNoteIds);
+    });
+
+    test("executeForSummary returns TransactionSummary for authorized transaction with matching salt", async ({
+      page,
+    }) => {
+      const result = await page.evaluate(async () => {
+        const client = window.client;
+
+        const senderAccount = await client.newWallet(
+          window.AccountStorageMode.private(),
+          false,
+          0
+        );
+
+        await client.syncState();
+
+        // Create a known salt value
+        const expectedSalt = new window.Word(
+          new BigUint64Array([BigInt(1), BigInt(2), BigInt(3), BigInt(4)])
+        );
+
+        // Build transaction request with the salt as auth_arg
+        const transactionRequest = new window.TransactionRequestBuilder()
+          .withAuthArg(expectedSalt)
+          .build();
+
+        const summary = await client.executeForSummary(
+          senderAccount.id(),
+          transactionRequest
+        );
+
+        return {
+          inputNotesCount: summary.inputNotes().numNotes(),
+          outputNotesCount: summary.outputNotes().numNotes(),
+          saltHex: summary.salt().toHex(),
+          expectedSaltHex: expectedSalt.toHex(),
+        };
+      });
+
+      expect(result.inputNotesCount).toBe(0);
+      expect(result.outputNotesCount).toBe(0);
+      expect(result.saltHex).toBe(result.expectedSaltHex);
+    });
+  });
 });

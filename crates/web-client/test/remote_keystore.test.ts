@@ -33,14 +33,14 @@ test.describe("remote keystore", () => {
     page,
   }) => {
     const { publicKeyCommitment, secretKey } = await page.evaluate(async () => {
-      let publicKeyCommitment: string | undefined;
-      let secretKey: string | undefined;
+      let publicKeyCommitment: number[] | undefined;
+      let secretKey: number[] | undefined;
       const insertKeyCb = async (
-        publicKeyCommitmentStr: string,
-        secretKeyStr: string
+        publicKeyCommitmentBytes: Uint8Array,
+        secretKeyBytes: Uint8Array
       ) => {
-        publicKeyCommitment = publicKeyCommitmentStr;
-        secretKey = secretKeyStr;
+        publicKeyCommitment = Array.from(publicKeyCommitmentBytes);
+        secretKey = Array.from(secretKeyBytes);
       };
       const client = await window.WebClient.createClientWithExternalKeystore(
         window.rpcUrl!,

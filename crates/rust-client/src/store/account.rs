@@ -201,20 +201,23 @@ pub enum AccountStatus {
     New { seed: Word },
     /// The account is tracked by the node and was used at least once.
     Tracked,
-    /// The local account state doesn't match the node's state, rendering it unusable. Only used
-    /// for private accounts.
-    Locked,
+    /// The local account state doesn't match the node's state, rendering it unusable.
+    /// Only used for private accounts.
+    /// The seed is preserved for private accounts with nonce=0 that need reconstruction via
+    /// `Account::new()`.
+    Locked { seed: Option<Word> },
 }
 
 impl AccountStatus {
     pub fn is_locked(&self) -> bool {
-        matches!(self, AccountStatus::Locked)
+        matches!(self, AccountStatus::Locked { .. })
     }
 
     pub fn seed(&self) -> Option<&Word> {
         match self {
             AccountStatus::New { seed } => Some(seed),
-            _ => None,
+            AccountStatus::Locked { seed } => seed.as_ref(),
+            AccountStatus::Tracked => None,
         }
     }
 }
@@ -224,7 +227,7 @@ impl Display for AccountStatus {
         match self {
             AccountStatus::New { .. } => write!(f, "New"),
             AccountStatus::Tracked => write!(f, "Tracked"),
-            AccountStatus::Locked => write!(f, "Locked"),
+            AccountStatus::Locked { .. } => write!(f, "Locked"),
         }
     }
 }
