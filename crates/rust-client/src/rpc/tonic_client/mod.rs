@@ -65,10 +65,6 @@ pub struct GrpcClient {
     genesis_commitment: RwLock<Option<Word>>,
 }
 
-// Helper function to request extra details for an account.
-// Keep in mind, this can potentially do **two** requests to the rpc endpoint.
-// If the account has a non public state, it will simply return the first response.
-// Otherwise it will request the RPC endpoint for the extra data for an account with public state.
 impl GrpcClient {
     /// Returns a new instance of [`GrpcClient`] that'll do calls to the provided [`Endpoint`]
     /// with the given timeout in milliseconds.
@@ -106,8 +102,7 @@ impl GrpcClient {
 
     /// Given an [`AccountId`], return the proof for the account.
     ///
-    /// If the account also has public state, the details for it will also be retrieved as part of 
-    /// the proof.
+    /// If the account also has public state, its details will also be retrieved
     pub async fn fetch_full_account_proof(
         &self,
         account_id: AccountId,
