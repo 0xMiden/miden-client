@@ -142,11 +142,7 @@ impl<AUTH> Client<AUTH> {
     ///   ([`ACCOUNT_ID_LIMIT`](crate::rpc::ACCOUNT_ID_LIMIT)).
     /// - If the client has reached the note tags limit
     ///   ([`NOTE_TAG_LIMIT`](crate::rpc::NOTE_TAG_LIMIT)).
-    pub async fn add_account(
-        &mut self,
-        account: &Account,
-        overwrite: bool,
-    ) -> Result<(), ClientError> {
+    pub async fn add_account(&self, account: &Account, overwrite: bool) -> Result<(), ClientError> {
         self.check_account_limit().await?;
         self.check_note_tag_limit().await?;
 
@@ -221,7 +217,7 @@ impl<AUTH> Client<AUTH> {
     /// - If the account is not found on the network.
     /// - If the account is private.
     /// - There was an error sending the request to the network.
-    pub async fn import_account_by_id(&mut self, account_id: AccountId) -> Result<(), ClientError> {
+    pub async fn import_account_by_id(&self, account_id: AccountId) -> Result<(), ClientError> {
         let fetched_account = self.rpc_api.get_account_details(account_id).await?;
 
         let account = match fetched_account {
@@ -242,7 +238,7 @@ impl<AUTH> Client<AUTH> {
     /// - If the client has reached the note tags limit
     ///   ([`NOTE_TAG_LIMIT`](crate::rpc::NOTE_TAG_LIMIT)).
     pub async fn add_address(
-        &mut self,
+        &self,
         address: Address,
         account_id: AccountId,
     ) -> Result<(), ClientError> {
@@ -280,7 +276,7 @@ impl<AUTH> Client<AUTH> {
     /// - If the account is not found on the network.
     /// - If the address is not being tracked.
     pub async fn remove_address(
-        &mut self,
+        &self,
         address: Address,
         account_id: AccountId,
     ) -> Result<(), ClientError> {

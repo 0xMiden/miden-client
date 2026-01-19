@@ -76,7 +76,7 @@ where
     /// An internal pagination mechanism is employed to reduce the number of downloaded notes.
     /// To fetch the full history of private notes for the tracked tags, use
     /// [`Client::fetch_all_private_notes`].
-    pub async fn fetch_private_notes(&mut self) -> Result<(), ClientError> {
+    pub async fn fetch_private_notes(&self) -> Result<(), ClientError> {
         // Unique tags
         let note_tags = self.store.get_unique_note_tags().await?;
         // Get global cursor
@@ -92,7 +92,7 @@ where
     /// Similar to [`Client::fetch_private_notes`] however does not employ pagination,
     /// fetching all notes stored in the note transport network for the tracked tags.
     /// Please prefer using [`Client::fetch_private_notes`] to avoid downloading repeated notes.
-    pub async fn fetch_all_private_notes(&mut self) -> Result<(), ClientError> {
+    pub async fn fetch_all_private_notes(&self) -> Result<(), ClientError> {
         let note_tags = self.store.get_unique_note_tags().await?;
 
         self.fetch_transport_notes(NoteTransportCursor::init(), note_tags).await?;
@@ -105,7 +105,7 @@ where
     /// Pagination is employed, where only notes after the provided cursor are requested.
     /// Downloaded notes are imported.
     pub(crate) async fn fetch_transport_notes<I>(
-        &mut self,
+        &self,
         cursor: NoteTransportCursor,
         tags: I,
     ) -> Result<(), ClientError>

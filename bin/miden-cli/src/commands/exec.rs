@@ -52,7 +52,7 @@ pub struct ExecCmd {
 impl ExecCmd {
     pub async fn execute<AUTH: TransactionAuthenticator + Sync + 'static>(
         &self,
-        mut client: Client<AUTH>,
+        client: Client<AUTH>,
     ) -> Result<(), CliError> {
         let script_path = PathBuf::from(&self.script_path);
         if !script_path.exists() {

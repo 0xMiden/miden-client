@@ -92,11 +92,19 @@ pub async fn test_pass_through(client_config: ClientConfig) -> Result<()> {
     println!("creating note with accountA");
     let asset = FungibleAsset::new(btc_faucet_account.id(), ASSET_AMOUNT)?;
 
-    let (pass_through_note_1, pass_through_note_details_1) =
-        create_pass_through_note(sender.id(), target.id(), asset.into(), client.rng())?;
+    let (pass_through_note_1, pass_through_note_details_1) = create_pass_through_note(
+        sender.id(),
+        target.id(),
+        asset.into(),
+        &mut client.rng().clone(),
+    )?;
 
-    let (pass_through_note_2, pass_through_note_details_2) =
-        create_pass_through_note(sender.id(), target.id(), asset.into(), client.rng())?;
+    let (pass_through_note_2, pass_through_note_details_2) = create_pass_through_note(
+        sender.id(),
+        target.id(),
+        asset.into(),
+        &mut client.rng().clone(),
+    )?;
 
     let tx_request = TransactionRequestBuilder::new()
         .own_output_notes(vec![
@@ -195,9 +203,9 @@ async fn create_pass_through_account<AUTH: TransactionAuthenticator>(
     client: &mut Client<AUTH>,
 ) -> Result<Account> {
     let mut init_seed = [0u8; 32];
-    client.rng().fill_bytes(&mut init_seed);
+    client.rng().clone().fill_bytes(&mut init_seed);
 
-    let key_pair = SecretKey::with_rng(client.rng());
+    let key_pair = SecretKey::with_rng(&mut client.rng().clone());
     let pub_key = key_pair.public_key().to_commitment();
 
     let acl_config = AuthRpoFalcon512AclConfig::new()

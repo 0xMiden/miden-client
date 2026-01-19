@@ -27,7 +27,7 @@ use crate::tests::{create_test_client, setup_wallet_and_faucet};
 
 #[tokio::test]
 async fn transaction_creates_two_notes() {
-    let (mut client, _, keystore) = Box::pin(create_test_client()).await;
+    let (client, _, keystore) = Box::pin(create_test_client()).await;
     let asset_1: Asset =
         FungibleAsset::new(ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET.try_into().unwrap(), 123)
             .unwrap()
@@ -58,7 +58,7 @@ async fn transaction_creates_two_notes() {
                 ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE.try_into().unwrap(),
             ),
             NoteType::Private,
-            client.rng(),
+            &mut client.rng().clone(),
         )
         .unwrap();
 
@@ -156,7 +156,12 @@ async fn prover_fallback_pattern_allows_retry_with_different_prover() {
     let fungible_asset = FungibleAsset::new(faucet.id(), 100).unwrap();
 
     let tx_request = TransactionRequestBuilder::new()
-        .build_mint_fungible_asset(fungible_asset, wallet.id(), NoteType::Private, client.rng())
+        .build_mint_fungible_asset(
+            fungible_asset,
+            wallet.id(),
+            NoteType::Private,
+            &mut client.rng().clone(),
+        )
         .unwrap();
 
     // First attempt with failing prover

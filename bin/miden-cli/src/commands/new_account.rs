@@ -374,7 +374,7 @@ async fn create_client_account<AUTH: TransactionAuthenticator + Sync + 'static>(
     debug!("Loaded initialization storage data");
 
     let mut init_seed = [0u8; 32];
-    client.rng().fill_bytes(&mut init_seed);
+    client.rng().clone().fill_bytes(&mut init_seed);
 
     let mut builder = AccountBuilder::new(init_seed)
         .account_type(account_type)
@@ -391,7 +391,7 @@ async fn create_client_account<AUTH: TransactionAuthenticator + Sync + 'static>(
         None
     } else {
         debug!("Adding default Falcon auth component");
-        let kp = AuthSecretKey::new_falcon512_rpo_with_rng(client.rng());
+        let kp = AuthSecretKey::new_falcon512_rpo_with_rng(&mut client.rng().clone());
         builder =
             builder.with_auth_component(AuthRpoFalcon512::new(kp.public_key().to_commitment()));
         Some(kp)

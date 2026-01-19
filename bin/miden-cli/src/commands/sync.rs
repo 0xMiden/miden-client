@@ -11,7 +11,7 @@ pub struct SyncCmd {}
 impl SyncCmd {
     pub async fn execute<AUTH: TransactionAuthenticator + Sync + 'static>(
         &self,
-        mut client: Client<AUTH>,
+        client: Client<AUTH>,
     ) -> Result<(), CliError> {
         let new_details = client.sync_state().await?;
 

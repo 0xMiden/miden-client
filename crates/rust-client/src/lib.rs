@@ -127,6 +127,7 @@
 #[macro_use]
 extern crate alloc;
 use alloc::boxed::Box;
+use core::ops::DerefMut;
 
 #[cfg(feature = "std")]
 extern crate std;
@@ -313,6 +314,7 @@ use miden_tx::auth::TransactionAuthenticator;
 use rand::RngCore;
 use rpc::NodeRpcClient;
 use store::Store;
+use utils::RwLock;
 
 use crate::note_transport::{NoteTransportClient, init_note_transport_cursor};
 use crate::rpc::{ACCOUNT_ID_LIMIT, NOTE_TAG_LIMIT};
@@ -345,7 +347,7 @@ pub struct Client<AUTH> {
     authenticator: Option<Arc<AUTH>>,
     /// Shared source manager used to retain MASM source information for assembled programs.
     source_manager: Arc<dyn SourceManagerSync>,
-    /// Options that control the transaction executor’s runtime behaviour (e.g. debug mode).
+    /// Options that control the transaction executor's runtime behaviour (e.g. debug mode).
     exec_options: ExecutionOptions,
     /// The number of blocks that are considered old enough to discard pending transactions.
     tx_graceful_blocks: Option<u32>,
@@ -394,7 +396,7 @@ where
     #[allow(clippy::too_many_arguments)]
     pub async fn new(
         rpc_api: Arc<dyn NodeRpcClient>,
-        rng: Box<dyn FeltRng>,
+        rng: Box<dyn FeltRng + Send + Sync>,
         store: Arc<dyn Store>,
         authenticator: Option<Arc<AUTH>>,
         exec_options: ExecutionOptions,
@@ -444,8 +446,8 @@ where
 
     /// Returns a reference to the client's random number generator. This can be used to generate
     /// randomness for various purposes such as serial numbers, keys, etc.
-    pub fn rng(&mut self) -> &mut ClientRng {
-        &mut self.rng
+    pub fn rng(&self) -> &ClientRng {
+        &self.rng
     }
 
     pub fn prover(&self) -> Arc<dyn TransactionProver + Send + Sync> {
@@ -492,39 +494,48 @@ impl<AUTH> Client<AUTH> {
 
 /// A wrapper around a [`FeltRng`] that implements the [`RngCore`] trait.
 /// This allows the user to pass their own generic RNG so that it's used by the client.
-pub struct ClientRng(Box<dyn FeltRng>);
+///
+/// The RNG is wrapped in an `Arc<RwLock<...>>` to ensure thread-safety (`Send + Sync`).
+pub struct ClientRng(Arc<RwLock<Box<dyn FeltRng + Send + Sync>>>);
 
 impl ClientRng {
-    pub fn new(rng: Box<dyn FeltRng>) -> Self {
-        Self(rng)
+    pub fn new(rng: Box<dyn FeltRng + Send + Sync>) -> Self {
+        Self(Arc::new(RwLock::new(rng)))
     }
 
-    pub fn inner_mut(&mut self) -> &mut Box<dyn FeltRng> {
-        &mut self.0
+    /// Returns exclusive access to the inner RNG.
+    pub fn inner(&self) -> impl DerefMut<Target = Box<dyn FeltRng + Send + Sync>> + '_ {
+        self.0.write()
+    }
+}
+
+impl Clone for ClientRng {
+    fn clone(&self) -> Self {
+        Self(Arc::clone(&self.0))
     }
 }
 
 impl RngCore for ClientRng {
     fn next_u32(&mut self) -> u32 {
-        self.0.next_u32()
+        self.0.write().next_u32()
     }
 
     fn next_u64(&mut self) -> u64 {
-        self.0.next_u64()
+        self.0.write().next_u64()
     }
 
     fn fill_bytes(&mut self, dest: &mut [u8]) {
-        self.0.fill_bytes(dest);
+        self.0.write().fill_bytes(dest);
     }
 }
 
 impl FeltRng for ClientRng {
     fn draw_element(&mut self) -> Felt {
-        self.0.draw_element()
+        self.0.write().draw_element()
     }
 
     fn draw_word(&mut self) -> Word {
-        self.0.draw_word()
+        self.0.write().draw_word()
     }
 }
 
@@ -551,5 +562,24 @@ impl From<bool> for DebugMode {
         } else {
             DebugMode::Disabled
         }
+    }
+}
+
+// TESTS
+// ================================================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Verifies that `Client<AUTH>` implements `Send` and `Sync`.
+    #[test]
+    fn client_is_send_sync() {
+        fn assert_send<T: Send>() {}
+        fn assert_sync<T: Sync>() {}
+
+        // Use a concrete authenticator type for the test
+        assert_send::<Client<()>>();
+        assert_sync::<Client<()>>();
     }
 }

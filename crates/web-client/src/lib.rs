@@ -173,7 +173,7 @@ impl WebClient {
 
         let keystore = WebKeyStore::new_with_callbacks(rng, get_key_cb, insert_key_cb, sign_cb);
 
-        let mut client = Client::new(
+        let client = Client::new(
             rpc_client,
             Box::new(rng),
             web_store.clone(),

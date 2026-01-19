@@ -33,11 +33,8 @@
 //! ///
 //! /// This transaction is executed by `sender_id`, and creates an output note
 //! /// containing 100 tokens of `faucet_id`'s fungible asset.
-//! async fn create_and_submit_transaction<
-//!     R: rand::Rng,
-//!     AUTH: TransactionAuthenticator + Sync + 'static,
-//! >(
-//!     client: &mut Client<AUTH>,
+//! async fn create_and_submit_transaction<AUTH: TransactionAuthenticator + Sync + 'static>(
+//!     client: &Client<AUTH>,
 //!     sender_id: AccountId,
 //!     target_id: AccountId,
 //!     faucet_id: AccountId,
@@ -49,7 +46,7 @@
 //!     let tx_request = TransactionRequestBuilder::new().build_pay_to_id(
 //!         PaymentNoteDescription::new(vec![asset.into()], sender_id, target_id),
 //!         NoteType::Private,
-//!         client.rng(),
+//!         &mut *client.rng().inner(),
 //!     )?;
 //!
 //!     // Execute, prove, and submit the transaction in a single call.
@@ -176,7 +173,7 @@ where
     /// doesn't have the required block header in the local database. In these scenarios, a sync to
     /// the chain tip is performed, and the required block header is retrieved.
     pub async fn submit_new_transaction(
-        &mut self,
+        &self,
         account_id: AccountId,
         transaction_request: TransactionRequest,
     ) -> Result<TransactionId, ClientError> {
@@ -196,7 +193,7 @@ where
     /// doesn't have the required block header in the local database. In these scenarios, a sync to
     /// the chain tip is performed, and the required block header is retrieved.
     pub async fn submit_new_transaction_with_prover(
-        &mut self,
+        &self,
         account_id: AccountId,
         transaction_request: TransactionRequest,
         tx_prover: Arc<dyn TransactionProver>,
@@ -227,7 +224,7 @@ where
     /// - Returns a [`ClientError::TransactionExecutorError`] if the execution fails.
     /// - Returns a [`ClientError::TransactionRequestError`] if the request is invalid.
     pub async fn execute_transaction(
-        &mut self,
+        &self,
         account_id: AccountId,
         transaction_request: TransactionRequest,
     ) -> Result<TransactionResult, ClientError> {
@@ -337,7 +334,7 @@ where
 
     /// Proves the specified transaction using the prover configured for this client.
     pub async fn prove_transaction(
-        &mut self,
+        &self,
         tx_result: &TransactionResult,
     ) -> Result<ProvenTransaction, ClientError> {
         self.prove_transaction_with(tx_result, self.tx_prover.clone()).await
@@ -345,7 +342,7 @@ where
 
     /// Proves the specified transaction using the provided prover.
     pub async fn prove_transaction_with(
-        &mut self,
+        &self,
         tx_result: &TransactionResult,
         tx_prover: Arc<dyn TransactionProver>,
     ) -> Result<ProvenTransaction, ClientError> {
@@ -359,10 +356,10 @@ where
         Ok(proven_transaction)
     }
 
-    /// Submits a previously proven transaction to the RPC endpoint and returns the node’s chain tip
+    /// Submits a previously proven transaction to the RPC endpoint and returns the node's chain tip
     /// upon mempool admission.
     pub async fn submit_proven_transaction(
-        &mut self,
+        &self,
         proven_transaction: ProvenTransaction,
         transaction_inputs: impl Into<TransactionInputs>,
     ) -> Result<BlockNumber, ClientError> {
@@ -447,7 +444,7 @@ where
     ///
     /// The transaction will use the current sync height as the block reference.
     pub async fn execute_program(
-        &mut self,
+        &self,
         account_id: AccountId,
         tx_script: TransactionScript,
         advice_inputs: AdviceInputs,
@@ -587,7 +584,7 @@ where
     /// - That the account has enough balance to cover the outgoing assets.
     /// - That the client is not too far behind the chain tip.
     pub async fn validate_request(
-        &mut self,
+        &self,
         account_id: AccountId,
         transaction_request: &TransactionRequest,
     ) -> Result<(), ClientError> {
@@ -674,7 +671,7 @@ where
     /// currently have the corresponding block header data. Otherwise, we additionally need to
     /// retrieve it, this implies a state sync call which may update the client in other ways.
     async fn retrieve_foreign_account_inputs(
-        &mut self,
+        &self,
         foreign_accounts: BTreeSet<ForeignAccount>,
     ) -> Result<(Option<BlockNumber>, Vec<AccountInputs>), ClientError> {
         if foreign_accounts.is_empty() {

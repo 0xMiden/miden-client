@@ -63,7 +63,7 @@ pub async fn insert_new_wallet(
     auth_scheme: AuthSchemeId,
 ) -> Result<(Account, AuthSecretKey), ClientError> {
     let mut init_seed = [0u8; 32];
-    client.rng().fill_bytes(&mut init_seed);
+    client.rng().inner().fill_bytes(&mut init_seed);
 
     insert_new_wallet_with_seed(client, storage_mode, keystore, init_seed, auth_scheme).await
 }
@@ -142,7 +142,7 @@ pub async fn insert_new_fungible_faucet(
 
     // we need to use an initial seed to create the faucet account
     let mut init_seed = [0u8; 32];
-    client.rng().fill_bytes(&mut init_seed);
+    client.rng().inner().fill_bytes(&mut init_seed);
 
     let symbol = TokenSymbol::new("TEST").unwrap();
     let max_supply = Felt::try_from(9_999_999_u64.to_le_bytes().as_slice())
@@ -399,7 +399,12 @@ pub async fn mint_note(
     let fungible_asset = FungibleAsset::new(faucet_account_id, MINT_AMOUNT).unwrap();
     println!("Minting Asset");
     let tx_request = TransactionRequestBuilder::new()
-        .build_mint_fungible_asset(fungible_asset, basic_account_id, note_type, client.rng())
+        .build_mint_fungible_asset(
+            fungible_asset,
+            basic_account_id,
+            note_type,
+            &mut client.rng().clone(),
+        )
         .unwrap();
     let tx_id =
         Box::pin(client.submit_new_transaction(fungible_asset.faucet_id(), tx_request.clone()))
@@ -529,7 +534,7 @@ pub async fn mint_and_consume(
             FungibleAsset::new(faucet_account_id, MINT_AMOUNT).unwrap(),
             basic_account_id,
             note_type,
-            client.rng(),
+            &mut client.rng().clone(),
         )
         .unwrap();
 
@@ -558,9 +563,9 @@ pub async fn insert_account_with_custom_component(
         .with_supports_all_types();
 
     let mut init_seed = [0u8; 32];
-    client.rng().fill_bytes(&mut init_seed);
+    client.rng().inner().fill_bytes(&mut init_seed);
 
-    let key_pair = AuthSecretKey::new_falcon512_rpo_with_rng(client.rng());
+    let key_pair = AuthSecretKey::new_falcon512_rpo_with_rng(&mut *client.rng().inner());
     let pub_key = key_pair.public_key();
     keystore.add_key(&key_pair).unwrap();
 

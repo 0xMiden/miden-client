@@ -144,7 +144,7 @@ async fn list_account_addresses<AUTH>(
 }
 
 async fn add_address<AUTH>(
-    mut client: Client<AUTH>,
+    client: Client<AUTH>,
     account_id: String,
     interface: CliAddressInterface,
     tag_len: Option<u8>,
@@ -173,7 +173,7 @@ async fn add_address<AUTH>(
 }
 
 async fn remove_address<AUTH>(
-    mut client: Client<AUTH>,
+    client: Client<AUTH>,
     account_id: String,
     address: String,
 ) -> Result<(), CliError> {

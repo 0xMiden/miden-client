@@ -53,7 +53,7 @@ pub async fn test_client_builder_initializes_client_with_endpoint(
 ) -> Result<()> {
     let (endpoint, _, store_config, auth_path) = client_config.as_parts();
 
-    let mut client = ClientBuilder::<FilesystemKeyStore>::new()
+    let client = ClientBuilder::<FilesystemKeyStore>::new()
         .grpc_client(&endpoint, Some(10_000))
         .filesystem_keystore(auth_path.to_str().context("failed to convert auth path to string")?)
         .sqlite_store(store_config)
@@ -100,7 +100,7 @@ pub async fn test_multiple_tx_on_same_block(client_config: ClientConfig) -> Resu
                 to_account_id,
             ),
             NoteType::Private,
-            client.rng(),
+            &mut client.rng().clone(),
         )
         .unwrap();
     let tx_request_2 = TransactionRequestBuilder::new()
@@ -111,7 +111,7 @@ pub async fn test_multiple_tx_on_same_block(client_config: ClientConfig) -> Resu
                 to_account_id,
             ),
             NoteType::Private,
-            client.rng(),
+            &mut client.rng().clone(),
         )
         .unwrap();
 
@@ -210,7 +210,7 @@ pub async fn test_import_expected_notes(client_config: ClientConfig) -> Result<(
             FungibleAsset::new(faucet_account.id(), MINT_AMOUNT).unwrap(),
             client_2_account.id(),
             NoteType::Public,
-            client_2.rng(),
+            &mut client_2.rng().clone(),
         )
         .unwrap();
     let note: InputNoteRecord =
@@ -255,7 +255,7 @@ pub async fn test_import_expected_notes(client_config: ClientConfig) -> Result<(
             FungibleAsset::new(faucet_account.id(), MINT_AMOUNT).unwrap(),
             first_basic_account.id(),
             NoteType::Private,
-            client_2.rng(),
+            &mut client_2.rng().clone(),
         )
         .unwrap();
     let note: InputNoteRecord =
@@ -322,7 +322,7 @@ pub async fn test_import_expected_note_uncommitted(client_config: ClientConfig) 
         FungibleAsset::new(faucet_account.id(), MINT_AMOUNT).unwrap(),
         client_2_account.id(),
         NoteType::Public,
-        client_1.rng(),
+        &mut client_1.rng().clone(),
     )?;
 
     let note: InputNoteRecord =
@@ -367,7 +367,7 @@ pub async fn test_import_expected_notes_from_the_past_as_committed(
         FungibleAsset::new(faucet_account.id(), MINT_AMOUNT).unwrap(),
         first_basic_account.id(),
         NoteType::Public,
-        client_1.rng(),
+        &mut client_1.rng().clone(),
     )?;
     let note: InputNoteRecord =
         tx_request.expected_output_own_notes().pop().unwrap().clone().into();
@@ -503,7 +503,7 @@ pub async fn test_sync_detail_values(client_config: ClientConfig) -> Result<()> 
         PaymentNoteDescription::new(vec![Asset::Fungible(asset)], from_account_id, to_account_id)
             .with_reclaim_height(new_details.block_num + 5),
         NoteType::Public,
-        client1.rng(),
+        &mut client1.rng().clone(),
     )?;
     let note = tx_request.expected_output_own_notes().pop().unwrap();
     execute_tx_and_sync(&mut client1, from_account_id, tx_request).await?;
@@ -554,7 +554,7 @@ pub async fn test_multiple_transactions_can_be_committed_in_different_blocks_wit
             fungible_asset,
             from_account_id,
             NoteType::Private,
-            client.rng(),
+            &mut client.rng().clone(),
         )?;
 
         println!("Executing transaction...");
@@ -575,7 +575,7 @@ pub async fn test_multiple_transactions_can_be_committed_in_different_blocks_wit
             fungible_asset,
             from_account_id,
             NoteType::Private,
-            client.rng(),
+            &mut client.rng().clone(),
         )?;
 
         println!("Executing transaction...");
@@ -615,7 +615,7 @@ pub async fn test_multiple_transactions_can_be_committed_in_different_blocks_wit
             fungible_asset,
             from_account_id,
             NoteType::Private,
-            client.rng(),
+            &mut client.rng().clone(),
         )?;
 
         println!("Executing transaction...");
@@ -720,7 +720,7 @@ pub async fn test_consume_multiple_expected_notes(client_config: ClientConfig) -
         fungible_asset,
         &[to_account_ids[0], to_account_ids[0], to_account_ids[1], to_account_ids[1]],
         NoteType::Private,
-        client.rng(),
+        &mut client.rng().clone(),
     );
 
     execute_tx_and_sync(&mut client, faucet_account_id, mint_tx_request.clone()).await?;
@@ -823,7 +823,7 @@ pub async fn test_import_consumed_note_with_proof(client_config: ClientConfig) -
         PaymentNoteDescription::new(vec![Asset::Fungible(asset)], from_account_id, to_account_id)
             .with_reclaim_height(current_block_num),
         NoteType::Private,
-        client_1.rng(),
+        &mut client_1.rng().clone(),
     )?;
     execute_tx_and_sync(&mut client_1, from_account_id, tx_request).await?;
     let note = client_1
@@ -890,7 +890,7 @@ pub async fn test_import_consumed_note_with_id(client_config: ClientConfig) -> R
         PaymentNoteDescription::new(vec![Asset::Fungible(asset)], from_account_id, to_account_id)
             .with_reclaim_height(current_block_num),
         NoteType::Public,
-        client_1.rng(),
+        &mut client_1.rng().clone(),
     )?;
     execute_tx_and_sync(&mut client_1, from_account_id, tx_request).await?;
     let note = client_1
@@ -953,7 +953,7 @@ pub async fn test_import_note_with_proof(client_config: ClientConfig) -> Result<
         PaymentNoteDescription::new(vec![Asset::Fungible(asset)], from_account_id, to_account_id)
             .with_reclaim_height(current_block_num),
         NoteType::Private,
-        client_1.rng(),
+        &mut client_1.rng().clone(),
     )?;
     execute_tx_and_sync(&mut client_1, from_account_id, tx_request).await?;
 
@@ -1023,7 +1023,7 @@ pub async fn test_discarded_transaction(client_config: ClientConfig) -> Result<(
         PaymentNoteDescription::new(vec![Asset::Fungible(asset)], from_account_id, to_account_id)
             .with_reclaim_height(current_block_num),
         NoteType::Public,
-        client_1.rng(),
+        &mut client_1.rng().clone(),
     )?;
 
     execute_tx_and_sync(&mut client_1, from_account_id, tx_request).await?;
@@ -1147,7 +1147,7 @@ pub async fn test_custom_transaction_prover_error_caught(
         fungible_asset,
         from_account_id,
         NoteType::Private,
-        client.rng(),
+        &mut client.rng().clone(),
     )?;
 
     let transaction_result =
@@ -1280,7 +1280,7 @@ pub async fn test_expired_transaction_fails(client_config: ClientConfig) -> Resu
             fungible_asset,
             from_account_id,
             NoteType::Public,
-            client.rng(),
+            &mut client.rng().clone(),
         )?;
 
     println!("Executing transaction...");
@@ -1414,7 +1414,7 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
         fungible_asset,
         first_basic_account.id(),
         NoteType::Public,
-        client.rng(),
+        &mut client.rng().clone(),
     )?;
     let note = tx_request.expected_output_own_notes().pop().unwrap();
     execute_tx_and_sync(&mut client, fungible_asset.faucet_id(), tx_request.clone()).await?;
@@ -1548,7 +1548,7 @@ pub async fn test_output_only_note(client_config: ClientConfig) -> Result<()> {
         fungible_asset,
         AccountId::try_from(ACCOUNT_ID_REGULAR).unwrap(),
         NoteType::Public,
-        client.rng(),
+        &mut client.rng().clone(),
     )?;
     let note_id = tx_request.expected_output_own_notes().pop().unwrap().id();
     execute_tx_and_sync(&mut client, fungible_asset.faucet_id(), tx_request.clone()).await?;

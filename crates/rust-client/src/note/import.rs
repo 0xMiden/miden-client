@@ -60,10 +60,7 @@ where
     ///
     /// Note: This operation is atomic. If any note file is invalid or any existing note is in the
     /// processing state, the entire operation fails and no notes are imported.
-    pub async fn import_notes(
-        &mut self,
-        note_files: &[NoteFile],
-    ) -> Result<Vec<NoteId>, ClientError> {
+    pub async fn import_notes(&self, note_files: &[NoteFile]) -> Result<Vec<NoteId>, ClientError> {
         let mut note_ids_map = BTreeMap::new();
         for note_file in note_files {
             let id = match &note_file {
@@ -306,7 +303,7 @@ where
     /// Builds a note record list from note details. If a note with the same ID was already stored
     /// it is passed via `previous_note` so it can be updated.
     async fn import_note_records_by_details(
-        &mut self,
+        &self,
         requested_notes: Vec<(Option<InputNoteRecord>, NoteDetails, BlockNumber, Option<NoteTag>)>,
     ) -> Result<Vec<Option<InputNoteRecord>>, ClientError> {
         let mut lowest_request_block: BlockNumber = u32::MAX.into();
@@ -374,7 +371,7 @@ where
     /// `request_block_num` and the current block. If found it returns their metadata and inclusion
     /// proof.
     async fn check_expected_notes(
-        &mut self,
+        &self,
         mut request_block_num: BlockNumber,
         // Expected notes with their tags
         expected_notes: Vec<(NoteId, &NoteTag)>,

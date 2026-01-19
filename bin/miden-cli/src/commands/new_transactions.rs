@@ -88,7 +88,7 @@ impl MintCmd {
                 fungible_asset,
                 target_account_id,
                 (&self.note_type).into(),
-                client.rng(),
+                &mut client.rng().clone(),
             )
             .map_err(|err| {
                 CliError::Transaction(err.into(), "Failed to build mint transaction".to_string())
@@ -175,7 +175,11 @@ impl SendCmd {
         }
 
         let transaction_request = TransactionRequestBuilder::new()
-            .build_pay_to_id(payment_description, (&self.note_type).into(), client.rng())
+            .build_pay_to_id(
+                payment_description,
+                (&self.note_type).into(),
+                &mut client.rng().clone(),
+            )
             .map_err(|err| {
                 CliError::Transaction(err.into(), "Failed to build payment transaction".to_string())
             })?;
@@ -253,7 +257,7 @@ impl SwapCmd {
                 &swap_transaction,
                 (&self.note_type).into(),
                 (&self.payback_note_type).into(),
-                client.rng(),
+                &mut client.rng().clone(),
             )
             .map_err(|err| {
                 CliError::Transaction(err.into(), "Failed to build swap transaction".to_string())

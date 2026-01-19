@@ -62,7 +62,7 @@ async fn list_tags<AUTH>(client: Client<AUTH>) -> Result<(), CliError> {
     Ok(())
 }
 
-async fn add_tag<AUTH>(mut client: Client<AUTH>, tag: u32) -> Result<(), CliError> {
+async fn add_tag<AUTH>(client: Client<AUTH>, tag: u32) -> Result<(), CliError> {
     let tag: NoteTag = tag.into();
     let execution_mode = match tag.execution_mode() {
         NoteExecutionMode::Local => "Local",
@@ -78,7 +78,7 @@ async fn add_tag<AUTH>(mut client: Client<AUTH>, tag: u32) -> Result<(), CliErro
     Ok(())
 }
 
-async fn remove_tag<AUTH>(mut client: Client<AUTH>, tag: u32) -> Result<(), CliError> {
+async fn remove_tag<AUTH>(client: Client<AUTH>, tag: u32) -> Result<(), CliError> {
     client.remove_note_tag(tag.into()).await?;
     println!("Tag {tag} removed");
     Ok(())

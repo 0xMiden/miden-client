@@ -185,7 +185,7 @@ impl WebClient {
                     fungible_asset,
                     target_account_id.into(),
                     note_type.into(),
-                    client.rng(),
+                    &mut client.rng().clone(),
                 )
                 .map_err(|err| {
                     js_error_with_context(err, "failed to create mint transaction request")
@@ -230,7 +230,7 @@ impl WebClient {
         }
 
         let send_transaction_request = NativeTransactionRequestBuilder::new()
-            .build_pay_to_id(payment_description, note_type.into(), client.rng())
+            .build_pay_to_id(payment_description, note_type.into(), &mut client.rng().clone())
             .map_err(|err| {
                 js_error_with_context(err, "failed to create send transaction request")
             })?;
@@ -305,7 +305,7 @@ impl WebClient {
                     &swap_transaction_data,
                     note_type.into(),
                     payback_note_type.into(),
-                    client.rng(),
+                    &mut client.rng().clone(),
                 )
                 .map_err(|err| {
                     js_error_with_context(err, "failed to create swap transaction request")

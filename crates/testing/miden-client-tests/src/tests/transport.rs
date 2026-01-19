@@ -18,11 +18,11 @@ async fn transport_basic() {
     // Setup entities
     let mock_node = Arc::new(RwLock::new(MockNoteTransportNode::new()));
     let (mut sender, sender_account) = create_test_user_transport(mock_node.clone()).await;
-    let (mut recipient, recipient_account) = create_test_user_transport(mock_node.clone()).await;
+    let (recipient, recipient_account) = create_test_user_transport(mock_node.clone()).await;
     let recipient_address = Address::new(recipient_account.id())
         .with_routing_parameters(RoutingParameters::new(AddressInterface::BasicWallet))
         .unwrap();
-    let (mut observer, _observer_account) = create_test_user_transport(mock_node.clone()).await;
+    let (observer, _observer_account) = create_test_user_transport(mock_node.clone()).await;
 
     // Create note
     let note = create_p2id_note(
@@ -31,7 +31,7 @@ async fn transport_basic() {
         vec![],
         NoteType::Private,
         Felt::default(),
-        sender.rng(),
+        &mut sender.rng().clone(),
     )
     .unwrap();
 
@@ -71,7 +71,7 @@ pub async fn create_test_client_transport(
     let transport_client = MockNoteTransportApi::new(mock_node);
     let builder_w_transport = builder.note_transport(Arc::new(transport_client));
 
-    let mut client = builder_w_transport.build().await.unwrap();
+    let client = builder_w_transport.build().await.unwrap();
     client.ensure_genesis_in_place().await.unwrap();
 
     (client, keystore)

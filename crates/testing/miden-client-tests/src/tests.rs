@@ -167,7 +167,7 @@ async fn input_notes_round_trip() {
 #[tokio::test]
 async fn get_input_note() {
     // generate test client with a random store name
-    let (mut client, rpc_api, _) = Box::pin(create_test_client()).await;
+    let (client, rpc_api, _) = Box::pin(create_test_client()).await;
     // Get note from mocked RPC backend since any note works here
     let original_note = rpc_api.get_available_notes()[0].note().unwrap().clone();
 
@@ -286,7 +286,7 @@ async fn insert_ecdsa_faucet_account() {
 #[tokio::test]
 async fn insert_same_account_twice_fails() {
     // generate test client with a random store name
-    let (mut client, _rpc_api, _) = Box::pin(create_test_client()).await;
+    let (client, _rpc_api, _) = Box::pin(create_test_client()).await;
 
     let account = Account::mock(
         ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_2,
@@ -300,7 +300,7 @@ async fn insert_same_account_twice_fails() {
 #[tokio::test]
 async fn account_code() {
     // generate test client with a random store name
-    let (mut client, _rpc_api, _) = Box::pin(create_test_client()).await;
+    let (client, _rpc_api, _) = Box::pin(create_test_client()).await;
 
     let account = Account::mock(
         ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE,
@@ -322,7 +322,7 @@ async fn account_code() {
 #[tokio::test]
 async fn get_account_by_id() {
     // generate test client with a random store name
-    let (mut client, _rpc_api, _) = Box::pin(create_test_client()).await;
+    let (client, _rpc_api, _) = Box::pin(create_test_client()).await;
 
     let account = Account::mock(
         ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_UPDATABLE_CODE,
@@ -346,7 +346,7 @@ async fn get_account_by_id() {
 #[tokio::test]
 async fn sync_state() {
     // generate test client with a random store name
-    let (mut client, rpc_api, _) = Box::pin(create_test_client()).await;
+    let (client, rpc_api, _) = Box::pin(create_test_client()).await;
 
     // Import first mockchain note as expected
     let expected_notes = rpc_api
@@ -497,7 +497,7 @@ async fn sync_state_tags() {
 #[tokio::test]
 async fn tags() {
     // generate test client with a random store name
-    let (mut client, _rpc_api, _) = Box::pin(create_test_client()).await;
+    let (client, _rpc_api, _) = Box::pin(create_test_client()).await;
 
     // Assert that the store gets created with the tag 0 (used for notes consumable by any account)
     assert!(client.get_note_tags().await.unwrap().is_empty());
@@ -549,7 +549,7 @@ async fn mint_transaction() {
             FungibleAsset::new(faucet.id(), 5u64).unwrap(),
             AccountId::try_from(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1).unwrap(),
             miden_protocol::note::NoteType::Private,
-            client.rng(),
+            &mut client.rng().clone(),
         )
         .unwrap();
 
@@ -565,7 +565,7 @@ async fn mint_transaction() {
 #[tokio::test]
 async fn import_note_validation() {
     // generate test client
-    let (mut client, rpc_api, _) = Box::pin(create_test_client()).await;
+    let (client, rpc_api, _) = Box::pin(create_test_client()).await;
 
     // generate deterministic test data
     let available_notes = rpc_api.get_available_notes();
@@ -645,7 +645,7 @@ async fn transaction_request_expiration() {
             FungibleAsset::new(faucet.id(), 5u64).unwrap(),
             AccountId::try_from(ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE).unwrap(),
             miden_protocol::note::NoteType::Private,
-            client.rng(),
+            &mut client.rng().clone(),
         )
         .unwrap();
 
@@ -680,7 +680,7 @@ async fn import_processing_note_returns_error() {
             FungibleAsset::new(faucet.id(), 5u64).unwrap(),
             account.id(),
             miden_protocol::note::NoteType::Public,
-            client.rng(),
+            &mut client.rng().clone(),
         )
         .unwrap();
 
@@ -723,7 +723,7 @@ async fn note_without_asset() {
     client.sync_state().await.unwrap();
 
     // Create note without assets
-    let serial_num = client.rng().draw_word();
+    let serial_num = client.rng().clone().draw_word();
     let recipient = utils::build_p2id_recipient(wallet.id(), serial_num).unwrap();
     let tag = NoteTag::from_account_id(wallet.id());
     let metadata =
@@ -770,7 +770,7 @@ async fn note_without_asset() {
         .build_pay_to_id(
             PaymentNoteDescription::new(vec![], faucet.id(), wallet.id()),
             NoteType::Public,
-            client.rng(),
+            &mut client.rng().clone(),
         )
         .unwrap_err();
 
@@ -784,7 +784,7 @@ async fn note_without_asset() {
                 wallet.id(),
             ),
             NoteType::Public,
-            client.rng(),
+            &mut client.rng().clone(),
         )
         .unwrap_err();
 
@@ -850,7 +850,7 @@ async fn real_note_roundtrip() {
             FungibleAsset::new(faucet.id(), 5u64).unwrap(),
             wallet.id(),
             miden_protocol::note::NoteType::Public,
-            client.rng(),
+            &mut client.rng().clone(),
         )
         .unwrap();
 
@@ -901,7 +901,7 @@ async fn added_notes() {
             fungible_asset,
             AccountId::try_from(ACCOUNT_ID_REGULAR).unwrap(),
             NoteType::Private,
-            client.rng(),
+            &mut client.rng().clone(),
         )
         .unwrap();
     println!("Running Mint tx...");
@@ -953,7 +953,7 @@ async fn p2id_transfer() {
                 to_account_id,
             ),
             NoteType::Private,
-            client.rng(),
+            &mut client.rng().clone(),
         )
         .unwrap();
 
@@ -1074,7 +1074,7 @@ async fn p2id_transfer_failing_not_enough_balance() {
                 to_account_id,
             ),
             NoteType::Private,
-            client.rng(),
+            &mut client.rng().clone(),
         )
         .unwrap();
     execute_failing_tx(
@@ -1160,7 +1160,7 @@ async fn p2ide_transfer_consumed_by_target() {
             )
             .with_reclaim_height(current_block_num + RECALL_HEIGHT_DELTA),
             NoteType::Private,
-            client.rng(),
+            &mut client.rng().clone(),
         )
         .unwrap();
 
@@ -1254,7 +1254,7 @@ async fn p2ide_transfer_consumed_by_sender() {
             )
             .with_reclaim_height(current_block_num + RECALL_HEIGHT_DELTA),
             NoteType::Private,
-            client.rng(),
+            &mut client.rng().clone(),
         )
         .unwrap();
     Box::pin(client.submit_new_transaction(from_account_id, tx_request))
@@ -1363,7 +1363,7 @@ async fn p2ide_timelocked() {
             .with_timelock_height(current_block_num + RECALL_HEIGHT_DELTA)
             .with_reclaim_height(current_block_num),
             NoteType::Public,
-            client.rng(),
+            &mut client.rng().clone(),
         )
         .unwrap();
     let note = tx_request.expected_output_own_notes().pop().unwrap();
@@ -1474,7 +1474,7 @@ async fn get_consumable_notes() {
             )
             .with_reclaim_height(100.into()),
             NoteType::Private,
-            client.rng(),
+            &mut client.rng().clone(),
         )
         .unwrap();
 
@@ -1579,7 +1579,7 @@ async fn get_output_notes() {
                 random_account_id,
             ),
             NoteType::Private,
-            client.rng(),
+            &mut client.rng().clone(),
         )
         .unwrap();
 
@@ -1636,7 +1636,7 @@ async fn account_rollback() {
         .build_pay_to_id(
             PaymentNoteDescription::new(vec![Asset::Fungible(asset)], account_id, account_id),
             NoteType::Public,
-            client.rng(),
+            &mut client.rng().clone(),
         )
         .unwrap();
 
@@ -1713,7 +1713,7 @@ async fn account_rollback() {
         .build_pay_to_id(
             PaymentNoteDescription::new(vec![Asset::Fungible(asset)], account_id, account_id),
             NoteType::Public,
-            client.rng(),
+            &mut client.rng().clone(),
         )
         .unwrap();
     let transaction_result =
@@ -1800,7 +1800,7 @@ async fn subsequent_discarded_transactions() {
         .build_pay_to_id(
             PaymentNoteDescription::new(vec![Asset::Fungible(asset)], account_id, account_id),
             NoteType::Public,
-            client.rng(),
+            &mut client.rng().clone(),
         )
         .unwrap();
 
@@ -1822,7 +1822,7 @@ async fn subsequent_discarded_transactions() {
         .build_pay_to_id(
             PaymentNoteDescription::new(vec![Asset::Fungible(asset)], account_id, account_id),
             NoteType::Public,
-            client.rng(),
+            &mut client.rng().clone(),
         )
         .unwrap();
 
@@ -1895,7 +1895,7 @@ async fn missing_recipient_digest() {
             FungibleAsset::new(faucet.id(), 5u64).unwrap(),
             AccountId::try_from(ACCOUNT_ID_PRIVATE_SENDER).unwrap(),
             NoteType::Public,
-            client.rng(),
+            &mut client.rng().clone(),
         )
         .unwrap();
 
@@ -2029,7 +2029,7 @@ async fn swap_chain_test() {
                 ),
                 NoteType::Private,
                 NoteType::Private,
-                client.rng(),
+                &mut client.rng().clone(),
             )
             .unwrap();
 
@@ -2072,7 +2072,7 @@ async fn swap_chain_test() {
 
 #[tokio::test]
 async fn empty_storage_map() {
-    let (mut client, _, keystore) = create_test_client().await;
+    let (client, _, keystore) = create_test_client().await;
 
     let storage_map = StorageMap::new();
 
@@ -2096,7 +2096,7 @@ async fn empty_storage_map() {
     keystore.add_key(&key_pair).unwrap();
 
     let mut init_seed = [0u8; 32];
-    client.rng().fill_bytes(&mut init_seed);
+    client.rng().clone().fill_bytes(&mut init_seed);
 
     let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountImmutableCode)
@@ -2205,7 +2205,7 @@ async fn storage_and_vault_proofs() {
     keystore.add_key(&key_pair).unwrap();
 
     let mut init_seed = [0u8; 32];
-    client.rng().fill_bytes(&mut init_seed);
+    client.rng().clone().fill_bytes(&mut init_seed);
 
     let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountImmutableCode)
@@ -2296,7 +2296,7 @@ async fn storage_and_vault_proofs() {
 #[tokio::test]
 async fn account_addresses_basic_wallet() {
     // generate test client with a random store name
-    let (mut client, _rpc_api, _) = Box::pin(create_test_client()).await;
+    let (client, _rpc_api, _) = Box::pin(create_test_client()).await;
 
     let account = Account::mock(
         ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_2,
@@ -2319,7 +2319,7 @@ async fn account_addresses_basic_wallet() {
 #[tokio::test]
 async fn account_addresses_non_basic_wallet() {
     // generate test client with a random store name
-    let (mut client, _rpc_api, _) = Box::pin(create_test_client()).await;
+    let (client, _rpc_api, _) = Box::pin(create_test_client()).await;
 
     let account = Account::mock_non_fungible_faucet(ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET);
 
@@ -2338,7 +2338,7 @@ async fn account_addresses_non_basic_wallet() {
 #[tokio::test]
 async fn account_add_address_after_creation() {
     // generate test client with a random store name
-    let (mut client, _rpc_api, _) = Box::pin(create_test_client()).await;
+    let (client, _rpc_api, _) = Box::pin(create_test_client()).await;
 
     let account = Account::mock(
         ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_2,
@@ -2406,7 +2406,7 @@ async fn consume_note_with_custom_script() {
     let note_script = client.code_builder().compile_note_script(custom_note_script).unwrap();
 
     let note_inputs = NoteInputs::new(vec![]).unwrap();
-    let serial_num = client.rng().draw_word();
+    let serial_num = client.rng().clone().draw_word();
     let note_metadata = NoteMetadata::new(
         sender_id,
         NoteType::Private,
@@ -2450,7 +2450,7 @@ async fn consume_note_with_custom_script() {
 
 #[tokio::test]
 async fn add_note_tag_fails_if_note_tag_limit_is_exceeded() {
-    let (mut client, _rpc_api, _) = Box::pin(create_test_client()).await;
+    let (client, _rpc_api, _) = Box::pin(create_test_client()).await;
 
     // add note tags until the limit is exceeded
     for i in 0..NOTE_TAG_LIMIT {
@@ -2466,7 +2466,7 @@ async fn add_note_tag_fails_if_note_tag_limit_is_exceeded() {
 
 #[tokio::test]
 async fn add_account_fails_if_accounts_limit_is_exceeded() {
-    let (mut client, _rpc_api, _) = Box::pin(create_test_client()).await;
+    let (client, _rpc_api, _) = Box::pin(create_test_client()).await;
 
     // add accounts until the limit is exceeded
     for i in 0..ACCOUNT_ID_LIMIT {
@@ -2503,7 +2503,7 @@ async fn add_account_fails_if_accounts_limit_is_exceeded() {
 pub async fn create_test_client() -> (MockClient<FilesystemKeyStore>, MockRpcApi, FilesystemKeyStore)
 {
     let (builder, rpc_api, keystore) = Box::pin(create_test_client_builder()).await;
-    let mut client = builder.build().await.unwrap();
+    let client = builder.build().await.unwrap();
     client.ensure_genesis_in_place().await.unwrap();
 
     (client, rpc_api, keystore)
@@ -2619,13 +2619,13 @@ async fn insert_new_wallet(
     storage_mode: AccountStorageMode,
     keystore: &FilesystemKeyStore,
 ) -> Result<Account, ClientError> {
-    let key_pair = AuthSecretKey::new_falcon512_rpo_with_rng(client.rng());
+    let key_pair = AuthSecretKey::new_falcon512_rpo_with_rng(&mut client.rng().clone());
     let pub_key = key_pair.public_key();
 
     keystore.add_key(&key_pair).unwrap();
 
     let mut init_seed = [0u8; 32];
-    client.rng().fill_bytes(&mut init_seed);
+    client.rng().clone().fill_bytes(&mut init_seed);
 
     let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountImmutableCode)
@@ -2671,14 +2671,14 @@ async fn insert_new_fungible_faucet(
     storage_mode: AccountStorageMode,
     keystore: &FilesystemKeyStore,
 ) -> Result<Account, ClientError> {
-    let key_pair = AuthSecretKey::new_falcon512_rpo_with_rng(client.rng());
+    let key_pair = AuthSecretKey::new_falcon512_rpo_with_rng(&mut client.rng().clone());
     let pub_key = key_pair.public_key();
 
     keystore.add_key(&key_pair).unwrap();
 
     // we need to use an initial seed to create the wallet account
     let mut init_seed = [0u8; 32];
-    client.rng().fill_bytes(&mut init_seed);
+    client.rng().clone().fill_bytes(&mut init_seed);
 
     let symbol = TokenSymbol::new("TEST").unwrap();
     let max_supply = Felt::try_from(9_999_999_u64.to_le_bytes().as_slice())
@@ -2711,7 +2711,7 @@ async fn insert_new_ecdsa_fungible_faucet(
 
     // we need to use an initial seed to create the wallet account
     let mut init_seed = [0u8; 32];
-    client.rng().fill_bytes(&mut init_seed);
+    client.rng().clone().fill_bytes(&mut init_seed);
 
     let symbol = TokenSymbol::new("TEST").unwrap();
     let max_supply = Felt::try_from(9_999_999_u64.to_le_bytes().as_slice())
@@ -2784,7 +2784,7 @@ async fn storage_and_vault_proofs_ecdsa() {
     keystore.add_key(&key_pair).unwrap();
 
     let mut init_seed = [0u8; 32];
-    client.rng().fill_bytes(&mut init_seed);
+    client.rng().clone().fill_bytes(&mut init_seed);
 
     let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountImmutableCode)

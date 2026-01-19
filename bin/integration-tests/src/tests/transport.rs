@@ -176,7 +176,7 @@ async fn run_flow(
             fungible_asset,
             recipient_account.id(),
             NoteType::Private,
-            sender.rng(),
+            &mut sender.rng().clone(),
         )
         .context("build mint tx")?;
     let note = tx_request

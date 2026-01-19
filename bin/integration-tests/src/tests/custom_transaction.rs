@@ -290,7 +290,7 @@ pub async fn test_onchain_notes_sync_with_tag(client_config: ClientConfig) -> Re
             ";
     let note_script = client_1.code_builder().compile_note_script(note_script)?;
     let inputs = NoteInputs::new(vec![])?;
-    let serial_num = client_1.rng().draw_word();
+    let serial_num = client_1.rng().clone().draw_word();
     let note_metadata = NoteMetadata::new(
         basic_account_1.id(),
         NoteType::Public,

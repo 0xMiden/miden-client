@@ -29,7 +29,7 @@ use super::{
     TransactionRequestError,
     TransactionScriptTemplate,
 };
-use crate::ClientRng;
+use crate::crypto::FeltRng;
 
 // TRANSACTION REQUEST BUILDER
 // ================================================================================================
@@ -284,7 +284,7 @@ impl TransactionRequestBuilder {
         asset: FungibleAsset,
         target_id: AccountId,
         note_type: NoteType,
-        rng: &mut ClientRng,
+        rng: &mut impl FeltRng,
     ) -> Result<TransactionRequest, TransactionRequestError> {
         let created_note = create_p2id_note(
             asset.faucet_id(),
@@ -313,7 +313,7 @@ impl TransactionRequestBuilder {
         self,
         payment_data: PaymentNoteDescription,
         note_type: NoteType,
-        rng: &mut ClientRng,
+        rng: &mut impl FeltRng,
     ) -> Result<TransactionRequest, TransactionRequestError> {
         if payment_data
             .assets()
@@ -344,7 +344,7 @@ impl TransactionRequestBuilder {
         swap_data: &SwapTransactionData,
         note_type: NoteType,
         payback_note_type: NoteType,
-        rng: &mut ClientRng,
+        rng: &mut impl FeltRng,
     ) -> Result<TransactionRequest, TransactionRequestError> {
         // The created note is the one that we need as the output of the tx, the other one is the
         // one that we expect to receive and consume eventually.
@@ -518,7 +518,7 @@ impl PaymentNoteDescription {
     pub(crate) fn into_note(
         self,
         note_type: NoteType,
-        rng: &mut ClientRng,
+        rng: &mut impl FeltRng,
     ) -> Result<Note, NoteError> {
         if self.reclaim_height.is_none() && self.timelock_height.is_none() {
             // Create a P2ID note

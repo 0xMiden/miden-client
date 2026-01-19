@@ -68,7 +68,7 @@ impl WebClient {
         let keystore = self.keystore.clone();
         if let Some(client) = self.get_mut_inner() {
             let mut seed = [0u8; 32];
-            client.rng().fill_bytes(&mut seed);
+            client.rng().clone().fill_bytes(&mut seed);
             // TODO: we need a way to pass the client's rng instead of having to use an stdrng
             let mut faucet_rng = StdRng::from_seed(seed);
 

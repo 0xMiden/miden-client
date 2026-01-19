@@ -57,7 +57,7 @@ pub fn create_ecdsa_initial_accounts_data() -> Vec<AccountFile> {
 #[tokio::test]
 pub async fn try_add_account() {
     // generate test client
-    let (mut client, _rpc_api, _) = Box::pin(create_test_client()).await;
+    let (client, _rpc_api, _) = Box::pin(create_test_client()).await;
 
     let account = Account::mock(
         ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
@@ -79,7 +79,7 @@ pub async fn try_add_account() {
 #[tokio::test]
 pub async fn try_add_ecdsa_account() {
     // generate test client
-    let (mut client, _rpc_api, _) = Box::pin(create_test_client()).await;
+    let (client, _rpc_api, _) = Box::pin(create_test_client()).await;
 
     let account = Account::mock(
         ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
@@ -101,7 +101,7 @@ pub async fn try_add_ecdsa_account() {
 #[tokio::test]
 async fn load_accounts_test() {
     // generate test client
-    let (mut client, ..) = Box::pin(create_test_client()).await;
+    let (client, ..) = Box::pin(create_test_client()).await;
 
     let created_accounts_data = create_initial_accounts_data();
 
@@ -128,7 +128,7 @@ async fn load_accounts_test() {
 #[tokio::test]
 async fn load_ecdsa_accounts_test() {
     // generate test client
-    let (mut client, ..) = Box::pin(create_test_client()).await;
+    let (client, ..) = Box::pin(create_test_client()).await;
 
     let created_accounts_data = create_ecdsa_initial_accounts_data();
     for account_data in created_accounts_data.clone() {

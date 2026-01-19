@@ -136,7 +136,7 @@ async fn get_counter_contract_account(
         .with_supports_all_types();
 
     let mut init_seed = [0u8; 32];
-    client.rng().fill_bytes(&mut init_seed);
+    client.rng().clone().fill_bytes(&mut init_seed);
 
     let account = AccountBuilder::new(init_seed)
         .storage_mode(storage_mode)
@@ -176,7 +176,7 @@ pub async fn test_counter_contract_ntx(client_config: ClientConfig) -> Result<()
 
     for _ in 0..BUMP_NOTE_NUMBER {
         let network_note =
-            get_network_note(native_account.id(), network_account.id(), &mut client.rng())?;
+            get_network_note(native_account.id(), network_account.id(), &mut client.rng().clone())?;
         network_notes.push(OutputNote::Full(network_note));
     }
 
@@ -213,7 +213,8 @@ pub async fn test_recall_note_before_ntx_consumes_it(client_config: ClientConfig
             .await?
             .0;
 
-    let network_note = get_network_note(wallet.id(), network_account.id(), &mut client.rng())?;
+    let network_note =
+        get_network_note(wallet.id(), network_account.id(), &mut client.rng().clone())?;
     // Prepare both transactions
     let tx_request = TransactionRequestBuilder::new()
         .own_output_notes(vec![OutputNote::Full(network_note.clone())])

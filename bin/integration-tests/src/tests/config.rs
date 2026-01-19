@@ -88,7 +88,7 @@ impl ClientConfig {
     pub async fn into_client(self) -> Result<(TestClient, FilesystemKeyStore)> {
         let (builder, keystore) = self.into_client_builder().await?;
 
-        let mut client = builder.build().await.with_context(|| "failed to build test client")?;
+        let client = builder.build().await.with_context(|| "failed to build test client")?;
 
         client.sync_state().await.with_context(|| "failed to sync client state")?;
 

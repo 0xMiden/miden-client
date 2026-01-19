@@ -29,7 +29,7 @@ impl<AUTH> Client<AUTH> {
     }
 
     /// Adds a note tag for the client to track. This tag's source will be marked as `User`.
-    pub async fn add_note_tag(&mut self, tag: NoteTag) -> Result<(), ClientError> {
+    pub async fn add_note_tag(&self, tag: NoteTag) -> Result<(), ClientError> {
         match self.insert_note_tag(NoteTagRecord { tag, source: NoteTagSource::User }).await {
             Ok(true) => Ok(()),
             Ok(false) => {
@@ -48,7 +48,7 @@ impl<AUTH> Client<AUTH> {
     }
 
     /// Removes a note tag for the client to track. Only tags added by the user can be removed.
-    pub async fn remove_note_tag(&mut self, tag: NoteTag) -> Result<(), ClientError> {
+    pub async fn remove_note_tag(&self, tag: NoteTag) -> Result<(), ClientError> {
         if self
             .store
             .remove_note_tag(NoteTagRecord { tag, source: NoteTagSource::User })

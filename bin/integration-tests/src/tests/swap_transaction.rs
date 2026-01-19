@@ -90,7 +90,7 @@ pub async fn test_swap_fully_onchain(client_config: ClientConfig) -> Result<()> 
         ),
         NoteType::Public,
         NoteType::Private,
-        client1.rng(),
+        &mut client1.rng().clone(),
     )?;
 
     let expected_output_notes: Vec<Note> = tx_request.expected_output_own_notes();
@@ -293,7 +293,7 @@ pub async fn test_swap_private(client_config: ClientConfig) -> Result<()> {
         ),
         NoteType::Private,
         NoteType::Private,
-        client1.rng(),
+        &mut client1.rng().clone(),
     )?;
 
     let expected_output_notes: Vec<Note> = tx_request.expected_output_own_notes();

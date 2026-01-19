@@ -62,7 +62,7 @@ pub async fn test_onchain_notes_flow(client_config: ClientConfig) -> Result<()> 
         FungibleAsset::new(faucet_account.id(), MINT_AMOUNT)?,
         basic_wallet_1.id(),
         NoteType::Public,
-        client_1.rng(),
+        &mut client_1.rng().clone(),
     )?;
     let note = tx_request
         .expected_output_own_notes()
@@ -107,7 +107,7 @@ pub async fn test_onchain_notes_flow(client_config: ClientConfig) -> Result<()> 
             basic_wallet_2.id(),
         ),
         NoteType::Public,
-        client_2.rng(),
+        &mut client_2.rng().clone(),
     )?;
     execute_tx_and_sync(&mut client_2, basic_wallet_1.id(), tx_request).await?;
 
@@ -120,7 +120,7 @@ pub async fn test_onchain_notes_flow(client_config: ClientConfig) -> Result<()> 
         )
         .with_reclaim_height(1.into()),
         NoteType::Public,
-        client_2.rng(),
+        &mut client_2.rng().clone(),
     )?;
     let note = tx_request
         .expected_output_own_notes()
@@ -287,7 +287,7 @@ pub async fn test_onchain_accounts(client_config: ClientConfig) -> Result<()> {
     let tx_request = TransactionRequestBuilder::new().build_pay_to_id(
         PaymentNoteDescription::new(vec![Asset::Fungible(asset)], from_account_id, to_account_id),
         NoteType::Public,
-        client_1.rng(),
+        &mut client_1.rng().clone(),
     )?;
     execute_tx_and_sync(&mut client_1, from_account_id, tx_request).await?;
 
@@ -345,7 +345,7 @@ pub async fn test_import_account_by_id(client_config: ClientConfig) -> Result<()
     wait_for_node(&mut client_1).await;
 
     let mut user_seed = [0u8; 32];
-    client_1.rng().fill_bytes(&mut user_seed);
+    client_1.rng().clone().fill_bytes(&mut user_seed);
 
     let (faucet_account_header, _) = insert_new_fungible_faucet(
         &mut client_1,

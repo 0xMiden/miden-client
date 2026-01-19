@@ -119,7 +119,7 @@ where
     ///    state.
     /// 7. The MMR is updated with the new peaks and authentication nodes.
     /// 8. All updates are applied to the store to be persisted.
-    pub async fn sync_state(&mut self) -> Result<SyncSummary, ClientError> {
+    pub async fn sync_state(&self) -> Result<SyncSummary, ClientError> {
         _ = self.ensure_genesis_in_place().await?;
 
         let note_screener = NoteScreener::new(self.store.clone(), self.authenticator.clone());
@@ -184,7 +184,7 @@ where
     /// Applies the state sync update to the store.
     ///
     /// See [`crate::Store::apply_state_sync()`] for what the update implies.
-    pub async fn apply_state_sync(&mut self, update: StateSyncUpdate) -> Result<(), ClientError> {
+    pub async fn apply_state_sync(&self, update: StateSyncUpdate) -> Result<(), ClientError> {
         self.store.apply_state_sync(update).await.map_err(ClientError::StoreError)?;
 
         // Remove irrelevant block headers
