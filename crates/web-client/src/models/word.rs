@@ -82,6 +82,10 @@ impl Word {
     pub fn to_felts(&self) -> Vec<Felt> {
         self.0.iter().map(|felt| Felt::from(*felt)).collect::<Vec<Felt>>()
     }
+
+    pub(crate) fn as_native(&self) -> &NativeWord {
+        &self.0
+    }
 }
 
 // CONVERSIONS

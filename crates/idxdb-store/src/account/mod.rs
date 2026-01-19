@@ -75,7 +75,7 @@ use utils::{
 
 impl WebStore {
     pub(super) async fn get_account_ids(&self) -> Result<Vec<AccountId>, StoreError> {
-        let promise = idxdb_get_account_ids();
+        let promise = idxdb_get_account_ids(self.db_id());
         let account_ids_as_strings: Vec<String> =
             await_js(promise, "failed to fetch account ids").await?;
 
@@ -90,7 +90,7 @@ impl WebStore {
     pub(super) async fn get_account_headers(
         &self,
     ) -> Result<Vec<(AccountHeader, AccountStatus)>, StoreError> {
-        let promise = idxdb_get_account_headers();
+        let promise = idxdb_get_account_headers(self.db_id());
         let account_headers_idxdb: Vec<AccountRecordIdxdbObject> =
             await_js(promise, "failed to fetch account headers").await?;
         let account_headers: Vec<(AccountHeader, AccountStatus)> = account_headers_idxdb
@@ -106,7 +106,7 @@ impl WebStore {
         account_id: AccountId,
     ) -> Result<Option<(AccountHeader, AccountStatus)>, StoreError> {
         let account_id_str = account_id.to_string();
-        let promise = idxdb_get_account_header(account_id_str);
+        let promise = idxdb_get_account_header(self.db_id(), account_id_str);
         let account_header_idxdb: Option<AccountRecordIdxdbObject> =
             await_js(promise, "failed to fetch account header").await?;
 
@@ -127,7 +127,7 @@ impl WebStore {
     ) -> Result<Option<AccountHeader>, StoreError> {
         let account_commitment_str = account_commitment.to_string();
 
-        let promise = idxdb_get_account_header_by_commitment(account_commitment_str);
+        let promise = idxdb_get_account_header_by_commitment(self.db_id(), account_commitment_str);
         let account_header_idxdb: Option<AccountRecordIdxdbObject> =
             await_js(promise, "failed to fetch account header by commitment").await?;
 
@@ -147,7 +147,7 @@ impl WebStore {
     ) -> Result<Vec<Address>, StoreError> {
         let account_id_str = account_id.to_string();
 
-        let promise = idxdb_get_account_addresses(account_id_str);
+        let promise = idxdb_get_account_addresses(self.db_id(), account_id_str);
 
         let account_addresses_idxdb: Vec<AddressIdxdbObject> =
             await_js(promise, "failed to fetch account addresses").await?;
@@ -224,7 +224,7 @@ impl WebStore {
     pub(super) async fn get_account_code(&self, root: Word) -> Result<AccountCode, StoreError> {
         let root_serialized = root.to_string();
 
-        let promise = idxdb_get_account_code(root_serialized);
+        let promise = idxdb_get_account_code(self.db_id(), root_serialized);
         let account_code_idxdb: AccountCodeIdxdbObject =
             await_js(promise, "failed to fetch account code").await?;
 
@@ -241,7 +241,7 @@ impl WebStore {
     ) -> Result<AccountStorage, StoreError> {
         let commitment_serialized = commitment.to_string();
 
-        let promise = idxdb_get_account_storage(commitment_serialized);
+        let promise = idxdb_get_account_storage(self.db_id(), commitment_serialized);
         let account_storage_idxdb: Vec<AccountStorageIdxdbObject> =
             await_js(promise, "failed to fetch account storage").await?;
 
@@ -288,7 +288,7 @@ impl WebStore {
             }
         }
 
-        let promise = idxdb_get_account_storage_maps(roots);
+        let promise = idxdb_get_account_storage_maps(self.db_id(), roots);
         let account_maps_idxdb: Vec<StorageMapEntryIdxdbObject> =
             await_js(promise, "failed to fetch account storage maps").await?;
 
@@ -330,7 +330,7 @@ impl WebStore {
     }
 
     pub(super) async fn get_vault_assets(&self, root: Word) -> Result<Vec<Asset>, StoreError> {
-        let promise = idxdb_get_account_vault_assets(root.to_hex());
+        let promise = idxdb_get_account_vault_assets(self.db_id(), root.to_hex());
         let vault_assets_idxdb: Vec<AccountAssetIdxdbObject> =
             await_js(promise, "failed to fetch vault assets").await?;
 
@@ -350,23 +350,27 @@ impl WebStore {
         account: &Account,
         initial_address: Address,
     ) -> Result<(), StoreError> {
-        upsert_account_code(account.code()).await.map_err(|js_error| {
+        upsert_account_code(self.db_id(), account.code()).await.map_err(|js_error| {
             StoreError::DatabaseError(format!("failed to insert account code: {js_error:?}",))
         })?;
 
-        upsert_account_storage(account.storage()).await.map_err(|js_error| {
-            StoreError::DatabaseError(format!("failed to insert account storage:{js_error:?}",))
-        })?;
+        upsert_account_storage(self.db_id(), account.storage())
+            .await
+            .map_err(|js_error| {
+                StoreError::DatabaseError(format!("failed to insert account storage:{js_error:?}",))
+            })?;
 
-        upsert_account_asset_vault(account.vault()).await.map_err(|js_error| {
-            StoreError::DatabaseError(format!("failed to insert account vault:{js_error:?}",))
-        })?;
+        upsert_account_asset_vault(self.db_id(), account.vault())
+            .await
+            .map_err(|js_error| {
+                StoreError::DatabaseError(format!("failed to insert account vault:{js_error:?}",))
+            })?;
 
-        upsert_account_record(account).await.map_err(|js_error| {
+        upsert_account_record(self.db_id(), account).await.map_err(|js_error| {
             StoreError::DatabaseError(format!("failed to insert account record: {js_error:?}",))
         })?;
 
-        insert_account_address(&account.id(), initial_address)
+        insert_account_address(self.db_id(), &account.id(), initial_address)
             .await
             .map_err(|js_error| {
                 StoreError::DatabaseError(format!(
@@ -382,7 +386,7 @@ impl WebStore {
         new_account_state: &Account,
     ) -> Result<(), StoreError> {
         let account_id_str = new_account_state.id().to_string();
-        let promise = idxdb_get_account_header(account_id_str);
+        let promise = idxdb_get_account_header(self.db_id(), account_id_str);
         let account_header_idxdb: Option<AccountRecordIdxdbObject> =
             await_js(promise, "failed to fetch account header").await?;
 
@@ -390,7 +394,7 @@ impl WebStore {
             return Err(StoreError::AccountDataNotFound(new_account_state.id()));
         }
 
-        update_account(new_account_state)
+        update_account(self.db_id(), new_account_state)
             .await
             .map_err(|_| StoreError::DatabaseError("failed to update account".to_string()))
     }
@@ -432,7 +436,7 @@ impl WebStore {
         let code = code.to_bytes();
         let account_id = account_id.to_string();
 
-        let promise = idxdb_upsert_foreign_account_code(account_id, code, root);
+        let promise = idxdb_upsert_foreign_account_code(self.db_id(), account_id, code, root);
         await_js_value(promise, "failed to upsert foreign account code").await?;
 
         Ok(())
@@ -443,7 +447,7 @@ impl WebStore {
         account_ids: Vec<AccountId>,
     ) -> Result<BTreeMap<AccountId, AccountCode>, StoreError> {
         let account_ids = account_ids.iter().map(ToString::to_string).collect::<Vec<_>>();
-        let promise = idxdb_get_foreign_account_code(account_ids);
+        let promise = idxdb_get_foreign_account_code(self.db_id(), account_ids);
         let foreign_account_code_idxdb: Option<Vec<ForeignAccountCodeIdxdbObject>> =
             await_js(promise, "failed to fetch foreign account code").await?;
 
@@ -469,7 +473,7 @@ impl WebStore {
     ) -> Result<(), StoreError> {
         let account_commitments =
             account_states.iter().map(ToString::to_string).collect::<Vec<_>>();
-        let promise = idxdb_undo_account_states(account_commitments);
+        let promise = idxdb_undo_account_states(self.db_id(), account_commitments);
         await_js_value(promise, "failed to undo account states").await?;
 
         Ok(())
@@ -492,7 +496,7 @@ impl WebStore {
         }
 
         let account_id_str = account_id.to_string();
-        let promise = idxdb_lock_account(account_id_str);
+        let promise = idxdb_lock_account(self.db_id(), account_id_str);
         await_js_value(promise, "failed to lock account").await?;
 
         Ok(())
@@ -503,15 +507,19 @@ impl WebStore {
         address: Address,
         account_id: &AccountId,
     ) -> Result<(), StoreError> {
-        insert_account_address(account_id, address).await.map_err(|js_error| {
-            StoreError::DatabaseError(format!("failed to insert account addresses: {js_error:?}",))
-        })?;
+        insert_account_address(self.db_id(), account_id, address)
+            .await
+            .map_err(|js_error| {
+                StoreError::DatabaseError(format!(
+                    "failed to insert account addresses: {js_error:?}",
+                ))
+            })?;
 
         Ok(())
     }
 
     pub(crate) async fn remove_address(&self, address: Address) -> Result<(), StoreError> {
-        remove_account_address(address).await.map_err(|js_error| {
+        remove_account_address(self.db_id(), address).await.map_err(|js_error| {
             StoreError::DatabaseError(format!("failed to remove account address: {js_error:?}"))
         })
     }

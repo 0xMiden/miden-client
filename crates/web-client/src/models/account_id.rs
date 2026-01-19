@@ -178,6 +178,10 @@ impl AccountId {
         let native_felt: NativeFelt = self.0.suffix();
         native_felt.into()
     }
+
+    pub(crate) fn as_native(&self) -> &NativeAccountId {
+        &self.0
+    }
 }
 
 // CONVERSIONS

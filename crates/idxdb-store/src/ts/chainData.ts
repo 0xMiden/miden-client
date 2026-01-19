@@ -1,14 +1,15 @@
-import { blockHeaders, partialBlockchainNodes, stateSync } from "./schema.js";
+import { getDatabase } from "./schema.js";
 import { logWebStoreError, uint8ArrayToBase64 } from "./utils.js";
 
-// INSERT FUNCTIONS
 export async function insertBlockHeader(
+  dbId: string,
   blockNum: string,
   header: Uint8Array,
   partialBlockchainPeaks: Uint8Array,
   hasClientNotes: boolean
 ) {
   try {
+    const db = getDatabase(dbId);
     const data = {
       blockNum: blockNum,
       header,
@@ -16,16 +17,15 @@ export async function insertBlockHeader(
       hasClientNotes: hasClientNotes.toString(),
     };
 
-    const existingBlockHeader = await blockHeaders.get(blockNum);
+    const existingBlockHeader = await db.blockHeaders.get(blockNum);
 
     if (!existingBlockHeader) {
-      await blockHeaders.add(data);
+      await db.blockHeaders.add(data);
     } else {
       console.log("Block header already exists, checking for update.");
 
-      // Update the hasClientNotes if the existing value is false
       if (existingBlockHeader.hasClientNotes === "false" && hasClientNotes) {
-        await blockHeaders.update(blockNum, {
+        await db.blockHeaders.update(blockNum, {
           hasClientNotes: hasClientNotes.toString(),
         });
         console.log("Updated hasClientNotes to true.");
@@ -39,11 +39,12 @@ export async function insertBlockHeader(
 }
 
 export async function insertPartialBlockchainNodes(
+  dbId: string,
   ids: string[],
   nodes: string[]
 ) {
   try {
-    // Check if the arrays are not of the same length
+    const db = getDatabase(dbId);
     if (ids.length !== nodes.length) {
       throw new Error("ids and nodes arrays must be of the same length");
     }
@@ -52,23 +53,21 @@ export async function insertPartialBlockchainNodes(
       return;
     }
 
-    // Create array of objects with id and node
     const data = nodes.map((node, index) => ({
       id: ids[index],
       node: node,
     }));
 
-    // Use bulkPut to add/overwrite the entries
-    await partialBlockchainNodes.bulkPut(data);
+    await db.partialBlockchainNodes.bulkPut(data);
   } catch (err) {
     logWebStoreError(err, "Failed to insert partial blockchain nodes");
   }
 }
 
-// GET FUNCTIONS
-export async function getBlockHeaders(blockNumbers: string[]) {
+export async function getBlockHeaders(dbId: string, blockNumbers: string[]) {
   try {
-    const results = await blockHeaders.bulkGet(blockNumbers);
+    const db = getDatabase(dbId);
+    const results = await db.blockHeaders.bulkGet(blockNumbers);
 
     const processedResults = await Promise.all(
       results.map((result) => {
@@ -96,15 +95,14 @@ export async function getBlockHeaders(blockNumbers: string[]) {
   }
 }
 
-export async function getTrackedBlockHeaders() {
+export async function getTrackedBlockHeaders(dbId: string) {
   try {
-    // Fetch all records matching the given root
-    const allMatchingRecords = await blockHeaders
+    const db = getDatabase(dbId);
+    const allMatchingRecords = await db.blockHeaders
       .where("hasClientNotes")
       .equals("true")
       .toArray();
 
-    // Process all records with async operations
     const processedRecords = await Promise.all(
       allMatchingRecords.map((record) => {
         const headerBase64 = uint8ArrayToBase64(record.header);
@@ -128,9 +126,13 @@ export async function getTrackedBlockHeaders() {
   }
 }
 
-export async function getPartialBlockchainPeaksByBlockNum(blockNum: string) {
+export async function getPartialBlockchainPeaksByBlockNum(
+  dbId: string,
+  blockNum: string
+) {
   try {
-    const blockHeader = await blockHeaders.get(blockNum);
+    const db = getDatabase(dbId);
+    const blockHeader = await db.blockHeaders.get(blockNum);
     if (blockHeader == undefined) {
       return {
         peaks: undefined,
@@ -148,18 +150,20 @@ export async function getPartialBlockchainPeaksByBlockNum(blockNum: string) {
   }
 }
 
-export async function getPartialBlockchainNodesAll() {
+export async function getPartialBlockchainNodesAll(dbId: string) {
   try {
-    const partialBlockchainNodesAll = await partialBlockchainNodes.toArray();
+    const db = getDatabase(dbId);
+    const partialBlockchainNodesAll = await db.partialBlockchainNodes.toArray();
     return partialBlockchainNodesAll;
   } catch (err) {
     logWebStoreError(err, "Failed to get partial blockchain nodes");
   }
 }
 
-export async function getPartialBlockchainNodes(ids: string[]) {
+export async function getPartialBlockchainNodes(dbId: string, ids: string[]) {
   try {
-    const results = await partialBlockchainNodes.bulkGet(ids);
+    const db = getDatabase(dbId);
+    const results = await db.partialBlockchainNodes.bulkGet(ids);
 
     return results;
   } catch (err) {
@@ -167,15 +171,16 @@ export async function getPartialBlockchainNodes(ids: string[]) {
   }
 }
 
-export async function pruneIrrelevantBlocks() {
+export async function pruneIrrelevantBlocks(dbId: string) {
   try {
-    const syncHeight = await stateSync.get(1);
+    const db = getDatabase(dbId);
+    const syncHeight = await db.stateSync.get(1);
 
     if (syncHeight == undefined) {
       throw Error("SyncHeight is undefined -- is the state sync table empty?");
     }
 
-    const allMatchingRecords = await blockHeaders
+    const allMatchingRecords = await db.blockHeaders
       .where("hasClientNotes")
       .equals("false")
       .and(
@@ -184,7 +189,7 @@ export async function pruneIrrelevantBlocks() {
       )
       .toArray();
 
-    await blockHeaders.bulkDelete(allMatchingRecords.map((r) => r.blockNum));
+    await db.blockHeaders.bulkDelete(allMatchingRecords.map((r) => r.blockNum));
   } catch (err) {
     logWebStoreError(err, "Failed to prune irrelevant blocks");
   }

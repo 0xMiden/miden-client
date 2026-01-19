@@ -31,7 +31,6 @@ const getConsumableNotes = async (
     const client = window.client;
     let records;
     if (_accountId) {
-      console.log({ _accountId });
       const accountId = window.AccountId.fromHex(_accountId);
       records = await client.getConsumableNotes(accountId);
     } else {
@@ -385,7 +384,6 @@ test.describe("createP2IDNote and createP2IDENote", () => {
       async ({ _senderId, _targetId, _faucetId }) => {
         let client = window.client;
 
-        console.log(_senderId, _targetId, _faucetId);
         let senderAccountId = window.AccountId.fromHex(_senderId);
         let targetAccountId = window.AccountId.fromHex(_targetId);
         let faucetAccountId = window.AccountId.fromHex(_faucetId);

@@ -24,6 +24,7 @@ export const test = base.extend<{ forEachTest: void }>({
       });
 
       await page.goto("http://localhost:8080");
+
       await page.evaluate(
         async ({ MIDEN_NODE_PORT, remoteProverPort }) => {
           // Import the sdk classes and attach them
@@ -32,6 +33,7 @@ export const test = base.extend<{ forEachTest: void }>({
           for (const [key, value] of Object.entries(sdkExports)) {
             window[key] = value;
           }
+
           let rpcUrl = `http://localhost:${MIDEN_NODE_PORT}`;
           let proverUrl = remoteProverPort
             ? `http://localhost:${remoteProverPort}`
@@ -39,7 +41,8 @@ export const test = base.extend<{ forEachTest: void }>({
           const client = await window.WebClient.createClient(
             rpcUrl,
             undefined,
-            undefined
+            undefined,
+            "tests"
           );
           window.rpcUrl = rpcUrl;
 
@@ -54,7 +57,7 @@ export const test = base.extend<{ forEachTest: void }>({
             window.remoteProverInstance =
               window.TransactionProver.newRemoteProver(
                 window.remoteProverUrl,
-                BigInt(10_000)
+                BigInt(20_000)
               );
           }
 

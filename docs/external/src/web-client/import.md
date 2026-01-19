@@ -89,7 +89,7 @@ try {
     const webClient = await WebClient.createClient();
 
     // storeDump should be the result of a previous store export
-    const result = await webClient.forceImportStore(storeDump);
+    const result = await webClient.forceImportStore(storeDump, "NewStoreName");
     console.log("Store import result:", result);
 } catch (error) {
     console.error("Failed to import store:", error.message);

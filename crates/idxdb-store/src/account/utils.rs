@@ -30,17 +30,20 @@ use super::js_bindings::{
 use crate::account::js_bindings::idxdb_insert_account_address;
 use crate::account::models::{AccountRecordIdxdbObject, AddressIdxdbObject};
 
-pub async fn upsert_account_code(account_code: &AccountCode) -> Result<(), JsValue> {
+pub async fn upsert_account_code(db_id: &str, account_code: &AccountCode) -> Result<(), JsValue> {
     let root = account_code.commitment().to_string();
     let code = account_code.to_bytes();
 
-    let promise = idxdb_upsert_account_code(root, code);
+    let promise = idxdb_upsert_account_code(db_id, root, code);
     JsFuture::from(promise).await?;
 
     Ok(())
 }
 
-pub async fn upsert_account_storage(account_storage: &AccountStorage) -> Result<(), JsValue> {
+pub async fn upsert_account_storage(
+    db_id: &str,
+    account_storage: &AccountStorage,
+) -> Result<(), JsValue> {
     let mut slots = vec![];
     let mut maps = vec![];
     for slot in account_storage.slots() {
@@ -50,25 +53,28 @@ pub async fn upsert_account_storage(account_storage: &AccountStorage) -> Result<
         }
     }
 
-    JsFuture::from(idxdb_upsert_account_storage(slots)).await?;
-    JsFuture::from(idxdb_upsert_storage_map_entries(maps)).await?;
+    JsFuture::from(idxdb_upsert_account_storage(db_id, slots)).await?;
+    JsFuture::from(idxdb_upsert_storage_map_entries(db_id, maps)).await?;
 
     Ok(())
 }
 
-pub async fn upsert_account_asset_vault(asset_vault: &AssetVault) -> Result<(), JsValue> {
+pub async fn upsert_account_asset_vault(
+    db_id: &str,
+    asset_vault: &AssetVault,
+) -> Result<(), JsValue> {
     let js_assets: Vec<JsVaultAsset> = asset_vault
         .assets()
         .map(|asset| JsVaultAsset::from_asset(&asset, asset_vault.root()))
         .collect();
 
-    let promise = idxdb_upsert_vault_assets(js_assets);
+    let promise = idxdb_upsert_vault_assets(db_id, js_assets);
     JsFuture::from(promise).await?;
 
     Ok(())
 }
 
-pub async fn upsert_account_record(account: &Account) -> Result<(), JsValue> {
+pub async fn upsert_account_record(db_id: &str, account: &Account) -> Result<(), JsValue> {
     let account_id_str = account.id().to_string();
     let code_root = account.code().commitment().to_string();
     let storage_root = account.storage().to_commitment().to_string();
@@ -79,6 +85,7 @@ pub async fn upsert_account_record(account: &Account) -> Result<(), JsValue> {
     let commitment = account.commitment().to_string();
 
     let promise = idxdb_upsert_account_record(
+        db_id,
         account_id_str,
         code_root,
         storage_root,
@@ -94,21 +101,24 @@ pub async fn upsert_account_record(account: &Account) -> Result<(), JsValue> {
 }
 
 pub async fn insert_account_address(
+    db_id: &str,
     account_id: &AccountId,
     address: Address,
 ) -> Result<(), JsValue> {
     let account_id_str = account_id.to_string();
     let serialized_address = address.to_bytes();
-    let promise = idxdb_insert_account_address(account_id_str, serialized_address);
+    let promise = idxdb_insert_account_address(db_id, account_id_str, serialized_address);
     JsFuture::from(promise).await?;
 
     Ok(())
 }
 
-pub async fn remove_account_address(address: Address) -> Result<(), JsValue> {
+pub async fn remove_account_address(db_id: &str, address: Address) -> Result<(), JsValue> {
     let serialized_address = address.to_bytes();
-    let promise =
-        crate::account::js_bindings::idxdb_remove_account_address(serialized_address.clone());
+    let promise = crate::account::js_bindings::idxdb_remove_account_address(
+        db_id,
+        serialized_address.clone(),
+    );
     JsFuture::from(promise).await?;
 
     Ok(())
@@ -154,8 +164,8 @@ pub fn parse_account_address_idxdb_object(
     Ok((address, native_account_id))
 }
 
-pub async fn update_account(new_account_state: &Account) -> Result<(), JsValue> {
-    upsert_account_storage(new_account_state.storage()).await?;
-    upsert_account_asset_vault(new_account_state.vault()).await?;
-    upsert_account_record(new_account_state).await
+pub async fn update_account(db_id: &str, new_account_state: &Account) -> Result<(), JsValue> {
+    upsert_account_storage(db_id, new_account_state.storage()).await?;
+    upsert_account_asset_vault(db_id, new_account_state.vault()).await?;
+    upsert_account_record(db_id, new_account_state).await
 }

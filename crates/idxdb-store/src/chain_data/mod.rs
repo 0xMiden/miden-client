@@ -56,6 +56,7 @@ impl WebStore {
         } = serialize_block_header(block_header, &partial_blockchain_peaks, has_client_notes);
 
         let promise = idxdb_insert_block_header(
+            self.db_id(),
             block_num,
             header,
             partial_blockchain_peaks,
@@ -75,7 +76,7 @@ impl WebStore {
             .map(|block_number| i64::from(block_number.as_u32()).to_string())
             .collect();
 
-        let promise = idxdb_get_block_headers(formatted_block_numbers_list);
+        let promise = idxdb_get_block_headers(self.db_id(), formatted_block_numbers_list);
         let block_headers_idxdb: Vec<Option<BlockHeaderIdxdbObject>> =
             await_js(promise, "failed to get block headers").await?;
 
@@ -96,7 +97,7 @@ impl WebStore {
     }
 
     pub(crate) async fn get_tracked_block_headers(&self) -> Result<Vec<BlockHeader>, StoreError> {
-        let promise = idxdb_get_tracked_block_headers();
+        let promise = idxdb_get_tracked_block_headers(self.db_id());
         let block_headers_idxdb: Vec<BlockHeaderIdxdbObject> =
             await_js(promise, "failed to get tracked block headers").await?;
 
@@ -118,7 +119,7 @@ impl WebStore {
     ) -> Result<BTreeMap<InOrderIndex, Word>, StoreError> {
         match filter {
             PartialBlockchainFilter::All => {
-                let promise = idxdb_get_partial_blockchain_nodes_all();
+                let promise = idxdb_get_partial_blockchain_nodes_all(self.db_id());
                 let js_value =
                     await_js_value(promise, "failed to get all partial blockchain nodes").await?;
                 process_partial_blockchain_nodes_from_js_value(js_value)
@@ -127,7 +128,7 @@ impl WebStore {
                 let formatted_list: Vec<String> =
                     ids.iter().map(|id| (Into::<usize>::into(*id)).to_string()).collect();
 
-                let promise = idxdb_get_partial_blockchain_nodes(formatted_list);
+                let promise = idxdb_get_partial_blockchain_nodes(self.db_id(), formatted_list);
                 let js_value =
                     await_js_value(promise, "failed to get partial blockchain nodes").await?;
                 process_partial_blockchain_nodes_from_js_value(js_value)
@@ -141,7 +142,8 @@ impl WebStore {
     ) -> Result<MmrPeaks, StoreError> {
         let block_num_as_str = block_num.to_string();
 
-        let promise = idxdb_get_partial_blockchain_peaks_by_block_num(block_num_as_str);
+        let promise =
+            idxdb_get_partial_blockchain_peaks_by_block_num(self.db_id(), block_num_as_str);
         let mmr_peaks_idxdb: PartialBlockchainPeaksIdxdbObject =
             await_js(promise, "failed to get partial blockchain peaks by block number").await?;
 
@@ -168,14 +170,18 @@ impl WebStore {
             serialized_nodes.push(node);
         }
 
-        let promise = idxdb_insert_partial_blockchain_nodes(serialized_node_ids, serialized_nodes);
+        let promise = idxdb_insert_partial_blockchain_nodes(
+            self.db_id(),
+            serialized_node_ids,
+            serialized_nodes,
+        );
         await_ok(promise, "failed to insert partial blockchain nodes").await?;
 
         Ok(())
     }
 
     pub(crate) async fn prune_irrelevant_blocks(&self) -> Result<(), StoreError> {
-        let promise = idxdb_prune_irrelevant_blocks();
+        let promise = idxdb_prune_irrelevant_blocks(self.db_id());
         await_ok(promise, "failed to prune block header").await?;
 
         Ok(())

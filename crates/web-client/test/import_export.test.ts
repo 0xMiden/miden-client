@@ -27,7 +27,7 @@ const exportDb = async (page: Page) => {
 const importDb = async (db: any, page: Page) => {
   return await page.evaluate(async (_db) => {
     const client = window.client;
-    await client.forceImportStore(_db);
+    await client.forceImportStore(_db, "ImportedStore");
   }, db);
 };
 

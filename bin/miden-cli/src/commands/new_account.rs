@@ -16,16 +16,17 @@ use miden_client::account::component::{
 };
 use miden_client::account::{Account, AccountBuilder, AccountStorageMode, AccountType};
 use miden_client::auth::{AuthRpoFalcon512, AuthSecretKey};
+use miden_client::keystore::FilesystemKeyStore;
 use miden_client::transaction::TransactionRequestBuilder;
 use miden_client::utils::Deserializable;
 use miden_client::vm::{Package, SectionId};
 use rand::RngCore;
-use tracing::debug;
+use tracing::{debug, warn};
 
 use crate::commands::account::set_default_account_if_unset;
 use crate::config::CliConfig;
 use crate::errors::CliError;
-use crate::{CliAuthenticator, CliKeyStore, client_binary_name, load_config_file};
+use crate::{CliAuthenticator, client_binary_name, load_config_file};
 
 // CLI TYPES
 // ================================================================================================
@@ -102,7 +103,7 @@ impl NewWalletCmd {
     pub async fn execute<AUTH: CliAuthenticator>(
         &self,
         mut client: Client<AUTH>,
-        keystore: CliKeyStore,
+        keystore: FilesystemKeyStore,
     ) -> Result<(), CliError> {
         let package_paths: Vec<PathBuf> = [PathBuf::from("basic-wallet")]
             .into_iter()
@@ -197,7 +198,7 @@ impl NewAccountCmd {
     pub async fn execute<AUTH: CliAuthenticator>(
         &self,
         mut client: Client<AUTH>,
-        keystore: CliKeyStore,
+        keystore: FilesystemKeyStore,
     ) -> Result<(), CliError> {
         let new_account = create_client_account(
             &mut client,
@@ -348,7 +349,7 @@ fn separate_auth_components(
 /// If no auth component is detected in the packages, a Falcon-based auth component will be added.
 async fn create_client_account<AUTH: CliAuthenticator>(
     client: &mut Client<AUTH>,
-    keystore: &CliKeyStore,
+    keystore: &FilesystemKeyStore,
     account_type: AccountType,
     storage_mode: AccountStorageMode,
     package_paths: &[PathBuf],
@@ -407,7 +408,21 @@ async fn create_client_account<AUTH: CliAuthenticator>(
 
     // Only add the key to the keystore if we generated a default key type (Falcon)
     if let Some(key_pair) = key_pair {
+        let public_key = key_pair.public_key();
+        let public_key_commitment = public_key.to_commitment();
         keystore.add_key(&key_pair).map_err(CliError::KeyStore)?;
+        if let Err(err) = client
+            .register_account_public_key_commitments(&account.id(), &[public_key])
+            .await
+        {
+            if let Err(rollback_err) = keystore.remove_key(public_key_commitment) {
+                warn!(
+                    ?rollback_err,
+                    "Failed to rollback keystore entry after commitment add failure"
+                );
+            }
+            return Err(err.into());
+        }
         println!("Generated and stored Falcon512 authentication key in keystore.");
     } else {
         println!("Using custom authentication component from package (no key generated).");

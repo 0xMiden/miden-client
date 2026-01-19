@@ -30,8 +30,6 @@ use commands::transactions::TransactionCmd;
 use self::utils::{config_file_exists, load_config_file};
 use crate::commands::address::AddressCmd;
 
-pub type CliKeyStore = FilesystemKeyStore;
-
 pub trait CliAuthenticator: TransactionAuthenticator + Send + Sync + 'static {}
 impl<T> CliAuthenticator for T where T: TransactionAuthenticator + Send + Sync + 'static {}
 mod config;

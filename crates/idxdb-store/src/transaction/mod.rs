@@ -46,7 +46,7 @@ impl WebStore {
             },
         };
 
-        let promise = idxdb_get_transactions(filter_as_str.to_string());
+        let promise = idxdb_get_transactions(self.db_id(), filter_as_str.to_string());
         let transactions_idxdb: Vec<TransactionIdxdbObject> =
             await_js(promise, "failed to get transactions").await?;
 
@@ -89,6 +89,7 @@ impl WebStore {
     ) -> Result<(), StoreError> {
         // Transaction Data
         insert_proven_transaction_data(
+            self.db_id(),
             tx_update.executed_transaction(),
             tx_update.submission_height(),
         )
@@ -111,12 +112,12 @@ impl WebStore {
             account.apply_delta(delta)?;
         }
 
-        update_account(&account).await.map_err(|err| {
+        update_account(self.db_id(), &account).await.map_err(|err| {
             StoreError::DatabaseError(format!("failed to update account: {err:?}"))
         })?;
 
         // Updates for notes
-        apply_note_updates_tx(tx_update.note_updates()).await?;
+        apply_note_updates_tx(self.db_id(), tx_update.note_updates()).await?;
 
         for tag_record in tx_update.new_tags() {
             self.add_note_tag(*tag_record).await?;

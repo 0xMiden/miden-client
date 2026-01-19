@@ -35,9 +35,7 @@ const instanceEmptyArray = async ({
   return await page.evaluate(
     async ({ arrayTypeToInstance: toInstance }) => {
       try {
-        console.log(toInstance);
         const array = new window.MidenArrays[toInstance]();
-        console.log(array);
         if (array.length() != 0) {
           throw new Error(
             `Newly created array of type ${toInstance} should be zero`
