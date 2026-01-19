@@ -15,10 +15,12 @@ test.describe("remote keystore", () => {
       const signCb = async (_publicKeyCommitment: string, _message: string) => {
         return undefined;
       };
-      const client = await window.WebClient.createClientWithExternalKeystore({
-        rpcUrl: window.rpcUrl!,
-        noteTransportUrl: undefined,
-        seed: undefined,
+      const client = await window.WebClient.createClientWithExternalKeystore(
+        window.rpcUrl!,
+        undefined,
+        undefined,
+        undefined,
+        insertKeyCb,
         getKeyCb,
         insertKeyCb,
         signCb,

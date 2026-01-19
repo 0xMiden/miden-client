@@ -107,10 +107,11 @@ pub(crate) fn serialize_input_note(note: &InputNoteRecord) -> SerializedInputNot
     }
 }
 
-pub async fn upsert_input_note_tx(note: &InputNoteRecord) -> Result<(), StoreError> {
+pub async fn upsert_input_note_tx(db_id: &str, note: &InputNoteRecord) -> Result<(), StoreError> {
     let serialized_data = serialize_input_note(note);
 
     let promise = idxdb_upsert_input_note(
+        db_id,
         serialized_data.note_id,
         serialized_data.note_assets,
         serialized_data.serial_number,
@@ -127,11 +128,14 @@ pub async fn upsert_input_note_tx(note: &InputNoteRecord) -> Result<(), StoreErr
     Ok(())
 }
 
-pub async fn upsert_note_script_tx(note_script: &NoteScript) -> Result<(), StoreError> {
+pub async fn upsert_note_script_tx(
+    db_id: &str,
+    note_script: &NoteScript,
+) -> Result<(), StoreError> {
     let note_script_bytes = note_script.to_bytes();
     let note_script_root = note_script.root().into();
 
-    let promise = idxdb_upsert_note_script(note_script_root, note_script_bytes);
+    let promise = idxdb_upsert_note_script(db_id, note_script_root, note_script_bytes);
     await_js_value(promise, "failed to upsert note script").await?;
 
     Ok(())
@@ -160,10 +164,11 @@ pub(crate) fn serialize_output_note(note: &OutputNoteRecord) -> SerializedOutput
     }
 }
 
-pub async fn upsert_output_note_tx(note: &OutputNoteRecord) -> Result<(), StoreError> {
+pub async fn upsert_output_note_tx(db_id: &str, note: &OutputNoteRecord) -> Result<(), StoreError> {
     let serialized_data = serialize_output_note(note);
 
     let promise = idxdb_upsert_output_note(
+        db_id,
         serialized_data.note_id,
         serialized_data.note_assets,
         serialized_data.recipient_digest,
@@ -237,14 +242,15 @@ pub fn parse_note_script_idxdb_object(
 }
 
 pub(crate) async fn apply_note_updates_tx(
+    db_id: &str,
     note_updates: &NoteUpdateTracker,
 ) -> Result<(), StoreError> {
     for input_note in note_updates.updated_input_notes() {
-        upsert_input_note_tx(input_note.inner()).await?;
+        upsert_input_note_tx(db_id, input_note.inner()).await?;
     }
 
     for output_note in note_updates.updated_output_notes() {
-        upsert_output_note_tx(output_note.inner()).await?;
+        upsert_output_note_tx(db_id, output_note.inner()).await?;
     }
 
     Ok(())

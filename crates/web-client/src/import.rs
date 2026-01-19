@@ -102,7 +102,11 @@ impl WebClient {
     }
 
     #[wasm_bindgen(js_name = "forceImportStore")]
-    pub async fn force_import_store(&mut self, store_dump: JsValue) -> Result<JsValue, JsValue> {
+    pub async fn force_import_store(
+        &mut self,
+        store_dump: JsValue,
+        _store_name: &str,
+    ) -> Result<JsValue, JsValue> {
         let store = self.store.as_ref().ok_or(JsValue::from_str("Store not initialized"))?;
         store
             .force_import_store(store_dump)
