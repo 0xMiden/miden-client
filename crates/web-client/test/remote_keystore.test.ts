@@ -19,6 +19,7 @@ test.describe("remote keystore", () => {
         window.rpcUrl!,
         undefined,
         undefined,
+        undefined,
         getKeyCb,
         insertKeyCb,
         signCb
@@ -43,6 +44,7 @@ test.describe("remote keystore", () => {
       };
       const client = await window.WebClient.createClientWithExternalKeystore(
         window.rpcUrl!,
+        undefined,
         undefined,
         undefined,
         undefined,
@@ -88,6 +90,7 @@ test.describe("remote keystore", () => {
 
       const client = await window.WebClient.createClientWithExternalKeystore(
         window.rpcUrl!,
+        undefined,
         undefined,
         undefined,
         getKeyCb,
@@ -152,6 +155,7 @@ test.describe("remote keystore", () => {
 
       const client = await window.WebClient.createClientWithExternalKeystore(
         window.rpcUrl!,
+        undefined,
         undefined,
         undefined,
         undefined,

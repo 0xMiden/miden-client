@@ -14,16 +14,15 @@ test.describe("AccountFile", () => {
       const client = window.client;
       const accountIdObj = window.AccountId.fromHex(accountId);
       const accountFile = await client.exportAccountFile(accountIdObj);
-      return Array.from(accountFile.serialize());
+      const bytes = Array.from(accountFile.serialize());
+      return bytes;
     }, accountId);
 
     const reserializedBytes = await page.evaluate(async (bytes) => {
       const byteArray = new Uint8Array(bytes);
-      // Deserialize bytes to AccountFile object
       const accountFile = window.AccountFile.deserialize(byteArray);
-
-      // Serialize the AccountFile object back to bytes
-      return Array.from(accountFile.serialize());
+      const reserialized = Array.from(accountFile.serialize());
+      return reserialized;
     }, accountFileBytes);
 
     expect(reserializedBytes).toEqual(accountFileBytes);

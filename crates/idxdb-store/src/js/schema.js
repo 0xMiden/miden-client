@@ -1,22 +1,33 @@
 import Dexie from "dexie";
 import * as semver from "semver";
 import { logWebStoreError } from "./utils.js";
-const DATABASE_NAME = "MidenClientDB";
 export const CLIENT_VERSION_SETTING_KEY = "clientVersion";
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
-export async function openDatabase(clientVersion) {
-    console.log(`Opening database for client version ${clientVersion}...`);
-    try {
-        await db.open();
-        await ensureClientVersion(clientVersion);
-        console.log("Database opened successfully");
-        return true;
+// Since we can't have a pointer to a JS Object from rust, we'll
+// use this instead to keep track of open DBs. A client can have
+// a DB for mainnet, devnet, testnet or a custom one, so this should be ok.
+const databaseRegistry = new Map();
+/**
+ * Get a database instance from the registry by its ID.
+ * Throws if the database hasn't been opened yet.
+ */
+export function getDatabase(dbId) {
+    const db = databaseRegistry.get(dbId);
+    if (!db) {
+        throw new Error(`Database not found for id: ${dbId}. Call openDatabase first.`);
     }
-    catch (err) {
-        logWebStoreError(err, "Failed to open database");
-        return false;
-    }
+    return db;
+}
+/**
+ * Opens a database for the given network and registers it in the registry.
+ * Returns the database ID (network name) which can be used to retrieve the database later.
+ */
+export async function openDatabase(network, clientVersion) {
+    const db = new MidenDatabase(network);
+    await db.open(clientVersion);
+    databaseRegistry.set(network, db);
+    return network;
 }
 var Table;
 (function (Table) {
@@ -40,101 +51,136 @@ var Table;
     Table["Settings"] = "settings";
     Table["TrackedAccounts"] = "trackedAccounts";
 })(Table || (Table = {}));
-const db = new Dexie(DATABASE_NAME);
-db.version(1).stores({
-    [Table.AccountCode]: indexes("root"),
-    [Table.AccountStorage]: indexes("[commitment+slotName]", "commitment"),
-    [Table.StorageMapEntries]: indexes("[root+key]", "root"),
-    [Table.AccountAssets]: indexes("[root+vaultKey]", "root", "faucetIdPrefix"),
-    [Table.AccountAuth]: indexes("pubKeyCommitmentHex"),
-    [Table.Accounts]: indexes("&accountCommitment", "id", "[id+nonce]", "codeRoot", "storageRoot", "vaultRoot"),
-    [Table.Addresses]: indexes("address", "id"),
-    [Table.Transactions]: indexes("id", "statusVariant"),
-    [Table.TransactionScripts]: indexes("scriptRoot"),
-    [Table.InputNotes]: indexes("noteId", "nullifier", "stateDiscriminant"),
-    [Table.OutputNotes]: indexes("noteId", "recipientDigest", "stateDiscriminant", "nullifier"),
-    [Table.NotesScripts]: indexes("scriptRoot"),
-    [Table.StateSync]: indexes("id"),
-    [Table.BlockHeaders]: indexes("blockNum", "hasClientNotes"),
-    [Table.PartialBlockchainNodes]: indexes("id"),
-    [Table.Tags]: indexes("id++", "tag", "source_note_id", "source_account_id"),
-    [Table.ForeignAccountCode]: indexes("accountId"),
-    [Table.Settings]: indexes("key"),
-    [Table.TrackedAccounts]: indexes("&id"),
-});
 function indexes(...items) {
     return items.join(",");
 }
-db.on("populate", () => {
-    // Populate the stateSync table with default values
-    stateSync
-        .put({ id: 1, blockNum: "0" })
-        .catch((err) => logWebStoreError(err, "Failed to populate DB"));
-});
-const accountCodes = db.table(Table.AccountCode);
-const accountStorages = db.table(Table.AccountStorage);
-const storageMapEntries = db.table(Table.StorageMapEntries);
-const accountAssets = db.table(Table.AccountAssets);
-const accountAuths = db.table(Table.AccountAuth);
-const accounts = db.table(Table.Accounts);
-const addresses = db.table(Table.Addresses);
-const transactions = db.table(Table.Transactions);
-const transactionScripts = db.table(Table.TransactionScripts);
-const inputNotes = db.table(Table.InputNotes);
-const outputNotes = db.table(Table.OutputNotes);
-const notesScripts = db.table(Table.NotesScripts);
-const stateSync = db.table(Table.StateSync);
-const blockHeaders = db.table(Table.BlockHeaders);
-const partialBlockchainNodes = db.table(Table.PartialBlockchainNodes);
-const tags = db.table(Table.Tags);
-const foreignAccountCode = db.table(Table.ForeignAccountCode);
-const settings = db.table(Table.Settings);
-const trackedAccounts = db.table(Table.TrackedAccounts);
-async function ensureClientVersion(clientVersion) {
-    if (!clientVersion) {
-        console.warn("openDatabase called without a client version; skipping version enforcement.");
-        return;
+export class MidenDatabase {
+    dexie;
+    accountCodes;
+    accountStorages;
+    storageMapEntries;
+    accountAssets;
+    accountAuths;
+    accounts;
+    addresses;
+    transactions;
+    transactionScripts;
+    inputNotes;
+    outputNotes;
+    notesScripts;
+    stateSync;
+    blockHeaders;
+    partialBlockchainNodes;
+    tags;
+    foreignAccountCode;
+    settings;
+    trackedAccounts;
+    constructor(network) {
+        this.dexie = new Dexie(network);
+        this.dexie.version(1).stores({
+            [Table.AccountCode]: indexes("root"),
+            [Table.AccountStorage]: indexes("[commitment+slotName]", "commitment"),
+            [Table.StorageMapEntries]: indexes("[root+key]", "root"),
+            [Table.AccountAssets]: indexes("[root+vaultKey]", "root", "faucetIdPrefix"),
+            [Table.AccountAuth]: indexes("pubKeyCommitmentHex"),
+            [Table.Accounts]: indexes("&accountCommitment", "id", "[id+nonce]", "codeRoot", "storageRoot", "vaultRoot"),
+            [Table.Addresses]: indexes("address", "id"),
+            [Table.Transactions]: indexes("id", "statusVariant"),
+            [Table.TransactionScripts]: indexes("scriptRoot"),
+            [Table.InputNotes]: indexes("noteId", "nullifier", "stateDiscriminant"),
+            [Table.OutputNotes]: indexes("noteId", "recipientDigest", "stateDiscriminant", "nullifier"),
+            [Table.NotesScripts]: indexes("scriptRoot"),
+            [Table.StateSync]: indexes("id"),
+            [Table.BlockHeaders]: indexes("blockNum", "hasClientNotes"),
+            [Table.PartialBlockchainNodes]: indexes("id"),
+            [Table.Tags]: indexes("id++", "tag", "source_note_id", "source_account_id"),
+            [Table.ForeignAccountCode]: indexes("accountId"),
+            [Table.Settings]: indexes("key"),
+            [Table.TrackedAccounts]: indexes("&id"),
+        });
+        this.accountCodes = this.dexie.table(Table.AccountCode);
+        this.accountStorages = this.dexie.table(Table.AccountStorage);
+        this.storageMapEntries = this.dexie.table(Table.StorageMapEntries);
+        this.accountAssets = this.dexie.table(Table.AccountAssets);
+        this.accountAuths = this.dexie.table(Table.AccountAuth);
+        this.accounts = this.dexie.table(Table.Accounts);
+        this.addresses = this.dexie.table(Table.Addresses);
+        this.transactions = this.dexie.table(Table.Transactions);
+        this.transactionScripts = this.dexie.table(Table.TransactionScripts);
+        this.inputNotes = this.dexie.table(Table.InputNotes);
+        this.outputNotes = this.dexie.table(Table.OutputNotes);
+        this.notesScripts = this.dexie.table(Table.NotesScripts);
+        this.stateSync = this.dexie.table(Table.StateSync);
+        this.blockHeaders = this.dexie.table(Table.BlockHeaders);
+        this.partialBlockchainNodes = this.dexie.table(Table.PartialBlockchainNodes);
+        this.tags = this.dexie.table(Table.Tags);
+        this.foreignAccountCode = this.dexie.table(Table.ForeignAccountCode);
+        this.settings = this.dexie.table(Table.Settings);
+        this.trackedAccounts = this.dexie.table(Table.TrackedAccounts);
+        this.dexie.on("populate", () => {
+            this.stateSync
+                .put({ id: 1, blockNum: "0" })
+                .catch((err) => logWebStoreError(err, "Failed to populate DB"));
+        });
     }
-    const storedVersion = await getStoredClientVersion();
-    if (!storedVersion) {
-        await persistClientVersion(clientVersion);
-        return;
-    }
-    if (storedVersion === clientVersion) {
-        return;
-    }
-    const validCurrent = semver.valid(clientVersion);
-    const validStored = semver.valid(storedVersion);
-    if (validCurrent && validStored) {
-        const parsedCurrent = semver.parse(validCurrent);
-        const parsedStored = semver.parse(validStored);
-        const sameMajorMinor = parsedCurrent?.major === parsedStored?.major &&
-            parsedCurrent?.minor === parsedStored?.minor;
-        if (sameMajorMinor || !semver.gt(clientVersion, storedVersion)) {
-            await persistClientVersion(clientVersion);
-            return;
+    async open(clientVersion) {
+        console.log(`Opening database ${this.dexie.name} for client version ${clientVersion}...`);
+        try {
+            await this.dexie.open();
+            await this.ensureClientVersion(clientVersion);
+            console.log("Database opened successfully");
+            return true;
+        }
+        catch (err) {
+            logWebStoreError(err, "Failed to open database");
+            return false;
         }
     }
-    else {
-        console.warn(`Failed to parse semver (${storedVersion} vs ${clientVersion}), forcing store reset.`);
+    async ensureClientVersion(clientVersion) {
+        if (!clientVersion) {
+            console.warn("openDatabase called without a client version; skipping version enforcement.");
+            return;
+        }
+        const storedVersion = await this.getStoredClientVersion();
+        if (!storedVersion) {
+            await this.persistClientVersion(clientVersion);
+            return;
+        }
+        if (storedVersion === clientVersion) {
+            return;
+        }
+        const validCurrent = semver.valid(clientVersion);
+        const validStored = semver.valid(storedVersion);
+        if (validCurrent && validStored) {
+            const parsedCurrent = semver.parse(validCurrent);
+            const parsedStored = semver.parse(validStored);
+            const sameMajorMinor = parsedCurrent?.major === parsedStored?.major &&
+                parsedCurrent?.minor === parsedStored?.minor;
+            if (sameMajorMinor || !semver.gt(clientVersion, storedVersion)) {
+                await this.persistClientVersion(clientVersion);
+                return;
+            }
+        }
+        else {
+            console.warn(`Failed to parse semver (${storedVersion} vs ${clientVersion}), forcing store reset.`);
+        }
+        console.warn(`IndexedDB client version mismatch (stored=${storedVersion}, expected=${clientVersion}). Resetting store.`);
+        this.dexie.close();
+        await this.dexie.delete();
+        await this.dexie.open();
+        await this.persistClientVersion(clientVersion);
     }
-    console.warn(`IndexedDB client version mismatch (stored=${storedVersion}, expected=${clientVersion}). Resetting store.`);
-    db.close();
-    await db.delete();
-    await db.open();
-    await persistClientVersion(clientVersion);
-}
-async function getStoredClientVersion() {
-    const record = await settings.get(CLIENT_VERSION_SETTING_KEY);
-    if (!record) {
-        return null;
+    async getStoredClientVersion() {
+        const record = await this.settings.get(CLIENT_VERSION_SETTING_KEY);
+        if (!record) {
+            return null;
+        }
+        return textDecoder.decode(record.value);
     }
-    return textDecoder.decode(record.value);
+    async persistClientVersion(clientVersion) {
+        await this.settings.put({
+            key: CLIENT_VERSION_SETTING_KEY,
+            value: textEncoder.encode(clientVersion),
+        });
+    }
 }
-async function persistClientVersion(clientVersion) {
-    await settings.put({
-        key: CLIENT_VERSION_SETTING_KEY,
-        value: textEncoder.encode(clientVersion),
-    });
-}
-export { db, accountCodes, accountStorages, storageMapEntries, accountAssets, accountAuths, accounts, addresses, transactions, transactionScripts, inputNotes, outputNotes, notesScripts, stateSync, blockHeaders, partialBlockchainNodes, tags, foreignAccountCode, settings, trackedAccounts, };

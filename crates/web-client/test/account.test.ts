@@ -20,6 +20,7 @@ export const getAccountOneMatch = async (
       true,
       0
     );
+
     const result = await client.getAccount(newAccount.id());
 
     return {
@@ -37,7 +38,7 @@ interface GetAccountFailureResult {
 export const getAccountNoMatch = async (
   page: Page
 ): Promise<GetAccountFailureResult> => {
-  return await page.evaluate(async (page: Page) => {
+  return await page.evaluate(async () => {
     const client = window.client;
     const nonExistingAccountId = window.TestUtils.createMockAccountId();
 
