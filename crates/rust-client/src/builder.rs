@@ -2,7 +2,7 @@ use alloc::string::{String, ToString};
 use alloc::sync::Arc;
 use std::boxed::Box;
 
-use miden_protocol::crypto::rand::{FeltRng, RpoRandomCoin};
+use miden_protocol::crypto::rand::RpoRandomCoin;
 use miden_protocol::{Felt, MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES};
 use miden_tx::ExecutionOptions;
 use miden_tx::auth::TransactionAuthenticator;
@@ -13,7 +13,7 @@ use crate::note_transport::NoteTransportClient;
 use crate::rpc::NodeRpcClient;
 use crate::store::{Store, StoreError};
 use crate::transaction::TransactionProver;
-use crate::{Client, ClientError, DebugMode};
+use crate::{Client, ClientError, ClientRngBox, DebugMode};
 
 // CONSTANTS
 // ================================================================================================
@@ -67,7 +67,7 @@ pub struct ClientBuilder<AUTH> {
     /// An optional store provided by the user.
     pub store: Option<StoreBuilder>,
     /// An optional RNG provided by the user.
-    rng: Option<Box<dyn FeltRng>>,
+    rng: Option<ClientRngBox>,
     /// The keystore configuration provided by the user.
     keystore: Option<AuthenticatorConfig<AUTH>>,
     /// A flag to enable debug mode.
@@ -142,7 +142,7 @@ where
 
     /// Optionally provide a custom RNG.
     #[must_use]
-    pub fn rng(mut self, rng: Box<dyn FeltRng>) -> Self {
+    pub fn rng(mut self, rng: ClientRngBox) -> Self {
         self.rng = Some(rng);
         self
     }
