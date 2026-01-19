@@ -299,24 +299,7 @@ pub use config::MIDEN_DIR;
 /// Re-export common types for external projects
 pub use config::{CLIENT_CONFIG_FILE_NAME, CliConfig};
 pub use errors::CliError as Error;
-// Re-export the entire `miden_client` crate so external projects can use a single dependency.
-//
-// This allows consumers of `miden-client-cli` to access all `miden-client` types without
-// adding `miden-client` as a separate dependency, avoiding potential version mismatches.
-//
-// # Examples
-//
-// ```no_run
-// use miden_client_cli::transaction::TransactionRequestBuilder;
-// use miden_client_cli::{CliClient, DebugMode};
-//
-// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-// let mut client = CliClient::from_system_user_config(DebugMode::Disabled).await?;
-// let req = TransactionRequestBuilder::new().build()?;
-// // Use the client...
-// # Ok(())
-// # }
-// ```
+/// Re-export the entire `miden_client` crate so external projects can use a single dependency.
 pub use miden_client::*;
 
 /// Client binary name.
