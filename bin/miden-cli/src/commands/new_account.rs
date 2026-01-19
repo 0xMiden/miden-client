@@ -412,7 +412,7 @@ async fn create_client_account<AUTH: TransactionAuthenticator + Sync + 'static>(
         let public_key_commitment = public_key.to_commitment();
         keystore.add_key(&key_pair).map_err(CliError::KeyStore)?;
         if let Err(err) = client
-            .register_account_public_key_commitment(&account.id(), &[public_key])
+            .register_account_public_key_commitments(&account.id(), &[public_key])
             .await
         {
             if let Err(rollback_err) = keystore.remove_key(public_key_commitment) {

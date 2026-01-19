@@ -368,7 +368,7 @@ impl<AUTH> Client<AUTH> {
     /// To identify these keys and avoid collisions, the account ID is turned into its hex
     /// representation and a suffix is added. If the resulting set is empty, any existing settings
     /// entry is removed.
-    pub async fn register_account_public_key_commitment(
+    pub async fn register_account_public_key_commitments(
         &self,
         account_id: &AccountId,
         pub_keys: &[PublicKey],

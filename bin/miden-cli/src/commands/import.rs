@@ -88,7 +88,7 @@ async fn import_account<AUTH>(
         let public_key_commitment = public_key.to_commitment();
         keystore.add_key(&key).map_err(CliError::KeyStore)?;
         if let Err(err) =
-            client.register_account_public_key_commitment(&account_id, &[public_key]).await
+            client.register_account_public_key_commitments(&account_id, &[public_key]).await
         {
             if let Err(rollback_err) = keystore.remove_key(public_key_commitment) {
                 warn!(
