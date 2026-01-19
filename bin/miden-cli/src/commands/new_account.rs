@@ -21,7 +21,7 @@ use miden_client::transaction::TransactionRequestBuilder;
 use miden_client::utils::Deserializable;
 use miden_client::vm::{Package, SectionId};
 use rand::RngCore;
-use tracing::debug;
+use tracing::{debug, warn};
 
 use crate::commands::account::set_default_account_if_unset;
 use crate::config::CliConfig;
@@ -408,7 +408,21 @@ async fn create_client_account<AUTH: TransactionAuthenticator + Sync + 'static>(
 
     // Only add the key to the keystore if we generated a default key type (Falcon)
     if let Some(key_pair) = key_pair {
+        let public_key = key_pair.public_key();
+        let public_key_commitment = public_key.to_commitment();
         keystore.add_key(&key_pair).map_err(CliError::KeyStore)?;
+        if let Err(err) = client
+            .register_account_public_key_commitments(&account.id(), &[public_key])
+            .await
+        {
+            if let Err(rollback_err) = keystore.remove_key(public_key_commitment) {
+                warn!(
+                    ?rollback_err,
+                    "Failed to rollback keystore entry after commitment add failure"
+                );
+            }
+            return Err(err.into());
+        }
         println!("Generated and stored Falcon512 authentication key in keystore.");
     } else {
         println!("Using custom authentication component from package (no key generated).");

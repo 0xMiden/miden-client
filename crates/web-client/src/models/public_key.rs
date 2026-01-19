@@ -11,7 +11,7 @@ use crate::utils::serialize_to_uint8array;
 
 #[wasm_bindgen]
 #[derive(Clone)]
-pub struct PublicKey(NativePublicKey);
+pub struct PublicKey(pub(crate) NativePublicKey);
 
 #[wasm_bindgen]
 impl PublicKey {

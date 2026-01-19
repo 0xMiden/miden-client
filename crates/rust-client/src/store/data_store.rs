@@ -113,7 +113,7 @@ impl DataStore for ClientDataStore {
     ) -> Result<Vec<AssetWitness>, DataStoreError> {
         let mut asset_witnesses = vec![];
         for vault_key in vault_keys {
-            match self.store.get_account_asset(account_id, vault_key.faucet_id_prefix()).await {
+            match self.store.get_account_asset(account_id, vault_key).await {
                 Ok(Some((_, asset_witness))) => {
                     asset_witnesses.push(asset_witness);
                 },

@@ -30,9 +30,13 @@
 
 ### addAccountSecretKeyToWebStore()
 
-> **addAccountSecretKeyToWebStore**(`secret_key`): `Promise`\<`void`\>
+> **addAccountSecretKeyToWebStore**(`account_id`, `secret_key`): `Promise`\<`void`\>
 
 #### Parameters
+
+##### account\_id
+
+[`AccountId`](AccountId.md)
 
 ##### secret\_key
 
@@ -82,10 +86,17 @@
 
 ### createClient()
 
-> **createClient**(`node_url?`, `node_note_transport_url?`, `seed?`): `Promise`\<`any`\>
+> **createClient**(`node_url?`, `node_note_transport_url?`, `seed?`, `store_name?`): `Promise`\<`any`\>
 
-Creates a new client with the given node URL and optional seed.
-If `node_url` is `None`, it defaults to the testnet endpoint.
+Creates a new `WebClient` instance with the specified configuration.
+
+# Arguments
+* `node_url`: The URL of the node RPC endpoint. If `None`, defaults to the testnet endpoint.
+* `node_note_transport_url`: Optional URL of the note transport service.
+* `seed`: Optional seed for account initialization.
+* `store_name`: Optional name for the web store. If `None`, the store name defaults to
+  `MidenClientDB_{network_id}`, where `network_id` is derived from the `node_url`.
+  Explicitly setting this allows for creating multiple isolated clients.
 
 #### Parameters
 
@@ -100,6 +111,10 @@ If `node_url` is `None`, it defaults to the testnet endpoint.
 ##### seed?
 
 `Uint8Array`
+
+##### store\_name?
+
+`string`
 
 #### Returns
 
@@ -109,10 +124,20 @@ If `node_url` is `None`, it defaults to the testnet endpoint.
 
 ### createClientWithExternalKeystore()
 
-> **createClientWithExternalKeystore**(`node_url?`, `node_note_transport_url?`, `seed?`, `get_key_cb?`, `insert_key_cb?`, `sign_cb?`): `Promise`\<`any`\>
+> **createClientWithExternalKeystore**(`node_url?`, `node_note_transport_url?`, `seed?`, `store_name?`, `get_key_cb?`, `insert_key_cb?`, `sign_cb?`): `Promise`\<`any`\>
 
-Creates a new client with the given node URL, optional seed, and external keystore
-callbacks. If `node_url` is `None`, it defaults to the testnet endpoint.
+Creates a new `WebClient` instance with external keystore callbacks.
+
+# Arguments
+* `node_url`: The URL of the node RPC endpoint. If `None`, defaults to the testnet endpoint.
+* `node_note_transport_url`: Optional URL of the note transport service.
+* `seed`: Optional seed for account initialization.
+* `store_name`: Optional name for the web store. If `None`, the store name defaults to
+  `MidenClientDB_{network_id}`, where `network_id` is derived from the `node_url`.
+  Explicitly setting this allows for creating multiple isolated clients.
+* `get_key_cb`: Callback to retrieve the secret key bytes for a given public key.
+* `insert_key_cb`: Callback to persist a secret key.
+* `sign_cb`: Callback to produce serialized signature bytes for the provided inputs.
 
 #### Parameters
 
@@ -127,6 +152,10 @@ callbacks. If `node_url` is `None`, it defaults to the testnet endpoint.
 ##### seed?
 
 `Uint8Array`
+
+##### store\_name?
+
+`string`
 
 ##### get\_key\_cb?
 
@@ -293,13 +322,17 @@ Uses an internal pagination mechanism to avoid fetching duplicate notes.
 
 ### forceImportStore()
 
-> **forceImportStore**(`store_dump`): `Promise`\<`any`\>
+> **forceImportStore**(`store_dump`, `_store_name`): `Promise`\<`any`\>
 
 #### Parameters
 
 ##### store\_dump
 
 `any`
+
+##### \_store\_name
+
+`string`
 
 #### Returns
 
@@ -333,13 +366,18 @@ Uses an internal pagination mechanism to avoid fetching duplicate notes.
 
 ***
 
-### getAccountAuthByPubKey()
+### getAccountAuthByPubKeyCommitment()
 
-> **getAccountAuthByPubKey**(`pub_key`): `Promise`\<[`AuthSecretKey`](AuthSecretKey.md)\>
+> **getAccountAuthByPubKeyCommitment**(`pub_key_commitment`): `Promise`\<[`AuthSecretKey`](AuthSecretKey.md)\>
+
+Retrieves an authentication secret key from the keystore given a public key commitment.
+
+The public key commitment should correspond to one of the keys tracked by the keystore.
+Returns the associated [`AuthSecretKey`] if found, or an error if not found.
 
 #### Parameters
 
-##### pub\_key
+##### pub\_key\_commitment
 
 [`Word`](Word.md)
 
@@ -436,6 +474,27 @@ Uses an internal pagination mechanism to avoid fetching duplicate notes.
 #### Returns
 
 `Promise`\<[`OutputNoteRecord`](OutputNoteRecord.md)[]\>
+
+***
+
+### getPublicKeyCommitmentsOfAccount()
+
+> **getPublicKeyCommitmentsOfAccount**(`account_id`): `Promise`\<[`Word`](Word.md)[]\>
+
+Returns all public key commitments associated with the given account ID.
+
+These commitments can be used with [`getAccountAuthByPubKeyCommitment`]
+to retrieve the corresponding secret keys from the keystore.
+
+#### Parameters
+
+##### account\_id
+
+[`AccountId`](AccountId.md)
+
+#### Returns
+
+`Promise`\<[`Word`](Word.md)[]\>
 
 ***
 

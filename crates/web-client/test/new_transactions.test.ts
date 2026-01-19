@@ -757,7 +757,10 @@ export const customAccountComponent = async (
         .withComponent(mappingAccountComponent)
         .build();
 
-      await client.addAccountSecretKeyToWebStore(secretKey);
+      await client.addAccountSecretKeyToWebStore(
+        accountBuilderResult.account.id(),
+        secretKey
+      );
       await client.newAccount(accountBuilderResult.account, false);
 
       await client.syncState();
@@ -960,7 +963,7 @@ export const discardedTransaction = async (
       senderTxResult.executedTransaction().id().toHex()
     );
 
-    await client.forceImportStore(preConsumeStore);
+    await client.forceImportStore(preConsumeStore, "tests");
 
     // Get the account state before the transaction is applied
     const accountStateBeforeTx = (await client.getAccount(
@@ -1201,7 +1204,6 @@ test.describe("counter account component tests", () => {
   test("counter account component transaction completes successfully", async ({
     page,
   }) => {
-    page.on("console", (msg) => console.log(msg));
     let { finalCounter, hasCounterComponent } =
       await counterAccountComponent(page);
     expect(finalCounter).toEqual("2");
@@ -1276,7 +1278,10 @@ export const testStorageMap = async (page: Page): Promise<any> => {
       .storageMode(window.AccountStorageMode.public())
       .build();
 
-    await client.addAccountSecretKeyToWebStore(secretKey);
+    await client.addAccountSecretKeyToWebStore(
+      bumpItemAccountBuilderResult.account.id(),
+      secretKey
+    );
     await client.newAccount(bumpItemAccountBuilderResult.account, false);
     await client.syncState();
 
