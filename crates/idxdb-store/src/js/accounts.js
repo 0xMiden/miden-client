@@ -197,17 +197,17 @@ export async function getAccountVaultAssets(dbId, vaultRoot) {
         logWebStoreError(error, `Error fetching account vault for root ${vaultRoot}`);
     }
 }
-export async function getAccountAuthByPubKey(dbId, pubKey) {
+export async function getAccountAuthByPubKeyCommitment(dbId, pubKeyCommitmentHex) {
     const db = getDatabase(dbId);
     const accountSecretKey = await db.accountAuths
-        .where("pubKey")
-        .equals(pubKey)
+        .where("pubKeyCommitmentHex")
+        .equals(pubKeyCommitmentHex)
         .first();
     if (!accountSecretKey) {
         throw new Error("Account auth not found in cache.");
     }
     const data = {
-        secretKey: accountSecretKey.secretKey,
+        secretKey: accountSecretKey.secretKeyHex,
     };
     return data;
 }
@@ -312,17 +312,17 @@ export async function upsertAccountRecord(dbId, accountId, codeRoot, storageRoot
         logWebStoreError(error, `Error inserting account: ${accountId}`);
     }
 }
-export async function insertAccountAuth(dbId, pubKey, secretKey) {
+export async function insertAccountAuth(dbId, pubKeyCommitmentHex, secretKey) {
     try {
         const db = getDatabase(dbId);
         const data = {
-            pubKey: pubKey,
-            secretKey: secretKey,
+            pubKeyCommitmentHex,
+            secretKeyHex: secretKey,
         };
         await db.accountAuths.add(data);
     }
     catch (error) {
-        logWebStoreError(error, `Error inserting account auth for pubKey: ${pubKey}`);
+        logWebStoreError(error, `Error inserting account auth for pubKey: ${pubKeyCommitmentHex}`);
     }
 }
 export async function insertAccountAddress(dbId, accountId, address) {

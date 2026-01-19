@@ -87,8 +87,8 @@ export interface IAccountAsset {
 }
 
 export interface IAccountAuth {
-  pubKey: string;
-  secretKey: string;
+  pubKeyCommitmentHex: string;
+  secretKeyHex: string;
 }
 
 export interface IAccount {
@@ -268,7 +268,7 @@ export class MidenDatabase {
         "root",
         "faucetIdPrefix"
       ),
-      [Table.AccountAuth]: indexes("pubKey"),
+      [Table.AccountAuth]: indexes("pubKeyCommitmentHex"),
       [Table.Accounts]: indexes(
         "&accountCommitment",
         "id",

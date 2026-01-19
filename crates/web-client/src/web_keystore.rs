@@ -1,7 +1,7 @@
 use alloc::string::{String, ToString};
 use alloc::sync::Arc;
 
-use idxdb_store::auth::{get_account_auth_by_pub_key, insert_account_auth};
+use idxdb_store::auth::{get_account_auth_by_pub_key_commitment, insert_account_auth};
 use miden_client::auth::{
     AuthSecretKey,
     PublicKey,
@@ -12,7 +12,7 @@ use miden_client::auth::{
 };
 use miden_client::keystore::KeyStoreError;
 use miden_client::utils::{RwLock, Serializable};
-use miden_client::{AuthenticationError, Word, Word as NativeWord};
+use miden_client::{AuthenticationError, Word as NativeWord};
 use rand::Rng;
 use wasm_bindgen_futures::js_sys::Function;
 
@@ -86,35 +86,35 @@ impl<R: Rng> WebKeyStore<R> {
             insert_key_cb.insert_key(&sk).await?;
             return Ok(());
         }
-        let pub_key = match key {
-            AuthSecretKey::RpoFalcon512(k) => k.public_key().to_commitment().to_hex(),
-            AuthSecretKey::EcdsaK256Keccak(k) => k.public_key().to_commitment().to_hex(),
-            other => {
-                let commitment: Word = other.public_key().to_commitment().into();
-                commitment.to_hex()
-            },
-        };
+
+        let pub_key_commitment = NativeWord::from(key.public_key().to_commitment()).to_hex();
         let secret_key_hex = hex::encode(key.to_bytes());
 
-        insert_account_auth(&self.db_id, pub_key, secret_key_hex).await.map_err(|_| {
-            KeyStoreError::StorageError("Failed to insert item into IndexedDB".to_string())
-        })?;
+        insert_account_auth(&self.db_id, pub_key_commitment, secret_key_hex)
+            .await
+            .map_err(|_| {
+                KeyStoreError::StorageError("Failed to insert item into IndexedDB".to_string())
+            })?;
 
         Ok(())
     }
 
     pub async fn get_key(
         &self,
-        pub_key: NativeWord,
+        pub_key: PublicKeyCommitment,
     ) -> Result<Option<AuthSecretKey>, KeyStoreError> {
         if let Some(get_key_cb) = &self.callbacks.as_ref().get_key {
             return get_key_cb.get_secret_key(pub_key).await;
         }
-        let pub_key_str = pub_key.to_hex();
+        let pub_key_commitment = NativeWord::from(pub_key).to_hex();
         let secret_key_hex =
-            get_account_auth_by_pub_key(&self.db_id, pub_key_str).await.map_err(|err| {
-                KeyStoreError::StorageError(format!("failed to get item from IndexedDB: {err:?}"))
-            })?;
+            get_account_auth_by_pub_key_commitment(&self.db_id, pub_key_commitment)
+                .await
+                .map_err(|err| {
+                    KeyStoreError::StorageError(format!(
+                        "failed to get item from IndexedDB: {err:?}"
+                    ))
+                })?;
 
         let secret_key_bytes = hex::decode(secret_key_hex).map_err(|err| {
             KeyStoreError::DecodingError(format!("error decoding secret key hex: {err:?}"))
@@ -146,7 +146,7 @@ impl<R: Rng> TransactionAuthenticator for WebKeyStore<R> {
         let message = signing_inputs.to_commitment();
 
         let secret_key = self
-            .get_key(pub_key.into())
+            .get_key(pub_key)
             .await
             .map_err(|err| AuthenticationError::other(err.to_string()))?;
 

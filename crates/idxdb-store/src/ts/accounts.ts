@@ -256,11 +256,14 @@ export async function getAccountVaultAssets(dbId: string, vaultRoot: string) {
   }
 }
 
-export async function getAccountAuthByPubKey(dbId: string, pubKey: string) {
+export async function getAccountAuthByPubKeyCommitment(
+  dbId: string,
+  pubKeyCommitmentHex: string
+) {
   const db = getDatabase(dbId);
   const accountSecretKey = await db.accountAuths
-    .where("pubKey")
-    .equals(pubKey)
+    .where("pubKeyCommitmentHex")
+    .equals(pubKeyCommitmentHex)
     .first();
 
   if (!accountSecretKey) {
@@ -268,7 +271,7 @@ export async function getAccountAuthByPubKey(dbId: string, pubKey: string) {
   }
 
   const data = {
-    secretKey: accountSecretKey.secretKey,
+    secretKey: accountSecretKey.secretKeyHex,
   };
 
   return data;
@@ -407,21 +410,21 @@ export async function upsertAccountRecord(
 
 export async function insertAccountAuth(
   dbId: string,
-  pubKey: string,
+  pubKeyCommitmentHex: string,
   secretKey: string
 ) {
   try {
     const db = getDatabase(dbId);
     const data = {
-      pubKey: pubKey,
-      secretKey: secretKey,
+      pubKeyCommitmentHex,
+      secretKeyHex: secretKey,
     };
 
     await db.accountAuths.add(data);
   } catch (error) {
     logWebStoreError(
       error,
-      `Error inserting account auth for pubKey: ${pubKey}`
+      `Error inserting account auth for pubKey: ${pubKeyCommitmentHex}`
     );
   }
 }

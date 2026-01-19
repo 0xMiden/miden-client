@@ -44,8 +44,11 @@ extern "C" {
     #[wasm_bindgen(js_name = getAccountVaultAssets)]
     pub fn idxdb_get_account_vault_assets(db_id: &str, vault_root: String) -> js_sys::Promise;
 
-    #[wasm_bindgen(js_name = getAccountAuthByPubKey)]
-    pub fn idxdb_get_account_auth_by_pub_key(db_id: &str, pub_key: String) -> js_sys::Promise;
+    #[wasm_bindgen(js_name = getAccountAuthByPubKeyCommitment)]
+    pub fn idxdb_get_account_auth_by_pub_key_commitment(
+        db_id: &str,
+        pub_key_commitment_hex: String,
+    ) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = getAccountAddresses)]
     pub fn idxdb_get_account_addresses(db_id: &str, account_id: String) -> js_sys::Promise;

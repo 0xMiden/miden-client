@@ -757,7 +757,10 @@ export const customAccountComponent = async (
         .withComponent(mappingAccountComponent)
         .build();
 
-      await client.addAccountSecretKeyToWebStore(secretKey);
+      await client.addAccountSecretKeyToWebStore(
+        accountBuilderResult.account.id(),
+        secretKey
+      );
       await client.newAccount(accountBuilderResult.account, false);
 
       await client.syncState();
@@ -1275,7 +1278,10 @@ export const testStorageMap = async (page: Page): Promise<any> => {
       .storageMode(window.AccountStorageMode.public())
       .build();
 
-    await client.addAccountSecretKeyToWebStore(secretKey);
+    await client.addAccountSecretKeyToWebStore(
+      bumpItemAccountBuilderResult.account.id(),
+      secretKey
+    );
     await client.newAccount(bumpItemAccountBuilderResult.account, false);
     await client.syncState();
 

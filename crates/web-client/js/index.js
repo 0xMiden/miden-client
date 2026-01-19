@@ -281,6 +281,8 @@ export class WebClient {
   /**
    * Factory method to create and initialize a WebClient instance with a remote keystore.
    * This method is async so you can await the asynchronous call to createClientWithExternalKeystore().
+   * Note: providing any external keystore callback disables web worker usage because functions
+   * cannot be transferred to workers; calls run on the main thread.
    *
    * @param {string} rpcUrl - The RPC URL.
    * @param {string | undefined} noteTransportUrl - The note transport URL (optional).
