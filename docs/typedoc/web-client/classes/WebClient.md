@@ -212,16 +212,6 @@ applications as it uses a mock chain that simulates the behavior of a real node.
 
 ***
 
-### createScriptBuilder()
-
-> **createScriptBuilder**(): [`ScriptBuilder`](ScriptBuilder.md)
-
-#### Returns
-
-[`ScriptBuilder`](ScriptBuilder.md)
-
-***
-
 ### executeForSummary()
 
 > **executeForSummary**(`account_id`, `transaction_request`): `Promise`\<[`TransactionSummary`](TransactionSummary.md)\>

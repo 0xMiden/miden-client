@@ -30,6 +30,7 @@ export {
   AdviceMap,
   AssetVault,
   AuthRpoFalcon512MultisigConfig,
+  AuthScheme,
   AuthSecretKey,
   BasicFungibleFaucetComponent,
   BlockHeader,
