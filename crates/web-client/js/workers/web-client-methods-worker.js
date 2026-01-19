@@ -1,5 +1,5 @@
 import loadWasm from "../../dist/wasm.js";
-import { MethodName, WorkerAction } from "../constants.js";
+import { CallbackType, MethodName, WorkerAction } from "../constants.js";
 
 let wasmModule = null;
 
@@ -88,6 +88,52 @@ let wasmSeed = null; // Seed for the WASM WebClient, if needed.
 let ready = false; // Indicates if the worker is fully initialized.
 let messageQueue = []; // Queue for sequential processing.
 let processing = false; // Flag to ensure one message is processed at a time.
+
+// Track pending callback requests
+let pendingCallbacks = new Map();
+
+// Define proxy functions for callbacks that communicate with main thread
+const callbackProxies = {
+  getKey: async (pubKey) => {
+    return new Promise((resolve, reject) => {
+      const requestId = `${CallbackType.GET_KEY}-${Date.now()}-${Math.random()}`;
+      pendingCallbacks.set(requestId, { resolve, reject });
+
+      self.postMessage({
+        action: WorkerAction.EXECUTE_CALLBACK,
+        callbackType: CallbackType.GET_KEY,
+        args: [pubKey],
+        requestId,
+      });
+    });
+  },
+  insertKey: async (pubKey, secretKey) => {
+    return new Promise((resolve, reject) => {
+      const requestId = `${CallbackType.INSERT_KEY}-${Date.now()}-${Math.random()}`;
+      pendingCallbacks.set(requestId, { resolve, reject });
+
+      self.postMessage({
+        action: WorkerAction.EXECUTE_CALLBACK,
+        callbackType: CallbackType.INSERT_KEY,
+        args: [pubKey, secretKey],
+        requestId,
+      });
+    });
+  },
+  sign: async (pubKey, signingInputs) => {
+    return new Promise((resolve, reject) => {
+      const requestId = `${CallbackType.SIGN}-${Date.now()}-${Math.random()}`;
+      pendingCallbacks.set(requestId, { resolve, reject });
+
+      self.postMessage({
+        action: WorkerAction.EXECUTE_CALLBACK,
+        callbackType: CallbackType.SIGN,
+        args: [pubKey, signingInputs],
+        requestId,
+      });
+    });
+  },
+};
 
 // Define a mapping from method names to handler functions.
 const methodHandlers = {
@@ -331,15 +377,40 @@ async function processMessage(event) {
   const { action, args, methodName, requestId } = event.data;
   try {
     if (action === WorkerAction.INIT) {
-      const [rpcUrl, noteTransportUrl, seed, storeName] = args;
-      const wasm = await getWasmOrThrow();
-      wasmWebClient = new wasm.WebClient();
-      await wasmWebClient.createClient(
+      const [
         rpcUrl,
         noteTransportUrl,
         seed,
-        storeName
-      );
+        storeName,
+        hasGetKeyCb,
+        hasInsertKeyCb,
+        hasSignCb,
+      ] = args;
+      const wasm = await getWasmOrThrow();
+      wasmWebClient = new wasm.WebClient();
+
+      // Check if any callbacks are provided
+      const useExternalKeystore = hasGetKeyCb || hasInsertKeyCb || hasSignCb;
+
+      if (useExternalKeystore) {
+        // Use callback proxies that communicate with the main thread
+        await wasmWebClient.createClientWithExternalKeystore(
+          rpcUrl,
+          noteTransportUrl,
+          seed,
+          storeName,
+          hasGetKeyCb ? callbackProxies.getKey : undefined,
+          hasInsertKeyCb ? callbackProxies.insertKey : undefined,
+          hasSignCb ? callbackProxies.sign : undefined
+        );
+      } else {
+        await wasmWebClient.createClient(
+          rpcUrl,
+          noteTransportUrl,
+          seed,
+          storeName
+        );
+      }
 
       wasmSeed = seed;
       ready = true;
@@ -401,6 +472,20 @@ async function processQueue() {
 
 // Enqueue incoming messages and process them sequentially.
 self.onmessage = (event) => {
+  if (
+    event.data.callbackRequestId &&
+    pendingCallbacks.has(event.data.callbackRequestId)
+  ) {
+    const { callbackRequestId, callbackResult, callbackError } = event.data;
+    const { resolve, reject } = pendingCallbacks.get(callbackRequestId);
+    pendingCallbacks.delete(callbackRequestId);
+    if (!callbackError) {
+      resolve(callbackResult);
+    } else {
+      reject(new Error(callbackError));
+    }
+    return;
+  }
   messageQueue.push(event);
   processQueue();
 };
