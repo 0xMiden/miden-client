@@ -197,6 +197,8 @@ test.describe("get public account with details", () => {
     expect(assetCount).toBe(1501);
     expect(balances.every((balance) => balance === "100")).toBe(true);
     expect(mapEntriesCount).toBe(2000);
+  });
+});
 test.describe("account public commitments", () => {
   test("properly stores public commitments", async ({ page }) => {
     const commitmentsCount = await page.evaluate(async () => {
