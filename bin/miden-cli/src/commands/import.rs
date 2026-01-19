@@ -42,7 +42,7 @@ impl ImportCmd {
                     "Attempting to import account data from {}...",
                     fs::canonicalize(filename)?.as_path().display()
                 );
-                let account_file = read_account_file(filename)?;
+                let account_file = AccountFile::read(filename)?;
                 let account_id =
                     import_account(&mut client, &keystore, account_file, self.overwrite).await?;
 
@@ -59,13 +59,6 @@ impl ImportCmd {
 
 // IMPORT ACCOUNT
 // ================================================================================================
-
-fn read_account_file(filename: &PathBuf) -> Result<AccountFile, CliError> {
-    let mut contents = vec![];
-    let mut _file = File::open(filename).and_then(|mut f| f.read_to_end(&mut contents))?;
-
-    Ok(AccountFile::read_from_bytes(&contents).map_err(ClientError::DataDeserializationError)?)
-}
 
 /// Imports an account file to the client.
 ///
