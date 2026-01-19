@@ -350,7 +350,7 @@ async fn token_symbol_mapping() -> Result<()> {
         .to_string();
 
     let note = {
-        let (client, _) = create_rust_client_with_store_path(&store_path, None, endpoint).await?;
+        let (client, _) = create_rust_client_with_store_path(&store_path, endpoint).await?;
         client.get_output_note(NoteId::try_from_hex(&note_id)?).await?.unwrap()
     };
 
@@ -399,7 +399,7 @@ async fn import_genesis_accounts_can_be_used_for_transactions() -> Result<()> {
     sync_cli(&temp_dir);
 
     let fungible_faucet_account_id = {
-        let (client, _) = create_rust_client_with_store_path(&store_path, None, endpoint).await?;
+        let (client, _) = create_rust_client_with_store_path(&store_path, endpoint).await?;
         let accounts = client.get_account_headers().await?;
 
         let account_ids = accounts.iter().map(|(acc, _seed)| acc.id()).collect::<Vec<_>>();
@@ -541,12 +541,9 @@ async fn cli_export_import_account() -> Result<()> {
     import_cmd.current_dir(&temp_dir_2).assert().success();
 
     // Ensure the account was imported
-    let (client_2, key_store) = create_rust_client_with_store_path(
-        &store_path_2,
-        Some(temp_dir_2.clone().join(".miden/keystore")),
-        endpoint_2,
-    )
-    .await?;
+    let (client_2, _) = create_rust_client_with_store_path(&store_path_2, endpoint_2).await?;
+    let cli_keystore =
+        FilesystemKeyStore::new(temp_dir_2.clone().join(MIDEN_DIR).join("keystore"))?;
 
     assert!(client_2.get_account(AccountId::from_hex(&faucet_id)?).await.is_ok());
     assert!(client_2.get_account(AccountId::from_hex(&wallet_id)?).await.is_ok());
@@ -569,7 +566,7 @@ async fn cli_export_import_account() -> Result<()> {
         .await?;
 
     for stored_pk_commitment in faucet_pks {
-        let matching_secret_key = key_store.get_key(stored_pk_commitment).unwrap();
+        let matching_secret_key = cli_keystore.get_key(stored_pk_commitment).unwrap();
         assert!(matching_secret_key.is_some());
         assert!(matching_secret_key.unwrap().public_key().to_commitment() == stored_pk_commitment);
     }
@@ -579,7 +576,7 @@ async fn cli_export_import_account() -> Result<()> {
         .await?;
 
     for stored_pk_commitment in wallet_pks {
-        let matching_secret_key = key_store.get_key(stored_pk_commitment).unwrap();
+        let matching_secret_key = cli_keystore.get_key(stored_pk_commitment).unwrap();
         assert!(matching_secret_key.is_some());
         assert!(matching_secret_key.unwrap().public_key().to_commitment() == stored_pk_commitment);
     }
@@ -683,7 +680,7 @@ async fn debug_mode_outputs_logs() -> Result<()> {
     // Create a Client and a custom note
     let (store_path, _, endpoint) = init_cli();
     let (mut client, authenticator) =
-        create_rust_client_with_store_path(&store_path, None, endpoint).await?;
+        create_rust_client_with_store_path(&store_path, endpoint).await?;
     let (account, ..) = insert_new_wallet(
         &mut client,
         AccountStorageMode::Private,
@@ -1096,7 +1093,6 @@ pub type TestClient = Client<FilesystemKeyStore>;
 /// Creates a new [`Client`] with a given store. Also returns the keystore associated with it.
 async fn create_rust_client_with_store_path(
     store_path: &Path,
-    keystore_path: Option<PathBuf>,
     endpoint: Endpoint,
 ) -> Result<(TestClient, FilesystemKeyStore)> {
     let store = {
@@ -1109,7 +1105,7 @@ async fn create_rust_client_with_store_path(
 
     let rng = Box::new(RpoRandomCoin::new(coin_seed.map(Felt::new).into()));
 
-    let keystore = FilesystemKeyStore::new(keystore_path.unwrap_or_else(temp_dir))?;
+    let keystore = FilesystemKeyStore::new(temp_dir())?;
 
     Ok((
         TestClient::new(
