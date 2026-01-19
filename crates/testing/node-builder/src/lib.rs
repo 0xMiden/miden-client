@@ -395,77 +395,116 @@ impl NodeHandle {
 // UTILS
 // ================================================================================================
 
+/// Expected account ID for the test account. Used to verify deterministic generation.
 const TEST_ACCOUNT_ID: &str = "0x0a0a0a0a0a0a0a100a0a0a0a0a0a0a";
 
-// Builds an account that triggers the "too_many_assets" boolean
-// flag when requested from the node.
+/// Deterministic seed used for the test account to ensure reproducible account IDs.
+const TEST_ACCOUNT_SEED: [u8; 32] = [0xa; 32];
+
+/// Number of faucets to create. This value is chosen to exceed typical limits
+/// and trigger the "too_many_assets" flag during testing.
+const NUM_TEST_FAUCETS: u128 = 1501;
+
+const NUM_STORAGE_MAP_ENTRIES: u32 = 2001;
+
+const FAUCET_DECIMALS: u8 = 12;
+const FAUCET_MAX_SUPPLY: u32 = 1 << 30;
+const ASSET_AMOUNT_PER_FAUCET: u64 = 100;
+
+/// Builds test faucets and an account that triggers the "too_many_assets" flag
+/// when requested from the node. This is used to test edge cases in account
+/// retrieval and asset handling.
 fn build_test_faucets_and_account() -> anyhow::Result<Vec<Account>> {
     let mut rng = ChaCha20Rng::from_seed(random());
     let secret = AuthSecretKey::new_falcon512_rpo_with_rng(&mut get_rpo_random_coin(&mut rng));
-    let faucets = (0_u128..=1500_u128)
-        .map(|i| -> anyhow::Result<Account> {
-            let init_seed = [i.to_be_bytes(), i.to_be_bytes()]
-                .concat()
-                .try_into()
-                .expect("this won't fail because we have exactly 32 bytes");
-            let symbol = TokenSymbol::new("TKN")?;
-            let decimals = 12;
-            let max_supply = Felt::from(1_u32 << 30);
-            let account_storage_mode = miden_protocol::account::AccountStorageMode::Public;
 
-            let auth_scheme = AuthScheme::RpoFalcon512 {
-                pub_key: secret.public_key().to_commitment(),
-            };
-            let faucet = create_basic_fungible_faucet(
-                init_seed,
-                symbol,
-                decimals,
-                max_supply,
-                account_storage_mode,
-                auth_scheme,
-            )?;
-            let (id, vault, storage, code, ..) = faucet.into_parts();
-            Ok(Account::new_unchecked(id, vault, storage, code, ONE, None))
-        })
-        .collect::<Result<Vec<_>>>()
-        .map_err(|err| Error::msg(format!("could not instance tests faucets got: {err}")))?;
+    let faucets = create_test_faucets(&secret)?;
+    let account = create_test_account_with_many_assets(&faucets)?;
 
-    let seed = [0xa; 32];
-    let sk = AuthSecretKey::new_falcon512_rpo_with_rng(&mut ChaCha20Rng::from_seed(seed));
-
-    let map_entries = (0_u32..2001_u32).map(|i| (Word::from([i; 4]), Word::from([i; 4])));
-
-    let storage_map = miden_protocol::account::StorageSlot::with_map(
-        miden_protocol::account::StorageSlotName::new("miden::test_account::map::too_many_entries")
-            .expect("should be a valid slot name"),
-        StorageMap::with_entries(map_entries).expect("should be a valid map"),
+    assert_eq!(
+        account.id().to_hex(),
+        TEST_ACCOUNT_ID,
+        "test account was generated with a different id than expected; \
+         this may indicate a change in account generation logic"
     );
 
+    Ok([&faucets[..], &[account][..]].concat())
+}
+
+/// Creates multiple fungible faucets for testing purposes.
+/// Each faucet is created with a deterministic seed derived from its index,
+/// ensuring reproducible test scenarios.
+fn create_test_faucets(secret: &AuthSecretKey) -> anyhow::Result<Vec<Account>> {
+    (0..NUM_TEST_FAUCETS)
+        .map(|i| create_single_test_faucet(i, secret))
+        .collect::<Result<Vec<_>>>()
+        .map_err(|err| Error::msg(format!("failed to create test faucets: {err}")))
+}
+
+fn create_single_test_faucet(index: u128, secret: &AuthSecretKey) -> anyhow::Result<Account> {
+    let init_seed: [u8; 32] = [index.to_be_bytes(), index.to_be_bytes()]
+        .concat()
+        .try_into()
+        .expect("concatenating two 16-byte arrays yields exactly 32 bytes");
+
+    let auth_scheme = AuthScheme::RpoFalcon512 {
+        pub_key: secret.public_key().to_commitment(),
+    };
+
+    let faucet = create_basic_fungible_faucet(
+        init_seed,
+        TokenSymbol::new("TKN")?,
+        FAUCET_DECIMALS,
+        Felt::from(FAUCET_MAX_SUPPLY),
+        miden_protocol::account::AccountStorageMode::Public,
+        auth_scheme,
+    )?;
+
+    // Set nonce to ONE to indicate the account is deployed (see generate_genesis_account)
+    let (id, vault, storage, code, ..) = faucet.into_parts();
+    Ok(Account::new_unchecked(id, vault, storage, code, ONE, None))
+}
+
+/// Creates a test account holding assets from all provided faucets.
+/// The account also includes a large storage map to test storage capacity limits.
+fn create_test_account_with_many_assets(faucets: &[Account]) -> anyhow::Result<Account> {
+    let sk =
+        AuthSecretKey::new_falcon512_rpo_with_rng(&mut ChaCha20Rng::from_seed(TEST_ACCOUNT_SEED));
+
+    let storage_map = create_large_storage_map();
     let acc_component = AccountComponent::new(basic_wallet_library(), vec![storage_map])
-        .expect(
-            "basic wallet component should satisfy the requirements of a valid account component",
-        )
+        .expect("basic wallet component should satisfy account component requirements")
         .with_supports_all_types();
 
-    let account = AccountBuilder::new(seed)
+    let assets = faucets.iter().map(|faucet| {
+        Asset::Fungible(
+            FungibleAsset::new(faucet.id(), ASSET_AMOUNT_PER_FAUCET)
+                .expect("faucet id should be valid for asset creation"),
+        )
+    });
+
+    let account = AccountBuilder::new(TEST_ACCOUNT_SEED)
         .with_auth_component(miden_standards::account::auth::AuthRpoFalcon512::new(
             sk.public_key().to_commitment(),
         ))
         .account_type(miden_protocol::account::AccountType::RegularAccountUpdatableCode)
         .with_component(acc_component)
         .storage_mode(miden_protocol::account::AccountStorageMode::Public)
-        .with_assets(faucets.iter().map(|faucet| {
-            Asset::Fungible(FungibleAsset::new(faucet.id(), 100).expect("should be a valid faucet"))
-        }))
+        .with_assets(assets)
         .build_existing()?;
 
-    assert_eq!(
-        account.id().to_hex(),
-        TEST_ACCOUNT_ID,
-        "test account with a large number of assets was generated with a different id than the one expected"
-    );
+    Ok(account)
+}
 
-    Ok([&faucets[..], &[account][..]].concat())
+/// Creates a storage map with many entries for stress-testing storage handling.
+fn create_large_storage_map() -> miden_protocol::account::StorageSlot {
+    let map_entries = (0..NUM_STORAGE_MAP_ENTRIES).map(|i| (Word::from([i; 4]), Word::from([i; 4])));
+
+    miden_protocol::account::StorageSlot::with_map(
+        miden_protocol::account::StorageSlotName::new("miden::test_account::map::too_many_entries")
+            .expect("slot name should be valid"),
+        StorageMap::with_entries(map_entries).expect("map entries should be valid"),
+    )
 }
 
 fn generate_genesis_account() -> anyhow::Result<AccountFile> {
