@@ -1,9 +1,4 @@
-import {
-  ITransaction,
-  ITransactionScript,
-  transactions,
-  transactionScripts,
-} from "./schema.js";
+import { getDatabase, ITransaction, ITransactionScript } from "./schema.js";
 import { logWebStoreError, mapOption, uint8ArrayToBase64 } from "./utils.js";
 
 interface ProcessedTransaction {
@@ -23,12 +18,13 @@ const STATUS_PENDING_VARIANT = 0;
 const STATUS_COMMITTED_VARIANT = 1;
 const STATUS_DISCARDED_VARIANT = 2;
 
-export async function getTransactions(filter: string) {
+export async function getTransactions(dbId: string, filter: string) {
   let transactionRecords: ITransaction[] = [];
 
   try {
+    const db = getDatabase(dbId);
     if (filter === "Uncommitted") {
-      transactionRecords = await transactions
+      transactionRecords = await db.transactions
         .filter((tx) => tx.statusVariant === STATUS_PENDING_VARIANT)
         .toArray();
     } else if (filter.startsWith(IDS_FILTER_PREFIX)) {
@@ -36,7 +32,7 @@ export async function getTransactions(filter: string) {
       const ids = idsString.split(",");
 
       if (ids.length > 0) {
-        transactionRecords = await transactions
+        transactionRecords = await db.transactions
           .where("id")
           .anyOf(ids)
           .toArray();
@@ -49,7 +45,7 @@ export async function getTransactions(filter: string) {
       );
       const blockNum = parseInt(blockNumString);
 
-      transactionRecords = await transactions
+      transactionRecords = await db.transactions
         .filter(
           (tx) =>
             tx.blockNum < blockNum &&
@@ -58,7 +54,7 @@ export async function getTransactions(filter: string) {
         )
         .toArray();
     } else {
-      transactionRecords = await transactions.toArray();
+      transactionRecords = await db.transactions.toArray();
     }
 
     if (transactionRecords.length === 0) {
@@ -71,12 +67,11 @@ export async function getTransactions(filter: string) {
       })
       .filter((scriptRoot) => scriptRoot != undefined);
 
-    const scripts = await transactionScripts
+    const scripts = await db.transactionScripts
       .where("scriptRoot")
       .anyOf(scriptRoots)
       .toArray();
 
-    // Create a map of scriptRoot to script for quick lookup
     const scriptMap: Map<string, Uint8Array> = new Map();
     scripts.forEach((script) => {
       if (script.txScript) {
@@ -120,10 +115,12 @@ export async function getTransactions(filter: string) {
 }
 
 export async function insertTransactionScript(
+  dbId: string,
   scriptRoot: Uint8Array,
   txScript: Uint8Array
 ) {
   try {
+    const db = getDatabase(dbId);
     const scriptRootArray = new Uint8Array(scriptRoot);
     const scriptRootBase64 = uint8ArrayToBase64(scriptRootArray);
 
@@ -132,13 +129,14 @@ export async function insertTransactionScript(
       txScript: mapOption(txScript, (txScript) => new Uint8Array(txScript)),
     };
 
-    await transactionScripts.put(data);
+    await db.transactionScripts.put(data);
   } catch (error) {
     logWebStoreError(error, "Failed to insert transaction script");
   }
 }
 
 export async function upsertTransactionRecord(
+  dbId: string,
   transactionId: string,
   details: Uint8Array,
   blockNum: number,
@@ -147,6 +145,7 @@ export async function upsertTransactionRecord(
   scriptRoot?: Uint8Array
 ) {
   try {
+    const db = getDatabase(dbId);
     const data = {
       id: transactionId,
       details,
@@ -156,7 +155,7 @@ export async function upsertTransactionRecord(
       status,
     };
 
-    await transactions.put(data);
+    await db.transactions.put(data);
   } catch (err) {
     logWebStoreError(err, "Failed to insert proven transaction data");
   }

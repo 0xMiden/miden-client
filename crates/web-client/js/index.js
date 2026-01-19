@@ -101,6 +101,7 @@ export class WebClient {
    *
    * @param {string | undefined} rpcUrl - RPC endpoint URL used by the client.
    * @param {Uint8Array | undefined} seed - Optional seed for account initialization.
+   * @param {string | undefined} storeName - Optional name for the store to be used by the client.
    * @param {(pubKey: Uint8Array) => Promise<Uint8Array | null | undefined> | Uint8Array | null | undefined} [getKeyCb]
    *   - Callback to retrieve the secret key bytes for a given public key. The `pubKey`
    *   parameter is the serialized public key (from `PublicKey.serialize()`). Return the
@@ -116,10 +117,19 @@ export class WebClient {
    *   `SigningInputs.serialize()`. Must return a `Uint8Array` containing the serialized
    *   signature, either directly or wrapped in a `Promise`.
    */
-  constructor(rpcUrl, noteTransportUrl, seed, getKeyCb, insertKeyCb, signCb) {
+  constructor(
+    rpcUrl,
+    noteTransportUrl,
+    seed,
+    storeName,
+    getKeyCb,
+    insertKeyCb,
+    signCb
+  ) {
     this.rpcUrl = rpcUrl;
     this.noteTransportUrl = noteTransportUrl;
     this.seed = seed;
+    this.storeName = storeName;
     this.getKeyCb = getKeyCb;
     this.insertKeyCb = insertKeyCb;
     this.signCb = signCb;
@@ -187,19 +197,7 @@ export class WebClient {
       });
 
       // Once the worker script has loaded, initialize the worker.
-      this.loaded.then(() => {
-        this.worker.postMessage({
-          action: WorkerAction.INIT,
-          args: [
-            this.rpcUrl,
-            this.noteTransportUrl,
-            this.seed,
-            this.getKeyCb,
-            this.insertKeyCb,
-            this.signCb,
-          ],
-        });
-      });
+      this.loaded.then(() => this.initializeWorker());
     } else {
       console.log("WebClient: Web Workers are not available.");
       // Worker not available; set up fallback values.
@@ -212,6 +210,16 @@ export class WebClient {
     // Lazy initialize the underlying WASM WebClient when first requested.
     this.wasmWebClient = null;
     this.wasmWebClientPromise = null;
+  }
+
+  // TODO: This will soon conflict with some changes in main.
+  // More context here:
+  // https://github.com/0xMiden/miden-client/pull/1645?notification_referrer_id=NT_kwHOA1yg7NoAJVJlcG9zaXRvcnk7NjU5MzQzNzAyO0lzc3VlOzM3OTY4OTU1Nzk&notifications_query=is%3Aunread#discussion_r2696075480
+  initializeWorker() {
+    this.worker.postMessage({
+      action: WorkerAction.INIT,
+      args: [this.rpcUrl, this.noteTransportUrl, this.seed, this.storeName],
+    });
   }
 
   async getWasmWebClient() {
@@ -236,15 +244,16 @@ export class WebClient {
    * @param {string} rpcUrl - The RPC URL.
    * @param {string} noteTransportUrl - The note transport URL (optional).
    * @param {string} seed - The seed for the account.
+   * @param {string | undefined} network - Optional name for the store. Setting this allows multiple clients to be used in the same browser.
    * @returns {Promise<WebClient>} The fully initialized WebClient.
    */
-  static async createClient(rpcUrl, noteTransportUrl, seed) {
+  static async createClient(rpcUrl, noteTransportUrl, seed, network) {
     // Construct the instance (synchronously).
-    const instance = new WebClient(rpcUrl, noteTransportUrl, seed);
+    const instance = new WebClient(rpcUrl, noteTransportUrl, seed, network);
 
     // Wait for the underlying wasmWebClient to be initialized.
     const wasmWebClient = await instance.getWasmWebClient();
-    await wasmWebClient.createClient(rpcUrl, noteTransportUrl, seed);
+    await wasmWebClient.createClient(rpcUrl, noteTransportUrl, seed, network);
 
     // Wait for the worker to be ready
     await instance.ready;
@@ -276,6 +285,7 @@ export class WebClient {
    * @param {string} rpcUrl - The RPC URL.
    * @param {string | undefined} noteTransportUrl - The note transport URL (optional).
    * @param {string | undefined} seed - The seed for the account.
+   * @param {string | undefined} storeName - Optional name for the store. Setting this allows multiple clients to be used in the same browser.
    * @param {Function | undefined} getKeyCb - The get key callback.
    * @param {Function | undefined} insertKeyCb - The insert key callback.
    * @param {Function | undefined} signCb - The sign callback.
@@ -285,6 +295,7 @@ export class WebClient {
     rpcUrl,
     noteTransportUrl,
     seed,
+    storeName,
     getKeyCb,
     insertKeyCb,
     signCb
@@ -294,6 +305,7 @@ export class WebClient {
       rpcUrl,
       noteTransportUrl,
       seed,
+      storeName,
       getKeyCb,
       insertKeyCb,
       signCb
@@ -304,6 +316,7 @@ export class WebClient {
       rpcUrl,
       noteTransportUrl,
       seed,
+      storeName,
       getKeyCb,
       insertKeyCb,
       signCb
@@ -569,7 +582,14 @@ export class WebClient {
 
 export class MockWebClient extends WebClient {
   constructor(seed) {
-    super(null, null, seed);
+    super(null, null, seed, "mock");
+  }
+
+  initializeWorker() {
+    this.worker.postMessage({
+      action: WorkerAction.INIT_MOCK,
+      args: [this.seed],
+    });
   }
 
   /**
