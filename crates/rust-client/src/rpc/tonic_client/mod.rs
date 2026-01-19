@@ -69,7 +69,6 @@ pub struct GrpcClient {
 // Keep in mind, this can potentially do **two** requests to the rpc endpoint.
 // If the account has a non public state, it will simply return the first response.
 // Otherwise it will request the RPC endpoint for the extra data for an account with public state.
-
 impl GrpcClient {
     /// Returns a new instance of [`GrpcClient`] that'll do calls to the provided [`Endpoint`]
     /// with the given timeout in milliseconds.
