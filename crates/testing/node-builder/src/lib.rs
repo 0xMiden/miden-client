@@ -402,7 +402,7 @@ const TEST_ACCOUNT_ID: &str = "0x0a0a0a0a0a0a0a100a0a0a0a0a0a0a";
 const TEST_ACCOUNT_SEED: [u8; 32] = [0xa; 32];
 
 /// Number of faucets to create. This value is chosen to exceed typical limits
-/// and trigger the "too_many_assets" flag during testing.
+/// and trigger the `too_many_assets` flag during testing.
 const NUM_TEST_FAUCETS: u128 = 1501;
 
 const NUM_STORAGE_MAP_ENTRIES: u32 = 2001;
@@ -411,7 +411,7 @@ const FAUCET_DECIMALS: u8 = 12;
 const FAUCET_MAX_SUPPLY: u32 = 1 << 30;
 const ASSET_AMOUNT_PER_FAUCET: u64 = 100;
 
-/// Builds test faucets and an account that triggers the "too_many_assets" flag
+/// Builds test faucets and an account that triggers the `too_many_assets` flag
 /// when requested from the node. This is used to test edge cases in account
 /// retrieval and asset handling.
 fn build_test_faucets_and_account() -> anyhow::Result<Vec<Account>> {
@@ -498,7 +498,8 @@ fn create_test_account_with_many_assets(faucets: &[Account]) -> anyhow::Result<A
 
 /// Creates a storage map with many entries for stress-testing storage handling.
 fn create_large_storage_map() -> miden_protocol::account::StorageSlot {
-    let map_entries = (0..NUM_STORAGE_MAP_ENTRIES).map(|i| (Word::from([i; 4]), Word::from([i; 4])));
+    let map_entries =
+        (0..NUM_STORAGE_MAP_ENTRIES).map(|i| (Word::from([i; 4]), Word::from([i; 4])));
 
     miden_protocol::account::StorageSlot::with_map(
         miden_protocol::account::StorageSlotName::new("miden::test_account::map::too_many_entries")

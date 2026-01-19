@@ -133,9 +133,7 @@ impl GrpcClient {
         let account_response = rpc_api
             .get_account_proof(account_request)
             .await
-            .map_err(|status| {
-                RpcError::from_grpc_error(NodeRpcClientEndpoint::GetAccountDetails, status)
-            })?
+            .map_err(|status| RpcError::from_grpc_error(NodeRpcClientEndpoint::GetAccount, status))?
             .into_inner();
         let block_number = account_response.block_num.ok_or(RpcError::ExpectedDataMissing(
             "GetAccountDetails returned an account without a matching block number for the witness"

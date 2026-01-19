@@ -400,7 +400,7 @@ pub trait NodeRpcClient: Send + Sync {
 pub enum NodeRpcClientEndpoint {
     CheckNullifiers,
     SyncNullifiers,
-    GetAccountDetails,
+    GetAccount,
     GetAccountStateDelta,
     GetAccountProofs,
     GetBlockByNumber,
@@ -422,7 +422,7 @@ impl fmt::Display for NodeRpcClientEndpoint {
             NodeRpcClientEndpoint::SyncNullifiers => {
                 write!(f, "sync_nullifiers")
             },
-            NodeRpcClientEndpoint::GetAccountDetails => write!(f, "get_account_details"),
+            NodeRpcClientEndpoint::GetAccount => write!(f, "get_account_details"),
             NodeRpcClientEndpoint::GetAccountStateDelta => write!(f, "get_account_state_delta"),
             NodeRpcClientEndpoint::GetAccountProofs => write!(f, "get_account_proofs"),
             NodeRpcClientEndpoint::GetBlockByNumber => write!(f, "get_block_by_number"),
