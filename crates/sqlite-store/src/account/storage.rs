@@ -187,14 +187,15 @@ pub(crate) fn query_storage_slots(
     Ok(storage_values
         .into_iter()
         .map(|(slot_name, value, slot_type)| {
+            let key = slot_name.clone();
             let slot = match slot_type {
-                StorageSlotType::Value => StorageSlot::with_value(slot_name.clone(), value),
+                StorageSlotType::Value => StorageSlot::with_value(slot_name, value),
                 StorageSlotType::Map => StorageSlot::with_map(
-                    slot_name.clone(),
-                    storage_maps.remove(&value).unwrap_or_default(),
+                    slot_name,
+                    storage_maps.remove(&value).unwrap_or(StorageMap::new()),
                 ),
             };
-            (slot_name, slot)
+            (key, slot)
         })
         .collect())
 }
