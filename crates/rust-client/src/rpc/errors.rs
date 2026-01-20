@@ -3,9 +3,9 @@ use alloc::string::{String, ToString};
 use core::error::Error;
 use core::num::TryFromIntError;
 
-use miden_protocol::NoteError;
 use miden_protocol::account::AccountId;
 use miden_protocol::crypto::merkle::MerkleError;
+use miden_protocol::errors::NoteError;
 use miden_protocol::note::NoteId;
 use miden_protocol::utils::DeserializationError;
 use thiserror::Error;

@@ -175,7 +175,7 @@ where
                 )))?;
             if let Some(mut previous_note) = previous_note {
                 if previous_note
-                    .inclusion_proof_received(inclusion_proof, *fetched_note.metadata())?
+                    .inclusion_proof_received(inclusion_proof, fetched_note.metadata().clone())?
                 {
                     self.store.remove_note_tag((&previous_note).try_into()?).await?;
 
@@ -243,12 +243,12 @@ where
             .await?;
 
         for (previous_note, note, inclusion_proof) in requested_notes {
-            let metadata = *note.metadata();
+            let metadata = note.metadata().clone();
             let mut note_record = previous_note.unwrap_or(InputNoteRecord::new(
                 note.into(),
                 self.store.get_current_timestamp(),
                 ExpectedNoteState {
-                    metadata: Some(metadata),
+                    metadata: Some(metadata.clone()),
                     after_block_num: inclusion_proof.location().block_num(),
                     tag: Some(metadata.tag()),
                 }
@@ -267,7 +267,7 @@ where
                 let current_block_num = self.get_sync_height().await?;
 
                 let mut note_changed =
-                    note_record.inclusion_proof_received(inclusion_proof, metadata)?;
+                    note_record.inclusion_proof_received(inclusion_proof, metadata.clone())?;
 
                 if block_height <= current_block_num {
                     // FIXME: We should be able to build the mmr only once (outside the for loop).
@@ -346,7 +346,7 @@ where
                         .await?;
 
                     let note_changed =
-                        note_record.inclusion_proof_received(inclusion_proof, metadata)?;
+                        note_record.inclusion_proof_received(inclusion_proof, metadata.clone())?;
 
                     if note_record.block_header_received(&block_header)? | note_changed {
                         self.store

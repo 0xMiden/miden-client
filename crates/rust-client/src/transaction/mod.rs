@@ -69,9 +69,10 @@ use alloc::vec::Vec;
 use miden_protocol::account::{Account, AccountId};
 use miden_protocol::asset::NonFungibleAsset;
 use miden_protocol::block::BlockNumber;
+use miden_protocol::errors::AssetError;
 use miden_protocol::note::{Note, NoteDetails, NoteId, NoteRecipient, NoteScript, NoteTag};
 use miden_protocol::transaction::AccountInputs;
-use miden_protocol::{AssetError, Felt, Word};
+use miden_protocol::{Felt, Word};
 use miden_standards::account::interface::AccountInterfaceExt;
 use miden_tx::{DataStore, NoteConsumptionChecker, TransactionExecutor};
 use tracing::info;
@@ -526,13 +527,13 @@ where
             // TODO: check_relevance() should have the option to take multiple notes
             let account_relevance = note_screener.check_relevance(note).await?;
             if !account_relevance.is_empty() {
-                let metadata = *note.metadata();
+                let metadata = note.metadata().clone();
 
                 new_input_notes.push(InputNoteRecord::new(
                     note.into(),
                     current_timestamp,
                     ExpectedNoteState {
-                        metadata: Some(metadata),
+                        metadata: Some(metadata.clone()),
                         after_block_num: submission_height,
                         tag: Some(metadata.tag()),
                     }
@@ -695,7 +696,7 @@ where
 
             let (_, account_proof) = self
                 .rpc_api
-                .get_account_proof(
+                .get_account(
                     foreign_account.clone(),
                     AccountStateAt::Block(block_num),
                     known_account_code,

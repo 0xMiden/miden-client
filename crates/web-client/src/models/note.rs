@@ -4,6 +4,8 @@ use miden_client::crypto::RpoRandomCoin;
 use miden_client::note::{
     Note as NativeNote,
     NoteAssets as NativeNoteAssets,
+    NoteAttachment as NativeNoteAttachment,
+    NoteAttachmentScheme as NativeNoteAttachmentScheme,
     create_p2id_note,
     create_p2ide_note,
 };
@@ -68,7 +70,7 @@ impl Note {
 
     /// Returns the public metadata associated with the note.
     pub fn metadata(&self) -> NoteMetadata {
-        (*self.0.metadata()).into()
+        self.0.metadata().clone().into()
     }
 
     /// Returns the recipient who can consume this note.
@@ -110,13 +112,14 @@ impl Note {
 
         let native_note_assets: NativeNoteAssets = assets.into();
         let native_assets: Vec<NativeAsset> = native_note_assets.iter().copied().collect();
+        let attachment = note_attachment_from_aux(aux);
 
         let native_note = create_p2id_note(
             sender.into(),
             target.into(),
             native_assets,
             note_type.into(),
-            (*aux).into(),
+            attachment,
             &mut rng,
         )
         .map_err(|err| js_error_with_context(err, "create p2id note"))?;
@@ -141,6 +144,7 @@ impl Note {
 
         let native_note_assets: NativeNoteAssets = assets.into();
         let native_assets: Vec<NativeAsset> = native_note_assets.iter().copied().collect();
+        let attachment = note_attachment_from_aux(aux);
 
         let native_note = create_p2ide_note(
             sender.into(),
@@ -149,7 +153,7 @@ impl Note {
             reclaim_height.map(NativeBlockNumber::from),
             timelock_height.map(NativeBlockNumber::from),
             note_type.into(),
-            (*aux).into(),
+            attachment,
             &mut rng,
         )
         .map_err(|err| js_error_with_context(err, "create p2ide note"))?;
@@ -182,5 +186,20 @@ impl From<Note> for NativeNote {
 impl From<&Note> for NativeNote {
     fn from(note: &Note) -> Self {
         note.0.clone()
+    }
+}
+
+// Map legacy aux data into a word attachment when provided.
+fn note_attachment_from_aux(aux: &Felt) -> NativeNoteAttachment {
+    if aux.as_int() == 0 {
+        NativeNoteAttachment::default()
+    } else {
+        let word = NativeWord::from([
+            (*aux).into(),
+            NativeFelt::new(0),
+            NativeFelt::new(0),
+            NativeFelt::new(0),
+        ]);
+        NativeNoteAttachment::new_word(NativeNoteAttachmentScheme::none(), word)
     }
 }

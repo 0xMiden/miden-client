@@ -273,7 +273,6 @@ impl SwapCmd {
             &swap_transaction.offered_asset(),
             &swap_transaction.requested_asset(),
         )
-        .map_err(|err| CliError::Transaction(err.into(), "Failed to build swap tag".to_string()))?
         .into();
         println!(
             "To receive updates about the payback Swap Note run `miden tags add {payback_note_tag}`",

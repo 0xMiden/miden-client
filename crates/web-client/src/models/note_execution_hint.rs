@@ -1,4 +1,4 @@
-use miden_client::note::NoteExecutionHint as NativeNoteExecutionHint;
+use miden_protocol::note::NoteExecutionHint as NativeNoteExecutionHint;
 use wasm_bindgen::prelude::*;
 
 /// Hint describing when a note can be consumed.
@@ -21,7 +21,7 @@ impl NoteExecutionHint {
     /// Creates a hint that activates after the given block number.
     #[wasm_bindgen(js_name = "afterBlock")]
     pub fn after_block(block_num: u32) -> NoteExecutionHint {
-        NoteExecutionHint(NativeNoteExecutionHint::after_block(block_num.into()).unwrap())
+        NoteExecutionHint(NativeNoteExecutionHint::after_block(block_num.into()))
     }
 
     /// Creates a hint that allows execution in a specific slot of a round.

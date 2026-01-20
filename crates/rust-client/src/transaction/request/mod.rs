@@ -5,22 +5,22 @@ use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
+use miden_protocol::Word;
 use miden_protocol::account::AccountId;
 use miden_protocol::asset::{Asset, NonFungibleAsset};
 use miden_protocol::crypto::merkle::MerkleError;
 use miden_protocol::crypto::merkle::store::MerkleStore;
-use miden_protocol::note::{Note, NoteDetails, NoteId, NoteRecipient, NoteTag, PartialNote};
-use miden_protocol::transaction::{InputNote, InputNotes, TransactionArgs, TransactionScript};
-use miden_protocol::vm::AdviceMap;
-use miden_protocol::{
+use miden_protocol::errors::{
     AccountError,
     AssetVaultError,
     NoteError,
     StorageMapError,
     TransactionInputError,
     TransactionScriptError,
-    Word,
 };
+use miden_protocol::note::{Note, NoteDetails, NoteId, NoteRecipient, NoteTag, PartialNote};
+use miden_protocol::transaction::{InputNote, InputNotes, TransactionArgs, TransactionScript};
+use miden_protocol::vm::AdviceMap;
 use miden_standards::account::interface::{AccountInterface, AccountInterfaceError};
 use miden_standards::code_builder::CodeBuilder;
 use miden_standards::errors::CodeBuilderError;
@@ -143,7 +143,7 @@ impl TransactionRequest {
                 .map(|partial| {
                     Note::new(
                         partial.assets().clone(),
-                        *partial.metadata(),
+                        partial.metadata().clone(),
                         self.expected_output_recipients
                             .get(&partial.recipient_digest())
                             .expect("Recipient should be included if it's an own note")
@@ -490,15 +490,15 @@ mod tests {
     };
     use miden_protocol::asset::FungibleAsset;
     use miden_protocol::crypto::rand::{FeltRng, RpoRandomCoin};
-    use miden_protocol::note::{NoteTag, NoteType};
+    use miden_protocol::note::{NoteAttachment, NoteTag, NoteType};
     use miden_protocol::testing::account_id::{
         ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
         ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
         ACCOUNT_ID_SENDER,
     };
     use miden_protocol::transaction::OutputNote;
-    use miden_protocol::{EMPTY_WORD, Felt, Word, ZERO};
-    use miden_standards::account::auth::{AuthEcdsaK256Keccak, AuthRpoFalcon512};
+    use miden_protocol::{EMPTY_WORD, Felt, Word};
+    use miden_standards::account::auth::{AuthEcdsaK256Keccak, AuthFalcon512Rpo};
     use miden_standards::note::create_p2id_note;
     use miden_standards::testing::account_component::MockAccountComponent;
     use miden_tx::utils::{Deserializable, Serializable};
@@ -510,7 +510,7 @@ mod tests {
     #[test]
     fn transaction_request_serialization() {
         assert_transaction_request_serialization_with(|| {
-            AuthRpoFalcon512::new(PublicKeyCommitment::from(EMPTY_WORD)).into()
+            AuthFalcon512Rpo::new(PublicKeyCommitment::from(EMPTY_WORD)).into()
         });
     }
 
@@ -538,7 +538,7 @@ mod tests {
                 target_id,
                 vec![FungibleAsset::new(faucet_id, 100 + i).unwrap().into()],
                 NoteType::Private,
-                ZERO,
+                NoteAttachment::default(),
                 &mut rng,
             )
             .unwrap();
@@ -564,7 +564,7 @@ mod tests {
             .expected_output_recipients(vec![notes.pop().unwrap().recipient().clone()])
             .expected_future_notes(vec![(
                 notes.pop().unwrap().into(),
-                NoteTag::from_account_id(sender_id),
+                NoteTag::with_account_target(sender_id),
             )])
             .extend_advice_map(advice_vec)
             .foreign_accounts([

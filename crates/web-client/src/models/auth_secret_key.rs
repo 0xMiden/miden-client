@@ -46,7 +46,7 @@ impl AuthSecretKey {
 
     fn public_key_commitment(&self) -> NativeWord {
         match &self.0 {
-            NativeAuthSecretKey::RpoFalcon512(key) => key.public_key().to_commitment(),
+            NativeAuthSecretKey::Falcon512Rpo(key) => key.public_key().to_commitment(),
             NativeAuthSecretKey::EcdsaK256Keccak(key) => key.public_key().to_commitment(),
             _ => todo!("auth scheme currently not supported"),
         }
@@ -84,7 +84,7 @@ impl AuthSecretKey {
     #[wasm_bindgen(js_name = "getRpoFalcon512SecretKeyAsFelts")]
     pub fn get_rpo_falcon_512_secret_key_as_felts(&self) -> Vec<Felt> {
         let secret_key_as_bytes = match &self.0 {
-            NativeAuthSecretKey::RpoFalcon512(key) => key.to_bytes(),
+            NativeAuthSecretKey::Falcon512Rpo(key) => key.to_bytes(),
             _ => todo!(), // TODO: what to do with other cases
         };
 

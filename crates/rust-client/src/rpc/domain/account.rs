@@ -142,20 +142,6 @@ impl TryFrom<proto::account::AccountId> for AccountId {
 // ACCOUNT HEADER
 // ================================================================================================
 
-pub(crate) struct SlotTypeProto(pub u32);
-
-impl TryInto<StorageSlotType> for SlotTypeProto {
-    type Error = crate::rpc::RpcError;
-
-    fn try_into(self) -> Result<StorageSlotType, Self::Error> {
-        match self.0 {
-            0 => Ok(StorageSlotType::Map),
-            1 => Ok(StorageSlotType::Value),
-            _ => Err(RpcError::InvalidResponse("Invalid storage slot type".into())),
-        }
-    }
-}
-
 impl TryInto<AccountHeader> for proto::account::AccountHeader {
     type Error = crate::rpc::RpcError;
 
@@ -215,7 +201,8 @@ impl TryInto<AccountStorageHeader> for proto::account::AccountStorageHeader {
                 ))?
                 .try_into()?;
 
-            let slot_type: StorageSlotType = SlotTypeProto(slot.slot_type).try_into()?;
+            let slot_type = StorageSlotType::try_from(slot.slot_type as u8)
+                .map_err(|err| RpcError::InvalidResponse(err.to_string()))?;
             let slot_name = StorageSlotName::new(slot.slot_name)
                 .map_err(|err| RpcError::InvalidResponse(err.to_string()))?;
 
@@ -232,8 +219,8 @@ impl TryInto<AccountStorageHeader> for proto::account::AccountStorageHeader {
 // ================================================================================================
 
 #[cfg(feature = "tonic")]
-impl proto::rpc::account_proof_response::AccountDetails {
-    /// Converts the RPC response into `StateHeaders`.
+impl proto::rpc::account_response::AccountDetails {
+    /// Converts the RPC response into `AccountDetails`.
     ///
     /// The RPC response may omit unchanged account codes. If so, this function uses
     /// `known_account_codes` to fill in the missing code. If a required code cannot be found in
@@ -249,20 +236,18 @@ impl proto::rpc::account_proof_response::AccountDetails {
         use crate::rpc::RpcError;
         use crate::rpc::domain::MissingFieldHelper;
 
-        let proto::rpc::account_proof_response::AccountDetails {
+        let proto::rpc::account_response::AccountDetails {
             header,
             storage_details,
             code,
             vault_details,
         } = self;
         let header: AccountHeader = header
-            .ok_or(proto::rpc::account_proof_response::AccountDetails::missing_field(stringify!(
-                header
-            )))?
+            .ok_or(proto::rpc::account_response::AccountDetails::missing_field(stringify!(header)))?
             .try_into()?;
 
         let storage_details = storage_details
-            .ok_or(proto::rpc::account_proof_response::AccountDetails::missing_field(stringify!(
+            .ok_or(proto::rpc::account_response::AccountDetails::missing_field(stringify!(
                 storage_details
             )))?
             .try_into()?;
@@ -318,7 +303,7 @@ pub struct AccountDetails {
 // ACCOUNT STORAGE DETAILS
 // ================================================================================================
 
-/// Account storage details for `AccountProofResponse`
+/// Account storage details for `AccountResponse`
 #[derive(Clone, Debug)]
 pub struct AccountStorageDetails {
     /// Account storage header (storage slot info for up to 256 slots)
@@ -377,19 +362,25 @@ impl TryFrom<proto::rpc::account_storage_details::AccountStorageMapDetails>
     fn try_from(
         value: proto::rpc::account_storage_details::AccountStorageMapDetails,
     ) -> Result<Self, Self::Error> {
+        use proto::rpc::account_storage_details::account_storage_map_details::Entries;
+
         let slot_name = StorageSlotName::new(value.slot_name)
             .map_err(|err| RpcError::ExpectedDataMissing(err.to_string()))?;
         let too_many_entries = value.too_many_entries;
 
-        let entries = value
-            .entries
-            .ok_or(proto::rpc::account_storage_details::AccountStorageMapDetails::missing_field(
-                stringify!(entries),
-            ))?
-            .entries
-            .iter_mut()
-            .map(|entry| entry.to_owned().try_into())
-            .collect::<Result<Vec<StorageMapEntry>, RpcError>>()?;
+        let entries = match value.entries {
+            Some(Entries::AllEntries(all_entries)) => all_entries
+                .entries
+                .into_iter()
+                .map(core::convert::TryInto::try_into)
+                .collect::<Result<Vec<StorageMapEntry>, RpcError>>()?,
+            Some(Entries::EntriesWithProofs(entries_with_proofs)) => entries_with_proofs
+                .entries
+                .into_iter()
+                .map(core::convert::TryInto::try_into)
+                .collect::<Result<Vec<StorageMapEntry>, RpcError>>()?,
+            None => Vec::new(),
+        };
 
         Ok(Self { slot_name, too_many_entries, entries })
     }
@@ -404,26 +395,28 @@ pub struct StorageMapEntry {
     pub value: Word,
 }
 
-impl TryFrom<proto::rpc::account_storage_details::account_storage_map_details::map_entries::StorageMapEntry>
+impl TryFrom<proto::rpc::account_storage_details::account_storage_map_details::all_map_entries::StorageMapEntry>
     for StorageMapEntry
 {
     type Error = RpcError;
 
-    fn try_from(value: proto::rpc::account_storage_details::account_storage_map_details::map_entries::StorageMapEntry) -> Result<Self, Self::Error> {
-        let key = value.key.ok_or(
-            proto::rpc::account_storage_details::account_storage_map_details::map_entries::StorageMapEntry::missing_field(
-                stringify!(key),
-            ))?.try_into()?;
+    fn try_from(value: proto::rpc::account_storage_details::account_storage_map_details::all_map_entries::StorageMapEntry) -> Result<Self, Self::Error> {
+        let key = value.key.ok_or(RpcError::ExpectedDataMissing("key".into()))?.try_into()?;
+        let value = value.value.ok_or(RpcError::ExpectedDataMissing("value".into()))?.try_into()?;
+        Ok(Self { key, value })
+    }
+}
 
-        let value = value.value.ok_or(
-            proto::rpc::account_storage_details::account_storage_map_details::map_entries::StorageMapEntry::missing_field(
-                stringify!(value),
-            ))?.try_into()?;
+impl TryFrom<proto::rpc::account_storage_details::account_storage_map_details::map_entries_with_proofs::StorageMapEntryWithProof>
+    for StorageMapEntry
+{
+    type Error = RpcError;
 
-        Ok(Self {
-            key,
-            value
-        })
+    fn try_from(value: proto::rpc::account_storage_details::account_storage_map_details::map_entries_with_proofs::StorageMapEntryWithProof) -> Result<Self, Self::Error> {
+        let key = value.key.ok_or(RpcError::ExpectedDataMissing("key".into()))?.try_into()?;
+        let value = value.value.ok_or(RpcError::ExpectedDataMissing("value".into()))?.try_into()?;
+        // Note: We ignore the proof here as the domain type doesn't include it
+        Ok(Self { key, value })
     }
 }
 
@@ -554,9 +547,9 @@ impl AccountProof {
 }
 
 #[cfg(feature = "tonic")]
-impl TryFrom<proto::rpc::AccountProofResponse> for AccountProof {
+impl TryFrom<proto::rpc::AccountResponse> for AccountProof {
     type Error = RpcError;
-    fn try_from(account_proof: proto::rpc::AccountProofResponse) -> Result<Self, Self::Error> {
+    fn try_from(account_proof: proto::rpc::AccountResponse) -> Result<Self, Self::Error> {
         let Some(witness) = account_proof.witness else {
             return Err(RpcError::ExpectedDataMissing(
                 "GetAccountProof returned an account without witness".to_owned(),
@@ -632,14 +625,13 @@ impl AccountStorageRequirements {
 }
 
 impl From<AccountStorageRequirements>
-    for Vec<proto::rpc::account_proof_request::account_detail_request::StorageMapDetailRequest>
+    for Vec<proto::rpc::account_request::account_detail_request::StorageMapDetailRequest>
 {
     fn from(
         value: AccountStorageRequirements,
-    ) -> Vec<proto::rpc::account_proof_request::account_detail_request::StorageMapDetailRequest>
-    {
-        use proto::rpc::account_proof_request::account_detail_request;
-        use proto::rpc::account_proof_request::account_detail_request::storage_map_detail_request;
+    ) -> Vec<proto::rpc::account_request::account_detail_request::StorageMapDetailRequest> {
+        use proto::rpc::account_request::account_detail_request;
+        use proto::rpc::account_request::account_detail_request::storage_map_detail_request;
         let request_map = value.0;
         let mut requests = Vec::with_capacity(request_map.len());
         for (slot_name, map_keys) in request_map {

@@ -180,7 +180,6 @@ pub mod assembly {
 
 /// Provides types and utilities for working with assets within the Miden network.
 pub mod asset {
-    pub use miden_protocol::AssetError;
     pub use miden_protocol::account::delta::{
         AccountStorageDelta,
         AccountVaultDelta,
@@ -210,10 +209,10 @@ pub mod auth {
         Signature,
     };
     pub use miden_standards::AuthScheme;
-    pub use miden_standards::account::auth::{AuthEcdsaK256Keccak, AuthRpoFalcon512, NoAuth};
+    pub use miden_standards::account::auth::{AuthEcdsaK256Keccak, AuthFalcon512Rpo, NoAuth};
     pub use miden_tx::auth::{BasicAuthenticator, SigningInputs, TransactionAuthenticator};
 
-    pub const RPO_FALCON_SCHEME_ID: AuthSchemeId = AuthSchemeId::RpoFalcon512;
+    pub const RPO_FALCON_SCHEME_ID: AuthSchemeId = AuthSchemeId::Falcon512Rpo;
     pub const ECDSA_K256_KECCAK_SCHEME_ID: AuthSchemeId = AuthSchemeId::EcdsaK256Keccak;
 }
 

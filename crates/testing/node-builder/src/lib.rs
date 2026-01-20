@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
 use std::net::SocketAddr;
+use std::num::NonZeroUsize;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -96,7 +97,8 @@ impl NodeBuilder {
             miden_node_utils::logging::OpenTelemetry::Disabled,
         )?;
 
-        let test_faucets_and_account = build_test_faucets_and_account()?;
+        // TODO: Re-enable when needed for too_many_assets test
+        // let test_faucets_and_account = build_test_faucets_and_account()?;
 
         let account_file =
             generate_genesis_account().context("failed to create genesis account")?;
@@ -122,7 +124,9 @@ impl NodeBuilder {
         let validator_signer = ecdsa_k256_keccak::SecretKey::new();
 
         let genesis_state = GenesisState::new(
-            [&[account_file.account][..], &test_faucets_and_account[..]].concat(),
+            // TODO: Re-enable when needed for too_many_assets test
+            // [&[account_file.account][..], &test_faucets_and_account[..]].concat(),
+            vec![account_file.account],
             FeeParameters::new(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET.try_into().unwrap(), 0u32)
                 .unwrap(),
             version,
@@ -184,6 +188,7 @@ impl NodeBuilder {
         let ntx_builder_id = Self::start_ntx_builder(
             block_producer_address,
             store_ntx_builder_address,
+            validator_address,
             checkpoint.clone(),
             &mut join_set,
         );
@@ -336,6 +341,7 @@ impl NodeBuilder {
     fn start_ntx_builder(
         block_producer_address: SocketAddr,
         store_address: SocketAddr,
+        validator_address: SocketAddr,
         production_checkpoint: Arc<Barrier>,
         join_set: &mut JoinSet<Result<()>>,
     ) -> Id {
@@ -348,15 +354,20 @@ impl NodeBuilder {
             block_producer_address.port()
         ))
         .unwrap();
+        let validator_url =
+            Url::parse(&format!("http://{}:{}/", validator_address.ip(), validator_address.port()))
+                .unwrap();
 
         join_set
             .spawn(async move {
                 NetworkTransactionBuilder::new(
                     store_url,
                     block_producer_url,
+                    validator_url,
                     None,
                     Duration::from_millis(200),
                     production_checkpoint,
+                    NonZeroUsize::new(1024).unwrap(),
                 )
                 .run()
                 .await
@@ -447,7 +458,7 @@ fn create_single_test_faucet(index: u128, secret: &AuthSecretKey) -> anyhow::Res
         .try_into()
         .expect("concatenating two 16-byte arrays yields exactly 32 bytes");
 
-    let auth_scheme = AuthScheme::RpoFalcon512 {
+    let auth_scheme = AuthScheme::Falcon512Rpo {
         pub_key: secret.public_key().to_commitment(),
     };
 
@@ -484,7 +495,7 @@ fn create_test_account_with_many_assets(faucets: &[Account]) -> anyhow::Result<A
     });
 
     let account = AccountBuilder::new(TEST_ACCOUNT_SEED)
-        .with_auth_component(miden_standards::account::auth::AuthRpoFalcon512::new(
+        .with_auth_component(miden_standards::account::auth::AuthFalcon512Rpo::new(
             sk.public_key().to_commitment(),
         ))
         .account_type(miden_protocol::account::AccountType::RegularAccountUpdatableCode)
@@ -518,7 +529,7 @@ fn generate_genesis_account() -> anyhow::Result<AccountFile> {
         12,
         Felt::from(1_000_000u32),
         miden_protocol::account::AccountStorageMode::Public,
-        AuthScheme::RpoFalcon512 {
+        AuthScheme::Falcon512Rpo {
             pub_key: secret.public_key().to_commitment(),
         },
     )?;

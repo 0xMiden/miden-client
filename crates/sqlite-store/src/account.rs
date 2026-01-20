@@ -1396,7 +1396,7 @@ mod tests {
         NonFungibleAsset,
         NonFungibleAssetDetails,
     };
-    use miden_client::auth::{AuthRpoFalcon512, PublicKeyCommitment};
+    use miden_client::auth::{AuthFalcon512Rpo, PublicKeyCommitment};
     use miden_client::store::Store;
     use miden_client::{EMPTY_WORD, ONE, ZERO};
     use miden_protocol::testing::account_id::{
@@ -1418,7 +1418,7 @@ mod tests {
             AccountComponent::new(component_code, vec![])?.with_supports_all_types();
         let account_code = AccountCode::from_components(
             &[
-                AuthRpoFalcon512::new(PublicKeyCommitment::from(EMPTY_WORD)).into(),
+                AuthFalcon512Rpo::new(PublicKeyCommitment::from(EMPTY_WORD)).into(),
                 account_component,
             ],
             AccountType::RegularAccountUpdatableCode,
@@ -1476,7 +1476,7 @@ mod tests {
         // Create and insert an account
         let account = AccountBuilder::new([0; 32])
             .account_type(AccountType::RegularAccountImmutableCode)
-            .with_auth_component(AuthRpoFalcon512::new(PublicKeyCommitment::from(EMPTY_WORD)))
+            .with_auth_component(AuthFalcon512Rpo::new(PublicKeyCommitment::from(EMPTY_WORD)))
             .with_component(dummy_component)
             .build()?;
 
@@ -1577,7 +1577,7 @@ mod tests {
         ];
         let account = AccountBuilder::new([0; 32])
             .account_type(AccountType::RegularAccountImmutableCode)
-            .with_auth_component(AuthRpoFalcon512::new(PublicKeyCommitment::from(EMPTY_WORD)))
+            .with_auth_component(AuthFalcon512Rpo::new(PublicKeyCommitment::from(EMPTY_WORD)))
             .with_component(dummy_component)
             .with_assets(assets.clone())
             .build_existing()?;

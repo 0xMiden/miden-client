@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use miden_client::Client;
 use miden_client::address::{Address, AddressInterface, NetworkId, RoutingParameters};
-use miden_client::note::{NoteExecutionMode, NoteTag};
+use miden_client::note::NoteTag;
 
 use crate::errors::CliError;
 use crate::utils::parse_account_id;
@@ -161,14 +161,10 @@ async fn add_address<AUTH>(
         .with_routing_parameters(routing_params)
         .map_err(|err| CliError::Address(err, "Failed to set routing params".to_string()))?;
 
-    let note_tag = NoteTag::from_account_id(account_id);
-    let execution_mode = match note_tag.execution_mode() {
-        NoteExecutionMode::Local => "Local",
-        NoteExecutionMode::Network => "Network",
-    };
+    let note_tag = NoteTag::with_account_target(account_id);
     client.add_address(address, account_id).await?;
 
-    println!("Address added: Account Id {account_id} - Execution mode: {execution_mode}");
+    println!("Address added: Account Id {account_id} - Note tag: {note_tag}");
     Ok(())
 }
 
@@ -179,12 +175,9 @@ async fn remove_address<AUTH>(
 ) -> Result<(), CliError> {
     let account_id = parse_account_id(&client, &account_id).await?;
     let (_, address) = Address::decode(&address).map_err(|e| CliError::Address(e, address))?;
-    let execution_mode = match address.to_note_tag().execution_mode() {
-        NoteExecutionMode::Local => "Local",
-        NoteExecutionMode::Network => "Network",
-    };
+    let note_tag = address.to_note_tag();
 
-    println!("removing address - Account Id {account_id} - Execution mode: {execution_mode}");
+    println!("removing address - Account Id {account_id} - Note tag: {note_tag}");
 
     client.remove_address(address, account_id).await?;
     Ok(())

@@ -73,14 +73,13 @@ mod note_update_tracker;
 // RE-EXPORTS
 // ================================================================================================
 
-pub use miden_protocol::NoteError;
 pub use miden_protocol::block::BlockNumber;
+pub use miden_protocol::errors::NoteError;
 pub use miden_protocol::note::{
     Note,
     NoteAssets,
+    NoteAttachment,
     NoteDetails,
-    NoteExecutionHint,
-    NoteExecutionMode,
     NoteFile,
     NoteHeader,
     NoteId,
