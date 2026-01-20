@@ -17,8 +17,14 @@ use miden_tx::utils::sync::RwLock;
 
 use crate::Client;
 use crate::rpc::domain::account::{
-    AccountDetails, AccountProof, AccountStorageDetails, AccountStorageMapDetails,
-    AccountUpdateSummary, AccountVaultDetails, FetchedAccount, StorageMapEntry,
+    AccountDetails,
+    AccountProof,
+    AccountStorageDetails,
+    AccountStorageMapDetails,
+    AccountUpdateSummary,
+    AccountVaultDetails,
+    FetchedAccount,
+    StorageMapEntry,
 };
 use crate::rpc::domain::account_vault::{AccountVaultInfo, AccountVaultUpdate};
 use crate::rpc::domain::note::{CommittedNote, FetchedNote, NoteSyncInfo};
@@ -188,7 +194,8 @@ impl MockRpcApi {
     }
 
     /// Retrieves account vault updates in a given block range.
-    /// This method tries to simulate pagination by limiting the number of blocks processed per request.
+    /// This method tries to simulate pagination by limiting the number of blocks processed per
+    /// request.
     fn get_sync_account_vault_request(
         &self,
         block_from: BlockNumber,
