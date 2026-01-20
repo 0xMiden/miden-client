@@ -39,6 +39,7 @@
 - [AdviceInputs](classes/AdviceInputs.md)
 - [AdviceMap](classes/AdviceMap.md)
 - [AssetVault](classes/AssetVault.md)
+- [AuthRpoFalcon512MultisigConfig](classes/AuthRpoFalcon512MultisigConfig.md)
 - [AuthSecretKey](classes/AuthSecretKey.md)
 - [BasicFungibleFaucetComponent](classes/BasicFungibleFaucetComponent.md)
 - [BlockHeader](classes/BlockHeader.md)
@@ -105,6 +106,7 @@
 - [OutputNotesArray](classes/OutputNotesArray.md)
 - [Package](classes/Package.md)
 - [PartialNote](classes/PartialNote.md)
+- [ProcedureThreshold](classes/ProcedureThreshold.md)
 - [Program](classes/Program.md)
 - [ProvenTransaction](classes/ProvenTransaction.md)
 - [PublicKey](classes/PublicKey.md)
@@ -144,3 +146,7 @@
 
 - [AddressInterface](type-aliases/AddressInterface.md)
 - [ReadableStreamType](type-aliases/ReadableStreamType.md)
+
+## Functions
+
+- [createAuthRpoFalcon512Multisig](functions/createAuthRpoFalcon512Multisig.md)
