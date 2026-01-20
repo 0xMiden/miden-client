@@ -14,6 +14,7 @@
 * Added doc_cfg as top level cfg_attr to turn on feature annotations in docs.rs and added make targets to serve the docs ([#1543](https://github.com/0xMiden/miden-client/pull/1543)).
 * Updated `DataStore` implementation to prevent retrieving whole `vault` and `storage` ([#1419](https://github.com/0xMiden/miden-client/pull/1419))
 * Added RPC limit handling for `sync_nullifiers` endpoint ([#1590](https://github.com/0xMiden/miden-client/pull/1590)).
+* Added pagination handling for `sync_storage_maps` and `sync_account_vault` RPC endpoints.
 * Added a convenience function `fromBech32` to turn a bech32 string into an AccountId ([#1607](https://github.com/0xMiden/miden-client/pull/1607)).
 * [BREAKING] Refactored the fields in retrieved notes in the WebClient: now the inclusion proof has been factored out and is always accessible ([#1606](https://github.com/0xMiden/miden-client/pull/1606)).
 * [BREAKING] Renamed `NodeRpcClient::get_account_proofs` to `NodeRpcClient::get_account_proof` & added `account_state` parameter (block at which we want to retrieve the proof) ([#1616](https://github.com/0xMiden/miden-client/pull/1616)).

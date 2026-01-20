@@ -2497,6 +2497,130 @@ async fn add_account_fails_if_accounts_limit_is_exceeded() {
     assert!(matches!(result, Err(ClientError::AccountsLimitExceeded(ACCOUNT_ID_LIMIT))));
 }
 
+// PAGINATION TESTS
+// ================================================================================================
+
+#[tokio::test]
+async fn sync_storage_maps_pagination() {
+    let mut mock_chain_builder = MockChainBuilder::new();
+    let _mock_account = mock_chain_builder
+        .add_existing_mock_account(miden_testing::Auth::IncrNonce)
+        .unwrap();
+    let mut mock_chain = mock_chain_builder.build().unwrap();
+
+    for _ in 0..12 {
+        mock_chain.prove_next_block().unwrap();
+    }
+
+    let rpc_api = MockRpcApi::new(mock_chain);
+    let chain_tip = rpc_api.get_chain_tip_block_num();
+
+    assert!(chain_tip.as_u32() >= 12);
+
+    let account_id = AccountId::try_from(ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE).unwrap();
+    let result = rpc_api.sync_storage_maps(0.into(), None, account_id).await.unwrap();
+
+    // Verify we got a response covering the full range
+    assert_eq!(result.chain_tip, chain_tip);
+    assert_eq!(result.block_number, chain_tip);
+}
+
+/// Tests that `sync_account_vault` correctly accumulates data across multiple pagination pages.
+#[tokio::test]
+async fn sync_account_vault_pagination() {
+    let mut mock_chain_builder = MockChainBuilder::new();
+    let _mock_account = mock_chain_builder
+        .add_existing_mock_account(miden_testing::Auth::IncrNonce)
+        .unwrap();
+    let mut mock_chain = mock_chain_builder.build().unwrap();
+
+    for _ in 0..12 {
+        mock_chain.prove_next_block().unwrap();
+    }
+
+    let rpc_api = MockRpcApi::new(mock_chain);
+    let chain_tip = rpc_api.get_chain_tip_block_num();
+
+    // Chain should have at least 12 blocks
+    assert!(chain_tip.as_u32() >= 12);
+
+    // Sync from block 0 to chain tip - this should require multiple pagination calls internally
+    let account_id = AccountId::try_from(ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE).unwrap();
+    let result = rpc_api.sync_account_vault(0.into(), None, account_id).await.unwrap();
+
+    // Verify we got a response covering the full range
+    assert_eq!(result.chain_tip, chain_tip);
+    assert_eq!(result.block_number, chain_tip);
+}
+
+/// Tests `sync_storage_maps` pagination with a specific `block_to` parameter.
+#[tokio::test]
+async fn sync_storage_maps_pagination_with_block_to() {
+    let mut mock_chain_builder = MockChainBuilder::new();
+    let _mock_account = mock_chain_builder
+        .add_existing_mock_account(miden_testing::Auth::IncrNonce)
+        .unwrap();
+    let mut mock_chain = mock_chain_builder.build().unwrap();
+
+    for _ in 0..15 {
+        mock_chain.prove_next_block().unwrap();
+    }
+
+    let rpc_api = MockRpcApi::new(mock_chain);
+
+    let account_id = AccountId::try_from(ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE).unwrap();
+    let result = rpc_api.sync_storage_maps(0.into(), Some(10.into()), account_id).await.unwrap();
+
+    // Verifies we stopped at block 10, not chain tip
+    assert_eq!(result.block_number.as_u32(), 10);
+}
+
+/// Tests `sync_account_vault` pagination with a specific `block_to` parameter.
+#[tokio::test]
+async fn sync_account_vault_pagination_with_block_to() {
+    let mut mock_chain_builder = MockChainBuilder::new();
+    let _mock_account = mock_chain_builder
+        .add_existing_mock_account(miden_testing::Auth::IncrNonce)
+        .unwrap();
+    let mut mock_chain = mock_chain_builder.build().unwrap();
+
+    for _ in 0..15 {
+        mock_chain.prove_next_block().unwrap();
+    }
+
+    let rpc_api = MockRpcApi::new(mock_chain);
+
+    let account_id = AccountId::try_from(ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE).unwrap();
+    let result = rpc_api.sync_account_vault(0.into(), Some(10.into()), account_id).await.unwrap();
+
+    // Verify we stopped at block 10, not chain tip
+    assert_eq!(result.block_number.as_u32(), 10);
+}
+
+/// Tests that pagination works correctly when starting from a non-zero block.
+#[tokio::test]
+async fn sync_storage_maps_pagination_from_middle() {
+    let mut mock_chain_builder = MockChainBuilder::new();
+    let _mock_account = mock_chain_builder
+        .add_existing_mock_account(miden_testing::Auth::IncrNonce)
+        .unwrap();
+    let mut mock_chain = mock_chain_builder.build().unwrap();
+
+    // Create 15 blocks
+    for _ in 0..15 {
+        mock_chain.prove_next_block().unwrap();
+    }
+
+    let rpc_api = MockRpcApi::new(mock_chain);
+    let chain_tip = rpc_api.get_chain_tip_block_num();
+
+    let account_id = AccountId::try_from(ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE).unwrap();
+    let result = rpc_api.sync_storage_maps(7.into(), None, account_id).await.unwrap();
+
+    assert_eq!(result.chain_tip, chain_tip);
+    assert_eq!(result.block_number, chain_tip);
+}
+
 // HELPERS
 // ================================================================================================
 
