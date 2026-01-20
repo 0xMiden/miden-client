@@ -221,6 +221,12 @@ impl From<AccountComponent> for NativeAccountComponent {
     }
 }
 
+impl From<NativeAccountComponent> for AccountComponent {
+    fn from(native_account_component: NativeAccountComponent) -> Self {
+        AccountComponent(native_account_component)
+    }
+}
+
 impl From<&AccountComponent> for NativeAccountComponent {
     fn from(account_component: &AccountComponent) -> Self {
         account_component.0.clone()
