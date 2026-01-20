@@ -1,8 +1,7 @@
 use alloc::string::String;
-use std::fs::OpenOptions;
+use std::fs;
 use std::hash::{DefaultHasher, Hash, Hasher};
-use std::io::{BufRead, BufReader, BufWriter, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::string::ToString;
 
 use miden_protocol::Word;
@@ -19,16 +18,15 @@ use super::KeyStoreError;
 #[derive(Debug, Clone)]
 pub struct FilesystemKeyStore {
     /// The directory where the keys are stored and read from.
-    keys_directory: PathBuf,
+    pub keys_directory: PathBuf,
 }
 
 impl FilesystemKeyStore {
     /// Creates a [`FilesystemKeyStore`] on a specific directory.
     pub fn new(keys_directory: PathBuf) -> Result<Self, KeyStoreError> {
         if !keys_directory.exists() {
-            std::fs::create_dir_all(&keys_directory).map_err(|err| {
-                KeyStoreError::StorageError(format!("error creating keys directory: {err:?}"))
-            })?;
+            fs::create_dir_all(&keys_directory)
+                .map_err(keystore_error("error creating keys directory"))?;
         }
 
         Ok(FilesystemKeyStore { keys_directory })
@@ -36,58 +34,32 @@ impl FilesystemKeyStore {
 
     /// Adds a secret key to the keystore.
     pub fn add_key(&self, key: &AuthSecretKey) -> Result<(), KeyStoreError> {
-        let public_key = key.public_key();
-        let pub_key_commitment = public_key.to_commitment();
-
-        let filename = hash_pub_key(pub_key_commitment.into());
-
-        let file_path = self.keys_directory.join(filename);
-        let file = OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .open(file_path)
-            .map_err(|err| {
-                KeyStoreError::StorageError(format!("error opening secret key file: {err:?}"))
-            })?;
-
-        let mut writer = BufWriter::new(file);
-        let key_pair_hex = hex::encode(key.to_bytes());
-        writer.write_all(key_pair_hex.as_bytes()).map_err(|err| {
-            KeyStoreError::StorageError(format!("error writing secret key file: {err:?}"))
-        })?;
-
-        Ok(())
+        let pub_key_commitment = key.public_key().to_commitment();
+        let file_path = key_file_path(&self.keys_directory, pub_key_commitment);
+        write_secret_key_file(&file_path, key)
     }
 
-    /// Retrieves a secret key from the keystore given its public key.
-    pub fn get_key(&self, pub_key: Word) -> Result<Option<AuthSecretKey>, KeyStoreError> {
-        let filename = hash_pub_key(pub_key);
+    /// Removes a secret key from the keystore, given the commitment of a public key.
+    pub fn remove_key(&self, pub_key: PublicKeyCommitment) -> Result<(), KeyStoreError> {
+        let file_path = key_file_path(&self.keys_directory, pub_key);
+        if !file_path.exists() {
+            return Ok(());
+        }
 
-        let file_path = self.keys_directory.join(filename);
+        fs::remove_file(file_path).map_err(keystore_error("error removing secret key file"))
+    }
+
+    /// Retrieves a secret key from the keystore given the commitment of a public key.
+    pub fn get_key(
+        &self,
+        pub_key: PublicKeyCommitment,
+    ) -> Result<Option<AuthSecretKey>, KeyStoreError> {
+        let file_path = key_file_path(&self.keys_directory, pub_key);
         if !file_path.exists() {
             return Ok(None);
         }
 
-        let file = OpenOptions::new().read(true).open(file_path).map_err(|err| {
-            KeyStoreError::StorageError(format!("error opening secret key file: {err:?}"))
-        })?;
-        let mut reader = BufReader::new(file);
-        let mut key_pair_hex = String::new();
-        reader.read_line(&mut key_pair_hex).map_err(|err| {
-            KeyStoreError::StorageError(format!("error reading secret key file: {err:?}"))
-        })?;
-
-        let secret_key_bytes = hex::decode(key_pair_hex.trim()).map_err(|err| {
-            KeyStoreError::DecodingError(format!("error decoding secret key hex: {err:?}"))
-        })?;
-        let secret_key =
-            AuthSecretKey::read_from_bytes(secret_key_bytes.as_slice()).map_err(|err| {
-                KeyStoreError::DecodingError(format!(
-                    "error reading secret key from bytes: {err:?}"
-                ))
-            })?;
-
+        let secret_key = read_secret_key_file(&file_path)?;
         Ok(Some(secret_key))
     }
 }
@@ -108,7 +80,7 @@ impl TransactionAuthenticator for FilesystemKeyStore {
         let message = signing_info.to_commitment();
 
         let secret_key = self
-            .get_key(pub_key.into())
+            .get_key(pub_key)
             .map_err(|err| {
                 AuthenticationError::other_with_source("failed to load secret key", err)
             })?
@@ -122,6 +94,32 @@ impl TransactionAuthenticator for FilesystemKeyStore {
     async fn get_public_key(&self, _pub_key_commitment: PublicKeyCommitment) -> Option<&PublicKey> {
         None
     }
+}
+
+// HELPERS
+// ================================================================================================
+
+/// Returns the file path that belongs to the public key commitment
+fn key_file_path(keys_directory: &Path, pub_key: PublicKeyCommitment) -> PathBuf {
+    let filename = hash_pub_key(pub_key.into());
+    keys_directory.join(filename)
+}
+
+/// Reads a file into an [`AuthSecretKey`]
+fn read_secret_key_file(file_path: &Path) -> Result<AuthSecretKey, KeyStoreError> {
+    let bytes = fs::read(file_path).map_err(keystore_error("error reading secret key file"))?;
+    AuthSecretKey::read_from_bytes(bytes.as_slice()).map_err(|err| {
+        KeyStoreError::DecodingError(format!("error reading secret key from file: {err:?}"))
+    })
+}
+
+/// Write an [`AuthSecretKey`] into a file
+fn write_secret_key_file(file_path: &Path, key: &AuthSecretKey) -> Result<(), KeyStoreError> {
+    fs::write(file_path, key.to_bytes()).map_err(keystore_error("error writing secret key file"))
+}
+
+fn keystore_error(context: &str) -> impl FnOnce(std::io::Error) -> KeyStoreError {
+    move |err| KeyStoreError::StorageError(format!("{context}: {err:?}"))
 }
 
 /// Hashes a public key to a string representation.

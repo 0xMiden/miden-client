@@ -82,7 +82,7 @@ export class MidenDatabase {
             [Table.AccountStorage]: indexes("[commitment+slotName]", "commitment"),
             [Table.StorageMapEntries]: indexes("[root+key]", "root"),
             [Table.AccountAssets]: indexes("[root+vaultKey]", "root", "faucetIdPrefix"),
-            [Table.AccountAuth]: indexes("pubKey"),
+            [Table.AccountAuth]: indexes("pubKeyCommitmentHex"),
             [Table.Accounts]: indexes("&accountCommitment", "id", "[id+nonce]", "codeRoot", "storageRoot", "vaultRoot"),
             [Table.Addresses]: indexes("address", "id"),
             [Table.Transactions]: indexes("id", "statusVariant"),

@@ -30,9 +30,13 @@
 
 ### addAccountSecretKeyToWebStore()
 
-> **addAccountSecretKeyToWebStore**(`secret_key`): `Promise`\<`void`\>
+> **addAccountSecretKeyToWebStore**(`account_id`, `secret_key`): `Promise`\<`void`\>
 
 #### Parameters
+
+##### account\_id
+
+[`AccountId`](AccountId.md)
 
 ##### secret\_key
 
@@ -362,13 +366,18 @@ Uses an internal pagination mechanism to avoid fetching duplicate notes.
 
 ***
 
-### getAccountAuthByPubKey()
+### getAccountAuthByPubKeyCommitment()
 
-> **getAccountAuthByPubKey**(`pub_key`): `Promise`\<[`AuthSecretKey`](AuthSecretKey.md)\>
+> **getAccountAuthByPubKeyCommitment**(`pub_key_commitment`): `Promise`\<[`AuthSecretKey`](AuthSecretKey.md)\>
+
+Retrieves an authentication secret key from the keystore given a public key commitment.
+
+The public key commitment should correspond to one of the keys tracked by the keystore.
+Returns the associated [`AuthSecretKey`] if found, or an error if not found.
 
 #### Parameters
 
-##### pub\_key
+##### pub\_key\_commitment
 
 [`Word`](Word.md)
 
@@ -465,6 +474,27 @@ Uses an internal pagination mechanism to avoid fetching duplicate notes.
 #### Returns
 
 `Promise`\<[`OutputNoteRecord`](OutputNoteRecord.md)[]\>
+
+***
+
+### getPublicKeyCommitmentsOfAccount()
+
+> **getPublicKeyCommitmentsOfAccount**(`account_id`): `Promise`\<[`Word`](Word.md)[]\>
+
+Returns all public key commitments associated with the given account ID.
+
+These commitments can be used with [`getAccountAuthByPubKeyCommitment`]
+to retrieve the corresponding secret keys from the keystore.
+
+#### Parameters
+
+##### account\_id
+
+[`AccountId`](AccountId.md)
+
+#### Returns
+
+`Promise`\<[`Word`](Word.md)[]\>
 
 ***
 

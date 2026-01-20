@@ -2093,8 +2093,6 @@ async fn empty_storage_map() {
     let key_pair = AuthSecretKey::new_falcon512_rpo();
     let pub_key = key_pair.public_key();
 
-    keystore.add_key(&key_pair).unwrap();
-
     let mut init_seed = [0u8; 32];
     client.rng().fill_bytes(&mut init_seed);
 
@@ -2108,6 +2106,8 @@ async fn empty_storage_map() {
         .unwrap();
 
     let account_id = account.id();
+
+    keystore.add_key(&key_pair).unwrap();
 
     client.add_account(&account, false).await.unwrap();
 
@@ -2202,8 +2202,6 @@ async fn storage_and_vault_proofs() {
     let key_pair = AuthSecretKey::new_falcon512_rpo();
     let pub_key = key_pair.public_key();
 
-    keystore.add_key(&key_pair).unwrap();
-
     let mut init_seed = [0u8; 32];
     client.rng().fill_bytes(&mut init_seed);
 
@@ -2215,6 +2213,8 @@ async fn storage_and_vault_proofs() {
         .with_component(bump_item_component)
         .build()
         .unwrap();
+
+    keystore.add_key(&key_pair).unwrap();
 
     client
         .test_store()
@@ -2622,8 +2622,6 @@ async fn insert_new_wallet(
     let key_pair = AuthSecretKey::new_falcon512_rpo_with_rng(client.rng());
     let pub_key = key_pair.public_key();
 
-    keystore.add_key(&key_pair).unwrap();
-
     let mut init_seed = [0u8; 32];
     client.rng().fill_bytes(&mut init_seed);
 
@@ -2634,6 +2632,8 @@ async fn insert_new_wallet(
         .with_component(BasicWallet)
         .build()
         .unwrap();
+
+    keystore.add_key(&key_pair).unwrap();
 
     client.add_account(&account, false).await?;
 
@@ -2651,8 +2651,6 @@ async fn insert_new_ecdsa_wallet(
     let key_pair = AuthSecretKey::new_ecdsa_k256_keccak_with_rng(&mut rng);
     let pub_key = key_pair.public_key();
 
-    keystore.add_key(&key_pair).unwrap();
-
     let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountImmutableCode)
         .storage_mode(storage_mode)
@@ -2660,6 +2658,8 @@ async fn insert_new_ecdsa_wallet(
         .with_component(BasicWallet)
         .build()
         .unwrap();
+
+    keystore.add_key(&key_pair).unwrap();
 
     client.add_account(&account, false).await?;
 
@@ -2673,8 +2673,6 @@ async fn insert_new_fungible_faucet(
 ) -> Result<Account, ClientError> {
     let key_pair = AuthSecretKey::new_falcon512_rpo_with_rng(client.rng());
     let pub_key = key_pair.public_key();
-
-    keystore.add_key(&key_pair).unwrap();
 
     // we need to use an initial seed to create the wallet account
     let mut init_seed = [0u8; 32];
@@ -2692,6 +2690,8 @@ async fn insert_new_fungible_faucet(
         .build()
         .unwrap();
 
+    keystore.add_key(&key_pair).unwrap();
+
     client.add_account(&account, false).await?;
     Ok(account)
 }
@@ -2706,8 +2706,6 @@ async fn insert_new_ecdsa_fungible_faucet(
 
     let key_pair = AuthSecretKey::new_ecdsa_k256_keccak_with_rng(&mut rng);
     let pub_key = key_pair.public_key();
-
-    keystore.add_key(&key_pair).unwrap();
 
     // we need to use an initial seed to create the wallet account
     let mut init_seed = [0u8; 32];
@@ -2724,6 +2722,8 @@ async fn insert_new_ecdsa_fungible_faucet(
         .with_component(BasicFungibleFaucet::new(symbol, 10, max_supply).unwrap())
         .build()
         .unwrap();
+
+    keystore.add_key(&key_pair).unwrap();
 
     client.add_account(&account, false).await?;
     Ok(account)
@@ -2781,8 +2781,6 @@ async fn storage_and_vault_proofs_ecdsa() {
     let key_pair = AuthSecretKey::new_ecdsa_k256_keccak();
     let pub_key = key_pair.public_key();
 
-    keystore.add_key(&key_pair).unwrap();
-
     let mut init_seed = [0u8; 32];
     client.rng().fill_bytes(&mut init_seed);
 
@@ -2794,6 +2792,8 @@ async fn storage_and_vault_proofs_ecdsa() {
         .with_component(bump_item_component)
         .build()
         .unwrap();
+
+    keystore.add_key(&key_pair).unwrap();
 
     client.add_account(&account, false).await.unwrap();
 

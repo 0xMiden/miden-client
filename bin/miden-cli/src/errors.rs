@@ -38,6 +38,7 @@ pub enum CliError {
     #[diagnostic(code(cli::client_error))]
     Client {
         #[source]
+        #[allow(unused_assignments)]
         error: ClientError,
         #[help]
         help: Option<String>,
