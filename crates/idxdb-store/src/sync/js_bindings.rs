@@ -58,10 +58,9 @@ extern "C" {
 #[wasm_bindgen(getter_with_clone)]
 #[derive(Clone)]
 pub struct JsStateSyncUpdate {
-    /// The block number for this update, stored as a string since it will be
-    /// persisted in `IndexedDB`.
+    /// The block number for this update.
     #[wasm_bindgen(js_name = "blockNum")]
-    pub block_num: String,
+    pub block_num: u32,
 
     /// The new block headers for this state update, serialized into a flattened byte array.
     #[wasm_bindgen(js_name = "flattenedNewBlockHeaders")]
@@ -71,7 +70,7 @@ pub struct JsStateSyncUpdate {
     /// This vec should have the same length as the number of headers, with each index
     /// representing the block number for the header at that same index.
     #[wasm_bindgen(js_name = "newBlockNums")]
-    pub new_block_nums: Vec<String>,
+    pub new_block_nums: Vec<u32>,
 
     /// Flattened byte array containing partial blockchain peaks used for merkle tree
     /// verification.

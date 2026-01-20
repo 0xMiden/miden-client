@@ -145,7 +145,7 @@ export async function pruneIrrelevantBlocks(dbId) {
         const allMatchingRecords = await db.blockHeaders
             .where("hasClientNotes")
             .equals("false")
-            .and((record) => record.blockNum !== "0" && record.blockNum !== syncHeight.blockNum)
+            .and((record) => record.blockNum !== 0 && record.blockNum !== syncHeight.blockNum)
             .toArray();
         await db.blockHeaders.bulkDelete(allMatchingRecords.map((r) => r.blockNum));
     }

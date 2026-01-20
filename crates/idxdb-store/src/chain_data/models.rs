@@ -8,7 +8,7 @@ use crate::{base64_to_vec_u8_optional, base64_to_vec_u8_required};
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BlockHeaderIdxdbObject {
-    pub block_num: String,
+    pub block_num: u32,
     #[serde(deserialize_with = "base64_to_vec_u8_required", default)]
     pub header: Vec<u8>,
     #[serde(deserialize_with = "base64_to_vec_u8_required", default)]
