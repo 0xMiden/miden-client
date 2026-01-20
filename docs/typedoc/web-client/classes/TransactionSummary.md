@@ -90,6 +90,18 @@ Serializes the summary into bytes.
 
 ***
 
+### toCommitment()
+
+> **toCommitment**(): [`Word`](Word.md)
+
+Computes the commitment to this `TransactionSummary`.
+
+#### Returns
+
+[`Word`](Word.md)
+
+***
+
 ### deserialize()
 
 > `static` **deserialize**(`bytes`): `TransactionSummary`

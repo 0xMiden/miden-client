@@ -1,11 +1,15 @@
+use miden_client::ClientError;
 use miden_client::asset::FungibleAsset;
 use miden_client::note::{BlockNumber, Note as NativeNote};
 use miden_client::transaction::{
     PaymentNoteDescription,
     ProvenTransaction as NativeProvenTransaction,
     SwapTransactionData,
+    TransactionExecutorError,
+    TransactionRequest as NativeTransactionRequest,
     TransactionRequestBuilder as NativeTransactionRequestBuilder,
     TransactionStoreUpdate as NativeTransactionStoreUpdate,
+    TransactionSummary as NativeTransactionSummary,
 };
 use wasm_bindgen::prelude::*;
 
@@ -18,6 +22,7 @@ use crate::models::transaction_id::TransactionId;
 use crate::models::transaction_request::TransactionRequest;
 use crate::models::transaction_result::TransactionResult;
 use crate::models::transaction_store_update::TransactionStoreUpdate;
+use crate::models::transaction_summary::TransactionSummary;
 use crate::{WebClient, js_error_with_context};
 
 #[wasm_bindgen]
@@ -94,6 +99,49 @@ impl WebClient {
                 .await
                 .map(TransactionResult::from)
                 .map_err(|err| js_error_with_context(err, "failed to execute transaction"))
+        } else {
+            Err(JsValue::from_str("Client not initialized"))
+        }
+    }
+
+    /// Executes a transaction and returns the `TransactionSummary`.
+    ///
+    /// If the transaction is unauthorized (auth script emits the unauthorized event),
+    /// returns the summary from the error. If the transaction succeeds, constructs
+    /// a summary from the executed transaction using the `auth_arg` from the transaction
+    /// request as the salt (or a zero salt if not provided).
+    ///
+    /// # Errors
+    /// - If there is an internal failure during execution.
+    #[wasm_bindgen(js_name = "executeForSummary")]
+    pub async fn execute_for_summary(
+        &mut self,
+        account_id: &AccountId,
+        transaction_request: &TransactionRequest,
+    ) -> Result<TransactionSummary, JsValue> {
+        if let Some(client) = self.get_mut_inner() {
+            let native_request: NativeTransactionRequest = transaction_request.into();
+            // auth_arg is passed to the auth procedure as the salt for the transaction summary
+            // defaults to 0 if not provided.
+            let salt = native_request.auth_arg().unwrap_or_default();
+
+            match Box::pin(client.execute_transaction(account_id.into(), native_request)).await {
+                Ok(res) => {
+                    // construct summary from executed transaction
+                    let executed_tx = res.executed_transaction();
+                    let summary = NativeTransactionSummary::new(
+                        executed_tx.account_delta().clone(),
+                        executed_tx.input_notes().clone(),
+                        executed_tx.output_notes().clone(),
+                        salt,
+                    );
+                    Ok(TransactionSummary::from(summary))
+                },
+                Err(ClientError::TransactionExecutorError(
+                    TransactionExecutorError::Unauthorized(summary),
+                )) => Ok(TransactionSummary::from(*summary)),
+                Err(err) => Err(js_error_with_context(err, "failed to execute transaction")),
+            }
         } else {
             Err(JsValue::from_str("Client not initialized"))
         }
