@@ -757,7 +757,10 @@ export const customAccountComponent = async (
         .withComponent(mappingAccountComponent)
         .build();
 
-      await client.addAccountSecretKeyToWebStore(secretKey);
+      await client.addAccountSecretKeyToWebStore(
+        accountBuilderResult.account.id(),
+        secretKey
+      );
       await client.newAccount(accountBuilderResult.account, false);
 
       await client.syncState();
@@ -1275,7 +1278,10 @@ export const testStorageMap = async (page: Page): Promise<any> => {
       .storageMode(window.AccountStorageMode.public())
       .build();
 
-    await client.addAccountSecretKeyToWebStore(secretKey);
+    await client.addAccountSecretKeyToWebStore(
+      bumpItemAccountBuilderResult.account.id(),
+      secretKey
+    );
     await client.newAccount(bumpItemAccountBuilderResult.account, false);
     await client.syncState();
 
@@ -1429,9 +1435,9 @@ test.describe("submitNewTransactionWithProver tests", () => {
         crypto.getRandomValues(walletSeed);
 
         const approverKeys = [
-          window.SecretKey.rpoFalconWithRNG(),
-          window.SecretKey.rpoFalconWithRNG(),
-          window.SecretKey.rpoFalconWithRNG(),
+          window.AuthSecretKey.rpoFalconWithRNG(),
+          window.AuthSecretKey.rpoFalconWithRNG(),
+          window.AuthSecretKey.rpoFalconWithRNG(),
         ];
         const approverCommitments = approverKeys.map((key) =>
           key.publicKey().toCommitment()
@@ -1450,7 +1456,13 @@ test.describe("submitNewTransactionWithProver tests", () => {
           .withBasicWalletComponent()
           .build();
 
+        const multisigAccountId = accountBuilderResult.account.id();
         await client.newAccount(accountBuilderResult.account, false);
+
+        // Register the approver keys with the multisig account
+        for (const key of approverKeys) {
+          await client.addAccountSecretKeyToWebStore(multisigAccountId, key);
+        }
 
         const targetAccount = await client.newWallet(
           window.AccountStorageMode.private(),
@@ -1492,8 +1504,19 @@ test.describe("submitNewTransactionWithProver tests", () => {
           mintTransactionUpdate.executedTransaction().id().toHex()
         );
 
+        // Convert note IDs to Note objects for consume request
+        const createdNotes = await Promise.all(
+          createdNoteIds.map(async (noteId: string) => {
+            const inputNoteRecord = await client.getInputNote(noteId);
+            if (!inputNoteRecord) {
+              throw new Error(`Note with ID ${noteId} not found`);
+            }
+            return inputNoteRecord.toNote();
+          })
+        );
+
         const consumeTransactionRequest =
-          client.newConsumeTransactionRequest(createdNoteIds);
+          client.newConsumeTransactionRequest(createdNotes);
 
         const consumeTransactionUpdate =
           await window.helpers.executeAndApplyTransaction(
@@ -1531,8 +1554,19 @@ test.describe("submitNewTransactionWithProver tests", () => {
           sendTransactionUpdate.executedTransaction().id().toHex()
         );
 
+        // Convert note IDs to Note objects for consume request
+        const sentNotes = await Promise.all(
+          sentNoteIds.map(async (noteId: string) => {
+            const inputNoteRecord = await client.getInputNote(noteId);
+            if (!inputNoteRecord) {
+              throw new Error(`Note with ID ${noteId} not found`);
+            }
+            return inputNoteRecord.toNote();
+          })
+        );
+
         const consumeSentNoteRequest =
-          client.newConsumeTransactionRequest(sentNoteIds);
+          client.newConsumeTransactionRequest(sentNotes);
 
         const summary = await client.executeForSummary(
           accountBuilderResult.account.id(),

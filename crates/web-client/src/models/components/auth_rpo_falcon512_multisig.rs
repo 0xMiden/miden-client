@@ -138,10 +138,14 @@ pub fn create_auth_rpo_falcon512_multisig(
         js_error_with_context(e, "Too many approvers (would truncate num_approvers)")
     })?;
 
-    // TODO: fix?
-    let slot_name = StorageSlotName::mock(0);
+    // Slot 0: threshold_config
+    let threshold_config_name =
+        StorageSlotName::new("miden::standards::auth::rpo_falcon512_multisig::threshold_config")
+            .map_err(|e| {
+                js_error_with_context(e, "Failed to create storage slot name 'threshold_config'")
+            })?;
     storage_slots.push(NativeStorageSlot::with_value(
-        slot_name,
+        threshold_config_name,
         NativeWord::from([native_config.default_threshold(), num_approvers, 0, 0]),
     ));
 
@@ -158,18 +162,31 @@ pub fn create_auth_rpo_falcon512_multisig(
         .collect::<Result<_, JsValue>>()?;
     let approver_map = NativeStorageMap::with_entries(map_entries.into_iter())
         .map_err(|e| js_error_with_context(e, "Failed to build approver map"))?;
-    let approver_map_name = StorageSlotName::new("approver::map").map_err(|e| {
-        js_error_with_context(e, "Failed to create storage slot name 'approver::map'")
+    let approver_map_name = StorageSlotName::new(
+        "miden::standards::auth::rpo_falcon512_multisig::approver_public_keys",
+    )
+    .map_err(|e| {
+        js_error_with_context(e, "Failed to create storage slot name 'approver_public_keys'")
     })?;
     storage_slots.push(NativeStorageSlot::with_map(approver_map_name, approver_map));
 
-    let default_map_name = StorageSlotName::new("default::map").map_err(|e| {
-        js_error_with_context(e, "Failed to create storage slot name 'default::map'")
+    // Slot 2: executed_transactions map (empty)
+    let executed_tx_map_name = StorageSlotName::new(
+        "miden::standards::auth::rpo_falcon512_multisig::executed_transactions",
+    )
+    .map_err(|e| {
+        js_error_with_context(e, "Failed to create storage slot name 'executed_transactions'")
     })?;
-    storage_slots.push(NativeStorageSlot::with_map(default_map_name, NativeStorageMap::default()));
+    storage_slots
+        .push(NativeStorageSlot::with_map(executed_tx_map_name, NativeStorageMap::default()));
 
-    let proc_map_name = StorageSlotName::new("proc::map")
-        .map_err(|e| js_error_with_context(e, "Failed to create storage slot name 'proc::map'"))?;
+    // Slot 3: procedure_thresholds map
+    let proc_map_name = StorageSlotName::new(
+        "miden::standards::auth::rpo_falcon512_multisig::procedure_thresholds",
+    )
+    .map_err(|e| {
+        js_error_with_context(e, "Failed to create storage slot name 'procedure_thresholds'")
+    })?;
     let proc_map = NativeStorageMap::with_entries(
         native_config
             .proc_thresholds()
