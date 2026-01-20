@@ -421,7 +421,7 @@ impl SqliteStore {
             .0;
 
         let smt_forest = smt_forest.read().expect("smt_forest read lock not poisoned");
-        match smt_forest.get_asset_and_witness(header.vault_root(), vault_key.into()) {
+        match smt_forest.get_asset_and_witness(header.vault_root(), vault_key) {
             Ok((asset, witness)) => Ok(Some((asset, witness))),
             Err(StoreError::MerkleStoreError(MerkleError::UntrackedKey(_))) => Ok(None),
             Err(err) => Err(err),
@@ -551,7 +551,7 @@ impl SqliteStore {
         // Apply vault delta. This map will contain all updated assets (indexed by vault key), both
         // fungible and non-fungible.
         let mut updated_assets: BTreeMap<AssetVaultKey, Asset> = BTreeMap::new();
-        let mut removed_vault_keys: Vec<Word> = Vec::new();
+        let mut removed_vault_keys: Vec<AssetVaultKey> = Vec::new();
 
         // We first process the fungible assets. Adding or subtracting them from the vault as
         // requested.
@@ -576,7 +576,7 @@ impl SqliteStore {
             if asset.amount() > 0 {
                 updated_assets.insert(asset.vault_key(), Asset::Fungible(asset));
             } else {
-                removed_vault_keys.push(Word::from(asset.vault_key()));
+                removed_vault_keys.push(asset.vault_key());
             }
         }
 
@@ -593,11 +593,8 @@ impl SqliteStore {
                 .map(|(asset, _)| (asset.vault_key(), Asset::NonFungible(*asset))),
         );
 
-        removed_vault_keys.extend(
-            removed_nonfungible_assets
-                .iter()
-                .map(|(asset, _)| Word::from(asset.vault_key())),
-        );
+        removed_vault_keys
+            .extend(removed_nonfungible_assets.iter().map(|(asset, _)| asset.vault_key()));
 
         const DELETE_QUERY: &str =
             "DELETE FROM account_assets WHERE root = ? AND vault_key IN rarray(?)";
@@ -609,7 +606,11 @@ impl SqliteStore {
                 Rc::new(
                     removed_vault_keys
                         .iter()
-                        .map(|k| Value::from(k.to_hex()))
+                        .copied()
+                        .map(|k| {
+                            let k_word: Word = k.into();
+                            Value::from(k_word.to_hex())
+                        })
                         .collect::<Vec<Value>>(),
                 ),
             ],
