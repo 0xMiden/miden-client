@@ -46,7 +46,8 @@ impl WebClient {
                 })?;
 
             let store = self.store.as_ref().expect("Store should be initialized");
-            let commitments: Vec<_> = pub_keys.iter().map(|pk| pk.to_commitment()).collect();
+            let commitments: Vec<_> =
+                pub_keys.iter().map(miden_client::auth::PublicKey::to_commitment).collect();
             store
                 .insert_account_public_keys(&commitments, account.id())
                 .await

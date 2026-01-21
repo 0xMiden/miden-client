@@ -547,12 +547,9 @@ impl WebStore {
         pub_key_commitments: &[PublicKeyCommitment],
         account_id: AccountId,
     ) -> Result<(), StoreError> {
-        let hexes: Vec<String> = pub_key_commitments
-            .iter()
-            .map(|c| Word::from(*c).to_hex())
-            .collect();
-        let promise =
-            idxdb_insert_account_public_keys(self.db_id(), hexes, account_id.to_hex());
+        let hexes: Vec<String> =
+            pub_key_commitments.iter().map(|c| Word::from(*c).to_hex()).collect();
+        let promise = idxdb_insert_account_public_keys(self.db_id(), hexes, account_id.to_hex());
         await_js_value(promise, "failed to insert account public keys").await?;
         Ok(())
     }
