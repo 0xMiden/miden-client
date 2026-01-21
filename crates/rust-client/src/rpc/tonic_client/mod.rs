@@ -624,9 +624,13 @@ impl NodeRpcClient for GrpcClient {
                 account_id: Some(account_id.into()),
             };
 
-            let response = rpc_api.sync_account_vault(request).await.map_err(|status| {
-                RpcError::from_grpc_error(NodeRpcClientEndpoint::SyncAccountVault, status)
-            })?.into_inner();
+            let response = rpc_api
+                .sync_account_vault(request)
+                .await
+                .map_err(|status| {
+                    RpcError::from_grpc_error(NodeRpcClientEndpoint::SyncAccountVault, status)
+                })?
+                .into_inner();
 
             let batch_updates = response
                 .updates
