@@ -210,14 +210,13 @@ impl WebStore {
             self.get_storage_slot_headers(account_header.storage_commitment()).await?;
 
         let mut storage_header_vec = Vec::new();
-        let mut map_roots_to_fetch = Vec::new();
 
         // Collect all map roots that need to be fetched
-        for (_, slot_type, value) in &storage_slot_headers {
-            if slot_type == &StorageSlotType::Map {
-                map_roots_to_fetch.push(value.to_hex());
-            }
-        }
+        let map_roots_to_fetch: Vec<String> = storage_slot_headers
+            .iter()
+            .filter(|(_, slot_type, _)| slot_type == &StorageSlotType::Map)
+            .map(|(_, _, value)| value.to_hex())
+            .collect();
 
         // Fetch all map entries for the partial account
         let mut storage_maps_data = BTreeMap::new();
