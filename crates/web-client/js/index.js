@@ -99,33 +99,38 @@ export class WebClient {
   /**
    * Create a WebClient wrapper.
    *
-   * @param {string | undefined} rpcUrl - RPC endpoint URL used by the client.
-   * @param {Uint8Array | undefined} seed - Optional seed for account initialization.
-   * @param {string | undefined} storeName - Optional name for the store to be used by the client.
-   * @param {(pubKey: Uint8Array) => Promise<Uint8Array | null | undefined> | Uint8Array | null | undefined} [getKeyCb]
-   *   - Callback to retrieve the secret key bytes for a given public key. The `pubKey`
-   *   parameter is the serialized public key (from `PublicKey.serialize()`). Return the
-   *   corresponding secret key as a `Uint8Array`, or `null`/`undefined` if not found. The
-   *   return value may be provided synchronously or via a `Promise`.
-   * @param {(pubKey: Uint8Array, AuthSecretKey: Uint8Array) => Promise<void> | void} [insertKeyCb]
-   *   - Callback to persist a secret key. `pubKey` is the serialized public key, and
-   *   `authSecretKey` is the serialized secret key (from `AuthSecretKey.serialize()`). May return
-   *   `void` or a `Promise<void>`.
-   * @param {(pubKey: Uint8Array, signingInputs: Uint8Array) => Promise<Uint8Array> | Uint8Array} [signCb]
-   *   - Callback to produce serialized signature bytes for the provided inputs. `pubKey` is the
-   *   serialized public key, and `signingInputs` is a `Uint8Array` produced by
-   *   `SigningInputs.serialize()`. Must return a `Uint8Array` containing the serialized
-   *   signature, either directly or wrapped in a `Promise`.
+   * @param {Object} config - The configuration object.
+   * @param {string} config.rpcUrl - RPC endpoint URL used by the client.
+   * @param {string} config.noteTransportUrl - URL for the note transport service.
+   * @param {Uint8Array} [config.seed] - Optional seed for account initialization.
+   * @param {string} [config.storeName] - Optional name for the store. Setting this allows multiple clients to be used in the same browser.
+   * @param {(pubKey: Uint8Array) => Promise<Uint8Array | null | undefined> | Uint8Array | null | undefined} [config.getKeyCb]
+   * - Callback to retrieve the secret key bytes for a given public key. The `pubKey`
+   * parameter is the serialized public key (from `PublicKey.serialize()`). Return the
+   * corresponding secret key as a `Uint8Array`, or `null`/`undefined` if not found. The
+   * return value may be provided synchronously or via a `Promise`.
+   * @param {(pubKey: Uint8Array, AuthSecretKey: Uint8Array) => Promise<void> | void} [config.insertKeyCb]
+   * - Callback to persist a secret key. `pubKey` is the serialized public key, and
+   * `authSecretKey` is the serialized secret key (from `AuthSecretKey.serialize()`). May return
+   * `void` or a `Promise<void>`.
+   * @param {(pubKey: Uint8Array, signingInputs: Uint8Array) => Promise<Uint8Array> | Uint8Array} [config.signCb]
+   * - Callback to produce serialized signature bytes for the provided inputs. `pubKey` is the
+   * serialized public key, and `signingInputs` is a `Uint8Array` produced by
+   * `SigningInputs.serialize()`. Must return a `Uint8Array` containing the serialized
+   * signature, either directly or wrapped in a `Promise`.
    */
-  constructor(
-    rpcUrl,
-    noteTransportUrl,
-    seed,
-    storeName,
-    getKeyCb,
-    insertKeyCb,
-    signCb
-  ) {
+  constructor(config) {
+    const {
+      rpcUrl,
+      noteTransportUrl,
+      seed,
+      storeName,
+      getKeyCb,
+      insertKeyCb,
+      signCb
+    } =
+      config || {};
+
     this.rpcUrl = rpcUrl;
     this.noteTransportUrl = noteTransportUrl;
     this.seed = seed;
@@ -239,21 +244,16 @@ export class WebClient {
 
   /**
    * Factory method to create and initialize a WebClient instance.
-   * This method is async so you can await the asynchronous call to createClient().
-   *
-   * @param {string} rpcUrl - The RPC URL.
-   * @param {string} noteTransportUrl - The note transport URL (optional).
-   * @param {string} seed - The seed for the account.
-   * @param {string | undefined} network - Optional name for the store. Setting this allows multiple clients to be used in the same browser.
-   * @returns {Promise<WebClient>} The fully initialized WebClient.
+   * @param {Object} config - The configuration object.
    */
-  static async createClient(rpcUrl, noteTransportUrl, seed, network) {
+  static async createClient(config) {
+    const { rpcUrl, noteTransportUrl, seed, storeName } = config || {};
     // Construct the instance (synchronously).
-    const instance = new WebClient(rpcUrl, noteTransportUrl, seed, network);
+    const instance = new WebClient(config);
 
     // Wait for the underlying wasmWebClient to be initialized.
     const wasmWebClient = await instance.getWasmWebClient();
-    await wasmWebClient.createClient(rpcUrl, noteTransportUrl, seed, network);
+    await wasmWebClient.createClient(rpcUrl, noteTransportUrl, seed, storeName);
 
     // Wait for the worker to be ready
     await instance.ready;
@@ -294,17 +294,8 @@ export class WebClient {
    * @param {Function | undefined} signCb - The sign callback.
    * @returns {Promise<WebClient>} The fully initialized WebClient.
    */
-  static async createClientWithExternalKeystore(
-    rpcUrl,
-    noteTransportUrl,
-    seed,
-    storeName,
-    getKeyCb,
-    insertKeyCb,
-    signCb
-  ) {
-    // Construct the instance (synchronously).
-    const instance = new WebClient(
+  static async createClientWithExternalKeystore(config) {
+    const {
       rpcUrl,
       noteTransportUrl,
       seed,
@@ -312,7 +303,10 @@ export class WebClient {
       getKeyCb,
       insertKeyCb,
       signCb
-    );
+    } =
+      config || {};
+    // Construct the instance (synchronously).
+    const instance = new WebClient(config);
     // Wait for the underlying wasmWebClient to be initialized.
     const wasmWebClient = await instance.getWasmWebClient();
     await wasmWebClient.createClientWithExternalKeystore(
