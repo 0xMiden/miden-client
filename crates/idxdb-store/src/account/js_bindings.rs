@@ -124,6 +124,31 @@ extern "C" {
 
     #[wasm_bindgen(js_name = undoAccountStates)]
     pub fn idxdb_undo_account_states(db_id: &str, account_hashes: Vec<String>) -> js_sys::Promise;
+
+    // ACCOUNT PUBLIC KEYS
+    // --------------------------------------------------------------------------------------------
+
+    #[wasm_bindgen(js_name = insertAccountPublicKey)]
+    pub fn idxdb_insert_account_public_key(
+        db_id: &str,
+        pub_key_commitment_hex: String,
+        account_id: String,
+    ) -> js_sys::Promise;
+
+    #[wasm_bindgen(js_name = getAccountIdByPublicKey)]
+    pub fn idxdb_get_account_id_by_public_key(
+        db_id: &str,
+        pub_key_commitment_hex: String,
+    ) -> js_sys::Promise;
+
+    #[wasm_bindgen(js_name = getPublicKeysByAccountId)]
+    pub fn idxdb_get_public_keys_by_account_id(db_id: &str, account_id: String) -> js_sys::Promise;
+
+    #[wasm_bindgen(js_name = removeAccountPublicKey)]
+    pub fn idxdb_remove_account_public_key(
+        db_id: &str,
+        pub_key_commitment_hex: String,
+    ) -> js_sys::Promise;
 }
 
 // VAULT ASSET

@@ -36,6 +36,7 @@ var Table;
     Table["AccountAssets"] = "accountAssets";
     Table["StorageMapEntries"] = "storageMapEntries";
     Table["AccountAuth"] = "accountAuth";
+    Table["AccountPublicKeys"] = "accountPublicKeys";
     Table["Accounts"] = "accounts";
     Table["Addresses"] = "addresses";
     Table["Transactions"] = "transactions";
@@ -61,6 +62,7 @@ export class MidenDatabase {
     storageMapEntries;
     accountAssets;
     accountAuths;
+    accountPublicKeys;
     accounts;
     addresses;
     transactions;
@@ -83,6 +85,7 @@ export class MidenDatabase {
             [Table.StorageMapEntries]: indexes("[root+key]", "root"),
             [Table.AccountAssets]: indexes("[root+vaultKey]", "root", "faucetIdPrefix"),
             [Table.AccountAuth]: indexes("pubKeyCommitmentHex"),
+            [Table.AccountPublicKeys]: indexes("&pubKeyCommitmentHex", "accountId"),
             [Table.Accounts]: indexes("&accountCommitment", "id", "[id+nonce]", "codeRoot", "storageRoot", "vaultRoot"),
             [Table.Addresses]: indexes("address", "id"),
             [Table.Transactions]: indexes("id", "statusVariant"),
@@ -103,6 +106,7 @@ export class MidenDatabase {
         this.storageMapEntries = this.dexie.table(Table.StorageMapEntries);
         this.accountAssets = this.dexie.table(Table.AccountAssets);
         this.accountAuths = this.dexie.table(Table.AccountAuth);
+        this.accountPublicKeys = this.dexie.table(Table.AccountPublicKeys);
         this.accounts = this.dexie.table(Table.Accounts);
         this.addresses = this.dexie.table(Table.Addresses);
         this.transactions = this.dexie.table(Table.Transactions);

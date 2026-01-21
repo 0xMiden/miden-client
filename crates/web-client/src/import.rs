@@ -45,6 +45,16 @@ impl WebClient {
                     js_error_with_context(err, "failed to map account to public keys")
                 })?;
 
+            let store = self.store.as_ref().expect("Store should be initialized");
+            for pub_key in &pub_keys {
+                store
+                    .insert_account_public_key(pub_key.to_commitment(), account.id())
+                    .await
+                    .map_err(|err| {
+                        js_error_with_context(err, "failed to index account by public key")
+                    })?;
+            }
+
             Ok(JsValue::from_str(&format!("Imported account with ID: {account_id}")))
         } else {
             Err(JsValue::from_str("Client not initialized"))
@@ -81,6 +91,12 @@ impl WebClient {
             .register_account_public_key_commitments(&native_id, &[key_pair.public_key()])
             .await
             .map_err(|err| js_error_with_context(err, "failed to map account to public keys"))?;
+
+        let store = self.store.as_ref().expect("Store should be initialized");
+        store
+            .insert_account_public_key(key_pair.public_key().to_commitment(), native_id)
+            .await
+            .map_err(|err| js_error_with_context(err, "failed to index account by public key"))?;
 
         Ok(Account::from(generated_acct))
     }

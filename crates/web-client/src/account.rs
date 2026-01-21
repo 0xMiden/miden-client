@@ -1,5 +1,6 @@
 use miden_client::Word as NativeWord;
 use miden_client::account::Account as NativeAccount;
+use miden_client::auth::PublicKey as NativePublicKey;
 use wasm_bindgen::prelude::*;
 
 use crate::models::account::Account;
@@ -7,6 +8,7 @@ use crate::models::account_header::AccountHeader;
 use crate::models::account_id::AccountId;
 use crate::models::address::Address;
 use crate::models::auth_secret_key::AuthSecretKey;
+use crate::models::public_key::PublicKey;
 use crate::models::word::Word;
 use crate::{WebClient, js_error_with_context};
 
@@ -132,6 +134,28 @@ impl WebClient {
             Ok(())
         } else {
             Err(JsValue::from_str("Client not initialized"))
+        }
+    }
+
+    #[wasm_bindgen(js_name = "getAccountByPublicKey")]
+    pub async fn get_account_by_public_key(
+        &mut self,
+        pub_key: &PublicKey,
+    ) -> Result<Option<Account>, JsValue> {
+        let store =
+            self.store.as_ref().ok_or_else(|| JsValue::from_str("Store not initialized"))?;
+
+        let native_pub_key: NativePublicKey = pub_key.into();
+        let commitment = native_pub_key.to_commitment();
+
+        let account_id = store
+            .get_account_id_by_public_key(commitment)
+            .await
+            .map_err(|err| js_error_with_context(err, "failed to get account by public key"))?;
+
+        match account_id {
+            Some(id) => self.get_account(&id.into()).await,
+            None => Ok(None),
         }
     }
 }

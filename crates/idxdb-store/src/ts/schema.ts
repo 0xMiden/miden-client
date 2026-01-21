@@ -45,6 +45,7 @@ enum Table {
   AccountAssets = "accountAssets",
   StorageMapEntries = "storageMapEntries",
   AccountAuth = "accountAuth",
+  AccountPublicKeys = "accountPublicKeys",
   Accounts = "accounts",
   Addresses = "addresses",
   Transactions = "transactions",
@@ -89,6 +90,11 @@ export interface IAccountAsset {
 export interface IAccountAuth {
   pubKeyCommitmentHex: string;
   secretKeyHex: string;
+}
+
+export interface IAccountPublicKey {
+  pubKeyCommitmentHex: string;
+  accountId: string;
 }
 
 export interface IAccount {
@@ -218,6 +224,7 @@ export type MidenDexie = Dexie & {
   accountAssets: Dexie.Table<IAccountAsset, string>;
   storageMapEntries: Dexie.Table<IStorageMapEntry, string>;
   accountAuths: Dexie.Table<IAccountAuth, string>;
+  accountPublicKeys: Dexie.Table<IAccountPublicKey, string>;
   accounts: Dexie.Table<IAccount, string>;
   addresses: Dexie.Table<IAddress, string>;
   transactions: Dexie.Table<ITransaction, string>;
@@ -241,6 +248,7 @@ export class MidenDatabase {
   storageMapEntries: Dexie.Table<IStorageMapEntry, string>;
   accountAssets: Dexie.Table<IAccountAsset, string>;
   accountAuths: Dexie.Table<IAccountAuth, string>;
+  accountPublicKeys: Dexie.Table<IAccountPublicKey, string>;
   accounts: Dexie.Table<IAccount, string>;
   addresses: Dexie.Table<IAddress, string>;
   transactions: Dexie.Table<ITransaction, string>;
@@ -269,6 +277,7 @@ export class MidenDatabase {
         "faucetIdPrefix"
       ),
       [Table.AccountAuth]: indexes("pubKeyCommitmentHex"),
+      [Table.AccountPublicKeys]: indexes("&pubKeyCommitmentHex", "accountId"),
       [Table.Accounts]: indexes(
         "&accountCommitment",
         "id",
@@ -316,6 +325,9 @@ export class MidenDatabase {
     );
     this.accountAuths = this.dexie.table<IAccountAuth, string>(
       Table.AccountAuth
+    );
+    this.accountPublicKeys = this.dexie.table<IAccountPublicKey, string>(
+      Table.AccountPublicKeys
     );
     this.accounts = this.dexie.table<IAccount, string>(Table.Accounts);
     this.addresses = this.dexie.table<IAddress, string>(Table.Addresses);

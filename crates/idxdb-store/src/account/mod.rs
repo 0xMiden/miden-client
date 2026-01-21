@@ -16,6 +16,7 @@ use miden_client::account::{
     StorageSlotType,
 };
 use miden_client::asset::{Asset, AssetVault};
+use miden_client::auth::PublicKeyCommitment;
 use miden_client::store::{
     AccountRecord,
     AccountRecordData,
@@ -43,12 +44,16 @@ use js_bindings::{
     idxdb_get_account_header,
     idxdb_get_account_header_by_commitment,
     idxdb_get_account_headers,
+    idxdb_get_account_id_by_public_key,
     idxdb_get_account_ids,
     idxdb_get_account_storage,
     idxdb_get_account_storage_maps,
     idxdb_get_account_vault_assets,
     idxdb_get_foreign_account_code,
+    idxdb_get_public_keys_by_account_id,
+    idxdb_insert_account_public_key,
     idxdb_lock_account,
+    idxdb_remove_account_public_key,
     idxdb_undo_account_states,
     idxdb_upsert_foreign_account_code,
 };
@@ -522,5 +527,59 @@ impl WebStore {
         remove_account_address(self.db_id(), address).await.map_err(|js_error| {
             StoreError::DatabaseError(format!("failed to remove account address: {js_error:?}"))
         })
+    }
+
+    pub async fn insert_account_public_key(
+        &self,
+        pub_key_commitment: PublicKeyCommitment,
+        account_id: AccountId,
+    ) -> Result<(), StoreError> {
+        let word: Word = pub_key_commitment.into();
+        let promise =
+            idxdb_insert_account_public_key(self.db_id(), word.to_hex(), account_id.to_hex());
+        await_js_value(promise, "failed to insert account public key").await?;
+        Ok(())
+    }
+
+    pub async fn get_account_id_by_public_key(
+        &self,
+        pub_key_commitment: PublicKeyCommitment,
+    ) -> Result<Option<AccountId>, StoreError> {
+        let word: Word = pub_key_commitment.into();
+        let promise = idxdb_get_account_id_by_public_key(self.db_id(), word.to_hex());
+        let account_id: Option<String> =
+            await_js(promise, "failed to get account id by public key").await?;
+
+        match account_id {
+            Some(id) => Ok(Some(AccountId::from_hex(&id)?)),
+            None => Ok(None),
+        }
+    }
+
+    pub async fn get_public_keys_by_account_id(
+        &self,
+        account_id: AccountId,
+    ) -> Result<Vec<PublicKeyCommitment>, StoreError> {
+        let promise = idxdb_get_public_keys_by_account_id(self.db_id(), account_id.to_hex());
+        let commitments: Vec<String> =
+            await_js(promise, "failed to get public keys by account id").await?;
+
+        commitments
+            .into_iter()
+            .map(|hex| {
+                let word = Word::try_from(&hex)?;
+                Ok(PublicKeyCommitment::from(word))
+            })
+            .collect()
+    }
+
+    pub async fn remove_account_public_key(
+        &self,
+        pub_key_commitment: PublicKeyCommitment,
+    ) -> Result<(), StoreError> {
+        let word: Word = pub_key_commitment.into();
+        let promise = idxdb_remove_account_public_key(self.db_id(), word.to_hex());
+        await_js_value(promise, "failed to remove account public key").await?;
+        Ok(())
     }
 }

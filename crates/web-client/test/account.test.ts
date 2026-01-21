@@ -328,3 +328,157 @@ test.describe("account public commitments", () => {
     expect(allSksRetrieved).toBe(true);
   });
 });
+
+// GET_ACCOUNT_BY_PUBLIC_KEY TESTS
+// =======================================================================================================
+
+test.describe("getAccountByPublicKey tests", () => {
+  test("finds wallet by public key after creation", async ({ page }) => {
+    const result = await page.evaluate(async () => {
+      const client = window.client;
+
+      const wallet = await client.newWallet(
+        window.AccountStorageMode.private(),
+        true,
+        0
+      );
+
+      const commitments = await client.getPublicKeyCommitmentsOfAccount(
+        wallet.id()
+      );
+      const secretKey = await client.getAccountAuthByPubKeyCommitment(
+        commitments[0]
+      );
+      const publicKey = secretKey.publicKey();
+
+      const foundAccount = await client.getAccountByPublicKey(publicKey);
+
+      return {
+        createdAccountId: wallet.id().toString(),
+        foundAccountId: foundAccount?.id().toString(),
+        found: foundAccount !== undefined,
+      };
+    });
+
+    expect(result.found).toBe(true);
+    expect(result.foundAccountId).toEqual(result.createdAccountId);
+  });
+
+  test("returns undefined for non-existent public key", async ({ page }) => {
+    const result = await page.evaluate(async () => {
+      const client = window.client;
+
+      const randomSecretKey = window.AuthSecretKey.rpoFalconWithRNG(null);
+      const randomPublicKey = randomSecretKey.publicKey();
+
+      const foundAccount = await client.getAccountByPublicKey(randomPublicKey);
+
+      return {
+        found: foundAccount !== undefined,
+      };
+    });
+
+    expect(result.found).toBe(false);
+  });
+
+  test("finds correct account among multiple accounts", async ({ page }) => {
+    const result = await page.evaluate(async () => {
+      const client = window.client;
+
+      const wallet1 = await client.newWallet(
+        window.AccountStorageMode.private(),
+        true,
+        0
+      );
+      const wallet2 = await client.newWallet(
+        window.AccountStorageMode.private(),
+        true,
+        0
+      );
+
+      const commitments2 = await client.getPublicKeyCommitmentsOfAccount(
+        wallet2.id()
+      );
+      const secretKey2 = await client.getAccountAuthByPubKeyCommitment(
+        commitments2[0]
+      );
+      const publicKey2 = secretKey2.publicKey();
+
+      const foundAccount = await client.getAccountByPublicKey(publicKey2);
+
+      return {
+        wallet1Id: wallet1.id().toString(),
+        wallet2Id: wallet2.id().toString(),
+        foundAccountId: foundAccount?.id().toString(),
+      };
+    });
+
+    expect(result.foundAccountId).toEqual(result.wallet2Id);
+    expect(result.foundAccountId).not.toEqual(result.wallet1Id);
+  });
+
+  test("finds account by additionally registered key", async ({ page }) => {
+    const result = await page.evaluate(async () => {
+      const client = window.client;
+
+      const wallet = await client.newWallet(
+        window.AccountStorageMode.private(),
+        true,
+        0
+      );
+
+      const additionalSecretKey = window.AuthSecretKey.ecdsaWithRNG(null);
+      await client.addAccountSecretKeyToWebStore(
+        wallet.id(),
+        additionalSecretKey
+      );
+
+      const additionalPublicKey = additionalSecretKey.publicKey();
+      const foundAccount =
+        await client.getAccountByPublicKey(additionalPublicKey);
+
+      return {
+        walletId: wallet.id().toString(),
+        foundAccountId: foundAccount?.id().toString(),
+        found: foundAccount !== undefined,
+      };
+    });
+
+    expect(result.found).toBe(true);
+    expect(result.foundAccountId).toEqual(result.walletId);
+  });
+
+  test("finds faucet by public key", async ({ page }) => {
+    const result = await page.evaluate(async () => {
+      const client = window.client;
+
+      const faucet = await client.newFaucet(
+        window.AccountStorageMode.private(),
+        false,
+        "TST",
+        8,
+        BigInt(10000000),
+        0
+      );
+
+      const commitments = await client.getPublicKeyCommitmentsOfAccount(
+        faucet.id()
+      );
+      const secretKey = await client.getAccountAuthByPubKeyCommitment(
+        commitments[0]
+      );
+      const publicKey = secretKey.publicKey();
+
+      const foundAccount = await client.getAccountByPublicKey(publicKey);
+
+      return {
+        faucetId: faucet.id().toString(),
+        foundAccountId: foundAccount?.id().toString(),
+        foundIsFaucet: foundAccount?.isFaucet(),
+      };
+    });
+
+    expect(result.foundAccountId).toEqual(result.faucetId);
+    expect(result.foundIsFaucet).toBe(true);
+  });
+});
