@@ -56,10 +56,10 @@ impl SqliteStore {
         root: Word,
         assets: impl Iterator<Item = Asset>,
     ) -> Result<(), StoreError> {
+        const QUERY: &str =
+            insert_sql!(account_assets { root, vault_key, faucet_id_prefix, asset } | REPLACE);
         for asset in assets {
             let vault_key_word: Word = asset.vault_key().into();
-            const QUERY: &str =
-                insert_sql!(account_assets { root, vault_key, faucet_id_prefix, asset } | REPLACE);
             tx.execute(
                 QUERY,
                 params![

@@ -68,16 +68,15 @@ impl SqliteStore {
         commitment: Word,
         account_storage: impl Iterator<Item = &'a StorageSlot>,
     ) -> Result<(), StoreError> {
+        const QUERY: &str = insert_sql!(
+            account_storage {
+                commitment,
+                slot_name,
+                slot_value,
+                slot_type
+            } | REPLACE
+        );
         for slot in account_storage {
-            const QUERY: &str = insert_sql!(
-                account_storage {
-                    commitment,
-                    slot_name,
-                    slot_value,
-                    slot_type
-                } | REPLACE
-            );
-
             tx.execute(
                 QUERY,
                 params![
