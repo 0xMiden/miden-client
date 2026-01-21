@@ -217,7 +217,9 @@ export declare class MockWebClient extends WebClient {
    * @param config - Client configuration (seed/storeName).
    * @returns A promise that resolves to a fully initialized MockWebClient.
    */
-  static createClient(config: WebClientConfig): Promise<MockWebClient & WasmWebClient>;
+  static createClient(
+    config: WebClientConfig
+  ): Promise<MockWebClient & WasmWebClient>;
 
   /**
    * Factory method to create and initialize a new wrapped MockWebClient.
