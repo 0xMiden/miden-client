@@ -10,6 +10,9 @@ use miden_client::account::{
     AccountIdError,
     AccountStorage,
     Address,
+    PartialAccount,
+    PartialStorage,
+    PartialStorageMap,
     StorageMap,
     StorageSlot,
     StorageSlotName,
@@ -25,6 +28,8 @@ use miden_client::store::{
 };
 use miden_client::utils::Serializable;
 use miden_client::{AccountError, Word};
+use miden_protocol::account::{AccountStorageHeader, StorageSlotHeader};
+use miden_protocol::asset::PartialVault;
 
 use super::WebStore;
 use crate::account::js_bindings::idxdb_get_account_addresses;
@@ -188,9 +193,8 @@ impl WebStore {
         Ok(Some(AccountRecord::new(account_data, status, addresses)))
     }
 
-    // TODO: current implementation is a copy of `get_account`,
-    // refactor for correct implementation.
-    // https://github.com/0xMiden/miden-client/issues/1515
+    // NOTE: This implementation creates partial accounts with storage map entries but without
+    // Merkle witnesses. Full witness support requires an SMT forest similar to the sqlite-store.
     pub(crate) async fn get_minimal_partial_account(
         &self,
         account_id: AccountId,
@@ -199,24 +203,67 @@ impl WebStore {
             None => return Ok(None),
             Some((account_header, status)) => (account_header, status),
         };
+
+        let partial_vault = PartialVault::new(account_header.vault_root());
+
+        let storage_slot_headers =
+            self.get_storage_slot_headers(account_header.storage_commitment()).await?;
+
+        let mut storage_header_vec = Vec::new();
+        let mut map_roots_to_fetch = Vec::new();
+
+        // Collect all map roots that need to be fetched
+        for (_, slot_type, value) in &storage_slot_headers {
+            if slot_type == &StorageSlotType::Map {
+                map_roots_to_fetch.push(value.to_hex());
+            }
+        }
+
+        // Fetch all map entries for the partial account
+        let mut storage_maps_data = BTreeMap::new();
+        if !map_roots_to_fetch.is_empty() {
+            let promise = idxdb_get_account_storage_maps(self.db_id(), map_roots_to_fetch);
+            let account_maps_idxdb: Vec<StorageMapEntryIdxdbObject> =
+                await_js(promise, "failed to fetch account storage maps").await?;
+
+            for entry in account_maps_idxdb {
+                let map = storage_maps_data.entry(entry.root).or_insert_with(StorageMap::new);
+                map.insert(
+                    Word::try_from(entry.key.as_str())?,
+                    Word::try_from(entry.value.as_str())?,
+                )?;
+            }
+        }
+
+        let mut maps = Vec::new();
+        for (slot_name, slot_type, value) in storage_slot_headers {
+            storage_header_vec.push(StorageSlotHeader::new(slot_name, slot_type, value));
+            if slot_type == StorageSlotType::Map {
+                let full_map =
+                    storage_maps_data.get(&value.to_hex()).cloned().unwrap_or_else(StorageMap::new);
+                let partial_storage_map = PartialStorageMap::new_full(full_map);
+                maps.push(partial_storage_map);
+            }
+        }
+
+        storage_header_vec.sort_by_key(StorageSlotHeader::id);
+        let storage_header =
+            AccountStorageHeader::new(storage_header_vec).map_err(StoreError::AccountError)?;
+        let partial_storage =
+            PartialStorage::new(storage_header, maps).map_err(StoreError::AccountError)?;
+
         let account_code = self.get_account_code(account_header.code_commitment()).await?;
 
-        let account_storage = self
-            .get_storage(account_header.storage_commitment(), AccountStorageFilter::All)
-            .await?;
-        let assets = self.get_vault_assets(account_header.vault_root()).await?;
-        let account_vault = AssetVault::new(&assets)?;
-
-        let account = Account::new(
+        let partial_account = PartialAccount::new(
             account_header.id(),
-            account_vault,
-            account_storage,
-            account_code,
             account_header.nonce(),
+            account_code,
+            partial_storage,
+            partial_vault,
             status.seed().copied(),
         )?;
 
-        let account_data = AccountRecordData::Partial((&account).into());
+        let account_data = AccountRecordData::Partial(partial_account);
         let addresses = self.get_account_addresses(account_id).await?;
         Ok(Some(AccountRecord::new(account_data, status, addresses)))
     }
@@ -232,6 +279,37 @@ impl WebStore {
             AccountCode::from_bytes(&account_code_idxdb.code).map_err(StoreError::AccountError)?;
 
         Ok(code)
+    }
+
+    /// Retrieves storage slot headers without fetching full map entries.
+    async fn get_storage_slot_headers(
+        &self,
+        commitment: Word,
+    ) -> Result<Vec<(StorageSlotName, StorageSlotType, Word)>, StoreError> {
+        let commitment_serialized = commitment.to_string();
+
+        let promise = idxdb_get_account_storage(self.db_id(), commitment_serialized);
+        let account_storage_idxdb: Vec<AccountStorageIdxdbObject> =
+            await_js(promise, "failed to fetch account storage").await?;
+
+        if account_storage_idxdb.iter().any(|s| s.slot_name.is_empty()) {
+            return Err(StoreError::DatabaseError(
+                "account storage entries are missing `slotName`; clear IndexedDB and re-sync"
+                    .to_string(),
+            ));
+        }
+
+        account_storage_idxdb
+            .into_iter()
+            .map(|slot| {
+                let slot_name = StorageSlotName::new(slot.slot_name).map_err(|err| {
+                    StoreError::DatabaseError(format!("invalid storage slot name in db: {err}"))
+                })?;
+                let slot_type = StorageSlotType::try_from(slot.slot_type)?;
+                let value = Word::try_from(slot.slot_value.as_str())?;
+                Ok((slot_name, slot_type, value))
+            })
+            .collect()
     }
 
     pub(super) async fn get_storage(
