@@ -1,7 +1,7 @@
 # Changelog
 
 ## 0.13.0 (TBD)
-
+* [BREAKING] refactor(web-client): use config object for constructor and factory methods ([#1666](https://github.com/0xMiden/miden-client/pull/1666))
 * [BREAKING] Removed `getRpoFalcon512PublicKeyAsWord` and `getEcdsaK256KeccakPublicKeyAsWord` in `AuthSecretKey`
 * Improved auth scheme handling across the Rust and web clients (typed `build_wallet_id`, unified transaction tests, new shared `getPublicKeyAsWord` binding, and refreshed typedoc output) ([#1556](https://github.com/0xMiden/miden-client/pull/1556)).
 * [BREAKING] Typed the `auth_scheme` plumbing across the Rust WebClient ID-building helpers and aligned the WebClient bindings with the native enum to avoid passing raw identifiers ([#1546](https://github.com/0xMiden/miden-client/pull/1546)).
