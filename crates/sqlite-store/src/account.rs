@@ -1137,7 +1137,7 @@ fn parse_accounts(
     let account_seed = account_seed.map(|seed| Word::read_from_bytes(&seed)).transpose()?;
 
     let status = match (account_seed, locked) {
-        (_, true) => AccountStatus::Locked,
+        (seed, true) => AccountStatus::Locked { seed },
         (Some(seed), _) => AccountStatus::New { seed },
         _ => AccountStatus::Tracked,
     };

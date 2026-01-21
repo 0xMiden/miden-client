@@ -16,7 +16,6 @@ use miden_client::account::component::{
 };
 use miden_client::account::{Account, AccountBuilder, AccountStorageMode, AccountType};
 use miden_client::auth::{AuthRpoFalcon512, AuthSecretKey, TransactionAuthenticator};
-use miden_client::keystore::FilesystemKeyStore;
 use miden_client::transaction::TransactionRequestBuilder;
 use miden_client::utils::Deserializable;
 use miden_client::vm::{Package, SectionId};
@@ -26,7 +25,7 @@ use tracing::{debug, warn};
 use crate::commands::account::set_default_account_if_unset;
 use crate::config::CliConfig;
 use crate::errors::CliError;
-use crate::{client_binary_name, load_config_file};
+use crate::{CliKeyStore, client_binary_name};
 
 // CLI TYPES
 // ================================================================================================
@@ -103,7 +102,7 @@ impl NewWalletCmd {
     pub async fn execute<AUTH: TransactionAuthenticator + Sync + 'static>(
         &self,
         mut client: Client<AUTH>,
-        keystore: FilesystemKeyStore,
+        keystore: CliKeyStore,
     ) -> Result<(), CliError> {
         let package_paths: Vec<PathBuf> = [PathBuf::from("basic-wallet")]
             .into_iter()
@@ -198,7 +197,7 @@ impl NewAccountCmd {
     pub async fn execute<AUTH: TransactionAuthenticator + Sync + 'static>(
         &self,
         mut client: Client<AUTH>,
-        keystore: FilesystemKeyStore,
+        keystore: CliKeyStore,
     ) -> Result<(), CliError> {
         let new_account = create_client_account(
             &mut client,
@@ -349,7 +348,7 @@ fn separate_auth_components(
 /// If no auth component is detected in the packages, a Falcon-based auth component will be added.
 async fn create_client_account<AUTH: TransactionAuthenticator + Sync + 'static>(
     client: &mut Client<AUTH>,
-    keystore: &FilesystemKeyStore,
+    keystore: &CliKeyStore,
     account_type: AccountType,
     storage_mode: AccountStorageMode,
     package_paths: &[PathBuf],
@@ -365,7 +364,7 @@ async fn create_client_account<AUTH: TransactionAuthenticator + Sync + 'static>(
 
     // Load the component templates and initialization storage data.
 
-    let (cli_config, _) = load_config_file()?;
+    let cli_config = CliConfig::from_system()?;
     debug!("Loading packages...");
     let packages = load_packages(&cli_config, package_paths)?;
     debug!("Loaded {} packages", packages.len());

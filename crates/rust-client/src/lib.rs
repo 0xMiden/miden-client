@@ -372,7 +372,8 @@ where
     /// - `rpc_api`: An instance of [`NodeRpcClient`] which provides a way for the client to connect
     ///   to the Miden node.
     /// - `rng`: An instance of [`FeltRng`] which provides randomness tools for generating new keys,
-    ///   serial numbers, etc. This can be any RNG that implements the [`FeltRng`] trait.
+    ///   serial numbers, etc. This can be any RNG that implements [`ClientFeltRng`] (ie `FeltRng`
+    ///   + `Send` + `Sync`).
     /// - `store`: An instance of [`Store`], which provides a way to write and read entities to
     ///   provide persistence.
     /// - `authenticator`: Defines the transaction authenticator that will be used by the
@@ -394,7 +395,7 @@ where
     #[allow(clippy::too_many_arguments)]
     pub async fn new(
         rpc_api: Arc<dyn NodeRpcClient>,
-        rng: Box<dyn FeltRng>,
+        rng: ClientRngBox,
         store: Arc<dyn Store>,
         authenticator: Option<Arc<AUTH>>,
         exec_options: ExecutionOptions,
@@ -490,16 +491,31 @@ impl<AUTH> Client<AUTH> {
 // CLIENT RNG
 // ================================================================================================
 
+// NOTE: The idea of having `ClientRng` is to enforce `Send` and `Sync` over `FeltRng`.
+// This allows `Client`` to be `Send` and `Sync`. There may be users that would want to use clients
+// with !Send/!Sync RNGs. For this we have two options:
+//
+// - We can make client generic over R (adds verbosity but is more flexible and maybe even correct)
+// - We can optionally (e.g., based on features/target) change `ClientRng` definition to not enforce
+//   these bounds. (similar to TransactionAuthenticator)
+
+/// Marker trait for RNGs that can be shared across threads and used by the client.
+pub trait ClientFeltRng: FeltRng + Send + Sync {}
+impl<T> ClientFeltRng for T where T: FeltRng + Send + Sync {}
+
+/// Boxed RNG trait object used by the client.
+pub type ClientRngBox = Box<dyn ClientFeltRng>;
+
 /// A wrapper around a [`FeltRng`] that implements the [`RngCore`] trait.
 /// This allows the user to pass their own generic RNG so that it's used by the client.
-pub struct ClientRng(Box<dyn FeltRng>);
+pub struct ClientRng(ClientRngBox);
 
 impl ClientRng {
-    pub fn new(rng: Box<dyn FeltRng>) -> Self {
+    pub fn new(rng: ClientRngBox) -> Self {
         Self(rng)
     }
 
-    pub fn inner_mut(&mut self) -> &mut Box<dyn FeltRng> {
+    pub fn inner_mut(&mut self) -> &mut ClientRngBox {
         &mut self.0
     }
 }
@@ -551,5 +567,17 @@ impl From<bool> for DebugMode {
         } else {
             DebugMode::Disabled
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Client;
+
+    fn assert_send_sync<T: Send + Sync>() {}
+
+    #[test]
+    fn client_is_send_sync() {
+        assert_send_sync::<Client<()>>();
     }
 }
