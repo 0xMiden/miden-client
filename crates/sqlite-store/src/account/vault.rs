@@ -50,6 +50,7 @@ impl SqliteStore {
     // MUTATOR/WRITER METHODS
     // --------------------------------------------------------------------------------------------
 
+    /// Inserts assets into the vault for a specific vault root.
     pub(crate) fn insert_assets(
         tx: &Transaction<'_>,
         root: Word,
@@ -74,6 +75,11 @@ impl SqliteStore {
         Ok(())
     }
 
+    /// Applies vault delta changes to the account state, updating fungible and non-fungible assets.
+    ///
+    /// The function updates the SMT forest with all asset changes and verifies that the resulting
+    /// vault root matches the expected final state. It deletes removed assets and inserts updated
+    /// ones into the database.
     pub(crate) fn apply_account_vault_delta(
         tx: &Transaction<'_>,
         smt_forest: &mut AccountSmtForest,

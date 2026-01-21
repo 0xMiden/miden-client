@@ -7,28 +7,13 @@ use std::sync::{Arc, RwLock};
 use std::vec::Vec;
 
 use miden_client::account::{
-    Account,
-    AccountCode,
-    AccountDelta,
-    AccountHeader,
-    AccountId,
-    AccountIdPrefix,
-    AccountStorage,
-    Address,
-    PartialAccount,
-    PartialStorage,
-    PartialStorageMap,
-    StorageMap,
-    StorageSlotName,
+    Account, AccountCode, AccountDelta, AccountHeader, AccountId, AccountIdPrefix, AccountStorage,
+    Address, PartialAccount, PartialStorage, PartialStorageMap, StorageMap, StorageSlotName,
     StorageSlotType,
 };
 use miden_client::asset::{Asset, AssetVault, AssetWitness, FungibleAsset};
 use miden_client::store::{
-    AccountRecord,
-    AccountRecordData,
-    AccountStatus,
-    AccountStorageFilter,
-    StoreError,
+    AccountRecord, AccountRecordData, AccountStatus, AccountStorageFilter, StoreError,
 };
 use miden_client::sync::NoteTagRecord;
 use miden_client::utils::Serializable;
@@ -40,14 +25,8 @@ use rusqlite::types::Value;
 use rusqlite::{Connection, Transaction, named_params, params};
 
 use crate::account::helpers::{
-    SerializedHeaderData,
-    parse_accounts,
-    query_account_addresses,
-    query_account_code,
-    query_account_headers,
-    query_storage_maps,
-    query_storage_slots,
-    query_storage_values,
+    SerializedHeaderData, parse_accounts, query_account_addresses, query_account_code,
+    query_account_headers, query_storage_maps, query_storage_slots, query_storage_values,
     query_vault_assets,
 };
 use crate::smt_forest::AccountSmtForest;
@@ -146,6 +125,7 @@ impl SqliteStore {
         )
     }
 
+    /// Retrieves a complete account record with full vault and storage data.
     pub(crate) fn get_account(
         conn: &mut Connection,
         account_id: AccountId,
@@ -185,6 +165,7 @@ impl SqliteStore {
         Ok(Some(AccountRecord::new(account_data, status, addresses)))
     }
 
+    /// Retrieves a minimal partial account record with storage and vault witnesses.
     pub(crate) fn get_minimal_partial_account(
         conn: &mut Connection,
         smt_forest: &Arc<RwLock<AccountSmtForest>>,
@@ -579,6 +560,25 @@ impl SqliteStore {
         Ok(())
     }
 
+    /// Updates the account state in the database to a new complete account state.
+    ///
+    /// This function replaces the current account state with a completely new one. It:
+    /// - Inserts the new account header
+    /// - Stores all storage slots and their maps
+    /// - Stores all vault assets
+    /// - Updates the SMT forest with the new state
+    /// - Pops old SMT roots from the forest to free memory
+    ///
+    /// This is typically used for replacing a full account state, as opposed to applying
+    /// incremental deltas via `apply_account_delta`.
+    ///
+    /// # Arguments
+    /// * `tx` - Database transaction
+    /// * `smt_forest` - SMT forest for updating and pruning
+    /// * `new_account_state` - The new complete account state to persist
+    ///
+    /// # Returns
+    /// `Ok(())` if the update was successful, or an error if any operation fails.
     pub(crate) fn update_account_state(
         tx: &Transaction<'_>,
         smt_forest: &mut AccountSmtForest,
@@ -631,9 +631,7 @@ impl SqliteStore {
     // HELPERS
     // --------------------------------------------------------------------------------------------
 
-    /// Inserts the new `final_account_header` to the store and copies over the previous account
-    /// state (vault and storage). This isn't meant to be the whole account update, just the first
-    /// step. The account delta should then be applied to the copied data.
+    /// Inserts the new final account header and copies over the previous account state.
     fn copy_account_state(
         tx: &Transaction<'_>,
         init_account_header: &AccountHeader,
@@ -697,8 +695,11 @@ impl SqliteStore {
         Ok(())
     }
 
-    /// Returns all SMT roots (vault root + storage map roots) for the given account ID's latest
-    /// state.
+    /// Returns all SMT roots for a given account ID's latest state.
+    ///
+    /// This function retrieves all Merkle tree roots needed for the SMT forest, including:
+    /// - The vault root for all asset nodes
+    /// - All storage map roots for storage slot map nodes
     fn get_smt_roots_by_account_id(
         tx: &Transaction<'_>,
         account_id: AccountId,

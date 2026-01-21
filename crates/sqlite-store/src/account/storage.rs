@@ -62,6 +62,7 @@ impl SqliteStore {
     // MUTATOR/WRITER METHODS
     // --------------------------------------------------------------------------------------------
 
+    /// Inserts storage slots into the database for a given storage commitment.
     pub(crate) fn insert_storage_slots<'a>(
         tx: &Transaction<'_>,
         commitment: Word,
@@ -105,6 +106,10 @@ impl SqliteStore {
         Ok(())
     }
 
+    /// Applies storage delta changes to the account state, updating storage slots and maps.
+    ///
+    /// All updated storage map entries are validated against the SMT forest to ensure consistency.
+    /// If the computed root doesn't match the expected root, an error is returned.
     pub(crate) fn apply_account_storage_delta(
         smt_forest: &mut AccountSmtForest,
         mut updated_storage_maps: BTreeMap<StorageSlotName, StorageMap>,
