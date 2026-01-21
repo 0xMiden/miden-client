@@ -145,6 +145,7 @@ export interface WebClientConfig {
   rpcUrl?: string;
   noteTransportUrl?: string;
   seed?: Uint8Array;
+  storeName?: string;
   getKeyCb?: GetKeyCallback;
   insertKeyCb?: InsertKeyCallback;
   signCb?: SignCallback;
@@ -177,9 +178,7 @@ export declare class WebClient extends WasmWebClient {
   /**
    * Factory method to create and initialize a new wrapped WebClient.
    *
-   * @param rpcUrl - The RPC URL (optional).
-   * @param noteTransportUrl - The note transport URL (optional).
-   * @param seed - The seed for the account (optional).
+   * @param config - Client configuration (RPC URL, optional note transport URL, optional seed, optional store name).
    * @returns A promise that resolves to a fully initialized WebClient.
    */
   static createClient(
@@ -189,12 +188,7 @@ export declare class WebClient extends WasmWebClient {
   /**
    * Factory method to create and initialize a new wrapped WebClient with a remote keystore.
    *
-   * @param rpcUrl - The RPC URL (optional).
-   * @param noteTransportUrl - The note transport URL (optional).
-   * @param seed - The seed for the account (optional).
-   * @param getKeyCb - Callback used to retrieve secret keys for a given public key.
-   * @param insertKeyCb - Callback used to persist secret keys in the external store.
-   * @param signCb - Callback used to create signatures for the provided inputs.
+   * @param config - Client configuration (RPC URL, optional note transport URL, optional seed, optional store name, and callbacks).
    * @returns A promise that resolves to a fully initialized WebClient.
    */
   static createClientWithExternalKeystore(
@@ -211,6 +205,20 @@ export declare class WebClient extends WasmWebClient {
 }
 
 export declare class MockWebClient extends WebClient {
+  /**
+   * Factory method to create and initialize a new wrapped MockWebClient.
+   *
+   * Overloads:
+   * - Accepts the same config object shape as `WebClient.createClient` (to keep the static side compatible).
+   * - Accepts mock chain/transport serialized bytes + optional seed (legacy signature).
+   *
+   * Note: when using the config overload, only `seed` (and optionally `storeName`) are meaningful for the mock client.
+   *
+   * @param config - Client configuration (seed/storeName).
+   * @returns A promise that resolves to a fully initialized MockWebClient.
+   */
+  static createClient(config: WebClientConfig): Promise<MockWebClient & WasmWebClient>;
+
   /**
    * Factory method to create and initialize a new wrapped MockWebClient.
    *
