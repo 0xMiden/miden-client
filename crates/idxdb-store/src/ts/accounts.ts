@@ -590,8 +590,6 @@ export async function getAccountIdByPublicKey(
       `Error fetching account by public key: ${pubKeyCommitmentHex}`
     );
   }
-
-  return null;
 }
 
 export async function getPublicKeysByAccountId(
@@ -611,8 +609,6 @@ export async function getPublicKeysByAccountId(
       `Error fetching public keys for account: ${accountId}`
     );
   }
-
-  return [];
 }
 
 export async function removeAccountPublicKey(
