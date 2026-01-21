@@ -39,7 +39,6 @@ async fn transaction_creates_two_notes() {
 
     let secret_key = AuthSecretKey::new_falcon512_rpo();
     let pub_key = secret_key.public_key();
-    keystore.add_key(&secret_key).unwrap();
 
     let account = AccountBuilder::new(Default::default())
         .with_component(BasicWallet)
@@ -47,6 +46,8 @@ async fn transaction_creates_two_notes() {
         .with_assets([asset_1, asset_2])
         .build_existing()
         .unwrap();
+
+    keystore.add_key(&secret_key).unwrap();
 
     client.add_account(&account, false).await.unwrap();
     client.sync_state().await.unwrap();

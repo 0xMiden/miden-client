@@ -1196,13 +1196,15 @@ pub async fn test_locked_account(client_config: ClientConfig) -> Result<()> {
             .await;
     wait_for_tx(&mut client_1, tx_id).await?;
 
-    let private_account = client_1
+    let private_account: Account = client_1
         .get_account(from_account_id)
         .await
         .unwrap()
         .unwrap()
         .try_into()
         .unwrap();
+
+    let original_seed = private_account.seed();
 
     // Import private account in client 2
     let (mut client_2, _) = ClientConfig::default()
@@ -1228,6 +1230,7 @@ pub async fn test_locked_account(client_config: ClientConfig) -> Result<()> {
     assert!(summary.locked_accounts.contains(&from_account_id));
     let account_record = client_2.get_account(from_account_id).await.unwrap().unwrap();
     assert!(account_record.is_locked());
+    assert_eq!(account_record.status().seed().copied(), original_seed);
 
     // Get updated account from client 1 and import it in client 2 with `overwrite` flag
     let updated_private_account = client_1

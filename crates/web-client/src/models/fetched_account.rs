@@ -1,3 +1,4 @@
+use miden_client::note::BlockNumber;
 use miden_client::rpc::domain::account::FetchedAccount as NativeFetchedAccount;
 use wasm_bindgen::prelude::*;
 
@@ -11,7 +12,7 @@ use super::word::Word;
 pub struct FetchedAccount {
     account_id: AccountId,
     commitment: Word,
-    last_block_num: u32,
+    last_block_num: BlockNumber,
     account: Option<Account>,
 }
 
@@ -31,7 +32,7 @@ impl FetchedAccount {
     /// Returns the last block height where the account was updated.
     #[wasm_bindgen(js_name = "lastBlockNum")]
     pub fn last_block_num(&self) -> u32 {
-        self.last_block_num
+        self.last_block_num.as_u32()
     }
 
     /// Returns the full account data when the account is public.

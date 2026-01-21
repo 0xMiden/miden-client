@@ -20,8 +20,8 @@ test.describe("remote keystore", () => {
         undefined,
         undefined,
         undefined,
-        insertKeyCb,
         getKeyCb,
+        insertKeyCb,
         signCb
       );
       return client;

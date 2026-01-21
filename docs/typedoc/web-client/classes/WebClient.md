@@ -30,9 +30,13 @@
 
 ### addAccountSecretKeyToWebStore()
 
-> **addAccountSecretKeyToWebStore**(`secret_key`): `Promise`\<`void`\>
+> **addAccountSecretKeyToWebStore**(`account_id`, `secret_key`): `Promise`\<`void`\>
 
 #### Parameters
+
+##### account\_id
+
+[`AccountId`](AccountId.md)
 
 ##### secret\_key
 
@@ -208,6 +212,36 @@ applications as it uses a mock chain that simulates the behavior of a real node.
 
 ***
 
+### executeForSummary()
+
+> **executeForSummary**(`account_id`, `transaction_request`): `Promise`\<[`TransactionSummary`](TransactionSummary.md)\>
+
+Executes a transaction and returns the `TransactionSummary`.
+
+If the transaction is unauthorized (auth script emits the unauthorized event),
+returns the summary from the error. If the transaction succeeds, constructs
+a summary from the executed transaction using the `auth_arg` from the transaction
+request as the salt (or a zero salt if not provided).
+
+# Errors
+- If there is an internal failure during execution.
+
+#### Parameters
+
+##### account\_id
+
+[`AccountId`](AccountId.md)
+
+##### transaction\_request
+
+[`TransactionRequest`](TransactionRequest.md)
+
+#### Returns
+
+`Promise`\<[`TransactionSummary`](TransactionSummary.md)\>
+
+***
+
 ### executeTransaction()
 
 > **executeTransaction**(`account_id`, `transaction_request`): `Promise`\<[`TransactionResult`](TransactionResult.md)\>
@@ -362,13 +396,18 @@ Uses an internal pagination mechanism to avoid fetching duplicate notes.
 
 ***
 
-### getAccountAuthByPubKey()
+### getAccountAuthByPubKeyCommitment()
 
-> **getAccountAuthByPubKey**(`pub_key`): `Promise`\<[`AuthSecretKey`](AuthSecretKey.md)\>
+> **getAccountAuthByPubKeyCommitment**(`pub_key_commitment`): `Promise`\<[`AuthSecretKey`](AuthSecretKey.md)\>
+
+Retrieves an authentication secret key from the keystore given a public key commitment.
+
+The public key commitment should correspond to one of the keys tracked by the keystore.
+Returns the associated [`AuthSecretKey`] if found, or an error if not found.
 
 #### Parameters
 
-##### pub\_key
+##### pub\_key\_commitment
 
 [`Word`](Word.md)
 
@@ -465,6 +504,27 @@ Uses an internal pagination mechanism to avoid fetching duplicate notes.
 #### Returns
 
 `Promise`\<[`OutputNoteRecord`](OutputNoteRecord.md)[]\>
+
+***
+
+### getPublicKeyCommitmentsOfAccount()
+
+> **getPublicKeyCommitmentsOfAccount**(`account_id`): `Promise`\<[`Word`](Word.md)[]\>
+
+Returns all public key commitments associated with the given account ID.
+
+These commitments can be used with [`getAccountAuthByPubKeyCommitment`]
+to retrieve the corresponding secret keys from the keystore.
+
+#### Parameters
+
+##### account\_id
+
+[`AccountId`](AccountId.md)
+
+#### Returns
+
+`Promise`\<[`Word`](Word.md)[]\>
 
 ***
 

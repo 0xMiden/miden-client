@@ -498,6 +498,7 @@ async fn cli_export_import_note() -> Result<()> {
         &mock_target_id.to_hex(),
         &fungible_faucet_account_id,
     );
+
     Ok(())
 }
 
@@ -541,7 +542,10 @@ async fn cli_export_import_account() -> Result<()> {
     import_cmd.current_dir(&temp_dir_2).assert().success();
 
     // Ensure the account was imported
-    let client_2 = create_rust_client_with_store_path(&store_path_2, endpoint_2).await?.0;
+    let (client_2, _) = create_rust_client_with_store_path(&store_path_2, endpoint_2).await?;
+    let cli_keystore =
+        FilesystemKeyStore::new(temp_dir_2.clone().join(MIDEN_DIR).join("keystore"))?;
+
     assert!(client_2.get_account(AccountId::from_hex(&faucet_id)?).await.is_ok());
     assert!(client_2.get_account(AccountId::from_hex(&wallet_id)?).await.is_ok());
 
@@ -554,6 +558,30 @@ async fn cli_export_import_account() -> Result<()> {
 
     // Consume the note
     consume_note_cli(&temp_dir_2, &wallet_id, &[&note_id]);
+
+    // Since importing keys should also store a mapping from
+    // the account id to its public key commitments, we should be able
+    // to retrieve them.
+    let faucet_pks = client_2
+        .get_account_public_key_commitments(&AccountId::from_hex(&faucet_id)?)
+        .await?;
+
+    for stored_pk_commitment in faucet_pks {
+        let matching_secret_key = cli_keystore.get_key(stored_pk_commitment).unwrap();
+        assert!(matching_secret_key.is_some());
+        assert!(matching_secret_key.unwrap().public_key().to_commitment() == stored_pk_commitment);
+    }
+
+    let wallet_pks = client_2
+        .get_account_public_key_commitments(&AccountId::from_hex(&wallet_id)?)
+        .await?;
+
+    for stored_pk_commitment in wallet_pks {
+        let matching_secret_key = cli_keystore.get_key(stored_pk_commitment).unwrap();
+        assert!(matching_secret_key.is_some());
+        assert!(matching_secret_key.unwrap().public_key().to_commitment() == stored_pk_commitment);
+    }
+
     Ok(())
 }
 

@@ -4,8 +4,11 @@ use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::error::Error;
+use miden_protocol::asset::{Asset, AssetVault};
 
-use miden_protocol::account::{Account, AccountCode, AccountId};
+use miden_protocol::account::{
+    Account, AccountCode, AccountId, AccountStorage, StorageMap, StorageSlot, StorageSlotType,
+};
 use miden_protocol::address::NetworkId;
 use miden_protocol::block::account_tree::AccountWitness;
 use miden_protocol::block::{BlockHeader, BlockNumber, ProvenBlock};
@@ -21,24 +24,21 @@ use miden_tx::utils::sync::RwLock;
 use tonic::Status;
 use tracing::info;
 
-use super::domain::account::{AccountProof, AccountUpdateSummary};
-use super::domain::note::FetchedNote;
-use super::domain::nullifier::NullifierUpdate;
+use super::domain::account::{AccountProof, AccountStorageDetails, AccountUpdateSummary};
+use super::domain::{note::FetchedNote, nullifier::NullifierUpdate};
+use super::generated::rpc::account_proof_request::AccountDetailRequest;
+use super::generated::rpc::AccountProofRequest;
 use super::{
-    Endpoint,
-    FetchedAccount,
-    NodeRpcClient,
-    NodeRpcClientEndpoint,
-    NoteSyncInfo,
-    RpcError,
+    Endpoint, FetchedAccount, NodeRpcClient, NodeRpcClientEndpoint, NoteSyncInfo, RpcError,
     StateSyncInfo,
 };
 use crate::rpc::domain::account_vault::AccountVaultInfo;
 use crate::rpc::domain::storage_map::StorageMapInfo;
 use crate::rpc::domain::transaction::TransactionsInfo;
 use crate::rpc::errors::{AcceptHeaderError, GrpcError, RpcConversionError};
-use crate::rpc::generated::rpc::BlockRange;
+use crate::rpc::generated::rpc::account_proof_request::account_detail_request::storage_map_detail_request::SlotData;
 use crate::rpc::generated::rpc::account_proof_request::account_detail_request::StorageMapDetailRequest;
+use crate::rpc::generated::rpc::BlockRange;
 use crate::rpc::{AccountStateAt, NOTE_IDS_LIMIT, NULLIFIER_PREFIXES_LIMIT, generated as proto};
 use crate::transaction::ForeignAccount;
 
@@ -98,6 +98,162 @@ impl GrpcClient {
         client.replace(new_client);
 
         Ok(())
+    }
+
+    /// Given an [`AccountId`], return the proof for the account.
+    ///
+    /// If the account also has public state, its details will also be retrieved
+    pub async fn fetch_full_account_proof(
+        &self,
+        account_id: AccountId,
+    ) -> Result<(BlockNumber, AccountProof), RpcError> {
+        let mut rpc_api = self.ensure_connected().await?;
+        let has_public_state = account_id.has_public_state();
+        let account_request = {
+            AccountProofRequest {
+                account_id: Some(account_id.into()),
+                block_num: None,
+                details: {
+                    if has_public_state {
+                        // Since we have to request the storage maps for an account
+                        // we *dont know* anything about, we'll have to do first this
+                        // request, which will tell us about the account's storage slots,
+                        // and then, request the slots in another request.
+                        Some(AccountDetailRequest {
+                            code_commitment: Some(EMPTY_WORD.into()),
+                            asset_vault_commitment: Some(EMPTY_WORD.into()),
+                            storage_maps: vec![],
+                        })
+                    } else {
+                        None
+                    }
+                },
+            }
+        };
+        let account_response = rpc_api
+            .get_account_proof(account_request)
+            .await
+            .map_err(|status| RpcError::from_grpc_error(NodeRpcClientEndpoint::GetAccount, status))?
+            .into_inner();
+        let block_number = account_response.block_num.ok_or(RpcError::ExpectedDataMissing(
+            "GetAccountDetails returned an account without a matching block number for the witness"
+                .to_owned(),
+        ))?;
+        let account_proof = {
+            if has_public_state {
+                let account_details = account_response
+                    .details
+                    .ok_or(RpcError::ExpectedDataMissing("details in public account".to_owned()))?
+                    .into_domain(&BTreeMap::new())?;
+                let storage_header = account_details.storage_details.header;
+                // This is variable will hold the storage slots that are maps,
+                // below we will use it to actually fetch the storage maps details,
+                // since we now know the names of each storage slot.
+                let maps_to_request = storage_header
+                    .slots()
+                    .filter(|header| header.slot_type().is_map())
+                    .map(|map| map.name().to_string());
+                let account_request = AccountProofRequest {
+                    account_id: Some(account_id.into()),
+                    block_num: None,
+                    details: Some(AccountDetailRequest {
+                        code_commitment: Some(EMPTY_WORD.into()),
+                        asset_vault_commitment: Some(EMPTY_WORD.into()),
+                        storage_maps: maps_to_request
+                            .map(|slot_name| StorageMapDetailRequest {
+                                slot_name,
+                                slot_data: Some(SlotData::AllEntries(true)),
+                            })
+                            .collect(),
+                    }),
+                };
+                match rpc_api.get_account_proof(account_request).await {
+                    Ok(account_proof) => account_proof.into_inner().try_into(),
+                    Err(err) => Err(RpcError::ConnectionError(
+                        format!(
+                            "failed to fetch account proof for account: {account_id}, got: {err}"
+                        )
+                        .into(),
+                    )),
+                }
+            } else {
+                account_response.try_into()
+            }
+        };
+        Ok((block_number.block_num.into(), account_proof?))
+    }
+
+    /// Given the storage details for an account and its id, returns a vector
+    /// with all of its storage slots. Keep in mind that if an account triggers
+    /// the `too_many_entries` flag, there will potentially be multiple requests.
+    pub async fn build_storage_slots(
+        &self,
+        account_id: AccountId,
+        storage_details: &AccountStorageDetails,
+    ) -> Result<Vec<StorageSlot>, RpcError> {
+        let mut slots = vec![];
+        // It seems that sync_storage_maps will return information for *every*
+        // map for a given account, so this map_cache value should be
+        // fetched only once, hence the None placeholder
+        let mut map_cache: Option<StorageMapInfo> = None;
+        for slot_header in storage_details.header.slots() {
+            // We have two cases for each slot:
+            // - Slot is a value => We simply instance a StorageSlot
+            // - Slot is a map => If the map is 'small', we can simply
+            // build the map from the given entries. Otherwise we will have to
+            // call the SyncStorageMaps RPC method to obtain the data for the map.
+            // With the current setup, one RPC call should be enough.
+            match slot_header.slot_type() {
+                StorageSlotType::Value => {
+                    slots.push(miden_protocol::account::StorageSlot::with_value(
+                        slot_header.name().clone(),
+                        slot_header.value(),
+                    ));
+                },
+                StorageSlotType::Map => {
+                    let map_details = storage_details.find_map_details(slot_header.name()).ok_or(
+                        RpcError::ExpectedDataMissing(format!(
+                            "slot named '{}' was reported as a map, but it does not have a matching map_detail entry",
+                            slot_header.name(),
+                        )),
+                    )?;
+
+                    let mut map_entries = vec![];
+                    if map_details.too_many_entries {
+                        let map_info = if let Some(ref info) = map_cache {
+                            info
+                        } else {
+                            let fetched_data =
+                                self.sync_storage_maps(0_u32.into(), None, account_id).await?;
+                            map_cache.insert(fetched_data)
+                        };
+                        map_entries.extend(
+                            map_info
+                                .updates
+                                .iter()
+                                .filter(|slot_info| slot_info.slot_name == *slot_header.name())
+                                .map(|slot_info| (slot_info.key, slot_info.value)),
+                        );
+                    } else {
+                        map_entries.extend(map_details.entries.iter().map(|e| {
+                            let key: Word = e.key;
+                            let value: Word = e.value;
+                            (key, value)
+                        }));
+                    }
+
+                    slots.push(miden_protocol::account::StorageSlot::with_map(
+                        slot_header.name().clone(),
+                        StorageMap::with_entries(map_entries).map_err(|err| {
+                            RpcError::InvalidResponse(format!(
+                                "the rpc api returned a non-valid map entry: {err}"
+                            ))
+                        })?,
+                    ));
+                },
+            }
+        }
+        Ok(slots)
     }
 }
 
@@ -256,36 +412,55 @@ impl NodeRpcClient for GrpcClient {
     ///   `account_commitment`, `details`).
     /// - There is an error during [Account] deserialization.
     async fn get_account_details(&self, account_id: AccountId) -> Result<FetchedAccount, RpcError> {
-        let request = proto::account::AccountId { id: account_id.to_bytes() };
+        let (block_number, full_account_proof) = self.fetch_full_account_proof(account_id).await?;
 
-        let mut rpc_api = self.ensure_connected().await?;
+        let update_summary =
+            AccountUpdateSummary::new(full_account_proof.account_commitment(), block_number);
 
-        let response = rpc_api.get_account_details(request).await.map_err(|status| {
-            RpcError::from_grpc_error(NodeRpcClientEndpoint::GetAccountDetails, status)
-        })?;
-        let response = response.into_inner();
-        let account_summary = response.summary.ok_or(RpcError::ExpectedDataMissing(
-            "GetAccountDetails response should have an `summary`".to_string(),
-        ))?;
-
-        let commitment =
-            account_summary.account_commitment.ok_or(RpcError::ExpectedDataMissing(
-                "GetAccountDetails response's account should have an `account_commitment`"
-                    .to_string(),
-            ))?;
-
-        let commitment = commitment.try_into()?;
-
-        let update_summary = AccountUpdateSummary::new(commitment, account_summary.block_num);
+        // The case for a private account is simple,
+        // we simple use the commitment and its id.
         if account_id.is_private() {
             Ok(FetchedAccount::new_private(account_id, update_summary))
         } else {
-            let account = Account::read_from_bytes(&response.details.ok_or(
-                RpcError::ExpectedDataMissing(
-                    "GetAccountDetails response should have an `account`".to_string(),
-                ),
-            )?)?;
+            // An account with public state has to fetch all of its state.
+            // Even more so, an account with a large state will have to do
+            // a couple of extra requests to fetch all of its data.
+            let details =
+                full_account_proof.into_parts().1.ok_or(RpcError::ExpectedDataMissing(
+                    "GetAccountDetails returned a public account without details".to_owned(),
+                ))?;
+            let account_id = details.header.id();
+            let nonce = details.header.nonce();
+            let assets: Vec<Asset> = {
+                if details.vault_details.too_many_assets {
+                    self.sync_account_vault(BlockNumber::from(0), None, account_id)
+                        .await?
+                        .updates
+                        .into_iter()
+                        .filter_map(|update| update.asset)
+                        .collect()
+                } else {
+                    details.vault_details.assets
+                }
+            };
 
+            let slots = self.build_storage_slots(account_id, &details.storage_details).await?;
+            let seed = None;
+            let asset_vault = AssetVault::new(&assets).map_err(|err| {
+                RpcError::InvalidResponse(format!("api rpc returned non-valid assets: {err}"))
+            })?;
+            let account_storage = AccountStorage::new(slots).map_err(|err| {
+                RpcError::InvalidResponse(format!(
+                    "api rpc returned non-valid storage slots: {err}"
+                ))
+            })?;
+            let account =
+                Account::new(account_id, asset_vault, account_storage, details.code, nonce, seed)
+                    .map_err(|err| {
+                    RpcError::InvalidResponse(format!(
+                        "failed to instance an account from the rpc api response: {err}"
+                    ))
+                })?;
             Ok(FetchedAccount::new_public(account, update_summary))
         }
     }

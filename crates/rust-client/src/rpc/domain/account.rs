@@ -94,12 +94,12 @@ pub struct AccountUpdateSummary {
     /// Commitment of the account, that represents a commitment to its updated state.
     pub commitment: Word,
     /// Block number of last account update.
-    pub last_block_num: u32,
+    pub last_block_num: BlockNumber,
 }
 
 impl AccountUpdateSummary {
     /// Creates a new [`AccountUpdateSummary`].
-    pub fn new(commitment: Word, last_block_num: u32) -> Self {
+    pub fn new(commitment: Word, last_block_num: BlockNumber) -> Self {
         Self { commitment, last_block_num }
     }
 }
@@ -327,6 +327,15 @@ pub struct AccountStorageDetails {
     pub map_details: Vec<AccountStorageMapDetails>,
 }
 
+impl AccountStorageDetails {
+    /// Find the matching details for a map, given its storage slot name.
+    //  This linear search should be good enough since there can be
+    //  only up to 256 slots, so locality probably wins here.
+    pub fn find_map_details(&self, target: &StorageSlotName) -> Option<&AccountStorageMapDetails> {
+        self.map_details.iter().find(|map_detail| map_detail.slot_name == *target)
+    }
+}
+
 impl TryFrom<proto::rpc::AccountStorageDetails> for AccountStorageDetails {
     type Error = RpcError;
 
@@ -541,6 +550,27 @@ impl AccountProof {
     /// Deconstructs `AccountProof` into its individual parts.
     pub fn into_parts(self) -> (AccountWitness, Option<AccountDetails>) {
         (self.account_witness, self.state_headers)
+    }
+}
+
+#[cfg(feature = "tonic")]
+impl TryFrom<proto::rpc::AccountProofResponse> for AccountProof {
+    type Error = RpcError;
+    fn try_from(account_proof: proto::rpc::AccountProofResponse) -> Result<Self, Self::Error> {
+        let Some(witness) = account_proof.witness else {
+            return Err(RpcError::ExpectedDataMissing(
+                "GetAccountProof returned an account without witness".to_owned(),
+            ));
+        };
+
+        let details: Option<AccountDetails> = {
+            match account_proof.details {
+                None => None,
+                Some(details) => Some(details.into_domain(&BTreeMap::new())?),
+            }
+        };
+        AccountProof::new(witness.try_into()?, details)
+            .map_err(|err| RpcError::InvalidResponse(format!("{err}")))
     }
 }
 

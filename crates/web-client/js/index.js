@@ -1,5 +1,5 @@
 import loadWasm from "./wasm.js";
-import { MethodName, WorkerAction } from "./constants.js";
+import { CallbackType, MethodName, WorkerAction } from "./constants.js";
 export * from "../Cargo.toml";
 
 const buildTypedArraysExport = (exportObject) => {
@@ -135,12 +135,7 @@ export class WebClient {
     this.signCb = signCb;
 
     // Check if Web Workers are available.
-    if (
-      typeof Worker !== "undefined" &&
-      !this.getKeyCb &&
-      !this.insertKeyCb &&
-      !this.signCb
-    ) {
+    if (typeof Worker !== "undefined") {
       console.log("WebClient: Web Workers are available.");
       // Create the worker.
       this.worker = new Worker(
@@ -162,7 +157,7 @@ export class WebClient {
       });
 
       // Listen for messages from the worker.
-      this.worker.addEventListener("message", (event) => {
+      this.worker.addEventListener("message", async (event) => {
         const data = event.data;
 
         // Worker script loaded.
@@ -174,6 +169,36 @@ export class WebClient {
         // Worker ready.
         if (data.ready) {
           this.readyResolver();
+          return;
+        }
+
+        if (data.action === WorkerAction.EXECUTE_CALLBACK) {
+          const { callbackType, args, requestId } = data;
+          try {
+            const callbackMapping = {
+              [CallbackType.GET_KEY]: this.getKeyCb,
+              [CallbackType.INSERT_KEY]: this.insertKeyCb,
+              [CallbackType.SIGN]: this.signCb,
+            };
+            if (!callbackMapping[callbackType]) {
+              throw new Error(`Callback ${callbackType} not available`);
+            }
+            const callbackFunction = callbackMapping[callbackType];
+            let result = callbackFunction.apply(this, args);
+            if (result instanceof Promise) {
+              result = await result;
+            }
+
+            this.worker.postMessage({
+              callbackResult: result,
+              callbackRequestId: requestId,
+            });
+          } catch (error) {
+            this.worker.postMessage({
+              callbackError: error.message,
+              callbackRequestId: requestId,
+            });
+          }
           return;
         }
 
@@ -218,7 +243,15 @@ export class WebClient {
   initializeWorker() {
     this.worker.postMessage({
       action: WorkerAction.INIT,
-      args: [this.rpcUrl, this.noteTransportUrl, this.seed, this.storeName],
+      args: [
+        this.rpcUrl,
+        this.noteTransportUrl,
+        this.seed,
+        this.storeName,
+        !!this.getKeyCb,
+        !!this.insertKeyCb,
+        !!this.signCb,
+      ],
     });
   }
 
