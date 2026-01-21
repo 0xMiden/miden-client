@@ -418,7 +418,7 @@ fn note_consumption_status_type(note_consumption_status: &NoteConsumptionStatus)
         },
         NoteConsumptionStatus::NeverConsumable(error) => format!("Never consumable: {error}"),
     }
-    .to_string()
+    .clone()
 }
 
 fn note_record_type(note_record_metadata: Option<&NoteMetadata>) -> String {

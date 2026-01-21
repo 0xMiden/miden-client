@@ -10,7 +10,7 @@ const mockChainTest = async (testingPage: Page) => {
     // to the actual context.
     // https://github.com/0xMiden/miden-client/issues/1611
     await new Promise<void>((resolve, reject) => {
-      const request = indexedDB.deleteDatabase("MidenClientDB");
+      const request = indexedDB.deleteDatabase("MidenClientDB_mlcl");
       request.onsuccess = () => resolve();
       request.onerror = () => reject(request.error);
       request.onblocked = () => resolve();

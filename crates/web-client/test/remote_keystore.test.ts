@@ -15,6 +15,7 @@ test.describe("remote keystore", () => {
       const signCb = async (_publicKeyCommitment: string, _message: string) => {
         return undefined;
       };
+<<<<<<< HEAD
       const client = await window.WebClient.createClientWithExternalKeystore({
         rpcUrl: window.rpcUrl!,
         noteTransportUrl: undefined,
@@ -23,6 +24,17 @@ test.describe("remote keystore", () => {
         insertKeyCb,
         signCb,
       });
+=======
+      const client = await window.WebClient.createClientWithExternalKeystore(
+        window.rpcUrl!,
+        undefined,
+        undefined,
+        undefined,
+        getKeyCb,
+        insertKeyCb,
+        signCb
+      );
+>>>>>>> upstream/next
       return client;
     });
     expect(client).toBeDefined();
@@ -41,11 +53,20 @@ test.describe("remote keystore", () => {
         publicKeyCommitment = publicKeyCommitmentStr;
         secretKey = secretKeyStr;
       };
+<<<<<<< HEAD
       const client = await window.WebClient.createClientWithExternalKeystore({
         rpcUrl: window.rpcUrl!,
         noteTransportUrl: undefined,
         seed: undefined,
         getKeyCb: undefined,
+=======
+      const client = await window.WebClient.createClientWithExternalKeystore(
+        window.rpcUrl!,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+>>>>>>> upstream/next
         insertKeyCb,
         signCb: undefined,
       });
@@ -86,10 +107,18 @@ test.describe("remote keystore", () => {
         return undefined;
       };
 
+<<<<<<< HEAD
       const client = await window.WebClient.createClientWithExternalKeystore({
         rpcUrl: window.rpcUrl!,
         noteTransportUrl: undefined,
         seed: undefined,
+=======
+      const client = await window.WebClient.createClientWithExternalKeystore(
+        window.rpcUrl!,
+        undefined,
+        undefined,
+        undefined,
+>>>>>>> upstream/next
         getKeyCb,
         insertKeyCb,
         signCb: undefined,
@@ -150,11 +179,20 @@ test.describe("remote keystore", () => {
         return serializedSig;
       };
 
+<<<<<<< HEAD
       const client = await window.WebClient.createClientWithExternalKeystore({
         rpcUrl: window.rpcUrl!,
         noteTransportUrl: undefined,
         seed: undefined,
         getKeyCb: undefined,
+=======
+      const client = await window.WebClient.createClientWithExternalKeystore(
+        window.rpcUrl!,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+>>>>>>> upstream/next
         insertKeyCb,
         signCb,
       });

@@ -47,7 +47,8 @@ impl WebStore {
         filter: NoteFilter,
     ) -> Result<Vec<InputNoteRecord>, StoreError> {
         let input_notes_idxdb: Vec<InputNoteIdxdbObject> =
-            await_js(filter.to_input_notes_promise(), "failed to get input notes").await?;
+            await_js(filter.to_input_notes_promise(self.db_id()), "failed to get input notes")
+                .await?;
 
         input_notes_idxdb
             .into_iter()
@@ -60,7 +61,8 @@ impl WebStore {
         filter: NoteFilter,
     ) -> Result<Vec<OutputNoteRecord>, StoreError> {
         let output_notes_idxdb: Vec<OutputNoteIdxdbObject> =
-            await_js(filter.to_output_note_promise(), "failed to get output notes").await?;
+            await_js(filter.to_output_note_promise(self.db_id()), "failed to get output notes")
+                .await?;
 
         output_notes_idxdb
             .into_iter()
@@ -73,7 +75,7 @@ impl WebStore {
         script_root: Word,
     ) -> Result<NoteScript, StoreError> {
         let script_root = script_root.to_hex();
-        let promise = idxdb_get_note_script(script_root);
+        let promise = idxdb_get_note_script(self.db_id(), script_root);
         let script_idxdb: NoteScriptIdxdbObject =
             await_js(promise, "failed to get note script").await?;
 
@@ -83,7 +85,7 @@ impl WebStore {
     pub(crate) async fn get_unspent_input_note_nullifiers(
         &self,
     ) -> Result<Vec<Nullifier>, StoreError> {
-        let promise = idxdb_get_unspent_input_note_nullifiers();
+        let promise = idxdb_get_unspent_input_note_nullifiers(self.db_id());
         let nullifiers_as_str: Vec<String> =
             await_js(promise, "failed to get unspent input note nullifiers").await?;
 
@@ -98,7 +100,7 @@ impl WebStore {
         notes: &[InputNoteRecord],
     ) -> Result<(), StoreError> {
         for note in notes {
-            upsert_input_note_tx(note).await?;
+            upsert_input_note_tx(self.db_id(), note).await?;
         }
 
         Ok(())
@@ -109,7 +111,7 @@ impl WebStore {
         note_scripts: &[NoteScript],
     ) -> Result<(), StoreError> {
         for note_script in note_scripts {
-            upsert_note_script_tx(note_script).await?;
+            upsert_note_script_tx(self.db_id(), note_script).await?;
         }
 
         Ok(())
@@ -118,12 +120,12 @@ impl WebStore {
 
 // Provide extension methods for NoteFilter via a local trait
 pub(crate) trait NoteFilterExt {
-    fn to_input_notes_promise(&self) -> Promise;
-    fn to_output_note_promise(&self) -> Promise;
+    fn to_input_notes_promise(&self, db_id: &str) -> Promise;
+    fn to_output_note_promise(&self, db_id: &str) -> Promise;
 }
 
 impl NoteFilterExt for NoteFilter {
-    fn to_input_notes_promise(&self) -> Promise {
+    fn to_input_notes_promise(&self, db_id: &str) -> Promise {
         match self {
             NoteFilter::All
             | NoteFilter::Consumed
@@ -160,28 +162,28 @@ impl NoteFilterExt for NoteFilter {
 
                 // Assuming `js_fetch_notes` is your JavaScript function that handles simple string
                 // filters
-                idxdb_get_input_notes(states)
+                idxdb_get_input_notes(db_id, states)
             },
             NoteFilter::List(ids) => {
                 let note_ids_as_str: Vec<String> =
                     ids.iter().map(|id| id.as_word().to_string()).collect();
-                idxdb_get_input_notes_from_ids(note_ids_as_str)
+                idxdb_get_input_notes_from_ids(db_id, note_ids_as_str)
             },
             NoteFilter::Unique(id) => {
                 let note_id_as_str = id.as_word().to_string();
                 let note_ids = vec![note_id_as_str];
-                idxdb_get_input_notes_from_ids(note_ids)
+                idxdb_get_input_notes_from_ids(db_id, note_ids)
             },
             NoteFilter::Nullifiers(nullifiers) => {
                 let nullifiers_as_str =
                     nullifiers.iter().map(ToString::to_string).collect::<Vec<String>>();
 
-                idxdb_get_input_notes_from_nullifiers(nullifiers_as_str)
+                idxdb_get_input_notes_from_nullifiers(db_id, nullifiers_as_str)
             },
         }
     }
 
-    fn to_output_note_promise(&self) -> Promise {
+    fn to_output_note_promise(&self, db_id: &str) -> Promise {
         match self {
             NoteFilter::All
             | NoteFilter::Consumed
@@ -206,7 +208,7 @@ impl NoteFilterExt for NoteFilter {
                     _ => unreachable!(), // Safety net, should never be reached
                 };
 
-                idxdb_get_output_notes(states)
+                idxdb_get_output_notes(db_id, states)
             },
             NoteFilter::Processing | NoteFilter::Unverified => {
                 Promise::resolve(&JsValue::from(Array::new()))
@@ -214,18 +216,18 @@ impl NoteFilterExt for NoteFilter {
             NoteFilter::List(ids) => {
                 let note_ids_as_str: Vec<String> =
                     ids.iter().map(|id| id.as_word().to_string()).collect();
-                idxdb_get_output_notes_from_ids(note_ids_as_str)
+                idxdb_get_output_notes_from_ids(db_id, note_ids_as_str)
             },
             NoteFilter::Unique(id) => {
                 let note_id_as_str = id.as_word().to_string();
                 let note_ids = vec![note_id_as_str];
-                idxdb_get_output_notes_from_ids(note_ids)
+                idxdb_get_output_notes_from_ids(db_id, note_ids)
             },
             NoteFilter::Nullifiers(nullifiers) => {
                 let nullifiers_as_str =
                     nullifiers.iter().map(ToString::to_string).collect::<Vec<String>>();
 
-                idxdb_get_output_notes_from_nullifiers(nullifiers_as_str)
+                idxdb_get_output_notes_from_nullifiers(db_id, nullifiers_as_str)
             },
         }
     }

@@ -1,55 +1,66 @@
-import { db, inputNotes, outputNotes, notesScripts, } from "./schema.js";
+import { getDatabase } from "./schema.js";
 import { logWebStoreError, uint8ArrayToBase64 } from "./utils.js";
-export async function getOutputNotes(states) {
+export async function getOutputNotes(dbId, states) {
     try {
+        const db = getDatabase(dbId);
         let notes = states.length == 0
-            ? await outputNotes.toArray()
-            : await outputNotes.where("stateDiscriminant").anyOf(states).toArray();
+            ? await db.outputNotes.toArray()
+            : await db.outputNotes
+                .where("stateDiscriminant")
+                .anyOf(states)
+                .toArray();
         return await processOutputNotes(notes);
     }
     catch (err) {
         logWebStoreError(err, "Failed to get output notes");
     }
 }
-export async function getInputNotes(states) {
+export async function getInputNotes(dbId, states) {
     try {
+        const db = getDatabase(dbId);
         let notes;
         if (states.length === 0) {
-            notes = await inputNotes.toArray();
+            notes = await db.inputNotes.toArray();
         }
         else {
-            notes = await inputNotes
+            notes = await db.inputNotes
                 .where("stateDiscriminant")
                 .anyOf(states)
                 .toArray();
         }
-        return await processInputNotes(notes);
+        return await processInputNotes(dbId, notes);
     }
     catch (err) {
         logWebStoreError(err, "Failed to get input notes");
     }
 }
-export async function getInputNotesFromIds(noteIds) {
+export async function getInputNotesFromIds(dbId, noteIds) {
     try {
-        let notes = await inputNotes.where("noteId").anyOf(noteIds).toArray();
-        return await processInputNotes(notes);
+        const db = getDatabase(dbId);
+        let notes = await db.inputNotes.where("noteId").anyOf(noteIds).toArray();
+        return await processInputNotes(dbId, notes);
     }
     catch (err) {
         logWebStoreError(err, "Failed to get input notes from IDs");
     }
 }
-export async function getInputNotesFromNullifiers(nullifiers) {
+export async function getInputNotesFromNullifiers(dbId, nullifiers) {
     try {
-        let notes = await inputNotes.where("nullifier").anyOf(nullifiers).toArray();
-        return await processInputNotes(notes);
+        const db = getDatabase(dbId);
+        let notes = await db.inputNotes
+            .where("nullifier")
+            .anyOf(nullifiers)
+            .toArray();
+        return await processInputNotes(dbId, notes);
     }
     catch (err) {
         logWebStoreError(err, "Failed to get input notes from nullifiers");
     }
 }
-export async function getOutputNotesFromNullifiers(nullifiers) {
+export async function getOutputNotesFromNullifiers(dbId, nullifiers) {
     try {
-        let notes = await outputNotes
+        const db = getDatabase(dbId);
+        let notes = await db.outputNotes
             .where("nullifier")
             .anyOf(nullifiers)
             .toArray();
@@ -59,18 +70,20 @@ export async function getOutputNotesFromNullifiers(nullifiers) {
         logWebStoreError(err, "Failed to get output notes from nullifiers");
     }
 }
-export async function getOutputNotesFromIds(noteIds) {
+export async function getOutputNotesFromIds(dbId, noteIds) {
     try {
-        let notes = await outputNotes.where("noteId").anyOf(noteIds).toArray();
+        const db = getDatabase(dbId);
+        let notes = await db.outputNotes.where("noteId").anyOf(noteIds).toArray();
         return await processOutputNotes(notes);
     }
     catch (err) {
         logWebStoreError(err, "Failed to get output notes from IDs");
     }
 }
-export async function getUnspentInputNoteNullifiers() {
+export async function getUnspentInputNoteNullifiers(dbId) {
     try {
-        const notes = await inputNotes
+        const db = getDatabase(dbId);
+        const notes = await db.inputNotes
             .where("stateDiscriminant")
             .anyOf([2, 4, 5])
             .toArray();
@@ -80,9 +93,10 @@ export async function getUnspentInputNoteNullifiers() {
         logWebStoreError(err, "Failed to get unspent input note nullifiers");
     }
 }
-export async function getNoteScript(scriptRoot) {
+export async function getNoteScript(dbId, scriptRoot) {
     try {
-        const noteScript = await notesScripts
+        const db = getDatabase(dbId);
+        const noteScript = await db.notesScripts
             .where("scriptRoot")
             .equals(scriptRoot)
             .first();
@@ -92,8 +106,9 @@ export async function getNoteScript(scriptRoot) {
         logWebStoreError(err, "Failed to get note script from root");
     }
 }
-export async function upsertInputNote(noteId, assets, serialNumber, inputs, scriptRoot, serializedNoteScript, nullifier, serializedCreatedAt, stateDiscriminant, state) {
-    return db.transaction("rw", inputNotes, notesScripts, async (tx) => {
+export async function upsertInputNote(dbId, noteId, assets, serialNumber, inputs, scriptRoot, serializedNoteScript, nullifier, serializedCreatedAt, stateDiscriminant, state) {
+    const db = getDatabase(dbId);
+    return db.dexie.transaction("rw", db.inputNotes, db.notesScripts, async (tx) => {
         try {
             const data = {
                 noteId,
@@ -118,8 +133,9 @@ export async function upsertInputNote(noteId, assets, serialNumber, inputs, scri
         }
     });
 }
-export async function upsertOutputNote(noteId, assets, recipientDigest, metadata, nullifier, expectedHeight, stateDiscriminant, state) {
-    return db.transaction("rw", outputNotes, notesScripts, async (tx) => {
+export async function upsertOutputNote(dbId, noteId, assets, recipientDigest, metadata, nullifier, expectedHeight, stateDiscriminant, state) {
+    const db = getDatabase(dbId);
+    return db.dexie.transaction("rw", db.outputNotes, db.notesScripts, async (tx) => {
         try {
             const data = {
                 noteId,
@@ -138,14 +154,15 @@ export async function upsertOutputNote(noteId, assets, recipientDigest, metadata
         }
     });
 }
-async function processInputNotes(notes) {
+async function processInputNotes(dbId, notes) {
+    const db = getDatabase(dbId);
     return await Promise.all(notes.map(async (note) => {
         const assetsBase64 = uint8ArrayToBase64(note.assets);
         const serialNumberBase64 = uint8ArrayToBase64(note.serialNumber);
         const inputsBase64 = uint8ArrayToBase64(note.inputs);
         let serializedNoteScriptBase64 = undefined;
         if (note.scriptRoot) {
-            let record = await notesScripts.get(note.scriptRoot);
+            let record = await db.notesScripts.get(note.scriptRoot);
             if (record) {
                 serializedNoteScriptBase64 = uint8ArrayToBase64(record.serializedNoteScript);
             }
@@ -175,8 +192,9 @@ async function processOutputNotes(notes) {
         };
     }));
 }
-export async function upsertNoteScript(scriptRoot, serializedNoteScript) {
-    return db.transaction("rw", outputNotes, notesScripts, async (tx) => {
+export async function upsertNoteScript(dbId, scriptRoot, serializedNoteScript) {
+    const db = getDatabase(dbId);
+    return db.dexie.transaction("rw", db.outputNotes, db.notesScripts, async (tx) => {
         try {
             const noteScriptData = {
                 scriptRoot,
