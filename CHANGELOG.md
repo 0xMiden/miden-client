@@ -26,11 +26,22 @@
 * Fixed MMR reconstruction code and fixed how block authentication paths are adjusted ([#1633](https://github.com/0xMiden/miden-client/pull/1633)).
 * Added WebClient bindings and RPC helpers for additional account, note, and validation workflows ([#1638](https://github.com/0xMiden/miden-client/pull/1638)).
 * [BREAKING] Modified JS binding for `AccountComponent::compile` which now takes an `AccountComponentCode` built with the newly added binding `CodeBuilder::compile_account_component_code` ([#1627](https://github.com/0xMiden/miden-client/pull/1627)).
+* Expanded the `GrpcClient` API with methods to fetch account proofs and rebuild the slots for an account ([#1591](https://github.com/0xMiden/miden-client/pull/1591)).
 * [BREAKING] `WebClient.addAccountSecretKeyToWebStore` now takes an additional parameter: an account ID. This will link the ID with the secret key in the WebStore. Added `WebClient.getPublicKeyCommitmentsOfAccount` method that will return a list of related public key commitments for the given account ID ([#1608](https://github.com/0xMiden/miden-client/pull/1608)).
 * [BREAKING] Added naming to `IndexedDB` store to allow multiple WebClient instances to run in the same browser; `WebClient.createClient` now takes an optional DB name (otherwise defaults to name based on the endpoint/network) ([#1645](https://github.com/0xMiden/miden-client/pull/1645)).
 * [BREAKING] Simplified the `NoteScreener` API, removing `NoteRelevance` in favor of `NoteConsumptionStatus`; exposed JS bindings for consumption check results ([#1630](https://github.com/0xMiden/miden-client/pull/1630)).
 * [BREAKING] Replaced `TransactionRequestBuilder::unauthenticated_input_notes` & `TransactionRequestBuilder::authenticated_input_notes` for `TransactionRequestBuilder::input_notes`, now the user passes a list of notes which the `Client` itself determines the authentication status of ([#1624](https://github.com/0xMiden/miden-client/issues/1624)).
 * Updated `SqliteStore`: replaced `MerkleStore` with `SmtForest` and introduced `AccountSmtForest`; simplified queries ([#1526](https://github.com/0xMiden/miden-client/pull/1526), [#1663](https://github.com/0xMiden/miden-client/pull/1663)).
+* Fixed a race condition in `pruneIrrelevantBlocks` that could delete the current block header when multiple tabs share IndexedDB, causing sync to panic ([#1650](https://github.com/0xMiden/miden-client/pull/1650)).
+* Fixed a race condition where concurrent sync operations could cause sync height to go backwards, leading to block header deletion and subsequent panics ([#1650](https://github.com/0xMiden/miden-client/pull/1650)).
+* Changed `get_current_partial_mmr` to return a `StoreError::BlockHeaderNotFound` error instead of panicking when the block header is missing ([#1650](https://github.com/0xMiden/miden-client/pull/1650)).
+
+## 0.12.6 (2026-01-08)
+
+* Enabled Workers with `createClientWithExternalKeystore` via callbacks ([#1569](https://github.com/0xMiden/miden-client/pull/1569)).
+* Added `executeForSummary` method to WebClient that executes a transaction and returns a `TransactionSummary`, handling both authorized and unauthorized transactions ([#1620](https://github.com/0xMiden/miden-client/pull/1620)).
+* Added WebClient bindings for the RPO Falcon512 multisig auth component ([#1620](https://github.com/0xMiden/miden-client/pull/1620)).
+* Added seed to `AccountStatus::Locked` variant in `AccountRecord` to track private accounts that are locked due to a mismatch in the account commitment ([#1665](https://github.com/0xMiden/miden-client/pull/1665)).
 
 ## 0.12.5 (2025-12-01)
 

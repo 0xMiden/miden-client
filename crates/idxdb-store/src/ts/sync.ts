@@ -4,6 +4,7 @@ import {
   JsStorageSlot,
   JsStorageMapEntry,
   IBlockHeader,
+  IStateSync,
 } from "./schema.js";
 
 import {
@@ -314,9 +315,17 @@ export async function applyStateSync(
 
 async function updateSyncHeight(tx: Transaction, blockNum: string) {
   try {
-    await (tx as Transaction & { stateSync: Dexie.Table }).stateSync.update(1, {
-      blockNum: blockNum,
-    });
+    // Only update if moving forward to prevent race conditions
+    const current = await (
+      tx as Transaction & { stateSync: Dexie.Table<IStateSync, number> }
+    ).stateSync.get(1);
+    if (!current || parseInt(current.blockNum) < parseInt(blockNum)) {
+      await (
+        tx as Transaction & { stateSync: Dexie.Table<IStateSync, number> }
+      ).stateSync.update(1, {
+        blockNum: blockNum,
+      });
+    }
   } catch (error) {
     logWebStoreError(error, "Failed to update sync height");
   }

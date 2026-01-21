@@ -51,6 +51,7 @@ pub mod basic_fungible_faucet_component;
 pub mod block_header;
 pub mod code_builder;
 pub mod committed_note;
+pub mod components;
 pub mod consumable_note_record;
 pub mod endpoint;
 pub mod executed_transaction;

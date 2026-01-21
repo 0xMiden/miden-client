@@ -29,6 +29,7 @@ export {
   AdviceInputs,
   AdviceMap,
   AssetVault,
+  AuthRpoFalcon512MultisigConfig,
   AuthScheme,
   AuthSecretKey,
   BasicFungibleFaucetComponent,
@@ -100,6 +101,7 @@ export {
   OutputNoteState,
   Package,
   PartialNote,
+  ProcedureThreshold,
   Program,
   ProvenTransaction,
   PublicKey,
@@ -136,6 +138,7 @@ export {
   TransactionStoreUpdate,
   TransactionSummary,
   Word,
+  createAuthRpoFalcon512Multisig,
 } from "./crates/miden_client_web";
 
 export interface WebClientConfig {
@@ -197,6 +200,9 @@ export declare class WebClient extends WasmWebClient {
   static createClientWithExternalKeystore(
     config: WebClientConfig
   ): Promise<WebClient & WasmWebClient>;
+
+  /** Returns the default transaction prover configured on the client. */
+  defaultTransactionProver(): TransactionProver;
 
   /**
    * Terminates the underlying worker.
