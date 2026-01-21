@@ -372,12 +372,16 @@ pub(crate) fn set_block_header_has_client_notes(
 
 #[cfg(test)]
 mod test {
+    use std::collections::{BTreeMap, BTreeSet};
     use std::vec::Vec;
 
+    use miden_client::Word;
     use miden_client::block::BlockHeader;
-    use miden_client::crypto::{Forest, MmrPeaks};
+    use miden_client::crypto::{Forest, InOrderIndex, MmrPeaks};
     use miden_client::store::Store;
+    use miden_protocol::crypto::merkle::mmr::Mmr;
     use miden_protocol::transaction::TransactionKernel;
+    use rusqlite::params;
 
     use crate::SqliteStore;
     use crate::tests::create_test_store;
@@ -437,5 +441,132 @@ mod test {
             &[mock_block_headers[1].clone(), mock_block_headers[3].clone()],
             &block_headers[..]
         );
+    }
+
+    /// Tests that large stored MMRs are built consistently throughout multiple prunes
+    #[tokio::test]
+    async fn partial_mmr_reconstructs_after_multiple_prune() {
+        // Setup (mock a large MMR to work with, with a partial tracked set)
+        // ----------------------------------------------------------------------------------------
+
+        let store = create_test_store().await;
+        const TOTAL_BLOCKS: usize = 7300;
+
+        let tx_kernel_commitment = TransactionKernel.to_commitment();
+        let block_headers: Vec<BlockHeader> = (0..TOTAL_BLOCKS)
+            .map(|block_num| {
+                BlockHeader::mock(
+                    u32::try_from(block_num).unwrap(),
+                    None,
+                    None,
+                    &[],
+                    tx_kernel_commitment,
+                )
+            })
+            .collect();
+
+        let mut mmr = Mmr::default();
+        for header in &block_headers {
+            mmr.add(header.commitment());
+        }
+
+        let mut tracked_set: BTreeSet<usize> = (0..(TOTAL_BLOCKS - 1)).step_by(97).collect();
+        tracked_set.insert(TOTAL_BLOCKS - 2);
+        let tracked_blocks: Vec<usize> = tracked_set.iter().copied().collect();
+
+        let mut tracked_nodes: BTreeMap<InOrderIndex, Word> = BTreeMap::new();
+        for &block_num in &tracked_blocks {
+            let header = &block_headers[block_num];
+            tracked_nodes.insert(InOrderIndex::from_leaf_pos(block_num), header.commitment());
+
+            let proof = mmr.open(block_num).expect("valid proof");
+            let mut idx = InOrderIndex::from_leaf_pos(block_num);
+            for node in proof.merkle_path.nodes() {
+                tracked_nodes.insert(idx.sibling(), *node);
+                idx = idx.parent();
+            }
+        }
+        let tracked_nodes: Vec<(InOrderIndex, Word)> = tracked_nodes.into_iter().collect();
+
+        let peaks_by_block: Vec<MmrPeaks> = (0..TOTAL_BLOCKS)
+            .map(|block_num| mmr.peaks_at(Forest::new(block_num)).expect("valid peaks"))
+            .collect();
+
+        // Save blocks and nodes
+        store
+            .interact_with_connection(move |conn| {
+                let tx = conn.transaction().unwrap();
+                for block_num in 0..TOTAL_BLOCKS {
+                    let has_notes = tracked_set.contains(&block_num);
+                    SqliteStore::insert_block_header_tx(
+                        &tx,
+                        &block_headers[block_num],
+                        &peaks_by_block[block_num],
+                        has_notes,
+                    )
+                    .unwrap();
+                }
+
+                SqliteStore::insert_partial_blockchain_nodes_tx(&tx, &tracked_nodes).unwrap();
+                tx.commit().unwrap();
+                Ok(())
+            })
+            .await
+            .unwrap();
+
+        let prune_heights = [
+            TOTAL_BLOCKS / 5,
+            (TOTAL_BLOCKS * 2) / 5,
+            (TOTAL_BLOCKS * 3) / 5,
+            TOTAL_BLOCKS - 1,
+        ];
+
+        // Tests/assertions
+        // ----------------------------------------------------------------------------------------
+
+        let mut previous_remaining: Option<i64> = None;
+        for height in prune_heights {
+            let height_i64 = i64::try_from(height).expect("fits in i64");
+
+            // Update sync height to simulate having synced further
+            store
+                .interact_with_connection(move |conn| {
+                    conn.execute("UPDATE state_sync SET block_num = ?", params![height_i64])
+                        .unwrap();
+                    Ok(())
+                })
+                .await
+                .unwrap();
+
+            // Prune
+            store.prune_irrelevant_blocks().await.unwrap();
+
+            // Assert blocks
+            let remaining_headers: i64 = store
+                .interact_with_connection(|conn| {
+                    let count = conn
+                        .query_row("SELECT COUNT(*) FROM block_headers", [], |row| row.get(0))
+                        .unwrap();
+                    Ok(count)
+                })
+                .await
+                .unwrap();
+            if let Some(previous) = previous_remaining {
+                assert!(remaining_headers < previous);
+            } else {
+                assert!(remaining_headers < i64::try_from(TOTAL_BLOCKS).unwrap());
+            }
+            previous_remaining = Some(remaining_headers);
+        }
+
+        // Try build MMR
+        let partial_mmr = Store::get_current_partial_mmr(&store).await.unwrap();
+        assert_eq!(partial_mmr.peaks().hash_peaks(), mmr.peaks().hash_peaks());
+
+        for block_num in tracked_blocks {
+            let partial_proof = partial_mmr.open(block_num).expect("partial mmr query succeeds");
+            assert!(partial_proof.is_some());
+            assert_eq!(partial_proof.unwrap(), mmr.open(block_num).unwrap());
+        }
     }
 }
