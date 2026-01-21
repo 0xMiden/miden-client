@@ -32,150 +32,31 @@ use miden_client::store::{
 };
 use miden_client::sync::NoteTagRecord;
 use miden_client::utils::Serializable;
-use miden_client::{AccountError, Deserializable, Felt, Word};
+use miden_client::{AccountError, Word};
 use miden_protocol::account::{AccountStorageHeader, StorageMapWitness, StorageSlotHeader};
 use miden_protocol::asset::{AssetVaultKey, PartialVault};
 use miden_protocol::crypto::merkle::MerkleError;
 use rusqlite::types::Value;
-use rusqlite::{Connection, Params, Transaction, named_params, params};
+use rusqlite::{Connection, Transaction, named_params, params};
 
-use crate::account::storage::{query_storage_maps, query_storage_slots, query_storage_values};
-use crate::account::vault::query_vault_assets;
+use crate::account::helpers::{
+    SerializedHeaderData,
+    parse_accounts,
+    query_account_addresses,
+    query_account_code,
+    query_account_headers,
+    query_storage_maps,
+    query_storage_slots,
+    query_storage_values,
+    query_vault_assets,
+};
 use crate::smt_forest::AccountSmtForest;
 use crate::sql_error::SqlResultExt;
 use crate::sync::{add_note_tag_tx, remove_note_tag_tx};
 use crate::{SqliteStore, column_value_as_u64, insert_sql, subst, u64_to_value};
 
-// TYPES
-// ================================================================================================
-
-pub(crate) struct SerializedHeaderData {
-    pub id: String,
-    pub nonce: u64,
-    pub vault_root: String,
-    pub storage_commitment: String,
-    pub code_commitment: String,
-    pub account_seed: Option<Vec<u8>>,
-    pub locked: bool,
-}
-
-// HELPERS
-// ================================================================================================
-
-/// Parse an account header from the provided serialized data.
-pub(crate) fn parse_accounts(
-    serialized_account_parts: SerializedHeaderData,
-) -> Result<(AccountHeader, AccountStatus), StoreError> {
-    let SerializedHeaderData {
-        id,
-        nonce,
-        vault_root,
-        storage_commitment,
-        code_commitment,
-        account_seed,
-        locked,
-    } = serialized_account_parts;
-    let account_seed = account_seed.map(|seed| Word::read_from_bytes(&seed)).transpose()?;
-
-    let status = match (account_seed, locked) {
-        (seed, true) => AccountStatus::Locked { seed },
-        (Some(seed), _) => AccountStatus::New { seed },
-        _ => AccountStatus::Tracked,
-    };
-
-    Ok((
-        AccountHeader::new(
-            AccountId::from_hex(&id).expect("Conversion from stored AccountID should not panic"),
-            Felt::new(nonce),
-            Word::try_from(&vault_root)?,
-            Word::try_from(&storage_commitment)?,
-            Word::try_from(&code_commitment)?,
-        ),
-        status,
-    ))
-}
-
-fn query_account_headers(
-    conn: &Connection,
-    where_clause: &str,
-    params: impl Params,
-) -> Result<Vec<(AccountHeader, AccountStatus)>, StoreError> {
-    const SELECT_QUERY: &str = "SELECT id, nonce, vault_root, storage_commitment, code_commitment, account_seed, locked \
-        FROM accounts";
-    let query = format!("{SELECT_QUERY} WHERE {where_clause}");
-    conn.prepare(&query)
-        .into_store_error()?
-        .query_map(params, |row| {
-            let id: String = row.get(0)?;
-            let nonce: u64 = column_value_as_u64(row, 1)?;
-            let vault_root: String = row.get(2)?;
-            let storage_commitment: String = row.get(3)?;
-            let code_commitment: String = row.get(4)?;
-            let account_seed: Option<Vec<u8>> = row.get(5)?;
-            let locked: bool = row.get(6)?;
-
-            Ok(SerializedHeaderData {
-                id,
-                nonce,
-                vault_root,
-                storage_commitment,
-                code_commitment,
-                account_seed,
-                locked,
-            })
-        })
-        .into_store_error()?
-        .map(|result| parse_accounts(result.into_store_error()?))
-        .collect::<Result<Vec<(AccountHeader, AccountStatus)>, StoreError>>()
-}
-
-fn query_account_code(
-    conn: &Connection,
-    commitment: Word,
-) -> Result<Option<AccountCode>, StoreError> {
-    // TODO: this function will probably be refactored to receive more complex where clauses and
-    // return multiple mast forests
-    const CODE_QUERY: &str = "SELECT code FROM account_code WHERE commitment = ?";
-
-    conn.prepare(CODE_QUERY)
-        .into_store_error()?
-        .query_map(params![commitment.to_hex()], |row| {
-            let code: Vec<u8> = row.get(0)?;
-            Ok(code)
-        })
-        .into_store_error()?
-        .map(|result| {
-            let bytes: Vec<u8> = result.into_store_error()?;
-            Ok(AccountCode::from_bytes(&bytes)?)
-        })
-        .next()
-        .transpose()
-}
-
-fn query_account_addresses(
-    conn: &Connection,
-    account_id: AccountId,
-) -> Result<Vec<Address>, StoreError> {
-    const ADDRESS_QUERY: &str = "SELECT address FROM addresses";
-
-    let query = format!("{ADDRESS_QUERY} WHERE ACCOUNT_ID = '{}'", account_id.to_hex());
-    conn.prepare(&query)
-        .into_store_error()?
-        .query_map([], |row| {
-            let address: Vec<u8> = row.get(0)?;
-            Ok(address)
-        })
-        .into_store_error()?
-        .map(|result| {
-            let serialized_address = result.into_store_error()?;
-            let address = Address::read_from_bytes(&serialized_address)?;
-            Ok(address)
-        })
-        .collect::<Result<Vec<Address>, StoreError>>()
-}
-
 impl SqliteStore {
-    // ACCOUNTS
+    // READER METHODS
     // --------------------------------------------------------------------------------------------
 
     pub(crate) fn get_account_ids(conn: &mut Connection) -> Result<Vec<AccountId>, StoreError> {
@@ -368,88 +249,6 @@ impl SqliteStore {
         Ok(Some(AccountRecord::new(account_record_data, status, addresses)))
     }
 
-    pub(crate) fn insert_account(
-        conn: &mut Connection,
-        smt_forest: &Arc<RwLock<AccountSmtForest>>,
-        account: &Account,
-        initial_address: &Address,
-    ) -> Result<(), StoreError> {
-        let tx = conn.transaction().into_store_error()?;
-
-        Self::insert_account_code(&tx, account.code())?;
-
-        Self::insert_storage_slots(
-            &tx,
-            account.storage().to_commitment(),
-            account.storage().slots().iter(),
-        )?;
-
-        Self::insert_assets(&tx, account.vault().root(), account.vault().assets())?;
-        Self::insert_account_header(&tx, &account.into(), account.seed())?;
-
-        Self::insert_address(&tx, initial_address, account.id())?;
-
-        tx.commit().into_store_error()?;
-
-        let mut smt_forest = smt_forest.write().expect("smt_forest write lock not poisoned");
-        smt_forest.insert_account_state(account.vault(), account.storage())?;
-
-        Ok(())
-    }
-
-    pub(crate) fn update_account(
-        conn: &mut Connection,
-        smt_forest: &Arc<RwLock<AccountSmtForest>>,
-        new_account_state: &Account,
-    ) -> Result<(), StoreError> {
-        const QUERY: &str = "SELECT id FROM accounts WHERE id = ?";
-        if conn
-            .prepare(QUERY)
-            .into_store_error()?
-            .query_map(params![new_account_state.id().to_hex()], |row| row.get(0))
-            .into_store_error()?
-            .map(|result| {
-                result.map_err(|err| StoreError::ParsingError(err.to_string())).and_then(
-                    |id: String| {
-                        AccountId::from_hex(&id).map_err(|err| {
-                            StoreError::AccountError(
-                                AccountError::FinalAccountHeaderIdParsingFailed(err),
-                            )
-                        })
-                    },
-                )
-            })
-            .next()
-            .is_none()
-        {
-            return Err(StoreError::AccountDataNotFound(new_account_state.id()));
-        }
-
-        let mut smt_forest = smt_forest.write().expect("smt_forest write lock not poisoned");
-        let tx = conn.transaction().into_store_error()?;
-        Self::update_account_state(&tx, &mut smt_forest, new_account_state)?;
-        tx.commit().into_store_error()
-    }
-
-    pub fn upsert_foreign_account_code(
-        conn: &mut Connection,
-        account_id: AccountId,
-        code: &AccountCode,
-    ) -> Result<(), StoreError> {
-        let tx = conn.transaction().into_store_error()?;
-
-        Self::insert_account_code(&tx, code)?;
-
-        const QUERY: &str =
-            insert_sql!(foreign_account_code { account_id, code_commitment } | REPLACE);
-
-        tx.execute(QUERY, params![account_id.to_hex(), code.commitment().to_string()])
-            .into_store_error()?;
-
-        Self::insert_account_code(&tx, code)?;
-        tx.commit().into_store_error()
-    }
-
     pub fn get_foreign_account_code(
         conn: &mut Connection,
         account_ids: Vec<AccountId>,
@@ -581,6 +380,91 @@ impl SqliteStore {
         query_account_addresses(conn, account_id)
     }
 
+    // MUTATOR/WRITER METHODS
+    // --------------------------------------------------------------------------------------------
+
+    pub(crate) fn insert_account(
+        conn: &mut Connection,
+        smt_forest: &Arc<RwLock<AccountSmtForest>>,
+        account: &Account,
+        initial_address: &Address,
+    ) -> Result<(), StoreError> {
+        let tx = conn.transaction().into_store_error()?;
+
+        Self::insert_account_code(&tx, account.code())?;
+
+        Self::insert_storage_slots(
+            &tx,
+            account.storage().to_commitment(),
+            account.storage().slots().iter(),
+        )?;
+
+        Self::insert_assets(&tx, account.vault().root(), account.vault().assets())?;
+        Self::insert_account_header(&tx, &account.into(), account.seed())?;
+
+        Self::insert_address(&tx, initial_address, account.id())?;
+
+        tx.commit().into_store_error()?;
+
+        let mut smt_forest = smt_forest.write().expect("smt_forest write lock not poisoned");
+        smt_forest.insert_account_state(account.vault(), account.storage())?;
+
+        Ok(())
+    }
+
+    pub(crate) fn update_account(
+        conn: &mut Connection,
+        smt_forest: &Arc<RwLock<AccountSmtForest>>,
+        new_account_state: &Account,
+    ) -> Result<(), StoreError> {
+        const QUERY: &str = "SELECT id FROM accounts WHERE id = ?";
+        if conn
+            .prepare(QUERY)
+            .into_store_error()?
+            .query_map(params![new_account_state.id().to_hex()], |row| row.get(0))
+            .into_store_error()?
+            .map(|result| {
+                result.map_err(|err| StoreError::ParsingError(err.to_string())).and_then(
+                    |id: String| {
+                        AccountId::from_hex(&id).map_err(|err| {
+                            StoreError::AccountError(
+                                AccountError::FinalAccountHeaderIdParsingFailed(err),
+                            )
+                        })
+                    },
+                )
+            })
+            .next()
+            .is_none()
+        {
+            return Err(StoreError::AccountDataNotFound(new_account_state.id()));
+        }
+
+        let mut smt_forest = smt_forest.write().expect("smt_forest write lock not poisoned");
+        let tx = conn.transaction().into_store_error()?;
+        Self::update_account_state(&tx, &mut smt_forest, new_account_state)?;
+        tx.commit().into_store_error()
+    }
+
+    pub fn upsert_foreign_account_code(
+        conn: &mut Connection,
+        account_id: AccountId,
+        code: &AccountCode,
+    ) -> Result<(), StoreError> {
+        let tx = conn.transaction().into_store_error()?;
+
+        Self::insert_account_code(&tx, code)?;
+
+        const QUERY: &str =
+            insert_sql!(foreign_account_code { account_id, code_commitment } | REPLACE);
+
+        tx.execute(QUERY, params![account_id.to_hex(), code.commitment().to_string()])
+            .into_store_error()?;
+
+        Self::insert_account_code(&tx, code)?;
+        tx.commit().into_store_error()
+    }
+
     pub(crate) fn insert_address(
         tx: &Transaction<'_>,
         address: &Address,
@@ -610,8 +494,16 @@ impl SqliteStore {
         tx.commit().into_store_error()
     }
 
-    // ACCOUNT DELTA HELPERS
-    // --------------------------------------------------------------------------------------------
+    /// Inserts an [`AccountCode`].
+    pub(crate) fn insert_account_code(
+        tx: &Transaction<'_>,
+        account_code: &AccountCode,
+    ) -> Result<(), StoreError> {
+        const QUERY: &str = insert_sql!(account_code { commitment, code } | IGNORE);
+        tx.execute(QUERY, params![account_code.commitment().to_hex(), account_code.to_bytes()])
+            .into_store_error()?;
+        Ok(())
+    }
 
     /// Applies the account delta to the account state, updating the vault and storage maps.
     ///
@@ -653,6 +545,91 @@ impl SqliteStore {
 
         Ok(())
     }
+
+    /// Removes account states with the specified hashes from the database and pops their
+    /// SMT roots from the forest to free up memory.
+    ///
+    /// This is used to rollback account changes when a transaction is discarded,
+    /// effectively undoing the account state changes that were applied by the transaction.
+    ///
+    /// Note: This is not part of the Store trait and is only used internally by the `SQLite` store
+    /// implementation to handle transaction rollbacks.
+    pub(crate) fn undo_account_state(
+        tx: &Transaction<'_>,
+        smt_forest: &mut AccountSmtForest,
+        account_commitments: &[Word],
+    ) -> Result<(), StoreError> {
+        if account_commitments.is_empty() {
+            return Ok(());
+        }
+
+        let account_hash_params = Rc::new(
+            account_commitments.iter().map(|h| Value::from(h.to_hex())).collect::<Vec<_>>(),
+        );
+
+        // Query all SMT roots before deletion so we can pop them from the forest
+        let smt_roots = Self::get_smt_roots_by_account_commitment(tx, &account_hash_params)?;
+
+        const DELETE_QUERY: &str = "DELETE FROM accounts WHERE account_commitment IN rarray(?)";
+        tx.execute(DELETE_QUERY, params![account_hash_params]).into_store_error()?;
+
+        // Pop the roots from the forest to release memory for nodes that are no longer reachable
+        smt_forest.pop_roots(smt_roots);
+
+        Ok(())
+    }
+
+    pub(crate) fn update_account_state(
+        tx: &Transaction<'_>,
+        smt_forest: &mut AccountSmtForest,
+        new_account_state: &Account,
+    ) -> Result<(), StoreError> {
+        // Get old SMT roots before updating so we can prune them after
+        let old_roots = Self::get_smt_roots_by_account_id(tx, new_account_state.id())?;
+
+        smt_forest.insert_account_state(new_account_state.vault(), new_account_state.storage())?;
+        Self::insert_storage_slots(
+            tx,
+            new_account_state.storage().to_commitment(),
+            new_account_state.storage().slots().iter(),
+        )?;
+        Self::insert_assets(
+            tx,
+            new_account_state.vault().root(),
+            new_account_state.vault().assets(),
+        )?;
+        Self::insert_account_header(tx, &new_account_state.into(), None)?;
+
+        // Pop old roots to free memory for nodes no longer reachable
+        smt_forest.pop_roots(old_roots);
+
+        Ok(())
+    }
+
+    /// Locks the account if the mismatched digest doesn't belong to a previous account state (stale
+    /// data).
+    pub(crate) fn lock_account_on_unexpected_commitment(
+        tx: &Transaction<'_>,
+        account_id: &AccountId,
+        mismatched_digest: &Word,
+    ) -> Result<(), StoreError> {
+        // Mismatched digests may be due to stale network data. If the mismatched digest is
+        // tracked in the db and corresponds to the mismatched account, it means we
+        // got a past update and shouldn't lock the account.
+        const QUERY: &str = "UPDATE accounts SET locked = true WHERE id = :account_id AND NOT EXISTS (SELECT 1 FROM accounts WHERE id = :account_id AND account_commitment = :digest)";
+        tx.execute(
+            QUERY,
+            named_params! {
+                ":account_id": account_id.to_hex(),
+                ":digest": mismatched_digest.to_string()
+            },
+        )
+        .into_store_error()?;
+        Ok(())
+    }
+
+    // HELPERS
+    // --------------------------------------------------------------------------------------------
 
     /// Inserts the new `final_account_header` to the store and copies over the previous account
     /// state (vault and storage). This isn't meant to be the whole account update, just the first
@@ -717,58 +694,6 @@ impl SqliteStore {
             .into_store_error()?;
         }
 
-        Ok(())
-    }
-
-    // HELPERS
-    // --------------------------------------------------------------------------------------------
-
-    pub(crate) fn update_account_state(
-        tx: &Transaction<'_>,
-        smt_forest: &mut AccountSmtForest,
-        new_account_state: &Account,
-    ) -> Result<(), StoreError> {
-        // Get old SMT roots before updating so we can prune them after
-        let old_roots = Self::get_smt_roots_by_account_id(tx, new_account_state.id())?;
-
-        smt_forest.insert_account_state(new_account_state.vault(), new_account_state.storage())?;
-        Self::insert_storage_slots(
-            tx,
-            new_account_state.storage().to_commitment(),
-            new_account_state.storage().slots().iter(),
-        )?;
-        Self::insert_assets(
-            tx,
-            new_account_state.vault().root(),
-            new_account_state.vault().assets(),
-        )?;
-        Self::insert_account_header(tx, &new_account_state.into(), None)?;
-
-        // Pop old roots to free memory for nodes no longer reachable
-        smt_forest.pop_roots(old_roots);
-
-        Ok(())
-    }
-
-    /// Locks the account if the mismatched digest doesn't belong to a previous account state (stale
-    /// data).
-    pub(crate) fn lock_account_on_unexpected_commitment(
-        tx: &Transaction<'_>,
-        account_id: &AccountId,
-        mismatched_digest: &Word,
-    ) -> Result<(), StoreError> {
-        // Mismatched digests may be due to stale network data. If the mismatched digest is
-        // tracked in the db and corresponds to the mismatched account, it means we
-        // got a past update and shouldn't lock the account.
-        const QUERY: &str = "UPDATE accounts SET locked = true WHERE id = :account_id AND NOT EXISTS (SELECT 1 FROM accounts WHERE id = :account_id AND account_commitment = :digest)";
-        tx.execute(
-            QUERY,
-            named_params! {
-                ":account_id": account_id.to_hex(),
-                ":digest": mismatched_digest.to_string()
-            },
-        )
-        .into_store_error()?;
         Ok(())
     }
 
@@ -846,39 +771,6 @@ impl SqliteStore {
         Ok(roots)
     }
 
-    /// Removes account states with the specified hashes from the database and pops their
-    /// SMT roots from the forest to free up memory.
-    ///
-    /// This is used to rollback account changes when a transaction is discarded,
-    /// effectively undoing the account state changes that were applied by the transaction.
-    ///
-    /// Note: This is not part of the Store trait and is only used internally by the `SQLite` store
-    /// implementation to handle transaction rollbacks.
-    pub(crate) fn undo_account_state(
-        tx: &Transaction<'_>,
-        smt_forest: &mut AccountSmtForest,
-        account_commitments: &[Word],
-    ) -> Result<(), StoreError> {
-        if account_commitments.is_empty() {
-            return Ok(());
-        }
-
-        let account_hash_params = Rc::new(
-            account_commitments.iter().map(|h| Value::from(h.to_hex())).collect::<Vec<_>>(),
-        );
-
-        // Query all SMT roots before deletion so we can pop them from the forest
-        let smt_roots = Self::get_smt_roots_by_account_commitment(tx, &account_hash_params)?;
-
-        const DELETE_QUERY: &str = "DELETE FROM accounts WHERE account_commitment IN rarray(?)";
-        tx.execute(DELETE_QUERY, params![account_hash_params]).into_store_error()?;
-
-        // Pop the roots from the forest to release memory for nodes that are no longer reachable
-        smt_forest.pop_roots(smt_roots);
-
-        Ok(())
-    }
-
     /// Inserts a new account record into the database.
     fn insert_account_header(
         tx: &Transaction<'_>,
@@ -923,17 +815,6 @@ impl SqliteStore {
         .into_store_error()?;
 
         Self::insert_tracked_account_id_tx(tx, account.id())?;
-        Ok(())
-    }
-
-    /// Inserts an [`AccountCode`].
-    pub(crate) fn insert_account_code(
-        tx: &Transaction<'_>,
-        account_code: &AccountCode,
-    ) -> Result<(), StoreError> {
-        const QUERY: &str = insert_sql!(account_code { commitment, code } | IGNORE);
-        tx.execute(QUERY, params![account_code.commitment().to_hex(), account_code.to_bytes()])
-            .into_store_error()?;
         Ok(())
     }
 

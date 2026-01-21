@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 use std::rc::Rc;
-use std::string::{String, ToString};
+use std::string::ToString;
 use std::vec::Vec;
 
 use miden_client::Word;
@@ -13,19 +13,53 @@ use miden_client::account::{
     StorageSlot,
     StorageSlotContent,
     StorageSlotName,
-    StorageSlotType,
 };
 use miden_client::store::StoreError;
 use miden_protocol::crypto::merkle::MerkleError;
 use rusqlite::types::Value;
-use rusqlite::{Connection, Params, Transaction, params};
+use rusqlite::{Connection, Transaction, params};
 
+use crate::account::helpers::query_storage_slots;
 use crate::smt_forest::AccountSmtForest;
 use crate::sql_error::SqlResultExt;
 use crate::{SqliteStore, insert_sql, subst};
 
 impl SqliteStore {
-    // STORAGE HELPERS
+    // READER METHODS
+    // --------------------------------------------------------------------------------------------
+
+    /// Fetches the relevant storage maps inside the account's storage that will be updated by the
+    /// account delta.
+    pub(crate) fn get_account_storage_maps_for_delta(
+        conn: &Connection,
+        header: &AccountHeader,
+        delta: &AccountDelta,
+    ) -> Result<BTreeMap<StorageSlotName, StorageMap>, StoreError> {
+        let updated_map_names = delta
+            .storage()
+            .maps()
+            .map(|(slot_name, _)| Value::Text(slot_name.to_string()))
+            .collect::<Vec<Value>>();
+
+        query_storage_slots(
+            conn,
+            "commitment = ? AND slot_name IN rarray(?)",
+            params![header.storage_commitment().to_hex(), Rc::new(updated_map_names)],
+        )?
+        .into_iter()
+        .map(|(slot_name, slot)| {
+            let StorageSlotContent::Map(map) = slot.into_parts().1 else {
+                return Err(StoreError::AccountError(
+                    miden_client::AccountError::StorageSlotNotMap(slot_name),
+                ));
+            };
+
+            Ok((slot_name, map))
+        })
+        .collect()
+    }
+
+    // MUTATOR/WRITER METHODS
     // --------------------------------------------------------------------------------------------
 
     pub(crate) fn insert_storage_slots<'a>(
@@ -114,150 +148,4 @@ impl SqliteStore {
 
         Ok(updated_storage_slots)
     }
-
-    /// Fetches the relevant storage maps inside the account's storage that will be updated by the
-    /// account delta.
-    pub(crate) fn get_account_storage_maps_for_delta(
-        conn: &Connection,
-        header: &AccountHeader,
-        delta: &AccountDelta,
-    ) -> Result<BTreeMap<StorageSlotName, StorageMap>, StoreError> {
-        let updated_map_names = delta
-            .storage()
-            .maps()
-            .map(|(slot_name, _)| Value::Text(slot_name.to_string()))
-            .collect::<Vec<Value>>();
-
-        query_storage_slots(
-            conn,
-            "commitment = ? AND slot_name IN rarray(?)",
-            params![header.storage_commitment().to_hex(), Rc::new(updated_map_names)],
-        )?
-        .into_iter()
-        .map(|(slot_name, slot)| {
-            let StorageSlotContent::Map(map) = slot.into_parts().1 else {
-                return Err(StoreError::AccountError(
-                    miden_client::AccountError::StorageSlotNotMap(slot_name),
-                ));
-            };
-
-            Ok((slot_name, map))
-        })
-        .collect()
-    }
-}
-
-// QUERY HELPERS
-// ================================================================================================
-
-pub(crate) fn query_storage_slots(
-    conn: &Connection,
-    where_clause: &str,
-    params: impl Params,
-) -> Result<BTreeMap<StorageSlotName, StorageSlot>, StoreError> {
-    const STORAGE_QUERY: &str = "SELECT slot_name, slot_value, slot_type FROM account_storage";
-
-    let query = format!("{STORAGE_QUERY} WHERE {where_clause}");
-    let storage_values = conn
-        .prepare(&query)
-        .into_store_error()?
-        .query_map(params, |row| {
-            let slot_name: String = row.get(0)?;
-            let value: String = row.get(1)?;
-            let slot_type: u8 = row.get(2)?;
-            Ok((slot_name, value, slot_type))
-        })
-        .into_store_error()?
-        .map(|result| {
-            let (slot_name, value, slot_type) = result.into_store_error()?;
-            let slot_name = StorageSlotName::new(slot_name)
-                .map_err(|err| StoreError::ParsingError(err.to_string()))?;
-            let slot_type = StorageSlotType::try_from(slot_type)
-                .map_err(|e| StoreError::ParsingError(e.to_string()))?;
-            Ok((slot_name, Word::try_from(value)?, slot_type))
-        })
-        .collect::<Result<Vec<(StorageSlotName, Word, StorageSlotType)>, StoreError>>()?;
-
-    let possible_roots: Vec<Value> =
-        storage_values.iter().map(|(_, value, _)| Value::from(value.to_hex())).collect();
-
-    let mut storage_maps =
-        query_storage_maps(conn, "root IN rarray(?)", [Rc::new(possible_roots)])?;
-
-    Ok(storage_values
-        .into_iter()
-        .map(|(slot_name, value, slot_type)| {
-            let key = slot_name.clone();
-            let slot = match slot_type {
-                StorageSlotType::Value => StorageSlot::with_value(slot_name, value),
-                StorageSlotType::Map => StorageSlot::with_map(
-                    slot_name,
-                    storage_maps.remove(&value).unwrap_or(StorageMap::new()),
-                ),
-            };
-            (key, slot)
-        })
-        .collect())
-}
-
-pub(crate) fn query_storage_maps(
-    conn: &Connection,
-    where_clause: &str,
-    params: impl Params,
-) -> Result<BTreeMap<Word, StorageMap>, StoreError> {
-    const STORAGE_MAP_SELECT: &str = "SELECT root, key, value FROM storage_map_entries";
-    let query = format!("{STORAGE_MAP_SELECT} WHERE {where_clause}");
-
-    let map_entries = conn
-        .prepare(&query)
-        .into_store_error()?
-        .query_map(params, |row| {
-            let root: String = row.get(0)?;
-            let key: String = row.get(1)?;
-            let value: String = row.get(2)?;
-
-            Ok((root, key, value))
-        })
-        .into_store_error()?
-        .map(|result| {
-            let (root, key, value) = result.into_store_error()?;
-            Ok((Word::try_from(root)?, Word::try_from(key)?, Word::try_from(value)?))
-        })
-        .collect::<Result<Vec<(Word, Word, Word)>, StoreError>>()?;
-
-    let mut maps = BTreeMap::new();
-    for (root, key, value) in map_entries {
-        let map = maps.entry(root).or_insert_with(StorageMap::new);
-        map.insert(key, value)?;
-    }
-
-    Ok(maps)
-}
-
-pub(crate) fn query_storage_values(
-    conn: &Connection,
-    where_clause: &str,
-    params: impl Params,
-) -> Result<BTreeMap<StorageSlotName, (StorageSlotType, Word)>, StoreError> {
-    const STORAGE_QUERY: &str = "SELECT slot_name, slot_value, slot_type FROM account_storage";
-
-    let query = format!("{STORAGE_QUERY} WHERE {where_clause}");
-    conn.prepare(&query)
-        .into_store_error()?
-        .query_map(params, |row| {
-            let slot_name: String = row.get(0)?;
-            let value: String = row.get(1)?;
-            let slot_type: u8 = row.get(2)?;
-            Ok((slot_name, value, slot_type))
-        })
-        .into_store_error()?
-        .map(|result| {
-            let (slot_name, value, slot_type) = result.into_store_error()?;
-            let slot_name = StorageSlotName::new(slot_name)
-                .map_err(|err| StoreError::ParsingError(err.to_string()))?;
-            let slot_type = StorageSlotType::try_from(slot_type)
-                .map_err(|e| StoreError::ParsingError(e.to_string()))?;
-            Ok((slot_name, (slot_type, Word::try_from(value)?)))
-        })
-        .collect()
 }

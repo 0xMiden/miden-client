@@ -2,7 +2,6 @@
 
 use std::collections::BTreeMap;
 use std::rc::Rc;
-use std::string::String;
 use std::vec::Vec;
 
 use miden_client::Word;
@@ -12,14 +11,43 @@ use miden_client::store::StoreError;
 use miden_protocol::asset::AssetVaultKey;
 use miden_protocol::crypto::merkle::MerkleError;
 use rusqlite::types::Value;
-use rusqlite::{Connection, Params, Transaction, params};
+use rusqlite::{Connection, Transaction, params};
 
+use crate::account::helpers::query_vault_assets;
 use crate::smt_forest::AccountSmtForest;
 use crate::sql_error::SqlResultExt;
 use crate::{SqliteStore, insert_sql, subst};
 
 impl SqliteStore {
-    // VAULT HELPERS
+    // READER METHODS
+    // --------------------------------------------------------------------------------------------
+
+    /// Fetches the relevant fungible assets of an account that will be updated by the account
+    /// delta.
+    pub(crate) fn get_account_fungible_assets_for_delta(
+        conn: &Connection,
+        header: &AccountHeader,
+        delta: &AccountDelta,
+    ) -> Result<BTreeMap<AccountIdPrefix, FungibleAsset>, StoreError> {
+        let fungible_faucet_prefixes = delta
+            .vault()
+            .fungible()
+            .iter()
+            .map(|(faucet_id, _)| Value::Text(faucet_id.prefix().to_hex()))
+            .collect::<Vec<Value>>();
+
+        Ok(query_vault_assets(
+            conn,
+            "root = ? AND faucet_id_prefix IN rarray(?)",
+            params![header.vault_root().to_hex(), Rc::new(fungible_faucet_prefixes)]
+                )?
+                .into_iter()
+                // SAFETY: all retrieved assets should be fungible
+                .map(|asset| (asset.faucet_id_prefix(), asset.unwrap_fungible()))
+                .collect())
+    }
+
+    // MUTATOR/WRITER METHODS
     // --------------------------------------------------------------------------------------------
 
     pub(crate) fn insert_assets(
@@ -143,55 +171,4 @@ impl SqliteStore {
 
         Ok(())
     }
-
-    /// Fetches the relevant fungible assets of an account that will be updated by the account
-    /// delta.
-    pub(crate) fn get_account_fungible_assets_for_delta(
-        conn: &Connection,
-        header: &AccountHeader,
-        delta: &AccountDelta,
-    ) -> Result<BTreeMap<AccountIdPrefix, FungibleAsset>, StoreError> {
-        let fungible_faucet_prefixes = delta
-            .vault()
-            .fungible()
-            .iter()
-            .map(|(faucet_id, _)| Value::Text(faucet_id.prefix().to_hex()))
-            .collect::<Vec<Value>>();
-
-        Ok(query_vault_assets(
-            conn,
-            "root = ? AND faucet_id_prefix IN rarray(?)",
-            params![header.vault_root().to_hex(), Rc::new(fungible_faucet_prefixes)]
-                )?
-                .into_iter()
-                // SAFETY: all retrieved assets should be fungible
-                .map(|asset| (asset.faucet_id_prefix(), asset.unwrap_fungible()))
-                .collect())
-    }
-}
-
-// QUERY HELPERS
-// ================================================================================================
-
-pub(crate) fn query_vault_assets(
-    conn: &Connection,
-    where_clause: &str,
-    params: impl Params,
-) -> Result<Vec<Asset>, StoreError> {
-    const VAULT_QUERY: &str = "SELECT asset FROM account_assets";
-
-    let query = format!("{VAULT_QUERY} WHERE {where_clause}");
-    conn.prepare(&query)
-        .into_store_error()?
-        .query_map(params, |row| {
-            let asset: String = row.get(0)?;
-            Ok(asset)
-        })
-        .into_store_error()?
-        .map(|result| {
-            let asset_str: String = result.into_store_error()?;
-            let word = Word::try_from(asset_str)?;
-            Ok(Asset::try_from(word)?)
-        })
-        .collect::<Result<Vec<Asset>, StoreError>>()
 }
