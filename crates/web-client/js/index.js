@@ -127,9 +127,8 @@ export class WebClient {
       storeName,
       getKeyCb,
       insertKeyCb,
-      signCb
-    } =
-      config || {};
+      signCb,
+    } = config || {};
 
     this.rpcUrl = rpcUrl;
     this.noteTransportUrl = noteTransportUrl;
@@ -333,9 +332,8 @@ export class WebClient {
       storeName,
       getKeyCb,
       insertKeyCb,
-      signCb
-    } =
-      config || {};
+      signCb,
+    } = config || {};
     // Construct the instance (synchronously).
     const instance = new WebClient(config);
     // Wait for the underlying wasmWebClient to be initialized.
@@ -610,7 +608,12 @@ export class WebClient {
 
 export class MockWebClient extends WebClient {
   constructor(seed) {
-    super(null, null, seed, "mock");
+    super({
+      rpcUrl: null,
+      noteTransportUrl: null,
+      seed,
+      storeName: "mock",
+    });
   }
 
   initializeWorker() {
