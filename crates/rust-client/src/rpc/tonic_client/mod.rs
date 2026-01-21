@@ -631,7 +631,7 @@ impl NodeRpcClient for GrpcClient {
             let batch_updates = response
                 .updates
                 .iter()
-                .map(TryInto::try_into)
+                .map(|u| (*u).try_into())
                 .collect::<Result<Vec<AccountVaultUpdate>, _>>()?;
             all_updates.extend(batch_updates);
 
