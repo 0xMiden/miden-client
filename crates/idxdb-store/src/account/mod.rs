@@ -52,6 +52,7 @@ use js_bindings::{
     idxdb_get_foreign_account_code,
     idxdb_get_public_keys_by_account_id,
     idxdb_insert_account_public_key,
+    idxdb_insert_account_public_keys,
     idxdb_lock_account,
     idxdb_remove_account_public_key,
     idxdb_undo_account_states,
@@ -538,6 +539,21 @@ impl WebStore {
         let promise =
             idxdb_insert_account_public_key(self.db_id(), word.to_hex(), account_id.to_hex());
         await_js_value(promise, "failed to insert account public key").await?;
+        Ok(())
+    }
+
+    pub async fn insert_account_public_keys(
+        &self,
+        pub_key_commitments: &[PublicKeyCommitment],
+        account_id: AccountId,
+    ) -> Result<(), StoreError> {
+        let hexes: Vec<String> = pub_key_commitments
+            .iter()
+            .map(|c| Word::from(*c).to_hex())
+            .collect();
+        let promise =
+            idxdb_insert_account_public_keys(self.db_id(), hexes, account_id.to_hex());
+        await_js_value(promise, "failed to insert account public keys").await?;
         Ok(())
     }
 

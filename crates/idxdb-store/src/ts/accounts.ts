@@ -576,6 +576,26 @@ export async function insertAccountPublicKey(
   }
 }
 
+export async function insertAccountPublicKeys(
+  dbId: string,
+  pubKeyCommitmentHexes: string[],
+  accountId: string
+): Promise<void> {
+  try {
+    const db = getDatabase(dbId);
+    const entries = pubKeyCommitmentHexes.map((pubKeyCommitmentHex) => ({
+      pubKeyCommitmentHex,
+      accountId,
+    }));
+    await db.accountPublicKeys.bulkPut(entries);
+  } catch (error) {
+    logWebStoreError(
+      error,
+      `Error inserting account public key mappings for account: ${accountId}`
+    );
+  }
+}
+
 export async function getAccountIdByPublicKey(
   dbId: string,
   pubKeyCommitmentHex: string

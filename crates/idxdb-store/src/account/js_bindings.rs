@@ -135,6 +135,13 @@ extern "C" {
         account_id: String,
     ) -> js_sys::Promise;
 
+    #[wasm_bindgen(js_name = insertAccountPublicKeys)]
+    pub fn idxdb_insert_account_public_keys(
+        db_id: &str,
+        pub_key_commitment_hexes: Vec<String>,
+        account_id: String,
+    ) -> js_sys::Promise;
+
     #[wasm_bindgen(js_name = getAccountIdByPublicKey)]
     pub fn idxdb_get_account_id_by_public_key(
         db_id: &str,

@@ -46,14 +46,13 @@ impl WebClient {
                 })?;
 
             let store = self.store.as_ref().expect("Store should be initialized");
-            for pub_key in &pub_keys {
-                store
-                    .insert_account_public_key(pub_key.to_commitment(), account.id())
-                    .await
-                    .map_err(|err| {
-                        js_error_with_context(err, "failed to index account by public key")
-                    })?;
-            }
+            let commitments: Vec<_> = pub_keys.iter().map(|pk| pk.to_commitment()).collect();
+            store
+                .insert_account_public_keys(&commitments, account.id())
+                .await
+                .map_err(|err| {
+                    js_error_with_context(err, "failed to index account by public key")
+                })?;
 
             Ok(JsValue::from_str(&format!("Imported account with ID: {account_id}")))
         } else {

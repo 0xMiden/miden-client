@@ -426,6 +426,19 @@ export async function insertAccountPublicKey(dbId, pubKeyCommitmentHex, accountI
         logWebStoreError(error, `Error inserting account public key mapping: ${pubKeyCommitmentHex} -> ${accountId}`);
     }
 }
+export async function insertAccountPublicKeys(dbId, pubKeyCommitmentHexes, accountId) {
+    try {
+        const db = getDatabase(dbId);
+        const entries = pubKeyCommitmentHexes.map((pubKeyCommitmentHex) => ({
+            pubKeyCommitmentHex,
+            accountId,
+        }));
+        await db.accountPublicKeys.bulkPut(entries);
+    }
+    catch (error) {
+        logWebStoreError(error, `Error inserting account public key mappings for account: ${accountId}`);
+    }
+}
 export async function getAccountIdByPublicKey(dbId, pubKeyCommitmentHex) {
     try {
         const db = getDatabase(dbId);
@@ -435,7 +448,6 @@ export async function getAccountIdByPublicKey(dbId, pubKeyCommitmentHex) {
     catch (error) {
         logWebStoreError(error, `Error fetching account by public key: ${pubKeyCommitmentHex}`);
     }
-    return null;
 }
 export async function getPublicKeysByAccountId(dbId, accountId) {
     try {
@@ -449,7 +461,6 @@ export async function getPublicKeysByAccountId(dbId, accountId) {
     catch (error) {
         logWebStoreError(error, `Error fetching public keys for account: ${accountId}`);
     }
-    return [];
 }
 export async function removeAccountPublicKey(dbId, pubKeyCommitmentHex) {
     try {
