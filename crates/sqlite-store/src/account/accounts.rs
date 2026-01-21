@@ -7,13 +7,28 @@ use std::sync::{Arc, RwLock};
 use std::vec::Vec;
 
 use miden_client::account::{
-    Account, AccountCode, AccountDelta, AccountHeader, AccountId, AccountIdPrefix, AccountStorage,
-    Address, PartialAccount, PartialStorage, PartialStorageMap, StorageMap, StorageSlotName,
+    Account,
+    AccountCode,
+    AccountDelta,
+    AccountHeader,
+    AccountId,
+    AccountIdPrefix,
+    AccountStorage,
+    Address,
+    PartialAccount,
+    PartialStorage,
+    PartialStorageMap,
+    StorageMap,
+    StorageSlotName,
     StorageSlotType,
 };
 use miden_client::asset::{Asset, AssetVault, AssetWitness, FungibleAsset};
 use miden_client::store::{
-    AccountRecord, AccountRecordData, AccountStatus, AccountStorageFilter, StoreError,
+    AccountRecord,
+    AccountRecordData,
+    AccountStatus,
+    AccountStorageFilter,
+    StoreError,
 };
 use miden_client::sync::NoteTagRecord;
 use miden_client::utils::Serializable;
@@ -25,8 +40,14 @@ use rusqlite::types::Value;
 use rusqlite::{Connection, Transaction, named_params, params};
 
 use crate::account::helpers::{
-    SerializedHeaderData, parse_accounts, query_account_addresses, query_account_code,
-    query_account_headers, query_storage_maps, query_storage_slots, query_storage_values,
+    SerializedHeaderData,
+    parse_accounts,
+    query_account_addresses,
+    query_account_code,
+    query_account_headers,
+    query_storage_maps,
+    query_storage_slots,
+    query_storage_values,
     query_vault_assets,
 };
 use crate::smt_forest::AccountSmtForest;
