@@ -77,6 +77,13 @@ impl Provider for CliConfig {
     }
 }
 
+/// Default implementation for `CliConfig`.
+///
+/// **Note**: This implementation is primarily used by the [`figment`] `Provider` trait
+/// (see [`CliConfig::data()`]) to provide default values during configuration merging.
+/// The paths returned are relative and intended to be resolved against a `.miden` directory.
+///
+/// For loading configuration from the filesystem, use [`CliConfig::from_system()`] instead.
 impl Default for CliConfig {
     fn default() -> Self {
         // Create paths relative to the config file location (which is in .miden directory)

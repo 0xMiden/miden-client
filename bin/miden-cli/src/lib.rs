@@ -255,16 +255,6 @@ impl CliClient {
     pub fn into_inner(self) -> miden_client::Client<CliKeyStore> {
         self.0
     }
-
-    /// Gets a reference to the inner `Client<CliKeyStore>`.
-    pub fn inner(&self) -> &miden_client::Client<CliKeyStore> {
-        &self.0
-    }
-
-    /// Gets a mutable reference to the inner `Client<CliKeyStore>`.
-    pub fn inner_mut(&mut self) -> &mut miden_client::Client<CliKeyStore> {
-        &mut self.0
-    }
 }
 
 /// Allows using `CliClient` like `Client<CliKeyStore>` through deref coercion.
