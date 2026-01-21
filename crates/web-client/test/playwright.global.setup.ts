@@ -38,18 +38,8 @@ export const test = base.extend<{ forEachTest: void }>({
           let proverUrl = remoteProverPort
             ? `http://localhost:${remoteProverPort}`
             : undefined;
-          const client = await window.WebClient.createClient({
-            rpcUrl,
-<<<<<<< HEAD
-            noteTransportUrl: undefined,
-            seed: undefined,
-          });
-=======
-            undefined,
-            undefined,
-            "tests"
-          );
->>>>>>> upstream/next
+          // createClient signature: (rpcUrl, noteTransportUrl, seed, storeName)
+          const client = await window.WebClient.createClient(rpcUrl, undefined, undefined, "tests");
           window.rpcUrl = rpcUrl;
 
           window.client = client;
