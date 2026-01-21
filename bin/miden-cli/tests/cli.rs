@@ -37,6 +37,7 @@ use miden_client::utils::Serializable;
 use miden_client::{
     self,
     Client,
+    DebugMode,
     ExecutionOptions,
     Felt,
     MAX_TX_EXECUTION_CYCLES,
@@ -1310,4 +1311,155 @@ fn create_account_with_ecdsa_auth() {
     ]);
 
     create_account_cmd.current_dir(&temp_dir).assert().success();
+}
+
+// FROM_SYSTEM_USER_CONFIG TESTS
+// ================================================================================================
+/// Tests that `CliClient::from_system_user_config()` successfully creates a client with the same
+/// configuration as the CLI tool when a local config exists.
+#[tokio::test]
+#[serial_test::serial(global_config)]
+async fn test_from_system_user_config_with_local_config() -> Result<()> {
+    // Initialize a local CLI configuration
+    let (store_path, temp_dir, _endpoint) = init_cli();
+
+    // Ensure no global config exists to verify local config takes priority
+    cleanup_global_config();
+
+    // Change to the temp directory where local .miden config exists
+    let original_dir = env::current_dir().unwrap();
+    env::set_current_dir(&temp_dir)?;
+
+    // Create a client using from_system_user_config - should pick up local config
+    let client_result =
+        miden_client_cli::CliClient::from_system_user_config(DebugMode::Disabled).await;
+
+    // Restore original directory
+    env::set_current_dir(original_dir)?;
+
+    // Assert the client was created successfully
+    assert!(
+        client_result.is_ok(),
+        "Failed to create client from local config: {:?}",
+        client_result.err()
+    );
+
+    // Verify that the local config was actually used by checking which store file was created.
+    // The local store should exist, indicating the local config was used.
+    assert!(
+        store_path.exists(),
+        "Local store file should exist at {store_path:?}, indicating local config was used"
+    );
+
+    Ok(())
+}
+
+/// Tests that `CliClient::from_system_user_config()` silently initializes with default config
+/// when no configuration exists.
+#[tokio::test]
+#[serial_test::serial(global_config)]
+async fn test_from_system_user_config_silent_init() -> Result<()> {
+    // Create a temporary directory with no .miden configuration
+    let temp_dir = temp_dir().join(format!("cli-test-silent-init-{}", rand::rng().random::<u64>()));
+    std::fs::create_dir_all(&temp_dir)?;
+
+    // Ensure no global config exists
+    cleanup_global_config();
+
+    // Verify no config exists before we start
+    let global_miden_dir = dirs::home_dir().unwrap().join(MIDEN_DIR);
+    let global_config_path = global_miden_dir.join("miden-client.toml");
+    assert!(!global_config_path.exists(), "Global config should not exist before test");
+
+    // Change to the temp directory
+    let original_dir = env::current_dir().unwrap();
+    env::set_current_dir(&temp_dir)?;
+
+    // Create a client - should succeed via silent initialization
+    let client_result =
+        miden_client_cli::CliClient::from_system_user_config(DebugMode::Disabled).await;
+
+    // Restore original directory
+    env::set_current_dir(original_dir)?;
+
+    // Assert the client was created successfully
+    assert!(
+        client_result.is_ok(),
+        "Expected client to be created via silent initialization, but got error: {:?}",
+        client_result.err()
+    );
+
+    // Verify that a global config was created by the silent initialization
+    assert!(
+        global_config_path.exists(),
+        "Expected global config to be created at {global_config_path:?} by silent initialization"
+    );
+
+    // Clean up temp directory and global config
+    let _ = std::fs::remove_dir_all(&temp_dir);
+    cleanup_global_config();
+
+    Ok(())
+}
+
+/// Tests that `CliConfig::from_system()` prioritizes local config over global config.
+#[tokio::test]
+#[serial_test::serial(global_config)]
+async fn test_from_system_user_config_local_priority() -> Result<()> {
+    // Clean up any existing global config
+    cleanup_global_config();
+
+    // Create a global config with testnet endpoint
+    let global_store_path = create_test_store_path();
+    let global_endpoint = Endpoint::testnet();
+
+    let temp_dir_for_global =
+        temp_dir().join(format!("cli-test-global-init-{}", rand::rng().random::<u64>()));
+    std::fs::create_dir_all(&temp_dir_for_global)?;
+
+    let mut init_global_cmd = cargo_bin_cmd!("miden-client");
+    init_global_cmd.args([
+        "init",
+        "--network",
+        global_endpoint.to_string().as_str(),
+        "--store-path",
+        global_store_path.to_str().unwrap(),
+    ]);
+    init_global_cmd.current_dir(&temp_dir_for_global).assert().success();
+
+    // Create a local config with localhost endpoint
+    let local_store_path = create_test_store_path();
+    let local_endpoint = Endpoint::localhost();
+    let local_temp_dir = init_cli_with_store_path(&local_store_path, &local_endpoint);
+
+    // Load config from the specific local directory (no need to change working directory!)
+    let local_miden_dir = local_temp_dir.join(MIDEN_DIR);
+    let config = miden_client_cli::CliConfig::from_dir(&local_miden_dir)?;
+
+    // Create client with local config
+    let client = miden_client_cli::CliClient::from_config(config, DebugMode::Disabled).await;
+
+    // Clean up
+    let _ = std::fs::remove_dir_all(&temp_dir_for_global);
+    let _ = std::fs::remove_dir_all(&local_temp_dir);
+    cleanup_global_config();
+
+    // Assert client was created with local config
+    assert!(client.is_ok(), "Failed to create client with local config: {:?}", client.err());
+
+    // Verify that the local config was actually used by checking which store file was created
+
+    // The local store should exist
+    assert!(
+        local_store_path.exists(),
+        "Local store file should exist at {local_store_path:?}, indicating local config was used"
+    );
+
+    // The global store should NOT exist
+    assert!(
+        !global_store_path.exists(),
+        "Global store file should NOT exist at {global_store_path:?}, as global config should not have been used"
+    );
+
+    Ok(())
 }

@@ -8,12 +8,11 @@ use miden_client::store::NoteFilter;
 use super::config::CliConfig;
 use crate::commands::account::DEFAULT_ACCOUNT_ID_KEY;
 use crate::errors::CliError;
-use crate::load_config_file;
 
 pub async fn print_client_info<AUTH: TransactionAuthenticator + Sync + 'static>(
     client: &Client<AUTH>,
 ) -> Result<(), CliError> {
-    let (config, _) = load_config_file()?;
+    let config = CliConfig::from_system()?;
 
     println!("Client version: {}", env!("CARGO_PKG_VERSION"));
     print_config_stats(&config)?;

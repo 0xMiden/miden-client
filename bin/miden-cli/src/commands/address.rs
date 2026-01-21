@@ -4,9 +4,10 @@ use miden_client::Client;
 use miden_client::address::{Address, AddressInterface, NetworkId, RoutingParameters};
 use miden_client::note::{NoteExecutionMode, NoteTag};
 
+use crate::config::CliConfig;
 use crate::errors::CliError;
 use crate::utils::parse_account_id;
-use crate::{Parser, Subcommand, create_dynamic_table, load_config_file};
+use crate::{Parser, Subcommand, create_dynamic_table};
 
 #[derive(Debug, Clone)]
 pub enum CliAddressInterface {
@@ -67,7 +68,7 @@ impl AddressCmd {
     pub async fn execute<AUTH>(&self, client: Client<AUTH>) -> Result<(), CliError> {
         match &self.command {
             Some(AddressSubCommand::List { account_id: Some(account_id) }) => {
-                let (cli_config, _) = load_config_file()?;
+                let cli_config = CliConfig::from_system()?;
                 let network_id = cli_config.rpc.endpoint.0.to_network_id();
                 list_account_addresses(client, account_id, network_id).await?;
             },
@@ -79,7 +80,7 @@ impl AddressCmd {
             },
             _ => {
                 // List all addresses as default
-                let (cli_config, _) = load_config_file()?;
+                let cli_config = CliConfig::from_system()?;
                 let network_id = cli_config.rpc.endpoint.0.to_network_id();
                 list_all_addresses(client, network_id).await?;
             },

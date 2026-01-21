@@ -15,7 +15,7 @@ use miden_client::{Client, PrettyPrint, ZERO};
 
 use crate::config::CliConfig;
 use crate::errors::CliError;
-use crate::utils::{load_config_file, load_faucet_details_map, parse_account_id};
+use crate::utils::{load_faucet_details_map, parse_account_id};
 use crate::{client_binary_name, create_dynamic_table};
 
 pub const DEFAULT_ACCOUNT_ID_KEY: &str = "default_account_id";
@@ -47,7 +47,7 @@ pub struct AccountCmd {
 
 impl AccountCmd {
     pub async fn execute<AUTH>(&self, mut client: Client<AUTH>) -> Result<(), CliError> {
-        let (cli_config, _) = load_config_file()?;
+        let cli_config = CliConfig::from_system()?;
         match self {
             AccountCmd {
                 list: false,
