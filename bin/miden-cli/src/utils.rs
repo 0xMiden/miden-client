@@ -1,7 +1,3 @@
-use std::path::{Path, PathBuf};
-
-use figment::Figment;
-use figment::providers::{Format, Toml};
 use miden_client::Client;
 use miden_client::account::AccountId;
 use miden_client::address::{Address, AddressId};
@@ -77,43 +73,6 @@ pub(crate) async fn parse_account_id<AUTH>(
     }
 }
 
-/// Loads config file from .miden directory with priority: local miden directory first, then global
-/// fallback.
-///
-/// This function will look for the configuration file at the .miden/miden-client.toml path in the
-/// following order:
-///   - Local miden directory in current working directory
-///   - Global miden directory in home directory
-///
-/// Note: Relative paths in the config are resolved relative to the .miden directory.
-pub(super) fn load_config_file() -> Result<(CliConfig, PathBuf), CliError> {
-    let local_miden_dir = get_local_miden_dir()?;
-    let mut config_path = local_miden_dir.join(CLIENT_CONFIG_FILE_NAME);
-
-    if !config_path.exists() {
-        let global_miden_dir = get_global_miden_dir().map_err(|e| {
-            CliError::Config(Box::new(e), "Failed to determine global config directory".to_string())
-        })?;
-        config_path = global_miden_dir.join(CLIENT_CONFIG_FILE_NAME);
-
-        if !config_path.exists() {
-            return Err(CliError::Config(
-                "No configuration file found".to_string().into(),
-                    "Neither local nor global config file exists. Run 'miden-client init' to create one.".to_string()
-            ));
-        }
-    }
-    let mut cli_config = load_config(config_path.as_path())?;
-    let config_dir = config_path.parent().unwrap();
-
-    resolve_relative_path(&mut cli_config.store_filepath, config_dir);
-    resolve_relative_path(&mut cli_config.secret_keys_directory, config_dir);
-    resolve_relative_path(&mut cli_config.token_symbol_map_filepath, config_dir);
-    resolve_relative_path(&mut cli_config.package_directory, config_dir);
-
-    Ok((cli_config, config_path))
-}
-
 /// Checks if either local or global configuration file exists.
 pub(super) fn config_file_exists() -> Result<bool, CliError> {
     let local_miden_dir = get_local_miden_dir()?;
@@ -128,23 +87,8 @@ pub(super) fn config_file_exists() -> Result<bool, CliError> {
     Ok(global_miden_dir.join(CLIENT_CONFIG_FILE_NAME).exists())
 }
 
-/// Loads the client configuration.
-fn load_config(config_file: &Path) -> Result<CliConfig, CliError> {
-    Figment::from(Toml::file(config_file)).extract().map_err(|err| {
-        CliError::Config("failed to load config file".to_string().into(), err.to_string())
-    })
-}
-
 /// Returns the faucet details map using the config file.
 pub fn load_faucet_details_map() -> Result<FaucetDetailsMap, CliError> {
-    let (config, _) = load_config_file()?;
+    let config = CliConfig::from_system()?;
     FaucetDetailsMap::new(config.token_symbol_map_filepath)
-}
-
-/// Resolves a relative path against a base directory.
-/// If the path is already absolute, it remains unchanged.
-fn resolve_relative_path(path: &mut PathBuf, base_dir: &Path) {
-    if path.is_relative() {
-        *path = base_dir.join(&*path);
-    }
 }
