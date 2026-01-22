@@ -1,5 +1,5 @@
 use alloc::string::String;
-use core::fmt::{self, Debug, Display, Formatter, Write};
+use core::fmt::{self, Debug, Display, Formatter};
 
 use hex::ToHex;
 use miden_protocol::note::NoteId;
@@ -35,17 +35,23 @@ impl ToHex for &proto::primitives::Digest {
 
 impl ToHex for proto::primitives::Digest {
     fn encode_hex<T: FromIterator<char>>(&self) -> T {
-        let mut data = String::with_capacity(Word::SERIALIZED_SIZE * 2);
-        write!(&mut data, "{:016x}{:016x}{:016x}{:016x}", self.d0, self.d1, self.d2, self.d3)
-            .unwrap();
-        data.chars().collect()
+        const HEX_LOWER: [char; 16] =
+            ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'];
+        [self.d0, self.d1, self.d2, self.d3]
+            .into_iter()
+            .flat_map(u64::to_be_bytes)
+            .flat_map(|b| [HEX_LOWER[(b >> 4) as usize], HEX_LOWER[(b & 0xf) as usize]])
+            .collect()
     }
 
     fn encode_hex_upper<T: FromIterator<char>>(&self) -> T {
-        let mut data = String::with_capacity(Word::SERIALIZED_SIZE * 2);
-        write!(&mut data, "{:016X}{:016X}{:016X}{:016X}", self.d0, self.d1, self.d2, self.d3)
-            .unwrap();
-        data.chars().collect()
+        const HEX_UPPER: [char; 16] =
+            ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'];
+        [self.d0, self.d1, self.d2, self.d3]
+            .into_iter()
+            .flat_map(u64::to_be_bytes)
+            .flat_map(|b| [HEX_UPPER[(b >> 4) as usize], HEX_UPPER[(b & 0xf) as usize]])
+            .collect()
     }
 }
 
