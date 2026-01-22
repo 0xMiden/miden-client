@@ -64,6 +64,9 @@ impl Default for MockRpcApi {
 }
 
 impl MockRpcApi {
+    // Constant to use in mocked pagination.
+    const PAGINATION_BLOCK_LIMIT: u32 = 5;
+
     /// Creates a new [`MockRpcApi`] instance with the state of the provided [`MockChain`].
     pub fn new(mock_chain: MockChain) -> Self {
         Self {
@@ -191,21 +194,26 @@ impl MockRpcApi {
     }
 
     /// Retrieves account vault updates in a given block range.
+    /// This method tries to simulate pagination by limiting the number of blocks processed per
+    /// request.
     fn get_sync_account_vault_request(
         &self,
         block_from: BlockNumber,
         block_to: Option<BlockNumber>,
         account_id: AccountId,
     ) -> AccountVaultInfo {
-        let block_to = match block_to {
-            Some(block_to) => block_to,
-            None => self.get_chain_tip_block_num(),
-        };
+        let chain_tip = self.get_chain_tip_block_num();
+        let target_block = block_to.unwrap_or(chain_tip).min(chain_tip);
+
+        let page_end_block: BlockNumber = (block_from.as_u32() + Self::PAGINATION_BLOCK_LIMIT)
+            .min(target_block.as_u32())
+            .into();
 
         let mut updates = vec![];
         for block in self.mock_chain.read().proven_blocks() {
             let block_number = block.header().block_num();
-            if block_number <= block_from || block_number > block_to {
+            // Only include blocks in range (block_from, page_end_block]
+            if block_number <= block_from || block_number > page_end_block {
                 continue;
             }
 
@@ -233,8 +241,8 @@ impl MockRpcApi {
         }
 
         AccountVaultInfo {
-            chain_tip: self.get_chain_tip_block_num(),
-            block_number: self.get_chain_tip_block_num(),
+            chain_tip,
+            block_number: page_end_block,
             updates,
         }
     }
@@ -278,21 +286,26 @@ impl MockRpcApi {
         }
     }
 
-    /// Retrieves storage map updates in a given block range
+    /// Retrieves storage map updates in a given block range.
+    ///
+    /// This method tries to simulate pagination of the real node.
     fn get_sync_storage_maps_request(
         &self,
         block_from: BlockNumber,
         block_to: Option<BlockNumber>,
         account_id: AccountId,
     ) -> StorageMapInfo {
-        let block_to = match block_to {
-            Some(block_to) => block_to,
-            None => self.get_chain_tip_block_num(),
-        };
+        let chain_tip = self.get_chain_tip_block_num();
+        let target_block = block_to.unwrap_or(chain_tip).min(chain_tip);
+
+        let page_end_block: BlockNumber = (block_from.as_u32() + Self::PAGINATION_BLOCK_LIMIT)
+            .min(target_block.as_u32())
+            .into();
+
         let mut updates = vec![];
         for block in self.mock_chain.read().proven_blocks() {
             let block_number = block.header().block_num();
-            if block_number <= block_from || block_number > block_to {
+            if block_number <= block_from || block_number > page_end_block {
                 continue;
             }
 
@@ -323,8 +336,8 @@ impl MockRpcApi {
         }
 
         StorageMapInfo {
-            chain_tip: self.get_chain_tip_block_num(),
-            block_number: self.get_chain_tip_block_num(),
+            chain_tip,
+            block_number: page_end_block,
             updates,
         }
     }
@@ -677,8 +690,26 @@ impl NodeRpcClient for MockRpcApi {
         block_to: Option<BlockNumber>,
         account_id: AccountId,
     ) -> Result<StorageMapInfo, RpcError> {
-        let response = self.get_sync_storage_maps_request(block_from, block_to, account_id);
-        Ok(response)
+        let mut all_updates = Vec::new();
+        let mut current_block_from = block_from;
+        let chain_tip = self.get_chain_tip_block_num();
+        let target_block = block_to.unwrap_or(chain_tip).min(chain_tip);
+
+        loop {
+            let response =
+                self.get_sync_storage_maps_request(current_block_from, block_to, account_id);
+            all_updates.extend(response.updates);
+
+            if response.block_number >= target_block {
+                return Ok(StorageMapInfo {
+                    chain_tip: response.chain_tip,
+                    block_number: response.block_number,
+                    updates: all_updates,
+                });
+            }
+
+            current_block_from = (response.block_number.as_u32() + 1).into();
+        }
     }
 
     async fn sync_account_vault(
@@ -687,8 +718,26 @@ impl NodeRpcClient for MockRpcApi {
         block_to: Option<BlockNumber>,
         account_id: AccountId,
     ) -> Result<AccountVaultInfo, RpcError> {
-        let response = self.get_sync_account_vault_request(block_from, block_to, account_id);
-        Ok(response)
+        let mut all_updates = Vec::new();
+        let mut current_block_from = block_from;
+        let chain_tip = self.get_chain_tip_block_num();
+        let target_block = block_to.unwrap_or(chain_tip).min(chain_tip);
+
+        loop {
+            let response =
+                self.get_sync_account_vault_request(current_block_from, block_to, account_id);
+            all_updates.extend(response.updates);
+
+            if response.block_number >= target_block {
+                return Ok(AccountVaultInfo {
+                    chain_tip: response.chain_tip,
+                    block_number: response.block_number,
+                    updates: all_updates,
+                });
+            }
+
+            current_block_from = (response.block_number.as_u32() + 1).into();
+        }
     }
 
     async fn sync_transactions(

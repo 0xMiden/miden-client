@@ -32,8 +32,8 @@ use super::{
     Endpoint, FetchedAccount, NodeRpcClient, NodeRpcClientEndpoint, NoteSyncInfo, RpcError,
     StateSyncInfo,
 };
-use crate::rpc::domain::account_vault::AccountVaultInfo;
-use crate::rpc::domain::storage_map::StorageMapInfo;
+use crate::rpc::domain::account_vault::{AccountVaultInfo, AccountVaultUpdate};
+use crate::rpc::domain::storage_map::{StorageMapInfo, StorageMapUpdate};
 use crate::rpc::domain::transaction::TransactionsInfo;
 use crate::rpc::errors::{AcceptHeaderError, GrpcError, RpcConversionError};
 use crate::rpc::generated::rpc::account_proof_request::account_detail_request::storage_map_detail_request::SlotData;
@@ -721,23 +721,59 @@ impl NodeRpcClient for GrpcClient {
         block_to: Option<BlockNumber>,
         account_id: AccountId,
     ) -> Result<StorageMapInfo, RpcError> {
-        let block_range = Some(BlockRange {
-            block_from: block_from.as_u32(),
-            block_to: block_to.map(|b| b.as_u32()),
-        });
-
-        let request = proto::rpc::SyncStorageMapsRequest {
-            block_range,
-            account_id: Some(account_id.into()),
-        };
+        let mut all_updates = Vec::new();
+        let mut current_block_from = block_from.as_u32();
+        let mut target_block_reached = false;
+        let mut final_chain_tip = 0;
+        let mut final_block_num = 0;
 
         let mut rpc_api = self.ensure_connected().await?;
 
-        let response = rpc_api.sync_storage_maps(request).await.map_err(|status| {
-            RpcError::from_grpc_error(NodeRpcClientEndpoint::SyncStorageMaps, status)
-        })?;
+        while !target_block_reached {
+            let request = proto::rpc::SyncStorageMapsRequest {
+                block_range: Some(BlockRange {
+                    block_from: current_block_from,
+                    block_to: block_to.map(|b| b.as_u32()),
+                }),
+                account_id: Some(account_id.into()),
+            };
 
-        response.into_inner().try_into()
+            let response = rpc_api.sync_storage_maps(request).await.map_err(|status| {
+                RpcError::from_grpc_error(NodeRpcClientEndpoint::SyncStorageMaps, status)
+            })?;
+            let response = response.into_inner();
+
+            let batch_updates = response
+                .updates
+                .into_iter()
+                .map(TryInto::try_into)
+                .collect::<Result<Vec<StorageMapUpdate>, _>>()?;
+            all_updates.extend(batch_updates);
+
+            let page = response
+                .pagination_info
+                .ok_or(RpcError::ExpectedDataMissing("pagination_info".to_owned()))?;
+
+            if page.block_num < current_block_from {
+                return Err(RpcError::InvalidResponse(
+                    "invalid pagination: block_num went backwards".to_owned(),
+                ));
+            }
+
+            final_chain_tip = page.chain_tip;
+            final_block_num = page.block_num;
+
+            let target_block = block_to.map_or(page.chain_tip, |b| b.as_u32().min(page.chain_tip));
+
+            target_block_reached = page.block_num >= target_block;
+            current_block_from = page.block_num + 1;
+        }
+
+        Ok(StorageMapInfo {
+            chain_tip: final_chain_tip.into(),
+            block_number: final_block_num.into(),
+            updates: all_updates,
+        })
     }
 
     async fn sync_account_vault(
@@ -746,23 +782,62 @@ impl NodeRpcClient for GrpcClient {
         block_to: Option<BlockNumber>,
         account_id: AccountId,
     ) -> Result<AccountVaultInfo, RpcError> {
-        let block_range = Some(BlockRange {
-            block_from: block_from.as_u32(),
-            block_to: block_to.map(|b| b.as_u32()),
-        });
-
-        let request = proto::rpc::SyncAccountVaultRequest {
-            block_range,
-            account_id: Some(account_id.into()),
-        };
+        let mut all_updates = Vec::new();
+        let mut current_block_from = block_from.as_u32();
+        let mut target_block_reached = false;
+        let mut final_chain_tip = 0;
+        let mut final_block_num = 0;
 
         let mut rpc_api = self.ensure_connected().await?;
 
-        let response = rpc_api.sync_account_vault(request).await.map_err(|status| {
-            RpcError::from_grpc_error(NodeRpcClientEndpoint::SyncAccountVault, status)
-        })?;
+        while !target_block_reached {
+            let request = proto::rpc::SyncAccountVaultRequest {
+                block_range: Some(BlockRange {
+                    block_from: current_block_from,
+                    block_to: block_to.map(|b| b.as_u32()),
+                }),
+                account_id: Some(account_id.into()),
+            };
 
-        response.into_inner().try_into()
+            let response = rpc_api
+                .sync_account_vault(request)
+                .await
+                .map_err(|status| {
+                    RpcError::from_grpc_error(NodeRpcClientEndpoint::SyncAccountVault, status)
+                })?
+                .into_inner();
+
+            let batch_updates = response
+                .updates
+                .iter()
+                .map(|u| (*u).try_into())
+                .collect::<Result<Vec<AccountVaultUpdate>, _>>()?;
+            all_updates.extend(batch_updates);
+
+            let page = response
+                .pagination_info
+                .ok_or(RpcError::ExpectedDataMissing("pagination_info".to_owned()))?;
+
+            if page.block_num < current_block_from {
+                return Err(RpcError::InvalidResponse(
+                    "invalid pagination: block_num went backwards".to_owned(),
+                ));
+            }
+
+            final_chain_tip = page.chain_tip;
+            final_block_num = page.block_num;
+
+            let target_block = block_to.map_or(page.chain_tip, |b| b.as_u32().min(page.chain_tip));
+
+            target_block_reached = page.block_num >= target_block;
+            current_block_from = page.block_num + 1;
+        }
+
+        Ok(AccountVaultInfo {
+            chain_tip: final_chain_tip.into(),
+            block_number: final_block_num.into(),
+            updates: all_updates,
+        })
     }
 
     async fn sync_transactions(
