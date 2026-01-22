@@ -1204,7 +1204,6 @@ test.describe("counter account component tests", () => {
   test("counter account component transaction completes successfully", async ({
     page,
   }) => {
-    test.slow();
     let { finalCounter, hasCounterComponent } =
       await counterAccountComponent(page);
     expect(finalCounter).toEqual("2");
