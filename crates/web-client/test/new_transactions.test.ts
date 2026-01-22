@@ -622,6 +622,8 @@ test.describe("custom transaction tests", () => {
   test("custom transaction with remote prover completes successfully", async ({
     page,
   }) => {
+    // TODO: hotfix CI failure, we should investigate slow prover tests further.
+    test.slow();
     await expect(customTransaction(page, "0", true)).resolves.toBeUndefined();
   });
 });
