@@ -337,7 +337,7 @@ export const customTransaction = async (
       let noteMetadata = new window.NoteMetadata(
         faucetAccount.id(),
         window.NoteType.Private,
-        window.NoteTag.fromAccountId(walletAccount.id())
+        window.NoteTag.withAccountTarget(walletAccount.id())
       );
 
       let expectedNoteArgs = noteArgs.map((felt) => felt.asInt());
@@ -545,7 +545,7 @@ const customTxWithMultipleNotes = async (
       let noteMetadata = new window.NoteMetadata(
         senderAccountId,
         window.NoteType.Public,
-        window.NoteTag.fromAccountId(targetAccountId)
+        window.NoteTag.withAccountTarget(targetAccountId)
       );
 
       let serialNum1 = new window.Word(
@@ -1155,7 +1155,7 @@ export const counterAccountComponent = async (
 
     // Create network account target attachment so the node knows to consume this note
     // with the network account (counter account)
-    let networkTarget = new window.NetworkAccountTarget(
+    let networkTargetAttachment = window.NoteAttachment.newNetworkAccountTarget(
       accountBuilderResult.account.id(),
       window.NoteExecutionHint.always()
     );
@@ -1163,8 +1163,8 @@ export const counterAccountComponent = async (
     let noteMetadata = new window.NoteMetadata(
       nativeAccount.id(),
       window.NoteType.Public,
-      window.NoteTag.fromAccountId(accountBuilderResult.account.id())
-    ).withAttachment(networkTarget.intoAttachment());
+      window.NoteTag.withAccountTarget(accountBuilderResult.account.id())
+    ).withAttachment(networkTargetAttachment);
 
     let note = new window.Note(noteAssets, noteMetadata, noteRecipient);
 

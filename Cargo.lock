@@ -2700,6 +2700,7 @@ dependencies = [
  "js-sys",
  "miden-client",
  "miden-idxdb-store",
+ "miden-protocol",
  "rand 0.9.2",
  "serde-wasm-bindgen",
  "thiserror 2.0.18",
