@@ -1487,7 +1487,7 @@ Syncs the mock state and returns the resulting summary.
 
 > **syncStateImpl**(): `Promise`\<[`SyncSummary`](SyncSummary.md)\>
 
-Internal implementation of sync_state.
+Internal implementation of `sync_state`.
 
 This method performs the actual sync operation. Concurrent call coordination
 is handled at the JavaScript layer using the Web Locks API.
