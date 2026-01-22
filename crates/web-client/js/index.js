@@ -315,13 +315,6 @@ export class WebClient {
    * This method is async so you can await the asynchronous call to createClientWithExternalKeystore().
    *
    * @param {Object} config - The configuration object.
-   * @param {string} rpcUrl - The RPC URL.
-   * @param {string | undefined} noteTransportUrl - The note transport URL (optional).
-   * @param {string | undefined} seed - The seed for the account.
-   * @param {string | undefined} storeName - Optional name for the store. Setting this allows multiple clients to be used in the same browser.
-   * @param {Function | undefined} getKeyCb - The get key callback.
-   * @param {Function | undefined} insertKeyCb - The insert key callback.
-   * @param {Function | undefined} signCb - The sign callback.
    * @returns {Promise<WebClient>} The fully initialized WebClient.
    */
   static async createClientWithExternalKeystore(config) {
