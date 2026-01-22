@@ -58,9 +58,6 @@ pub mod settings;
 pub mod sync;
 pub mod transaction;
 
-// Re-export sync lock handle for use in web-client
-pub use sync::SyncLockHandle;
-
 pub(crate) const CLIENT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[wasm_bindgen(module = "/src/js/utils.js")]

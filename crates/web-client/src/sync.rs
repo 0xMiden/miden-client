@@ -1,7 +1,5 @@
 use miden_client::asset::{Asset as NativeAsset, FungibleAsset as NativeFungibleAsset};
 use miden_client::note::build_swap_tag as native_build_swap_tag;
-use miden_client::sync::SyncSummary as NativeSyncSummary;
-use miden_client::utils::{Deserializable, Serializable};
 use wasm_bindgen::prelude::*;
 
 use crate::models::account_id::AccountId;
@@ -11,71 +9,23 @@ use crate::{WebClient, js_error_with_context};
 
 #[wasm_bindgen]
 impl WebClient {
-    /// Syncs the client state with the node.
+    /// Internal implementation of `sync_state`.
     ///
-    /// This method coordinates concurrent sync calls using the Web Locks API when available,
-    /// with an in-process mutex fallback for older browsers. If a sync is already in progress,
-    /// subsequent callers will wait and receive the same result (coalescing behavior).
-    #[wasm_bindgen(js_name = "syncState")]
-    pub async fn sync_state(&mut self) -> Result<SyncSummary, JsValue> {
-        self.sync_state_with_timeout(0).await
-    }
+    /// This method performs the actual sync operation. Concurrent call coordination
+    /// is handled at the JavaScript layer using the Web Locks API.
+    ///
+    /// **Note:** Do not call this method directly. Use `syncState()` from JavaScript instead,
+    /// which provides proper coordination for concurrent calls.
+    #[wasm_bindgen(js_name = "syncStateImpl")]
+    pub async fn sync_state_impl(&mut self) -> Result<SyncSummary, JsValue> {
+        let client = self.get_mut_inner().ok_or(JsValue::from_str("Client not initialized"))?;
 
-    /// Syncs the client state with the node with an optional timeout.
-    ///
-    /// This method coordinates concurrent sync calls using the Web Locks API when available,
-    /// with an in-process mutex fallback for older browsers. If a sync is already in progress,
-    /// subsequent callers will wait and receive the same result (coalescing behavior).
-    ///
-    /// # Arguments
-    /// * `timeout_ms` - Timeout in milliseconds (0 = no timeout)
-    #[wasm_bindgen(js_name = "syncStateWithTimeout")]
-    pub async fn sync_state_with_timeout(
-        &mut self,
-        timeout_ms: u32,
-    ) -> Result<SyncSummary, JsValue> {
-        // Clone the store Arc to avoid borrow conflicts with self
-        let store = self.store.clone().ok_or(JsValue::from_str("Store not initialized"))?;
-
-        // Acquire the sync lock
-        let lock_handle = store
-            .acquire_sync_lock(timeout_ms)
+        let sync_summary = client
+            .sync_state()
             .await
-            .map_err(|err| js_error_with_context(err, "failed to acquire sync lock"))?;
+            .map_err(|err| js_error_with_context(err, "failed to sync state"))?;
 
-        if lock_handle.acquired {
-            // We acquired the lock - perform the sync
-            let client = self.get_mut_inner().ok_or(JsValue::from_str("Client not initialized"))?;
-
-            match client.sync_state().await {
-                Ok(sync_summary) => {
-                    // Release the lock with the serialized result
-                    let serialized = sync_summary.to_bytes();
-                    store.release_sync_lock(serialized);
-                    Ok(sync_summary.into())
-                },
-                Err(err) => {
-                    // Release the lock with error, passing the error message to waiters
-                    let error_message = format!("failed to sync state: {err}");
-                    store.release_sync_lock_with_error(Some(error_message.clone()));
-                    Err(js_error_with_context(err, "failed to sync state"))
-                },
-            }
-        } else {
-            // We're coalescing - use the result from the in-progress sync
-            let coalesced_bytes = lock_handle
-                .coalesced_result
-                .ok_or_else(|| JsValue::from_str("Coalesced sync lock handle missing result"))?;
-
-            let sync_summary =
-                NativeSyncSummary::read_from_bytes(&coalesced_bytes).map_err(|err| {
-                    JsValue::from_str(&format!(
-                        "Failed to deserialize coalesced sync result: {err}"
-                    ))
-                })?;
-
-            Ok(sync_summary.into())
-        }
+        Ok(sync_summary.into())
     }
 
     #[wasm_bindgen(js_name = "getSyncHeight")]
