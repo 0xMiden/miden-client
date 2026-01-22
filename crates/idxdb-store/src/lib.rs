@@ -97,18 +97,28 @@ impl WebStore {
             smt_forest: RwLock::new(smt_forest::AccountSmtForest::new()),
         };
 
-        // Eagerly load SMT forest by populating it with all existing account vault/storage data
-        let account_ids = store
+        // Initialize SMT forest
+        store.build_smt_forest().await?;
+
+        Ok(store)
+    }
+
+    /// Builds the SMT forest by loading all existing account vault and storage data.
+    ///
+    /// This ensures that the forest contains all necessary Merkle nodes for generating
+    /// witnesses when creating partial accounts or executing transactions.
+    async fn build_smt_forest(&self) -> Result<(), JsValue> {
+        let account_ids = self
             .get_account_ids()
             .await
             .map_err(|e| JsValue::from_str(&format!("Failed to get account IDs: {e:?}")))?;
 
         for account_id in account_ids {
-            let vault = store.get_account_vault(account_id).await.map_err(|e| {
+            let vault = self.get_account_vault(account_id).await.map_err(|e| {
                 JsValue::from_str(&format!("Failed to get vault for account {account_id}: {e:?}"))
             })?;
 
-            let storage = store
+            let storage = self
                 .get_account_storage(account_id, AccountStorageFilter::All)
                 .await
                 .map_err(|e| {
@@ -117,14 +127,14 @@ impl WebStore {
                     ))
                 })?;
 
-            store.smt_forest.write().insert_account_state(&vault, &storage).map_err(|e| {
+            self.smt_forest.write().insert_account_state(&vault, &storage).map_err(|e| {
                 JsValue::from_str(&format!(
                     "Failed to insert account state for {account_id}: {e:?}"
                 ))
             })?;
         }
 
-        Ok(store)
+        Ok(())
     }
 
     /// Returns the database ID as a string slice for passing to JS functions.
