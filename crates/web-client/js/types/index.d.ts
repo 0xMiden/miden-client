@@ -69,6 +69,7 @@ export {
   Note,
   NoteAttachment,
   NoteAttachmentKind,
+  NoteAttachmentScheme,
   NoteAndArgs,
   NoteAndArgsArray,
   NoteAssets,
