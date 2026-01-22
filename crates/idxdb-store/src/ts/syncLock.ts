@@ -1,0 +1,238 @@
+/**
+ * Sync Lock Module
+ *
+ * Provides coordination for concurrent sync_state() calls using the Web Locks API
+ * with an in-process mutex fallback for older browsers.
+ *
+ * Behavior:
+ * - Uses "coalescing": if a sync is in progress, subsequent callers wait and receive
+ *   the same result
+ * - Web Locks for cross-tab coordination (Chrome 69+, Safari 15.4+)
+ * - In-process mutex fallback when Web Locks unavailable
+ * - Optional timeout support
+ */
+
+/**
+ * Result returned when acquiring a sync lock.
+ */
+export interface SyncLockHandle {
+  /** True if we acquired the lock, false if we're coalescing with an in-progress sync */
+  acquired: boolean;
+  /** If coalescing, the serialized result from the in-progress sync */
+  coalescedResult?: Uint8Array;
+}
+
+/**
+ * Internal state for tracking in-progress syncs and waiters.
+ */
+interface SyncState {
+  /** Whether a sync is currently in progress */
+  inProgress: boolean;
+  /** The result of the sync operation (set when complete) */
+  result?: Uint8Array;
+  /** Whether the sync errored */
+  errored: boolean;
+  /** Waiters for the result */
+  waiters: Array<{
+    resolve: (result: Uint8Array) => void;
+    reject: (error: Error) => void;
+  }>;
+  /** Resolve function to release the lock */
+  releaseLock?: () => void;
+}
+
+// Registry of sync states per database
+const syncStates = new Map<string, SyncState>();
+
+/**
+ * Check if the Web Locks API is available.
+ */
+export function hasWebLocks(): boolean {
+  return (
+    typeof navigator !== "undefined" &&
+    navigator.locks !== undefined &&
+    typeof navigator.locks.request === "function"
+  );
+}
+
+/**
+ * Get or create sync state for a database.
+ */
+function getSyncState(dbId: string): SyncState {
+  let state = syncStates.get(dbId);
+  if (!state) {
+    state = {
+      inProgress: false,
+      errored: false,
+      waiters: [],
+    };
+    syncStates.set(dbId, state);
+  }
+  return state;
+}
+
+/**
+ * Acquire a sync lock for the given database.
+ *
+ * If a sync is already in progress:
+ * - Returns { acquired: false } and the caller should wait for the coalesced result
+ *   via the returned promise
+ *
+ * If no sync is in progress:
+ * - Returns { acquired: true } and the caller should perform the sync, then call
+ *   releaseSyncLock() or releaseSyncLockWithError()
+ *
+ * @param dbId - The database ID to lock
+ * @param timeoutMs - Optional timeout in milliseconds (0 = no timeout)
+ * @returns Promise resolving to a SyncLockHandle
+ */
+export async function acquireSyncLock(
+  dbId: string,
+  timeoutMs: number
+): Promise<SyncLockHandle> {
+  const state = getSyncState(dbId);
+
+  // If a sync is already in progress, wait for it to complete (coalescing)
+  if (state.inProgress) {
+    return new Promise<SyncLockHandle>((resolve, reject) => {
+      // Set up timeout if specified
+      let timeoutId: ReturnType<typeof setTimeout> | undefined;
+      if (timeoutMs > 0) {
+        timeoutId = setTimeout(() => {
+          // Remove this waiter from the list
+          const idx = state.waiters.findIndex((w) => w.resolve === onResult);
+          if (idx !== -1) {
+            state.waiters.splice(idx, 1);
+          }
+          reject(new Error("Sync lock acquisition timed out"));
+        }, timeoutMs);
+      }
+
+      const onResult = (result: Uint8Array) => {
+        if (timeoutId) clearTimeout(timeoutId);
+        resolve({ acquired: false, coalescedResult: result });
+      };
+
+      const onError = (error: Error) => {
+        if (timeoutId) clearTimeout(timeoutId);
+        reject(error);
+      };
+
+      state.waiters.push({ resolve: onResult, reject: onError });
+    });
+  }
+
+  // Mark sync as in progress
+  state.inProgress = true;
+  state.result = undefined;
+  state.errored = false;
+
+  // Try to acquire Web Lock if available
+  if (hasWebLocks()) {
+    const lockName = `miden-sync-${dbId}`;
+
+    return new Promise<SyncLockHandle>((resolve, reject) => {
+      // Set up timeout if specified
+      let timeoutId: ReturnType<typeof setTimeout> | undefined;
+      let timedOut = false;
+
+      if (timeoutMs > 0) {
+        timeoutId = setTimeout(() => {
+          timedOut = true;
+          state.inProgress = false;
+          reject(new Error("Sync lock acquisition timed out"));
+        }, timeoutMs);
+      }
+
+      // Request the Web Lock
+      navigator.locks
+        .request(lockName, { mode: "exclusive" }, async () => {
+          if (timedOut) {
+            // Already timed out, just return
+            return;
+          }
+
+          if (timeoutId) clearTimeout(timeoutId);
+
+          // Create a promise that will be resolved when releaseSyncLock is called
+          return new Promise<void>((releaseLock) => {
+            state.releaseLock = releaseLock;
+            resolve({ acquired: true });
+          });
+        })
+        .catch((err: unknown) => {
+          if (timeoutId) clearTimeout(timeoutId);
+          state.inProgress = false;
+          reject(err instanceof Error ? err : new Error(String(err)));
+        });
+    });
+  } else {
+    // Fallback: no Web Locks, just use in-process state
+    // The lock is already "acquired" via the inProgress flag
+    return { acquired: true };
+  }
+}
+
+/**
+ * Release the sync lock with a successful result.
+ *
+ * This notifies all waiting callers with the result and releases the lock.
+ *
+ * @param dbId - The database ID
+ * @param result - The serialized sync result
+ */
+export function releaseSyncLock(dbId: string, result: Uint8Array): void {
+  const state = getSyncState(dbId);
+
+  if (!state.inProgress) {
+    console.warn("releaseSyncLock called but no sync was in progress");
+    return;
+  }
+
+  state.result = result;
+  state.inProgress = false;
+
+  // Notify all waiters
+  for (const waiter of state.waiters) {
+    waiter.resolve(result);
+  }
+  state.waiters = [];
+
+  // Release the Web Lock if we have one
+  if (state.releaseLock) {
+    state.releaseLock();
+    state.releaseLock = undefined;
+  }
+}
+
+/**
+ * Release the sync lock due to an error.
+ *
+ * This notifies all waiting callers that the sync failed.
+ *
+ * @param dbId - The database ID
+ */
+export function releaseSyncLockWithError(dbId: string): void {
+  const state = getSyncState(dbId);
+
+  if (!state.inProgress) {
+    console.warn("releaseSyncLockWithError called but no sync was in progress");
+    return;
+  }
+
+  state.errored = true;
+  state.inProgress = false;
+
+  // Notify all waiters of the error
+  const error = new Error("Sync operation failed");
+  for (const waiter of state.waiters) {
+    waiter.reject(error);
+  }
+  state.waiters = [];
+
+  // Release the Web Lock if we have one
+  if (state.releaseLock) {
+    state.releaseLock();
+    state.releaseLock = undefined;
+  }
+}
