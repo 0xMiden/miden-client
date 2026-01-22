@@ -42,6 +42,7 @@ use miden_client::store::{
 };
 use miden_client::sync::{NoteTagRecord, StateSyncUpdate};
 use miden_client::transaction::{TransactionRecord, TransactionStoreUpdate};
+use miden_client::utils::RwLock;
 use serde::de::Error;
 use serde::{Deserialize, Deserializer};
 use wasm_bindgen::prelude::*;
@@ -55,6 +56,7 @@ pub mod import;
 pub mod note;
 mod promise;
 pub mod settings;
+mod smt_forest;
 pub mod sync;
 pub mod transaction;
 
@@ -82,13 +84,47 @@ extern "C" {
 /// which would prevent the struct from being Send + Sync.
 pub struct WebStore {
     database_id: String,
+    smt_forest: RwLock<smt_forest::AccountSmtForest>,
 }
 
 impl WebStore {
     pub async fn new(database_name: String) -> Result<WebStore, JsValue> {
         let promise = open_database(database_name.as_str(), CLIENT_VERSION);
         let _db_id = JsFuture::from(promise).await?;
-        Ok(WebStore { database_id: database_name })
+
+        let store = WebStore {
+            database_id: database_name,
+            smt_forest: RwLock::new(smt_forest::AccountSmtForest::new()),
+        };
+
+        // Eagerly load SMT forest by populating it with all existing account vault/storage data
+        let account_ids = store
+            .get_account_ids()
+            .await
+            .map_err(|e| JsValue::from_str(&format!("Failed to get account IDs: {e:?}")))?;
+
+        for account_id in account_ids {
+            let vault = store.get_account_vault(account_id).await.map_err(|e| {
+                JsValue::from_str(&format!("Failed to get vault for account {account_id}: {e:?}"))
+            })?;
+
+            let storage = store
+                .get_account_storage(account_id, AccountStorageFilter::All)
+                .await
+                .map_err(|e| {
+                    JsValue::from_str(&format!(
+                        "Failed to get storage for account {account_id}: {e:?}"
+                    ))
+                })?;
+
+            store.smt_forest.write().insert_account_state(&vault, &storage).map_err(|e| {
+                JsValue::from_str(&format!(
+                    "Failed to insert account state for {account_id}: {e:?}"
+                ))
+            })?;
+        }
+
+        Ok(store)
     }
 
     /// Returns the database ID as a string slice for passing to JS functions.
@@ -298,6 +334,24 @@ impl Store for WebStore {
         filter: AccountStorageFilter,
     ) -> Result<AccountStorage, StoreError> {
         self.get_account_storage(account_id, filter).await
+    }
+
+    async fn get_account_asset(
+        &self,
+        account_id: AccountId,
+        vault_key: miden_protocol::asset::AssetVaultKey,
+    ) -> Result<Option<(miden_client::asset::Asset, miden_client::asset::AssetWitness)>, StoreError>
+    {
+        self.get_account_asset(account_id, vault_key).await
+    }
+
+    async fn get_account_map_item(
+        &self,
+        account_id: AccountId,
+        slot_name: miden_client::account::StorageSlotName,
+        key: Word,
+    ) -> Result<(Word, miden_protocol::account::StorageMapWitness), StoreError> {
+        self.get_account_map_item(account_id, slot_name, key).await
     }
 
     async fn get_addresses_by_account_id(

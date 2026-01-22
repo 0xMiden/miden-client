@@ -28,7 +28,7 @@ use miden_client::store::{
 };
 use miden_client::utils::Serializable;
 use miden_client::{AccountError, Word};
-use miden_protocol::account::{AccountStorageHeader, StorageSlotHeader};
+use miden_protocol::account::{AccountStorageHeader, StorageSlotContent, StorageSlotHeader};
 use miden_protocol::asset::PartialVault;
 
 use super::WebStore;
@@ -193,8 +193,6 @@ impl WebStore {
         Ok(Some(AccountRecord::new(account_data, status, addresses)))
     }
 
-    // NOTE: This implementation creates partial accounts with storage map entries but without
-    // Merkle witnesses. Full witness support requires an SMT forest similar to the sqlite-store.
     pub(crate) async fn get_minimal_partial_account(
         &self,
         account_id: AccountId,
@@ -235,12 +233,33 @@ impl WebStore {
         }
 
         let mut maps = Vec::new();
+
         for (slot_name, slot_type, value) in storage_slot_headers {
             storage_header_vec.push(StorageSlotHeader::new(slot_name, slot_type, value));
             if slot_type == StorageSlotType::Map {
                 let full_map =
                     storage_maps_data.get(&value.to_hex()).cloned().unwrap_or_else(StorageMap::new);
-                let partial_storage_map = PartialStorageMap::new_full(full_map);
+
+                // Try to create a partial storage map with witnesses from the SMT forest,
+                // but fall back to a full map without witnesses if the forest doesn't have the root
+                let mut partial_storage_map = PartialStorageMap::new(value);
+                let mut has_witness_error = false;
+                for (k, _v) in full_map.entries() {
+                    let smt_forest = self.smt_forest.read();
+                    if let Ok(witness) = smt_forest.get_storage_map_item_witness(value, *k) {
+                        partial_storage_map.add(witness).map_err(StoreError::MerkleStoreError)?;
+                    } else {
+                        // If we can't get a witness, fall back to creating a full map
+                        has_witness_error = true;
+                        break;
+                    }
+                }
+
+                // If we had errors getting witnesses, use a full map instead
+                if has_witness_error {
+                    partial_storage_map = PartialStorageMap::new_full(full_map);
+                }
+
                 maps.push(partial_storage_map);
             }
         }
@@ -455,6 +474,9 @@ impl WebStore {
                 ))
             })?;
 
+        let mut smt_forest = self.smt_forest.write();
+        smt_forest.insert_account_state(account.vault(), account.storage())?;
+
         Ok(())
     }
 
@@ -473,7 +495,13 @@ impl WebStore {
 
         update_account(self.db_id(), new_account_state)
             .await
-            .map_err(|_| StoreError::DatabaseError("failed to update account".to_string()))
+            .map_err(|_| StoreError::DatabaseError("failed to update account".to_string()))?;
+
+        // Update the SMT forest with the new account state
+        let mut smt_forest = self.smt_forest.write();
+        smt_forest.insert_account_state(new_account_state.vault(), new_account_state.storage())?;
+
+        Ok(())
     }
 
     pub(crate) async fn get_account_vault(
@@ -502,6 +530,54 @@ impl WebStore {
             .0;
 
         self.get_storage(account_header.storage_commitment(), filter).await
+    }
+
+    pub(crate) async fn get_account_asset(
+        &self,
+        account_id: AccountId,
+        vault_key: miden_protocol::asset::AssetVaultKey,
+    ) -> Result<Option<(miden_client::asset::Asset, miden_client::asset::AssetWitness)>, StoreError>
+    {
+        let account_header = self
+            .get_account_header(account_id)
+            .await?
+            .ok_or(StoreError::AccountDataNotFound(account_id))?
+            .0;
+
+        let vault_key_word: Word = vault_key.into();
+        let smt_forest = self.smt_forest.read();
+
+        match smt_forest.get_asset_and_witness(account_header.vault_root(), vault_key_word) {
+            Ok(result) => Ok(Some(result)),
+            Err(StoreError::MerkleStoreError(_)) => Ok(None),
+            Err(e) => Err(e),
+        }
+    }
+
+    pub(crate) async fn get_account_map_item(
+        &self,
+        account_id: AccountId,
+        slot_name: miden_client::account::StorageSlotName,
+        key: Word,
+    ) -> Result<(Word, miden_protocol::account::StorageMapWitness), StoreError> {
+        let storage = self
+            .get_account_storage(account_id, AccountStorageFilter::SlotName(slot_name.clone()))
+            .await?;
+
+        match storage.get(&slot_name).map(StorageSlot::content) {
+            Some(StorageSlotContent::Map(map)) => {
+                let value = map.get(&key);
+
+                let smt_forest = self.smt_forest.read();
+                let witness = smt_forest.get_storage_map_item_witness(map.root(), key)?;
+
+                Ok((value, witness))
+            },
+            Some(_) => {
+                Err(StoreError::AccountError(AccountError::other("Storage slot is not a map")))
+            },
+            None => Err(StoreError::AccountError(AccountError::other("Storage slot not found"))),
+        }
     }
 
     pub(crate) async fn upsert_foreign_account_code(

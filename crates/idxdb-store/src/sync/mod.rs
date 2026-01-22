@@ -2,6 +2,7 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
 use miden_client::account::AccountId;
+use miden_client::asset::AssetVault;
 use miden_client::note::{BlockNumber, NoteId, NoteTag};
 use miden_client::store::StoreError;
 use miden_client::sync::{NoteTagRecord, NoteTagSource, StateSyncUpdate};
@@ -186,11 +187,27 @@ impl WebStore {
         // Remove the account states that are originated from the discarded transactions
         self.undo_account_states(&account_states_to_rollback).await?;
 
+        // Update SMT forest for account rollbacks
+        {
+            // Use a separate scope to prevent holding the `MutexGuard` across an await point
+            let mut smt_forest = self.smt_forest.write();
+            smt_forest.pop_roots(account_states_to_rollback.clone());
+        }
+
         let transaction_updates: Vec<_> = transaction_updates
             .committed_transactions()
             .chain(transaction_updates.discarded_transactions())
             .map(serialize_transaction_record)
             .collect();
+
+        // Update SMT forest for public account updates
+        for account in account_updates.updated_public_accounts() {
+            let vault = AssetVault::new(account.vault().assets().collect::<Vec<_>>().as_slice())?;
+            let storage = account.storage();
+
+            let mut smt_forest = self.smt_forest.write();
+            smt_forest.insert_account_state(&vault, storage)?;
+        }
 
         let state_update = JsStateSyncUpdate {
             block_num: block_num.to_string(),
