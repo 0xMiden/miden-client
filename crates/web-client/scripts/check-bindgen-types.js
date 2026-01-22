@@ -72,7 +72,9 @@ async function collectExports(filePath) {
         });
       } else if (!node.exportClause && node.moduleSpecifier) {
         // Star export: export * from "..."
-        const modulePath = node.moduleSpecifier.getText(sourceFile).slice(1, -1);
+        const modulePath = node.moduleSpecifier
+          .getText(sourceFile)
+          .slice(1, -1);
         starExportModules.push(modulePath);
       }
     }
@@ -109,13 +111,18 @@ async function resolveStarExports(filePath, starExportModules, baseDir = null) {
 }
 
 const { names: wasmExports } = await collectExports(wasmTypesPath);
-const { names: publicExports, starExportModules } = await collectExports(publicTypesPath);
+const { names: publicExports, starExportModules } =
+  await collectExports(publicTypesPath);
 
 // Resolve star exports to get all re-exported names
 // Use dist/ as base directory since that's where the file will be deployed
 // and where the relative imports (./crates/...) will be resolved from
 const distDir = path.join(rootDir, "dist");
-const starExportedNames = await resolveStarExports(publicTypesPath, starExportModules, distDir);
+const starExportedNames = await resolveStarExports(
+  publicTypesPath,
+  starExportModules,
+  distDir
+);
 starExportedNames.forEach((name) => publicExports.add(name));
 
 // The wrapper defines its own WebClient, so we do not expect to re-export the wasm-bindgen version.
