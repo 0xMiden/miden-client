@@ -152,11 +152,11 @@ export interface INotesScript {
 
 export interface IStateSync {
   id: number;
-  blockNum: string;
+  blockNum: number;
 }
 
 export interface IBlockHeader {
-  blockNum: string;
+  blockNum: number;
   header: Uint8Array;
   partialBlockchainPeaks: Uint8Array;
   hasClientNotes: string;
@@ -226,7 +226,7 @@ export type MidenDexie = Dexie & {
   outputNotes: Dexie.Table<IOutputNote, string>;
   notesScripts: Dexie.Table<INotesScript, string>;
   stateSync: Dexie.Table<IStateSync, number>;
-  blockHeaders: Dexie.Table<IBlockHeader, string>;
+  blockHeaders: Dexie.Table<IBlockHeader, number>;
   partialBlockchainNodes: Dexie.Table<IPartialBlockchainNode, string>;
   tags: Dexie.Table<ITag, number>;
   foreignAccountCode: Dexie.Table<IForeignAccountCode, string>;
@@ -249,7 +249,7 @@ export class MidenDatabase {
   outputNotes: Dexie.Table<IOutputNote, string>;
   notesScripts: Dexie.Table<INotesScript, string>;
   stateSync: Dexie.Table<IStateSync, number>;
-  blockHeaders: Dexie.Table<IBlockHeader, string>;
+  blockHeaders: Dexie.Table<IBlockHeader, number>;
   partialBlockchainNodes: Dexie.Table<IPartialBlockchainNode, string>;
   tags: Dexie.Table<ITag, number>;
   foreignAccountCode: Dexie.Table<IForeignAccountCode, string>;
@@ -331,7 +331,7 @@ export class MidenDatabase {
       Table.NotesScripts
     );
     this.stateSync = this.dexie.table<IStateSync, number>(Table.StateSync);
-    this.blockHeaders = this.dexie.table<IBlockHeader, string>(
+    this.blockHeaders = this.dexie.table<IBlockHeader, number>(
       Table.BlockHeaders
     );
     this.partialBlockchainNodes = this.dexie.table<
@@ -349,7 +349,7 @@ export class MidenDatabase {
 
     this.dexie.on("populate", () => {
       this.stateSync
-        .put({ id: 1, blockNum: "0" } as IStateSync)
+        .put({ id: 1, blockNum: 0 } as IStateSync)
         .catch((err: unknown) =>
           logWebStoreError(err, "Failed to populate DB")
         );
