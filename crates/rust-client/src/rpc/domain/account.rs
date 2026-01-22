@@ -5,7 +5,16 @@ use core::fmt::{self, Debug, Display, Formatter};
 
 use miden_protocol::Word;
 use miden_protocol::account::{
-    Account, AccountCode, AccountHeader, AccountId, AccountStorageHeader, StorageMap, StorageMapWitness, StorageSlotHeader, StorageSlotName, StorageSlotType
+    Account,
+    AccountCode,
+    AccountHeader,
+    AccountId,
+    AccountStorageHeader,
+    StorageMap,
+    StorageMapWitness,
+    StorageSlotHeader,
+    StorageSlotName,
+    StorageSlotType,
 };
 use miden_protocol::asset::Asset;
 use miden_protocol::block::BlockNumber;
@@ -440,14 +449,10 @@ pub enum StorageMapEntries {
 
 impl StorageMapEntries {
     /// Converts the entries into a [`StorageMap`].
-    pub fn into_storage_map(
-        self,
-    ) -> Result<StorageMap, miden_protocol::errors::StorageMapError> {
+    pub fn into_storage_map(self) -> Result<StorageMap, miden_protocol::errors::StorageMapError> {
         match self {
             StorageMapEntries::AllEntries(entries) => {
-                StorageMap::with_entries(
-                    entries.into_iter().map(|e| (e.key, e.value)),
-                )
+                StorageMap::with_entries(entries.into_iter().map(|e| (e.key, e.value)))
             },
             StorageMapEntries::EntriesWithProofs(witnesses) => {
                 let entries: Vec<_> =
