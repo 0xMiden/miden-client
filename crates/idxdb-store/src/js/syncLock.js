@@ -31,6 +31,7 @@ function getSyncState(dbId) {
             inProgress: false,
             errored: false,
             waiters: [],
+            syncGeneration: 0,
         };
         syncStates.set(dbId, state);
     }
@@ -81,10 +82,12 @@ export async function acquireSyncLock(dbId, timeoutMs) {
             state.waiters.push({ resolve: onResult, reject: onError });
         });
     }
-    // Mark sync as in progress
+    // Mark sync as in progress and increment generation
     state.inProgress = true;
     state.result = undefined;
     state.errored = false;
+    state.syncGeneration++;
+    const currentGeneration = state.syncGeneration;
     // Try to acquire Web Lock if available
     if (hasWebLocks()) {
         const lockName = `miden-sync-${dbId}`;
@@ -95,15 +98,25 @@ export async function acquireSyncLock(dbId, timeoutMs) {
             if (timeoutMs > 0) {
                 timeoutId = setTimeout(() => {
                     timedOut = true;
-                    state.inProgress = false;
+                    // Only clean up state if we're still the current sync operation
+                    if (state.syncGeneration === currentGeneration) {
+                        state.inProgress = false;
+                        // Reject all waiters since this sync operation is being cancelled
+                        const error = new Error("Sync lock acquisition timed out");
+                        for (const waiter of state.waiters) {
+                            waiter.reject(error);
+                        }
+                        state.waiters = [];
+                    }
                     reject(new Error("Sync lock acquisition timed out"));
                 }, timeoutMs);
             }
             // Request the Web Lock
             navigator.locks
                 .request(lockName, { mode: "exclusive" }, async () => {
-                if (timedOut) {
-                    // Already timed out, just return
+                // Check if timed out or if a newer sync operation has started
+                if (timedOut || state.syncGeneration !== currentGeneration) {
+                    // Stale lock acquisition, just return to release the Web Lock
                     return;
                 }
                 if (timeoutId)
@@ -117,7 +130,10 @@ export async function acquireSyncLock(dbId, timeoutMs) {
                 .catch((err) => {
                 if (timeoutId)
                     clearTimeout(timeoutId);
-                state.inProgress = false;
+                // Only clean up state if we're still the current sync operation
+                if (state.syncGeneration === currentGeneration) {
+                    state.inProgress = false;
+                }
                 reject(err instanceof Error ? err : new Error(String(err)));
             });
         });
