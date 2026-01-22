@@ -20,14 +20,18 @@ mod js_bindings;
 use js_bindings::{
     JsAccountUpdate,
     JsStateSyncUpdate,
+    idxdb_acquire_sync_lock,
     idxdb_add_note_tag,
     idxdb_apply_state_sync,
     idxdb_get_note_tags,
     idxdb_get_sync_height,
+    idxdb_release_sync_lock,
+    idxdb_release_sync_lock_with_error,
     idxdb_remove_note_tag,
 };
 
 mod models;
+pub use models::SyncLockHandle;
 use models::{NoteTagIdxdbObject, SyncHeightIdxdbObject};
 
 mod flattened_vec;
@@ -213,5 +217,43 @@ impl WebStore {
         await_js_value(promise, "failed to apply state sync").await?;
 
         Ok(())
+    }
+
+    /// Attempts to acquire a sync lock for coordinating concurrent sync operations.
+    ///
+    /// This method provides "coalescing" behavior:
+    /// - If no sync is in progress, returns a lock handle with `acquired: true`
+    /// - If a sync is already in progress, waits for it to complete and returns the result in
+    ///   `coalesced_result`
+    ///
+    /// This uses the Web Locks API for cross-tab coordination when available,
+    /// with an in-process mutex fallback for older browsers.
+    ///
+    /// # Arguments
+    /// * `timeout_ms` - Timeout in milliseconds (0 = no timeout)
+    ///
+    /// # Returns
+    /// A `SyncLockHandle` indicating whether the lock was acquired or if the
+    /// caller should use the coalesced result.
+    pub async fn acquire_sync_lock(&self, timeout_ms: u32) -> Result<SyncLockHandle, StoreError> {
+        let promise = idxdb_acquire_sync_lock(self.db_id(), timeout_ms);
+        await_js(promise, "failed to acquire sync lock").await
+    }
+
+    /// Releases the sync lock with a successful result.
+    ///
+    /// This notifies all waiting callers with the serialized result.
+    ///
+    /// # Arguments
+    /// * `result` - The serialized sync result bytes
+    pub fn release_sync_lock(&self, result: Vec<u8>) {
+        idxdb_release_sync_lock(self.db_id(), result);
+    }
+
+    /// Releases the sync lock due to an error.
+    ///
+    /// This notifies all waiting callers that the sync failed.
+    pub fn release_sync_lock_with_error(&self) {
+        idxdb_release_sync_lock_with_error(self.db_id());
     }
 }

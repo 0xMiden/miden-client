@@ -15,6 +15,26 @@ use crate::transaction::utils::SerializedTransactionData;
 // Sync IndexedDB Operations
 #[wasm_bindgen(module = "/src/js/sync.js")]
 extern "C" {
+    // SYNC LOCK
+    // --------------------------------------------------------------------------------------------
+
+    /// Acquires a sync lock for the given database.
+    /// Returns a Promise that resolves to an object with:
+    /// - `acquired: boolean` - true if lock was acquired, false if coalescing
+    /// - `coalescedResult?: Uint8Array` - result from in-progress sync if coalescing
+    #[wasm_bindgen(js_name = acquireSyncLock)]
+    pub fn idxdb_acquire_sync_lock(db_id: &str, timeout_ms: u32) -> js_sys::Promise;
+
+    /// Releases the sync lock with a successful result.
+    /// Notifies all waiting callers with the serialized result.
+    #[wasm_bindgen(js_name = releaseSyncLock)]
+    pub fn idxdb_release_sync_lock(db_id: &str, result: Vec<u8>);
+
+    /// Releases the sync lock due to an error.
+    /// Notifies all waiting callers that the sync failed.
+    #[wasm_bindgen(js_name = releaseSyncLockWithError)]
+    pub fn idxdb_release_sync_lock_with_error(db_id: &str);
+
     // GETS
     // --------------------------------------------------------------------------------------------
 
