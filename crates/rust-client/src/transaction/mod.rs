@@ -704,7 +704,7 @@ where
                 )
                 .await?;
             let foreign_account_inputs = match foreign_account {
-                ForeignAccount::Public(account_id,..) => {
+                ForeignAccount::Public(account_id, ..) => {
                     let foreign_account_inputs: AccountInputs =
                         account_proof_into_inputs(account_proof)?;
 

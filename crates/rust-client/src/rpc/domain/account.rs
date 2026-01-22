@@ -446,6 +446,26 @@ pub enum StorageMapEntries {
     EntriesWithProofs(Vec<StorageMapWitness>),
 }
 
+impl StorageMapEntries {
+    /// Converts the entries into a [`StorageMap`].
+    pub fn into_storage_map(
+        self,
+    ) -> Result<miden_protocol::account::StorageMap, miden_protocol::errors::StorageMapError> {
+        match self {
+            StorageMapEntries::AllEntries(entries) => {
+                miden_protocol::account::StorageMap::with_entries(
+                    entries.into_iter().map(|e| (e.key, e.value)),
+                )
+            },
+            StorageMapEntries::EntriesWithProofs(witnesses) => {
+                let entries: Vec<_> =
+                    witnesses.iter().flat_map(|w| w.entries().map(|(k, v)| (*k, *v))).collect();
+                miden_protocol::account::StorageMap::with_entries(entries)
+            },
+        }
+    }
+}
+
 // ACCOUNT VAULT DETAILS
 // ================================================================================================
 

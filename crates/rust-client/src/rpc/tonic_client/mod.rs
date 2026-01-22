@@ -24,9 +24,7 @@ use miden_tx::utils::sync::RwLock;
 use tonic::Status;
 use tracing::info;
 
-use super::domain::account::{
-    AccountProof, AccountStorageDetails, AccountUpdateSummary, StorageMapEntries,
-};
+use super::domain::account::{AccountProof, AccountStorageDetails, AccountUpdateSummary};
 use super::domain::{note::FetchedNote, nullifier::NullifierUpdate};
 use super::generated::rpc::account_request::AccountDetailRequest;
 use super::generated::rpc::AccountRequest;
@@ -151,8 +149,8 @@ impl GrpcClient {
                     .ok_or(RpcError::ExpectedDataMissing("details in public account".to_owned()))?
                     .into_domain(&BTreeMap::new())?;
                 let storage_header = account_details.storage_details.header;
-                // This is variable will hold the storage slots that are maps, below we will use it
-                // to actually fetch the storage maps details, since we now know the names of each
+                // This variable will hold the storage slots that are maps, below we will use it to
+                // actually fetch the storage maps details, since we now know the names of each
                 // storage slot.
                 let maps_to_request = storage_header
                     .slots()
@@ -197,9 +195,8 @@ impl GrpcClient {
         storage_details: &AccountStorageDetails,
     ) -> Result<Vec<StorageSlot>, RpcError> {
         let mut slots = vec![];
-        // It seems that sync_storage_maps will return information for *every*
-        // map for a given account, so this map_cache value should be
-        // fetched only once, hence the None placeholder
+        // `SyncStorageMaps` will return information for *every* map for a given account, so this
+        // map_cache value should be fetched only once, hence the None placeholder
         let mut map_cache: Option<StorageMapInfo> = None;
         for slot_header in storage_details.header.slots() {
             // We have two cases for each slot:
@@ -223,8 +220,7 @@ impl GrpcClient {
                         )),
                     )?;
 
-                    let mut map_entries = vec![];
-                    if map_details.too_many_entries {
+                    let storage_map = if map_details.too_many_entries {
                         let map_info = if let Some(ref info) = map_cache {
                             info
                         } else {
@@ -232,31 +228,25 @@ impl GrpcClient {
                                 self.sync_storage_maps(0_u32.into(), None, account_id).await?;
                             map_cache.insert(fetched_data)
                         };
-                        map_entries.extend(
-                            map_info
-                                .updates
-                                .iter()
-                                .filter(|slot_info| slot_info.slot_name == *slot_header.name())
-                                .map(|slot_info| (slot_info.key, slot_info.value)),
-                        );
+                        let map_entries: Vec<_> = map_info
+                            .updates
+                            .iter()
+                            .filter(|slot_info| slot_info.slot_name == *slot_header.name())
+                            .map(|slot_info| (slot_info.key, slot_info.value))
+                            .collect();
+                        StorageMap::with_entries(map_entries)
                     } else {
-                        match &map_details.entries {
-                            StorageMapEntries::AllEntries(entries) => {
-                                map_entries.extend(entries.iter().map(|e| (e.key, e.value)));
-                            },
-                            StorageMapEntries::EntriesWithProofs(entries) => {
-                                map_entries.extend(entries.iter().map(|e| (e.key, e.value)));
-                            },
-                        }
+                        map_details.entries.clone().into_storage_map()
                     }
+                    .map_err(|err| {
+                        RpcError::InvalidResponse(format!(
+                            "the rpc api returned a non-valid map entry: {err}"
+                        ))
+                    })?;
 
                     slots.push(miden_protocol::account::StorageSlot::with_map(
                         slot_header.name().clone(),
-                        StorageMap::with_entries(map_entries).map_err(|err| {
-                            RpcError::InvalidResponse(format!(
-                                "the rpc api returned a non-valid map entry: {err}"
-                            ))
-                        })?,
+                        storage_map,
                     ));
                 },
             }
@@ -530,9 +520,7 @@ impl NodeRpcClient for GrpcClient {
         let response = rpc_api
             .get_account(request)
             .await
-            .map_err(|status| {
-                RpcError::from_grpc_error(NodeRpcClientEndpoint::GetAccountProofs, status)
-            })?
+            .map_err(|status| RpcError::from_grpc_error(NodeRpcClientEndpoint::GetAccount, status))?
             .into_inner();
 
         let account_witness: AccountWitness = response

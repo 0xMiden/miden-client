@@ -402,7 +402,6 @@ pub enum NodeRpcClientEndpoint {
     SyncNullifiers,
     GetAccount,
     GetAccountStateDelta,
-    GetAccountProofs,
     GetBlockByNumber,
     GetBlockHeaderByNumber,
     GetNotesById,
@@ -422,9 +421,8 @@ impl fmt::Display for NodeRpcClientEndpoint {
             NodeRpcClientEndpoint::SyncNullifiers => {
                 write!(f, "sync_nullifiers")
             },
-            NodeRpcClientEndpoint::GetAccount => write!(f, "get_account_details"),
+            NodeRpcClientEndpoint::GetAccount => write!(f, "get_account"),
             NodeRpcClientEndpoint::GetAccountStateDelta => write!(f, "get_account_state_delta"),
-            NodeRpcClientEndpoint::GetAccountProofs => write!(f, "get_accounts"),
             NodeRpcClientEndpoint::GetBlockByNumber => write!(f, "get_block_by_number"),
             NodeRpcClientEndpoint::GetBlockHeaderByNumber => {
                 write!(f, "get_block_header_by_number")
