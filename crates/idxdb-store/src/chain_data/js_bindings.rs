@@ -11,7 +11,7 @@ extern "C" {
     // ================================================================================================
 
     #[wasm_bindgen(js_name = getBlockHeaders)]
-    pub fn idxdb_get_block_headers(db_id: &str, block_numbers: Vec<String>) -> js_sys::Promise;
+    pub fn idxdb_get_block_headers(db_id: &str, block_numbers: Vec<u32>) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = getTrackedBlockHeaders)]
     pub fn idxdb_get_tracked_block_headers(db_id: &str) -> js_sys::Promise;
@@ -31,7 +31,7 @@ extern "C" {
     #[wasm_bindgen(js_name = getPartialBlockchainPeaksByBlockNum)]
     pub fn idxdb_get_partial_blockchain_peaks_by_block_num(
         db_id: &str,
-        block_num: String,
+        block_num: u32,
     ) -> js_sys::Promise;
 
     // INSERTS
@@ -40,7 +40,7 @@ extern "C" {
     #[wasm_bindgen(js_name = insertBlockHeader)]
     pub fn idxdb_insert_block_header(
         db_id: &str,
-        block_num: String,
+        block_num: u32,
         header: Vec<u8>,
         partial_blockchain_peaks: Vec<u8>,
         has_client_notes: bool,

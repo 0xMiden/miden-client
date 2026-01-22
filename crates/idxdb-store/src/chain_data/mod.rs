@@ -72,10 +72,8 @@ impl WebStore {
         &self,
         block_numbers: &BTreeSet<BlockNumber>,
     ) -> Result<Vec<(BlockHeader, BlockRelevance)>, StoreError> {
-        let formatted_block_numbers_list: Vec<String> = block_numbers
-            .iter()
-            .map(|block_number| i64::from(block_number.as_u32()).to_string())
-            .collect();
+        let formatted_block_numbers_list: Vec<u32> =
+            block_numbers.iter().map(BlockNumber::as_u32).collect();
 
         let promise = idxdb_get_block_headers(self.db_id(), formatted_block_numbers_list);
         let block_headers_idxdb: Vec<Option<BlockHeaderIdxdbObject>> =
@@ -156,10 +154,10 @@ impl WebStore {
         &self,
         block_num: BlockNumber,
     ) -> Result<MmrPeaks, StoreError> {
-        let block_num_as_str = block_num.to_string();
+        let block_num_as_u32 = block_num.as_u32();
 
         let promise =
-            idxdb_get_partial_blockchain_peaks_by_block_num(self.db_id(), block_num_as_str);
+            idxdb_get_partial_blockchain_peaks_by_block_num(self.db_id(), block_num_as_u32);
         let mmr_peaks_idxdb: PartialBlockchainPeaksIdxdbObject =
             await_js(promise, "failed to get partial blockchain peaks by block number").await?;
 

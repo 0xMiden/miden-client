@@ -14,7 +14,7 @@ use wasm_bindgen::JsValue;
 use crate::chain_data::PartialBlockchainNodeIdxdbObject;
 
 pub struct SerializedBlockHeaderData {
-    pub block_num: String,
+    pub block_num: u32,
     pub header: Vec<u8>,
     pub partial_blockchain_peaks: Vec<u8>,
     pub has_client_notes: bool,
@@ -30,7 +30,7 @@ pub fn serialize_block_header(
     partial_blockchain_peaks: &[Word],
     has_client_notes: bool,
 ) -> SerializedBlockHeaderData {
-    let block_num = block_header.block_num().to_string();
+    let block_num = block_header.block_num().as_u32();
     let header = block_header.to_bytes();
     let partial_blockchain_peaks = partial_blockchain_peaks.to_bytes();
 

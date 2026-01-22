@@ -157,10 +157,10 @@ interface JsAccountUpdate {
 }
 
 interface JsStateSyncUpdate {
-  blockNum: string;
+  blockNum: number;
   flattenedNewBlockHeaders: FlattenedU8Vec;
   flattenedPartialBlockChainPeaks: FlattenedU8Vec;
-  newBlockNums: string[];
+  newBlockNums: number[];
   blockHasRelevantNotes: Uint8Array;
   serializedNodeIds: string[];
   serializedNodes: string[];
@@ -313,13 +313,13 @@ export async function applyStateSync(
   });
 }
 
-async function updateSyncHeight(tx: Transaction, blockNum: string) {
+async function updateSyncHeight(tx: Transaction, blockNum: number) {
   try {
     // Only update if moving forward to prevent race conditions
     const current = await (
       tx as Transaction & { stateSync: Dexie.Table<IStateSync, number> }
     ).stateSync.get(1);
-    if (!current || parseInt(current.blockNum) < parseInt(blockNum)) {
+    if (!current || current.blockNum < blockNum) {
       await (
         tx as Transaction & { stateSync: Dexie.Table<IStateSync, number> }
       ).stateSync.update(1, {
@@ -333,7 +333,7 @@ async function updateSyncHeight(tx: Transaction, blockNum: string) {
 
 async function updateBlockHeader(
   tx: Transaction,
-  blockNum: string,
+  blockNum: number,
   blockHeader: Uint8Array,
   partialBlockchainPeaks: Uint8Array,
   hasClientNotes: boolean
@@ -347,7 +347,7 @@ async function updateBlockHeader(
     };
 
     const existingBlockHeader = await (
-      tx as Transaction & { blockHeaders: Dexie.Table<IBlockHeader, string> }
+      tx as Transaction & { blockHeaders: Dexie.Table<IBlockHeader, number> }
     ).blockHeaders.get(blockNum);
 
     if (!existingBlockHeader) {
