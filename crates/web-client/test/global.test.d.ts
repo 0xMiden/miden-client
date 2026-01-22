@@ -15,7 +15,7 @@ import {
   Address,
   AddressInterface,
   AdviceMap,
-  AuthRpoFalcon512MultisigConfig,
+  AuthFalcon512RpoMultisigConfig,
   AuthSecretKey,
   BasicFungibleFaucetComponent,
   ConsumableNoteRecord,
@@ -75,7 +75,7 @@ import {
   MidenArrays,
   CodeBuilder,
   CodeBuilderMode,
-  createAuthRpoFalcon512Multisig,
+  createAuthFalcon512RpoMultisig,
 } from "../dist/index";
 import { MockWebClient, WebClient } from "../js";
 
@@ -103,7 +103,7 @@ declare global {
     Address: typeof Address;
     AddressInterface: typeof AddressInterface;
     AdviceMap: typeof AdviceMap;
-    AuthRpoFalcon512MultisigConfig: typeof AuthRpoFalcon512MultisigConfig;
+    AuthFalcon512RpoMultisigConfig: typeof AuthFalcon512RpoMultisigConfig;
     AuthSecretKey: typeof AuthSecretKey;
     BasicFungibleFaucetComponent: typeof BasicFungibleFaucetComponent;
     ConsumableNoteRecord: typeof ConsumableNoteRecord;
@@ -167,7 +167,7 @@ declare global {
     MidenArrays: typeof MidenArrays;
     CodeBuilder: typeof CodeBuilder;
     CodeBuilderMode: typeof CodeBuilderMode;
-    createAuthRpoFalcon512Multisig: typeof createAuthRpoFalcon512Multisig;
+    createAuthFalcon512RpoMultisig: typeof createAuthFalcon512RpoMultisig;
     createClient: () => Promise<void>;
 
     // Add the helpers namespace

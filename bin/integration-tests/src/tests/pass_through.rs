@@ -1,20 +1,19 @@
 use anyhow::Result;
 use miden_client::account::component::{
-    AuthRpoFalcon512Acl,
-    AuthRpoFalcon512AclConfig,
+    AuthFalcon512RpoAcl,
+    AuthFalcon512RpoAclConfig,
     BasicWallet,
 };
 use miden_client::account::{Account, AccountBuilder, AccountId, AccountStorageMode, AccountType};
 use miden_client::assembly::CodeBuilder;
 use miden_client::asset::{Asset, FungibleAsset};
-use miden_client::auth::TransactionAuthenticator;
+use miden_client::auth::{AuthSchemeId, TransactionAuthenticator};
 use miden_client::crypto::FeltRng;
 use miden_client::crypto::rpo_falcon512::SecretKey;
 use miden_client::note::{
     Note,
     NoteAssets,
     NoteDetails,
-    NoteExecutionHint,
     NoteFile,
     NoteInputs,
     NoteMetadata,
@@ -27,7 +26,7 @@ use miden_client::note::{
 use miden_client::store::{InputNoteState, TransactionFilter};
 use miden_client::testing::common::*;
 use miden_client::transaction::{OutputNote, TransactionRequestBuilder};
-use miden_client::{Client, ClientRng, Felt, Word};
+use miden_client::{Client, ClientRng, Word};
 use rand::RngCore;
 
 use crate::tests::config::ClientConfig;
@@ -59,14 +58,14 @@ pub async fn test_pass_through(client_config: ClientConfig) -> Result<()> {
         &mut client,
         AccountStorageMode::Private,
         &authenticator_1,
-        miden_client::auth::AuthSchemeId::RpoFalcon512,
+        AuthSchemeId::Falcon512Rpo,
     )
     .await?;
     let (target, ..) = insert_new_wallet(
         &mut client_2,
         AccountStorageMode::Private,
         &authenticator_2,
-        miden_client::auth::AuthSchemeId::RpoFalcon512,
+        AuthSchemeId::Falcon512Rpo,
     )
     .await?;
 
@@ -77,7 +76,7 @@ pub async fn test_pass_through(client_config: ClientConfig) -> Result<()> {
         &mut client,
         AccountStorageMode::Private,
         &authenticator_1,
-        miden_client::auth::AuthSchemeId::RpoFalcon512,
+        AuthSchemeId::Falcon512Rpo,
     )
     .await?;
 
@@ -200,11 +199,11 @@ async fn create_pass_through_account<AUTH: TransactionAuthenticator>(
     let key_pair = SecretKey::with_rng(client.rng());
     let pub_key = key_pair.public_key().to_commitment();
 
-    let acl_config = AuthRpoFalcon512AclConfig::new()
+    let acl_config = AuthFalcon512RpoAclConfig::new()
         .with_allow_unauthorized_input_notes(true)
         .with_allow_unauthorized_output_notes(true);
 
-    let auth_component = AuthRpoFalcon512Acl::new(pub_key.into(), acl_config).unwrap();
+    let auth_component = AuthFalcon512RpoAcl::new(pub_key.into(), acl_config).unwrap();
 
     let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountImmutableCode)
@@ -248,22 +247,15 @@ fn create_pass_through_note(
         target_recipient.digest()[1],
         target_recipient.digest()[2],
         target_recipient.digest()[3],
-        NoteExecutionHint::always().into(),
         NoteType::Public.into(),
-        Felt::new(0u64),
-        NoteTag::from_account_id(target).into(),
+        NoteTag::with_account_target(target).into(),
     ])?;
 
     let serial_num = rng.draw_word();
     let pass_through_recipient = NoteRecipient::new(serial_num, note_script, inputs);
 
-    let metadata = NoteMetadata::new(
-        sender,
-        NoteType::Public,
-        NoteTag::from_account_id(target), // this needs to change
-        NoteExecutionHint::always(),
-        Felt::new(0u64),
-    )?;
+    let metadata =
+        NoteMetadata::new(sender, NoteType::Public, NoteTag::with_account_target(target));
     let note = Note::new(NoteAssets::new(vec![asset])?, metadata, pass_through_recipient);
 
     let pass_through_note_details =

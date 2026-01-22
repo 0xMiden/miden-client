@@ -1,10 +1,10 @@
 use miden::protocol::active_note
 use miden::protocol::output_note
 
-# ERRORS
+# ERRORS
 # =================================================================================================
 
-# PASS_THROUGH script expects exactly 12 note inputs
+# PASS_THROUGH script expects exactly 10 note inputs
 const ERR_PASS_THROUGH_WRONG_NUMBER_OF_INPUTS="wrong number of inputs"
 
 #! PASS_THROUGH script:
@@ -16,18 +16,17 @@ const ERR_PASS_THROUGH_WRONG_NUMBER_OF_INPUTS="wrong number of inputs"
 #! Note inputs are assumed to be as follows:
 #! - ASSET
 #! - RECIPIENT
-#! - [hint, note_type, aux, tag]
+#! - [note_type, tag]
 begin
     # drop note arguments
     dropw
 
     # store note inputs into memory starting at address 0
-    # TODO use active_note once changes propagate to client repo
     push.0 exec.active_note::get_inputs
     # => [num_inputs, inputs_ptr]
 
-    # make sure the number of inputs is 12
-    eq.12 assert.err=ERR_PASS_THROUGH_WRONG_NUMBER_OF_INPUTS
+    # make sure the number of inputs is 10
+    eq.10 assert.err=ERR_PASS_THROUGH_WRONG_NUMBER_OF_INPUTS
     # => [inputs_ptr]
 
     # load ASSET
@@ -37,18 +36,20 @@ begin
     padw mem_loadw_be.4
     # => [RECIPIENT, ASSET]
 
-    padw mem_loadw_be.8
-    # => [tag, aux, note_type, execution_hint, RECIPIENT, ASSET]
+    # load note_type and tag from memory
+    mem_load.8 mem_load.9
+    # => [tag, note_type, RECIPIENT, ASSET]
 
     # create a note using inputs
+    # Inputs: [tag, note_type, RECIPIENT]
     exec.output_note::create
     # => [note_idx, ASSET]
 
     movdn.4
-    # => [ASSET, note_idx, pad(11)]
+    # => [ASSET, note_idx]
     # add asset to the note
     exec.output_note::add_asset
-    # => [ASSET, note_idx]
+    # => []
 
     # clean stack
     dropw dropw dropw dropw

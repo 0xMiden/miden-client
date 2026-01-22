@@ -24,6 +24,7 @@ use crate::rpc::domain::account::{
     AccountUpdateSummary,
     AccountVaultDetails,
     FetchedAccount,
+    StorageMapEntries,
     StorageMapEntry,
 };
 use crate::rpc::domain::account_vault::{AccountVaultInfo, AccountVaultUpdate};
@@ -350,7 +351,7 @@ impl MockRpcApi {
                             note.inclusion_proof().location().node_index_in_block(),
                         ),
                         note_id: Some(note.id().into()),
-                        metadata: Some((*note.metadata()).into()),
+                        metadata: Some(note.metadata().clone().into()),
                         inclusion_path: Some(note.inclusion_proof().note_path().clone().into()),
                     })
                 } else {
@@ -482,7 +483,7 @@ impl NodeRpcClient for MockRpcApi {
         for note in hit_notes {
             let fetched_note = match note {
                 MockChainNote::Private(note_id, note_metadata, note_inclusion_proof) => {
-                    let note_header = NoteHeader::new(*note_id, *note_metadata);
+                    let note_header = NoteHeader::new(*note_id, note_metadata.clone());
                     FetchedNote::Private(note_header, note_inclusion_proof.clone())
                 },
                 MockChainNote::Public(note, note_inclusion_proof) => {
@@ -537,7 +538,7 @@ impl NodeRpcClient for MockRpcApi {
 
     /// Returns the account proof for the specified account. The `known_account_code` parameter
     /// is ignored in the mock implementation and the latest account code is always returned.
-    async fn get_account_proof(
+    async fn get_account(
         &self,
         foreign_account: ForeignAccount,
         account_state: AccountStateAt,
@@ -559,16 +560,16 @@ impl NodeRpcClient for MockRpcApi {
                     if let Some(StorageSlotContent::Map(storage_map)) =
                         account.storage().get(slot_name).map(StorageSlot::content)
                     {
-                        let entries = storage_map
+                        let entries: Vec<StorageMapEntry> = storage_map
                             .entries()
                             .map(|(key, value)| StorageMapEntry { key: *key, value: *value })
-                            .collect::<Vec<StorageMapEntry>>();
+                            .collect();
 
                         let too_many_entries = entries.len() > 1000;
                         let account_storage_map_detail = AccountStorageMapDetails {
                             slot_name: slot_name.clone(),
                             too_many_entries,
-                            entries,
+                            entries: StorageMapEntries::AllEntries(entries),
                         };
 
                         map_details.push(account_storage_map_detail);

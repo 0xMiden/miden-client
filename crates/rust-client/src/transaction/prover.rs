@@ -31,7 +31,7 @@ impl TransactionProver for RemoteTransactionProver {
         &self,
         witness: TransactionInputs,
     ) -> Result<ProvenTransaction, TransactionProverError> {
-        let fut = RemoteTransactionProver::prove(self, witness);
+        let fut = RemoteTransactionProver::prove(self, &witness);
         fut.await
     }
 }

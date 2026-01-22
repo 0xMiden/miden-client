@@ -9,13 +9,20 @@ use miden_protocol::account::{
     PartialStorage,
     PartialStorageMap,
     StorageMap,
+    StorageMapWitness,
+    StorageSlotHeader,
 };
 use miden_protocol::asset::{AssetVault, PartialVault};
 use miden_protocol::transaction::AccountInputs;
 use miden_tx::utils::{Deserializable, DeserializationError, Serializable};
 
 use super::TransactionRequestError;
-use crate::rpc::domain::account::{AccountDetails, AccountProof, AccountStorageRequirements};
+use crate::rpc::domain::account::{
+    AccountDetails,
+    AccountProof,
+    AccountStorageRequirements,
+    StorageMapEntries,
+};
 
 // FOREIGN ACCOUNT
 // ================================================================================================
@@ -126,45 +133,77 @@ impl Deserializable for ForeignAccount {
     }
 }
 
-impl TryFrom<AccountProof> for AccountInputs {
-    type Error = TransactionRequestError;
+/// Converts an [`AccountProof`] to [`AccountInputs`] using the provided storage requirements.
+///
+/// The storage requirements are needed because when the node returns entries with proofs,
+/// the key/value fields in the proto response may not be populated. Instead, we use the
+/// originally requested keys from the storage requirements.
+pub fn account_proof_into_inputs(
+    account_proof: AccountProof,
+    storage_requirements: &AccountStorageRequirements,
+) -> Result<AccountInputs, TransactionRequestError> {
+    let (witness, account_details) = account_proof.into_parts();
 
-    fn try_from(value: AccountProof) -> Result<Self, Self::Error> {
-        let (witness, account_details) = value.into_parts();
+    if let Some(AccountDetails {
+        header: account_header,
+        code,
+        storage_details,
+        vault_details,
+    }) = account_details
+    {
+        // discard slot indices - not needed for execution
+        let account_storage_map_details = storage_details.map_details;
+        let mut storage_map_proofs = Vec::with_capacity(account_storage_map_details.len());
+        for account_storage_detail in account_storage_map_details {
+            let partial_storage = match account_storage_detail.entries {
+                StorageMapEntries::AllEntries(entries) => {
+                    // Full map available - create from all entries
+                    let storage_entries_iter = entries.iter().map(|e| (e.key, e.value));
+                    PartialStorageMap::new_full(
+                        StorageMap::with_entries(storage_entries_iter)
+                            .map_err(TransactionRequestError::StorageMapError)?,
+                    )
+                },
+                StorageMapEntries::EntriesWithProofs(entries_with_proofs) => {
+                    // Partial map - get commitment from storage header and create with proofs
+                    let slot_commitment = storage_details
+                        .header
+                        .slots()
+                        .find(|slot| *slot.name() == account_storage_detail.slot_name)
+                        .map(StorageSlotHeader::value)
+                        .ok_or_else(|| TransactionRequestError::ForeignAccountDataMissing)?;
 
-        if let Some(AccountDetails {
-            header: account_header,
-            code,
-            storage_details,
-            vault_details,
-        }) = account_details
-        {
-            // discard slot indices - not needed for execution
-            let account_storage_map_details = storage_details.map_details;
-            let mut storage_map_proofs = Vec::with_capacity(account_storage_map_details.len());
-            for account_storage_detail in account_storage_map_details {
-                let storage_entries_iter =
-                    account_storage_detail.entries.iter().map(|e| (e.key, e.value));
-                let partial_storage = PartialStorageMap::new_full(
-                    StorageMap::with_entries(storage_entries_iter)
-                        .map_err(TransactionRequestError::StorageMapError)?,
-                );
-                storage_map_proofs.push(partial_storage);
-            }
+                    // Get the requested keys for this slot from the storage requirements
+                    let requested_keys = storage_requirements
+                        .inner()
+                        .get(&account_storage_detail.slot_name)
+                        .ok_or_else(|| TransactionRequestError::ForeignAccountDataMissing)?;
 
-            let vault = AssetVault::new(&vault_details.assets)?;
-            return Ok(AccountInputs::new(
-                PartialAccount::new(
-                    account_header.id(),
-                    account_header.nonce(),
-                    code,
-                    PartialStorage::new(storage_details.header, storage_map_proofs.into_iter())?,
-                    PartialVault::new_full(vault),
-                    None,
-                )?,
-                witness,
-            ));
+                    let mut partial_map = PartialStorageMap::new(slot_commitment);
+                    for (entry, requested_key) in
+                        entries_with_proofs.into_iter().zip(requested_keys.iter())
+                    {
+                        let witness = StorageMapWitness::new(entry.proof, [*requested_key])?;
+                        partial_map.add(witness)?;
+                    }
+                    partial_map
+                },
+            };
+            storage_map_proofs.push(partial_storage);
         }
-        Err(TransactionRequestError::ForeignAccountDataMissing)
+
+        let vault = AssetVault::new(&vault_details.assets)?;
+        return Ok(AccountInputs::new(
+            PartialAccount::new(
+                account_header.id(),
+                account_header.nonce(),
+                code,
+                PartialStorage::new(storage_details.header, storage_map_proofs.into_iter())?,
+                PartialVault::new_full(vault),
+                None,
+            )?,
+            witness,
+        ));
     }
+    Err(TransactionRequestError::ForeignAccountDataMissing)
 }

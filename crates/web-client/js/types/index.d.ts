@@ -29,7 +29,7 @@ export {
   AdviceInputs,
   AdviceMap,
   AssetVault,
-  AuthRpoFalcon512MultisigConfig,
+  AuthFalcon512RpoMultisigConfig,
   AuthScheme,
   AuthSecretKey,
   BasicFungibleFaucetComponent,
@@ -63,9 +63,12 @@ export {
   JsVaultAsset,
   Library,
   MerklePath,
+  NetworkAccountTarget,
   NetworkId,
   NetworkType,
   Note,
+  NoteAttachment,
+  NoteAttachmentKind,
   NoteAndArgs,
   NoteAndArgsArray,
   NoteAssets,
@@ -138,7 +141,7 @@ export {
   TransactionStoreUpdate,
   TransactionSummary,
   Word,
-  createAuthRpoFalcon512Multisig,
+  createAuthFalcon512RpoMultisig,
 } from "./crates/miden_client_web";
 
 export type GetKeyCallback = (

@@ -30,10 +30,10 @@ opt-level = 1
 [workspace.dependencies]
 # Miden protocol dependencies
 miden-mast-package = { default-features = false, version = "0.20.1" }
-miden-protocol     = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base.git" }
-miden-standards    = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base.git" }
-miden-testing      = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base.git" }
-miden-tx           = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base.git" }
+miden-protocol     = { default-features = false, version = "0.13" }
+miden-standards    = { default-features = false, version = "0.13" }
+miden-testing      = { default-features = false, version = "0.13" }
+miden-tx           = { default-features = false, version = "0.13" }
 
 # Miden node dependencies
 miden-node-block-producer = { branch = "next", git = "https://github.com/0xMiden/miden-node.git" }
