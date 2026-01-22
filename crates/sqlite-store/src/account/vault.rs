@@ -133,11 +133,8 @@ impl SqliteStore {
                 .map(|(asset, _)| (asset.vault_key(), Asset::NonFungible(*asset))),
         );
 
-        removed_vault_keys.extend(
-            removed_nonfungible_assets
-                .iter()
-                .map(|(asset, _)| asset.vault_key()),
-        );
+        removed_vault_keys
+            .extend(removed_nonfungible_assets.iter().map(|(asset, _)| asset.vault_key()));
 
         const DELETE_QUERY: &str =
             "DELETE FROM account_assets WHERE root = ? AND vault_key IN rarray(?)";

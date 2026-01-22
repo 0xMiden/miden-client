@@ -336,7 +336,7 @@ impl SqliteStore {
             .0;
 
         let smt_forest = smt_forest.read().expect("smt_forest read lock not poisoned");
-        match smt_forest.get_asset_and_witness(header.vault_root(), vault_key.into()) {
+        match smt_forest.get_asset_and_witness(header.vault_root(), vault_key) {
             Ok((asset, witness)) => Ok(Some((asset, witness))),
             Err(StoreError::MerkleStoreError(MerkleError::UntrackedKey(_))) => Ok(None),
             Err(err) => Err(err),
