@@ -418,13 +418,7 @@ export async function undoAccountStates(dbId, accountCommitments) {
     }
 }
 export async function insertAccountPublicKey(dbId, pubKeyCommitmentHex, accountId) {
-    try {
-        const db = getDatabase(dbId);
-        await db.accountPublicKeys.put({ pubKeyCommitmentHex, accountId });
-    }
-    catch (error) {
-        logWebStoreError(error, `Error inserting account public key mapping: ${pubKeyCommitmentHex} -> ${accountId}`);
-    }
+    return insertAccountPublicKeys(dbId, [pubKeyCommitmentHex], accountId);
 }
 export async function insertAccountPublicKeys(dbId, pubKeyCommitmentHexes, accountId) {
     try {

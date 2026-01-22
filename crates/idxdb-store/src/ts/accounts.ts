@@ -565,15 +565,7 @@ export async function insertAccountPublicKey(
   pubKeyCommitmentHex: string,
   accountId: string
 ): Promise<void> {
-  try {
-    const db = getDatabase(dbId);
-    await db.accountPublicKeys.put({ pubKeyCommitmentHex, accountId });
-  } catch (error) {
-    logWebStoreError(
-      error,
-      `Error inserting account public key mapping: ${pubKeyCommitmentHex} -> ${accountId}`
-    );
-  }
+  return insertAccountPublicKeys(dbId, [pubKeyCommitmentHex], accountId);
 }
 
 export async function insertAccountPublicKeys(
