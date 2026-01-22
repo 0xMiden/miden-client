@@ -10,6 +10,7 @@ use miden_protocol::account::{
     AccountHeader,
     AccountId,
     AccountStorageHeader,
+    StorageMapWitness,
     StorageSlotHeader,
     StorageSlotName,
     StorageSlotType,
@@ -27,6 +28,7 @@ use crate::alloc::string::ToString;
 use crate::rpc::RpcError;
 use crate::rpc::domain::MissingFieldHelper;
 use crate::rpc::errors::RpcConversionError;
+use crate::rpc::generated::rpc::account_request::account_detail_request;
 use crate::rpc::generated::{self as proto};
 
 // FETCHED ACCOUNT
@@ -384,12 +386,23 @@ impl TryFrom<proto::rpc::account_storage_details::AccountStorageMapDetails>
                 StorageMapEntries::AllEntries(entries)
             },
             Some(Entries::EntriesWithProofs(entries_with_proofs)) => {
-                let entries = entries_with_proofs
+                let witnesses = entries_with_proofs
                     .entries
                     .into_iter()
-                    .map(core::convert::TryInto::try_into)
-                    .collect::<Result<Vec<StorageMapEntryWithProof>, RpcError>>()?;
-                StorageMapEntries::EntriesWithProofs(entries)
+                    .map(|entry| {
+                        let key: Word = entry
+                            .key
+                            .ok_or(RpcError::ExpectedDataMissing("key".into()))?
+                            .try_into()?;
+                        let proof: SmtProof = entry
+                            .proof
+                            .ok_or(RpcError::ExpectedDataMissing("proof".into()))?
+                            .try_into()?;
+                        StorageMapWitness::new(proof, [key])
+                            .map_err(|e| RpcError::InvalidResponse(e.to_string()))
+                    })
+                    .collect::<Result<Vec<StorageMapWitness>, RpcError>>()?;
+                StorageMapEntries::EntriesWithProofs(witnesses)
             },
             None => StorageMapEntries::AllEntries(Vec::new()),
         };
@@ -420,30 +433,6 @@ impl TryFrom<proto::rpc::account_storage_details::account_storage_map_details::a
     }
 }
 
-// STORAGE MAP ENTRY WITH PROOF
-// ================================================================================================
-
-/// A storage map entry containing a key-value pair and its SMT proof.
-#[derive(Clone, Debug)]
-pub struct StorageMapEntryWithProof {
-    pub key: Word,
-    pub value: Word,
-    pub proof: SmtProof,
-}
-
-impl TryFrom<proto::rpc::account_storage_details::account_storage_map_details::map_entries_with_proofs::StorageMapEntryWithProof>
-    for StorageMapEntryWithProof
-{
-    type Error = RpcError;
-
-    fn try_from(value: proto::rpc::account_storage_details::account_storage_map_details::map_entries_with_proofs::StorageMapEntryWithProof) -> Result<Self, Self::Error> {
-        let key = value.key.ok_or(RpcError::ExpectedDataMissing("key".into()))?.try_into()?;
-        let value_word = value.value.ok_or(RpcError::ExpectedDataMissing("value".into()))?.try_into()?;
-        let proof = value.proof.ok_or(RpcError::ExpectedDataMissing("proof".into()))?.try_into()?;
-        Ok(Self { key, value: value_word, proof })
-    }
-}
-
 // STORAGE MAP ENTRIES
 // ================================================================================================
 
@@ -454,7 +443,7 @@ pub enum StorageMapEntries {
     /// All entries in the storage map (no proofs needed as the full map is available).
     AllEntries(Vec<StorageMapEntry>),
     /// Specific entries with their SMT proofs (for partial maps).
-    EntriesWithProofs(Vec<StorageMapEntryWithProof>),
+    EntriesWithProofs(Vec<StorageMapWitness>),
 }
 
 // ACCOUNT VAULT DETAILS
@@ -661,22 +650,15 @@ impl AccountStorageRequirements {
     }
 }
 
-impl From<AccountStorageRequirements>
-    for Vec<proto::rpc::account_request::account_detail_request::StorageMapDetailRequest>
-{
+impl From<AccountStorageRequirements> for Vec<account_detail_request::StorageMapDetailRequest> {
     fn from(
         value: AccountStorageRequirements,
-    ) -> Vec<proto::rpc::account_request::account_detail_request::StorageMapDetailRequest> {
-        use proto::rpc::account_request::account_detail_request;
-        use proto::rpc::account_request::account_detail_request::storage_map_detail_request;
+    ) -> Vec<account_detail_request::StorageMapDetailRequest> {
+        use account_detail_request;
+        use account_detail_request::storage_map_detail_request;
         let request_map = value.0;
         let mut requests = Vec::with_capacity(request_map.len());
         for (slot_name, _map_keys) in request_map {
-            // TODO: We request all entries instead of specific keys with proofs because the node
-            // currently doesn't correctly generate SMT proofs for MapKeys requests. Once the node
-            // properly supports proof generation for specific keys, this can be changed back to
-            // use MapKeys for more efficient partial map retrieval with large storage maps.
-            // See: https://github.com/0xMiden/miden-client/issues/XXXX
             let slot_data = Some(storage_map_detail_request::SlotData::AllEntries(true));
             requests.push(account_detail_request::StorageMapDetailRequest {
                 slot_name: slot_name.to_string(),

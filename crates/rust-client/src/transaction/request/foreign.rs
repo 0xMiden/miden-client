@@ -9,8 +9,6 @@ use miden_protocol::account::{
     PartialStorage,
     PartialStorageMap,
     StorageMap,
-    StorageMapWitness,
-    StorageSlotHeader,
 };
 use miden_protocol::asset::{AssetVault, PartialVault};
 use miden_protocol::transaction::AccountInputs;
@@ -133,14 +131,9 @@ impl Deserializable for ForeignAccount {
     }
 }
 
-/// Converts an [`AccountProof`] to [`AccountInputs`] using the provided storage requirements.
-///
-/// The storage requirements are needed because when the node returns entries with proofs,
-/// the key/value fields in the proto response may not be populated. Instead, we use the
-/// originally requested keys from the storage requirements.
+/// Converts an [`AccountProof`] to [`AccountInputs`].
 pub fn account_proof_into_inputs(
     account_proof: AccountProof,
-    storage_requirements: &AccountStorageRequirements,
 ) -> Result<AccountInputs, TransactionRequestError> {
     let (witness, account_details) = account_proof.into_parts();
 
@@ -164,29 +157,9 @@ pub fn account_proof_into_inputs(
                             .map_err(TransactionRequestError::StorageMapError)?,
                     )
                 },
-                StorageMapEntries::EntriesWithProofs(entries_with_proofs) => {
-                    // Partial map - get commitment from storage header and create with proofs
-                    let slot_commitment = storage_details
-                        .header
-                        .slots()
-                        .find(|slot| *slot.name() == account_storage_detail.slot_name)
-                        .map(StorageSlotHeader::value)
-                        .ok_or_else(|| TransactionRequestError::ForeignAccountDataMissing)?;
-
-                    // Get the requested keys for this slot from the storage requirements
-                    let requested_keys = storage_requirements
-                        .inner()
-                        .get(&account_storage_detail.slot_name)
-                        .ok_or_else(|| TransactionRequestError::ForeignAccountDataMissing)?;
-
-                    let mut partial_map = PartialStorageMap::new(slot_commitment);
-                    for (entry, requested_key) in
-                        entries_with_proofs.into_iter().zip(requested_keys.iter())
-                    {
-                        let witness = StorageMapWitness::new(entry.proof, [*requested_key])?;
-                        partial_map.add(witness)?;
-                    }
-                    partial_map
+                StorageMapEntries::EntriesWithProofs(witnesses) => {
+                    // Partial map - create from witnesses
+                    PartialStorageMap::with_witnesses(witnesses)?
                 },
             };
             storage_map_proofs.push(partial_storage);

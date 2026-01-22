@@ -704,9 +704,9 @@ where
                 )
                 .await?;
             let foreign_account_inputs = match foreign_account {
-                ForeignAccount::Public(account_id, ref storage_requirements) => {
+                ForeignAccount::Public(account_id,..) => {
                     let foreign_account_inputs: AccountInputs =
-                        account_proof_into_inputs(account_proof, storage_requirements)?;
+                        account_proof_into_inputs(account_proof)?;
 
                     // Update our foreign account code cache
                     self.store
