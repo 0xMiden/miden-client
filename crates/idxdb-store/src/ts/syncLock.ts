@@ -229,8 +229,12 @@ export function releaseSyncLock(dbId: string, result: Uint8Array): void {
  * This notifies all waiting callers that the sync failed.
  *
  * @param dbId - The database ID
+ * @param errorMessage - Optional error message to include in the error sent to waiters
  */
-export function releaseSyncLockWithError(dbId: string): void {
+export function releaseSyncLockWithError(
+  dbId: string,
+  errorMessage?: string
+): void {
   const state = getSyncState(dbId);
 
   if (!state.inProgress) {
@@ -241,8 +245,8 @@ export function releaseSyncLockWithError(dbId: string): void {
   state.errored = true;
   state.inProgress = false;
 
-  // Notify all waiters of the error
-  const error = new Error("Sync operation failed");
+  // Notify all waiters of the error with the actual error message if provided
+  const error = new Error(errorMessage || "Sync operation failed");
   for (const waiter of state.waiters) {
     waiter.reject(error);
   }

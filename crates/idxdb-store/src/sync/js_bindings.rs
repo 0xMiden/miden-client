@@ -31,9 +31,9 @@ extern "C" {
     pub fn idxdb_release_sync_lock(db_id: &str, result: Vec<u8>);
 
     /// Releases the sync lock due to an error.
-    /// Notifies all waiting callers that the sync failed.
+    /// Notifies all waiting callers that the sync failed with the provided error message.
     #[wasm_bindgen(js_name = releaseSyncLockWithError)]
-    pub fn idxdb_release_sync_lock_with_error(db_id: &str);
+    pub fn idxdb_release_sync_lock_with_error(db_id: &str, error_message: Option<String>);
 
     // GETS
     // --------------------------------------------------------------------------------------------

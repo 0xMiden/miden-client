@@ -252,8 +252,8 @@ impl WebStore {
 
     /// Releases the sync lock due to an error.
     ///
-    /// This notifies all waiting callers that the sync failed.
-    pub fn release_sync_lock_with_error(&self) {
-        idxdb_release_sync_lock_with_error(self.db_id());
+    /// This notifies all waiting callers that the sync failed with the provided error message.
+    pub fn release_sync_lock_with_error(&self, error_message: Option<String>) {
+        idxdb_release_sync_lock_with_error(self.db_id(), error_message);
     }
 }

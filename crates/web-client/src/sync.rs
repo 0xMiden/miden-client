@@ -55,8 +55,9 @@ impl WebClient {
                     Ok(sync_summary.into())
                 },
                 Err(err) => {
-                    // Release the lock with error
-                    store.release_sync_lock_with_error();
+                    // Release the lock with error, passing the error message to waiters
+                    let error_message = format!("failed to sync state: {err}");
+                    store.release_sync_lock_with_error(Some(error_message.clone()));
                     Err(js_error_with_context(err, "failed to sync state"))
                 },
             }
