@@ -1027,6 +1027,30 @@ Returns the inner serialized mock note transport node if it exists.
 
 ***
 
+### setDebugMode()
+
+> **setDebugMode**(`enabled`): `void`
+
+Sets the debug mode for transaction execution.
+
+When enabled, the transaction executor will record additional information useful for
+debugging (the values on the VM stack and the state of the advice provider). This is
+disabled by default since it adds overhead.
+
+Must be called before `createClient`.
+
+#### Parameters
+
+##### enabled
+
+`boolean`
+
+#### Returns
+
+`void`
+
+***
+
 ### setSetting()
 
 > **setSetting**(`key`, `value`): `Promise`\<`void`\>
