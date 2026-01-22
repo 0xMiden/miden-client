@@ -406,15 +406,19 @@ test.describe("Sync Lock Tests", () => {
 });
 
 test.describe("Cross-Tab Sync Lock Tests", () => {
-  test("syncs from different browser contexts are coordinated", async ({
+  // Note: Web Locks are shared between pages (tabs) within the same browser context.
+  // Different browser contexts do NOT share Web Locks. These tests use multiple pages
+  // from the same context to properly test cross-tab coordination.
+
+  test("syncs from different pages are coordinated via Web Locks", async ({
     browser,
   }) => {
-    // Create two separate browser contexts (simulates different tabs)
-    const context1 = await browser.newContext();
-    const context2 = await browser.newContext();
+    // Create a single context with multiple pages (simulates multiple tabs)
+    // Pages in the same context share Web Locks, enabling cross-tab coordination
+    const context = await browser.newContext();
 
-    const page1 = await context1.newPage();
-    const page2 = await context2.newPage();
+    const page1 = await context.newPage();
+    const page2 = await context.newPage();
 
     try {
       // Set up both pages
@@ -430,7 +434,7 @@ test.describe("Cross-Tab Sync Lock Tests", () => {
 
             const rpcUrl = `http://localhost:${MIDEN_NODE_PORT}`;
             window.rpcUrl = rpcUrl;
-            // Both tabs use the same store name for cross-tab coordination
+            // Both pages use the same store name for cross-tab coordination
             const client = await window.WebClient.createClient(
               rpcUrl,
               undefined,
@@ -445,7 +449,8 @@ test.describe("Cross-Tab Sync Lock Tests", () => {
 
       await Promise.all([setupPage(page1), setupPage(page2)]);
 
-      // Fire syncs from both tabs concurrently
+      // Fire syncs from both pages concurrently
+      // Web Locks should ensure they are serialized (one completes before the other starts)
       const [result1, result2] = await Promise.all([
         page1.evaluate(async () => {
           const startTime = Date.now();
@@ -467,25 +472,23 @@ test.describe("Cross-Tab Sync Lock Tests", () => {
         }),
       ]);
 
-      // Both tabs should get valid results
+      // Both pages should get valid results
       expect(typeof result1.blockNum).toBe("number");
       expect(typeof result2.blockNum).toBe("number");
       expect(result1.blockNum).toBeGreaterThanOrEqual(0);
       expect(result2.blockNum).toBeGreaterThanOrEqual(0);
     } finally {
-      await context1.close();
-      await context2.close();
+      await context.close();
     }
   });
 
-  test("rapid syncs from multiple tabs all complete", async ({ browser }) => {
-    const context1 = await browser.newContext();
-    const context2 = await browser.newContext();
-    const context3 = await browser.newContext();
+  test("rapid syncs from multiple pages all complete", async ({ browser }) => {
+    // Create a single context with multiple pages
+    const context = await browser.newContext();
 
-    const page1 = await context1.newPage();
-    const page2 = await context2.newPage();
-    const page3 = await context3.newPage();
+    const page1 = await context.newPage();
+    const page2 = await context.newPage();
+    const page3 = await context.newPage();
 
     try {
       const MIDEN_NODE_PORT = 57291;
@@ -514,7 +517,8 @@ test.describe("Cross-Tab Sync Lock Tests", () => {
 
       await Promise.all([setupPage(page1), setupPage(page2), setupPage(page3)]);
 
-      // Fire multiple syncs from all tabs concurrently
+      // Fire multiple syncs from all pages concurrently
+      // Web Locks ensures these are serialized across pages
       const results = await Promise.all([
         page1.evaluate(() =>
           window.client.syncState().then((r) => r.blockNum())
@@ -543,9 +547,7 @@ test.describe("Cross-Tab Sync Lock Tests", () => {
         expect(blockNum).toBeGreaterThanOrEqual(0);
       });
     } finally {
-      await context1.close();
-      await context2.close();
-      await context3.close();
+      await context.close();
     }
   });
 });
