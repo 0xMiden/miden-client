@@ -1133,6 +1133,37 @@ chain tip is performed, and the required block header is retrieved.
 
 > **syncState**(): `Promise`\<[`SyncSummary`](SyncSummary.md)\>
 
+Syncs the client state with the node.
+
+This method coordinates concurrent sync calls using the Web Locks API when available,
+with an in-process mutex fallback for older browsers. If a sync is already in progress,
+subsequent callers will wait and receive the same result (coalescing behavior).
+
+#### Returns
+
+`Promise`\<[`SyncSummary`](SyncSummary.md)\>
+
+***
+
+### syncStateWithTimeout()
+
+> **syncStateWithTimeout**(`timeout_ms`): `Promise`\<[`SyncSummary`](SyncSummary.md)\>
+
+Syncs the client state with the node with an optional timeout.
+
+This method coordinates concurrent sync calls using the Web Locks API when available,
+with an in-process mutex fallback for older browsers. If a sync is already in progress,
+subsequent callers will wait and receive the same result (coalescing behavior).
+
+# Arguments
+* `timeout_ms` - Timeout in milliseconds (0 = no timeout)
+
+#### Parameters
+
+##### timeout\_ms
+
+`number`
+
 #### Returns
 
 `Promise`\<[`SyncSummary`](SyncSummary.md)\>
