@@ -226,7 +226,7 @@ export type MidenDexie = Dexie & {
   outputNotes: Dexie.Table<IOutputNote, string>;
   notesScripts: Dexie.Table<INotesScript, string>;
   stateSync: Dexie.Table<IStateSync, number>;
-  blockHeaders: Dexie.Table<IBlockHeader, string>;
+  blockHeaders: Dexie.Table<IBlockHeader, number>;
   partialBlockchainNodes: Dexie.Table<IPartialBlockchainNode, number>;
   tags: Dexie.Table<ITag, number>;
   foreignAccountCode: Dexie.Table<IForeignAccountCode, string>;
@@ -249,7 +249,7 @@ export class MidenDatabase {
   outputNotes: Dexie.Table<IOutputNote, string>;
   notesScripts: Dexie.Table<INotesScript, string>;
   stateSync: Dexie.Table<IStateSync, number>;
-  blockHeaders: Dexie.Table<IBlockHeader, string>;
+  blockHeaders: Dexie.Table<IBlockHeader, number>;
   partialBlockchainNodes: Dexie.Table<IPartialBlockchainNode, number>;
   tags: Dexie.Table<ITag, number>;
   foreignAccountCode: Dexie.Table<IForeignAccountCode, string>;
