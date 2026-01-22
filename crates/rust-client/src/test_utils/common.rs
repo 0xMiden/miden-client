@@ -293,11 +293,10 @@ pub async fn wait_for_blocks_no_sync(client: &mut TestClient, amount_of_blocks: 
 pub async fn wait_for_node(client: &mut TestClient) {
     const NODE_TIME_BETWEEN_ATTEMPTS: u64 = 2;
     const NUMBER_OF_NODE_ATTEMPTS: u64 = 60;
-
+    println!(
+        "Waiting for Node to be up. Checking every {NODE_TIME_BETWEEN_ATTEMPTS}s for {NUMBER_OF_NODE_ATTEMPTS} tries..."
+    );
     for _try_number in 0..NUMBER_OF_NODE_ATTEMPTS {
-        println!(
-            "Waiting for Node to be up. Checking every {NODE_TIME_BETWEEN_ATTEMPTS}s for {NUMBER_OF_NODE_ATTEMPTS} tries..."
-        );
         match client.sync_state().await {
             Err(ClientError::RpcError(RpcError::ConnectionError(_))) => {
                 std::thread::sleep(Duration::from_secs(NODE_TIME_BETWEEN_ATTEMPTS));
