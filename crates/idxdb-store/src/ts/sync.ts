@@ -24,13 +24,6 @@ import { logWebStoreError, uint8ArrayToBase64 } from "./utils.js";
 import { Transaction } from "dexie";
 import Dexie from "dexie";
 
-// Re-export sync lock functions for wasm-bindgen
-export {
-  acquireSyncLock,
-  releaseSyncLock,
-  releaseSyncLockWithError,
-} from "./syncLock.js";
-
 export async function getNoteTags(dbId: string) {
   try {
     const db = getDatabase(dbId);

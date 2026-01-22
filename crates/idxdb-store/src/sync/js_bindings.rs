@@ -12,12 +12,9 @@ use crate::account::{JsStorageMapEntry, JsStorageSlot, JsVaultAsset};
 use crate::note::utils::{SerializedInputNoteData, SerializedOutputNoteData};
 use crate::transaction::utils::SerializedTransactionData;
 
-// Sync IndexedDB Operations
-#[wasm_bindgen(module = "/src/js/sync.js")]
+// Sync Lock Operations (separate module to ensure bundler includes it)
+#[wasm_bindgen(module = "/src/js/syncLock.js")]
 extern "C" {
-    // SYNC LOCK
-    // --------------------------------------------------------------------------------------------
-
     /// Acquires a sync lock for the given database.
     /// Returns a Promise that resolves to an object with:
     /// - `acquired: boolean` - true if lock was acquired, false if coalescing
@@ -34,7 +31,11 @@ extern "C" {
     /// Notifies all waiting callers that the sync failed with the provided error message.
     #[wasm_bindgen(js_name = releaseSyncLockWithError)]
     pub fn idxdb_release_sync_lock_with_error(db_id: &str, error_message: Option<String>);
+}
 
+// Sync IndexedDB Operations
+#[wasm_bindgen(module = "/src/js/sync.js")]
+extern "C" {
     // GETS
     // --------------------------------------------------------------------------------------------
 

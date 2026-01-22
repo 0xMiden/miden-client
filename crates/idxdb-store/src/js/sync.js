@@ -3,8 +3,6 @@ import { upsertTransactionRecord, insertTransactionScript, } from "./transaction
 import { upsertInputNote, upsertOutputNote } from "./notes.js";
 import { upsertAccountStorage, upsertAccountRecord, upsertVaultAssets, upsertStorageMapEntries, } from "./accounts.js";
 import { logWebStoreError, uint8ArrayToBase64 } from "./utils.js";
-// Re-export sync lock functions for wasm-bindgen
-export { acquireSyncLock, releaseSyncLock, releaseSyncLockWithError, } from "./syncLock.js";
 export async function getNoteTags(dbId) {
     try {
         const db = getDatabase(dbId);
