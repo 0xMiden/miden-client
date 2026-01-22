@@ -16,10 +16,14 @@ pub struct BlockHeaderIdxdbObject {
     pub has_client_notes: bool,
 }
 
+/// Represents a partial blockchain node stored in `IndexedDB`.
+///
+/// Note: `id` is stored as `u32` because this store is WASM-only, where `usize` is 32 bits.
+/// This limits WASM clients to blockchains with up to ~2^31 blocks (see `utils.rs` for details).
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PartialBlockchainNodeIdxdbObject {
-    pub id: u64,
+    pub id: u32,
     pub node: String,
 }
 
