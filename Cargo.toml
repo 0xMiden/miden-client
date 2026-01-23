@@ -43,7 +43,7 @@ miden-node-rpc = { branch = "next", git = "https://github.com/0xMiden/miden-node
 miden-node-store = { branch = "next", git = "https://github.com/0xMiden/miden-node.git" }
 miden-node-utils = { branch = "next", git = "https://github.com/0xMiden/miden-node.git" }
 miden-node-validator = { branch = "next", git = "https://github.com/0xMiden/miden-node.git" }
-miden-note-transport-proto-build = { branch = "main", default-features = false, git = "https://github.com/0xMiden/miden-note-transport.git" }
+miden-note-transport-proto-build = { branch = "mmagician-update-base-v0.13", default-features = false, git = "https://github.com/0xMiden/miden-note-transport.git" }
 miden-remote-prover = { branch = "next", features = ["concurrent"], git = "https://github.com/0xMiden/miden-node.git" }
 miden-remote-prover-client = { branch = "next", default-features = false, features = [
   "tx-prover",

@@ -10,6 +10,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 TRANSPORT_DIR=${TRANSPORT_DIR:-.tmp/miden-note-transport}
 REPO_URL=${REPO_URL:-https://github.com/0xMiden/miden-note-transport}
+BRANCH=${TRANSPORT_BRANCH:-mmagician-update-base-v0.13}
 RUN_CMD=${TRANSPORT_RUN_CMD:-cargo run --release --locked}
 
 # Shared target directory (important for CI speed: ends up under repo `target/` which is cached)
@@ -21,18 +22,13 @@ mkdir -p "$(dirname "$TRANSPORT_DIR")"
 mkdir -p "$TRANSPORT_CARGO_TARGET_DIR"
 
 if [ ! -d "$TRANSPORT_DIR/.git" ]; then
-  echo "Cloning note transport repo into $TRANSPORT_DIR";
-  git clone --depth=1 "$REPO_URL" "$TRANSPORT_DIR"
+  echo "Cloning note transport repo (branch: $BRANCH) into $TRANSPORT_DIR";
+  git clone --depth=1 -b "$BRANCH" "$REPO_URL" "$TRANSPORT_DIR"
 else
-  echo "Updating note transport repo in $TRANSPORT_DIR";
-  git -C "$TRANSPORT_DIR" fetch --prune
-  # Reset to the default remote HEAD to avoid local drift on CI
-  DEFAULT_REF=$(git -C "$TRANSPORT_DIR" symbolic-ref --quiet refs/remotes/origin/HEAD || true)
-  if [ -n "${DEFAULT_REF:-}" ]; then
-    git -C "$TRANSPORT_DIR" reset --hard "$DEFAULT_REF"
-  else
-    git -C "$TRANSPORT_DIR" reset --hard origin/HEAD || true
-  fi
+  echo "Updating note transport repo in $TRANSPORT_DIR (branch: $BRANCH)";
+  git -C "$TRANSPORT_DIR" fetch --prune origin "$BRANCH"
+  git -C "$TRANSPORT_DIR" checkout "$BRANCH"
+  git -C "$TRANSPORT_DIR" reset --hard "origin/$BRANCH"
 fi
 
 echo "Building note transport service..."
