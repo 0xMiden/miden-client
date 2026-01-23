@@ -37,6 +37,22 @@ jobs:
       - name: Run doc-tests
         run: make test-docs
 
+  test-react-sdk:
+    name: Test React SDK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@main
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install dependencies
+        run: |
+          cd ./crates/react-sdk
+          yarn install
+      - name: Run unit tests
+        run: make test-react-sdk
+
   integration-tests:
     name: Run integration tests on ubuntu-latest
     runs-on: ubuntu-latest

@@ -45,6 +45,24 @@ jobs:
       - uses: actions/checkout@v4
       - run: make rust-client-ts-lint
 
+  react-sdk-lint:
+    name: "React SDK lint and typecheck"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install dependencies
+        run: |
+          cd ./crates/react-sdk
+          yarn install
+      - name: Run lint
+        run: make react-sdk-lint
+      - name: Run typecheck
+        run: cd ./crates/react-sdk && yarn typecheck
+
   clippy:
     name: Clippy
     runs-on: ubuntu-latest

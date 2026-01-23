@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>React SDK Integration Tests</title>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module">
+    // Import the SDK from web-client dist (served at /sdk/)
+    const initSdk = async () => {
+      try {
+        const sdkExports = await import('/sdk/index.js');
+
+        // Expose all SDK exports on window for Playwright tests
+        for (const [key, value] of Object.entries(sdkExports)) {
+          window[key] = value;
+        }
+
+        console.log('SDK loaded successfully. Available exports:', Object.keys(sdkExports));
+        window.sdkLoaded = true;
+        window.testAppReady = true;
+      } catch (err) {
+        console.error('Failed to load SDK:', err);
+        window.sdkLoadError = err.message;
+        window.testAppReady = true; // Still mark ready so tests can check and skip
+      }
+    };
+
+    initSdk();
+  </script>
+</body>
+</html>

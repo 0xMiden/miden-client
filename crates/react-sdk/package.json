@@ -1,0 +1,69 @@
+{
+  "name": "@miden-sdk/react",
+  "version": "0.12.0",
+  "description": "React hooks library for Miden Web Client",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm --dts --clean",
+    "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run",
+    "test:integration": "playwright test",
+    "test:all": "vitest run && playwright test"
+  },
+  "peerDependencies": {
+    "@demox-labs/miden-sdk": ">=0.12.0",
+    "react": ">=18.0.0"
+  },
+  "dependencies": {
+    "zustand": "^5.0.0"
+  },
+  "devDependencies": {
+    "@demox-labs/miden-sdk": "^0.12.5",
+    "@playwright/test": "^1.55.0",
+    "@testing-library/react": "^14.0.0",
+    "@types/react": "^18.2.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.0.0",
+    "http-server": "^14.1.1",
+    "jsdom": "^24.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^1.0.0"
+  },
+  "keywords": [
+    "miden",
+    "react",
+    "hooks",
+    "blockchain",
+    "rollup",
+    "zk"
+  ],
+  "author": "Miden Contributors",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/0xMiden/miden-client"
+  },
+  "bugs": {
+    "url": "https://github.com/0xMiden/miden-client/issues"
+  }
+}

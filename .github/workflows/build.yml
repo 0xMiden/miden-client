@@ -32,3 +32,19 @@ jobs:
         uses: Swatinem/rust-cache@v2
       - name: make - build-wasm
         run: make build-wasm
+
+  build-react-sdk:
+    name: Build React SDK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@main
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install dependencies
+        run: |
+          cd ./crates/react-sdk
+          yarn install
+      - name: Build React SDK
+        run: make build-react-sdk
