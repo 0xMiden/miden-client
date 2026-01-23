@@ -725,7 +725,7 @@ impl NodeRpcClient for GrpcClient {
         let mut rpc_api = self.ensure_connected().await?;
 
         while !target_block_reached {
-            let request = proto::rpc::SyncStorageMapsRequest {
+            let request = proto::rpc::SyncAccountStorageMapsRequest {
                 block_range: Some(BlockRange {
                     block_from: current_block_from,
                     block_to: block_to.map(|b| b.as_u32()),
@@ -733,7 +733,7 @@ impl NodeRpcClient for GrpcClient {
                 account_id: Some(account_id.into()),
             };
 
-            let response = rpc_api.sync_storage_maps(request).await.map_err(|status| {
+            let response = rpc_api.sync_account_storage_maps(request).await.map_err(|status| {
                 RpcError::from_grpc_error(NodeRpcClientEndpoint::SyncStorageMaps, status)
             })?;
             let response = response.into_inner();

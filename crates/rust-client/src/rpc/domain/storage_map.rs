@@ -26,12 +26,12 @@ pub struct StorageMapInfo {
 // STORAGE MAP INFO CONVERSION
 // ================================================================================================
 
-impl TryFrom<proto::rpc::SyncStorageMapsResponse> for StorageMapInfo {
+impl TryFrom<proto::rpc::SyncAccountStorageMapsResponse> for StorageMapInfo {
     type Error = RpcError;
 
-    fn try_from(value: proto::rpc::SyncStorageMapsResponse) -> Result<Self, Self::Error> {
+    fn try_from(value: proto::rpc::SyncAccountStorageMapsResponse) -> Result<Self, Self::Error> {
         let pagination_info = value.pagination_info.ok_or(
-            proto::rpc::SyncStorageMapsResponse::missing_field(stringify!(pagination_info)),
+            proto::rpc::SyncAccountStorageMapsResponse::missing_field(stringify!(pagination_info)),
         )?;
         let chain_tip = pagination_info.chain_tip;
         let block_number = pagination_info.block_num;
