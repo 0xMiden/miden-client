@@ -200,7 +200,7 @@ pub struct SwapCmd {
     sender_account_id: Option<String>,
 
     /// Asset offered.
-    #[arg(long = "offered-asset", help=format!("Asset offered.\n{SHARED_TOKEN_DOCUMENTATION}"))]
+    #[arg(short = 'o', long = "offered-asset", help=format!("Asset offered.\n{SHARED_TOKEN_DOCUMENTATION}"))]
     offered_asset: String,
 
     /// Asset requested.
@@ -210,10 +210,6 @@ pub struct SwapCmd {
     /// Visibility of the swap note to be created.
     #[arg(short, long, value_enum)]
     note_type: NoteType,
-
-    /// Visibility of the payback note.
-    #[arg(short, long, value_enum)]
-    payback_note_type: NoteType,
 
     /// Flag to submit the executed transaction without asking for confirmation.
     #[arg(long, default_value_t = false)]
@@ -252,7 +248,7 @@ impl SwapCmd {
             .build_swap(
                 &swap_transaction,
                 (&self.note_type).into(),
-                (&self.payback_note_type).into(),
+                MidenNoteType::Private,
                 client.rng(),
             )
             .map_err(|err| {
@@ -275,7 +271,7 @@ impl SwapCmd {
         )
         .into();
         println!(
-            "To receive updates about the payback Swap Note run `miden tags add {payback_note_tag}`",
+            "To receive updates about the payback Swap Note run `miden-client tags --add {payback_note_tag}`",
         );
 
         Ok(())

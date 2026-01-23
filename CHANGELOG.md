@@ -42,6 +42,7 @@
 * [BREAKING] Updated `BlockNumber` IndexedDB type: changed from `string` to `number` ([#1684](https://github.com/0xMiden/miden-client/pull/1684)).
 * [BREAKING] Upgraded to protocol 0.13: exposed and aligned note-related structs to WebClient; `NoteTag` and `NoteAttachment` APIs updated renamed `NoteTag.fromAccountId` to `withAccountTarget`, added `withCustomAccountTarget`; added `NoteAttachmentScheme` wrapper and content accessors (`asWord`, `asArray`) to `NoteAttachment`; removed `NoteExecutionMode` ([#1685](https://github.com/0xMiden/miden-client/pull/1685)).
 * Added sync lock to coordinate concurrent `syncState()` calls in the WebClient using the Web Locks API, with coalescing behavior where concurrent callers share results from an in-progress sync ([#1690](https://github.com/0xMiden/miden-client/pull/1690)).
+* [BREAKING] Removed the `payback_note_type` field from the swap command ([#1700](https://github.com/0xMiden/miden-client/pull/1700)).
 
 ## 0.12.6 (2026-01-08)
 
