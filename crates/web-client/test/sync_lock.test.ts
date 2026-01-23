@@ -82,6 +82,9 @@ test.describe("Sync Lock Tests", () => {
       expect(result.blockNum1).toBeGreaterThanOrEqual(0);
       expect(result.blockNum2).toBeGreaterThanOrEqual(0);
       expect(result.blockNum3).toBeGreaterThanOrEqual(0);
+      // Block numbers should be monotonically non-decreasing
+      expect(result.blockNum2).toBeGreaterThanOrEqual(result.blockNum1);
+      expect(result.blockNum3).toBeGreaterThanOrEqual(result.blockNum2);
     });
   });
 
@@ -169,6 +172,8 @@ test.describe("Sync Lock Tests", () => {
 
       expect(typeof result.blockNum1).toBe("number");
       expect(typeof result.blockNum2).toBe("number");
+      // Block numbers should be monotonically non-decreasing
+      expect(result.blockNum2).toBeGreaterThanOrEqual(result.blockNum1);
     });
   });
 
