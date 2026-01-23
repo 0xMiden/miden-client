@@ -46,12 +46,14 @@ declare module "./crates/miden_client_web" {
      * @param rpcUrl - The RPC URL (optional).
      * @param noteTransportUrl - The note transport URL (optional).
      * @param seed - The seed for the account (optional).
+     * @param network - Optional name for the store. Setting this allows multiple clients to be used in the same browser.
      * @returns A promise that resolves to a fully initialized WebClient.
      */
     createClient(
       rpcUrl?: string,
       noteTransportUrl?: string,
-      seed?: Uint8Array
+      seed?: Uint8Array,
+      network?: string
     ): Promise<WebClient>;
 
     /**
@@ -60,6 +62,7 @@ declare module "./crates/miden_client_web" {
      * @param rpcUrl - The RPC URL (optional).
      * @param noteTransportUrl - The note transport URL (optional).
      * @param seed - The seed for the account (optional).
+     * @param storeName - Optional name for the store. Setting this allows multiple clients to be used in the same browser.
      * @param getKeyCb - Callback used to retrieve secret keys for a given public key.
      * @param insertKeyCb - Callback used to persist secret keys in the external store.
      * @param signCb - Callback used to create signatures for the provided inputs.
@@ -69,6 +72,7 @@ declare module "./crates/miden_client_web" {
       rpcUrl?: string,
       noteTransportUrl?: string,
       seed?: Uint8Array,
+      storeName?: string,
       getKeyCb?: GetKeyCallback,
       insertKeyCb?: InsertKeyCallback,
       signCb?: SignCallback

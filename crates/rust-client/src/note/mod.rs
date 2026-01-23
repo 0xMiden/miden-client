@@ -73,14 +73,16 @@ mod note_update_tracker;
 // RE-EXPORTS
 // ================================================================================================
 
-pub use miden_protocol::NoteError;
 pub use miden_protocol::block::BlockNumber;
+pub use miden_protocol::errors::NoteError;
 pub use miden_protocol::note::{
     Note,
     NoteAssets,
+    NoteAttachment,
+    NoteAttachmentKind,
+    NoteAttachmentScheme,
     NoteDetails,
     NoteExecutionHint,
-    NoteExecutionMode,
     NoteFile,
     NoteHeader,
     NoteId,
@@ -98,6 +100,7 @@ pub use miden_protocol::note::{
 pub use miden_protocol::transaction::ToInputNoteCommitments;
 pub use miden_standards::note::utils::{build_p2id_recipient, build_swap_tag};
 pub use miden_standards::note::{
+    NetworkAccountTarget,
     NoteConsumptionStatus,
     WellKnownNote,
     create_p2id_note,

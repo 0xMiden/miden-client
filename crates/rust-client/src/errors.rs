@@ -2,17 +2,17 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::fmt;
 
+use miden_protocol::Word;
 use miden_protocol::account::AccountId;
 use miden_protocol::crypto::merkle::MerkleError;
-use miden_protocol::note::{NoteId, NoteTag};
-pub use miden_protocol::{AccountError, AccountIdError, AssetError, NetworkIdError};
-use miden_protocol::{
+pub use miden_protocol::errors::{AccountError, AccountIdError, AssetError, NetworkIdError};
+use miden_protocol::errors::{
     NoteError,
     PartialBlockchainError,
     TransactionInputError,
     TransactionScriptError,
-    Word,
 };
+use miden_protocol::note::{NoteId, NoteTag};
 use miden_standards::account::interface::AccountInterfaceError;
 // RE-EXPORTS
 // ================================================================================================

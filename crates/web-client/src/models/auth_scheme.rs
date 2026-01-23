@@ -15,7 +15,7 @@ pub enum AuthScheme {
 
 // Compile-time check to ensure both enums stay aligned.
 const _: () = {
-    assert!(NativeAuthSchemeId::RpoFalcon512 as u8 == AuthScheme::AuthRpoFalcon512 as u8);
+    assert!(NativeAuthSchemeId::Falcon512Rpo as u8 == AuthScheme::AuthRpoFalcon512 as u8);
     assert!(NativeAuthSchemeId::EcdsaK256Keccak as u8 == AuthScheme::AuthEcdsaK256Keccak as u8);
 };
 
@@ -24,7 +24,7 @@ impl TryFrom<AuthScheme> for NativeAuthSchemeId {
 
     fn try_from(value: AuthScheme) -> Result<Self, Self::Error> {
         match value {
-            AuthScheme::AuthRpoFalcon512 => Ok(NativeAuthSchemeId::RpoFalcon512),
+            AuthScheme::AuthRpoFalcon512 => Ok(NativeAuthSchemeId::Falcon512Rpo),
             AuthScheme::AuthEcdsaK256Keccak => Ok(NativeAuthSchemeId::EcdsaK256Keccak),
         }
     }
@@ -35,7 +35,7 @@ impl TryFrom<NativeAuthSchemeId> for AuthScheme {
 
     fn try_from(value: NativeAuthSchemeId) -> Result<Self, Self::Error> {
         match value {
-            NativeAuthSchemeId::RpoFalcon512 => Ok(AuthScheme::AuthRpoFalcon512),
+            NativeAuthSchemeId::Falcon512Rpo => Ok(AuthScheme::AuthRpoFalcon512),
             NativeAuthSchemeId::EcdsaK256Keccak => Ok(AuthScheme::AuthEcdsaK256Keccak),
             _ => Err(unsupported_scheme_error(value)),
         }

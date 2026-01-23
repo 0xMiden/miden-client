@@ -63,9 +63,9 @@ pub use miden_protocol::account::{
     StorageSlotType,
 };
 pub use miden_protocol::address::{Address, AddressInterface, AddressType, NetworkId};
+pub use miden_protocol::errors::{AccountIdError, AddressError, NetworkIdError};
 use miden_protocol::note::NoteTag;
-pub use miden_protocol::{AccountIdError, AddressError, NetworkIdError};
-use miden_standards::account::auth::{AuthEcdsaK256Keccak, AuthRpoFalcon512};
+use miden_standards::account::auth::{AuthEcdsaK256Keccak, AuthFalcon512Rpo};
 // RE-EXPORTS
 // ================================================================================================
 pub use miden_standards::account::interface::AccountInterfaceExt;
@@ -97,11 +97,11 @@ pub mod component {
         basic_fungible_faucet_library,
         basic_wallet_library,
         ecdsa_k256_keccak_library,
+        falcon_512_rpo_acl_library,
+        falcon_512_rpo_library,
+        falcon_512_rpo_multisig_library,
         network_fungible_faucet_library,
         no_auth_library,
-        rpo_falcon_512_acl_library,
-        rpo_falcon_512_library,
-        rpo_falcon_512_multisig_library,
     };
     pub use miden_standards::account::faucets::{
         BasicFungibleFaucet,
@@ -486,7 +486,7 @@ impl<AUTH> Client<AUTH> {
 /// used seed is known).
 ///
 /// This function currently supports accounts composed of the [`BasicWallet`] component and one of
-/// the supported authentication schemes ([`AuthRpoFalcon512`] or [`AuthEcdsaK256Keccak`]).
+/// the supported authentication schemes ([`AuthFalcon512Rpo`] or [`AuthEcdsaK256Keccak`]).
 ///
 /// # Arguments
 /// - `init_seed`: Initial seed used to create the account. This is the seed passed to
@@ -511,9 +511,9 @@ pub fn build_wallet_id(
 
     let auth_scheme = public_key.auth_scheme();
     let auth_component = match auth_scheme {
-        AuthSchemeId::RpoFalcon512 => {
+        AuthSchemeId::Falcon512Rpo => {
             let auth_component: AccountComponent =
-                AuthRpoFalcon512::new(public_key.to_commitment()).into();
+                AuthFalcon512Rpo::new(public_key.to_commitment()).into();
             auth_component
         },
         AuthSchemeId::EcdsaK256Keccak => {

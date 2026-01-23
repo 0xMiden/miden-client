@@ -105,7 +105,7 @@ pub async fn test_swap_fully_onchain(client_config: ClientConfig) -> Result<()> 
         NoteType::Public,
         &Asset::Fungible(offered_asset),
         &Asset::Fungible(requested_asset),
-    )?;
+    );
 
     // add swap note's tag to client2
     // we could technically avoid this step, but for the first iteration of swap notes we'll
@@ -314,7 +314,7 @@ pub async fn test_swap_private(client_config: ClientConfig) -> Result<()> {
         NoteType::Private,
         &Asset::Fungible(offered_asset),
         &Asset::Fungible(requested_asset),
-    )?;
+    );
     client2.add_note_tag(tag).await?;
     client2
         .import_notes(&[NoteFile::NoteDetails {
