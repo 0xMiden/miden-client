@@ -107,7 +107,7 @@ fn init_with_params() {
 }
 
 #[test]
-#[serial_test::serial(global_config)]
+#[serial_test::file_serial]
 fn silent_initialization_uses_default_values() {
     // Clean up any existing global config first
     cleanup_global_config();
@@ -666,6 +666,7 @@ async fn init_with_testnet() -> Result<()> {
 }
 
 #[tokio::test]
+#[serial_test::file_serial]
 async fn debug_mode_outputs_logs() -> Result<()> {
     // This test tries to execute a transaction with debug mode enabled and checks that the stack
     // state is printed. We need to use the CLI for this because the debug logs are always printed
@@ -751,6 +752,10 @@ async fn debug_mode_outputs_logs() -> Result<()> {
         .assert()
         .success()
         .stdout(contains("Stack state"));
+
+    unsafe {
+        env::remove_var("MIDEN_DEBUG");
+    }
 
     Ok(())
 }
@@ -860,6 +865,52 @@ async fn list_addresses_remove() -> Result<()> {
     let formatted_output = String::from_utf8(output.stdout).unwrap();
     assert!(formatted_output.contains(&basic_account_id));
     assert_eq!(formatted_output.matches("Unspecified").count(), 0);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn new_wallet_with_deploy_flag() -> Result<()> {
+    let (store_path, temp_dir, endpoint) = init_cli();
+
+    sync_cli(&temp_dir);
+
+    let mut create_wallet_cmd = cargo_bin_cmd!("miden-client");
+    create_wallet_cmd.args(["new-wallet", "-s", "public", "--deploy"]);
+
+    let output = create_wallet_cmd.current_dir(&temp_dir).output().unwrap();
+    assert!(
+        output.status.success(),
+        "Failed to create and deploy wallet: {}",
+        String::from_utf8(output.stderr).unwrap()
+    );
+
+    // Extract the account ID from the output
+    let output_str = std::str::from_utf8(&output.stdout).unwrap();
+    let account_id_str = output_str
+        .split_whitespace()
+        .skip_while(|&word| word != "-s")
+        .nth(1)
+        .expect("Failed to extract account ID from output");
+
+    // Sync to ensure the transaction is committed
+    sync_cli(&temp_dir);
+
+    // Create a client and retrieve the account to verify the nonce
+    let (client, _) = create_rust_client_with_store_path(&store_path, endpoint).await?;
+    let account_id = AccountId::from_hex(account_id_str)?;
+    let account = client
+        .get_account(account_id)
+        .await?
+        .expect("Account should exist in the store");
+
+    // Verify that the nonce is non-zero (account was deployed)
+    // By convention, a nonce of 0 indicates an undeployed account
+    assert!(
+        account.nonce().as_int() > 0,
+        "Account nonce should be non-zero after deployment, but got: {}",
+        account.nonce()
+    );
 
     Ok(())
 }
@@ -1317,7 +1368,7 @@ fn create_account_with_ecdsa_auth() {
 /// Tests that `CliClient::from_system_user_config()` successfully creates a client with the same
 /// configuration as the CLI tool when a local config exists.
 #[tokio::test]
-#[serial_test::serial(global_config)]
+#[serial_test::file_serial]
 async fn test_from_system_user_config_with_local_config() -> Result<()> {
     // Initialize a local CLI configuration
     let (store_path, temp_dir, _endpoint) = init_cli();
@@ -1356,7 +1407,7 @@ async fn test_from_system_user_config_with_local_config() -> Result<()> {
 /// Tests that `CliClient::from_system_user_config()` silently initializes with default config
 /// when no configuration exists.
 #[tokio::test]
-#[serial_test::serial(global_config)]
+#[serial_test::file_serial]
 async fn test_from_system_user_config_silent_init() -> Result<()> {
     // Create a temporary directory with no .miden configuration
     let temp_dir = temp_dir().join(format!("cli-test-silent-init-{}", rand::rng().random::<u64>()));
@@ -1403,7 +1454,7 @@ async fn test_from_system_user_config_silent_init() -> Result<()> {
 
 /// Tests that `CliConfig::from_system()` prioritizes local config over global config.
 #[tokio::test]
-#[serial_test::serial(global_config)]
+#[serial_test::file_serial]
 async fn test_from_system_user_config_local_priority() -> Result<()> {
     // Clean up any existing global config
     cleanup_global_config();

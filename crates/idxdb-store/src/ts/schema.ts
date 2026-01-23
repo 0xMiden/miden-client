@@ -163,7 +163,7 @@ export interface IBlockHeader {
 }
 
 export interface IPartialBlockchainNode {
-  id: string;
+  id: number;
   node: string;
 }
 
@@ -227,7 +227,7 @@ export type MidenDexie = Dexie & {
   notesScripts: Dexie.Table<INotesScript, string>;
   stateSync: Dexie.Table<IStateSync, number>;
   blockHeaders: Dexie.Table<IBlockHeader, number>;
-  partialBlockchainNodes: Dexie.Table<IPartialBlockchainNode, string>;
+  partialBlockchainNodes: Dexie.Table<IPartialBlockchainNode, number>;
   tags: Dexie.Table<ITag, number>;
   foreignAccountCode: Dexie.Table<IForeignAccountCode, string>;
   settings: Dexie.Table<ISetting, string>;
@@ -250,7 +250,7 @@ export class MidenDatabase {
   notesScripts: Dexie.Table<INotesScript, string>;
   stateSync: Dexie.Table<IStateSync, number>;
   blockHeaders: Dexie.Table<IBlockHeader, number>;
-  partialBlockchainNodes: Dexie.Table<IPartialBlockchainNode, string>;
+  partialBlockchainNodes: Dexie.Table<IPartialBlockchainNode, number>;
   tags: Dexie.Table<ITag, number>;
   foreignAccountCode: Dexie.Table<IForeignAccountCode, string>;
   settings: Dexie.Table<ISetting, string>;
@@ -336,7 +336,7 @@ export class MidenDatabase {
     );
     this.partialBlockchainNodes = this.dexie.table<
       IPartialBlockchainNode,
-      string
+      number
     >(Table.PartialBlockchainNodes);
     this.tags = this.dexie.table<ITag, number>(Table.Tags);
     this.foreignAccountCode = this.dexie.table<IForeignAccountCode, string>(
