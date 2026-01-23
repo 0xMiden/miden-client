@@ -47,6 +47,7 @@ async function collectExports(filePath) {
   );
 
   const names = new Set();
+  const starExportModules = [];
 
   const visit = (node) => {
     if (
@@ -63,25 +64,66 @@ async function collectExports(filePath) {
       }
     }
 
-    if (
-      ts.isExportDeclaration(node) &&
-      node.exportClause &&
-      ts.isNamedExports(node.exportClause)
-    ) {
-      node.exportClause.elements.forEach((element) => {
-        names.add(element.name.getText(sourceFile));
-      });
+    if (ts.isExportDeclaration(node)) {
+      if (node.exportClause && ts.isNamedExports(node.exportClause)) {
+        // Named exports: export { A, B, C } from "..."
+        node.exportClause.elements.forEach((element) => {
+          names.add(element.name.getText(sourceFile));
+        });
+      } else if (!node.exportClause && node.moduleSpecifier) {
+        // Star export: export * from "..."
+        const modulePath = node.moduleSpecifier
+          .getText(sourceFile)
+          .slice(1, -1);
+        starExportModules.push(modulePath);
+      }
     }
 
     ts.forEachChild(node, visit);
   };
 
   visit(sourceFile);
-  return names;
+  return { names, starExportModules };
 }
 
-const wasmExports = await collectExports(wasmTypesPath);
-const publicExports = await collectExports(publicTypesPath);
+async function resolveStarExports(filePath, starExportModules, baseDir = null) {
+  const resolvedNames = new Set();
+  // Use baseDir if provided, otherwise use the file's directory
+  // This allows resolving paths as if the file was in a different location (e.g., dist/)
+  const dir = baseDir || path.dirname(filePath);
+
+  for (const modulePath of starExportModules) {
+    // Resolve the module path relative to the base directory
+    let resolvedPath = path.resolve(dir, modulePath);
+    if (!resolvedPath.endsWith(".d.ts") && !resolvedPath.endsWith(".ts")) {
+      resolvedPath += ".d.ts";
+    }
+
+    try {
+      const { names } = await collectExports(resolvedPath);
+      names.forEach((name) => resolvedNames.add(name));
+    } catch {
+      // If we can't resolve, skip (the module might be external)
+    }
+  }
+
+  return resolvedNames;
+}
+
+const { names: wasmExports } = await collectExports(wasmTypesPath);
+const { names: publicExports, starExportModules } =
+  await collectExports(publicTypesPath);
+
+// Resolve star exports to get all re-exported names
+// Use dist/ as base directory since that's where the file will be deployed
+// and where the relative imports (./crates/...) will be resolved from
+const distDir = path.join(rootDir, "dist");
+const starExportedNames = await resolveStarExports(
+  publicTypesPath,
+  starExportModules,
+  distDir
+);
+starExportedNames.forEach((name) => publicExports.add(name));
 
 // The wrapper defines its own WebClient, so we do not expect to re-export the wasm-bindgen version.
 const allowedMissing = new Set(["WebClient"]);

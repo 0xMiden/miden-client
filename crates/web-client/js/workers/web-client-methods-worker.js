@@ -176,7 +176,8 @@ const methodHandlers = {
     return serializedFaucet.buffer;
   },
   [MethodName.SYNC_STATE]: async () => {
-    const syncSummary = await wasmWebClient.syncState();
+    // Call the internal WASM method (sync lock is handled at the JS wrapper level)
+    const syncSummary = await wasmWebClient.syncStateImpl();
     const serializedSyncSummary = syncSummary.serialize();
     return serializedSyncSummary.buffer;
   },

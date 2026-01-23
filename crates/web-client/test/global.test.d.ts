@@ -170,6 +170,8 @@ declare global {
     createAuthRpoFalcon512Multisig: typeof createAuthRpoFalcon512Multisig;
     createClient: () => Promise<void>;
 
+    rpcUrl: string;
+
     // Add the helpers namespace
     helpers: {
       waitForTransaction: (

@@ -72,6 +72,7 @@
 - [JsVaultAsset](classes/JsVaultAsset.md)
 - [Library](classes/Library.md)
 - [MerklePath](classes/MerklePath.md)
+- [MockWebClient](classes/MockWebClient.md)
 - [NetworkId](classes/NetworkId.md)
 - [Note](classes/Note.md)
 - [NoteAndArgs](classes/NoteAndArgs.md)
@@ -145,8 +146,21 @@
 ## Type Aliases
 
 - [AddressInterface](type-aliases/AddressInterface.md)
+- [GetKeyCallback](type-aliases/GetKeyCallback.md)
+- [InsertKeyCallback](type-aliases/InsertKeyCallback.md)
 - [ReadableStreamType](type-aliases/ReadableStreamType.md)
+- [SignCallback](type-aliases/SignCallback.md)
+
+## Variables
+
+- [MidenArrays](variables/MidenArrays.md)
 
 ## Functions
 
 - [createAuthRpoFalcon512Multisig](functions/createAuthRpoFalcon512Multisig.md)
+
+## References
+
+### WasmWebClient
+
+Renames and re-exports [WebClient](classes/WebClient.md)
