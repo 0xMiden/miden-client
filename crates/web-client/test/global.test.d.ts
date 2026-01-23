@@ -31,7 +31,6 @@ import {
   NoteAssets,
   NoteConsumability,
   NoteExecutionHint,
-  NoteExecutionMode,
   NoteFilter,
   NoteFile,
   NoteFilterTypes,
@@ -122,7 +121,6 @@ declare global {
     NoteAssets: typeof NoteAssets;
     NoteConsumability: typeof NoteConsumability;
     NoteExecutionHint: typeof NoteExecutionHint;
-    NoteExecutionMode: typeof NoteExecutionMode;
     NoteFilter: typeof NoteFilter;
     NoteFile: typeof NoteFile;
     NoteFilterTypes: typeof NoteFilterTypes;

@@ -77,7 +77,6 @@ export {
   NoteDetailsAndTag,
   NoteDetailsAndTagArray,
   NoteExecutionHint,
-  NoteExecutionMode,
   NoteFile,
   NoteFilter,
   NoteFilterTypes,
