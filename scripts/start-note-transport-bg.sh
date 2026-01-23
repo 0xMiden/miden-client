@@ -8,9 +8,11 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+# NOTE: This should be in line with `miden-note-transport-proto-build`'s version in Cargo.toml
+BRANCH=${TRANSPORT_BRANCH:-main}
+
 TRANSPORT_DIR=${TRANSPORT_DIR:-.tmp/miden-note-transport}
 REPO_URL=${REPO_URL:-https://github.com/0xMiden/miden-note-transport}
-BRANCH=${TRANSPORT_BRANCH:-mmagician-update-base-v0.13}
 RUN_CMD=${TRANSPORT_RUN_CMD:-cargo run --release --locked}
 
 # Shared target directory (important for CI speed: ends up under repo `target/` which is cached)
