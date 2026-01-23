@@ -7,7 +7,7 @@ use miden_client::account::{
 use miden_client::assembly::{Library as NativeLibrary, MastNodeExt};
 use miden_client::auth::{
     AuthEcdsaK256Keccak as NativeEcdsaK256Keccak,
-    AuthRpoFalcon512 as NativeRpoFalcon512,
+    AuthFalcon512Rpo as NativeFalcon512Rpo,
     AuthSecretKey as NativeSecretKey,
     PublicKeyCommitment,
 };
@@ -128,7 +128,7 @@ impl AccountComponent {
     ) -> AccountComponent {
         match auth_scheme {
             AuthScheme::AuthRpoFalcon512 => {
-                let auth = NativeRpoFalcon512::new(commitment);
+                let auth = NativeFalcon512Rpo::new(commitment);
                 AccountComponent(auth.into())
             },
             AuthScheme::AuthEcdsaK256Keccak => {
@@ -148,7 +148,7 @@ impl AccountComponent {
 
         let auth_scheme = match native_secret_key {
             NativeSecretKey::EcdsaK256Keccak(_) => AuthScheme::AuthEcdsaK256Keccak,
-            NativeSecretKey::RpoFalcon512(_) => AuthScheme::AuthRpoFalcon512,
+            NativeSecretKey::Falcon512Rpo(_) => AuthScheme::AuthRpoFalcon512,
             // This is because the definition of NativeSecretKey has the
             // '#[non_exhaustive]' attribute, without this catch-all clause,
             // this is a compiler error.
