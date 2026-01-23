@@ -17,6 +17,7 @@ use js_bindings::{
     idxdb_get_block_headers,
     idxdb_get_partial_blockchain_nodes,
     idxdb_get_partial_blockchain_nodes_all,
+    idxdb_get_partial_blockchain_nodes_up_to_inorder_index,
     idxdb_get_partial_blockchain_peaks_by_block_num,
     idxdb_get_tracked_block_headers,
     idxdb_insert_block_header,
@@ -129,6 +130,21 @@ impl WebStore {
                 let promise = idxdb_get_partial_blockchain_nodes(self.db_id(), formatted_list);
                 let js_value =
                     await_js_value(promise, "failed to get partial blockchain nodes").await?;
+                process_partial_blockchain_nodes_from_js_value(js_value)
+            },
+            PartialBlockchainFilter::Forest(forest) => {
+                if forest.is_empty() {
+                    return Ok(BTreeMap::new());
+                }
+
+                let max_in_order_index = forest.rightmost_in_order_index().inner().to_string();
+                let promise = idxdb_get_partial_blockchain_nodes_up_to_inorder_index(
+                    self.db_id(),
+                    max_in_order_index,
+                );
+                let js_value =
+                    await_js_value(promise, "failed to get partial blockchain nodes up to index")
+                        .await?;
                 process_partial_blockchain_nodes_from_js_value(js_value)
             },
         }
