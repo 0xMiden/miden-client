@@ -72,7 +72,7 @@ impl From<&NoteAttachmentScheme> for NativeNoteAttachmentScheme {
 /// Note attachments provide additional context about how notes should be processed.
 /// For example, a network account target attachment indicates that the note should
 /// be consumed by a specific network account.
-#[derive(Clone)]
+#[derive(Clone, Default)]
 #[wasm_bindgen]
 pub struct NoteAttachment(NativeNoteAttachment);
 
