@@ -1,1 +1,1 @@
-pub mod auth_rpo_falcon512_multisig;
+pub mod auth_falcon512_rpo_multisig;

@@ -68,8 +68,7 @@ impl WebClient {
             note_type.into(),
             &offered_fungible_asset,
             &requested_fungible_asset,
-        )
-        .map_err(|err| js_error_with_context(err, "failed to build swap tag"))?;
+        );
 
         Ok(native_note_tag.into())
     }

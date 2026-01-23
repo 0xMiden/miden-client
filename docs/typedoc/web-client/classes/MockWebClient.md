@@ -152,7 +152,7 @@ Creates a new `WebClient` instance with the specified configuration.
 
 #### Call Signature
 
-> **createClient**(`rpcUrl?`, `noteTransportUrl?`, `seed?`): `Promise`\<[`WebClient`](WebClient.md)\>
+> **createClient**(`rpcUrl?`, `noteTransportUrl?`, `seed?`, `network?`): `Promise`\<[`WebClient`](WebClient.md)\>
 
 Factory method to create and initialize a new wrapped WebClient.
 
@@ -175,6 +175,12 @@ The note transport URL (optional).
 `Uint8Array`
 
 The seed for the account (optional).
+
+###### network?
+
+`string`
+
+Optional name for the store. Setting this allows multiple clients to be used in the same browser.
 
 ##### Returns
 
@@ -247,7 +253,7 @@ Creates a new `WebClient` instance with external keystore callbacks.
 
 #### Call Signature
 
-> **createClientWithExternalKeystore**(`rpcUrl?`, `noteTransportUrl?`, `seed?`, `getKeyCb?`, `insertKeyCb?`, `signCb?`): `Promise`\<[`WebClient`](WebClient.md)\>
+> **createClientWithExternalKeystore**(`rpcUrl?`, `noteTransportUrl?`, `seed?`, `storeName?`, `getKeyCb?`, `insertKeyCb?`, `signCb?`): `Promise`\<[`WebClient`](WebClient.md)\>
 
 Factory method to create and initialize a new wrapped WebClient with a remote keystore.
 
@@ -270,6 +276,12 @@ The note transport URL (optional).
 `Uint8Array`
 
 The seed for the account (optional).
+
+###### storeName?
+
+`string`
+
+Optional name for the store. Setting this allows multiple clients to be used in the same browser.
 
 ###### getKeyCb?
 
@@ -1346,6 +1358,34 @@ Returns the inner serialized mock note transport node if it exists.
 #### Inherited from
 
 [`WebClient`](WebClient.md).[`serializeMockNoteTransportNode`](WebClient.md#serializemocknotetransportnode)
+
+***
+
+### setDebugMode()
+
+> **setDebugMode**(`enabled`): `void`
+
+Sets the debug mode for transaction execution.
+
+When enabled, the transaction executor will record additional information useful for
+debugging (the values on the VM stack and the state of the advice provider). This is
+disabled by default since it adds overhead.
+
+Must be called before `createClient`.
+
+#### Parameters
+
+##### enabled
+
+`boolean`
+
+#### Returns
+
+`void`
+
+#### Inherited from
+
+[`WebClient`](WebClient.md).[`setDebugMode`](WebClient.md#setdebugmode)
 
 ***
 

@@ -11,6 +11,7 @@
 - [AuthScheme](enumerations/AuthScheme.md)
 - [InputNoteState](enumerations/InputNoteState.md)
 - [NetworkType](enumerations/NetworkType.md)
+- [NoteAttachmentKind](enumerations/NoteAttachmentKind.md)
 - [NoteFilterTypes](enumerations/NoteFilterTypes.md)
 - [NoteType](enumerations/NoteType.md)
 - [OutputNoteState](enumerations/OutputNoteState.md)
@@ -39,7 +40,7 @@
 - [AdviceInputs](classes/AdviceInputs.md)
 - [AdviceMap](classes/AdviceMap.md)
 - [AssetVault](classes/AssetVault.md)
-- [AuthRpoFalcon512MultisigConfig](classes/AuthRpoFalcon512MultisigConfig.md)
+- [AuthFalcon512RpoMultisigConfig](classes/AuthFalcon512RpoMultisigConfig.md)
 - [AuthSecretKey](classes/AuthSecretKey.md)
 - [BasicFungibleFaucetComponent](classes/BasicFungibleFaucetComponent.md)
 - [BlockHeader](classes/BlockHeader.md)
@@ -78,13 +79,14 @@
 - [NoteAndArgs](classes/NoteAndArgs.md)
 - [NoteAndArgsArray](classes/NoteAndArgsArray.md)
 - [NoteAssets](classes/NoteAssets.md)
+- [NoteAttachment](classes/NoteAttachment.md)
+- [NoteAttachmentScheme](classes/NoteAttachmentScheme.md)
 - [NoteConsumability](classes/NoteConsumability.md)
 - [NoteConsumptionStatus](classes/NoteConsumptionStatus.md)
 - [NoteDetails](classes/NoteDetails.md)
 - [NoteDetailsAndTag](classes/NoteDetailsAndTag.md)
 - [NoteDetailsAndTagArray](classes/NoteDetailsAndTagArray.md)
 - [NoteExecutionHint](classes/NoteExecutionHint.md)
-- [NoteExecutionMode](classes/NoteExecutionMode.md)
 - [NoteFile](classes/NoteFile.md)
 - [NoteFilter](classes/NoteFilter.md)
 - [NoteHeader](classes/NoteHeader.md)
@@ -157,7 +159,7 @@
 
 ## Functions
 
-- [createAuthRpoFalcon512Multisig](functions/createAuthRpoFalcon512Multisig.md)
+- [createAuthFalcon512RpoMultisig](functions/createAuthFalcon512RpoMultisig.md)
 
 ## References
 

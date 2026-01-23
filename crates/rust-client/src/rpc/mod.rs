@@ -220,7 +220,7 @@ pub trait NodeRpcClient: Send + Sync {
     /// The `known_account_code` parameter is the known code commitment
     /// to prevent unnecessary data fetching. Returns the block number and the FPI account data. If
     /// the tracked account is not found in the node, the method will return an error.
-    async fn get_account_proof(
+    async fn get_account(
         &self,
         foreign_account: ForeignAccount,
         account_state: AccountStateAt,
@@ -276,7 +276,7 @@ pub trait NodeRpcClient: Send + Sync {
         for detail in note_details {
             if let FetchedNote::Public(note, inclusion_proof) = detail {
                 let state = UnverifiedNoteState {
-                    metadata: *note.metadata(),
+                    metadata: note.metadata().clone(),
                     inclusion_proof,
                 }
                 .into();
@@ -402,7 +402,6 @@ pub enum NodeRpcClientEndpoint {
     SyncNullifiers,
     GetAccount,
     GetAccountStateDelta,
-    GetAccountProofs,
     GetBlockByNumber,
     GetBlockHeaderByNumber,
     GetNotesById,
@@ -422,9 +421,8 @@ impl fmt::Display for NodeRpcClientEndpoint {
             NodeRpcClientEndpoint::SyncNullifiers => {
                 write!(f, "sync_nullifiers")
             },
-            NodeRpcClientEndpoint::GetAccount => write!(f, "get_account_details"),
+            NodeRpcClientEndpoint::GetAccount => write!(f, "get_account"),
             NodeRpcClientEndpoint::GetAccountStateDelta => write!(f, "get_account_state_delta"),
-            NodeRpcClientEndpoint::GetAccountProofs => write!(f, "get_account_proofs"),
             NodeRpcClientEndpoint::GetBlockByNumber => write!(f, "get_block_by_number"),
             NodeRpcClientEndpoint::GetBlockHeaderByNumber => {
                 write!(f, "get_block_header_by_number")
