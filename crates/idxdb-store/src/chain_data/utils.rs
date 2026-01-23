@@ -83,6 +83,9 @@ pub fn process_partial_blockchain_nodes_from_js_value(
         .map(|record| {
             // u32 -> usize always succeeds (even in WASM where usize is 32 bits)
             let id = record.id as usize;
+            let id = NonZeroUsize::new(id).ok_or_else(|| {
+                StoreError::ParsingError("partial blockchain node id must be non-zero".to_string())
+            })?;
             let id = InOrderIndex::new(id);
             let node = Word::try_from(&record.node)?;
             Ok((id, node))
