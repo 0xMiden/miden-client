@@ -292,7 +292,7 @@ test.describe("createP2IDNote and createP2IDENote", () => {
           targetAccountId,
           noteAssets,
           window.NoteType.Public,
-          new window.Felt(0n)
+          new window.NoteAttachment()
         );
 
         let outputNote = window.OutputNote.full(p2IdNote);
@@ -401,7 +401,7 @@ test.describe("createP2IDNote and createP2IDENote", () => {
           null,
           null,
           window.NoteType.Public,
-          new window.Felt(0n)
+          new window.NoteAttachment()
         );
 
         let outputNote = window.OutputNote.full(p2IdeNote);

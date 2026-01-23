@@ -18,7 +18,7 @@ use miden_client::assembly::{
 };
 use miden_client::auth::{
     AuthEcdsaK256Keccak,
-    AuthRpoFalcon512,
+    AuthFalcon512Rpo,
     AuthSecretKey,
     PublicKeyCommitment,
     RPO_FALCON_SCHEME_ID,
@@ -83,8 +83,6 @@ use miden_protocol::crypto::rand::{FeltRng, RpoRandomCoin};
 use miden_protocol::note::{
     Note,
     NoteAssets,
-    NoteExecutionHint,
-    NoteExecutionMode,
     NoteFile,
     NoteInputs,
     NoteMetadata,
@@ -104,7 +102,7 @@ use miden_protocol::testing::account_id::{
 use miden_protocol::transaction::{OutputNote, TransactionKernel};
 use miden_protocol::utils::{Deserializable, Serializable};
 use miden_protocol::vm::AdviceInputs;
-use miden_protocol::{EMPTY_WORD, Felt, ONE, Word, ZERO};
+use miden_protocol::{EMPTY_WORD, Felt, ONE, Word};
 use miden_standards::account::faucets::BasicFungibleFaucet;
 use miden_standards::account::interface::AccountInterfaceError;
 use miden_standards::account::wallets::BasicWallet;
@@ -290,7 +288,7 @@ async fn insert_same_account_twice_fails() {
 
     let account = Account::mock(
         ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_2,
-        AuthRpoFalcon512::new(PublicKeyCommitment::from(EMPTY_WORD)),
+        AuthFalcon512Rpo::new(PublicKeyCommitment::from(EMPTY_WORD)),
     );
 
     assert!(client.add_account(&account, false).await.is_ok());
@@ -304,7 +302,7 @@ async fn account_code() {
 
     let account = Account::mock(
         ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE,
-        AuthRpoFalcon512::new(PublicKeyCommitment::from(EMPTY_WORD)),
+        AuthFalcon512Rpo::new(PublicKeyCommitment::from(EMPTY_WORD)),
     );
 
     let account_code = account.code();
@@ -326,7 +324,7 @@ async fn get_account_by_id() {
 
     let account = Account::mock(
         ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_UPDATABLE_CODE,
-        AuthRpoFalcon512::new(PublicKeyCommitment::from(EMPTY_WORD)),
+        AuthFalcon512Rpo::new(PublicKeyCommitment::from(EMPTY_WORD)),
     );
 
     client.add_account(&account, false).await.unwrap();
@@ -725,10 +723,8 @@ async fn note_without_asset() {
     // Create note without assets
     let serial_num = client.rng().draw_word();
     let recipient = utils::build_p2id_recipient(wallet.id(), serial_num).unwrap();
-    let tag = NoteTag::from_account_id(wallet.id());
-    let metadata =
-        NoteMetadata::new(wallet.id(), NoteType::Private, tag, NoteExecutionHint::always(), ZERO)
-            .unwrap();
+    let tag = NoteTag::with_account_target(wallet.id());
+    let metadata = NoteMetadata::new(wallet.id(), NoteType::Private, tag);
     let vault = NoteAssets::new(vec![]).unwrap();
 
     let note = Note::new(vault.clone(), metadata, recipient.clone());
@@ -745,9 +741,7 @@ async fn note_without_asset() {
     assert!(transaction.is_ok());
 
     // Create the same transaction for the faucet
-    let metadata =
-        NoteMetadata::new(faucet.id(), NoteType::Private, tag, NoteExecutionHint::always(), ZERO)
-            .unwrap();
+    let metadata = NoteMetadata::new(faucet.id(), NoteType::Private, tag);
     let note = Note::new(vault, metadata, recipient);
 
     let transaction_request = TransactionRequestBuilder::new()
@@ -1081,10 +1075,12 @@ async fn p2id_transfer_failing_not_enough_balance() {
         &mut client,
         from_account_id,
         tx_request,
-        ClientError::AssetError(miden_protocol::AssetError::FungibleAssetAmountNotSufficient {
-            minuend: MINT_AMOUNT,
-            subtrahend: MINT_AMOUNT + 1,
-        }),
+        ClientError::AssetError(
+            miden_protocol::errors::AssetError::FungibleAssetAmountNotSufficient {
+                minuend: MINT_AMOUNT,
+                subtrahend: MINT_AMOUNT + 1,
+            },
+        ),
     )
     .await;
 }
@@ -2099,7 +2095,7 @@ async fn empty_storage_map() {
     let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountImmutableCode)
         .storage_mode(AccountStorageMode::Public)
-        .with_auth_component(AuthRpoFalcon512::new(pub_key.to_commitment()))
+        .with_auth_component(AuthFalcon512Rpo::new(pub_key.to_commitment()))
         .with_component(BasicWallet)
         .with_component(component)
         .build()
@@ -2208,7 +2204,7 @@ async fn storage_and_vault_proofs() {
     let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountImmutableCode)
         .storage_mode(AccountStorageMode::Public)
-        .with_auth_component(AuthRpoFalcon512::new(pub_key.to_commitment()))
+        .with_auth_component(AuthFalcon512Rpo::new(pub_key.to_commitment()))
         .with_component(BasicWallet)
         .with_component(bump_item_component)
         .build()
@@ -2300,7 +2296,7 @@ async fn account_addresses_basic_wallet() {
 
     let account = Account::mock(
         ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_2,
-        AuthRpoFalcon512::new(PublicKeyCommitment::from(EMPTY_WORD)),
+        AuthFalcon512Rpo::new(PublicKeyCommitment::from(EMPTY_WORD)),
     );
 
     client.add_account(&account, false).await.unwrap();
@@ -2342,7 +2338,7 @@ async fn account_add_address_after_creation() {
 
     let account = Account::mock(
         ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_2,
-        AuthRpoFalcon512::new(PublicKeyCommitment::from(EMPTY_WORD)),
+        AuthFalcon512Rpo::new(PublicKeyCommitment::from(EMPTY_WORD)),
     );
 
     client.add_account(&account, false).await.unwrap();
@@ -2407,14 +2403,8 @@ async fn consume_note_with_custom_script() {
 
     let note_inputs = NoteInputs::new(vec![]).unwrap();
     let serial_num = client.rng().draw_word();
-    let note_metadata = NoteMetadata::new(
-        sender_id,
-        NoteType::Private,
-        NoteTag::from_account_id(receiver_id),
-        NoteExecutionHint::None,
-        Felt::default(),
-    )
-    .unwrap();
+    let note_metadata =
+        NoteMetadata::new(sender_id, NoteType::Private, NoteTag::with_account_target(receiver_id));
     let note_assets = NoteAssets::new(vec![]).unwrap();
     let note_recipient = NoteRecipient::new(serial_num, note_script.clone(), note_inputs);
     let custom_note = Note::new(note_assets, note_metadata, note_recipient);
@@ -2475,7 +2465,7 @@ async fn add_account_fails_if_accounts_limit_is_exceeded() {
             .add_account(
                 &Account::mock(
                     (i << 8) as u128,
-                    AuthRpoFalcon512::new(PublicKeyCommitment::from(EMPTY_WORD)),
+                    AuthFalcon512Rpo::new(PublicKeyCommitment::from(EMPTY_WORD)),
                 ),
                 false,
             )
@@ -2488,7 +2478,7 @@ async fn add_account_fails_if_accounts_limit_is_exceeded() {
         .add_account(
             &Account::mock(
                 (ACCOUNT_ID_LIMIT << 8) as u128,
-                AuthRpoFalcon512::new(PublicKeyCommitment::from(EMPTY_WORD)),
+                AuthFalcon512Rpo::new(PublicKeyCommitment::from(EMPTY_WORD)),
             ),
             false,
         )
@@ -2666,14 +2656,14 @@ pub async fn create_prebuilt_mock_chain() -> MockChain {
     let note_first =
         NoteBuilder::new(mock_account.id(), RpoRandomCoin::new([0, 0, 0, 0].map(Felt::new).into()))
             .note_type(NoteType::Public)
-            .tag(NoteTag::for_public_use_case(0, 0, NoteExecutionMode::Local).unwrap().into())
+            .tag(NoteTag::new(0).into())
             .build()
             .unwrap();
 
     let note_second =
         NoteBuilder::new(mock_account.id(), RpoRandomCoin::new([0, 0, 0, 1].map(Felt::new).into()))
             .note_type(NoteType::Public)
-            .tag(NoteTag::for_local_use_case(0, 0).unwrap().into())
+            .tag(NoteTag::new(0).into())
             .build()
             .unwrap();
     let spawn_note_1 =
@@ -2752,7 +2742,7 @@ async fn insert_new_wallet(
     let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountImmutableCode)
         .storage_mode(storage_mode)
-        .with_auth_component(AuthRpoFalcon512::new(pub_key.to_commitment()))
+        .with_auth_component(AuthFalcon512Rpo::new(pub_key.to_commitment()))
         .with_component(BasicWallet)
         .build()
         .unwrap();
@@ -2809,7 +2799,7 @@ async fn insert_new_fungible_faucet(
     let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::FungibleFaucet)
         .storage_mode(storage_mode)
-        .with_auth_component(AuthRpoFalcon512::new(pub_key.to_commitment()))
+        .with_auth_component(AuthFalcon512Rpo::new(pub_key.to_commitment()))
         .with_component(BasicFungibleFaucet::new(symbol, 10, max_supply).unwrap())
         .build()
         .unwrap();

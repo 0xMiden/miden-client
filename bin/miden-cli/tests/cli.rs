@@ -14,7 +14,6 @@ use miden_client::crypto::{FeltRng, RpoRandomCoin};
 use miden_client::note::{
     Note,
     NoteAssets,
-    NoteExecutionHint,
     NoteFile,
     NoteId,
     NoteInputs,
@@ -703,11 +702,8 @@ async fn debug_mode_outputs_logs() -> Result<()> {
     let note_metadata = NoteMetadata::new(
         account.id(),
         NoteType::Private,
-        NoteTag::from_account_id(account.id()),
-        NoteExecutionHint::None,
-        Felt::default(),
-    )
-    .unwrap();
+        NoteTag::with_account_target(account.id()),
+    );
     let note_assets = NoteAssets::new(vec![]).unwrap();
     let note_recipient = NoteRecipient::new(serial_num, note_script, inputs);
     let note = Note::new(note_assets, note_metadata, note_recipient);
@@ -1258,18 +1254,21 @@ fn create_account_with_multisig_auth() {
     let temp_dir = init_cli().1;
 
     // Create init storage data file for multisig
+    // threshold_config is a value slot with [threshold, num_approvers, 0, 0]
+    // approver_public_keys and procedure_thresholds are map slots
     let init_storage_data_toml = r#"
-        ["miden::standards::auth::rpo_falcon512_multisig::threshold_config"]
-        approvers = [
-            { key = "0x0000000000000000000000000000000000000000000000000000000000000001", value = "0x0000000000000000000000000000000000000000000000000000000000000001" }
+        "miden::standards::auth::falcon512_rpo_multisig::threshold_config.threshold" = "2"
+        "miden::standards::auth::falcon512_rpo_multisig::threshold_config.num_approvers" = "3"
+
+        "miden::standards::auth::falcon512_rpo_multisig::approver_public_keys" = [
+            { key = ["0", "0", "0", "0"], value = "0x0000000000000000000000000000000000000000000000000000000000000001" },
+            { key = ["0", "0", "0", "1"], value = "0x0000000000000000000000000000000000000000000000000000000000000002" },
+            { key = ["0", "0", "0", "2"], value = "0x0000000000000000000000000000000000000000000000000000000000000003" }
         ]
 
-        proc_thresholds = [
-            { key = "0xd2d1b6229d7cfb9f2ada31c5cb61453cf464f91828e124437c708eec55b9cd07", value = "0x00000000000000000000000000000000000000000000000000000000000001" }
+        "miden::standards::auth::falcon512_rpo_multisig::procedure_thresholds" = [
+            { key = "0xd2d1b6229d7cfb9f2ada31c5cb61453cf464f91828e124437c708eec55b9cd07", value = "1" }
         ]
-
-        threshold="2"
-        num_approvers="3"
         "#;
     let file_path = temp_dir.join("multisig_init_data.toml");
     fs::write(&file_path, init_storage_data_toml).unwrap();

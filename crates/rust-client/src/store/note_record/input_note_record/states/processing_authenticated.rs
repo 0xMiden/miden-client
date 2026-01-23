@@ -80,7 +80,7 @@ impl NoteStateHandler for ProcessingAuthenticatedNoteState {
 
         Ok(Some(
             ConsumedAuthenticatedLocalNoteState {
-                metadata: self.metadata,
+                metadata: self.metadata.clone(),
                 inclusion_proof: self.inclusion_proof.clone(),
                 block_note_root: self.block_note_root,
                 nullifier_block_height: block_height,
