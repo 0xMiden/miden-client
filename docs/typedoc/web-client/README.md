@@ -145,10 +145,6 @@
 - [WebClient](classes/WebClient.md)
 - [Word](classes/Word.md)
 
-## Interfaces
-
-- [WasmWebClient](interfaces/WasmWebClient.md)
-
 ## Type Aliases
 
 - [AddressInterface](type-aliases/AddressInterface.md)
@@ -160,7 +156,6 @@
 ## Variables
 
 - [MidenArrays](variables/MidenArrays.md)
-- [NetworkAccountTarget](variables/NetworkAccountTarget.md)
 
 ## Functions
 
@@ -168,6 +163,6 @@
 
 ## References
 
-### SecretKey
+### WasmWebClient
 
-Renames and re-exports [NetworkAccountTarget](variables/NetworkAccountTarget.md)
+Renames and re-exports [WebClient](classes/WebClient.md)
