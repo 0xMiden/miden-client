@@ -78,6 +78,12 @@ pub struct NoteAttachment(NativeNoteAttachment);
 
 #[wasm_bindgen]
 impl NoteAttachment {
+    /// Creates a default (empty) note attachment.
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> NoteAttachment {
+        NoteAttachment(NativeNoteAttachment::default())
+    }
+
     /// Creates a new note attachment with Word content from the provided word.
     #[wasm_bindgen(js_name = "newWord")]
     pub fn new_word(scheme: &NoteAttachmentScheme, word: &Word) -> NoteAttachment {

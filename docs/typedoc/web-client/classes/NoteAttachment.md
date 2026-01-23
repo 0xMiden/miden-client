@@ -12,6 +12,18 @@ Note attachments provide additional context about how notes should be processed.
 For example, a network account target attachment indicates that the note should
 be consumed by a specific network account.
 
+## Constructors
+
+### Constructor
+
+> **new NoteAttachment**(): `NoteAttachment`
+
+Creates a default (empty) note attachment.
+
+#### Returns
+
+`NoteAttachment`
+
 ## Methods
 
 ### \[dispose\]()

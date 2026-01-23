@@ -4,8 +4,6 @@ use miden_client::crypto::RpoRandomCoin;
 use miden_client::note::{
     Note as NativeNote,
     NoteAssets as NativeNoteAssets,
-    NoteAttachment as NativeNoteAttachment,
-    NoteAttachmentScheme as NativeNoteAttachmentScheme,
     create_p2id_note,
     create_p2ide_note,
 };
@@ -17,8 +15,8 @@ use wasm_bindgen_futures::js_sys::Uint8Array;
 
 use super::NoteType;
 use super::account_id::AccountId;
-use super::felt::Felt;
 use super::note_assets::NoteAssets;
+use super::note_attachment::NoteAttachment;
 use super::note_id::NoteId;
 use super::note_metadata::NoteMetadata;
 use super::note_recipient::NoteRecipient;
@@ -104,7 +102,7 @@ impl Note {
         target: &AccountId,
         assets: &NoteAssets,
         note_type: NoteType,
-        aux: &Felt,
+        attachment: &NoteAttachment,
     ) -> Result<Self, JsValue> {
         let mut rng = StdRng::from_os_rng();
         let coin_seed: [u64; 4] = rng.random();
@@ -112,14 +110,13 @@ impl Note {
 
         let native_note_assets: NativeNoteAssets = assets.into();
         let native_assets: Vec<NativeAsset> = native_note_assets.iter().copied().collect();
-        let attachment = note_attachment_from_aux(aux);
 
         let native_note = create_p2id_note(
             sender.into(),
             target.into(),
             native_assets,
             note_type.into(),
-            attachment,
+            attachment.into(),
             &mut rng,
         )
         .map_err(|err| js_error_with_context(err, "create p2id note"))?;
@@ -136,7 +133,7 @@ impl Note {
         reclaim_height: Option<u32>,
         timelock_height: Option<u32>,
         note_type: NoteType,
-        aux: &Felt,
+        attachment: &NoteAttachment,
     ) -> Result<Self, JsValue> {
         let mut rng = StdRng::from_os_rng();
         let coin_seed: [u64; 4] = rng.random();
@@ -144,7 +141,6 @@ impl Note {
 
         let native_note_assets: NativeNoteAssets = assets.into();
         let native_assets: Vec<NativeAsset> = native_note_assets.iter().copied().collect();
-        let attachment = note_attachment_from_aux(aux);
 
         let native_note = create_p2ide_note(
             sender.into(),
@@ -153,7 +149,7 @@ impl Note {
             reclaim_height.map(NativeBlockNumber::from),
             timelock_height.map(NativeBlockNumber::from),
             note_type.into(),
-            attachment,
+            attachment.into(),
             &mut rng,
         )
         .map_err(|err| js_error_with_context(err, "create p2ide note"))?;
@@ -186,20 +182,5 @@ impl From<Note> for NativeNote {
 impl From<&Note> for NativeNote {
     fn from(note: &Note) -> Self {
         note.0.clone()
-    }
-}
-
-// Map legacy aux data into a word attachment when provided.
-fn note_attachment_from_aux(aux: &Felt) -> NativeNoteAttachment {
-    if aux.as_int() == 0 {
-        NativeNoteAttachment::default()
-    } else {
-        let word = NativeWord::from([
-            (*aux).into(),
-            NativeFelt::new(0),
-            NativeFelt::new(0),
-            NativeFelt::new(0),
-        ]);
-        NativeNoteAttachment::new_word(NativeNoteAttachmentScheme::none(), word)
     }
 }

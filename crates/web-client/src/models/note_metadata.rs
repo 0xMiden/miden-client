@@ -45,9 +45,9 @@ impl NoteMetadata {
     /// For example, a `NetworkAccountTarget` attachment indicates that the note
     /// should be consumed by a specific network account.
     #[wasm_bindgen(js_name = "withAttachment")]
-    pub fn with_attachment(self, attachment: &NoteAttachment) -> NoteMetadata {
+    pub fn with_attachment(&self, attachment: &NoteAttachment) -> NoteMetadata {
         let native_attachment = attachment.into();
-        NoteMetadata(self.0.with_attachment(native_attachment))
+        NoteMetadata(self.clone().0.with_attachment(native_attachment))
     }
 }
 
