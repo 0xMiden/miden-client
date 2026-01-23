@@ -441,35 +441,12 @@ async fn deploy_account<AUTH: TransactionAuthenticator + Sync + 'static>(
     client: &mut Client<AUTH>,
     account: &Account,
 ) -> Result<(), CliError> {
-    // Retrieve the auth procedure mast root pointer and call it in the transaction script.
-    // We only use AuthRpoFalcon512 for the auth component so this may be overkill but it lets us
-    // use different auth components in the future.
-    let auth_procedure_mast_root = account
-        .code()
-        .get(0)
-        .expect("account code should contain at least one procedure")
-        .mast_root();
-
-    let auth_script = client
-        .code_builder()
-        .compile_tx_script(
-            "
-                    begin
-                        # [AUTH_PROCEDURE_MAST_ROOT]
-                        mem_storew_be.4000 push.4000
-                        # [auth_procedure_mast_root_ptr]
-                        dyncall
-                    end",
-        )
-        .expect("Auth script should compile");
-
-    let tx_request = TransactionRequestBuilder::new()
-        .script_arg(*auth_procedure_mast_root)
-        .custom_script(auth_script)
-        .build()
-        .map_err(|err| {
-            CliError::Transaction(err.into(), "Failed to build deploy transaction".to_string())
-        })?;
+    // Build a minimal transaction request. The transaction execution will naturally increment
+    // the account nonce from 0 to 1, which deploys the account on-chain.
+    // We don't need to call auth procedures directly as that must be done in the epilogue.
+    let tx_request = TransactionRequestBuilder::new().build().map_err(|err| {
+        CliError::Transaction(err.into(), "Failed to build deploy transaction".to_string())
+    })?;
 
     client.submit_new_transaction(account.id(), tx_request).await?;
     Ok(())
