@@ -1,11 +1,8 @@
 use miden_client::account::{AccountStorage, StorageMap, StorageSlotContent};
-use miden_client::asset::{Asset, AssetVault, AssetWitness};
-use miden_client::crypto::SMT_DEPTH;
+use miden_client::asset::{Asset, AssetVault, AssetWitness, StorageMapWitness};
+use miden_client::crypto::{EmptySubtreeRoots, MerkleError, SMT_DEPTH, Smt, SmtForest};
 use miden_client::store::StoreError;
 use miden_client::{EMPTY_WORD, Word};
-use miden_protocol::account::StorageMapWitness;
-use miden_protocol::crypto::merkle::smt::{Smt, SmtForest};
-use miden_protocol::crypto::merkle::{EmptySubtreeRoots, MerkleError};
 
 /// Thin wrapper around `SmtForest` for account vault/storage proofs and updates.
 #[derive(Debug, Default, Clone, Eq, PartialEq)]

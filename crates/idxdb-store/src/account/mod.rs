@@ -18,7 +18,14 @@ use miden_client::account::{
     StorageSlotName,
     StorageSlotType,
 };
-use miden_client::asset::{Asset, AssetVault};
+use miden_client::asset::{
+    AccountStorageHeader,
+    Asset,
+    AssetVault,
+    PartialVault,
+    StorageSlotContent,
+    StorageSlotHeader,
+};
 use miden_client::store::{
     AccountRecord,
     AccountRecordData,
@@ -28,8 +35,6 @@ use miden_client::store::{
 };
 use miden_client::utils::Serializable;
 use miden_client::{AccountError, Word};
-use miden_protocol::account::{AccountStorageHeader, StorageSlotContent, StorageSlotHeader};
-use miden_protocol::asset::PartialVault;
 
 use super::WebStore;
 use crate::account::js_bindings::idxdb_get_account_addresses;
@@ -569,7 +574,7 @@ impl WebStore {
     pub(crate) async fn get_account_asset(
         &self,
         account_id: AccountId,
-        vault_key: miden_protocol::asset::AssetVaultKey,
+        vault_key: miden_client::asset::AssetVaultKey,
     ) -> Result<Option<(miden_client::asset::Asset, miden_client::asset::AssetWitness)>, StoreError>
     {
         let account_header = self
@@ -593,7 +598,7 @@ impl WebStore {
         account_id: AccountId,
         slot_name: miden_client::account::StorageSlotName,
         key: Word,
-    ) -> Result<(Word, miden_protocol::account::StorageMapWitness), StoreError> {
+    ) -> Result<(Word, miden_client::asset::StorageMapWitness), StoreError> {
         let storage = self
             .get_account_storage(account_id, AccountStorageFilter::SlotName(slot_name.clone()))
             .await?;

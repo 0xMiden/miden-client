@@ -349,7 +349,7 @@ impl Store for WebStore {
     async fn get_account_asset(
         &self,
         account_id: AccountId,
-        vault_key: miden_protocol::asset::AssetVaultKey,
+        vault_key: miden_client::asset::AssetVaultKey,
     ) -> Result<Option<(miden_client::asset::Asset, miden_client::asset::AssetWitness)>, StoreError>
     {
         self.get_account_asset(account_id, vault_key).await
@@ -360,7 +360,7 @@ impl Store for WebStore {
         account_id: AccountId,
         slot_name: miden_client::account::StorageSlotName,
         key: Word,
-    ) -> Result<(Word, miden_protocol::account::StorageMapWitness), StoreError> {
+    ) -> Result<(Word, miden_client::asset::StorageMapWitness), StoreError> {
         self.get_account_map_item(account_id, slot_name, key).await
     }
 

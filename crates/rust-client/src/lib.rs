@@ -188,13 +188,21 @@ pub mod asset {
         NonFungibleAssetDelta,
         NonFungibleDeltaAction,
     };
+    pub use miden_protocol::account::{
+        AccountStorageHeader,
+        StorageMapWitness,
+        StorageSlotContent,
+        StorageSlotHeader,
+    };
     pub use miden_protocol::asset::{
         Asset,
         AssetVault,
+        AssetVaultKey,
         AssetWitness,
         FungibleAsset,
         NonFungibleAsset,
         NonFungibleAssetDetails,
+        PartialVault,
         TokenSymbol,
     };
 }
@@ -239,9 +247,22 @@ pub mod crypto {
         MmrProof,
         PartialMmr,
     };
-    pub use miden_protocol::crypto::merkle::smt::{LeafIndex, SMT_DEPTH, SmtLeaf, SmtProof};
+    pub use miden_protocol::crypto::merkle::smt::{
+        LeafIndex,
+        SMT_DEPTH,
+        Smt,
+        SmtForest,
+        SmtLeaf,
+        SmtProof,
+    };
     pub use miden_protocol::crypto::merkle::store::MerkleStore;
-    pub use miden_protocol::crypto::merkle::{MerklePath, MerkleTree, NodeIndex};
+    pub use miden_protocol::crypto::merkle::{
+        EmptySubtreeRoots,
+        MerkleError,
+        MerklePath,
+        MerkleTree,
+        NodeIndex,
+    };
     pub use miden_protocol::crypto::rand::{FeltRng, RpoRandomCoin};
 }
 
