@@ -12,10 +12,9 @@ use miden_client::account::component::{
     InitStorageData,
     MIDEN_PACKAGE_EXTENSION,
     StorageSlotSchema,
-    StorageValueName,
 };
 use miden_client::account::{Account, AccountBuilder, AccountStorageMode, AccountType};
-use miden_client::auth::{AuthRpoFalcon512, AuthSecretKey, TransactionAuthenticator};
+use miden_client::auth::{AuthFalcon512Rpo, AuthSecretKey, TransactionAuthenticator};
 use miden_client::transaction::TransactionRequestBuilder;
 use miden_client::utils::Deserializable;
 use miden_client::vm::{Package, SectionId};
@@ -392,7 +391,7 @@ async fn create_client_account<AUTH: TransactionAuthenticator + Sync + 'static>(
         debug!("Adding default Falcon auth component");
         let kp = AuthSecretKey::new_falcon512_rpo_with_rng(client.rng());
         builder =
-            builder.with_auth_component(AuthRpoFalcon512::new(kp.public_key().to_commitment()));
+            builder.with_auth_component(AuthFalcon512Rpo::new(kp.public_key().to_commitment()));
         Some(kp)
     };
 
@@ -442,7 +441,7 @@ async fn deploy_account<AUTH: TransactionAuthenticator + Sync + 'static>(
     account: &Account,
 ) -> Result<(), CliError> {
     // Retrieve the auth procedure mast root pointer and call it in the transaction script.
-    // We only use AuthRpoFalcon512 for the auth component so this may be overkill but it lets us
+    // We only use AuthFalcon512Rpo for the auth component so this may be overkill but it lets us
     // use different auth components in the future.
     let auth_procedure_mast_root = account
         .code()
@@ -506,11 +505,10 @@ fn process_packages(
 
         // Preserve any provided map entries for map slots.
         for (slot_name, schema) in component_metadata.storage_schema().iter() {
-            if matches!(schema, StorageSlotSchema::Map(_)) {
-                let value_name = StorageValueName::from_slot_name(slot_name);
-                if let Some(entries) = init_storage_data.map_entries(&value_name) {
-                    map_entries.insert(value_name, entries.clone());
-                }
+            if matches!(schema, StorageSlotSchema::Map(_))
+                && let Some(entries) = init_storage_data.map_entries(slot_name)
+            {
+                map_entries.insert(slot_name.clone(), entries.clone());
             }
         }
 
@@ -533,16 +531,19 @@ fn process_packages(
             value_entries.insert(value_name, input_value.to_string().into());
         }
 
-        let account_component = AccountComponent::from_package(
-            &package,
-            &InitStorageData::new(value_entries, map_entries),
-        )
-        .map_err(|e| {
-            CliError::Account(
-                e,
-                format!("error instantiating component from Package {}", package.name),
+        let init_data = InitStorageData::new(value_entries, map_entries).map_err(|e| {
+            CliError::AccountComponentError(
+                Box::new(e),
+                format!("error creating InitStorageData for Package {}", package.name),
             )
         })?;
+        let account_component =
+            AccountComponent::from_package(&package, &init_data).map_err(|e| {
+                CliError::Account(
+                    e,
+                    format!("error instantiating component from Package {}", package.name),
+                )
+            })?;
 
         account_components.push(account_component);
     }

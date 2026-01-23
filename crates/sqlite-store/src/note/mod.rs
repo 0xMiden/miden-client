@@ -9,7 +9,6 @@ use miden_client::note::{
     BlockNumber,
     NoteAssets,
     NoteDetails,
-    NoteInputs,
     NoteMetadata,
     NoteRecipient,
     NoteScript,
@@ -25,6 +24,7 @@ use miden_client::store::{
     StoreError,
 };
 use miden_client::utils::{Deserializable, Serializable};
+use miden_protocol::note::NoteInputs;
 use rusqlite::types::Value;
 use rusqlite::{Connection, Transaction, params, params_from_iter};
 

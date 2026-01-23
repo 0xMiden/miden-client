@@ -66,11 +66,11 @@ pub fn serialize_partial_blockchain_node(
 ///
 /// Note: The `id` is stored as `u32` because this store is WASM-only, where `usize` is 32 bits.
 /// For an MMR with N blocks, the rightmost in-order index is `2N - 1`. To fit in 32 bits:
-/// `2N - 1 ≤ u32::MAX` → `N ≤ 2^31` (~2.15 billion blocks).
+/// `2N - 1 ≤ u32::MAX` → `N <= 2^31` (~2 billion blocks).
 ///
 /// This means WASM clients can only support blockchains with up to ~2^31 blocks.
 /// Supporting the full `u32::MAX` blocks would require `InOrderIndex` in `miden-crypto`
-/// to use `u64` instead of `usize`.
+/// to use `u64` instead of `usize` (Issue #1691).
 pub fn process_partial_blockchain_nodes_from_js_value(
     js_value: JsValue,
 ) -> Result<BTreeMap<InOrderIndex, Word>, StoreError> {
@@ -83,9 +83,6 @@ pub fn process_partial_blockchain_nodes_from_js_value(
         .map(|record| {
             // u32 -> usize always succeeds (even in WASM where usize is 32 bits)
             let id = record.id as usize;
-            let id = NonZeroUsize::new(id).ok_or_else(|| {
-                StoreError::ParsingError("partial blockchain node id must be non-zero".to_string())
-            })?;
             let id = InOrderIndex::new(id);
             let node = Word::try_from(&record.node)?;
             Ok((id, node))

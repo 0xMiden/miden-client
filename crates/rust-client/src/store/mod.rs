@@ -26,6 +26,7 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::fmt::Debug;
 
+use miden_protocol::Word;
 use miden_protocol::account::{
     Account,
     AccountCode,
@@ -41,9 +42,9 @@ use miden_protocol::address::Address;
 use miden_protocol::asset::{Asset, AssetVault, AssetVaultKey, AssetWitness};
 use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::crypto::merkle::mmr::{Forest, InOrderIndex, MmrPeaks, PartialMmr};
+use miden_protocol::errors::AccountError;
 use miden_protocol::note::{NoteId, NoteScript, NoteTag, Nullifier};
 use miden_protocol::transaction::TransactionId;
-use miden_protocol::{AccountError, Word};
 
 use crate::note_transport::{NOTE_TRANSPORT_CURSOR_STORE_SETTING, NoteTransportCursor};
 use crate::sync::{NoteTagRecord, StateSyncUpdate};

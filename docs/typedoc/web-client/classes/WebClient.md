@@ -6,6 +6,10 @@
 
 # Class: WebClient
 
+## Extended by
+
+- [`MockWebClient`](MockWebClient.md)
+
 ## Constructors
 
 ### Constructor
@@ -86,6 +90,8 @@
 
 ### createClient()
 
+#### Call Signature
+
 > **createClient**(`node_url?`, `node_note_transport_url?`, `seed?`, `store_name?`): `Promise`\<`any`\>
 
 Creates a new `WebClient` instance with the specified configuration.
@@ -98,31 +104,71 @@ Creates a new `WebClient` instance with the specified configuration.
   `MidenClientDB_{network_id}`, where `network_id` is derived from the `node_url`.
   Explicitly setting this allows for creating multiple isolated clients.
 
-#### Parameters
+##### Parameters
 
-##### node\_url?
-
-`string`
-
-##### node\_note\_transport\_url?
+###### node\_url?
 
 `string`
 
-##### seed?
+###### node\_note\_transport\_url?
+
+`string`
+
+###### seed?
 
 `Uint8Array`
 
-##### store\_name?
+###### store\_name?
 
 `string`
 
-#### Returns
+##### Returns
 
 `Promise`\<`any`\>
+
+#### Call Signature
+
+> **createClient**(`rpcUrl?`, `noteTransportUrl?`, `seed?`, `network?`): `Promise`\<`WebClient`\>
+
+Factory method to create and initialize a new wrapped WebClient.
+
+##### Parameters
+
+###### rpcUrl?
+
+`string`
+
+The RPC URL (optional).
+
+###### noteTransportUrl?
+
+`string`
+
+The note transport URL (optional).
+
+###### seed?
+
+`Uint8Array`
+
+The seed for the account (optional).
+
+###### network?
+
+`string`
+
+Optional name for the store. Setting this allows multiple clients to be used in the same browser.
+
+##### Returns
+
+`Promise`\<`WebClient`\>
+
+A promise that resolves to a fully initialized WebClient.
 
 ***
 
 ### createClientWithExternalKeystore()
+
+#### Call Signature
 
 > **createClientWithExternalKeystore**(`node_url?`, `node_note_transport_url?`, `seed?`, `store_name?`, `get_key_cb?`, `insert_key_cb?`, `sign_cb?`): `Promise`\<`any`\>
 
@@ -139,39 +185,95 @@ Creates a new `WebClient` instance with external keystore callbacks.
 * `insert_key_cb`: Callback to persist a secret key.
 * `sign_cb`: Callback to produce serialized signature bytes for the provided inputs.
 
-#### Parameters
+##### Parameters
 
-##### node\_url?
-
-`string`
-
-##### node\_note\_transport\_url?
+###### node\_url?
 
 `string`
 
-##### seed?
+###### node\_note\_transport\_url?
+
+`string`
+
+###### seed?
 
 `Uint8Array`
 
-##### store\_name?
+###### store\_name?
 
 `string`
 
-##### get\_key\_cb?
+###### get\_key\_cb?
 
 `Function`
 
-##### insert\_key\_cb?
+###### insert\_key\_cb?
 
 `Function`
 
-##### sign\_cb?
+###### sign\_cb?
 
 `Function`
 
-#### Returns
+##### Returns
 
 `Promise`\<`any`\>
+
+#### Call Signature
+
+> **createClientWithExternalKeystore**(`rpcUrl?`, `noteTransportUrl?`, `seed?`, `storeName?`, `getKeyCb?`, `insertKeyCb?`, `signCb?`): `Promise`\<`WebClient`\>
+
+Factory method to create and initialize a new wrapped WebClient with a remote keystore.
+
+##### Parameters
+
+###### rpcUrl?
+
+`string`
+
+The RPC URL (optional).
+
+###### noteTransportUrl?
+
+`string`
+
+The note transport URL (optional).
+
+###### seed?
+
+`Uint8Array`
+
+The seed for the account (optional).
+
+###### storeName?
+
+`string`
+
+Optional name for the store. Setting this allows multiple clients to be used in the same browser.
+
+###### getKeyCb?
+
+[`GetKeyCallback`](../type-aliases/GetKeyCallback.md)
+
+Callback used to retrieve secret keys for a given public key.
+
+###### insertKeyCb?
+
+[`InsertKeyCallback`](../type-aliases/InsertKeyCallback.md)
+
+Callback used to persist secret keys in the external store.
+
+###### signCb?
+
+[`SignCallback`](../type-aliases/SignCallback.md)
+
+Callback used to create signatures for the provided inputs.
+
+##### Returns
+
+`Promise`\<`WebClient`\>
+
+A promise that resolves to a fully initialized WebClient.
 
 ***
 
@@ -209,6 +311,18 @@ applications as it uses a mock chain that simulates the behavior of a real node.
 #### Returns
 
 `Promise`\<`any`\>
+
+***
+
+### defaultTransactionProver()
+
+> **defaultTransactionProver**(): [`TransactionProver`](TransactionProver.md)
+
+Returns the default transaction prover configured on the client.
+
+#### Returns
+
+[`TransactionProver`](TransactionProver.md)
 
 ***
 
@@ -1027,6 +1141,30 @@ Returns the inner serialized mock note transport node if it exists.
 
 ***
 
+### setDebugMode()
+
+> **setDebugMode**(`enabled`): `void`
+
+Sets the debug mode for transaction execution.
+
+When enabled, the transaction executor will record additional information useful for
+debugging (the values on the VM stack and the state of the advice provider). This is
+disabled by default since it adds overhead.
+
+Must be called before `createClient`.
+
+#### Parameters
+
+##### enabled
+
+`boolean`
+
+#### Returns
+
+`void`
+
+***
+
 ### setSetting()
 
 > **setSetting**(`key`, `value`): `Promise`\<`void`\>
@@ -1133,9 +1271,74 @@ chain tip is performed, and the required block header is retrieved.
 
 > **syncState**(): `Promise`\<[`SyncSummary`](SyncSummary.md)\>
 
+Syncs the client state with the Miden node.
+
+This method coordinates concurrent calls using the Web Locks API:
+- If a sync is already in progress, callers wait and receive the same result
+- Cross-tab coordination ensures only one sync runs at a time per database
+
 #### Returns
 
 `Promise`\<[`SyncSummary`](SyncSummary.md)\>
+
+A promise that resolves to a SyncSummary with the sync results.
+
+***
+
+### syncStateImpl()
+
+> **syncStateImpl**(): `Promise`\<[`SyncSummary`](SyncSummary.md)\>
+
+Internal implementation of `sync_state`.
+
+This method performs the actual sync operation. Concurrent call coordination
+is handled at the JavaScript layer using the Web Locks API.
+
+**Note:** Do not call this method directly. Use `syncState()` from JavaScript instead,
+which provides proper coordination for concurrent calls.
+
+#### Returns
+
+`Promise`\<[`SyncSummary`](SyncSummary.md)\>
+
+***
+
+### syncStateWithTimeout()
+
+> **syncStateWithTimeout**(`timeoutMs?`): `Promise`\<[`SyncSummary`](SyncSummary.md)\>
+
+Syncs the client state with the Miden node with an optional timeout.
+
+This method coordinates concurrent calls using the Web Locks API:
+- If a sync is already in progress, callers wait and receive the same result
+- Cross-tab coordination ensures only one sync runs at a time per database
+- If a timeout is specified and exceeded, the method throws an error
+
+#### Parameters
+
+##### timeoutMs?
+
+`number`
+
+Optional timeout in milliseconds. If 0 or not provided, waits indefinitely.
+
+#### Returns
+
+`Promise`\<[`SyncSummary`](SyncSummary.md)\>
+
+A promise that resolves to a SyncSummary with the sync results.
+
+***
+
+### terminate()
+
+> **terminate**(): `void`
+
+Terminates the underlying worker.
+
+#### Returns
+
+`void`
 
 ***
 
