@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, useMemo } from "react";
 import { useMiden } from "../context/MidenProvider";
 import { useMidenStore } from "../store/MidenStore";
-import { AccountId } from "@demox-labs/miden-sdk";
+import { AccountId } from "@miden-sdk/miden-sdk";
 import type { AccountResult, AssetBalance } from "../types";
 
 /**

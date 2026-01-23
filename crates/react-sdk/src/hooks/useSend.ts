@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import { useMiden } from "../context/MidenProvider";
-import { NoteType, AccountId } from "@demox-labs/miden-sdk";
+import { NoteType, AccountId } from "@miden-sdk/miden-sdk";
 import type { SendOptions, TransactionStage, TransactionResult } from "../types";
 import { DEFAULTS } from "../types";
 

@@ -27,14 +27,14 @@
     "test:all": "vitest run && playwright test"
   },
   "peerDependencies": {
-    "@demox-labs/miden-sdk": ">=0.12.0",
+    "@miden-sdk/miden-sdk": ">=0.13.0",
     "react": ">=18.0.0"
   },
   "dependencies": {
     "zustand": "^5.0.0"
   },
   "devDependencies": {
-    "@demox-labs/miden-sdk": "^0.12.5",
+    "@miden-sdk/miden-sdk": "file:../web-client",
     "@playwright/test": "^1.55.0",
     "@testing-library/react": "^14.0.0",
     "@types/react": "^18.2.0",

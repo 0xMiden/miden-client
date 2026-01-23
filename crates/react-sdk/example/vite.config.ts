@@ -4,6 +4,6 @@ import react from "@vitejs/plugin-react";
 export default defineConfig({
   plugins: [react()],
   optimizeDeps: {
-    exclude: ["@demox-labs/miden-sdk"],
+    exclude: ["@miden-sdk/miden-sdk"],
   },
 });

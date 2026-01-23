@@ -13,11 +13,11 @@ React hooks library for the Miden Web Client. Provides a simple, ergonomic inter
 ## Installation
 
 ```bash
-npm install @miden-sdk/react @demox-labs/miden-sdk
+npm install @miden-sdk/react @miden-sdk/miden-sdk
 # or
-yarn add @miden-sdk/react @demox-labs/miden-sdk
+yarn add @miden-sdk/react @miden-sdk/miden-sdk
 # or
-pnpm add @miden-sdk/react @demox-labs/miden-sdk
+pnpm add @miden-sdk/react @miden-sdk/miden-sdk
 ```
 
 ## Quick Start
@@ -673,7 +673,7 @@ yarn dev
 ## Requirements
 
 - React 18.0 or higher
-- `@demox-labs/miden-sdk` 0.12.0 or higher
+- `@miden-sdk/miden-sdk` 0.13.0 or higher
 
 ## Browser Support
 

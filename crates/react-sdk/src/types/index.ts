@@ -8,7 +8,7 @@ import type {
   TransactionId,
   NoteType,
   AccountStorageMode,
-} from "@demox-labs/miden-sdk";
+} from "@miden-sdk/miden-sdk";
 
 // Re-export SDK types for convenience
 export type {

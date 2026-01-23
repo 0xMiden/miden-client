@@ -1,8 +1,8 @@
 import { useCallback, useState } from "react";
 import { useMiden } from "../context/MidenProvider";
 import { useMidenStore } from "../store/MidenStore";
-import { AccountStorageMode } from "@demox-labs/miden-sdk";
-import type { Account } from "@demox-labs/miden-sdk";
+import { AccountStorageMode } from "@miden-sdk/miden-sdk";
+import type { Account } from "@miden-sdk/miden-sdk";
 import type { CreateWalletOptions } from "../types";
 import { DEFAULTS } from "../types";
 

@@ -5,7 +5,7 @@ import type {
   AccountHeader,
   InputNoteRecord,
   ConsumableNoteRecord,
-} from "@demox-labs/miden-sdk";
+} from "@miden-sdk/miden-sdk";
 import type { SyncState, MidenConfig } from "../types";
 
 interface MidenStoreState {

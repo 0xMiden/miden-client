@@ -60,15 +60,6 @@
   resolved "https://registry.yarnpkg.com/@csstools/css-tokenizer/-/css-tokenizer-3.0.4.tgz#333fedabc3fd1a8e5d0100013731cf19e6a8c5d3"
   integrity sha512-Vd/9EVDiu6PPJt9yAh6roZP6El1xHrdvIVGjyBsHR0RYwNHgL7FJPyIIW4fANJNG6FtyZfvlRPpFI4ZM/lubvw==
 
-"@demox-labs/miden-sdk@^0.12.5":
-  version "0.12.5"
-  resolved "https://registry.yarnpkg.com/@demox-labs/miden-sdk/-/miden-sdk-0.12.5.tgz#0f7851bef9ae4f5ff5770ac094400acc2c46d0ca"
-  integrity sha512-Oq+MKObtOEY3aro+q1coVSc2RKrIycWbz9hBvnxqIlUkHzn6iL8X4+TG8t14co03cyuVt1dz1F13w0ScQSBMuA==
-  dependencies:
-    "@rollup/plugin-typescript" "^12.3.0"
-    dexie "^4.0.1"
-    glob "^11.0.0"
-
 "@esbuild/aix-ppc64@0.21.5":
   version "0.21.5"
   resolved "https://registry.yarnpkg.com/@esbuild/aix-ppc64/-/aix-ppc64-0.21.5.tgz#c7184a326533fcdf1b8ee0733e21c713b975575f"
@@ -421,6 +412,13 @@
   dependencies:
     "@jridgewell/resolve-uri" "^3.1.0"
     "@jridgewell/sourcemap-codec" "^1.4.14"
+
+"@miden-sdk/miden-sdk@file:../web-client":
+  version "0.12.6"
+  dependencies:
+    "@rollup/plugin-typescript" "^12.3.0"
+    dexie "^4.0.1"
+    glob "^11.0.0"
 
 "@nodelib/fs.scandir@2.1.5":
   version "2.1.5"

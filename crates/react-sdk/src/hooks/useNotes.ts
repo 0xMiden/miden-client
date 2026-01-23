@@ -5,7 +5,7 @@ import {
   useNotesStore,
   useConsumableNotesStore,
 } from "../store/MidenStore";
-import { NoteFilter, NoteFilterTypes, AccountId } from "@demox-labs/miden-sdk";
+import { NoteFilter, NoteFilterTypes, AccountId } from "@miden-sdk/miden-sdk";
 import type { NotesFilter, NotesResult } from "../types";
 
 /**

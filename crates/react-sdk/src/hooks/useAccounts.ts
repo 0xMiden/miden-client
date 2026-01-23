@@ -1,7 +1,7 @@
 import { useCallback, useEffect } from "react";
 import { useMiden } from "../context/MidenProvider";
 import { useMidenStore, useAccountsStore } from "../store/MidenStore";
-import type { AccountHeader } from "@demox-labs/miden-sdk";
+import type { AccountHeader } from "@miden-sdk/miden-sdk";
 import type { AccountsResult } from "../types";
 
 /**
