@@ -1,7 +1,5 @@
-import type { WebClient as WasmWebClient } from "./crates/miden_client_web";
-// Import the full namespace to derive the concrete Miden array constructor map so the
-// declaration matches the actual WASM exports rather than a generic ArrayBufferView.
-import type * as WasmExports from "./crates/miden_client_web";
+// Re-export everything from the WASM module
+export * from "./crates/miden_client_web";
 
 export type { WebClient as WasmWebClient } from "./crates/miden_client_web";
 
@@ -125,11 +123,6 @@ export {
   StorageSlot,
   StorageSlotArray,
   SyncSummary,
-  TestUtils,
-  TokenSymbol,
-  TransactionArgs,
-  TransactionFilter,
-  TransactionId,
   TransactionProver,
   TransactionRecord,
   TransactionRequest,
@@ -145,6 +138,13 @@ export {
   createAuthFalcon512RpoMultisig,
 } from "./crates/miden_client_web";
 
+// Import the full namespace for the MidenArrayConstructors type
+import type * as WasmExports from "./crates/miden_client_web";
+
+// Export the WASM WebClient type alias for users who need to reference it explicitly
+export type { WebClient as WasmWebClient } from "./crates/miden_client_web";
+
+// Callback types for external keystore support
 export type GetKeyCallback = (
   pubKey: Uint8Array
 ) => Promise<Uint8Array | null | undefined> | Uint8Array | null | undefined;
@@ -211,12 +211,37 @@ export declare class WebClient extends WasmWebClient {
   defaultTransactionProver(): TransactionProver;
 
   /**
+   * Syncs the client state with the Miden node.
+   *
+   * This method coordinates concurrent calls using the Web Locks API:
+   * - If a sync is already in progress, callers wait and receive the same result
+   * - Cross-tab coordination ensures only one sync runs at a time per database
+   *
+   * @returns A promise that resolves to a SyncSummary with the sync results.
+   */
+  syncState(): Promise<SyncSummary>;
+
+  /**
+   * Syncs the client state with the Miden node with an optional timeout.
+   *
+   * This method coordinates concurrent calls using the Web Locks API:
+   * - If a sync is already in progress, callers wait and receive the same result
+   * - Cross-tab coordination ensures only one sync runs at a time per database
+   * - If a timeout is specified and exceeded, the method throws an error
+   *
+   * @param timeoutMs - Optional timeout in milliseconds. If 0 or not provided, waits indefinitely.
+   * @returns A promise that resolves to a SyncSummary with the sync results.
+   */
+  syncStateWithTimeout(timeoutMs?: number): Promise<SyncSummary>;
+
+  /**
    * Terminates the underlying worker.
    */
   terminate(): void;
 }
 
-export declare class MockWebClient extends WebClient {
+// MockWebClient class that extends the augmented WebClient
+export declare class MockWebClient extends WasmWebClient {
   /**
    * Factory method to create and initialize a new wrapped MockWebClient.
    *
@@ -229,7 +254,16 @@ export declare class MockWebClient extends WebClient {
     serializedMockChain?: ArrayBuffer | Uint8Array,
     serializedMockNoteTransportNode?: ArrayBuffer | Uint8Array,
     seed?: Uint8Array
-  ): Promise<MockWebClient & WasmWebClient>;
+  ): Promise<MockWebClient>;
+
   /** Syncs the mock state and returns the resulting summary. */
   syncState(): Promise<SyncSummary>;
+
+  /**
+   * Syncs the client state with the Miden node with an optional timeout.
+   *
+   * @param timeoutMs - Optional timeout in milliseconds. If 0 or not provided, waits indefinitely.
+   * @returns A promise that resolves to a SyncSummary with the sync results.
+   */
+  syncStateWithTimeout(timeoutMs?: number): Promise<SyncSummary>;
 }

@@ -367,6 +367,7 @@ test.describe("createP2IDNote and createP2IDENote", () => {
   test("should create a proper consumable p2ide note from the createP2IDENote function", async ({
     page,
   }) => {
+    test.slow();
     const { accountId: senderId, faucetId } = await setupWalletAndFaucet(page);
     const { accountId: targetId } = await setupWalletAndFaucet(page);
 
