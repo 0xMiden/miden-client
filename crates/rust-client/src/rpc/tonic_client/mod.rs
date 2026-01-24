@@ -67,20 +67,10 @@ pub struct GrpcClient {
 }
 
 impl GrpcClient {
-    // PAGINATION HELPERS
-    // ============================================================================================
-
     /// Maximum number of pagination iterations allowed for a single request.
-    ///
-    /// This is a safety limit to prevent infinite loops if a node returns inconsistent pagination
-    /// information.
     const MAX_PAGINATION_ITERATIONS: u32 = 1000;
 
-    /// Paginates block-driven endpoints accumulating per-page updates.
-    ///
-    /// The node uses block numbers as pagination axis. The provided `fetch` function must:
-    /// - request data for the given `block_from` (inclusive) and `block_to` (optional),
-    /// - return the updates for that page and the pagination info for that response.
+    /// Paginates block-driven endpoints by accumulating per-page updates.
     async fn paginate_block_driven_updates<Update, Fetch, Fut>(
         mut current_block_from: u32,
         block_to: Option<u32>,
@@ -98,7 +88,6 @@ impl GrpcClient {
             let (batch_updates, page) = fetch(current_block_from, block_to).await?;
             all_updates.extend(batch_updates);
 
-            // Ensure we're making progress to avoid infinite loops.
             if page.block_num < current_block_from {
                 return Err(RpcError::InvalidResponse(
                     "invalid pagination: block_num went backwards".to_owned(),
@@ -108,7 +97,6 @@ impl GrpcClient {
             final_chain_tip = page.chain_tip;
             final_block_num = page.block_num;
 
-            // Calculate target block as minimum between block_to and chain_tip.
             let target_block = block_to.map_or(page.chain_tip, |b| b.min(page.chain_tip));
 
             if page.block_num >= target_block {
