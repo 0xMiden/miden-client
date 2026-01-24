@@ -36,18 +36,16 @@ miden-testing      = { default-features = false, version = "0.13" }
 miden-tx           = { default-features = false, version = "0.13" }
 
 # Miden node dependencies
-miden-node-block-producer = { branch = "main", git = "https://github.com/0xMiden/miden-node.git" }
-miden-node-ntx-builder = { branch = "main", git = "https://github.com/0xMiden/miden-node.git" }
-miden-node-proto-build = { branch = "main", default-features = false, git = "https://github.com/0xMiden/miden-node.git" }
-miden-node-rpc = { branch = "main", git = "https://github.com/0xMiden/miden-node.git" }
-miden-node-store = { branch = "main", git = "https://github.com/0xMiden/miden-node.git" }
-miden-node-utils = { branch = "main", git = "https://github.com/0xMiden/miden-node.git" }
-miden-node-validator = { branch = "main", git = "https://github.com/0xMiden/miden-node.git" }
-miden-note-transport-proto-build = { branch = "main", default-features = false, git = "https://github.com/0xMiden/miden-note-transport.git" }
-miden-remote-prover = { branch = "main", features = ["concurrent"], git = "https://github.com/0xMiden/miden-node.git" }
-miden-remote-prover-client = { branch = "main", default-features = false, features = [
-  "tx-prover",
-], git = "https://github.com/0xMiden/miden-node.git" }
+miden-node-block-producer        = { git = "https://github.com/0xMiden/miden-node.git", version = "0.13" }
+miden-node-ntx-builder           = { git = "https://github.com/0xMiden/miden-node.git", version = "0.13" }
+miden-node-proto-build           = { default-features = false, git = "https://github.com/0xMiden/miden-node.git", version = "0.13" }
+miden-node-rpc                   = { git = "https://github.com/0xMiden/miden-node.git", version = "0.13" }
+miden-node-store                 = { git = "https://github.com/0xMiden/miden-node.git", version = "0.13" }
+miden-node-utils                 = { git = "https://github.com/0xMiden/miden-node.git", version = "0.13" }
+miden-node-validator             = { git = "https://github.com/0xMiden/miden-node.git", version = "0.13" }
+miden-note-transport-proto-build = { default-features = false, version = "0.2" }
+miden-remote-prover              = { features = ["concurrent"], version = "0.13" }
+miden-remote-prover-client       = { default-features = false, features = ["tx-prover"], version = "0.13" }
 
 # External dependencies
 anyhow      = { default-features = false, version = "1.0" }
