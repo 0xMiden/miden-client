@@ -36,13 +36,13 @@ miden-testing      = { default-features = false, version = "0.13" }
 miden-tx           = { default-features = false, version = "0.13" }
 
 # Miden node dependencies
-miden-node-block-producer        = { git = "https://github.com/0xMiden/miden-node.git", version = "0.13" }
-miden-node-ntx-builder           = { git = "https://github.com/0xMiden/miden-node.git", version = "0.13" }
-miden-node-proto-build           = { default-features = false, git = "https://github.com/0xMiden/miden-node.git", version = "0.13" }
-miden-node-rpc                   = { git = "https://github.com/0xMiden/miden-node.git", version = "0.13" }
-miden-node-store                 = { git = "https://github.com/0xMiden/miden-node.git", version = "0.13" }
-miden-node-utils                 = { git = "https://github.com/0xMiden/miden-node.git", version = "0.13" }
-miden-node-validator             = { git = "https://github.com/0xMiden/miden-node.git", version = "0.13" }
+miden-node-block-producer        = { version = "0.13" }
+miden-node-ntx-builder           = { version = "0.13" }
+miden-node-proto-build           = { default-features = false, version = "0.13" }
+miden-node-rpc                   = { version = "0.13" }
+miden-node-store                 = { version = "0.13" }
+miden-node-utils                 = { version = "0.13" }
+miden-node-validator             = { version = "0.13" }
 miden-note-transport-proto-build = { default-features = false, version = "0.2" }
 miden-remote-prover              = { features = ["concurrent"], version = "0.13" }
 miden-remote-prover-client       = { default-features = false, features = ["tx-prover"], version = "0.13" }
