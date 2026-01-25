@@ -11,24 +11,33 @@ vi.mock("@miden-sdk/miden-sdk", () => {
     free: vi.fn(),
   });
 
+  const mockClient = {
+    getAccounts: vi.fn().mockResolvedValue([]),
+    getAccount: vi.fn().mockResolvedValue(null),
+    newWallet: vi.fn().mockResolvedValue({}),
+    newFaucet: vi.fn().mockResolvedValue({}),
+    syncState: vi.fn().mockResolvedValue({ blockNum: vi.fn(() => 100) }),
+    getSyncHeight: vi.fn().mockResolvedValue(100),
+    getInputNotes: vi.fn().mockResolvedValue([]),
+    getConsumableNotes: vi.fn().mockResolvedValue([]),
+    newMintTransactionRequest: vi.fn().mockReturnValue({}),
+    newSendTransactionRequest: vi.fn().mockReturnValue({}),
+    newConsumeTransactionRequest: vi.fn().mockReturnValue({}),
+    newSwapTransactionRequest: vi.fn().mockReturnValue({}),
+    submitNewTransaction: vi.fn().mockResolvedValue({ toString: vi.fn(() => "0xtx") }),
+    free: vi.fn(),
+  };
+
+  const WebClient = Object.assign(
+    vi.fn().mockImplementation(() => mockClient),
+    {
+      createClient: vi.fn().mockResolvedValue(mockClient),
+      createClientWithExternalKeystore: vi.fn().mockResolvedValue(mockClient),
+    }
+  );
+
   return {
-    WebClient: vi.fn().mockImplementation(() => ({
-      createClient: vi.fn().mockResolvedValue(undefined),
-      getAccounts: vi.fn().mockResolvedValue([]),
-      getAccount: vi.fn().mockResolvedValue(null),
-      newWallet: vi.fn().mockResolvedValue({}),
-      newFaucet: vi.fn().mockResolvedValue({}),
-      syncState: vi.fn().mockResolvedValue({ blockNum: vi.fn(() => 100) }),
-      getSyncHeight: vi.fn().mockResolvedValue(100),
-      getInputNotes: vi.fn().mockResolvedValue([]),
-      getConsumableNotes: vi.fn().mockResolvedValue([]),
-      newMintTransactionRequest: vi.fn().mockReturnValue({}),
-      newSendTransactionRequest: vi.fn().mockReturnValue({}),
-      newConsumeTransactionRequest: vi.fn().mockReturnValue({}),
-      newSwapTransactionRequest: vi.fn().mockReturnValue({}),
-      submitNewTransaction: vi.fn().mockResolvedValue({ toString: vi.fn(() => "0xtx") }),
-      free: vi.fn(),
-    })),
+    WebClient,
     AccountId: {
       fromHex: vi.fn((hex: string) => createMockAccountId(hex)),
     },

@@ -211,7 +211,10 @@ export const createMockSdkModule = (clientOverrides: Partial<MockWebClientType> 
   const mockClient = createMockWebClient(clientOverrides);
 
   return {
-    WebClient: vi.fn().mockImplementation(() => mockClient),
+    WebClient: Object.assign(vi.fn().mockImplementation(() => mockClient), {
+      createClient: vi.fn().mockResolvedValue(mockClient),
+      createClientWithExternalKeystore: vi.fn().mockResolvedValue(mockClient),
+    }),
     AccountId: MockAccountId,
     AccountStorageMode: MockAccountStorageMode,
     NoteType: MockNoteType,
