@@ -92,8 +92,7 @@ export function MidenProvider({
       setConfig(config);
 
       try {
-        const webClient = new WebClient();
-        await webClient.createClient(
+        const webClient = await WebClient.createClient(
           config.rpcUrl,
           config.noteTransportUrl,
           config.seed
