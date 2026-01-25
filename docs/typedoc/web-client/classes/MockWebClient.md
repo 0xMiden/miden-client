@@ -110,8 +110,6 @@
 
 ### createClient()
 
-#### Call Signature
-
 > **createClient**(`node_url?`, `node_note_transport_url?`, `seed?`, `store_name?`): `Promise`\<`any`\>
 
 Creates a new `WebClient` instance with the specified configuration.
@@ -124,79 +122,35 @@ Creates a new `WebClient` instance with the specified configuration.
   `MidenClientDB_{network_id}`, where `network_id` is derived from the `node_url`.
   Explicitly setting this allows for creating multiple isolated clients.
 
-##### Parameters
+#### Parameters
 
-###### node\_url?
-
-`string`
-
-###### node\_note\_transport\_url?
+##### node\_url?
 
 `string`
 
-###### seed?
+##### node\_note\_transport\_url?
+
+`string`
+
+##### seed?
 
 `Uint8Array`
 
-###### store\_name?
+##### store\_name?
 
 `string`
 
-##### Returns
+#### Returns
 
 `Promise`\<`any`\>
 
-##### Inherited from
-
-[`WebClient`](WebClient.md).[`createClient`](WebClient.md#createclient)
-
-#### Call Signature
-
-> **createClient**(`rpcUrl?`, `noteTransportUrl?`, `seed?`, `network?`): `Promise`\<[`WebClient`](WebClient.md)\>
-
-Factory method to create and initialize a new wrapped WebClient.
-
-##### Parameters
-
-###### rpcUrl?
-
-`string`
-
-The RPC URL (optional).
-
-###### noteTransportUrl?
-
-`string`
-
-The note transport URL (optional).
-
-###### seed?
-
-`Uint8Array`
-
-The seed for the account (optional).
-
-###### network?
-
-`string`
-
-Optional name for the store. Setting this allows multiple clients to be used in the same browser.
-
-##### Returns
-
-`Promise`\<[`WebClient`](WebClient.md)\>
-
-A promise that resolves to a fully initialized WebClient.
-
-##### Inherited from
+#### Inherited from
 
 [`WebClient`](WebClient.md).[`createClient`](WebClient.md#createclient)
 
 ***
 
 ### createClientWithExternalKeystore()
-
-#### Call Signature
 
 > **createClientWithExternalKeystore**(`node_url?`, `node_note_transport_url?`, `seed?`, `store_name?`, `get_key_cb?`, `insert_key_cb?`, `sign_cb?`): `Promise`\<`any`\>
 
@@ -213,101 +167,41 @@ Creates a new `WebClient` instance with external keystore callbacks.
 * `insert_key_cb`: Callback to persist a secret key.
 * `sign_cb`: Callback to produce serialized signature bytes for the provided inputs.
 
-##### Parameters
+#### Parameters
 
-###### node\_url?
-
-`string`
-
-###### node\_note\_transport\_url?
+##### node\_url?
 
 `string`
 
-###### seed?
+##### node\_note\_transport\_url?
+
+`string`
+
+##### seed?
 
 `Uint8Array`
 
-###### store\_name?
+##### store\_name?
 
 `string`
 
-###### get\_key\_cb?
+##### get\_key\_cb?
 
 `Function`
 
-###### insert\_key\_cb?
+##### insert\_key\_cb?
 
 `Function`
 
-###### sign\_cb?
+##### sign\_cb?
 
 `Function`
 
-##### Returns
+#### Returns
 
 `Promise`\<`any`\>
 
-##### Inherited from
-
-[`WebClient`](WebClient.md).[`createClientWithExternalKeystore`](WebClient.md#createclientwithexternalkeystore)
-
-#### Call Signature
-
-> **createClientWithExternalKeystore**(`rpcUrl?`, `noteTransportUrl?`, `seed?`, `storeName?`, `getKeyCb?`, `insertKeyCb?`, `signCb?`): `Promise`\<[`WebClient`](WebClient.md)\>
-
-Factory method to create and initialize a new wrapped WebClient with a remote keystore.
-
-##### Parameters
-
-###### rpcUrl?
-
-`string`
-
-The RPC URL (optional).
-
-###### noteTransportUrl?
-
-`string`
-
-The note transport URL (optional).
-
-###### seed?
-
-`Uint8Array`
-
-The seed for the account (optional).
-
-###### storeName?
-
-`string`
-
-Optional name for the store. Setting this allows multiple clients to be used in the same browser.
-
-###### getKeyCb?
-
-[`GetKeyCallback`](../type-aliases/GetKeyCallback.md)
-
-Callback used to retrieve secret keys for a given public key.
-
-###### insertKeyCb?
-
-[`InsertKeyCallback`](../type-aliases/InsertKeyCallback.md)
-
-Callback used to persist secret keys in the external store.
-
-###### signCb?
-
-[`SignCallback`](../type-aliases/SignCallback.md)
-
-Callback used to create signatures for the provided inputs.
-
-##### Returns
-
-`Promise`\<[`WebClient`](WebClient.md)\>
-
-A promise that resolves to a fully initialized WebClient.
-
-##### Inherited from
+#### Inherited from
 
 [`WebClient`](WebClient.md).[`createClientWithExternalKeystore`](WebClient.md#createclientwithexternalkeystore)
 
@@ -1668,3 +1562,69 @@ Seed for account initialization (optional).
 `Promise`\<`MockWebClient`\>
 
 A promise that resolves to a fully initialized MockWebClient.
+
+#### Overrides
+
+[`WebClient`](WebClient.md).[`createClient`](WebClient.md#createclient-2)
+
+***
+
+### createClientWithExternalKeystore()
+
+> `static` **createClientWithExternalKeystore**(`rpcUrl?`, `noteTransportUrl?`, `seed?`, `storeName?`, `getKeyCb?`, `insertKeyCb?`, `signCb?`): `Promise`\<[`WebClient`](WebClient.md)\>
+
+Factory method to create and initialize a new wrapped WebClient with a remote keystore.
+
+#### Parameters
+
+##### rpcUrl?
+
+`string`
+
+The RPC URL (optional).
+
+##### noteTransportUrl?
+
+`string`
+
+The note transport URL (optional).
+
+##### seed?
+
+`Uint8Array`
+
+The seed for the account (optional).
+
+##### storeName?
+
+`string`
+
+Optional name for the store. Setting this allows multiple clients to be used in the same browser.
+
+##### getKeyCb?
+
+[`GetKeyCallback`](../type-aliases/GetKeyCallback.md)
+
+Callback used to retrieve secret keys for a given public key.
+
+##### insertKeyCb?
+
+[`InsertKeyCallback`](../type-aliases/InsertKeyCallback.md)
+
+Callback used to persist secret keys in the external store.
+
+##### signCb?
+
+[`SignCallback`](../type-aliases/SignCallback.md)
+
+Callback used to create signatures for the provided inputs.
+
+#### Returns
+
+`Promise`\<[`WebClient`](WebClient.md)\>
+
+A promise that resolves to a fully initialized WebClient.
+
+#### Inherited from
+
+[`WebClient`](WebClient.md).[`createClientWithExternalKeystore`](WebClient.md#createclientwithexternalkeystore-2)
