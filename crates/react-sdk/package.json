@@ -21,10 +21,10 @@
     "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
     "lint": "eslint src",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "test:unit": "vitest run",
+    "test": "VITE_CJS_IGNORE_WARNING=1 vitest run",
+    "test:unit": "VITE_CJS_IGNORE_WARNING=1 vitest run",
     "test:integration": "playwright test",
-    "test:all": "vitest run && playwright test"
+    "test:all": "VITE_CJS_IGNORE_WARNING=1 vitest run && playwright test"
   },
   "peerDependencies": {
     "@miden-sdk/miden-sdk": ">=0.13.0",

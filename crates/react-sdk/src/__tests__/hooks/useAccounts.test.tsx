@@ -215,15 +215,20 @@ describe("useAccounts", () => {
         useMidenStore.getState().setClient(mockClient as any);
       });
 
-      const { result } = renderHook(() => useAccounts());
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      try {
+        const { result } = renderHook(() => useAccounts());
 
-      // Trigger fetch
-      await act(async () => {
-        await result.current.refetch();
-      });
+        // Trigger fetch
+        await act(async () => {
+          await result.current.refetch();
+        });
 
-      // Should not throw, just log error
-      expect(result.current.isLoading).toBe(false);
+        // Should not throw, just log error
+        expect(result.current.isLoading).toBe(false);
+      } finally {
+        consoleError.mockRestore();
+      }
     });
   });
 

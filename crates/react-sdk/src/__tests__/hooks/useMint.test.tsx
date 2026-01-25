@@ -378,13 +378,15 @@ describe("useMint", () => {
 
       const { result } = renderHook(() => useMint());
 
-      await expect(
-        result.current.mint({
-          targetAccountId: "0x1",
-          faucetId: "0x2",
-          amount: 100n,
-        })
-      ).rejects.toThrow();
+      await act(async () => {
+        await expect(
+          result.current.mint({
+            targetAccountId: "0x1",
+            faucetId: "0x2",
+            amount: 100n,
+          })
+        ).rejects.toThrow();
+      });
 
       expect(mockSync).not.toHaveBeenCalled();
     });

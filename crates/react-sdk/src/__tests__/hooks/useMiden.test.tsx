@@ -13,9 +13,14 @@ beforeEach(() => {
 describe("useMiden", () => {
   describe("when not wrapped in MidenProvider", () => {
     it("should throw an error", () => {
-      expect(() => {
-        renderHook(() => useMiden());
-      }).toThrow("useMiden must be used within a MidenProvider");
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      try {
+        expect(() => {
+          renderHook(() => useMiden());
+        }).toThrow("useMiden must be used within a MidenProvider");
+      } finally {
+        consoleError.mockRestore();
+      }
     });
   });
 

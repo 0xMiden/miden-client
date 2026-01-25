@@ -165,7 +165,9 @@ describe("useSwap", () => {
       });
 
       // Public / Encrypted
-      result.current.reset();
+      act(() => {
+        result.current.reset();
+      });
       await act(async () => {
         await result.current.swap({
           accountId: "0x1",
@@ -454,15 +456,17 @@ describe("useSwap", () => {
 
       const { result } = renderHook(() => useSwap());
 
-      await expect(
-        result.current.swap({
-          accountId: "0x1",
-          offeredFaucetId: "0xA",
-          offeredAmount: 100n,
-          requestedFaucetId: "0xB",
-          requestedAmount: 50n,
-        })
-      ).rejects.toThrow();
+      await act(async () => {
+        await expect(
+          result.current.swap({
+            accountId: "0x1",
+            offeredFaucetId: "0xA",
+            offeredAmount: 100n,
+            requestedFaucetId: "0xB",
+            requestedAmount: 50n,
+          })
+        ).rejects.toThrow();
+      });
 
       expect(mockSync).not.toHaveBeenCalled();
     });

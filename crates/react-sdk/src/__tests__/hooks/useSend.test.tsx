@@ -161,7 +161,9 @@ describe("useSend", () => {
       });
 
       // Test encrypted
-      result.current.reset();
+      act(() => {
+        result.current.reset();
+      });
       await act(async () => {
         await result.current.send({
           from: "0x1",
