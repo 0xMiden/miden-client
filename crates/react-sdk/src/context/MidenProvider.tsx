@@ -140,23 +140,17 @@ export function MidenProvider({
     };
   }, [isReady, client, config.autoSyncInterval, sync]);
 
-  // Render loading state
-  if (isInitializing) {
-    if (loadingComponent) {
-      return <>{loadingComponent}</>;
-    }
-    return null;
+  // Render loading state when a custom component is provided.
+  if (isInitializing && loadingComponent) {
+    return <>{loadingComponent}</>;
   }
 
-  // Render error state
-  if (initError) {
-    if (errorComponent) {
-      if (typeof errorComponent === "function") {
-        return <>{errorComponent(initError)}</>;
-      }
-      return <>{errorComponent}</>;
+  // Render error state when a custom component is provided.
+  if (initError && errorComponent) {
+    if (typeof errorComponent === "function") {
+      return <>{errorComponent(initError)}</>;
     }
-    return null;
+    return <>{errorComponent}</>;
   }
 
   const contextValue: MidenContextValue = {

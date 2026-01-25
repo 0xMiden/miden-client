@@ -6,4 +6,7 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ["@miden-sdk/miden-sdk"],
   },
+  resolve: {
+    dedupe: ["react", "react-dom", "react/jsx-runtime"],
+  },
 });
