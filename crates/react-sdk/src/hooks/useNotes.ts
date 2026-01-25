@@ -7,6 +7,7 @@ import {
 } from "../store/MidenStore";
 import { NoteFilter, NoteFilterTypes, AccountId } from "@miden-sdk/miden-sdk";
 import type { NotesFilter, NotesResult } from "../types";
+import { runExclusiveDirect } from "../utils/runExclusive";
 
 /**
  * Hook to list notes.
@@ -43,7 +44,8 @@ import type { NotesFilter, NotesResult } from "../types";
  * ```
  */
 export function useNotes(options?: NotesFilter): NotesResult {
-  const { client, isReady } = useMiden();
+  const { client, isReady, runExclusive } = useMiden();
+  const runExclusiveSafe = runExclusive ?? runExclusiveDirect;
   const notes = useNotesStore();
   const consumableNotes = useConsumableNotesStore();
   const isLoadingNotes = useMidenStore((state) => state.isLoadingNotes);
@@ -60,22 +62,26 @@ export function useNotes(options?: NotesFilter): NotesResult {
     setError(null);
 
     try {
-      // Get the appropriate filter type
-      const filterType = getNoteFilterType(options?.status);
-      const filter = new NoteFilter(filterType);
+      const { fetchedNotes, fetchedConsumable } = await runExclusiveSafe(
+        async () => {
+          const filterType = getNoteFilterType(options?.status);
+          const filter = new NoteFilter(filterType);
 
-      // Fetch input notes
-      const fetchedNotes = await client.getInputNotes(filter);
+          const notesResult = await client.getInputNotes(filter);
+
+          let consumableResult;
+          if (options?.accountId) {
+            const accountIdObj = AccountId.fromHex(options.accountId);
+            consumableResult = await client.getConsumableNotes(accountIdObj);
+          } else {
+            consumableResult = await client.getConsumableNotes();
+          }
+
+          return { fetchedNotes: notesResult, fetchedConsumable: consumableResult };
+        }
+      );
+
       setNotes(fetchedNotes);
-
-      // Fetch consumable notes
-      let fetchedConsumable;
-      if (options?.accountId) {
-        const accountIdObj = AccountId.fromHex(options.accountId);
-        fetchedConsumable = await client.getConsumableNotes(accountIdObj);
-      } else {
-        fetchedConsumable = await client.getConsumableNotes();
-      }
       setConsumableNotes(fetchedConsumable);
     } catch (err) {
       setError(err instanceof Error ? err : new Error(String(err)));
@@ -85,6 +91,7 @@ export function useNotes(options?: NotesFilter): NotesResult {
   }, [
     client,
     isReady,
+    runExclusive,
     options?.status,
     options?.accountId,
     setLoadingNotes,

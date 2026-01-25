@@ -3,6 +3,7 @@ import { useMiden } from "../context/MidenProvider";
 import { useMidenStore, useAccountsStore } from "../store/MidenStore";
 import type { AccountHeader } from "@miden-sdk/miden-sdk";
 import type { AccountsResult } from "../types";
+import { runExclusiveDirect } from "../utils/runExclusive";
 
 /**
  * Hook to list all accounts in the client.
@@ -27,7 +28,8 @@ import type { AccountsResult } from "../types";
  * ```
  */
 export function useAccounts(): AccountsResult {
-  const { client, isReady } = useMiden();
+  const { client, isReady, runExclusive } = useMiden();
+  const runExclusiveSafe = runExclusive ?? runExclusiveDirect;
   const accounts = useAccountsStore();
   const isLoadingAccounts = useMidenStore((state) => state.isLoadingAccounts);
   const setLoadingAccounts = useMidenStore((state) => state.setLoadingAccounts);
@@ -38,14 +40,14 @@ export function useAccounts(): AccountsResult {
 
     setLoadingAccounts(true);
     try {
-      const fetchedAccounts = await client.getAccounts();
+      const fetchedAccounts = await runExclusiveSafe(() => client.getAccounts());
       setAccounts(fetchedAccounts);
     } catch (error) {
       console.error("Failed to fetch accounts:", error);
     } finally {
       setLoadingAccounts(false);
     }
-  }, [client, isReady, setAccounts, setLoadingAccounts]);
+  }, [client, isReady, runExclusive, setAccounts, setLoadingAccounts]);
 
   // Initial fetch
   useEffect(() => {

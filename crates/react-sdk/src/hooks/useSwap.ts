@@ -3,6 +3,7 @@ import { useMiden } from "../context/MidenProvider";
 import { NoteType, AccountId } from "@miden-sdk/miden-sdk";
 import type { SwapOptions, TransactionStage, TransactionResult } from "../types";
 import { DEFAULTS } from "../types";
+import { runExclusiveDirect } from "../utils/runExclusive";
 
 export interface UseSwapResult {
   /** Create an atomic swap offer */
@@ -51,7 +52,8 @@ export interface UseSwapResult {
  * ```
  */
 export function useSwap(): UseSwapResult {
-  const { client, isReady, sync } = useMiden();
+  const { client, isReady, sync, runExclusive } = useMiden();
+  const runExclusiveSafe = runExclusive ?? runExclusiveDirect;
 
   const [result, setResult] = useState<TransactionResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -79,30 +81,26 @@ export function useSwap(): UseSwapResult {
         const offeredFaucetIdObj = AccountId.fromHex(options.offeredFaucetId);
         const requestedFaucetIdObj = AccountId.fromHex(options.requestedFaucetId);
 
-        // Create the swap transaction request
-        const txRequest = client.newSwapTransactionRequest(
-          accountIdObj,
-          offeredFaucetIdObj,
-          options.offeredAmount,
-          requestedFaucetIdObj,
-          options.requestedAmount,
-          noteType,
-          paybackNoteType
-        );
-
-        // Execute, prove, and submit in one call
         setStage("proving");
-        const txId = await client.submitNewTransaction(accountIdObj, txRequest);
+        const txResult = await runExclusiveSafe(async () => {
+          const txRequest = client.newSwapTransactionRequest(
+            accountIdObj,
+            offeredFaucetIdObj,
+            options.offeredAmount,
+            requestedFaucetIdObj,
+            options.requestedAmount,
+            noteType,
+            paybackNoteType
+          );
+
+          const txId = await client.submitNewTransaction(accountIdObj, txRequest);
+
+          return { transactionId: txId.toString() };
+        });
 
         setStage("complete");
-
-        const txResult: TransactionResult = {
-          transactionId: txId.toString(),
-        };
-
         setResult(txResult);
 
-        // Trigger sync to update state
         await sync();
 
         return txResult;
@@ -115,7 +113,7 @@ export function useSwap(): UseSwapResult {
         setIsLoading(false);
       }
     },
-    [client, isReady, sync]
+    [client, isReady, runExclusive, sync]
   );
 
   const reset = useCallback(() => {

@@ -3,6 +3,7 @@ import { useMiden } from "../context/MidenProvider";
 import { useMidenStore } from "../store/MidenStore";
 import { AccountId } from "@miden-sdk/miden-sdk";
 import type { AccountResult, AssetBalance } from "../types";
+import { runExclusiveDirect } from "../utils/runExclusive";
 
 /**
  * Hook to get details for a single account.
@@ -36,7 +37,8 @@ import type { AccountResult, AssetBalance } from "../types";
 export function useAccount(
   accountId: string | AccountId | undefined
 ): AccountResult {
-  const { client, isReady } = useMiden();
+  const { client, isReady, runExclusive } = useMiden();
+  const runExclusiveSafe = runExclusive ?? runExclusiveDirect;
   const accountDetails = useMidenStore((state) => state.accountDetails);
   const setAccountDetails = useMidenStore((state) => state.setAccountDetails);
 
@@ -65,7 +67,9 @@ export function useAccount(
 
     try {
       const accountIdObj = AccountId.fromHex(accountIdStr);
-      const fetchedAccount = await client.getAccount(accountIdObj);
+      const fetchedAccount = await runExclusiveSafe(() =>
+        client.getAccount(accountIdObj)
+      );
       if (fetchedAccount) {
         setAccountDetails(accountIdStr, fetchedAccount);
       }
@@ -74,7 +78,7 @@ export function useAccount(
     } finally {
       setIsLoading(false);
     }
-  }, [client, isReady, accountIdStr, setAccountDetails]);
+  }, [client, isReady, runExclusive, accountIdStr, setAccountDetails]);
 
   // Initial fetch
   useEffect(() => {

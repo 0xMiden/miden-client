@@ -5,6 +5,7 @@ import { AccountStorageMode } from "@miden-sdk/miden-sdk";
 import type { Account } from "@miden-sdk/miden-sdk";
 import type { CreateWalletOptions } from "../types";
 import { DEFAULTS } from "../types";
+import { runExclusiveDirect } from "../utils/runExclusive";
 
 export interface UseCreateWalletResult {
   /** Create a new wallet with optional configuration */
@@ -48,7 +49,8 @@ export interface UseCreateWalletResult {
  * ```
  */
 export function useCreateWallet(): UseCreateWalletResult {
-  const { client, isReady } = useMiden();
+  const { client, isReady, runExclusive } = useMiden();
+  const runExclusiveSafe = runExclusive ?? runExclusiveDirect;
   const setAccounts = useMidenStore((state) => state.setAccounts);
 
   const [wallet, setWallet] = useState<Account | null>(null);
@@ -71,18 +73,19 @@ export function useCreateWallet(): UseCreateWalletResult {
         const mutable = options.mutable ?? DEFAULTS.WALLET_MUTABLE;
         const authScheme = options.authScheme ?? DEFAULTS.AUTH_SCHEME;
 
-        const newWallet = await client.newWallet(
-          storageMode,
-          mutable,
-          authScheme,
-          options.initSeed
-        );
+        const newWallet = await runExclusiveSafe(async () => {
+          const createdWallet = await client.newWallet(
+            storageMode,
+            mutable,
+            authScheme,
+            options.initSeed
+          );
+          const accounts = await client.getAccounts();
+          setAccounts(accounts);
+          return createdWallet;
+        });
 
         setWallet(newWallet);
-
-        // Refresh accounts list
-        const accounts = await client.getAccounts();
-        setAccounts(accounts);
 
         return newWallet;
       } catch (err) {
@@ -93,7 +96,7 @@ export function useCreateWallet(): UseCreateWalletResult {
         setIsCreating(false);
       }
     },
-    [client, isReady, setAccounts]
+    [client, isReady, runExclusive, setAccounts]
   );
 
   const reset = useCallback(() => {

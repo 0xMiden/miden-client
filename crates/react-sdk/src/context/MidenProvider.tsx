@@ -10,6 +10,7 @@ import { WebClient } from "@miden-sdk/miden-sdk";
 import { useMidenStore } from "../store/MidenStore";
 import type { MidenConfig } from "../types";
 import { DEFAULTS } from "../types";
+import { AsyncLock } from "../utils/asyncLock";
 
 interface MidenContextValue {
   client: WebClient | null;
@@ -17,6 +18,7 @@ interface MidenContextValue {
   isInitializing: boolean;
   error: Error | null;
   sync: () => Promise<void>;
+  runExclusive: <T>(fn: () => Promise<T>) => Promise<T>;
 }
 
 const MidenContext = createContext<MidenContextValue | null>(null);
@@ -50,6 +52,13 @@ export function MidenProvider({
 
   const syncIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isInitializedRef = useRef(false);
+  const clientLockRef = useRef(new AsyncLock());
+
+  const runExclusive = useCallback(
+    async <T,>(fn: () => Promise<T>): Promise<T> =>
+      clientLockRef.current.runExclusive(fn),
+    []
+  );
 
   // Sync function
   const sync = useCallback(async () => {
@@ -60,27 +69,29 @@ export function MidenProvider({
 
     setSyncState({ isSyncing: true, error: null });
 
-    try {
-      const summary = await client.syncState();
-      const syncHeight = summary.blockNum();
+    await runExclusive(async () => {
+      try {
+        const summary = await client.syncState();
+        const syncHeight = summary.blockNum();
 
-      setSyncState({
-        syncHeight,
-        isSyncing: false,
-        lastSyncTime: Date.now(),
-        error: null,
-      });
+        setSyncState({
+          syncHeight,
+          isSyncing: false,
+          lastSyncTime: Date.now(),
+          error: null,
+        });
 
-      // Trigger account and note refresh after sync
-      const accounts = await client.getAccounts();
-      useMidenStore.getState().setAccounts(accounts);
-    } catch (error) {
-      setSyncState({
-        isSyncing: false,
-        error: error instanceof Error ? error : new Error(String(error)),
-      });
-    }
-  }, [client, isReady, setSyncState]);
+        // Trigger account and note refresh after sync
+        const accounts = await client.getAccounts();
+        useMidenStore.getState().setAccounts(accounts);
+      } catch (error) {
+        setSyncState({
+          isSyncing: false,
+          error: error instanceof Error ? error : new Error(String(error)),
+        });
+      }
+    });
+  }, [client, isReady, runExclusive, setSyncState]);
 
   // Initialize client
   useEffect(() => {
@@ -92,17 +103,18 @@ export function MidenProvider({
       setConfig(config);
 
       try {
+        const seed = config.seed as Parameters<typeof WebClient.createClient>[2];
         const webClient = await WebClient.createClient(
           config.rpcUrl,
           config.noteTransportUrl,
-          config.seed
+          seed
         );
 
         setClient(webClient);
 
         // Initial sync
         try {
-          const summary = await webClient.syncState();
+          const summary = await runExclusive(() => webClient.syncState());
           setSyncState({
             syncHeight: summary.blockNum(),
             lastSyncTime: Date.now(),
@@ -118,7 +130,15 @@ export function MidenProvider({
     };
 
     initClient();
-  }, [config, setClient, setConfig, setInitError, setInitializing, setSyncState]);
+  }, [
+    config,
+    runExclusive,
+    setClient,
+    setConfig,
+    setInitError,
+    setInitializing,
+    setSyncState,
+  ]);
 
   // Auto-sync interval
   useEffect(() => {
@@ -158,6 +178,7 @@ export function MidenProvider({
     isInitializing,
     error: initError,
     sync,
+    runExclusive,
   };
 
   return (

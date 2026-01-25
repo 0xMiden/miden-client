@@ -3,6 +3,7 @@ import { useMiden } from "../context/MidenProvider";
 import { NoteType, AccountId } from "@miden-sdk/miden-sdk";
 import type { MintOptions, TransactionStage, TransactionResult } from "../types";
 import { DEFAULTS } from "../types";
+import { runExclusiveDirect } from "../utils/runExclusive";
 
 export interface UseMintResult {
   /** Mint tokens from a faucet to a target account */
@@ -49,7 +50,8 @@ export interface UseMintResult {
  * ```
  */
 export function useMint(): UseMintResult {
-  const { client, isReady, sync } = useMiden();
+  const { client, isReady, sync, runExclusive } = useMiden();
+  const runExclusiveSafe = runExclusive ?? runExclusiveDirect;
 
   const [result, setResult] = useState<TransactionResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -73,28 +75,23 @@ export function useMint(): UseMintResult {
         const targetAccountIdObj = AccountId.fromHex(options.targetAccountId);
         const faucetIdObj = AccountId.fromHex(options.faucetId);
 
-        // Create the mint transaction request
-        const txRequest = client.newMintTransactionRequest(
-          targetAccountIdObj,
-          faucetIdObj,
-          noteType,
-          options.amount
-        );
-
-        // Execute, prove, and submit in one call
-        // The transaction is executed by the faucet account
         setStage("proving");
-        const txId = await client.submitNewTransaction(faucetIdObj, txRequest);
+        const txResult = await runExclusiveSafe(async () => {
+          const txRequest = client.newMintTransactionRequest(
+            targetAccountIdObj,
+            faucetIdObj,
+            noteType,
+            options.amount
+          );
+
+          const txId = await client.submitNewTransaction(faucetIdObj, txRequest);
+
+          return { transactionId: txId.toString() };
+        });
 
         setStage("complete");
-
-        const txResult: TransactionResult = {
-          transactionId: txId.toString(),
-        };
-
         setResult(txResult);
 
-        // Trigger sync to update state
         await sync();
 
         return txResult;
@@ -107,7 +104,7 @@ export function useMint(): UseMintResult {
         setIsLoading(false);
       }
     },
-    [client, isReady, sync]
+    [client, isReady, runExclusive, sync]
   );
 
   const reset = useCallback(() => {

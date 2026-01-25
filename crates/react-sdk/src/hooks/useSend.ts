@@ -3,6 +3,7 @@ import { useMiden } from "../context/MidenProvider";
 import { NoteType, AccountId } from "@miden-sdk/miden-sdk";
 import type { SendOptions, TransactionStage, TransactionResult } from "../types";
 import { DEFAULTS } from "../types";
+import { runExclusiveDirect } from "../utils/runExclusive";
 
 export interface UseSendResult {
   /** Send tokens from one account to another */
@@ -50,7 +51,8 @@ export interface UseSendResult {
  * ```
  */
 export function useSend(): UseSendResult {
-  const { client, isReady, sync } = useMiden();
+  const { client, isReady, sync, runExclusive } = useMiden();
+  const runExclusiveSafe = runExclusive ?? runExclusiveDirect;
 
   const [result, setResult] = useState<TransactionResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -75,30 +77,29 @@ export function useSend(): UseSendResult {
         const toAccountId = AccountId.fromHex(options.to);
         const faucetIdObj = AccountId.fromHex(options.faucetId);
 
-        // Create the send transaction request
-        const txRequest = client.newSendTransactionRequest(
-          fromAccountId,
-          toAccountId,
-          faucetIdObj,
-          noteType,
-          options.amount,
-          options.recallHeight ?? null,
-          options.timelockHeight ?? null
-        );
-
-        // Execute, prove, and submit in one call
         setStage("proving");
-        const txId = await client.submitNewTransaction(fromAccountId, txRequest);
+        const txResult = await runExclusiveSafe(async () => {
+          const txRequest = client.newSendTransactionRequest(
+            fromAccountId,
+            toAccountId,
+            faucetIdObj,
+            noteType,
+            options.amount,
+            options.recallHeight ?? null,
+            options.timelockHeight ?? null
+          );
+
+          const txId = await client.submitNewTransaction(
+            fromAccountId,
+            txRequest
+          );
+
+          return { transactionId: txId.toString() };
+        });
 
         setStage("complete");
-
-        const txResult: TransactionResult = {
-          transactionId: txId.toString(),
-        };
-
         setResult(txResult);
 
-        // Trigger sync to update state
         await sync();
 
         return txResult;
@@ -111,7 +112,7 @@ export function useSend(): UseSendResult {
         setIsLoading(false);
       }
     },
-    [client, isReady, sync]
+    [client, isReady, runExclusive, sync]
   );
 
   const reset = useCallback(() => {

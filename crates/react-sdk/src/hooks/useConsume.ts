@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 import { useMiden } from "../context/MidenProvider";
 import { AccountId } from "@miden-sdk/miden-sdk";
 import type { ConsumeOptions, TransactionStage, TransactionResult } from "../types";
+import { runExclusiveDirect } from "../utils/runExclusive";
 
 export interface UseConsumeResult {
   /** Consume one or more notes */
@@ -47,7 +48,8 @@ export interface UseConsumeResult {
  * ```
  */
 export function useConsume(): UseConsumeResult {
-  const { client, isReady, sync } = useMiden();
+  const { client, isReady, sync, runExclusive } = useMiden();
+  const runExclusiveSafe = runExclusive ?? runExclusiveDirect;
 
   const [result, setResult] = useState<TransactionResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -72,22 +74,16 @@ export function useConsume(): UseConsumeResult {
         // Convert account ID string to AccountId object
         const accountIdObj = AccountId.fromHex(options.accountId);
 
-        // Create the consume transaction request
-        const txRequest = client.newConsumeTransactionRequest(options.noteIds);
-
-        // Execute, prove, and submit in one call
         setStage("proving");
-        const txId = await client.submitNewTransaction(accountIdObj, txRequest);
+        const txResult = await runExclusiveSafe(async () => {
+          const txRequest = client.newConsumeTransactionRequest(options.noteIds);
+          const txId = await client.submitNewTransaction(accountIdObj, txRequest);
+          return { transactionId: txId.toString() };
+        });
 
         setStage("complete");
-
-        const txResult: TransactionResult = {
-          transactionId: txId.toString(),
-        };
-
         setResult(txResult);
 
-        // Trigger sync to update state
         await sync();
 
         return txResult;
@@ -100,7 +96,7 @@ export function useConsume(): UseConsumeResult {
         setIsLoading(false);
       }
     },
-    [client, isReady, sync]
+    [client, isReady, runExclusive, sync]
   );
 
   const reset = useCallback(() => {
