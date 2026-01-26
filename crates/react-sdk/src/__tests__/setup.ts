@@ -24,7 +24,9 @@ vi.mock("@miden-sdk/miden-sdk", () => {
     newSendTransactionRequest: vi.fn().mockReturnValue({}),
     newConsumeTransactionRequest: vi.fn().mockReturnValue({}),
     newSwapTransactionRequest: vi.fn().mockReturnValue({}),
-    submitNewTransaction: vi.fn().mockResolvedValue({ toString: vi.fn(() => "0xtx") }),
+    submitNewTransaction: vi
+      .fn()
+      .mockResolvedValue({ toString: vi.fn(() => "0xtx") }),
     free: vi.fn(),
   };
 
@@ -80,8 +82,9 @@ beforeEach(() => {
 });
 
 // Mock ResizeObserver for jsdom
-(globalThis as typeof globalThis & { ResizeObserver: unknown }).ResizeObserver = vi.fn().mockImplementation(() => ({
-  observe: vi.fn(),
-  unobserve: vi.fn(),
-  disconnect: vi.fn(),
-}));
+(globalThis as typeof globalThis & { ResizeObserver: unknown }).ResizeObserver =
+  vi.fn().mockImplementation(() => ({
+    observe: vi.fn(),
+    unobserve: vi.fn(),
+    disconnect: vi.fn(),
+  }));

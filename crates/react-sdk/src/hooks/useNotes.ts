@@ -77,7 +77,10 @@ export function useNotes(options?: NotesFilter): NotesResult {
             consumableResult = await client.getConsumableNotes();
           }
 
-          return { fetchedNotes: notesResult, fetchedConsumable: consumableResult };
+          return {
+            fetchedNotes: notesResult,
+            fetchedConsumable: consumableResult,
+          };
         }
       );
 

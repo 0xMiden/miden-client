@@ -65,7 +65,9 @@ describe("useSend", () => {
       const mockTxId = createMockTransactionId("0xtx123");
       const mockSync = vi.fn().mockResolvedValue(undefined);
       const mockClient = createMockWebClient({
-        newSendTransactionRequest: vi.fn().mockReturnValue(createMockTransactionRequest()),
+        newSendTransactionRequest: vi
+          .fn()
+          .mockReturnValue(createMockTransactionRequest()),
         submitNewTransaction: vi.fn().mockResolvedValue(mockTxId),
       });
 
@@ -98,7 +100,9 @@ describe("useSend", () => {
       const mockTxId = createMockTransactionId();
       const mockSync = vi.fn().mockResolvedValue(undefined);
       const mockClient = createMockWebClient({
-        newSendTransactionRequest: vi.fn().mockReturnValue(createMockTransactionRequest()),
+        newSendTransactionRequest: vi
+          .fn()
+          .mockReturnValue(createMockTransactionRequest()),
         submitNewTransaction: vi.fn().mockResolvedValue(mockTxId),
       });
 
@@ -137,7 +141,9 @@ describe("useSend", () => {
       const mockTxId = createMockTransactionId();
       const mockSync = vi.fn().mockResolvedValue(undefined);
       const mockClient = createMockWebClient({
-        newSendTransactionRequest: vi.fn().mockReturnValue(createMockTransactionRequest()),
+        newSendTransactionRequest: vi
+          .fn()
+          .mockReturnValue(createMockTransactionRequest()),
         submitNewTransaction: vi.fn().mockResolvedValue(mockTxId),
       });
 
@@ -182,7 +188,9 @@ describe("useSend", () => {
     it("should transition through stages during execution", async () => {
       let resolveSubmit: () => void;
 
-      const submitPromise = new Promise<ReturnType<typeof createMockTransactionId>>((resolve) => {
+      const submitPromise = new Promise<
+        ReturnType<typeof createMockTransactionId>
+      >((resolve) => {
         resolveSubmit = () => resolve(createMockTransactionId());
       });
 
@@ -231,7 +239,9 @@ describe("useSend", () => {
     it("should handle transaction errors", async () => {
       const txError = new Error("Insufficient balance");
       const mockClient = createMockWebClient({
-        newSendTransactionRequest: vi.fn().mockReturnValue(createMockTransactionRequest()),
+        newSendTransactionRequest: vi
+          .fn()
+          .mockReturnValue(createMockTransactionRequest()),
         submitNewTransaction: vi.fn().mockRejectedValue(txError),
       });
 
@@ -297,7 +307,9 @@ describe("useSend", () => {
     it("should reset all state", async () => {
       const mockTxId = createMockTransactionId();
       const mockClient = createMockWebClient({
-        newSendTransactionRequest: vi.fn().mockReturnValue(createMockTransactionRequest()),
+        newSendTransactionRequest: vi
+          .fn()
+          .mockReturnValue(createMockTransactionRequest()),
         submitNewTransaction: vi.fn().mockResolvedValue(mockTxId),
       });
 
@@ -342,7 +354,9 @@ describe("useSend", () => {
       });
 
       const mockClient = createMockWebClient({
-        newSendTransactionRequest: vi.fn().mockReturnValue(createMockTransactionRequest()),
+        newSendTransactionRequest: vi
+          .fn()
+          .mockReturnValue(createMockTransactionRequest()),
         submitNewTransaction: vi.fn().mockReturnValue(submitPromise),
       });
 

@@ -66,7 +66,9 @@ describe("useSwap", () => {
       const mockTxId = createMockTransactionId("0xswaptx");
       const mockSync = vi.fn().mockResolvedValue(undefined);
       const mockClient = createMockWebClient({
-        newSwapTransactionRequest: vi.fn().mockReturnValue(createMockTransactionRequest()),
+        newSwapTransactionRequest: vi
+          .fn()
+          .mockReturnValue(createMockTransactionRequest()),
         submitNewTransaction: vi.fn().mockResolvedValue(mockTxId),
       });
 
@@ -109,7 +111,9 @@ describe("useSwap", () => {
     it("should execute swap transaction with custom note types", async () => {
       const mockTxId = createMockTransactionId();
       const mockClient = createMockWebClient({
-        newSwapTransactionRequest: vi.fn().mockReturnValue(createMockTransactionRequest()),
+        newSwapTransactionRequest: vi
+          .fn()
+          .mockReturnValue(createMockTransactionRequest()),
         submitNewTransaction: vi.fn().mockResolvedValue(mockTxId),
       });
 
@@ -139,7 +143,9 @@ describe("useSwap", () => {
     it("should handle different note type combinations", async () => {
       const mockTxId = createMockTransactionId();
       const mockClient = createMockWebClient({
-        newSwapTransactionRequest: vi.fn().mockReturnValue(createMockTransactionRequest()),
+        newSwapTransactionRequest: vi
+          .fn()
+          .mockReturnValue(createMockTransactionRequest()),
         submitNewTransaction: vi.fn().mockResolvedValue(mockTxId),
       });
 
@@ -187,12 +193,16 @@ describe("useSwap", () => {
   describe("stage transitions", () => {
     it("should transition through stages during execution", async () => {
       let resolveSubmit: () => void;
-      const submitPromise = new Promise<ReturnType<typeof createMockTransactionId>>((resolve) => {
+      const submitPromise = new Promise<
+        ReturnType<typeof createMockTransactionId>
+      >((resolve) => {
         resolveSubmit = () => resolve(createMockTransactionId());
       });
 
       const mockClient = createMockWebClient({
-        newSwapTransactionRequest: vi.fn().mockReturnValue(createMockTransactionRequest()),
+        newSwapTransactionRequest: vi
+          .fn()
+          .mockReturnValue(createMockTransactionRequest()),
         submitNewTransaction: vi.fn().mockReturnValue(submitPromise),
       });
 
@@ -235,7 +245,9 @@ describe("useSwap", () => {
     it("should handle swap transaction errors", async () => {
       const swapError = new Error("Insufficient liquidity");
       const mockClient = createMockWebClient({
-        newSwapTransactionRequest: vi.fn().mockReturnValue(createMockTransactionRequest()),
+        newSwapTransactionRequest: vi
+          .fn()
+          .mockReturnValue(createMockTransactionRequest()),
         submitNewTransaction: vi.fn().mockRejectedValue(swapError),
       });
 
@@ -327,7 +339,9 @@ describe("useSwap", () => {
     it("should reset all state", async () => {
       const mockTxId = createMockTransactionId();
       const mockClient = createMockWebClient({
-        newSwapTransactionRequest: vi.fn().mockReturnValue(createMockTransactionRequest()),
+        newSwapTransactionRequest: vi
+          .fn()
+          .mockReturnValue(createMockTransactionRequest()),
         submitNewTransaction: vi.fn().mockResolvedValue(mockTxId),
       });
 
@@ -372,7 +386,9 @@ describe("useSwap", () => {
       });
 
       const mockClient = createMockWebClient({
-        newSwapTransactionRequest: vi.fn().mockReturnValue(createMockTransactionRequest()),
+        newSwapTransactionRequest: vi
+          .fn()
+          .mockReturnValue(createMockTransactionRequest()),
         submitNewTransaction: vi.fn().mockReturnValue(submitPromise),
       });
 
@@ -416,7 +432,9 @@ describe("useSwap", () => {
       const mockTxId = createMockTransactionId();
       const mockSync = vi.fn().mockResolvedValue(undefined);
       const mockClient = createMockWebClient({
-        newSwapTransactionRequest: vi.fn().mockReturnValue(createMockTransactionRequest()),
+        newSwapTransactionRequest: vi
+          .fn()
+          .mockReturnValue(createMockTransactionRequest()),
         submitNewTransaction: vi.fn().mockResolvedValue(mockTxId),
       });
 
@@ -444,7 +462,9 @@ describe("useSwap", () => {
     it("should not trigger sync on swap failure", async () => {
       const mockSync = vi.fn().mockResolvedValue(undefined);
       const mockClient = createMockWebClient({
-        newSwapTransactionRequest: vi.fn().mockReturnValue(createMockTransactionRequest()),
+        newSwapTransactionRequest: vi
+          .fn()
+          .mockReturnValue(createMockTransactionRequest()),
         submitNewTransaction: vi.fn().mockRejectedValue(new Error("Failed")),
       });
 
@@ -476,7 +496,9 @@ describe("useSwap", () => {
     it("should handle large amounts correctly", async () => {
       const mockTxId = createMockTransactionId();
       const mockClient = createMockWebClient({
-        newSwapTransactionRequest: vi.fn().mockReturnValue(createMockTransactionRequest()),
+        newSwapTransactionRequest: vi
+          .fn()
+          .mockReturnValue(createMockTransactionRequest()),
         submitNewTransaction: vi.fn().mockResolvedValue(mockTxId),
       });
 

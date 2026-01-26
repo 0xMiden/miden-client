@@ -88,7 +88,9 @@ describe("useAccounts", () => {
 
       act(() => {
         useMidenStore.getState().setClient(mockClient as any);
-        useMidenStore.getState().setAccounts([walletAccount, faucetAccount] as any);
+        useMidenStore
+          .getState()
+          .setAccounts([walletAccount, faucetAccount] as any);
       });
 
       const { result } = renderHook(() => useAccounts());
@@ -215,7 +217,9 @@ describe("useAccounts", () => {
         useMidenStore.getState().setClient(mockClient as any);
       });
 
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
       try {
         const { result } = renderHook(() => useAccounts());
 

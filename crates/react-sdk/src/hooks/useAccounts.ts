@@ -40,7 +40,9 @@ export function useAccounts(): AccountsResult {
 
     setLoadingAccounts(true);
     try {
-      const fetchedAccounts = await runExclusiveSafe(() => client.getAccounts());
+      const fetchedAccounts = await runExclusiveSafe(() =>
+        client.getAccounts()
+      );
       setAccounts(fetchedAccounts);
     } catch (error) {
       console.error("Failed to fetch accounts:", error);

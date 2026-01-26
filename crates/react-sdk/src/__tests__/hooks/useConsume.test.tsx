@@ -82,7 +82,9 @@ describe("useConsume", () => {
       const mockTxId = createMockTransactionId("0xtx789");
       const mockSync = vi.fn().mockResolvedValue(undefined);
       const mockClient = createMockWebClient({
-        newConsumeTransactionRequest: vi.fn().mockReturnValue(createMockTransactionRequest()),
+        newConsumeTransactionRequest: vi
+          .fn()
+          .mockReturnValue(createMockTransactionRequest()),
         submitNewTransaction: vi.fn().mockResolvedValue(mockTxId),
       });
 
@@ -117,7 +119,9 @@ describe("useConsume", () => {
     it("should consume single note", async () => {
       const mockTxId = createMockTransactionId();
       const mockClient = createMockWebClient({
-        newConsumeTransactionRequest: vi.fn().mockReturnValue(createMockTransactionRequest()),
+        newConsumeTransactionRequest: vi
+          .fn()
+          .mockReturnValue(createMockTransactionRequest()),
         submitNewTransaction: vi.fn().mockResolvedValue(mockTxId),
       });
 
@@ -136,13 +140,17 @@ describe("useConsume", () => {
         });
       });
 
-      expect(mockClient.newConsumeTransactionRequest).toHaveBeenCalledWith(["0xsinglenote"]);
+      expect(mockClient.newConsumeTransactionRequest).toHaveBeenCalledWith([
+        "0xsinglenote",
+      ]);
     });
 
     it("should consume multiple notes in one transaction", async () => {
       const mockTxId = createMockTransactionId();
       const mockClient = createMockWebClient({
-        newConsumeTransactionRequest: vi.fn().mockReturnValue(createMockTransactionRequest()),
+        newConsumeTransactionRequest: vi
+          .fn()
+          .mockReturnValue(createMockTransactionRequest()),
         submitNewTransaction: vi.fn().mockResolvedValue(mockTxId),
       });
 
@@ -163,19 +171,25 @@ describe("useConsume", () => {
         });
       });
 
-      expect(mockClient.newConsumeTransactionRequest).toHaveBeenCalledWith(noteIds);
+      expect(mockClient.newConsumeTransactionRequest).toHaveBeenCalledWith(
+        noteIds
+      );
     });
   });
 
   describe("stage transitions", () => {
     it("should transition through stages during execution", async () => {
       let resolveSubmit: () => void;
-      const submitPromise = new Promise<ReturnType<typeof createMockTransactionId>>((resolve) => {
+      const submitPromise = new Promise<
+        ReturnType<typeof createMockTransactionId>
+      >((resolve) => {
         resolveSubmit = () => resolve(createMockTransactionId());
       });
 
       const mockClient = createMockWebClient({
-        newConsumeTransactionRequest: vi.fn().mockReturnValue(createMockTransactionRequest()),
+        newConsumeTransactionRequest: vi
+          .fn()
+          .mockReturnValue(createMockTransactionRequest()),
         submitNewTransaction: vi.fn().mockReturnValue(submitPromise),
       });
 
@@ -215,7 +229,9 @@ describe("useConsume", () => {
     it("should handle consume transaction errors", async () => {
       const consumeError = new Error("Note already consumed");
       const mockClient = createMockWebClient({
-        newConsumeTransactionRequest: vi.fn().mockReturnValue(createMockTransactionRequest()),
+        newConsumeTransactionRequest: vi
+          .fn()
+          .mockReturnValue(createMockTransactionRequest()),
         submitNewTransaction: vi.fn().mockRejectedValue(consumeError),
       });
 
@@ -270,8 +286,12 @@ describe("useConsume", () => {
 
     it("should handle account not found errors", async () => {
       const mockClient = createMockWebClient({
-        newConsumeTransactionRequest: vi.fn().mockReturnValue(createMockTransactionRequest()),
-        submitNewTransaction: vi.fn().mockRejectedValue(new Error("Account not found")),
+        newConsumeTransactionRequest: vi
+          .fn()
+          .mockReturnValue(createMockTransactionRequest()),
+        submitNewTransaction: vi
+          .fn()
+          .mockRejectedValue(new Error("Account not found")),
       });
 
       mockUseMiden.mockReturnValue({
@@ -297,7 +317,9 @@ describe("useConsume", () => {
     it("should reset all state", async () => {
       const mockTxId = createMockTransactionId();
       const mockClient = createMockWebClient({
-        newConsumeTransactionRequest: vi.fn().mockReturnValue(createMockTransactionRequest()),
+        newConsumeTransactionRequest: vi
+          .fn()
+          .mockReturnValue(createMockTransactionRequest()),
         submitNewTransaction: vi.fn().mockResolvedValue(mockTxId),
       });
 
@@ -334,7 +356,9 @@ describe("useConsume", () => {
       const mockTxId1 = createMockTransactionId("0xtx1");
       const mockTxId2 = createMockTransactionId("0xtx2");
       const mockClient = createMockWebClient({
-        newConsumeTransactionRequest: vi.fn().mockReturnValue(createMockTransactionRequest()),
+        newConsumeTransactionRequest: vi
+          .fn()
+          .mockReturnValue(createMockTransactionRequest()),
         submitNewTransaction: vi
           .fn()
           .mockResolvedValueOnce(mockTxId1)
@@ -381,7 +405,9 @@ describe("useConsume", () => {
       const mockTxId = createMockTransactionId();
       const mockSync = vi.fn().mockResolvedValue(undefined);
       const mockClient = createMockWebClient({
-        newConsumeTransactionRequest: vi.fn().mockReturnValue(createMockTransactionRequest()),
+        newConsumeTransactionRequest: vi
+          .fn()
+          .mockReturnValue(createMockTransactionRequest()),
         submitNewTransaction: vi.fn().mockResolvedValue(mockTxId),
       });
 

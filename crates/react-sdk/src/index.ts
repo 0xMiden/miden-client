@@ -1,5 +1,9 @@
 // Context and Provider
-export { MidenProvider, useMiden, useMidenClient } from "./context/MidenProvider";
+export {
+  MidenProvider,
+  useMiden,
+  useMidenClient,
+} from "./context/MidenProvider";
 
 // Query Hooks
 export { useAccounts } from "./hooks/useAccounts";

@@ -183,7 +183,9 @@ describe("useAccount", () => {
 
       act(() => {
         useMidenStore.getState().setClient(mockClient as any);
-        useMidenStore.getState().setAccountDetails(accountId, mockAccount as any);
+        useMidenStore
+          .getState()
+          .setAccountDetails(accountId, mockAccount as any);
       });
 
       const { result } = renderHook(() => useAccount(accountId));
@@ -210,7 +212,9 @@ describe("useAccount", () => {
 
       act(() => {
         useMidenStore.getState().setClient(mockClient as any);
-        useMidenStore.getState().setAccountDetails(accountId, mockAccount as any);
+        useMidenStore
+          .getState()
+          .setAccountDetails(accountId, mockAccount as any);
       });
 
       const { result } = renderHook(() => useAccount(accountId));
@@ -237,7 +241,9 @@ describe("useAccount", () => {
 
       act(() => {
         useMidenStore.getState().setClient(mockClient as any);
-        useMidenStore.getState().setAccountDetails(accountId, mockAccount as any);
+        useMidenStore
+          .getState()
+          .setAccountDetails(accountId, mockAccount as any);
       });
 
       const { result } = renderHook(() => useAccount(accountId));
@@ -258,7 +264,9 @@ describe("useAccount", () => {
 
       act(() => {
         useMidenStore.getState().setClient(mockClient as any);
-        useMidenStore.getState().setAccountDetails(accountId, createMockAccount() as any);
+        useMidenStore
+          .getState()
+          .setAccountDetails(accountId, createMockAccount() as any);
       });
 
       const { result } = renderHook(() => useAccount(accountId));

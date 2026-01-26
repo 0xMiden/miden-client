@@ -2,7 +2,10 @@ import React, { type ReactNode } from "react";
 import { render, type RenderOptions, renderHook } from "@testing-library/react";
 import { useMidenStore } from "../../store/MidenStore";
 import type { MidenConfig } from "../../types";
-import { createMockWebClient, type MockWebClientType } from "../mocks/miden-sdk";
+import {
+  createMockWebClient,
+  type MockWebClientType,
+} from "../mocks/miden-sdk";
 
 // Reset store between tests
 export const resetStore = () => {
@@ -70,7 +73,8 @@ export const renderWithProvider = (
 };
 
 // Wait for async state updates
-export const waitForStateUpdate = () => new Promise((resolve) => setTimeout(resolve, 0));
+export const waitForStateUpdate = () =>
+  new Promise((resolve) => setTimeout(resolve, 0));
 
 // Helper to wait for loading to complete
 export const waitForLoading = async (
@@ -86,8 +90,12 @@ export const waitForLoading = async (
 // Helper to set up store with mock data
 export const setupStoreWithData = (options: {
   client?: MockWebClientType;
-  accounts?: ReturnType<typeof import("../mocks/miden-sdk").createMockAccountHeader>[];
-  notes?: ReturnType<typeof import("../mocks/miden-sdk").createMockInputNoteRecord>[];
+  accounts?: ReturnType<
+    typeof import("../mocks/miden-sdk").createMockAccountHeader
+  >[];
+  notes?: ReturnType<
+    typeof import("../mocks/miden-sdk").createMockInputNoteRecord
+  >[];
   syncHeight?: number;
   isReady?: boolean;
 }) => {

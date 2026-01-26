@@ -1,7 +1,11 @@
 import { useCallback, useState } from "react";
 import { useMiden } from "../context/MidenProvider";
 import { NoteType, AccountId } from "@miden-sdk/miden-sdk";
-import type { MintOptions, TransactionStage, TransactionResult } from "../types";
+import type {
+  MintOptions,
+  TransactionStage,
+  TransactionResult,
+} from "../types";
 import { DEFAULTS } from "../types";
 import { runExclusiveDirect } from "../utils/runExclusive";
 
@@ -84,7 +88,10 @@ export function useMint(): UseMintResult {
             options.amount
           );
 
-          const txId = await client.submitNewTransaction(faucetIdObj, txRequest);
+          const txId = await client.submitNewTransaction(
+            faucetIdObj,
+            txRequest
+          );
 
           return { transactionId: txId.toString() };
         });

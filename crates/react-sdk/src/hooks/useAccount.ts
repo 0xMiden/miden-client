@@ -57,7 +57,9 @@ export function useAccount(
   }, [accountId]);
 
   // Get cached account
-  const account = accountIdStr ? accountDetails.get(accountIdStr) ?? null : null;
+  const account = accountIdStr
+    ? (accountDetails.get(accountIdStr) ?? null)
+    : null;
 
   const refetch = useCallback(async () => {
     if (!client || !isReady || !accountIdStr) return;

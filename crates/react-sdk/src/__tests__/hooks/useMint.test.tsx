@@ -64,7 +64,9 @@ describe("useMint", () => {
       const mockTxId = createMockTransactionId("0xtx456");
       const mockSync = vi.fn().mockResolvedValue(undefined);
       const mockClient = createMockWebClient({
-        newMintTransactionRequest: vi.fn().mockReturnValue(createMockTransactionRequest()),
+        newMintTransactionRequest: vi
+          .fn()
+          .mockReturnValue(createMockTransactionRequest()),
         submitNewTransaction: vi.fn().mockResolvedValue(mockTxId),
       });
 
@@ -102,7 +104,9 @@ describe("useMint", () => {
     it("should execute mint transaction with custom note type", async () => {
       const mockTxId = createMockTransactionId();
       const mockClient = createMockWebClient({
-        newMintTransactionRequest: vi.fn().mockReturnValue(createMockTransactionRequest()),
+        newMintTransactionRequest: vi
+          .fn()
+          .mockReturnValue(createMockTransactionRequest()),
         submitNewTransaction: vi.fn().mockResolvedValue(mockTxId),
       });
 
@@ -129,7 +133,9 @@ describe("useMint", () => {
     it("should submit transaction using faucet account", async () => {
       const mockTxId = createMockTransactionId();
       const mockClient = createMockWebClient({
-        newMintTransactionRequest: vi.fn().mockReturnValue(createMockTransactionRequest()),
+        newMintTransactionRequest: vi
+          .fn()
+          .mockReturnValue(createMockTransactionRequest()),
         submitNewTransaction: vi.fn().mockResolvedValue(mockTxId),
       });
 
@@ -157,12 +163,16 @@ describe("useMint", () => {
   describe("stage transitions", () => {
     it("should transition through stages during execution", async () => {
       let resolveSubmit: () => void;
-      const submitPromise = new Promise<ReturnType<typeof createMockTransactionId>>((resolve) => {
+      const submitPromise = new Promise<
+        ReturnType<typeof createMockTransactionId>
+      >((resolve) => {
         resolveSubmit = () => resolve(createMockTransactionId());
       });
 
       const mockClient = createMockWebClient({
-        newMintTransactionRequest: vi.fn().mockReturnValue(createMockTransactionRequest()),
+        newMintTransactionRequest: vi
+          .fn()
+          .mockReturnValue(createMockTransactionRequest()),
         submitNewTransaction: vi.fn().mockReturnValue(submitPromise),
       });
 
@@ -205,7 +215,9 @@ describe("useMint", () => {
       });
 
       const mockClient = createMockWebClient({
-        newMintTransactionRequest: vi.fn().mockReturnValue(createMockTransactionRequest()),
+        newMintTransactionRequest: vi
+          .fn()
+          .mockReturnValue(createMockTransactionRequest()),
         submitNewTransaction: vi.fn().mockReturnValue(submitPromise),
       });
 
@@ -240,7 +252,9 @@ describe("useMint", () => {
     it("should handle mint transaction errors", async () => {
       const mintError = new Error("Mint limit exceeded");
       const mockClient = createMockWebClient({
-        newMintTransactionRequest: vi.fn().mockReturnValue(createMockTransactionRequest()),
+        newMintTransactionRequest: vi
+          .fn()
+          .mockReturnValue(createMockTransactionRequest()),
         submitNewTransaction: vi.fn().mockRejectedValue(mintError),
       });
 
@@ -300,7 +314,9 @@ describe("useMint", () => {
     it("should reset all state", async () => {
       const mockTxId = createMockTransactionId();
       const mockClient = createMockWebClient({
-        newMintTransactionRequest: vi.fn().mockReturnValue(createMockTransactionRequest()),
+        newMintTransactionRequest: vi
+          .fn()
+          .mockReturnValue(createMockTransactionRequest()),
         submitNewTransaction: vi.fn().mockResolvedValue(mockTxId),
       });
 
@@ -340,7 +356,9 @@ describe("useMint", () => {
       const mockTxId = createMockTransactionId();
       const mockSync = vi.fn().mockResolvedValue(undefined);
       const mockClient = createMockWebClient({
-        newMintTransactionRequest: vi.fn().mockReturnValue(createMockTransactionRequest()),
+        newMintTransactionRequest: vi
+          .fn()
+          .mockReturnValue(createMockTransactionRequest()),
         submitNewTransaction: vi.fn().mockResolvedValue(mockTxId),
       });
 
@@ -366,7 +384,9 @@ describe("useMint", () => {
     it("should not trigger sync on mint failure", async () => {
       const mockSync = vi.fn().mockResolvedValue(undefined);
       const mockClient = createMockWebClient({
-        newMintTransactionRequest: vi.fn().mockReturnValue(createMockTransactionRequest()),
+        newMintTransactionRequest: vi
+          .fn()
+          .mockReturnValue(createMockTransactionRequest()),
         submitNewTransaction: vi.fn().mockRejectedValue(new Error("Failed")),
       });
 

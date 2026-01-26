@@ -1,7 +1,11 @@
 import { useCallback, useState } from "react";
 import { useMiden } from "../context/MidenProvider";
 import { NoteType, AccountId } from "@miden-sdk/miden-sdk";
-import type { SendOptions, TransactionStage, TransactionResult } from "../types";
+import type {
+  SendOptions,
+  TransactionStage,
+  TransactionResult,
+} from "../types";
 import { DEFAULTS } from "../types";
 import { runExclusiveDirect } from "../utils/runExclusive";
 

@@ -4,7 +4,9 @@ import { useCreateWallet, useAccounts } from "@miden-sdk/react";
 export function WalletManager() {
   const { createWallet, isCreating, error, reset } = useCreateWallet();
   const { wallets } = useAccounts();
-  const [storageMode, setStorageMode] = useState<"private" | "public">("private");
+  const [storageMode, setStorageMode] = useState<"private" | "public">(
+    "private"
+  );
 
   const handleCreateWallet = async () => {
     try {
@@ -33,7 +35,9 @@ export function WalletManager() {
           <strong>Storage Mode:</strong>{" "}
           <select
             value={storageMode}
-            onChange={(e) => setStorageMode(e.target.value as "private" | "public")}
+            onChange={(e) =>
+              setStorageMode(e.target.value as "private" | "public")
+            }
           >
             <option value="private">Private (default)</option>
             <option value="public">Public</option>

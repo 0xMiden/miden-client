@@ -13,7 +13,9 @@ beforeEach(() => {
 describe("useMiden", () => {
   describe("when not wrapped in MidenProvider", () => {
     it("should throw an error", () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
       try {
         expect(() => {
           renderHook(() => useMiden());
@@ -54,12 +56,10 @@ describe("useMiden", () => {
     it("should return the client and isReady as true", () => {
       const mockClient = createMockWebClient();
 
-      const { result } = renderHook(
-        () => ({
-          client: useMidenStore((s) => s.client),
-          isReady: useMidenStore((s) => s.isReady),
-        })
-      );
+      const { result } = renderHook(() => ({
+        client: useMidenStore((s) => s.client),
+        isReady: useMidenStore((s) => s.isReady),
+      }));
 
       // Simulate client initialization
       act(() => {

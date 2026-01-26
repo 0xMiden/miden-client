@@ -1,7 +1,11 @@
 import { useCallback, useState } from "react";
 import { useMiden } from "../context/MidenProvider";
 import { AccountId } from "@miden-sdk/miden-sdk";
-import type { ConsumeOptions, TransactionStage, TransactionResult } from "../types";
+import type {
+  ConsumeOptions,
+  TransactionStage,
+  TransactionResult,
+} from "../types";
 import { runExclusiveDirect } from "../utils/runExclusive";
 
 export interface UseConsumeResult {
@@ -76,8 +80,13 @@ export function useConsume(): UseConsumeResult {
 
         setStage("proving");
         const txResult = await runExclusiveSafe(async () => {
-          const txRequest = client.newConsumeTransactionRequest(options.noteIds);
-          const txId = await client.submitNewTransaction(accountIdObj, txRequest);
+          const txRequest = client.newConsumeTransactionRequest(
+            options.noteIds
+          );
+          const txId = await client.submitNewTransaction(
+            accountIdObj,
+            txRequest
+          );
           return { transactionId: txId.toString() };
         });
 

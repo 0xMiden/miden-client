@@ -6,7 +6,12 @@ import { TransferForm } from "./components/TransferForm";
 function App() {
   const { isReady, error: initError } = useMiden();
   const { syncHeight, isSyncing, lastSyncTime, sync } = useSyncState();
-  const { accounts, wallets, faucets, isLoading: accountsLoading } = useAccounts();
+  const {
+    accounts,
+    wallets,
+    faucets,
+    isLoading: accountsLoading,
+  } = useAccounts();
 
   if (initError) {
     return (
@@ -53,8 +58,8 @@ function App() {
         ) : (
           <>
             <p>
-              Total: {accounts.length} ({wallets.length} wallets, {faucets.length}{" "}
-              faucets)
+              Total: {accounts.length} ({wallets.length} wallets,{" "}
+              {faucets.length} faucets)
             </p>
             {accounts.length > 0 && (
               <ul className="account-list">

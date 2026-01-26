@@ -28,9 +28,7 @@ export class ErrorBoundary extends React.Component<
       return (
         this.props.fallback ?? (
           <div className="card">
-            <div className="status error">
-              {this.state.error.message}
-            </div>
+            <div className="status error">{this.state.error.message}</div>
           </div>
         )
       );

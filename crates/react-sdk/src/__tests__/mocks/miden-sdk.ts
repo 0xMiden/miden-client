@@ -10,7 +10,9 @@ export const createMockAccountId = (id: string = "0x1234567890abcdef") => ({
 });
 
 // Mock Account
-export const createMockAccount = (overrides: Partial<ReturnType<typeof createMockAccountBase>> = {}) => {
+export const createMockAccount = (
+  overrides: Partial<ReturnType<typeof createMockAccountBase>> = {}
+) => {
   const base = createMockAccountBase();
   return { ...base, ...overrides };
 };
@@ -45,7 +47,9 @@ export const createMockAccountHeader = (id: string = "0x1234567890abcdef") => ({
 });
 
 // Mock AssetVault
-export const createMockVault = (assets: Array<{ faucetId: string; amount: bigint }> = []) => ({
+export const createMockVault = (
+  assets: Array<{ faucetId: string; amount: bigint }> = []
+) => ({
   fungibleAssets: vi.fn(() =>
     assets.map((a) => ({
       faucetId: vi.fn(() => createMockAccountId(a.faucetId)),
@@ -58,7 +62,10 @@ export const createMockVault = (assets: Array<{ faucetId: string; amount: bigint
 });
 
 // Mock InputNoteRecord
-export const createMockInputNoteRecord = (id: string = "0xnote1", consumed: boolean = false) => ({
+export const createMockInputNoteRecord = (
+  id: string = "0xnote1",
+  consumed: boolean = false
+) => ({
   id: vi.fn(() => ({ toString: () => id, toHex: () => id })),
   state: vi.fn(() => (consumed ? "consumed" : "committed")),
   details: vi.fn(() => ({})),
@@ -153,7 +160,9 @@ export const MockAccountId = {
 };
 
 // Create a mock WebClient
-export const createMockWebClient = (overrides: Partial<MockWebClientType> = {}) => {
+export const createMockWebClient = (
+  overrides: Partial<MockWebClientType> = {}
+) => {
   const defaultClient: MockWebClientType = {
     // Initialization
     createClient: vi.fn().mockResolvedValue(undefined),
@@ -162,7 +171,9 @@ export const createMockWebClient = (overrides: Partial<MockWebClientType> = {}) 
     getAccounts: vi.fn().mockResolvedValue([]),
     getAccount: vi.fn().mockResolvedValue(null),
     newWallet: vi.fn().mockResolvedValue(createMockAccount()),
-    newFaucet: vi.fn().mockResolvedValue(createMockAccount({ isFaucet: vi.fn(() => true) })),
+    newFaucet: vi
+      .fn()
+      .mockResolvedValue(createMockAccount({ isFaucet: vi.fn(() => true) })),
 
     // Sync methods
     syncState: vi.fn().mockResolvedValue(createMockSyncSummary()),
@@ -174,10 +185,18 @@ export const createMockWebClient = (overrides: Partial<MockWebClientType> = {}) 
     getInputNote: vi.fn().mockResolvedValue(null),
 
     // Transaction methods
-    newMintTransactionRequest: vi.fn().mockReturnValue(createMockTransactionRequest()),
-    newSendTransactionRequest: vi.fn().mockReturnValue(createMockTransactionRequest()),
-    newConsumeTransactionRequest: vi.fn().mockReturnValue(createMockTransactionRequest()),
-    newSwapTransactionRequest: vi.fn().mockReturnValue(createMockTransactionRequest()),
+    newMintTransactionRequest: vi
+      .fn()
+      .mockReturnValue(createMockTransactionRequest()),
+    newSendTransactionRequest: vi
+      .fn()
+      .mockReturnValue(createMockTransactionRequest()),
+    newConsumeTransactionRequest: vi
+      .fn()
+      .mockReturnValue(createMockTransactionRequest()),
+    newSwapTransactionRequest: vi
+      .fn()
+      .mockReturnValue(createMockTransactionRequest()),
     submitNewTransaction: vi.fn().mockResolvedValue(createMockTransactionId()),
 
     // Cleanup
@@ -207,14 +226,19 @@ export type MockWebClientType = {
 };
 
 // Factory to create mock SDK module
-export const createMockSdkModule = (clientOverrides: Partial<MockWebClientType> = {}) => {
+export const createMockSdkModule = (
+  clientOverrides: Partial<MockWebClientType> = {}
+) => {
   const mockClient = createMockWebClient(clientOverrides);
 
   return {
-    WebClient: Object.assign(vi.fn().mockImplementation(() => mockClient), {
-      createClient: vi.fn().mockResolvedValue(mockClient),
-      createClientWithExternalKeystore: vi.fn().mockResolvedValue(mockClient),
-    }),
+    WebClient: Object.assign(
+      vi.fn().mockImplementation(() => mockClient),
+      {
+        createClient: vi.fn().mockResolvedValue(mockClient),
+        createClientWithExternalKeystore: vi.fn().mockResolvedValue(mockClient),
+      }
+    ),
     AccountId: MockAccountId,
     AccountStorageMode: MockAccountStorageMode,
     NoteType: MockNoteType,

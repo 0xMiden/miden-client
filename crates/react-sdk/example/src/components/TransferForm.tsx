@@ -3,8 +3,20 @@ import { useSend, useMint, useAccounts } from "@miden-sdk/react";
 
 export function TransferForm() {
   const { wallets, faucets } = useAccounts();
-  const { send, isLoading: isSending, stage: sendStage, error: sendError, reset: resetSend } = useSend();
-  const { mint, isLoading: isMinting, stage: mintStage, error: mintError, reset: resetMint } = useMint();
+  const {
+    send,
+    isLoading: isSending,
+    stage: sendStage,
+    error: sendError,
+    reset: resetSend,
+  } = useSend();
+  const {
+    mint,
+    isLoading: isMinting,
+    stage: mintStage,
+    error: mintError,
+    reset: resetMint,
+  } = useMint();
 
   const [selectedWallet, setSelectedWallet] = useState("");
   const [selectedFaucet, setSelectedFaucet] = useState("");
@@ -79,7 +91,10 @@ export function TransferForm() {
               style={{ width: 300, fontFamily: "monospace" }}
             >
               {wallets.map((wallet) => (
-                <option key={wallet.id().toString()} value={wallet.id().toString()}>
+                <option
+                  key={wallet.id().toString()}
+                  value={wallet.id().toString()}
+                >
                   {wallet.id().toString()}
                 </option>
               ))}
@@ -96,7 +111,10 @@ export function TransferForm() {
               style={{ width: 300, fontFamily: "monospace" }}
             >
               {faucets.map((faucet) => (
-                <option key={faucet.id().toString()} value={faucet.id().toString()}>
+                <option
+                  key={faucet.id().toString()}
+                  value={faucet.id().toString()}
+                >
                   {faucet.id().toString()}
                 </option>
               ))}
@@ -121,7 +139,10 @@ export function TransferForm() {
       <p style={{ color: "#666", fontSize: 14 }}>
         Mint tokens from the selected faucet to the selected wallet.
       </p>
-      <button onClick={handleMint} disabled={isMinting || !selectedWallet || !selectedFaucet}>
+      <button
+        onClick={handleMint}
+        disabled={isMinting || !selectedWallet || !selectedFaucet}
+      >
         {isMinting ? `Minting (${mintStage})...` : "Mint Tokens"}
       </button>
 
@@ -143,7 +164,9 @@ export function TransferForm() {
       </div>
       <button
         onClick={handleSend}
-        disabled={isSending || !selectedWallet || !selectedFaucet || !recipientAddress}
+        disabled={
+          isSending || !selectedWallet || !selectedFaucet || !recipientAddress
+        }
       >
         {isSending ? `Sending (${sendStage})...` : "Send Tokens"}
       </button>

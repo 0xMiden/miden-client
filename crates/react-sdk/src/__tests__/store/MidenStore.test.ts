@@ -144,7 +144,10 @@ describe("MidenStore", () => {
 
     it("should replace existing accounts", () => {
       const accounts1 = [createMockAccountHeader("0x1")];
-      const accounts2 = [createMockAccountHeader("0x2"), createMockAccountHeader("0x3")];
+      const accounts2 = [
+        createMockAccountHeader("0x2"),
+        createMockAccountHeader("0x3"),
+      ];
 
       useMidenStore.getState().setAccounts(accounts1 as any);
       expect(useMidenStore.getState().accounts.length).toBe(1);
@@ -256,8 +259,12 @@ describe("MidenStore", () => {
     });
 
     it("should clear account details map", () => {
-      useMidenStore.getState().setAccountDetails("0x1", createMockAccount() as any);
-      useMidenStore.getState().setAccountDetails("0x2", createMockAccount() as any);
+      useMidenStore
+        .getState()
+        .setAccountDetails("0x1", createMockAccount() as any);
+      useMidenStore
+        .getState()
+        .setAccountDetails("0x2", createMockAccount() as any);
 
       expect(useMidenStore.getState().accountDetails.size).toBe(2);
 

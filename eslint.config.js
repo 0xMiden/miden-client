@@ -9,6 +9,7 @@ module.exports = [
       "**/*.d.ts",
       "docs/**/*",
       "crates/idxdb-store/src/**",
+      "crates/react-sdk/**",
     ],
   },
   {

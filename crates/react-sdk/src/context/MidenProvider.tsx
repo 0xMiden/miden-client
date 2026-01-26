@@ -103,7 +103,9 @@ export function MidenProvider({
       setConfig(config);
 
       try {
-        const seed = config.seed as Parameters<typeof WebClient.createClient>[2];
+        const seed = config.seed as Parameters<
+          typeof WebClient.createClient
+        >[2];
         const webClient = await WebClient.createClient(
           config.rpcUrl,
           config.noteTransportUrl,
@@ -123,9 +125,7 @@ export function MidenProvider({
           // Initial sync failure is non-fatal
         }
       } catch (error) {
-        setInitError(
-          error instanceof Error ? error : new Error(String(error))
-        );
+        setInitError(error instanceof Error ? error : new Error(String(error)));
       }
     };
 

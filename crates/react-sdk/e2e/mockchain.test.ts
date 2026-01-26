@@ -11,12 +11,13 @@ import { test, expect, type Page } from "@playwright/test";
 // Helper to wait for SDK to load
 async function waitForSdk(page: Page): Promise<boolean> {
   try {
-    await page.waitForFunction(
-      () => (window as any).testAppReady === true,
-      { timeout: 30000 }
-    );
+    await page.waitForFunction(() => (window as any).testAppReady === true, {
+      timeout: 30000,
+    });
 
-    const sdkLoaded = await page.evaluate(() => (window as any).sdkLoaded === true);
+    const sdkLoaded = await page.evaluate(
+      () => (window as any).sdkLoaded === true
+    );
     if (!sdkLoaded) {
       const error = await page.evaluate(() => (window as any).sdkLoadError);
       console.log("SDK not loaded:", error || "Unknown error");
@@ -132,7 +133,9 @@ test.describe("MockWebClient Integration", () => {
     expect(result.count).toBeGreaterThanOrEqual(1);
   });
 
-  test("should mint and consume tokens with MockWebClient", async ({ page }) => {
+  test("should mint and consume tokens with MockWebClient", async ({
+    page,
+  }) => {
     const sdkAvailable = await waitForSdk(page);
     if (!sdkAvailable) {
       test.skip();
@@ -187,7 +190,9 @@ test.describe("MockWebClient Integration", () => {
         .toString();
 
       // Consume the note (no await - it's synchronous)
-      const consumeRequest = client.newConsumeTransactionRequest([mintedNoteId]);
+      const consumeRequest = client.newConsumeTransactionRequest([
+        mintedNoteId,
+      ]);
       await client.submitNewTransaction(wallet.id(), consumeRequest);
 
       // Prove and sync
@@ -252,8 +257,14 @@ test.describe("MockWebClient Integration", () => {
       const [mintTxRecord] = await client.getTransactions(
         (window as any).TransactionFilter.ids([mintTxId])
       );
-      const mintedNoteId = mintTxRecord.outputNotes().notes()[0].id().toString();
-      const consumeRequest = client.newConsumeTransactionRequest([mintedNoteId]);
+      const mintedNoteId = mintTxRecord
+        .outputNotes()
+        .notes()[0]
+        .id()
+        .toString();
+      const consumeRequest = client.newConsumeTransactionRequest([
+        mintedNoteId,
+      ]);
       await client.submitNewTransaction(sender.id(), consumeRequest);
       await client.proveBlock();
       await client.syncState();
@@ -289,7 +300,10 @@ test.describe("MockWebClient Integration", () => {
 
       return {
         senderBalance: updatedSender.vault().getBalance(faucet.id()).toString(),
-        receiverBalance: updatedReceiver.vault().getBalance(faucet.id()).toString(),
+        receiverBalance: updatedReceiver
+          .vault()
+          .getBalance(faucet.id())
+          .toString(),
       };
     });
 

@@ -118,7 +118,13 @@ describe("useNotes", () => {
       });
 
       // Test each filter status
-      const statuses = ["all", "consumed", "committed", "expected", "processing"] as const;
+      const statuses = [
+        "all",
+        "consumed",
+        "committed",
+        "expected",
+        "processing",
+      ] as const;
 
       for (const status of statuses) {
         const { result } = renderHook(() => useNotes({ status }));
@@ -327,7 +333,9 @@ describe("useNotes", () => {
     it("should handle consumable notes fetch error", async () => {
       const mockClient = createMockWebClient({
         getInputNotes: vi.fn().mockResolvedValue([]),
-        getConsumableNotes: vi.fn().mockRejectedValue(new Error("Consumable error")),
+        getConsumableNotes: vi
+          .fn()
+          .mockRejectedValue(new Error("Consumable error")),
       });
 
       mockUseMiden.mockReturnValue({
