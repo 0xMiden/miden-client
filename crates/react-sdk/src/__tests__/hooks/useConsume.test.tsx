@@ -17,8 +17,13 @@ vi.mock("../../context/MidenProvider", () => ({
 
 const mockUseMiden = useMiden as ReturnType<typeof vi.fn>;
 
+type NoteLike = { id: () => { toString: () => string } };
+
 const createNoteRecords = (noteIds: string[]) =>
   noteIds.map((noteId) => createMockInputNoteRecord(noteId));
+
+const extractNoteIds = (notes: NoteLike[]) =>
+  notes.map((note) => note.id().toString());
 
 beforeEach(() => {
   useMidenStore.getState().reset();
@@ -117,8 +122,10 @@ describe("useConsume", () => {
       expect(mockSync).toHaveBeenCalled();
 
       // Verify notes were passed
-      const [notes] = mockClient.newConsumeTransactionRequest.mock.calls[0];
-      expect(notes.map((note) => note.id().toString())).toEqual(noteIds);
+      const notes = mockClient.newConsumeTransactionRequest.mock.calls[0][0] as
+        | NoteLike[]
+        | undefined;
+      expect(extractNoteIds(notes ?? [])).toEqual(noteIds);
     });
 
     it("should consume single note", async () => {
@@ -148,8 +155,10 @@ describe("useConsume", () => {
         });
       });
 
-      const [notes] = mockClient.newConsumeTransactionRequest.mock.calls[0];
-      expect(notes.map((note) => note.id().toString())).toEqual(noteIds);
+      const notes = mockClient.newConsumeTransactionRequest.mock.calls[0][0] as
+        | NoteLike[]
+        | undefined;
+      expect(extractNoteIds(notes ?? [])).toEqual(noteIds);
     });
 
     it("should consume multiple notes in one transaction", async () => {
@@ -179,8 +188,10 @@ describe("useConsume", () => {
         });
       });
 
-      const [notes] = mockClient.newConsumeTransactionRequest.mock.calls[0];
-      expect(notes.map((note) => note.id().toString())).toEqual(noteIds);
+      const notes = mockClient.newConsumeTransactionRequest.mock.calls[0][0] as
+        | NoteLike[]
+        | undefined;
+      expect(extractNoteIds(notes ?? [])).toEqual(noteIds);
     });
   });
 
