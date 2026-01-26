@@ -62,7 +62,7 @@ impl SqliteStore {
     pub(crate) fn get_account_ids(conn: &mut Connection) -> Result<Vec<AccountId>, StoreError> {
         const QUERY: &str = "SELECT id FROM tracked_accounts";
 
-        conn.prepare(QUERY)
+        conn.prepare_cached(QUERY)
             .into_store_error()?
             .query_map([], |row| row.get(0))
             .expect("no binding parameters used in query")
@@ -96,7 +96,7 @@ impl SqliteStore {
             ORDER BY a.id;
             ";
 
-        conn.prepare(QUERY)
+        conn.prepare_cached(QUERY)
             .into_store_error()?
             .query_map(params![], |row| {
                 let id: String = row.get(0)?;
@@ -209,15 +209,26 @@ impl SqliteStore {
             params![header.storage_commitment().to_hex()],
         )?;
 
+        // Collect all map roots for a single batched query
+        let map_roots: Vec<Value> = storage_values
+            .iter()
+            .filter(|(_, (slot_type, _))| *slot_type == StorageSlotType::Map)
+            .map(|(_, (_, value))| Value::from(value.to_hex()))
+            .collect();
+
+        // Fetch all storage maps in a single query
+        let mut all_storage_maps = if map_roots.is_empty() {
+            BTreeMap::new()
+        } else {
+            query_storage_maps(conn, "root IN rarray(?)", [Rc::new(map_roots)])?
+        };
+
         for (slot_name, (slot_type, value)) in storage_values {
             storage_header.push(StorageSlotHeader::new(slot_name.clone(), slot_type, value));
             if slot_type == StorageSlotType::Map {
-                // TODO: querying the database for a single map is not performant
-                // consider retrieving all storage maps in a single transaction.
                 let mut partial_storage_map = PartialStorageMap::new(value);
-                let mut query = query_storage_maps(conn, "root = ?", [value.to_hex()])?;
 
-                if let Some(map) = query.remove(&value) {
+                if let Some(map) = all_storage_maps.remove(&value) {
                     let smt_forest = smt_forest.read().expect("smt_forest read lock not poisoned");
                     for (k, _v) in map.entries() {
                         let witness = smt_forest.get_storage_map_item_witness(value, *k)?;

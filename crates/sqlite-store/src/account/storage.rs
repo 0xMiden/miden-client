@@ -68,7 +68,7 @@ impl SqliteStore {
         commitment: Word,
         account_storage: impl Iterator<Item = &'a StorageSlot>,
     ) -> Result<(), StoreError> {
-        const QUERY: &str = insert_sql!(
+        const SLOT_QUERY: &str = insert_sql!(
             account_storage {
                 commitment,
                 slot_name,
@@ -76,28 +76,29 @@ impl SqliteStore {
                 slot_type
             } | REPLACE
         );
+        const MAP_ENTRY_QUERY: &str =
+            insert_sql!(storage_map_entries { root, key, value } | REPLACE);
+
+        let mut slot_stmt = tx.prepare_cached(SLOT_QUERY).into_store_error()?;
+        let mut map_entry_stmt = tx.prepare_cached(MAP_ENTRY_QUERY).into_store_error()?;
+        let commitment_hex = commitment.to_hex();
+
         for slot in account_storage {
-            tx.execute(
-                QUERY,
-                params![
-                    commitment.to_hex(),
+            slot_stmt
+                .execute(params![
+                    &commitment_hex,
                     slot.name().to_string(),
                     slot.value().to_hex(),
                     slot.slot_type() as u8
-                ],
-            )
-            .into_store_error()?;
+                ])
+                .into_store_error()?;
 
             if let StorageSlotContent::Map(map) = slot.content() {
-                const MAP_QUERY: &str =
-                    insert_sql!(storage_map_entries { root, key, value } | REPLACE);
+                let root_hex = map.root().to_hex();
                 for (key, value) in map.entries() {
-                    // Insert each entry of the storage map
-                    tx.execute(
-                        MAP_QUERY,
-                        params![map.root().to_hex(), key.to_hex(), value.to_hex()],
-                    )
-                    .into_store_error()?;
+                    map_entry_stmt
+                        .execute(params![&root_hex, key.to_hex(), value.to_hex()])
+                        .into_store_error()?;
                 }
             }
         }
