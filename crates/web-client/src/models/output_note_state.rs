@@ -1,4 +1,4 @@
-use miden_client::store::OutputNoteState as NativeOutputNoteState;
+use miden_client_core::store::OutputNoteState as NativeOutputNoteState;
 use wasm_bindgen::prelude::*;
 
 #[derive(Clone)]

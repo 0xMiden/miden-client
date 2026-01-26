@@ -1,4 +1,4 @@
-use miden_client::vm::AdviceInputs as NativeAdviceInputs;
+use miden_client_core::vm::AdviceInputs as NativeAdviceInputs;
 use wasm_bindgen::prelude::*;
 
 use super::felt::Felt;
@@ -25,7 +25,7 @@ impl AdviceInputs {
     /// Returns mapped values for a given key if present.
     #[wasm_bindgen(js_name = "mappedValues")]
     pub fn mapped_values(&self, key: &Word) -> Option<Vec<Felt>> {
-        let native_key: miden_client::Word = key.into();
+        let native_key: miden_client_core::Word = key.into();
         self.0
             .map
             .get(&native_key)

@@ -1,10 +1,10 @@
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
-use miden_client::Word;
-use miden_client::account::Account;
-use miden_client::store::{StoreError, TransactionFilter};
-use miden_client::transaction::{
+use miden_client_core::Word;
+use miden_client_core::account::Account;
+use miden_client_core::store::{StoreError, TransactionFilter};
+use miden_client_core::transaction::{
     TransactionDetails,
     TransactionId,
     TransactionRecord,
@@ -12,7 +12,7 @@ use miden_client::transaction::{
     TransactionStatus,
     TransactionStoreUpdate,
 };
-use miden_client::utils::Deserializable;
+use miden_client_core::utils::Deserializable;
 
 use super::WebStore;
 use super::account::utils::update_account;

@@ -542,7 +542,7 @@ async fn cli_export_import_account() -> Result<()> {
 
     // Ensure the account was imported
     let (client_2, _) = create_rust_client_with_store_path(&store_path_2, endpoint_2).await?;
-    let cli_keystore =
+    let filesystem_keystore =
         FilesystemKeyStore::new(temp_dir_2.clone().join(MIDEN_DIR).join("keystore"))?;
 
     assert!(client_2.get_account(AccountId::from_hex(&faucet_id)?).await.is_ok());
@@ -566,7 +566,7 @@ async fn cli_export_import_account() -> Result<()> {
         .await?;
 
     for stored_pk_commitment in faucet_pks {
-        let matching_secret_key = cli_keystore.get_key(stored_pk_commitment).unwrap();
+        let matching_secret_key = filesystem_keystore.get_key(stored_pk_commitment).unwrap();
         assert!(matching_secret_key.is_some());
         assert!(matching_secret_key.unwrap().public_key().to_commitment() == stored_pk_commitment);
     }
@@ -576,7 +576,7 @@ async fn cli_export_import_account() -> Result<()> {
         .await?;
 
     for stored_pk_commitment in wallet_pks {
-        let matching_secret_key = cli_keystore.get_key(stored_pk_commitment).unwrap();
+        let matching_secret_key = filesystem_keystore.get_key(stored_pk_commitment).unwrap();
         assert!(matching_secret_key.is_some());
         assert!(matching_secret_key.unwrap().public_key().to_commitment() == stored_pk_commitment);
     }

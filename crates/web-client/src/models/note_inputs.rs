@@ -1,4 +1,4 @@
-use miden_client::note::NoteInputs as NativeNoteInputs;
+use miden_client_core::note::NoteInputs as NativeNoteInputs;
 use wasm_bindgen::prelude::*;
 
 use super::felt::Felt;

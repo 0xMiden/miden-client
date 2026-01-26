@@ -1,5 +1,5 @@
-use miden_client::note::BlockNumber;
-use miden_client::rpc::domain::account::FetchedAccount as NativeFetchedAccount;
+use miden_client_core::note::BlockNumber;
+use miden_client_core::rpc::domain::account::FetchedAccount as NativeFetchedAccount;
 use wasm_bindgen::prelude::*;
 
 use super::account::Account;

@@ -8,6 +8,13 @@ The following document lists the commands that the CLI currently supports.
 Use `--help` as a flag on any command for more information.
 :::
 
+:::info
+The CLI is built on top of the std-enabled `miden-client` crate, which wraps the shared
+`miden-client-core` functionality together with the new background service runtime introduced in
+this release. Existing workflows continue to work, but long-running applications can now rely on
+the same crate to spawn a continuously syncing client service.
+:::
+
 ## Usage
 
 Call a command on the `miden-client` like this:
@@ -65,7 +72,7 @@ miden-client init --remote-prover-endpoint <PROVER_URL>
 miden-client init --note-transport-endpoint <MIDEN_NOTE_TRANSPORT_URL>
 ```
 
-More information on the configuration file can be found in the [configuration section](https://github.com/0xMiden/miden-client/docs/typedoc/rust-client/cli-config.md).
+More information on the configuration file can be found in the [configuration section](https://github.com/0xMiden/miden-client/docs/typedoc/miden-client-core/cli-config.md).
 
 ### `account`
 
@@ -309,7 +316,7 @@ miden-client address remove 0x17f13f4f83a8e8100c19d2961dfda2 mlcl1qple0ejnutx8zy
 
 #### Tips
 
-For `send` and `consume-notes`, you can omit the `--sender` and `--account` flags to use the default account defined in the [config](https://github.com/0xMiden/miden-client/docs/typedoc/rust-client/cli-config.md). If you omit the flag but have no default account defined in the config, you'll get an error instead.
+For `send` and `consume-notes`, you can omit the `--sender` and `--account` flags to use the default account defined in the [config](https://github.com/0xMiden/miden-client/docs/typedoc/miden-client-core/cli-config.md). If you omit the flag but have no default account defined in the config, you'll get an error instead.
 
 For every command which needs an account ID (either wallet or faucet), you can also provide a partial ID instead of the full ID for each account. So instead of
 

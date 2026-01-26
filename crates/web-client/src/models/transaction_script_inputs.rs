@@ -1,4 +1,4 @@
-use miden_client::{Felt as NativeFelt, Word as NativeWord};
+use miden_client_core::{Felt as NativeFelt, Word as NativeWord};
 use wasm_bindgen::prelude::*;
 
 use super::miden_arrays::FeltArray;

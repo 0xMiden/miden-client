@@ -1,8 +1,8 @@
 use alloc::sync::Arc;
 use core::time::Duration;
 
-use miden_client::RemoteTransactionProver;
-use miden_client::transaction::{
+use miden_client_core::RemoteTransactionProver;
+use miden_client_core::transaction::{
     LocalTransactionProver,
     ProvingOptions,
     TransactionProver as TransactionProverTrait,

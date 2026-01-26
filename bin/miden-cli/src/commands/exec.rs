@@ -2,11 +2,11 @@ use std::collections::BTreeSet;
 use std::path::PathBuf;
 
 use clap::Parser;
-use miden_client::auth::TransactionAuthenticator;
 use miden_client::vm::AdviceInputs;
 use miden_client::{Client, Felt, Word};
 use serde::{Deserialize, Deserializer, Serialize, de};
 
+use crate::CliAuthenticator;
 use crate::errors::CliError;
 use crate::utils::get_input_acc_id_by_prefix_or_default;
 
@@ -50,7 +50,7 @@ pub struct ExecCmd {
 }
 
 impl ExecCmd {
-    pub async fn execute<AUTH: TransactionAuthenticator + Sync + 'static>(
+    pub async fn execute<AUTH: CliAuthenticator>(
         &self,
         mut client: Client<AUTH>,
     ) -> Result<(), CliError> {

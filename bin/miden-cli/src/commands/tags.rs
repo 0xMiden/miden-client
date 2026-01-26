@@ -3,7 +3,7 @@ use miden_client::note::NoteTag;
 use tracing::info;
 
 use crate::errors::CliError;
-use crate::{Parser, create_dynamic_table};
+use crate::{CliAuthenticator, Parser, create_dynamic_table};
 
 #[derive(Default, Debug, Parser, Clone)]
 #[command(about = "View and manage tags. Defaults to `list` command")]
@@ -22,7 +22,10 @@ pub struct TagsCmd {
 }
 
 impl TagsCmd {
-    pub async fn execute<AUTH>(&self, client: Client<AUTH>) -> Result<(), CliError> {
+    pub async fn execute<AUTH>(&self, client: Client<AUTH>) -> Result<(), CliError>
+    where
+        AUTH: CliAuthenticator,
+    {
         match self {
             TagsCmd { add: Some(tag), .. } => {
                 add_tag(client, *tag).await?;
@@ -40,7 +43,10 @@ impl TagsCmd {
 
 // HELPERS
 // ================================================================================================
-async fn list_tags<AUTH>(client: Client<AUTH>) -> Result<(), CliError> {
+async fn list_tags<AUTH>(client: Client<AUTH>) -> Result<(), CliError>
+where
+    AUTH: CliAuthenticator,
+{
     let mut table = create_dynamic_table(&["Tag", "Source"]);
 
     let tags = client.get_note_tags().await?;
@@ -62,7 +68,10 @@ async fn list_tags<AUTH>(client: Client<AUTH>) -> Result<(), CliError> {
     Ok(())
 }
 
-async fn add_tag<AUTH>(mut client: Client<AUTH>, tag: u32) -> Result<(), CliError> {
+async fn add_tag<AUTH>(mut client: Client<AUTH>, tag: u32) -> Result<(), CliError>
+where
+    AUTH: CliAuthenticator,
+{
     let tag: NoteTag = tag.into();
     info!("adding tag {tag}");
     client.add_note_tag(tag).await?;
@@ -70,7 +79,10 @@ async fn add_tag<AUTH>(mut client: Client<AUTH>, tag: u32) -> Result<(), CliErro
     Ok(())
 }
 
-async fn remove_tag<AUTH>(mut client: Client<AUTH>, tag: u32) -> Result<(), CliError> {
+async fn remove_tag<AUTH>(mut client: Client<AUTH>, tag: u32) -> Result<(), CliError>
+where
+    AUTH: CliAuthenticator,
+{
     client.remove_note_tag(tag.into()).await?;
     println!("Tag {tag} removed");
     Ok(())

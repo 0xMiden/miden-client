@@ -1,8 +1,8 @@
-use miden_client::Felt;
-use miden_client::account::component::BasicFungibleFaucet;
-use miden_client::account::{AccountBuilder, AccountComponent, AccountType};
-use miden_client::asset::TokenSymbol;
-use miden_client::auth::{
+use miden_client_core::Felt;
+use miden_client_core::account::component::BasicFungibleFaucet;
+use miden_client_core::account::{AccountBuilder, AccountComponent, AccountType};
+use miden_client_core::asset::TokenSymbol;
+use miden_client_core::auth::{
     AuthEcdsaK256Keccak,
     AuthFalcon512Rpo,
     AuthSchemeId as NativeAuthScheme,

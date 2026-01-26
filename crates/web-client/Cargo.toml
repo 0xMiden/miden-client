@@ -19,13 +19,13 @@ ignored = ["wasm-bindgen-futures"]
 crate-type = ["cdylib"]
 
 [features]
-testing = ["miden-client/testing"]
+testing = ["miden-client-core/testing"]
 
 [dependencies]
 # Workspace dependencies
-idxdb-store    = { package = "miden-idxdb-store", path = "../idxdb-store" }
-miden-client   = { default-features = false, features = ["testing", "tonic"], path = "../rust-client" }
-miden-protocol = { workspace = true }
+idxdb-store       = { package = "miden-idxdb-store", path = "../idxdb-store" }
+miden-client-core = { default-features = false, features = ["testing", "tonic"], path = "../miden-client-core" }
+miden-protocol    = { workspace = true }
 
 # External dependencies
 console_error_panic_hook = { version = "0.1.7" }

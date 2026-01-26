@@ -31,6 +31,9 @@ use commands::transactions::TransactionCmd;
 use self::utils::config_file_exists;
 use crate::commands::address::AddressCmd;
 
+pub trait CliAuthenticator: TransactionAuthenticator + Send + Sync + 'static {}
+impl<T> CliAuthenticator for T where T: TransactionAuthenticator + Send + Sync + 'static {}
+
 pub type CliKeyStore = FilesystemKeyStore;
 
 /// A Client configured using the CLI's system user configuration.
@@ -496,10 +499,13 @@ pub fn create_dynamic_table(headers: &[&str]) -> Table {
 ///   unable to find any note where `note_id_prefix` is a prefix of its ID.
 /// - Returns [`IdPrefixFetchError::MultipleMatches`](miden_client::IdPrefixFetchError::MultipleMatches)
 ///   if there were more than one note found where `note_id_prefix` is a prefix of its ID.
-pub(crate) async fn get_output_note_with_id_prefix<AUTH: TransactionAuthenticator + Sync>(
+pub(crate) async fn get_output_note_with_id_prefix<AUTH>(
     client: &miden_client::Client<AUTH>,
     note_id_prefix: &str,
-) -> Result<OutputNoteRecord, miden_client::IdPrefixFetchError> {
+) -> Result<OutputNoteRecord, miden_client::IdPrefixFetchError>
+where
+    AUTH: CliAuthenticator,
+{
     let mut output_note_records = client
         .get_output_notes(ClientNoteFilter::All)
         .await
@@ -547,7 +553,10 @@ pub(crate) async fn get_output_note_with_id_prefix<AUTH: TransactionAuthenticato
 async fn get_account_with_id_prefix<AUTH>(
     client: &miden_client::Client<AUTH>,
     account_id_prefix: &str,
-) -> Result<AccountHeader, miden_client::IdPrefixFetchError> {
+) -> Result<AccountHeader, miden_client::IdPrefixFetchError>
+where
+    AUTH: CliAuthenticator,
+{
     let mut accounts = client
         .get_account_headers()
         .await

@@ -1,7 +1,7 @@
 use clap::Parser;
 use miden_client::Client;
-use miden_client::auth::TransactionAuthenticator;
 
+use crate::CliAuthenticator;
 use crate::errors::CliError;
 
 #[derive(Debug, Parser, Clone)]
@@ -9,7 +9,7 @@ use crate::errors::CliError;
 pub struct SyncCmd {}
 
 impl SyncCmd {
-    pub async fn execute<AUTH: TransactionAuthenticator + Sync + 'static>(
+    pub async fn execute<AUTH: CliAuthenticator>(
         &self,
         mut client: Client<AUTH>,
     ) -> Result<(), CliError> {

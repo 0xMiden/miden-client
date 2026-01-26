@@ -1,7 +1,7 @@
 use alloc::string::ToString;
 use alloc::vec::Vec;
 
-use miden_client::account::{
+use miden_client_core::account::{
     Account,
     AccountCode,
     AccountHeader,
@@ -10,10 +10,10 @@ use miden_client::account::{
     Address,
     StorageSlotContent,
 };
-use miden_client::asset::AssetVault;
-use miden_client::store::{AccountStatus, StoreError};
-use miden_client::utils::{Deserializable, Serializable};
-use miden_client::{Felt, Word};
+use miden_client_core::asset::AssetVault;
+use miden_client_core::store::{AccountStatus, StoreError};
+use miden_client_core::utils::{Deserializable, Serializable};
+use miden_client_core::{Felt, Word};
 use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::JsFuture;
 

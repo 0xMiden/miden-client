@@ -1,7 +1,7 @@
 use alloc::sync::Arc;
 
-use miden_client::account::AccountComponentCode as NativeAccountComponentCode;
-use miden_client::assembly::{
+use miden_client_core::account::AccountComponentCode as NativeAccountComponentCode;
+use miden_client_core::assembly::{
     Assembler,
     CodeBuilder as NativeCodeBuilder,
     Library as NativeLibrary,

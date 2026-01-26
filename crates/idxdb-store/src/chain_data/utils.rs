@@ -3,11 +3,11 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::num::NonZeroUsize;
 
-use miden_client::Word;
-use miden_client::block::BlockHeader;
-use miden_client::crypto::InOrderIndex;
-use miden_client::store::StoreError;
-use miden_client::utils::Serializable;
+use miden_client_core::Word;
+use miden_client_core::block::BlockHeader;
+use miden_client_core::crypto::InOrderIndex;
+use miden_client_core::store::StoreError;
+use miden_client_core::utils::Serializable;
 use serde_wasm_bindgen::from_value;
 use wasm_bindgen::JsValue;
 

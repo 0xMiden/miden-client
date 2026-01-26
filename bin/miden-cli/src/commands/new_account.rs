@@ -14,7 +14,7 @@ use miden_client::account::component::{
     StorageSlotSchema,
 };
 use miden_client::account::{Account, AccountBuilder, AccountStorageMode, AccountType};
-use miden_client::auth::{AuthFalcon512Rpo, AuthSecretKey, TransactionAuthenticator};
+use miden_client::auth::{AuthFalcon512Rpo, AuthSecretKey};
 use miden_client::transaction::TransactionRequestBuilder;
 use miden_client::utils::Deserializable;
 use miden_client::vm::{Package, SectionId};
@@ -24,7 +24,7 @@ use tracing::{debug, warn};
 use crate::commands::account::set_default_account_if_unset;
 use crate::config::CliConfig;
 use crate::errors::CliError;
-use crate::{CliKeyStore, client_binary_name};
+use crate::{CliAuthenticator, CliKeyStore, client_binary_name};
 
 // CLI TYPES
 // ================================================================================================
@@ -98,7 +98,7 @@ pub struct NewWalletCmd {
 }
 
 impl NewWalletCmd {
-    pub async fn execute<AUTH: TransactionAuthenticator + Sync + 'static>(
+    pub async fn execute<AUTH: CliAuthenticator>(
         &self,
         mut client: Client<AUTH>,
         keystore: CliKeyStore,
@@ -193,7 +193,7 @@ pub struct NewAccountCmd {
 }
 
 impl NewAccountCmd {
-    pub async fn execute<AUTH: TransactionAuthenticator + Sync + 'static>(
+    pub async fn execute<AUTH: CliAuthenticator>(
         &self,
         mut client: Client<AUTH>,
         keystore: CliKeyStore,
@@ -345,7 +345,7 @@ fn separate_auth_components(
 /// and build the account.
 ///
 /// If no auth component is detected in the packages, a Falcon-based auth component will be added.
-async fn create_client_account<AUTH: TransactionAuthenticator + Sync + 'static>(
+async fn create_client_account<AUTH: CliAuthenticator>(
     client: &mut Client<AUTH>,
     keystore: &CliKeyStore,
     account_type: AccountType,
@@ -436,7 +436,7 @@ async fn create_client_account<AUTH: TransactionAuthenticator + Sync + 'static>(
 }
 
 /// Submits a deploy transaction to the node for the specified account.
-async fn deploy_account<AUTH: TransactionAuthenticator + Sync + 'static>(
+async fn deploy_account<AUTH: CliAuthenticator>(
     client: &mut Client<AUTH>,
     account: &Account,
 ) -> Result<(), CliError> {

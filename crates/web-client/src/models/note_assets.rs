@@ -1,5 +1,5 @@
-use miden_client::asset::Asset as NativeAsset;
-use miden_client::note::NoteAssets as NativeNoteAssets;
+use miden_client_core::asset::Asset as NativeAsset;
+use miden_client_core::note::NoteAssets as NativeNoteAssets;
 use wasm_bindgen::prelude::*;
 
 use super::fungible_asset::FungibleAsset;

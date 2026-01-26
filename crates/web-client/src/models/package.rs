@@ -1,4 +1,4 @@
-use miden_client::vm::Package as NativePackage;
+use miden_client_core::vm::Package as NativePackage;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys::Uint8Array;
 

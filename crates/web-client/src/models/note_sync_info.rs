@@ -1,4 +1,4 @@
-use miden_client::rpc::domain::note::NoteSyncInfo as NativeNoteSyncInfo;
+use miden_client_core::rpc::domain::note::NoteSyncInfo as NativeNoteSyncInfo;
 use wasm_bindgen::prelude::*;
 
 use super::block_header::BlockHeader;

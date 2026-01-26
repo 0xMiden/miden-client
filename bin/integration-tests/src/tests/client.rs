@@ -770,9 +770,11 @@ pub async fn test_consume_multiple_expected_notes(client_config: ClientConfig) -
     );
 
     // Validate the final asset amounts in each account
-    for (client, account_id) in [(client, to_account_ids[0]), (unauth_client, to_account_ids[1])] {
+    for (loop_client, account_id) in
+        [(client, to_account_ids[0]), (unauth_client, to_account_ids[1])]
+    {
         assert_account_has_single_asset(
-            &client,
+            &loop_client,
             account_id,
             faucet_account_id,
             TRANSFER_AMOUNT * 2,

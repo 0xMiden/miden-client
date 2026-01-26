@@ -1,7 +1,7 @@
 use alloc::string::String;
 
-use miden_client::account::StorageSlotName as NativeStorageSlotName;
-use miden_client::rpc::domain::account::{
+use miden_client_core::account::StorageSlotName as NativeStorageSlotName;
+use miden_client_core::rpc::domain::account::{
     AccountStorageRequirements as NativeAccountStorageRequirements,
     StorageMapKey as NativeStorageMapKey,
 };

@@ -1,4 +1,4 @@
-use miden_client::transaction::ForeignAccount as NativeForeignAccount;
+use miden_client_core::transaction::ForeignAccount as NativeForeignAccount;
 use wasm_bindgen::prelude::*;
 
 use crate::js_error_with_context;

@@ -39,7 +39,7 @@ node_modules/
 # Ignore files that spawn using `miden-client init`
 miden-client.toml
 **/packages/**
-keystore/
+/keystore/
 
 # Ignore files that spawn using `cargo run`
 miden-node.pid

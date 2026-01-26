@@ -1,4 +1,4 @@
-use miden_client::note::NoteType as NativeNoteType;
+use miden_client_core::note::NoteType as NativeNoteType;
 use wasm_bindgen::prelude::*;
 
 /// Visibility level for note contents when published to the network.

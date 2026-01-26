@@ -2,12 +2,12 @@ use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
-use miden_client::Word;
-use miden_client::block::BlockHeader;
-use miden_client::crypto::{Forest, InOrderIndex, MmrPeaks};
-use miden_client::note::BlockNumber;
-use miden_client::store::{BlockRelevance, PartialBlockchainFilter, StoreError};
-use miden_client::utils::Deserializable;
+use miden_client_core::Word;
+use miden_client_core::block::BlockHeader;
+use miden_client_core::crypto::{Forest, InOrderIndex, MmrPeaks};
+use miden_client_core::note::BlockNumber;
+use miden_client_core::store::{BlockRelevance, PartialBlockchainFilter, StoreError};
+use miden_client_core::utils::Deserializable;
 
 use super::WebStore;
 use crate::promise::{await_js, await_js_value, await_ok};

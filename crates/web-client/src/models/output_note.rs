@@ -1,9 +1,9 @@
-use miden_client::note::{
+use miden_client_core::note::{
     Note as NativeNote,
     NoteHeader as NativeNoteHeader,
     PartialNote as NativePartialNote,
 };
-use miden_client::transaction::OutputNote as NativeOutputNote;
+use miden_client_core::transaction::OutputNote as NativeOutputNote;
 use wasm_bindgen::prelude::*;
 
 use super::note::Note;

@@ -1,15 +1,15 @@
-use miden_client::Word as NativeWord;
-use miden_client::account::component::{
+use miden_client_core::Word as NativeWord;
+use miden_client_core::account::component::{
     AccountComponent as NativeAccountComponent,
     AuthFalcon512RpoMultisigConfig as NativeAuthFalcon512RpoMultisigConfig,
     falcon_512_rpo_multisig_library,
 };
-use miden_client::account::{
+use miden_client_core::account::{
     StorageMap as NativeStorageMap,
     StorageSlot as NativeStorageSlot,
     StorageSlotName,
 };
-use miden_client::auth::PublicKeyCommitment;
+use miden_client_core::auth::PublicKeyCommitment;
 use wasm_bindgen::prelude::*;
 
 use crate::js_error_with_context;

@@ -14,8 +14,8 @@ use alloc::vec::Vec;
 
 use base64::Engine;
 use base64::engine::general_purpose;
-use miden_client::Word;
-use miden_client::account::{
+use miden_client_core::Word;
+use miden_client_core::account::{
     Account,
     AccountCode,
     AccountHeader,
@@ -23,11 +23,11 @@ use miden_client::account::{
     AccountStorage,
     Address,
 };
-use miden_client::asset::AssetVault;
-use miden_client::block::BlockHeader;
-use miden_client::crypto::{InOrderIndex, MmrPeaks};
-use miden_client::note::{BlockNumber, NoteScript, Nullifier};
-use miden_client::store::{
+use miden_client_core::asset::AssetVault;
+use miden_client_core::block::BlockHeader;
+use miden_client_core::crypto::{InOrderIndex, MmrPeaks};
+use miden_client_core::note::{BlockNumber, NoteScript, Nullifier};
+use miden_client_core::store::{
     AccountRecord,
     AccountStatus,
     AccountStorageFilter,
@@ -40,8 +40,8 @@ use miden_client::store::{
     StoreError,
     TransactionFilter,
 };
-use miden_client::sync::{NoteTagRecord, StateSyncUpdate};
-use miden_client::transaction::{TransactionRecord, TransactionStoreUpdate};
+use miden_client_core::sync::{NoteTagRecord, StateSyncUpdate};
+use miden_client_core::transaction::{TransactionRecord, TransactionStoreUpdate};
 use serde::de::Error;
 use serde::{Deserialize, Deserializer};
 use wasm_bindgen::prelude::*;

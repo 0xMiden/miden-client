@@ -1,6 +1,6 @@
-use miden_client::account::component::{AccountComponent, BasicWallet};
-use miden_client::account::{Account, AccountBuilder, AccountType};
-use miden_client::auth::{
+use miden_client_core::account::component::BasicWallet;
+use miden_client_core::account::{Account, AccountBuilder, AccountComponent, AccountType};
+use miden_client_core::auth::{
     AuthEcdsaK256Keccak,
     AuthFalcon512Rpo,
     AuthSchemeId as NativeAuthScheme,

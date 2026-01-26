@@ -1,8 +1,8 @@
-use miden_client::note::{
+use miden_client_core::note::{
     NoteConsumability as NativeNoteConsumability,
     NoteConsumptionStatus as NativeNoteConsumptionStatus,
 };
-use miden_client::store::InputNoteRecord as NativeInputNoteRecord;
+use miden_client_core::store::InputNoteRecord as NativeInputNoteRecord;
 use wasm_bindgen::prelude::*;
 
 use super::account_id::AccountId;

@@ -1,7 +1,7 @@
 use alloc::string::String;
 use alloc::vec::Vec;
 
-use miden_client::store::StoreError;
+use miden_client_core::store::StoreError;
 
 mod js_bindings;
 mod models;

@@ -1,4 +1,4 @@
-use miden_client::note::NoteMetadata as NativeNoteMetadata;
+use miden_client_core::note::NoteMetadata as NativeNoteMetadata;
 use wasm_bindgen::prelude::*;
 
 use super::account_id::AccountId;

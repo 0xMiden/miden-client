@@ -1,13 +1,13 @@
-use miden_client::asset::Asset as NativeAsset;
-use miden_client::block::BlockNumber as NativeBlockNumber;
-use miden_client::crypto::RpoRandomCoin;
-use miden_client::note::{
+use miden_client_core::asset::Asset as NativeAsset;
+use miden_client_core::block::BlockNumber as NativeBlockNumber;
+use miden_client_core::crypto::RpoRandomCoin;
+use miden_client_core::note::{
     Note as NativeNote,
     NoteAssets as NativeNoteAssets,
     create_p2id_note,
     create_p2ide_note,
 };
-use miden_client::{Felt as NativeFelt, Word as NativeWord};
+use miden_client_core::{Felt as NativeFelt, Word as NativeWord};
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use wasm_bindgen::prelude::*;
@@ -89,7 +89,7 @@ impl Note {
     /// Returns the note nullifier as a word.
     pub fn nullifier(&self) -> Word {
         let nullifier = self.0.nullifier();
-        let elements: [miden_client::Felt; 4] =
+        let elements: [miden_client_core::Felt; 4] =
             nullifier.as_elements().try_into().expect("nullifier has 4 elements");
         let native_word: NativeWord = NativeWord::from(&elements);
         native_word.into()

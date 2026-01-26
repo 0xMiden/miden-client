@@ -1,4 +1,4 @@
-use miden_client::note::NoteExecutionHint as NativeNoteExecutionHint;
+use miden_client_core::note::NoteExecutionHint as NativeNoteExecutionHint;
 use wasm_bindgen::prelude::*;
 
 /// Hint describing when a note can be consumed.

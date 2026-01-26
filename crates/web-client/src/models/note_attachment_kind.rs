@@ -1,4 +1,4 @@
-use miden_client::note::NoteAttachmentKind as NativeNoteAttachmentKind;
+use miden_client_core::note::NoteAttachmentKind as NativeNoteAttachmentKind;
 use wasm_bindgen::prelude::*;
 
 /// Defines the payload shape of a note attachment.

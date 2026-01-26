@@ -1,5 +1,5 @@
-use miden_client::Word as NativeWord;
-use miden_client::account::Account as NativeAccount;
+use miden_client_core::Word as NativeWord;
+use miden_client_core::account::Account as NativeAccount;
 use wasm_bindgen::prelude::*;
 
 use crate::models::account::Account;

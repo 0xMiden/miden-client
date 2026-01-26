@@ -1,5 +1,5 @@
-use miden_client::account::AccountId as NativeAccountId;
-use miden_client::note::NoteTag as NativeNoteTag;
+use miden_client_core::account::AccountId as NativeAccountId;
+use miden_client_core::note::NoteTag as NativeNoteTag;
 use wasm_bindgen::prelude::*;
 
 use super::account_id::AccountId;

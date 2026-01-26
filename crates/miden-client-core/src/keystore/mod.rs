@@ -1,0 +1,17 @@
+use alloc::string::String;
+
+use thiserror::Error;
+
+#[derive(Debug, Error)]
+pub enum KeyStoreError {
+    #[error("keystore storage error: {0}")]
+    StorageError(String),
+    #[error("keystore decoding error: {0}")]
+    DecodingError(String),
+}
+
+#[cfg(feature = "std")]
+mod fs_keystore;
+
+#[cfg(feature = "std")]
+pub use fs_keystore::FilesystemKeyStore;

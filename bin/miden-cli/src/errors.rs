@@ -34,15 +34,9 @@ pub enum CliError {
     #[error("asset error")]
     #[diagnostic(code(cli::asset_error))]
     Asset(#[source] AssetError),
-    #[error("client error: {error}")]
+    #[error("client error: {0}")]
     #[diagnostic(code(cli::client_error))]
-    Client {
-        #[source]
-        #[allow(unused_assignments)]
-        error: ClientError,
-        #[help]
-        help: Option<String>,
-    },
+    Client(#[source] ClientError, #[help] Option<String>),
     #[error("config error: {1}")]
     #[diagnostic(
         code(cli::config_error),
@@ -111,6 +105,6 @@ pub enum CliError {
 impl From<ClientError> for CliError {
     fn from(error: ClientError) -> Self {
         let help = Option::<ErrorHint>::from(&error).map(ErrorHint::into_help_message);
-        CliError::Client { error, help }
+        CliError::Client(error, help)
     }
 }

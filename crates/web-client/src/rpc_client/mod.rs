@@ -6,10 +6,10 @@ use alloc::collections::BTreeSet;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
-use miden_client::block::BlockNumber;
-use miden_client::note::{NoteId as NativeNoteId, Nullifier};
-use miden_client::rpc::domain::note::FetchedNote as NativeFetchedNote;
-use miden_client::rpc::{GrpcClient, NodeRpcClient};
+use miden_client_core::block::BlockNumber;
+use miden_client_core::note::{NoteId as NativeNoteId, Nullifier};
+use miden_client_core::rpc::domain::note::FetchedNote as NativeFetchedNote;
+use miden_client_core::rpc::{GrpcClient, NodeRpcClient};
 use note::FetchedNote;
 use wasm_bindgen::prelude::*;
 
@@ -73,8 +73,10 @@ impl RpcClient {
                     FetchedNote::from_header(header, None, inclusion_proof)
                 },
                 NativeFetchedNote::Public(note, inclusion_proof) => {
-                    let header =
-                        miden_client::note::NoteHeader::new(note.id(), note.metadata().clone());
+                    let header = miden_client_core::note::NoteHeader::new(
+                        note.id(),
+                        note.metadata().clone(),
+                    );
                     FetchedNote::from_header(header, Some(note.into()), inclusion_proof)
                 },
             })
@@ -164,7 +166,7 @@ impl RpcClient {
         nullifier: Word,
         block_num: u32,
     ) -> Result<Option<u32>, JsValue> {
-        let native_word: miden_client::Word = nullifier.into();
+        let native_word: miden_client_core::Word = nullifier.into();
         // TODO: nullifier JS binding
         let nullifier = Nullifier::from_raw(native_word);
         let block_num = BlockNumber::from(block_num);

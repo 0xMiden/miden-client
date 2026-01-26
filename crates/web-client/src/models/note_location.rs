@@ -1,4 +1,4 @@
-use miden_client::note::NoteLocation as NativeNoteLocation;
+use miden_client_core::note::NoteLocation as NativeNoteLocation;
 use wasm_bindgen::prelude::*;
 
 /// Contains information about the location of a note.

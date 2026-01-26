@@ -1,5 +1,5 @@
 use idxdb_store::account::JsStorageMapEntry;
-use miden_client::account::{
+use miden_client_core::account::{
     AccountStorage as NativeAccountStorage,
     StorageSlotContent,
     StorageSlotName,

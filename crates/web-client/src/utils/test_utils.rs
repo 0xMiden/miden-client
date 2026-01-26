@@ -1,10 +1,10 @@
 use alloc::sync::Arc;
 
-use miden_client::Serializable;
-use miden_client::account::AccountId as NativeAccountId;
-use miden_client::assembly::Assembler as NativeAssembler;
-use miden_client::testing::account_id::ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE;
-use miden_client::vm::{
+use miden_client_core::Serializable;
+use miden_client_core::account::AccountId as NativeAccountId;
+use miden_client_core::assembly::Assembler as NativeAssembler;
+use miden_client_core::testing::account_id::ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE;
+use miden_client_core::vm::{
     MastArtifact as NativeMastArtifact,
     Package as NativePackage,
     PackageKind as NativePackageKind,

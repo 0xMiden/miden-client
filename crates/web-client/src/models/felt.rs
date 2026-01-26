@@ -1,4 +1,4 @@
-use miden_client::Felt as NativeFelt;
+use miden_client_core::Felt as NativeFelt;
 use wasm_bindgen::prelude::*;
 
 use crate::models::miden_arrays::FeltArray;

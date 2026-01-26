@@ -190,7 +190,7 @@ pub async fn test_pass_through(client_config: ClientConfig) -> Result<()> {
 // HELPERS
 // ================================================================================================
 
-async fn create_pass_through_account<AUTH: TransactionAuthenticator>(
+async fn create_pass_through_account<AUTH: TransactionAuthenticator + Sync>(
     client: &mut Client<AUTH>,
 ) -> Result<Account> {
     let mut init_seed = [0u8; 32];

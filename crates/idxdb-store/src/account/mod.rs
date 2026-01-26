@@ -2,7 +2,7 @@ use alloc::collections::BTreeMap;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
-use miden_client::account::{
+use miden_client_core::account::{
     Account,
     AccountCode,
     AccountHeader,
@@ -15,16 +15,16 @@ use miden_client::account::{
     StorageSlotName,
     StorageSlotType,
 };
-use miden_client::asset::{Asset, AssetVault};
-use miden_client::store::{
+use miden_client_core::asset::{Asset, AssetVault};
+use miden_client_core::store::{
     AccountRecord,
     AccountRecordData,
     AccountStatus,
     AccountStorageFilter,
     StoreError,
 };
-use miden_client::utils::Serializable;
-use miden_client::{AccountError, Word};
+use miden_client_core::utils::Serializable;
+use miden_client_core::{AccountError, Word};
 
 use super::WebStore;
 use crate::account::js_bindings::idxdb_get_account_addresses;

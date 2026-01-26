@@ -1,4 +1,5 @@
-use miden_client::account::{AccountFile as NativeAccountFile, AccountId as NativeAccountId};
+use miden_client_core::account::{AccountFile as NativeAccountFile, AccountId as NativeAccountId};
+use miden_client_core::auth::AuthSecretKey;
 use wasm_bindgen::prelude::*;
 
 use crate::helpers::generate_wallet;
@@ -34,10 +35,7 @@ impl WebClient {
                 keystore.add_key(key).await.map_err(|err| err.to_string())?;
             }
 
-            let pub_keys: Vec<_> = auth_secret_keys
-                .iter()
-                .map(miden_client::auth::AuthSecretKey::public_key)
-                .collect();
+            let pub_keys: Vec<_> = auth_secret_keys.iter().map(AuthSecretKey::public_key).collect();
             client
                 .register_account_public_key_commitments(&account.id(), &pub_keys)
                 .await

@@ -1,4 +1,4 @@
-use miden_client::auth::SigningInputs as NativeSigningInputs;
+use miden_client_core::auth::SigningInputs as NativeSigningInputs;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys::Uint8Array;
 

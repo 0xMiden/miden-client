@@ -1,6 +1,6 @@
 use js_sys::Uint8Array;
-use miden_client::account::AccountId as NativeAccountId;
-use miden_client::address::{
+use miden_client_core::account::AccountId as NativeAccountId;
+use miden_client_core::address::{
     Address as NativeAddress,
     AddressId,
     AddressInterface as NativeAddressInterface,

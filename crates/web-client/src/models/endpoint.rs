@@ -1,4 +1,4 @@
-use miden_client::rpc::Endpoint as NativeEndpoint;
+use miden_client_core::rpc::Endpoint as NativeEndpoint;
 use wasm_bindgen::prelude::*;
 
 /// The `Endpoint` struct represents a network endpoint, consisting of a protocol, a host, and a

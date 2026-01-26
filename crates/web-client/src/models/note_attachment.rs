@@ -1,10 +1,10 @@
-use miden_client::account::AccountId as NativeAccountId;
-use miden_client::note::{
+use miden_client_core::account::AccountId as NativeAccountId;
+use miden_client_core::note::{
     NetworkAccountTarget as NativeNetworkAccountTarget,
     NoteAttachment as NativeNoteAttachment,
     NoteAttachmentScheme as NativeNoteAttachmentScheme,
 };
-use miden_client::{Felt as NativeFelt, Word as NativeWord};
+use miden_client_core::{Felt as NativeFelt, Word as NativeWord};
 use miden_protocol::note::NoteAttachmentContent;
 use wasm_bindgen::prelude::*;
 
@@ -119,7 +119,7 @@ impl NoteAttachment {
     #[wasm_bindgen(js_name = "asWord")]
     pub fn as_word(&self) -> Option<Word> {
         match self.0.content() {
-            NoteAttachmentContent::Word(word) => Some((*word).into()),
+            NoteAttachmentContent::Word(word) => Some(word.into()),
             _ => None,
         }
     }

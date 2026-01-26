@@ -1,6 +1,6 @@
-use miden_client::auth::AuthSecretKey as NativeAuthSecretKey;
-use miden_client::utils::Serializable;
-use miden_client::{Felt as NativeFelt, Word as NativeWord};
+use miden_client_core::auth::AuthSecretKey as NativeAuthSecretKey;
+use miden_client_core::utils::Serializable;
+use miden_client_core::{Felt as NativeFelt, Word as NativeWord};
 use rand::SeedableRng;
 use rand::rngs::StdRng;
 use wasm_bindgen::prelude::*;

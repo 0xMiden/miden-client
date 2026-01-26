@@ -1,4 +1,4 @@
-use miden_client::store::OutputNoteRecord as NativeOutputNoteRecord;
+use miden_client_core::store::OutputNoteRecord as NativeOutputNoteRecord;
 use wasm_bindgen::prelude::*;
 
 use super::note_assets::NoteAssets;

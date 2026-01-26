@@ -3,6 +3,7 @@ use miden_client::account::AccountId;
 use miden_client::address::{Address, AddressId};
 
 use super::{CLIENT_CONFIG_FILE_NAME, get_account_with_id_prefix};
+use crate::CliAuthenticator;
 use crate::commands::account::DEFAULT_ACCOUNT_ID_KEY;
 use crate::config::{CliConfig, get_global_miden_dir, get_local_miden_dir};
 use crate::errors::CliError;
@@ -21,7 +22,10 @@ For example, `100::0xabcdef0123456789` or `1.23::TST`";
 pub(crate) async fn get_input_acc_id_by_prefix_or_default<AUTH>(
     client: &Client<AUTH>,
     account_id: Option<String>,
-) -> Result<AccountId, CliError> {
+) -> Result<AccountId, CliError>
+where
+    AUTH: CliAuthenticator,
+{
     let account_id_str = if let Some(account_id_prefix) = account_id {
         account_id_prefix
     } else {
@@ -50,7 +54,10 @@ pub(crate) async fn get_input_acc_id_by_prefix_or_default<AUTH>(
 pub(crate) async fn parse_account_id<AUTH>(
     client: &Client<AUTH>,
     account_id: &str,
-) -> Result<AccountId, CliError> {
+) -> Result<AccountId, CliError>
+where
+    AUTH: CliAuthenticator,
+{
     if account_id.starts_with("0x") {
         if let Ok(account_id) = AccountId::from_hex(account_id) {
             return Ok(account_id);

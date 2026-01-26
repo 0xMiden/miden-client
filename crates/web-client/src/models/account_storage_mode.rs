@@ -1,6 +1,6 @@
 use core::str::FromStr;
 
-use miden_client::account::AccountStorageMode as NativeAccountStorageMode;
+use miden_client_core::account::AccountStorageMode as NativeAccountStorageMode;
 use wasm_bindgen::prelude::*;
 
 /// Storage visibility mode for an account.

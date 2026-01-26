@@ -1,10 +1,10 @@
-use miden_client::Word as NativeWord;
-use miden_client::account::{
+use miden_client_core::Word as NativeWord;
+use miden_client_core::account::{
     Account as NativeAccount,
     AccountInterfaceExt,
     AccountType as NativeAccountType,
 };
-use miden_client::transaction::AccountInterface;
+use miden_client_core::transaction::AccountInterface;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys::Uint8Array;
 

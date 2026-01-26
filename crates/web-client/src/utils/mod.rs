@@ -1,5 +1,5 @@
-use miden_client::SliceReader;
-use miden_client::utils::{Deserializable, Serializable};
+use miden_client_core::SliceReader;
+use miden_client_core::utils::{Deserializable, Serializable};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys::Uint8Array;
 
@@ -26,7 +26,7 @@ pub fn deserialize_from_uint8array<T: Deserializable>(bytes: &Uint8Array) -> Res
 
 #[cfg(test)]
 mod tests {
-    use miden_client::utils::{ByteReader, DeserializationError};
+    use miden_client_core::utils::{ByteReader, DeserializationError};
 
     use super::*;
 

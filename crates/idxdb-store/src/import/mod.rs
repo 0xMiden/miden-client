@@ -1,4 +1,4 @@
-use miden_client::store::StoreError;
+use miden_client_core::store::StoreError;
 
 use super::WebStore;
 

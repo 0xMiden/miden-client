@@ -1,7 +1,7 @@
-use miden_client::ClientError;
-use miden_client::asset::FungibleAsset;
-use miden_client::note::{BlockNumber, Note as NativeNote};
-use miden_client::transaction::{
+use miden_client_core::asset::FungibleAsset;
+use miden_client_core::errors::ClientError;
+use miden_client_core::note::{BlockNumber, Note as NativeNote};
+use miden_client_core::transaction::{
     PaymentNoteDescription,
     ProvenTransaction as NativeProvenTransaction,
     SwapTransactionData,

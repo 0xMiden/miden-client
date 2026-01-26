@@ -1,4 +1,4 @@
-use miden_client::note::NoteTag;
+use miden_client_core::note::NoteTag;
 use wasm_bindgen::prelude::*;
 
 use crate::{WebClient, js_error_with_context};

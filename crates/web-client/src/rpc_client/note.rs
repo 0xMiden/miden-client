@@ -1,4 +1,4 @@
-use miden_client::note::{
+use miden_client_core::note::{
     NoteHeader as NativeNoteHeader,
     NoteInclusionProof as NativeNoteInclusionProof,
 };

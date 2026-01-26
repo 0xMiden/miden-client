@@ -1,5 +1,5 @@
-use miden_client::note::{Note as NativeNote, NoteInclusionProof as NativeNoteInclusionProof};
-use miden_client::transaction::InputNote as NativeInputNote;
+use miden_client_core::note::{Note as NativeNote, NoteInclusionProof as NativeNoteInclusionProof};
+use miden_client_core::transaction::InputNote as NativeInputNote;
 use wasm_bindgen::prelude::*;
 
 use super::note::Note;

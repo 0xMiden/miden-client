@@ -1,5 +1,5 @@
-use miden_client::transaction::TransactionStoreUpdate as NativeTransactionStoreUpdate;
-use wasm_bindgen::prelude::{wasm_bindgen, *};
+use miden_client_core::transaction::TransactionStoreUpdate as NativeTransactionStoreUpdate;
+use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys::Uint8Array;
 
 use crate::models::account_delta::AccountDelta;

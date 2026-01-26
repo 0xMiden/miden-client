@@ -1,4 +1,4 @@
-use miden_client::account::{
+use miden_client_core::account::{
     StorageSlot as NativeStorageSlot,
     StorageSlotName as NativeStorageSlotName,
 };

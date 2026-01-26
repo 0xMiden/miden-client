@@ -1,5 +1,5 @@
-use miden_client::PrettyPrint;
-use miden_client::note::{NoteScript as NativeNoteScript, WellKnownNote};
+use miden_client_core::PrettyPrint;
+use miden_client_core::note::{NoteScript as NativeNoteScript, WellKnownNote};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys::Uint8Array;
 
