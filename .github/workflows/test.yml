@@ -53,6 +53,28 @@ jobs:
       - name: Run unit tests
         run: make test-react-sdk
 
+  build-react-sdk:
+    name: Build React SDK
+    runs-on: ubuntu-latest
+    needs: [ build-web-client-dist-folder ]
+    steps:
+      - uses: actions/checkout@main
+      - name: Fetch web client dist
+        uses: actions/download-artifact@v4
+        with:
+          name: web-client-artifacts
+          path: ./crates/web-client/dist
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install dependencies
+        run: |
+          cd ./crates/react-sdk
+          yarn install
+      - name: Build React SDK
+        run: cd ./crates/react-sdk && yarn build
+
   integration-tests:
     name: Run integration tests on ubuntu-latest
     runs-on: ubuntu-latest

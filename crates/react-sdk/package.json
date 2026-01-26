@@ -27,14 +27,14 @@
     "test:all": "VITE_CJS_IGNORE_WARNING=1 vitest run && playwright test"
   },
   "peerDependencies": {
-    "@miden-sdk/miden-sdk": ">=0.13.0-next.4",
+    "@miden-sdk/miden-sdk": "^0.13.0-next.4",
     "react": ">=18.0.0"
   },
   "dependencies": {
     "zustand": "^5.0.0"
   },
   "devDependencies": {
-    "@miden-sdk/miden-sdk": "0.13.0-next.4",
+    "@miden-sdk/miden-sdk": "file:../web-client",
     "@playwright/test": "^1.55.0",
     "@testing-library/react": "^14.0.0",
     "@types/react": "^18.2.0",

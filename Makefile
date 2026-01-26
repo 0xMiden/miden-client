@@ -208,6 +208,7 @@ rust-client-ts-build:
 
 .PHONY: build-react-sdk
 build-react-sdk: ## Build the React SDK package
+	cd crates/web-client && yarn && yarn build
 	cd crates/react-sdk && yarn && yarn build
 
 # --- Check ---------------------------------------------------------------------------------------
