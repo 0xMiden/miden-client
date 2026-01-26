@@ -673,7 +673,7 @@ yarn dev
 ## Requirements
 
 - React 18.0 or higher
-- `@miden-sdk/miden-sdk` ^0.13.0-next.4
+- `@miden-sdk/miden-sdk` ^0.13.0-0
 
 ## Browser Support
 

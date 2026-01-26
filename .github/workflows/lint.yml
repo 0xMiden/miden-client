@@ -54,6 +54,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
+      - name: Check React SDK peer range
+        run: node scripts/check-react-sdk-peer.js
       - name: Install dependencies
         run: |
           cd ./crates/react-sdk

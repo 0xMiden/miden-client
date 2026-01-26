@@ -27,7 +27,7 @@
     "test:all": "VITE_CJS_IGNORE_WARNING=1 vitest run && playwright test"
   },
   "peerDependencies": {
-    "@miden-sdk/miden-sdk": "^0.13.0-next.4",
+    "@miden-sdk/miden-sdk": "^0.13.0-0",
     "react": ">=18.0.0"
   },
   "dependencies": {
