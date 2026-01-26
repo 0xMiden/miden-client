@@ -1,4 +1,4 @@
-use miden_protocol::crypto::merkle::SparseMerklePath as NativeSparseMerklePath;
+use miden_client_core::crypto::SparseMerklePath as NativeSparseMerklePath;
 use wasm_bindgen::prelude::*;
 
 use super::word::Word;
@@ -20,7 +20,7 @@ impl SparseMerklePath {
     /// Returns the sibling nodes that make up the path.
     pub fn nodes(&self) -> Vec<Word> {
         let (_mask, siblings) = self.0.clone().into_parts();
-        siblings.into_iter().map(Into::into).collect()
+        siblings.into_iter().map(Word::from).collect()
     }
 
     /// Verifies the path against a root.

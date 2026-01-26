@@ -20,7 +20,7 @@
 
 use alloc::string::{String, ToString};
 
-use miden_protocol::NoteError;
+use miden_protocol::errors::NoteError;
 use thiserror::Error;
 
 mod input_note_record;

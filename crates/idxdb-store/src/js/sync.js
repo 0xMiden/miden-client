@@ -124,9 +124,13 @@ export async function applyStateSync(dbId, stateUpdate) {
 }
 async function updateSyncHeight(tx, blockNum) {
     try {
-        await tx.stateSync.update(1, {
-            blockNum: blockNum,
-        });
+        // Only update if moving forward to prevent race conditions
+        const current = await tx.stateSync.get(1);
+        if (!current || current.blockNum < blockNum) {
+            await tx.stateSync.update(1, {
+                blockNum: blockNum,
+            });
+        }
     }
     catch (error) {
         logWebStoreError(error, "Failed to update sync height");
@@ -158,7 +162,7 @@ async function updatePartialBlockchainNodes(tx, nodeIndexes, nodes) {
             return;
         }
         const data = nodes.map((node, index) => ({
-            id: nodeIndexes[index],
+            id: Number(nodeIndexes[index]),
             node: node,
         }));
         // Use bulkPut to add/overwrite the entries

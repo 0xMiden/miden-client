@@ -313,7 +313,6 @@ import {
     NotesArray,
     NoteAssets,
     NoteExecutionHint,
-    NoteExecutionMode,
     NoteMetadata,
     NoteTag,
     NoteType,
@@ -420,7 +419,6 @@ For more detailed information about transaction functionality, refer to the foll
 - [Felt](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/Felt.md) - Class for working with field elements
 - [FeltArray](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/FeltArray.md) - Class for working with arrays of field elements
 - [NoteTag](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/NoteTag.md) - Class for defining note tags
-- [NoteExecutionMode](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/NoteExecutionMode.md) - Class for defining note execution modes
 - [NoteExecutionHint](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/NoteExecutionHint.md) - Class for defining note execution hints
 - [OutputNotesArray](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/OutputNotesArray.md) - Class for working with arrays of output notes
 - [NotesArray](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/NotesArray.md) - Class for working with arrays of notes

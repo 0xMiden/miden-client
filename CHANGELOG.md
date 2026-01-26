@@ -14,6 +14,7 @@
 * Added doc_cfg as top level cfg_attr to turn on feature annotations in docs.rs and added make targets to serve the docs ([#1543](https://github.com/0xMiden/miden-client/pull/1543)).
 * Updated `DataStore` implementation to prevent retrieving whole `vault` and `storage` ([#1419](https://github.com/0xMiden/miden-client/pull/1419))
 * Added RPC limit handling for `sync_nullifiers` endpoint ([#1590](https://github.com/0xMiden/miden-client/pull/1590)).
+* Added pagination handling for `sync_storage_maps` and `sync_account_vault` RPC endpoints.
 * Added a convenience function `fromBech32` to turn a bech32 string into an AccountId ([#1607](https://github.com/0xMiden/miden-client/pull/1607)).
 * [BREAKING] Refactored the fields in retrieved notes in the WebClient: now the inclusion proof has been factored out and is always accessible ([#1606](https://github.com/0xMiden/miden-client/pull/1606)).
 * [BREAKING] Renamed `NodeRpcClient::get_account_proofs` to `NodeRpcClient::get_account_proof` & added `account_state` parameter (block at which we want to retrieve the proof) ([#1616](https://github.com/0xMiden/miden-client/pull/1616)).
@@ -26,11 +27,29 @@
 * Fixed MMR reconstruction code and fixed how block authentication paths are adjusted ([#1633](https://github.com/0xMiden/miden-client/pull/1633)).
 * Added WebClient bindings and RPC helpers for additional account, note, and validation workflows ([#1638](https://github.com/0xMiden/miden-client/pull/1638)).
 * [BREAKING] Modified JS binding for `AccountComponent::compile` which now takes an `AccountComponentCode` built with the newly added binding `CodeBuilder::compile_account_component_code` ([#1627](https://github.com/0xMiden/miden-client/pull/1627)).
+* Expanded the `GrpcClient` API with methods to fetch account proofs and rebuild the slots for an account ([#1591](https://github.com/0xMiden/miden-client/pull/1591)).
 * [BREAKING] `WebClient.addAccountSecretKeyToWebStore` now takes an additional parameter: an account ID. This will link the ID with the secret key in the WebStore. Added `WebClient.getPublicKeyCommitmentsOfAccount` method that will return a list of related public key commitments for the given account ID ([#1608](https://github.com/0xMiden/miden-client/pull/1608)).
 * [BREAKING] Added naming to `IndexedDB` store to allow multiple WebClient instances to run in the same browser; `WebClient.createClient` now takes an optional DB name (otherwise defaults to name based on the endpoint/network) ([#1645](https://github.com/0xMiden/miden-client/pull/1645)).
 * [BREAKING] Simplified the `NoteScreener` API, removing `NoteRelevance` in favor of `NoteConsumptionStatus`; exposed JS bindings for consumption check results ([#1630](https://github.com/0xMiden/miden-client/pull/1630)).
 * [BREAKING] Replaced `TransactionRequestBuilder::unauthenticated_input_notes` & `TransactionRequestBuilder::authenticated_input_notes` for `TransactionRequestBuilder::input_notes`, now the user passes a list of notes which the `Client` itself determines the authentication status of ([#1624](https://github.com/0xMiden/miden-client/issues/1624)).
 * Updated `SqliteStore`: replaced `MerkleStore` with `SmtForest` and introduced `AccountSmtForest`; simplified queries ([#1526](https://github.com/0xMiden/miden-client/pull/1526), [#1663](https://github.com/0xMiden/miden-client/pull/1663)).
+* Added filter to store query to improve how the MMR is built ([#1681](https://github.com/0xMiden/miden-client/pull/1681)).
+* [BREAKING] Required the client RNG to be `Send + Sync` (via the `ClientFeltRng` marker and `ClientRngBox` alias) so `Client` can be `Send + Sync` ([#1677](https://github.com/0xMiden/miden-client/issues/1677)).
+* Fixed a race condition in `pruneIrrelevantBlocks` that could delete the current block header when multiple tabs share IndexedDB, causing sync to panic ([#1650](https://github.com/0xMiden/miden-client/pull/1650)).
+* Fixed a race condition where concurrent sync operations could cause sync height to go backwards, leading to block header deletion and subsequent panics ([#1650](https://github.com/0xMiden/miden-client/pull/1650)).
+* Changed `get_current_partial_mmr` to return a `StoreError::BlockHeaderNotFound` error instead of panicking when the block header is missing ([#1650](https://github.com/0xMiden/miden-client/pull/1650)).
+* Added `CliClient` wrapper and `CliConfig::from_system()` to allow creating a CLI-configured client programmatically ([#1642](https://github.com/0xMiden/miden-client/pull/1642)).
+* [BREAKING] Updated `BlockNumber` IndexedDB type: changed from `string` to `number` ([#1684](https://github.com/0xMiden/miden-client/pull/1684)).
+* [BREAKING] Upgraded to protocol 0.13: exposed and aligned note-related structs to WebClient; `NoteTag` and `NoteAttachment` APIs updated renamed `NoteTag.fromAccountId` to `withAccountTarget`, added `withCustomAccountTarget`; added `NoteAttachmentScheme` wrapper and content accessors (`asWord`, `asArray`) to `NoteAttachment`; removed `NoteExecutionMode` ([#1685](https://github.com/0xMiden/miden-client/pull/1685)).
+* Added sync lock to coordinate concurrent `syncState()` calls in the WebClient using the Web Locks API, with coalescing behavior where concurrent callers share results from an in-progress sync ([#1690](https://github.com/0xMiden/miden-client/pull/1690)).
+* [BREAKING] Removed the `payback_note_type` field from the swap command ([#1700](https://github.com/0xMiden/miden-client/pull/1700)).
+
+## 0.12.6 (2026-01-08)
+
+* Enabled Workers with `createClientWithExternalKeystore` via callbacks ([#1569](https://github.com/0xMiden/miden-client/pull/1569)).
+* Added `executeForSummary` method to WebClient that executes a transaction and returns a `TransactionSummary`, handling both authorized and unauthorized transactions ([#1620](https://github.com/0xMiden/miden-client/pull/1620)).
+* Added WebClient bindings for the RPO Falcon512 multisig auth component ([#1620](https://github.com/0xMiden/miden-client/pull/1620)).
+* Added seed to `AccountStatus::Locked` variant in `AccountRecord` to track private accounts that are locked due to a mismatch in the account commitment ([#1665](https://github.com/0xMiden/miden-client/pull/1665)).
 
 ## 0.12.5 (2025-12-01)
 

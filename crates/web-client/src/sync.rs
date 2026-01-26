@@ -9,18 +9,23 @@ use crate::{WebClient, js_error_with_context};
 
 #[wasm_bindgen]
 impl WebClient {
-    #[wasm_bindgen(js_name = "syncState")]
-    pub async fn sync_state(&mut self) -> Result<SyncSummary, JsValue> {
-        if let Some(client) = self.get_mut_inner() {
-            let sync_summary = client
-                .sync_state()
-                .await
-                .map_err(|err| js_error_with_context(err, "failed to sync state"))?;
+    /// Internal implementation of `sync_state`.
+    ///
+    /// This method performs the actual sync operation. Concurrent call coordination
+    /// is handled at the JavaScript layer using the Web Locks API.
+    ///
+    /// **Note:** Do not call this method directly. Use `syncState()` from JavaScript instead,
+    /// which provides proper coordination for concurrent calls.
+    #[wasm_bindgen(js_name = "syncStateImpl")]
+    pub async fn sync_state_impl(&mut self) -> Result<SyncSummary, JsValue> {
+        let client = self.get_mut_inner().ok_or(JsValue::from_str("Client not initialized"))?;
 
-            Ok(sync_summary.into())
-        } else {
-            Err(JsValue::from_str("Client not initialized"))
-        }
+        let sync_summary = client
+            .sync_state()
+            .await
+            .map_err(|err| js_error_with_context(err, "failed to sync state"))?;
+
+        Ok(sync_summary.into())
     }
 
     #[wasm_bindgen(js_name = "getSyncHeight")]
@@ -63,8 +68,7 @@ impl WebClient {
             note_type.into(),
             &offered_fungible_asset,
             &requested_fungible_asset,
-        )
-        .map_err(|err| js_error_with_context(err, "failed to build swap tag"))?;
+        );
 
         Ok(native_note_tag.into())
     }

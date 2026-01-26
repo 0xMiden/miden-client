@@ -15,8 +15,8 @@ use wasm_bindgen_futures::js_sys::Uint8Array;
 
 use super::NoteType;
 use super::account_id::AccountId;
-use super::felt::Felt;
 use super::note_assets::NoteAssets;
+use super::note_attachment::NoteAttachment;
 use super::note_id::NoteId;
 use super::note_metadata::NoteMetadata;
 use super::note_recipient::NoteRecipient;
@@ -68,7 +68,7 @@ impl Note {
 
     /// Returns the public metadata associated with the note.
     pub fn metadata(&self) -> NoteMetadata {
-        (*self.0.metadata()).into()
+        self.0.metadata().clone().into()
     }
 
     /// Returns the recipient who can consume this note.
@@ -102,7 +102,7 @@ impl Note {
         target: &AccountId,
         assets: &NoteAssets,
         note_type: NoteType,
-        aux: &Felt,
+        attachment: &NoteAttachment,
     ) -> Result<Self, JsValue> {
         let mut rng = StdRng::from_os_rng();
         let coin_seed: [u64; 4] = rng.random();
@@ -116,7 +116,7 @@ impl Note {
             target.into(),
             native_assets,
             note_type.into(),
-            (*aux).into(),
+            attachment.into(),
             &mut rng,
         )
         .map_err(|err| js_error_with_context(err, "create p2id note"))?;
@@ -133,7 +133,7 @@ impl Note {
         reclaim_height: Option<u32>,
         timelock_height: Option<u32>,
         note_type: NoteType,
-        aux: &Felt,
+        attachment: &NoteAttachment,
     ) -> Result<Self, JsValue> {
         let mut rng = StdRng::from_os_rng();
         let coin_seed: [u64; 4] = rng.random();
@@ -149,7 +149,7 @@ impl Note {
             reclaim_height.map(NativeBlockNumber::from),
             timelock_height.map(NativeBlockNumber::from),
             note_type.into(),
-            (*aux).into(),
+            attachment.into(),
             &mut rng,
         )
         .map_err(|err| js_error_with_context(err, "create p2ide note"))?;

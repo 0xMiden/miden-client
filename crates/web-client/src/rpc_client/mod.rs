@@ -73,8 +73,10 @@ impl RpcClient {
                     FetchedNote::from_header(header, None, inclusion_proof)
                 },
                 NativeFetchedNote::Public(note, inclusion_proof) => {
-                    let header =
-                        miden_client_core::note::NoteHeader::new(note.id(), *note.metadata());
+                    let header = miden_client_core::note::NoteHeader::new(
+                        note.id(),
+                        note.metadata().clone(),
+                    );
                     FetchedNote::from_header(header, Some(note.into()), inclusion_proof)
                 },
             })

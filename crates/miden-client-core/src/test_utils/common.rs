@@ -9,14 +9,14 @@ use std::time::{Duration, Instant};
 use std::vec::Vec;
 
 use anyhow::{Context, Result};
+use miden_protocol::Felt;
 use miden_protocol::account::auth::AuthSecretKey;
 use miden_protocol::account::{Account, AccountId, AccountStorageMode};
 use miden_protocol::asset::{Asset, FungibleAsset, TokenSymbol};
 use miden_protocol::note::NoteType;
 use miden_protocol::testing::account_id::ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE;
 use miden_protocol::transaction::{OutputNote, TransactionId};
-use miden_protocol::{Felt, FieldElement};
-use miden_standards::account::auth::{AuthEcdsaK256Keccak, AuthRpoFalcon512};
+use miden_standards::account::auth::{AuthEcdsaK256Keccak, AuthFalcon512Rpo};
 use miden_standards::code_builder::CodeBuilder;
 use rand::RngCore;
 use uuid::Uuid;
@@ -26,7 +26,7 @@ use crate::account::{AccountBuilder, AccountType, StorageSlot};
 use crate::auth::AuthSchemeId;
 use crate::crypto::FeltRng;
 pub use crate::keystore::FilesystemKeyStore;
-use crate::note::{Note, create_p2id_note};
+use crate::note::{Note, NoteAttachment, create_p2id_note};
 use crate::rpc::RpcError;
 use crate::store::{NoteFilter, TransactionFilter};
 use crate::sync::SyncSummary;
@@ -77,10 +77,10 @@ pub async fn insert_new_wallet_with_seed(
     auth_scheme: AuthSchemeId,
 ) -> Result<(Account, AuthSecretKey), ClientError> {
     let (key_pair, auth_component) = match auth_scheme {
-        AuthSchemeId::RpoFalcon512 => {
+        AuthSchemeId::Falcon512Rpo => {
             let key_pair = AuthSecretKey::new_falcon512_rpo();
             let auth_component: AccountComponent =
-                AuthRpoFalcon512::new(key_pair.public_key().to_commitment()).into();
+                AuthFalcon512Rpo::new(key_pair.public_key().to_commitment()).into();
             (key_pair, auth_component)
         },
         AuthSchemeId::EcdsaK256Keccak => {
@@ -119,10 +119,10 @@ pub async fn insert_new_fungible_faucet(
     auth_scheme: AuthSchemeId,
 ) -> Result<(Account, AuthSecretKey), ClientError> {
     let (key_pair, auth_component) = match auth_scheme {
-        AuthSchemeId::RpoFalcon512 => {
+        AuthSchemeId::Falcon512Rpo => {
             let key_pair = AuthSecretKey::new_falcon512_rpo();
             let auth_component: AccountComponent =
-                AuthRpoFalcon512::new(key_pair.public_key().to_commitment()).into();
+                AuthFalcon512Rpo::new(key_pair.public_key().to_commitment()).into();
             (key_pair, auth_component)
         },
         AuthSchemeId::EcdsaK256Keccak => {
@@ -291,13 +291,11 @@ pub async fn wait_for_blocks_no_sync(client: &mut TestClient, amount_of_blocks: 
 /// This function will panic if it does `NUMBER_OF_NODE_ATTEMPTS` unsuccessful checks or if we
 /// receive an error other than a connection related error.
 pub async fn wait_for_node(client: &mut TestClient) {
-    const NODE_TIME_BETWEEN_ATTEMPTS: u64 = 5;
+    const NODE_TIME_BETWEEN_ATTEMPTS: u64 = 2;
     const NUMBER_OF_NODE_ATTEMPTS: u64 = 60;
-
     println!(
         "Waiting for Node to be up. Checking every {NODE_TIME_BETWEEN_ATTEMPTS}s for {NUMBER_OF_NODE_ATTEMPTS} tries..."
     );
-
     for _try_number in 0..NUMBER_OF_NODE_ATTEMPTS {
         match client.sync_state().await {
             Err(ClientError::RpcError(RpcError::ConnectionError(_))) => {
@@ -485,7 +483,7 @@ pub fn mint_multiple_fungible_asset(
                     *account_id,
                     vec![asset.into()],
                     note_type,
-                    Felt::ZERO,
+                    NoteAttachment::default(),
                     rng,
                 )
                 .unwrap(),
@@ -566,7 +564,7 @@ pub async fn insert_account_with_custom_component(
     let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountImmutableCode)
         .storage_mode(storage_mode)
-        .with_auth_component(AuthRpoFalcon512::new(pub_key.to_commitment()))
+        .with_auth_component(AuthFalcon512Rpo::new(pub_key.to_commitment()))
         .with_component(BasicWallet)
         .with_component(custom_component)
         .build()

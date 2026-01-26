@@ -2,5 +2,5 @@
   "compilerOptions": {
     "skipLibCheck": true
   },
-  "files": ["./dist/crates/miden_client_web.d.ts"]
+  "files": ["./dist/index.d.ts", "./dist/crates/miden_client_web.d.ts"]
 }

@@ -6,7 +6,6 @@ use miden_client::crypto::{FeltRng, MerkleStore, MerkleTree, NodeIndex, Rpo256, 
 use miden_client::note::{
     Note,
     NoteAssets,
-    NoteExecutionHint,
     NoteInputs,
     NoteMetadata,
     NoteRecipient,
@@ -294,10 +293,8 @@ pub async fn test_onchain_notes_sync_with_tag(client_config: ClientConfig) -> Re
     let note_metadata = NoteMetadata::new(
         basic_account_1.id(),
         NoteType::Public,
-        NoteTag::from_account_id(basic_account_1.id()),
-        NoteExecutionHint::None,
-        Default::default(),
-    )?;
+        NoteTag::with_account_target(basic_account_1.id()),
+    );
     let note_assets = NoteAssets::new(vec![])?;
     let note_recipient = NoteRecipient::new(serial_num, note_script, inputs);
     let note = Note::new(note_assets, note_metadata, note_recipient);
@@ -315,7 +312,9 @@ pub async fn test_onchain_notes_sync_with_tag(client_config: ClientConfig) -> Re
     execute_tx_and_sync(&mut client_1, basic_account_1.id(), tx_request).await?;
 
     // Load tag into client 2
-    client_2.add_note_tag(NoteTag::from_account_id(basic_account_1.id())).await?;
+    client_2
+        .add_note_tag(NoteTag::with_account_target(basic_account_1.id()))
+        .await?;
 
     // Client 2's account should receive the note here:
     client_2.sync_state().await?;
@@ -379,11 +378,8 @@ fn create_custom_note(
     let note_metadata = NoteMetadata::new(
         faucet_account_id,
         NoteType::Private,
-        NoteTag::from_account_id(target_account_id),
-        NoteExecutionHint::None,
-        Default::default(),
-    )
-    .context("failed to create note metadata")?;
+        NoteTag::with_account_target(target_account_id),
+    );
     let note_assets = NoteAssets::new(vec![
         FungibleAsset::new(faucet_account_id, 10)
             .context("failed to create fungible asset")?

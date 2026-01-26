@@ -2,11 +2,11 @@ use alloc::string::String;
 use core::num::TryFromIntError;
 
 use miden_protocol::account::AccountId;
+use miden_protocol::block::BlockNumber;
 use miden_protocol::crypto::merkle::MerkleError;
 use miden_protocol::crypto::merkle::mmr::MmrError;
 use miden_protocol::crypto::merkle::smt::SmtProofError;
-use miden_protocol::utils::{DeserializationError, HexParseError};
-use miden_protocol::{
+use miden_protocol::errors::{
     AccountError,
     AccountIdError,
     AddressError,
@@ -15,9 +15,9 @@ use miden_protocol::{
     NoteError,
     StorageMapError,
     TransactionScriptError,
-    Word,
-    WordError,
 };
+use miden_protocol::utils::{DeserializationError, HexParseError};
+use miden_protocol::{Word, WordError};
 use miden_tx::DataStoreError;
 use thiserror::Error;
 
@@ -52,6 +52,8 @@ pub enum StoreError {
     AccountStorageRootNotFound(Word),
     #[error("account storage data with index {0} not found")]
     AccountStorageIndexNotFound(usize),
+    #[error("block header for block {0} not found")]
+    BlockHeaderNotFound(BlockNumber),
     #[error("partial blockchain node at index {0} not found")]
     PartialBlockchainNodeNotFound(u64),
     #[error("error deserializing data from the store")]

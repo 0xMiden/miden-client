@@ -8,10 +8,10 @@ use miden_client::account::component::{
     basic_fungible_faucet_library,
     basic_wallet_library,
     ecdsa_k256_keccak_library,
+    falcon_512_rpo_acl_library,
+    falcon_512_rpo_library,
+    falcon_512_rpo_multisig_library,
     no_auth_library,
-    rpo_falcon_512_acl_library,
-    rpo_falcon_512_library,
-    rpo_falcon_512_multisig_library,
 };
 use miden_client::assembly::Library;
 use miden_client::utils::Serializable;
@@ -40,7 +40,7 @@ fn main() {
 
     build_package(
         &PathBuf::from("templates/basic-auth.toml"),
-        rpo_falcon_512_library(),
+        falcon_512_rpo_library(),
         Some("auth"),
     );
 
@@ -54,13 +54,13 @@ fn main() {
 
     build_package(
         &PathBuf::from("templates/multisig-auth.toml"),
-        rpo_falcon_512_multisig_library(),
+        falcon_512_rpo_multisig_library(),
         Some("auth"),
     );
 
     build_package(
         &PathBuf::from("templates/acl-auth.toml"),
-        rpo_falcon_512_acl_library(),
+        falcon_512_rpo_acl_library(),
         Some("auth"),
     );
 }

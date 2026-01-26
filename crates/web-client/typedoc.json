@@ -1,5 +1,5 @@
 {
-  "entryPoints": ["./dist/crates/miden_client_web.d.ts"],
+  "entryPoints": ["./dist/index.d.ts"],
   "tsconfig": "./tsconfig.docs.json",
   "readme": "none",
   "out": "../../docs/typedoc/web-client",

@@ -3,8 +3,8 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use miden_protocol::account::{Account, AccountId};
+use miden_protocol::errors::{AccountError, AssetError};
 use miden_protocol::note::{Note, NoteId};
-use miden_protocol::{AccountError, AssetError};
 use miden_standards::account::interface::{AccountInterface, AccountInterfaceExt};
 use miden_standards::note::NoteConsumptionStatus;
 use miden_tx::auth::TransactionAuthenticator;

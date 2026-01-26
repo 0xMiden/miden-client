@@ -61,7 +61,7 @@ impl NoteStateHandler for ExpectedNoteState {
         consumer_transaction: TransactionId,
         current_timestamp: Option<u64>,
     ) -> Result<Option<InputNoteState>, NoteRecordError> {
-        match self.metadata {
+        match &self.metadata {
             None => Err(NoteRecordError::NoteNotConsumable(
                 "Can't consume note without metadata".to_string(),
             )),
@@ -74,7 +74,7 @@ impl NoteStateHandler for ExpectedNoteState {
 
                 Ok(Some(
                     ProcessingUnauthenticatedNoteState {
-                        metadata,
+                        metadata: metadata.clone(),
                         after_block_num: self.after_block_num,
                         submission_data,
                     }

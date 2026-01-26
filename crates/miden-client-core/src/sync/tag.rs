@@ -132,7 +132,7 @@ impl PartialEq<NoteTag> for NoteTagRecord {
 
 impl From<&Account> for NoteTagRecord {
     fn from(account: &Account) -> Self {
-        NoteTagRecord::with_account_source(NoteTag::from_account_id(account.id()), account.id())
+        NoteTagRecord::with_account_source(NoteTag::with_account_target(account.id()), account.id())
     }
 }
 

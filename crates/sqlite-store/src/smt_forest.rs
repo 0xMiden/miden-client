@@ -4,6 +4,7 @@ use miden_client::crypto::SMT_DEPTH;
 use miden_client::store::StoreError;
 use miden_client::{EMPTY_WORD, Word};
 use miden_protocol::account::StorageMapWitness;
+use miden_protocol::asset::AssetVaultKey;
 use miden_protocol::crypto::merkle::smt::{Smt, SmtForest};
 use miden_protocol::crypto::merkle::{EmptySubtreeRoots, MerkleError};
 
@@ -22,12 +23,14 @@ impl AccountSmtForest {
     pub fn get_asset_and_witness(
         &self,
         vault_root: Word,
-        vault_key: Word,
+        vault_key: AssetVaultKey,
     ) -> Result<(Asset, AssetWitness), StoreError> {
-        let proof = self.forest.open(vault_root, vault_key)?;
-        let asset_word = proof.get(&vault_key).ok_or(MerkleError::UntrackedKey(vault_key))?;
+        let vault_key_word = vault_key.into();
+        let proof = self.forest.open(vault_root, vault_key_word)?;
+        let asset_word =
+            proof.get(&vault_key_word).ok_or(MerkleError::UntrackedKey(vault_key_word))?;
         if asset_word == EMPTY_WORD {
-            return Err(MerkleError::UntrackedKey(vault_key).into());
+            return Err(MerkleError::UntrackedKey(vault_key_word).into());
         }
 
         let asset = Asset::try_from(asset_word)?;
@@ -53,16 +56,16 @@ impl AccountSmtForest {
     pub fn update_asset_nodes(
         &mut self,
         root: Word,
-        assets: impl Iterator<Item = Asset>,
-        removed_vault_keys: impl Iterator<Item = Word>,
+        new_assets: impl Iterator<Item = Asset>,
+        removed_vault_keys: impl Iterator<Item = AssetVaultKey>,
     ) -> Result<Word, StoreError> {
-        let entries: Vec<(Word, Word)> = assets
+        let entries: Vec<(Word, Word)> = new_assets
             .map(|asset| {
                 let key: Word = asset.vault_key().into();
                 let value: Word = asset.into();
                 (key, value)
             })
-            .chain(removed_vault_keys.map(|key| (key, EMPTY_WORD)))
+            .chain(removed_vault_keys.map(|key| (key.into(), EMPTY_WORD)))
             .collect();
 
         if entries.is_empty() {

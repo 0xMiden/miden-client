@@ -2,6 +2,13 @@ export const WorkerAction = Object.freeze({
   INIT: "init",
   INIT_MOCK: "initMock",
   CALL_METHOD: "callMethod",
+  EXECUTE_CALLBACK: "executeCallback",
+});
+
+export const CallbackType = Object.freeze({
+  GET_KEY: "getKey",
+  INSERT_KEY: "insertKey",
+  SIGN: "sign",
 });
 
 export const MethodName = Object.freeze({

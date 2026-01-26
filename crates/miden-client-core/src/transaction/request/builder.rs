@@ -8,8 +8,10 @@ use miden_protocol::asset::{Asset, FungibleAsset};
 use miden_protocol::block::BlockNumber;
 use miden_protocol::crypto::merkle::InnerNodeInfo;
 use miden_protocol::crypto::merkle::store::MerkleStore;
+use miden_protocol::errors::NoteError;
 use miden_protocol::note::{
     Note,
+    NoteAttachment,
     NoteDetails,
     NoteId,
     NoteRecipient,
@@ -19,7 +21,7 @@ use miden_protocol::note::{
 };
 use miden_protocol::transaction::{OutputNote, TransactionScript};
 use miden_protocol::vm::AdviceMap;
-use miden_protocol::{Felt, FieldElement, NoteError, Word};
+use miden_protocol::{Felt, Word};
 use miden_standards::note::{create_p2id_note, create_p2ide_note, create_swap_note};
 
 use super::{
@@ -291,7 +293,7 @@ impl TransactionRequestBuilder {
             target_id,
             vec![asset.into()],
             note_type,
-            Felt::ZERO,
+            NoteAttachment::default(),
             rng,
         )?;
 
@@ -353,13 +355,13 @@ impl TransactionRequestBuilder {
             swap_data.offered_asset(),
             swap_data.requested_asset(),
             note_type,
-            Felt::ZERO,
+            NoteAttachment::default(),
             payback_note_type,
-            Felt::ZERO,
+            NoteAttachment::default(),
             rng,
         )?;
 
-        let payback_tag = NoteTag::from_account_id(swap_data.account_id());
+        let payback_tag = NoteTag::with_account_target(swap_data.account_id());
 
         self.expected_future_notes(vec![(payback_note_details, payback_tag)])
             .own_output_notes(vec![OutputNote::Full(created_note)])
@@ -527,7 +529,7 @@ impl PaymentNoteDescription {
                 self.target_account_id,
                 self.assets,
                 note_type,
-                Felt::ZERO,
+                NoteAttachment::default(),
                 rng,
             )
         } else {
@@ -539,7 +541,7 @@ impl PaymentNoteDescription {
                 self.reclaim_height,
                 self.timelock_height,
                 note_type,
-                Felt::ZERO,
+                NoteAttachment::default(),
                 rng,
             )
         }

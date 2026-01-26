@@ -1,5 +1,5 @@
 use miden_client::Client;
-use miden_client::note::{NoteExecutionMode, NoteTag};
+use miden_client::note::NoteTag;
 use tracing::info;
 
 use crate::errors::CliError;
@@ -73,15 +73,7 @@ where
     AUTH: CliAuthenticator,
 {
     let tag: NoteTag = tag.into();
-    let execution_mode = match tag.execution_mode() {
-        NoteExecutionMode::Local => "Local",
-        NoteExecutionMode::Network => "Network",
-    };
-    info!(
-        "adding tag - Single Target? {} - Execution mode: {}",
-        tag.is_single_target(),
-        execution_mode
-    );
+    info!("adding tag {tag}");
     client.add_note_tag(tag).await?;
     println!("Tag {tag} added");
     Ok(())

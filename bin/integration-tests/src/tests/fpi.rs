@@ -13,7 +13,7 @@ use miden_client::account::{
 use miden_client::assembly::CodeBuilder;
 use miden_client::auth::{
     AuthEcdsaK256Keccak,
-    AuthRpoFalcon512,
+    AuthFalcon512Rpo,
     AuthSchemeId,
     AuthSecretKey,
     RPO_FALCON_SCHEME_ID,
@@ -104,6 +104,10 @@ pub async fn test_fpi_execute_program(client_config: ClientConfig) -> Result<()>
         ClientConfig::new(client_config.rpc_endpoint, client_config.rpc_timeout_ms)
             .into_client()
             .await?;
+
+    // NOTE: Syncing the client is important because the client needs to be beyond the account
+    // creation block
+    client2.sync_state().await?;
 
     let (wallet, ..) = insert_new_wallet(
         &mut client2,
@@ -369,6 +373,10 @@ async fn standard_fpi(
             .into_client()
             .await?;
 
+    // NOTE: Syncing the client is important because the client needs to be beyond the account
+    // creation block
+    client2.sync_state().await?;
+
     let (native_account, ..) = insert_new_wallet(
         &mut client2,
         AccountStorageMode::Public,
@@ -434,10 +442,10 @@ fn foreign_account_with_code(
         .with_supports_all_types();
 
     let (key_pair, auth_component) = match auth_scheme {
-        AuthSchemeId::RpoFalcon512 => {
+        AuthSchemeId::Falcon512Rpo => {
             let key_pair = AuthSecretKey::new_falcon512_rpo();
             let auth_component: AccountComponent =
-                AuthRpoFalcon512::new(key_pair.public_key().to_commitment()).into();
+                AuthFalcon512Rpo::new(key_pair.public_key().to_commitment()).into();
             (key_pair, auth_component)
         },
         AuthSchemeId::EcdsaK256Keccak => {

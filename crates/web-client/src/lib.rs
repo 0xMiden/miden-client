@@ -57,6 +57,7 @@ pub struct WebClient {
     inner: Option<Client<WebKeyStore<RpoRandomCoin>>>,
     mock_rpc_api: Option<Arc<MockRpcApi>>,
     mock_note_transport_api: Option<Arc<MockNoteTransportApi>>,
+    debug_mode: bool,
 }
 
 impl Default for WebClient {
@@ -76,7 +77,20 @@ impl WebClient {
             keystore: None,
             mock_rpc_api: None,
             mock_note_transport_api: None,
+            debug_mode: false,
         }
+    }
+
+    /// Sets the debug mode for transaction execution.
+    ///
+    /// When enabled, the transaction executor will record additional information useful for
+    /// debugging (the values on the VM stack and the state of the advice provider). This is
+    /// disabled by default since it adds overhead.
+    ///
+    /// Must be called before `createClient`.
+    #[wasm_bindgen(js_name = "setDebugMode")]
+    pub fn set_debug_mode(&mut self, enabled: bool) {
+        self.debug_mode = enabled;
     }
 
     pub(crate) fn get_mut_inner(&mut self) -> Option<&mut Client<WebKeyStore<RpoRandomCoin>>> {
@@ -220,7 +234,7 @@ impl WebClient {
                 Some(MAX_TX_EXECUTION_CYCLES),
                 MIN_TX_EXECUTION_CYCLES,
                 false,
-                false,
+                self.debug_mode,
             )
             .expect("Default executor's options should always be valid"),
             None,

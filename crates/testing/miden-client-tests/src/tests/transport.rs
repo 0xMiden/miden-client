@@ -1,10 +1,9 @@
 use std::sync::Arc;
 
-use miden_client::Felt;
 use miden_client::account::{Account, AccountStorageMode};
 use miden_client::address::{Address, AddressInterface, RoutingParameters};
 use miden_client::keystore::FilesystemKeyStore;
-use miden_client::note::NoteType;
+use miden_client::note::{NoteAttachment, NoteType};
 use miden_client::store::NoteFilter;
 use miden_client::testing::mock::MockClient;
 use miden_client::testing::note_transport::{MockNoteTransportApi, MockNoteTransportNode};
@@ -30,7 +29,7 @@ async fn transport_basic() {
         recipient_account.id(),
         vec![],
         NoteType::Private,
-        Felt::default(),
+        NoteAttachment::default(),
         sender.rng(),
     )
     .unwrap();

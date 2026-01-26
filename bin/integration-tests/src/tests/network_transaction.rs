@@ -21,8 +21,10 @@ use miden_client::assembly::{
 };
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
 use miden_client::note::{
+    NetworkAccountTarget,
     Note,
     NoteAssets,
+    NoteAttachment,
     NoteExecutionHint,
     NoteInputs,
     NoteMetadata,
@@ -295,13 +297,11 @@ fn get_network_note<T: Rng>(
     network_account: AccountId,
     rng: &mut T,
 ) -> Result<Note> {
-    let metadata = NoteMetadata::new(
-        sender,
-        NoteType::Public,
-        NoteTag::from_account_id(network_account),
-        NoteExecutionHint::Always,
-        ZERO,
-    )?;
+    let target = NetworkAccountTarget::new(network_account, NoteExecutionHint::Always)?;
+    let attachment: NoteAttachment = target.into();
+    let metadata =
+        NoteMetadata::new(sender, NoteType::Public, NoteTag::with_account_target(network_account))
+            .with_attachment(attachment);
 
     let script = CodeBuilder::new()
         .with_dynamically_linked_library(counter_contract_library())?

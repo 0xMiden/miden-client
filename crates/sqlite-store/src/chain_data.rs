@@ -3,7 +3,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::num::NonZeroUsize;
 use std::rc::Rc;
-use std::string::String;
 use std::vec::Vec;
 
 use miden_client::Word;
@@ -39,17 +38,6 @@ struct SerializedPartialBlockchainNodeData {
 struct SerializedPartialBlockchainNodeParts {
     id: u64,
     node: String,
-}
-
-// PARTIAL BLOCKCHAIN NODE FILTER HELPERS
-// --------------------------------------------------------------------------------------------
-
-fn partial_blockchain_filter_to_query(filter: &PartialBlockchainFilter) -> String {
-    let base = String::from("SELECT id, node FROM partial_blockchain_nodes");
-    match filter {
-        PartialBlockchainFilter::All => base,
-        PartialBlockchainFilter::List(_) => format!("{base} WHERE id IN rarray(?)"),
-    }
 }
 
 impl SqliteStore {
@@ -115,27 +103,39 @@ impl SqliteStore {
         conn: &mut Connection,
         filter: &PartialBlockchainFilter,
     ) -> Result<BTreeMap<InOrderIndex, Word>, StoreError> {
-        let mut params = Vec::new();
-        if let PartialBlockchainFilter::List(ids) = &filter {
-            let id_values = ids
-                .iter()
-            // SAFETY: d.inner() is a usize casted to u64, should not fail.
-                .map(|id| Value::Integer(i64::try_from(id.inner()).expect("id is a valid i64")))
-                .collect::<Vec<_>>();
+        match filter {
+            PartialBlockchainFilter::All => query_partial_blockchain_nodes(
+                conn,
+                "SELECT id, node FROM partial_blockchain_nodes",
+                params![],
+            ),
 
-            params.push(Rc::new(id_values));
+            PartialBlockchainFilter::List(ids) if ids.is_empty() => Ok(BTreeMap::new()),
+            PartialBlockchainFilter::List(ids) => {
+                let id_values = ids
+                    .iter()
+                    .map(|id| Value::Integer(i64::try_from(id.inner()).expect("id is a valid i64")))
+                    .collect::<Vec<_>>();
+
+                query_partial_blockchain_nodes(
+                    conn,
+                    "SELECT id, node FROM partial_blockchain_nodes WHERE id IN rarray(?)",
+                    params_from_iter([Rc::new(id_values)]),
+                )
+            },
+
+            PartialBlockchainFilter::Forest(forest) if forest.is_empty() => Ok(BTreeMap::new()),
+            PartialBlockchainFilter::Forest(forest) => {
+                let max_index = i64::try_from(forest.rightmost_in_order_index().inner())
+                    .expect("id is a valid i64");
+
+                query_partial_blockchain_nodes(
+                    conn,
+                    "SELECT id, node FROM partial_blockchain_nodes WHERE id <= ?",
+                    params![max_index],
+                )
+            },
         }
-
-        conn.prepare(&partial_blockchain_filter_to_query(filter))
-            .into_store_error()?
-            .query_map(params_from_iter(params), parse_partial_blockchain_nodes_columns)
-            .into_store_error()?
-            .map(|result| {
-                let serialized_partial_blockchain_node_parts: SerializedPartialBlockchainNodeParts =
-                    result.into_store_error()?;
-                parse_partial_blockchain_nodes(&serialized_partial_blockchain_node_parts)
-            })
-            .collect()
     }
 
     pub(crate) fn get_partial_blockchain_peaks_by_block_num(
@@ -257,6 +257,22 @@ fn insert_partial_blockchain_node(
     Ok(())
 }
 
+fn query_partial_blockchain_nodes<P: rusqlite::Params>(
+    conn: &mut Connection,
+    sql: &str,
+    params: P,
+) -> Result<BTreeMap<InOrderIndex, Word>, StoreError> {
+    let mut stmt = conn.prepare_cached(sql).into_store_error()?;
+
+    stmt.query_map(params, parse_partial_blockchain_nodes_columns)
+        .into_store_error()?
+        .map(|row_res| {
+            let parts: SerializedPartialBlockchainNodeParts = row_res.into_store_error()?;
+            parse_partial_blockchain_nodes(&parts)
+        })
+        .collect()
+}
+
 fn parse_partial_blockchain_peaks(forest: u32, peaks_nodes: &[u8]) -> Result<MmrPeaks, StoreError> {
     let mmr_peaks_nodes = Vec::<Word>::read_from_bytes(peaks_nodes)?;
 
@@ -356,12 +372,16 @@ pub(crate) fn set_block_header_has_client_notes(
 
 #[cfg(test)]
 mod test {
+    use std::collections::{BTreeMap, BTreeSet};
     use std::vec::Vec;
 
+    use miden_client::Word;
     use miden_client::block::BlockHeader;
-    use miden_client::crypto::{Forest, MmrPeaks};
+    use miden_client::crypto::{Forest, InOrderIndex, MmrPeaks};
     use miden_client::store::Store;
+    use miden_protocol::crypto::merkle::mmr::Mmr;
     use miden_protocol::transaction::TransactionKernel;
+    use rusqlite::params;
 
     use crate::SqliteStore;
     use crate::tests::create_test_store;
@@ -421,5 +441,132 @@ mod test {
             &[mock_block_headers[1].clone(), mock_block_headers[3].clone()],
             &block_headers[..]
         );
+    }
+
+    /// Tests that large stored MMRs are built consistently throughout multiple prunes
+    #[tokio::test]
+    async fn partial_mmr_reconstructs_after_multiple_prune() {
+        // Setup (mock a large MMR to work with, with a partial tracked set)
+        // ----------------------------------------------------------------------------------------
+
+        let store = create_test_store().await;
+        const TOTAL_BLOCKS: usize = 7300;
+
+        let tx_kernel_commitment = TransactionKernel.to_commitment();
+        let block_headers: Vec<BlockHeader> = (0..TOTAL_BLOCKS)
+            .map(|block_num| {
+                BlockHeader::mock(
+                    u32::try_from(block_num).unwrap(),
+                    None,
+                    None,
+                    &[],
+                    tx_kernel_commitment,
+                )
+            })
+            .collect();
+
+        let mut mmr = Mmr::default();
+        for header in &block_headers {
+            mmr.add(header.commitment());
+        }
+
+        let mut tracked_set: BTreeSet<usize> = (0..(TOTAL_BLOCKS - 1)).step_by(97).collect();
+        tracked_set.insert(TOTAL_BLOCKS - 2);
+        let tracked_blocks: Vec<usize> = tracked_set.iter().copied().collect();
+
+        let mut tracked_nodes: BTreeMap<InOrderIndex, Word> = BTreeMap::new();
+        for &block_num in &tracked_blocks {
+            let header = &block_headers[block_num];
+            tracked_nodes.insert(InOrderIndex::from_leaf_pos(block_num), header.commitment());
+
+            let proof = mmr.open(block_num).expect("valid proof");
+            let mut idx = InOrderIndex::from_leaf_pos(block_num);
+            for node in proof.merkle_path.nodes() {
+                tracked_nodes.insert(idx.sibling(), *node);
+                idx = idx.parent();
+            }
+        }
+        let tracked_nodes: Vec<(InOrderIndex, Word)> = tracked_nodes.into_iter().collect();
+
+        let peaks_by_block: Vec<MmrPeaks> = (0..TOTAL_BLOCKS)
+            .map(|block_num| mmr.peaks_at(Forest::new(block_num)).expect("valid peaks"))
+            .collect();
+
+        // Save blocks and nodes
+        store
+            .interact_with_connection(move |conn| {
+                let tx = conn.transaction().unwrap();
+                for block_num in 0..TOTAL_BLOCKS {
+                    let has_notes = tracked_set.contains(&block_num);
+                    SqliteStore::insert_block_header_tx(
+                        &tx,
+                        &block_headers[block_num],
+                        &peaks_by_block[block_num],
+                        has_notes,
+                    )
+                    .unwrap();
+                }
+
+                SqliteStore::insert_partial_blockchain_nodes_tx(&tx, &tracked_nodes).unwrap();
+                tx.commit().unwrap();
+                Ok(())
+            })
+            .await
+            .unwrap();
+
+        let prune_heights = [
+            TOTAL_BLOCKS / 5,
+            (TOTAL_BLOCKS * 2) / 5,
+            (TOTAL_BLOCKS * 3) / 5,
+            TOTAL_BLOCKS - 1,
+        ];
+
+        // Tests/assertions
+        // ----------------------------------------------------------------------------------------
+
+        let mut previous_remaining: Option<i64> = None;
+        for height in prune_heights {
+            let height_i64 = i64::try_from(height).expect("fits in i64");
+
+            // Update sync height to simulate having synced further
+            store
+                .interact_with_connection(move |conn| {
+                    conn.execute("UPDATE state_sync SET block_num = ?", params![height_i64])
+                        .unwrap();
+                    Ok(())
+                })
+                .await
+                .unwrap();
+
+            // Prune
+            store.prune_irrelevant_blocks().await.unwrap();
+
+            // Assert blocks
+            let remaining_headers: i64 = store
+                .interact_with_connection(|conn| {
+                    let count = conn
+                        .query_row("SELECT COUNT(*) FROM block_headers", [], |row| row.get(0))
+                        .unwrap();
+                    Ok(count)
+                })
+                .await
+                .unwrap();
+            if let Some(previous) = previous_remaining {
+                assert!(remaining_headers < previous);
+            } else {
+                assert!(remaining_headers < i64::try_from(TOTAL_BLOCKS).unwrap());
+            }
+            previous_remaining = Some(remaining_headers);
+        }
+
+        // Try build MMR
+        let partial_mmr = Store::get_current_partial_mmr(&store).await.unwrap();
+        assert_eq!(partial_mmr.peaks().hash_peaks(), mmr.peaks().hash_peaks());
+
+        for block_num in tracked_blocks {
+            let partial_proof = partial_mmr.open(block_num).expect("partial mmr query succeeds");
+            assert!(partial_proof.is_some());
+            assert_eq!(partial_proof.unwrap(), mmr.open(block_num).unwrap());
+        }
     }
 }

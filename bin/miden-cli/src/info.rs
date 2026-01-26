@@ -5,14 +5,14 @@ use miden_client::account::AccountId;
 use miden_client::store::NoteFilter;
 
 use super::config::CliConfig;
+use crate::CliAuthenticator;
 use crate::commands::account::DEFAULT_ACCOUNT_ID_KEY;
 use crate::errors::CliError;
-use crate::{CliAuthenticator, load_config_file};
 
 pub async fn print_client_info<AUTH: CliAuthenticator>(
     client: &Client<AUTH>,
 ) -> Result<(), CliError> {
-    let (config, _) = load_config_file()?;
+    let config = CliConfig::from_system()?;
 
     println!("Client version: {}", env!("CARGO_PKG_VERSION"));
     print_config_stats(&config)?;

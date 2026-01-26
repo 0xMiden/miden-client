@@ -4,6 +4,7 @@ import {
   JsStorageSlot,
   JsStorageMapEntry,
   IBlockHeader,
+  IStateSync,
 } from "./schema.js";
 
 import {
@@ -156,10 +157,10 @@ interface JsAccountUpdate {
 }
 
 interface JsStateSyncUpdate {
-  blockNum: string;
+  blockNum: number;
   flattenedNewBlockHeaders: FlattenedU8Vec;
   flattenedPartialBlockChainPeaks: FlattenedU8Vec;
-  newBlockNums: string[];
+  newBlockNums: number[];
   blockHasRelevantNotes: Uint8Array;
   serializedNodeIds: string[];
   serializedNodes: string[];
@@ -312,11 +313,19 @@ export async function applyStateSync(
   });
 }
 
-async function updateSyncHeight(tx: Transaction, blockNum: string) {
+async function updateSyncHeight(tx: Transaction, blockNum: number) {
   try {
-    await (tx as Transaction & { stateSync: Dexie.Table }).stateSync.update(1, {
-      blockNum: blockNum,
-    });
+    // Only update if moving forward to prevent race conditions
+    const current = await (
+      tx as Transaction & { stateSync: Dexie.Table<IStateSync, number> }
+    ).stateSync.get(1);
+    if (!current || current.blockNum < blockNum) {
+      await (
+        tx as Transaction & { stateSync: Dexie.Table<IStateSync, number> }
+      ).stateSync.update(1, {
+        blockNum: blockNum,
+      });
+    }
   } catch (error) {
     logWebStoreError(error, "Failed to update sync height");
   }
@@ -324,7 +333,7 @@ async function updateSyncHeight(tx: Transaction, blockNum: string) {
 
 async function updateBlockHeader(
   tx: Transaction,
-  blockNum: string,
+  blockNum: number,
   blockHeader: Uint8Array,
   partialBlockchainPeaks: Uint8Array,
   hasClientNotes: boolean
@@ -338,7 +347,7 @@ async function updateBlockHeader(
     };
 
     const existingBlockHeader = await (
-      tx as Transaction & { blockHeaders: Dexie.Table<IBlockHeader, string> }
+      tx as Transaction & { blockHeaders: Dexie.Table<IBlockHeader, number> }
     ).blockHeaders.get(blockNum);
 
     if (!existingBlockHeader) {
@@ -368,7 +377,7 @@ async function updatePartialBlockchainNodes(
     }
 
     const data = nodes.map((node, index) => ({
-      id: nodeIndexes[index],
+      id: Number(nodeIndexes[index]),
       node: node,
     }));
     // Use bulkPut to add/overwrite the entries

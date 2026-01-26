@@ -1,5 +1,10 @@
 import loadWasm from "./wasm.js";
-import { MethodName, WorkerAction } from "./constants.js";
+import { CallbackType, MethodName, WorkerAction } from "./constants.js";
+import {
+  acquireSyncLock,
+  releaseSyncLock,
+  releaseSyncLockWithError,
+} from "./syncLock.js";
 export * from "../Cargo.toml";
 
 const buildTypedArraysExport = (exportObject) => {
@@ -135,12 +140,7 @@ export class WebClient {
     this.signCb = signCb;
 
     // Check if Web Workers are available.
-    if (
-      typeof Worker !== "undefined" &&
-      !this.getKeyCb &&
-      !this.insertKeyCb &&
-      !this.signCb
-    ) {
+    if (typeof Worker !== "undefined") {
       console.log("WebClient: Web Workers are available.");
       // Create the worker.
       this.worker = new Worker(
@@ -162,7 +162,7 @@ export class WebClient {
       });
 
       // Listen for messages from the worker.
-      this.worker.addEventListener("message", (event) => {
+      this.worker.addEventListener("message", async (event) => {
         const data = event.data;
 
         // Worker script loaded.
@@ -174,6 +174,36 @@ export class WebClient {
         // Worker ready.
         if (data.ready) {
           this.readyResolver();
+          return;
+        }
+
+        if (data.action === WorkerAction.EXECUTE_CALLBACK) {
+          const { callbackType, args, requestId } = data;
+          try {
+            const callbackMapping = {
+              [CallbackType.GET_KEY]: this.getKeyCb,
+              [CallbackType.INSERT_KEY]: this.insertKeyCb,
+              [CallbackType.SIGN]: this.signCb,
+            };
+            if (!callbackMapping[callbackType]) {
+              throw new Error(`Callback ${callbackType} not available`);
+            }
+            const callbackFunction = callbackMapping[callbackType];
+            let result = callbackFunction.apply(this, args);
+            if (result instanceof Promise) {
+              result = await result;
+            }
+
+            this.worker.postMessage({
+              callbackResult: result,
+              callbackRequestId: requestId,
+            });
+          } catch (error) {
+            this.worker.postMessage({
+              callbackError: error.message,
+              callbackRequestId: requestId,
+            });
+          }
           return;
         }
 
@@ -218,7 +248,15 @@ export class WebClient {
   initializeWorker() {
     this.worker.postMessage({
       action: WorkerAction.INIT,
-      args: [this.rpcUrl, this.noteTransportUrl, this.seed, this.storeName],
+      args: [
+        this.rpcUrl,
+        this.noteTransportUrl,
+        this.seed,
+        this.storeName,
+        !!this.getKeyCb,
+        !!this.insertKeyCb,
+        !!this.signCb,
+      ],
     });
   }
 
@@ -281,8 +319,6 @@ export class WebClient {
   /**
    * Factory method to create and initialize a WebClient instance with a remote keystore.
    * This method is async so you can await the asynchronous call to createClientWithExternalKeystore().
-   * Note: providing any external keystore callback disables web worker usage because functions
-   * cannot be transferred to workers; calls run on the main thread.
    *
    * @param {string} rpcUrl - The RPC URL.
    * @param {string | undefined} noteTransportUrl - The note transport URL (optional).
@@ -554,21 +590,66 @@ export class WebClient {
     }
   }
 
+  /**
+   * Syncs the client state with the node.
+   *
+   * This method coordinates concurrent sync calls using the Web Locks API when available,
+   * with an in-process mutex fallback for older browsers. If a sync is already in progress,
+   * subsequent callers will wait and receive the same result (coalescing behavior).
+   *
+   * @returns {Promise<SyncSummary>} The sync summary
+   */
   async syncState() {
+    return this.syncStateWithTimeout(0);
+  }
+
+  /**
+   * Syncs the client state with the node with an optional timeout.
+   *
+   * This method coordinates concurrent sync calls using the Web Locks API when available,
+   * with an in-process mutex fallback for older browsers. If a sync is already in progress,
+   * subsequent callers will wait and receive the same result (coalescing behavior).
+   *
+   * @param {number} timeoutMs - Timeout in milliseconds (0 = no timeout)
+   * @returns {Promise<SyncSummary>} The sync summary
+   */
+  async syncStateWithTimeout(timeoutMs = 0) {
+    // Use storeName as the database ID for lock coordination
+    const dbId = this.storeName || "default";
+
     try {
-      if (!this.worker) {
-        const wasmWebClient = await this.getWasmWebClient();
-        return await wasmWebClient.syncState();
+      // Acquire the sync lock (coordinates concurrent calls)
+      const lockHandle = await acquireSyncLock(dbId, timeoutMs);
+
+      if (!lockHandle.acquired) {
+        // We're coalescing - return the result from the in-progress sync
+        return lockHandle.coalescedResult;
       }
 
-      const wasm = await getWasmOrThrow();
-      const serializedSyncSummaryBytes = await this.callMethodWithWorker(
-        MethodName.SYNC_STATE
-      );
+      // We acquired the lock - perform the sync
+      try {
+        let result;
+        if (!this.worker) {
+          const wasmWebClient = await this.getWasmWebClient();
+          result = await wasmWebClient.syncStateImpl();
+        } else {
+          const wasm = await getWasmOrThrow();
+          const serializedSyncSummaryBytes = await this.callMethodWithWorker(
+            MethodName.SYNC_STATE
+          );
+          result = wasm.SyncSummary.deserialize(
+            new Uint8Array(serializedSyncSummaryBytes)
+          );
+        }
 
-      return wasm.SyncSummary.deserialize(
-        new Uint8Array(serializedSyncSummaryBytes)
-      );
+        // Release the lock with the result
+        releaseSyncLock(dbId, result);
+        return result;
+      } catch (error) {
+        // Release the lock with the error
+        releaseSyncLockWithError(dbId, error);
+        throw error;
+      }
     } catch (error) {
       console.error("INDEX.JS: Error in syncState:", error);
       throw error;
@@ -641,28 +722,65 @@ export class MockWebClient extends WebClient {
     });
   }
 
+  /**
+   * Syncs the mock client state.
+   *
+   * This method coordinates concurrent sync calls using the Web Locks API when available,
+   * with an in-process mutex fallback for older browsers. If a sync is already in progress,
+   * subsequent callers will wait and receive the same result (coalescing behavior).
+   *
+   * @returns {Promise<SyncSummary>} The sync summary
+   */
   async syncState() {
+    return this.syncStateWithTimeout(0);
+  }
+
+  /**
+   * Syncs the mock client state with an optional timeout.
+   *
+   * @param {number} timeoutMs - Timeout in milliseconds (0 = no timeout)
+   * @returns {Promise<SyncSummary>} The sync summary
+   */
+  async syncStateWithTimeout(timeoutMs = 0) {
+    const dbId = this.storeName || "mock";
+
     try {
-      const wasmWebClient = await this.getWasmWebClient();
-      if (!this.worker) {
-        return await wasmWebClient.syncState();
+      const lockHandle = await acquireSyncLock(dbId, timeoutMs);
+
+      if (!lockHandle.acquired) {
+        return lockHandle.coalescedResult;
       }
 
-      let serializedMockChain = wasmWebClient.serializeMockChain().buffer;
-      let serializedMockNoteTransportNode =
-        wasmWebClient.serializeMockNoteTransportNode().buffer;
+      try {
+        let result;
+        const wasmWebClient = await this.getWasmWebClient();
 
-      const wasm = await getWasmOrThrow();
+        if (!this.worker) {
+          result = await wasmWebClient.syncStateImpl();
+        } else {
+          let serializedMockChain = wasmWebClient.serializeMockChain().buffer;
+          let serializedMockNoteTransportNode =
+            wasmWebClient.serializeMockNoteTransportNode().buffer;
 
-      const serializedSyncSummaryBytes = await this.callMethodWithWorker(
-        MethodName.SYNC_STATE_MOCK,
-        serializedMockChain,
-        serializedMockNoteTransportNode
-      );
+          const wasm = await getWasmOrThrow();
 
-      return wasm.SyncSummary.deserialize(
-        new Uint8Array(serializedSyncSummaryBytes)
-      );
+          const serializedSyncSummaryBytes = await this.callMethodWithWorker(
+            MethodName.SYNC_STATE_MOCK,
+            serializedMockChain,
+            serializedMockNoteTransportNode
+          );
+
+          result = wasm.SyncSummary.deserialize(
+            new Uint8Array(serializedSyncSummaryBytes)
+          );
+        }
+
+        releaseSyncLock(dbId, result);
+        return result;
+      } catch (error) {
+        releaseSyncLockWithError(dbId, error);
+        throw error;
+      }
     } catch (error) {
       console.error("INDEX.JS: Error in syncState:", error);
       throw error;
