@@ -128,6 +128,16 @@ yarn check:wasm-types
 
 `WebClient` is intentionally excluded because the wrapper defines its own implementation. If the check reports missing exports, update `js/types/index.d.ts` so consumers get the full generated surface.
 
+### React SDK peer dependency
+
+When you bump the web-client version (especially major/minor), update the React SDK peer range to match. From the repo root, run:
+
+```
+yarn react-sdk:peer-fix
+```
+
+This syncs the peer range in `crates/react-sdk/package.json` to the current web-client version.
+
 ## Usage
 
 The following are just a few simple examples to get started. For more details, see the [API Reference](../../docs/typedoc/web-client/README.md).

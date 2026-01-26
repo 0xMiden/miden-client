@@ -1,4 +1,7 @@
 {
+  "scripts": {
+    "react-sdk:peer-fix": "node scripts/check-react-sdk-peer.js --fix"
+  },
   "dependencies": {
     "prettier": "^3.6.2"
   },
