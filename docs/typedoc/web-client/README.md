@@ -145,6 +145,10 @@
 - [WebClient](classes/WebClient.md)
 - [Word](classes/Word.md)
 
+## Interfaces
+
+- [WasmWebClient](interfaces/WasmWebClient.md)
+
 ## Type Aliases
 
 - [AddressInterface](type-aliases/AddressInterface.md)
@@ -160,9 +164,3 @@
 ## Functions
 
 - [createAuthFalcon512RpoMultisig](functions/createAuthFalcon512RpoMultisig.md)
-
-## References
-
-### WasmWebClient
-
-Renames and re-exports [WebClient](classes/WebClient.md)

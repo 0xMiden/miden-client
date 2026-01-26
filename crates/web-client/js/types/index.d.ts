@@ -37,83 +37,81 @@ type MidenArrayConstructors = {
 
 export declare const MidenArrays: MidenArrayConstructors;
 
-// Module augmentation to add JavaScript wrapper methods to WebClient
-declare module "./crates/miden_client_web" {
-  interface WebClient {
-    /**
-     * Factory method to create and initialize a new wrapped WebClient.
-     *
-     * @param rpcUrl - The RPC URL (optional).
-     * @param noteTransportUrl - The note transport URL (optional).
-     * @param seed - The seed for the account (optional).
-     * @param network - Optional name for the store. Setting this allows multiple clients to be used in the same browser.
-     * @returns A promise that resolves to a fully initialized WebClient.
-     */
-    createClient(
-      rpcUrl?: string,
-      noteTransportUrl?: string,
-      seed?: Uint8Array,
-      network?: string
-    ): Promise<WebClient>;
+// WebClient wrapper class that uses a worker and forwards missing methods to WASM.
+export declare class WebClient extends WasmWebClient {
+  /**
+   * Factory method to create and initialize a new wrapped WebClient.
+   *
+   * @param rpcUrl - The RPC URL (optional).
+   * @param noteTransportUrl - The note transport URL (optional).
+   * @param seed - The seed for the account (optional).
+   * @param network - Optional name for the store. Setting this allows multiple clients to be used in the same browser.
+   * @returns A promise that resolves to a fully initialized WebClient.
+   */
+  static createClient(
+    rpcUrl?: string,
+    noteTransportUrl?: string,
+    seed?: Uint8Array,
+    network?: string
+  ): Promise<WebClient>;
 
-    /**
-     * Factory method to create and initialize a new wrapped WebClient with a remote keystore.
-     *
-     * @param rpcUrl - The RPC URL (optional).
-     * @param noteTransportUrl - The note transport URL (optional).
-     * @param seed - The seed for the account (optional).
-     * @param storeName - Optional name for the store. Setting this allows multiple clients to be used in the same browser.
-     * @param getKeyCb - Callback used to retrieve secret keys for a given public key.
-     * @param insertKeyCb - Callback used to persist secret keys in the external store.
-     * @param signCb - Callback used to create signatures for the provided inputs.
-     * @returns A promise that resolves to a fully initialized WebClient.
-     */
-    createClientWithExternalKeystore(
-      rpcUrl?: string,
-      noteTransportUrl?: string,
-      seed?: Uint8Array,
-      storeName?: string,
-      getKeyCb?: GetKeyCallback,
-      insertKeyCb?: InsertKeyCallback,
-      signCb?: SignCallback
-    ): Promise<WebClient>;
+  /**
+   * Factory method to create and initialize a new wrapped WebClient with a remote keystore.
+   *
+   * @param rpcUrl - The RPC URL (optional).
+   * @param noteTransportUrl - The note transport URL (optional).
+   * @param seed - The seed for the account (optional).
+   * @param storeName - Optional name for the store. Setting this allows multiple clients to be used in the same browser.
+   * @param getKeyCb - Callback used to retrieve secret keys for a given public key.
+   * @param insertKeyCb - Callback used to persist secret keys in the external store.
+   * @param signCb - Callback used to create signatures for the provided inputs.
+   * @returns A promise that resolves to a fully initialized WebClient.
+   */
+  static createClientWithExternalKeystore(
+    rpcUrl?: string,
+    noteTransportUrl?: string,
+    seed?: Uint8Array,
+    storeName?: string,
+    getKeyCb?: GetKeyCallback,
+    insertKeyCb?: InsertKeyCallback,
+    signCb?: SignCallback
+  ): Promise<WebClient>;
 
-    /** Returns the default transaction prover configured on the client. */
-    defaultTransactionProver(): TransactionProver;
+  /** Returns the default transaction prover configured on the client. */
+  defaultTransactionProver(): TransactionProver;
 
-    /**
-     * Syncs the client state with the Miden node.
-     *
-     * This method coordinates concurrent calls using the Web Locks API:
-     * - If a sync is already in progress, callers wait and receive the same result
-     * - Cross-tab coordination ensures only one sync runs at a time per database
-     *
-     * @returns A promise that resolves to a SyncSummary with the sync results.
-     */
-    syncState(): Promise<SyncSummary>;
+  /**
+   * Syncs the client state with the Miden node.
+   *
+   * This method coordinates concurrent calls using the Web Locks API:
+   * - If a sync is already in progress, callers wait and receive the same result
+   * - Cross-tab coordination ensures only one sync runs at a time per database
+   *
+   * @returns A promise that resolves to a SyncSummary with the sync results.
+   */
+  syncState(): Promise<SyncSummary>;
 
-    /**
-     * Syncs the client state with the Miden node with an optional timeout.
-     *
-     * This method coordinates concurrent calls using the Web Locks API:
-     * - If a sync is already in progress, callers wait and receive the same result
-     * - Cross-tab coordination ensures only one sync runs at a time per database
-     * - If a timeout is specified and exceeded, the method throws an error
-     *
-     * @param timeoutMs - Optional timeout in milliseconds. If 0 or not provided, waits indefinitely.
-     * @returns A promise that resolves to a SyncSummary with the sync results.
-     */
-    syncStateWithTimeout(timeoutMs?: number): Promise<SyncSummary>;
+  /**
+   * Syncs the client state with the Miden node with an optional timeout.
+   *
+   * This method coordinates concurrent calls using the Web Locks API:
+   * - If a sync is already in progress, callers wait and receive the same result
+   * - Cross-tab coordination ensures only one sync runs at a time per database
+   * - If a timeout is specified and exceeded, the method throws an error
+   *
+   * @param timeoutMs - Optional timeout in milliseconds. If 0 or not provided, waits indefinitely.
+   * @returns A promise that resolves to a SyncSummary with the sync results.
+   */
+  syncStateWithTimeout(timeoutMs?: number): Promise<SyncSummary>;
 
-    /**
-     * Terminates the underlying worker.
-     */
-    terminate(): void;
-  }
+  /**
+   * Terminates the underlying worker.
+   */
+  terminate(): void;
 }
 
-// MockWebClient class that extends the augmented WebClient
-export declare class MockWebClient extends WasmWebClient {
+// MockWebClient class that extends the WebClient wrapper
+export declare class MockWebClient extends WebClient {
   /**
    * Factory method to create and initialize a new wrapped MockWebClient.
    *

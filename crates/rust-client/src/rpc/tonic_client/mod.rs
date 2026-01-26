@@ -775,15 +775,18 @@ impl NodeRpcClient for GrpcClient {
                 let account_id = account_id.clone();
 
                 async move {
-                    let request = proto::rpc::SyncStorageMapsRequest {
+                    let request = proto::rpc::SyncAccountStorageMapsRequest {
                         block_range: Some(BlockRange { block_from, block_to }),
                         account_id,
                     };
 
-                    let response = rpc_api.sync_storage_maps(request).await.map_err(|status| {
+                    let response = rpc_api
+                        .sync_account_storage_maps(request)
+                        .await
+                        .map_err(|status| {
                         RpcError::from_grpc_error(NodeRpcClientEndpoint::SyncStorageMaps, status)
-                    })?;
-                    let response = response.into_inner();
+                        })?
+                        .into_inner();
 
                     let batch_updates = response
                         .updates

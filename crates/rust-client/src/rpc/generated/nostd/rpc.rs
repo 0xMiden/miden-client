@@ -93,7 +93,7 @@ pub struct MaybeNoteScript {
     #[prost(message, optional, tag = "1")]
     pub script: ::core::option::Option<super::note::NoteScript>,
 }
-/// Returns the latest state proof of the specified account.
+/// Defines the request for account details.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct AccountRequest {
     /// ID of the account for which we want to get data
@@ -234,7 +234,7 @@ pub mod account_storage_details {
         #[prost(string, tag = "1")]
         pub slot_name: ::prost::alloc::string::String,
         /// True when the number of entries exceeds the response limit.
-        /// When set, clients should use the `SyncStorageMaps` endpoint.
+        /// When set, clients should use the `SyncAccountStorageMaps` endpoint.
         #[prost(bool, tag = "2")]
         pub too_many_entries: bool,
         /// The map entries (with or without proofs). Empty when too_many_entries is true.
@@ -479,7 +479,7 @@ pub struct SyncStateResponse {
 /// Allows requesters to sync storage map values for specific public accounts within a block range,
 /// with support for cursor-based pagination to handle large storage maps.
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
-pub struct SyncStorageMapsRequest {
+pub struct SyncAccountStorageMapsRequest {
     /// Block range from which to start synchronizing.
     ///
     /// If the `block_to` is specified, this block must be close to the chain tip (i.e., within 30 blocks),
@@ -491,7 +491,7 @@ pub struct SyncStorageMapsRequest {
     pub account_id: ::core::option::Option<super::account::AccountId>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct SyncStorageMapsResponse {
+pub struct SyncAccountStorageMapsResponse {
     /// Pagination information.
     #[prost(message, optional, tag = "1")]
     pub pagination_info: ::core::option::Option<PaginationInfo>,
@@ -739,7 +739,7 @@ pub mod api_client {
             req.extensions_mut().insert(GrpcMethod::new("rpc.Api", "CheckNullifiers"));
             self.inner.unary(req, path, codec).await
         }
-        /// Returns the latest state proof of the specified account.
+        /// Returns the latest details of the specified account.
         pub async fn get_account(
             &mut self,
             request: impl tonic::IntoRequest<super::AccountRequest>,
@@ -1033,11 +1033,11 @@ pub mod api_client {
             self.inner.unary(req, path, codec).await
         }
         /// Returns storage map updates for specified account and storage slots within a block range.
-        pub async fn sync_storage_maps(
+        pub async fn sync_account_storage_maps(
             &mut self,
-            request: impl tonic::IntoRequest<super::SyncStorageMapsRequest>,
+            request: impl tonic::IntoRequest<super::SyncAccountStorageMapsRequest>,
         ) -> core::result::Result<
-            tonic::Response<super::SyncStorageMapsResponse>,
+            tonic::Response<super::SyncAccountStorageMapsResponse>,
             tonic::Status,
         > {
             self.inner
@@ -1049,9 +1049,12 @@ pub mod api_client {
                     )
                 })?;
             let codec = tonic_prost::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/rpc.Api/SyncStorageMaps");
+            let path = http::uri::PathAndQuery::from_static(
+                "/rpc.Api/SyncAccountStorageMaps",
+            );
             let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new("rpc.Api", "SyncStorageMaps"));
+            req.extensions_mut()
+                .insert(GrpcMethod::new("rpc.Api", "SyncAccountStorageMaps"));
             self.inner.unary(req, path, codec).await
         }
         /// Returns transactions records for specific accounts within a block range.
