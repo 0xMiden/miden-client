@@ -4,6 +4,7 @@ import { useConsume } from "../../hooks/useConsume";
 import { useMiden } from "../../context/MidenProvider";
 import { useMidenStore } from "../../store/MidenStore";
 import {
+  createMockInputNoteRecord,
   createMockWebClient,
   createMockTransactionId,
   createMockTransactionRequest,
@@ -15,6 +16,9 @@ vi.mock("../../context/MidenProvider", () => ({
 }));
 
 const mockUseMiden = useMiden as ReturnType<typeof vi.fn>;
+
+const createNoteRecords = (noteIds: string[]) =>
+  noteIds.map((noteId) => createMockInputNoteRecord(noteId));
 
 beforeEach(() => {
   useMidenStore.getState().reset();
@@ -81,7 +85,10 @@ describe("useConsume", () => {
     it("should execute consume transaction", async () => {
       const mockTxId = createMockTransactionId("0xtx789");
       const mockSync = vi.fn().mockResolvedValue(undefined);
+      const noteIds = ["0xnote1", "0xnote2"];
+      const noteRecords = createNoteRecords(noteIds);
       const mockClient = createMockWebClient({
+        getInputNotes: vi.fn().mockResolvedValue(noteRecords),
         newConsumeTransactionRequest: vi
           .fn()
           .mockReturnValue(createMockTransactionRequest()),
@@ -100,7 +107,7 @@ describe("useConsume", () => {
       await act(async () => {
         txResult = await result.current.consume({
           accountId: "0xaccount",
-          noteIds: ["0xnote1", "0xnote2"],
+          noteIds,
         });
       });
 
@@ -109,16 +116,17 @@ describe("useConsume", () => {
       expect(result.current.stage).toBe("complete");
       expect(mockSync).toHaveBeenCalled();
 
-      // Verify note IDs were passed
-      expect(mockClient.newConsumeTransactionRequest).toHaveBeenCalledWith([
-        "0xnote1",
-        "0xnote2",
-      ]);
+      // Verify notes were passed
+      const [notes] = mockClient.newConsumeTransactionRequest.mock.calls[0];
+      expect(notes.map((note) => note.id().toString())).toEqual(noteIds);
     });
 
     it("should consume single note", async () => {
       const mockTxId = createMockTransactionId();
+      const noteIds = ["0xsinglenote"];
+      const noteRecords = createNoteRecords(noteIds);
       const mockClient = createMockWebClient({
+        getInputNotes: vi.fn().mockResolvedValue(noteRecords),
         newConsumeTransactionRequest: vi
           .fn()
           .mockReturnValue(createMockTransactionRequest()),
@@ -132,37 +140,6 @@ describe("useConsume", () => {
       });
 
       const { result } = renderHook(() => useConsume());
-
-      await act(async () => {
-        await result.current.consume({
-          accountId: "0xaccount",
-          noteIds: ["0xsinglenote"],
-        });
-      });
-
-      expect(mockClient.newConsumeTransactionRequest).toHaveBeenCalledWith([
-        "0xsinglenote",
-      ]);
-    });
-
-    it("should consume multiple notes in one transaction", async () => {
-      const mockTxId = createMockTransactionId();
-      const mockClient = createMockWebClient({
-        newConsumeTransactionRequest: vi
-          .fn()
-          .mockReturnValue(createMockTransactionRequest()),
-        submitNewTransaction: vi.fn().mockResolvedValue(mockTxId),
-      });
-
-      mockUseMiden.mockReturnValue({
-        client: mockClient,
-        isReady: true,
-        sync: vi.fn().mockResolvedValue(undefined),
-      });
-
-      const { result } = renderHook(() => useConsume());
-
-      const noteIds = ["0xnote1", "0xnote2", "0xnote3", "0xnote4", "0xnote5"];
 
       await act(async () => {
         await result.current.consume({
@@ -171,9 +148,39 @@ describe("useConsume", () => {
         });
       });
 
-      expect(mockClient.newConsumeTransactionRequest).toHaveBeenCalledWith(
-        noteIds
-      );
+      const [notes] = mockClient.newConsumeTransactionRequest.mock.calls[0];
+      expect(notes.map((note) => note.id().toString())).toEqual(noteIds);
+    });
+
+    it("should consume multiple notes in one transaction", async () => {
+      const mockTxId = createMockTransactionId();
+      const noteIds = ["0xnote1", "0xnote2", "0xnote3", "0xnote4", "0xnote5"];
+      const noteRecords = createNoteRecords(noteIds);
+      const mockClient = createMockWebClient({
+        getInputNotes: vi.fn().mockResolvedValue(noteRecords),
+        newConsumeTransactionRequest: vi
+          .fn()
+          .mockReturnValue(createMockTransactionRequest()),
+        submitNewTransaction: vi.fn().mockResolvedValue(mockTxId),
+      });
+
+      mockUseMiden.mockReturnValue({
+        client: mockClient,
+        isReady: true,
+        sync: vi.fn().mockResolvedValue(undefined),
+      });
+
+      const { result } = renderHook(() => useConsume());
+
+      await act(async () => {
+        await result.current.consume({
+          accountId: "0xaccount",
+          noteIds,
+        });
+      });
+
+      const [notes] = mockClient.newConsumeTransactionRequest.mock.calls[0];
+      expect(notes.map((note) => note.id().toString())).toEqual(noteIds);
     });
   });
 
@@ -186,7 +193,9 @@ describe("useConsume", () => {
         resolveSubmit = () => resolve(createMockTransactionId());
       });
 
+      const noteRecords = createNoteRecords(["0xnote1"]);
       const mockClient = createMockWebClient({
+        getInputNotes: vi.fn().mockResolvedValue(noteRecords),
         newConsumeTransactionRequest: vi
           .fn()
           .mockReturnValue(createMockTransactionRequest()),
@@ -228,7 +237,9 @@ describe("useConsume", () => {
   describe("error handling", () => {
     it("should handle consume transaction errors", async () => {
       const consumeError = new Error("Note already consumed");
+      const noteRecords = createNoteRecords(["0xconsumed"]);
       const mockClient = createMockWebClient({
+        getInputNotes: vi.fn().mockResolvedValue(noteRecords),
         newConsumeTransactionRequest: vi
           .fn()
           .mockReturnValue(createMockTransactionRequest()),
@@ -260,7 +271,9 @@ describe("useConsume", () => {
     });
 
     it("should handle request creation errors", async () => {
+      const noteRecords = createNoteRecords(["invalid-format"]);
       const mockClient = createMockWebClient({
+        getInputNotes: vi.fn().mockResolvedValue(noteRecords),
         newConsumeTransactionRequest: vi.fn().mockImplementation(() => {
           throw new Error("Invalid note ID format");
         }),
@@ -285,7 +298,9 @@ describe("useConsume", () => {
     });
 
     it("should handle account not found errors", async () => {
+      const noteRecords = createNoteRecords(["0xnote1"]);
       const mockClient = createMockWebClient({
+        getInputNotes: vi.fn().mockResolvedValue(noteRecords),
         newConsumeTransactionRequest: vi
           .fn()
           .mockReturnValue(createMockTransactionRequest()),
@@ -316,7 +331,9 @@ describe("useConsume", () => {
   describe("reset", () => {
     it("should reset all state", async () => {
       const mockTxId = createMockTransactionId();
+      const noteRecords = createNoteRecords(["0xnote1"]);
       const mockClient = createMockWebClient({
+        getInputNotes: vi.fn().mockResolvedValue(noteRecords),
         newConsumeTransactionRequest: vi
           .fn()
           .mockReturnValue(createMockTransactionRequest()),
@@ -355,7 +372,13 @@ describe("useConsume", () => {
     it("should allow consuming new notes after reset", async () => {
       const mockTxId1 = createMockTransactionId("0xtx1");
       const mockTxId2 = createMockTransactionId("0xtx2");
+      const noteRecordsFirst = createNoteRecords(["0xnote1"]);
+      const noteRecordsSecond = createNoteRecords(["0xnote2"]);
       const mockClient = createMockWebClient({
+        getInputNotes: vi
+          .fn()
+          .mockResolvedValueOnce(noteRecordsFirst)
+          .mockResolvedValueOnce(noteRecordsSecond),
         newConsumeTransactionRequest: vi
           .fn()
           .mockReturnValue(createMockTransactionRequest()),
@@ -404,7 +427,9 @@ describe("useConsume", () => {
     it("should trigger sync after successful consume", async () => {
       const mockTxId = createMockTransactionId();
       const mockSync = vi.fn().mockResolvedValue(undefined);
+      const noteRecords = createNoteRecords(["0xnote1"]);
       const mockClient = createMockWebClient({
+        getInputNotes: vi.fn().mockResolvedValue(noteRecords),
         newConsumeTransactionRequest: vi
           .fn()
           .mockReturnValue(createMockTransactionRequest()),

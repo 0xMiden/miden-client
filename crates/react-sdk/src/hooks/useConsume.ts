@@ -1,6 +1,11 @@
 import { useCallback, useState } from "react";
 import { useMiden } from "../context/MidenProvider";
-import { AccountId } from "@miden-sdk/miden-sdk";
+import {
+  AccountId,
+  NoteFilter,
+  NoteFilterTypes,
+  NoteId,
+} from "@miden-sdk/miden-sdk";
 import type {
   ConsumeOptions,
   TransactionStage,
@@ -80,9 +85,22 @@ export function useConsume(): UseConsumeResult {
 
         setStage("proving");
         const txResult = await runExclusiveSafe(async () => {
-          const txRequest = client.newConsumeTransactionRequest(
-            options.noteIds
+          const noteIds = options.noteIds.map((noteId) =>
+            NoteId.fromHex(noteId)
           );
+          const filter = new NoteFilter(NoteFilterTypes.List, noteIds);
+          const noteRecords = await client.getInputNotes(filter);
+          const notes = noteRecords.map((record) => record.toNote());
+
+          if (notes.length === 0) {
+            throw new Error("No notes found for provided IDs");
+          }
+
+          if (notes.length !== options.noteIds.length) {
+            throw new Error("Some notes could not be found for provided IDs");
+          }
+
+          const txRequest = client.newConsumeTransactionRequest(notes);
           const txId = await client.submitNewTransaction(
             accountIdObj,
             txRequest

@@ -61,24 +61,36 @@ export const createMockVault = (
   free: vi.fn(),
 });
 
+// Mock Note
+export const createMockNote = (id: string = "0xnote1") => ({
+  id: vi.fn(() => ({ toString: () => id })),
+  free: vi.fn(),
+});
+
 // Mock InputNoteRecord
 export const createMockInputNoteRecord = (
   id: string = "0xnote1",
-  consumed: boolean = false
-) => ({
-  id: vi.fn(() => ({ toString: () => id, toHex: () => id })),
-  state: vi.fn(() => (consumed ? "consumed" : "committed")),
-  details: vi.fn(() => ({})),
-  metadata: vi.fn(() => ({})),
-  commitment: vi.fn(() => ({ toString: () => "0xcommitment" })),
-  inclusionProof: vi.fn(() => null),
-  consumerTransactionId: vi.fn(() => (consumed ? "0xtx" : null)),
-  nullifier: vi.fn(() => "0xnullifier"),
-  isAuthenticated: vi.fn(() => true),
-  isConsumed: vi.fn(() => consumed),
-  isProcessing: vi.fn(() => false),
-  free: vi.fn(),
-});
+  consumed: boolean = false,
+  noteOverride?: ReturnType<typeof createMockNote>
+) => {
+  const note = noteOverride ?? createMockNote(id);
+
+  return {
+    id: vi.fn(() => ({ toString: () => id, toHex: () => id })),
+    state: vi.fn(() => (consumed ? "consumed" : "committed")),
+    details: vi.fn(() => ({})),
+    metadata: vi.fn(() => ({})),
+    commitment: vi.fn(() => ({ toString: () => "0xcommitment" })),
+    inclusionProof: vi.fn(() => null),
+    consumerTransactionId: vi.fn(() => (consumed ? "0xtx" : null)),
+    nullifier: vi.fn(() => "0xnullifier"),
+    isAuthenticated: vi.fn(() => true),
+    isConsumed: vi.fn(() => consumed),
+    isProcessing: vi.fn(() => false),
+    toNote: vi.fn(() => note),
+    free: vi.fn(),
+  };
+};
 
 // Mock ConsumableNoteRecord
 export const createMockConsumableNoteRecord = (noteId: string = "0xnote1") => ({
@@ -145,6 +157,11 @@ export const MockNoteType = {
   Private: 2,
   Encrypted: 3,
   Public: 1,
+};
+
+// Mock NoteId static methods
+export const MockNoteId = {
+  fromHex: vi.fn((hex: string) => ({ toString: () => hex })),
 };
 
 // Mock AccountStorageMode
@@ -242,6 +259,7 @@ export const createMockSdkModule = (
     AccountId: MockAccountId,
     AccountStorageMode: MockAccountStorageMode,
     NoteType: MockNoteType,
+    NoteId: MockNoteId,
     NoteFilter: MockNoteFilter,
     NoteFilterTypes: MockNoteFilterTypes,
     __mockClient: mockClient, // Expose for test assertions

@@ -43,6 +43,9 @@ vi.mock("@miden-sdk/miden-sdk", () => {
     AccountId: {
       fromHex: vi.fn((hex: string) => createMockAccountId(hex)),
     },
+    NoteId: {
+      fromHex: vi.fn((hex: string) => ({ toString: () => hex })),
+    },
     AccountStorageMode: {
       private: vi.fn(() => ({ type: "private" })),
       public: vi.fn(() => ({ type: "public" })),
