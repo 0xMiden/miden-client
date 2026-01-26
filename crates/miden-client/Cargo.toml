@@ -20,8 +20,6 @@ tonic   = ["miden-client-core/tonic", "std"]
 
 [dependencies]
 anyhow            = { workspace = true }
-async-trait       = { workspace = true }
-futures           = { version = "0.3" }
 miden-client-core = { default-features = false, path = "../miden-client-core" }
 thiserror         = { workspace = true }
 tokio             = { workspace = true }
