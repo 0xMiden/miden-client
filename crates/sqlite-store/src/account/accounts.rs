@@ -273,7 +273,7 @@ impl SqliteStore {
             FROM foreign_account_code JOIN account_code ON foreign_account_code.code_commitment = account_code.commitment
             WHERE account_id IN rarray(?)";
 
-        conn.prepare(QUERY)
+        conn.prepare_cached(QUERY)
             .into_store_error()?
             .query_map([Rc::new(params)], |row| Ok((row.get(0)?, row.get(1)?)))
             .expect("no binding parameters used in query")
