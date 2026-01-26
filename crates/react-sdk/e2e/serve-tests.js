@@ -1,78 +1,182 @@
 /**
- * Simple test server that serves both the test app and the SDK
+ * Simple static server that serves both the test app and the SDK.
  * - /        -> e2e/test-app/
  * - /sdk/    -> ../web-client/dist/
  */
-const http = require('http');
-const fs = require('fs');
-const path = require('path');
+const http = require("http");
+const fs = require("fs");
+const path = require("path");
 
-const PORT = 8081;
+const PORT = Number.parseInt(process.env.PORT, 10) || 8081;
+const MAX_URL_LENGTH = 2048;
+const ALLOWED_METHODS = new Set(["GET", "HEAD"]);
 
 const MIME_TYPES = {
-  '.html': 'text/html',
-  '.js': 'application/javascript',
-  '.mjs': 'application/javascript',
-  '.css': 'text/css',
-  '.json': 'application/json',
-  '.wasm': 'application/wasm',
-  '.map': 'application/json',
+  ".html": "text/html; charset=utf-8",
+  ".js": "application/javascript",
+  ".mjs": "application/javascript",
+  ".css": "text/css; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
+  ".wasm": "application/wasm",
+  ".map": "application/json; charset=utf-8",
 };
 
-const TEST_APP_DIR = path.join(__dirname, 'test-app');
-const SDK_DIR = path.join(__dirname, '..', '..', 'web-client', 'dist');
+const TEST_APP_DIR = path.join(__dirname, "test-app");
+const SDK_DIR = path.join(__dirname, "..", "..", "web-client", "dist");
 
-const server = http.createServer((req, res) => {
-  let filePath;
-  let requestPath = req.url.split('?')[0]; // Remove query strings
+const SECURITY_HEADERS = {
+  "Cross-Origin-Opener-Policy": "same-origin",
+  "Cross-Origin-Embedder-Policy": "require-corp",
+  "Cross-Origin-Resource-Policy": "same-origin",
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY",
+  "Referrer-Policy": "no-referrer",
+};
 
-  // Set CORS and security headers
-  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
-  res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
-  res.setHeader('Access-Control-Allow-Origin', '*');
+function setSecurityHeaders(res) {
+  for (const [key, value] of Object.entries(SECURITY_HEADERS)) {
+    res.setHeader(key, value);
+  }
+}
 
-  if (requestPath.startsWith('/sdk/')) {
-    // Serve from web-client dist
-    const sdkPath = requestPath.replace('/sdk/', '');
-    filePath = path.join(SDK_DIR, sdkPath);
-  } else {
-    // Serve from test-app
-    if (requestPath === '/') {
-      requestPath = '/index.html';
-    }
-    filePath = path.join(TEST_APP_DIR, requestPath);
+function sendPlain(res, statusCode, message) {
+  res.writeHead(statusCode, {
+    "Content-Type": "text/plain; charset=utf-8",
+    "Cache-Control": "no-store",
+  });
+  res.end(message);
+}
+
+function sanitizePath(urlPath) {
+  if (!urlPath || urlPath.length > MAX_URL_LENGTH) {
+    return null;
   }
 
-  // Security: prevent directory traversal
-  if (!filePath.startsWith(TEST_APP_DIR) && !filePath.startsWith(SDK_DIR)) {
-    res.writeHead(403);
-    res.end('Forbidden');
+  let decodedPath;
+  try {
+    decodedPath = decodeURIComponent(urlPath);
+  } catch {
+    return null;
+  }
+
+  if (decodedPath.includes("\0") || decodedPath.includes("\\")) {
+    return null;
+  }
+
+  const normalized = path.posix.normalize(decodedPath);
+  const endsWithSlash = decodedPath.endsWith("/");
+  let relativePath = normalized.replace(/^\/+/, "");
+
+  if (relativePath === "" || endsWithSlash) {
+    relativePath = path.posix.join(relativePath, "index.html");
+  }
+
+  const segments = relativePath.split("/");
+  if (segments.some((segment) => segment === "..")) {
+    return null;
+  }
+
+  return relativePath;
+}
+
+function resolvePath(baseDir, relativePath) {
+  const absolutePath = path.resolve(baseDir, relativePath);
+  const relativeToBase = path.relative(baseDir, absolutePath);
+
+  if (relativeToBase.startsWith("..") || path.isAbsolute(relativeToBase)) {
+    return null;
+  }
+
+  return absolutePath;
+}
+
+function resolveRequestPath(requestPath) {
+  if (requestPath === "/sdk") {
+    return { baseDir: SDK_DIR, urlPath: "/" };
+  }
+
+  if (requestPath.startsWith("/sdk/")) {
+    return { baseDir: SDK_DIR, urlPath: requestPath.slice("/sdk".length) };
+  }
+
+  return { baseDir: TEST_APP_DIR, urlPath: requestPath };
+}
+
+const server = http.createServer((req, res) => {
+  setSecurityHeaders(res);
+
+  if (!ALLOWED_METHODS.has(req.method)) {
+    res.setHeader("Allow", "GET, HEAD");
+    sendPlain(res, 405, "Method Not Allowed");
     return;
   }
 
-  const ext = path.extname(filePath).toLowerCase();
-  const contentType = MIME_TYPES[ext] || 'application/octet-stream';
+  if (!req.url) {
+    sendPlain(res, 400, "Bad Request");
+    return;
+  }
 
-  fs.readFile(filePath, (err, content) => {
-    if (err) {
-      if (err.code === 'ENOENT') {
-        console.log(`404: ${requestPath} -> ${filePath}`);
-        res.writeHead(404);
-        res.end(`Not found: ${requestPath}`);
-      } else {
-        console.error(`Error reading ${filePath}:`, err);
-        res.writeHead(500);
-        res.end('Internal server error');
-      }
-    } else {
-      res.writeHead(200, { 'Content-Type': contentType });
-      res.end(content);
+  let requestPath;
+  try {
+    requestPath = new URL(req.url, "http://localhost").pathname;
+  } catch {
+    sendPlain(res, 400, "Bad Request");
+    return;
+  }
+
+  const { baseDir, urlPath } = resolveRequestPath(requestPath);
+  const relativePath = sanitizePath(urlPath);
+  if (!relativePath) {
+    sendPlain(res, 400, "Bad Request");
+    return;
+  }
+
+  const absolutePath = resolvePath(baseDir, relativePath);
+  if (!absolutePath) {
+    sendPlain(res, 403, "Forbidden");
+    return;
+  }
+
+  const ext = path.extname(absolutePath).toLowerCase();
+  const contentType = MIME_TYPES[ext];
+  if (!contentType) {
+    sendPlain(res, 404, "Not Found");
+    return;
+  }
+
+  fs.stat(absolutePath, (statErr, stats) => {
+    if (statErr || !stats.isFile()) {
+      sendPlain(res, 404, "Not Found");
+      return;
     }
+
+    res.writeHead(200, {
+      "Content-Type": contentType,
+      "Content-Length": stats.size,
+      "Cache-Control": "no-store",
+    });
+
+    if (req.method === "HEAD") {
+      res.end();
+      return;
+    }
+
+    const stream = fs.createReadStream(absolutePath);
+    stream.on("error", () => {
+      sendPlain(res, 500, "Internal Server Error");
+    });
+    stream.pipe(res);
   });
 });
 
+server.on("clientError", (err, socket) => {
+  socket.end("HTTP/1.1 400 Bad Request\r\n\r\n");
+});
+
 server.listen(PORT, () => {
-  console.log(`Test server running at http://localhost:${PORT}`);
-  console.log(`  Test app: ${TEST_APP_DIR}`);
-  console.log(`  SDK: ${SDK_DIR}`);
+  console.log("Test server running", {
+    url: `http://localhost:${PORT}`,
+    testApp: TEST_APP_DIR,
+    sdk: SDK_DIR,
+  });
 });
