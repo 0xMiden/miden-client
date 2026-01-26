@@ -10,6 +10,7 @@ const path = require("path");
 const PORT = Number.parseInt(process.env.PORT, 10) || 8081;
 const MAX_URL_LENGTH = 2048;
 const ALLOWED_METHODS = new Set(["GET", "HEAD"]);
+const SAFE_PATH_PATTERN = /^[A-Za-z0-9._/-]+$/;
 
 const MIME_TYPES = {
   ".html": "text/html; charset=utf-8",
@@ -76,18 +77,49 @@ function sanitizePath(urlPath) {
     return null;
   }
 
-  return relativePath;
-}
-
-function resolvePath(baseDir, relativePath) {
-  const absolutePath = path.resolve(baseDir, relativePath);
-  const relativeToBase = path.relative(baseDir, absolutePath);
-
-  if (relativeToBase.startsWith("..") || path.isAbsolute(relativeToBase)) {
+  if (!SAFE_PATH_PATTERN.test(relativePath)) {
     return null;
   }
 
-  return absolutePath;
+  return relativePath;
+}
+
+function buildFileMap(baseDir) {
+  const fileMap = new Map();
+  const stack = [baseDir];
+
+  while (stack.length > 0) {
+    const currentDir = stack.pop();
+    let entries;
+    try {
+      entries = fs.readdirSync(currentDir, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+
+    for (const entry of entries) {
+      const entryPath = path.join(currentDir, entry.name);
+      if (entry.isDirectory()) {
+        stack.push(entryPath);
+        continue;
+      }
+
+      if (!entry.isFile()) {
+        continue;
+      }
+
+      const relative = path.relative(baseDir, entryPath);
+      const normalized = relative.split(path.sep).join("/");
+
+      if (normalized.startsWith("..") || !SAFE_PATH_PATTERN.test(normalized)) {
+        continue;
+      }
+
+      fileMap.set(normalized, entryPath);
+    }
+  }
+
+  return fileMap;
 }
 
 function resolveRequestPath(requestPath) {
@@ -101,6 +133,13 @@ function resolveRequestPath(requestPath) {
 
   return { baseDir: TEST_APP_DIR, urlPath: requestPath };
 }
+
+const TEST_APP_FILES = buildFileMap(TEST_APP_DIR);
+const SDK_FILES = buildFileMap(SDK_DIR);
+const FILE_MAPS = new Map([
+  [TEST_APP_DIR, TEST_APP_FILES],
+  [SDK_DIR, SDK_FILES],
+]);
 
 const server = http.createServer((req, res) => {
   setSecurityHeaders(res);
@@ -131,9 +170,10 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  const absolutePath = resolvePath(baseDir, relativePath);
+  const fileMap = FILE_MAPS.get(baseDir);
+  const absolutePath = fileMap ? fileMap.get(relativePath) : null;
   if (!absolutePath) {
-    sendPlain(res, 403, "Forbidden");
+    sendPlain(res, 404, "Not Found");
     return;
   }
 
