@@ -60,8 +60,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-      - name: Check React SDK peer range
-        run: node scripts/check-react-sdk-peer.js
+      - name: Check React SDK version sync
+        run: node scripts/check-react-sdk-sync.js
       - name: Install dependencies
         run: |
           cd ./crates/react-sdk

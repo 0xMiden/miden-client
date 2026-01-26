@@ -34,38 +34,65 @@ const major = Number(versionMatch[1]);
 const minor = Number(versionMatch[2]);
 const hasPrerelease = Boolean(versionMatch[4]);
 
+const expectedVersion = webClientVersion;
 const expectedRange = hasPrerelease
   ? `^${major}.${minor}.0-0`
   : `^${major}.${minor}.0`;
 
 const peerDeps = reactSdkPkg.peerDependencies || {};
 const actualRange = peerDeps["@miden-sdk/miden-sdk"];
+const actualVersion = reactSdkPkg.version;
 const shouldFix = process.argv.includes("--fix");
+const errors = [];
 
 if (!actualRange) {
-  console.error(
+  errors.push(
     "Missing peerDependencies entry for @miden-sdk/miden-sdk in react-sdk."
   );
-  process.exit(1);
 }
 
 if (actualRange !== expectedRange) {
+  errors.push(
+    `React SDK peer range "${actualRange}" does not match expected "${expectedRange}" for web-client ${webClientVersion}.`
+  );
+}
+
+if (actualVersion !== expectedVersion) {
+  errors.push(
+    `React SDK version "${actualVersion}" does not match web-client version "${expectedVersion}".`
+  );
+}
+
+if (errors.length > 0) {
   if (shouldFix) {
-    peerDeps["@miden-sdk/miden-sdk"] = expectedRange;
-    reactSdkPkg.peerDependencies = peerDeps;
-    writeJson(reactSdkPath, reactSdkPkg);
-    console.log(
-      `Updated react-sdk peer range to "${expectedRange}" based on web-client ${webClientVersion}.`
-    );
+    let updated = false;
+    if (actualRange !== expectedRange) {
+      peerDeps["@miden-sdk/miden-sdk"] = expectedRange;
+      reactSdkPkg.peerDependencies = peerDeps;
+      updated = true;
+    }
+
+    if (actualVersion !== expectedVersion) {
+      reactSdkPkg.version = expectedVersion;
+      updated = true;
+    }
+
+    if (updated) {
+      writeJson(reactSdkPath, reactSdkPkg);
+      console.log(
+        `Updated react-sdk version to "${expectedVersion}" and peer range to "${expectedRange}" based on web-client ${webClientVersion}.`
+      );
+    }
+
     process.exit(0);
   }
 
-  console.error(
-    `React SDK peer range "${actualRange}" does not match expected "${expectedRange}" for web-client ${webClientVersion}.`
-  );
+  for (const message of errors) {
+    console.error(message);
+  }
   process.exit(1);
 }
 
 console.log(
-  `React SDK peer range matches web-client ${webClientVersion} (${expectedRange}).`
+  `React SDK version and peer range match web-client ${webClientVersion} (${expectedRange}).`
 );
