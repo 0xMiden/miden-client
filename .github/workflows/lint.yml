@@ -48,8 +48,14 @@ jobs:
   react-sdk-lint:
     name: "React SDK lint and typecheck"
     runs-on: ubuntu-latest
+    needs: [wasm-bindgen-types]
     steps:
       - uses: actions/checkout@v4
+      - name: Fetch web client dist
+        uses: actions/download-artifact@v4
+        with:
+          name: web-client-artifacts
+          path: ./crates/web-client/dist
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
@@ -138,6 +144,11 @@ jobs:
       - name: Check bindgen type coverage
         working-directory: crates/web-client
         run: yarn check:wasm-types
+      - name: Upload web client dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-client-artifacts
+          path: ./crates/web-client/dist
 
   rustdocs:
     name: build rust documentation

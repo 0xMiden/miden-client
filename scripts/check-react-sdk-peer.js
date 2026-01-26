@@ -11,15 +11,9 @@ const webClientPath = path.join(
   "web-client",
   "package.json"
 );
-const reactSdkPath = path.join(
-  repoRoot,
-  "crates",
-  "react-sdk",
-  "package.json"
-);
+const reactSdkPath = path.join(repoRoot, "crates", "react-sdk", "package.json");
 
-const readJson = (filePath) =>
-  JSON.parse(fs.readFileSync(filePath, "utf8"));
+const readJson = (filePath) => JSON.parse(fs.readFileSync(filePath, "utf8"));
 
 const writeJson = (filePath, data) => {
   fs.writeFileSync(filePath, `${JSON.stringify(data, null, 2)}\n`);
@@ -32,9 +26,7 @@ const webClientVersion = webClientPkg.version;
 const versionMatch = /^(\d+)\.(\d+)\.(\d+)(-.+)?$/.exec(webClientVersion);
 
 if (!versionMatch) {
-  console.error(
-    `Unsupported web-client version format: "${webClientVersion}"`
-  );
+  console.error(`Unsupported web-client version format: "${webClientVersion}"`);
   process.exit(1);
 }
 
