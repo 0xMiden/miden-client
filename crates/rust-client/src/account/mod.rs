@@ -65,6 +65,9 @@ pub use miden_protocol::account::{
 pub use miden_protocol::address::{Address, AddressInterface, AddressType, NetworkId};
 pub use miden_protocol::errors::{AccountIdError, AddressError, NetworkIdError};
 use miden_protocol::note::NoteTag;
+
+mod storage_reader;
+pub use storage_reader::StorageReader;
 use miden_standards::account::auth::{AuthEcdsaK256Keccak, AuthFalcon512Rpo};
 // RE-EXPORTS
 // ================================================================================================
