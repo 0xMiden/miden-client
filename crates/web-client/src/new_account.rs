@@ -56,6 +56,14 @@ impl WebClient {
                     js_error_with_context(err, "failed to map account to public keys")
                 })?;
 
+            let store = self.store.as_ref().expect("Store should be initialized");
+            store
+                .insert_account_public_key(key_pair.public_key().to_commitment(), new_account.id())
+                .await
+                .map_err(|err| {
+                    js_error_with_context(err, "failed to index account by public key")
+                })?;
+
             Ok(new_account.into())
         } else {
             Err(JsValue::from_str("Client not initialized"))
@@ -77,6 +85,11 @@ impl WebClient {
         }
 
         let keystore = self.keystore.clone();
+        let store = self
+            .store
+            .clone()
+            .ok_or(JsValue::from_str("(newFaucet) store is not initialized"))?;
+
         if let Some(client) = self.get_mut_inner() {
             let mut seed = [0u8; 32];
             client.rng().fill_bytes(&mut seed);
@@ -144,6 +157,13 @@ impl WebClient {
                     js_error_with_context(err, "failed to map account to public keys")
                 })?;
 
+            store
+                .insert_account_public_key(key_pair.public_key().to_commitment(), new_account.id())
+                .await
+                .map_err(|err| {
+                    js_error_with_context(err, "failed to index account by public key")
+                })?;
+
             match client.add_account(&new_account, false).await {
                 Ok(_) => Ok(new_account.into()),
                 Err(err) => {
@@ -192,6 +212,17 @@ impl WebClient {
                 .await
                 .map_err(|err| {
                     js_error_with_context(err, "failed to map account to public keys")
+                })?;
+
+            let store = self.store.as_ref().expect("Store should be initialized");
+            store
+                .insert_account_public_key(
+                    native_secret_key.public_key().to_commitment(),
+                    native_account_id,
+                )
+                .await
+                .map_err(|err| {
+                    js_error_with_context(err, "failed to index account by public key")
                 })?;
         }
 

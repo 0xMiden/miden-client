@@ -417,3 +417,51 @@ export async function undoAccountStates(dbId, accountCommitments) {
         logWebStoreError(error, `Error undoing account states: ${accountCommitments.join(",")}`);
     }
 }
+export async function insertAccountPublicKey(dbId, pubKeyCommitmentHex, accountId) {
+    return insertAccountPublicKeys(dbId, [pubKeyCommitmentHex], accountId);
+}
+export async function insertAccountPublicKeys(dbId, pubKeyCommitmentHexes, accountId) {
+    try {
+        const db = getDatabase(dbId);
+        const entries = pubKeyCommitmentHexes.map((pubKeyCommitmentHex) => ({
+            pubKeyCommitmentHex,
+            accountId,
+        }));
+        await db.accountPublicKeys.bulkPut(entries);
+    }
+    catch (error) {
+        logWebStoreError(error, `Error inserting account public key mappings for account: ${accountId}`);
+    }
+}
+export async function getAccountIdByPublicKey(dbId, pubKeyCommitmentHex) {
+    try {
+        const db = getDatabase(dbId);
+        const record = await db.accountPublicKeys.get(pubKeyCommitmentHex);
+        return record?.accountId ?? null;
+    }
+    catch (error) {
+        logWebStoreError(error, `Error fetching account by public key: ${pubKeyCommitmentHex}`);
+    }
+}
+export async function getPublicKeysByAccountId(dbId, accountId) {
+    try {
+        const db = getDatabase(dbId);
+        const records = await db.accountPublicKeys
+            .where("accountId")
+            .equals(accountId)
+            .toArray();
+        return records.map((r) => r.pubKeyCommitmentHex);
+    }
+    catch (error) {
+        logWebStoreError(error, `Error fetching public keys for account: ${accountId}`);
+    }
+}
+export async function removeAccountPublicKey(dbId, pubKeyCommitmentHex) {
+    try {
+        const db = getDatabase(dbId);
+        await db.accountPublicKeys.delete(pubKeyCommitmentHex);
+    }
+    catch (error) {
+        logWebStoreError(error, `Error removing account public key: ${pubKeyCommitmentHex}`);
+    }
+}
