@@ -195,11 +195,6 @@ impl fmt::Display for AcceptHeaderContext {
 }
 
 impl AcceptHeaderError {
-    /// Try to parse an accept header error from a message string
-    pub fn try_from_message(message: &str) -> Option<Self> {
-        Self::try_from_message_with_context(message, AcceptHeaderContext::unknown())
-    }
-
     /// Try to parse an accept header error from a message string, adding context.
     pub fn try_from_message_with_context(
         message: &str,
