@@ -1,6 +1,7 @@
 use alloc::boxed::Box;
 use alloc::string::{String, ToString};
 use core::error::Error;
+use core::fmt;
 use core::num::TryFromIntError;
 
 use miden_protocol::account::AccountId;
@@ -161,20 +162,54 @@ impl GrpcError {
 /// Errors that can occur during accept header validation.
 #[derive(Debug, Error)]
 pub enum AcceptHeaderError {
-    #[error("server rejected request - please check your version and network settings")]
-    NoSupportedMediaRange,
+    #[error("server rejected request - please check your version and network settings ({0})")]
+    NoSupportedMediaRange(AcceptHeaderContext),
     #[error("server rejected request - parsing error: {0}")]
     ParsingError(String),
+}
+
+/// Extra context attached to Accept header negotiation failures.
+#[derive(Debug, Clone)]
+pub struct AcceptHeaderContext {
+    pub client_version: String,
+    pub genesis_commitment: String,
+}
+
+impl AcceptHeaderContext {
+    pub fn unknown() -> Self {
+        Self {
+            client_version: "unknown".to_string(),
+            genesis_commitment: "unknown".to_string(),
+        }
+    }
+}
+
+impl fmt::Display for AcceptHeaderContext {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "client version: {}, genesis commitment: {}",
+            self.client_version, self.genesis_commitment
+        )
+    }
 }
 
 impl AcceptHeaderError {
     /// Try to parse an accept header error from a message string
     pub fn try_from_message(message: &str) -> Option<Self> {
+        Self::try_from_message_with_context(message, AcceptHeaderContext::unknown())
+    }
+
+    /// Try to parse an accept header error from a message string, adding context.
+    pub fn try_from_message_with_context(
+        message: &str,
+        context: AcceptHeaderContext,
+    ) -> Option<Self> {
         // Check for the main compatibility error message
         if message.contains(
             "server does not support any of the specified application/vnd.miden content types",
         ) {
-            return Some(Self::NoSupportedMediaRange);
+            return Some(Self::NoSupportedMediaRange(context));
         }
         if message.contains("genesis value failed to parse")
             || message.contains("version value failed to parse")
