@@ -11,17 +11,17 @@ use crate::store::Store;
 /// Provides convenient, name-based access to account storage slots.
 ///
 /// `StorageReader` executes queries lazily - each method call fetches only the
-/// requested slot from storage, not the entire account.
+/// requested slot from storage.
 ///
 /// # Example
 /// ```ignore
 /// // Get a storage reader for an account
 /// let reader = client.storage(account_id);
 ///
-/// // Read a value slot (fetches only this slot)
+/// // Read a value slot
 /// let metadata = reader.get_item("token_metadata").await?;
 ///
-/// // Read from a map slot (fetches only this slot)
+/// // Read from a map slot
 /// let balance = reader.get_map_item("balances", user_key).await?;
 ///
 /// // Read with witness for proofs
@@ -47,8 +47,6 @@ impl StorageReader {
 
     /// Retrieves a storage slot value by name.
     ///
-    /// This method fetches only the requested slot from storage, not the entire account.
-    ///
     /// For `Value` slots, returns the stored word.
     /// For `Map` slots, returns the map root.
     pub async fn get_item(
@@ -62,8 +60,6 @@ impl StorageReader {
     }
 
     /// Retrieves a value from a storage map slot by name and key.
-    ///
-    /// This method fetches only the requested slot from storage, not the entire account.
     ///
     /// # Errors
     /// Returns an error if the slot is not found or is not a map.
@@ -79,7 +75,6 @@ impl StorageReader {
 
     /// Retrieves a value and its Merkle witness from a storage map slot.
     ///
-    /// This method fetches only the requested slot from storage, not the entire account.
     /// The witness can be used in transaction proofs.
     ///
     /// # Errors
