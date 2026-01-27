@@ -14,7 +14,7 @@ use wasm_bindgen::JsValue;
 use crate::chain_data::PartialBlockchainNodeIdxdbObject;
 
 pub struct SerializedBlockHeaderData {
-    pub block_num: String,
+    pub block_num: u32,
     pub header: Vec<u8>,
     pub partial_blockchain_peaks: Vec<u8>,
     pub has_client_notes: bool,
@@ -30,7 +30,7 @@ pub fn serialize_block_header(
     partial_blockchain_peaks: &[Word],
     has_client_notes: bool,
 ) -> SerializedBlockHeaderData {
-    let block_num = block_header.block_num().to_string();
+    let block_num = block_header.block_num().as_u32();
     let header = block_header.to_bytes();
     let partial_blockchain_peaks = partial_blockchain_peaks.to_bytes();
 
@@ -42,16 +42,35 @@ pub fn serialize_block_header(
     }
 }
 
+/// Serializes a partial blockchain node for storage.
+///
+/// Note: The `id` is stored as `u32` because this store is WASM-only, where `usize` is 32 bits.
+/// This enforces the ~2^31 block limit at the type level.
+/// See [`process_partial_blockchain_nodes_from_js_value`] for details on the block limit.
 pub fn serialize_partial_blockchain_node(
     id: InOrderIndex,
     node: Word,
 ) -> Result<SerializedPartialBlockchainNodeData, StoreError> {
-    let id: u64 = id.inner().try_into()?;
+    let id: u32 = id.inner().try_into().map_err(|_| {
+        StoreError::ParsingError(format!(
+            "partial blockchain node id {} exceeds u32 capacity",
+            id.inner()
+        ))
+    })?;
     let id_as_str = id.to_string();
     let node = node.to_string();
     Ok(SerializedPartialBlockchainNodeData { id: id_as_str, node })
 }
 
+/// Deserializes partial blockchain nodes from a JS value.
+///
+/// Note: The `id` is stored as `u32` because this store is WASM-only, where `usize` is 32 bits.
+/// For an MMR with N blocks, the rightmost in-order index is `2N - 1`. To fit in 32 bits:
+/// `2N - 1 ≤ u32::MAX` → `N <= 2^31` (~2 billion blocks).
+///
+/// This means WASM clients can only support blockchains with up to ~2^31 blocks.
+/// Supporting the full `u32::MAX` blocks would require `InOrderIndex` in `miden-crypto`
+/// to use `u64` instead of `usize` (Issue #1691).
 pub fn process_partial_blockchain_nodes_from_js_value(
     js_value: JsValue,
 ) -> Result<BTreeMap<InOrderIndex, Word>, StoreError> {
@@ -62,13 +81,12 @@ pub fn process_partial_blockchain_nodes_from_js_value(
     let results: Result<BTreeMap<InOrderIndex, Word>, StoreError> = partial_blockchain_nodes_idxdb
         .into_iter()
         .map(|record| {
-            let id_as_u64: u64 = record.id.parse::<u64>().unwrap();
-            let id = InOrderIndex::new(
-                NonZeroUsize::new(
-                    usize::try_from(id_as_u64).expect("usize should not fail converting to u64"),
-                )
-                .unwrap(),
-            );
+            // u32 -> usize always succeeds (even in WASM where usize is 32 bits)
+            let id = record.id as usize;
+            let id = NonZeroUsize::new(id).ok_or_else(|| {
+                StoreError::ParsingError("partial blockchain node id must be non-zero".to_string())
+            })?;
+            let id = InOrderIndex::new(id);
             let node = Word::try_from(&record.node)?;
             Ok((id, node))
         })

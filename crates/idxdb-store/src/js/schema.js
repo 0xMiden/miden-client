@@ -119,7 +119,7 @@ export class MidenDatabase {
         this.trackedAccounts = this.dexie.table(Table.TrackedAccounts);
         this.dexie.on("populate", () => {
             this.stateSync
-                .put({ id: 1, blockNum: "0" })
+                .put({ id: 1, blockNum: 0 })
                 .catch((err) => logWebStoreError(err, "Failed to populate DB"));
         });
     }

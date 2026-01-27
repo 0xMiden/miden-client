@@ -12,11 +12,9 @@ use miden_client::account::component::{
     InitStorageData,
     MIDEN_PACKAGE_EXTENSION,
     StorageSlotSchema,
-    StorageValueName,
 };
 use miden_client::account::{Account, AccountBuilder, AccountStorageMode, AccountType};
-use miden_client::auth::{AuthRpoFalcon512, AuthSecretKey, TransactionAuthenticator};
-use miden_client::keystore::FilesystemKeyStore;
+use miden_client::auth::{AuthFalcon512Rpo, AuthSecretKey, TransactionAuthenticator};
 use miden_client::transaction::TransactionRequestBuilder;
 use miden_client::utils::Deserializable;
 use miden_client::vm::{Package, SectionId};
@@ -26,7 +24,7 @@ use tracing::{debug, warn};
 use crate::commands::account::set_default_account_if_unset;
 use crate::config::CliConfig;
 use crate::errors::CliError;
-use crate::{client_binary_name, load_config_file};
+use crate::{CliKeyStore, client_binary_name};
 
 // CLI TYPES
 // ================================================================================================
@@ -103,7 +101,7 @@ impl NewWalletCmd {
     pub async fn execute<AUTH: TransactionAuthenticator + Sync + 'static>(
         &self,
         mut client: Client<AUTH>,
-        keystore: FilesystemKeyStore,
+        keystore: CliKeyStore,
     ) -> Result<(), CliError> {
         let package_paths: Vec<PathBuf> = [PathBuf::from("basic-wallet")]
             .into_iter()
@@ -198,7 +196,7 @@ impl NewAccountCmd {
     pub async fn execute<AUTH: TransactionAuthenticator + Sync + 'static>(
         &self,
         mut client: Client<AUTH>,
-        keystore: FilesystemKeyStore,
+        keystore: CliKeyStore,
     ) -> Result<(), CliError> {
         let new_account = create_client_account(
             &mut client,
@@ -349,7 +347,7 @@ fn separate_auth_components(
 /// If no auth component is detected in the packages, a Falcon-based auth component will be added.
 async fn create_client_account<AUTH: TransactionAuthenticator + Sync + 'static>(
     client: &mut Client<AUTH>,
-    keystore: &FilesystemKeyStore,
+    keystore: &CliKeyStore,
     account_type: AccountType,
     storage_mode: AccountStorageMode,
     package_paths: &[PathBuf],
@@ -365,7 +363,7 @@ async fn create_client_account<AUTH: TransactionAuthenticator + Sync + 'static>(
 
     // Load the component templates and initialization storage data.
 
-    let (cli_config, _) = load_config_file()?;
+    let cli_config = CliConfig::from_system()?;
     debug!("Loading packages...");
     let packages = load_packages(&cli_config, package_paths)?;
     debug!("Loaded {} packages", packages.len());
@@ -393,7 +391,7 @@ async fn create_client_account<AUTH: TransactionAuthenticator + Sync + 'static>(
         debug!("Adding default Falcon auth component");
         let kp = AuthSecretKey::new_falcon512_rpo_with_rng(client.rng());
         builder =
-            builder.with_auth_component(AuthRpoFalcon512::new(kp.public_key().to_commitment()));
+            builder.with_auth_component(AuthFalcon512Rpo::new(kp.public_key().to_commitment()));
         Some(kp)
     };
 
@@ -442,35 +440,12 @@ async fn deploy_account<AUTH: TransactionAuthenticator + Sync + 'static>(
     client: &mut Client<AUTH>,
     account: &Account,
 ) -> Result<(), CliError> {
-    // Retrieve the auth procedure mast root pointer and call it in the transaction script.
-    // We only use AuthRpoFalcon512 for the auth component so this may be overkill but it lets us
-    // use different auth components in the future.
-    let auth_procedure_mast_root = account
-        .code()
-        .get(0)
-        .expect("account code should contain at least one procedure")
-        .mast_root();
-
-    let auth_script = client
-        .code_builder()
-        .compile_tx_script(
-            "
-                    begin
-                        # [AUTH_PROCEDURE_MAST_ROOT]
-                        mem_storew_be.4000 push.4000
-                        # [auth_procedure_mast_root_ptr]
-                        dyncall
-                    end",
-        )
-        .expect("Auth script should compile");
-
-    let tx_request = TransactionRequestBuilder::new()
-        .script_arg(*auth_procedure_mast_root)
-        .custom_script(auth_script)
-        .build()
-        .map_err(|err| {
-            CliError::Transaction(err.into(), "Failed to build deploy transaction".to_string())
-        })?;
+    // Build a minimal transaction request. The transaction execution will naturally increment
+    // the account nonce from 0 to 1, which deploys the account on-chain.
+    // We don't need to call auth procedures directly as that must be done in the epilogue.
+    let tx_request = TransactionRequestBuilder::new().build().map_err(|err| {
+        CliError::Transaction(err.into(), "Failed to build deploy transaction".to_string())
+    })?;
 
     client.submit_new_transaction(account.id(), tx_request).await?;
     Ok(())
@@ -507,11 +482,10 @@ fn process_packages(
 
         // Preserve any provided map entries for map slots.
         for (slot_name, schema) in component_metadata.storage_schema().iter() {
-            if matches!(schema, StorageSlotSchema::Map(_)) {
-                let value_name = StorageValueName::from_slot_name(slot_name);
-                if let Some(entries) = init_storage_data.map_entries(&value_name) {
-                    map_entries.insert(value_name, entries.clone());
-                }
+            if matches!(schema, StorageSlotSchema::Map(_))
+                && let Some(entries) = init_storage_data.map_entries(slot_name)
+            {
+                map_entries.insert(slot_name.clone(), entries.clone());
             }
         }
 
@@ -534,16 +508,19 @@ fn process_packages(
             value_entries.insert(value_name, input_value.to_string().into());
         }
 
-        let account_component = AccountComponent::from_package(
-            &package,
-            &InitStorageData::new(value_entries, map_entries),
-        )
-        .map_err(|e| {
-            CliError::Account(
-                e,
-                format!("error instantiating component from Package {}", package.name),
+        let init_data = InitStorageData::new(value_entries, map_entries).map_err(|e| {
+            CliError::AccountComponentError(
+                Box::new(e),
+                format!("error creating InitStorageData for Package {}", package.name),
             )
         })?;
+        let account_component =
+            AccountComponent::from_package(&package, &init_data).map_err(|e| {
+                CliError::Account(
+                    e,
+                    format!("error instantiating component from Package {}", package.name),
+                )
+            })?;
 
         account_components.push(account_component);
     }

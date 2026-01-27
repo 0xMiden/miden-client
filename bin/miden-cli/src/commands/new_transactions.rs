@@ -24,12 +24,12 @@ use miden_client::transaction::{
 use miden_client::{Client, RemoteTransactionProver};
 use tracing::info;
 
+use crate::config::CliConfig;
 use crate::create_dynamic_table;
 use crate::errors::CliError;
 use crate::utils::{
     SHARED_TOKEN_DOCUMENTATION,
     get_input_acc_id_by_prefix_or_default,
-    load_config_file,
     load_faucet_details_map,
     parse_account_id,
 };
@@ -200,7 +200,7 @@ pub struct SwapCmd {
     sender_account_id: Option<String>,
 
     /// Asset offered.
-    #[arg(long = "offered-asset", help=format!("Asset offered.\n{SHARED_TOKEN_DOCUMENTATION}"))]
+    #[arg(short = 'o', long = "offered-asset", help=format!("Asset offered.\n{SHARED_TOKEN_DOCUMENTATION}"))]
     offered_asset: String,
 
     /// Asset requested.
@@ -210,10 +210,6 @@ pub struct SwapCmd {
     /// Visibility of the swap note to be created.
     #[arg(short, long, value_enum)]
     note_type: NoteType,
-
-    /// Visibility of the payback note.
-    #[arg(short, long, value_enum)]
-    payback_note_type: NoteType,
 
     /// Flag to submit the executed transaction without asking for confirmation.
     #[arg(long, default_value_t = false)]
@@ -252,7 +248,7 @@ impl SwapCmd {
             .build_swap(
                 &swap_transaction,
                 (&self.note_type).into(),
-                (&self.payback_note_type).into(),
+                MidenNoteType::Private,
                 client.rng(),
             )
             .map_err(|err| {
@@ -273,10 +269,9 @@ impl SwapCmd {
             &swap_transaction.offered_asset(),
             &swap_transaction.requested_asset(),
         )
-        .map_err(|err| CliError::Transaction(err.into(), "Failed to build swap tag".to_string()))?
         .into();
         println!(
-            "To receive updates about the payback Swap Note run `miden tags add {payback_note_tag}`",
+            "To receive updates about the payback Swap Note run `miden-client tags --add {payback_note_tag}`",
         );
 
         Ok(())
@@ -412,7 +407,7 @@ async fn execute_transaction<AUTH: TransactionAuthenticator + Sync + 'static>(
     println!("Proving transaction...");
 
     let prover = if delegated_proving {
-        let (cli_config, _) = load_config_file()?;
+        let cli_config = CliConfig::from_system()?;
         let remote_prover_endpoint =
             cli_config.remote_prover_endpoint.as_ref().ok_or(CliError::Config(
                 "Remote prover endpoint".to_string().into(),
