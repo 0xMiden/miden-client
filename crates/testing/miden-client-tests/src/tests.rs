@@ -2631,7 +2631,7 @@ pub async fn create_test_client_builder()
     let rng = RpoRandomCoin::new(coin_seed.map(Felt::new).into());
 
     let keystore_path = temp_dir();
-    let keystore = FilesystemKeyStore::new(keystore_path.clone()).unwrap();
+    let keystore = FilesystemKeyStore::new(keystore_path).unwrap();
 
     let rpc_api = MockRpcApi::new(Box::pin(create_prebuilt_mock_chain()).await);
     let arc_rpc_api = Arc::new(rpc_api.clone());
@@ -2640,7 +2640,7 @@ pub async fn create_test_client_builder()
         .rpc(arc_rpc_api)
         .rng(Box::new(rng))
         .sqlite_store(create_test_store_path())
-        .filesystem_keystore(keystore_path.to_str().unwrap())
+        .authenticator(Arc::new(keystore.clone()))
         .in_debug_mode(DebugMode::Enabled)
         .tx_graceful_blocks(None);
 

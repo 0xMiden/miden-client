@@ -11,7 +11,7 @@ use miden_tx::utils::sync::RwLock;
 use tonic::{Request, Streaming};
 use tonic_health::pb::HealthCheckRequest;
 use tonic_health::pb::health_client::HealthClient;
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(all(not(target_arch = "wasm32"), feature = "std"))]
 use {
     std::time::Duration,
     tonic::transport::{Channel, ClientTlsConfig},
@@ -27,9 +27,9 @@ use super::generated::miden_note_transport::{
 };
 use super::{NoteInfo, NoteStream, NoteTransportCursor, NoteTransportError};
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(all(not(target_arch = "wasm32"), feature = "std"))]
 type Service = Channel;
-#[cfg(target_arch = "wasm32")]
+#[cfg(any(target_arch = "wasm32", not(feature = "std")))]
 type Service = tonic_web_wasm_client::Client;
 
 /// gRPC client
@@ -40,7 +40,7 @@ pub struct GrpcNoteTransportClient {
 
 impl GrpcNoteTransportClient {
     /// gRPC client constructor
-    #[cfg(not(target_arch = "wasm32"))]
+    #[cfg(all(not(target_arch = "wasm32"), feature = "std"))]
     pub async fn connect(endpoint: String, timeout_ms: u64) -> Result<Self, NoteTransportError> {
         let endpoint = tonic::transport::Endpoint::try_from(endpoint)
             .map_err(|e| NoteTransportError::Connection(Box::new(e)))?
@@ -61,8 +61,8 @@ impl GrpcNoteTransportClient {
         })
     }
 
-    /// gRPC client (WASM) constructor
-    #[cfg(target_arch = "wasm32")]
+    /// gRPC client (WASM or no-std) constructor
+    #[cfg(any(target_arch = "wasm32", not(feature = "std")))]
     pub fn new(endpoint: String) -> Self {
         let wasm_client = tonic_web_wasm_client::Client::new(endpoint);
         let health_client = HealthClient::new(wasm_client.clone());

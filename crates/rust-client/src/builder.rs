@@ -1,19 +1,23 @@
+use alloc::boxed::Box;
+#[cfg(all(feature = "tonic", feature = "std"))]
 use alloc::string::{String, ToString};
 use alloc::sync::Arc;
-use std::boxed::Box;
 
+use miden_protocol::assembly::{DefaultSourceManager, SourceManagerSync};
+use miden_protocol::block::BlockNumber;
 use miden_protocol::crypto::rand::RpoRandomCoin;
 use miden_protocol::{Felt, MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES};
-use miden_tx::ExecutionOptions;
 use miden_tx::auth::TransactionAuthenticator;
+use miden_tx::{ExecutionOptions, LocalTransactionProver};
 use rand::Rng;
 
-use crate::keystore::FilesystemKeyStore;
+#[cfg(all(feature = "tonic", feature = "std"))]
+use crate::RemoteTransactionProver;
 use crate::note_transport::NoteTransportClient;
-use crate::rpc::NodeRpcClient;
+use crate::rpc::{Endpoint, NodeRpcClient};
 use crate::store::{Store, StoreError};
 use crate::transaction::TransactionProver;
-use crate::{Client, ClientError, ClientRngBox, DebugMode};
+use crate::{Client, ClientError, ClientRng, ClientRngBox, DebugMode};
 
 // CONSTANTS
 // ================================================================================================
@@ -21,19 +25,29 @@ use crate::{Client, ClientError, ClientRngBox, DebugMode};
 /// The number of blocks that are considered old enough to discard pending transactions.
 const TX_GRACEFUL_BLOCKS: u32 = 20;
 
-// AUTHENTICATOR CONFIGURATION
+/// Default remote prover endpoint for testnet.
+#[cfg(all(feature = "tonic", feature = "std"))]
+pub const TESTNET_PROVER_ENDPOINT: &str = "https://tx-prover.testnet.miden.io";
+
+/// Default remote prover endpoint for devnet.
+#[cfg(all(feature = "tonic", feature = "std"))]
+pub const DEVNET_PROVER_ENDPOINT: &str = "https://tx-prover.devnet.miden.io";
+
+/// Default timeout for note transport connections (10 seconds).
+#[cfg(all(feature = "tonic", feature = "std"))]
+const NOTE_TRANSPORT_DEFAULT_TIMEOUT_MS: u64 = 10_000;
+
+// NOTE TRANSPORT CONFIG
 // ================================================================================================
 
-/// Represents the configuration for an authenticator.
+/// Configuration for lazy note transport initialization.
 ///
-/// This enum defers authenticator instantiation until the build phase. The builder can accept
-/// either:
-///
-/// - A direct instance of an authenticator, or
-/// - A keystore path as a string which is then used as an authenticator.
-enum AuthenticatorConfig<AUTH> {
-    Path(String),
-    Instance(Arc<AUTH>),
+/// Since `GrpcNoteTransportClient::connect()` is async, this struct allows us to defer
+/// the connection until `build()` is called.
+#[cfg(all(feature = "tonic", feature = "std"))]
+struct NoteTransportConfig {
+    endpoint: String,
+    timeout_ms: u64,
 }
 
 // STORE BUILDER
@@ -59,8 +73,19 @@ pub trait StoreFactory {
 /// A builder for constructing a Miden client.
 ///
 /// This builder allows you to configure the various components required by the client, such as the
-/// RPC endpoint, store, RNG, and keystore. It is generic over the keystore type. By default, it
-/// uses [`FilesystemKeyStore`].
+/// RPC endpoint, store, RNG, and authenticator. It is generic over the authenticator type.
+///
+/// ## Network-Aware Constructors
+///
+/// Use one of the network-specific constructors to get sensible defaults for a specific network:
+/// - [`for_testnet()`](Self::for_testnet) - Pre-configured for Miden testnet
+/// - [`for_devnet()`](Self::for_devnet) - Pre-configured for Miden devnet
+/// - [`for_localhost()`](Self::for_localhost) - Pre-configured for local development
+///
+/// The builder provides defaults for:
+/// - **RPC endpoint**: Automatically configured based on the network
+/// - **Transaction prover**: Remote for testnet/devnet, local for localhost
+/// - **RNG**: Random seed-based prover randomness
 pub struct ClientBuilder<AUTH> {
     /// An optional custom RPC client. If provided, this takes precedence over `rpc_endpoint`.
     rpc_api: Option<Arc<dyn NodeRpcClient>>,
@@ -68,8 +93,8 @@ pub struct ClientBuilder<AUTH> {
     pub store: Option<StoreBuilder>,
     /// An optional RNG provided by the user.
     rng: Option<ClientRngBox>,
-    /// The keystore configuration provided by the user.
-    keystore: Option<AuthenticatorConfig<AUTH>>,
+    /// The authenticator provided by the user.
+    authenticator: Option<Arc<AUTH>>,
     /// A flag to enable debug mode.
     in_debug_mode: DebugMode,
     /// The number of blocks that are considered old enough to discard pending transactions. If
@@ -80,8 +105,13 @@ pub struct ClientBuilder<AUTH> {
     max_block_number_delta: Option<u32>,
     /// An optional custom note transport client.
     note_transport_api: Option<Arc<dyn NoteTransportClient>>,
+    /// Configuration for lazy note transport initialization (used by network constructors).
+    #[cfg(all(feature = "tonic", feature = "std"))]
+    note_transport_config: Option<NoteTransportConfig>,
     /// An optional custom transaction prover.
     tx_prover: Option<Arc<dyn TransactionProver + Send + Sync>>,
+    /// The endpoint used by the builder for network configuration.
+    endpoint: Option<Endpoint>,
 }
 
 impl<AUTH> Default for ClientBuilder<AUTH> {
@@ -90,12 +120,136 @@ impl<AUTH> Default for ClientBuilder<AUTH> {
             rpc_api: None,
             store: None,
             rng: None,
-            keystore: None,
+            authenticator: None,
             in_debug_mode: DebugMode::Disabled,
             tx_graceful_blocks: Some(TX_GRACEFUL_BLOCKS),
             max_block_number_delta: None,
             note_transport_api: None,
+            #[cfg(all(feature = "tonic", feature = "std"))]
+            note_transport_config: None,
             tx_prover: None,
+            endpoint: None,
+        }
+    }
+}
+
+/// Network-specific constructors for [`ClientBuilder`].
+///
+/// These constructors automatically configure the builder for a specific network,
+/// including RPC endpoint, transaction prover, and note transport (where applicable).
+#[cfg(all(feature = "tonic", feature = "std"))]
+impl<AUTH> ClientBuilder<AUTH>
+where
+    AUTH: BuilderAuthenticator,
+{
+    /// Creates a `ClientBuilder` pre-configured for Miden testnet.
+    ///
+    /// This automatically configures:
+    /// - **RPC**: `https://rpc.testnet.miden.io`
+    /// - **Prover**: Remote prover at `https://tx-prover.testnet.miden.io`
+    /// - **Note transport**: `https://transport.miden.io`
+    ///
+    /// You still need to provide:
+    /// - A store (via `.store()`)
+    /// - An authenticator (via `.authenticator()`)
+    ///
+    /// All defaults can be overridden by calling the corresponding builder methods
+    /// after `for_testnet()`.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let client = ClientBuilder::for_testnet()
+    ///     .store(store)
+    ///     .authenticator(Arc::new(keystore))
+    ///     .build()
+    ///     .await?;
+    /// ```
+    #[must_use]
+    pub fn for_testnet() -> Self {
+        let endpoint = Endpoint::testnet();
+        Self {
+            rpc_api: Some(Arc::new(crate::rpc::GrpcClient::new(&endpoint, 10_000))),
+            tx_prover: Some(Arc::new(RemoteTransactionProver::new(
+                TESTNET_PROVER_ENDPOINT.to_string(),
+            ))),
+            note_transport_config: Some(NoteTransportConfig {
+                endpoint: crate::note_transport::NOTE_TRANSPORT_DEFAULT_ENDPOINT.to_string(),
+                timeout_ms: NOTE_TRANSPORT_DEFAULT_TIMEOUT_MS,
+            }),
+            endpoint: Some(endpoint),
+            ..Self::default()
+        }
+    }
+
+    /// Creates a `ClientBuilder` pre-configured for Miden devnet.
+    ///
+    /// This automatically configures:
+    /// - **RPC**: `https://rpc.devnet.miden.io`
+    /// - **Prover**: Remote prover at `https://tx-prover.devnet.miden.io`
+    ///
+    /// Note transport is not configured by default for devnet.
+    ///
+    /// You still need to provide:
+    /// - A store (via `.store()`)
+    /// - An authenticator (via `.authenticator()`)
+    ///
+    /// All defaults can be overridden by calling the corresponding builder methods
+    /// after `for_devnet()`.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let client = ClientBuilder::for_devnet()
+    ///     .store(store)
+    ///     .authenticator(Arc::new(keystore))
+    ///     .build()
+    ///     .await?;
+    /// ```
+    #[must_use]
+    pub fn for_devnet() -> Self {
+        let endpoint = Endpoint::devnet();
+        Self {
+            rpc_api: Some(Arc::new(crate::rpc::GrpcClient::new(&endpoint, 10_000))),
+            tx_prover: Some(Arc::new(RemoteTransactionProver::new(
+                DEVNET_PROVER_ENDPOINT.to_string(),
+            ))),
+            endpoint: Some(endpoint),
+            ..Self::default()
+        }
+    }
+
+    /// Creates a `ClientBuilder` pre-configured for localhost.
+    ///
+    /// This automatically configures:
+    /// - **RPC**: `http://localhost:57291`
+    /// - **Prover**: Local (default)
+    ///
+    /// Note transport is not configured by default for localhost.
+    ///
+    /// You still need to provide:
+    /// - A store (via `.store()`)
+    /// - An authenticator (via `.authenticator()`)
+    ///
+    /// All defaults can be overridden by calling the corresponding builder methods
+    /// after `for_localhost()`.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let client = ClientBuilder::for_localhost()
+    ///     .store(store)
+    ///     .authenticator(Arc::new(keystore))
+    ///     .build()
+    ///     .await?;
+    /// ```
+    #[must_use]
+    pub fn for_localhost() -> Self {
+        let endpoint = Endpoint::localhost();
+        Self {
+            rpc_api: Some(Arc::new(crate::rpc::GrpcClient::new(&endpoint, 10_000))),
+            endpoint: Some(endpoint),
+            ..Self::default()
         }
     }
 }
@@ -126,7 +280,7 @@ where
 
     /// Sets a gRPC client from the endpoint and optional timeout.
     #[must_use]
-    #[cfg(feature = "tonic")]
+    #[cfg(all(feature = "tonic", feature = "std"))]
     pub fn grpc_client(mut self, endpoint: &crate::rpc::Endpoint, timeout_ms: Option<u64>) -> Self {
         self.rpc_api =
             Some(Arc::new(crate::rpc::GrpcClient::new(endpoint, timeout_ms.unwrap_or(10_000))));
@@ -150,7 +304,7 @@ where
     /// Optionally provide a custom authenticator instance.
     #[must_use]
     pub fn authenticator(mut self, authenticator: Arc<AUTH>) -> Self {
-        self.keystore = Some(AuthenticatorConfig::Instance(authenticator));
+        self.authenticator = Some(authenticator);
         self
     }
 
@@ -171,16 +325,6 @@ where
         self
     }
 
-    /// **Required:** Provide the keystore path as a string.
-    ///
-    /// This stores the keystore path as a configuration option so that actual keystore
-    /// initialization is deferred until `build()`. This avoids panicking during builder chaining.
-    #[must_use]
-    pub fn filesystem_keystore(mut self, keystore_path: &str) -> Self {
-        self.keystore = Some(AuthenticatorConfig::Path(keystore_path.to_string()));
-        self
-    }
-
     /// Sets a custom note transport client directly.
     #[must_use]
     pub fn note_transport(mut self, client: Arc<dyn NoteTransportClient>) -> Self {
@@ -195,13 +339,22 @@ where
         self
     }
 
+    /// Returns the endpoint configured for this builder, if any.
+    ///
+    /// This is set automatically when using network-specific constructors like
+    /// [`for_testnet()`](Self::for_testnet), [`for_devnet()`](Self::for_devnet),
+    /// or [`for_localhost()`](Self::for_localhost).
+    #[must_use]
+    pub fn endpoint(&self) -> Option<&Endpoint> {
+        self.endpoint.as_ref()
+    }
+
     /// Build and return the `Client`.
     ///
     /// # Errors
     ///
-    /// - Returns an error if no RPC client or endpoint was provided.
+    /// - Returns an error if no RPC client was provided.
     /// - Returns an error if the store cannot be instantiated.
-    /// - Returns an error if the keystore is not specified or fails to initialize.
     #[allow(clippy::unused_async, unused_mut)]
     pub async fn build(mut self) -> Result<Client<AUTH>, ClientError> {
         // Determine the RPC client to use.
@@ -209,8 +362,7 @@ where
             client
         } else {
             return Err(ClientError::ClientInitializationError(
-                "RPC client or endpoint is required. Call `.rpc(...)` or `.tonic_rpc_client(...)`."
-                    .into(),
+                "RPC client is required. Call `.rpc(...)` or `.grpc_client(...)`.".into(),
             ));
         };
 
@@ -235,48 +387,70 @@ where
             Box::new(RpoRandomCoin::new(coin_seed.map(Felt::new).into()))
         };
 
-        // Initialize the authenticator.
-        let authenticator = match self.keystore {
-            Some(AuthenticatorConfig::Instance(authenticator)) => Some(authenticator),
-            Some(AuthenticatorConfig::Path(ref path)) => {
-                let keystore = FilesystemKeyStore::new(path.into())
-                    .map_err(|err| ClientError::ClientInitializationError(err.to_string()))?;
-                Some(Arc::new(AUTH::from(keystore)))
-            },
-            None => None,
-        };
+        // Set default prover if not provided
+        let tx_prover: Arc<dyn TransactionProver + Send + Sync> =
+            self.tx_prover.unwrap_or_else(|| Arc::new(LocalTransactionProver::default()));
 
-        Client::new(
-            rpc_api,
-            rng,
+        // Initialize genesis commitment in RPC client
+        if let Some((genesis, _)) = store.get_block_header_by_num(BlockNumber::GENESIS).await? {
+            rpc_api.set_genesis_commitment(genesis.commitment()).await?;
+        }
+
+        // Initialize note transport: prefer explicit client, fall back to config (std only)
+        #[cfg(all(feature = "tonic", feature = "std"))]
+        let note_transport_api: Option<Arc<dyn NoteTransportClient>> =
+            if let Some(api) = self.note_transport_api {
+                Some(api)
+            } else if let Some(config) = self.note_transport_config {
+                let transport = crate::note_transport::grpc::GrpcNoteTransportClient::connect(
+                    config.endpoint,
+                    config.timeout_ms,
+                )
+                .await
+                .map_err(|e| {
+                    ClientError::ClientInitializationError(format!(
+                        "Failed to connect to note transport: {e}"
+                    ))
+                })?;
+                Some(Arc::new(transport) as Arc<dyn NoteTransportClient>)
+            } else {
+                None
+            };
+
+        #[cfg(not(all(feature = "tonic", feature = "std")))]
+        let note_transport_api = self.note_transport_api;
+
+        // Initialize the note transport cursor if the client uses it
+        if note_transport_api.is_some() {
+            crate::note_transport::init_note_transport_cursor(store.clone()).await?;
+        }
+
+        // Create source manager for MASM source information
+        let source_manager: Arc<dyn SourceManagerSync> = Arc::new(DefaultSourceManager::default());
+
+        // Construct and return the Client
+        Ok(Client {
             store,
-            authenticator,
-            ExecutionOptions::new(
+            rng: ClientRng::new(rng),
+            rpc_api,
+            tx_prover,
+            authenticator: self.authenticator,
+            source_manager,
+            exec_options: ExecutionOptions::new(
                 Some(MAX_TX_EXECUTION_CYCLES),
                 MIN_TX_EXECUTION_CYCLES,
                 false,
                 self.in_debug_mode.into(),
             )
             .expect("Default executor's options should always be valid"),
-            self.tx_graceful_blocks,
-            self.max_block_number_delta,
-            self.note_transport_api,
-            self.tx_prover,
-        )
-        .await
+            tx_graceful_blocks: self.tx_graceful_blocks,
+            max_block_number_delta: self.max_block_number_delta,
+            note_transport_api,
+        })
     }
 }
 
-// AUTH TRAIT MARKER
-// ================================================================================================
+/// Marker trait to capture the bounds the builder requires for the authenticator type parameter.
+pub trait BuilderAuthenticator: TransactionAuthenticator + 'static {}
 
-/// Marker trait to capture the bounds the builder requires for the authenticator type
-/// parameter
-pub trait BuilderAuthenticator:
-    TransactionAuthenticator + From<FilesystemKeyStore> + 'static
-{
-}
-impl<T> BuilderAuthenticator for T where
-    T: TransactionAuthenticator + From<FilesystemKeyStore> + 'static
-{
-}
+impl<T> BuilderAuthenticator for T where T: TransactionAuthenticator + 'static {}

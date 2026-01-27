@@ -1,6 +1,6 @@
 pub mod errors;
 pub mod generated;
-#[cfg(feature = "tonic")]
+#[cfg(all(feature = "tonic", any(feature = "std", target_arch = "wasm32")))]
 pub mod grpc;
 
 use alloc::boxed::Box;
