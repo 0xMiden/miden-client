@@ -305,9 +305,7 @@ async fn get_account_storage_item_success() -> anyhow::Result<()> {
     store.insert_account(&account, default_address).await?;
 
     // Test get_account_storage_item
-    let result = store
-        .get_account_storage_item(account.id(), value_slot_name)
-        .await?;
+    let result = store.get_account_storage_item(account.id(), value_slot_name).await?;
 
     assert_eq!(result, test_value.into());
 
@@ -339,9 +337,7 @@ async fn get_account_storage_item_not_found() -> anyhow::Result<()> {
     // Test get_account_storage_item with missing slot name
     let missing_name =
         StorageSlotName::new("miden::testing::sqlite_store::missing").expect("valid slot name");
-    let result = store
-        .get_account_storage_item(account.id(), missing_name)
-        .await;
+    let result = store.get_account_storage_item(account.id(), missing_name).await;
 
     assert!(result.is_err());
 
@@ -377,9 +373,8 @@ async fn get_account_map_item_success() -> anyhow::Result<()> {
     store.insert_account(&account, default_address).await?;
 
     // Test get_account_map_item
-    let (value, _witness) = store
-        .get_account_map_item(account.id(), map_slot_name, test_key)
-        .await?;
+    let (value, _witness) =
+        store.get_account_map_item(account.id(), map_slot_name, test_key).await?;
 
     assert_eq!(value, test_value);
 
@@ -410,9 +405,7 @@ async fn get_account_map_item_value_slot_error() -> anyhow::Result<()> {
 
     // Test get_account_map_item on a value slot (should error)
     let test_key: miden_client::Word = [ONE, ZERO, ZERO, ZERO].into();
-    let result = store
-        .get_account_map_item(account.id(), value_slot_name, test_key)
-        .await;
+    let result = store.get_account_map_item(account.id(), value_slot_name, test_key).await;
 
     assert!(result.is_err());
 

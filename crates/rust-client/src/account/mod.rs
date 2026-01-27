@@ -68,13 +68,13 @@ pub use miden_protocol::errors::{AccountIdError, AddressError, NetworkIdError};
 use miden_protocol::note::NoteTag;
 
 mod storage_reader;
-pub use storage_reader::StorageReader;
 use miden_standards::account::auth::{AuthEcdsaK256Keccak, AuthFalcon512Rpo};
 // RE-EXPORTS
 // ================================================================================================
 pub use miden_standards::account::interface::AccountInterfaceExt;
 use miden_standards::account::wallets::BasicWallet;
 use miden_tx::utils::{Deserializable, Serializable};
+pub use storage_reader::StorageReader;
 
 use super::Client;
 use crate::Word;

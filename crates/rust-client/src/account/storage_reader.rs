@@ -2,8 +2,8 @@
 
 use alloc::sync::Arc;
 
-use miden_protocol::account::{AccountId, StorageMapWitness, StorageSlotName};
 use miden_protocol::Word;
+use miden_protocol::account::{AccountId, StorageMapWitness, StorageSlotName};
 
 use crate::errors::ClientError;
 use crate::store::Store;
@@ -72,10 +72,8 @@ impl StorageReader {
         slot_name: impl Into<StorageSlotName>,
         key: Word,
     ) -> Result<Word, ClientError> {
-        let (value, _witness) = self
-            .store
-            .get_account_map_item(self.account_id, slot_name.into(), key)
-            .await?;
+        let (value, _witness) =
+            self.store.get_account_map_item(self.account_id, slot_name.into(), key).await?;
         Ok(value)
     }
 
