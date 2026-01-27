@@ -56,6 +56,7 @@ pub use miden_protocol::account::{
     PartialStorage,
     PartialStorageMap,
     StorageMap,
+    StorageMapWitness,
     StorageSlot,
     StorageSlotContent,
     StorageSlotId,
@@ -478,6 +479,17 @@ impl<AUTH> Client<AUTH> {
             },
             None => Ok(vec![]),
         }
+    }
+
+    // ACCOUNT STORAGE ACCESS
+    // --------------------------------------------------------------------------------------------
+
+    /// Returns a [`StorageReader`] for reading storage slots of the specified account.
+    ///
+    /// The `StorageReader` provides lazy access to storage - each method call fetches
+    /// only the requested slot from storage, not the entire account.
+    pub fn storage(&self, account_id: AccountId) -> StorageReader {
+        StorageReader::new(self.store.clone(), account_id)
     }
 }
 

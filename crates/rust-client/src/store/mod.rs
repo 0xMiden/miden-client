@@ -478,6 +478,26 @@ pub trait Store: Send + Sync {
         filter: AccountStorageFilter,
     ) -> Result<AccountStorage, StoreError>;
 
+    /// Retrieves a storage slot value by name.
+    ///
+    /// For `Value` slots, returns the stored word.
+    /// For `Map` slots, returns the map root.
+    ///
+    /// The default implementation of this method uses [`Store::get_account_storage`].
+    async fn get_account_storage_item(
+        &self,
+        account_id: AccountId,
+        slot_name: StorageSlotName,
+    ) -> Result<Word, StoreError> {
+        let storage = self
+            .get_account_storage(account_id, AccountStorageFilter::SlotName(slot_name.clone()))
+            .await?;
+        storage
+            .get(&slot_name)
+            .map(StorageSlot::value)
+            .ok_or(StoreError::AccountError(AccountError::StorageSlotNameNotFound { slot_name }))
+    }
+
     /// Retrieves a specific item from the account's storage map along with its Merkle proof.
     ///
     /// The default implementation of this method uses [`Store::get_account_storage`].

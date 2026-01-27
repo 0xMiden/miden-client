@@ -280,3 +280,141 @@ async fn apply_account_delta_removals() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+#[tokio::test]
+async fn get_account_storage_item_success() -> anyhow::Result<()> {
+    let store = create_test_store().await;
+
+    let value_slot_name =
+        StorageSlotName::new("miden::testing::sqlite_store::value").expect("valid slot name");
+    let test_value: [miden_client::Felt; 4] = [ONE, ONE, ONE, ONE];
+
+    let dummy_component = AccountComponent::new(
+        basic_wallet_library(),
+        vec![StorageSlot::with_value(value_slot_name.clone(), test_value.into())],
+    )?
+    .with_supports_all_types();
+
+    let account = AccountBuilder::new([0; 32])
+        .account_type(AccountType::RegularAccountImmutableCode)
+        .with_auth_component(AuthFalcon512Rpo::new(PublicKeyCommitment::from(EMPTY_WORD)))
+        .with_component(dummy_component)
+        .build_existing()?;
+
+    let default_address = Address::new(account.id());
+    store.insert_account(&account, default_address).await?;
+
+    // Test get_account_storage_item
+    let result = store
+        .get_account_storage_item(account.id(), value_slot_name)
+        .await?;
+
+    assert_eq!(result, test_value.into());
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn get_account_storage_item_not_found() -> anyhow::Result<()> {
+    let store = create_test_store().await;
+
+    let value_slot_name =
+        StorageSlotName::new("miden::testing::sqlite_store::value").expect("valid slot name");
+
+    let dummy_component = AccountComponent::new(
+        basic_wallet_library(),
+        vec![StorageSlot::with_empty_value(value_slot_name)],
+    )?
+    .with_supports_all_types();
+
+    let account = AccountBuilder::new([0; 32])
+        .account_type(AccountType::RegularAccountImmutableCode)
+        .with_auth_component(AuthFalcon512Rpo::new(PublicKeyCommitment::from(EMPTY_WORD)))
+        .with_component(dummy_component)
+        .build_existing()?;
+
+    let default_address = Address::new(account.id());
+    store.insert_account(&account, default_address).await?;
+
+    // Test get_account_storage_item with missing slot name
+    let missing_name =
+        StorageSlotName::new("miden::testing::sqlite_store::missing").expect("valid slot name");
+    let result = store
+        .get_account_storage_item(account.id(), missing_name)
+        .await;
+
+    assert!(result.is_err());
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn get_account_map_item_success() -> anyhow::Result<()> {
+    let store = create_test_store().await;
+
+    let map_slot_name =
+        StorageSlotName::new("miden::testing::sqlite_store::map").expect("valid slot name");
+
+    let test_key: miden_client::Word = [ONE, ZERO, ZERO, ZERO].into();
+    let test_value: miden_client::Word = [ONE, ONE, ONE, ONE].into();
+
+    let mut storage_map = StorageMap::new();
+    storage_map.insert(test_key, test_value)?;
+
+    let dummy_component = AccountComponent::new(
+        basic_wallet_library(),
+        vec![StorageSlot::with_map(map_slot_name.clone(), storage_map)],
+    )?
+    .with_supports_all_types();
+
+    let account = AccountBuilder::new([0; 32])
+        .account_type(AccountType::RegularAccountImmutableCode)
+        .with_auth_component(AuthFalcon512Rpo::new(PublicKeyCommitment::from(EMPTY_WORD)))
+        .with_component(dummy_component)
+        .build_existing()?;
+
+    let default_address = Address::new(account.id());
+    store.insert_account(&account, default_address).await?;
+
+    // Test get_account_map_item
+    let (value, _witness) = store
+        .get_account_map_item(account.id(), map_slot_name, test_key)
+        .await?;
+
+    assert_eq!(value, test_value);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn get_account_map_item_value_slot_error() -> anyhow::Result<()> {
+    let store = create_test_store().await;
+
+    let value_slot_name =
+        StorageSlotName::new("miden::testing::sqlite_store::value").expect("valid slot name");
+
+    let dummy_component = AccountComponent::new(
+        basic_wallet_library(),
+        vec![StorageSlot::with_empty_value(value_slot_name.clone())],
+    )?
+    .with_supports_all_types();
+
+    let account = AccountBuilder::new([0; 32])
+        .account_type(AccountType::RegularAccountImmutableCode)
+        .with_auth_component(AuthFalcon512Rpo::new(PublicKeyCommitment::from(EMPTY_WORD)))
+        .with_component(dummy_component)
+        .build_existing()?;
+
+    let default_address = Address::new(account.id());
+    store.insert_account(&account, default_address).await?;
+
+    // Test get_account_map_item on a value slot (should error)
+    let test_key: miden_client::Word = [ONE, ZERO, ZERO, ZERO].into();
+    let result = store
+        .get_account_map_item(account.id(), value_slot_name, test_key)
+        .await;
+
+    assert!(result.is_err());
+
+    Ok(())
+}
