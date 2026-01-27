@@ -1,6 +1,8 @@
 use alloc::boxed::Box;
 #[cfg(all(feature = "tonic", feature = "std"))]
-use alloc::string::{String, ToString};
+use alloc::string::String;
+#[cfg(feature = "std")]
+use alloc::string::ToString;
 use alloc::sync::Arc;
 
 use miden_protocol::assembly::{DefaultSourceManager, SourceManagerSync};
@@ -13,6 +15,8 @@ use rand::Rng;
 
 #[cfg(all(feature = "tonic", feature = "std"))]
 use crate::RemoteTransactionProver;
+#[cfg(feature = "std")]
+use crate::keystore::FilesystemKeyStore;
 use crate::note_transport::NoteTransportClient;
 use crate::rpc::{Endpoint, NodeRpcClient};
 use crate::store::{Store, StoreError};
@@ -86,6 +90,42 @@ pub trait StoreFactory {
 /// - **RPC endpoint**: Automatically configured based on the network
 /// - **Transaction prover**: Remote for testnet/devnet, local for localhost
 /// - **RNG**: Random seed-based prover randomness
+///
+/// ## Components
+///
+/// The client requires several components to function:
+///
+/// - **RPC client** ([`NodeRpcClient`]): Provides connectivity to the Miden node for submitting
+///   transactions, syncing state, and fetching account/note data. Configure via
+///   [`rpc()`](Self::rpc) or [`grpc_client()`](Self::grpc_client).
+///
+/// - **Store** ([`Store`]): Provides persistence for accounts, notes, and transaction history.
+///   Configure via [`store()`](Self::store).
+///
+/// - **RNG** ([`FeltRng`](miden_protocol::crypto::rand::FeltRng)): Provides randomness for
+///   generating keys, serial numbers, and other cryptographic operations. If not provided, a random
+///   seed-based RNG is created automatically. Configure via [`rng()`](Self::rng).
+///
+/// - **Authenticator** ([`TransactionAuthenticator`]): Handles transaction signing when signatures
+///   are requested from within the VM. Configure via [`authenticator()`](Self::authenticator).
+///
+/// - **Transaction prover** ([`TransactionProver`]): Generates proofs for transactions. Defaults to
+///   a local prover if not specified. Configure via [`prover()`](Self::prover).
+///
+/// - **Note transport** ([`NoteTransportClient`]): Optional component for exchanging private notes
+///   through the Miden note transport network. Configure via
+///   [`note_transport()`](Self::note_transport).
+///
+/// - **Execution options**: Control runtime behavior such as debug mode and cycle limits. Configure
+///   via [`in_debug_mode()`](Self::in_debug_mode).
+///
+/// - **Transaction graceful blocks**: Number of blocks after which pending transactions are
+///   considered stale and discarded. Configure via
+///   [`tx_graceful_blocks()`](Self::tx_graceful_blocks).
+///
+/// - **Max block number delta**: Maximum number of blocks the client can be behind the network for
+///   transactions and account proofs to be considered valid. Configure via
+///   [`max_block_number_delta()`](Self::max_block_number_delta).
 pub struct ClientBuilder<AUTH> {
     /// An optional custom RPC client. If provided, this takes precedence over `rpc_endpoint`.
     rpc_api: Option<Arc<dyn NodeRpcClient>>,
@@ -454,3 +494,39 @@ where
 pub trait BuilderAuthenticator: TransactionAuthenticator + 'static {}
 
 impl<T> BuilderAuthenticator for T where T: TransactionAuthenticator + 'static {}
+
+// FILESYSTEM KEYSTORE CONVENIENCE METHOD
+// ================================================================================================
+
+/// Convenience method for [`ClientBuilder`] when using [`FilesystemKeyStore`] as the authenticator.
+#[cfg(feature = "std")]
+impl ClientBuilder<FilesystemKeyStore> {
+    /// Creates a [`FilesystemKeyStore`] from the given path and sets it as the authenticator.
+    ///
+    /// This is a convenience method that creates the keystore and configures it as the
+    /// authenticator in a single call. The keystore provides transaction signing capabilities
+    /// using keys stored on the filesystem.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the keystore cannot be created from the given path.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let client = ClientBuilder::new()
+    ///     .rpc(rpc_client)
+    ///     .store(store)
+    ///     .with_filesystem_keystore("path/to/keys")?
+    ///     .build()
+    ///     .await?;
+    /// ```
+    pub fn with_filesystem_keystore(
+        self,
+        keystore_path: impl Into<std::path::PathBuf>,
+    ) -> Result<Self, ClientError> {
+        let keystore = FilesystemKeyStore::new(keystore_path.into())
+            .map_err(|e| ClientError::ClientInitializationError(e.to_string()))?;
+        Ok(self.authenticator(Arc::new(keystore)))
+    }
+}
