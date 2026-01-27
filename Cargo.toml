@@ -30,10 +30,10 @@ opt-level = 1
 [workspace.dependencies]
 # Miden protocol dependencies
 miden-mast-package = { default-features = false, version = "0.20.1" }
-miden-protocol     = { default-features = false, version = "0.13" }
-miden-standards    = { default-features = false, version = "0.13" }
-miden-testing      = { default-features = false, version = "0.13" }
-miden-tx           = { default-features = false, version = "0.13" }
+miden-protocol     = { default-features = false, version = "0.13.2" }
+miden-standards    = { default-features = false, version = "0.13.2" }
+miden-testing      = { default-features = false, version = "0.13.2" }
+miden-tx           = { default-features = false, version = "0.13.2" }
 
 # Miden node dependencies
 miden-node-block-producer = { branch = "next", git = "https://github.com/0xMiden/miden-node.git" }
@@ -73,3 +73,9 @@ module_name_repetitions     = "allow" # Many triggers, and is a stylistic choice
 must_use_candidate          = "allow" # This marks many fn's which isn't helpful.
 should_panic_without_expect = "allow" # We don't care about the specific panic message.
 # End of pedantic lints.
+
+[patch.crates-io]
+miden-protocol = { git = "https://github.com/0xMiden/miden-base.git", branch = "mmagician-fix-create-claim" }
+miden-tx = { git = "https://github.com/0xMiden/miden-base.git", branch = "mmagician-fix-create-claim" }
+miden-standards = { git = "https://github.com/0xMiden/miden-base.git", branch = "mmagician-fix-create-claim" }
+miden-testing = { git = "https://github.com/0xMiden/miden-base.git", branch = "mmagician-fix-create-claim" }
