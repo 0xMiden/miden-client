@@ -2,7 +2,7 @@ import type {
   ConsumableNoteRecord,
   InputNoteRecord,
 } from "@miden-sdk/miden-sdk";
-import type { NoteAsset, NoteSummary } from "../types";
+import type { AssetMetadata, NoteAsset, NoteSummary } from "../types";
 import { toBech32AccountId } from "./accountBech32";
 
 const getInputNoteRecord = (
@@ -16,17 +16,30 @@ const getInputNoteRecord = (
 };
 
 export const getNoteSummary = (
-  note: ConsumableNoteRecord | InputNoteRecord
+  note: ConsumableNoteRecord | InputNoteRecord,
+  getAssetMetadata?: (assetId: string) => AssetMetadata | undefined
 ): NoteSummary | null => {
   try {
     const record = getInputNoteRecord(note);
     const id = record.id().toString();
-    const details = record.details();
-    const assetsList = details?.assets?.().fungibleAssets?.() ?? [];
-    const assets: NoteAsset[] = assetsList.map((asset) => ({
-      assetId: asset.faucetId().toString(),
-      amount: BigInt(asset.amount() as number | bigint),
-    }));
+    const assets: NoteAsset[] = [];
+
+    try {
+      const details = record.details();
+      const assetsList = details?.assets?.().fungibleAssets?.() ?? [];
+      for (const asset of assetsList) {
+        const assetId = asset.faucetId().toString();
+        const metadata = getAssetMetadata?.(assetId);
+        assets.push({
+          assetId,
+          amount: BigInt(asset.amount() as number | bigint),
+          symbol: metadata?.symbol,
+          decimals: metadata?.decimals,
+        });
+      }
+    } catch {
+      // Keep assets empty if details are unavailable.
+    }
 
     const metadata = record.metadata?.();
     const senderHex = metadata?.sender?.()?.toString?.();
@@ -41,7 +54,7 @@ export const getNoteSummary = (
 export const formatNoteSummary = (
   summary: NoteSummary,
   formatAsset: (asset: NoteAsset) => string = (asset) =>
-    `${asset.amount.toString()} ${toBech32AccountId(asset.assetId)}`
+    `${asset.amount.toString()} ${asset.symbol ?? asset.assetId}`
 ): string => {
   if (!summary.assets.length) {
     return summary.id;

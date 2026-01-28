@@ -6,7 +6,7 @@ import type {
   InputNoteRecord,
   ConsumableNoteRecord,
 } from "@miden-sdk/miden-sdk";
-import type { SyncState, MidenConfig } from "../types";
+import type { SyncState, MidenConfig, AssetMetadata } from "../types";
 
 interface MidenStoreState {
   // Client state
@@ -24,6 +24,7 @@ interface MidenStoreState {
   accountDetails: Map<string, Account>;
   notes: InputNoteRecord[];
   consumableNotes: ConsumableNoteRecord[];
+  assetMetadata: Map<string, AssetMetadata>;
 
   // Loading states
   isLoadingAccounts: boolean;
@@ -41,6 +42,7 @@ interface MidenStoreState {
   setAccountDetails: (accountId: string, account: Account) => void;
   setNotes: (notes: InputNoteRecord[]) => void;
   setConsumableNotes: (notes: ConsumableNoteRecord[]) => void;
+  setAssetMetadata: (assetId: string, metadata: AssetMetadata) => void;
 
   setLoadingAccounts: (isLoading: boolean) => void;
   setLoadingNotes: (isLoading: boolean) => void;
@@ -68,6 +70,7 @@ const initialState = {
   accountDetails: new Map<string, Account>(),
   notes: [],
   consumableNotes: [],
+  assetMetadata: new Map<string, AssetMetadata>(),
 
   isLoadingAccounts: false,
   isLoadingNotes: false,
@@ -113,6 +116,13 @@ export const useMidenStore = create<MidenStoreState>()((set) => ({
 
   setConsumableNotes: (consumableNotes) => set({ consumableNotes }),
 
+  setAssetMetadata: (assetId, metadata) =>
+    set((state) => {
+      const newMap = new Map(state.assetMetadata);
+      newMap.set(assetId, metadata);
+      return { assetMetadata: newMap };
+    }),
+
   setLoadingAccounts: (isLoadingAccounts) => set({ isLoadingAccounts }),
 
   setLoadingNotes: (isLoadingNotes) => set({ isLoadingNotes }),
@@ -132,3 +142,5 @@ export const useAccountsStore = () => useMidenStore((state) => state.accounts);
 export const useNotesStore = () => useMidenStore((state) => state.notes);
 export const useConsumableNotesStore = () =>
   useMidenStore((state) => state.consumableNotes);
+export const useAssetMetadataStore = () =>
+  useMidenStore((state) => state.assetMetadata);

@@ -99,6 +99,8 @@ export interface AccountResult {
 export interface AssetBalance {
   assetId: string;
   amount: bigint;
+  symbol?: string;
+  decimals?: number;
 }
 
 // Notes types
@@ -110,14 +112,24 @@ export interface NotesFilter {
 export interface NotesResult {
   notes: InputNoteRecord[];
   consumableNotes: ConsumableNoteRecord[];
+  noteSummaries: NoteSummary[];
+  consumableNoteSummaries: NoteSummary[];
   isLoading: boolean;
   error: Error | null;
   refetch: () => Promise<void>;
 }
 
+export interface AssetMetadata {
+  assetId: string;
+  symbol?: string;
+  decimals?: number;
+}
+
 export interface NoteAsset {
   assetId: string;
   amount: bigint;
+  symbol?: string;
+  decimals?: number;
 }
 
 export interface NoteSummary {

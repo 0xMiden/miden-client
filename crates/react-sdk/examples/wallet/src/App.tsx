@@ -1,5 +1,5 @@
 import { useEffect, useState, type ChangeEvent, type ReactNode } from "react";
-import { formatNoteSummary, getNoteSummary, useMiden, useAccounts, useAccount, useNotes, useCreateWallet, useConsume, useSend } from "@miden-sdk/react";
+import { formatNoteSummary, useMiden, useAccounts, useAccount, useNotes, useCreateWallet, useConsume, useSend } from "@miden-sdk/react";
 
 const Panel = ({ title, children }: { title: string; children: ReactNode }) => (
   <div className="panel">
@@ -34,7 +34,7 @@ export default function App() {
 
 function Wallet({ accountId }: { accountId: string }) {
   const { account, assets } = useAccount(accountId);
-  const { consumableNotes } = useNotes({ accountId });
+  const { consumableNoteSummaries } = useNotes({ accountId });
   const { consume, isLoading: isConsuming } = useConsume();
   const { send, isLoading: isSending } = useSend();
   const [to, setTo] = useState("");
@@ -77,7 +77,7 @@ function Wallet({ accountId }: { accountId: string }) {
           <div className="list">
             {assets.map((asset) => (
               <div key={asset.assetId} className="row">
-                <span className="mono">{asset.assetId}</span>
+                <span className="mono">{asset.symbol ?? asset.assetId}</span>
                 <span>{asset.amount.toString()}</span>
               </div>
             ))}
@@ -85,14 +85,13 @@ function Wallet({ accountId }: { accountId: string }) {
         )}
       </Panel>
       <Panel title="Unclaimed notes">
-        {consumableNotes.length === 0 ? (
+        {consumableNoteSummaries.length === 0 ? (
           <div className="empty">None</div>
         ) : (
           <div className="list">
-            {consumableNotes.map((note) => {
-              const summary = getNoteSummary(note);
-              const id = summary?.id ?? note.inputNoteRecord().id().toString();
-              const label = summary ? formatNoteSummary(summary) : id;
+            {consumableNoteSummaries.map((summary) => {
+              const id = summary.id;
+              const label = formatNoteSummary(summary);
               return (
                 <div key={id} className="row">
                   <span className="mono">{label}</span>
@@ -111,7 +110,7 @@ function Wallet({ accountId }: { accountId: string }) {
             {hasAssets ? (
               assets.map((asset) => (
                 <option key={asset.assetId} value={asset.assetId}>
-                  {asset.assetId}
+                  {asset.symbol ?? asset.assetId}
                 </option>
               ))
             ) : (

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useMiden } from "../context/MidenProvider";
 import {
   useMidenStore,
@@ -7,8 +7,10 @@ import {
   useSyncStateStore,
 } from "../store/MidenStore";
 import { NoteFilter, NoteFilterTypes, AccountId } from "@miden-sdk/miden-sdk";
-import type { NotesFilter, NotesResult } from "../types";
+import type { NotesFilter, NotesResult, NoteSummary } from "../types";
 import { runExclusiveDirect } from "../utils/runExclusive";
+import { getNoteSummary } from "../utils/notes";
+import { useAssetMetadata } from "./useAssetMetadata";
 
 /**
  * Hook to list notes.
@@ -117,9 +119,47 @@ export function useNotes(options?: NotesFilter): NotesResult {
     refetch();
   }, [isReady, lastSyncTime, refetch]);
 
+  const noteAssetIds = useMemo(() => {
+    const ids = new Set<string>();
+    const collect = (note: unknown) => {
+      const summary = getNoteSummary(note as never);
+      if (!summary) return;
+      summary.assets.forEach((asset) => ids.add(asset.assetId));
+    };
+
+    notes.forEach(collect);
+    consumableNotes.forEach(collect);
+
+    return Array.from(ids);
+  }, [notes, consumableNotes]);
+
+  const { assetMetadata } = useAssetMetadata(noteAssetIds);
+  const getMetadata = useCallback(
+    (assetId: string) => assetMetadata.get(assetId),
+    [assetMetadata]
+  );
+
+  const noteSummaries = useMemo(
+    () =>
+      notes
+        .map((note) => getNoteSummary(note, getMetadata))
+        .filter(Boolean) as NoteSummary[],
+    [notes, getMetadata]
+  );
+
+  const consumableNoteSummaries = useMemo(
+    () =>
+      consumableNotes
+        .map((note) => getNoteSummary(note, getMetadata))
+        .filter(Boolean) as NoteSummary[],
+    [consumableNotes, getMetadata]
+  );
+
   return {
     notes,
     consumableNotes,
+    noteSummaries,
+    consumableNoteSummaries,
     isLoading: isLoadingNotes,
     error,
     refetch,

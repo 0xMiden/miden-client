@@ -15,6 +15,7 @@ export { useAccounts } from "./hooks/useAccounts";
 export { useAccount } from "./hooks/useAccount";
 export { useNotes } from "./hooks/useNotes";
 export { useSyncState } from "./hooks/useSyncState";
+export { useAssetMetadata } from "./hooks/useAssetMetadata";
 
 // Mutation Hooks
 export { useCreateWallet } from "./hooks/useCreateWallet";
@@ -37,6 +38,7 @@ export type {
   AssetBalance,
   NotesFilter,
   NotesResult,
+  AssetMetadata,
   NoteAsset,
   NoteSummary,
   CreateWalletOptions,

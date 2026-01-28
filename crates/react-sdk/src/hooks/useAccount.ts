@@ -5,6 +5,7 @@ import { AccountId } from "@miden-sdk/miden-sdk";
 import type { AccountResult, AssetBalance } from "../types";
 import { runExclusiveDirect } from "../utils/runExclusive";
 import { ensureAccountBech32 } from "../utils/accountBech32";
+import { useAssetMetadata } from "./useAssetMetadata";
 
 /**
  * Hook to get details for a single account.
@@ -99,7 +100,7 @@ export function useAccount(
   }, [isReady, accountIdStr, lastSyncTime, refetch]);
 
   // Extract assets from account vault
-  const assets = useMemo((): AssetBalance[] => {
+  const rawAssets = useMemo((): AssetBalance[] => {
     if (!account) return [];
 
     try {
@@ -120,6 +121,25 @@ export function useAccount(
       return [];
     }
   }, [account]);
+
+  const assetIds = useMemo(
+    () => rawAssets.map((asset) => asset.assetId),
+    [rawAssets]
+  );
+  const { assetMetadata } = useAssetMetadata(assetIds);
+
+  const assets = useMemo(
+    () =>
+      rawAssets.map((asset) => {
+        const metadata = assetMetadata.get(asset.assetId);
+        return {
+          ...asset,
+          symbol: metadata?.symbol,
+          decimals: metadata?.decimals,
+        };
+      }),
+    [rawAssets, assetMetadata]
+  );
 
   // Helper to get balance for a specific faucet
   const getBalance = useCallback(

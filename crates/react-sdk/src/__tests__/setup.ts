@@ -38,10 +38,31 @@ vi.mock("@miden-sdk/miden-sdk", () => {
     }
   );
 
+  class Endpoint {
+    constructor(_url?: string) {}
+    static testnet() {
+      return new Endpoint();
+    }
+  }
+
+  class RpcClient {
+    constructor(_endpoint: unknown) {}
+    getAccountDetails = vi.fn().mockResolvedValue({ account: () => null });
+  }
+
   return {
     WebClient,
     AccountId: {
       fromHex: vi.fn((hex: string) => createMockAccountId(hex)),
+      fromBech32: vi.fn((bech32: string) => createMockAccountId(bech32)),
+    },
+    Endpoint,
+    RpcClient,
+    BasicFungibleFaucetComponent: {
+      fromAccount: vi.fn(() => ({
+        symbol: vi.fn(() => ({ toString: () => "TKN" })),
+        decimals: vi.fn(() => 0),
+      })),
     },
     NoteId: {
       fromHex: vi.fn((hex: string) => ({ toString: () => hex })),
