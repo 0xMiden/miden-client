@@ -76,9 +76,14 @@ export function useSend(): UseSendResult {
       try {
         const noteType = getNoteType(options.noteType ?? DEFAULTS.NOTE_TYPE);
 
+        const parseAccountId = (value: string) =>
+          value.startsWith("m") || value.startsWith("M")
+            ? AccountId.fromBech32(value)
+            : AccountId.fromHex(value);
+
         // Convert string IDs to AccountId objects
-        const fromAccountId = AccountId.fromHex(options.from);
-        const toAccountId = AccountId.fromHex(options.to);
+        const fromAccountId = parseAccountId(options.from);
+        const toAccountId = parseAccountId(options.to);
         const assetId =
           options.assetId ??
           (options as { faucetId?: string }).faucetId ??
@@ -86,7 +91,7 @@ export function useSend(): UseSendResult {
         if (!assetId) {
           throw new Error("Asset ID is required");
         }
-        const assetIdObj = AccountId.fromHex(assetId);
+        const assetIdObj = parseAccountId(assetId);
 
         setStage("proving");
         const txResult = await runExclusiveSafe(async () => {
