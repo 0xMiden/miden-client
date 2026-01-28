@@ -191,7 +191,7 @@ describe("useAccount", () => {
       const { result } = renderHook(() => useAccount(accountId));
 
       expect(result.current.assets.length).toBe(2);
-      expect(result.current.assets[0].faucetId).toBeDefined();
+      expect(result.current.assets[0].assetId).toBeDefined();
       expect(result.current.assets[0].amount).toBeDefined();
     });
 
@@ -226,8 +226,8 @@ describe("useAccount", () => {
   describe("getBalance helper", () => {
     it("should return balance for specific faucet", async () => {
       const accountId = "0x1234567890abcdef";
-      const faucetId = "0xfaucet1";
-      const mockAssets = [{ faucetId, amount: 1000n }];
+      const assetId = "0xfaucet1";
+      const mockAssets = [{ faucetId: assetId, amount: 1000n }];
 
       const mockAccount = createMockAccount();
       mockAccount.vault = vi.fn(() => createMockVault(mockAssets));
@@ -248,7 +248,7 @@ describe("useAccount", () => {
 
       const { result } = renderHook(() => useAccount(accountId));
 
-      const balance = result.current.getBalance(faucetId);
+      const balance = result.current.getBalance(assetId);
       expect(balance).toBe(1000n);
     });
 

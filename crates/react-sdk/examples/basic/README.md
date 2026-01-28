@@ -18,7 +18,7 @@ A minimal example demonstrating how to use `@miden-sdk/react` hooks in a React a
 1. First, build the React SDK:
 
 ```bash
-cd ..
+cd ../..
 yarn install
 yarn build
 ```
@@ -52,7 +52,7 @@ By default, the example connects to the Miden testnet. You can change the RPC UR
 ## Project Structure
 
 ```
-example/
+examples/basic/
 ├── src/
 │   ├── main.tsx           # Entry point with MidenProvider
 │   ├── App.tsx            # Main app component
@@ -123,7 +123,7 @@ function SendTokens() {
     await send({
       from: "0x...",
       to: "0x...",
-      faucetId: "0x...",
+      assetId: "0x...",
       amount: 100n,
     });
   };

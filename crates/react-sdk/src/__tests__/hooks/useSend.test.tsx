@@ -55,7 +55,7 @@ describe("useSend", () => {
         result.current.send({
           from: "0xsender",
           to: "0xrecipient",
-          faucetId: "0xfaucet",
+          assetId: "0xfaucet",
           amount: 100n,
         })
       ).rejects.toThrow("Miden client is not ready");
@@ -84,7 +84,7 @@ describe("useSend", () => {
         txResult = await result.current.send({
           from: "0xsender",
           to: "0xrecipient",
-          faucetId: "0xfaucet",
+          assetId: "0xfaucet",
           amount: 100n,
         });
       });
@@ -118,7 +118,7 @@ describe("useSend", () => {
         await result.current.send({
           from: "0xsender",
           to: "0xrecipient",
-          faucetId: "0xfaucet",
+          assetId: "0xfaucet",
           amount: 500n,
           noteType: "public",
           recallHeight: 1000,
@@ -129,7 +129,7 @@ describe("useSend", () => {
       expect(mockClient.newSendTransactionRequest).toHaveBeenCalledWith(
         expect.anything(), // fromAccountId
         expect.anything(), // toAccountId
-        expect.anything(), // faucetIdObj
+        expect.anything(), // assetIdObj
         expect.anything(), // noteType (public)
         500n,
         1000,
@@ -160,7 +160,7 @@ describe("useSend", () => {
         await result.current.send({
           from: "0x1",
           to: "0x2",
-          faucetId: "0x3",
+          assetId: "0x3",
           amount: 1n,
           noteType: "private",
         });
@@ -174,7 +174,7 @@ describe("useSend", () => {
         await result.current.send({
           from: "0x1",
           to: "0x2",
-          faucetId: "0x3",
+          assetId: "0x3",
           amount: 1n,
           noteType: "encrypted",
         });
@@ -215,7 +215,7 @@ describe("useSend", () => {
         sendPromise = result.current.send({
           from: "0x1",
           to: "0x2",
-          faucetId: "0x3",
+          assetId: "0x3",
           amount: 1n,
         });
       });
@@ -258,7 +258,7 @@ describe("useSend", () => {
           result.current.send({
             from: "0x1",
             to: "0x2",
-            faucetId: "0x3",
+            assetId: "0x3",
             amount: 1000000n,
           })
         ).rejects.toThrow("Insufficient balance");
@@ -291,7 +291,7 @@ describe("useSend", () => {
           result.current.send({
             from: "0x1",
             to: "0x2",
-            faucetId: "0x3",
+            assetId: "0x3",
             amount: 1n,
           })
         ).rejects.toThrow("Invalid parameters");
@@ -326,7 +326,7 @@ describe("useSend", () => {
         await result.current.send({
           from: "0x1",
           to: "0x2",
-          faucetId: "0x3",
+          assetId: "0x3",
           amount: 1n,
         });
       });
@@ -374,7 +374,7 @@ describe("useSend", () => {
         sendPromise = result.current.send({
           from: "0x1",
           to: "0x2",
-          faucetId: "0x3",
+          assetId: "0x3",
           amount: 1n,
         });
       });

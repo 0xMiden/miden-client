@@ -29,7 +29,7 @@ export interface UseSendResult {
  *
  * @example
  * ```tsx
- * function SendButton({ from, to, faucetId }: Props) {
+ * function SendButton({ from, to, assetId }: Props) {
  *   const { send, isLoading, stage, error } = useSend();
  *
  *   const handleSend = async () => {
@@ -37,7 +37,7 @@ export interface UseSendResult {
  *       const result = await send({
  *         from,
  *         to,
- *         faucetId,
+ *         assetId,
  *         amount: 100n,
  *       });
  *       console.log('Transaction ID:', result.transactionId);
@@ -79,14 +79,21 @@ export function useSend(): UseSendResult {
         // Convert string IDs to AccountId objects
         const fromAccountId = AccountId.fromHex(options.from);
         const toAccountId = AccountId.fromHex(options.to);
-        const faucetIdObj = AccountId.fromHex(options.faucetId);
+        const assetId =
+          options.assetId ??
+          (options as { faucetId?: string }).faucetId ??
+          null;
+        if (!assetId) {
+          throw new Error("Asset ID is required");
+        }
+        const assetIdObj = AccountId.fromHex(assetId);
 
         setStage("proving");
         const txResult = await runExclusiveSafe(async () => {
           const txRequest = client.newSendTransactionRequest(
             fromAccountId,
             toAccountId,
-            faucetIdObj,
+            assetIdObj,
             noteType,
             options.amount,
             options.recallHeight ?? null,

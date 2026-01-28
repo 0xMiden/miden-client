@@ -6,6 +6,7 @@ import type { Account } from "@miden-sdk/miden-sdk";
 import type { CreateWalletOptions } from "../types";
 import { DEFAULTS } from "../types";
 import { runExclusiveDirect } from "../utils/runExclusive";
+import { ensureAccountBech32 } from "../utils/accountBech32";
 
 export interface UseCreateWalletResult {
   /** Create a new wallet with optional configuration */
@@ -49,7 +50,7 @@ export interface UseCreateWalletResult {
  * ```
  */
 export function useCreateWallet(): UseCreateWalletResult {
-  const { client, isReady, runExclusive } = useMiden();
+  const { client, isReady, sync, runExclusive } = useMiden();
   const runExclusiveSafe = runExclusive ?? runExclusiveDirect;
   const setAccounts = useMidenStore((state) => state.setAccounts);
 
@@ -62,6 +63,8 @@ export function useCreateWallet(): UseCreateWalletResult {
       if (!client || !isReady) {
         throw new Error("Miden client is not ready");
       }
+
+      await sync();
 
       setIsCreating(true);
       setError(null);
@@ -80,6 +83,7 @@ export function useCreateWallet(): UseCreateWalletResult {
             authScheme,
             options.initSeed
           );
+          ensureAccountBech32(createdWallet);
           const accounts = await client.getAccounts();
           setAccounts(accounts);
           return createdWallet;

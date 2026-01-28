@@ -7,7 +7,7 @@ module.exports = [
       "dist/**/*",
       "node_modules/**/*",
       "e2e/**/*",
-      "example/**/*",
+      "examples/**/*",
       "**/*.d.ts",
     ],
   },

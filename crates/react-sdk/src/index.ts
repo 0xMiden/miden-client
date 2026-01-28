@@ -1,3 +1,8 @@
+import "./types/augmentations";
+import { installAccountBech32 } from "./utils/accountBech32";
+
+installAccountBech32();
+
 // Context and Provider
 export {
   MidenProvider,
@@ -56,6 +61,9 @@ export type {
 
 // Default configuration values
 export { DEFAULTS } from "./types";
+
+// Utilities
+export { toBech32AccountId } from "./utils/accountBech32";
 
 // Hook result types
 export type { UseCreateWalletResult } from "./hooks/useCreateWallet";

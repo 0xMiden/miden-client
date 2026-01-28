@@ -206,18 +206,18 @@ import { useAccount } from '@miden-sdk/react';
 function AccountDetails({ accountId }: { accountId: string }) {
   const {
     account,     // Full account object
-    assets,      // Array of { faucetId, amount } balances
+    assets,      // Array of { assetId, amount } balances
     isLoading,
     error,
     refetch,
-    getBalance,  // Helper to get balance for specific faucet
+    getBalance,  // Helper to get balance for specific asset
   } = useAccount(accountId);
 
   if (isLoading) return <div>Loading...</div>;
   if (!account) return <div>Account not found</div>;
 
   // Get balance for a specific token
-  const usdcBalance = getBalance('0xfaucet123...');
+  const usdcBalance = getBalance('0xasset123...');
 
   return (
     <div>
@@ -226,8 +226,8 @@ function AccountDetails({ accountId }: { accountId: string }) {
 
       <h3>Assets</h3>
       {assets.map(asset => (
-        <div key={asset.faucetId}>
-          {asset.faucetId}: {asset.amount.toString()}
+        <div key={asset.assetId}>
+          {asset.assetId}: {asset.amount.toString()}
         </div>
       ))}
 
@@ -395,7 +395,7 @@ function SendForm() {
       const { transactionId } = await send({
         from: '0xsender...',      // Sender account ID
         to: '0xrecipient...',     // Recipient account ID
-        faucetId: '0xtoken...',   // Token faucet ID
+        assetId: '0xtoken...',    // Asset ID (token id)
         amount: 100n,             // Amount in smallest units
 
         // Optional parameters
@@ -654,18 +654,15 @@ import type {
 } from '@miden-sdk/react';
 ```
 
-## Example App
+## Examples
 
-See the [example](./example) directory for a complete working example with:
+Two runnable Vite examples live in `examples/`:
 
-- Wallet creation
-- Faucet creation
-- Token minting
-- Token transfers
-- Sync status display
+- `examples/basic` - Full example with wallets, faucets, minting, transfers, and sync status.
+- `examples/wallet` - Minimal wallet: create account, view balances, claim notes, send tokens.
 
 ```bash
-cd example
+cd examples/basic
 yarn install
 yarn dev
 ```

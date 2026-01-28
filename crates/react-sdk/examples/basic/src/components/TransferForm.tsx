@@ -19,7 +19,7 @@ export function TransferForm() {
   } = useMint();
 
   const [selectedWallet, setSelectedWallet] = useState("");
-  const [selectedFaucet, setSelectedFaucet] = useState("");
+  const [selectedAsset, setSelectedAsset] = useState("");
   const [recipientAddress, setRecipientAddress] = useState("");
   const [amount, setAmount] = useState("100");
 
@@ -27,17 +27,17 @@ export function TransferForm() {
   if (!selectedWallet && wallets.length > 0) {
     setSelectedWallet(wallets[0].id().toString());
   }
-  if (!selectedFaucet && faucets.length > 0) {
-    setSelectedFaucet(faucets[0].id().toString());
+  if (!selectedAsset && faucets.length > 0) {
+    setSelectedAsset(faucets[0].id().toString());
   }
 
   const handleMint = async () => {
-    if (!selectedWallet || !selectedFaucet) return;
+    if (!selectedWallet || !selectedAsset) return;
 
     try {
       const result = await mint({
         targetAccountId: selectedWallet,
-        faucetId: selectedFaucet,
+        faucetId: selectedAsset,
         amount: BigInt(amount),
       });
       console.log("Minted tokens, tx:", result.transactionId);
@@ -47,13 +47,13 @@ export function TransferForm() {
   };
 
   const handleSend = async () => {
-    if (!selectedWallet || !selectedFaucet || !recipientAddress) return;
+    if (!selectedWallet || !selectedAsset || !recipientAddress) return;
 
     try {
       const result = await send({
         from: selectedWallet,
         to: recipientAddress,
-        faucetId: selectedFaucet,
+        assetId: selectedAsset,
         amount: BigInt(amount),
       });
       console.log("Sent tokens, tx:", result.transactionId);
@@ -104,10 +104,10 @@ export function TransferForm() {
 
         <div style={{ marginBottom: 10 }}>
           <label>
-            <strong>Faucet:</strong>{" "}
+            <strong>Asset:</strong>{" "}
             <select
-              value={selectedFaucet}
-              onChange={(e) => setSelectedFaucet(e.target.value)}
+              value={selectedAsset}
+              onChange={(e) => setSelectedAsset(e.target.value)}
               style={{ width: 300, fontFamily: "monospace" }}
             >
               {faucets.map((faucet) => (
@@ -137,11 +137,11 @@ export function TransferForm() {
 
       <h3>Mint Tokens</h3>
       <p style={{ color: "#666", fontSize: 14 }}>
-        Mint tokens from the selected faucet to the selected wallet.
+        Mint tokens from the selected asset (faucet) to the selected wallet.
       </p>
       <button
         onClick={handleMint}
-        disabled={isMinting || !selectedWallet || !selectedFaucet}
+        disabled={isMinting || !selectedWallet || !selectedAsset}
       >
         {isMinting ? `Minting (${mintStage})...` : "Mint Tokens"}
       </button>
@@ -165,7 +165,7 @@ export function TransferForm() {
       <button
         onClick={handleSend}
         disabled={
-          isSending || !selectedWallet || !selectedFaucet || !recipientAddress
+          isSending || !selectedWallet || !selectedAsset || !recipientAddress
         }
       >
         {isSending ? `Sending (${sendStage})...` : "Send Tokens"}

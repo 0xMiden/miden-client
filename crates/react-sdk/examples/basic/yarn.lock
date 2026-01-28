@@ -342,7 +342,7 @@
     dexie "^4.0.1"
     glob "^11.0.0"
 
-"@miden-sdk/react@file:..":
+"@miden-sdk/react@file:../..":
   version "0.12.0"
   dependencies:
     zustand "^5.0.0"

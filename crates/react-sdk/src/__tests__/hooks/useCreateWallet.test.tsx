@@ -27,6 +27,7 @@ describe("useCreateWallet", () => {
       mockUseMiden.mockReturnValue({
         client: null,
         isReady: false,
+        sync: vi.fn(),
       });
 
       const { result } = renderHook(() => useCreateWallet());
@@ -44,6 +45,7 @@ describe("useCreateWallet", () => {
       mockUseMiden.mockReturnValue({
         client: null,
         isReady: false,
+        sync: vi.fn(),
       });
 
       const { result } = renderHook(() => useCreateWallet());
@@ -63,6 +65,7 @@ describe("useCreateWallet", () => {
       mockUseMiden.mockReturnValue({
         client: mockClient,
         isReady: true,
+        sync: vi.fn(),
       });
 
       const { result } = renderHook(() => useCreateWallet());
@@ -96,6 +99,7 @@ describe("useCreateWallet", () => {
       mockUseMiden.mockReturnValue({
         client: mockClient,
         isReady: true,
+        sync: vi.fn(),
       });
 
       const { result } = renderHook(() => useCreateWallet());
@@ -128,6 +132,7 @@ describe("useCreateWallet", () => {
       mockUseMiden.mockReturnValue({
         client: mockClient,
         isReady: true,
+        sync: vi.fn(),
       });
 
       const { result } = renderHook(() => useCreateWallet());
@@ -149,6 +154,7 @@ describe("useCreateWallet", () => {
       mockUseMiden.mockReturnValue({
         client: mockClient,
         isReady: true,
+        sync: vi.fn(),
       });
 
       const { result } = renderHook(() => useCreateWallet());
@@ -171,6 +177,7 @@ describe("useCreateWallet", () => {
       mockUseMiden.mockReturnValue({
         client: mockClient,
         isReady: true,
+        sync: vi.fn(),
       });
 
       const { result } = renderHook(() => useCreateWallet());
@@ -199,6 +206,7 @@ describe("useCreateWallet", () => {
       mockUseMiden.mockReturnValue({
         client: mockClient,
         isReady: true,
+        sync: vi.fn(),
       });
 
       const { result } = renderHook(() => useCreateWallet());
@@ -236,6 +244,7 @@ describe("useCreateWallet", () => {
       mockUseMiden.mockReturnValue({
         client: mockClient,
         isReady: true,
+        sync: vi.fn(),
       });
 
       const { result } = renderHook(() => useCreateWallet());
@@ -261,6 +270,7 @@ describe("useCreateWallet", () => {
       mockUseMiden.mockReturnValue({
         client: mockClient,
         isReady: true,
+        sync: vi.fn(),
       });
 
       const { result } = renderHook(() => useCreateWallet());
@@ -287,6 +297,7 @@ describe("useCreateWallet", () => {
       mockUseMiden.mockReturnValue({
         client: mockClient,
         isReady: true,
+        sync: vi.fn(),
       });
 
       const { result } = renderHook(() => useCreateWallet());
@@ -322,6 +333,7 @@ describe("useCreateWallet", () => {
       mockUseMiden.mockReturnValue({
         client: mockClient,
         isReady: true,
+        sync: vi.fn(),
       });
 
       const { result } = renderHook(() => useCreateWallet());

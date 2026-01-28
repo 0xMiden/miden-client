@@ -4,6 +4,7 @@ import { useMidenStore, useSyncStateStore } from "../store/MidenStore";
 import { AccountId } from "@miden-sdk/miden-sdk";
 import type { AccountResult, AssetBalance } from "../types";
 import { runExclusiveDirect } from "../utils/runExclusive";
+import { ensureAccountBech32 } from "../utils/accountBech32";
 
 /**
  * Hook to get details for a single account.
@@ -24,8 +25,8 @@ import { runExclusiveDirect } from "../utils/runExclusive";
  *       <p>Nonce: {account.nonce().toString()}</p>
  *       <h3>Assets</h3>
  *       {assets.map(a => (
- *         <div key={a.faucetId}>
- *           {a.faucetId}: {a.amount.toString()}
+ *         <div key={a.assetId}>
+ *           {a.assetId}: {a.amount.toString()}
  *         </div>
  *       ))}
  *       <p>USDC Balance: {getBalance('0x...').toString()}</p>
@@ -74,6 +75,7 @@ export function useAccount(
         client.getAccount(accountIdObj)
       );
       if (fetchedAccount) {
+        ensureAccountBech32(fetchedAccount);
         setAccountDetails(accountIdStr, fetchedAccount);
       }
     } catch (err) {
@@ -108,7 +110,7 @@ export function useAccount(
       const vaultAssets = vault.fungibleAssets();
       for (const asset of vaultAssets) {
         assetsList.push({
-          faucetId: asset.faucetId().toString(),
+          assetId: asset.faucetId().toString(),
           amount: asset.amount(),
         });
       }
@@ -119,10 +121,11 @@ export function useAccount(
     }
   }, [account]);
 
+
   // Helper to get balance for a specific faucet
   const getBalance = useCallback(
-    (faucetId: string): bigint => {
-      const asset = assets.find((a) => a.faucetId === faucetId);
+    (assetId: string): bigint => {
+      const asset = assets.find((a) => a.assetId === assetId);
       return asset?.amount ?? 0n;
     },
     [assets]

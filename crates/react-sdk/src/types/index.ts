@@ -93,11 +93,11 @@ export interface AccountResult {
   isLoading: boolean;
   error: Error | null;
   refetch: () => Promise<void>;
-  getBalance: (faucetId: string) => bigint;
+  getBalance: (assetId: string) => bigint;
 }
 
 export interface AssetBalance {
-  faucetId: string;
+  assetId: string;
   amount: bigint;
 }
 
@@ -147,8 +147,8 @@ export interface SendOptions {
   from: string;
   /** Recipient account ID */
   to: string;
-  /** Faucet ID for the asset */
-  faucetId: string;
+  /** Asset ID to send (token id) */
+  assetId: string;
   /** Amount to send */
   amount: bigint;
   /** Note type. Default: private */
