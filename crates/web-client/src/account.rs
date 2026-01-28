@@ -1,5 +1,5 @@
 use miden_client::Word as NativeWord;
-use miden_client::account::Account as NativeAccount;
+use miden_client::account::{Account as NativeAccount, StorageSlotName};
 use wasm_bindgen::prelude::*;
 
 use crate::models::account::Account;
@@ -130,6 +130,77 @@ impl WebClient {
                 js_error_with_context(err, "failed to remove address from account")
             })?;
             Ok(())
+        } else {
+            Err(JsValue::from_str("Client not initialized"))
+        }
+    }
+
+    /// Retrieves a storage slot value by name for the given account.
+    ///
+    /// This method fetches fresh data from storage on each call, providing lazy access
+    /// to account storage without needing to fetch the full account first.
+    ///
+    /// For `Value` slots, returns the stored word.
+    /// For `Map` slots, returns the map root.
+    ///
+    /// # Arguments
+    /// * `account_id` - The ID of the account to read storage from.
+    /// * `slot_name` - The name of the storage slot.
+    ///
+    /// # Errors
+    /// Returns an error if the account or slot is not found.
+    #[wasm_bindgen(js_name = "getStorageItem")]
+    pub async fn get_storage_item(
+        &mut self,
+        account_id: &AccountId,
+        slot_name: &str,
+    ) -> Result<Word, JsValue> {
+        if let Some(client) = self.get_mut_inner() {
+            let slot_name = StorageSlotName::new(slot_name)
+                .map_err(|err| js_error_with_context(err, "invalid slot name"))?;
+
+            let value = client
+                .storage(account_id.into())
+                .get_item(slot_name)
+                .await
+                .map_err(|err| js_error_with_context(err, "failed to get storage item"))?;
+
+            Ok(value.into())
+        } else {
+            Err(JsValue::from_str("Client not initialized"))
+        }
+    }
+
+    /// Retrieves a value from a storage map slot by name and key.
+    ///
+    /// This method fetches fresh data from storage on each call, providing lazy access
+    /// to account storage maps without needing to fetch the full account first.
+    ///
+    /// # Arguments
+    /// * `account_id` - The ID of the account to read storage from.
+    /// * `slot_name` - The name of the storage map slot.
+    /// * `key` - The key within the map.
+    ///
+    /// # Errors
+    /// Returns an error if the account or slot is not found, or if the slot is not a map.
+    #[wasm_bindgen(js_name = "getStorageMapItem")]
+    pub async fn get_storage_map_item(
+        &mut self,
+        account_id: &AccountId,
+        slot_name: &str,
+        key: &Word,
+    ) -> Result<Word, JsValue> {
+        if let Some(client) = self.get_mut_inner() {
+            let slot_name = StorageSlotName::new(slot_name)
+                .map_err(|err| js_error_with_context(err, "invalid slot name"))?;
+
+            let value = client
+                .storage(account_id.into())
+                .get_map_item(slot_name, (*key.as_native()).into())
+                .await
+                .map_err(|err| js_error_with_context(err, "failed to get storage map item"))?;
+
+            Ok(value.into())
         } else {
             Err(JsValue::from_str("Client not initialized"))
         }
