@@ -17,13 +17,14 @@ path = "src/main.rs"
 
 [dependencies]
 # Miden dependencies
-miden-lib                 = { workspace = true }
 miden-node-block-producer = { workspace = true }
 miden-node-ntx-builder    = { workspace = true }
 miden-node-rpc            = { workspace = true }
 miden-node-store          = { workspace = true }
 miden-node-utils          = { features = ["testing", "tracing-forest"], workspace = true }
-miden-objects             = { workspace = true }
+miden-node-validator      = { workspace = true }
+miden-protocol            = { workspace = true }
+miden-standards           = { workspace = true }
 
 # External dependencies
 anyhow      = { workspace = true }

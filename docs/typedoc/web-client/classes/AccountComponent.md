@@ -1,8 +1,8 @@
-[**@demox-labs/miden-sdk**](../README.md)
+[**@miden-sdk/miden-sdk**](../README.md)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / AccountComponent
+[@miden-sdk/miden-sdk](../README.md) / AccountComponent
 
 # Class: AccountComponent
 
@@ -32,6 +32,8 @@
 
 > **getProcedureHash**(`procedure_name`): `string`
 
+Returns the hex-encoded MAST root for a procedure by name.
+
 #### Parameters
 
 ##### procedure\_name
@@ -48,6 +50,8 @@
 
 > **getProcedures**(): [`GetProceduresResultItem`](GetProceduresResultItem.md)[]
 
+Returns all procedures exported by this component.
+
 #### Returns
 
 [`GetProceduresResultItem`](GetProceduresResultItem.md)[]
@@ -58,6 +62,8 @@
 
 > **withSupportsAllTypes**(): `AccountComponent`
 
+Marks the component as supporting all account types.
+
 #### Returns
 
 `AccountComponent`
@@ -66,17 +72,15 @@
 
 ### compile()
 
-> `static` **compile**(`account_code`, `builder`, `storage_slots`): `AccountComponent`
+> `static` **compile**(`account_code`, `storage_slots`): `AccountComponent`
+
+Compiles account code with the given storage slots using the provided assembler.
 
 #### Parameters
 
 ##### account\_code
 
-`string`
-
-##### builder
-
-[`ScriptBuilder`](ScriptBuilder.md)
+[`AccountComponentCode`](AccountComponentCode.md)
 
 ##### storage\_slots
 
@@ -88,25 +92,9 @@
 
 ***
 
-### createAuthComponent()
-
-> `static` **createAuthComponent**(`secret_key`): `AccountComponent`
-
-#### Parameters
-
-##### secret\_key
-
-[`SecretKey`](SecretKey.md)
-
-#### Returns
-
-`AccountComponent`
-
-***
-
 ### createAuthComponentFromCommitment()
 
-> `static` **createAuthComponentFromCommitment**(`commitment`, `auth_scheme_id`): `AccountComponent`
+> `static` **createAuthComponentFromCommitment**(`commitment`, `auth_scheme`): `AccountComponent`
 
 #### Parameters
 
@@ -114,9 +102,49 @@
 
 [`Word`](Word.md)
 
-##### auth\_scheme\_id
+##### auth\_scheme
 
-`number`
+[`AuthScheme`](../enumerations/AuthScheme.md)
+
+#### Returns
+
+`AccountComponent`
+
+***
+
+### createAuthComponentFromSecretKey()
+
+> `static` **createAuthComponentFromSecretKey**(`secret_key`): `AccountComponent`
+
+Builds an auth component from a secret key, inferring the auth scheme from the key type.
+
+#### Parameters
+
+##### secret\_key
+
+[`AuthSecretKey`](AuthSecretKey.md)
+
+#### Returns
+
+`AccountComponent`
+
+***
+
+### fromLibrary()
+
+> `static` **fromLibrary**(`library`, `storage_slots`): `AccountComponent`
+
+Creates an account component from a compiled library and storage slots.
+
+#### Parameters
+
+##### library
+
+[`Library`](Library.md)
+
+##### storage\_slots
+
+[`StorageSlot`](StorageSlot.md)[]
 
 #### Returns
 
@@ -127,6 +155,8 @@
 ### fromPackage()
 
 > `static` **fromPackage**(`_package`, `storage_slots`): `AccountComponent`
+
+Creates an account component from a compiled package and storage slots.
 
 #### Parameters
 

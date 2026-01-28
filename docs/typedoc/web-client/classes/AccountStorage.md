@@ -1,10 +1,20 @@
-[**@demox-labs/miden-sdk**](../README.md)
+[**@miden-sdk/miden-sdk**](../README.md)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / AccountStorage
+[@miden-sdk/miden-sdk](../README.md) / AccountStorage
 
 # Class: AccountStorage
+
+Account storage is composed of a variable number of index-addressable storage slots up to 255
+slots in total.
+
+Each slot has a type which defines its size and structure. Currently, the following types are
+supported:
+- `StorageSlot::Value`: contains a single Word of data (i.e., 32 bytes).
+- `StorageSlot::Map`: contains a `StorageMap` which is a key-value map where both keys and
+  values are Words. The value of a storage slot containing a map is the commitment to the
+  underlying map.
 
 ## Methods
 
@@ -21,6 +31,8 @@
 ### commitment()
 
 > **commitment**(): [`Word`](Word.md)
+
+Returns the commitment to the full account storage.
 
 #### Returns
 
@@ -40,13 +52,15 @@
 
 ### getItem()
 
-> **getItem**(`index`): [`Word`](Word.md)
+> **getItem**(`slot_name`): [`Word`](Word.md)
+
+Returns the value stored at the given slot name, if any.
 
 #### Parameters
 
-##### index
+##### slot\_name
 
-`number`
+`string`
 
 #### Returns
 
@@ -56,17 +70,17 @@
 
 ### getMapEntries()
 
-> **getMapEntries**(`index`): [`JsStorageMapEntry`](JsStorageMapEntry.md)[]
+> **getMapEntries**(`slot_name`): [`JsStorageMapEntry`](JsStorageMapEntry.md)[]
 
-Get all key-value pairs from the map slot at `index`.
-Returns `undefined` if the slot isn't a map or `index` is out of bounds (0-255).
+Get all key-value pairs from the map slot identified by `slot_name`.
+Returns `undefined` if the slot isn't a map or doesn't exist.
 Returns `[]` if the map exists but is empty.
 
 #### Parameters
 
-##### index
+##### slot\_name
 
-`number`
+`string`
 
 #### Returns
 
@@ -76,13 +90,15 @@ Returns `[]` if the map exists but is empty.
 
 ### getMapItem()
 
-> **getMapItem**(`index`, `key`): [`Word`](Word.md)
+> **getMapItem**(`slot_name`, `key`): [`Word`](Word.md)
+
+Returns the value for a key in the map stored at the given slot, if any.
 
 #### Parameters
 
-##### index
+##### slot\_name
 
-`number`
+`string`
 
 ##### key
 
@@ -91,3 +107,15 @@ Returns `[]` if the map exists but is empty.
 #### Returns
 
 [`Word`](Word.md)
+
+***
+
+### getSlotNames()
+
+> **getSlotNames**(): `string`[]
+
+Returns the names of all storage slots on this account.
+
+#### Returns
+
+`string`[]

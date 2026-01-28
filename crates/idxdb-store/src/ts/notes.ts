@@ -1,20 +1,17 @@
-import {
-  db,
-  inputNotes,
-  outputNotes,
-  notesScripts,
-  IInputNote,
-  IOutputNote,
-} from "./schema.js";
+import { getDatabase, IInputNote, IOutputNote } from "./schema.js";
 
 import { logWebStoreError, uint8ArrayToBase64 } from "./utils.js";
 
-export async function getOutputNotes(states: Uint8Array) {
+export async function getOutputNotes(dbId: string, states: Uint8Array) {
   try {
+    const db = getDatabase(dbId);
     let notes =
       states.length == 0
-        ? await outputNotes.toArray()
-        : await outputNotes.where("stateDiscriminant").anyOf(states).toArray();
+        ? await db.outputNotes.toArray()
+        : await db.outputNotes
+            .where("stateDiscriminant")
+            .anyOf(states)
+            .toArray();
 
     return await processOutputNotes(notes);
   } catch (err) {
@@ -22,46 +19,59 @@ export async function getOutputNotes(states: Uint8Array) {
   }
 }
 
-export async function getInputNotes(states: Uint8Array) {
+export async function getInputNotes(dbId: string, states: Uint8Array) {
   try {
+    const db = getDatabase(dbId);
     let notes;
 
     if (states.length === 0) {
-      notes = await inputNotes.toArray();
+      notes = await db.inputNotes.toArray();
     } else {
-      notes = await inputNotes
+      notes = await db.inputNotes
         .where("stateDiscriminant")
         .anyOf(states)
         .toArray();
     }
 
-    return await processInputNotes(notes);
+    return await processInputNotes(dbId, notes);
   } catch (err) {
     logWebStoreError(err, "Failed to get input notes");
   }
 }
 
-export async function getInputNotesFromIds(noteIds: string[]) {
+export async function getInputNotesFromIds(dbId: string, noteIds: string[]) {
   try {
-    let notes = await inputNotes.where("noteId").anyOf(noteIds).toArray();
-    return await processInputNotes(notes);
+    const db = getDatabase(dbId);
+    let notes = await db.inputNotes.where("noteId").anyOf(noteIds).toArray();
+    return await processInputNotes(dbId, notes);
   } catch (err) {
     logWebStoreError(err, "Failed to get input notes from IDs");
   }
 }
 
-export async function getInputNotesFromNullifiers(nullifiers: string[]) {
+export async function getInputNotesFromNullifiers(
+  dbId: string,
+  nullifiers: string[]
+) {
   try {
-    let notes = await inputNotes.where("nullifier").anyOf(nullifiers).toArray();
-    return await processInputNotes(notes);
+    const db = getDatabase(dbId);
+    let notes = await db.inputNotes
+      .where("nullifier")
+      .anyOf(nullifiers)
+      .toArray();
+    return await processInputNotes(dbId, notes);
   } catch (err) {
     logWebStoreError(err, "Failed to get input notes from nullifiers");
   }
 }
 
-export async function getOutputNotesFromNullifiers(nullifiers: string[]) {
+export async function getOutputNotesFromNullifiers(
+  dbId: string,
+  nullifiers: string[]
+) {
   try {
-    let notes = await outputNotes
+    const db = getDatabase(dbId);
+    let notes = await db.outputNotes
       .where("nullifier")
       .anyOf(nullifiers)
       .toArray();
@@ -71,18 +81,20 @@ export async function getOutputNotesFromNullifiers(nullifiers: string[]) {
   }
 }
 
-export async function getOutputNotesFromIds(noteIds: string[]) {
+export async function getOutputNotesFromIds(dbId: string, noteIds: string[]) {
   try {
-    let notes = await outputNotes.where("noteId").anyOf(noteIds).toArray();
+    const db = getDatabase(dbId);
+    let notes = await db.outputNotes.where("noteId").anyOf(noteIds).toArray();
     return await processOutputNotes(notes);
   } catch (err) {
     logWebStoreError(err, "Failed to get output notes from IDs");
   }
 }
 
-export async function getUnspentInputNoteNullifiers() {
+export async function getUnspentInputNoteNullifiers(dbId: string) {
   try {
-    const notes = await inputNotes
+    const db = getDatabase(dbId);
+    const notes = await db.inputNotes
       .where("stateDiscriminant")
       .anyOf([2, 4, 5])
       .toArray();
@@ -92,9 +104,10 @@ export async function getUnspentInputNoteNullifiers() {
   }
 }
 
-export async function getNoteScript(scriptRoot: string) {
+export async function getNoteScript(dbId: string, scriptRoot: string) {
   try {
-    const noteScript = await notesScripts
+    const db = getDatabase(dbId);
+    const noteScript = await db.notesScripts
       .where("scriptRoot")
       .equals(scriptRoot)
       .first();
@@ -105,6 +118,7 @@ export async function getNoteScript(scriptRoot: string) {
 }
 
 export async function upsertInputNote(
+  dbId: string,
   noteId: string,
   assets: Uint8Array,
   serialNumber: Uint8Array,
@@ -116,35 +130,42 @@ export async function upsertInputNote(
   stateDiscriminant: number,
   state: Uint8Array
 ) {
-  return db.transaction("rw", inputNotes, notesScripts, async (tx) => {
-    try {
-      const data = {
-        noteId,
-        assets,
-        serialNumber,
-        inputs,
-        scriptRoot,
-        nullifier,
-        state,
-        stateDiscriminant,
-        serializedCreatedAt,
-      };
+  const db = getDatabase(dbId);
+  return db.dexie.transaction(
+    "rw",
+    db.inputNotes,
+    db.notesScripts,
+    async (tx) => {
+      try {
+        const data = {
+          noteId,
+          assets,
+          serialNumber,
+          inputs,
+          scriptRoot,
+          nullifier,
+          state,
+          stateDiscriminant,
+          serializedCreatedAt,
+        };
 
-      await tx.inputNotes.put(data);
+        await tx.inputNotes.put(data);
 
-      const noteScriptData = {
-        scriptRoot,
-        serializedNoteScript,
-      };
+        const noteScriptData = {
+          scriptRoot,
+          serializedNoteScript,
+        };
 
-      await tx.notesScripts.put(noteScriptData);
-    } catch (error) {
-      logWebStoreError(error, `Error inserting note: ${noteId}`);
+        await tx.notesScripts.put(noteScriptData);
+      } catch (error) {
+        logWebStoreError(error, `Error inserting note: ${noteId}`);
+      }
     }
-  });
+  );
 }
 
 export async function upsertOutputNote(
+  dbId: string,
   noteId: string,
   assets: Uint8Array,
   recipientDigest: string,
@@ -154,27 +175,34 @@ export async function upsertOutputNote(
   stateDiscriminant: number,
   state: Uint8Array
 ) {
-  return db.transaction("rw", outputNotes, notesScripts, async (tx) => {
-    try {
-      const data = {
-        noteId,
-        assets,
-        recipientDigest,
-        metadata,
-        nullifier: nullifier ? nullifier : undefined,
-        expectedHeight,
-        stateDiscriminant,
-        state,
-      };
+  const db = getDatabase(dbId);
+  return db.dexie.transaction(
+    "rw",
+    db.outputNotes,
+    db.notesScripts,
+    async (tx) => {
+      try {
+        const data = {
+          noteId,
+          assets,
+          recipientDigest,
+          metadata,
+          nullifier: nullifier ? nullifier : undefined,
+          expectedHeight,
+          stateDiscriminant,
+          state,
+        };
 
-      await tx.outputNotes.put(data);
-    } catch (error) {
-      logWebStoreError(error, `Error inserting note: ${noteId}`);
+        await tx.outputNotes.put(data);
+      } catch (error) {
+        logWebStoreError(error, `Error inserting note: ${noteId}`);
+      }
     }
-  });
+  );
 }
 
-async function processInputNotes(notes: IInputNote[]) {
+async function processInputNotes(dbId: string, notes: IInputNote[]) {
+  const db = getDatabase(dbId);
   return await Promise.all(
     notes.map(async (note) => {
       const assetsBase64 = uint8ArrayToBase64(note.assets);
@@ -185,7 +213,7 @@ async function processInputNotes(notes: IInputNote[]) {
 
       let serializedNoteScriptBase64: string | undefined = undefined;
       if (note.scriptRoot) {
-        let record = await notesScripts.get(note.scriptRoot);
+        let record = await db.notesScripts.get(note.scriptRoot);
         if (record) {
           serializedNoteScriptBase64 = uint8ArrayToBase64(
             record.serializedNoteScript
@@ -228,19 +256,26 @@ async function processOutputNotes(notes: IOutputNote[]) {
 }
 
 export async function upsertNoteScript(
+  dbId: string,
   scriptRoot: string,
   serializedNoteScript: Uint8Array
 ) {
-  return db.transaction("rw", outputNotes, notesScripts, async (tx) => {
-    try {
-      const noteScriptData = {
-        scriptRoot,
-        serializedNoteScript,
-      };
+  const db = getDatabase(dbId);
+  return db.dexie.transaction(
+    "rw",
+    db.outputNotes,
+    db.notesScripts,
+    async (tx) => {
+      try {
+        const noteScriptData = {
+          scriptRoot,
+          serializedNoteScript,
+        };
 
-      await tx.notesScripts.put(noteScriptData);
-    } catch (error) {
-      logWebStoreError(error, `Error inserting note script: ${scriptRoot}`);
+        await tx.notesScripts.put(noteScriptData);
+      } catch (error) {
+        logWebStoreError(error, `Error inserting note script: ${scriptRoot}`);
+      }
     }
-  });
+  );
 }

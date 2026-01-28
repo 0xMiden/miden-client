@@ -1,8 +1,8 @@
-[**@demox-labs/miden-sdk**](../README.md)
+[**@miden-sdk/miden-sdk**](../README.md)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / AuthSecretKey
+[@miden-sdk/miden-sdk](../README.md) / AuthSecretKey
 
 # Class: AuthSecretKey
 
@@ -28,19 +28,11 @@
 
 ***
 
-### getEcdsaK256KeccakPublicKeyAsWord()
-
-> **getEcdsaK256KeccakPublicKeyAsWord**(): [`Word`](Word.md)
-
-#### Returns
-
-[`Word`](Word.md)
-
-***
-
 ### getEcdsaK256KeccakSecretKeyAsFelts()
 
 > **getEcdsaK256KeccakSecretKeyAsFelts**(): [`Felt`](Felt.md)[]
+
+Returns the ECDSA k256 Keccak secret key bytes encoded as felts.
 
 #### Returns
 
@@ -48,9 +40,9 @@
 
 ***
 
-### getRpoFalcon512PublicKeyAsWord()
+### getPublicKeyAsWord()
 
-> **getRpoFalcon512PublicKeyAsWord**(): [`Word`](Word.md)
+> **getPublicKeyAsWord**(): [`Word`](Word.md)
 
 #### Returns
 
@@ -65,3 +57,103 @@
 #### Returns
 
 [`Felt`](Felt.md)[]
+
+***
+
+### publicKey()
+
+> **publicKey**(): [`PublicKey`](PublicKey.md)
+
+#### Returns
+
+[`PublicKey`](PublicKey.md)
+
+***
+
+### serialize()
+
+> **serialize**(): `Uint8Array`
+
+#### Returns
+
+`Uint8Array`
+
+***
+
+### sign()
+
+> **sign**(`message`): [`Signature`](Signature.md)
+
+#### Parameters
+
+##### message
+
+[`Word`](Word.md)
+
+#### Returns
+
+[`Signature`](Signature.md)
+
+***
+
+### signData()
+
+> **signData**(`signing_inputs`): [`Signature`](Signature.md)
+
+#### Parameters
+
+##### signing\_inputs
+
+[`SigningInputs`](SigningInputs.md)
+
+#### Returns
+
+[`Signature`](Signature.md)
+
+***
+
+### deserialize()
+
+> `static` **deserialize**(`bytes`): `AuthSecretKey`
+
+#### Parameters
+
+##### bytes
+
+`Uint8Array`
+
+#### Returns
+
+`AuthSecretKey`
+
+***
+
+### ecdsaWithRNG()
+
+> `static` **ecdsaWithRNG**(`seed?`): `AuthSecretKey`
+
+#### Parameters
+
+##### seed?
+
+`Uint8Array`
+
+#### Returns
+
+`AuthSecretKey`
+
+***
+
+### rpoFalconWithRNG()
+
+> `static` **rpoFalconWithRNG**(`seed?`): `AuthSecretKey`
+
+#### Parameters
+
+##### seed?
+
+`Uint8Array`
+
+#### Returns
+
+`AuthSecretKey`

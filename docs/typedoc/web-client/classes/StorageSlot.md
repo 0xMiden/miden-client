@@ -1,10 +1,12 @@
-[**@demox-labs/miden-sdk**](../README.md)
+[**@miden-sdk/miden-sdk**](../README.md)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / StorageSlot
+[@miden-sdk/miden-sdk](../README.md) / StorageSlot
 
 # Class: StorageSlot
+
+A single storage slot value or map for an account component.
 
 ## Methods
 
@@ -30,7 +32,15 @@
 
 ### emptyValue()
 
-> `static` **emptyValue**(): `StorageSlot`
+> `static` **emptyValue**(`name`): `StorageSlot`
+
+Returns an empty value slot (zeroed).
+
+#### Parameters
+
+##### name
+
+`string`
 
 #### Returns
 
@@ -40,9 +50,15 @@
 
 ### fromValue()
 
-> `static` **fromValue**(`value`): `StorageSlot`
+> `static` **fromValue**(`name`, `value`): `StorageSlot`
+
+Creates a storage slot holding a single value.
 
 #### Parameters
+
+##### name
+
+`string`
 
 ##### value
 
@@ -56,9 +72,15 @@
 
 ### map()
 
-> `static` **map**(`storage_map`): `StorageSlot`
+> `static` **map**(`name`, `storage_map`): `StorageSlot`
+
+Creates a storage slot backed by a map.
 
 #### Parameters
+
+##### name
+
+`string`
 
 ##### storage\_map
 

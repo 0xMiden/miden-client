@@ -21,29 +21,30 @@ edition      = "2024"
 license      = "MIT"
 repository   = "https://github.com/0xMiden/miden-client"
 rust-version = "1.90"
-version      = "0.12.6"
+version      = "0.13.0"
 
 [profile.test-dev]
 inherits  = "dev"
 opt-level = 1
 
 [workspace.dependencies]
-# Miden base/protocol dependencies
-miden-lib     = { default-features = false, version = "0.12" }
-miden-objects = { default-features = false, version = "0.12" }
-miden-testing = { default-features = false, version = "0.12" }
-miden-tx      = { default-features = false, version = "0.12" }
+# Miden protocol dependencies
+miden-protocol  = { default-features = false, version = "0.13" }
+miden-standards = { default-features = false, version = "0.13" }
+miden-testing   = { default-features = false, version = "0.13" }
+miden-tx        = { default-features = false, version = "0.13" }
 
 # Miden node dependencies
-miden-node-block-producer        = { version = "0.12" }
-miden-node-ntx-builder           = { version = "0.12" }
-miden-node-proto-build           = { default-features = false, version = "0.12" }
-miden-node-rpc                   = { version = "0.12" }
-miden-node-store                 = { version = "0.12" }
-miden-node-utils                 = { version = "0.12" }
-miden-note-transport-proto-build = { default-features = false, version = "0.1" }
-miden-remote-prover              = { features = ["concurrent"], version = "0.12" }
-miden-remote-prover-client       = { default-features = false, features = ["tx-prover"], version = "0.12" }
+miden-node-block-producer        = { version = "0.13" }
+miden-node-ntx-builder           = { version = "0.13" }
+miden-node-proto-build           = { default-features = false, version = "0.13" }
+miden-node-rpc                   = { version = "0.13" }
+miden-node-store                 = { version = "0.13" }
+miden-node-utils                 = { version = "0.13" }
+miden-node-validator             = { version = "0.13" }
+miden-note-transport-proto-build = { default-features = false, version = "0.2" }
+miden-remote-prover              = { features = ["concurrent"], version = "0.13" }
+miden-remote-prover-client       = { default-features = false, features = ["tx-prover"], version = "0.13" }
 
 # External dependencies
 anyhow      = { default-features = false, version = "1.0" }

@@ -17,7 +17,7 @@
 //!
 //! ```no_run
 //! # use miden_client::rpc::{Endpoint, NodeRpcClient, GrpcClient};
-//! # use miden_objects::block::BlockNumber;
+//! # use miden_protocol::block::BlockNumber;
 //! # #[tokio::main]
 //! # async fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! // Create a gRPC client instance (assumes default endpoint configuration).
@@ -46,17 +46,18 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use core::fmt;
 
-use domain::account::{AccountProofs, FetchedAccount};
+use domain::account::{AccountProof, FetchedAccount};
 use domain::note::{FetchedNote, NoteSyncInfo};
 use domain::nullifier::NullifierUpdate;
 use domain::sync::StateSyncInfo;
-use miden_objects::Word;
-use miden_objects::account::{Account, AccountCode, AccountHeader, AccountId};
-use miden_objects::address::NetworkId;
-use miden_objects::block::{BlockHeader, BlockNumber, ProvenBlock};
-use miden_objects::crypto::merkle::{MmrProof, SmtProof};
-use miden_objects::note::{NoteId, NoteScript, NoteTag, Nullifier};
-use miden_objects::transaction::{ProvenTransaction, TransactionInputs};
+use miden_protocol::Word;
+use miden_protocol::account::{Account, AccountCode, AccountHeader, AccountId};
+use miden_protocol::address::NetworkId;
+use miden_protocol::block::{BlockHeader, BlockNumber, ProvenBlock};
+use miden_protocol::crypto::merkle::mmr::MmrProof;
+use miden_protocol::crypto::merkle::smt::SmtProof;
+use miden_protocol::note::{NoteId, NoteScript, NoteTag, Nullifier};
+use miden_protocol::transaction::{ProvenTransaction, TransactionInputs};
 
 /// Contains domain types related to RPC requests and responses, as well as utility functions
 /// for dealing with them.
@@ -85,12 +86,22 @@ use crate::store::InputNoteRecord;
 use crate::store::input_note_states::UnverifiedNoteState;
 use crate::transaction::ForeignAccount;
 
+/// Represents the state that we want to retrieve from the network
+pub enum AccountStateAt {
+    /// Gets the latest state, for the current chain tip
+    ChainTip,
+    /// Gets the state at a specific block number
+    Block(BlockNumber),
+}
+
 // RPC ENDPOINT LIMITS
 // ================================================================================================
 
 // TODO: We need a better structured way of getting limits as defined by the node (#1139)
 pub const NOTE_IDS_LIMIT: usize = 100;
-pub const NULLIFIER_PREFIXES_LIMIT: usize = 100;
+pub const NULLIFIER_PREFIXES_LIMIT: usize = 1000;
+pub const ACCOUNT_ID_LIMIT: usize = 1000;
+pub const NOTE_TAG_LIMIT: usize = 1000;
 
 // NODE RPC CLIENT TRAIT
 // ================================================================================================
@@ -135,13 +146,13 @@ pub trait NodeRpcClient: Send + Sync {
     /// Fetches note-related data for a list of [`NoteId`] using the `/GetNotesById`
     /// RPC endpoint.
     ///
-    /// For [`miden_objects::note::NoteType::Private`] notes, the response includes only the
-    /// [`miden_objects::note::NoteMetadata`].
+    /// For [`miden_protocol::note::NoteType::Private`] notes, the response includes only the
+    /// [`miden_protocol::note::NoteMetadata`].
     ///
-    /// For [`miden_objects::note::NoteType::Public`] notes, the response includes all note details
+    /// For [`miden_protocol::note::NoteType::Public`] notes, the response includes all note details
     /// (recipient, assets, script, etc.).
     ///
-    /// In both cases, a [`miden_objects::note::NoteInclusionProof`] is returned so the caller can
+    /// In both cases, a [`miden_protocol::note::NoteInclusionProof`] is returned so the caller can
     /// verify that each note is part of the block's note tree.
     async fn get_notes_by_id(&self, note_ids: &[NoteId]) -> Result<Vec<FetchedNote>, RpcError>;
 
@@ -201,16 +212,20 @@ pub trait NodeRpcClient: Send + Sync {
     async fn check_nullifiers(&self, nullifiers: &[Nullifier]) -> Result<Vec<SmtProof>, RpcError>;
 
     /// Fetches the account data needed to perform a Foreign Procedure Invocation (FPI) on the
-    /// specified foreign accounts, using the `GetAccountProofs` endpoint.
+    /// specified foreign account, using the `GetAccountProof` endpoint.
     ///
-    /// The `code_commitments` parameter is a list of known code commitments
+    /// The `account_state` parameter specifies the block number from which to retrieve
+    /// the account proof from (the state of the account at that block).
+    ///
+    /// The `known_account_code` parameter is the known code commitment
     /// to prevent unnecessary data fetching. Returns the block number and the FPI account data. If
-    /// one of the tracked accounts is not found in the node, the method will return an error.
-    async fn get_account_proofs(
+    /// the tracked account is not found in the node, the method will return an error.
+    async fn get_account(
         &self,
-        account_storage_requests: &BTreeSet<ForeignAccount>,
-        known_account_codes: BTreeMap<AccountId, AccountCode>,
-    ) -> Result<AccountProofs, RpcError>;
+        foreign_account: ForeignAccount,
+        account_state: AccountStateAt,
+        known_account_code: Option<AccountCode>,
+    ) -> Result<(BlockNumber, AccountProof), RpcError>;
 
     /// Fetches the commit height where the nullifier was consumed. If the nullifier isn't found,
     /// then `None` is returned.
@@ -218,17 +233,27 @@ pub trait NodeRpcClient: Send + Sync {
     ///
     /// The default implementation of this method uses
     /// [`NodeRpcClient::sync_nullifiers`].
-    async fn get_nullifier_commit_height(
+    async fn get_nullifier_commit_heights(
         &self,
-        nullifier: &Nullifier,
-        block_num: BlockNumber,
-    ) -> Result<Option<BlockNumber>, RpcError> {
-        let nullifiers = self.sync_nullifiers(&[nullifier.prefix()], block_num, None).await?;
+        requested_nullifiers: BTreeSet<Nullifier>,
+        block_from: BlockNumber,
+    ) -> Result<BTreeMap<Nullifier, Option<BlockNumber>>, RpcError> {
+        let prefixes: Vec<u16> =
+            requested_nullifiers.iter().map(crate::note::Nullifier::prefix).collect();
+        let retrieved_nullifiers = self.sync_nullifiers(&prefixes, block_from, None).await?;
 
-        Ok(nullifiers
-            .iter()
-            .find(|update| update.nullifier == *nullifier)
-            .map(|update| update.block_num))
+        let mut nullifiers_height = BTreeMap::new();
+        for nullifier in requested_nullifiers {
+            if let Some(update) =
+                retrieved_nullifiers.iter().find(|update| update.nullifier == nullifier)
+            {
+                nullifiers_height.insert(nullifier, Some(update.block_num));
+            } else {
+                nullifiers_height.insert(nullifier, None);
+            }
+        }
+
+        Ok(nullifiers_height)
     }
 
     /// Fetches public note-related data for a list of [`NoteId`] and builds [`InputNoteRecord`]s
@@ -251,7 +276,7 @@ pub trait NodeRpcClient: Send + Sync {
         for detail in note_details {
             if let FetchedNote::Public(note, inclusion_proof) = detail {
                 let state = UnverifiedNoteState {
-                    metadata: *note.metadata(),
+                    metadata: note.metadata().clone(),
                     inclusion_proof,
                 }
                 .into();
@@ -375,9 +400,8 @@ pub trait NodeRpcClient: Send + Sync {
 pub enum NodeRpcClientEndpoint {
     CheckNullifiers,
     SyncNullifiers,
-    GetAccountDetails,
+    GetAccount,
     GetAccountStateDelta,
-    GetAccountProofs,
     GetBlockByNumber,
     GetBlockHeaderByNumber,
     GetNotesById,
@@ -397,9 +421,8 @@ impl fmt::Display for NodeRpcClientEndpoint {
             NodeRpcClientEndpoint::SyncNullifiers => {
                 write!(f, "sync_nullifiers")
             },
-            NodeRpcClientEndpoint::GetAccountDetails => write!(f, "get_account_details"),
+            NodeRpcClientEndpoint::GetAccount => write!(f, "get_account"),
             NodeRpcClientEndpoint::GetAccountStateDelta => write!(f, "get_account_state_delta"),
-            NodeRpcClientEndpoint::GetAccountProofs => write!(f, "get_account_proofs"),
             NodeRpcClientEndpoint::GetBlockByNumber => write!(f, "get_block_by_number"),
             NodeRpcClientEndpoint::GetBlockHeaderByNumber => {
                 write!(f, "get_block_header_by_number")

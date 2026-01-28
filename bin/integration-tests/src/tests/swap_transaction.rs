@@ -105,7 +105,7 @@ pub async fn test_swap_fully_onchain(client_config: ClientConfig) -> Result<()> 
         NoteType::Public,
         &Asset::Fungible(offered_asset),
         &Asset::Fungible(requested_asset),
-    )?;
+    );
 
     // add swap note's tag to client2
     // we could technically avoid this step, but for the first iteration of swap notes we'll
@@ -118,8 +118,12 @@ pub async fn test_swap_fully_onchain(client_config: ClientConfig) -> Result<()> 
     client2.sync_state().await?;
     println!("Consuming swap note on second client...");
 
-    let tx_request = TransactionRequestBuilder::new()
-        .build_consume_notes(vec![expected_output_notes[0].id()])?;
+    let note = client2
+        .get_input_note(expected_output_notes[0].id())
+        .await?
+        .unwrap()
+        .try_into()?;
+    let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![note])?;
     execute_tx_and_sync(&mut client2, account_b.id(), tx_request).await?;
 
     // sync on client 1, we should get the missing payback note details.
@@ -127,8 +131,12 @@ pub async fn test_swap_fully_onchain(client_config: ClientConfig) -> Result<()> 
     client1.sync_state().await?;
     println!("Consuming swap payback note on first client...");
 
-    let tx_request = TransactionRequestBuilder::new()
-        .build_consume_notes(vec![expected_payback_note_details[0].id()])?;
+    let note = client1
+        .get_input_note(expected_payback_note_details[0].id())
+        .await?
+        .unwrap()
+        .try_into()?;
+    let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![note])?;
     execute_tx_and_sync(&mut client1, account_a.id(), tx_request).await?;
 
     // At the end we should end up with
@@ -141,7 +149,8 @@ pub async fn test_swap_fully_onchain(client_config: ClientConfig) -> Result<()> 
         .get_account(account_a.id())
         .await?
         .context("failed to find account A after swap transaction")?
-        .into();
+        .try_into()
+        .unwrap();
     let account_a_assets = account_a.vault().assets();
     assert_eq!(account_a_assets.count(), 2);
     let mut account_a_assets = account_a.vault().assets();
@@ -175,7 +184,8 @@ pub async fn test_swap_fully_onchain(client_config: ClientConfig) -> Result<()> 
         .get_account(account_b.id())
         .await?
         .context("failed to find account B after swap transaction")?
-        .into();
+        .try_into()
+        .unwrap();
     let account_b_assets = account_b.vault().assets();
     assert_eq!(account_b_assets.count(), 2);
     let mut account_b_assets = account_b.vault().assets();
@@ -304,14 +314,14 @@ pub async fn test_swap_private(client_config: ClientConfig) -> Result<()> {
         NoteType::Private,
         &Asset::Fungible(offered_asset),
         &Asset::Fungible(requested_asset),
-    )?;
+    );
     client2.add_note_tag(tag).await?;
     client2
-        .import_note(NoteFile::NoteDetails {
+        .import_notes(&[NoteFile::NoteDetails {
             details: output_note.try_into()?,
             after_block_num: client1.get_sync_height().await?,
             tag: Some(tag),
-        })
+        }])
         .await?;
 
     // Sync so we get the inclusion proof info
@@ -320,8 +330,12 @@ pub async fn test_swap_private(client_config: ClientConfig) -> Result<()> {
     // consume swap note with accountB, and check that the vault changed appropriately
     println!("Consuming swap note on second client...");
 
-    let tx_request = TransactionRequestBuilder::new()
-        .build_consume_notes(vec![expected_output_notes[0].id()])?;
+    let note = client2
+        .get_input_note(expected_output_notes[0].id())
+        .await?
+        .unwrap()
+        .try_into()?;
+    let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![note])?;
     execute_tx_and_sync(&mut client2, account_b.id(), tx_request).await?;
 
     // sync on client 1, we should get the missing payback note details.
@@ -329,8 +343,12 @@ pub async fn test_swap_private(client_config: ClientConfig) -> Result<()> {
     client1.sync_state().await?;
     println!("Consuming swap payback note on first client...");
 
-    let tx_request = TransactionRequestBuilder::new()
-        .build_consume_notes(vec![expected_payback_note_details[0].id()])?;
+    let note = client1
+        .get_input_note(expected_payback_note_details[0].id())
+        .await?
+        .unwrap()
+        .try_into()?;
+    let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![note])?;
     execute_tx_and_sync(&mut client1, account_a.id(), tx_request).await?;
 
     // At the end we should end up with
@@ -343,7 +361,8 @@ pub async fn test_swap_private(client_config: ClientConfig) -> Result<()> {
         .get_account(account_a.id())
         .await?
         .context("failed to find account A after private swap transaction")?
-        .into();
+        .try_into()
+        .unwrap();
     let account_a_assets = account_a.vault().assets();
     assert_eq!(account_a_assets.count(), 2);
     let mut account_a_assets = account_a.vault().assets();
@@ -377,7 +396,8 @@ pub async fn test_swap_private(client_config: ClientConfig) -> Result<()> {
         .get_account(account_b.id())
         .await?
         .context("failed to find account B after swap transaction")?
-        .into();
+        .try_into()
+        .unwrap();
     let account_b_assets = account_b.vault().assets();
     assert_eq!(account_b_assets.count(), 2);
     let mut account_b_assets = account_b.vault().assets();

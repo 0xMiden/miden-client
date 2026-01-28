@@ -1,5 +1,5 @@
+use miden_client::Word as NativeWord;
 use miden_client::account::Account as NativeAccount;
-use miden_client::store::AccountRecord;
 use wasm_bindgen::prelude::*;
 
 use crate::models::account::Account;
@@ -36,28 +36,70 @@ impl WebClient {
                 .get_account(account_id.into())
                 .await
                 .map_err(|err| js_error_with_context(err, "failed to get account"))?;
-            let account: Option<NativeAccount> = result.map(AccountRecord::into);
 
-            Ok(account.map(miden_client::account::Account::into))
+            if let Some(account_record) = result {
+                // TODO: add partial account support for web client
+                let native_account: NativeAccount = account_record
+                    .try_into()
+                    .map_err(|_| JsValue::from_str("retrieval of partial account unsupported"))?;
+                Ok(Some(native_account.into()))
+            } else {
+                Ok(None)
+            }
         } else {
             Err(JsValue::from_str("Client not initialized"))
         }
     }
 
-    #[wasm_bindgen(js_name = "getAccountAuthByPubKey")]
-    pub async fn get_account_secret_key_by_pub_key(
+    /// Retrieves an authentication secret key from the keystore given a public key commitment.
+    ///
+    /// The public key commitment should correspond to one of the keys tracked by the keystore.
+    /// Returns the associated [`AuthSecretKey`] if found, or an error if not found.
+    #[wasm_bindgen(js_name = "getAccountAuthByPubKeyCommitment")]
+    pub async fn get_account_auth_secret_key_by_pub_key_commitment(
         &mut self,
-        pub_key: &Word,
+        pub_key_commitment: &Word,
     ) -> Result<AuthSecretKey, JsValue> {
         let keystore = self.keystore.clone().expect("Keystore not initialized");
 
         let auth_secret_key = keystore
-            .get_key(pub_key.into())
+            .get_key((*pub_key_commitment.as_native()).into())
             .await
-            .map_err(|err| js_error_with_context(err, "failed to get public key for account"))?
+            .map_err(|err| js_error_with_context(err, "failed to get auth key for account"))?
             .ok_or(JsValue::from_str("Auth not found for account"))?;
 
         Ok(auth_secret_key.into())
+    }
+
+    /// Returns all public key commitments associated with the given account ID.
+    ///
+    /// These commitments can be used with [`getAccountAuthByPubKeyCommitment`]
+    /// to retrieve the corresponding secret keys from the keystore.
+    #[wasm_bindgen(js_name = "getPublicKeyCommitmentsOfAccount")]
+    pub async fn get_public_key_commitments_of(
+        &mut self,
+        account_id: &AccountId,
+    ) -> Result<Vec<Word>, JsValue> {
+        if let Some(client) = self.get_mut_inner() {
+            Ok(client
+                .get_account_public_key_commitments(account_id.as_native())
+                .await
+                .map_err(|err| {
+                    js_error_with_context(
+                        err,
+                        &format!(
+                            "failed to fetch public key commitments for account: {}",
+                            account_id.as_native()
+                        ),
+                    )
+                })?
+                .into_iter()
+                .map(NativeWord::from)
+                .map(Into::into)
+                .collect())
+        } else {
+            Err(JsValue::from_str("Client not initialized"))
+        }
     }
 
     #[wasm_bindgen(js_name = "insertAccountAddress")]

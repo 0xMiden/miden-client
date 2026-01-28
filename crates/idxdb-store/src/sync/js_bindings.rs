@@ -2,7 +2,7 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
 use miden_client::Word;
-use miden_client::account::{Account, StorageSlot};
+use miden_client::account::{Account, StorageSlotContent};
 use miden_client::utils::Serializable;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys;
@@ -19,35 +19,37 @@ extern "C" {
     // --------------------------------------------------------------------------------------------
 
     #[wasm_bindgen(js_name = getSyncHeight)]
-    pub fn idxdb_get_sync_height() -> js_sys::Promise;
+    pub fn idxdb_get_sync_height(db_id: &str) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = getNoteTags)]
-    pub fn idxdb_get_note_tags() -> js_sys::Promise;
+    pub fn idxdb_get_note_tags(db_id: &str) -> js_sys::Promise;
 
     // INSERTS
     // --------------------------------------------------------------------------------------------
 
     #[wasm_bindgen(js_name = addNoteTag)]
     pub fn idxdb_add_note_tag(
+        db_id: &str,
         tag: Vec<u8>,
         source_note_id: Option<String>,
         source_account_id: Option<String>,
     ) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = applyStateSync)]
-    pub fn idxdb_apply_state_sync(state_update: JsStateSyncUpdate) -> js_sys::Promise;
+    pub fn idxdb_apply_state_sync(db_id: &str, state_update: JsStateSyncUpdate) -> js_sys::Promise;
 
     // DELETES
     // --------------------------------------------------------------------------------------------
     #[wasm_bindgen(js_name = removeNoteTag)]
     pub fn idxdb_remove_note_tag(
+        db_id: &str,
         tag: Vec<u8>,
         source_note_id: Option<String>,
         source_account_id: Option<String>,
     ) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = discardTransactions)]
-    pub fn idxdb_discard_transactions(transactions: Vec<String>) -> js_sys::Promise;
+    pub fn idxdb_discard_transactions(db_id: &str, transactions: Vec<String>) -> js_sys::Promise;
 }
 
 /// An object that contains data for a sync update,
@@ -56,10 +58,9 @@ extern "C" {
 #[wasm_bindgen(getter_with_clone)]
 #[derive(Clone)]
 pub struct JsStateSyncUpdate {
-    /// The block number for this update, stored as a string since it will be
-    /// persisted in `IndexedDB`.
+    /// The block number for this update.
     #[wasm_bindgen(js_name = "blockNum")]
-    pub block_num: String,
+    pub block_num: u32,
 
     /// The new block headers for this state update, serialized into a flattened byte array.
     #[wasm_bindgen(js_name = "flattenedNewBlockHeaders")]
@@ -69,7 +70,7 @@ pub struct JsStateSyncUpdate {
     /// This vec should have the same length as the number of headers, with each index
     /// representing the block number for the header at that same index.
     #[wasm_bindgen(js_name = "newBlockNums")]
-    pub new_block_nums: Vec<String>,
+    pub new_block_nums: Vec<u32>,
 
     /// Flattened byte array containing partial blockchain peaks used for merkle tree
     /// verification.
@@ -164,16 +165,14 @@ impl JsAccountUpdate {
     pub fn from_account(account: &Account, account_seed: Option<Word>) -> Self {
         let asset_vault = account.vault();
         Self {
-            storage_root: account.storage().commitment().to_string(),
+            storage_root: account.storage().to_commitment().to_string(),
             storage_slots: account
                 .storage()
                 .slots()
                 .iter()
-                .enumerate()
-                .map(|(index, slot)| JsStorageSlot {
-                    commitment: account.storage().commitment().to_hex(),
-                    slot_index: u8::try_from(index)
-                        .expect("Indexes in account storage should be less than 256"),
+                .map(|slot| JsStorageSlot {
+                    commitment: account.storage().to_commitment().to_hex(),
+                    slot_name: slot.name().to_string(),
                     slot_value: slot.value().to_hex(),
                     slot_type: slot.slot_type().to_bytes()[0],
                 })
@@ -183,7 +182,7 @@ impl JsAccountUpdate {
                 .slots()
                 .iter()
                 .filter_map(|slot| {
-                    if let StorageSlot::Map(map) = slot {
+                    if let StorageSlotContent::Map(map) = slot.content() {
                         Some(JsStorageMapEntry::from_map(map))
                     } else {
                         None

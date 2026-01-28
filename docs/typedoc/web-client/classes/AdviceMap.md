@@ -1,16 +1,20 @@
-[**@demox-labs/miden-sdk**](../README.md)
+[**@miden-sdk/miden-sdk**](../README.md)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / AdviceMap
+[@miden-sdk/miden-sdk](../README.md) / AdviceMap
 
 # Class: AdviceMap
+
+Map of advice values keyed by words for script execution.
 
 ## Constructors
 
 ### Constructor
 
 > **new AdviceMap**(): `AdviceMap`
+
+Creates an empty advice map.
 
 #### Returns
 
@@ -41,6 +45,8 @@
 ### insert()
 
 > **insert**(`key`, `value`): [`Felt`](Felt.md)[]
+
+Inserts a value for the given key, returning any previous value.
 
 #### Parameters
 

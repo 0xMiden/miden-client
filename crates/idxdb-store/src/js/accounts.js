@@ -1,9 +1,9 @@
-import { accountCodes, accountStorages, accountAssets, accountAuths, accounts, addresses, foreignAccountCode, storageMapEntries, trackedAccounts, } from "./schema.js";
+import { getDatabase, } from "./schema.js";
 import { logWebStoreError, uint8ArrayToBase64 } from "./utils.js";
-// GET FUNCTIONS
-export async function getAccountIds() {
+export async function getAccountIds(dbId) {
     try {
-        const tracked = await trackedAccounts.toArray();
+        const db = getDatabase(dbId);
+        const tracked = await db.trackedAccounts.toArray();
         return tracked.map((entry) => entry.id);
     }
     catch (error) {
@@ -11,18 +11,17 @@ export async function getAccountIds() {
     }
     return [];
 }
-export async function getAllAccountHeaders() {
+export async function getAllAccountHeaders(dbId) {
     try {
-        // Use a Map to track the latest record for each id based on nonce
+        const db = getDatabase(dbId);
         const latestRecordsMap = new Map();
-        await accounts.each((record) => {
+        await db.accounts.each((record) => {
             const existingRecord = latestRecordsMap.get(record.id);
             if (!existingRecord ||
                 BigInt(record.nonce) > BigInt(existingRecord.nonce)) {
                 latestRecordsMap.set(record.id, record);
             }
         });
-        // Extract the latest records from the Map
         const latestRecords = Array.from(latestRecordsMap.values());
         const resultObject = await Promise.all(latestRecords.map((record) => {
             let accountSeedBase64 = undefined;
@@ -35,13 +34,13 @@ export async function getAllAccountHeaders() {
             return {
                 id: record.id,
                 nonce: record.nonce,
-                vaultRoot: record.vaultRoot, // Fallback if missing
+                vaultRoot: record.vaultRoot,
                 storageRoot: record.storageRoot || "",
                 codeRoot: record.codeRoot || "",
-                accountSeed: accountSeedBase64, // null or base64 string
+                accountSeed: accountSeedBase64,
                 locked: record.locked,
-                committed: record.committed, // Use actual value or default
-                accountCommitment: record.accountCommitment || "", // Keep original field name
+                committed: record.committed,
+                accountCommitment: record.accountCommitment || "",
             };
         }));
         return resultObject;
@@ -50,10 +49,10 @@ export async function getAllAccountHeaders() {
         logWebStoreError(error, "Error while fetching account headers");
     }
 }
-export async function getAccountHeader(accountId) {
+export async function getAccountHeader(dbId, accountId) {
     try {
-        // Fetch all records matching the given id
-        const allMatchingRecords = await accounts
+        const db = getDatabase(dbId);
+        const allMatchingRecords = await db.accounts
             .where("id")
             .equals(accountId)
             .toArray();
@@ -61,21 +60,17 @@ export async function getAccountHeader(accountId) {
             console.log("No account header record found for given ID.");
             return null;
         }
-        // Convert nonce to BigInt and sort
-        // Note: This assumes all nonces are valid BigInt strings.
         const sortedRecords = allMatchingRecords.sort((a, b) => {
             const bigIntA = BigInt(a.nonce);
             const bigIntB = BigInt(b.nonce);
             return bigIntA > bigIntB ? -1 : bigIntA < bigIntB ? 1 : 0;
         });
-        // The first record is the most recent one due to the sorting
         const mostRecentRecord = sortedRecords[0];
         if (mostRecentRecord === undefined) {
             return null;
         }
         let accountSeedBase64 = undefined;
         if (mostRecentRecord.accountSeed) {
-            // Ensure accountSeed is processed as a Uint8Array and converted to Base64
             if (mostRecentRecord.accountSeed.length > 0) {
                 accountSeedBase64 = uint8ArrayToBase64(mostRecentRecord.accountSeed);
             }
@@ -95,17 +90,16 @@ export async function getAccountHeader(accountId) {
         logWebStoreError(error, `Error while fetching account header for id: ${accountId}`);
     }
 }
-export async function getAccountHeaderByCommitment(accountCommitment) {
+export async function getAccountHeaderByCommitment(dbId, accountCommitment) {
     try {
-        // Fetch all records matching the given commitment
-        const allMatchingRecords = await accounts
+        const db = getDatabase(dbId);
+        const allMatchingRecords = await db.accounts
             .where("accountCommitment")
             .equals(accountCommitment)
             .toArray();
         if (allMatchingRecords.length == 0) {
             return undefined;
         }
-        // There should be only one match
         const matchingRecord = allMatchingRecords[0];
         if (matchingRecord === undefined) {
             console.log("No account header record found for given commitment.");
@@ -130,20 +124,18 @@ export async function getAccountHeaderByCommitment(accountCommitment) {
         logWebStoreError(error, `Error fetching account header for commitment ${accountCommitment}`);
     }
 }
-export async function getAccountCode(codeRoot) {
+export async function getAccountCode(dbId, codeRoot) {
     try {
-        // Fetch all records matching the given root
-        const allMatchingRecords = await accountCodes
+        const db = getDatabase(dbId);
+        const allMatchingRecords = await db.accountCodes
             .where("root")
             .equals(codeRoot)
             .toArray();
-        // The first record is the only one due to the uniqueness constraint
         const codeRecord = allMatchingRecords[0];
         if (codeRecord === undefined) {
             console.log("No records found for given code root.");
             return null;
         }
-        // Convert the code Blob to an ArrayBuffer
         const codeBase64 = uint8ArrayToBase64(codeRecord.code);
         return {
             root: codeRecord.root,
@@ -154,15 +146,16 @@ export async function getAccountCode(codeRoot) {
         logWebStoreError(error, `Error fetching account code for root ${codeRoot}`);
     }
 }
-export async function getAccountStorage(storageCommitment) {
+export async function getAccountStorage(dbId, storageCommitment) {
     try {
-        const allMatchingRecords = await accountStorages
+        const db = getDatabase(dbId);
+        const allMatchingRecords = await db.accountStorages
             .where("commitment")
             .equals(storageCommitment)
             .toArray();
         const slots = allMatchingRecords.map((record) => {
             return {
-                slotIndex: record.slotIndex,
+                slotName: record.slotName,
                 slotValue: record.slotValue,
                 slotType: record.slotType,
             };
@@ -173,9 +166,10 @@ export async function getAccountStorage(storageCommitment) {
         logWebStoreError(error, `Error fetching account storage for commitment ${storageCommitment}`);
     }
 }
-export async function getAccountStorageMaps(roots) {
+export async function getAccountStorageMaps(dbId, roots) {
     try {
-        const allMatchingRecords = await storageMapEntries
+        const db = getDatabase(dbId);
+        const allMatchingRecords = await db.storageMapEntries
             .where("root")
             .anyOf(roots)
             .toArray();
@@ -185,14 +179,13 @@ export async function getAccountStorageMaps(roots) {
         logWebStoreError(error, `Error fetching account storage maps for roots ${roots.join(", ")}`);
     }
 }
-export async function getAccountVaultAssets(vaultRoot) {
+export async function getAccountVaultAssets(dbId, vaultRoot) {
     try {
-        // Fetch all records matching the given root
-        const allMatchingRecords = await accountAssets
+        const db = getDatabase(dbId);
+        const allMatchingRecords = await db.accountAssets
             .where("root")
             .equals(vaultRoot)
             .toArray();
-        // Map the records to their asset values
         const assets = allMatchingRecords.map((record) => {
             return {
                 asset: record.asset,
@@ -204,25 +197,24 @@ export async function getAccountVaultAssets(vaultRoot) {
         logWebStoreError(error, `Error fetching account vault for root ${vaultRoot}`);
     }
 }
-export async function getAccountAuthByPubKey(pubKey) {
-    // Try to get the account auth from the store
-    const accountSecretKey = await accountAuths
-        .where("pubKey")
-        .equals(pubKey)
+export async function getAccountAuthByPubKeyCommitment(dbId, pubKeyCommitmentHex) {
+    const db = getDatabase(dbId);
+    const accountSecretKey = await db.accountAuths
+        .where("pubKeyCommitmentHex")
+        .equals(pubKeyCommitmentHex)
         .first();
-    // If it's not in the cache, throw an error
     if (!accountSecretKey) {
         throw new Error("Account auth not found in cache.");
     }
     const data = {
-        secretKey: accountSecretKey.secretKey,
+        secretKey: accountSecretKey.secretKeyHex,
     };
     return data;
 }
-export async function getAccountAddresses(accountId) {
+export async function getAccountAddresses(dbId, accountId) {
     try {
-        // Fetch all records matching the given accountId
-        const allMatchingRecords = await addresses
+        const db = getDatabase(dbId);
+        const allMatchingRecords = await db.addresses
             .where("id")
             .equals(accountId)
             .toArray();
@@ -236,39 +228,39 @@ export async function getAccountAddresses(accountId) {
         logWebStoreError(error, `Error while fetching account addresses for id: ${accountId}`);
     }
 }
-// INSERT FUNCTIONS
-export async function upsertAccountCode(codeRoot, code) {
+export async function upsertAccountCode(dbId, codeRoot, code) {
     try {
-        // Prepare the data object to insert
+        const db = getDatabase(dbId);
         const data = {
-            root: codeRoot, // Using codeRoot as the key
+            root: codeRoot,
             code,
         };
-        // Perform the insert using Dexie
-        await accountCodes.put(data);
+        await db.accountCodes.put(data);
     }
     catch (error) {
         logWebStoreError(error, `Error inserting code with root: ${codeRoot}`);
     }
 }
-export async function upsertAccountStorage(storageSlots) {
+export async function upsertAccountStorage(dbId, storageSlots) {
     try {
+        const db = getDatabase(dbId);
         let processedSlots = storageSlots.map((slot) => {
             return {
                 commitment: slot.commitment,
-                slotIndex: slot.slotIndex,
+                slotName: slot.slotName,
                 slotValue: slot.slotValue,
                 slotType: slot.slotType,
             };
         });
-        await accountStorages.bulkPut(processedSlots);
+        await db.accountStorages.bulkPut(processedSlots);
     }
     catch (error) {
         logWebStoreError(error, `Error inserting storage slots`);
     }
 }
-export async function upsertStorageMapEntries(entries) {
+export async function upsertStorageMapEntries(dbId, entries) {
     try {
+        const db = getDatabase(dbId);
         let processedEntries = entries.map((entry) => {
             return {
                 root: entry.root,
@@ -276,14 +268,15 @@ export async function upsertStorageMapEntries(entries) {
                 value: entry.value,
             };
         });
-        await storageMapEntries.bulkPut(processedEntries);
+        await db.storageMapEntries.bulkPut(processedEntries);
     }
     catch (error) {
         logWebStoreError(error, `Error inserting storage map entries`);
     }
 }
-export async function upsertVaultAssets(assets) {
+export async function upsertVaultAssets(dbId, assets) {
     try {
+        const db = getDatabase(dbId);
         let processedAssets = assets.map((asset) => {
             return {
                 root: asset.root,
@@ -292,14 +285,15 @@ export async function upsertVaultAssets(assets) {
                 asset: asset.asset,
             };
         });
-        await accountAssets.bulkPut(processedAssets);
+        await db.accountAssets.bulkPut(processedAssets);
     }
     catch (error) {
         logWebStoreError(error, `Error inserting assets`);
     }
 }
-export async function upsertAccountRecord(accountId, codeRoot, storageRoot, vaultRoot, nonce, committed, commitment, accountSeed) {
+export async function upsertAccountRecord(dbId, accountId, codeRoot, storageRoot, vaultRoot, nonce, committed, commitment, accountSeed) {
     try {
+        const db = getDatabase(dbId);
         const data = {
             id: accountId,
             codeRoot,
@@ -311,75 +305,75 @@ export async function upsertAccountRecord(accountId, codeRoot, storageRoot, vaul
             accountCommitment: commitment,
             locked: false,
         };
-        await accounts.put(data);
-        await trackedAccounts.put({ id: accountId });
+        await db.accounts.put(data);
+        await db.trackedAccounts.put({ id: accountId });
     }
     catch (error) {
         logWebStoreError(error, `Error inserting account: ${accountId}`);
     }
 }
-export async function insertAccountAuth(pubKey, secretKey) {
+export async function insertAccountAuth(dbId, pubKeyCommitmentHex, secretKey) {
     try {
-        // Prepare the data object to insert
+        const db = getDatabase(dbId);
         const data = {
-            pubKey: pubKey,
-            secretKey: secretKey,
+            pubKeyCommitmentHex,
+            secretKeyHex: secretKey,
         };
-        // Perform the insert using Dexie
-        await accountAuths.add(data);
+        await db.accountAuths.add(data);
     }
     catch (error) {
-        logWebStoreError(error, `Error inserting account auth for pubKey: ${pubKey}`);
+        logWebStoreError(error, `Error inserting account auth for pubKey: ${pubKeyCommitmentHex}`);
     }
 }
-export async function insertAccountAddress(accountId, address) {
+export async function insertAccountAddress(dbId, accountId, address) {
     try {
-        // Prepare the data object to insert
+        const db = getDatabase(dbId);
         const data = {
             id: accountId,
             address,
         };
-        // Perform the insert using Dexie
-        await addresses.put(data);
+        await db.addresses.put(data);
     }
     catch (error) {
         logWebStoreError(error, `Error inserting address with value: ${String(address)} for the account ID ${accountId}`);
     }
 }
-export async function removeAccountAddress(address) {
+export async function removeAccountAddress(dbId, address) {
     try {
-        // Perform the delete using Dexie
-        await addresses.where("address").equals(address).delete();
+        const db = getDatabase(dbId);
+        await db.addresses.where("address").equals(address).delete();
     }
     catch (error) {
         logWebStoreError(error, `Error removing address with value: ${String(address)}`);
     }
 }
-export async function upsertForeignAccountCode(accountId, code, codeRoot) {
+export async function upsertForeignAccountCode(dbId, accountId, code, codeRoot) {
     try {
-        await upsertAccountCode(codeRoot, code);
+        const db = getDatabase(dbId);
+        await upsertAccountCode(dbId, codeRoot, code);
         const data = {
             accountId,
             codeRoot,
         };
-        await foreignAccountCode.put(data);
+        await db.foreignAccountCode.put(data);
     }
     catch (error) {
         logWebStoreError(error, `Error upserting foreign account code for account: ${accountId}`);
     }
 }
-export async function getForeignAccountCode(accountIds) {
+export async function getForeignAccountCode(dbId, accountIds) {
     try {
-        const foreignAccounts = await foreignAccountCode
+        const db = getDatabase(dbId);
+        const foreignAccounts = await db.foreignAccountCode
             .where("accountId")
             .anyOf(accountIds)
             .toArray();
         if (foreignAccounts.length === 0) {
             console.log("No records found for the given account IDs.");
-            return null; // No records found
+            return null;
         }
         const codeRoots = foreignAccounts.map((account) => account.codeRoot);
-        const accountCode = await accountCodes
+        const accountCode = await db.accountCodes
             .where("root")
             .anyOf(codeRoots)
             .toArray();
@@ -402,18 +396,19 @@ export async function getForeignAccountCode(accountIds) {
         logWebStoreError(error, "Error fetching foreign account code");
     }
 }
-export async function lockAccount(accountId) {
+export async function lockAccount(dbId, accountId) {
     try {
-        await accounts.where("id").equals(accountId).modify({ locked: true });
+        const db = getDatabase(dbId);
+        await db.accounts.where("id").equals(accountId).modify({ locked: true });
     }
     catch (error) {
         logWebStoreError(error, `Error locking account: ${accountId}`);
     }
 }
-// Delete functions
-export async function undoAccountStates(accountCommitments) {
+export async function undoAccountStates(dbId, accountCommitments) {
     try {
-        await accounts
+        const db = getDatabase(dbId);
+        await db.accounts
             .where("accountCommitment")
             .anyOf(accountCommitments)
             .delete();

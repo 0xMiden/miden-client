@@ -5,12 +5,7 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::num::ParseIntError;
 
-use miden_lib::AuthScheme;
-use miden_lib::account::faucets::BasicFungibleFaucet;
-use miden_lib::account::interface::AccountInterface;
-pub use miden_lib::utils::ScriptBuilderError;
-use miden_objects::Word;
-use miden_objects::account::Account;
+use miden_standards::account::faucets::BasicFungibleFaucet;
 pub use miden_tx::utils::sync::{LazyLock, RwLock, RwLockReadGuard, RwLockWriteGuard};
 pub use miden_tx::utils::{
     ByteReader,
@@ -105,33 +100,6 @@ pub fn tokens_to_base_units(decimal_str: &str, n_decimals: u8) -> Result<u64, To
 
     // Convert the combined string to an integer
     combined.parse::<u64>().map_err(TokenParseError::ParseU64)
-}
-
-/// Gets the public key from the storage of an account. The function is required to create an
-/// `AccountFile` for exporting accounts in the cli and the web client.
-///
-/// # Arguments
-/// - `account`: The Accounts from which to extract the public keys.
-pub fn get_public_keys_from_account(account: &Account) -> Vec<Word> {
-    let mut words = vec![];
-    let interface: AccountInterface = account.into();
-
-    for auth in interface.auth() {
-        match auth {
-            AuthScheme::NoAuth | AuthScheme::Unknown => {},
-            AuthScheme::RpoFalcon512Multisig { pub_keys, .. } => {
-                words.extend(pub_keys.iter().map(|k| Word::from(*k)));
-            },
-            AuthScheme::RpoFalcon512 { pub_key } | AuthScheme::EcdsaK256Keccak { pub_key } => {
-                words.push(Word::from(*pub_key));
-            },
-            AuthScheme::EcdsaK256KeccakMultisig { pub_keys, .. } => {
-                words.extend(pub_keys.iter().map(|k| Word::from(*k)));
-            },
-        }
-    }
-
-    words
 }
 
 // TESTS

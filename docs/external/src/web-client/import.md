@@ -15,7 +15,7 @@ This guide demonstrates how to import accounts, notes, and store data using the 
 To import an account that was previously exported:
 
 ```typescript
-import { WebClient } from "@demox-labs/miden-sdk";
+import { WebClient } from "@miden-sdk/miden-sdk";
 
 try {
     // Initialize the web client
@@ -34,7 +34,7 @@ try {
 To import a public account using an initialization seed:
 
 ```typescript
-import { WebClient } from "@demox-labs/miden-sdk";
+import { WebClient } from "@miden-sdk/miden-sdk";
 
 try {
     // Initialize the web client
@@ -63,7 +63,7 @@ When importing notes, there are three types of note files that can be used:
 To import a note that was previously exported:
 
 ```typescript
-import { WebClient } from "@demox-labs/miden-sdk";
+import { WebClient } from "@miden-sdk/miden-sdk";
 
 try {
     // Initialize the web client
@@ -82,14 +82,14 @@ try {
 To import an entire store (this is a destructive operation that will overwrite the current store):
 
 ```typescript
-import { WebClient } from "@demox-labs/miden-sdk";
+import { WebClient } from "@miden-sdk/miden-sdk";
 
 try {
     // Initialize the web client
     const webClient = await WebClient.createClient();
 
     // storeDump should be the result of a previous store export
-    const result = await webClient.forceImportStore(storeDump);
+    const result = await webClient.forceImportStore(storeDump, "NewStoreName");
     console.log("Store import result:", result);
 } catch (error) {
     console.error("Failed to import store:", error.message);

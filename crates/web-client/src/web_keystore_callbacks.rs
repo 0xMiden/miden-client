@@ -1,5 +1,6 @@
 use miden_client::auth::{
     AuthSecretKey,
+    PublicKeyCommitment,
     Signature as NativeSignature,
     SigningInputs as NativeSigningInputs,
 };
@@ -10,7 +11,7 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
 use wasm_bindgen_futures::js_sys::{Function, Promise, Uint8Array};
 
-use crate::models::secret_key::SecretKey;
+use crate::models::auth_secret_key::AuthSecretKey as WebAuthSecretKey;
 use crate::models::signature::Signature;
 use crate::models::signing_inputs::SigningInputs;
 
@@ -22,9 +23,9 @@ pub(crate) struct GetKeyCallback(pub(crate) Function);
 impl GetKeyCallback {
     pub(crate) async fn get_secret_key(
         &self,
-        pub_key_commitment: NativeWord,
+        pub_key_commitment: PublicKeyCommitment,
     ) -> Result<Option<AuthSecretKey>, KeyStoreError> {
-        let pub_key_array = pub_key_commitment.as_bytes().to_vec();
+        let pub_key_array = NativeWord::from(pub_key_commitment).as_bytes().to_vec();
         let call_result = self
             .0
             .call1(&JsValue::NULL, &JsValue::from(pub_key_array))
@@ -59,7 +60,10 @@ impl GetKeyCallback {
 pub(crate) struct InsertKeyCallback(pub(crate) Function);
 
 impl InsertKeyCallback {
-    pub(crate) async fn insert_key(&self, secret_key: &SecretKey) -> Result<(), KeyStoreError> {
+    pub(crate) async fn insert_key(
+        &self,
+        secret_key: &WebAuthSecretKey,
+    ) -> Result<(), KeyStoreError> {
         let pub_key_commitment: NativeWord = secret_key.public_key().to_commitment().into();
         let result = self
             .0

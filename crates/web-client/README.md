@@ -1,8 +1,8 @@
-# @demox-labs/miden-sdk
+# @miden-sdk/miden-sdk
 
 ## Overview
 
-The `@demox-labs/miden-sdk` is a comprehensive software development toolkit (SDK) for interacting with the Miden blockchain and virtual machine from within a web application. It provides developers with everything needed to:
+The `@miden-sdk/miden-sdk` is a comprehensive software development toolkit (SDK) for interacting with the Miden blockchain and virtual machine from within a web application. It provides developers with everything needed to:
 
 - Interact with the Miden chain (e.g. syncing accounts, submitting transactions)
 - Create and manage Miden transactions
@@ -40,13 +40,13 @@ This setup allows the SDK to be seamlessly consumed in JavaScript environments, 
 A non-stable version of the SDK is also maintained, which tracks the `next` branch of the Miden client repository (essentially the development branch). To install the pre-release version, run:
 
 ```javascript
-npm i @demox-labs/miden-sdk
+npm i @miden-sdk/miden-sdk
 ```
 
 Or using Yarn:
 
 ```javascript
-yarn add @demox-labs/miden-sdk
+yarn add @miden-sdk/miden-sdk
 ```
 
 ### Pre-release ("next") Version
@@ -54,13 +54,13 @@ yarn add @demox-labs/miden-sdk
 A non-stable version is also maintained. To install the pre-release version, run:
 
 ```javascript
-npm i @demox-labs/miden-sdk@next
+npm i @miden-sdk/miden-sdk@next
 ```
 
 Or with Yarn:
 
 ```javascript
-yarn add @demox-labs/miden-sdk@next
+yarn add @miden-sdk/miden-sdk@next
 ```
 
 > **Note:** The `next` version of the SDK must be used in conjunction with a locally running Miden node built from the `next` branch of the `miden-node` repository. This is necessary because the public testnet runs the stable `main` branch, which may not be compatible with the latest development features in `next`. Instructions to run a local node can be found [here](https://github.com/0xMiden/miden-node/tree/next) on the `next` branch of the `miden-node` repository. Additionally, if you plan to leverage delegated proving in your application, you may need to run a local prover (see [Remote prover instructions](https://github.com/0xMiden/miden-node/tree/next/bin/remote-prover)).
@@ -118,6 +118,16 @@ Follow the steps below to produce the contents that get published to npm (`dist/
 
 > Tip: during development you can set `MIDEN_WEB_DEV=true` before running `yarn build` (or run `npm run build-dev`) to skip the clean step and keep extra debugging metadata in the bundled output. This debugging metadata also includes debug symbols for the generated wasm binary
 
+### Checking the generated TypeScript bindings
+
+The script at `crates/web-client/scripts/check-bindgen-types.js` verifies that every type exported by the generated wasm bindings (`dist/crates/miden_client_web.d.ts`) is re-exported from the public declarations (`js/types/index.d.ts`). Run it after a build with:
+
+```
+yarn check:wasm-types
+```
+
+`WebClient` is intentionally excluded because the wrapper defines its own implementation. If the check reports missing exports, update `js/types/index.d.ts` so consumers get the full generated surface.
+
 ## Usage
 
 The following are just a few simple examples to get started. For more details, see the [API Reference](../../docs/typedoc/web-client/README.md).
@@ -125,7 +135,7 @@ The following are just a few simple examples to get started. For more details, s
 ### Create a New Wallet
 
 ```typescript
-import { AccountStorageMode, WebClient } from "@demox-labs/miden-sdk";
+import { AccountStorageMode, WebClient } from "@miden-sdk/miden-sdk";
 
 // Instantiate web client object
 const webClient = await WebClient.createClient();
@@ -154,11 +164,11 @@ await webClient.syncState();
 
 // Query the client for consumable notes, and retrieve the id of the new note to be consumed
 let consumableNotes = await webClient.getConsumableNotes(account);
-const noteIdToConsume = consumableNotes[0].inputNoteRecord().id();
+const noteToConsume = consumableNotes[0].inputNoteRecord().toNote();
 
 // Create a consume transaction request object
 const consumeTransactionRequest = webClient.newConsumeTransactionRequest([
-  noteIdToConsume,
+  noteToConsume,
 ]);
 
 // Execute, prove, submit, and apply the transaction in one step

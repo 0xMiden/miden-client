@@ -18,7 +18,7 @@ All transactions follow a similar pattern:
 If you don't need to inspect the transaction intermediate structures manually, the SDK offers `submitNewTransaction` to run steps 2-4 for you:
 
 ```typescript
-import { NoteType, WebClient } from "@demox-labs/miden-sdk";
+import { NoteType, WebClient } from "@miden-sdk/miden-sdk";
 
 try {
     const webClient = await WebClient.createClient();
@@ -48,7 +48,7 @@ try {
 When you need to inspect execution results before proving, fall back to the manual pipeline:
 
 ```typescript
-import { NoteType, TransactionProver, WebClient } from "@demox-labs/miden-sdk";
+import { NoteType, TransactionProver, WebClient } from "@miden-sdk/miden-sdk";
 
 try {
     const webClient = await WebClient.createClient();
@@ -103,12 +103,12 @@ try {
 For better performance, you can offload the work of proving the transaction to a remote prover. This is especially useful for complex transactions:
 
 ```typescript
-import { NoteType, TransactionProver, WebClient } from "@demox-labs/miden-sdk";
+import { NoteType, TransactionProver, WebClient } from "@miden-sdk/miden-sdk";
 
 try {
     const webClient = await WebClient.createClient();
 
-    const remoteProver = TransactionProver.newRemoteProver("https://prover.example.com");
+    const remoteProver = TransactionProver.newRemoteProver("https://prover.example.com", 10_000);
 
     const transactionRequest = webClient.newMintTransactionRequest(
         targetAccountId,
@@ -146,12 +146,66 @@ try {
 Using a remote prover can significantly improve performance for complex transactions by offloading the computationally intensive proving work to a dedicated server. This is particularly useful when dealing with large transactions or when running in resource-constrained environments.
 :::
 
+### Defining the Prover
+
+When using `submitNewTransaction`, the SDK uses a local prover by default. If you need to use a specific prover (local or remote), use `submitNewTransactionWithProver` instead:
+
+```typescript
+import { NoteType, TransactionProver, WebClient } from "@miden-sdk/miden-sdk";
+
+const webClient = await WebClient.createClient();
+
+const transactionRequest = webClient.newMintTransactionRequest(
+    targetAccountId,
+    faucetId,
+    NoteType.Private,
+    1000
+);
+
+// Use a specific prover
+const remoteProver = TransactionProver.newRemoteProver("https://prover.example.com", 10_000);
+
+const transactionId = await webClient.submitNewTransactionWithProver(
+    faucetId,
+    transactionRequest,
+    remoteProver
+);
+console.log("Transaction submitted:", transactionId.toString());
+```
+
+#### Prover Fallback Pattern
+
+When using a remote prover, network issues or server errors may cause proving to fail. A common pattern is to fall back to local proving when remote proving fails:
+
+```typescript
+const remoteProver = TransactionProver.newRemoteProver("https://prover.example.com", 10_000);
+const localProver = TransactionProver.newLocalProver();
+
+try {
+    const transactionId = await webClient.submitNewTransactionWithProver(
+        faucetId,
+        transactionRequest,
+        remoteProver
+    );
+    console.log("Transaction submitted with remote prover:", transactionId.toString());
+} catch (error) {
+    // Fall back to local prover on failure
+    console.log("Remote proving failed, falling back to local prover...");
+    const transactionId = await webClient.submitNewTransactionWithProver(
+        faucetId,
+        transactionRequest,
+        localProver
+    );
+    console.log("Transaction submitted with local prover:", transactionId.toString());
+}
+```
+
 ## Sending Transactions
 
 To send tokens between accounts:
 
 ```typescript
-import { NoteType, TransactionProver, WebClient } from "@demox-labs/miden-sdk";
+import { NoteType, TransactionProver, WebClient } from "@miden-sdk/miden-sdk";
 
 try {
     // Initialize the web client
@@ -199,14 +253,14 @@ try {
 To consume (spend) notes:
 
 ```typescript
-import { TransactionProver, WebClient } from "@demox-labs/miden-sdk";
+import { TransactionProver, WebClient } from "@miden-sdk/miden-sdk";
 
 try {
     // Initialize the web client
     const webClient = await WebClient.createClient();
 
     const transactionRequest = webClient.newConsumeTransactionRequest(
-        [noteId1, noteId2]  // Array of note IDs to consume
+        [note1, note2]  // Array of notes to consume, can be retrieved from the client by their noteID
     );
 
     const result = await webClient.executeTransaction(
@@ -259,16 +313,15 @@ import {
     NotesArray,
     NoteAssets,
     NoteExecutionHint,
-    NoteExecutionMode,
     NoteMetadata,
     NoteTag,
     NoteType,
-    OutputNotesArray,
+    OutputNoteArray,
     TransactionProver,
     TransactionRequestBuilder,
     TransactionScript,
     WebClient
-} from "@demox-labs/miden-sdk";
+} from "@miden-sdk/miden-sdk";
 
 try {
     // Initialize the web client
@@ -302,7 +355,7 @@ try {
     const transactionScript = new TransactionScript(noteScript);
 
     // Create output notes array
-    const outputNotes = new OutputNotesArray();
+    const outputNotes = new OutputNoteArray();
     // Add your output notes here
 
     // Create expected notes array
@@ -366,7 +419,6 @@ For more detailed information about transaction functionality, refer to the foll
 - [Felt](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/Felt.md) - Class for working with field elements
 - [FeltArray](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/FeltArray.md) - Class for working with arrays of field elements
 - [NoteTag](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/NoteTag.md) - Class for defining note tags
-- [NoteExecutionMode](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/NoteExecutionMode.md) - Class for defining note execution modes
 - [NoteExecutionHint](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/NoteExecutionHint.md) - Class for defining note execution hints
 - [OutputNotesArray](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/OutputNotesArray.md) - Class for working with arrays of output notes
 - [NotesArray](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/NotesArray.md) - Class for working with arrays of notes

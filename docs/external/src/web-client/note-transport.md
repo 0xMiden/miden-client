@@ -12,7 +12,7 @@ This guide demonstrates how to use the note transport features in the Miden SDK.
 To use note transport features, you need to initialize the client with a note transport endpoint URL:
 
 ```typescript
-import { WebClient } from "@demox-labs/miden-sdk";
+import { WebClient } from "@miden-sdk/miden-sdk";
 
 try {
     // Initialize the web client with note transport endpoint
@@ -33,7 +33,7 @@ try {
 To send a private note, use `sendPrivateNote()`:
 
 ```typescript
-import { WebClient, Note, Address } from "@demox-labs/miden-sdk";
+import { WebClient, Note, Address } from "@miden-sdk/miden-sdk";
 
 try {
     // Initialize the web client with note transport endpoint
@@ -56,7 +56,7 @@ try {
 To fetch private notes from the note transport layer, use `fetchPrivateNotes()`.
 
 ```typescript
-import { WebClient, NoteFilter, NoteFilterTypes } from "@demox-labs/miden-sdk";
+import { WebClient, NoteFilter, NoteFilterTypes } from "@miden-sdk/miden-sdk";
 
 try {
     // Initialize the web client with note transport endpoint

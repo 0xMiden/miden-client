@@ -1,10 +1,12 @@
-[**@demox-labs/miden-sdk**](../README.md)
+[**@miden-sdk/miden-sdk**](../README.md)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / ScriptBuilder
+[@miden-sdk/miden-sdk](../README.md) / CodeBuilder
 
-# Class: ScriptBuilder
+# Class: CodeBuilder
+
+Utility for linking libraries and compiling transaction/note scripts.
 
 ## Methods
 
@@ -25,7 +27,7 @@
 Given a Library Path, and a source code, turn it into a Library.
 E.g. A path library can be `miden::my_contract`. When turned into a library,
 this can be used from another script with an import statement, following the
-previous example: `use.miden::my_contract'.
+previous example: `use miden::my_contract'.
 
 #### Parameters
 
@@ -40,6 +42,25 @@ previous example: `use.miden::my_contract'.
 #### Returns
 
 [`Library`](Library.md)
+
+***
+
+### compileAccountComponentCode()
+
+> **compileAccountComponentCode**(`account_code`): [`AccountComponentCode`](AccountComponentCode.md)
+
+Given an `AccountComponentCode`, compiles it
+with the available modules under this builder. Returns the compiled account component code.
+
+#### Parameters
+
+##### account\_code
+
+`string`
+
+#### Returns
+
+[`AccountComponentCode`](AccountComponentCode.md)
 
 ***
 
@@ -95,7 +116,7 @@ modules under this builder. Returns the compiled script.
 
 > **linkDynamicLibrary**(`library`): `void`
 
-This is useful to dynamically link the [`Library`] of a foreign account
+This is useful to dynamically link the [Library](Library.md) of a foreign account
 that is invoked using foreign procedure invocation (FPI). Its code is available
 on-chain and so it does not have to be copied into the script code.
 

@@ -14,7 +14,6 @@ use miden_client::crypto::{FeltRng, RpoRandomCoin};
 use miden_client::note::{
     Note,
     NoteAssets,
-    NoteExecutionHint,
     NoteFile,
     NoteId,
     NoteInputs,
@@ -27,7 +26,7 @@ use miden_client::rpc::{Endpoint, GrpcClient};
 use miden_client::testing::account_id::ACCOUNT_ID_PRIVATE_SENDER;
 use miden_client::testing::common::{
     ACCOUNT_ID_REGULAR,
-    TestClientKeyStore,
+    FilesystemKeyStore,
     create_test_store_path,
     execute_tx_and_sync,
     insert_new_wallet,
@@ -37,12 +36,13 @@ use miden_client::utils::Serializable;
 use miden_client::{
     self,
     Client,
+    DebugMode,
     ExecutionOptions,
     Felt,
     MAX_TX_EXECUTION_CYCLES,
     MIN_TX_EXECUTION_CYCLES,
 };
-use miden_client_cli::{CliKeyStore, MIDEN_DIR};
+use miden_client_cli::MIDEN_DIR;
 use miden_client_sqlite_store::SqliteStore;
 use predicates::str::contains;
 use rand::Rng;
@@ -107,7 +107,7 @@ fn init_with_params() {
 }
 
 #[test]
-#[serial_test::serial(global_config)]
+#[serial_test::file_serial]
 fn silent_initialization_uses_default_values() {
     // Clean up any existing global config first
     cleanup_global_config();
@@ -260,6 +260,10 @@ fn silent_initialization_does_not_override_existing_config() {
         [rpc]
         endpoint = "https://custom-endpoint.com"
         timeout_ms = 5000
+
+        [remote_prover_timeout]
+        secs = 20
+        nanos = 0
         "#
     );
     std::fs::write(&config_path, custom_config).unwrap();
@@ -493,6 +497,7 @@ async fn cli_export_import_note() -> Result<()> {
         &mock_target_id.to_hex(),
         &fungible_faucet_account_id,
     );
+
     Ok(())
 }
 
@@ -536,7 +541,10 @@ async fn cli_export_import_account() -> Result<()> {
     import_cmd.current_dir(&temp_dir_2).assert().success();
 
     // Ensure the account was imported
-    let client_2 = create_rust_client_with_store_path(&store_path_2, endpoint_2).await?.0;
+    let (client_2, _) = create_rust_client_with_store_path(&store_path_2, endpoint_2).await?;
+    let cli_keystore =
+        FilesystemKeyStore::new(temp_dir_2.clone().join(MIDEN_DIR).join("keystore"))?;
+
     assert!(client_2.get_account(AccountId::from_hex(&faucet_id)?).await.is_ok());
     assert!(client_2.get_account(AccountId::from_hex(&wallet_id)?).await.is_ok());
 
@@ -549,6 +557,30 @@ async fn cli_export_import_account() -> Result<()> {
 
     // Consume the note
     consume_note_cli(&temp_dir_2, &wallet_id, &[&note_id]);
+
+    // Since importing keys should also store a mapping from
+    // the account id to its public key commitments, we should be able
+    // to retrieve them.
+    let faucet_pks = client_2
+        .get_account_public_key_commitments(&AccountId::from_hex(&faucet_id)?)
+        .await?;
+
+    for stored_pk_commitment in faucet_pks {
+        let matching_secret_key = cli_keystore.get_key(stored_pk_commitment).unwrap();
+        assert!(matching_secret_key.is_some());
+        assert!(matching_secret_key.unwrap().public_key().to_commitment() == stored_pk_commitment);
+    }
+
+    let wallet_pks = client_2
+        .get_account_public_key_commitments(&AccountId::from_hex(&wallet_id)?)
+        .await?;
+
+    for stored_pk_commitment in wallet_pks {
+        let matching_secret_key = cli_keystore.get_key(stored_pk_commitment).unwrap();
+        assert!(matching_secret_key.is_some());
+        assert!(matching_secret_key.unwrap().public_key().to_commitment() == stored_pk_commitment);
+    }
+
     Ok(())
 }
 
@@ -634,6 +666,7 @@ async fn init_with_testnet() -> Result<()> {
 }
 
 #[tokio::test]
+#[serial_test::file_serial]
 async fn debug_mode_outputs_logs() -> Result<()> {
     // This test tries to execute a transaction with debug mode enabled and checks that the stack
     // state is printed. We need to use the CLI for this because the debug logs are always printed
@@ -664,17 +697,14 @@ async fn debug_mode_outputs_logs() -> Result<()> {
                 assert_eq
             end
             ";
-    let note_script = client.script_builder().compile_note_script(note_script).unwrap();
+    let note_script = client.code_builder().compile_note_script(note_script).unwrap();
     let inputs = NoteInputs::new(vec![]).unwrap();
     let serial_num = client.rng().draw_word();
     let note_metadata = NoteMetadata::new(
         account.id(),
         NoteType::Private,
-        NoteTag::from_account_id(account.id()),
-        NoteExecutionHint::None,
-        Felt::default(),
-    )
-    .unwrap();
+        NoteTag::with_account_target(account.id()),
+    );
     let note_assets = NoteAssets::new(vec![]).unwrap();
     let note_recipient = NoteRecipient::new(serial_num, note_script, inputs);
     let note = Note::new(note_assets, note_metadata, note_recipient);
@@ -722,6 +752,10 @@ async fn debug_mode_outputs_logs() -> Result<()> {
         .assert()
         .success()
         .stdout(contains("Stack state"));
+
+    unsafe {
+        env::remove_var("MIDEN_DEBUG");
+    }
 
     Ok(())
 }
@@ -831,6 +865,52 @@ async fn list_addresses_remove() -> Result<()> {
     let formatted_output = String::from_utf8(output.stdout).unwrap();
     assert!(formatted_output.contains(&basic_account_id));
     assert_eq!(formatted_output.matches("Unspecified").count(), 0);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn new_wallet_with_deploy_flag() -> Result<()> {
+    let (store_path, temp_dir, endpoint) = init_cli();
+
+    sync_cli(&temp_dir);
+
+    let mut create_wallet_cmd = cargo_bin_cmd!("miden-client");
+    create_wallet_cmd.args(["new-wallet", "-s", "public", "--deploy"]);
+
+    let output = create_wallet_cmd.current_dir(&temp_dir).output().unwrap();
+    assert!(
+        output.status.success(),
+        "Failed to create and deploy wallet: {}",
+        String::from_utf8(output.stderr).unwrap()
+    );
+
+    // Extract the account ID from the output
+    let output_str = std::str::from_utf8(&output.stdout).unwrap();
+    let account_id_str = output_str
+        .split_whitespace()
+        .skip_while(|&word| word != "-s")
+        .nth(1)
+        .expect("Failed to extract account ID from output");
+
+    // Sync to ensure the transaction is committed
+    sync_cli(&temp_dir);
+
+    // Create a client and retrieve the account to verify the nonce
+    let (client, _) = create_rust_client_with_store_path(&store_path, endpoint).await?;
+    let account_id = AccountId::from_hex(account_id_str)?;
+    let account = client
+        .get_account(account_id)
+        .await?
+        .expect("Account should exist in the store");
+
+    // Verify that the nonce is non-zero (account was deployed)
+    // By convention, a nonce of 0 indicates an undeployed account
+    assert!(
+        account.nonce().as_int() > 0,
+        "Account nonce should be non-zero after deployment, but got: {}",
+        account.nonce()
+    );
 
     Ok(())
 }
@@ -1000,9 +1080,10 @@ fn new_faucet_cli(cli_path: &Path, storage_mode: AccountStorageMode) -> String {
 
     // Create a TOML file with the InitStorageData
     let init_storage_data_toml = r#"
-        token_metadata.decimals=10
-        token_metadata.max_supply=10000000
-        token_metadata.ticker="BTC"
+        ["miden::standards::fungible_faucets::metadata"]
+        decimals="10"
+        max_supply="10000000"
+        ticker="BTC"
         "#;
     let file_path = cli_path.join(INIT_DATA_FILENAME);
     fs::write(&file_path, init_storage_data_toml).unwrap();
@@ -1055,13 +1136,13 @@ fn new_wallet_cli(cli_path: &Path, storage_mode: AccountStorageMode) -> String {
         .to_string()
 }
 
-pub type TestClient = Client<TestClientKeyStore>;
+pub type TestClient = Client<FilesystemKeyStore>;
 
 /// Creates a new [`Client`] with a given store. Also returns the keystore associated with it.
 async fn create_rust_client_with_store_path(
     store_path: &Path,
     endpoint: Endpoint,
-) -> Result<(TestClient, CliKeyStore)> {
+) -> Result<(TestClient, FilesystemKeyStore)> {
     let store = {
         let sqlite_store = SqliteStore::new(PathBuf::from(store_path)).await?;
         std::sync::Arc::new(sqlite_store)
@@ -1072,7 +1153,7 @@ async fn create_rust_client_with_store_path(
 
     let rng = Box::new(RpoRandomCoin::new(coin_seed.map(Felt::new).into()));
 
-    let keystore = CliKeyStore::new(temp_dir())?;
+    let keystore = FilesystemKeyStore::new(temp_dir())?;
 
     Ok((
         TestClient::new(
@@ -1178,18 +1259,21 @@ fn create_account_with_multisig_auth() {
     let temp_dir = init_cli().1;
 
     // Create init storage data file for multisig
+    // threshold_config is a value slot with [threshold, num_approvers, 0, 0]
+    // approver_public_keys and procedure_thresholds are map slots
     let init_storage_data_toml = r#"
-        approvers = [
-        { key = "0x0000000000000000000000000000000000000000000000000000000000000001", value = "0x0000000000000000000000000000000000000000000000000000000000000001" }
+        "miden::standards::auth::falcon512_rpo_multisig::threshold_config.threshold" = "2"
+        "miden::standards::auth::falcon512_rpo_multisig::threshold_config.num_approvers" = "3"
+
+        "miden::standards::auth::falcon512_rpo_multisig::approver_public_keys" = [
+            { key = ["0", "0", "0", "0"], value = "0x0000000000000000000000000000000000000000000000000000000000000001" },
+            { key = ["0", "0", "0", "1"], value = "0x0000000000000000000000000000000000000000000000000000000000000002" },
+            { key = ["0", "0", "0", "2"], value = "0x0000000000000000000000000000000000000000000000000000000000000003" }
         ]
 
-        proc_thresholds = [
-        { key = "0xd2d1b6229d7cfb9f2ada31c5cb61453cf464f91828e124437c708eec55b9cd07", value = "0x00000000000000000000000000000000000000000000000000000000000001" }
+        "miden::standards::auth::falcon512_rpo_multisig::procedure_thresholds" = [
+            { key = "0xd2d1b6229d7cfb9f2ada31c5cb61453cf464f91828e124437c708eec55b9cd07", value = "1" }
         ]
-
-        [threshold_and_count]
-        threshold=2
-        num_approvers=3
         "#;
     let file_path = temp_dir.join("multisig_init_data.toml");
     fs::write(&file_path, init_storage_data_toml).unwrap();
@@ -1219,14 +1303,14 @@ fn create_account_with_acl_auth() {
 
     // Create init storage data file for acl-auth with a test public key
     let init_storage_data_toml = r#"
-        proc_roots = [
-        { key = "0x0000000000000000000000000000000000000000000000000000000000000000", value = "0xd2d1b6229d7cfb9f2ada31c5cb61453cf464f91828e124437c708eec55b9cd07" }
-        ]
+        "miden::standards::auth::rpo_falcon512_acl::public_key" = "0x0000000000000000000000000000000000000000000000000000000000000001"
+        "miden::standards::auth::rpo_falcon512_acl::config.num_tracked_procs" = "1"
+        "miden::standards::auth::rpo_falcon512_acl::config.allow_unauthorized_output_notes" = "0"
+        "miden::standards::auth::rpo_falcon512_acl::config.allow_unauthorized_input_notes" = "0"
 
-        falcon_pubkey="0x0000000000000000000000000000000000000000000000000000000000000001"
-        acl_config.num_tracked_procs=1
-        acl_config.allow_unauthorized_output_notes=0
-        acl_config.allow_unauthorized_input_notes=0
+        "miden::standards::auth::rpo_falcon512_acl::trigger_procedure_roots" = [
+            { key = ["0", "0", "0", "0"], value = "0xd2d1b6229d7cfb9f2ada31c5cb61453cf464f91828e124437c708eec55b9cd07" }
+        ]
         "#;
     let file_path = temp_dir.join("acl_init_data.toml");
     fs::write(&file_path, init_storage_data_toml).unwrap();
@@ -1256,7 +1340,7 @@ fn create_account_with_ecdsa_auth() {
 
     // Create init storage data file for ecdsa-auth with a test public key
     let init_storage_data_toml = r#"
-        ecdsa_pubkey="0x0000000000000000000000000000000000000000000000000000000000000001"
+        "miden::standards::auth::ecdsa_k256_keccak::public_key"="0x0000000000000000000000000000000000000000000000000000000000000001"
         "#;
     let file_path = temp_dir.join("ecdsa_init_data.toml");
     fs::write(&file_path, init_storage_data_toml).unwrap();
@@ -1277,4 +1361,155 @@ fn create_account_with_ecdsa_auth() {
     ]);
 
     create_account_cmd.current_dir(&temp_dir).assert().success();
+}
+
+// FROM_SYSTEM_USER_CONFIG TESTS
+// ================================================================================================
+/// Tests that `CliClient::from_system_user_config()` successfully creates a client with the same
+/// configuration as the CLI tool when a local config exists.
+#[tokio::test]
+#[serial_test::file_serial]
+async fn test_from_system_user_config_with_local_config() -> Result<()> {
+    // Initialize a local CLI configuration
+    let (store_path, temp_dir, _endpoint) = init_cli();
+
+    // Ensure no global config exists to verify local config takes priority
+    cleanup_global_config();
+
+    // Change to the temp directory where local .miden config exists
+    let original_dir = env::current_dir().unwrap();
+    env::set_current_dir(&temp_dir)?;
+
+    // Create a client using from_system_user_config - should pick up local config
+    let client_result =
+        miden_client_cli::CliClient::from_system_user_config(DebugMode::Disabled).await;
+
+    // Restore original directory
+    env::set_current_dir(original_dir)?;
+
+    // Assert the client was created successfully
+    assert!(
+        client_result.is_ok(),
+        "Failed to create client from local config: {:?}",
+        client_result.err()
+    );
+
+    // Verify that the local config was actually used by checking which store file was created.
+    // The local store should exist, indicating the local config was used.
+    assert!(
+        store_path.exists(),
+        "Local store file should exist at {store_path:?}, indicating local config was used"
+    );
+
+    Ok(())
+}
+
+/// Tests that `CliClient::from_system_user_config()` silently initializes with default config
+/// when no configuration exists.
+#[tokio::test]
+#[serial_test::file_serial]
+async fn test_from_system_user_config_silent_init() -> Result<()> {
+    // Create a temporary directory with no .miden configuration
+    let temp_dir = temp_dir().join(format!("cli-test-silent-init-{}", rand::rng().random::<u64>()));
+    std::fs::create_dir_all(&temp_dir)?;
+
+    // Ensure no global config exists
+    cleanup_global_config();
+
+    // Verify no config exists before we start
+    let global_miden_dir = dirs::home_dir().unwrap().join(MIDEN_DIR);
+    let global_config_path = global_miden_dir.join("miden-client.toml");
+    assert!(!global_config_path.exists(), "Global config should not exist before test");
+
+    // Change to the temp directory
+    let original_dir = env::current_dir().unwrap();
+    env::set_current_dir(&temp_dir)?;
+
+    // Create a client - should succeed via silent initialization
+    let client_result =
+        miden_client_cli::CliClient::from_system_user_config(DebugMode::Disabled).await;
+
+    // Restore original directory
+    env::set_current_dir(original_dir)?;
+
+    // Assert the client was created successfully
+    assert!(
+        client_result.is_ok(),
+        "Expected client to be created via silent initialization, but got error: {:?}",
+        client_result.err()
+    );
+
+    // Verify that a global config was created by the silent initialization
+    assert!(
+        global_config_path.exists(),
+        "Expected global config to be created at {global_config_path:?} by silent initialization"
+    );
+
+    // Clean up temp directory and global config
+    let _ = std::fs::remove_dir_all(&temp_dir);
+    cleanup_global_config();
+
+    Ok(())
+}
+
+/// Tests that `CliConfig::from_system()` prioritizes local config over global config.
+#[tokio::test]
+#[serial_test::file_serial]
+async fn test_from_system_user_config_local_priority() -> Result<()> {
+    // Clean up any existing global config
+    cleanup_global_config();
+
+    // Create a global config with testnet endpoint
+    let global_store_path = create_test_store_path();
+    let global_endpoint = Endpoint::testnet();
+
+    let temp_dir_for_global =
+        temp_dir().join(format!("cli-test-global-init-{}", rand::rng().random::<u64>()));
+    std::fs::create_dir_all(&temp_dir_for_global)?;
+
+    let mut init_global_cmd = cargo_bin_cmd!("miden-client");
+    init_global_cmd.args([
+        "init",
+        "--network",
+        global_endpoint.to_string().as_str(),
+        "--store-path",
+        global_store_path.to_str().unwrap(),
+    ]);
+    init_global_cmd.current_dir(&temp_dir_for_global).assert().success();
+
+    // Create a local config with localhost endpoint
+    let local_store_path = create_test_store_path();
+    let local_endpoint = Endpoint::localhost();
+    let local_temp_dir = init_cli_with_store_path(&local_store_path, &local_endpoint);
+
+    // Load config from the specific local directory (no need to change working directory!)
+    let local_miden_dir = local_temp_dir.join(MIDEN_DIR);
+    let config = miden_client_cli::CliConfig::from_dir(&local_miden_dir)?;
+
+    // Create client with local config
+    let client = miden_client_cli::CliClient::from_config(config, DebugMode::Disabled).await;
+
+    // Clean up
+    let _ = std::fs::remove_dir_all(&temp_dir_for_global);
+    let _ = std::fs::remove_dir_all(&local_temp_dir);
+    cleanup_global_config();
+
+    // Assert client was created with local config
+    assert!(client.is_ok(), "Failed to create client with local config: {:?}", client.err());
+
+    // Verify that the local config was actually used by checking which store file was created
+
+    // The local store should exist
+    assert!(
+        local_store_path.exists(),
+        "Local store file should exist at {local_store_path:?}, indicating local config was used"
+    );
+
+    // The global store should NOT exist
+    assert!(
+        !global_store_path.exists(),
+        "Global store file should NOT exist at {global_store_path:?}, as global config should not have been used"
+    );
+
+    Ok(())
 }

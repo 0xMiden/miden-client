@@ -225,7 +225,7 @@ export const compileTxScript = async (
       0
     );
 
-    let builder = client.createScriptBuilder();
+    let builder = client.createCodeBuilder();
     const compiledScript = builder.compileNoteScript(_script);
 
     return {
@@ -237,10 +237,6 @@ export const compileTxScript = async (
 test.describe("compile_tx_script tests", () => {
   test("compile_tx_script compiles script successfully", async ({ page }) => {
     const script = `
-            use.miden::contracts::auth::basic->auth_tx
-            use.miden::kernels::tx::prologue
-            use.miden::kernels::tx::memory
-
             begin
                 push.0 push.0
                 # => [0, 0]

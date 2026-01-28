@@ -1,10 +1,10 @@
-[**@demox-labs/miden-sdk**](../README.md)
+[**@miden-sdk/miden-sdk**](../README.md)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / AuthRpoFalcon512MultisigConfig
+[@miden-sdk/miden-sdk](../README.md) / AuthFalcon512RpoMultisigConfig
 
-# Class: AuthRpoFalcon512MultisigConfig
+# Class: AuthFalcon512RpoMultisigConfig
 
 Multisig auth configuration for `RpoFalcon512` signatures.
 
@@ -12,7 +12,7 @@ Multisig auth configuration for `RpoFalcon512` signatures.
 
 ### Constructor
 
-> **new AuthRpoFalcon512MultisigConfig**(`approvers`, `default_threshold`): `AuthRpoFalcon512MultisigConfig`
+> **new AuthFalcon512RpoMultisigConfig**(`approvers`, `default_threshold`): `AuthFalcon512RpoMultisigConfig`
 
 Build a configuration with a list of approver public key commitments and a default
 threshold.
@@ -31,7 +31,7 @@ threshold.
 
 #### Returns
 
-`AuthRpoFalcon512MultisigConfig`
+`AuthFalcon512RpoMultisigConfig`
 
 ## Properties
 
@@ -83,7 +83,7 @@ Per-procedure thresholds.
 
 ### withProcThresholds()
 
-> **withProcThresholds**(`proc_thresholds`): `AuthRpoFalcon512MultisigConfig`
+> **withProcThresholds**(`proc_thresholds`): `AuthFalcon512RpoMultisigConfig`
 
 Attach per-procedure thresholds. Each threshold must be >= 1 and <= `approvers.length`.
 
@@ -95,4 +95,4 @@ Attach per-procedure thresholds. Each threshold must be >= 1 and <= `approvers.l
 
 #### Returns
 
-`AuthRpoFalcon512MultisigConfig`
+`AuthFalcon512RpoMultisigConfig`

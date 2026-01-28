@@ -1,12 +1,15 @@
-[**@demox-labs/miden-sdk**](../README.md)
+[**@miden-sdk/miden-sdk**](../README.md)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / TransactionResult
+[@miden-sdk/miden-sdk](../README.md) / TransactionResult
 
 # Class: TransactionResult
 
-WASM wrapper around the native [`TransactionResult`].
+Represents the result of executing a transaction by the client.
+
+It contains an `ExecutedTransaction`, and a list of `future_notes`
+that we expect to receive in the future (you can check at swap notes for an example of this).
 
 ## Methods
 

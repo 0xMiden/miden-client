@@ -1,16 +1,14 @@
 use std::sync::Arc;
 
-use miden_client::Felt;
 use miden_client::account::{Account, AccountStorageMode};
 use miden_client::address::{Address, AddressInterface, RoutingParameters};
 use miden_client::keystore::FilesystemKeyStore;
-use miden_client::note::NoteType;
+use miden_client::note::{NoteAttachment, NoteType};
 use miden_client::store::NoteFilter;
 use miden_client::testing::mock::MockClient;
 use miden_client::testing::note_transport::{MockNoteTransportApi, MockNoteTransportNode};
 use miden_client::utils::RwLock;
-use miden_lib::note::create_p2id_note;
-use rand::rngs::StdRng;
+use miden_standards::note::create_p2id_note;
 
 use crate::tests::{create_test_client_builder, insert_new_wallet};
 
@@ -31,7 +29,7 @@ async fn transport_basic() {
         recipient_account.id(),
         vec![],
         NoteType::Private,
-        Felt::default(),
+        NoteAttachment::default(),
         sender.rng(),
     )
     .unwrap();
@@ -67,7 +65,7 @@ async fn transport_basic() {
 
 pub async fn create_test_client_transport(
     mock_node: Arc<RwLock<MockNoteTransportNode>>,
-) -> (MockClient<FilesystemKeyStore<StdRng>>, FilesystemKeyStore<StdRng>) {
+) -> (MockClient<FilesystemKeyStore>, FilesystemKeyStore) {
     let (builder, _, keystore) = create_test_client_builder().await;
     let transport_client = MockNoteTransportApi::new(mock_node);
     let builder_w_transport = builder.note_transport(Arc::new(transport_client));
@@ -80,7 +78,7 @@ pub async fn create_test_client_transport(
 
 pub async fn create_test_user_transport(
     mock_node: Arc<RwLock<MockNoteTransportNode>>,
-) -> (MockClient<FilesystemKeyStore<StdRng>>, Account) {
+) -> (MockClient<FilesystemKeyStore>, Account) {
     let (mut client, keystore) = Box::pin(create_test_client_transport(mock_node.clone())).await;
     let account = insert_new_wallet(&mut client, AccountStorageMode::Private, &keystore)
         .await

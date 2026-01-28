@@ -17,9 +17,9 @@ pub struct AccountCodeIdxdbObject {
 #[serde(rename_all = "camelCase")]
 #[allow(clippy::struct_field_names)]
 pub struct AccountStorageIdxdbObject {
-    pub slot_index: u8,
+    pub slot_name: String,
     pub slot_value: String,
-    pub slot_type: u64,
+    pub slot_type: u8,
 }
 
 #[derive(Serialize, Deserialize)]

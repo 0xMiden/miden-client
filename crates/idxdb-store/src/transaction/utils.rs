@@ -1,4 +1,4 @@
-use alloc::string::{String, ToString};
+use alloc::string::String;
 use alloc::vec::Vec;
 
 use miden_client::Word;
@@ -30,7 +30,7 @@ pub struct SerializedTransactionData {
     #[wasm_bindgen(js_name = "txScript")]
     pub tx_script: Option<Vec<u8>>,
     #[wasm_bindgen(js_name = "blockNum")]
-    pub block_num: String,
+    pub block_num: u32,
     #[wasm_bindgen(js_name = "statusVariant")]
     pub status_variant: u8,
     pub status: Vec<u8>,
@@ -41,6 +41,7 @@ pub struct SerializedTransactionData {
 /// Converts an `ExecutedTransaction` into a `TransactionRecord` and inserts it into the store.
 /// `submission_height` is the block number at which the transaction was submitted to the network.
 pub async fn insert_proven_transaction_data(
+    db_id: &str,
     executed_transaction: &ExecutedTransaction,
     submission_height: BlockNumber,
 ) -> Result<(), StoreError> {
@@ -72,7 +73,7 @@ pub async fn insert_proven_transaction_data(
         TransactionStatus::Pending,
     );
 
-    upsert_transaction_record(&transaction_record).await?;
+    upsert_transaction_record(db_id, &transaction_record).await?;
 
     Ok(())
 }
@@ -91,7 +92,7 @@ pub(crate) fn serialize_transaction_record(
         script_root,
         tx_script,
         details: transaction_record.details.to_bytes(),
-        block_num: transaction_record.details.block_num.as_u32().to_string(),
+        block_num: transaction_record.details.block_num.as_u32(),
         status_variant: transaction_record.status.variant() as u8,
         status: transaction_record.status.to_bytes(),
     }
@@ -99,16 +100,18 @@ pub(crate) fn serialize_transaction_record(
 
 /// Updates the transaction record in the database, inserting it if it doesn't exist.
 pub(crate) async fn upsert_transaction_record(
+    db_id: &str,
     transaction: &TransactionRecord,
 ) -> Result<(), StoreError> {
     let serialized_data = serialize_transaction_record(transaction);
 
     if let Some(root) = serialized_data.script_root.clone() {
-        let promise = idxdb_insert_transaction_script(root, serialized_data.tx_script);
+        let promise = idxdb_insert_transaction_script(db_id, root, serialized_data.tx_script);
         await_ok(promise, "failed to insert script").await?;
     }
 
     let promise = idxdb_upsert_transaction_record(
+        db_id,
         serialized_data.id,
         serialized_data.details,
         serialized_data.block_num,

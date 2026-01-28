@@ -1,8 +1,8 @@
 use alloc::string::ToString;
 
-use miden_objects::block::{BlockHeader, BlockNumber};
-use miden_objects::note::{NoteId, NoteInclusionProof, NoteMetadata, compute_note_commitment};
-use miden_objects::transaction::TransactionId;
+use miden_protocol::block::{BlockHeader, BlockNumber};
+use miden_protocol::note::{NoteId, NoteInclusionProof, NoteMetadata, compute_note_commitment};
+use miden_protocol::transaction::TransactionId;
 
 use super::{
     CommittedNoteState,
@@ -59,7 +59,7 @@ impl NoteStateHandler for UnverifiedNoteState {
             Ok(Some(
                 CommittedNoteState {
                     inclusion_proof: self.inclusion_proof.clone(),
-                    metadata: self.metadata,
+                    metadata: self.metadata.clone(),
                     block_note_root: block_header.note_root(),
                 }
                 .into(),
@@ -67,7 +67,7 @@ impl NoteStateHandler for UnverifiedNoteState {
         } else {
             Ok(Some(
                 InvalidNoteState {
-                    metadata: self.metadata,
+                    metadata: self.metadata.clone(),
                     invalid_inclusion_proof: self.inclusion_proof.clone(),
                     block_note_root: block_header.note_root(),
                 }
@@ -78,8 +78,8 @@ impl NoteStateHandler for UnverifiedNoteState {
 
     fn consumed_locally(
         &self,
-        consumer_account: miden_objects::account::AccountId,
-        consumer_transaction: miden_objects::transaction::TransactionId,
+        consumer_account: miden_protocol::account::AccountId,
+        consumer_transaction: miden_protocol::transaction::TransactionId,
         _current_timestamp: Option<u64>,
     ) -> Result<Option<InputNoteState>, NoteRecordError> {
         let submission_data = NoteSubmissionData {
@@ -92,7 +92,7 @@ impl NoteStateHandler for UnverifiedNoteState {
             self.inclusion_proof.location().block_num().as_u32().saturating_sub(1);
         Ok(Some(
             ProcessingUnauthenticatedNoteState {
-                metadata: self.metadata,
+                metadata: self.metadata.clone(),
                 after_block_num: BlockNumber::from(after_block_num),
                 submission_data,
             }

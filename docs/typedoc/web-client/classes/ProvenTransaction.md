@@ -1,12 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+[**@miden-sdk/miden-sdk**](../README.md)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / ProvenTransaction
+[@miden-sdk/miden-sdk](../README.md) / ProvenTransaction
 
 # Class: ProvenTransaction
 
-WASM wrapper around the native [`ProvenTransaction`].
+Result of executing and proving a transaction. Contains all the data required to verify that a
+transaction was executed correctly.
 
 ## Methods
 

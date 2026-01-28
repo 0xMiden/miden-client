@@ -4,11 +4,11 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use async_trait::async_trait;
-use miden_objects::Word;
-use miden_objects::account::{Account, AccountHeader, AccountId};
-use miden_objects::block::{BlockHeader, BlockNumber};
-use miden_objects::crypto::merkle::{InOrderIndex, MmrDelta, MmrPeaks, PartialMmr};
-use miden_objects::note::{NoteId, NoteTag};
+use miden_protocol::Word;
+use miden_protocol::account::{Account, AccountHeader, AccountId};
+use miden_protocol::block::{BlockHeader, BlockNumber};
+use miden_protocol::crypto::merkle::mmr::{InOrderIndex, MmrDelta, MmrPeaks, PartialMmr};
+use miden_protocol::note::{NoteId, NoteTag};
 use tracing::info;
 
 use super::state_sync_update::TransactionUpdateTracker;

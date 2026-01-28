@@ -1,6 +1,6 @@
 use alloc::boxed::Box;
 
-use miden_objects::transaction::{ProvenTransaction, TransactionInputs};
+use miden_protocol::transaction::{ProvenTransaction, TransactionInputs};
 use miden_remote_prover_client::remote_prover::tx_prover::RemoteTransactionProver;
 use miden_tx::{LocalTransactionProver, TransactionProverError};
 
@@ -31,7 +31,7 @@ impl TransactionProver for RemoteTransactionProver {
         &self,
         witness: TransactionInputs,
     ) -> Result<ProvenTransaction, TransactionProverError> {
-        let fut = RemoteTransactionProver::prove(self, witness);
+        let fut = RemoteTransactionProver::prove(self, &witness);
         fut.await
     }
 }

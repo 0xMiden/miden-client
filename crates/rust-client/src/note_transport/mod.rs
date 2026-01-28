@@ -8,9 +8,9 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use futures::Stream;
-use miden_lib::utils::Serializable;
-use miden_objects::address::Address;
-use miden_objects::note::{Note, NoteDetails, NoteFile, NoteHeader, NoteTag};
+use miden_protocol::address::Address;
+use miden_protocol::note::{Note, NoteDetails, NoteFile, NoteHeader, NoteTag};
+use miden_protocol::utils::Serializable;
 use miden_tx::auth::TransactionAuthenticator;
 use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, SliceReader};
 
@@ -49,7 +49,7 @@ impl<AUTH> Client<AUTH> {
     ) -> Result<(), ClientError> {
         let api = self.get_note_transport_api()?;
 
-        let header = *note.header();
+        let header = note.header().clone();
         let details = NoteDetails::from(note);
         let details_bytes = details.to_bytes();
         // e2ee impl hint:
@@ -128,6 +128,7 @@ where
 
         let sync_height = self.get_sync_height().await?;
         // Import fetched notes
+        let mut note_requests = Vec::with_capacity(notes.len());
         for note in notes {
             let tag = note.metadata().tag();
             let note_file = NoteFile::NoteDetails {
@@ -135,8 +136,9 @@ where
                 after_block_num: sync_height,
                 tag: Some(tag),
             };
-            self.import_note(note_file).await?;
+            note_requests.push(note_file);
         }
+        self.import_notes(&note_requests).await?;
 
         // Update cursor (pagination)
         self.store.update_note_transport_cursor(rcursor).await?;
@@ -268,6 +270,6 @@ impl Deserializable for NoteTransportCursor {
 fn rejoin_note(header: &NoteHeader, details_bytes: &[u8]) -> Result<Note, DeserializationError> {
     let mut reader = SliceReader::new(details_bytes);
     let details = NoteDetails::read_from(&mut reader)?;
-    let metadata = *header.metadata();
+    let metadata = header.metadata().clone();
     Ok(Note::new(details.assets().clone(), metadata, details.recipient().clone()))
 }

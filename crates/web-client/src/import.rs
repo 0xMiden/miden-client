@@ -6,6 +6,7 @@ use crate::models::account::Account;
 use crate::models::account_file::AccountFile;
 use crate::models::account_id::AccountId as JsAccountId;
 use crate::models::account_storage_mode::AccountStorageMode;
+use crate::models::auth::AuthScheme;
 use crate::models::note_file::NoteFile;
 use crate::models::note_id::NoteId;
 use crate::{WebClient, js_error_with_context};
@@ -17,7 +18,7 @@ impl WebClient {
         &mut self,
         account_file: AccountFile,
     ) -> Result<JsValue, JsValue> {
-        let keystore = self.keystore.clone();
+        let keystore = self.keystore.clone().expect("Keystore should be initialized");
         if let Some(client) = self.get_mut_inner() {
             let account_data: NativeAccountFile = account_file.into();
             let account_id = account_data.account.id().to_string();
@@ -29,10 +30,20 @@ impl WebClient {
                 .await
                 .map_err(|err| js_error_with_context(err, "failed to import account"))?;
 
-            let keystore = keystore.expect("KeyStore should be initialized");
-            for key in auth_secret_keys {
-                keystore.add_key(&key).await.map_err(|err| err.to_string())?;
+            for key in &auth_secret_keys {
+                keystore.add_key(key).await.map_err(|err| err.to_string())?;
             }
+
+            let pub_keys: Vec<_> = auth_secret_keys
+                .iter()
+                .map(miden_client::auth::AuthSecretKey::public_key)
+                .collect();
+            client
+                .register_account_public_key_commitments(&account.id(), &pub_keys)
+                .await
+                .map_err(|err| {
+                    js_error_with_context(err, "failed to map account to public keys")
+                })?;
 
             Ok(JsValue::from_str(&format!("Imported account with ID: {account_id}")))
         } else {
@@ -45,18 +56,14 @@ impl WebClient {
         &mut self,
         init_seed: Vec<u8>,
         mutable: bool,
-        auth_scheme_id: u8,
+        auth_scheme: AuthScheme,
     ) -> Result<Account, JsValue> {
         let keystore = self.keystore.clone();
         let client = self.get_mut_inner().ok_or(JsValue::from_str("Client not initialized"))?;
 
-        let (generated_acct, key_pair) = generate_wallet(
-            &AccountStorageMode::public(),
-            mutable,
-            Some(init_seed),
-            auth_scheme_id,
-        )
-        .await?;
+        let (generated_acct, key_pair) =
+            generate_wallet(&AccountStorageMode::public(), mutable, Some(init_seed), auth_scheme)
+                .await?;
 
         let native_id = generated_acct.id();
         client
@@ -69,6 +76,11 @@ impl WebClient {
             .add_key(&key_pair)
             .await
             .map_err(|err| err.to_string())?;
+
+        client
+            .register_account_public_key_commitments(&native_id, &[key_pair.public_key()])
+            .await
+            .map_err(|err| js_error_with_context(err, "failed to map account to public keys"))?;
 
         Ok(Account::from(generated_acct))
     }
@@ -95,9 +107,9 @@ impl WebClient {
     pub async fn import_note_file(&mut self, note_file: NoteFile) -> Result<NoteId, JsValue> {
         if let Some(client) = self.get_mut_inner() {
             Ok(client
-                .import_note(note_file.into())
+                .import_notes(&[note_file.into()])
                 .await
-                .map_err(|err| js_error_with_context(err, "failed to import note"))?
+                .map_err(|err| js_error_with_context(err, "failed to import note"))?[0]
                 .into())
         } else {
             Err(JsValue::from_str("Client not initialized"))
@@ -105,7 +117,11 @@ impl WebClient {
     }
 
     #[wasm_bindgen(js_name = "forceImportStore")]
-    pub async fn force_import_store(&mut self, store_dump: JsValue) -> Result<JsValue, JsValue> {
+    pub async fn force_import_store(
+        &mut self,
+        store_dump: JsValue,
+        _store_name: &str,
+    ) -> Result<JsValue, JsValue> {
         let store = self.store.as_ref().ok_or(JsValue::from_str("Store not initialized"))?;
         store
             .force_import_store(store_dump)

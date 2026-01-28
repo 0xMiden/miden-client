@@ -8,7 +8,7 @@ use crate::{base64_to_vec_u8_optional, base64_to_vec_u8_required};
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BlockHeaderIdxdbObject {
-    pub block_num: String,
+    pub block_num: u32,
     #[serde(deserialize_with = "base64_to_vec_u8_required", default)]
     pub header: Vec<u8>,
     #[serde(deserialize_with = "base64_to_vec_u8_required", default)]
@@ -16,10 +16,14 @@ pub struct BlockHeaderIdxdbObject {
     pub has_client_notes: bool,
 }
 
+/// Represents a partial blockchain node stored in `IndexedDB`.
+///
+/// Note: `id` is stored as `u32` because this store is WASM-only, where `usize` is 32 bits.
+/// This limits WASM clients to blockchains with up to ~2^31 blocks (see `utils.rs` for details).
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PartialBlockchainNodeIdxdbObject {
-    pub id: String,
+    pub id: u32,
     pub node: String,
 }
 

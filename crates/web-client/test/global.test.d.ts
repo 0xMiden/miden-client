@@ -15,7 +15,7 @@ import {
   Address,
   AddressInterface,
   AdviceMap,
-  AuthRpoFalcon512MultisigConfig,
+  AuthFalcon512RpoMultisigConfig,
   AuthSecretKey,
   BasicFungibleFaucetComponent,
   ConsumableNoteRecord,
@@ -31,7 +31,6 @@ import {
   NoteAssets,
   NoteConsumability,
   NoteExecutionHint,
-  NoteExecutionMode,
   NoteFilter,
   NoteFile,
   NoteFilterTypes,
@@ -50,7 +49,6 @@ import {
   PublicKey,
   Rpo256,
   RpcClient,
-  SecretKey,
   Signature,
   SigningInputs,
   SigningInputsType,
@@ -74,9 +72,9 @@ import {
   NoteAndArgs,
   NoteAndArgsArray,
   MidenArrays,
-  ScriptBuilder,
-  ScriptBuilderMode,
-  createAuthRpoFalcon512Multisig,
+  CodeBuilder,
+  CodeBuilderMode,
+  createAuthFalcon512RpoMultisig,
 } from "../dist/index";
 import { MockWebClient, WebClient } from "../js";
 
@@ -104,7 +102,7 @@ declare global {
     Address: typeof Address;
     AddressInterface: typeof AddressInterface;
     AdviceMap: typeof AdviceMap;
-    AuthRpoFalcon512MultisigConfig: typeof AuthRpoFalcon512MultisigConfig;
+    AuthFalcon512RpoMultisigConfig: typeof AuthFalcon512RpoMultisigConfig;
     AuthSecretKey: typeof AuthSecretKey;
     BasicFungibleFaucetComponent: typeof BasicFungibleFaucetComponent;
     ConsumableNoteRecord: typeof ConsumableNoteRecord;
@@ -123,7 +121,6 @@ declare global {
     NoteAssets: typeof NoteAssets;
     NoteConsumability: typeof NoteConsumability;
     NoteExecutionHint: typeof NoteExecutionHint;
-    NoteExecutionMode: typeof NoteExecutionMode;
     NoteFilter: typeof NoteFilter;
     NoteFile: typeof NoteFile;
     NoteFilterTypes: typeof NoteFilterTypes;
@@ -142,7 +139,6 @@ declare global {
     ProcedureThreshold: typeof ProcedureThreshold;
     PublicKey: typeof PublicKey;
     Rpo256: typeof Rpo256;
-    SecretKey: typeof SecretKey;
     Signature: typeof Signature;
     SigningInputs: typeof SigningInputs;
     SigningInputsType: typeof SigningInputsType;
@@ -167,10 +163,12 @@ declare global {
     Word: typeof Word;
     Address: typeof Address;
     MidenArrays: typeof MidenArrays;
-    ScriptBuilder: typeof ScriptBuilder;
-    ScriptBuilderMode: typeof ScriptBuilderMode;
-    createAuthRpoFalcon512Multisig: typeof createAuthRpoFalcon512Multisig;
+    CodeBuilder: typeof CodeBuilder;
+    CodeBuilderMode: typeof CodeBuilderMode;
+    createAuthFalcon512RpoMultisig: typeof createAuthFalcon512RpoMultisig;
     createClient: () => Promise<void>;
+
+    rpcUrl: string;
 
     // Add the helpers namespace
     helpers: {
@@ -182,7 +180,7 @@ declare global {
       waitForBlocks: (amountOfBlocks: number) => Promise<void>;
       refreshClient: (initSeed?: Uint8Array) => Promise<void>;
       parseNetworkId: (networkId: string) => NetworkId;
-      generateKeyWithScheme: (signatureScheme: string) => SecretKey;
+      generateKeyWithScheme: (signatureScheme: string) => AuthSecretKey;
     };
   }
 }

@@ -1,10 +1,12 @@
-[**@demox-labs/miden-sdk**](../README.md)
+[**@miden-sdk/miden-sdk**](../README.md)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / Package
+[@miden-sdk/miden-sdk](../README.md) / Package
 
 # Class: Package
+
+Compiled VM package containing libraries and metadata.
 
 ## Methods
 
@@ -58,6 +60,8 @@ Fails if the package is not a program.
 
 > **serialize**(): `Uint8Array`
 
+Serializes the package into bytes.
+
 #### Returns
 
 `Uint8Array`
@@ -67,6 +71,8 @@ Fails if the package is not a program.
 ### deserialize()
 
 > `static` **deserialize**(`bytes`): `Package`
+
+Deserializes a package from bytes.
 
 #### Parameters
 

@@ -6,7 +6,7 @@ use miden_client::account::{StorageMap, StorageSlot};
 use miden_client::asset::Asset;
 use miden_client::utils::Serializable;
 use wasm_bindgen::prelude::*;
-use wasm_bindgen_futures::{js_sys, wasm_bindgen};
+use wasm_bindgen_futures::js_sys;
 
 // INDEXED DB BINDINGS
 // ================================================================================================
@@ -18,52 +18,69 @@ extern "C" {
     // --------------------------------------------------------------------------------------------
 
     #[wasm_bindgen(js_name = getAccountIds)]
-    pub fn idxdb_get_account_ids() -> js_sys::Promise;
+    pub fn idxdb_get_account_ids(db_id: &str) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = getAllAccountHeaders)]
-    pub fn idxdb_get_account_headers() -> js_sys::Promise;
+    pub fn idxdb_get_account_headers(db_id: &str) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = getAccountHeader)]
-    pub fn idxdb_get_account_header(account_id: String) -> js_sys::Promise;
+    pub fn idxdb_get_account_header(db_id: &str, account_id: String) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = getAccountHeaderByCommitment)]
-    pub fn idxdb_get_account_header_by_commitment(account_commitment: String) -> js_sys::Promise;
+    pub fn idxdb_get_account_header_by_commitment(
+        db_id: &str,
+        account_commitment: String,
+    ) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = getAccountCode)]
-    pub fn idxdb_get_account_code(code_root: String) -> js_sys::Promise;
+    pub fn idxdb_get_account_code(db_id: &str, code_root: String) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = getAccountStorage)]
-    pub fn idxdb_get_account_storage(storage_root: String) -> js_sys::Promise;
+    pub fn idxdb_get_account_storage(db_id: &str, storage_root: String) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = getAccountStorageMaps)]
-    pub fn idxdb_get_account_storage_maps(roots: Vec<String>) -> js_sys::Promise;
+    pub fn idxdb_get_account_storage_maps(db_id: &str, roots: Vec<String>) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = getAccountVaultAssets)]
-    pub fn idxdb_get_account_vault_assets(vault_root: String) -> js_sys::Promise;
+    pub fn idxdb_get_account_vault_assets(db_id: &str, vault_root: String) -> js_sys::Promise;
 
-    #[wasm_bindgen(js_name = getAccountAuthByPubKey)]
-    pub fn idxdb_get_account_auth_by_pub_key(pub_key: String) -> js_sys::Promise;
+    #[wasm_bindgen(js_name = getAccountAuthByPubKeyCommitment)]
+    pub fn idxdb_get_account_auth_by_pub_key_commitment(
+        db_id: &str,
+        pub_key_commitment_hex: String,
+    ) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = getAccountAddresses)]
-    pub fn idxdb_get_account_addresses(account_id: String) -> js_sys::Promise;
+    pub fn idxdb_get_account_addresses(db_id: &str, account_id: String) -> js_sys::Promise;
 
     // INSERTS
     // --------------------------------------------------------------------------------------------
 
     #[wasm_bindgen(js_name = upsertAccountCode)]
-    pub fn idxdb_upsert_account_code(code_root: String, code: Vec<u8>) -> js_sys::Promise;
+    pub fn idxdb_upsert_account_code(
+        db_id: &str,
+        code_root: String,
+        code: Vec<u8>,
+    ) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = upsertAccountStorage)]
-    pub fn idxdb_upsert_account_storage(storage_slots: Vec<JsStorageSlot>) -> js_sys::Promise;
+    pub fn idxdb_upsert_account_storage(
+        db_id: &str,
+        storage_slots: Vec<JsStorageSlot>,
+    ) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = upsertStorageMapEntries)]
-    pub fn idxdb_upsert_storage_map_entries(entries: Vec<JsStorageMapEntry>) -> js_sys::Promise;
+    pub fn idxdb_upsert_storage_map_entries(
+        db_id: &str,
+        entries: Vec<JsStorageMapEntry>,
+    ) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = upsertVaultAssets)]
-    pub fn idxdb_upsert_vault_assets(assets: Vec<JsVaultAsset>) -> js_sys::Promise;
+    pub fn idxdb_upsert_vault_assets(db_id: &str, assets: Vec<JsVaultAsset>) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = upsertAccountRecord)]
     pub fn idxdb_upsert_account_record(
+        db_id: &str,
         id: String,
         code_root: String,
         storage_root: String,
@@ -75,32 +92,38 @@ extern "C" {
     ) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = insertAccountAddress)]
-    pub fn idxdb_insert_account_address(account_id: String, address: Vec<u8>) -> js_sys::Promise;
+    pub fn idxdb_insert_account_address(
+        db_id: &str,
+        account_id: String,
+        address: Vec<u8>,
+    ) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = removeAccountAddress)]
-    pub fn idxdb_remove_account_address(address: Vec<u8>) -> js_sys::Promise;
+    pub fn idxdb_remove_account_address(db_id: &str, address: Vec<u8>) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = upsertForeignAccountCode)]
     pub fn idxdb_upsert_foreign_account_code(
+        db_id: &str,
         account_id: String,
         code: Vec<u8>,
         code_root: String,
     ) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = getForeignAccountCode)]
-    pub fn idxdb_get_foreign_account_code(account_ids: Vec<String>) -> js_sys::Promise;
+    pub fn idxdb_get_foreign_account_code(db_id: &str, account_ids: Vec<String>)
+    -> js_sys::Promise;
 
     // UPDATES
     // --------------------------------------------------------------------------------------------
 
     #[wasm_bindgen(js_name = lockAccount)]
-    pub fn idxdb_lock_account(account_id: String) -> js_sys::Promise;
+    pub fn idxdb_lock_account(db_id: &str, account_id: String) -> js_sys::Promise;
 
     // DELETES
     // --------------------------------------------------------------------------------------------
 
     #[wasm_bindgen(js_name = undoAccountStates)]
-    pub fn idxdb_undo_account_states(account_hashes: Vec<String>) -> js_sys::Promise;
+    pub fn idxdb_undo_account_states(db_id: &str, account_hashes: Vec<String>) -> js_sys::Promise;
 }
 
 // VAULT ASSET
@@ -145,9 +168,9 @@ pub struct JsStorageSlot {
     /// Commitment of the whole account storage
     #[wasm_bindgen(js_name = "commitment")]
     pub commitment: String,
-    /// The index of the storage slot.
-    #[wasm_bindgen(js_name = "slotIndex")]
-    pub slot_index: u8,
+    /// The name of the storage slot.
+    #[wasm_bindgen(js_name = "slotName")]
+    pub slot_name: String,
     /// The value stored in the storage slot.
     #[wasm_bindgen(js_name = "slotValue")]
     pub slot_value: String,
@@ -157,10 +180,10 @@ pub struct JsStorageSlot {
 }
 
 impl JsStorageSlot {
-    pub fn from_slot(slot: &StorageSlot, index: u8, storage_commitment: Word) -> Self {
+    pub fn from_slot(slot: &StorageSlot, storage_commitment: Word) -> Self {
         Self {
             commitment: storage_commitment.to_hex(),
-            slot_index: index,
+            slot_name: slot.name().to_string(),
             slot_value: slot.value().to_hex(),
             slot_type: slot.slot_type().to_bytes()[0],
         }

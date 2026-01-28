@@ -1,10 +1,12 @@
-[**@demox-labs/miden-sdk**](../README.md)
+[**@miden-sdk/miden-sdk**](../README.md)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / InputNotes
+[@miden-sdk/miden-sdk](../README.md) / InputNotes
 
 # Class: InputNotes
+
+Input notes for a transaction, empty if the transaction does not consume notes.
 
 ## Methods
 
@@ -21,6 +23,8 @@
 ### commitment()
 
 > **commitment**(): [`Word`](Word.md)
+
+Returns the commitment to all input notes.
 
 #### Returns
 
@@ -42,6 +46,8 @@
 
 > **getNote**(`index`): [`InputNote`](InputNote.md)
 
+Returns the input note at the specified index.
+
 #### Parameters
 
 ##### index
@@ -58,6 +64,8 @@
 
 > **isEmpty**(): `boolean`
 
+Returns true if there are no input notes.
+
 #### Returns
 
 `boolean`
@@ -68,6 +76,8 @@
 
 > **notes**(): [`InputNote`](InputNote.md)[]
 
+Returns all input notes as a vector.
+
 #### Returns
 
 [`InputNote`](InputNote.md)[]
@@ -77,6 +87,8 @@
 ### numNotes()
 
 > **numNotes**(): `number`
+
+Returns the number of input notes.
 
 #### Returns
 

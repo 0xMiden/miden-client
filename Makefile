@@ -19,6 +19,7 @@ WEB_CLIENT_DIR=crates/web-client
 RUST_CLIENT_DIR=crates/rust-client
 
 EXCLUDE_WASM_PACKAGES=--exclude miden-client-web --exclude miden-idxdb-store
+NOTE_TRANSPORT_ENDPOINT=http://127.0.0.1:57292
 
 # --- Linting -------------------------------------------------------------------------------------
 
@@ -72,10 +73,13 @@ rust-client-ts-lint:
 # --- Documentation -------------------------------------------------------------------------------
 
 .PHONY: doc
-doc: ## Generate & check rust documentation. You'll need `jq` in order for this to run.
+doc: ## Generate & check rust documentation. Ensure you have the nightly toolchain installed.
 	@cd crates/rust-client && \
-	FEATURES=$$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "miden-client") | .features | keys[] | select(. != "web-tonic" and . != "idxdb")' | tr '\n' ',') && \
-	RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --features "$$FEATURES" --keep-going --release
+	RUSTDOCFLAGS="-D warnings --cfg docsrs" cargo +nightly doc --lib --no-deps --all-features --keep-going --release
+
+doc-open: ## Generate & open rust documentation in browser. Ensure you have the nightly toolchain installed.
+	@cd crates/rust-client && \
+	RUSTDOCFLAGS="-D warnings --cfg docsrs" cargo +nightly doc --lib --no-deps --all-features --keep-going --release --open
 
 .PHONY: serve-docs
 serve-docs: ## Serves the docs
@@ -117,7 +121,7 @@ start-note-transport-background: ## Start the note transport service in backgrou
 	./scripts/start-note-transport-bg.sh
 
 .PHONY: stop-note-transport
-stop-transport: ## Stop the note transport service
+stop-note-transport: ## Stop the note transport service
 	./scripts/stop-note-transport.sh
 
 .PHONY: start-note-transport
@@ -143,12 +147,20 @@ integration-test-remote-prover-web-client: ## Run integration tests for the web 
 
 .PHONY: integration-test-full
 integration-test-full: ## Run the integration test binary with ignored tests included (requires note transport service)
-	TEST_WITH_NOTE_TRANSPORT=1 cargo nextest run --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --release --test=integration
+	TEST_MIDEN_NOTE_TRANSPORT_ENDPOINT=$(NOTE_TRANSPORT_ENDPOINT) TEST_WITH_NOTE_TRANSPORT=1 cargo nextest run --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --release --test=integration
 	cargo nextest run --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --release --test=integration --run-ignored ignored-only -- import_genesis_accounts_can_be_used_for_transactions
+
+.PHONY: test-dev
+test-dev: ## Run tests with debug assertions enabled via test-dev profile
+	cargo nextest run --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --cargo-profile test-dev --lib $(FEATURES_CLIENT)
+
+.PHONY: integration-test-dev
+integration-test-dev: ## Run integration tests with debug assertions enabled via test-dev profile
+	cargo nextest run --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --cargo-profile test-dev --test=integration
 
 .PHONY: integration-test-binary
 integration-test-binary: ## Run the integration tests using the standalone binary (requires note transport service)
-	TEST_WITH_NOTE_TRANSPORT=1 cargo run --package miden-client-integration-tests --release --locked
+	TEST_MIDEN_NOTE_TRANSPORT_ENDPOINT=$(NOTE_TRANSPORT_ENDPOINT) TEST_WITH_NOTE_TRANSPORT=1 cargo run --package miden-client-integration-tests --release --locked
 
 .PHONY: start-prover
 start-prover: ## Start the remote prover

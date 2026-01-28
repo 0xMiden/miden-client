@@ -8,7 +8,7 @@ use crate::base64_to_vec_u8_required;
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SyncHeightIdxdbObject {
-    pub block_num: String,
+    pub block_num: u32,
 }
 
 #[derive(Serialize, Deserialize)]

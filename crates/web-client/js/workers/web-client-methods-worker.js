@@ -15,6 +15,41 @@ const getWasmOrThrow = async () => {
   return wasmModule;
 };
 
+const serializeUnknown = (value) => {
+  if (typeof value === "string") {
+    return value;
+  }
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+};
+
+const serializeError = (error) => {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+      cause: error.cause ? serializeError(error.cause) : undefined,
+      code: error.code,
+    };
+  }
+
+  if (typeof error === "object" && error !== null) {
+    return {
+      name: error.name ?? "Error",
+      message: error.message ?? serializeUnknown(error),
+    };
+  }
+
+  return {
+    name: "Error",
+    message: serializeUnknown(error),
+  };
+};
+
 /**
  * Worker for executing WebClient methods in a separate thread.
  *
@@ -141,7 +176,8 @@ const methodHandlers = {
     return serializedFaucet.buffer;
   },
   [MethodName.SYNC_STATE]: async () => {
-    const syncSummary = await wasmWebClient.syncState();
+    // Call the internal WASM method (sync lock is handled at the JS wrapper level)
+    const syncSummary = await wasmWebClient.syncStateImpl();
     const serializedSyncSummary = syncSummary.serialize();
     return serializedSyncSummary.buffer;
   },
@@ -170,20 +206,9 @@ const methodHandlers = {
       transactionResultBytes
     );
 
-    let prover;
-    if (proverPayload) {
-      if (proverPayload === "local") {
-        prover = wasm.TransactionProver.newLocalProver();
-      } else if (proverPayload.startsWith("remote:")) {
-        const endpoint = proverPayload.slice("remote:".length);
-        if (!endpoint) {
-          throw new Error("Remote prover requires an endpoint");
-        }
-        prover = wasm.TransactionProver.newRemoteProver(endpoint);
-      } else {
-        throw new Error("Invalid prover tag received in worker");
-      }
-    }
+    const prover = proverPayload
+      ? wasm.TransactionProver.deserialize(proverPayload)
+      : undefined;
 
     const proven = await wasmWebClient.proveTransaction(
       transactionResult,
@@ -211,6 +236,46 @@ const methodHandlers = {
     const transactionId = result.id().toHex();
 
     const proven = await wasmWebClient.proveTransaction(result);
+    const submissionHeight = await wasmWebClient.submitProvenTransaction(
+      proven,
+      result
+    );
+    const transactionUpdate = await wasmWebClient.applyTransaction(
+      result,
+      submissionHeight
+    );
+
+    return {
+      transactionId,
+      submissionHeight,
+      serializedTransactionResult: result.serialize().buffer,
+      serializedTransactionUpdate: transactionUpdate.serialize().buffer,
+    };
+  },
+  [MethodName.SUBMIT_NEW_TRANSACTION_WITH_PROVER]: async (args) => {
+    const wasm = await getWasmOrThrow();
+    const [accountIdHex, serializedTransactionRequest, proverPayload] = args;
+    const accountId = wasm.AccountId.fromHex(accountIdHex);
+    const transactionRequestBytes = new Uint8Array(
+      serializedTransactionRequest
+    );
+    const transactionRequest = wasm.TransactionRequest.deserialize(
+      transactionRequestBytes
+    );
+
+    // Deserialize the prover from the serialized payload
+    const prover = proverPayload
+      ? wasm.TransactionProver.deserialize(proverPayload)
+      : undefined;
+
+    const result = await wasmWebClient.executeTransaction(
+      accountId,
+      transactionRequest
+    );
+
+    const transactionId = result.id().toHex();
+
+    const proven = await wasmWebClient.proveTransaction(result, prover);
     const submissionHeight = await wasmWebClient.submitProvenTransaction(
       proven,
       result
@@ -274,6 +339,38 @@ methodHandlers[MethodName.SUBMIT_NEW_TRANSACTION_MOCK] = async (args) => {
   };
 };
 
+methodHandlers[MethodName.SUBMIT_NEW_TRANSACTION_WITH_PROVER_MOCK] = async (
+  args
+) => {
+  const wasm = await getWasmOrThrow();
+  let serializedMockNoteTransportNode = args.pop();
+  let serializedMockChain = args.pop();
+  serializedMockChain = new Uint8Array(serializedMockChain);
+  serializedMockNoteTransportNode = serializedMockNoteTransportNode
+    ? new Uint8Array(serializedMockNoteTransportNode)
+    : null;
+
+  wasmWebClient = new wasm.WebClient();
+  await wasmWebClient.createMockClient(
+    wasmSeed,
+    serializedMockChain,
+    serializedMockNoteTransportNode
+  );
+
+  const result =
+    await methodHandlers[MethodName.SUBMIT_NEW_TRANSACTION_WITH_PROVER](args);
+
+  return {
+    transactionId: result.transactionId,
+    submissionHeight: result.submissionHeight,
+    serializedTransactionResult: result.serializedTransactionResult,
+    serializedTransactionUpdate: result.serializedTransactionUpdate,
+    serializedMockChain: wasmWebClient.serializeMockChain().buffer,
+    serializedMockNoteTransportNode:
+      wasmWebClient.serializeMockNoteTransportNode().buffer,
+  };
+};
+
 /**
  * Process a single message event.
  */
@@ -281,27 +378,53 @@ async function processMessage(event) {
   const { action, args, methodName, requestId } = event.data;
   try {
     if (action === WorkerAction.INIT) {
-      // Initialize the WASM WebClient.
-      const [rpcUrl, noteTransportUrl, seed, getKey, insertKey, sign] = args;
+      const [
+        rpcUrl,
+        noteTransportUrl,
+        seed,
+        storeName,
+        hasGetKeyCb,
+        hasInsertKeyCb,
+        hasSignCb,
+      ] = args;
       const wasm = await getWasmOrThrow();
       wasmWebClient = new wasm.WebClient();
-      // Initialize the WASM WebClient.
-      if (getKey || insertKey || sign) {
+
+      // Check if any callbacks are provided
+      const useExternalKeystore = hasGetKeyCb || hasInsertKeyCb || hasSignCb;
+
+      if (useExternalKeystore) {
+        // Use callback proxies that communicate with the main thread
         await wasmWebClient.createClientWithExternalKeystore(
           rpcUrl,
           noteTransportUrl,
           seed,
-          getKey && callbackProxies.getKey,
-          insertKey && callbackProxies.insertKey,
-          sign && callbackProxies.sign
+          storeName,
+          hasGetKeyCb ? callbackProxies.getKey : undefined,
+          hasInsertKeyCb ? callbackProxies.insertKey : undefined,
+          hasSignCb ? callbackProxies.sign : undefined
         );
       } else {
-        await wasmWebClient.createClient(rpcUrl, noteTransportUrl, seed);
+        await wasmWebClient.createClient(
+          rpcUrl,
+          noteTransportUrl,
+          seed,
+          storeName
+        );
       }
 
       wasmSeed = seed;
       ready = true;
-      // Signal that the worker is fully initialized.
+      self.postMessage({ ready: true });
+      return;
+    } else if (action === WorkerAction.INIT_MOCK) {
+      const [seed] = args;
+      const wasm = await getWasmOrThrow();
+      wasmWebClient = new wasm.WebClient();
+      await wasmWebClient.createMockClient(seed);
+
+      wasmSeed = seed;
+      ready = true;
       self.postMessage({ ready: true });
       return;
     } else if (action === WorkerAction.CALL_METHOD) {
@@ -317,14 +440,19 @@ async function processMessage(event) {
         throw new Error(`Unsupported method: ${methodName}`);
       }
       const result = await handler(args);
-      self.postMessage({ requestId, result });
+      self.postMessage({ requestId, result, methodName });
       return;
     } else {
       throw new Error(`Unsupported action: ${action}`);
     }
   } catch (error) {
-    console.error(`WORKER: Error occurred - ${error}`);
-    self.postMessage({ requestId, error: error });
+    const serializedError = serializeError(error);
+    console.error(
+      "WORKER: Error occurred - %s",
+      serializedError.message,
+      error
+    );
+    self.postMessage({ requestId, error: serializedError, methodName });
   }
 }
 

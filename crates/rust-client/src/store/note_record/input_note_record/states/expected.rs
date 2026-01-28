@@ -1,9 +1,9 @@
 use alloc::string::ToString;
 
-use miden_objects::account::AccountId;
-use miden_objects::block::{BlockHeader, BlockNumber};
-use miden_objects::note::{NoteId, NoteInclusionProof, NoteMetadata, NoteTag};
-use miden_objects::transaction::TransactionId;
+use miden_protocol::account::AccountId;
+use miden_protocol::block::{BlockHeader, BlockNumber};
+use miden_protocol::note::{NoteId, NoteInclusionProof, NoteMetadata, NoteTag};
+use miden_protocol::transaction::TransactionId;
 
 use super::{
     ConsumedExternalNoteState,
@@ -61,7 +61,7 @@ impl NoteStateHandler for ExpectedNoteState {
         consumer_transaction: TransactionId,
         current_timestamp: Option<u64>,
     ) -> Result<Option<InputNoteState>, NoteRecordError> {
-        match self.metadata {
+        match &self.metadata {
             None => Err(NoteRecordError::NoteNotConsumable(
                 "Can't consume note without metadata".to_string(),
             )),
@@ -74,7 +74,7 @@ impl NoteStateHandler for ExpectedNoteState {
 
                 Ok(Some(
                     ProcessingUnauthenticatedNoteState {
-                        metadata,
+                        metadata: metadata.clone(),
                         after_block_num: self.after_block_num,
                         submission_data,
                     }

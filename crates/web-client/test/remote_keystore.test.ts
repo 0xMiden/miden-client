@@ -19,8 +19,9 @@ test.describe("remote keystore", () => {
         window.rpcUrl!,
         undefined,
         undefined,
-        insertKeyCb,
+        undefined,
         getKeyCb,
+        insertKeyCb,
         signCb
       );
       return client;
@@ -43,6 +44,7 @@ test.describe("remote keystore", () => {
       };
       const client = await window.WebClient.createClientWithExternalKeystore(
         window.rpcUrl!,
+        undefined,
         undefined,
         undefined,
         undefined,
@@ -88,6 +90,7 @@ test.describe("remote keystore", () => {
 
       const client = await window.WebClient.createClientWithExternalKeystore(
         window.rpcUrl!,
+        undefined,
         undefined,
         undefined,
         getKeyCb,
@@ -142,7 +145,9 @@ test.describe("remote keystore", () => {
         signPubKey = Array.from(publicKeyCommitment);
         const wasmSigningInputs =
           window.SigningInputs.deserialize(signingInputs);
-        const wasmSecretKey = window.SecretKey.deserialize(faucetSecretKey!);
+        const wasmSecretKey = window.AuthSecretKey.deserialize(
+          faucetSecretKey!
+        );
         const signature = wasmSecretKey.signData(wasmSigningInputs);
         const serializedSig = signature.serialize();
         return serializedSig;
@@ -150,6 +155,7 @@ test.describe("remote keystore", () => {
 
       const client = await window.WebClient.createClientWithExternalKeystore(
         window.rpcUrl!,
+        undefined,
         undefined,
         undefined,
         undefined,

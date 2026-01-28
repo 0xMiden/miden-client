@@ -6,6 +6,7 @@ use miden_client::auth::TransactionAuthenticator;
 use miden_client::note::{
     Note,
     NoteConsumability,
+    NoteConsumptionStatus,
     NoteInputs,
     NoteMetadata,
     WellKnownNote,
@@ -395,12 +396,29 @@ where
             table.add_row(vec![
                 note.id().to_hex(),
                 relevance.0.to_string(),
-                relevance.1.to_string(),
+                note_consumption_status_type(&relevance.1),
             ]);
         }
     }
 
     println!("{table}");
+}
+
+fn note_consumption_status_type(note_consumption_status: &NoteConsumptionStatus) -> String {
+    match note_consumption_status {
+        NoteConsumptionStatus::Consumable => "Consumable".to_string(),
+        NoteConsumptionStatus::ConsumableAfter(block_number) => {
+            format!("Consumable after block {block_number}")
+        },
+        NoteConsumptionStatus::ConsumableWithAuthorization => {
+            "Consumable with authorization".to_string()
+        },
+        NoteConsumptionStatus::UnconsumableConditions => {
+            "Unconsumable due to conditions".to_string()
+        },
+        NoteConsumptionStatus::NeverConsumable(error) => format!("Never consumable: {error}"),
+    }
+    .clone()
 }
 
 fn note_record_type(note_record_metadata: Option<&NoteMetadata>) -> String {

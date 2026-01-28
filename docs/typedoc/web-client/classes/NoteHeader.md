@@ -1,10 +1,14 @@
-[**@demox-labs/miden-sdk**](../README.md)
+[**@miden-sdk/miden-sdk**](../README.md)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / NoteHeader
+[@miden-sdk/miden-sdk](../README.md) / NoteHeader
 
 # Class: NoteHeader
+
+Holds the strictly required, public information of a note.
+
+See `NoteId` and `NoteMetadata` for additional details.
 
 ## Methods
 
@@ -21,6 +25,8 @@
 ### commitment()
 
 > **commitment**(): [`Word`](Word.md)
+
+Returns a commitment to the note ID and metadata.
 
 #### Returns
 
@@ -42,6 +48,8 @@
 
 > **id**(): [`NoteId`](NoteId.md)
 
+Returns the unique identifier for the note.
+
 #### Returns
 
 [`NoteId`](NoteId.md)
@@ -51,6 +59,8 @@
 ### metadata()
 
 > **metadata**(): [`NoteMetadata`](NoteMetadata.md)
+
+Returns the public metadata attached to the note.
 
 #### Returns
 

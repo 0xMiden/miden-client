@@ -9,7 +9,6 @@ use miden_client::note::{
     BlockNumber,
     NoteAssets,
     NoteDetails,
-    NoteInputs,
     NoteMetadata,
     NoteRecipient,
     NoteScript,
@@ -25,6 +24,7 @@ use miden_client::store::{
     StoreError,
 };
 use miden_client::utils::{Deserializable, Serializable};
+use miden_protocol::note::NoteInputs;
 use rusqlite::types::Value;
 use rusqlite::{Connection, Transaction, params, params_from_iter};
 
@@ -165,7 +165,7 @@ impl SqliteStore {
             .map(|result| {
                 result
                     .map_err(|err| StoreError::ParsingError(err.to_string()))
-                    .and_then(|v: String| Ok(Word::try_from(v).map(Nullifier::from)?))
+                    .and_then(|v: String| Ok(Nullifier::from_hex(&v)?))
             })
             .collect::<Result<Vec<Nullifier>, _>>()
     }

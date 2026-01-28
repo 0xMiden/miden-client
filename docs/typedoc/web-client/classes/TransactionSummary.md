@@ -1,10 +1,12 @@
-[**@demox-labs/miden-sdk**](../README.md)
+[**@miden-sdk/miden-sdk**](../README.md)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / TransactionSummary
+[@miden-sdk/miden-sdk](../README.md) / TransactionSummary
 
 # Class: TransactionSummary
+
+Represents a transaction summary.
 
 ## Methods
 
@@ -21,6 +23,8 @@
 ### accountDelta()
 
 > **accountDelta**(): [`AccountDelta`](AccountDelta.md)
+
+Returns the account delta described by the summary.
 
 #### Returns
 
@@ -42,6 +46,8 @@
 
 > **inputNotes**(): [`InputNotes`](InputNotes.md)
 
+Returns the input notes referenced by the summary.
+
 #### Returns
 
 [`InputNotes`](InputNotes.md)
@@ -51,6 +57,8 @@
 ### outputNotes()
 
 > **outputNotes**(): [`OutputNotes`](OutputNotes.md)
+
+Returns the output notes referenced by the summary.
 
 #### Returns
 
@@ -62,6 +70,8 @@
 
 > **salt**(): [`Word`](Word.md)
 
+Returns the random salt mixed into the summary commitment.
+
 #### Returns
 
 [`Word`](Word.md)
@@ -71,6 +81,8 @@
 ### serialize()
 
 > **serialize**(): `Uint8Array`
+
+Serializes the summary into bytes.
 
 #### Returns
 
@@ -93,6 +105,8 @@ Computes the commitment to this `TransactionSummary`.
 ### deserialize()
 
 > `static` **deserialize**(`bytes`): `TransactionSummary`
+
+Deserializes a summary from bytes.
 
 #### Parameters
 

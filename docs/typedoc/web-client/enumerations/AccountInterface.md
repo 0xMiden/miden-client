@@ -1,8 +1,8 @@
-[**@demox-labs/miden-sdk**](../README.md)
+[**@miden-sdk/miden-sdk**](../README.md)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / AccountInterface
+[@miden-sdk/miden-sdk](../README.md) / AccountInterface
 
 # Enumeration: AccountInterface
 
@@ -11,3 +11,5 @@
 ### BasicWallet
 
 > **BasicWallet**: `0`
+
+Basic wallet address interface.

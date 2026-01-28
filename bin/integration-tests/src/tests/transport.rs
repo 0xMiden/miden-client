@@ -4,15 +4,14 @@ use anyhow::{Context, Result};
 use miden_client::account::AccountStorageMode;
 use miden_client::address::{Address, AddressInterface, RoutingParameters};
 use miden_client::asset::FungibleAsset;
-use miden_client::auth::RPO_FALCON_SCHEME_ID;
-use miden_client::keystore::FilesystemKeyStore;
+use miden_client::auth::{AuthSchemeId, RPO_FALCON_SCHEME_ID};
 use miden_client::note::NoteType;
 use miden_client::note_transport::NOTE_TRANSPORT_DEFAULT_ENDPOINT;
 use miden_client::note_transport::grpc::GrpcNoteTransportClient;
 use miden_client::store::NoteFilter;
 use miden_client::testing::common::{
+    FilesystemKeyStore,
     TestClient,
-    TestClientKeyStore,
     execute_tx_and_sync,
     insert_new_fungible_faucet,
     insert_new_wallet,
@@ -95,10 +94,7 @@ pub async fn test_note_transport_sender_only(client_config: ClientConfig) -> Res
 
 async fn builder_with_transport(
     client_config: ClientConfig,
-) -> Result<(
-    miden_client::builder::ClientBuilder<FilesystemKeyStore<rand::rngs::StdRng>>,
-    FilesystemKeyStore<rand::rngs::StdRng>,
-)> {
+) -> Result<(miden_client::builder::ClientBuilder<FilesystemKeyStore>, FilesystemKeyStore)> {
     let (mut builder, keystore) = client_config
         .into_client_builder()
         .await
@@ -124,10 +120,7 @@ async fn builder_with_transport(
 
 async fn builder_without_transport(
     client_config: ClientConfig,
-) -> Result<(
-    miden_client::builder::ClientBuilder<FilesystemKeyStore<rand::rngs::StdRng>>,
-    FilesystemKeyStore<rand::rngs::StdRng>,
-)> {
+) -> Result<(miden_client::builder::ClientBuilder<FilesystemKeyStore>, FilesystemKeyStore)> {
     let (builder, keystore) = client_config
         .into_client_builder()
         .await
@@ -137,11 +130,11 @@ async fn builder_without_transport(
 
 async fn run_flow(
     mut sender: TestClient,
-    sender_keystore: &TestClientKeyStore,
+    sender_keystore: &FilesystemKeyStore,
     mut recipient: TestClient,
-    recipient_keystore: &TestClientKeyStore,
+    recipient_keystore: &FilesystemKeyStore,
     recipient_should_receive: bool,
-    auth_scheme_id: u8,
+    auth_scheme: AuthSchemeId,
 ) -> Result<()> {
     // Ensure node is up
     wait_for_node(&mut sender).await;
@@ -151,7 +144,7 @@ async fn run_flow(
         &mut recipient,
         AccountStorageMode::Private,
         recipient_keystore,
-        auth_scheme_id,
+        auth_scheme,
     )
     .await
     .context("failed to insert recipient wallet")?;
@@ -161,7 +154,7 @@ async fn run_flow(
         &mut sender,
         AccountStorageMode::Private,
         sender_keystore,
-        auth_scheme_id,
+        auth_scheme,
     )
     .await
     .context("failed to insert faucet in sender")?;

@@ -35,7 +35,7 @@ use flattened_vec::flatten_nested_u8_vec;
 
 impl WebStore {
     pub(crate) async fn get_note_tags(&self) -> Result<Vec<NoteTagRecord>, StoreError> {
-        let promise = idxdb_get_note_tags();
+        let promise = idxdb_get_note_tags(self.db_id());
         let tags_idxdb: Vec<NoteTagIdxdbObject> =
             await_js(promise, "failed to get note tags").await?;
 
@@ -64,12 +64,11 @@ impl WebStore {
     }
 
     pub(super) async fn get_sync_height(&self) -> Result<BlockNumber, StoreError> {
-        let promise = idxdb_get_sync_height();
+        let promise = idxdb_get_sync_height(self.db_id());
         let block_num_idxdb: SyncHeightIdxdbObject =
             await_js(promise, "failed to get sync height").await?;
 
-        let block_num_as_u32: u32 = block_num_idxdb.block_num.parse::<u32>().unwrap();
-        Ok(block_num_as_u32.into())
+        Ok(block_num_idxdb.block_num.into())
     }
 
     pub(super) async fn add_note_tag(&self, tag: NoteTagRecord) -> Result<bool, StoreError> {
@@ -83,7 +82,8 @@ impl WebStore {
             NoteTagSource::User => (None, None),
         };
 
-        let promise = idxdb_add_note_tag(tag.tag.to_bytes(), source_note_id, source_account_id);
+        let promise =
+            idxdb_add_note_tag(self.db_id(), tag.tag.to_bytes(), source_note_id, source_account_id);
         await_js_value(promise, "failed to add note tag").await?;
 
         Ok(true)
@@ -96,7 +96,12 @@ impl WebStore {
             NoteTagSource::User => (None, None),
         };
 
-        let promise = idxdb_remove_note_tag(tag.tag.to_bytes(), source_note_id, source_account_id);
+        let promise = idxdb_remove_note_tag(
+            self.db_id(),
+            tag.tag.to_bytes(),
+            source_note_id,
+            source_account_id,
+        );
         let removed_tags: usize = await_js(promise, "failed to remove note tag").await?;
 
         Ok(removed_tags)
@@ -118,13 +123,13 @@ impl WebStore {
         let block_headers_len = block_updates.block_headers().len();
         let mut block_headers_as_bytes = Vec::with_capacity(block_headers_len);
         let mut new_mmr_peaks_as_bytes = Vec::with_capacity(block_headers_len);
-        let mut block_nums_as_str = Vec::with_capacity(block_headers_len);
+        let mut block_nums = Vec::with_capacity(block_headers_len);
         let mut block_has_relevant_notes = Vec::with_capacity(block_headers_len);
 
         for (block_header, has_client_notes, mmr_peaks) in block_updates.block_headers() {
             block_headers_as_bytes.push(block_header.to_bytes());
             new_mmr_peaks_as_bytes.push(mmr_peaks.peaks().to_vec().to_bytes());
-            block_nums_as_str.push(block_header.block_num().to_string());
+            block_nums.push(block_header.block_num().as_u32());
             block_has_relevant_notes.push(u8::from(*has_client_notes));
         }
 
@@ -187,9 +192,9 @@ impl WebStore {
             .collect();
 
         let state_update = JsStateSyncUpdate {
-            block_num: block_num.to_string(),
+            block_num: block_num.as_u32(),
             flattened_new_block_headers: flatten_nested_u8_vec(block_headers_as_bytes),
-            new_block_nums: block_nums_as_str,
+            new_block_nums: block_nums,
             flattened_partial_blockchain_peaks: flatten_nested_u8_vec(new_mmr_peaks_as_bytes),
             block_has_relevant_notes,
             serialized_node_ids,
@@ -204,7 +209,7 @@ impl WebStore {
                 .collect(),
             transaction_updates,
         };
-        let promise = idxdb_apply_state_sync(state_update);
+        let promise = idxdb_apply_state_sync(self.db_id(), state_update);
         await_js_value(promise, "failed to apply state sync").await?;
 
         Ok(())

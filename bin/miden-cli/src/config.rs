@@ -1,10 +1,12 @@
 use core::fmt::Debug;
 use std::fmt::Display;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
+use std::time::Duration;
 
+use figment::providers::{Format, Toml};
 use figment::value::{Dict, Map};
-use figment::{Metadata, Profile, Provider};
+use figment::{Figment, Metadata, Profile, Provider};
 use miden_client::note_transport::NOTE_TRANSPORT_DEFAULT_ENDPOINT;
 use miden_client::rpc::Endpoint;
 use serde::{Deserialize, Serialize};
@@ -12,10 +14,12 @@ use serde::{Deserialize, Serialize};
 use crate::errors::CliError;
 
 pub const MIDEN_DIR: &str = ".miden";
+pub const CLIENT_CONFIG_FILE_NAME: &str = "miden-client.toml";
 pub const TOKEN_SYMBOL_MAP_FILENAME: &str = "token_symbol_map.toml";
 pub const DEFAULT_PACKAGES_DIR: &str = "packages";
 pub const STORE_FILENAME: &str = "store.sqlite3";
 pub const KEYSTORE_DIRECTORY: &str = "keystore";
+pub const DEFAULT_REMOTE_PROVER_TIMEOUT: Duration = Duration::from_secs(20);
 
 /// Returns the global miden directory path in the user's home directory
 pub fn get_global_miden_dir() -> Result<PathBuf, std::io::Error> {
@@ -53,6 +57,8 @@ pub struct CliConfig {
     pub max_block_number_delta: Option<u32>,
     /// Describes settings related to the note transport endpoint.
     pub note_transport: Option<NoteTransportConfig>,
+    /// Timeout for the remote prover requests.
+    pub remote_prover_timeout: Duration,
 }
 
 // Make `ClientConfig` a provider itself for composability.
@@ -71,6 +77,13 @@ impl Provider for CliConfig {
     }
 }
 
+/// Default implementation for `CliConfig`.
+///
+/// **Note**: This implementation is primarily used by the [`figment`] `Provider` trait
+/// (see [`CliConfig::data()`]) to provide default values during configuration merging.
+/// The paths returned are relative and intended to be resolved against a `.miden` directory.
+///
+/// For loading configuration from the filesystem, use [`CliConfig::from_system()`] instead.
 impl Default for CliConfig {
     fn default() -> Self {
         // Create paths relative to the config file location (which is in .miden directory)
@@ -84,6 +97,244 @@ impl Default for CliConfig {
             package_directory: PathBuf::from(DEFAULT_PACKAGES_DIR),
             max_block_number_delta: None,
             note_transport: None,
+            remote_prover_timeout: DEFAULT_REMOTE_PROVER_TIMEOUT,
+        }
+    }
+}
+
+impl CliConfig {
+    /// Loads configuration from a specific `.miden` directory.
+    ///
+    /// # ⚠️ WARNING: Advanced Use Only
+    ///
+    /// **This method bypasses the standard CLI configuration discovery logic.**
+    ///
+    /// This method loads config from an explicitly specified directory, which means:
+    /// - It does NOT check for local `.miden` directory first
+    /// - It does NOT fall back to global `~/.miden` directory
+    /// - It does NOT follow CLI priority logic
+    ///
+    /// ## Recommended Alternative
+    ///
+    /// For standard CLI-like configuration loading, use:
+    /// ```ignore
+    /// CliConfig::from_system()  // Respects local → global priority
+    /// ```
+    ///
+    /// Or for client initialization:
+    /// ```ignore
+    /// CliClient::from_system_user_config(debug_mode).await?
+    /// ```
+    ///
+    /// ## When to use this method
+    ///
+    /// - **Testing**: When you need to test with config from a specific directory
+    /// - **Explicit Control**: When you must load from a non-standard location
+    ///
+    /// # Arguments
+    ///
+    /// * `miden_dir` - Path to the `.miden` directory containing `miden-client.toml`
+    ///
+    /// # Returns
+    ///
+    /// A configured [`CliConfig`] instance with resolved paths.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`CliError`](crate::errors::CliError):
+    /// - [`CliError::ConfigNotFound`](crate::errors::CliError::ConfigNotFound) if the config file
+    ///   doesn't exist in the specified directory
+    /// - [`CliError::Config`](crate::errors::CliError::Config) if configuration file parsing fails
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use std::path::PathBuf;
+    ///
+    /// use miden_client_cli::config::CliConfig;
+    ///
+    /// # fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// // ⚠️ This bypasses standard config discovery!
+    /// let config = CliConfig::from_dir(&PathBuf::from("/path/to/.miden"))?;
+    ///
+    /// // ✅ Prefer this for CLI-like behavior:
+    /// let config = CliConfig::from_system()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn from_dir(miden_dir: &Path) -> Result<Self, CliError> {
+        let config_path = miden_dir.join(CLIENT_CONFIG_FILE_NAME);
+
+        if !config_path.exists() {
+            return Err(CliError::ConfigNotFound(format!(
+                "Config file does not exist at {}",
+                config_path.display()
+            )));
+        }
+
+        let mut cli_config = Self::load_from_file(&config_path)?;
+
+        // Resolve all relative paths relative to the .miden directory
+        Self::resolve_relative_path(&mut cli_config.store_filepath, miden_dir);
+        Self::resolve_relative_path(&mut cli_config.secret_keys_directory, miden_dir);
+        Self::resolve_relative_path(&mut cli_config.token_symbol_map_filepath, miden_dir);
+        Self::resolve_relative_path(&mut cli_config.package_directory, miden_dir);
+
+        Ok(cli_config)
+    }
+
+    /// Loads configuration from the local `.miden` directory (current working directory).
+    ///
+    /// # ⚠️ WARNING: Advanced Use Only
+    ///
+    /// **This method bypasses the standard CLI configuration discovery logic.**
+    ///
+    /// This method ONLY checks the local directory and does NOT fall back to the global
+    /// configuration if the local config doesn't exist. This differs from CLI behavior.
+    ///
+    /// ## Recommended Alternative
+    ///
+    /// For standard CLI-like behavior:
+    /// ```ignore
+    /// CliConfig::from_system()  // Respects local → global fallback
+    /// CliClient::from_system_user_config(debug_mode).await?
+    /// ```
+    ///
+    /// ## When to use this method
+    ///
+    /// - **Testing**: When you need to ensure only local config is used
+    /// - **Explicit Control**: When you must avoid global config
+    ///
+    /// # Returns
+    ///
+    /// A configured [`CliConfig`] instance.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`CliError`](crate::errors::CliError) if:
+    /// - Cannot determine current working directory
+    /// - The config file doesn't exist locally
+    /// - Configuration file parsing fails
+    pub fn from_local_dir() -> Result<Self, CliError> {
+        let local_miden_dir = get_local_miden_dir()?;
+        Self::from_dir(&local_miden_dir)
+    }
+
+    /// Loads configuration from the global `.miden` directory (user's home directory).
+    ///
+    /// # ⚠️ WARNING: Advanced Use Only
+    ///
+    /// **This method bypasses the standard CLI configuration discovery logic.**
+    ///
+    /// This method ONLY checks the global directory and does NOT check for local config first.
+    /// This differs from CLI behavior which prioritizes local config over global.
+    ///
+    /// ## Recommended Alternative
+    ///
+    /// For standard CLI-like behavior:
+    /// ```ignore
+    /// CliConfig::from_system()  // Respects local → global priority
+    /// CliClient::from_system_user_config(debug_mode).await?
+    /// ```
+    ///
+    /// ## When to use this method
+    ///
+    /// - **Testing**: When you need to ensure only global config is used
+    /// - **Explicit Control**: When you must bypass local config
+    ///
+    /// # Returns
+    ///
+    /// A configured [`CliConfig`] instance.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`CliError`](crate::errors::CliError) if:
+    /// - Cannot determine home directory
+    /// - The config file doesn't exist globally
+    /// - Configuration file parsing fails
+    pub fn from_global_dir() -> Result<Self, CliError> {
+        let global_miden_dir = get_global_miden_dir().map_err(|e| {
+            CliError::Config(Box::new(e), "Failed to determine global config directory".to_string())
+        })?;
+        Self::from_dir(&global_miden_dir)
+    }
+
+    /// Loads configuration from system directories with priority: local first, then global
+    /// fallback.
+    ///
+    /// # ✅ Recommended Method
+    ///
+    /// **This is the recommended method for loading CLI configuration as it follows the same
+    /// discovery logic as the CLI tool itself.**
+    ///
+    /// This method searches for configuration files in the following order:
+    /// 1. Local `.miden/miden-client.toml` in the current working directory
+    /// 2. Global `.miden/miden-client.toml` in the home directory (fallback)
+    ///
+    /// This matches the CLI's configuration priority logic. For most use cases, you should
+    /// use [`CliClient::from_system_user_config()`](crate::CliClient::from_system_user_config)
+    /// instead, which uses this method internally.
+    ///
+    /// # Returns
+    ///
+    /// A configured [`CliConfig`] instance.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`CliError`](crate::errors::CliError):
+    /// - [`CliError::ConfigNotFound`](crate::errors::CliError::ConfigNotFound) if neither local nor
+    ///   global config file exists
+    /// - [`CliError::Config`](crate::errors::CliError::Config) if configuration file parsing fails
+    ///
+    /// Note: If a local config file exists but has parse errors, the error is returned
+    /// immediately without falling back to global config.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use miden_client_cli::config::CliConfig;
+    ///
+    /// # fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// // ✅ Recommended: Loads from local .miden dir if it exists, otherwise from global
+    /// let config = CliConfig::from_system()?;
+    ///
+    /// // Or even better, use CliClient directly:
+    /// // let client = CliClient::from_system_user_config(DebugMode::Disabled).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn from_system() -> Result<Self, CliError> {
+        // Try local first
+        match Self::from_local_dir() {
+            Ok(config) => Ok(config),
+            // Only fall back to global if the local config file was not found
+            // (not for parse errors or other issues)
+            Err(CliError::ConfigNotFound(_)) => {
+                // Fall back to global
+                Self::from_global_dir().map_err(|e| match e {
+                    CliError::ConfigNotFound(_) => CliError::ConfigNotFound(
+                        "Neither local nor global config file exists".to_string(),
+                    ),
+                    other => other,
+                })
+            },
+            // For other errors (like parse errors), propagate them immediately
+            Err(e) => Err(e),
+        }
+    }
+
+    /// Loads the client configuration from a TOML file.
+    fn load_from_file(config_file: &Path) -> Result<Self, CliError> {
+        Figment::from(Toml::file(config_file)).extract().map_err(|err| {
+            CliError::Config("failed to load config file".to_string().into(), err.to_string())
+        })
+    }
+
+    /// Resolves a relative path against a base directory.
+    /// If the path is already absolute, it remains unchanged.
+    fn resolve_relative_path(path: &mut PathBuf, base_dir: &Path) {
+        if path.is_relative() {
+            *path = base_dir.join(&*path);
         }
     }
 }

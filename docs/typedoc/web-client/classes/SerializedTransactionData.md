@@ -1,8 +1,8 @@
-[**@demox-labs/miden-sdk**](../README.md)
+[**@miden-sdk/miden-sdk**](../README.md)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / SerializedTransactionData
+[@miden-sdk/miden-sdk](../README.md) / SerializedTransactionData
 
 # Class: SerializedTransactionData
 
@@ -10,7 +10,7 @@
 
 ### blockNum
 
-> **blockNum**: `string`
+> **blockNum**: `number`
 
 ***
 

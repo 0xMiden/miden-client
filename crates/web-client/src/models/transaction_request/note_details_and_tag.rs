@@ -1,10 +1,11 @@
 use miden_client::note::{NoteDetails as NativeNoteDetails, NoteTag as NativeNoteTag};
 use wasm_bindgen::prelude::*;
 
+use crate::models::NoteTag;
 use crate::models::miden_arrays::NoteDetailsAndTagArray;
 use crate::models::note_details::NoteDetails;
-use crate::models::note_tag::NoteTag;
 
+/// Pair of note details and tag used when declaring expected notes.
 #[derive(Clone)]
 #[wasm_bindgen]
 pub struct NoteDetailsAndTag {
@@ -14,17 +15,20 @@ pub struct NoteDetailsAndTag {
 
 #[wasm_bindgen]
 impl NoteDetailsAndTag {
+    /// Creates a new pair from note details and tag.
     #[wasm_bindgen(constructor)]
     pub fn new(note_details: NoteDetails, tag: NoteTag) -> NoteDetailsAndTag {
         NoteDetailsAndTag { note_details, tag }
     }
 
+    /// Returns the note details.
     #[wasm_bindgen(getter)]
     #[wasm_bindgen(js_name = "noteDetails")]
     pub fn note_details(&self) -> NoteDetails {
         self.note_details.clone()
     }
 
+    /// Returns the note tag.
     #[wasm_bindgen(getter)]
     pub fn tag(&self) -> NoteTag {
         self.tag

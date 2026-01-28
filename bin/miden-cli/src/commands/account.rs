@@ -1,6 +1,12 @@
 use clap::Parser;
 use comfy_table::{Cell, ContentArrangement, presets};
-use miden_client::account::{Account, AccountId, AccountType, StorageSlot};
+use miden_client::account::{
+    Account,
+    AccountId,
+    AccountInterfaceExt,
+    AccountType,
+    StorageSlotContent,
+};
 use miden_client::address::{Address, AddressInterface, RoutingParameters};
 use miden_client::asset::Asset;
 use miden_client::rpc::{GrpcClient, NodeRpcClient};
@@ -9,7 +15,7 @@ use miden_client::{Client, PrettyPrint, ZERO};
 
 use crate::config::CliConfig;
 use crate::errors::CliError;
-use crate::utils::{load_config_file, load_faucet_details_map, parse_account_id};
+use crate::utils::{load_faucet_details_map, parse_account_id};
 use crate::{client_binary_name, create_dynamic_table};
 
 pub const DEFAULT_ACCOUNT_ID_KEY: &str = "default_account_id";
@@ -41,7 +47,7 @@ pub struct AccountCmd {
 
 impl AccountCmd {
     pub async fn execute<AUTH>(&self, mut client: Client<AUTH>) -> Result<(), CliError> {
-        let (cli_config, _) = load_config_file()?;
+        let cli_config = CliConfig::from_system()?;
         match self {
             AccountCmd {
                 list: false,
@@ -133,7 +139,8 @@ pub async fn show_account<AUTH>(
     with_code: bool,
 ) -> Result<(), CliError> {
     let account = if let Some(account) = client.get_account(account_id).await? {
-        account.into()
+        // TODO: Show partial accounts through CLI
+        account.try_into().map_err(|_| CliError::InvalidAccount(account_id))?
     } else {
         println!("Account {account_id} is not tracked by the client. Fetching from the network...",);
 
@@ -190,26 +197,25 @@ pub async fn show_account<AUTH>(
 
         println!("Storage: \n");
 
-        let mut table =
-            create_dynamic_table(&["Item Slot Index", "Item Slot Type", "Value/Commitment"]);
+        let mut table = create_dynamic_table(&["Slot Name", "Slot Type", "Value/Commitment"]);
 
-        for (idx, entry) in account_storage.slots().iter().enumerate() {
-            let item = account_storage
-                .get_item(u8::try_from(idx).expect("there are no more than 256 slots"))
-                .map_err(|err| CliError::Account(err, "Index out of bounds".to_string()))?;
+        for entry in account_storage.slots() {
+            let item = account_storage.get_item(entry.name()).map_err(|err| {
+                CliError::Account(err, format!("failed to fetch slot {}", entry.name()))
+            })?;
 
             // Last entry is reserved so I don't think the user cares about it. Also, to keep the
             // output smaller, if the [StorageSlot] is a value and it's 0 we assume it's not
             // initialized and skip it
-            if matches!(entry, StorageSlot::Value { .. }) && item == [ZERO; 4].into() {
+            if matches!(entry.content(), StorageSlotContent::Value(_)) && item == [ZERO; 4].into() {
                 continue;
             }
 
-            let slot_type = match entry {
-                StorageSlot::Value(..) => "Value",
-                StorageSlot::Map(..) => "Map",
+            let slot_type = match entry.content() {
+                StorageSlotContent::Value(_) => "Value",
+                StorageSlotContent::Map(_) => "Map",
             };
-            table.add_row(vec![&idx.to_string(), slot_type, &item.to_hex()]);
+            table.add_row(vec![entry.name().as_str(), slot_type, &item.to_hex()]);
         }
         println!("{table}\n");
     }
@@ -261,7 +267,7 @@ async fn print_summary_table<AUTH>(
     table.add_row(vec![Cell::new("Vault Root"), Cell::new(account.vault().root().to_string())]);
     table.add_row(vec![
         Cell::new("Storage Root"),
-        Cell::new(account.storage().commitment().to_string()),
+        Cell::new(account.storage().to_commitment().to_string()),
     ]);
     table.add_row(vec![Cell::new("Nonce"), Cell::new(account.nonce().as_int().to_string())]);
 
@@ -314,8 +320,9 @@ async fn account_bech_32<AUTH>(
     cli_config: &CliConfig,
 ) -> Result<String, CliError> {
     let account_record = client.try_get_account(account_id).await?;
-
-    let account_interface: AccountInterface = account_record.account().into();
+    let account: Account =
+        account_record.try_into().map_err(|_| CliError::InvalidAccount(account_id))?;
+    let account_interface = AccountInterface::from_account(&account);
 
     let mut address = Address::new(account_id);
     if account_interface

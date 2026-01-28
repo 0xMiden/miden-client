@@ -1,8 +1,8 @@
 use alloc::string::ToString;
 use alloc::vec::Vec;
 
-use miden_objects::account::{Account, AccountId};
-use miden_objects::note::{NoteId, NoteTag};
+use miden_protocol::account::{Account, AccountId};
+use miden_protocol::note::{NoteId, NoteTag};
 use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 use tracing::warn;
 
@@ -30,12 +30,7 @@ impl<AUTH> Client<AUTH> {
 
     /// Adds a note tag for the client to track. This tag's source will be marked as `User`.
     pub async fn add_note_tag(&mut self, tag: NoteTag) -> Result<(), ClientError> {
-        match self
-            .store
-            .add_note_tag(NoteTagRecord { tag, source: NoteTagSource::User })
-            .await
-            .map_err(Into::into)
-        {
+        match self.insert_note_tag(NoteTagRecord { tag, source: NoteTagSource::User }).await {
             Ok(true) => Ok(()),
             Ok(false) => {
                 warn!("Tag {} is already being tracked", tag);
@@ -43,6 +38,13 @@ impl<AUTH> Client<AUTH> {
             },
             Err(err) => Err(err),
         }
+    }
+
+    /// Wrapper around the store's `add_note_tag` method that checks the note tags limit before the
+    /// insert.
+    pub async fn insert_note_tag(&self, tag_record: NoteTagRecord) -> Result<bool, ClientError> {
+        self.check_note_tag_limit().await?;
+        self.store.add_note_tag(tag_record).await.map_err(Into::into)
     }
 
     /// Removes a note tag for the client to track. Only tags added by the user can be removed.
@@ -128,6 +130,12 @@ impl PartialEq<NoteTag> for NoteTagRecord {
     }
 }
 
+impl From<&Account> for NoteTagRecord {
+    fn from(account: &Account) -> Self {
+        NoteTagRecord::with_account_source(NoteTag::with_account_target(account.id()), account.id())
+    }
+}
+
 impl TryInto<NoteTagRecord> for &InputNoteRecord {
     type Error = NoteRecordError;
 
@@ -138,11 +146,5 @@ impl TryInto<NoteTagRecord> for &InputNoteRecord {
                 "Input Note Record does not contain tag".to_string(),
             )),
         }
-    }
-}
-
-impl From<&Account> for NoteTagRecord {
-    fn from(account: &Account) -> Self {
-        NoteTagRecord::with_account_source(NoteTag::from_account_id(account.id()), account.id())
     }
 }

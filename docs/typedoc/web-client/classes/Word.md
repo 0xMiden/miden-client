@@ -1,8 +1,8 @@
-[**@demox-labs/miden-sdk**](../README.md)
+[**@miden-sdk/miden-sdk**](../README.md)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / Word
+[@miden-sdk/miden-sdk](../README.md) / Word
 
 # Class: Word
 
@@ -11,6 +11,8 @@
 ### Constructor
 
 > **new Word**(`u64_vec`): `Word`
+
+Creates a word from four u64 values.
 
 #### Parameters
 
@@ -48,6 +50,8 @@
 
 > **serialize**(): `Uint8Array`
 
+Serializes the word into bytes.
+
 #### Returns
 
 `Uint8Array`
@@ -57,6 +61,8 @@
 ### toFelts()
 
 > **toFelts**(): [`Felt`](Felt.md)[]
+
+Returns the word as an array of field elements.
 
 #### Returns
 
@@ -68,6 +74,8 @@
 
 > **toHex**(): `string`
 
+Returns the hex representation of the word.
+
 #### Returns
 
 `string`
@@ -78,6 +86,8 @@
 
 > **toU64s**(): `BigUint64Array`
 
+Returns the word as an array of u64 values.
+
 #### Returns
 
 `BigUint64Array`
@@ -87,6 +97,8 @@
 ### deserialize()
 
 > `static` **deserialize**(`bytes`): `Word`
+
+Deserializes a word from bytes.
 
 #### Parameters
 
@@ -122,6 +134,8 @@ Fails if the provided string is not a valid hex representation of a Word.
 ### newFromFelts()
 
 > `static` **newFromFelts**(`felt_vec`): `Word`
+
+Creates a word from four field elements.
 
 #### Parameters
 

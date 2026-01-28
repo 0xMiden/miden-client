@@ -7,7 +7,7 @@ use core::task::{Context, Poll};
 
 use chrono::Utc;
 use futures::Stream;
-use miden_objects::note::{NoteHeader, NoteTag};
+use miden_protocol::note::{NoteHeader, NoteTag};
 use miden_tx::utils::sync::RwLock;
 use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 
@@ -33,12 +33,10 @@ impl MockNoteTransportNode {
     }
 
     pub fn add_note(&mut self, header: NoteHeader, details_bytes: Vec<u8>) {
+        let tag = header.metadata().tag();
         let info = NoteInfo { header, details_bytes };
         let cursor = u64::try_from(Utc::now().timestamp_micros()).unwrap();
-        self.notes
-            .entry(header.metadata().tag())
-            .or_default()
-            .push((info, cursor.into()));
+        self.notes.entry(tag).or_default().push((info, cursor.into()));
     }
 
     pub fn get_notes(

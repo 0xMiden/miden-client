@@ -1,8 +1,8 @@
-[**@demox-labs/miden-sdk**](../README.md)
+[**@miden-sdk/miden-sdk**](../README.md)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / AccountBuilderResult
+[@miden-sdk/miden-sdk](../README.md) / AccountBuilderResult
 
 # Class: AccountBuilderResult
 
@@ -12,11 +12,15 @@
 
 > `readonly` **account**: [`Account`](Account.md)
 
+Returns the built account.
+
 ***
 
 ### seed
 
 > `readonly` **seed**: [`Word`](Word.md)
+
+Returns the seed used to derive the account ID.
 
 ## Methods
 

@@ -1,10 +1,12 @@
-[**@demox-labs/miden-sdk**](../README.md)
+[**@miden-sdk/miden-sdk**](../README.md)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / AdviceInputs
+[@miden-sdk/miden-sdk](../README.md) / AdviceInputs
 
 # Class: AdviceInputs
+
+Advice inputs provided to a transaction or note script.
 
 ## Methods
 
@@ -32,6 +34,8 @@
 
 > **mappedValues**(`key`): [`Felt`](Felt.md)[]
 
+Returns mapped values for a given key if present.
+
 #### Parameters
 
 ##### key
@@ -47,6 +51,8 @@
 ### stack()
 
 > **stack**(): [`Felt`](Felt.md)[]
+
+Returns the stack inputs as a vector of felts.
 
 #### Returns
 

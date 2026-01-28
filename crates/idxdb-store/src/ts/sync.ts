@@ -1,12 +1,10 @@
 import {
-  db,
-  stateSync,
-  inputNotes,
-  outputNotes,
-  transactions,
-  blockHeaders,
-  partialBlockchainNodes,
-  tags,
+  getDatabase,
+  JsVaultAsset,
+  JsStorageSlot,
+  JsStorageMapEntry,
+  IBlockHeader,
+  IStateSync,
 } from "./schema.js";
 
 import {
@@ -24,10 +22,12 @@ import {
 } from "./accounts.js";
 import { logWebStoreError, uint8ArrayToBase64 } from "./utils.js";
 import { Transaction } from "dexie";
+import Dexie from "dexie";
 
-export async function getNoteTags() {
+export async function getNoteTags(dbId: string) {
   try {
-    let records = await tags.toArray();
+    const db = getDatabase(dbId);
+    let records = await db.tags.toArray();
 
     let processedRecords = records.map((record) => {
       record.sourceNoteId =
@@ -43,9 +43,10 @@ export async function getNoteTags() {
   }
 }
 
-export async function getSyncHeight() {
+export async function getSyncHeight(dbId: string) {
   try {
-    const record = await stateSync.get(1); // Since id is the primary key and always 1
+    const db = getDatabase(dbId);
+    const record = await db.stateSync.get(1);
     if (record) {
       let data = {
         blockNum: record.blockNum,
@@ -60,14 +61,16 @@ export async function getSyncHeight() {
 }
 
 export async function addNoteTag(
+  dbId: string,
   tag: Uint8Array,
   sourceNoteId: string,
   sourceAccountId: string
 ) {
   try {
+    const db = getDatabase(dbId);
     let tagArray = new Uint8Array(tag);
     let tagBase64 = uint8ArrayToBase64(tagArray);
-    await tags.add({
+    await db.tags.add({
       tag: tagBase64,
       sourceNoteId: sourceNoteId ? sourceNoteId : "",
       sourceAccountId: sourceAccountId ? sourceAccountId : "",
@@ -78,15 +81,17 @@ export async function addNoteTag(
 }
 
 export async function removeNoteTag(
+  dbId: string,
   tag: Uint8Array,
   sourceNoteId?: string,
   sourceAccountId?: string
 ) {
   try {
+    const db = getDatabase(dbId);
     let tagArray = new Uint8Array(tag);
     let tagBase64 = uint8ArrayToBase64(tagArray);
 
-    return await tags
+    return await db.tags
       .where({
         tag: tagBase64,
         sourceNoteId: sourceNoteId ? sourceNoteId : "",
@@ -98,8 +103,6 @@ export async function removeNoteTag(
   }
 }
 
-// TODO: The interfaces below are already defined in Rust, we should look into something that keeps
-// types in sync between Rust and Typescript (#1083).
 interface FlattenedU8Vec {
   data(): Uint8Array;
   lengths(): number[];
@@ -132,7 +135,7 @@ interface SerializedOutputNoteData {
 interface SerializedTransactionData {
   id: string;
   details: Uint8Array;
-  blockNum: string;
+  blockNum: number;
   scriptRoot?: Uint8Array;
   statusVariant: number;
   status: Uint8Array;
@@ -154,10 +157,10 @@ interface JsAccountUpdate {
 }
 
 interface JsStateSyncUpdate {
-  blockNum: string;
+  blockNum: number;
   flattenedNewBlockHeaders: FlattenedU8Vec;
   flattenedPartialBlockChainPeaks: FlattenedU8Vec;
-  newBlockNums: string[];
+  newBlockNums: number[];
   blockHasRelevantNotes: Uint8Array;
   serializedNodeIds: string[];
   serializedNodes: string[];
@@ -168,56 +171,35 @@ interface JsStateSyncUpdate {
   transactionUpdates: SerializedTransactionData[];
 }
 
-export interface JsVaultAsset {
-  root: string;
-  vaultKey: string;
-  faucetIdPrefix: string;
-  asset: string;
-}
-
-export interface JsStorageSlot {
-  commitment: string;
-  slotIndex: number;
-  slotValue: string;
-  slotType: number;
-}
-
-export interface JsStorageMapEntry {
-  root: string;
-  key: string;
-  value: string;
-}
-
-/*
- * Takes a `JsStateSyncUpdate` object and writes the state update into the store.
- * @param {JsStateSyncUpdate}
- */
-export async function applyStateSync(stateUpdate: JsStateSyncUpdate) {
+export async function applyStateSync(
+  dbId: string,
+  stateUpdate: JsStateSyncUpdate
+) {
+  const db = getDatabase(dbId);
   const {
-    blockNum, // Target block number for this sync
-    flattenedNewBlockHeaders, // Serialized block headers to be reconstructed
-    flattenedPartialBlockChainPeaks, // Serialized blockchain peaks for verification
-    newBlockNums, // Block numbers corresponding to new headers
-    blockHasRelevantNotes, // Flags indicating which blocks have relevant notes
-    serializedNodeIds, // IDs for new authentication nodes
-    serializedNodes, // Authentication node data for merkle proofs
-    committedNoteIds, // Note tags to be cleaned up/removed
-    serializedInputNotes, // Input notes consumed in transactions
-    serializedOutputNotes, // Output notes created in transactions
-    accountUpdates, // Account state changes
-    transactionUpdates, // Transaction records and scripts
+    blockNum,
+    flattenedNewBlockHeaders,
+    flattenedPartialBlockChainPeaks,
+    newBlockNums,
+    blockHasRelevantNotes,
+    serializedNodeIds,
+    serializedNodes,
+    committedNoteIds,
+    serializedInputNotes,
+    serializedOutputNotes,
+    accountUpdates,
+    transactionUpdates,
   } = stateUpdate;
-  // Block headers and Blockchain peaks are flattened before calling
-  // this function, here we rebuild them.
+
   const newBlockHeaders = reconstructFlattenedVec(flattenedNewBlockHeaders);
   const partialBlockchainPeaks = reconstructFlattenedVec(
     flattenedPartialBlockChainPeaks
   );
-  // Create promises to insert each input note. Each note will have its own transaction,
-  // and therefore, nested inside the final transaction inside this function.
+
   let inputNotesWriteOp = Promise.all(
     serializedInputNotes.map((note) => {
       return upsertInputNote(
+        dbId,
         note.noteId,
         note.noteAssets,
         note.serialNumber,
@@ -232,10 +214,10 @@ export async function applyStateSync(stateUpdate: JsStateSyncUpdate) {
     })
   );
 
-  // See comment above, the same thing applies here, but for Output Notes.
   let outputNotesWriteOp = Promise.all(
     serializedOutputNotes.map((note) => {
       return upsertOutputNote(
+        dbId,
         note.noteId,
         note.noteAssets,
         note.recipientDigest,
@@ -248,11 +230,11 @@ export async function applyStateSync(stateUpdate: JsStateSyncUpdate) {
     })
   );
 
-  // Promises to insert each transaction update.
   let transactionWriteOp = Promise.all(
     transactionUpdates.map((transactionRecord) => {
       let promises = [
         upsertTransactionRecord(
+          dbId,
           transactionRecord.id,
           transactionRecord.details,
           transactionRecord.blockNum,
@@ -265,6 +247,7 @@ export async function applyStateSync(stateUpdate: JsStateSyncUpdate) {
       if (transactionRecord.scriptRoot && transactionRecord.txScript) {
         promises.push(
           insertTransactionScript(
+            dbId,
             transactionRecord.scriptRoot,
             transactionRecord.txScript
           )
@@ -275,15 +258,14 @@ export async function applyStateSync(stateUpdate: JsStateSyncUpdate) {
     })
   );
 
-  // Promises to insert each account update.
-
   let accountUpdatesWriteOp = Promise.all(
     accountUpdates.flatMap((accountUpdate) => {
       return [
-        upsertAccountStorage(accountUpdate.storageSlots),
-        upsertStorageMapEntries(accountUpdate.storageMapEntries),
-        upsertVaultAssets(accountUpdate.assets),
+        upsertAccountStorage(dbId, accountUpdate.storageSlots),
+        upsertStorageMapEntries(dbId, accountUpdate.storageMapEntries),
+        upsertVaultAssets(dbId, accountUpdate.assets),
         upsertAccountRecord(
+          dbId,
           accountUpdate.accountId,
           accountUpdate.codeRoot,
           accountUpdate.storageRoot,
@@ -298,20 +280,16 @@ export async function applyStateSync(stateUpdate: JsStateSyncUpdate) {
   );
 
   const tablesToAccess = [
-    stateSync,
-    inputNotes,
-    outputNotes,
-    transactions,
-    blockHeaders,
-    partialBlockchainNodes,
-    tags,
+    db.stateSync,
+    db.inputNotes,
+    db.outputNotes,
+    db.transactions,
+    db.blockHeaders,
+    db.partialBlockchainNodes,
+    db.tags,
   ];
 
-  // Write everything in a single transaction, this transaction will atomically do the operations
-  // below, since every operation here (or at least, most of them), is done in a nested transaction.
-  // For more information on this, check: https://dexie.org/docs/Dexie/Dexie.transaction()
-  return await db.transaction("rw", tablesToAccess, async (tx) => {
-    // Everything is under a single promise since otherwise the tx expires.
+  return await db.dexie.transaction("rw", tablesToAccess, async (tx) => {
     await Promise.all([
       inputNotesWriteOp,
       outputNotesWriteOp,
@@ -335,15 +313,18 @@ export async function applyStateSync(stateUpdate: JsStateSyncUpdate) {
   });
 }
 
-async function updateSyncHeight(
-  tx: Transaction & { stateSync: typeof stateSync },
-  blockNum: string
-) {
+async function updateSyncHeight(tx: Transaction, blockNum: number) {
   try {
     // Only update if moving forward to prevent race conditions
-    const current = await tx.stateSync.get(1);
-    if (!current || parseInt(current.blockNum) < parseInt(blockNum)) {
-      await tx.stateSync.update(1, { blockNum: blockNum });
+    const current = await (
+      tx as Transaction & { stateSync: Dexie.Table<IStateSync, number> }
+    ).stateSync.get(1);
+    if (!current || current.blockNum < blockNum) {
+      await (
+        tx as Transaction & { stateSync: Dexie.Table<IStateSync, number> }
+      ).stateSync.update(1, {
+        blockNum: blockNum,
+      });
     }
   } catch (error) {
     logWebStoreError(error, "Failed to update sync height");
@@ -351,8 +332,8 @@ async function updateSyncHeight(
 }
 
 async function updateBlockHeader(
-  tx: Transaction & { blockHeaders: typeof blockHeaders },
-  blockNum: string,
+  tx: Transaction,
+  blockNum: number,
   blockHeader: Uint8Array,
   partialBlockchainPeaks: Uint8Array,
   hasClientNotes: boolean
@@ -365,10 +346,14 @@ async function updateBlockHeader(
       hasClientNotes: hasClientNotes.toString(),
     };
 
-    const existingBlockHeader = await tx.blockHeaders.get(blockNum);
+    const existingBlockHeader = await (
+      tx as Transaction & { blockHeaders: Dexie.Table<IBlockHeader, number> }
+    ).blockHeaders.get(blockNum);
 
     if (!existingBlockHeader) {
-      await tx.blockHeaders.add(data);
+      await (
+        tx as Transaction & { blockHeaders: Dexie.Table }
+      ).blockHeaders.add(data);
     }
   } catch (err) {
     logWebStoreError(err, "Failed to insert block header");
@@ -376,12 +361,11 @@ async function updateBlockHeader(
 }
 
 async function updatePartialBlockchainNodes(
-  tx: Transaction & { partialBlockchainNodes: typeof partialBlockchainNodes },
+  tx: Transaction,
   nodeIndexes: string[],
   nodes: string[]
 ) {
   try {
-    // Check if the arrays are not of the same length
     if (nodeIndexes.length !== nodes.length) {
       throw new Error(
         "nodeIndexes and nodes arrays must be of the same length"
@@ -392,34 +376,36 @@ async function updatePartialBlockchainNodes(
       return;
     }
 
-    // Create array of objects with id and node
     const data = nodes.map((node, index) => ({
-      id: nodeIndexes[index],
+      id: Number(nodeIndexes[index]),
       node: node,
     }));
     // Use bulkPut to add/overwrite the entries
-    await tx.partialBlockchainNodes.bulkPut(data);
+    await (
+      tx as Transaction & { partialBlockchainNodes: Dexie.Table }
+    ).partialBlockchainNodes.bulkPut(data);
   } catch (err) {
     logWebStoreError(err, "Failed to update partial blockchain nodes");
   }
 }
 
 async function updateCommittedNoteTags(
-  tx: Transaction & { tags: typeof tags },
+  tx: Transaction,
   inputNoteIds: string[]
 ) {
   try {
     for (let i = 0; i < inputNoteIds.length; i++) {
       const noteId = inputNoteIds[i];
-      // Remove note tags
-      await tx.tags.where("source_note_id").equals(noteId).delete();
+      await (tx as Transaction & { tags: Dexie.Table }).tags
+        .where("source_note_id")
+        .equals(noteId)
+        .delete();
     }
   } catch (error) {
     logWebStoreError(error, "Failed to pudate committed note tags");
   }
 }
 
-// Helper function to reconstruct arrays from flattened data
 function reconstructFlattenedVec(flattenedVec: FlattenedU8Vec) {
   const data = flattenedVec.data();
   const lengths = flattenedVec.lengths();
@@ -431,4 +417,16 @@ function reconstructFlattenedVec(flattenedVec: FlattenedU8Vec) {
     index += length;
   });
   return result;
+}
+
+export async function discardTransactions(
+  dbId: string,
+  transactions: string[]
+) {
+  try {
+    const db = getDatabase(dbId);
+    await db.transactions.where("id").anyOf(transactions).delete();
+  } catch (err) {
+    logWebStoreError(err, "Failed to discard transactions");
+  }
 }

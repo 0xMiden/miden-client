@@ -1,9 +1,9 @@
 use alloc::string::ToString;
 use core::fmt::{self, Display};
 
-use miden_objects::Word;
-use miden_objects::block::BlockNumber;
-use miden_objects::note::{
+use miden_protocol::Word;
+use miden_protocol::block::BlockNumber;
+use miden_protocol::note::{
     Note,
     NoteAssets,
     NoteDetails,
@@ -15,7 +15,7 @@ use miden_objects::note::{
     Nullifier,
     PartialNote,
 };
-use miden_objects::transaction::OutputNote;
+use miden_protocol::transaction::OutputNote;
 use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 
 use super::NoteRecordError;
@@ -164,12 +164,12 @@ impl OutputNoteRecord {
 // TODO: Improve conversions by implementing into_parts()
 impl OutputNoteRecord {
     pub fn from_full_note(note: Note, expected_height: BlockNumber) -> Self {
-        let header = *note.header();
+        let header = note.header().clone();
         let (assets, recipient) = NoteDetails::from(note).into_parts();
         OutputNoteRecord {
             recipient_digest: recipient.digest(),
             assets,
-            metadata: *header.metadata(),
+            metadata: header.metadata().clone(),
             state: OutputNoteState::ExpectedFull { recipient },
             expected_height,
         }
@@ -179,7 +179,7 @@ impl OutputNoteRecord {
         OutputNoteRecord {
             recipient_digest: partial_note.recipient_digest(),
             assets: partial_note.assets().clone(),
-            metadata: *partial_note.metadata(),
+            metadata: partial_note.metadata().clone(),
             state: OutputNoteState::ExpectedPartial,
             expected_height,
         }
@@ -221,7 +221,8 @@ impl TryFrom<OutputNoteRecord> for Note {
     fn try_from(value: OutputNoteRecord) -> Result<Self, Self::Error> {
         match value.recipient() {
             Some(recipient) => {
-                let note = Note::new(value.assets.clone(), value.metadata, recipient.clone());
+                let note =
+                    Note::new(value.assets.clone(), value.metadata.clone(), recipient.clone());
                 Ok(note)
             },
             None => Err(NoteRecordError::ConversionError(

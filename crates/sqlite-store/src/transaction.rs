@@ -6,11 +6,11 @@ use std::sync::{Arc, RwLock};
 use std::vec::Vec;
 
 use miden_client::Word;
-use miden_client::crypto::MerkleStore;
 use miden_client::note::ToInputNoteCommitments;
 use miden_client::store::{StoreError, TransactionFilter};
 use miden_client::transaction::{
     TransactionDetails,
+    TransactionId,
     TransactionRecord,
     TransactionScript,
     TransactionStatus,
@@ -23,6 +23,7 @@ use rusqlite::{Connection, Transaction, params};
 use super::SqliteStore;
 use super::note::apply_note_updates_tx;
 use super::sync::add_note_tag_tx;
+use crate::smt_forest::AccountSmtForest;
 use crate::sql_error::SqlResultExt;
 use crate::{insert_sql, subst};
 
@@ -106,7 +107,7 @@ impl SqliteStore {
     /// Inserts a transaction and updates the current state based on the `tx_result` changes.
     pub fn apply_transaction(
         conn: &mut Connection,
-        merkle_store: &Arc<RwLock<MerkleStore>>,
+        smt_forest: &Arc<RwLock<AccountSmtForest>>,
         tx_update: &TransactionStoreUpdate,
     ) -> Result<(), StoreError> {
         let executed_transaction = tx_update.executed_transaction();
@@ -157,17 +158,17 @@ impl SqliteStore {
         upsert_transaction_record(&tx, &transaction_record)?;
 
         // Account Data
-        let mut merkle_store = merkle_store.write().expect("merkle_store write lock not poisoned");
+        let mut smt_forest = smt_forest.write().expect("smt_forest write lock not poisoned");
         Self::apply_account_delta(
             &tx,
-            &mut merkle_store,
+            &mut smt_forest,
             &executed_transaction.initial_account().into(),
             executed_transaction.final_account(),
             updated_fungible_assets,
             updated_storage_maps,
             executed_transaction.account_delta(),
         )?;
-        drop(merkle_store);
+        drop(smt_forest);
 
         // Note Updates
         apply_note_updates_tx(&tx, tx_update.note_updates())?;
@@ -254,7 +255,7 @@ fn parse_transaction(
         .transpose()?;
 
     Ok(TransactionRecord {
-        id: id.into(),
+        id: TransactionId::from_raw(id),
         details: TransactionDetails::read_from_bytes(&details)?,
         script,
         status: TransactionStatus::read_from_bytes(&status)?,

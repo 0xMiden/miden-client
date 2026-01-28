@@ -1,16 +1,28 @@
-[**@demox-labs/miden-sdk**](../README.md)
+[**@miden-sdk/miden-sdk**](../README.md)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / NoteRecipient
+[@miden-sdk/miden-sdk](../README.md) / NoteRecipient
 
 # Class: NoteRecipient
+
+Value that describes under which condition a note can be consumed.
+
+The recipient is not an account address, instead it is a value that describes when a note can be
+consumed. Because not all notes have predetermined consumer addresses, e.g. swap notes can be
+consumed by anyone, the recipient is defined as the code and its inputs, that when successfully
+executed results in the note's consumption.
+
+Recipient is computed as a nested hash of the serial number, the script root, and the inputs
+commitment, ensuring the recipient digest binds all three pieces of data together.
 
 ## Constructors
 
 ### Constructor
 
 > **new NoteRecipient**(`serial_num`, `note_script`, `inputs`): `NoteRecipient`
+
+Creates a note recipient from its serial number, script, and inputs.
 
 #### Parameters
 
@@ -46,6 +58,8 @@
 
 > **digest**(): [`Word`](Word.md)
 
+Returns the digest of the recipient data (used in the note commitment).
+
 #### Returns
 
 [`Word`](Word.md)
@@ -66,6 +80,8 @@
 
 > **inputs**(): [`NoteInputs`](NoteInputs.md)
 
+Returns the inputs provided to the script.
+
 #### Returns
 
 [`NoteInputs`](NoteInputs.md)
@@ -76,6 +92,8 @@
 
 > **script**(): [`NoteScript`](NoteScript.md)
 
+Returns the script that controls consumption.
+
 #### Returns
 
 [`NoteScript`](NoteScript.md)
@@ -85,6 +103,8 @@
 ### serialNum()
 
 > **serialNum**(): [`Word`](Word.md)
+
+Returns the serial number that prevents double spends.
 
 #### Returns
 

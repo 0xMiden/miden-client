@@ -1,16 +1,20 @@
-[**@demox-labs/miden-sdk**](../README.md)
+[**@miden-sdk/miden-sdk**](../README.md)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / TransactionScriptInputPair
+[@miden-sdk/miden-sdk](../README.md) / TransactionScriptInputPair
 
 # Class: TransactionScriptInputPair
+
+A script argument represented as a word plus additional felts.
 
 ## Constructors
 
 ### Constructor
 
 > **new TransactionScriptInputPair**(`word`, `felts`): `TransactionScriptInputPair`
+
+Creates a new script input pair.
 
 #### Parameters
 
@@ -42,6 +46,8 @@
 
 > **felts**(): [`FeltArray`](FeltArray.md)
 
+Returns the remaining felts for the input.
+
 #### Returns
 
 [`FeltArray`](FeltArray.md)
@@ -61,6 +67,8 @@
 ### word()
 
 > **word**(): [`Word`](Word.md)
+
+Returns the word part of the input.
 
 #### Returns
 

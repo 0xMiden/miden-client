@@ -1,10 +1,12 @@
-[**@demox-labs/miden-sdk**](../README.md)
+[**@miden-sdk/miden-sdk**](../README.md)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / SyncSummary
+[@miden-sdk/miden-sdk](../README.md) / SyncSummary
 
 # Class: SyncSummary
+
+Contains stats about the sync operation.
 
 ## Methods
 
@@ -22,6 +24,8 @@
 
 > **blockNum**(): `number`
 
+Returns the block height the summary is based on.
+
 #### Returns
 
 `number`
@@ -31,6 +35,8 @@
 ### committedNotes()
 
 > **committedNotes**(): [`NoteId`](NoteId.md)[]
+
+Returns IDs of notes committed in this sync window.
 
 #### Returns
 
@@ -42,6 +48,8 @@
 
 > **committedTransactions**(): [`TransactionId`](TransactionId.md)[]
 
+Returns transactions that were committed.
+
 #### Returns
 
 [`TransactionId`](TransactionId.md)[]
@@ -51,6 +59,8 @@
 ### consumedNotes()
 
 > **consumedNotes**(): [`NoteId`](NoteId.md)[]
+
+Returns IDs of notes that were consumed.
 
 #### Returns
 
@@ -72,6 +82,8 @@
 
 > **serialize**(): `Uint8Array`
 
+Serializes the sync summary into bytes.
+
 #### Returns
 
 `Uint8Array`
@@ -82,6 +94,8 @@
 
 > **updatedAccounts**(): [`AccountId`](AccountId.md)[]
 
+Returns accounts that were updated.
+
 #### Returns
 
 [`AccountId`](AccountId.md)[]
@@ -91,6 +105,8 @@
 ### deserialize()
 
 > `static` **deserialize**(`bytes`): `SyncSummary`
+
+Deserializes a sync summary from bytes.
 
 #### Parameters
 

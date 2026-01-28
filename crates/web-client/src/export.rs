@@ -1,7 +1,7 @@
 use miden_client::Word;
 use miden_client::account::AccountFile as NativeAccountFile;
+use miden_client::note::NoteId;
 use miden_client::store::NoteExportType;
-use miden_client::utils::get_public_keys_from_account;
 use wasm_bindgen::prelude::*;
 
 use crate::models::account_file::AccountFile;
@@ -18,14 +18,12 @@ impl WebClient {
         export_type: String,
     ) -> Result<NoteFile, JsValue> {
         if let Some(client) = self.get_mut_inner() {
-            let note_id = Word::try_from(note_id)
-                .map_err(|err| {
-                    js_error_with_context(
-                        err,
-                        "error exporting note file: failed to parse input note id",
-                    )
-                })?
-                .into();
+            let note_id = NoteId::from_raw(Word::try_from(note_id).map_err(|err| {
+                js_error_with_context(
+                    err,
+                    "error exporting note file: failed to parse input note id",
+                )
+            })?);
 
             let output_note = client
                 .get_output_note(note_id)
@@ -80,6 +78,7 @@ impl WebClient {
         &mut self,
         account_id: AccountId,
     ) -> Result<AccountFile, JsValue> {
+        let keystore = self.keystore.clone().expect("Keystore not initialized");
         if let Some(client) = self.get_mut_inner() {
             let account = client
                 .get_account(account_id.into())
@@ -94,16 +93,29 @@ impl WebClient {
                     )
                 })?
                 .ok_or(JsValue::from_str("No account found"))?;
-
-            let keystore = self.keystore.clone().expect("Keystore not initialized");
-            let account = account.into();
+            let account = account
+                .try_into()
+                .map_err(|_| JsValue::from_str("partial accounts are still unsupported"))?;
 
             let mut key_pairs = vec![];
 
-            for pub_key in get_public_keys_from_account(&account) {
+            let commitments = client
+                .get_account_public_key_commitments(account_id.as_native())
+                .await
+                .map_err(|err| {
+                    js_error_with_context(
+                        err,
+                        &format!(
+                            "failed to get public keys for account: {}",
+                            &account_id.to_string()
+                        ),
+                    )
+                })?;
+
+            for commitment in commitments {
                 key_pairs.push(
                     keystore
-                        .get_key(pub_key)
+                        .get_key(commitment)
                         .await
                         .map_err(|err| {
                             js_error_with_context(err, "failed to get public key for account")

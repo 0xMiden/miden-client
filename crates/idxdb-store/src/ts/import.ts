@@ -2,7 +2,7 @@
 // with importing DB types and we're testing this which
 // should be enough + the TS compiler.
 /* eslint-disable */
-import { db, openDatabase } from "./schema.js";
+import { getDatabase } from "./schema.js";
 import { logWebStoreError } from "./utils.js";
 type ImportableInput =
   | { type: "Blob"; value: { __type: "Blob"; data: string } }
@@ -54,29 +54,27 @@ export async function transformForImport(obj: any): Promise<any> {
     value: obj,
   });
 }
-export async function forceImportStore(jsonStr: string) {
-  try {
-    if (!db.isOpen) {
-      await openDatabase();
-    }
 
+export async function forceImportStore(dbId: string, jsonStr: string) {
+  try {
+    const db = getDatabase(dbId);
     let dbJson = JSON.parse(jsonStr);
     if (typeof dbJson === "string") {
       dbJson = JSON.parse(dbJson);
     }
 
     const jsonTableNames = Object.keys(dbJson);
-    const dbTableNames = db.tables.map((t) => t.name);
+    const dbTableNames = db.dexie.tables.map((t) => t.name);
 
     if (jsonTableNames.length === 0) {
       throw new Error("No tables found in the provided JSON.");
     }
 
-    await db.transaction("rw", dbTableNames, async () => {
-      await Promise.all(db.tables.map((t) => t.clear()));
+    await db.dexie.transaction("rw", dbTableNames, async () => {
+      await Promise.all(db.dexie.tables.map((t) => t.clear()));
 
       for (const tableName of jsonTableNames) {
-        const table = db.table(tableName);
+        const table = db.dexie.table(tableName);
 
         if (!dbTableNames.includes(tableName)) {
           console.warn(

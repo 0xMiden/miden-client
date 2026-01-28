@@ -1,10 +1,12 @@
-[**@demox-labs/miden-sdk**](../README.md)
+[**@miden-sdk/miden-sdk**](../README.md)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / ForeignAccount
+[@miden-sdk/miden-sdk](../README.md) / ForeignAccount
 
 # Class: ForeignAccount
+
+Description of a foreign account referenced by a transaction.
 
 ## Methods
 
@@ -21,6 +23,8 @@
 ### account\_id()
 
 > **account\_id**(): [`AccountId`](AccountId.md)
+
+Returns the ID of the foreign account.
 
 #### Returns
 
@@ -42,6 +46,8 @@
 
 > **storage\_slot\_requirements**(): [`AccountStorageRequirements`](AccountStorageRequirements.md)
 
+Returns the required storage slots/keys for this foreign account.
+
 #### Returns
 
 [`AccountStorageRequirements`](AccountStorageRequirements.md)
@@ -51,6 +57,8 @@
 ### public()
 
 > `static` **public**(`account_id`, `storage_requirements`): `ForeignAccount`
+
+Creates a foreign account entry for a public account with given storage requirements.
 
 #### Parameters
 
