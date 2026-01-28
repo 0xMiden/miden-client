@@ -1,4 +1,12 @@
 {
   "printWidth": 120,
-  "trailingComma": "es5"
+  "trailingComma": "es5",
+  "overrides": [
+    {
+      "files": "src/App.tsx",
+      "options": {
+        "printWidth": 160
+      }
+    }
+  ]
 }

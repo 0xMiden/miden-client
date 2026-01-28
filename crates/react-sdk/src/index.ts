@@ -37,6 +37,8 @@ export type {
   AssetBalance,
   NotesFilter,
   NotesResult,
+  NoteAsset,
+  NoteSummary,
   CreateWalletOptions,
   CreateFaucetOptions,
   SendOptions,
@@ -64,6 +66,7 @@ export { DEFAULTS } from "./types";
 
 // Utilities
 export { toBech32AccountId } from "./utils/accountBech32";
+export { getNoteSummary, formatNoteSummary } from "./utils/notes";
 
 // Hook result types
 export type { UseCreateWalletResult } from "./hooks/useCreateWallet";

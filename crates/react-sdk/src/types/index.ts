@@ -115,6 +115,17 @@ export interface NotesResult {
   refetch: () => Promise<void>;
 }
 
+export interface NoteAsset {
+  assetId: string;
+  amount: bigint;
+}
+
+export interface NoteSummary {
+  id: string;
+  assets: NoteAsset[];
+  sender?: string;
+}
+
 // Wallet creation options
 export interface CreateWalletOptions {
   /** Storage mode. Default: private */

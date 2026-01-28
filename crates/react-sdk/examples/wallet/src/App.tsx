@@ -1,5 +1,5 @@
 import { useEffect, useState, type ChangeEvent, type ReactNode } from "react";
-import { useMiden, useAccounts, useAccount, useNotes, useCreateWallet, useConsume, useSend } from "@miden-sdk/react";
+import { formatNoteSummary, getNoteSummary, useMiden, useAccounts, useAccount, useNotes, useCreateWallet, useConsume, useSend } from "@miden-sdk/react";
 
 const Panel = ({ title, children }: { title: string; children: ReactNode }) => (
   <div className="panel">
@@ -90,10 +90,12 @@ function Wallet({ accountId }: { accountId: string }) {
         ) : (
           <div className="list">
             {consumableNotes.map((note) => {
-              const id = note.inputNoteRecord().id().toString();
+              const summary = getNoteSummary(note);
+              const id = summary?.id ?? note.inputNoteRecord().id().toString();
+              const label = summary ? formatNoteSummary(summary) : id;
               return (
                 <div key={id} className="row">
-                  <span className="mono">{id}</span>
+                  <span className="mono">{label}</span>
                   <button onClick={claimNote(id)} disabled={isConsuming}>
                     Claim
                   </button>
