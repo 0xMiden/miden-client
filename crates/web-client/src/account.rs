@@ -196,7 +196,7 @@ impl WebClient {
 
             let value = client
                 .storage(account_id.into())
-                .get_map_item(slot_name, (*key.as_native()).into())
+                .get_map_item(slot_name, *key.as_native())
                 .await
                 .map_err(|err| js_error_with_context(err, "failed to get storage map item"))?;
 
