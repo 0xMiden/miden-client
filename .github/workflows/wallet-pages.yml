@@ -32,7 +32,7 @@ jobs:
         run: yarn install --frozen-lockfile
       - name: Build wallet example
         working-directory: crates/react-sdk/examples/wallet
-        run: yarn build --base=/${{ github.event.repository.name }}/
+        run: yarn build --base=/${{ github.event.repository.name }}/wallet-react-example/ --outDir=dist/wallet-react-example
       - name: Upload pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
