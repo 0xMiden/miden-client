@@ -1,15 +1,15 @@
-use alloc::{string::String, vec::Vec};
+use alloc::string::String;
 use core::fmt::{self, Display, Formatter};
 
 use hex::ToHex;
-use miden_protocol::{Felt, StarkField, Word, note::NoteId};
+use miden_objects::{Felt, StarkField, Word, note::NoteId};
 
 use crate::rpc::{errors::RpcConversionError, generated::word};
 
 // CONSTANTS
 // ================================================================================================
 
-pub const WORD_DATA_SIZE: usize = 32;
+pub const WORD_DATA_SIZE: usize = Word::SERIALIZED_SIZE * 2;
 
 // FORMATTING
 // ================================================================================================
@@ -32,21 +32,23 @@ impl ToHex for &word::Word {
 
 impl ToHex for word::Word {
     fn encode_hex<T: FromIterator<char>>(&self) -> T {
-        let mut data: Vec<char> = Vec::with_capacity(WORD_DATA_SIZE);
-        data.extend(format!("{:016x}", self.w0).chars());
-        data.extend(format!("{:016x}", self.w1).chars());
-        data.extend(format!("{:016x}", self.w2).chars());
-        data.extend(format!("{:016x}", self.w3).chars());
-        data.into_iter().collect()
+        const HEX_LOWER: [char; 16] =
+            ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'];
+        [self.w0, self.w1, self.w2, self.w3]
+            .into_iter()
+            .flat_map(u64::to_be_bytes)
+            .flat_map(|b| [HEX_LOWER[(b >> 4) as usize], HEX_LOWER[(b & 0xf) as usize]])
+            .collect()
     }
 
     fn encode_hex_upper<T: FromIterator<char>>(&self) -> T {
-        let mut data: Vec<char> = Vec::with_capacity(WORD_DATA_SIZE);
-        data.extend(format!("{:016X}", self.w0).chars());
-        data.extend(format!("{:016X}", self.w1).chars());
-        data.extend(format!("{:016X}", self.w2).chars());
-        data.extend(format!("{:016X}", self.w3).chars());
-        data.into_iter().collect()
+        const HEX_UPPER: [char; 16] =
+            ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'];
+        [self.w0, self.w1, self.w2, self.w3]
+            .into_iter()
+            .flat_map(u64::to_be_bytes)
+            .flat_map(|b| [HEX_UPPER[(b >> 4) as usize], HEX_UPPER[(b & 0xf) as usize]])
+            .collect()
     }
 }
 
