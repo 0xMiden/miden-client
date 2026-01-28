@@ -258,6 +258,7 @@ pub mod address {
 
 /// Provides types for working with the virtual machine within the Miden network.
 pub mod vm {
+    // TODO: Remove this re-export once miden-protocol exposes PackageKind/ProcedureExport.
     pub use miden_mast_package::{PackageKind, ProcedureExport};
     pub use miden_protocol::vm::{
         AdviceInputs,
