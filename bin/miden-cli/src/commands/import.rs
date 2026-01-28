@@ -7,11 +7,11 @@ use miden_client::auth::TransactionAuthenticator;
 use miden_client::note::NoteFile;
 use miden_client::utils::Deserializable;
 use miden_client::{Client, ClientError};
-use tracing::info;
+use tracing::{info, warn};
 
 use crate::commands::account::set_default_account_if_unset;
 use crate::errors::CliError;
-use crate::{CliKeyStore, Parser};
+use crate::{FilesystemKeyStore, Parser};
 
 #[derive(Debug, Parser, Clone)]
 #[command(about = "Import notes or accounts")]
@@ -28,29 +28,23 @@ impl ImportCmd {
     pub async fn execute<AUTH: TransactionAuthenticator + Sync + 'static>(
         &self,
         mut client: Client<AUTH>,
-        keystore: CliKeyStore,
+        keystore: FilesystemKeyStore,
     ) -> Result<(), CliError> {
         validate_paths(&self.filenames)?;
         for filename in &self.filenames {
             let note_file = read_note_file(filename.clone());
 
             if let Ok(note_file) = note_file {
-                let note_id = client.import_note(note_file).await?;
+                let note_id = client.import_notes(&[note_file]).await?[0];
                 println!("Successfully imported note {}", note_id.to_hex());
             } else {
                 info!(
                     "Attempting to import account data from {}...",
                     fs::canonicalize(filename)?.as_path().display()
                 );
-                let account_data_file_contents = fs::read(filename)?;
-
-                let account_id = import_account(
-                    &mut client,
-                    &keystore,
-                    &account_data_file_contents,
-                    self.overwrite,
-                )
-                .await?;
+                let account_file = AccountFile::read(filename)?;
+                let account_id =
+                    import_account(&mut client, &keystore, account_file, self.overwrite).await?;
 
                 println!("Successfully imported account {account_id}");
 
@@ -66,20 +60,37 @@ impl ImportCmd {
 // IMPORT ACCOUNT
 // ================================================================================================
 
+/// Imports an account file to the client.
+///
+/// This implies:
+///
+/// - Reading all secret keys, and importing it to the CLI keystore
+/// - Storing account ID -> public key commitment mapping on the client's store
+/// - Adding the [account][`miden_client::account::Account`] to the client
 async fn import_account<AUTH>(
     client: &mut Client<AUTH>,
-    keystore: &CliKeyStore,
-    account_data_file_contents: &[u8],
+    keystore: &FilesystemKeyStore,
+    account_file: AccountFile,
     overwrite: bool,
 ) -> Result<AccountId, CliError> {
-    let account_data = AccountFile::read_from_bytes(account_data_file_contents)
-        .map_err(ClientError::DataDeserializationError)?;
-    let account_id = account_data.account.id();
-
-    let AccountFile { account, auth_secret_keys } = account_data;
+    let account_id = account_file.account.id();
+    let AccountFile { account, auth_secret_keys } = account_file;
 
     for key in auth_secret_keys {
+        let public_key = key.public_key();
+        let public_key_commitment = public_key.to_commitment();
         keystore.add_key(&key).map_err(CliError::KeyStore)?;
+        if let Err(err) =
+            client.register_account_public_key_commitments(&account_id, &[public_key]).await
+        {
+            if let Err(rollback_err) = keystore.remove_key(public_key_commitment) {
+                warn!(
+                    ?rollback_err,
+                    "Failed to rollback keystore entry after commitment add failure"
+                );
+            }
+            return Err(err.into());
+        }
     }
 
     client.add_account(&account, overwrite).await?;

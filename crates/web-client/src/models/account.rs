@@ -1,5 +1,10 @@
-use miden_client::account::{Account as NativeAccount, AccountType as NativeAccountType};
-use miden_client::utils::get_public_keys_from_account;
+use miden_client::Word as NativeWord;
+use miden_client::account::{
+    Account as NativeAccount,
+    AccountInterfaceExt,
+    AccountType as NativeAccountType,
+};
+use miden_client::transaction::AccountInterface;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys::Uint8Array;
 
@@ -117,16 +122,18 @@ impl Account {
         deserialize_from_uint8array::<NativeAccount>(bytes).map(Account)
     }
 
-    /// Returns the public keys derived from the account's authentication scheme.
-    #[wasm_bindgen(js_name = "getPublicKeys")]
-    pub fn get_public_keys(&self) -> Vec<Word> {
-        let mut key_pairs = vec![];
+    /// Returns the public key commitments derived from the account's authentication scheme.
+    #[wasm_bindgen(js_name = "getPublicKeyCommitments")]
+    pub fn get_public_key_commitments(&self) -> Vec<Word> {
+        let inner_account = &self.0;
+        let mut pks = vec![];
+        let interface: AccountInterface = AccountInterface::from_account(inner_account);
 
-        for pub_key in get_public_keys_from_account(&self.0) {
-            key_pairs.push(pub_key.into());
+        for auth in interface.auth() {
+            pks.extend(auth.get_public_key_commitments());
         }
 
-        key_pairs
+        pks.into_iter().map(NativeWord::from).map(Into::into).collect()
     }
 }
 

@@ -1,9 +1,9 @@
 use alloc::string::ToString;
 
-use miden_objects::Word;
-use miden_objects::block::{BlockHeader, BlockNumber};
-use miden_objects::note::{NoteId, NoteInclusionProof, NoteMetadata, compute_note_commitment};
-use miden_objects::transaction::TransactionId;
+use miden_protocol::Word;
+use miden_protocol::block::{BlockHeader, BlockNumber};
+use miden_protocol::note::{NoteId, NoteInclusionProof, NoteMetadata, compute_note_commitment};
+use miden_protocol::transaction::TransactionId;
 
 use super::{
     CommittedNoteState,
@@ -60,7 +60,7 @@ impl NoteStateHandler for InvalidNoteState {
             Ok(Some(
                 CommittedNoteState {
                     inclusion_proof: self.invalid_inclusion_proof.clone(),
-                    metadata: self.metadata,
+                    metadata: self.metadata.clone(),
                     block_note_root: block_header.note_root(),
                 }
                 .into(),
@@ -72,8 +72,8 @@ impl NoteStateHandler for InvalidNoteState {
 
     fn consumed_locally(
         &self,
-        _consumer_account: miden_objects::account::AccountId,
-        _consumer_transaction: miden_objects::transaction::TransactionId,
+        _consumer_account: miden_protocol::account::AccountId,
+        _consumer_transaction: miden_protocol::transaction::TransactionId,
         _current_timestamp: Option<u64>,
     ) -> Result<Option<InputNoteState>, NoteRecordError> {
         Err(NoteRecordError::NoteNotConsumable("Can't consume invalid note".to_string()))

@@ -5,8 +5,8 @@ use core::pin::Pin;
 use core::task::{Context, Poll};
 
 use futures::Stream;
-use miden_objects::note::{NoteHeader, NoteTag};
-use miden_objects::utils::{Deserializable, Serializable};
+use miden_protocol::note::{NoteHeader, NoteTag};
+use miden_protocol::utils::{Deserializable, Serializable};
 use miden_tx::utils::sync::RwLock;
 use tonic::{Request, Streaming};
 use tonic_health::pb::HealthCheckRequest;

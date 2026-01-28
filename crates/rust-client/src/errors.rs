@@ -2,20 +2,21 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::fmt;
 
-use miden_lib::account::interface::AccountInterfaceError;
-use miden_objects::account::AccountId;
-use miden_objects::crypto::merkle::MerkleError;
-use miden_objects::note::{NoteId, NoteTag};
-pub use miden_objects::{AccountError, AccountIdError, AssetError, NetworkIdError};
-use miden_objects::{
+use miden_protocol::Word;
+use miden_protocol::account::AccountId;
+use miden_protocol::crypto::merkle::MerkleError;
+pub use miden_protocol::errors::{AccountError, AccountIdError, AssetError, NetworkIdError};
+use miden_protocol::errors::{
     NoteError,
     PartialBlockchainError,
     TransactionInputError,
     TransactionScriptError,
-    Word,
 };
+use miden_protocol::note::{NoteId, NoteTag};
+use miden_standards::account::interface::AccountInterfaceError;
 // RE-EXPORTS
 // ================================================================================================
+pub use miden_standards::errors::CodeBuilderError;
 pub use miden_tx::AuthenticationError;
 use miden_tx::utils::{DeserializationError, HexParseError};
 use miden_tx::{NoteCheckerError, TransactionExecutorError, TransactionProverError};
@@ -168,14 +169,6 @@ impl From<&ClientError> for Option<ErrorHint> {
                 ),
                 docs_url: Some(TROUBLESHOOTING_DOC),
             }),
-            ClientError::StoreError(StoreError::AccountCommitmentAlreadyExists(commitment)) => {
-                Some(ErrorHint {
-                    message: format!(
-                        "Account commitment {commitment:?} already exists locally. Sync to confirm the transaction status and avoid resubmitting it; if you need a clean slate for development, reset the store."
-                    ),
-                    docs_url: Some(TROUBLESHOOTING_DOC),
-                })
-            },
             _ => None,
         }
     }
@@ -190,14 +183,6 @@ impl ClientError {
 impl From<&TransactionRequestError> for Option<ErrorHint> {
     fn from(err: &TransactionRequestError) -> Self {
         match err {
-            TransactionRequestError::MissingAuthenticatedInputNote(note_id) => {
-                Some(ErrorHint {
-                    message: format!(
-                        "Note {note_id} was listed via `TransactionRequestBuilder::authenticated_input_notes(...)`, but the store lacks an authenticated `InputNoteRecord`. Import or sync the note so its record and authentication data are available before executing the request."
-                    ),
-                    docs_url: Some(TROUBLESHOOTING_DOC),
-                })
-            },
             TransactionRequestError::NoInputNotesNorAccountChange => Some(ErrorHint {
                 message: "Transactions must consume input notes or mutate tracked account state. Add at least one authenticated/unauthenticated input note or include an explicit account state update in the request.".to_string(),
                 docs_url: Some(TROUBLESHOOTING_DOC),

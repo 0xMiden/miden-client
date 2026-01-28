@@ -1,4 +1,5 @@
 use miden_client::asset::Asset as NativeAsset;
+use miden_client::block::BlockNumber as NativeBlockNumber;
 use miden_client::crypto::RpoRandomCoin;
 use miden_client::note::{
     Note as NativeNote,
@@ -6,20 +7,20 @@ use miden_client::note::{
     create_p2id_note,
     create_p2ide_note,
 };
-use miden_client::{BlockNumber as NativeBlockNumber, Felt as NativeFelt};
+use miden_client::{Felt as NativeFelt, Word as NativeWord};
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys::Uint8Array;
 
+use super::NoteType;
 use super::account_id::AccountId;
-use super::felt::Felt;
 use super::note_assets::NoteAssets;
+use super::note_attachment::NoteAttachment;
 use super::note_id::NoteId;
 use super::note_metadata::NoteMetadata;
 use super::note_recipient::NoteRecipient;
 use super::note_script::NoteScript;
-use super::note_type::NoteType;
 use super::word::Word;
 use crate::js_error_with_context;
 use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
@@ -31,7 +32,7 @@ use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
 /// happen. See `NoteRecipient` for the shape of the recipient data.
 #[wasm_bindgen]
 #[derive(Clone)]
-pub struct Note(NativeNote);
+pub struct Note(pub(crate) NativeNote);
 
 #[wasm_bindgen]
 impl Note {
@@ -67,7 +68,7 @@ impl Note {
 
     /// Returns the public metadata associated with the note.
     pub fn metadata(&self) -> NoteMetadata {
-        (*self.0.metadata()).into()
+        self.0.metadata().clone().into()
     }
 
     /// Returns the recipient who can consume this note.
@@ -85,6 +86,15 @@ impl Note {
         self.0.script().clone().into()
     }
 
+    /// Returns the note nullifier as a word.
+    pub fn nullifier(&self) -> Word {
+        let nullifier = self.0.nullifier();
+        let elements: [miden_client::Felt; 4] =
+            nullifier.as_elements().try_into().expect("nullifier has 4 elements");
+        let native_word: NativeWord = NativeWord::from(&elements);
+        native_word.into()
+    }
+
     /// Builds a standard P2ID note that targets the specified account.
     #[wasm_bindgen(js_name = "createP2IDNote")]
     pub fn create_p2id_note(
@@ -92,7 +102,7 @@ impl Note {
         target: &AccountId,
         assets: &NoteAssets,
         note_type: NoteType,
-        aux: &Felt,
+        attachment: &NoteAttachment,
     ) -> Result<Self, JsValue> {
         let mut rng = StdRng::from_os_rng();
         let coin_seed: [u64; 4] = rng.random();
@@ -106,7 +116,7 @@ impl Note {
             target.into(),
             native_assets,
             note_type.into(),
-            (*aux).into(),
+            attachment.into(),
             &mut rng,
         )
         .map_err(|err| js_error_with_context(err, "create p2id note"))?;
@@ -123,7 +133,7 @@ impl Note {
         reclaim_height: Option<u32>,
         timelock_height: Option<u32>,
         note_type: NoteType,
-        aux: &Felt,
+        attachment: &NoteAttachment,
     ) -> Result<Self, JsValue> {
         let mut rng = StdRng::from_os_rng();
         let coin_seed: [u64; 4] = rng.random();
@@ -139,7 +149,7 @@ impl Note {
             reclaim_height.map(NativeBlockNumber::from),
             timelock_height.map(NativeBlockNumber::from),
             note_type.into(),
-            (*aux).into(),
+            attachment.into(),
             &mut rng,
         )
         .map_err(|err| js_error_with_context(err, "create p2ide note"))?;

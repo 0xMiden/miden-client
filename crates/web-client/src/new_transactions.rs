@@ -1,28 +1,36 @@
+use miden_client::ClientError;
 use miden_client::asset::FungibleAsset;
-use miden_client::note::{BlockNumber, NoteId as NativeNoteId};
+use miden_client::note::{BlockNumber, Note as NativeNote};
 use miden_client::transaction::{
     PaymentNoteDescription,
     ProvenTransaction as NativeProvenTransaction,
     SwapTransactionData,
+    TransactionExecutorError,
+    TransactionRequest as NativeTransactionRequest,
     TransactionRequestBuilder as NativeTransactionRequestBuilder,
     TransactionStoreUpdate as NativeTransactionStoreUpdate,
+    TransactionSummary as NativeTransactionSummary,
 };
 use wasm_bindgen::prelude::*;
 
+use crate::models::NoteType;
 use crate::models::account_id::AccountId;
-use crate::models::note_type::NoteType;
+use crate::models::note::Note;
 use crate::models::proven_transaction::ProvenTransaction;
 use crate::models::provers::TransactionProver;
 use crate::models::transaction_id::TransactionId;
 use crate::models::transaction_request::TransactionRequest;
 use crate::models::transaction_result::TransactionResult;
 use crate::models::transaction_store_update::TransactionStoreUpdate;
+use crate::models::transaction_summary::TransactionSummary;
 use crate::{WebClient, js_error_with_context};
 
 #[wasm_bindgen]
 impl WebClient {
     /// Executes a transaction specified by the request against the specified account,
     /// proves it, submits it to the network, and updates the local database.
+    ///
+    /// Uses the prover configured for this client.
     ///
     /// If the transaction utilizes foreign account data, there is a chance that the client doesn't
     /// have the required block header in the local database. In these scenarios, a sync to
@@ -38,6 +46,33 @@ impl WebClient {
         let tx_id = transaction_result.id();
 
         let proven_transaction = self.prove_transaction(&transaction_result, None).await?;
+
+        let submission_height =
+            self.submit_proven_transaction(&proven_transaction, &transaction_result).await?;
+        self.apply_transaction(&transaction_result, submission_height).await?;
+
+        Ok(tx_id)
+    }
+
+    /// Executes a transaction specified by the request against the specified account, proves it
+    /// with the user provided prover, submits it to the network, and updates the local database.
+    ///
+    /// If the transaction utilizes foreign account data, there is a chance that the client doesn't
+    /// have the required block header in the local database. In these scenarios, a sync to the
+    /// chain tip is performed, and the required block header is retrieved.
+    #[wasm_bindgen(js_name = "submitNewTransactionWithProver")]
+    pub async fn submit_new_transaction_with_prover(
+        &mut self,
+        account_id: &AccountId,
+        transaction_request: &TransactionRequest,
+        prover: &TransactionProver,
+    ) -> Result<TransactionId, JsValue> {
+        let transaction_result = self.execute_transaction(account_id, transaction_request).await?;
+
+        let tx_id = transaction_result.id();
+
+        let proven_transaction =
+            self.prove_transaction(&transaction_result, Some(prover.clone())).await?;
 
         let submission_height =
             self.submit_proven_transaction(&proven_transaction, &transaction_result).await?;
@@ -64,6 +99,49 @@ impl WebClient {
                 .await
                 .map(TransactionResult::from)
                 .map_err(|err| js_error_with_context(err, "failed to execute transaction"))
+        } else {
+            Err(JsValue::from_str("Client not initialized"))
+        }
+    }
+
+    /// Executes a transaction and returns the `TransactionSummary`.
+    ///
+    /// If the transaction is unauthorized (auth script emits the unauthorized event),
+    /// returns the summary from the error. If the transaction succeeds, constructs
+    /// a summary from the executed transaction using the `auth_arg` from the transaction
+    /// request as the salt (or a zero salt if not provided).
+    ///
+    /// # Errors
+    /// - If there is an internal failure during execution.
+    #[wasm_bindgen(js_name = "executeForSummary")]
+    pub async fn execute_for_summary(
+        &mut self,
+        account_id: &AccountId,
+        transaction_request: &TransactionRequest,
+    ) -> Result<TransactionSummary, JsValue> {
+        if let Some(client) = self.get_mut_inner() {
+            let native_request: NativeTransactionRequest = transaction_request.into();
+            // auth_arg is passed to the auth procedure as the salt for the transaction summary
+            // defaults to 0 if not provided.
+            let salt = native_request.auth_arg().unwrap_or_default();
+
+            match Box::pin(client.execute_transaction(account_id.into(), native_request)).await {
+                Ok(res) => {
+                    // construct summary from executed transaction
+                    let executed_tx = res.executed_transaction();
+                    let summary = NativeTransactionSummary::new(
+                        executed_tx.account_delta().clone(),
+                        executed_tx.input_notes().clone(),
+                        executed_tx.output_notes().clone(),
+                        salt,
+                    );
+                    Ok(TransactionSummary::from(summary))
+                },
+                Err(ClientError::TransactionExecutorError(
+                    TransactionExecutorError::Unauthorized(summary),
+                )) => Ok(TransactionSummary::from(*summary)),
+                Err(err) => Err(js_error_with_context(err, "failed to execute transaction")),
+            }
         } else {
             Err(JsValue::from_str("Client not initialized"))
         }
@@ -211,21 +289,19 @@ impl WebClient {
     #[wasm_bindgen(js_name = "newConsumeTransactionRequest")]
     pub fn new_consume_transaction_request(
         &mut self,
-        list_of_note_ids: Vec<String>,
+        list_of_notes: Vec<Note>,
     ) -> Result<TransactionRequest, JsValue> {
         let consume_transaction_request = {
-            let native_note_ids = list_of_note_ids
+            let native_notes = list_of_notes
                 .into_iter()
-                .map(|note_id| NativeNoteId::try_from_hex(note_id.as_str()))
+                .map(NativeNote::try_from)
                 .collect::<Result<Vec<_>, _>>()
                 .map_err(|err| {
-                    JsValue::from_str(&format!(
-                        "Failed to convert note id to native note id: {err}"
-                    ))
+                    JsValue::from_str(&format!("Failed to convert note to native note: {err}"))
                 })?;
 
             NativeTransactionRequestBuilder::new()
-                .build_consume_notes(native_note_ids)
+                .build_consume_notes(native_notes)
                 .map_err(|err| {
                     JsValue::from_str(&format!(
                         "Failed to create Consume Transaction Request: {err}"

@@ -1,8 +1,8 @@
-[**@demox-labs/miden-sdk**](../README.md)
+[**@miden-sdk/miden-sdk**](../README.md)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / NoteConsumability
+[@miden-sdk/miden-sdk](../README.md) / NoteConsumability
 
 # Class: NoteConsumability
 
@@ -30,15 +30,15 @@ Returns the account that can consume the note.
 
 ***
 
-### consumableAfterBlock()
+### consumptionStatus()
 
-> **consumableAfterBlock**(): `number`
+> **consumptionStatus**(): [`NoteConsumptionStatus`](NoteConsumptionStatus.md)
 
-Returns the block number after which the note becomes consumable (if any).
+Returns the consumption status of the note.
 
 #### Returns
 
-`number`
+[`NoteConsumptionStatus`](NoteConsumptionStatus.md)
 
 ***
 

@@ -3,17 +3,82 @@
 use alloc::vec::Vec;
 use core::fmt::Display;
 
-use miden_objects::account::{Account, AccountCode, AccountId, PartialAccount};
-use miden_objects::address::Address;
-use miden_objects::{Felt, Word};
+use miden_protocol::account::{Account, AccountCode, AccountId, PartialAccount};
+use miden_protocol::address::Address;
+use miden_protocol::{Felt, Word};
 
 use crate::ClientError;
 
+// ACCOUNT RECORD DATA
+// ================================================================================================
+
+/// Represents types of records retrieved from the store
 #[derive(Debug)]
 pub enum AccountRecordData {
     Full(Account),
     Partial(PartialAccount),
 }
+
+impl AccountRecordData {
+    pub fn id(&self) -> AccountId {
+        match self {
+            AccountRecordData::Full(account) => account.id(),
+            AccountRecordData::Partial(partial_account) => partial_account.id(),
+        }
+    }
+
+    pub fn commitment(&self) -> Word {
+        match self {
+            AccountRecordData::Full(account) => account.commitment(),
+            AccountRecordData::Partial(partial_account) => partial_account.commitment(),
+        }
+    }
+
+    pub fn initial_commitment(&self) -> Word {
+        match self {
+            AccountRecordData::Full(account) => account.initial_commitment(),
+            AccountRecordData::Partial(partial_account) => partial_account.initial_commitment(),
+        }
+    }
+
+    pub fn nonce(&self) -> Felt {
+        match self {
+            AccountRecordData::Full(account) => account.nonce(),
+            AccountRecordData::Partial(partial_account) => partial_account.nonce(),
+        }
+    }
+
+    pub fn seed(&self) -> Option<Word> {
+        match self {
+            AccountRecordData::Full(account) => account.seed(),
+            AccountRecordData::Partial(partial_account) => partial_account.seed(),
+        }
+    }
+
+    pub fn is_new(&self) -> bool {
+        match self {
+            AccountRecordData::Full(account) => account.is_new(),
+            AccountRecordData::Partial(partial_account) => partial_account.is_new(),
+        }
+    }
+
+    pub fn has_public_state(&self) -> bool {
+        match self {
+            AccountRecordData::Full(account) => account.has_public_state(),
+            AccountRecordData::Partial(partial_account) => partial_account.has_public_state(),
+        }
+    }
+
+    pub fn code(&self) -> &AccountCode {
+        match self {
+            AccountRecordData::Full(account) => account.code(),
+            AccountRecordData::Partial(partial_account) => partial_account.code(),
+        }
+    }
+}
+
+// ACCOUNT RECORD
+// ================================================================================================
 
 /// Represents a stored account state along with its status.
 ///
@@ -82,10 +147,10 @@ impl AccountRecord {
         }
     }
 
-    pub fn commitment(&self) -> Felt {
+    pub fn commitment(&self) -> Word {
         match &self.account_data {
-            AccountRecordData::Full(acc) => acc.nonce(),
-            AccountRecordData::Partial(acc) => acc.nonce(),
+            AccountRecordData::Full(acc) => acc.commitment(),
+            AccountRecordData::Partial(acc) => acc.commitment(),
         }
     }
 
@@ -136,20 +201,23 @@ pub enum AccountStatus {
     New { seed: Word },
     /// The account is tracked by the node and was used at least once.
     Tracked,
-    /// The local account state doesn't match the node's state, rendering it unusable. Only used
-    /// for private accounts.
-    Locked,
+    /// The local account state doesn't match the node's state, rendering it unusable.
+    /// Only used for private accounts.
+    /// The seed is preserved for private accounts with nonce=0 that need reconstruction via
+    /// `Account::new()`.
+    Locked { seed: Option<Word> },
 }
 
 impl AccountStatus {
     pub fn is_locked(&self) -> bool {
-        matches!(self, AccountStatus::Locked)
+        matches!(self, AccountStatus::Locked { .. })
     }
 
     pub fn seed(&self) -> Option<&Word> {
         match self {
             AccountStatus::New { seed } => Some(seed),
-            _ => None,
+            AccountStatus::Locked { seed } => seed.as_ref(),
+            AccountStatus::Tracked => None,
         }
     }
 }
@@ -159,7 +227,7 @@ impl Display for AccountStatus {
         match self {
             AccountStatus::New { .. } => write!(f, "New"),
             AccountStatus::Tracked => write!(f, "Tracked"),
-            AccountStatus::Locked => write!(f, "Locked"),
+            AccountStatus::Locked { .. } => write!(f, "Locked"),
         }
     }
 }

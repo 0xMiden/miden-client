@@ -12,7 +12,7 @@ This guide demonstrates how to retrieve and work with existing accounts using th
 To retrieve a specific account by its ID:
 
 ```typescript
-import { AccountId, WebClient } from "@demox-labs/miden-sdk";
+import { AccountId, WebClient } from "@miden-sdk/miden-sdk";
 
 try {
   // Initialize the web client
@@ -49,7 +49,7 @@ try {
 To retrieve a list of all accounts tracked by the client:
 
 ```typescript
-import { WebClient } from "@demox-labs/miden-sdk";
+import { WebClient } from "@miden-sdk/miden-sdk";
 
 try {
   // Initialize the web client

@@ -2,8 +2,12 @@ use miden_client::Felt;
 use miden_client::account::component::BasicFungibleFaucet;
 use miden_client::account::{AccountBuilder, AccountComponent, AccountType};
 use miden_client::asset::TokenSymbol;
-use miden_client::auth::{AuthEcdsaK256Keccak, AuthRpoFalcon512, AuthSecretKey};
-use miden_objects::account::auth::AuthScheme as NativeAuthScheme;
+use miden_client::auth::{
+    AuthEcdsaK256Keccak,
+    AuthFalcon512Rpo,
+    AuthSchemeId as NativeAuthScheme,
+    AuthSecretKey,
+};
 use rand::rngs::StdRng;
 use rand::{RngCore, SeedableRng};
 use wasm_bindgen::prelude::*;
@@ -13,6 +17,7 @@ use super::models::account_storage_mode::AccountStorageMode;
 use super::models::auth::AuthScheme;
 use super::models::auth_secret_key::AuthSecretKey as WebAuthSecretKey;
 use crate::helpers::generate_wallet;
+use crate::models::account_id::AccountId;
 use crate::{WebClient, js_error_with_context};
 
 #[wasm_bindgen]
@@ -40,6 +45,16 @@ impl WebClient {
                 .add_key(&key_pair)
                 .await
                 .map_err(|err| err.to_string())?;
+
+            client
+                .register_account_public_key_commitments(
+                    &new_account.id(),
+                    &[key_pair.public_key()],
+                )
+                .await
+                .map_err(|err| {
+                    js_error_with_context(err, "failed to map account to public keys")
+                })?;
 
             Ok(new_account.into())
         } else {
@@ -70,10 +85,10 @@ impl WebClient {
 
             let native_scheme: NativeAuthScheme = auth_scheme.try_into()?;
             let (key_pair, auth_component) = match native_scheme {
-                NativeAuthScheme::RpoFalcon512 => {
-                    let key_pair = AuthSecretKey::new_rpo_falcon512_with_rng(&mut faucet_rng);
+                NativeAuthScheme::Falcon512Rpo => {
+                    let key_pair = AuthSecretKey::new_falcon512_rpo_with_rng(&mut faucet_rng);
                     let auth_component: AccountComponent =
-                        AuthRpoFalcon512::new(key_pair.public_key().to_commitment()).into();
+                        AuthFalcon512Rpo::new(key_pair.public_key().to_commitment()).into();
                     (key_pair, auth_component)
                 },
                 NativeAuthScheme::EcdsaK256Keccak => {
@@ -119,6 +134,16 @@ impl WebClient {
                 .await
                 .map_err(|err| err.to_string())?;
 
+            client
+                .register_account_public_key_commitments(
+                    &new_account.id(),
+                    &[key_pair.public_key()],
+                )
+                .await
+                .map_err(|err| {
+                    js_error_with_context(err, "failed to map account to public keys")
+                })?;
+
             match client.add_account(&new_account, false).await {
                 Ok(_) => Ok(new_account.into()),
                 Err(err) => {
@@ -149,10 +174,27 @@ impl WebClient {
     #[wasm_bindgen(js_name = "addAccountSecretKeyToWebStore")]
     pub async fn add_account_secret_key_to_web_store(
         &mut self,
+        account_id: &AccountId,
         secret_key: &WebAuthSecretKey,
     ) -> Result<(), JsValue> {
-        let keystore = self.keystore.as_mut().expect("KeyStore should be initialized");
-        keystore.add_key(secret_key.into()).await.map_err(|err| err.to_string())?;
+        let keystore = self.keystore.as_ref().expect("KeyStore should be initialized");
+        let native_secret_key: AuthSecretKey = secret_key.into();
+        let native_account_id = account_id.into();
+
+        keystore.add_key(&native_secret_key).await.map_err(|err| err.to_string())?;
+
+        if let Some(client) = self.get_mut_inner() {
+            client
+                .register_account_public_key_commitments(
+                    &native_account_id,
+                    &[native_secret_key.public_key()],
+                )
+                .await
+                .map_err(|err| {
+                    js_error_with_context(err, "failed to map account to public keys")
+                })?;
+        }
+
         Ok(())
     }
 }

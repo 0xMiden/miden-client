@@ -9,35 +9,29 @@ use std::time::{Duration, Instant};
 use std::vec::Vec;
 
 use anyhow::{Context, Result};
-use miden_objects::account::auth::AuthSecretKey;
-use miden_objects::account::{Account, AccountId, AccountStorageMode};
-use miden_objects::asset::{Asset, FungibleAsset, TokenSymbol};
-use miden_objects::note::{NoteId, NoteType};
-use miden_objects::transaction::{OutputNote, TransactionId};
-use miden_objects::{Felt, FieldElement};
+use miden_protocol::Felt;
+use miden_protocol::account::auth::AuthSecretKey;
+use miden_protocol::account::{Account, AccountId, AccountStorageMode};
+use miden_protocol::asset::{Asset, FungibleAsset, TokenSymbol};
+use miden_protocol::note::NoteType;
+use miden_protocol::testing::account_id::ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE;
+use miden_protocol::transaction::{OutputNote, TransactionId};
+use miden_standards::account::auth::{AuthEcdsaK256Keccak, AuthFalcon512Rpo};
+use miden_standards::code_builder::CodeBuilder;
 use rand::RngCore;
-use rand::rngs::StdRng;
 use uuid::Uuid;
 
-use crate::account::component::{
-    AccountComponent,
-    AuthEcdsaK256Keccak,
-    AuthRpoFalcon512,
-    BasicFungibleFaucet,
-    BasicWallet,
-};
+use crate::account::component::{AccountComponent, BasicFungibleFaucet, BasicWallet};
 use crate::account::{AccountBuilder, AccountType, StorageSlot};
 use crate::auth::AuthSchemeId;
 use crate::crypto::FeltRng;
-use crate::keystore::FilesystemKeyStore;
-use crate::note::{Note, create_p2id_note};
+pub use crate::keystore::FilesystemKeyStore;
+use crate::note::{Note, NoteAttachment, create_p2id_note};
 use crate::rpc::RpcError;
 use crate::store::{NoteFilter, TransactionFilter};
 use crate::sync::SyncSummary;
-use crate::testing::account_id::ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE;
 use crate::transaction::{
     NoteArgs,
-    TransactionKernel,
     TransactionRequest,
     TransactionRequestBuilder,
     TransactionRequestError,
@@ -45,8 +39,7 @@ use crate::transaction::{
 };
 use crate::{Client, ClientError};
 
-pub type TestClientKeyStore = FilesystemKeyStore<StdRng>;
-pub type TestClient = Client<TestClientKeyStore>;
+pub type TestClient = Client<FilesystemKeyStore>;
 
 // CONSTANTS
 // ================================================================================================
@@ -66,7 +59,7 @@ pub fn create_test_store_path() -> PathBuf {
 pub async fn insert_new_wallet(
     client: &mut TestClient,
     storage_mode: AccountStorageMode,
-    keystore: &TestClientKeyStore,
+    keystore: &FilesystemKeyStore,
     auth_scheme: AuthSchemeId,
 ) -> Result<(Account, AuthSecretKey), ClientError> {
     let mut init_seed = [0u8; 32];
@@ -79,15 +72,15 @@ pub async fn insert_new_wallet(
 pub async fn insert_new_wallet_with_seed(
     client: &mut TestClient,
     storage_mode: AccountStorageMode,
-    keystore: &TestClientKeyStore,
+    keystore: &FilesystemKeyStore,
     init_seed: [u8; 32],
     auth_scheme: AuthSchemeId,
 ) -> Result<(Account, AuthSecretKey), ClientError> {
     let (key_pair, auth_component) = match auth_scheme {
-        AuthSchemeId::RpoFalcon512 => {
-            let key_pair = AuthSecretKey::new_rpo_falcon512();
+        AuthSchemeId::Falcon512Rpo => {
+            let key_pair = AuthSecretKey::new_falcon512_rpo();
             let auth_component: AccountComponent =
-                AuthRpoFalcon512::new(key_pair.public_key().to_commitment()).into();
+                AuthFalcon512Rpo::new(key_pair.public_key().to_commitment()).into();
             (key_pair, auth_component)
         },
         AuthSchemeId::EcdsaK256Keccak => {
@@ -103,8 +96,6 @@ pub async fn insert_new_wallet_with_seed(
         },
     };
 
-    keystore.add_key(&key_pair).unwrap();
-
     let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountImmutableCode)
         .storage_mode(storage_mode)
@@ -112,6 +103,8 @@ pub async fn insert_new_wallet_with_seed(
         .with_component(BasicWallet)
         .build()
         .unwrap();
+
+    keystore.add_key(&key_pair).unwrap();
 
     client.add_account(&account, false).await?;
 
@@ -122,14 +115,14 @@ pub async fn insert_new_wallet_with_seed(
 pub async fn insert_new_fungible_faucet(
     client: &mut TestClient,
     storage_mode: AccountStorageMode,
-    keystore: &TestClientKeyStore,
+    keystore: &FilesystemKeyStore,
     auth_scheme: AuthSchemeId,
 ) -> Result<(Account, AuthSecretKey), ClientError> {
     let (key_pair, auth_component) = match auth_scheme {
-        AuthSchemeId::RpoFalcon512 => {
-            let key_pair = AuthSecretKey::new_rpo_falcon512();
+        AuthSchemeId::Falcon512Rpo => {
+            let key_pair = AuthSecretKey::new_falcon512_rpo();
             let auth_component: AccountComponent =
-                AuthRpoFalcon512::new(key_pair.public_key().to_commitment()).into();
+                AuthFalcon512Rpo::new(key_pair.public_key().to_commitment()).into();
             (key_pair, auth_component)
         },
         AuthSchemeId::EcdsaK256Keccak => {
@@ -144,8 +137,6 @@ pub async fn insert_new_fungible_faucet(
             ));
         },
     };
-
-    keystore.add_key(&key_pair).unwrap();
 
     // we need to use an initial seed to create the faucet account
     let mut init_seed = [0u8; 32];
@@ -162,6 +153,8 @@ pub async fn insert_new_fungible_faucet(
         .with_component(BasicFungibleFaucet::new(symbol, 10, max_supply).unwrap())
         .build()
         .unwrap();
+
+    keystore.add_key(&key_pair).unwrap();
 
     client.add_account(&account, false).await?;
     Ok((account, key_pair))
@@ -298,13 +291,11 @@ pub async fn wait_for_blocks_no_sync(client: &mut TestClient, amount_of_blocks: 
 /// This function will panic if it does `NUMBER_OF_NODE_ATTEMPTS` unsuccessful checks or if we
 /// receive an error other than a connection related error.
 pub async fn wait_for_node(client: &mut TestClient) {
-    const NODE_TIME_BETWEEN_ATTEMPTS: u64 = 5;
+    const NODE_TIME_BETWEEN_ATTEMPTS: u64 = 2;
     const NUMBER_OF_NODE_ATTEMPTS: u64 = 60;
-
     println!(
         "Waiting for Node to be up. Checking every {NODE_TIME_BETWEEN_ATTEMPTS}s for {NUMBER_OF_NODE_ATTEMPTS} tries..."
     );
-
     for _try_number in 0..NUMBER_OF_NODE_ATTEMPTS {
         match client.sync_state().await {
             Err(ClientError::RpcError(RpcError::ConnectionError(_))) => {
@@ -327,7 +318,7 @@ pub const TRANSFER_AMOUNT: u64 = 59;
 pub async fn setup_two_wallets_and_faucet(
     client: &mut TestClient,
     accounts_storage_mode: AccountStorageMode,
-    keystore: &TestClientKeyStore,
+    keystore: &FilesystemKeyStore,
     auth_scheme: AuthSchemeId,
 ) -> Result<(Account, Account, Account)> {
     // Ensure clean state
@@ -378,7 +369,7 @@ pub async fn setup_two_wallets_and_faucet(
 pub async fn setup_wallet_and_faucet(
     client: &mut TestClient,
     accounts_storage_mode: AccountStorageMode,
-    keystore: &TestClientKeyStore,
+    keystore: &FilesystemKeyStore,
     auth_scheme: AuthSchemeId,
 ) -> Result<(Account, Account)> {
     let (faucet_account, _) =
@@ -427,7 +418,7 @@ pub async fn consume_notes(
 ) -> TransactionId {
     println!("Consuming Note...");
     let tx_request = TransactionRequestBuilder::new()
-        .build_consume_notes(input_notes.iter().map(Note::id).collect())
+        .build_consume_notes(input_notes.to_vec())
         .unwrap();
     Box::pin(client.submit_new_transaction(account_id, tx_request)).await.unwrap()
 }
@@ -457,14 +448,14 @@ pub async fn assert_account_has_single_asset(
 pub async fn assert_note_cannot_be_consumed_twice(
     client: &mut TestClient,
     consuming_account_id: AccountId,
-    note_to_consume_id: NoteId,
+    note_to_consume: Note,
 ) {
     // Check that we can't consume the P2ID note again
     println!("Consuming Note...");
 
     // Double-spend error expected to be received since we are consuming the same note
     let tx_request = TransactionRequestBuilder::new()
-        .build_consume_notes(vec![note_to_consume_id])
+        .build_consume_notes(vec![note_to_consume.clone()])
         .unwrap();
 
     match Box::pin(client.submit_new_transaction(consuming_account_id, tx_request)).await {
@@ -472,7 +463,7 @@ pub async fn assert_note_cannot_be_consumed_twice(
             TransactionRequestError::InputNoteAlreadyConsumed(_),
         )) => {},
         Ok(_) => panic!("Double-spend error: Note should not be consumable!"),
-        err => panic!("Unexpected error {:?} for note ID: {}", err, note_to_consume_id.to_hex()),
+        err => panic!("Unexpected error {:?} for note ID: {}", err, note_to_consume.id().to_hex()),
     }
 }
 
@@ -492,7 +483,7 @@ pub fn mint_multiple_fungible_asset(
                     *account_id,
                     vec![asset.into()],
                     note_type,
-                    Felt::ZERO,
+                    NoteAttachment::default(),
                     rng,
                 )
                 .unwrap(),
@@ -519,10 +510,7 @@ pub async fn execute_tx_and_consume_output_notes(
 
     Box::pin(client.submit_new_transaction(executor, tx_request)).await.unwrap();
 
-    let tx_request = TransactionRequestBuilder::new()
-        .unauthenticated_input_notes(output_notes)
-        .build()
-        .unwrap();
+    let tx_request = TransactionRequestBuilder::new().input_notes(output_notes).build().unwrap();
     Box::pin(client.submit_new_transaction(consumer, tx_request)).await.unwrap()
 }
 
@@ -558,29 +546,31 @@ pub async fn insert_account_with_custom_component(
     custom_code: &str,
     storage_slots: Vec<StorageSlot>,
     storage_mode: AccountStorageMode,
-    keystore: &TestClientKeyStore,
+    keystore: &FilesystemKeyStore,
 ) -> Result<(Account, AuthSecretKey), ClientError> {
-    let assembler = TransactionKernel::assembler();
-    let custom_component = AccountComponent::compile(custom_code, assembler.clone(), storage_slots)
+    let component_code = CodeBuilder::default()
+        .compile_component_code("custom::component", custom_code)
+        .map_err(|err| ClientError::TransactionRequestError(err.into()))?;
+    let custom_component = AccountComponent::new(component_code, storage_slots)
         .map_err(ClientError::AccountError)?
         .with_supports_all_types();
 
     let mut init_seed = [0u8; 32];
     client.rng().fill_bytes(&mut init_seed);
 
-    let key_pair = AuthSecretKey::new_rpo_falcon512_with_rng(client.rng());
+    let key_pair = AuthSecretKey::new_falcon512_rpo_with_rng(client.rng());
     let pub_key = key_pair.public_key();
-    keystore.add_key(&key_pair).unwrap();
 
     let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountImmutableCode)
         .storage_mode(storage_mode)
-        .with_auth_component(AuthRpoFalcon512::new(pub_key.to_commitment()))
+        .with_auth_component(AuthFalcon512Rpo::new(pub_key.to_commitment()))
         .with_component(BasicWallet)
         .with_component(custom_component)
         .build()
         .map_err(ClientError::AccountError)?;
 
+    keystore.add_key(&key_pair).unwrap();
     client.add_account(&account, false).await?;
 
     Ok((account, key_pair))

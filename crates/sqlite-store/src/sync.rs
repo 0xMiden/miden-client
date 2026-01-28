@@ -5,7 +5,6 @@ use std::sync::{Arc, RwLock};
 use std::vec::Vec;
 
 use miden_client::Word;
-use miden_client::crypto::MerkleStore;
 use miden_client::note::{BlockNumber, NoteTag};
 use miden_client::store::StoreError;
 use miden_client::sync::{NoteTagRecord, NoteTagSource, StateSyncUpdate};
@@ -14,6 +13,7 @@ use rusqlite::{Connection, Transaction, params};
 
 use super::SqliteStore;
 use crate::note::apply_note_updates_tx;
+use crate::smt_forest::AccountSmtForest;
 use crate::sql_error::SqlResultExt;
 use crate::transaction::upsert_transaction_record;
 use crate::{insert_sql, subst};
@@ -22,7 +22,7 @@ impl SqliteStore {
     pub(crate) fn get_note_tags(conn: &mut Connection) -> Result<Vec<NoteTagRecord>, StoreError> {
         const QUERY: &str = "SELECT tag, source FROM tags";
 
-        conn.prepare(QUERY)
+        conn.prepare_cached(QUERY)
             .into_store_error()?
             .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
             .expect("no binding parameters used in query")
@@ -43,7 +43,7 @@ impl SqliteStore {
     ) -> Result<BTreeSet<NoteTag>, StoreError> {
         const QUERY: &str = "SELECT DISTINCT tag FROM tags";
 
-        conn.prepare(QUERY)
+        conn.prepare_cached(QUERY)
             .into_store_error()?
             .query_map([], |row| row.get(0))
             .expect("no binding parameters used in query")
@@ -85,7 +85,7 @@ impl SqliteStore {
     pub(super) fn get_sync_height(conn: &mut Connection) -> Result<BlockNumber, StoreError> {
         const QUERY: &str = "SELECT block_num FROM state_sync";
 
-        conn.prepare(QUERY)
+        conn.prepare_cached(QUERY)
             .into_store_error()?
             .query_map([], |row| row.get(0))
             .expect("no binding parameters used in query")
@@ -99,7 +99,7 @@ impl SqliteStore {
 
     pub(super) fn apply_state_sync(
         conn: &mut Connection,
-        merkle_store: &Arc<RwLock<MerkleStore>>,
+        smt_forest: &Arc<RwLock<AccountSmtForest>>,
         state_sync_update: StateSyncUpdate,
     ) -> Result<(), StoreError> {
         let StateSyncUpdate {
@@ -112,10 +112,13 @@ impl SqliteStore {
 
         let tx = conn.transaction().into_store_error()?;
 
-        // Update state sync block number
-        const BLOCK_NUMBER_QUERY: &str = "UPDATE state_sync SET block_num = ?";
-        tx.execute(BLOCK_NUMBER_QUERY, params![i64::from(block_num.as_u32())])
-            .into_store_error()?;
+        // Update state sync block number only if moving forward
+        const BLOCK_NUMBER_QUERY: &str = "UPDATE state_sync SET block_num = ? WHERE block_num < ?";
+        tx.execute(
+            BLOCK_NUMBER_QUERY,
+            params![i64::from(block_num.as_u32()), i64::from(block_num.as_u32())],
+        )
+        .into_store_error()?;
 
         for (block_header, block_has_relevant_notes, new_mmr_peaks) in block_updates.block_headers()
         {
@@ -166,14 +169,14 @@ impl SqliteStore {
             .map(|tx| tx.details.final_account_state)
             .collect();
 
-        Self::undo_account_state(&tx, &account_hashes_to_delete)?;
+        let mut smt_forest = smt_forest.write().expect("smt_forest write lock not poisoned");
+        Self::undo_account_state(&tx, &mut smt_forest, &account_hashes_to_delete)?;
 
         // Update public accounts on the db that have been updated onchain
-        let mut merkle_store = merkle_store.write().expect("merkle_store write lock not poisoned");
         for account in account_updates.updated_public_accounts() {
-            Self::update_account_state(&tx, &mut merkle_store, account)?;
+            Self::update_account_state(&tx, &mut smt_forest, account)?;
         }
-        drop(merkle_store);
+        drop(smt_forest);
 
         for (account_id, digest) in account_updates.mismatched_private_accounts() {
             Self::lock_account_on_unexpected_commitment(&tx, account_id, digest)?;

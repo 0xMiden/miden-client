@@ -69,16 +69,31 @@ extern "C" {
 // Initialize IndexedDB
 #[wasm_bindgen(module = "/src/js/schema.js")]
 extern "C" {
+    /// Opens the database and registers it in the JS registry.
+    /// Returns the database ID (network name) which can be used to look up the database.
     #[wasm_bindgen(js_name = openDatabase)]
-    fn setup_indexed_db(client_version: &str) -> js_sys::Promise;
+    fn open_database(network: &str, client_version: &str) -> js_sys::Promise;
 }
 
-pub struct WebStore {}
+/// `WebStore` provides an `IndexedDB`-backed implementation of the Store trait.
+///
+/// The database reference is stored in a JavaScript registry and looked up by
+/// `database_id` when needed. This avoids storing `JsValue` references in Rust
+/// which would prevent the struct from being Send + Sync.
+pub struct WebStore {
+    database_id: String,
+}
 
 impl WebStore {
-    pub async fn new() -> Result<WebStore, JsValue> {
-        JsFuture::from(setup_indexed_db(CLIENT_VERSION)).await?;
-        Ok(WebStore {})
+    pub async fn new(database_name: String) -> Result<WebStore, JsValue> {
+        let promise = open_database(database_name.as_str(), CLIENT_VERSION);
+        let _db_id = JsFuture::from(promise).await?;
+        Ok(WebStore { database_id: database_name })
+    }
+
+    /// Returns the database ID as a string slice for passing to JS functions.
+    pub(crate) fn db_id(&self) -> &str {
+        self.database_id.as_str()
     }
 }
 

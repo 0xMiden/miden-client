@@ -1,8 +1,8 @@
-[**@demox-labs/miden-sdk**](../README.md)
+[**@miden-sdk/miden-sdk**](../README.md)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / TransactionSummary
+[@miden-sdk/miden-sdk](../README.md) / TransactionSummary
 
 # Class: TransactionSummary
 
@@ -87,6 +87,18 @@ Serializes the summary into bytes.
 #### Returns
 
 `Uint8Array`
+
+***
+
+### toCommitment()
+
+> **toCommitment**(): [`Word`](Word.md)
+
+Computes the commitment to this `TransactionSummary`.
+
+#### Returns
+
+[`Word`](Word.md)
 
 ***
 

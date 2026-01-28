@@ -10,7 +10,7 @@ const mockChainTest = async (testingPage: Page) => {
     // to the actual context.
     // https://github.com/0xMiden/miden-client/issues/1611
     await new Promise<void>((resolve, reject) => {
-      const request = indexedDB.deleteDatabase("MidenClientDB");
+      const request = indexedDB.deleteDatabase("MidenClientDB_mlcl");
       request.onsuccess = () => resolve();
       request.onerror = () => reject(request.error);
       request.onblocked = () => resolve();
@@ -60,8 +60,14 @@ const mockChainTest = async (testingPage: Page) => {
       .id()
       .toString();
 
+    const mintedNoteRecord = await client.getInputNote(mintedNoteId);
+    if (!mintedNoteRecord) {
+      throw new Error(`Note with ID ${mintedNoteId} not found`);
+    }
+
+    const mintedNote = mintedNoteRecord.toNote();
     const consumeTransactionRequest = client.newConsumeTransactionRequest([
-      mintedNoteId,
+      mintedNote,
     ]);
     await client.submitNewTransaction(account.id(), consumeTransactionRequest);
     await client.proveBlock();

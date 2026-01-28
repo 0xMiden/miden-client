@@ -27,7 +27,7 @@ const exportDb = async (page: Page) => {
 const importDb = async (db: any, page: Page) => {
   return await page.evaluate(async (_db) => {
     const client = window.client;
-    await client.forceImportStore(_db);
+    await client.forceImportStore(_db, "ImportedStore");
   }, db);
 };
 
@@ -254,7 +254,7 @@ test.describe("export and import note", () => {
             account2.id(),
             new window.NoteAssets([]),
             window.NoteType.Public,
-            new window.Felt(0n)
+            new window.NoteAttachment()
           );
           return window.NoteFile.fromOutputNote(
             window.OutputNote.full(p2IdNote)

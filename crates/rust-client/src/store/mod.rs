@@ -26,23 +26,25 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::fmt::Debug;
 
-use miden_objects::account::{
+use miden_protocol::Word;
+use miden_protocol::account::{
     Account,
     AccountCode,
     AccountHeader,
     AccountId,
-    AccountIdPrefix,
     AccountStorage,
     StorageMapWitness,
     StorageSlot,
+    StorageSlotContent,
+    StorageSlotName,
 };
-use miden_objects::address::Address;
-use miden_objects::asset::{Asset, AssetVault, AssetWitness};
-use miden_objects::block::{BlockHeader, BlockNumber};
-use miden_objects::crypto::merkle::{InOrderIndex, MmrPeaks, PartialMmr};
-use miden_objects::note::{NoteId, NoteScript, NoteTag, Nullifier};
-use miden_objects::transaction::TransactionId;
-use miden_objects::{AccountError, Word};
+use miden_protocol::address::Address;
+use miden_protocol::asset::{Asset, AssetVault, AssetVaultKey, AssetWitness};
+use miden_protocol::block::{BlockHeader, BlockNumber};
+use miden_protocol::crypto::merkle::mmr::{Forest, InOrderIndex, MmrPeaks, PartialMmr};
+use miden_protocol::errors::AccountError;
+use miden_protocol::note::{NoteId, NoteScript, NoteTag, Nullifier};
+use miden_protocol::transaction::TransactionId;
 
 use crate::note_transport::{NOTE_TRANSPORT_CURSOR_STORE_SETTING, NoteTransportCursor};
 use crate::sync::{NoteTagRecord, StateSyncUpdate};
@@ -412,32 +414,30 @@ pub trait Store: Send + Sync {
     async fn get_current_partial_mmr(&self) -> Result<PartialMmr, StoreError> {
         let current_block_num = self.get_sync_height().await?;
 
-        let tracked_nodes = self.get_partial_blockchain_nodes(PartialBlockchainFilter::All).await?;
         let current_peaks =
             self.get_partial_blockchain_peaks_by_block_num(current_block_num).await?;
-
-        // FIXME: Because each block stores the peaks for the MMR for the leaf of pos `block_num-1`,
-        // we can get an MMR based on those peaks, add the current block number and align it with
-        // the set of all nodes in the store.
-        // Otherwise, by doing `PartialMmr::from_parts` we would effectively have more nodes than
-        // we need for the passed peaks. The alternative here is to truncate the set of all nodes
-        // before calling `from_parts`
-        //
-        // This is a bit hacky but it works. One alternative would be to _just_ get nodes required
-        // for tracked blocks in the MMR. This would however block us from the convenience of
-        // just getting all nodes from the store.
 
         let (current_block, has_client_notes) = self
             .get_block_header_by_num(current_block_num)
             .await?
-            .expect("Current block should be in the store");
+            .ok_or(StoreError::BlockHeaderNotFound(current_block_num))?;
 
         let mut current_partial_mmr = PartialMmr::from_peaks(current_peaks);
         let has_client_notes = has_client_notes.into();
         current_partial_mmr.add(current_block.commitment(), has_client_notes);
 
+        // Only track the latest leaf if it is relevant (it has client notes) _and_ the forest
+        // actually has a single leaf tree bit
+        let track_latest = has_client_notes && current_partial_mmr.forest().has_single_leaf_tree();
+
+        let tracked_nodes = self
+            .get_partial_blockchain_nodes(PartialBlockchainFilter::Forest(
+                current_partial_mmr.forest(),
+            ))
+            .await?;
+
         let current_partial_mmr =
-            PartialMmr::from_parts(current_partial_mmr.peaks(), tracked_nodes, has_client_notes);
+            PartialMmr::from_parts(current_partial_mmr.peaks(), tracked_nodes, track_latest);
 
         Ok(current_partial_mmr)
     }
@@ -448,20 +448,21 @@ pub trait Store: Send + Sync {
     /// Retrieves the asset vault for a specific account.
     async fn get_account_vault(&self, account_id: AccountId) -> Result<AssetVault, StoreError>;
 
-    /// Retrieves a specific asset from the account's vault along with its Merkle witness.
+    /// Retrieves a specific asset (by vault key) from the account's vault along with its Merkle
+    /// witness.
     ///
     /// The default implementation of this method uses [`Store::get_account_vault`].
     async fn get_account_asset(
         &self,
         account_id: AccountId,
-        faucet_id_prefix: AccountIdPrefix,
+        vault_key: AssetVaultKey,
     ) -> Result<Option<(Asset, AssetWitness)>, StoreError> {
         let vault = self.get_account_vault(account_id).await?;
-        let Some(asset) = vault.assets().find(|a| a.faucet_id_prefix() == faucet_id_prefix) else {
+        let Some(asset) = vault.assets().find(|a| a.vault_key() == vault_key) else {
             return Ok(None);
         };
 
-        let witness = AssetWitness::new(vault.open(asset.vault_key()).into())?;
+        let witness = AssetWitness::new(vault.open(vault_key).into())?;
 
         Ok(Some((asset, witness)))
     }
@@ -483,20 +484,23 @@ pub trait Store: Send + Sync {
     async fn get_account_map_item(
         &self,
         account_id: AccountId,
-        index: u8,
+        slot_name: StorageSlotName,
         key: Word,
     ) -> Result<(Word, StorageMapWitness), StoreError> {
         let storage = self
-            .get_account_storage(account_id, AccountStorageFilter::Index(index as usize))
+            .get_account_storage(account_id, AccountStorageFilter::SlotName(slot_name.clone()))
             .await?;
-        match storage.slots().first() {
-            Some(StorageSlot::Map(map)) => {
+        match storage.get(&slot_name).map(StorageSlot::content) {
+            Some(StorageSlotContent::Map(map)) => {
                 let value = map.get(&key);
                 let witness = map.open(&key);
 
                 Ok((value, witness))
             },
-            _ => Err(StoreError::AccountError(AccountError::StorageSlotNotMap(index))),
+            Some(_) => Err(StoreError::AccountError(AccountError::StorageSlotNotMap(slot_name))),
+            None => {
+                Err(StoreError::AccountError(AccountError::StorageSlotNameNotFound { slot_name }))
+            },
         }
     }
 
@@ -521,6 +525,8 @@ pub enum PartialBlockchainFilter {
     All,
     /// Filter by the specified in-order indices.
     List(Vec<InOrderIndex>),
+    /// Return nodes with in-order indices within the specified forest.
+    Forest(Forest),
 }
 
 // TRANSACTION FILTERS
@@ -651,6 +657,6 @@ pub enum AccountStorageFilter {
     All,
     /// Return an [`AccountStorage`] with a single slot that matches the provided [`Word`] map root.
     Root(Word),
-    /// Return an [`AccountStorage`] with a single slot that matches the provided index.
-    Index(usize),
+    /// Return an [`AccountStorage`] with a single slot that matches the provided slot name.
+    SlotName(StorageSlotName),
 }

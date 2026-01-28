@@ -8,10 +8,10 @@ use miden_client::account::component::{
     basic_fungible_faucet_library,
     basic_wallet_library,
     ecdsa_k256_keccak_library,
+    falcon_512_rpo_acl_library,
+    falcon_512_rpo_library,
+    falcon_512_rpo_multisig_library,
     no_auth_library,
-    rpo_falcon_512_acl_library,
-    rpo_falcon_512_library,
-    rpo_falcon_512_multisig_library,
 };
 use miden_client::assembly::Library;
 use miden_client::utils::Serializable;
@@ -19,7 +19,9 @@ use miden_client::vm::{
     MastArtifact,
     Package,
     PackageExport,
+    PackageKind,
     PackageManifest,
+    ProcedureExport,
     QualifiedProcedureName,
     Section,
     SectionId,
@@ -38,7 +40,7 @@ fn main() {
 
     build_package(
         &PathBuf::from("templates/basic-auth.toml"),
-        rpo_falcon_512_library(),
+        falcon_512_rpo_library(),
         Some("auth"),
     );
 
@@ -52,13 +54,13 @@ fn main() {
 
     build_package(
         &PathBuf::from("templates/multisig-auth.toml"),
-        rpo_falcon_512_multisig_library(),
+        falcon_512_rpo_multisig_library(),
         Some("auth"),
     );
 
     build_package(
         &PathBuf::from("templates/acl-auth.toml"),
-        rpo_falcon_512_acl_library(),
+        falcon_512_rpo_acl_library(),
         Some("auth"),
     );
 }
@@ -70,8 +72,8 @@ pub fn build_package(metadata_path: &Path, library: Library, subdirectory: Optio
         .unwrap_or_else(|_| panic!("Failed to read file {}", metadata_path.display()));
 
     let template_metadata =
-        AccountComponentMetadata::from_toml(&toml_string).unwrap_or_else(|_| {
-            panic!("Failed to deserialize component metadata in {}", metadata_path.display())
+        AccountComponentMetadata::from_toml(&toml_string).unwrap_or_else(|err| {
+            panic!("Failed to deserialize component metadata in {}: {err}", metadata_path.display())
         });
 
     // NOTE: Taken from the miden-compiler's build_package function:
@@ -80,12 +82,14 @@ pub fn build_package(metadata_path: &Path, library: Library, subdirectory: Optio
     let mut exports: Vec<PackageExport> = Vec::new();
     for module_info in library.module_infos() {
         for (_, proc_info) in module_info.procedures() {
-            let name =
-                QualifiedProcedureName::new(module_info.path().clone(), proc_info.name.clone());
-            let digest = proc_info.digest;
-            let signature = proc_info.signature.as_deref().cloned();
-            let attributes = proc_info.attributes.clone();
-            exports.push(PackageExport { name, digest, signature, attributes });
+            let name = QualifiedProcedureName::new(module_info.path(), proc_info.name.clone());
+            let export = ProcedureExport {
+                path: name.into_inner(),
+                digest: proc_info.digest,
+                signature: proc_info.signature.as_deref().cloned(),
+                attributes: proc_info.attributes.clone(),
+            };
+            exports.push(PackageExport::Procedure(export));
         }
     }
 
@@ -103,6 +107,7 @@ pub fn build_package(metadata_path: &Path, library: Library, subdirectory: Optio
         mast,
         manifest,
         sections: vec![account_component_metadata_section],
+        kind: PackageKind::AccountComponent,
     };
 
     let out_dir = env::var("OUT_DIR").expect("OUT_DIR environment variable not set");

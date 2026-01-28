@@ -1,7 +1,11 @@
 use miden_client::account::component::{AccountComponent, BasicWallet};
 use miden_client::account::{Account, AccountBuilder, AccountType};
-use miden_client::auth::{AuthEcdsaK256Keccak, AuthRpoFalcon512, AuthSecretKey};
-use miden_objects::account::auth::AuthScheme as NativeAuthScheme;
+use miden_client::auth::{
+    AuthEcdsaK256Keccak,
+    AuthFalcon512Rpo,
+    AuthSchemeId as NativeAuthScheme,
+    AuthSecretKey,
+};
 use rand::rngs::StdRng;
 use rand::{RngCore, SeedableRng};
 use wasm_bindgen::JsValue;
@@ -38,10 +42,10 @@ pub(crate) async fn generate_wallet(
 
     let native_scheme: NativeAuthScheme = auth_scheme.try_into()?;
     let (key_pair, auth_component) = match native_scheme {
-        NativeAuthScheme::RpoFalcon512 => {
-            let key_pair = AuthSecretKey::new_rpo_falcon512_with_rng(&mut rng);
+        NativeAuthScheme::Falcon512Rpo => {
+            let key_pair = AuthSecretKey::new_falcon512_rpo_with_rng(&mut rng);
             let auth_component: AccountComponent =
-                AuthRpoFalcon512::new(key_pair.public_key().to_commitment()).into();
+                AuthFalcon512Rpo::new(key_pair.public_key().to_commitment()).into();
             (key_pair, auth_component)
         },
         NativeAuthScheme::EcdsaK256Keccak => {

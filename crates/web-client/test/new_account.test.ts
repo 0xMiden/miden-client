@@ -242,11 +242,14 @@ test.describe("new_faucet tests", () => {
 // =======================================================================================================
 
 test.describe("AccountStorage.getMapEntries tests", () => {
-  test("returns null for invalid indices and adds test for storage map", async ({
-    page,
-  }) => {
+  test("returns undefined for invalid slot names", async ({ page }) => {
     const result = await page.evaluate(async () => {
       const client = window.client;
+
+      const NON_MAP_SLOT_NAME =
+        "miden::standards::auth::rpo_falcon512::public_key";
+      const MISSING_SLOT_NAME =
+        "miden::testing::account_storage_tests::missing";
 
       // Create a new wallet with private storage
       const account = await client.newWallet(
@@ -263,20 +266,16 @@ test.describe("AccountStorage.getMapEntries tests", () => {
 
       const storage = accountRecord.storage();
 
-      // Test non-map storage slot (slot 0 should be empty for a new account)
-      const nonMapResult = storage.getMapEntries(0);
-
-      // Test out of bounds index
-      const outOfBoundsResult = storage.getMapEntries(255);
+      const nonMapResult = storage.getMapEntries(NON_MAP_SLOT_NAME);
+      const missingSlotResult = storage.getMapEntries(MISSING_SLOT_NAME);
 
       return {
         nonMap: nonMapResult,
-        outOfBounds: outOfBoundsResult,
+        missing: missingSlotResult,
       };
     });
 
-    // For invalid cases, getMapEntries should return undefined
     expect(result.nonMap).toBeUndefined();
-    expect(result.outOfBounds).toBeUndefined();
+    expect(result.missing).toBeUndefined();
   });
 });

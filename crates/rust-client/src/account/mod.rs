@@ -15,7 +15,7 @@
 //! #   account::{Account, AccountBuilder, AccountType, component::BasicWallet},
 //! #   crypto::FeltRng
 //! # };
-//! # use miden_objects::account::AccountStorageMode;
+//! # use miden_protocol::account::AccountStorageMode;
 //! # async fn add_new_account_example<AUTH>(
 //! #     client: &mut miden_client::Client<AUTH>
 //! # ) -> Result<(), miden_client::ClientError> {
@@ -34,78 +34,81 @@
 //!
 //! For more details on accounts, refer to the [Account] documentation.
 
+use alloc::collections::BTreeSet;
 use alloc::vec::Vec;
 
-use miden_lib::account::auth::{AuthEcdsaK256Keccak, AuthRpoFalcon512};
-use miden_lib::account::wallets::BasicWallet;
-use miden_objects::account::auth::PublicKey;
-use miden_objects::note::NoteTag;
+use miden_protocol::account::auth::{PublicKey, PublicKeyCommitment};
+pub use miden_protocol::account::{
+    Account,
+    AccountBuilder,
+    AccountCode,
+    AccountComponent,
+    AccountComponentCode,
+    AccountDelta,
+    AccountFile,
+    AccountHeader,
+    AccountId,
+    AccountIdPrefix,
+    AccountStorage,
+    AccountStorageMode,
+    AccountType,
+    PartialAccount,
+    PartialStorage,
+    PartialStorageMap,
+    StorageMap,
+    StorageSlot,
+    StorageSlotContent,
+    StorageSlotId,
+    StorageSlotName,
+    StorageSlotType,
+};
+pub use miden_protocol::address::{Address, AddressInterface, AddressType, NetworkId};
+pub use miden_protocol::errors::{AccountIdError, AddressError, NetworkIdError};
+use miden_protocol::note::NoteTag;
+use miden_standards::account::auth::{AuthEcdsaK256Keccak, AuthFalcon512Rpo};
 // RE-EXPORTS
 // ================================================================================================
-pub use miden_objects::{
-    AccountIdError,
-    AddressError,
-    NetworkIdError,
-    account::{
-        Account,
-        AccountBuilder,
-        AccountCode,
-        AccountComponent,
-        AccountDelta,
-        AccountFile,
-        AccountHeader,
-        AccountId,
-        AccountIdPrefix,
-        AccountStorage,
-        AccountStorageMode,
-        AccountType,
-        PartialAccount,
-        PartialStorage,
-        PartialStorageMap,
-        StorageMap,
-        StorageSlot,
-        StorageSlotType,
-    },
-    address::{Address, AddressInterface, AddressType, NetworkId},
-};
+pub use miden_standards::account::interface::AccountInterfaceExt;
+use miden_standards::account::wallets::BasicWallet;
+use miden_tx::utils::{Deserializable, Serializable};
 
 use super::Client;
+use crate::Word;
 use crate::auth::AuthSchemeId;
 use crate::errors::ClientError;
 use crate::rpc::domain::account::FetchedAccount;
 use crate::store::{AccountRecord, AccountStatus};
 use crate::sync::NoteTagRecord;
 
+const PUBLIC_KEY_COMMITMENT_SETTING_SUFFIX: &str = "_public_key_commitments";
+
 pub mod component {
     pub const MIDEN_PACKAGE_EXTENSION: &str = "masp";
 
-    pub use miden_lib::account::auth::*;
-    pub use miden_lib::account::components::{
+    pub use miden_protocol::account::auth::*;
+    pub use miden_protocol::account::component::{
+        InitStorageData,
+        StorageSlotSchema,
+        StorageValueName,
+    };
+    pub use miden_protocol::account::{AccountComponent, AccountComponentMetadata};
+    pub use miden_standards::account::auth::*;
+    pub use miden_standards::account::components::{
         basic_fungible_faucet_library,
         basic_wallet_library,
         ecdsa_k256_keccak_library,
+        falcon_512_rpo_acl_library,
+        falcon_512_rpo_library,
+        falcon_512_rpo_multisig_library,
         network_fungible_faucet_library,
         no_auth_library,
-        rpo_falcon_512_acl_library,
-        rpo_falcon_512_library,
-        rpo_falcon_512_multisig_library,
     };
-    pub use miden_lib::account::faucets::{
+    pub use miden_standards::account::faucets::{
         BasicFungibleFaucet,
         FungibleFaucetExt,
         NetworkFungibleFaucet,
     };
-    pub use miden_lib::account::wallets::BasicWallet;
-    pub use miden_objects::account::{
-        AccountComponent,
-        AccountComponentMetadata,
-        FeltRepresentation,
-        InitStorageData,
-        StorageEntry,
-        StorageValueName,
-        TemplateType,
-        WordRepresentation,
-    };
+    pub use miden_standards::account::wallets::BasicWallet;
 }
 
 // CLIENT METHODS
@@ -149,19 +152,12 @@ impl<AUTH> Client<AUTH> {
         account: &Account,
         overwrite: bool,
     ) -> Result<(), ClientError> {
-        self.check_account_limit().await?;
-        self.check_note_tag_limit().await?;
-
         if account.is_new() {
             if account.seed().is_none() {
                 return Err(ClientError::AddNewAccountWithoutSeed);
             }
         } else {
             // Ignore the seed since it's not a new account
-
-            // TODO: The alternative approach to this is to store the seed anyway, but
-            // ignore it at the point of executing against this transaction, but that
-            // approach seems a little bit more incorrect
             if account.seed().is_some() {
                 tracing::warn!(
                     "Added an existing account and still provided a seed when it is not needed. It's possible that the account's file was incorrectly generated. The seed will be ignored."
@@ -173,6 +169,10 @@ impl<AUTH> Client<AUTH> {
 
         match tracked_account {
             None => {
+                // Check limits since it's a non-tracked account
+                self.check_account_limit().await?;
+                self.check_note_tag_limit().await?;
+
                 let default_address = Address::new(account.id());
 
                 // If the account is not being tracked, insert it into the store regardless of the
@@ -353,6 +353,129 @@ impl<AUTH> Client<AUTH> {
             .await?
             .ok_or(ClientError::AccountDataNotFound(account_id))
     }
+
+    /// Adds a list of public key commitments associated with the given account ID.
+    ///
+    /// Commitments are stored as a `BTreeSet`, so duplicates are ignored. If the account already
+    /// has known commitments, the new ones are merged into the existing set.
+    ///
+    /// This is useful because with a public key commitment, we can retrieve its corresponding
+    /// secret key using, for example,
+    /// [`FilesystemKeyStore::get_key`](crate::keystore::FilesystemKeyStore::get_key). This yields
+    /// an indirect mapping from account ID to its secret keys: account ID -> public key commitments
+    /// -> secret keys (via keystore).
+    ///
+    /// To identify these keys and avoid collisions, the account ID is turned into its hex
+    /// representation and a suffix is added. If the resulting set is empty, any existing settings
+    /// entry is removed.
+    pub async fn register_account_public_key_commitments(
+        &self,
+        account_id: &AccountId,
+        pub_keys: &[PublicKey],
+    ) -> Result<(), ClientError> {
+        let setting_key =
+            format!("{}{}", account_id.to_hex(), PUBLIC_KEY_COMMITMENT_SETTING_SUFFIX);
+        // Store commitments as Words because PublicKeyCommitment doesn't implement
+        // (De)Serializable.
+        let (had_setting, mut commitments): (bool, BTreeSet<Word>) =
+            match self.store.get_setting(setting_key.clone()).await? {
+                Some(known) => {
+                    let known: BTreeSet<Word> = Deserializable::read_from_bytes(&known)
+                        .map_err(ClientError::DataDeserializationError)?;
+                    (true, known)
+                },
+                None => (false, BTreeSet::new()),
+            };
+
+        commitments.extend(pub_keys.iter().map(|pk| Word::from(pk.to_commitment())));
+
+        if commitments.is_empty() {
+            if had_setting {
+                self.store.remove_setting(setting_key).await.map_err(ClientError::StoreError)?;
+            }
+            return Ok(());
+        }
+
+        self.store
+            .set_setting(setting_key, Serializable::to_bytes(&commitments))
+            .await
+            .map_err(ClientError::StoreError)
+    }
+
+    /// Removes a list of public key commitments associated with the given account ID.
+    ///
+    /// Commitments are stored as a `BTreeSet`, so duplicates in `pub_key_commitments` are ignored
+    /// and missing commitments are skipped. If the account is not registered or has no stored
+    /// commitments, this is a no-op.
+    ///
+    /// If the resulting set is empty, the settings entry is removed. Returns `true` if at least
+    /// one commitment was removed, or `false` otherwise.
+    pub async fn deregister_account_public_key_commitment(
+        &self,
+        account_id: &AccountId,
+        pub_key_commitments: &[PublicKeyCommitment],
+    ) -> Result<bool, ClientError> {
+        let setting_key =
+            format!("{}{}", account_id.to_hex(), PUBLIC_KEY_COMMITMENT_SETTING_SUFFIX);
+        let Some(known) = self.store.get_setting(setting_key.clone()).await? else {
+            return Ok(false);
+        };
+        let mut commitments: BTreeSet<Word> = Deserializable::read_from_bytes(&known)
+            .map_err(ClientError::DataDeserializationError)?;
+
+        if commitments.is_empty() {
+            self.store.remove_setting(setting_key).await.map_err(ClientError::StoreError)?;
+            return Ok(false);
+        }
+
+        let mut removed_any = false;
+        for commitment in pub_key_commitments {
+            let word = Word::from(*commitment);
+            if commitments.remove(&word) {
+                removed_any = true;
+            }
+        }
+
+        if !removed_any {
+            return Ok(false);
+        }
+
+        if commitments.is_empty() {
+            self.store.remove_setting(setting_key).await.map_err(ClientError::StoreError)?;
+            return Ok(true);
+        }
+
+        self.store
+            .set_setting(setting_key, Serializable::to_bytes(&commitments))
+            .await
+            .map_err(ClientError::StoreError)?;
+        Ok(true)
+    }
+
+    /// Returns the previously stored public key commitments associated with the given
+    /// [`AccountId`], if any.
+    ///
+    /// Once retrieved, this list of public key commitments can be used in conjunction with
+    /// [`FilesystemKeyStore::get_key`](crate::keystore::FilesystemKeyStore::get_key) to retrieve
+    /// secret keys.
+    ///
+    /// Commitments are stored as a `BTreeSet`, so the returned list is deduplicated. Returns an
+    /// empty vector if the account is not registered or no commitments are stored.
+    pub async fn get_account_public_key_commitments(
+        &self,
+        account_id: &AccountId,
+    ) -> Result<Vec<PublicKeyCommitment>, ClientError> {
+        let setting_key =
+            format!("{}{}", account_id.to_hex(), PUBLIC_KEY_COMMITMENT_SETTING_SUFFIX);
+        match self.store.get_setting(setting_key).await? {
+            Some(known) => {
+                let commitments: BTreeSet<Word> = Deserializable::read_from_bytes(&known)
+                    .map_err(ClientError::DataDeserializationError)?;
+                Ok(commitments.into_iter().map(PublicKeyCommitment::from).collect())
+            },
+            None => Ok(vec![]),
+        }
+    }
 }
 
 // UTILITY FUNCTIONS
@@ -363,7 +486,7 @@ impl<AUTH> Client<AUTH> {
 /// used seed is known).
 ///
 /// This function currently supports accounts composed of the [`BasicWallet`] component and one of
-/// the supported authentication schemes ([`AuthRpoFalcon512`] or [`AuthEcdsaK256Keccak`]).
+/// the supported authentication schemes ([`AuthFalcon512Rpo`] or [`AuthEcdsaK256Keccak`]).
 ///
 /// # Arguments
 /// - `init_seed`: Initial seed used to create the account. This is the seed passed to
@@ -388,9 +511,9 @@ pub fn build_wallet_id(
 
     let auth_scheme = public_key.auth_scheme();
     let auth_component = match auth_scheme {
-        AuthSchemeId::RpoFalcon512 => {
+        AuthSchemeId::Falcon512Rpo => {
             let auth_component: AccountComponent =
-                AuthRpoFalcon512::new(public_key.to_commitment()).into();
+                AuthFalcon512Rpo::new(public_key.to_commitment()).into();
             auth_component
         },
         AuthSchemeId::EcdsaK256Keccak => {

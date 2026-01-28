@@ -6,9 +6,9 @@ use miden_client::address::{
     Address,
     AddressId,
     AddressInterface as NativeAccountInterface,
+    CustomNetworkId,
     RoutingParameters,
 };
-use miden_objects::address::CustomNetworkId;
 use wasm_bindgen::prelude::*;
 
 use super::felt::Felt;
@@ -177,6 +177,10 @@ impl AccountId {
     pub fn suffix(&self) -> Felt {
         let native_felt: NativeFelt = self.0.suffix();
         native_felt.into()
+    }
+
+    pub(crate) fn as_native(&self) -> &NativeAccountId {
+        &self.0
     }
 }
 

@@ -1,5 +1,6 @@
 use miden_client::auth::{
     AuthSecretKey,
+    PublicKeyCommitment,
     Signature as NativeSignature,
     SigningInputs as NativeSigningInputs,
 };
@@ -22,9 +23,9 @@ pub(crate) struct GetKeyCallback(pub(crate) Function);
 impl GetKeyCallback {
     pub(crate) async fn get_secret_key(
         &self,
-        pub_key_commitment: NativeWord,
+        pub_key_commitment: PublicKeyCommitment,
     ) -> Result<Option<AuthSecretKey>, KeyStoreError> {
-        let pub_key_array = pub_key_commitment.as_bytes().to_vec();
+        let pub_key_array = NativeWord::from(pub_key_commitment).as_bytes().to_vec();
         let call_result = self
             .0
             .call1(&JsValue::NULL, &JsValue::from(pub_key_array))

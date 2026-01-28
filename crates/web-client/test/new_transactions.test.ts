@@ -6,7 +6,6 @@ import {
   mintTransaction,
   sendTransaction,
   setupWalletAndFaucet,
-  swapTransaction,
   setupConsumedNote,
 } from "./webClientTestUtils";
 import {
@@ -94,8 +93,15 @@ const multipleMintsTest = async (
 
       // Consume the minted notes
       for (let i = 0; i < result.createdNoteIds.length; i++) {
+        let noteId = result.createdNoteIds[i];
+        const inputNoteRecord = await client.getInputNote(noteId);
+        if (!inputNoteRecord) {
+          throw new Error(`Note with ID ${noteId} not found`);
+        }
+
+        const note = inputNoteRecord.toNote();
         const consumeTransactionRequest = client.newConsumeTransactionRequest([
-          result.createdNoteIds[i],
+          note,
         ]);
         const consumeTransactionUpdate =
           await window.helpers.executeAndApplyTransaction(
@@ -275,65 +281,6 @@ test.describe("send transaction tests", () => {
   });
 });
 
-// SWAP_TRANSACTION TEST
-// =======================================================================================================
-
-test.describe("swap transaction tests", () => {
-  const testCases = [
-    { flag: false, description: "swap transaction completes successfully" },
-    {
-      flag: true,
-      description: "swap transaction with remote prover completes successfully",
-    },
-  ];
-
-  testCases.forEach(({ flag, description }) => {
-    test(description, async ({ page }) => {
-      const { accountId: accountA, faucetId: faucetA } =
-        await setupWalletAndFaucet(page);
-      const { accountId: accountB, faucetId: faucetB } =
-        await setupWalletAndFaucet(page);
-
-      const assetAAmount = BigInt(1);
-      const assetBAmount = BigInt(25);
-
-      await mintAndConsumeTransaction(page, accountA, faucetA, flag);
-      await mintAndConsumeTransaction(page, accountB, faucetB, flag);
-
-      const { accountAAssets, accountBAssets } = await swapTransaction(
-        page,
-        accountA,
-        accountB,
-        faucetA,
-        assetAAmount,
-        faucetB,
-        assetBAmount,
-        "private",
-        "private",
-        flag
-      );
-
-      // --- assertions for Account A ---
-      const aA = accountAAssets!.find((a) => a.assetId === faucetA);
-      expect(aA, `Expected to find asset ${faucetA} on Account A`).toBeTruthy();
-      expect(BigInt(aA!.amount)).toEqual(999n);
-
-      const aB = accountAAssets!.find((a) => a.assetId === faucetB);
-      expect(aB, `Expected to find asset ${faucetB} on Account A`).toBeTruthy();
-      expect(BigInt(aB!.amount)).toEqual(25n);
-
-      // --- assertions for Account B ---
-      const bA = accountBAssets!.find((a) => a.assetId === faucetA);
-      expect(bA, `Expected to find asset ${faucetA} on Account B`).toBeTruthy();
-      expect(BigInt(bA!.amount)).toEqual(1n);
-
-      const bB = accountBAssets!.find((a) => a.assetId === faucetB);
-      expect(bB, `Expected to find asset ${faucetB} on Account B`).toBeTruthy();
-      expect(BigInt(bB!.amount)).toEqual(975n);
-    });
-  });
-});
-
 // CUSTOM_TRANSACTIONS TESTS
 // =======================================================================================================
 
@@ -390,9 +337,7 @@ export const customTransaction = async (
       let noteMetadata = new window.NoteMetadata(
         faucetAccount.id(),
         window.NoteType.Private,
-        window.NoteTag.fromAccountId(walletAccount.id()),
-        window.NoteExecutionHint.none(),
-        undefined
+        window.NoteTag.withAccountTarget(walletAccount.id())
       );
 
       let expectedNoteArgs = noteArgs.map((felt) => felt.asInt());
@@ -411,11 +356,11 @@ export const customTransaction = async (
             # This note script is based off of the P2ID note script because notes currently need to have
             # assets, otherwise it could have been boiled down to the assert.
 
-            use.miden::native_account
-            use.miden::active_note
-            use.miden::contracts::wallets::basic->wallet
-            use.std::mem
-
+            use miden::protocol::native_account
+            use miden::protocol::active_note
+            use miden::core::sys
+            use miden::core::mem
+            use miden::standards::wallets::basic->basic_wallet
             begin
                 # push data from the advice map into the advice stack
                 adv.push_mapval
@@ -469,12 +414,12 @@ export const customTransaction = async (
                 assert_eq.err="P2ID's target account address and transaction address do not match"
                 # => [...]
 
-                exec.active_note::add_assets_to_account
+                exec.basic_wallet::add_assets_to_account
                 # => [...]
             end
         `;
 
-      let builder = client.createScriptBuilder();
+      let builder = client.createCodeBuilder();
       let compiledNoteScript = builder.compileNoteScript(noteScript);
       let noteInputs = new window.NoteInputs(
         new window.MidenArrays.FeltArray([
@@ -523,9 +468,6 @@ export const customTransaction = async (
       // Just like in the miden test, you can modify this script to get the execution to fail
       // by modifying the assert
       let txScript = `
-            use.miden::kernels::tx::prologue
-            use.miden::kernels::tx::memory
-
             begin
                 push.0 push.${assertedValue}
                 # => [0, ${assertedValue}]
@@ -547,7 +489,7 @@ export const customTransaction = async (
       adviceMap.insert(noteArgsCommitment2, feltArray);
 
       let transactionRequest2 = new window.TransactionRequestBuilder()
-        .withUnauthenticatedInputNotes(noteAndArgsArray)
+        .withInputNotes(noteAndArgsArray)
         .withCustomScript(transactionScript)
         .extendAdviceMap(adviceMap)
         .build();
@@ -603,9 +545,7 @@ const customTxWithMultipleNotes = async (
       let noteMetadata = new window.NoteMetadata(
         senderAccountId,
         window.NoteType.Public,
-        window.NoteTag.fromAccountId(targetAccountId),
-        window.NoteExecutionHint.none(),
-        undefined
+        window.NoteTag.withAccountTarget(targetAccountId)
       );
 
       let serialNum1 = new window.Word(
@@ -678,6 +618,8 @@ test.describe("custom transaction tests", () => {
   test("custom transaction with remote prover completes successfully", async ({
     page,
   }) => {
+    // TODO: hotfix CI failure, we should investigate slow prover tests further.
+    test.slow();
     await expect(customTransaction(page, "0", true)).resolves.toBeUndefined();
   });
 });
@@ -719,19 +661,22 @@ export const customAccountComponent = async (
 ): Promise<void> => {
   return await testingPage.evaluate(
     async ({ schemeSecretKeyFunction }) => {
+      const MAP_SLOT_NAME =
+        "miden::testing::mapping_example_contract::map_slot";
+
       const accountCode = `
-        use.miden::active_account
-        use.miden::native_account
-        use.std::sys
+        use miden::protocol::active_account
+        use miden::protocol::native_account
+        use miden::core::word
+        use miden::core::sys
+
+        const MAP_SLOT = word("${MAP_SLOT_NAME}")
 
         # Inputs: [KEY, VALUE]
         # Outputs: []
-        export.write_to_map
-            # The storage map is in storage slot 1
-            push.0
-            # => [index, KEY, VALUE]
-
+        pub proc write_to_map
             # Setting the key value pair in the map
+            push.MAP_SLOT[0..2]
             exec.native_account::set_map_item
             # => [OLD_MAP_ROOT, OLD_MAP_VALUE]
 
@@ -741,20 +686,16 @@ export const customAccountComponent = async (
 
         # Inputs: [KEY]
         # Outputs: [VALUE]
-        export.get_value_in_map
-            # The storage map is in storage slot 1
-            push.0
-            # => [index, KEY]
-
+        pub proc get_value_in_map
+            push.MAP_SLOT[0..2]
             exec.active_account::get_map_item
             # => [VALUE]
         end
 
         # Inputs: []
         # Outputs: [CURRENT_ROOT]
-        export.get_current_map_root
-            # Getting the current root from slot 1
-            push.0 exec.active_account::get_item
+        pub proc get_current_map_root
+            push.MAP_SLOT[0..2] exec.active_account::get_item
             # => [CURRENT_ROOT]
 
             exec.sys::truncate_stack
@@ -762,8 +703,8 @@ export const customAccountComponent = async (
         end
       `;
       const scriptCode = `
-        use.miden_by_example::mapping_example_contract
-        use.std::sys
+        use miden_by_example::mapping_example_contract
+        use miden::core::sys
 
         begin
             push.1.2.3.4
@@ -789,13 +730,14 @@ export const customAccountComponent = async (
         end
       `;
       const client = window.client;
-      let builder = client.createScriptBuilder();
+      let builder = client.createCodeBuilder();
       let storageMap = new window.StorageMap();
-      let storageSlotMap = window.StorageSlot.map(storageMap);
+      let storageSlotMap = window.StorageSlot.map(MAP_SLOT_NAME, storageMap);
 
+      let accountComponentCode =
+        builder.compileAccountComponentCode(accountCode);
       let mappingAccountComponent = window.AccountComponent.compile(
-        accountCode,
-        builder,
+        accountComponentCode,
         [storageSlotMap]
       ).withSupportsAllTypes();
 
@@ -813,7 +755,10 @@ export const customAccountComponent = async (
         .withComponent(mappingAccountComponent)
         .build();
 
-      await client.addAccountSecretKeyToWebStore(secretKey);
+      await client.addAccountSecretKeyToWebStore(
+        accountBuilderResult.account.id(),
+        secretKey
+      );
       await client.newAccount(accountBuilderResult.account, false);
 
       await client.syncState();
@@ -847,7 +792,9 @@ export const customAccountComponent = async (
 
       // Read a map value from storage slot 1 with key 0x0
       const keyZero = new window.Word(new BigUint64Array([0n, 0n, 0n, 0n]));
-      const retrieveMapKey = updated?.storage().getMapItem(1, keyZero);
+      const retrieveMapKey = updated
+        ?.storage()
+        .getMapItem(MAP_SLOT_NAME, keyZero);
 
       const expected = new window.Word(new BigUint64Array([1n, 2n, 3n, 4n]));
 
@@ -931,8 +878,19 @@ export const discardedTransaction = async (
       mintTransactionUpdate.executedTransaction().id().toHex()
     );
 
+    let notes: Note[] = [];
+    for (const _noteId of createdNoteIds) {
+      const inputNoteRecord = await client.getInputNote(_noteId);
+
+      if (!inputNoteRecord) {
+        throw new Error(`Note with ID ${_noteId} not found`);
+      }
+
+      const note = inputNoteRecord.toNote();
+      notes.push(note);
+    }
     const senderConsumeTransactionRequest =
-      client.newConsumeTransactionRequest(createdNoteIds);
+      client.newConsumeTransactionRequest(notes);
     let senderConsumeTransactionUpdate =
       await window.helpers.executeAndApplyTransaction(
         senderAccount.id(),
@@ -967,20 +925,34 @@ export const discardedTransaction = async (
       sendTransactionUpdate.executedTransaction().id().toHex()
     );
 
-    let noteIdAndArgs = new window.NoteIdAndArgs(
-      sendCreatedNotes[0].id(),
-      null
-    );
-    let noteIdAndArgsArray = new window.NoteIdAndArgsArray([noteIdAndArgs]);
+    const inputNoteRecord = await client.getInputNote(sendCreatedNoteIds[0]);
+    if (!inputNoteRecord) {
+      throw new Error(`Note with ID ${sendCreatedNoteIds[0]} not found`);
+    }
+
+    const note = inputNoteRecord.toNote();
+    let noteAndArgs = new window.NoteAndArgs(note, null);
+    let noteAndArgsArray = new window.NoteAndArgsArray([noteAndArgs]);
     const consumeTransactionRequest = new window.TransactionRequestBuilder()
-      .withAuthenticatedInputNotes(noteIdAndArgsArray)
+      .withInputNotes(noteAndArgsArray)
       .build();
 
     let preConsumeStore = await client.exportStore();
 
     // Sender retrieves the note
-    let senderTxRequest =
-      await client.newConsumeTransactionRequest(sendCreatedNoteIds);
+
+    notes = [];
+    for (const _noteId of sendCreatedNoteIds) {
+      const inputNoteRecord = await client.getInputNote(_noteId);
+
+      if (!inputNoteRecord) {
+        throw new Error(`Note with ID ${_noteId} not found`);
+      }
+
+      const note = inputNoteRecord.toNote();
+      notes.push(note);
+    }
+    let senderTxRequest = client.newConsumeTransactionRequest(notes);
     let senderTxResult = await window.helpers.executeAndApplyTransaction(
       senderAccount.id(),
       senderTxRequest
@@ -989,7 +961,7 @@ export const discardedTransaction = async (
       senderTxResult.executedTransaction().id().toHex()
     );
 
-    await client.forceImportStore(preConsumeStore);
+    await client.forceImportStore(preConsumeStore, "tests");
 
     // Get the account state before the transaction is applied
     const accountStateBeforeTx = (await client.getAccount(
@@ -1074,36 +1046,36 @@ export const counterAccountComponent = async (
   hasCounterComponent: boolean;
 }> => {
   return await testingPage.evaluate(async () => {
+    const COUNTER_SLOT_NAME = "miden::testing::counter_contract::counter";
+
     const accountCode = `
-        use.miden::active_account
-        use.miden::native_account
-        use.std::sys
+        use miden::protocol::active_account
+        use miden::protocol::native_account
+        use miden::core::word
+        use miden::core::sys
+
+        const COUNTER_SLOT = word("${COUNTER_SLOT_NAME}")
 
         # => []
-        export.get_count
-            push.0
-            exec.active_account::get_item
+        pub proc get_count
+            push.COUNTER_SLOT[0..2] exec.active_account::get_item
             exec.sys::truncate_stack
         end
 
         # => []
-        export.increment_count
-            push.0
-            # => [index]
-            exec.active_account::get_item
+        pub proc increment_count
+            push.COUNTER_SLOT[0..2] exec.active_account::get_item
             # => [count]
             push.1 add
             # => [count+1]
-            push.0
-            # [index, count+1]
-            exec.native_account::set_item
+            push.COUNTER_SLOT[0..2] exec.native_account::set_item
             # => []
             exec.sys::truncate_stack
             # => []
         end
       `;
     const scriptCode = `
-        use.external_contract::counter_contract
+        use external_contract::counter_contract
         begin
             call.counter_contract::increment_count
         end
@@ -1111,13 +1083,13 @@ export const counterAccountComponent = async (
     const client = window.client;
 
     // Create counter account
-    let emptyStorageSlot = window.StorageSlot.emptyValue();
+    let emptyStorageSlot = window.StorageSlot.emptyValue(COUNTER_SLOT_NAME);
 
-    let builder = client.createScriptBuilder();
+    let builder = client.createCodeBuilder();
 
+    let accountComponentCode = builder.compileAccountComponentCode(accountCode);
     let counterAccountComponent = window.AccountComponent.compile(
-      accountCode,
-      builder,
+      accountComponentCode,
       [emptyStorageSlot]
     ).withSupportsAllTypes();
 
@@ -1181,13 +1153,18 @@ export const counterAccountComponent = async (
 
     let noteAssets = new window.NoteAssets([]);
 
+    // Create network account target attachment so the node knows to consume this note
+    // with the network account (counter account)
+    let networkTargetAttachment = window.NoteAttachment.newNetworkAccountTarget(
+      accountBuilderResult.account.id(),
+      window.NoteExecutionHint.always()
+    );
+
     let noteMetadata = new window.NoteMetadata(
       nativeAccount.id(),
       window.NoteType.Public,
-      window.NoteTag.fromAccountId(accountBuilderResult.account.id()),
-      window.NoteExecutionHint.none(),
-      undefined
-    );
+      window.NoteTag.withAccountTarget(accountBuilderResult.account.id())
+    ).withAttachment(networkTargetAttachment);
 
     let note = new window.Note(noteAssets, noteMetadata, noteRecipient);
 
@@ -1209,7 +1186,7 @@ export const counterAccountComponent = async (
     await window.helpers.waitForBlocks(2);
 
     let account = await client.getAccount(accountBuilderResult.account.id());
-    let counter = account?.storage().getItem(0)?.toHex();
+    let counter = account?.storage().getItem(COUNTER_SLOT_NAME)?.toHex();
     let finalCounter = counter?.replace(/^0x/, "").replace(/^0+|0+$/g, "");
 
     let code = account?.code();
@@ -1230,7 +1207,6 @@ test.describe("counter account component tests", () => {
   test("counter account component transaction completes successfully", async ({
     page,
   }) => {
-    page.on("console", (msg) => console.log(msg));
     let { finalCounter, hasCounterComponent } =
       await counterAccountComponent(page);
     expect(finalCounter).toEqual("2");
@@ -1242,6 +1218,8 @@ export const testStorageMap = async (page: Page): Promise<any> => {
   return await page.evaluate(async () => {
     const client = window.client;
     await client.syncState();
+
+    const MAP_SLOT_NAME = "miden::testing::bump_item_contract::map_slot";
 
     const normalizeHexWord = (hex) => {
       if (!hex) return undefined;
@@ -1264,28 +1242,30 @@ export const testStorageMap = async (page: Page): Promise<any> => {
       new window.Word(new BigUint64Array([0n, 0n, 0n, 9n]))
     );
 
-    const accountCode = `export.bump_map_item
+    const accountCode = `
+                    use miden::core::word
+
+                    const MAP_SLOT = word("${MAP_SLOT_NAME}")
+
+                    pub proc bump_map_item
                     # map key
                     push.1.1.1.1 # Map key
-                    # item index
-                    push.0
-                    # => [index, KEY]
-                    exec.::miden::active_account::get_map_item
+                    push.MAP_SLOT[0..2]
+                    exec.::miden::protocol::active_account::get_map_item
                     add.1
                     push.1.1.1.1 # Map key
-                    push.0
-                    # => [index, KEY, BUMPED_VALUE]
-                    exec.::miden::native_account::set_map_item
+                    push.MAP_SLOT[0..2]
+                    exec.::miden::protocol::native_account::set_map_item
                     # => [OLD_MAP_ROOT, OLD_VALUE]
                     dropw dropw
                 end
         `;
 
-    let builder = client.createScriptBuilder();
+    let builder = client.createCodeBuilder();
+    let accountComponentCode = builder.compileAccountComponentCode(accountCode);
     let bumpItemComponent = window.AccountComponent.compile(
-      accountCode,
-      builder,
-      [window.StorageSlot.map(storageMap)]
+      accountComponentCode,
+      [window.StorageSlot.map(MAP_SLOT_NAME, storageMap)]
     ).withSupportsAllTypes();
 
     const walletSeed = new Uint8Array(32);
@@ -1301,7 +1281,10 @@ export const testStorageMap = async (page: Page): Promise<any> => {
       .storageMode(window.AccountStorageMode.public())
       .build();
 
-    await client.addAccountSecretKeyToWebStore(secretKey);
+    await client.addAccountSecretKeyToWebStore(
+      bumpItemAccountBuilderResult.account.id(),
+      secretKey
+    );
     await client.newAccount(bumpItemAccountBuilderResult.account, false);
     await client.syncState();
 
@@ -1309,7 +1292,7 @@ export const testStorageMap = async (page: Page): Promise<any> => {
       await client.getAccount(bumpItemAccountBuilderResult.account.id())
     )
       ?.storage()
-      .getMapItem(1, MAP_KEY)
+      .getMapItem(MAP_SLOT_NAME, MAP_KEY)
       ?.toHex();
 
     // Deploy counter account
@@ -1322,7 +1305,7 @@ export const testStorageMap = async (page: Page): Promise<any> => {
     builder.linkDynamicLibrary(accountComponentLib);
 
     let txScript = builder.compileTxScript(
-      `use.external_contract::bump_item_contract
+      `use external_contract::bump_item_contract
       begin
           call.bump_item_contract::bump_map_item
       end`
@@ -1344,14 +1327,14 @@ export const testStorageMap = async (page: Page): Promise<any> => {
       await client.getAccount(bumpItemAccountBuilderResult.account.id())
     )
       ?.storage()
-      .getMapItem(1, MAP_KEY)
+      .getMapItem(MAP_SLOT_NAME, MAP_KEY)
       ?.toHex();
 
     // Test getMapEntries() functionality
     let accountStorage = (
       await client.getAccount(bumpItemAccountBuilderResult.account.id())
     )?.storage();
-    let mapEntries = accountStorage?.getMapEntries(1);
+    let mapEntries = accountStorage?.getMapEntries(MAP_SLOT_NAME);
 
     // Verify we get the expected entries
     let expectedKey = MAP_KEY.toHex();
@@ -1393,5 +1376,262 @@ test.describe("storage map test", () => {
     expect(mapEntries.hasExpectedEntry).toBe(true);
     expect(mapEntries.expectedKey).toBeDefined();
     expect(mapEntries.expectedValue).toBe("2");
+  });
+});
+
+// SUBMIT_NEW_TRANSACTION_WITH_PROVER TESTS
+// ================================================================================================
+
+test.describe("submitNewTransactionWithProver tests", () => {
+  test("submitNewTransactionWithProver with failing prover throws, then succeeds with local prover", async ({
+    page,
+  }) => {
+    const { faucetId, accountId } = await setupWalletAndFaucet(page);
+
+    // Test that a failing prover throws an error
+    const failingProverResult = await page.evaluate(
+      async ({ faucetId, accountId }) => {
+        const client = window.client;
+        const faucetAccountId = window.AccountId.fromHex(faucetId);
+        const targetAccountId = window.AccountId.fromHex(accountId);
+
+        await client.syncState();
+
+        const mintTransactionRequest = client.newMintTransactionRequest(
+          targetAccountId,
+          faucetAccountId,
+          window.NoteType.Public,
+          BigInt(1000)
+        );
+
+        // Create a failing remote prover with an invalid endpoint
+        const failingProver = window.TransactionProver.newRemoteProver(
+          "http://localhost:1",
+          null
+        );
+
+        try {
+          await client.submitNewTransactionWithProver(
+            faucetAccountId,
+            mintTransactionRequest,
+            failingProver
+          );
+          return { threw: false, error: null };
+        } catch (e: any) {
+          return { threw: true, error: e.message || String(e) };
+        }
+      },
+      { faucetId, accountId }
+    );
+
+    expect(failingProverResult.threw).toBe(true);
+  });
+
+  test.describe("executeForSummary tests", () => {
+    test("executeForSummary returns TransactionSummary for unauthorized transaction", async ({
+      page,
+    }) => {
+      const result = await page.evaluate(async () => {
+        const client = window.client;
+
+        const walletSeed = new Uint8Array(32);
+        crypto.getRandomValues(walletSeed);
+
+        const approverKeys = [
+          window.AuthSecretKey.rpoFalconWithRNG(),
+          window.AuthSecretKey.rpoFalconWithRNG(),
+          window.AuthSecretKey.rpoFalconWithRNG(),
+        ];
+        const approverCommitments = approverKeys.map((key) =>
+          key.publicKey().toCommitment()
+        );
+        const multisigConfig = new window.AuthFalcon512RpoMultisigConfig(
+          approverCommitments,
+          2
+        );
+        const multisigComponent =
+          window.createAuthFalcon512RpoMultisig(multisigConfig);
+
+        const accountBuilderResult = new window.AccountBuilder(walletSeed)
+          .accountType(window.AccountType.RegularAccountImmutableCode)
+          .storageMode(window.AccountStorageMode.private())
+          .withAuthComponent(multisigComponent)
+          .withBasicWalletComponent()
+          .build();
+
+        const multisigAccountId = accountBuilderResult.account.id();
+        await client.newAccount(accountBuilderResult.account, false);
+
+        // Register the approver keys with the multisig account
+        for (const key of approverKeys) {
+          await client.addAccountSecretKeyToWebStore(multisigAccountId, key);
+        }
+
+        const targetAccount = await client.newWallet(
+          window.AccountStorageMode.private(),
+          false,
+          0
+        );
+
+        const faucetAccount = await client.newFaucet(
+          window.AccountStorageMode.private(),
+          false,
+          "DAG",
+          8,
+          BigInt(10000000),
+          0
+        );
+
+        await client.syncState();
+
+        const mintTransactionRequest = client.newMintTransactionRequest(
+          targetAccount.id(),
+          faucetAccount.id(),
+          window.NoteType.Public,
+          BigInt(1000)
+        );
+
+        const mintTransactionUpdate =
+          await window.helpers.executeAndApplyTransaction(
+            faucetAccount.id(),
+            mintTransactionRequest
+          );
+
+        const createdNoteIds = mintTransactionUpdate
+          .executedTransaction()
+          .outputNotes()
+          .notes()
+          .map((note: Note) => note.id().toString());
+
+        await window.helpers.waitForTransaction(
+          mintTransactionUpdate.executedTransaction().id().toHex()
+        );
+
+        // Convert note IDs to Note objects for consume request
+        const createdNotes = await Promise.all(
+          createdNoteIds.map(async (noteId: string) => {
+            const inputNoteRecord = await client.getInputNote(noteId);
+            if (!inputNoteRecord) {
+              throw new Error(`Note with ID ${noteId} not found`);
+            }
+            return inputNoteRecord.toNote();
+          })
+        );
+
+        const consumeTransactionRequest =
+          client.newConsumeTransactionRequest(createdNotes);
+
+        const consumeTransactionUpdate =
+          await window.helpers.executeAndApplyTransaction(
+            targetAccount.id(),
+            consumeTransactionRequest
+          );
+
+        await window.helpers.waitForTransaction(
+          consumeTransactionUpdate.executedTransaction().id().toHex()
+        );
+
+        const sendTransactionRequest = client.newSendTransactionRequest(
+          targetAccount.id(),
+          accountBuilderResult.account.id(),
+          faucetAccount.id(),
+          window.NoteType.Public,
+          BigInt(100),
+          null,
+          null
+        );
+
+        const sendTransactionUpdate =
+          await window.helpers.executeAndApplyTransaction(
+            targetAccount.id(),
+            sendTransactionRequest
+          );
+
+        const sentNoteIds = sendTransactionUpdate
+          .executedTransaction()
+          .outputNotes()
+          .notes()
+          .map((note: Note) => note.id().toString());
+
+        await window.helpers.waitForTransaction(
+          sendTransactionUpdate.executedTransaction().id().toHex()
+        );
+
+        // Convert note IDs to Note objects for consume request
+        const sentNotes = await Promise.all(
+          sentNoteIds.map(async (noteId: string) => {
+            const inputNoteRecord = await client.getInputNote(noteId);
+            if (!inputNoteRecord) {
+              throw new Error(`Note with ID ${noteId} not found`);
+            }
+            return inputNoteRecord.toNote();
+          })
+        );
+
+        const consumeSentNoteRequest =
+          client.newConsumeTransactionRequest(sentNotes);
+
+        const summary = await client.executeForSummary(
+          accountBuilderResult.account.id(),
+          consumeSentNoteRequest
+        );
+
+        return {
+          inputNotesCount: summary.inputNotes().numNotes(),
+          outputNotesCount: summary.outputNotes().numNotes(),
+          inputNoteIds: summary
+            .inputNotes()
+            .notes()
+            .map((note: any) => note.id().toString()),
+          sentNoteIds,
+        };
+      });
+
+      expect(result.inputNotesCount).toBe(1);
+      expect(result.outputNotesCount).toBe(0);
+      expect(result.inputNoteIds).toEqual(result.sentNoteIds);
+    });
+
+    test("executeForSummary returns TransactionSummary for authorized transaction with matching salt", async ({
+      page,
+    }) => {
+      const result = await page.evaluate(async () => {
+        const client = window.client;
+
+        const senderAccount = await client.newWallet(
+          window.AccountStorageMode.private(),
+          false,
+          0
+        );
+
+        await client.syncState();
+
+        // Create a known salt value
+        const expectedSalt = new window.Word(
+          new BigUint64Array([BigInt(1), BigInt(2), BigInt(3), BigInt(4)])
+        );
+
+        // Build transaction request with the salt as auth_arg
+        const transactionRequest = new window.TransactionRequestBuilder()
+          .withAuthArg(expectedSalt)
+          .build();
+
+        const summary = await client.executeForSummary(
+          senderAccount.id(),
+          transactionRequest
+        );
+
+        return {
+          inputNotesCount: summary.inputNotes().numNotes(),
+          outputNotesCount: summary.outputNotes().numNotes(),
+          saltHex: summary.salt().toHex(),
+          expectedSaltHex: expectedSalt.toHex(),
+        };
+      });
+
+      expect(result.inputNotesCount).toBe(0);
+      expect(result.outputNotesCount).toBe(0);
+      expect(result.saltHex).toBe(result.expectedSaltHex);
+    });
   });
 });

@@ -20,7 +20,7 @@ use miden_client::{
     MAX_TX_EXECUTION_CYCLES,
     MIN_TX_EXECUTION_CYCLES,
 };
-use models::script_builder::ScriptBuilder;
+use models::code_builder::CodeBuilder;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use wasm_bindgen::prelude::*;
@@ -48,6 +48,8 @@ mod web_keystore;
 mod web_keystore_callbacks;
 pub use web_keystore::WebKeyStore;
 
+const BASE_STORE_NAME: &str = "MidenClientDB";
+
 #[wasm_bindgen]
 pub struct WebClient {
     store: Option<Arc<WebStore>>,
@@ -55,6 +57,7 @@ pub struct WebClient {
     inner: Option<Client<WebKeyStore<RpoRandomCoin>>>,
     mock_rpc_api: Option<Arc<MockRpcApi>>,
     mock_note_transport_api: Option<Arc<MockNoteTransportApi>>,
+    debug_mode: bool,
 }
 
 impl Default for WebClient {
@@ -74,21 +77,42 @@ impl WebClient {
             keystore: None,
             mock_rpc_api: None,
             mock_note_transport_api: None,
+            debug_mode: false,
         }
+    }
+
+    /// Sets the debug mode for transaction execution.
+    ///
+    /// When enabled, the transaction executor will record additional information useful for
+    /// debugging (the values on the VM stack and the state of the advice provider). This is
+    /// disabled by default since it adds overhead.
+    ///
+    /// Must be called before `createClient`.
+    #[wasm_bindgen(js_name = "setDebugMode")]
+    pub fn set_debug_mode(&mut self, enabled: bool) {
+        self.debug_mode = enabled;
     }
 
     pub(crate) fn get_mut_inner(&mut self) -> Option<&mut Client<WebKeyStore<RpoRandomCoin>>> {
         self.inner.as_mut()
     }
 
-    /// Creates a new client with the given node URL and optional seed.
-    /// If `node_url` is `None`, it defaults to the testnet endpoint.
+    /// Creates a new `WebClient` instance with the specified configuration.
+    ///
+    /// # Arguments
+    /// * `node_url`: The URL of the node RPC endpoint. If `None`, defaults to the testnet endpoint.
+    /// * `node_note_transport_url`: Optional URL of the note transport service.
+    /// * `seed`: Optional seed for account initialization.
+    /// * `store_name`: Optional name for the web store. If `None`, the store name defaults to
+    ///   `MidenClientDB_{network_id}`, where `network_id` is derived from the `node_url`.
+    ///   Explicitly setting this allows for creating multiple isolated clients.
     #[wasm_bindgen(js_name = "createClient")]
     pub async fn create_client(
         &mut self,
         node_url: Option<String>,
         node_note_transport_url: Option<String>,
         seed: Option<Vec<u8>>,
+        store_name: Option<String>,
     ) -> Result<JsValue, JsValue> {
         let endpoint = node_url.map_or(Ok(Endpoint::testnet()), |url| {
             Endpoint::try_from(url.as_str()).map_err(|_| JsValue::from_str("Invalid node URL"))
@@ -99,20 +123,42 @@ impl WebClient {
         let note_transport_client = node_note_transport_url
             .map(|url| Arc::new(GrpcNoteTransportClient::new(url)) as Arc<dyn NoteTransportClient>);
 
-        self.setup_client(web_rpc_client, note_transport_client, seed, None, None, None)
-            .await?;
+        let store_name =
+            store_name.unwrap_or(format!("{}_{}", BASE_STORE_NAME, endpoint.to_network_id()));
+
+        self.setup_client(
+            web_rpc_client,
+            store_name,
+            note_transport_client,
+            seed,
+            None,
+            None,
+            None,
+        )
+        .await?;
 
         Ok(JsValue::from_str("Client created successfully"))
     }
 
-    /// Creates a new client with the given node URL, optional seed, and external keystore
-    /// callbacks. If `node_url` is `None`, it defaults to the testnet endpoint.
+    /// Creates a new `WebClient` instance with external keystore callbacks.
+    ///
+    /// # Arguments
+    /// * `node_url`: The URL of the node RPC endpoint. If `None`, defaults to the testnet endpoint.
+    /// * `node_note_transport_url`: Optional URL of the note transport service.
+    /// * `seed`: Optional seed for account initialization.
+    /// * `store_name`: Optional name for the web store. If `None`, the store name defaults to
+    ///   `MidenClientDB_{network_id}`, where `network_id` is derived from the `node_url`.
+    ///   Explicitly setting this allows for creating multiple isolated clients.
+    /// * `get_key_cb`: Callback to retrieve the secret key bytes for a given public key.
+    /// * `insert_key_cb`: Callback to persist a secret key.
+    /// * `sign_cb`: Callback to produce serialized signature bytes for the provided inputs.
     #[wasm_bindgen(js_name = "createClientWithExternalKeystore")]
     pub async fn create_client_with_external_keystore(
         &mut self,
         node_url: Option<String>,
         node_note_transport_url: Option<String>,
         seed: Option<Vec<u8>>,
+        store_name: Option<String>,
         get_key_cb: Option<Function>,
         insert_key_cb: Option<Function>,
         sign_cb: Option<Function>,
@@ -126,8 +172,12 @@ impl WebClient {
         let note_transport_client = node_note_transport_url
             .map(|url| Arc::new(GrpcNoteTransportClient::new(url)) as Arc<dyn NoteTransportClient>);
 
+        let store_name =
+            store_name.unwrap_or(format!("{}_{}", BASE_STORE_NAME, endpoint.to_network_id()));
+
         self.setup_client(
             web_rpc_client,
+            store_name,
             note_transport_client,
             seed,
             get_key_cb,
@@ -143,6 +193,7 @@ impl WebClient {
     async fn setup_client(
         &mut self,
         rpc_client: Arc<dyn NodeRpcClient>,
+        store_name: String,
         note_transport_client: Option<Arc<dyn NoteTransportClient>>,
         seed: Option<Vec<u8>>,
         get_key_cb: Option<Function>,
@@ -166,12 +217,13 @@ impl WebClient {
         let rng = RpoRandomCoin::new(coin_seed.map(Felt::new).into());
 
         let web_store = Arc::new(
-            WebStore::new()
+            WebStore::new(store_name.clone())
                 .await
                 .map_err(|_| JsValue::from_str("Failed to initialize WebStore"))?,
         );
 
-        let keystore = WebKeyStore::new_with_callbacks(rng, get_key_cb, insert_key_cb, sign_cb);
+        let keystore =
+            WebKeyStore::new_with_callbacks(rng, store_name, get_key_cb, insert_key_cb, sign_cb);
 
         let mut client = Client::new(
             rpc_client,
@@ -182,7 +234,7 @@ impl WebClient {
                 Some(MAX_TX_EXECUTION_CYCLES),
                 MIN_TX_EXECUTION_CYCLES,
                 false,
-                false,
+                self.debug_mode,
             )
             .expect("Default executor's options should always be valid"),
             None,
@@ -209,14 +261,12 @@ impl WebClient {
         Ok(())
     }
 
-    #[wasm_bindgen(js_name = "createScriptBuilder")]
-    pub fn create_script_builder(&self) -> Result<ScriptBuilder, JsValue> {
+    #[wasm_bindgen(js_name = "createCodeBuilder")]
+    pub fn create_code_builder(&self) -> Result<CodeBuilder, JsValue> {
         let Some(client) = &self.inner else {
-            return Err("client was not initialized before instancing ScriptBuilder".into());
+            return Err("client was not initialized before instancing CodeBuilder".into());
         };
-        Ok(ScriptBuilder::from_source_manager(
-            client.script_builder().source_manager().clone(),
-        ))
+        Ok(CodeBuilder::from_source_manager(client.code_builder().source_manager().clone()))
     }
 }
 

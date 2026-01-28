@@ -1,8 +1,8 @@
-[**@demox-labs/miden-sdk**](../README.md)
+[**@miden-sdk/miden-sdk**](../README.md)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / TransactionRecord
+[@miden-sdk/miden-sdk](../README.md) / TransactionRecord
 
 # Class: TransactionRecord
 
@@ -53,6 +53,18 @@ Returns the timestamp when the record was created.
 #### Returns
 
 `bigint`
+
+***
+
+### expirationBlockNum()
+
+> **expirationBlockNum**(): `number`
+
+Returns the expiration block height for the transaction.
+
+#### Returns
+
+`number`
 
 ***
 
@@ -123,6 +135,18 @@ Returns the output notes created by this transaction.
 #### Returns
 
 [`OutputNotes`](OutputNotes.md)
+
+***
+
+### submissionHeight()
+
+> **submissionHeight**(): `number`
+
+Returns the block height at which the transaction was submitted.
+
+#### Returns
+
+`number`
 
 ***
 

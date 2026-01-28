@@ -11,26 +11,36 @@ extern "C" {
     // ================================================================================================
 
     #[wasm_bindgen(js_name = getBlockHeaders)]
-    pub fn idxdb_get_block_headers(block_numbers: Vec<String>) -> js_sys::Promise;
+    pub fn idxdb_get_block_headers(db_id: &str, block_numbers: Vec<u32>) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = getTrackedBlockHeaders)]
-    pub fn idxdb_get_tracked_block_headers() -> js_sys::Promise;
+    pub fn idxdb_get_tracked_block_headers(db_id: &str) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = getPartialBlockchainNodesAll)]
-    pub fn idxdb_get_partial_blockchain_nodes_all() -> js_sys::Promise;
+    pub fn idxdb_get_partial_blockchain_nodes_all(db_id: &str) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = getPartialBlockchainNodes)]
-    pub fn idxdb_get_partial_blockchain_nodes(ids: Vec<String>) -> js_sys::Promise;
+    pub fn idxdb_get_partial_blockchain_nodes(db_id: &str, ids: Vec<String>) -> js_sys::Promise;
+
+    #[wasm_bindgen(js_name = getPartialBlockchainNodesUpToInOrderIndex)]
+    pub fn idxdb_get_partial_blockchain_nodes_up_to_inorder_index(
+        db_id: &str,
+        max_in_order_index: String,
+    ) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = getPartialBlockchainPeaksByBlockNum)]
-    pub fn idxdb_get_partial_blockchain_peaks_by_block_num(block_num: String) -> js_sys::Promise;
+    pub fn idxdb_get_partial_blockchain_peaks_by_block_num(
+        db_id: &str,
+        block_num: u32,
+    ) -> js_sys::Promise;
 
     // INSERTS
     // ================================================================================================
 
     #[wasm_bindgen(js_name = insertBlockHeader)]
     pub fn idxdb_insert_block_header(
-        block_num: String,
+        db_id: &str,
+        block_num: u32,
         header: Vec<u8>,
         partial_blockchain_peaks: Vec<u8>,
         has_client_notes: bool,
@@ -38,6 +48,7 @@ extern "C" {
 
     #[wasm_bindgen(js_name = insertPartialBlockchainNodes)]
     pub fn idxdb_insert_partial_blockchain_nodes(
+        db_id: &str,
         ids: Vec<String>,
         nodes: Vec<String>,
     ) -> js_sys::Promise;
@@ -46,5 +57,5 @@ extern "C" {
     // ================================================================================================
 
     #[wasm_bindgen(js_name = pruneIrrelevantBlocks)]
-    pub fn idxdb_prune_irrelevant_blocks() -> js_sys::Promise;
+    pub fn idxdb_prune_irrelevant_blocks(db_id: &str) -> js_sys::Promise;
 }

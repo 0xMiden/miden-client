@@ -24,12 +24,12 @@ use miden_client::transaction::{
 use miden_client::{Client, RemoteTransactionProver};
 use tracing::info;
 
+use crate::config::CliConfig;
 use crate::create_dynamic_table;
 use crate::errors::CliError;
 use crate::utils::{
     SHARED_TOKEN_DOCUMENTATION,
     get_input_acc_id_by_prefix_or_default,
-    load_config_file,
     load_faucet_details_map,
     parse_account_id,
 };
@@ -200,7 +200,7 @@ pub struct SwapCmd {
     sender_account_id: Option<String>,
 
     /// Asset offered.
-    #[arg(long = "offered-asset", help=format!("Asset offered.\n{SHARED_TOKEN_DOCUMENTATION}"))]
+    #[arg(short = 'o', long = "offered-asset", help=format!("Asset offered.\n{SHARED_TOKEN_DOCUMENTATION}"))]
     offered_asset: String,
 
     /// Asset requested.
@@ -210,10 +210,6 @@ pub struct SwapCmd {
     /// Visibility of the swap note to be created.
     #[arg(short, long, value_enum)]
     note_type: NoteType,
-
-    /// Visibility of the payback note.
-    #[arg(short, long, value_enum)]
-    payback_note_type: NoteType,
 
     /// Flag to submit the executed transaction without asking for confirmation.
     #[arg(long, default_value_t = false)]
@@ -252,7 +248,7 @@ impl SwapCmd {
             .build_swap(
                 &swap_transaction,
                 (&self.note_type).into(),
-                (&self.payback_note_type).into(),
+                MidenNoteType::Private,
                 client.rng(),
             )
             .map_err(|err| {
@@ -273,10 +269,9 @@ impl SwapCmd {
             &swap_transaction.offered_asset(),
             &swap_transaction.requested_asset(),
         )
-        .map_err(|err| CliError::Transaction(err.into(), "Failed to build swap tag".to_string()))?
         .into();
         println!(
-            "To receive updates about the payback Swap Note run `miden tags add {payback_note_tag}`",
+            "To receive updates about the payback Swap Note run `miden-client tags --add {payback_note_tag}`",
         );
 
         Ok(())
@@ -310,18 +305,29 @@ impl ConsumeNotesCmd {
     ) -> Result<(), CliError> {
         let force = self.force;
 
-        let mut authenticated_notes = Vec::new();
-        let mut unauthenticated_notes = Vec::new();
+        let mut input_notes = Vec::new();
 
         for note_id in &self.list_of_notes {
             let note_record = get_input_note_with_id_prefix(&client, note_id)
                 .await
                 .map_err(|_| CliError::Input(format!("Input note ID {note_id} is neither a valid Note ID nor a prefix of a known Note ID")))?;
 
-            if note_record.is_authenticated() {
-                authenticated_notes.push(note_record.id());
-            } else {
-                unauthenticated_notes.push((
+            input_notes.push((
+                note_record.try_into().map_err(|err: NoteRecordError| {
+                    CliError::Transaction(err.into(), "Failed to convert note record".to_string())
+                })?,
+                None,
+            ));
+        }
+
+        let account_id =
+            get_input_acc_id_by_prefix_or_default(&client, self.account_id.clone()).await?;
+
+        if input_notes.is_empty() {
+            info!("No input note IDs provided, getting all notes consumable by {}", account_id);
+            let consumable_notes = client.get_consumable_notes(Some(account_id)).await?;
+            for (note_record, _) in consumable_notes {
+                input_notes.push((
                     note_record.try_into().map_err(|err: NoteRecordError| {
                         CliError::Transaction(
                             err.into(),
@@ -333,17 +339,7 @@ impl ConsumeNotesCmd {
             }
         }
 
-        let account_id =
-            get_input_acc_id_by_prefix_or_default(&client, self.account_id.clone()).await?;
-
-        if authenticated_notes.is_empty() {
-            info!("No input note IDs provided, getting all notes consumable by {}", account_id);
-            let consumable_notes = client.get_consumable_notes(Some(account_id)).await?;
-
-            authenticated_notes.extend(consumable_notes.iter().map(|(note, _)| note.id()));
-        }
-
-        if authenticated_notes.is_empty() && unauthenticated_notes.is_empty() {
+        if input_notes.is_empty() {
             return Err(CliError::Transaction(
                 "No input notes were provided and the store does not contain any notes consumable by {account_id}".into(),
                 "Input notes check failed".to_string(),
@@ -351,8 +347,7 @@ impl ConsumeNotesCmd {
         }
 
         let transaction_request = TransactionRequestBuilder::new()
-            .authenticated_input_notes(authenticated_notes.into_iter().map(|id| (id, None)))
-            .unauthenticated_input_notes(unauthenticated_notes)
+            .input_notes(input_notes)
             .build()
             .map_err(|err| {
                 CliError::Transaction(
@@ -412,7 +407,7 @@ async fn execute_transaction<AUTH: TransactionAuthenticator + Sync + 'static>(
     println!("Proving transaction...");
 
     let prover = if delegated_proving {
-        let (cli_config, _) = load_config_file()?;
+        let cli_config = CliConfig::from_system()?;
         let remote_prover_endpoint =
             cli_config.remote_prover_endpoint.as_ref().ok_or(CliError::Config(
                 "Remote prover endpoint".to_string().into(),

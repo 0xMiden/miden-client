@@ -1,8 +1,8 @@
-[**@demox-labs/miden-sdk**](../README.md)
+[**@miden-sdk/miden-sdk**](../README.md)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / Note
+[@miden-sdk/miden-sdk](../README.md) / Note
 
 # Class: Note
 
@@ -108,6 +108,18 @@ Returns the public metadata associated with the note.
 
 ***
 
+### nullifier()
+
+> **nullifier**(): [`Word`](Word.md)
+
+Returns the note nullifier as a word.
+
+#### Returns
+
+[`Word`](Word.md)
+
+***
+
 ### recipient()
 
 > **recipient**(): [`NoteRecipient`](NoteRecipient.md)
@@ -146,7 +158,7 @@ Serializes the note into bytes.
 
 ### createP2IDENote()
 
-> `static` **createP2IDENote**(`sender`, `target`, `assets`, `reclaim_height`, `timelock_height`, `note_type`, `aux`): `Note`
+> `static` **createP2IDENote**(`sender`, `target`, `assets`, `reclaim_height`, `timelock_height`, `note_type`, `attachment`): `Note`
 
 Builds a P2IDE note that can be reclaimed or timelocked based on block heights.
 
@@ -176,9 +188,9 @@ Builds a P2IDE note that can be reclaimed or timelocked based on block heights.
 
 [`NoteType`](../enumerations/NoteType.md)
 
-##### aux
+##### attachment
 
-[`Felt`](Felt.md)
+[`NoteAttachment`](NoteAttachment.md)
 
 #### Returns
 
@@ -188,7 +200,7 @@ Builds a P2IDE note that can be reclaimed or timelocked based on block heights.
 
 ### createP2IDNote()
 
-> `static` **createP2IDNote**(`sender`, `target`, `assets`, `note_type`, `aux`): `Note`
+> `static` **createP2IDNote**(`sender`, `target`, `assets`, `note_type`, `attachment`): `Note`
 
 Builds a standard P2ID note that targets the specified account.
 
@@ -210,9 +222,9 @@ Builds a standard P2ID note that targets the specified account.
 
 [`NoteType`](../enumerations/NoteType.md)
 
-##### aux
+##### attachment
 
-[`Felt`](Felt.md)
+[`NoteAttachment`](NoteAttachment.md)
 
 #### Returns
 

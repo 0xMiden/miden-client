@@ -1,12 +1,12 @@
-import { settings, CLIENT_VERSION_SETTING_KEY } from "./schema.js";
+import { getDatabase, CLIENT_VERSION_SETTING_KEY } from "./schema.js";
 import { logWebStoreError, uint8ArrayToBase64 } from "./utils.js";
 
 const INTERNAL_SETTING_KEYS = new Set([CLIENT_VERSION_SETTING_KEY]);
 
-export async function getSetting(key: string) {
+export async function getSetting(dbId: string, key: string) {
   try {
-    // Fetch all records matching the given key
-    const allMatchingRecords = await settings
+    const db = getDatabase(dbId);
+    const allMatchingRecords = await db.settings
       .where("key")
       .equals(key)
       .toArray();
@@ -16,10 +16,8 @@ export async function getSetting(key: string) {
       return null;
     }
 
-    // There should be only one match
     const matchingRecord = allMatchingRecords[0];
 
-    // Convert the setting value to base64
     const valueBase64 = uint8ArrayToBase64(matchingRecord.value);
 
     return {
@@ -32,15 +30,17 @@ export async function getSetting(key: string) {
 }
 
 export async function insertSetting(
+  dbId: string,
   key: string,
   value: Uint8Array
 ): Promise<void> {
   try {
+    const db = getDatabase(dbId);
     const setting = {
       key,
       value,
     };
-    await settings.put(setting);
+    await db.settings.put(setting);
   } catch (error) {
     logWebStoreError(
       error,
@@ -49,17 +49,19 @@ export async function insertSetting(
   }
 }
 
-export async function removeSetting(key: string): Promise<void> {
+export async function removeSetting(dbId: string, key: string): Promise<void> {
   try {
-    await settings.where("key").equals(key).delete();
+    const db = getDatabase(dbId);
+    await db.settings.where("key").equals(key).delete();
   } catch (error) {
     logWebStoreError(error, `Error deleting setting with key: ${key}`);
   }
 }
 
-export async function listSettingKeys() {
+export async function listSettingKeys(dbId: string) {
   try {
-    const keys: string[] = await settings
+    const db = getDatabase(dbId);
+    const keys: string[] = await db.settings
       .toArray()
       .then((settings) => settings.map((setting) => setting.key));
     return keys.filter((key) => !INTERNAL_SETTING_KEYS.has(key));

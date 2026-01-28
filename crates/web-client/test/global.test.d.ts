@@ -15,6 +15,7 @@ import {
   Address,
   AddressInterface,
   AdviceMap,
+  AuthFalcon512RpoMultisigConfig,
   AuthSecretKey,
   BasicFungibleFaucetComponent,
   ConsumableNoteRecord,
@@ -30,7 +31,6 @@ import {
   NoteAssets,
   NoteConsumability,
   NoteExecutionHint,
-  NoteExecutionMode,
   NoteFilter,
   NoteFile,
   NoteFilterTypes,
@@ -45,6 +45,7 @@ import {
   OutputNote,
   OutputNotesArray,
   Package,
+  ProcedureThreshold,
   PublicKey,
   Rpo256,
   RpcClient,
@@ -66,12 +67,14 @@ import {
   TransactionScript,
   TransactionScriptInputPair,
   TransactionScriptInputPairArray,
+  TransactionSummary,
   Word,
   NoteAndArgs,
   NoteAndArgsArray,
   MidenArrays,
-  ScriptBuilder,
-  ScriptBuilderMode,
+  CodeBuilder,
+  CodeBuilderMode,
+  createAuthFalcon512RpoMultisig,
 } from "../dist/index";
 import { MockWebClient, WebClient } from "../js";
 
@@ -99,6 +102,7 @@ declare global {
     Address: typeof Address;
     AddressInterface: typeof AddressInterface;
     AdviceMap: typeof AdviceMap;
+    AuthFalcon512RpoMultisigConfig: typeof AuthFalcon512RpoMultisigConfig;
     AuthSecretKey: typeof AuthSecretKey;
     BasicFungibleFaucetComponent: typeof BasicFungibleFaucetComponent;
     ConsumableNoteRecord: typeof ConsumableNoteRecord;
@@ -117,7 +121,6 @@ declare global {
     NoteAssets: typeof NoteAssets;
     NoteConsumability: typeof NoteConsumability;
     NoteExecutionHint: typeof NoteExecutionHint;
-    NoteExecutionMode: typeof NoteExecutionMode;
     NoteFilter: typeof NoteFilter;
     NoteFile: typeof NoteFile;
     NoteFilterTypes: typeof NoteFilterTypes;
@@ -133,6 +136,7 @@ declare global {
     OutputNote: typeof OutputNote;
     OutputNotesArray: typeof OutputNotesArray;
     Package: typeof Package;
+    ProcedureThreshold: typeof ProcedureThreshold;
     PublicKey: typeof PublicKey;
     Rpo256: typeof Rpo256;
     Signature: typeof Signature;
@@ -159,9 +163,12 @@ declare global {
     Word: typeof Word;
     Address: typeof Address;
     MidenArrays: typeof MidenArrays;
-    ScriptBuilder: typeof ScriptBuilder;
-    ScriptBuilderMode: typeof ScriptBuilderMode;
+    CodeBuilder: typeof CodeBuilder;
+    CodeBuilderMode: typeof CodeBuilderMode;
+    createAuthFalcon512RpoMultisig: typeof createAuthFalcon512RpoMultisig;
     createClient: () => Promise<void>;
+
+    rpcUrl: string;
 
     // Add the helpers namespace
     helpers: {

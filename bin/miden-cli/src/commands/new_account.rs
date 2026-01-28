@@ -11,19 +11,20 @@ use miden_client::account::component::{
     AccountComponentMetadata,
     InitStorageData,
     MIDEN_PACKAGE_EXTENSION,
+    StorageSlotSchema,
 };
 use miden_client::account::{Account, AccountBuilder, AccountStorageMode, AccountType};
-use miden_client::auth::{AuthRpoFalcon512, AuthSecretKey, TransactionAuthenticator};
+use miden_client::auth::{AuthFalcon512Rpo, AuthSecretKey, TransactionAuthenticator};
 use miden_client::transaction::TransactionRequestBuilder;
 use miden_client::utils::Deserializable;
 use miden_client::vm::{Package, SectionId};
 use rand::RngCore;
-use tracing::debug;
+use tracing::{debug, warn};
 
 use crate::commands::account::set_default_account_if_unset;
 use crate::config::CliConfig;
 use crate::errors::CliError;
-use crate::{CliKeyStore, client_binary_name, load_config_file};
+use crate::{CliKeyStore, client_binary_name};
 
 // CLI TYPES
 // ================================================================================================
@@ -362,7 +363,7 @@ async fn create_client_account<AUTH: TransactionAuthenticator + Sync + 'static>(
 
     // Load the component templates and initialization storage data.
 
-    let (cli_config, _) = load_config_file()?;
+    let cli_config = CliConfig::from_system()?;
     debug!("Loading packages...");
     let packages = load_packages(&cli_config, package_paths)?;
     debug!("Loaded {} packages", packages.len());
@@ -388,9 +389,9 @@ async fn create_client_account<AUTH: TransactionAuthenticator + Sync + 'static>(
         None
     } else {
         debug!("Adding default Falcon auth component");
-        let kp = AuthSecretKey::new_rpo_falcon512_with_rng(client.rng());
+        let kp = AuthSecretKey::new_falcon512_rpo_with_rng(client.rng());
         builder =
-            builder.with_auth_component(AuthRpoFalcon512::new(kp.public_key().to_commitment()));
+            builder.with_auth_component(AuthFalcon512Rpo::new(kp.public_key().to_commitment()));
         Some(kp)
     };
 
@@ -405,7 +406,21 @@ async fn create_client_account<AUTH: TransactionAuthenticator + Sync + 'static>(
 
     // Only add the key to the keystore if we generated a default key type (Falcon)
     if let Some(key_pair) = key_pair {
+        let public_key = key_pair.public_key();
+        let public_key_commitment = public_key.to_commitment();
         keystore.add_key(&key_pair).map_err(CliError::KeyStore)?;
+        if let Err(err) = client
+            .register_account_public_key_commitments(&account.id(), &[public_key])
+            .await
+        {
+            if let Err(rollback_err) = keystore.remove_key(public_key_commitment) {
+                warn!(
+                    ?rollback_err,
+                    "Failed to rollback keystore entry after commitment add failure"
+                );
+            }
+            return Err(err.into());
+        }
         println!("Generated and stored Falcon512 authentication key in keystore.");
     } else {
         println!("Using custom authentication component from package (no key generated).");
@@ -425,31 +440,12 @@ async fn deploy_account<AUTH: TransactionAuthenticator + Sync + 'static>(
     client: &mut Client<AUTH>,
     account: &Account,
 ) -> Result<(), CliError> {
-    // Retrieve the auth procedure mast root pointer and call it in the transaction script.
-    // We only use AuthRpoFalcon512 for the auth component so this may be overkill but it lets us
-    // use different auth components in the future.
-    let auth_procedure_mast_root = account.code().get_procedure_by_index(0).mast_root();
-
-    let auth_script = client
-        .script_builder()
-        .compile_tx_script(
-            "
-                    begin
-                        # [AUTH_PROCEDURE_MAST_ROOT]
-                        mem_storew_be.4000 push.4000
-                        # [auth_procedure_mast_root_ptr]
-                        dyncall
-                    end",
-        )
-        .expect("Auth script should compile");
-
-    let tx_request = TransactionRequestBuilder::new()
-        .script_arg(*auth_procedure_mast_root)
-        .custom_script(auth_script)
-        .build()
-        .map_err(|err| {
-            CliError::Transaction(err.into(), "Failed to build deploy transaction".to_string())
-        })?;
+    // Build a minimal transaction request. The transaction execution will naturally increment
+    // the account nonce from 0 to 1, which deploys the account on-chain.
+    // We don't need to call auth procedures directly as that must be done in the epilogue.
+    let tx_request = TransactionRequestBuilder::new().build().map_err(|err| {
+        CliError::Transaction(err.into(), "Failed to build deploy transaction".to_string())
+    })?;
 
     client.submit_new_transaction(account.id(), tx_request).await?;
     Ok(())
@@ -462,7 +458,7 @@ fn process_packages(
     let mut account_components = Vec::with_capacity(packages.len());
 
     for package in packages {
-        let mut placeholders = init_storage_data.placeholders().clone();
+        let mut value_entries = init_storage_data.values().clone();
         let mut map_entries = BTreeMap::new();
 
         let Some(component_metadata_section) = package.sections.iter().find(|section| {
@@ -484,41 +480,47 @@ fn process_packages(
             )
         })?;
 
-        for (placeholder_key, placeholder_type) in component_metadata.get_placeholder_requirements()
-        {
-            if placeholders.contains_key(&placeholder_key) {
-                // The use provided it through the TOML file, so we can skip it
+        // Preserve any provided map entries for map slots.
+        for (slot_name, schema) in component_metadata.storage_schema().iter() {
+            if matches!(schema, StorageSlotSchema::Map(_))
+                && let Some(entries) = init_storage_data.map_entries(slot_name)
+            {
+                map_entries.insert(slot_name.clone(), entries.clone());
+            }
+        }
+
+        for (value_name, requirement) in component_metadata.schema_requirements() {
+            if value_entries.contains_key(&value_name) {
+                // The user provided it through the TOML file, so we can skip it
                 continue;
             }
 
-            if let Some(entries) = init_storage_data.map_entries(&placeholder_key) {
-                map_entries.insert(placeholder_key.clone(), entries.clone());
-                continue;
-            }
-
-            let description = placeholder_type.description.unwrap_or("[No description]".into());
+            let description = requirement.description.unwrap_or("[No description]".into());
             println!(
-                "Enter value for '{placeholder_key}' - {description} (type: {}): ",
-                placeholder_type.r#type
+                "Enter value for '{value_name}' - {description} (type: {}): ",
+                requirement.r#type
             );
             std::io::stdout().flush()?;
 
             let mut input_value = String::new();
             std::io::stdin().read_line(&mut input_value)?;
             let input_value = input_value.trim();
-            placeholders.insert(placeholder_key, input_value.to_string());
+            value_entries.insert(value_name, input_value.to_string().into());
         }
 
-        let account_component = AccountComponent::from_package(
-            &package,
-            &InitStorageData::new(placeholders, map_entries),
-        )
-        .map_err(|e| {
-            CliError::Account(
-                e,
-                format!("error instantiating component from Package {}", package.name),
+        let init_data = InitStorageData::new(value_entries, map_entries).map_err(|e| {
+            CliError::AccountComponentError(
+                Box::new(e),
+                format!("error creating InitStorageData for Package {}", package.name),
             )
         })?;
+        let account_component =
+            AccountComponent::from_package(&package, &init_data).map_err(|e| {
+                CliError::Account(
+                    e,
+                    format!("error instantiating component from Package {}", package.name),
+                )
+            })?;
 
         account_components.push(account_component);
     }

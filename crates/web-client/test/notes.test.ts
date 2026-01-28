@@ -13,10 +13,7 @@ import {
   setupPublicConsumedNote,
 } from "./webClientTestUtils";
 import { Page, expect } from "@playwright/test";
-import {
-  ConsumableNoteRecord,
-  NoteConsumability,
-} from "../dist/crates/miden_client_web";
+import { ConsumableNoteRecord } from "../dist/crates/miden_client_web";
 
 const getConsumableNotes = async (
   testingPage: Page,
@@ -34,7 +31,6 @@ const getConsumableNotes = async (
     const client = window.client;
     let records;
     if (_accountId) {
-      console.log({ _accountId });
       const accountId = window.AccountId.fromHex(_accountId);
       records = await client.getConsumableNotes(accountId);
     } else {
@@ -45,7 +41,7 @@ const getConsumableNotes = async (
       noteId: record.inputNoteRecord().id().toString(),
       consumability: record.noteConsumability().map((c) => ({
         accountId: c.accountId().toString(),
-        consumableAfterBlock: c.consumableAfterBlock(),
+        consumableAfterBlock: c.consumptionStatus()?.consumableAfterBlock(),
       })),
     }));
   }, accountId);
@@ -132,6 +128,56 @@ test.describe("get_input_note", () => {
 
     expect(retrievedScript.hasScript).toBe(true);
     expect(retrievedScript.scriptRoot).toEqual(noteData.scriptRoot);
+  });
+
+  test("sync notes by tag and check nullifier commit height", async ({
+    page,
+  }) => {
+    const { consumedNoteId } = await setupConsumedNote(page, true);
+
+    const result = await page.evaluate(async (_consumedNoteId: string) => {
+      const endpoint = new window.Endpoint(window.rpcUrl);
+      const rpcClient = new window.RpcClient(endpoint);
+
+      const noteId = window.NoteId.fromHex(_consumedNoteId);
+      const fetchedNotes = await rpcClient.getNotesById([noteId]);
+
+      if (fetchedNotes.length === 0) {
+        return { found: false };
+      }
+
+      const note = fetchedNotes[0].note;
+      const tag = fetchedNotes[0].metadata.tag();
+
+      const syncInfo = await rpcClient.syncNotes(0, undefined, [tag]);
+      const syncedNoteIds = syncInfo
+        .notes()
+        .map((synced) => synced.noteId().toString());
+
+      const inputNote = await window.client.getInputNote(_consumedNoteId);
+      const nullifierWord = note
+        ? note.nullifier()
+        : inputNote
+          ? window.Word.fromHex(inputNote.nullifier())
+          : undefined;
+      const commitHeight = nullifierWord
+        ? await rpcClient.getNullifierCommitHeight(nullifierWord, 0)
+        : undefined;
+
+      return {
+        found: true,
+        syncedNoteIds,
+        noteNullifierHex: note ? note.nullifier().toHex() : undefined,
+        noteNullifierWord: note ? note.nullifier().toHex() : undefined,
+        commitHeight,
+      };
+    }, consumedNoteId);
+
+    expect(result.found).toBe(true);
+    expect(result.syncedNoteIds).toContain(consumedNoteId);
+    expect(result.noteNullifierHex).toMatch(/^0x[0-9a-fA-F]+$/);
+    expect(result.noteNullifierWord).toEqual(result.noteNullifierHex);
+    expect(result.commitHeight).not.toBeUndefined();
   });
 });
 
@@ -246,7 +292,7 @@ test.describe("createP2IDNote and createP2IDENote", () => {
           targetAccountId,
           noteAssets,
           window.NoteType.Public,
-          new window.Felt(0n)
+          new window.NoteAttachment()
         );
 
         let outputNote = window.OutputNote.full(p2IdNote);
@@ -273,8 +319,14 @@ test.describe("createP2IDNote and createP2IDENote", () => {
           .id()
           .toString();
 
+        const inputNoteRecord = await client.getInputNote(createdNoteId);
+        if (!inputNoteRecord) {
+          throw new Error(`Note with ID ${createdNoteId} not found`);
+        }
+
+        const note = inputNoteRecord.toNote();
         let consumeTransactionRequest = client.newConsumeTransactionRequest([
-          createdNoteId,
+          note,
         ]);
 
         let consumeTransactionUpdate =
@@ -315,6 +367,7 @@ test.describe("createP2IDNote and createP2IDENote", () => {
   test("should create a proper consumable p2ide note from the createP2IDENote function", async ({
     page,
   }) => {
+    test.slow();
     const { accountId: senderId, faucetId } = await setupWalletAndFaucet(page);
     const { accountId: targetId } = await setupWalletAndFaucet(page);
 
@@ -332,7 +385,6 @@ test.describe("createP2IDNote and createP2IDENote", () => {
       async ({ _senderId, _targetId, _faucetId }) => {
         let client = window.client;
 
-        console.log(_senderId, _targetId, _faucetId);
         let senderAccountId = window.AccountId.fromHex(_senderId);
         let targetAccountId = window.AccountId.fromHex(_targetId);
         let faucetAccountId = window.AccountId.fromHex(_faucetId);
@@ -349,7 +401,7 @@ test.describe("createP2IDNote and createP2IDENote", () => {
           null,
           null,
           window.NoteType.Public,
-          new window.Felt(0n)
+          new window.NoteAttachment()
         );
 
         let outputNote = window.OutputNote.full(p2IdeNote);
@@ -376,8 +428,14 @@ test.describe("createP2IDNote and createP2IDENote", () => {
           .id()
           .toString();
 
+        const inputNoteRecord = await client.getInputNote(createdNoteId);
+        if (!inputNoteRecord) {
+          throw new Error(`Note with ID ${createdNoteId} not found`);
+        }
+
+        const note = inputNoteRecord.toNote();
         let consumeTransactionRequest = client.newConsumeTransactionRequest([
-          createdNoteId,
+          note,
         ]);
 
         let consumeTransactionUpdate =

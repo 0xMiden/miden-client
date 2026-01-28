@@ -12,34 +12,41 @@ extern "C" {
     // ================================================================================================
 
     #[wasm_bindgen(js_name = getInputNotes)]
-    pub fn idxdb_get_input_notes(states: Vec<u8>) -> js_sys::Promise;
+    pub fn idxdb_get_input_notes(db_id: &str, states: Vec<u8>) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = getInputNotesFromIds)]
-    pub fn idxdb_get_input_notes_from_ids(note_ids: Vec<String>) -> js_sys::Promise;
+    pub fn idxdb_get_input_notes_from_ids(db_id: &str, note_ids: Vec<String>) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = getInputNotesFromNullifiers)]
-    pub fn idxdb_get_input_notes_from_nullifiers(nullifiers: Vec<String>) -> js_sys::Promise;
+    pub fn idxdb_get_input_notes_from_nullifiers(
+        db_id: &str,
+        nullifiers: Vec<String>,
+    ) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = getOutputNotes)]
-    pub fn idxdb_get_output_notes(states: Vec<u8>) -> js_sys::Promise;
+    pub fn idxdb_get_output_notes(db_id: &str, states: Vec<u8>) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = getOutputNotesFromIds)]
-    pub fn idxdb_get_output_notes_from_ids(note_ids: Vec<String>) -> js_sys::Promise;
+    pub fn idxdb_get_output_notes_from_ids(db_id: &str, note_ids: Vec<String>) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = getOutputNotesFromNullifiers)]
-    pub fn idxdb_get_output_notes_from_nullifiers(nullifiers: Vec<String>) -> js_sys::Promise;
+    pub fn idxdb_get_output_notes_from_nullifiers(
+        db_id: &str,
+        nullifiers: Vec<String>,
+    ) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = getUnspentInputNoteNullifiers)]
-    pub fn idxdb_get_unspent_input_note_nullifiers() -> js_sys::Promise;
+    pub fn idxdb_get_unspent_input_note_nullifiers(db_id: &str) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = getNoteScript)]
-    pub fn idxdb_get_note_script(script_root: String) -> js_sys::Promise;
+    pub fn idxdb_get_note_script(db_id: &str, script_root: String) -> js_sys::Promise;
 
     // INSERTS
     // ================================================================================================
 
     #[wasm_bindgen(js_name = upsertInputNote)]
     pub fn idxdb_upsert_input_note(
+        db_id: &str,
         note_id: String,
         assets: Vec<u8>,
         serial_number: Vec<u8>,
@@ -54,6 +61,7 @@ extern "C" {
 
     #[wasm_bindgen(js_name = upsertOutputNote)]
     pub fn idxdb_upsert_output_note(
+        db_id: &str,
         note_id: String,
         assets: Vec<u8>,
         recipient_digest: String,
@@ -66,6 +74,7 @@ extern "C" {
 
     #[wasm_bindgen(js_name = upsertNoteScript)]
     pub fn idxdb_upsert_note_script(
+        db_id: &str,
         note_script_root: String,
         serialized_note_script: Vec<u8>,
     ) -> js_sys::Promise;

@@ -28,27 +28,23 @@ inherits  = "dev"
 opt-level = 1
 
 [workspace.dependencies]
-# Miden base/protocol dependencies
-miden-lib = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base.git" }
-miden-objects = { branch = "next", default-features = false, features = [
-  "testing",
-], git = "https://github.com/0xMiden/miden-base.git" }
-miden-testing = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base.git" }
-miden-tx = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base.git" }
+# Miden protocol dependencies
+miden-protocol  = { default-features = false, version = "0.13" }
+miden-standards = { default-features = false, version = "0.13" }
+miden-testing   = { default-features = false, version = "0.13" }
+miden-tx        = { default-features = false, version = "0.13" }
 
 # Miden node dependencies
-miden-node-block-producer = { branch = "next", git = "https://github.com/0xMiden/miden-node.git" }
-miden-node-ntx-builder = { branch = "next", git = "https://github.com/0xMiden/miden-node.git" }
-miden-node-proto-build = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-node.git" }
-miden-node-rpc = { branch = "next", git = "https://github.com/0xMiden/miden-node.git" }
-miden-node-store = { branch = "next", git = "https://github.com/0xMiden/miden-node.git" }
-miden-node-utils = { branch = "next", git = "https://github.com/0xMiden/miden-node.git" }
-miden-node-validator = { branch = "next", git = "https://github.com/0xMiden/miden-node.git" }
-miden-note-transport-proto-build = { branch = "main", default-features = false, git = "https://github.com/0xMiden/miden-note-transport.git" }
-miden-remote-prover = { branch = "next", features = ["concurrent"], git = "https://github.com/0xMiden/miden-node.git" }
-miden-remote-prover-client = { branch = "next", default-features = false, features = [
-  "tx-prover",
-], git = "https://github.com/0xMiden/miden-node.git" }
+miden-node-block-producer        = { version = "0.13" }
+miden-node-ntx-builder           = { version = "0.13" }
+miden-node-proto-build           = { default-features = false, version = "0.13" }
+miden-node-rpc                   = { version = "0.13" }
+miden-node-store                 = { version = "0.13" }
+miden-node-utils                 = { version = "0.13" }
+miden-node-validator             = { version = "0.13" }
+miden-note-transport-proto-build = { default-features = false, version = "0.2" }
+miden-remote-prover              = { features = ["concurrent"], version = "0.13" }
+miden-remote-prover-client       = { default-features = false, features = ["tx-prover"], version = "0.13" }
 
 # External dependencies
 anyhow      = { default-features = false, version = "1.0" }

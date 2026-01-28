@@ -1,10 +1,10 @@
 use alloc::string::ToString;
 
-use miden_objects::Word;
-use miden_objects::account::AccountId;
-use miden_objects::block::{BlockHeader, BlockNumber};
-use miden_objects::note::{NoteId, NoteInclusionProof, NoteMetadata};
-use miden_objects::transaction::TransactionId;
+use miden_protocol::Word;
+use miden_protocol::account::AccountId;
+use miden_protocol::block::{BlockHeader, BlockNumber};
+use miden_protocol::note::{NoteId, NoteInclusionProof, NoteMetadata};
+use miden_protocol::transaction::TransactionId;
 
 use super::{
     ConsumedAuthenticatedLocalNoteState,
@@ -80,7 +80,7 @@ impl NoteStateHandler for ProcessingAuthenticatedNoteState {
 
         Ok(Some(
             ConsumedAuthenticatedLocalNoteState {
-                metadata: self.metadata,
+                metadata: self.metadata.clone(),
                 inclusion_proof: self.inclusion_proof.clone(),
                 block_note_root: self.block_note_root,
                 nullifier_block_height: block_height,

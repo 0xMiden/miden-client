@@ -1,8 +1,8 @@
 use alloc::string::ToString;
 use alloc::vec::Vec;
 
-use miden_objects::account::{Account, AccountId};
-use miden_objects::note::{NoteId, NoteTag};
+use miden_protocol::account::{Account, AccountId};
+use miden_protocol::note::{NoteId, NoteTag};
 use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 use tracing::warn;
 
@@ -130,6 +130,12 @@ impl PartialEq<NoteTag> for NoteTagRecord {
     }
 }
 
+impl From<&Account> for NoteTagRecord {
+    fn from(account: &Account) -> Self {
+        NoteTagRecord::with_account_source(NoteTag::with_account_target(account.id()), account.id())
+    }
+}
+
 impl TryInto<NoteTagRecord> for &InputNoteRecord {
     type Error = NoteRecordError;
 
@@ -140,11 +146,5 @@ impl TryInto<NoteTagRecord> for &InputNoteRecord {
                 "Input Note Record does not contain tag".to_string(),
             )),
         }
-    }
-}
-
-impl From<&Account> for NoteTagRecord {
-    fn from(account: &Account) -> Self {
-        NoteTagRecord::with_account_source(NoteTag::from_account_id(account.id()), account.id())
     }
 }

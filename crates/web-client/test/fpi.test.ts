@@ -6,6 +6,9 @@ export const testStandardFpi = async (page: Page): Promise<void> => {
     const client = window.client;
     await client.syncState();
 
+    const MAP_SLOT_NAME = "miden::testing::fpi::map_slot";
+    const COMPONENT_LIB_PATH = "miden::testing::fpi_component";
+
     // BUILD FOREIGN ACCOUNT WITH CUSTOM COMPONENT
     // --------------------------------------------------------------------------
 
@@ -22,19 +25,24 @@ export const testStandardFpi = async (page: Page): Promise<void> => {
     storageMap.insert(MAP_KEY, FPI_STORAGE_VALUE);
 
     const code = `
-            export.get_fpi_map_item
+            use miden::core::word
+
+            const MAP_SLOT = word("${MAP_SLOT_NAME}")
+
+            pub proc get_fpi_map_item
                 # map key
                 push.15.15.15.15
-                # item index
-                push.0
-                exec.::miden::active_account::get_map_item
+                push.MAP_SLOT[0..2]
+                exec.::miden::protocol::active_account::get_map_item
                 swapw dropw
             end
         `;
-    let builder = client.createScriptBuilder();
-    let getItemComponent = window.AccountComponent.compile(code, builder, [
-      window.StorageSlot.map(storageMap),
-    ]).withSupportsAllTypes();
+    let builder = client.createCodeBuilder();
+    let componentLibrary = builder.buildLibrary(COMPONENT_LIB_PATH, code);
+    let getItemComponent = window.AccountComponent.fromLibrary(
+      componentLibrary,
+      [window.StorageSlot.map(MAP_SLOT_NAME, storageMap)]
+    ).withSupportsAllTypes();
 
     const walletSeed = new Uint8Array(32);
     crypto.getRandomValues(walletSeed);
@@ -50,15 +58,14 @@ export const testStandardFpi = async (page: Page): Promise<void> => {
       .storageMode(window.AccountStorageMode.public())
       .build();
 
-    let getFpiMapItemProcedureHash =
-      getItemComponent.getProcedureHash("get_fpi_map_item");
+    builder.linkDynamicLibrary(componentLibrary);
 
     // DEPLOY FOREIGN ACCOUNT
     // --------------------------------------------------------------------------
 
     let foreignAccountId = getItemAccountBuilderResult.account.id();
 
-    await client.addAccountSecretKeyToWebStore(secretKey);
+    await client.addAccountSecretKeyToWebStore(foreignAccountId, secretKey);
     await client.newAccount(getItemAccountBuilderResult.account, false);
     await client.syncState();
 
@@ -83,11 +90,10 @@ export const testStandardFpi = async (page: Page): Promise<void> => {
     );
 
     let txScript = `
-            use.miden::tx
-            use.miden::account
+            use miden::protocol::tx
             begin
-                # push the hash of the {} account procedure
-                push.{proc_root}
+                # push the hash of the component procedure
+                procref.::miden::testing::fpi_component::get_fpi_map_item
 
                 # push the foreign account id
                 push.{account_id_suffix} push.{account_id_prefix}
@@ -99,7 +105,6 @@ export const testStandardFpi = async (page: Page): Promise<void> => {
         `;
 
     txScript = txScript
-      .replace("{proc_root}", getFpiMapItemProcedureHash)
       .replace("{account_id_suffix}", foreignAccountId.suffix().toString())
       .replace(
         "{account_id_prefix}",
@@ -112,7 +117,7 @@ export const testStandardFpi = async (page: Page): Promise<void> => {
 
     await window.helpers.waitForBlocks(2);
 
-    let slotAndKeys = new window.SlotAndKeys(1, [MAP_KEY]);
+    let slotAndKeys = new window.SlotAndKeys(MAP_SLOT_NAME, [MAP_KEY]);
     let storageRequirements =
       window.AccountStorageRequirements.fromSlotAndKeysArray([slotAndKeys]);
 

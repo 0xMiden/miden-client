@@ -1,5 +1,10 @@
 import loadWasm from "./wasm.js";
-import { MethodName, WorkerAction } from "./constants.js";
+import { CallbackType, MethodName, WorkerAction } from "./constants.js";
+import {
+  acquireSyncLock,
+  releaseSyncLock,
+  releaseSyncLockWithError,
+} from "./syncLock.js";
 export * from "../Cargo.toml";
 
 const buildTypedArraysExport = (exportObject) => {
@@ -101,6 +106,7 @@ export class WebClient {
    *
    * @param {string | undefined} rpcUrl - RPC endpoint URL used by the client.
    * @param {Uint8Array | undefined} seed - Optional seed for account initialization.
+   * @param {string | undefined} storeName - Optional name for the store to be used by the client.
    * @param {(pubKey: Uint8Array) => Promise<Uint8Array | null | undefined> | Uint8Array | null | undefined} [getKeyCb]
    *   - Callback to retrieve the secret key bytes for a given public key. The `pubKey`
    *   parameter is the serialized public key (from `PublicKey.serialize()`). Return the
@@ -116,21 +122,25 @@ export class WebClient {
    *   `SigningInputs.serialize()`. Must return a `Uint8Array` containing the serialized
    *   signature, either directly or wrapped in a `Promise`.
    */
-  constructor(rpcUrl, noteTransportUrl, seed, getKeyCb, insertKeyCb, signCb) {
+  constructor(
+    rpcUrl,
+    noteTransportUrl,
+    seed,
+    storeName,
+    getKeyCb,
+    insertKeyCb,
+    signCb
+  ) {
     this.rpcUrl = rpcUrl;
     this.noteTransportUrl = noteTransportUrl;
     this.seed = seed;
+    this.storeName = storeName;
     this.getKeyCb = getKeyCb;
     this.insertKeyCb = insertKeyCb;
     this.signCb = signCb;
 
     // Check if Web Workers are available.
-    if (
-      typeof Worker !== "undefined" &&
-      !this.getKeyCb &&
-      !this.insertKeyCb &&
-      !this.signCb
-    ) {
+    if (typeof Worker !== "undefined") {
       console.log("WebClient: Web Workers are available.");
       // Create the worker.
       this.worker = new Worker(
@@ -152,7 +162,7 @@ export class WebClient {
       });
 
       // Listen for messages from the worker.
-      this.worker.addEventListener("message", (event) => {
+      this.worker.addEventListener("message", async (event) => {
         const data = event.data;
 
         // Worker script loaded.
@@ -164,6 +174,36 @@ export class WebClient {
         // Worker ready.
         if (data.ready) {
           this.readyResolver();
+          return;
+        }
+
+        if (data.action === WorkerAction.EXECUTE_CALLBACK) {
+          const { callbackType, args, requestId } = data;
+          try {
+            const callbackMapping = {
+              [CallbackType.GET_KEY]: this.getKeyCb,
+              [CallbackType.INSERT_KEY]: this.insertKeyCb,
+              [CallbackType.SIGN]: this.signCb,
+            };
+            if (!callbackMapping[callbackType]) {
+              throw new Error(`Callback ${callbackType} not available`);
+            }
+            const callbackFunction = callbackMapping[callbackType];
+            let result = callbackFunction.apply(this, args);
+            if (result instanceof Promise) {
+              result = await result;
+            }
+
+            this.worker.postMessage({
+              callbackResult: result,
+              callbackRequestId: requestId,
+            });
+          } catch (error) {
+            this.worker.postMessage({
+              callbackError: error.message,
+              callbackRequestId: requestId,
+            });
+          }
           return;
         }
 
@@ -187,19 +227,7 @@ export class WebClient {
       });
 
       // Once the worker script has loaded, initialize the worker.
-      this.loaded.then(() => {
-        this.worker.postMessage({
-          action: WorkerAction.INIT,
-          args: [
-            this.rpcUrl,
-            this.noteTransportUrl,
-            this.seed,
-            this.getKeyCb,
-            this.insertKeyCb,
-            this.signCb,
-          ],
-        });
-      });
+      this.loaded.then(() => this.initializeWorker());
     } else {
       console.log("WebClient: Web Workers are not available.");
       // Worker not available; set up fallback values.
@@ -212,6 +240,24 @@ export class WebClient {
     // Lazy initialize the underlying WASM WebClient when first requested.
     this.wasmWebClient = null;
     this.wasmWebClientPromise = null;
+  }
+
+  // TODO: This will soon conflict with some changes in main.
+  // More context here:
+  // https://github.com/0xMiden/miden-client/pull/1645?notification_referrer_id=NT_kwHOA1yg7NoAJVJlcG9zaXRvcnk7NjU5MzQzNzAyO0lzc3VlOzM3OTY4OTU1Nzk&notifications_query=is%3Aunread#discussion_r2696075480
+  initializeWorker() {
+    this.worker.postMessage({
+      action: WorkerAction.INIT,
+      args: [
+        this.rpcUrl,
+        this.noteTransportUrl,
+        this.seed,
+        this.storeName,
+        !!this.getKeyCb,
+        !!this.insertKeyCb,
+        !!this.signCb,
+      ],
+    });
   }
 
   async getWasmWebClient() {
@@ -236,15 +282,16 @@ export class WebClient {
    * @param {string} rpcUrl - The RPC URL.
    * @param {string} noteTransportUrl - The note transport URL (optional).
    * @param {string} seed - The seed for the account.
+   * @param {string | undefined} network - Optional name for the store. Setting this allows multiple clients to be used in the same browser.
    * @returns {Promise<WebClient>} The fully initialized WebClient.
    */
-  static async createClient(rpcUrl, noteTransportUrl, seed) {
+  static async createClient(rpcUrl, noteTransportUrl, seed, network) {
     // Construct the instance (synchronously).
-    const instance = new WebClient(rpcUrl, noteTransportUrl, seed);
+    const instance = new WebClient(rpcUrl, noteTransportUrl, seed, network);
 
     // Wait for the underlying wasmWebClient to be initialized.
     const wasmWebClient = await instance.getWasmWebClient();
-    await wasmWebClient.createClient(rpcUrl, noteTransportUrl, seed);
+    await wasmWebClient.createClient(rpcUrl, noteTransportUrl, seed, network);
 
     // Wait for the worker to be ready
     await instance.ready;
@@ -276,6 +323,7 @@ export class WebClient {
    * @param {string} rpcUrl - The RPC URL.
    * @param {string | undefined} noteTransportUrl - The note transport URL (optional).
    * @param {string | undefined} seed - The seed for the account.
+   * @param {string | undefined} storeName - Optional name for the store. Setting this allows multiple clients to be used in the same browser.
    * @param {Function | undefined} getKeyCb - The get key callback.
    * @param {Function | undefined} insertKeyCb - The insert key callback.
    * @param {Function | undefined} signCb - The sign callback.
@@ -285,6 +333,7 @@ export class WebClient {
     rpcUrl,
     noteTransportUrl,
     seed,
+    storeName,
     getKeyCb,
     insertKeyCb,
     signCb
@@ -294,6 +343,7 @@ export class WebClient {
       rpcUrl,
       noteTransportUrl,
       seed,
+      storeName,
       getKeyCb,
       insertKeyCb,
       signCb
@@ -304,6 +354,7 @@ export class WebClient {
       rpcUrl,
       noteTransportUrl,
       seed,
+      storeName,
       getKeyCb,
       insertKeyCb,
       signCb
@@ -451,6 +502,41 @@ export class WebClient {
     }
   }
 
+  async submitNewTransactionWithProver(accountId, transactionRequest, prover) {
+    try {
+      if (!this.worker) {
+        const wasmWebClient = await this.getWasmWebClient();
+        return await wasmWebClient.submitNewTransactionWithProver(
+          accountId,
+          transactionRequest,
+          prover
+        );
+      }
+
+      const wasm = await getWasmOrThrow();
+      const serializedTransactionRequest = transactionRequest.serialize();
+      const proverPayload = prover.serialize();
+      const result = await this.callMethodWithWorker(
+        MethodName.SUBMIT_NEW_TRANSACTION_WITH_PROVER,
+        accountId.toString(),
+        serializedTransactionRequest,
+        proverPayload
+      );
+
+      const transactionResult = wasm.TransactionResult.deserialize(
+        new Uint8Array(result.serializedTransactionResult)
+      );
+
+      return transactionResult.id();
+    } catch (error) {
+      console.error(
+        "INDEX.JS: Error in submitNewTransactionWithProver:",
+        error
+      );
+      throw error;
+    }
+  }
+
   async executeTransaction(accountId, transactionRequest) {
     try {
       if (!this.worker) {
@@ -504,21 +590,66 @@ export class WebClient {
     }
   }
 
+  /**
+   * Syncs the client state with the node.
+   *
+   * This method coordinates concurrent sync calls using the Web Locks API when available,
+   * with an in-process mutex fallback for older browsers. If a sync is already in progress,
+   * subsequent callers will wait and receive the same result (coalescing behavior).
+   *
+   * @returns {Promise<SyncSummary>} The sync summary
+   */
   async syncState() {
+    return this.syncStateWithTimeout(0);
+  }
+
+  /**
+   * Syncs the client state with the node with an optional timeout.
+   *
+   * This method coordinates concurrent sync calls using the Web Locks API when available,
+   * with an in-process mutex fallback for older browsers. If a sync is already in progress,
+   * subsequent callers will wait and receive the same result (coalescing behavior).
+   *
+   * @param {number} timeoutMs - Timeout in milliseconds (0 = no timeout)
+   * @returns {Promise<SyncSummary>} The sync summary
+   */
+  async syncStateWithTimeout(timeoutMs = 0) {
+    // Use storeName as the database ID for lock coordination
+    const dbId = this.storeName || "default";
+
     try {
-      if (!this.worker) {
-        const wasmWebClient = await this.getWasmWebClient();
-        return await wasmWebClient.syncState();
+      // Acquire the sync lock (coordinates concurrent calls)
+      const lockHandle = await acquireSyncLock(dbId, timeoutMs);
+
+      if (!lockHandle.acquired) {
+        // We're coalescing - return the result from the in-progress sync
+        return lockHandle.coalescedResult;
       }
 
-      const wasm = await getWasmOrThrow();
-      const serializedSyncSummaryBytes = await this.callMethodWithWorker(
-        MethodName.SYNC_STATE
-      );
+      // We acquired the lock - perform the sync
+      try {
+        let result;
+        if (!this.worker) {
+          const wasmWebClient = await this.getWasmWebClient();
+          result = await wasmWebClient.syncStateImpl();
+        } else {
+          const wasm = await getWasmOrThrow();
+          const serializedSyncSummaryBytes = await this.callMethodWithWorker(
+            MethodName.SYNC_STATE
+          );
+          result = wasm.SyncSummary.deserialize(
+            new Uint8Array(serializedSyncSummaryBytes)
+          );
+        }
 
-      return wasm.SyncSummary.deserialize(
-        new Uint8Array(serializedSyncSummaryBytes)
-      );
+        // Release the lock with the result
+        releaseSyncLock(dbId, result);
+        return result;
+      } catch (error) {
+        // Release the lock with the error
+        releaseSyncLockWithError(dbId, error);
+        throw error;
+      }
     } catch (error) {
       console.error("INDEX.JS: Error in syncState:", error);
       throw error;
@@ -534,7 +665,14 @@ export class WebClient {
 
 export class MockWebClient extends WebClient {
   constructor(seed) {
-    super(null, null, seed);
+    super(null, null, seed, "mock");
+  }
+
+  initializeWorker() {
+    this.worker.postMessage({
+      action: WorkerAction.INIT_MOCK,
+      args: [this.seed],
+    });
   }
 
   /**
@@ -584,28 +722,65 @@ export class MockWebClient extends WebClient {
     });
   }
 
+  /**
+   * Syncs the mock client state.
+   *
+   * This method coordinates concurrent sync calls using the Web Locks API when available,
+   * with an in-process mutex fallback for older browsers. If a sync is already in progress,
+   * subsequent callers will wait and receive the same result (coalescing behavior).
+   *
+   * @returns {Promise<SyncSummary>} The sync summary
+   */
   async syncState() {
+    return this.syncStateWithTimeout(0);
+  }
+
+  /**
+   * Syncs the mock client state with an optional timeout.
+   *
+   * @param {number} timeoutMs - Timeout in milliseconds (0 = no timeout)
+   * @returns {Promise<SyncSummary>} The sync summary
+   */
+  async syncStateWithTimeout(timeoutMs = 0) {
+    const dbId = this.storeName || "mock";
+
     try {
-      const wasmWebClient = await this.getWasmWebClient();
-      if (!this.worker) {
-        return await wasmWebClient.syncState();
+      const lockHandle = await acquireSyncLock(dbId, timeoutMs);
+
+      if (!lockHandle.acquired) {
+        return lockHandle.coalescedResult;
       }
 
-      let serializedMockChain = wasmWebClient.serializeMockChain().buffer;
-      let serializedMockNoteTransportNode =
-        wasmWebClient.serializeMockNoteTransportNode().buffer;
+      try {
+        let result;
+        const wasmWebClient = await this.getWasmWebClient();
 
-      const wasm = await getWasmOrThrow();
+        if (!this.worker) {
+          result = await wasmWebClient.syncStateImpl();
+        } else {
+          let serializedMockChain = wasmWebClient.serializeMockChain().buffer;
+          let serializedMockNoteTransportNode =
+            wasmWebClient.serializeMockNoteTransportNode().buffer;
 
-      const serializedSyncSummaryBytes = await this.callMethodWithWorker(
-        MethodName.SYNC_STATE_MOCK,
-        serializedMockChain,
-        serializedMockNoteTransportNode
-      );
+          const wasm = await getWasmOrThrow();
 
-      return wasm.SyncSummary.deserialize(
-        new Uint8Array(serializedSyncSummaryBytes)
-      );
+          const serializedSyncSummaryBytes = await this.callMethodWithWorker(
+            MethodName.SYNC_STATE_MOCK,
+            serializedMockChain,
+            serializedMockNoteTransportNode
+          );
+
+          result = wasm.SyncSummary.deserialize(
+            new Uint8Array(serializedSyncSummaryBytes)
+          );
+        }
+
+        releaseSyncLock(dbId, result);
+        return result;
+      } catch (error) {
+        releaseSyncLockWithError(dbId, error);
+        throw error;
+      }
     } catch (error) {
       console.error("INDEX.JS: Error in syncState:", error);
       throw error;
@@ -657,6 +832,64 @@ export class MockWebClient extends WebClient {
       return transactionResult.id();
     } catch (error) {
       console.error("INDEX.JS: Error in submitNewTransaction:", error);
+      throw error;
+    }
+  }
+
+  async submitNewTransactionWithProver(accountId, transactionRequest, prover) {
+    try {
+      if (!this.worker) {
+        return await super.submitNewTransactionWithProver(
+          accountId,
+          transactionRequest,
+          prover
+        );
+      }
+
+      const wasmWebClient = await this.getWasmWebClient();
+      const wasm = await getWasmOrThrow();
+      const serializedTransactionRequest = transactionRequest.serialize();
+      const proverPayload = prover.serialize();
+      const serializedMockChain = wasmWebClient.serializeMockChain().buffer;
+      const serializedMockNoteTransportNode =
+        wasmWebClient.serializeMockNoteTransportNode().buffer;
+
+      const result = await this.callMethodWithWorker(
+        MethodName.SUBMIT_NEW_TRANSACTION_WITH_PROVER_MOCK,
+        accountId.toString(),
+        serializedTransactionRequest,
+        proverPayload,
+        serializedMockChain,
+        serializedMockNoteTransportNode
+      );
+
+      const newMockChain = new Uint8Array(result.serializedMockChain);
+      const newMockNoteTransportNode = result.serializedMockNoteTransportNode
+        ? new Uint8Array(result.serializedMockNoteTransportNode)
+        : undefined;
+
+      const transactionResult = wasm.TransactionResult.deserialize(
+        new Uint8Array(result.serializedTransactionResult)
+      );
+
+      if (!(this instanceof MockWebClient)) {
+        return transactionResult.id();
+      }
+
+      this.wasmWebClient = new wasm.WebClient();
+      this.wasmWebClientPromise = Promise.resolve(this.wasmWebClient);
+      await this.wasmWebClient.createMockClient(
+        this.seed,
+        newMockChain,
+        newMockNoteTransportNode
+      );
+
+      return transactionResult.id();
+    } catch (error) {
+      console.error(
+        "INDEX.JS: Error in submitNewTransactionWithProver:",
+        error
+      );
       throw error;
     }
   }

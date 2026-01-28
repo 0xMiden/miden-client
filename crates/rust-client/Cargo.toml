@@ -25,21 +25,22 @@ crate-type = ["lib"]
 [features]
 default = ["std"]
 std = [
-  "miden-objects/std",
+  "miden-protocol/std",
   "miden-remote-prover-client/std",
   "miden-tx/concurrent",
   "tonic/tls-native-roots",
   "tonic/tls-ring",
   "tonic/transport",
 ]
-testing = ["dep:miden-testing", "dep:uuid", "miden-lib/testing", "miden-objects/testing", "miden-tx/testing"]
+testing = ["dep:miden-testing", "dep:uuid", "miden-protocol/testing", "miden-standards/testing", "miden-tx/testing"]
 tonic = []
 
 [dependencies]
 # Miden dependencies
-miden-lib                  = { workspace = true }
-miden-objects              = { workspace = true }
+miden-mast-package         = { default-features = false, version = "0.20" }
+miden-protocol             = { workspace = true }
 miden-remote-prover-client = { default-features = false, features = ["tx-prover"], workspace = true }
+miden-standards            = { workspace = true }
 miden-testing              = { optional = true, workspace = true }
 miden-tx                   = { workspace = true }
 
@@ -65,23 +66,19 @@ tonic-web-wasm-client = { default-features = false, version = "0.8" }
 web-sys               = { features = ["Storage", "Window", "console"], version = "0.3" }
 
 [build-dependencies]
-miden-lib                        = { workspace = true }
 miden-node-proto-build           = { workspace = true }
 miden-note-transport-proto-build = { workspace = true }
-miden-objects                    = { workspace = true }
+miden-protocol                   = { workspace = true }
+miden-standards                  = { workspace = true }
 miette                           = { workspace = true }
 prost                            = { default-features = false, features = ["derive"], version = "0.14" }
-prost-build                      = { default-features = false, version = "0.14" }
-protox                           = { version = "0.7" }
-tonic-build                      = { version = "0.14" }
-tonic-prost                      = { version = "0.14" }
 tonic-prost-build                = { version = "0.14" }
 
 [dev-dependencies]
 miden-client              = { features = ["std", "testing"], path = "." }
 miden-client-sqlite-store = { package = "miden-client-sqlite-store", path = "../sqlite-store" }
-miden-lib                 = { features = ["testing"], workspace = true }
-miden-objects             = { default-features = false, features = ["testing"], workspace = true }
+miden-protocol            = { default-features = false, features = ["testing"], workspace = true }
+miden-standards           = { features = ["testing"], workspace = true }
 miden-testing             = { default-features = false, workspace = true }
 tokio                     = { workspace = true }
 web-sys                   = { features = ["console"], version = "0.3" }

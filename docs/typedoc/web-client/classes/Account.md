@@ -1,8 +1,8 @@
-[**@demox-labs/miden-sdk**](../README.md)
+[**@miden-sdk/miden-sdk**](../README.md)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / Account
+[@miden-sdk/miden-sdk](../README.md) / Account
 
 # Class: Account
 
@@ -71,11 +71,11 @@ Returns the commitment to the account header, storage, and code.
 
 ***
 
-### getPublicKeys()
+### getPublicKeyCommitments()
 
-> **getPublicKeys**(): [`Word`](Word.md)[]
+> **getPublicKeyCommitments**(): [`Word`](Word.md)[]
 
-Returns the public keys derived from the account's authentication scheme.
+Returns the public key commitments derived from the account's authentication scheme.
 
 #### Returns
 
