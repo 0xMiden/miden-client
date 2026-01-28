@@ -1,34 +1,33 @@
-import { useEffect, useState } from "react";
-import {
-  useMiden,
-  useAccounts,
-  useAccount,
-  useNotes,
-  useCreateWallet,
-  useConsume,
-  useSend,
-} from "@miden-sdk/react";
+import { useEffect, useState, type ChangeEvent, type ReactNode } from "react";
+import { useMiden, useAccounts, useAccount, useNotes, useCreateWallet, useConsume, useSend } from "@miden-sdk/react";
+
+const Panel = ({ title, children }: { title: string; children: ReactNode }) => (
+  <div className="panel">
+    <div className="label">{title}</div>
+    {children}
+  </div>
+);
 
 export default function App() {
   const { isReady, error } = useMiden();
   const { wallets, isLoading } = useAccounts();
   const { createWallet, isCreating } = useCreateWallet();
+  const handleCreate = () => createWallet();
+  const createLabel = isCreating ? "Creating..." : "Create wallet";
 
   if (error) return <div className="center">Error: {error.message}</div>;
-  if (!isReady) return <div className="center">Initializing...</div>;
-  if (isLoading) return <div className="center">Loading...</div>;
+  if (!isReady || isLoading) return <div className="center">{!isReady ? "Initializing..." : "Loading..."}</div>;
 
   const accountId = wallets[0]?.id().toString();
-  if (!accountId) {
+  if (!accountId)
     return (
       <div className="wallet">
         <h1>Wallet</h1>
-        <button onClick={() => createWallet()} disabled={isCreating}>
-          {isCreating ? "Creating..." : "Create wallet"}
+        <button onClick={handleCreate} disabled={isCreating}>
+          {createLabel}
         </button>
       </div>
     );
-  }
 
   return <Wallet accountId={accountId} />;
 }
@@ -41,44 +40,37 @@ function Wallet({ accountId }: { accountId: string }) {
   const [to, setTo] = useState("");
   const [assetId, setAssetId] = useState("");
   const [amount, setAmount] = useState("");
+  const defaultAssetId = assets[0]?.assetId;
   const hasAssets = assets.length > 0;
 
   useEffect(() => {
-    if (!assetId && hasAssets) {
-      setAssetId(assets[0].assetId);
-    }
-  }, [assetId, assets, hasAssets]);
+    if (!assetId && defaultAssetId) setAssetId(defaultAssetId);
+  }, [assetId, defaultAssetId]);
 
   const handleSend = async () => {
     try {
       if (!assetId) return;
-      await send({
-        from: accountId,
-        to,
-        assetId,
-        amount: BigInt(amount),
-      });
+      await send({ from: accountId, to, assetId, amount: BigInt(amount) });
       setAmount("");
     } catch {
       // Keep example lean; ignore errors here.
     }
   };
 
-  const canSend = hasAssets && to && assetId && amount;
-
-  const bech32Address = account?.bech32id?.() ?? "Loading...";
+  const claimNote = (id: string) => () => consume({ accountId, noteIds: [id] });
+  const onAssetChange = (event: ChangeEvent<HTMLSelectElement>) => setAssetId(event.target.value);
+  const onToChange = (event: ChangeEvent<HTMLInputElement>) => setTo(event.target.value);
+  const onAmountChange = (event: ChangeEvent<HTMLInputElement>) => setAmount(event.target.value);
+  const canSend = Boolean(hasAssets && to && assetId && amount);
+  const sendLabel = isSending ? "Sending..." : "Send";
 
   return (
     <div className="wallet">
       <h1>Wallet</h1>
-
-      <div className="panel">
-        <div className="label">Address</div>
-        <div className="mono">{bech32Address}</div>
-      </div>
-
-      <div className="panel">
-        <div className="label">Balances</div>
+      <Panel title="Address">
+        <div className="mono">{account?.bech32id?.() ?? "Loading..."}</div>
+      </Panel>
+      <Panel title="Balances">
         {assets.length === 0 ? (
           <div className="empty">None</div>
         ) : (
@@ -91,10 +83,8 @@ function Wallet({ accountId }: { accountId: string }) {
             ))}
           </div>
         )}
-      </div>
-
-      <div className="panel">
-        <div className="label">Unclaimed notes</div>
+      </Panel>
+      <Panel title="Unclaimed notes">
         {consumableNotes.length === 0 ? (
           <div className="empty">None</div>
         ) : (
@@ -104,10 +94,7 @@ function Wallet({ accountId }: { accountId: string }) {
               return (
                 <div key={id} className="row">
                   <span className="mono">{id}</span>
-                  <button
-                    onClick={() => consume({ accountId, noteIds: [id] })}
-                    disabled={isConsuming}
-                  >
+                  <button onClick={claimNote(id)} disabled={isConsuming}>
                     Claim
                   </button>
                 </div>
@@ -115,16 +102,10 @@ function Wallet({ accountId }: { accountId: string }) {
             })}
           </div>
         )}
-      </div>
-
-      <div className="panel">
-        <div className="label">Send</div>
+      </Panel>
+      <Panel title="Send">
         <div className="form">
-          <select
-            value={assetId}
-            onChange={(event) => setAssetId(event.target.value)}
-            disabled={!hasAssets}
-          >
+          <select value={assetId} onChange={onAssetChange} disabled={!hasAssets}>
             {hasAssets ? (
               assets.map((asset) => (
                 <option key={asset.assetId} value={asset.assetId}>
@@ -135,23 +116,13 @@ function Wallet({ accountId }: { accountId: string }) {
               <option value="">No assets</option>
             )}
           </select>
-          <input
-            placeholder="to account id"
-            value={to}
-            onChange={(event) => setTo(event.target.value)}
-            disabled={!hasAssets}
-          />
-          <input
-            placeholder="amount"
-            value={amount}
-            onChange={(event) => setAmount(event.target.value)}
-            disabled={!hasAssets}
-          />
+          <input placeholder="to account id" value={to} onChange={onToChange} disabled={!hasAssets} />
+          <input placeholder="amount" value={amount} onChange={onAmountChange} disabled={!hasAssets} />
           <button disabled={!canSend || isSending} onClick={handleSend}>
-            {isSending ? "Sending..." : "Send"}
+            {sendLabel}
           </button>
         </div>
-      </div>
+      </Panel>
     </div>
   );
 }

@@ -121,7 +121,6 @@ export function useAccount(
     }
   }, [account]);
 
-
   // Helper to get balance for a specific faucet
   const getBalance = useCallback(
     (assetId: string): bigint => {
