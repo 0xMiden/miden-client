@@ -3,9 +3,6 @@
 ## 0.14.0 (TBD)
 
 * Added the `@miden-sdk/react` hooks library with a provider, hooks, and an example app for the web client ([#1711](https://github.com/0xMiden/miden-client/pull/1711)).
-* React SDK query hooks now refresh account details and notes after successful syncs to keep balances and note state current.
-* React SDK `useCreateWallet` now triggers a sync before creating a wallet.
-* [BREAKING] React SDK send options now use `assetId` instead of `faucetId`, and account asset balances expose `assetId`.
 
 ## 0.13.0 (TBD)
 
