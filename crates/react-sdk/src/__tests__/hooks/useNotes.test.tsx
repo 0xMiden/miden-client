@@ -70,6 +70,41 @@ describe("useNotes", () => {
       expect(mockClient.getConsumableNotes).toHaveBeenCalled();
     });
 
+    it("should refetch notes after sync updates", async () => {
+      const mockNotes = [createMockInputNoteRecord("0xnote1")];
+      const mockConsumable = [createMockConsumableNoteRecord("0xnote1")];
+
+      const mockClient = createMockWebClient({
+        getInputNotes: vi.fn().mockResolvedValue(mockNotes),
+        getConsumableNotes: vi.fn().mockResolvedValue(mockConsumable),
+      });
+
+      mockUseMiden.mockReturnValue({
+        client: mockClient,
+        isReady: true,
+      });
+
+      act(() => {
+        useMidenStore.getState().setClient(mockClient as any);
+      });
+
+      const { result } = renderHook(() => useNotes());
+
+      await waitFor(() => {
+        expect(result.current.notes.length).toBeGreaterThan(0);
+      });
+
+      expect(mockClient.getInputNotes).toHaveBeenCalledTimes(1);
+
+      act(() => {
+        useMidenStore.getState().setSyncState({ lastSyncTime: Date.now() });
+      });
+
+      await waitFor(() => {
+        expect(mockClient.getInputNotes).toHaveBeenCalledTimes(2);
+      });
+    });
+
     it("should use cached notes on subsequent renders", async () => {
       const mockNotes = [createMockInputNoteRecord("0xnote1")];
 

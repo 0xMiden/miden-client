@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, useMemo } from "react";
 import { useMiden } from "../context/MidenProvider";
-import { useMidenStore } from "../store/MidenStore";
+import { useMidenStore, useSyncStateStore } from "../store/MidenStore";
 import { AccountId } from "@miden-sdk/miden-sdk";
 import type { AccountResult, AssetBalance } from "../types";
 import { runExclusiveDirect } from "../utils/runExclusive";
@@ -41,6 +41,7 @@ export function useAccount(
   const runExclusiveSafe = runExclusive ?? runExclusiveDirect;
   const accountDetails = useMidenStore((state) => state.accountDetails);
   const setAccountDetails = useMidenStore((state) => state.setAccountDetails);
+  const { lastSyncTime } = useSyncStateStore();
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
@@ -88,6 +89,12 @@ export function useAccount(
       refetch();
     }
   }, [isReady, accountIdStr, account, refetch]);
+
+  // Refresh after successful syncs to keep balances up to date
+  useEffect(() => {
+    if (!isReady || !accountIdStr || !lastSyncTime) return;
+    refetch();
+  }, [isReady, accountIdStr, lastSyncTime, refetch]);
 
   // Extract assets from account vault
   const assets = useMemo((): AssetBalance[] => {

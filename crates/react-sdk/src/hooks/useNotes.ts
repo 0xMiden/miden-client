@@ -4,6 +4,7 @@ import {
   useMidenStore,
   useNotesStore,
   useConsumableNotesStore,
+  useSyncStateStore,
 } from "../store/MidenStore";
 import { NoteFilter, NoteFilterTypes, AccountId } from "@miden-sdk/miden-sdk";
 import type { NotesFilter, NotesResult } from "../types";
@@ -52,6 +53,7 @@ export function useNotes(options?: NotesFilter): NotesResult {
   const setLoadingNotes = useMidenStore((state) => state.setLoadingNotes);
   const setNotes = useMidenStore((state) => state.setNotes);
   const setConsumableNotes = useMidenStore((state) => state.setConsumableNotes);
+  const { lastSyncTime } = useSyncStateStore();
 
   const [error, setError] = useState<Error | null>(null);
 
@@ -108,6 +110,12 @@ export function useNotes(options?: NotesFilter): NotesResult {
       refetch();
     }
   }, [isReady, notes.length, refetch]);
+
+  // Refresh after successful syncs to keep notes current
+  useEffect(() => {
+    if (!isReady || !lastSyncTime) return;
+    refetch();
+  }, [isReady, lastSyncTime, refetch]);
 
   return {
     notes,

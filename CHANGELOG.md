@@ -3,6 +3,7 @@
 ## 0.14.0 (TBD)
 
 * Added the `@miden-sdk/react` hooks library with a provider, hooks, and an example app for the web client ([#1711](https://github.com/0xMiden/miden-client/pull/1711)).
+* React SDK query hooks now refresh account details and notes after successful syncs to keep balances and note state current.
 
 ## 0.13.0 (TBD)
 

@@ -314,6 +314,40 @@ describe("useAccount", () => {
 
       expect(mockClient.getAccount).toHaveBeenCalledTimes(2);
     });
+
+    it("should refetch after sync updates", async () => {
+      const accountId = "0x1234567890abcdef";
+      const mockAccount = createMockAccount();
+
+      const mockClient = createMockWebClient({
+        getAccount: vi.fn().mockResolvedValue(mockAccount),
+      });
+
+      mockUseMiden.mockReturnValue({
+        client: mockClient,
+        isReady: true,
+      });
+
+      act(() => {
+        useMidenStore.getState().setClient(mockClient as any);
+      });
+
+      const { result } = renderHook(() => useAccount(accountId));
+
+      await waitFor(() => {
+        expect(result.current.account).not.toBeNull();
+      });
+
+      expect(mockClient.getAccount).toHaveBeenCalledTimes(1);
+
+      act(() => {
+        useMidenStore.getState().setSyncState({ lastSyncTime: Date.now() });
+      });
+
+      await waitFor(() => {
+        expect(mockClient.getAccount).toHaveBeenCalledTimes(2);
+      });
+    });
   });
 
   describe("error handling", () => {
