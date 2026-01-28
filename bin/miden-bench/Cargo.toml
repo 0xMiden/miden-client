@@ -1,0 +1,48 @@
+[package]
+authors.workspace      = true
+categories             = ["command-line-utilities", "development-tools::profiling"]
+description            = "Benchmarking tool for the Miden client library"
+edition.workspace      = true
+keywords               = ["benchmark", "client", "miden", "performance"]
+license.workspace      = true
+name                   = "miden-client-bench"
+readme                 = "README.md"
+repository.workspace   = true
+rust-version.workspace = true
+version.workspace      = true
+
+[[bin]]
+name = "miden-bench"
+path = "src/main.rs"
+
+[dependencies]
+# Workspace dependencies
+miden-client              = { features = ["std", "testing", "tonic"], path = "../../crates/rust-client" }
+miden-client-sqlite-store = { path = "../../crates/sqlite-store" }
+
+# Miden protocol dependencies
+miden-protocol  = { features = ["std", "testing"], workspace = true }
+miden-standards = { features = ["std", "testing"], workspace = true }
+
+# External dependencies
+anyhow      = { features = ["std"], workspace = true }
+clap        = { features = ["derive", "env"], version = "4.0" }
+comfy-table = { version = "7.1" }
+hex         = { workspace = true }
+indicatif   = { version = "0.17" }
+rand        = { workspace = true }
+rand_chacha = { version = "0.9" }
+tokio       = { workspace = true }
+uuid        = { features = ["v4"], version = "1.0" }
+
+[dev-dependencies]
+assert_cmd  = { version = "2.0" }
+predicates  = { version = "3.0" }
+serial_test = { features = ["file_locks"], version = "3.0" }
+
+[lints]
+workspace = true
+
+[[test]]
+name = "integration"
+path = "tests/bench.rs"
