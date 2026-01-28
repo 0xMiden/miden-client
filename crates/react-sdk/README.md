@@ -656,13 +656,12 @@ import type {
 
 ## Examples
 
-Two runnable Vite examples live in `examples/`:
+One runnable Vite example lives in `examples/`:
 
-- `examples/basic` - Full example with wallets, faucets, minting, transfers, and sync status.
 - `examples/wallet` - Minimal wallet: create account, view balances, claim notes, send tokens.
 
 ```bash
-cd examples/basic
+cd examples/wallet
 yarn install
 yarn dev
 ```
