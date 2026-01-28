@@ -12,6 +12,14 @@ const webClientPath = path.join(
   "package.json"
 );
 const reactSdkPath = path.join(repoRoot, "crates", "react-sdk", "package.json");
+const walletExamplePath = path.join(
+  repoRoot,
+  "crates",
+  "react-sdk",
+  "examples",
+  "wallet",
+  "package.json"
+);
 
 const readJson = (filePath) => JSON.parse(fs.readFileSync(filePath, "utf8"));
 
@@ -21,6 +29,7 @@ const writeJson = (filePath, data) => {
 
 const webClientPkg = readJson(webClientPath);
 const reactSdkPkg = readJson(reactSdkPath);
+const walletExamplePkg = readJson(walletExamplePath);
 
 const webClientVersion = webClientPkg.version;
 const versionMatch = /^(\d+)\.(\d+)\.(\d+)(-.+)?$/.exec(webClientVersion);
@@ -32,16 +41,14 @@ if (!versionMatch) {
 
 const major = Number(versionMatch[1]);
 const minor = Number(versionMatch[2]);
-const hasPrerelease = Boolean(versionMatch[4]);
-
 const expectedVersion = webClientVersion;
-const expectedRange = hasPrerelease
-  ? `^${major}.${minor}.0-0`
-  : `^${major}.${minor}.0`;
+const expectedRange = `^${major}.${minor}.0`;
 
 const peerDeps = reactSdkPkg.peerDependencies || {};
 const actualRange = peerDeps["@miden-sdk/miden-sdk"];
 const actualVersion = reactSdkPkg.version;
+const walletDeps = walletExamplePkg.dependencies || {};
+const walletRange = walletDeps["@miden-sdk/miden-sdk"];
 const shouldFix = process.argv.includes("--fix");
 const errors = [];
 
@@ -63,6 +70,18 @@ if (actualVersion !== expectedVersion) {
   );
 }
 
+if (!walletRange) {
+  errors.push(
+    "Missing dependencies entry for @miden-sdk/miden-sdk in wallet example."
+  );
+}
+
+if (walletRange !== expectedRange) {
+  errors.push(
+    `Wallet example dependency "${walletRange}" does not match expected "${expectedRange}" for web-client ${webClientVersion}.`
+  );
+}
+
 if (errors.length > 0) {
   if (shouldFix) {
     let updated = false;
@@ -77,10 +96,17 @@ if (errors.length > 0) {
       updated = true;
     }
 
+    if (walletRange !== expectedRange) {
+      walletDeps["@miden-sdk/miden-sdk"] = expectedRange;
+      walletExamplePkg.dependencies = walletDeps;
+      updated = true;
+    }
+
     if (updated) {
       writeJson(reactSdkPath, reactSdkPkg);
+      writeJson(walletExamplePath, walletExamplePkg);
       console.log(
-        `Updated react-sdk version to "${expectedVersion}" and peer range to "${expectedRange}" based on web-client ${webClientVersion}.`
+        `Updated react-sdk version to "${expectedVersion}", peer range to "${expectedRange}", and wallet dependency based on web-client ${webClientVersion}.`
       );
     }
 
@@ -94,5 +120,5 @@ if (errors.length > 0) {
 }
 
 console.log(
-  `React SDK version and peer range match web-client ${webClientVersion} (${expectedRange}).`
+  `React SDK version/peer range and wallet dependency match web-client ${webClientVersion} (${expectedRange}).`
 );
