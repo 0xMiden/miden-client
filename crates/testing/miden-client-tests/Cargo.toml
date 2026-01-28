@@ -6,8 +6,8 @@ rust-version.workspace = true
 version.workspace      = true
 
 [dev-dependencies]
-miden-client              = { features = ["std", "testing"], path = "../../rust-client" }
-miden-client-sqlite-store = { path = "../../sqlite-store" }
+miden-client              = { features = ["std", "testing"], workspace = true }
+miden-client-sqlite-store = { workspace = true }
 miden-protocol            = { default-features = false, features = ["testing"], workspace = true }
 miden-standards           = { features = ["testing"], workspace = true }
 miden-testing             = { default-features = false, workspace = true }
