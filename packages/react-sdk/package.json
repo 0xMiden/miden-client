@@ -34,7 +34,7 @@
     "zustand": "^5.0.0"
   },
   "devDependencies": {
-    "@miden-sdk/miden-sdk": "file:../web-client",
+    "@miden-sdk/miden-sdk": "file:../../crates/web-client",
     "@playwright/test": "^1.55.0",
     "@testing-library/react": "^14.0.0",
     "@types/react": "^18.2.0",

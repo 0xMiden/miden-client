@@ -3,8 +3,8 @@
  * These tests complement the vitest unit tests by running against actual WASM.
  *
  * Prerequisites:
- * 1. Build the web-client: cd ../web-client && yarn build
- * 2. The SDK will be served from ../web-client/dist/
+ * 1. Build the web-client: cd ../../crates/web-client && yarn build
+ * 2. The SDK will be served from ../../crates/web-client/dist/
  */
 import { test, expect, type Page } from "@playwright/test";
 

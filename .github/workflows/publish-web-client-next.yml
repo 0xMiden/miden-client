@@ -68,7 +68,7 @@ jobs:
       - name: Install & build react-sdk
         if: steps.check_react_version.outputs.should_publish == 'true'
         run: |
-          cd crates/react-sdk
+          cd packages/react-sdk
           yarn install --frozen-lockfile
           yarn build
 
@@ -77,7 +77,7 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_WEBCLIENT_TOKEN }}
         run: |
-          cd crates/react-sdk
+          cd packages/react-sdk
           npm publish --tag next
 
       - name: Done

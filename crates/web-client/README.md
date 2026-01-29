@@ -136,7 +136,7 @@ When you bump the web-client version (especially major/minor), keep the React SD
 yarn check:sync:react-sdk --fix
 ```
 
-Run without `--fix` to check only. This syncs `crates/react-sdk/package.json` to the current web-client version.
+Run without `--fix` to check only. This syncs `packages/react-sdk/package.json` to the current web-client version.
 
 ## Usage
 

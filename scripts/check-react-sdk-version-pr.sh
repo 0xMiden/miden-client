@@ -20,17 +20,17 @@ write_skip_and_exit() {
   exit 0
 }
 
-if ! git diff --name-only "$BASE_SHA"...HEAD -- crates/react-sdk/package.json | grep -q .; then
-  echo "No changes to crates/react-sdk/package.json; skipping publish."
+if ! git diff --name-only "$BASE_SHA"...HEAD -- packages/react-sdk/package.json | grep -q .; then
+  echo "No changes to packages/react-sdk/package.json; skipping publish."
   write_skip_and_exit
 fi
 
-if ! git show "$BASE_SHA:crates/react-sdk/package.json" > /tmp/base_react_package.json; then
-  echo "Unable to read crates/react-sdk/package.json from $BASE_SHA."
+if ! git show "$BASE_SHA:packages/react-sdk/package.json" > /tmp/base_react_package.json; then
+  echo "Unable to read packages/react-sdk/package.json from $BASE_SHA."
   write_skip_and_exit
 fi
 
-CURRENT_VERSION=$(jq -r '.version' crates/react-sdk/package.json)
+CURRENT_VERSION=$(jq -r '.version' packages/react-sdk/package.json)
 PREVIOUS_VERSION=$(jq -r '.version' /tmp/base_react_package.json)
 
 if [ "$CURRENT_VERSION" = "$PREVIOUS_VERSION" ]; then

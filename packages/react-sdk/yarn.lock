@@ -413,7 +413,7 @@
     "@jridgewell/resolve-uri" "^3.1.0"
     "@jridgewell/sourcemap-codec" "^1.4.14"
 
-"@miden-sdk/miden-sdk@file:../web-client":
+"@miden-sdk/miden-sdk@file:../../crates/web-client":
   version "0.12.6"
   dependencies:
     "@rollup/plugin-typescript" "^12.3.0"

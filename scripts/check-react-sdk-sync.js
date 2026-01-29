@@ -11,10 +11,15 @@ const webClientPath = path.join(
   "web-client",
   "package.json"
 );
-const reactSdkPath = path.join(repoRoot, "crates", "react-sdk", "package.json");
+const reactSdkPath = path.join(
+  repoRoot,
+  "packages",
+  "react-sdk",
+  "package.json"
+);
 const walletExamplePath = path.join(
   repoRoot,
-  "crates",
+  "packages",
   "react-sdk",
   "examples",
   "wallet",

@@ -1,7 +1,7 @@
 /**
  * Simple static server that serves both the test app and the SDK.
  * - /        -> e2e/test-app/
- * - /sdk/    -> ../web-client/dist/
+ * - /sdk/    -> ../../crates/web-client/dist/
  */
 const http = require("http");
 const fs = require("fs");
@@ -23,7 +23,15 @@ const MIME_TYPES = {
 };
 
 const TEST_APP_DIR = path.join(__dirname, "test-app");
-const SDK_DIR = path.join(__dirname, "..", "..", "web-client", "dist");
+const SDK_DIR = path.join(
+  __dirname,
+  "..",
+  "..",
+  "..",
+  "crates",
+  "web-client",
+  "dist"
+);
 
 const SECURITY_HEADERS = {
   "Cross-Origin-Opener-Policy": "same-origin",

@@ -72,7 +72,7 @@ rust-client-ts-lint:
 
 .PHONY: react-sdk-lint
 react-sdk-lint: ## Run lint for the React SDK
-	cd crates/react-sdk && yarn && yarn lint
+	cd packages/react-sdk && yarn && yarn lint
 
 # --- Documentation -------------------------------------------------------------------------------
 
@@ -107,7 +107,7 @@ test-docs: ## Run documentation tests
 
 .PHONY: test-react-sdk
 test-react-sdk: ## Run React SDK unit tests
-	cd crates/react-sdk && yarn && yarn test:unit
+	cd packages/react-sdk && yarn && yarn test:unit
 
 # --- Integration testing -------------------------------------------------------------------------
 
@@ -209,7 +209,7 @@ rust-client-ts-build:
 .PHONY: build-react-sdk
 build-react-sdk: ## Build the React SDK package
 	cd crates/web-client && yarn && yarn build
-	cd crates/react-sdk && yarn && yarn build
+	cd packages/react-sdk && yarn && yarn build
 
 # --- Check ---------------------------------------------------------------------------------------
 

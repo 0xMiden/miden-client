@@ -64,12 +64,12 @@ jobs:
         run: node scripts/check-react-sdk-sync.js
       - name: Install dependencies
         run: |
-          cd ./crates/react-sdk
+          cd ./packages/react-sdk
           yarn install
       - name: Run lint
         run: make react-sdk-lint
       - name: Run typecheck
-        run: cd ./crates/react-sdk && yarn typecheck
+        run: cd ./packages/react-sdk && yarn typecheck
 
   clippy:
     name: Clippy

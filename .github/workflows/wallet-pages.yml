@@ -20,23 +20,23 @@ jobs:
           cache: yarn
           cache-dependency-path: |
             yarn.lock
-            crates/react-sdk/yarn.lock
-            crates/react-sdk/examples/wallet/yarn.lock
+            packages/react-sdk/yarn.lock
+            packages/react-sdk/examples/wallet/yarn.lock
       - name: Install root dependencies
         run: yarn install --frozen-lockfile
       - name: Build react sdk
-        working-directory: crates/react-sdk
+        working-directory: packages/react-sdk
         run: yarn build
       - name: Install wallet dependencies
-        working-directory: crates/react-sdk/examples/wallet
+        working-directory: packages/react-sdk/examples/wallet
         run: yarn install --frozen-lockfile
       - name: Build wallet example
-        working-directory: crates/react-sdk/examples/wallet
+        working-directory: packages/react-sdk/examples/wallet
         run: yarn build --base=/${{ github.event.repository.name }}/wallet-react-example/ --outDir=dist/wallet-react-example
       - name: Upload pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: crates/react-sdk/examples/wallet/dist
+          path: packages/react-sdk/examples/wallet/dist
 
   deploy:
     needs: build

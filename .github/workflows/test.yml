@@ -56,7 +56,7 @@ jobs:
           node-version: "20"
       - name: Install dependencies
         run: |
-          cd ./crates/react-sdk
+          cd ./packages/react-sdk
           yarn install
       - name: Run unit tests
         run: make test-react-sdk
@@ -78,12 +78,12 @@ jobs:
           node-version: "20"
       - name: Install dependencies
         run: |
-          cd ./crates/react-sdk
+          cd ./packages/react-sdk
           yarn install
       - name: Install Playwright browsers
-        run: cd ./crates/react-sdk && yarn playwright install --with-deps
+        run: cd ./packages/react-sdk && yarn playwright install --with-deps
       - name: Run Playwright tests
-        run: cd ./crates/react-sdk && yarn test:integration
+        run: cd ./packages/react-sdk && yarn test:integration
 
   build-react-sdk:
     name: Build React SDK
@@ -102,10 +102,10 @@ jobs:
           node-version: "20"
       - name: Install dependencies
         run: |
-          cd ./crates/react-sdk
+          cd ./packages/react-sdk
           yarn install
       - name: Build React SDK
-        run: cd ./crates/react-sdk && yarn build
+        run: cd ./packages/react-sdk && yarn build
 
   integration-tests:
     name: Run integration tests on ubuntu-latest
