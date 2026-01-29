@@ -6,7 +6,7 @@ module.exports = [
     ignores: [
       "dist/**/*",
       "node_modules/**/*",
-      "e2e/**/*",
+      "test/**/*",
       "examples/**/*",
       "**/*.d.ts",
     ],

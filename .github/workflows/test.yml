@@ -61,8 +61,8 @@ jobs:
       - name: Run unit tests
         run: make test-react-sdk
 
-  test-react-sdk-e2e:
-    name: React SDK Playwright tests
+  test-react-sdk-integration:
+    name: React SDK integration tests
     runs-on: ubuntu-latest
     needs: [build-web-client-dist-folder]
     steps:

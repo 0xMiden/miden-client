@@ -6,7 +6,7 @@ import { defineConfig, devices } from "@playwright/test";
  */
 export default defineConfig({
   timeout: 120_000,
-  testDir: "./e2e",
+  testDir: "./test",
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: 0,
@@ -31,7 +31,7 @@ export default defineConfig({
   ],
 
   webServer: {
-    command: "node ./e2e/serve-tests.js",
+    command: "node ./test/serve-tests.js",
     url: "http://127.0.0.1:8081",
     reuseExistingServer: true,
     timeout: 30000,

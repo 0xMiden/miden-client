@@ -1,6 +1,6 @@
 /**
  * Simple static server that serves both the test app and the SDK.
- * - /        -> e2e/test-app/
+ * - /        -> test/test-app/
  * - /sdk/    -> ../../crates/web-client/dist/
  */
 const http = require("http");
