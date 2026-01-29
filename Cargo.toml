@@ -3,6 +3,7 @@ resolver = "2"
 
 members = [
   "bin/integration-tests",
+  "bin/miden-bench",
   "bin/miden-cli",
   "crates/idxdb-store",
   "crates/rust-client",
