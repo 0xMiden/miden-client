@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import { useMiden } from "../context/MidenProvider";
-import { NoteType, AccountId, Address } from "@miden-sdk/miden-sdk";
+import { NoteType, AccountId, Address, TransactionFilter } from "@miden-sdk/miden-sdk";
 import type { Note } from "@miden-sdk/miden-sdk";
 import type {
   SendOptions,
@@ -24,6 +24,13 @@ export interface UseSendResult {
   /** Reset the hook state */
   reset: () => void;
 }
+
+type ClientWithTransactions = {
+  syncState: () => Promise<unknown>;
+  getTransactions: (
+    filter: TransactionFilter
+  ) => Promise<Array<{ id: () => { toHex: () => string } }>>;
+};
 
 /**
  * Hook to send tokens between accounts.
@@ -145,6 +152,9 @@ export function useSend(): UseSendResult {
           client.applyTransaction(txResult, submissionHeight)
         );
 
+        const txIdHex = txResult.id().toHex();
+        await waitForTransactionCommit(client, runExclusiveSafe, txIdHex);
+
         if (noteType === NoteType.Private) {
           const fullNote = extractFullNote(txResult);
           if (!fullNote) {
@@ -208,6 +218,31 @@ function getNoteType(type: "private" | "public" | "encrypted"): NoteType {
     default:
       return NoteType.Private;
   }
+}
+
+async function waitForTransactionCommit(
+  client: ClientWithTransactions,
+  runExclusiveSafe: <T>(fn: () => Promise<T>) => Promise<T>,
+  txIdHex: string,
+  maxWaitMs = 10_000,
+  delayMs = 1_000
+) {
+  let waited = 0;
+
+  while (waited < maxWaitMs) {
+    await runExclusiveSafe(() => client.syncState());
+    const uncommitted = await runExclusiveSafe(() =>
+      client.getTransactions(TransactionFilter.uncommitted())
+    );
+    const stillPending = uncommitted.some(
+      (tx) => tx.id().toHex() === txIdHex
+    );
+    if (!stillPending) return;
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+    waited += delayMs;
+  }
+
+  throw new Error("Timeout waiting for transaction commit");
 }
 
 function extractFullNote(txResult: unknown): Note | null {

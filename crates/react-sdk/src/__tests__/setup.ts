@@ -20,6 +20,7 @@ vi.mock("@miden-sdk/miden-sdk", () => {
     getSyncHeight: vi.fn().mockResolvedValue(100),
     getInputNotes: vi.fn().mockResolvedValue([]),
     getConsumableNotes: vi.fn().mockResolvedValue([]),
+    getTransactions: vi.fn().mockResolvedValue([]),
     newMintTransactionRequest: vi.fn().mockReturnValue({}),
     newSendTransactionRequest: vi.fn().mockReturnValue({}),
     newConsumeTransactionRequest: vi.fn().mockReturnValue({}),
@@ -107,6 +108,9 @@ vi.mock("@miden-sdk/miden-sdk", () => {
       Unique: 6,
       Nullifiers: 7,
       Unverified: 8,
+    },
+    TransactionFilter: {
+      uncommitted: vi.fn(() => ({})),
     },
   };
 });

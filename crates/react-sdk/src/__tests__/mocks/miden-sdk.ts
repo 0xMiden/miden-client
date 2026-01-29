@@ -217,6 +217,7 @@ export const createMockWebClient = (
     getInputNotes: vi.fn().mockResolvedValue([]),
     getConsumableNotes: vi.fn().mockResolvedValue([]),
     getInputNote: vi.fn().mockResolvedValue(null),
+    getTransactions: vi.fn().mockResolvedValue([]),
 
     // Transaction methods
     newMintTransactionRequest: vi
@@ -258,6 +259,7 @@ export type MockWebClientType = {
   getInputNotes: ReturnType<typeof vi.fn>;
   getConsumableNotes: ReturnType<typeof vi.fn>;
   getInputNote: ReturnType<typeof vi.fn>;
+  getTransactions: ReturnType<typeof vi.fn>;
   newMintTransactionRequest: ReturnType<typeof vi.fn>;
   newSendTransactionRequest: ReturnType<typeof vi.fn>;
   newConsumeTransactionRequest: ReturnType<typeof vi.fn>;
@@ -300,6 +302,9 @@ export const createMockSdkModule = (
     },
     AccountStorageMode: MockAccountStorageMode,
     NoteType: MockNoteType,
+    TransactionFilter: {
+      uncommitted: vi.fn(() => ({})),
+    },
     NoteId: MockNoteId,
     NoteFilter: MockNoteFilter,
     NoteFilterTypes: MockNoteFilterTypes,

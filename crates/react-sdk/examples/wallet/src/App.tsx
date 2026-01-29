@@ -41,6 +41,7 @@ function Wallet({ accountId }: { accountId: string }) {
   const [to, setTo] = useState("");
   const [assetId, setAssetId] = useState("");
   const [amount, setAmount] = useState("");
+  const [noteType, setNoteType] = useState<"private" | "public">("private");
   const defaultAssetId = assets[0]?.assetId;
   const selectedAsset = assets.find((asset) => asset.assetId === assetId);
   const selectedDecimals = selectedAsset?.decimals;
@@ -53,8 +54,8 @@ function Wallet({ accountId }: { accountId: string }) {
   const handleSend = async () => {
     try {
       if (!assetId) return;
-      const parsedAmount = parseAssetAmount(amount, selectedDecimals);
-      await send({ from: accountId, to, assetId, amount: parsedAmount });
+      const amt = parseAssetAmount(amount, selectedDecimals);
+      await send({ from: accountId, to, assetId, amount: amt, noteType });
       setAmount("");
     } catch (error) {
       // Keep example lean; log errors for visibility.
@@ -64,6 +65,7 @@ function Wallet({ accountId }: { accountId: string }) {
 
   const claimNote = (id: string) => () => consume({ accountId, noteIds: [id] });
   const onAssetChange = (event: ChangeEvent<HTMLSelectElement>) => setAssetId(event.target.value);
+  const onNoteTypeChange = (event: ChangeEvent<HTMLSelectElement>) => setNoteType(event.target.value as "private" | "public");
   const onToChange = (event: ChangeEvent<HTMLInputElement>) => setTo(event.target.value);
   const onAmountChange = (event: ChangeEvent<HTMLInputElement>) => setAmount(event.target.value);
   const canSend = Boolean(hasAssets && to && assetId && amount);
@@ -111,6 +113,10 @@ function Wallet({ accountId }: { accountId: string }) {
       </Panel>
       <Panel title="Send">
         <div className="form">
+          <select value={noteType} onChange={onNoteTypeChange}>
+            <option value="private">Private</option>
+            <option value="public">Public</option>
+          </select>
           <select value={assetId} onChange={onAssetChange} disabled={!hasAssets}>
             {hasAssets ? (
               assets.map((asset) => (
