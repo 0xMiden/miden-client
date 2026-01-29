@@ -20,7 +20,16 @@ vi.mock("@miden-sdk/miden-sdk", () => {
     getSyncHeight: vi.fn().mockResolvedValue(100),
     getInputNotes: vi.fn().mockResolvedValue([]),
     getConsumableNotes: vi.fn().mockResolvedValue([]),
-    getTransactions: vi.fn().mockResolvedValue([]),
+    getTransactions: vi.fn().mockResolvedValue([
+      {
+        id: vi.fn(() => ({ toHex: vi.fn(() => "0xtx") })),
+        transactionStatus: vi.fn(() => ({
+          isPending: vi.fn(() => false),
+          isCommitted: vi.fn(() => true),
+          isDiscarded: vi.fn(() => false),
+        })),
+      },
+    ]),
     newMintTransactionRequest: vi.fn().mockReturnValue({}),
     newSendTransactionRequest: vi.fn().mockReturnValue({}),
     newConsumeTransactionRequest: vi.fn().mockReturnValue({}),
@@ -111,6 +120,7 @@ vi.mock("@miden-sdk/miden-sdk", () => {
     },
     TransactionFilter: {
       uncommitted: vi.fn(() => ({})),
+      ids: vi.fn((ids: unknown) => ({ ids })),
     },
   };
 });

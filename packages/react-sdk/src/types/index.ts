@@ -6,6 +6,7 @@ import type {
   InputNoteRecord,
   ConsumableNoteRecord,
   TransactionId,
+  TransactionRequest,
   NoteType,
   AccountStorageMode,
 } from "@miden-sdk/miden-sdk";
@@ -19,6 +20,7 @@ export type {
   InputNoteRecord,
   ConsumableNoteRecord,
   TransactionId,
+  TransactionRequest,
   NoteType,
   AccountStorageMode,
 };
@@ -218,6 +220,16 @@ export interface SwapOptions {
   noteType?: "private" | "public" | "encrypted";
   /** Note type for payback note. Default: private */
   paybackNoteType?: "private" | "public" | "encrypted";
+}
+
+// Arbitrary transaction options
+export interface ExecuteTransactionOptions {
+  /** Account ID the transaction applies to */
+  accountId: string | AccountId;
+  /** Transaction request or builder */
+  request:
+    | TransactionRequest
+    | ((client: WebClient) => TransactionRequest | Promise<TransactionRequest>);
 }
 
 // Transaction result

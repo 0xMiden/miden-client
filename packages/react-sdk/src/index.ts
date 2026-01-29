@@ -24,6 +24,7 @@ export { useSend } from "./hooks/useSend";
 export { useMint } from "./hooks/useMint";
 export { useConsume } from "./hooks/useConsume";
 export { useSwap } from "./hooks/useSwap";
+export { useTransaction } from "./hooks/useTransaction";
 
 // Types
 export type {
@@ -47,6 +48,7 @@ export type {
   MintOptions,
   ConsumeOptions,
   SwapOptions,
+  ExecuteTransactionOptions,
   TransactionResult,
 } from "./types";
 
@@ -59,6 +61,7 @@ export type {
   InputNoteRecord,
   ConsumableNoteRecord,
   TransactionId,
+  TransactionRequest,
   NoteType,
   AccountStorageMode,
 } from "./types";
@@ -78,4 +81,5 @@ export type { UseSendResult } from "./hooks/useSend";
 export type { UseMintResult } from "./hooks/useMint";
 export type { UseConsumeResult } from "./hooks/useConsume";
 export type { UseSwapResult } from "./hooks/useSwap";
+export type { UseTransactionResult } from "./hooks/useTransaction";
 export type { UseSyncStateResult } from "./hooks/useSyncState";
