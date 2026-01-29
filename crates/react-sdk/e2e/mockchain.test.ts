@@ -193,7 +193,9 @@ test.describe("MockWebClient Integration", () => {
       if (!mintedInput) {
         throw new Error(`Minted note ${mintedNoteId} not found`);
       }
-      const mintedNote = mintedInput.toNote();
+      const mintedNote = mintedInput.toNote
+        ? mintedInput.toNote()
+        : mintedNoteId;
 
       // Consume the note (no await - it's synchronous)
       const consumeRequest = client.newConsumeTransactionRequest([mintedNote]);
@@ -270,7 +272,9 @@ test.describe("MockWebClient Integration", () => {
       if (!mintedInput) {
         throw new Error(`Minted note ${mintedNoteId} not found`);
       }
-      const mintedNote = mintedInput.toNote();
+      const mintedNote = mintedInput.toNote
+        ? mintedInput.toNote()
+        : mintedNoteId;
       const consumeRequest = client.newConsumeTransactionRequest([mintedNote]);
       await client.submitNewTransaction(sender.id(), consumeRequest);
       await client.proveBlock();
@@ -300,7 +304,7 @@ test.describe("MockWebClient Integration", () => {
       if (!sentInput) {
         throw new Error(`Sent note ${sentNoteId} not found`);
       }
-      const sentNote = sentInput.toNote();
+      const sentNote = sentInput.toNote ? sentInput.toNote() : sentNoteId;
       const receiveRequest = client.newConsumeTransactionRequest([sentNote]);
       await client.submitNewTransaction(receiver.id(), receiveRequest);
       await client.proveBlock();
