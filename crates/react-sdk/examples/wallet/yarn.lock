@@ -333,17 +333,17 @@
     "@jridgewell/resolve-uri" "^3.1.0"
     "@jridgewell/sourcemap-codec" "^1.4.14"
 
-"@miden-sdk/miden-sdk@^0.13.0-0":
-  version "0.13.0-next.1"
-  resolved "https://registry.yarnpkg.com/@miden-sdk/miden-sdk/-/miden-sdk-0.13.0-next.1.tgz#08a34b588920d8d3c4ec92fc7af9479c5c51e4b4"
-  integrity sha512-vQfzUZwDuhaNVnHyuh+SLSMR1u+VT+X1r2Ll3lw9GxaJqEkXgs4piHQVK6S8prbqP+EA+OxcYZjPTK7+xUCDyw==
+"@miden-sdk/miden-sdk@^0.13.0":
+  version "0.13.0"
+  resolved "https://registry.yarnpkg.com/@miden-sdk/miden-sdk/-/miden-sdk-0.13.0.tgz#df7f639f90931d279761a62bb513374366d755e4"
+  integrity sha512-N0qUCZW9Dvk3Oqj37IrGmm0b0v3Nq5qHsX3BtQIzZIwDXKXKPBxy/0lO40oCwDtwI8AfriZQyMLbJR81Fo4Vpg==
   dependencies:
     "@rollup/plugin-typescript" "^12.3.0"
     dexie "^4.0.1"
     glob "^11.0.0"
 
 "@miden-sdk/react@file:../..":
-  version "0.12.0"
+  version "0.13.0"
   dependencies:
     zustand "^5.0.0"
 

@@ -189,10 +189,14 @@ test.describe("MockWebClient Integration", () => {
         .id()
         .toString();
 
+      const mintedInput = await client.getInputNote(mintedNoteId);
+      if (!mintedInput) {
+        throw new Error(`Minted note ${mintedNoteId} not found`);
+      }
+      const mintedNote = mintedInput.toNote();
+
       // Consume the note (no await - it's synchronous)
-      const consumeRequest = client.newConsumeTransactionRequest([
-        mintedNoteId,
-      ]);
+      const consumeRequest = client.newConsumeTransactionRequest([mintedNote]);
       await client.submitNewTransaction(wallet.id(), consumeRequest);
 
       // Prove and sync
@@ -262,9 +266,12 @@ test.describe("MockWebClient Integration", () => {
         .notes()[0]
         .id()
         .toString();
-      const consumeRequest = client.newConsumeTransactionRequest([
-        mintedNoteId,
-      ]);
+      const mintedInput = await client.getInputNote(mintedNoteId);
+      if (!mintedInput) {
+        throw new Error(`Minted note ${mintedNoteId} not found`);
+      }
+      const mintedNote = mintedInput.toNote();
+      const consumeRequest = client.newConsumeTransactionRequest([mintedNote]);
       await client.submitNewTransaction(sender.id(), consumeRequest);
       await client.proveBlock();
       await client.syncState();
@@ -289,7 +296,12 @@ test.describe("MockWebClient Integration", () => {
         (window as any).TransactionFilter.ids([sendTxId])
       );
       const sentNoteId = sendTxRecord.outputNotes().notes()[0].id().toString();
-      const receiveRequest = client.newConsumeTransactionRequest([sentNoteId]);
+      const sentInput = await client.getInputNote(sentNoteId);
+      if (!sentInput) {
+        throw new Error(`Sent note ${sentNoteId} not found`);
+      }
+      const sentNote = sentInput.toNote();
+      const receiveRequest = client.newConsumeTransactionRequest([sentNote]);
       await client.submitNewTransaction(receiver.id(), receiveRequest);
       await client.proveBlock();
       await client.syncState();
