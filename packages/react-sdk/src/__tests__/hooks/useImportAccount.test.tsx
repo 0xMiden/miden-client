@@ -3,6 +3,7 @@ import { renderHook, act, waitFor } from "@testing-library/react";
 import { useImportAccount } from "../../hooks/useImportAccount";
 import { useMiden } from "../../context/MidenProvider";
 import { useMidenStore } from "../../store/MidenStore";
+import type { AccountFile } from "@miden-sdk/miden-sdk";
 import {
   createMockAccount,
   createMockAccountFile,
@@ -77,13 +78,15 @@ describe("useImportAccount", () => {
       await act(async () => {
         imported = await result.current.importAccount({
           type: "file",
-          file: mockAccountFile,
+          file: mockAccountFile as unknown as AccountFile,
         });
       });
 
       expect(imported).toBe(mockAccount);
       expect(result.current.account).toBe(mockAccount);
-      expect(mockClient.importAccountFile).toHaveBeenCalledWith(mockAccountFile);
+      expect(mockClient.importAccountFile).toHaveBeenCalledWith(
+        mockAccountFile
+      );
       expect(mockClient.getAccounts).toHaveBeenCalled();
     });
 
@@ -109,13 +112,15 @@ describe("useImportAccount", () => {
       await act(async () => {
         imported = await result.current.importAccount({
           type: "file",
-          file: mockAccountFile,
+          file: mockAccountFile as unknown as AccountFile,
         });
       });
 
       expect(imported).toBe(mockAccount);
       expect(result.current.account).toBe(mockAccount);
-      expect(mockClient.importAccountFile).toHaveBeenCalledWith(mockAccountFile);
+      expect(mockClient.importAccountFile).toHaveBeenCalledWith(
+        mockAccountFile
+      );
     });
 
     it("should import account by id", async () => {

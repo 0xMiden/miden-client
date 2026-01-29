@@ -93,10 +93,7 @@ async function waitForReactSdk(page: Page): Promise<boolean> {
 
     const sdkState = await waitForSdkLoaded(page);
     if (!sdkState.sdkLoaded) {
-      console.log(
-        "SDK not loaded:",
-        sdkState.sdkLoadError || "Unknown error"
-      );
+      console.log("SDK not loaded:", sdkState.sdkLoadError || "Unknown error");
       return false;
     }
 
@@ -136,9 +133,7 @@ test.describe("React SDK Hooks (Playwright)", () => {
       () => (window as any).__reactSdkState().transactionStage === "complete"
     );
 
-    const state = await page.evaluate(
-      () => (window as any).__reactSdkState()
-    );
+    const state = await page.evaluate(() => (window as any).__reactSdkState());
     expect(state.transactionStage).toBe("complete");
     expect(state.transactionError).toBeNull();
   });
@@ -161,9 +156,7 @@ test.describe("React SDK Hooks (Playwright)", () => {
       () => (window as any).__reactSdkState().importedAccountId
     );
 
-    const state = await page.evaluate(
-      () => (window as any).__reactSdkState()
-    );
+    const state = await page.evaluate(() => (window as any).__reactSdkState());
     expect(state.importError).toBeNull();
     expect(state.importedAccountId).toBeTruthy();
   });

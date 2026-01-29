@@ -79,10 +79,7 @@ async function waitForSdk(page: Page): Promise<boolean> {
 
     const sdkState = await waitForSdkLoaded(page);
     if (!sdkState.sdkLoaded) {
-      console.log(
-        "SDK not loaded:",
-        sdkState.sdkLoadError || "Unknown error"
-      );
+      console.log("SDK not loaded:", sdkState.sdkLoadError || "Unknown error");
       return false;
     }
 

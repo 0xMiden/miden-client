@@ -68,10 +68,17 @@ const waitForClient = (isReady, client) => {
 
 const TestHarness = () => {
   const { client, isReady } = useMiden();
-  const { execute, stage: transactionStage, error: transactionError } =
-    useTransaction();
-  const { importAccount, account, isImporting, error: importError } =
-    useImportAccount();
+  const {
+    execute,
+    stage: transactionStage,
+    error: transactionError,
+  } = useTransaction();
+  const {
+    importAccount,
+    account,
+    isImporting,
+    error: importError,
+  } = useImportAccount();
 
   useEffect(() => {
     window.reactSdkReady = !!isReady;

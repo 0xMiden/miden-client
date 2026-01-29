@@ -32,9 +32,7 @@ export interface UseSendResult {
 
 type ClientWithTransactions = {
   syncState: () => Promise<unknown>;
-  getTransactions: (
-    filter: TransactionFilter
-  ) => Promise<
+  getTransactions: (filter: TransactionFilter) => Promise<
     Array<{
       id: () => { toHex: () => string };
       transactionStatus: () => {

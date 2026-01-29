@@ -151,7 +151,9 @@ export const createMockTransactionId = (id: string = "0xtx123") => ({
 });
 
 // Mock TransactionRecord
-export const createMockTransactionRecord = (status: "committed" | "pending" | "discarded" = "committed") => ({
+export const createMockTransactionRecord = (
+  status: "committed" | "pending" | "discarded" = "committed"
+) => ({
   id: vi.fn(() => createMockTransactionId()),
   transactionStatus: vi.fn(() => ({
     isPending: vi.fn(() => status === "pending"),
@@ -164,8 +166,8 @@ export const createMockTransactionRecord = (status: "committed" | "pending" | "d
 export const createMockTransactionRequest = () => ({
   expectedOutputOwnNotes: vi.fn(() => []),
   expectedFutureNotes: vi.fn(() => []),
-  scriptArg: vi.fn(() => null),
-  authArg: vi.fn(() => null),
+  scriptArg: vi.fn(() => undefined),
+  authArg: vi.fn(() => undefined),
   serialize: vi.fn(() => new Uint8Array()),
   free: vi.fn(),
 });
@@ -236,9 +238,7 @@ export const createMockWebClient = (
     getInputNotes: vi.fn().mockResolvedValue([]),
     getConsumableNotes: vi.fn().mockResolvedValue([]),
     getInputNote: vi.fn().mockResolvedValue(null),
-    getTransactions: vi
-      .fn()
-      .mockResolvedValue([createMockTransactionRecord()]),
+    getTransactions: vi.fn().mockResolvedValue([createMockTransactionRecord()]),
 
     // Transaction methods
     newMintTransactionRequest: vi
