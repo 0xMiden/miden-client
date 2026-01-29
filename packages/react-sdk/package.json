@@ -23,7 +23,7 @@
     "typecheck": "tsc --noEmit",
     "test": "VITE_CJS_IGNORE_WARNING=1 vitest run",
     "test:unit": "VITE_CJS_IGNORE_WARNING=1 vitest run",
-    "test:integration": "playwright test",
+    "test:integration": "yarn build && playwright test",
     "test:all": "VITE_CJS_IGNORE_WARNING=1 vitest run && playwright test"
   },
   "peerDependencies": {

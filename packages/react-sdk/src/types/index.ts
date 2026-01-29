@@ -3,6 +3,7 @@ import type {
   Account,
   AccountHeader,
   AccountId,
+  AccountFile,
   InputNoteRecord,
   ConsumableNoteRecord,
   TransactionId,
@@ -17,6 +18,7 @@ export type {
   Account,
   AccountHeader,
   AccountId,
+  AccountFile,
   InputNoteRecord,
   ConsumableNoteRecord,
   TransactionId,
@@ -165,6 +167,23 @@ export interface CreateFaucetOptions {
   /** Auth scheme: 0 = RpoFalcon512, 1 = EcdsaK256Keccak. Default: 0 */
   authScheme?: 0 | 1;
 }
+
+// Account import options
+export type ImportAccountOptions =
+  | {
+      type: "file";
+      file: AccountFile | Uint8Array | ArrayBuffer;
+    }
+  | {
+      type: "id";
+      accountId: string | AccountId;
+    }
+  | {
+      type: "seed";
+      seed: Uint8Array;
+      mutable?: boolean;
+      authScheme?: 0 | 1;
+    };
 
 // Send options
 export interface SendOptions {

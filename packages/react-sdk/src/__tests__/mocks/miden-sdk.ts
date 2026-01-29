@@ -46,6 +46,15 @@ export const createMockAccountHeader = (id: string = "0x1234567890abcdef") => ({
   free: vi.fn(),
 });
 
+// Mock AccountFile
+export const createMockAccountFile = (account = createMockAccount()) => ({
+  accountId: vi.fn(() => account.id()),
+  account: vi.fn(() => account),
+  authSecretKeyCount: vi.fn(() => 1),
+  serialize: vi.fn(() => new Uint8Array()),
+  free: vi.fn(),
+});
+
 // Mock AssetVault
 export const createMockVault = (
   assets: Array<{ faucetId: string; amount: bigint }> = []
@@ -252,6 +261,10 @@ export const createMockWebClient = (
     submitProvenTransaction: vi.fn().mockResolvedValue(0),
     applyTransaction: vi.fn().mockResolvedValue({}),
     sendPrivateNote: vi.fn().mockResolvedValue(undefined),
+    importAccountFile: vi.fn().mockResolvedValue("Imported account"),
+    importAccountById: vi.fn().mockResolvedValue(undefined),
+    importPublicAccountFromSeed: vi.fn().mockResolvedValue(createMockAccount()),
+    exportAccountFile: vi.fn().mockResolvedValue(createMockAccountFile()),
 
     // Cleanup
     free: vi.fn(),
@@ -282,6 +295,10 @@ export type MockWebClientType = {
   submitProvenTransaction: ReturnType<typeof vi.fn>;
   applyTransaction: ReturnType<typeof vi.fn>;
   sendPrivateNote: ReturnType<typeof vi.fn>;
+  importAccountFile: ReturnType<typeof vi.fn>;
+  importAccountById: ReturnType<typeof vi.fn>;
+  importPublicAccountFromSeed: ReturnType<typeof vi.fn>;
+  exportAccountFile: ReturnType<typeof vi.fn>;
   free: ReturnType<typeof vi.fn>;
 };
 
@@ -318,6 +335,12 @@ export const createMockSdkModule = (
       uncommitted: vi.fn(() => ({})),
       ids: vi.fn((ids: unknown) => ({ ids })),
     },
+    AccountFile: Object.assign(
+      vi.fn().mockImplementation(() => createMockAccountFile()),
+      {
+        deserialize: vi.fn(() => createMockAccountFile()),
+      }
+    ),
     NoteId: MockNoteId,
     NoteFilter: MockNoteFilter,
     NoteFilterTypes: MockNoteFilterTypes,

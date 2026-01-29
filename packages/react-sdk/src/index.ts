@@ -20,6 +20,7 @@ export { useAssetMetadata } from "./hooks/useAssetMetadata";
 // Mutation Hooks
 export { useCreateWallet } from "./hooks/useCreateWallet";
 export { useCreateFaucet } from "./hooks/useCreateFaucet";
+export { useImportAccount } from "./hooks/useImportAccount";
 export { useSend } from "./hooks/useSend";
 export { useMint } from "./hooks/useMint";
 export { useConsume } from "./hooks/useConsume";
@@ -44,6 +45,7 @@ export type {
   NoteSummary,
   CreateWalletOptions,
   CreateFaucetOptions,
+  ImportAccountOptions,
   SendOptions,
   MintOptions,
   ConsumeOptions,
@@ -58,6 +60,7 @@ export type {
   Account,
   AccountHeader,
   AccountId,
+  AccountFile,
   InputNoteRecord,
   ConsumableNoteRecord,
   TransactionId,
@@ -77,6 +80,7 @@ export { getNoteSummary, formatNoteSummary } from "./utils/notes";
 // Hook result types
 export type { UseCreateWalletResult } from "./hooks/useCreateWallet";
 export type { UseCreateFaucetResult } from "./hooks/useCreateFaucet";
+export type { UseImportAccountResult } from "./hooks/useImportAccount";
 export type { UseSendResult } from "./hooks/useSend";
 export type { UseMintResult } from "./hooks/useMint";
 export type { UseConsumeResult } from "./hooks/useConsume";

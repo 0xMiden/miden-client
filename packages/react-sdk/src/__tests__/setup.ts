@@ -42,6 +42,12 @@ vi.mock("@miden-sdk/miden-sdk", () => {
     submitProvenTransaction: vi.fn().mockResolvedValue(0),
     applyTransaction: vi.fn().mockResolvedValue({}),
     sendPrivateNote: vi.fn().mockResolvedValue(undefined),
+    importAccountFile: vi.fn().mockResolvedValue("Imported account"),
+    importAccountById: vi.fn().mockResolvedValue(undefined),
+    importPublicAccountFromSeed: vi.fn().mockResolvedValue({}),
+    exportAccountFile: vi
+      .fn()
+      .mockResolvedValue({ serialize: () => new Uint8Array() }),
     free: vi.fn(),
   };
 
@@ -121,6 +127,23 @@ vi.mock("@miden-sdk/miden-sdk", () => {
     TransactionFilter: {
       uncommitted: vi.fn(() => ({})),
       ids: vi.fn((ids: unknown) => ({ ids })),
+    },
+    AccountFile: class AccountFile {
+      account() {
+        return {};
+      }
+      accountId() {
+        return createMockAccountId("0ximported");
+      }
+      authSecretKeyCount() {
+        return 1;
+      }
+      serialize() {
+        return new Uint8Array();
+      }
+      static deserialize() {
+        return new AccountFile();
+      }
     },
   };
 });

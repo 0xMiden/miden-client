@@ -6,7 +6,7 @@ import {
   Address,
   TransactionFilter,
 } from "@miden-sdk/miden-sdk";
-import type { Note } from "@miden-sdk/miden-sdk";
+import type { Note, TransactionId } from "@miden-sdk/miden-sdk";
 import type {
   SendOptions,
   TransactionStage,
@@ -237,12 +237,11 @@ function getNoteType(type: "private" | "public" | "encrypted"): NoteType {
 async function waitForTransactionCommit(
   client: ClientWithTransactions,
   runExclusiveSafe: <T>(fn: () => Promise<T>) => Promise<T>,
-  txId: { toHex: () => string },
+  txId: TransactionId,
   maxWaitMs = 10_000,
   delayMs = 1_000
 ) {
   let waited = 0;
-  const txIdHex = txId.toHex();
 
   while (waited < maxWaitMs) {
     await runExclusiveSafe(() => client.syncState());

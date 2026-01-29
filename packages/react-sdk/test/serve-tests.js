@@ -2,6 +2,10 @@
  * Simple static server that serves both the test app and the SDK.
  * - /        -> test/test-app/
  * - /sdk/    -> ../../crates/web-client/dist/
+ * - /react-sdk/ -> ../dist/
+ * - /vendor/react/ -> ../node_modules/react/umd/
+ * - /vendor/react-dom/ -> ../node_modules/react-dom/umd/
+ * - /vendor/zustand/ -> ../node_modules/zustand/
  */
 const http = require("http");
 const fs = require("fs");
@@ -32,6 +36,22 @@ const SDK_DIR = path.join(
   "web-client",
   "dist"
 );
+const REACT_SDK_DIR = path.join(__dirname, "..", "dist");
+const REACT_UMD_DIR = path.join(
+  __dirname,
+  "..",
+  "node_modules",
+  "react",
+  "umd"
+);
+const REACT_DOM_UMD_DIR = path.join(
+  __dirname,
+  "..",
+  "node_modules",
+  "react-dom",
+  "umd"
+);
+const ZUSTAND_DIR = path.join(__dirname, "..", "node_modules", "zustand");
 
 const SECURITY_HEADERS = {
   "Cross-Origin-Opener-Policy": "same-origin",
@@ -139,14 +159,54 @@ function resolveRequestPath(requestPath) {
     return { baseDir: SDK_DIR, urlPath: requestPath.slice("/sdk".length) };
   }
 
+  if (requestPath === "/react-sdk") {
+    return { baseDir: REACT_SDK_DIR, urlPath: "/" };
+  }
+
+  if (requestPath.startsWith("/react-sdk/")) {
+    return {
+      baseDir: REACT_SDK_DIR,
+      urlPath: requestPath.slice("/react-sdk".length),
+    };
+  }
+
+  if (requestPath.startsWith("/vendor/react-dom/")) {
+    return {
+      baseDir: REACT_DOM_UMD_DIR,
+      urlPath: requestPath.slice("/vendor/react-dom".length),
+    };
+  }
+
+  if (requestPath.startsWith("/vendor/react/")) {
+    return {
+      baseDir: REACT_UMD_DIR,
+      urlPath: requestPath.slice("/vendor/react".length),
+    };
+  }
+
+  if (requestPath.startsWith("/vendor/zustand/")) {
+    return {
+      baseDir: ZUSTAND_DIR,
+      urlPath: requestPath.slice("/vendor/zustand".length),
+    };
+  }
+
   return { baseDir: TEST_APP_DIR, urlPath: requestPath };
 }
 
 const TEST_APP_FILES = buildFileMap(TEST_APP_DIR);
 const SDK_FILES = buildFileMap(SDK_DIR);
+const REACT_SDK_FILES = buildFileMap(REACT_SDK_DIR);
+const REACT_UMD_FILES = buildFileMap(REACT_UMD_DIR);
+const REACT_DOM_UMD_FILES = buildFileMap(REACT_DOM_UMD_DIR);
+const ZUSTAND_FILES = buildFileMap(ZUSTAND_DIR);
 const FILE_MAPS = new Map([
   [TEST_APP_DIR, TEST_APP_FILES],
   [SDK_DIR, SDK_FILES],
+  [REACT_SDK_DIR, REACT_SDK_FILES],
+  [REACT_UMD_DIR, REACT_UMD_FILES],
+  [REACT_DOM_UMD_DIR, REACT_DOM_UMD_FILES],
+  [ZUSTAND_DIR, ZUSTAND_FILES],
 ]);
 
 const server = http.createServer((req, res) => {

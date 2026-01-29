@@ -8,19 +8,81 @@
  */
 import { test, expect, type Page } from "@playwright/test";
 
+type TestAppState = {
+  testAppReady: boolean;
+  testAppError: string | null;
+  sdkLoaded: boolean;
+  sdkLoadError: string | null;
+};
+
+async function readTestAppState(page: Page): Promise<TestAppState> {
+  return page.evaluate(() => ({
+    testAppReady: (window as any).testAppReady === true,
+    testAppError: (window as any).testAppError ?? null,
+    sdkLoaded: (window as any).sdkLoaded === true,
+    sdkLoadError: (window as any).sdkLoadError ?? null,
+  }));
+}
+
+async function waitForTestAppReady(
+  page: Page,
+  timeoutMs = 15_000
+): Promise<TestAppState> {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    const state = await readTestAppState(page);
+    if (state.testAppError) {
+      return state;
+    }
+    if (state.testAppReady) {
+      return state;
+    }
+    await page.waitForTimeout(200);
+  }
+
+  return readTestAppState(page);
+}
+
+async function waitForSdkLoaded(
+  page: Page,
+  timeoutMs = 15_000
+): Promise<TestAppState> {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    const state = await readTestAppState(page);
+    if (state.testAppError) {
+      return state;
+    }
+    if (state.sdkLoaded || state.sdkLoadError) {
+      return state;
+    }
+    await page.waitForTimeout(200);
+  }
+
+  return readTestAppState(page);
+}
+
 // Helper to wait for SDK to load
 async function waitForSdk(page: Page): Promise<boolean> {
   try {
-    await page.waitForFunction(() => (window as any).testAppReady === true, {
-      timeout: 30000,
-    });
+    const state = await waitForTestAppReady(page);
 
-    const sdkLoaded = await page.evaluate(
-      () => (window as any).sdkLoaded === true
-    );
-    if (!sdkLoaded) {
-      const error = await page.evaluate(() => (window as any).sdkLoadError);
-      console.log("SDK not loaded:", error || "Unknown error");
+    if (!state.testAppReady) {
+      console.log("Timed out waiting for test app to be ready:", state);
+      return false;
+    }
+
+    if (state.testAppError) {
+      console.log("Test app error:", state.testAppError);
+      return false;
+    }
+
+    const sdkState = await waitForSdkLoaded(page);
+    if (!sdkState.sdkLoaded) {
+      console.log(
+        "SDK not loaded:",
+        sdkState.sdkLoadError || "Unknown error"
+      );
       return false;
     }
 
