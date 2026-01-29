@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import { useMiden } from "../context/MidenProvider";
-import { NoteType, AccountId } from "@miden-sdk/miden-sdk";
+import { NoteType, AccountId, Address } from "@miden-sdk/miden-sdk";
 import type {
   SendOptions,
   TransactionStage,
@@ -76,10 +76,17 @@ export function useSend(): UseSendResult {
       try {
         const noteType = getNoteType(options.noteType ?? DEFAULTS.NOTE_TYPE);
 
-        const parseAccountId = (value: string) =>
-          value.startsWith("m") || value.startsWith("M")
-            ? AccountId.fromBech32(value)
-            : AccountId.fromHex(value);
+        const parseAccountId = (value: string) => {
+          if (value.startsWith("m") || value.startsWith("M")) {
+            try {
+              return Address.fromBech32(value).accountId();
+            } catch {
+              // Fall through to AccountId parsing.
+            }
+            return AccountId.fromBech32(value);
+          }
+          return AccountId.fromHex(value);
+        };
 
         // Convert string IDs to AccountId objects
         const fromAccountId = parseAccountId(options.from);
