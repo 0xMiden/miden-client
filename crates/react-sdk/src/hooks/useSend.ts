@@ -1,6 +1,11 @@
 import { useCallback, useState } from "react";
 import { useMiden } from "../context/MidenProvider";
-import { NoteType, AccountId, Address, TransactionFilter } from "@miden-sdk/miden-sdk";
+import {
+  NoteType,
+  AccountId,
+  Address,
+  TransactionFilter,
+} from "@miden-sdk/miden-sdk";
 import type { Note } from "@miden-sdk/miden-sdk";
 import type {
   SendOptions,
@@ -234,9 +239,7 @@ async function waitForTransactionCommit(
     const uncommitted = await runExclusiveSafe(() =>
       client.getTransactions(TransactionFilter.uncommitted())
     );
-    const stillPending = uncommitted.some(
-      (tx) => tx.id().toHex() === txIdHex
-    );
+    const stillPending = uncommitted.some((tx) => tx.id().toHex() === txIdHex);
     if (!stillPending) return;
     await new Promise((resolve) => setTimeout(resolve, delayMs));
     waited += delayMs;
