@@ -2676,7 +2676,6 @@ dependencies = [
  "rand_chacha 0.9.0",
  "serial_test",
  "tokio",
- "tracing",
  "uuid",
 ]
 
