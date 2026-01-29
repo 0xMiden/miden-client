@@ -112,7 +112,7 @@ async function waitForReactSdk(page: Page): Promise<boolean> {
 
 test.describe("React SDK Hooks (Playwright)", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto("http://localhost:8081");
+    await page.goto("http://localhost:8081/react-hooks.html");
   });
 
   test("useTransaction executes a transaction", async ({ page }) => {
