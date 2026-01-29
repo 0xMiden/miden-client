@@ -28,10 +28,7 @@ use super::domain::account::{AccountProof, AccountStorageDetails, AccountUpdateS
 use super::domain::{note::FetchedNote, nullifier::NullifierUpdate};
 use super::generated::rpc::account_request::AccountDetailRequest;
 use super::generated::rpc::AccountRequest;
-use super::{
-    Endpoint, FetchedAccount, NodeRpcClient, NodeRpcClientEndpoint, NoteSyncInfo, RpcError,
-    StateSyncInfo,
-};
+use super::{Endpoint, FetchedAccount, NodeRpcClient, NoteSyncInfo, RpcError, StateSyncInfo};
 use crate::rpc::domain::account_vault::{AccountVaultInfo, AccountVaultUpdate};
 use crate::rpc::domain::storage_map::{StorageMapInfo, StorageMapUpdate};
 use crate::rpc::domain::transaction::TransactionsInfo;
@@ -39,7 +36,8 @@ use crate::rpc::errors::{AcceptHeaderError, GrpcError, RpcConversionError};
 use crate::rpc::generated::rpc::account_request::account_detail_request::storage_map_detail_request::SlotData;
 use crate::rpc::generated::rpc::account_request::account_detail_request::StorageMapDetailRequest;
 use crate::rpc::generated::rpc::BlockRange;
-use crate::rpc::{AccountStateAt, NOTE_IDS_LIMIT, NULLIFIER_PREFIXES_LIMIT, generated as proto};
+use crate::rpc::limits::RpcLimits;
+use crate::rpc::{AccountStateAt, NodeRpcClientEndpoint, generated as proto};
 use crate::transaction::ForeignAccount;
 
 mod api_client;
@@ -63,6 +61,8 @@ pub struct GrpcClient {
     endpoint: String,
     timeout_ms: u64,
     genesis_commitment: RwLock<Option<Word>>,
+    /// Cached RPC limits fetched from the node.
+    limits: RwLock<Option<RpcLimits>>,
 }
 
 impl GrpcClient {
@@ -74,6 +74,7 @@ impl GrpcClient {
             endpoint: endpoint.to_string(),
             timeout_ms,
             genesis_commitment: RwLock::new(None),
+            limits: RwLock::new(None),
         }
     }
 
@@ -253,6 +254,17 @@ impl GrpcClient {
         }
         Ok(slots)
     }
+
+    /// Fetches the RPC limits from the node.
+    async fn fetch_rpc_limits(&self) -> Result<RpcLimits, RpcError> {
+        let mut rpc_api = self.ensure_connected().await?;
+
+        let response = rpc_api.get_limits(()).await.map_err(|status| {
+            RpcError::from_grpc_error(NodeRpcClientEndpoint::GetLimits, status)
+        })?;
+
+        Ok(RpcLimits::from_proto(response.into_inner()))
+    }
 }
 
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
@@ -348,8 +360,9 @@ impl NodeRpcClient for GrpcClient {
     }
 
     async fn get_notes_by_id(&self, note_ids: &[NoteId]) -> Result<Vec<FetchedNote>, RpcError> {
+        let limits = self.get_rpc_limits().await;
         let mut notes = Vec::with_capacity(note_ids.len());
-        for chunk in note_ids.chunks(NOTE_IDS_LIMIT) {
+        for chunk in note_ids.chunks(limits.note_ids_limit) {
             let request = proto::note::NoteIdList {
                 ids: chunk.iter().map(|id| (*id).into()).collect(),
             };
@@ -586,6 +599,7 @@ impl NodeRpcClient for GrpcClient {
     ) -> Result<Vec<NullifierUpdate>, RpcError> {
         const MAX_ITERATIONS: u32 = 1000; // Safety limit to prevent infinite loops
 
+        let limits = self.get_rpc_limits().await;
         let mut all_nullifiers = BTreeSet::new();
 
         // Establish RPC connection once before the loop
@@ -593,7 +607,7 @@ impl NodeRpcClient for GrpcClient {
 
         // If the prefixes are too many, we need to chunk them into smaller groups to avoid
         // violating the RPC limit.
-        'chunk_nullifiers: for chunk in prefixes.chunks(NULLIFIER_PREFIXES_LIMIT) {
+        'chunk_nullifiers: for chunk in prefixes.chunks(limits.nullifiers_limit) {
             let mut current_block_from = block_num.as_u32();
 
             for _ in 0..MAX_ITERATIONS {
@@ -650,8 +664,9 @@ impl NodeRpcClient for GrpcClient {
     }
 
     async fn check_nullifiers(&self, nullifiers: &[Nullifier]) -> Result<Vec<SmtProof>, RpcError> {
+        let limits = self.get_rpc_limits().await;
         let mut proofs: Vec<SmtProof> = Vec::with_capacity(nullifiers.len());
-        for chunk in nullifiers.chunks(NULLIFIER_PREFIXES_LIMIT) {
+        for chunk in nullifiers.chunks(limits.nullifiers_limit) {
             let request = proto::rpc::NullifierList {
                 nullifiers: chunk.iter().map(|nul| nul.as_word().into()).collect(),
             };
@@ -864,6 +879,26 @@ impl NodeRpcClient for GrpcClient {
         let endpoint: Endpoint =
             Endpoint::try_from(endpoint_str).map_err(RpcError::InvalidNodeEndpoint)?;
         Ok(endpoint.to_network_id())
+    }
+
+    async fn get_rpc_limits(&self) -> RpcLimits {
+        // Return cached limits if available
+        if let Some(limits) = *self.limits.read() {
+            return limits;
+        }
+
+        // Try to fetch limits from the node
+        let limits = match self.fetch_rpc_limits().await {
+            Ok(limits) => limits,
+            Err(_) => {
+                // Fall back to defaults if fetch fails (older node without endpoint)
+                RpcLimits::default()
+            },
+        };
+
+        // Cache and return the result
+        self.limits.write().replace(limits);
+        limits
     }
 }
 
