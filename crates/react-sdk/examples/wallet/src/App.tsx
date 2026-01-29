@@ -1,5 +1,6 @@
 import { useEffect, useState, type ChangeEvent, type ReactNode } from "react";
-import { formatNoteSummary, useMiden, useAccounts, useAccount, useNotes, useCreateWallet, useConsume, useSend } from "@miden-sdk/react";
+import { formatAssetAmount, formatNoteSummary, parseAssetAmount } from "@miden-sdk/react";
+import { useMiden, useAccounts, useAccount, useNotes, useCreateWallet, useConsume, useSend } from "@miden-sdk/react";
 
 const Panel = ({ title, children }: { title: string; children: ReactNode }) => (
   <div className="panel">
@@ -41,6 +42,8 @@ function Wallet({ accountId }: { accountId: string }) {
   const [assetId, setAssetId] = useState("");
   const [amount, setAmount] = useState("");
   const defaultAssetId = assets[0]?.assetId;
+  const selectedAsset = assets.find((asset) => asset.assetId === assetId);
+  const selectedDecimals = selectedAsset?.decimals;
   const hasAssets = assets.length > 0;
 
   useEffect(() => {
@@ -50,10 +53,12 @@ function Wallet({ accountId }: { accountId: string }) {
   const handleSend = async () => {
     try {
       if (!assetId) return;
-      await send({ from: accountId, to, assetId, amount: BigInt(amount) });
+      const parsedAmount = parseAssetAmount(amount, selectedDecimals);
+      await send({ from: accountId, to, assetId, amount: parsedAmount });
       setAmount("");
-    } catch {
-      // Keep example lean; ignore errors here.
+    } catch (error) {
+      // Keep example lean; log errors for visibility.
+      console.error(error);
     }
   };
 
@@ -78,7 +83,7 @@ function Wallet({ accountId }: { accountId: string }) {
             {assets.map((asset) => (
               <div key={asset.assetId} className="row">
                 <span className="mono">{asset.symbol ?? asset.assetId}</span>
-                <span>{asset.amount.toString()}</span>
+                <span>{formatAssetAmount(asset.amount, asset.decimals)}</span>
               </div>
             ))}
           </div>

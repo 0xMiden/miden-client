@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import { useMiden } from "../context/MidenProvider";
 import { NoteType, AccountId, Address } from "@miden-sdk/miden-sdk";
+import type { Note } from "@miden-sdk/miden-sdk";
 import type {
   SendOptions,
   TransactionStage,
@@ -75,17 +76,33 @@ export function useSend(): UseSendResult {
 
       try {
         const noteType = getNoteType(options.noteType ?? DEFAULTS.NOTE_TYPE);
+        const normalizeInput = (value: string) =>
+          value.trim().replace(/^miden:/i, "");
+        const isBech32Input = (value: string) =>
+          value.startsWith("m") || value.startsWith("M");
 
         const parseAccountId = (value: string) => {
-          if (value.startsWith("m") || value.startsWith("M")) {
+          const normalized = normalizeInput(value);
+          if (isBech32Input(normalized)) {
             try {
-              return Address.fromBech32(value).accountId();
+              return Address.fromBech32(normalized).accountId();
             } catch {
               // Fall through to AccountId parsing.
             }
-            return AccountId.fromBech32(value);
+            return AccountId.fromBech32(normalized);
           }
-          return AccountId.fromHex(value);
+          return AccountId.fromHex(normalized);
+        };
+
+        const resolveRecipientAddress = (
+          value: string,
+          accountId: AccountId
+        ) => {
+          const normalized = normalizeInput(value);
+          if (isBech32Input(normalized)) {
+            return Address.fromBech32(normalized);
+          }
+          return Address.fromAccountId(accountId, "BasicWallet");
         };
 
         // Convert string IDs to AccountId objects
@@ -100,7 +117,6 @@ export function useSend(): UseSendResult {
         }
         const assetIdObj = parseAccountId(assetId);
 
-        setStage("proving");
         const txResult = await runExclusiveSafe(async () => {
           const txRequest = client.newSendTransactionRequest(
             fromAccountId,
@@ -112,20 +128,46 @@ export function useSend(): UseSendResult {
             options.timelockHeight ?? null
           );
 
-          const txId = await client.submitNewTransaction(
-            fromAccountId,
-            txRequest
-          );
-
-          return { transactionId: txId.toString() };
+          return await client.executeTransaction(fromAccountId, txRequest);
         });
 
+        setStage("proving");
+        const provenTransaction = await runExclusiveSafe(() =>
+          client.proveTransaction(txResult)
+        );
+
+        setStage("submitting");
+        const submissionHeight = await runExclusiveSafe(() =>
+          client.submitProvenTransaction(provenTransaction, txResult)
+        );
+
+        await runExclusiveSafe(() =>
+          client.applyTransaction(txResult, submissionHeight)
+        );
+
+        if (noteType === NoteType.Private) {
+          const fullNote = extractFullNote(txResult);
+          if (!fullNote) {
+            throw new Error("Missing full note for private send");
+          }
+
+          const recipientAddress = resolveRecipientAddress(
+            options.to,
+            toAccountId
+          );
+          await runExclusiveSafe(() =>
+            client.sendPrivateNote(fullNote, recipientAddress)
+          );
+        }
+
+        const txSummary = { transactionId: txResult.id().toString() };
+
         setStage("complete");
-        setResult(txResult);
+        setResult(txSummary);
 
         await sync();
 
-        return txResult;
+        return txSummary;
       } catch (err) {
         const error = err instanceof Error ? err : new Error(String(err));
         setError(error);
@@ -165,5 +207,22 @@ function getNoteType(type: "private" | "public" | "encrypted"): NoteType {
       return NoteType.Encrypted;
     default:
       return NoteType.Private;
+  }
+}
+
+function extractFullNote(txResult: unknown): Note | null {
+  try {
+    const executedTx = (
+      txResult as { executedTransaction?: () => unknown }
+    ).executedTransaction?.() as {
+      outputNotes?: () => {
+        notes?: () => Array<{ intoFull?: () => Note | null }>;
+      };
+    };
+    const notes = executedTx?.outputNotes?.().notes?.() ?? [];
+    const note = notes[0];
+    return note?.intoFull?.() ?? null;
+  } catch {
+    return null;
   }
 }

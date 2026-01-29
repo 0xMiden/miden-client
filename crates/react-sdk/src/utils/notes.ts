@@ -4,6 +4,7 @@ import type {
 } from "@miden-sdk/miden-sdk";
 import type { AssetMetadata, NoteAsset, NoteSummary } from "../types";
 import { toBech32AccountId } from "./accountBech32";
+import { formatAssetAmount } from "./amounts";
 
 const getInputNoteRecord = (
   note: ConsumableNoteRecord | InputNoteRecord
@@ -54,7 +55,9 @@ export const getNoteSummary = (
 export const formatNoteSummary = (
   summary: NoteSummary,
   formatAsset: (asset: NoteAsset) => string = (asset) =>
-    `${asset.amount.toString()} ${asset.symbol ?? asset.assetId}`
+    `${formatAssetAmount(asset.amount, asset.decimals)} ${
+      asset.symbol ?? asset.assetId
+    }`
 ): string => {
   if (!summary.assets.length) {
     return summary.id;

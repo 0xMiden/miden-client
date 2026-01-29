@@ -5,8 +5,8 @@ import { useMiden } from "../../context/MidenProvider";
 import { useMidenStore } from "../../store/MidenStore";
 import {
   createMockWebClient,
-  createMockTransactionId,
   createMockTransactionRequest,
+  createMockTransactionResult,
 } from "../mocks/miden-sdk";
 
 // Mock useMiden
@@ -62,13 +62,17 @@ describe("useSend", () => {
     });
 
     it("should execute send transaction with default options", async () => {
-      const mockTxId = createMockTransactionId("0xtx123");
+      const mockTxResult = createMockTransactionResult("0xtx123");
       const mockSync = vi.fn().mockResolvedValue(undefined);
       const mockClient = createMockWebClient({
         newSendTransactionRequest: vi
           .fn()
           .mockReturnValue(createMockTransactionRequest()),
-        submitNewTransaction: vi.fn().mockResolvedValue(mockTxId),
+        executeTransaction: vi.fn().mockResolvedValue(mockTxResult),
+        proveTransaction: vi.fn().mockResolvedValue({}),
+        submitProvenTransaction: vi.fn().mockResolvedValue(100),
+        applyTransaction: vi.fn().mockResolvedValue({}),
+        sendPrivateNote: vi.fn().mockResolvedValue(undefined),
       });
 
       mockUseMiden.mockReturnValue({
@@ -97,13 +101,16 @@ describe("useSend", () => {
     });
 
     it("should execute send transaction with custom options", async () => {
-      const mockTxId = createMockTransactionId();
+      const mockTxResult = createMockTransactionResult();
       const mockSync = vi.fn().mockResolvedValue(undefined);
       const mockClient = createMockWebClient({
         newSendTransactionRequest: vi
           .fn()
           .mockReturnValue(createMockTransactionRequest()),
-        submitNewTransaction: vi.fn().mockResolvedValue(mockTxId),
+        executeTransaction: vi.fn().mockResolvedValue(mockTxResult),
+        proveTransaction: vi.fn().mockResolvedValue({}),
+        submitProvenTransaction: vi.fn().mockResolvedValue(100),
+        applyTransaction: vi.fn().mockResolvedValue({}),
       });
 
       mockUseMiden.mockReturnValue({
@@ -138,13 +145,17 @@ describe("useSend", () => {
     });
 
     it("should handle different note types", async () => {
-      const mockTxId = createMockTransactionId();
+      const mockTxResult = createMockTransactionResult();
       const mockSync = vi.fn().mockResolvedValue(undefined);
       const mockClient = createMockWebClient({
         newSendTransactionRequest: vi
           .fn()
           .mockReturnValue(createMockTransactionRequest()),
-        submitNewTransaction: vi.fn().mockResolvedValue(mockTxId),
+        executeTransaction: vi.fn().mockResolvedValue(mockTxResult),
+        proveTransaction: vi.fn().mockResolvedValue({}),
+        submitProvenTransaction: vi.fn().mockResolvedValue(100),
+        applyTransaction: vi.fn().mockResolvedValue({}),
+        sendPrivateNote: vi.fn().mockResolvedValue(undefined),
       });
 
       mockUseMiden.mockReturnValue({
@@ -186,19 +197,29 @@ describe("useSend", () => {
 
   describe("stage transitions", () => {
     it("should transition through stages during execution", async () => {
+      let resolveExecute: () => void;
+      let resolveProve: () => void;
       let resolveSubmit: () => void;
 
-      const submitPromise = new Promise<
-        ReturnType<typeof createMockTransactionId>
-      >((resolve) => {
-        resolveSubmit = () => resolve(createMockTransactionId());
+      const executePromise = new Promise((resolve) => {
+        resolveExecute = () => resolve(createMockTransactionResult());
+      });
+      const provePromise = new Promise((resolve) => {
+        resolveProve = () => resolve({});
+      });
+      const submitPromise = new Promise((resolve) => {
+        resolveSubmit = () => resolve(100);
       });
 
       const mockClient = createMockWebClient({
-        newSendTransactionRequest: vi.fn().mockImplementation(() => {
-          return createMockTransactionRequest();
-        }),
-        submitNewTransaction: vi.fn().mockReturnValue(submitPromise),
+        newSendTransactionRequest: vi
+          .fn()
+          .mockReturnValue(createMockTransactionRequest()),
+        executeTransaction: vi.fn().mockReturnValue(executePromise),
+        proveTransaction: vi.fn().mockReturnValue(provePromise),
+        submitProvenTransaction: vi.fn().mockReturnValue(submitPromise),
+        applyTransaction: vi.fn().mockResolvedValue({}),
+        sendPrivateNote: vi.fn().mockResolvedValue(undefined),
       });
 
       mockUseMiden.mockReturnValue({
@@ -220,12 +241,22 @@ describe("useSend", () => {
         });
       });
 
-      // Should transition to executing
+      await waitFor(() => {
+        expect(result.current.stage).toBe("executing");
+      });
+
+      // Resolve execute -> proving
+      resolveExecute!();
       await waitFor(() => {
         expect(result.current.stage).toBe("proving");
       });
 
-      // Resolve submit
+      // Resolve prove -> submitting
+      resolveProve!();
+      await waitFor(() => {
+        expect(result.current.stage).toBe("submitting");
+      });
+
       await act(async () => {
         resolveSubmit!();
         await sendPromise;
@@ -242,7 +273,7 @@ describe("useSend", () => {
         newSendTransactionRequest: vi
           .fn()
           .mockReturnValue(createMockTransactionRequest()),
-        submitNewTransaction: vi.fn().mockRejectedValue(txError),
+        executeTransaction: vi.fn().mockRejectedValue(txError),
       });
 
       mockUseMiden.mockReturnValue({
@@ -305,12 +336,16 @@ describe("useSend", () => {
 
   describe("reset", () => {
     it("should reset all state", async () => {
-      const mockTxId = createMockTransactionId();
+      const mockTxResult = createMockTransactionResult();
       const mockClient = createMockWebClient({
         newSendTransactionRequest: vi
           .fn()
           .mockReturnValue(createMockTransactionRequest()),
-        submitNewTransaction: vi.fn().mockResolvedValue(mockTxId),
+        executeTransaction: vi.fn().mockResolvedValue(mockTxResult),
+        proveTransaction: vi.fn().mockResolvedValue({}),
+        submitProvenTransaction: vi.fn().mockResolvedValue(100),
+        applyTransaction: vi.fn().mockResolvedValue({}),
+        sendPrivateNote: vi.fn().mockResolvedValue(undefined),
       });
 
       mockUseMiden.mockReturnValue({
@@ -348,16 +383,20 @@ describe("useSend", () => {
 
   describe("loading state", () => {
     it("should set isLoading during transaction", async () => {
-      let resolvePromise: (value: any) => void;
-      const submitPromise = new Promise((resolve) => {
-        resolvePromise = resolve;
+      let resolveExecute: () => void;
+      const executePromise = new Promise((resolve) => {
+        resolveExecute = () => resolve(createMockTransactionResult());
       });
 
       const mockClient = createMockWebClient({
         newSendTransactionRequest: vi
           .fn()
           .mockReturnValue(createMockTransactionRequest()),
-        submitNewTransaction: vi.fn().mockReturnValue(submitPromise),
+        executeTransaction: vi.fn().mockReturnValue(executePromise),
+        proveTransaction: vi.fn().mockResolvedValue({}),
+        submitProvenTransaction: vi.fn().mockResolvedValue(100),
+        applyTransaction: vi.fn().mockResolvedValue({}),
+        sendPrivateNote: vi.fn().mockResolvedValue(undefined),
       });
 
       mockUseMiden.mockReturnValue({
@@ -386,7 +425,7 @@ describe("useSend", () => {
 
       // Resolve
       await act(async () => {
-        resolvePromise!(createMockTransactionId());
+        resolveExecute!();
         await sendPromise;
       });
 

@@ -27,6 +27,11 @@ vi.mock("@miden-sdk/miden-sdk", () => {
     submitNewTransaction: vi
       .fn()
       .mockResolvedValue({ toString: vi.fn(() => "0xtx") }),
+    executeTransaction: vi.fn().mockResolvedValue({}),
+    proveTransaction: vi.fn().mockResolvedValue({}),
+    submitProvenTransaction: vi.fn().mockResolvedValue(0),
+    applyTransaction: vi.fn().mockResolvedValue({}),
+    sendPrivateNote: vi.fn().mockResolvedValue(undefined),
     free: vi.fn(),
   };
 
@@ -55,6 +60,18 @@ vi.mock("@miden-sdk/miden-sdk", () => {
     AccountId: {
       fromHex: vi.fn((hex: string) => createMockAccountId(hex)),
       fromBech32: vi.fn((bech32: string) => createMockAccountId(bech32)),
+    },
+    Address: {
+      fromBech32: vi.fn((bech32: string) => ({
+        accountId: vi.fn(() => createMockAccountId(bech32)),
+        toString: vi.fn(() => bech32),
+      })),
+      fromAccountId: vi.fn(
+        (accountId: ReturnType<typeof createMockAccountId>) => ({
+          accountId: vi.fn(() => accountId),
+          toString: vi.fn(() => accountId.toString()),
+        })
+      ),
     },
     Endpoint,
     RpcClient,

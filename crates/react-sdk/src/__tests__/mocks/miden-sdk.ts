@@ -67,6 +67,23 @@ export const createMockNote = (id: string = "0xnote1") => ({
   free: vi.fn(),
 });
 
+export const createMockOutputNote = (note = createMockNote()) => ({
+  intoFull: vi.fn(() => note),
+});
+
+export const createMockTransactionResult = (
+  id: string = "0xtx123",
+  note = createMockNote()
+) => ({
+  id: vi.fn(() => createMockTransactionId(id)),
+  executedTransaction: vi.fn(() => ({
+    outputNotes: vi.fn(() => ({
+      notes: vi.fn(() => [createMockOutputNote(note)]),
+    })),
+  })),
+  serialize: vi.fn(() => new Uint8Array()),
+});
+
 // Mock InputNoteRecord
 export const createMockInputNoteRecord = (
   id: string = "0xnote1",
@@ -215,6 +232,13 @@ export const createMockWebClient = (
       .fn()
       .mockReturnValue(createMockTransactionRequest()),
     submitNewTransaction: vi.fn().mockResolvedValue(createMockTransactionId()),
+    executeTransaction: vi
+      .fn()
+      .mockResolvedValue(createMockTransactionResult()),
+    proveTransaction: vi.fn().mockResolvedValue({}),
+    submitProvenTransaction: vi.fn().mockResolvedValue(0),
+    applyTransaction: vi.fn().mockResolvedValue({}),
+    sendPrivateNote: vi.fn().mockResolvedValue(undefined),
 
     // Cleanup
     free: vi.fn(),
@@ -239,6 +263,11 @@ export type MockWebClientType = {
   newConsumeTransactionRequest: ReturnType<typeof vi.fn>;
   newSwapTransactionRequest: ReturnType<typeof vi.fn>;
   submitNewTransaction: ReturnType<typeof vi.fn>;
+  executeTransaction: ReturnType<typeof vi.fn>;
+  proveTransaction: ReturnType<typeof vi.fn>;
+  submitProvenTransaction: ReturnType<typeof vi.fn>;
+  applyTransaction: ReturnType<typeof vi.fn>;
+  sendPrivateNote: ReturnType<typeof vi.fn>;
   free: ReturnType<typeof vi.fn>;
 };
 
@@ -257,6 +286,18 @@ export const createMockSdkModule = (
       }
     ),
     AccountId: MockAccountId,
+    Address: {
+      fromBech32: vi.fn((bech32: string) => ({
+        accountId: vi.fn(() => createMockAccountId(bech32)),
+        toString: vi.fn(() => bech32),
+      })),
+      fromAccountId: vi.fn(
+        (accountId: ReturnType<typeof createMockAccountId>) => ({
+          accountId: vi.fn(() => accountId),
+          toString: vi.fn(() => accountId.toString()),
+        })
+      ),
+    },
     AccountStorageMode: MockAccountStorageMode,
     NoteType: MockNoteType,
     NoteId: MockNoteId,

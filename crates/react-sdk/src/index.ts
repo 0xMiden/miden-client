@@ -68,6 +68,7 @@ export { DEFAULTS } from "./types";
 
 // Utilities
 export { toBech32AccountId } from "./utils/accountBech32";
+export { formatAssetAmount, parseAssetAmount } from "./utils/amounts";
 export { getNoteSummary, formatNoteSummary } from "./utils/notes";
 
 // Hook result types
