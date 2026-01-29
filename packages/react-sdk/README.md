@@ -20,6 +20,22 @@ yarn add @miden-sdk/react @miden-sdk/miden-sdk
 pnpm add @miden-sdk/react @miden-sdk/miden-sdk
 ```
 
+## Testing
+
+From `packages/react-sdk`:
+
+```bash
+# Unit tests
+yarn test:unit
+
+# Integration tests (Playwright) in test/
+# Build the web-client dist first:
+cd ../../crates/web-client && yarn build
+cd ../../packages/react-sdk
+yarn playwright install --with-deps
+yarn test:integration
+```
+
 ## Quick Start
 
 Wrap your app with `MidenProvider` and start using hooks:
