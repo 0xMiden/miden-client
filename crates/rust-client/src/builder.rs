@@ -1,6 +1,4 @@
 use alloc::boxed::Box;
-#[cfg(all(feature = "tonic", feature = "std"))]
-use alloc::string::String;
 #[cfg(feature = "std")]
 use alloc::string::ToString;
 use alloc::sync::Arc;
@@ -13,8 +11,6 @@ use miden_tx::auth::TransactionAuthenticator;
 use miden_tx::{ExecutionOptions, LocalTransactionProver};
 use rand::Rng;
 
-#[cfg(all(feature = "tonic", feature = "std"))]
-use crate::RemoteTransactionProver;
 #[cfg(feature = "std")]
 use crate::keystore::FilesystemKeyStore;
 use crate::note_transport::NoteTransportClient;
@@ -26,33 +22,49 @@ use crate::{Client, ClientError, ClientRng, ClientRngBox, DebugMode};
 // CONSTANTS
 // ================================================================================================
 
-/// The number of blocks that are considered old enough to discard pending transactions.
-const TX_GRACEFUL_BLOCKS: u32 = 20;
+/// The default number of blocks after which pending transactions are considered stale and
+/// discarded.
+const TX_DISCARD_DELTA: u32 = 20;
 
-/// Default remote prover endpoint for testnet.
-#[cfg(all(feature = "tonic", feature = "std"))]
-pub const TESTNET_PROVER_ENDPOINT: &str = "https://tx-prover.testnet.miden.io";
-
-/// Default remote prover endpoint for devnet.
-#[cfg(all(feature = "tonic", feature = "std"))]
-pub const DEVNET_PROVER_ENDPOINT: &str = "https://tx-prover.devnet.miden.io";
-
-/// Default timeout for note transport connections (10 seconds).
-#[cfg(all(feature = "tonic", feature = "std"))]
-const NOTE_TRANSPORT_DEFAULT_TIMEOUT_MS: u64 = 10_000;
-
-// NOTE TRANSPORT CONFIG
+// GRPC SUPPORT
 // ================================================================================================
 
-/// Configuration for lazy note transport initialization.
+/// Module containing gRPC-specific types and constants.
 ///
-/// Since `GrpcNoteTransportClient::connect()` is async, this struct allows us to defer
-/// the connection until `build()` is called.
+/// This module is only available when both `tonic` and `std` features are enabled.
 #[cfg(all(feature = "tonic", feature = "std"))]
-struct NoteTransportConfig {
-    endpoint: String,
-    timeout_ms: u64,
+mod grpc_support {
+    use alloc::string::String;
+
+    pub use crate::RemoteTransactionProver;
+
+    /// Default remote prover endpoint for testnet.
+    pub const TESTNET_PROVER_ENDPOINT: &str = "https://tx-prover.testnet.miden.io";
+
+    /// Default remote prover endpoint for devnet.
+    pub const DEVNET_PROVER_ENDPOINT: &str = "https://tx-prover.devnet.miden.io";
+
+    /// Default timeout for note transport connections (10 seconds).
+    pub const NOTE_TRANSPORT_DEFAULT_TIMEOUT_MS: u64 = 10_000;
+
+    /// Configuration for lazy note transport initialization.
+    ///
+    /// Since `GrpcNoteTransportClient::connect()` is async, this struct allows us to defer
+    /// the connection until `build()` is called.
+    pub struct NoteTransportConfig {
+        pub endpoint: String,
+        pub timeout_ms: u64,
+    }
 }
+
+#[cfg(all(feature = "tonic", feature = "std"))]
+pub use grpc_support::{DEVNET_PROVER_ENDPOINT, TESTNET_PROVER_ENDPOINT};
+#[cfg(all(feature = "tonic", feature = "std"))]
+use grpc_support::{
+    NOTE_TRANSPORT_DEFAULT_TIMEOUT_MS,
+    NoteTransportConfig,
+    RemoteTransactionProver,
+};
 
 // STORE BUILDER
 // ================================================================================================
@@ -116,12 +128,11 @@ pub trait StoreFactory {
 ///   through the Miden note transport network. Configure via
 ///   [`note_transport()`](Self::note_transport).
 ///
-/// - **Execution options**: Control runtime behavior such as debug mode and cycle limits. Configure
-///   via [`in_debug_mode()`](Self::in_debug_mode).
+/// - **Debug mode**: Enables debug mode for transaction execution. Configure via
+///   [`in_debug_mode()`](Self::in_debug_mode).
 ///
-/// - **Transaction graceful blocks**: Number of blocks after which pending transactions are
-///   considered stale and discarded. Configure via
-///   [`tx_graceful_blocks()`](Self::tx_graceful_blocks).
+/// - **Transaction discard delta**: Number of blocks after which pending transactions are
+///   considered stale and discarded. Configure via [`tx_discard_delta()`](Self::tx_discard_delta).
 ///
 /// - **Max block number delta**: Maximum number of blocks the client can be behind the network for
 ///   transactions and account proofs to be considered valid. Configure via
@@ -137,9 +148,9 @@ pub struct ClientBuilder<AUTH> {
     authenticator: Option<Arc<AUTH>>,
     /// A flag to enable debug mode.
     in_debug_mode: DebugMode,
-    /// The number of blocks that are considered old enough to discard pending transactions. If
-    /// `None`, there is no limit and transactions will be kept indefinitely.
-    tx_graceful_blocks: Option<u32>,
+    /// Number of blocks after which pending transactions are considered stale and discarded.
+    /// If `None`, there is no limit and transactions will be kept indefinitely.
+    tx_discard_delta: Option<u32>,
     /// Maximum number of blocks the client can be behind the network for transactions and account
     /// proofs to be considered valid.
     max_block_number_delta: Option<u32>,
@@ -162,7 +173,7 @@ impl<AUTH> Default for ClientBuilder<AUTH> {
             rng: None,
             authenticator: None,
             in_debug_mode: DebugMode::Disabled,
-            tx_graceful_blocks: Some(TX_GRACEFUL_BLOCKS),
+            tx_discard_delta: Some(TX_DISCARD_DELTA),
             max_block_number_delta: None,
             note_transport_api: None,
             #[cfg(all(feature = "tonic", feature = "std"))]
@@ -356,12 +367,27 @@ where
         self
     }
 
-    /// Optionally set a maximum number of blocks to wait for a transaction to be confirmed. If
-    /// `None`, there is no limit and transactions will be kept indefinitely.
-    /// By default, the maximum is set to `TX_GRACEFUL_BLOCKS`.
+    /// Sets the number of blocks after which pending transactions are considered stale and
+    /// discarded.
+    ///
+    /// If a transaction has not been included in a block within this many blocks after submission,
+    /// it will be discarded. If `None`, transactions will be kept indefinitely.
+    ///
+    /// By default, the delta is set to `TX_DISCARD_DELTA` (20 blocks).
+    #[must_use]
+    pub fn tx_discard_delta(mut self, delta: Option<u32>) -> Self {
+        self.tx_discard_delta = delta;
+        self
+    }
+
+    /// Sets the number of blocks after which pending transactions are considered stale and
+    /// discarded.
+    ///
+    /// This is an alias for [`tx_discard_delta`](Self::tx_discard_delta).
+    #[deprecated(since = "0.10.0", note = "Use `tx_discard_delta` instead")]
     #[must_use]
     pub fn tx_graceful_blocks(mut self, delta: Option<u32>) -> Self {
-        self.tx_graceful_blocks = delta;
+        self.tx_discard_delta = delta;
         self
     }
 
@@ -483,7 +509,7 @@ where
                 self.in_debug_mode.into(),
             )
             .expect("Default executor's options should always be valid"),
-            tx_graceful_blocks: self.tx_graceful_blocks,
+            tx_discard_delta: self.tx_discard_delta,
             max_block_number_delta: self.max_block_number_delta,
             note_transport_api,
         })

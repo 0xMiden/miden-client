@@ -53,11 +53,9 @@ pub async fn test_client_builder_initializes_client_with_endpoint(
 ) -> Result<()> {
     let (endpoint, _, store_config, auth_path) = client_config.as_parts();
 
-    let keystore = FilesystemKeyStore::new(auth_path).context("failed to create keystore")?;
-
     let mut client = ClientBuilder::<FilesystemKeyStore>::new()
         .grpc_client(&endpoint, Some(10_000))
-        .authenticator(Arc::new(keystore))
+        .filesystem_keystore(auth_path)?
         .sqlite_store(store_config)
         .in_debug_mode(miden_client::DebugMode::Enabled)
         .build()

@@ -73,7 +73,7 @@ impl ClientConfig {
             .sqlite_store(store_config)
             .authenticator(Arc::new(keystore.clone()))
             .in_debug_mode(DebugMode::Disabled)
-            .tx_graceful_blocks(None);
+            .tx_discard_delta(None);
 
         Ok((builder, keystore))
     }

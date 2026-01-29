@@ -327,16 +327,40 @@ pub struct Client<AUTH> {
     authenticator: Option<Arc<AUTH>>,
     /// Shared source manager used to retain MASM source information for assembled programs.
     source_manager: Arc<dyn SourceManagerSync>,
-    /// Options that control the transaction executor’s runtime behaviour (e.g. debug mode).
+    /// Options that control the transaction executor's runtime behaviour (e.g. debug mode).
     exec_options: ExecutionOptions,
-    /// The number of blocks that are considered old enough to discard pending transactions.
-    tx_graceful_blocks: Option<u32>,
+    /// Number of blocks after which pending transactions are considered stale and discarded.
+    tx_discard_delta: Option<u32>,
     /// Maximum number of blocks the client can be behind the network for transactions and account
     /// proofs to be considered valid.
     max_block_number_delta: Option<u32>,
     /// An instance of [`NoteTransportClient`] which provides a way for the client to connect to
     /// the Miden Note Transport network.
     note_transport_api: Option<Arc<dyn NoteTransportClient>>,
+}
+
+/// Constructors.
+impl<AUTH> Client<AUTH>
+where
+    AUTH: builder::BuilderAuthenticator,
+{
+    /// Returns a new [`ClientBuilder`](builder::ClientBuilder) for constructing a client.
+    ///
+    /// This is a convenience method equivalent to calling `ClientBuilder::new()`.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let client = Client::builder()
+    ///     .rpc(rpc_client)
+    ///     .store(store)
+    ///     .authenticator(Arc::new(keystore))
+    ///     .build()
+    ///     .await?;
+    /// ```
+    pub fn builder() -> builder::ClientBuilder<AUTH> {
+        builder::ClientBuilder::new()
+    }
 }
 
 /// Access methods.
