@@ -128,16 +128,6 @@ yarn check:wasm-types
 
 `WebClient` is intentionally excluded because the wrapper defines its own implementation. If the check reports missing exports, update `js/types/index.d.ts` so consumers get the full generated surface.
 
-### React SDK version sync
-
-When you bump the web-client version (especially major/minor), keep the React SDK version and peer range in sync. From the repo root, run:
-
-```
-yarn check:sync:react-sdk --fix
-```
-
-Run without `--fix` to check only. This syncs `packages/react-sdk/package.json` to the current web-client version.
-
 ## Usage
 
 The following are just a few simple examples to get started. For more details, see the [API Reference](../../docs/typedoc/web-client/README.md).
