@@ -34,7 +34,16 @@ type ClientWithTransactions = {
   syncState: () => Promise<unknown>;
   getTransactions: (
     filter: TransactionFilter
-  ) => Promise<Array<{ id: () => { toHex: () => string } }>>;
+  ) => Promise<
+    Array<{
+      id: () => { toHex: () => string };
+      transactionStatus: () => {
+        isPending: () => boolean;
+        isCommitted: () => boolean;
+        isDiscarded: () => boolean;
+      };
+    }>
+  >;
 };
 
 /**
@@ -157,8 +166,8 @@ export function useSend(): UseSendResult {
           client.applyTransaction(txResult, submissionHeight)
         );
 
-        const txIdHex = txResult.id().toHex();
-        await waitForTransactionCommit(client, runExclusiveSafe, txIdHex);
+        const txId = txResult.id();
+        await waitForTransactionCommit(client, runExclusiveSafe, txId);
 
         if (noteType === NoteType.Private) {
           const fullNote = extractFullNote(txResult);
@@ -228,19 +237,27 @@ function getNoteType(type: "private" | "public" | "encrypted"): NoteType {
 async function waitForTransactionCommit(
   client: ClientWithTransactions,
   runExclusiveSafe: <T>(fn: () => Promise<T>) => Promise<T>,
-  txIdHex: string,
+  txId: { toHex: () => string },
   maxWaitMs = 10_000,
   delayMs = 1_000
 ) {
   let waited = 0;
+  const txIdHex = txId.toHex();
 
   while (waited < maxWaitMs) {
     await runExclusiveSafe(() => client.syncState());
-    const uncommitted = await runExclusiveSafe(() =>
-      client.getTransactions(TransactionFilter.uncommitted())
+    const [record] = await runExclusiveSafe(() =>
+      client.getTransactions(TransactionFilter.ids([txId]))
     );
-    const stillPending = uncommitted.some((tx) => tx.id().toHex() === txIdHex);
-    if (!stillPending) return;
+    if (record) {
+      const status = record.transactionStatus();
+      if (status.isCommitted()) {
+        return;
+      }
+      if (status.isDiscarded()) {
+        throw new Error("Transaction was discarded before commit");
+      }
+    }
     await new Promise((resolve) => setTimeout(resolve, delayMs));
     waited += delayMs;
   }
