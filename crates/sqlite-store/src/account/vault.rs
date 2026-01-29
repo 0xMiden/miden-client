@@ -58,17 +58,16 @@ impl SqliteStore {
     ) -> Result<(), StoreError> {
         const QUERY: &str =
             insert_sql!(account_assets { root, vault_key, faucet_id_prefix, asset } | REPLACE);
+        let mut stmt = tx.prepare_cached(QUERY).into_store_error()?;
+        let root_hex = root.to_hex();
         for asset in assets {
             let vault_key_word: Word = asset.vault_key().into();
-            tx.execute(
-                QUERY,
-                params![
-                    root.to_hex(),
-                    vault_key_word.to_hex(),
-                    asset.faucet_id_prefix().to_hex(),
-                    Word::from(asset).to_hex(),
-                ],
-            )
+            stmt.execute(params![
+                &root_hex,
+                vault_key_word.to_hex(),
+                asset.faucet_id_prefix().to_hex(),
+                Word::from(asset).to_hex(),
+            ])
             .into_store_error()?;
         }
 

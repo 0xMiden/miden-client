@@ -29,11 +29,10 @@ opt-level = 1
 
 [workspace.dependencies]
 # Miden protocol dependencies
-miden-mast-package = { default-features = false, version = "0.20.1" }
-miden-protocol     = { default-features = false, version = "0.13" }
-miden-standards    = { default-features = false, version = "0.13" }
-miden-testing      = { default-features = false, version = "0.13" }
-miden-tx           = { default-features = false, version = "0.13" }
+miden-protocol  = { default-features = false, version = "0.13" }
+miden-standards = { default-features = false, version = "0.13" }
+miden-testing   = { default-features = false, version = "0.13" }
+miden-tx        = { default-features = false, version = "0.13" }
 
 # Miden node dependencies
 miden-node-block-producer        = { version = "0.13" }

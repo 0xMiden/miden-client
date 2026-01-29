@@ -107,7 +107,7 @@ pub(crate) fn query_account_code(
     // return multiple mast forests
     const CODE_QUERY: &str = "SELECT code FROM account_code WHERE commitment = ?";
 
-    conn.prepare(CODE_QUERY)
+    conn.prepare_cached(CODE_QUERY)
         .into_store_error()?
         .query_map(params![commitment.to_hex()], |row| {
             let code: Vec<u8> = row.get(0)?;
@@ -126,12 +126,11 @@ pub(crate) fn query_account_addresses(
     conn: &Connection,
     account_id: AccountId,
 ) -> Result<Vec<Address>, StoreError> {
-    const ADDRESS_QUERY: &str = "SELECT address FROM addresses";
+    const ADDRESS_QUERY: &str = "SELECT address FROM addresses WHERE account_id = ?";
 
-    let query = format!("{ADDRESS_QUERY} WHERE ACCOUNT_ID = '{}'", account_id.to_hex());
-    conn.prepare(&query)
+    conn.prepare_cached(ADDRESS_QUERY)
         .into_store_error()?
-        .query_map([], |row| {
+        .query_map(params![account_id.to_hex()], |row| {
             let address: Vec<u8> = row.get(0)?;
             Ok(address)
         })
