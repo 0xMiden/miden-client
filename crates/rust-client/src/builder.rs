@@ -517,11 +517,11 @@ impl ClientBuilder<FilesystemKeyStore> {
     /// let client = ClientBuilder::new()
     ///     .rpc(rpc_client)
     ///     .store(store)
-    ///     .with_filesystem_keystore("path/to/keys")?
+    ///     .filesystem_keystore("path/to/keys")?
     ///     .build()
     ///     .await?;
     /// ```
-    pub fn with_filesystem_keystore(
+    pub fn filesystem_keystore(
         self,
         keystore_path: impl Into<std::path::PathBuf>,
     ) -> Result<Self, ClientError> {
