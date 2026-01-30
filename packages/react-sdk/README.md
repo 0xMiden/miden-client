@@ -514,8 +514,8 @@ function SendForm() {
 #### `useMultiSend()`
 
 Create multiple P2ID output notes in a single transaction. For `noteType: 'private'`,
-the hook also delivers each note to recipients via `sendPrivateNote` (bech32 addresses
-recommended).
+the hook also delivers each note to recipients via `sendPrivateNote`. Recipient IDs
+accept bech32 or hex (auto-detected).
 
 ```tsx
 import { useMultiSend } from '@miden-sdk/react';
