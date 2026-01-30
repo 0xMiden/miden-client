@@ -4,7 +4,7 @@
 
 ### Enhancements
 
-* Updated the `GrpcClient` to get the RPC limits from the node ([#1724](https://github.com/0xMiden/miden-client/pull/1724)).
+* Updated the `GrpcClient` to fetch the RPC limits from the node ([#1724](https://github.com/0xMiden/miden-client/pull/1724)).
 
 ### Changes
 

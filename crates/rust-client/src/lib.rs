@@ -168,12 +168,7 @@ pub mod assembly {
     pub use miden_protocol::assembly::diagnostics::reporting::PrintDiagnostic;
     pub use miden_protocol::assembly::mast::MastNodeExt;
     pub use miden_protocol::assembly::{
-        Assembler,
-        DefaultSourceManager,
-        Library,
-        Module,
-        ModuleKind,
-        Path,
+        Assembler, DefaultSourceManager, Library, Module, ModuleKind, Path,
     };
     pub use miden_standards::code_builder::CodeBuilder;
 }
@@ -181,19 +176,11 @@ pub mod assembly {
 /// Provides types and utilities for working with assets within the Miden network.
 pub mod asset {
     pub use miden_protocol::account::delta::{
-        AccountStorageDelta,
-        AccountVaultDelta,
-        FungibleAssetDelta,
-        NonFungibleAssetDelta,
+        AccountStorageDelta, AccountVaultDelta, FungibleAssetDelta, NonFungibleAssetDelta,
         NonFungibleDeltaAction,
     };
     pub use miden_protocol::asset::{
-        Asset,
-        AssetVault,
-        AssetWitness,
-        FungibleAsset,
-        NonFungibleAsset,
-        NonFungibleAssetDetails,
+        Asset, AssetVault, AssetWitness, FungibleAsset, NonFungibleAsset, NonFungibleAssetDetails,
         TokenSymbol,
     };
 }
@@ -202,11 +189,7 @@ pub mod asset {
 /// network.
 pub mod auth {
     pub use miden_protocol::account::auth::{
-        AuthScheme as AuthSchemeId,
-        AuthSecretKey,
-        PublicKey,
-        PublicKeyCommitment,
-        Signature,
+        AuthScheme as AuthSchemeId, AuthSecretKey, PublicKey, PublicKeyCommitment, Signature,
     };
     pub use miden_standards::AuthScheme;
     pub use miden_standards::account::auth::{AuthEcdsaK256Keccak, AuthFalcon512Rpo, NoAuth};
@@ -231,12 +214,7 @@ pub mod crypto {
     pub use miden_protocol::crypto::hash::blake::{Blake3_160, Blake3Digest};
     pub use miden_protocol::crypto::hash::rpo::Rpo256;
     pub use miden_protocol::crypto::merkle::mmr::{
-        Forest,
-        InOrderIndex,
-        MmrDelta,
-        MmrPeaks,
-        MmrProof,
-        PartialMmr,
+        Forest, InOrderIndex, MmrDelta, MmrPeaks, MmrProof, PartialMmr,
     };
     pub use miden_protocol::crypto::merkle::smt::{LeafIndex, SMT_DEPTH, SmtLeaf, SmtProof};
     pub use miden_protocol::crypto::merkle::store::MerkleStore;
@@ -247,12 +225,7 @@ pub mod crypto {
 /// Provides types for working with addresses within the Miden network.
 pub mod address {
     pub use miden_protocol::address::{
-        Address,
-        AddressId,
-        AddressInterface,
-        CustomNetworkId,
-        NetworkId,
-        RoutingParameters,
+        Address, AddressId, AddressInterface, CustomNetworkId, NetworkId, RoutingParameters,
     };
 }
 
@@ -261,17 +234,8 @@ pub mod vm {
     // TODO: Remove this re-export once miden-protocol exposes PackageKind/ProcedureExport.
     pub use miden_mast_package::{PackageKind, ProcedureExport};
     pub use miden_protocol::vm::{
-        AdviceInputs,
-        AdviceMap,
-        AttributeSet,
-        MastArtifact,
-        Package,
-        PackageExport,
-        PackageManifest,
-        Program,
-        QualifiedProcedureName,
-        Section,
-        SectionId,
+        AdviceInputs, AdviceMap, AttributeSet, MastArtifact, Package, PackageExport,
+        PackageManifest, Program, QualifiedProcedureName, Section, SectionId,
     };
 }
 
@@ -279,15 +243,8 @@ pub use async_trait::async_trait;
 pub use errors::*;
 use miden_protocol::assembly::{DefaultSourceManager, SourceManagerSync};
 pub use miden_protocol::{
-    EMPTY_WORD,
-    Felt,
-    MAX_TX_EXECUTION_CYCLES,
-    MIN_TX_EXECUTION_CYCLES,
-    ONE,
-    PrettyPrint,
-    StarkField,
-    Word,
-    ZERO,
+    EMPTY_WORD, Felt, MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES, ONE, PrettyPrint,
+    StarkField, Word, ZERO,
 };
 pub use miden_remote_prover_client::remote_prover::tx_prover::RemoteTransactionProver;
 pub use miden_tx::ExecutionOptions;
@@ -417,7 +374,7 @@ where
         }
 
         // Pre-fetch and cache RPC limits from the node
-        let _ = rpc_api.get_rpc_limits().await;
+        rpc_api.get_rpc_limits().await;
 
         let source_manager: Arc<dyn SourceManagerSync> = Arc::new(DefaultSourceManager::default());
 
