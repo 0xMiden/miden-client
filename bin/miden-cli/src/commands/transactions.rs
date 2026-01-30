@@ -1,5 +1,5 @@
 use miden_client::Client;
-use miden_client::auth::TransactionAuthenticator;
+use miden_client::keystore::Keystore;
 use miden_client::store::TransactionFilter;
 use miden_client::transaction::TransactionRecord;
 
@@ -15,7 +15,7 @@ pub struct TransactionCmd {
 }
 
 impl TransactionCmd {
-    pub async fn execute<AUTH: TransactionAuthenticator + Sync + 'static>(
+    pub async fn execute<AUTH: Keystore + Sync + 'static>(
         &self,
         client: Client<AUTH>,
     ) -> Result<(), CliError> {
@@ -26,7 +26,7 @@ impl TransactionCmd {
 
 // LIST TRANSACTIONS
 // ================================================================================================
-async fn list_transactions<AUTH: TransactionAuthenticator + Sync + 'static>(
+async fn list_transactions<AUTH: Keystore + Sync + 'static>(
     client: Client<AUTH>,
 ) -> Result<(), CliError> {
     let transactions = client.get_transactions(TransactionFilter::All).await?;

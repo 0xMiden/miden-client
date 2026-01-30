@@ -372,6 +372,7 @@ impl<AUTH> Client<AUTH> {
     /// To identify these keys and avoid collisions, the account ID is turned into its hex
     /// representation and a suffix is added. If the resulting set is empty, any existing settings
     /// entry is removed.
+    #[deprecated(since = "0.12.0", note = "Use Keystore::add_key instead")]
     pub async fn register_account_public_key_commitments(
         &self,
         account_id: &AccountId,
@@ -414,6 +415,7 @@ impl<AUTH> Client<AUTH> {
     ///
     /// If the resulting set is empty, the settings entry is removed. Returns `true` if at least
     /// one commitment was removed, or `false` otherwise.
+    #[deprecated(since = "0.12.0", note = "Use Keystore::disassociate_key_from_account instead")]
     pub async fn deregister_account_public_key_commitment(
         &self,
         account_id: &AccountId,
@@ -465,6 +467,7 @@ impl<AUTH> Client<AUTH> {
     ///
     /// Commitments are stored as a `BTreeSet`, so the returned list is deduplicated. Returns an
     /// empty vector if the account is not registered or no commitments are stored.
+    #[deprecated(since = "0.12.0", note = "Use Keystore::get_account_key_commitments instead")]
     pub async fn get_account_public_key_commitments(
         &self,
         account_id: &AccountId,

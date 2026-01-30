@@ -5,10 +5,9 @@ use std::boxed::Box;
 use miden_protocol::crypto::rand::RpoRandomCoin;
 use miden_protocol::{Felt, MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES};
 use miden_tx::ExecutionOptions;
-use miden_tx::auth::TransactionAuthenticator;
 use rand::Rng;
 
-use crate::keystore::FilesystemKeyStore;
+use crate::keystore::{FilesystemKeyStore, Keystore};
 use crate::note_transport::NoteTransportClient;
 use crate::rpc::NodeRpcClient;
 use crate::store::{Store, StoreError};
@@ -272,11 +271,5 @@ where
 
 /// Marker trait to capture the bounds the builder requires for the authenticator type
 /// parameter
-pub trait BuilderAuthenticator:
-    TransactionAuthenticator + From<FilesystemKeyStore> + 'static
-{
-}
-impl<T> BuilderAuthenticator for T where
-    T: TransactionAuthenticator + From<FilesystemKeyStore> + 'static
-{
-}
+pub trait BuilderAuthenticator: Keystore + From<FilesystemKeyStore> + 'static {}
+impl<T> BuilderAuthenticator for T where T: Keystore + From<FilesystemKeyStore> + 'static {}

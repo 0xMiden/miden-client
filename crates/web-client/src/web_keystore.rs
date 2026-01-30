@@ -1,7 +1,17 @@
 use alloc::string::{String, ToString};
 use alloc::sync::Arc;
+use alloc::vec::Vec;
 
-use idxdb_store::auth::{get_account_auth_by_pub_key_commitment, insert_account_auth};
+use idxdb_store::auth::{
+    get_account_auth_by_pub_key_commitment,
+    get_key_commitments_by_account_id,
+    insert_account_auth,
+    insert_account_key_mapping,
+    remove_account_auth,
+    remove_account_key_mapping,
+    remove_all_mappings_for_key,
+};
+use miden_client::account::AccountId;
 use miden_client::auth::{
     AuthSecretKey,
     PublicKey,
@@ -10,7 +20,7 @@ use miden_client::auth::{
     SigningInputs,
     TransactionAuthenticator,
 };
-use miden_client::keystore::KeyStoreError;
+use miden_client::keystore::{KeyStoreError, Keystore};
 use miden_client::utils::{RwLock, Serializable};
 use miden_client::{AuthenticationError, Word as NativeWord};
 use rand::Rng;
@@ -80,7 +90,10 @@ impl<R: Rng> WebKeyStore<R> {
         }
     }
 
-    pub async fn add_key(&self, key: &AuthSecretKey) -> Result<(), KeyStoreError> {
+    /// Adds a secret key to the keystore without associating it with an account.
+    ///
+    /// This is an internal method. Use [`Keystore::add_key`] with `account_id: None` instead.
+    async fn add_key_without_account(&self, key: &AuthSecretKey) -> Result<(), KeyStoreError> {
         if let Some(insert_key_cb) = &self.callbacks.as_ref().insert_key {
             let sk = WebAuthSecretKey::from(key.clone());
             insert_key_cb.insert_key(&sk).await?;
@@ -99,7 +112,8 @@ impl<R: Rng> WebKeyStore<R> {
         Ok(())
     }
 
-    pub async fn get_key(
+    /// Retrieves a secret key from the keystore given the commitment of a public key.
+    pub async fn get_key_internal(
         &self,
         pub_key: PublicKeyCommitment,
     ) -> Result<Option<AuthSecretKey>, KeyStoreError> {
@@ -107,22 +121,19 @@ impl<R: Rng> WebKeyStore<R> {
             return get_key_cb.get_secret_key(pub_key).await;
         }
         let pub_key_commitment = NativeWord::from(pub_key).to_hex();
-        let secret_key_hex =
-            get_account_auth_by_pub_key_commitment(&self.db_id, pub_key_commitment)
-                .await
-                .map_err(|err| {
-                    KeyStoreError::StorageError(format!(
-                        "failed to get item from IndexedDB: {err:?}"
-                    ))
+        let result = get_account_auth_by_pub_key_commitment(&self.db_id, pub_key_commitment).await;
+
+        match result {
+            Ok(secret_key_hex) => {
+                let secret_key_bytes = hex::decode(secret_key_hex).map_err(|err| {
+                    KeyStoreError::DecodingError(format!("error decoding secret key hex: {err:?}"))
                 })?;
 
-        let secret_key_bytes = hex::decode(secret_key_hex).map_err(|err| {
-            KeyStoreError::DecodingError(format!("error decoding secret key hex: {err:?}"))
-        })?;
-
-        let secret_key = decode_secret_key_from_bytes(&secret_key_bytes)?;
-
-        Ok(Some(secret_key))
+                let secret_key = decode_secret_key_from_bytes(&secret_key_bytes)?;
+                Ok(Some(secret_key))
+            },
+            Err(_) => Ok(None),
+        }
     }
 }
 
@@ -146,7 +157,7 @@ impl<R: Rng> TransactionAuthenticator for WebKeyStore<R> {
         let message = signing_inputs.to_commitment();
 
         let secret_key = self
-            .get_key(pub_key)
+            .get_key_internal(pub_key)
             .await
             .map_err(|err| AuthenticationError::other(err.to_string()))?;
 
@@ -167,5 +178,105 @@ impl<R: Rng> TransactionAuthenticator for WebKeyStore<R> {
     // TODO: add this (related to #1417)
     async fn get_public_key(&self, _pub_key_commitment: PublicKeyCommitment) -> Option<&PublicKey> {
         None
+    }
+}
+
+#[async_trait::async_trait(?Send)]
+impl<R: Rng> Keystore for WebKeyStore<R> {
+    async fn add_key(
+        &self,
+        key: &AuthSecretKey,
+        account_id: Option<AccountId>,
+    ) -> Result<(), KeyStoreError> {
+        let pub_key_commitment = key.public_key().to_commitment();
+
+        // Always store the key
+        self.add_key_without_account(key).await?;
+
+        // Conditionally store the mapping
+        if let Some(account_id) = account_id {
+            let account_id_hex = account_id.to_hex();
+            let pub_key_hex = NativeWord::from(pub_key_commitment).to_hex();
+
+            insert_account_key_mapping(&self.db_id, account_id_hex, pub_key_hex)
+                .await
+                .map_err(|_| {
+                    KeyStoreError::StorageError(
+                        "Failed to insert account key mapping into IndexedDB".to_string(),
+                    )
+                })?;
+        }
+
+        Ok(())
+    }
+
+    async fn remove_key(&self, pub_key: PublicKeyCommitment) -> Result<(), KeyStoreError> {
+        let pub_key_hex = NativeWord::from(pub_key).to_hex();
+
+        // Remove all account-key mappings for this key
+        remove_all_mappings_for_key(&self.db_id, pub_key_hex.clone())
+            .await
+            .map_err(|_| {
+                KeyStoreError::StorageError(
+                    "Failed to remove account key mappings from IndexedDB".to_string(),
+                )
+            })?;
+
+        // Remove the key itself
+        remove_account_auth(&self.db_id, pub_key_hex).await.map_err(|_| {
+            KeyStoreError::StorageError("Failed to remove key from IndexedDB".to_string())
+        })?;
+
+        Ok(())
+    }
+
+    async fn get_key(
+        &self,
+        pub_key: PublicKeyCommitment,
+    ) -> Result<Option<AuthSecretKey>, KeyStoreError> {
+        self.get_key_internal(pub_key).await
+    }
+
+    async fn get_account_key_commitments(
+        &self,
+        account_id: &AccountId,
+    ) -> Result<Vec<PublicKeyCommitment>, KeyStoreError> {
+        let account_id_hex = account_id.to_hex();
+
+        let commitment_hexes = get_key_commitments_by_account_id(&self.db_id, account_id_hex)
+            .await
+            .map_err(|_| {
+                KeyStoreError::StorageError(
+                    "Failed to get key commitments from IndexedDB".to_string(),
+                )
+            })?;
+
+        let commitments = commitment_hexes
+            .into_iter()
+            .filter_map(|hex| {
+                NativeWord::try_from(hex.as_str()).ok().map(PublicKeyCommitment::from)
+            })
+            .collect();
+
+        Ok(commitments)
+    }
+
+    async fn disassociate_key_from_account(
+        &self,
+        pub_key: PublicKeyCommitment,
+        account_id: &AccountId,
+    ) -> Result<bool, KeyStoreError> {
+        let account_id_hex = account_id.to_hex();
+        let pub_key_hex = NativeWord::from(pub_key).to_hex();
+
+        let removed = remove_account_key_mapping(&self.db_id, account_id_hex, pub_key_hex)
+            .await
+            .map_err(|_| {
+                KeyStoreError::StorageError(
+                    "Failed to remove account key mapping from IndexedDB".to_string(),
+                )
+            })?;
+
+        Ok(removed)
     }
 }
