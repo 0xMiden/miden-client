@@ -54,7 +54,7 @@ export interface UseMintResult {
  * ```
  */
 export function useMint(): UseMintResult {
-  const { client, isReady, sync, runExclusive } = useMiden();
+  const { client, isReady, sync, runExclusive, prover } = useMiden();
   const runExclusiveSafe = runExclusive ?? runExclusiveDirect;
 
   const [result, setResult] = useState<TransactionResult | null>(null);
@@ -88,10 +88,13 @@ export function useMint(): UseMintResult {
             options.amount
           );
 
-          const txId = await client.submitNewTransaction(
-            faucetIdObj,
-            txRequest
-          );
+          const txId = prover
+            ? await client.submitNewTransactionWithProver(
+                faucetIdObj,
+                txRequest,
+                prover
+              )
+            : await client.submitNewTransaction(faucetIdObj, txRequest);
 
           return { transactionId: txId.toString() };
         });
@@ -111,7 +114,7 @@ export function useMint(): UseMintResult {
         setIsLoading(false);
       }
     },
-    [client, isReady, runExclusive, sync]
+    [client, isReady, prover, runExclusive, sync]
   );
 
   const reset = useCallback(() => {

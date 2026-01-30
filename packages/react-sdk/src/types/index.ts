@@ -27,16 +27,44 @@ export type {
   AccountStorageMode,
 };
 
+export type RpcUrlConfig =
+  | string
+  | "devnet"
+  | "testnet"
+  | "localhost"
+  | "local";
+
+export type ProverConfig =
+  | "local"
+  | "devnet"
+  | "testnet"
+  | string
+  | {
+      url: string;
+      timeoutMs?: number | bigint;
+    };
+
+export type ProverUrls = {
+  devnet?: string;
+  testnet?: string;
+};
+
 // Provider configuration
 export interface MidenConfig {
-  /** RPC node URL. Defaults to testnet. */
-  rpcUrl?: string;
+  /** RPC node URL or network name (devnet/testnet/localhost). Defaults to testnet. */
+  rpcUrl?: RpcUrlConfig;
   /** Note transport URL for streaming notes. */
   noteTransportUrl?: string;
   /** Auto-sync interval in milliseconds. Set to 0 to disable. Default: 15000ms */
   autoSyncInterval?: number;
   /** Initial seed for deterministic RNG (must be 32 bytes if provided) */
   seed?: Uint8Array;
+  /** Transaction prover selection (local/devnet/testnet or a remote URL). */
+  prover?: ProverConfig;
+  /** Optional override URLs for network provers. */
+  proverUrls?: ProverUrls;
+  /** Default timeout for remote prover requests in milliseconds. */
+  proverTimeoutMs?: number | bigint;
 }
 
 // Provider state

@@ -57,7 +57,7 @@ export interface UseConsumeResult {
  * ```
  */
 export function useConsume(): UseConsumeResult {
-  const { client, isReady, sync, runExclusive } = useMiden();
+  const { client, isReady, sync, runExclusive, prover } = useMiden();
   const runExclusiveSafe = runExclusive ?? runExclusiveDirect;
 
   const [result, setResult] = useState<TransactionResult | null>(null);
@@ -101,10 +101,13 @@ export function useConsume(): UseConsumeResult {
           }
 
           const txRequest = client.newConsumeTransactionRequest(notes);
-          const txId = await client.submitNewTransaction(
-            accountIdObj,
-            txRequest
-          );
+          const txId = prover
+            ? await client.submitNewTransactionWithProver(
+                accountIdObj,
+                txRequest,
+                prover
+              )
+            : await client.submitNewTransaction(accountIdObj, txRequest);
           return { transactionId: txId.toString() };
         });
 
@@ -123,7 +126,7 @@ export function useConsume(): UseConsumeResult {
         setIsLoading(false);
       }
     },
-    [client, isReady, runExclusive, sync]
+    [client, isReady, prover, runExclusive, sync]
   );
 
   const reset = useCallback(() => {

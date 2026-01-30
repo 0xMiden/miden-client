@@ -75,7 +75,7 @@ type ClientWithTransactions = {
  * ```
  */
 export function useSend(): UseSendResult {
-  const { client, isReady, sync, runExclusive } = useMiden();
+  const { client, isReady, sync, runExclusive, prover } = useMiden();
   const runExclusiveSafe = runExclusive ?? runExclusiveDirect;
 
   const [result, setResult] = useState<TransactionResult | null>(null);
@@ -152,7 +152,7 @@ export function useSend(): UseSendResult {
 
         setStage("proving");
         const provenTransaction = await runExclusiveSafe(() =>
-          client.proveTransaction(txResult)
+          client.proveTransaction(txResult, prover ?? undefined)
         );
 
         setStage("submitting");
@@ -199,7 +199,7 @@ export function useSend(): UseSendResult {
         setIsLoading(false);
       }
     },
-    [client, isReady, runExclusive, sync]
+    [client, isReady, prover, runExclusive, sync]
   );
 
   const reset = useCallback(() => {

@@ -4,6 +4,7 @@ import {
   useEffect,
   useRef,
   useCallback,
+  useMemo,
   type ReactNode,
 } from "react";
 import { WebClient } from "@miden-sdk/miden-sdk";
@@ -11,6 +12,8 @@ import { useMidenStore } from "../store/MidenStore";
 import type { MidenConfig } from "../types";
 import { DEFAULTS } from "../types";
 import { AsyncLock } from "../utils/asyncLock";
+import { resolveRpcUrl } from "../utils/network";
+import { resolveTransactionProver } from "../utils/prover";
 
 interface MidenContextValue {
   client: WebClient | null;
@@ -19,6 +22,7 @@ interface MidenContextValue {
   error: Error | null;
   sync: () => Promise<void>;
   runExclusive: <T>(fn: () => Promise<T>) => Promise<T>;
+  prover: ReturnType<typeof resolveTransactionProver>;
 }
 
 const MidenContext = createContext<MidenContextValue | null>(null);
@@ -53,6 +57,23 @@ export function MidenProvider({
   const syncIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isInitializedRef = useRef(false);
   const clientLockRef = useRef(new AsyncLock());
+
+  const resolvedConfig = useMemo(
+    () => ({
+      ...config,
+      rpcUrl: resolveRpcUrl(config.rpcUrl),
+    }),
+    [config]
+  );
+  const defaultProver = useMemo(
+    () => resolveTransactionProver(resolvedConfig),
+    [
+      resolvedConfig.prover,
+      resolvedConfig.proverTimeoutMs,
+      resolvedConfig.proverUrls?.devnet,
+      resolvedConfig.proverUrls?.testnet,
+    ]
+  );
 
   const runExclusive = useCallback(
     async <T,>(fn: () => Promise<T>): Promise<T> =>
@@ -100,15 +121,15 @@ export function MidenProvider({
 
     const initClient = async () => {
       setInitializing(true);
-      setConfig(config);
+      setConfig(resolvedConfig);
 
       try {
-        const seed = config.seed as Parameters<
+        const seed = resolvedConfig.seed as Parameters<
           typeof WebClient.createClient
         >[2];
         const webClient = await WebClient.createClient(
-          config.rpcUrl,
-          config.noteTransportUrl,
+          resolvedConfig.rpcUrl,
+          resolvedConfig.noteTransportUrl,
           seed
         );
 
@@ -131,8 +152,8 @@ export function MidenProvider({
 
     initClient();
   }, [
-    config,
     runExclusive,
+    resolvedConfig,
     setClient,
     setConfig,
     setInitError,
@@ -179,6 +200,7 @@ export function MidenProvider({
     error: initError,
     sync,
     runExclusive,
+    prover: defaultProver,
   };
 
   return (

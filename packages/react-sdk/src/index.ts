@@ -30,6 +30,9 @@ export { useTransaction } from "./hooks/useTransaction";
 // Types
 export type {
   MidenConfig,
+  RpcUrlConfig,
+  ProverConfig,
+  ProverUrls,
   MidenState,
   TransactionStage,
   QueryResult,
