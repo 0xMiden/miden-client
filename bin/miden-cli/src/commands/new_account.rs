@@ -14,12 +14,13 @@ use miden_client::account::component::{
     StorageSlotSchema,
 };
 use miden_client::account::{Account, AccountBuilder, AccountStorageMode, AccountType};
-use miden_client::auth::{AuthFalcon512Rpo, AuthSecretKey, TransactionAuthenticator};
+use miden_client::auth::{AuthFalcon512Rpo, AuthSecretKey};
+use miden_client::keystore::Keystore;
 use miden_client::transaction::TransactionRequestBuilder;
 use miden_client::utils::Deserializable;
 use miden_client::vm::{Package, SectionId};
 use rand::RngCore;
-use tracing::{debug, warn};
+use tracing::debug;
 
 use crate::commands::account::set_default_account_if_unset;
 use crate::config::CliConfig;
@@ -98,7 +99,7 @@ pub struct NewWalletCmd {
 }
 
 impl NewWalletCmd {
-    pub async fn execute<AUTH: TransactionAuthenticator + Sync + 'static>(
+    pub async fn execute<AUTH: Keystore + Sync + 'static>(
         &self,
         mut client: Client<AUTH>,
         keystore: CliKeyStore,
@@ -193,7 +194,7 @@ pub struct NewAccountCmd {
 }
 
 impl NewAccountCmd {
-    pub async fn execute<AUTH: TransactionAuthenticator + Sync + 'static>(
+    pub async fn execute<AUTH: Keystore + Sync + 'static>(
         &self,
         mut client: Client<AUTH>,
         keystore: CliKeyStore,
@@ -345,7 +346,7 @@ fn separate_auth_components(
 /// and build the account.
 ///
 /// If no auth component is detected in the packages, a Falcon-based auth component will be added.
-async fn create_client_account<AUTH: TransactionAuthenticator + Sync + 'static>(
+async fn create_client_account<AUTH: Keystore + Sync + 'static>(
     client: &mut Client<AUTH>,
     keystore: &CliKeyStore,
     account_type: AccountType,
@@ -406,21 +407,11 @@ async fn create_client_account<AUTH: TransactionAuthenticator + Sync + 'static>(
 
     // Only add the key to the keystore if we generated a default key type (Falcon)
     if let Some(key_pair) = key_pair {
-        let public_key = key_pair.public_key();
-        let public_key_commitment = public_key.to_commitment();
-        keystore.add_key(&key_pair).map_err(CliError::KeyStore)?;
-        if let Err(err) = client
-            .register_account_public_key_commitments(&account.id(), &[public_key])
+        // Use the Keystore trait method which handles both key storage and account association
+        keystore
+            .add_key(&key_pair, Some(account.id()))
             .await
-        {
-            if let Err(rollback_err) = keystore.remove_key(public_key_commitment) {
-                warn!(
-                    ?rollback_err,
-                    "Failed to rollback keystore entry after commitment add failure"
-                );
-            }
-            return Err(err.into());
-        }
+            .map_err(CliError::KeyStore)?;
         println!("Generated and stored Falcon512 authentication key in keystore.");
     } else {
         println!("Using custom authentication component from package (no key generated).");
@@ -436,7 +427,7 @@ async fn create_client_account<AUTH: TransactionAuthenticator + Sync + 'static>(
 }
 
 /// Submits a deploy transaction to the node for the specified account.
-async fn deploy_account<AUTH: TransactionAuthenticator + Sync + 'static>(
+async fn deploy_account<AUTH: Keystore + Sync + 'static>(
     client: &mut Client<AUTH>,
     account: &Account,
 ) -> Result<(), CliError> {

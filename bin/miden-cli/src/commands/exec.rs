@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 use std::path::PathBuf;
 
 use clap::Parser;
-use miden_client::auth::TransactionAuthenticator;
+use miden_client::keystore::Keystore;
 use miden_client::vm::AdviceInputs;
 use miden_client::{Client, Felt, Word};
 use serde::{Deserialize, Deserializer, Serialize, de};
@@ -50,7 +50,7 @@ pub struct ExecCmd {
 }
 
 impl ExecCmd {
-    pub async fn execute<AUTH: TransactionAuthenticator + Sync + 'static>(
+    pub async fn execute<AUTH: Keystore + Sync + 'static>(
         &self,
         mut client: Client<AUTH>,
     ) -> Result<(), CliError> {
