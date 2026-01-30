@@ -39,6 +39,7 @@ pub mod note_transport;
 pub mod notes;
 pub mod rpc_client;
 pub mod settings;
+pub mod storage_reader;
 pub mod sync;
 pub mod tags;
 pub mod transactions;

@@ -820,6 +820,33 @@ Returns all the existing setting keys from the store.
 
 ***
 
+### newStorageReader()
+
+> **newStorageReader**(`account_id`): [`StorageReader`](../classes/StorageReader.md)
+
+Returns a [`StorageReader`] for reading storage slots of the specified account.
+
+The `StorageReader` provides lazy access to storage - each method call fetches
+only the requested slot from storage.
+
+# Arguments
+* `account_id` - The ID of the account to read storage from.
+
+# Errors
+Returns an error if the client is not initialized.
+
+#### Parameters
+
+##### account\_id
+
+[`AccountId`](../classes/AccountId.md)
+
+#### Returns
+
+[`StorageReader`](../classes/StorageReader.md)
+
+***
+
 ### newSwapTransactionRequest()
 
 > **newSwapTransactionRequest**(`sender_account_id`, `offered_asset_faucet_id`, `offered_asset_amount`, `requested_asset_faucet_id`, `requested_asset_amount`, `note_type`, `payback_note_type`): [`TransactionRequest`](../classes/TransactionRequest.md)
