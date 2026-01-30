@@ -69,8 +69,7 @@ pub use errors::*;
 mod endpoint;
 pub use endpoint::Endpoint;
 
-mod limits;
-pub use limits::RpcLimits;
+pub use domain::limits::RpcLimits;
 
 #[cfg(not(feature = "testing"))]
 mod generated;
@@ -101,16 +100,12 @@ pub enum AccountStateAt {
 // ================================================================================================
 
 /// Maximum number of note IDs allowed per RPC request.
-#[deprecated(since = "0.10.0", note = "Use `RpcLimits` fetched from the node via `NodeRpcClient::get_rpc_limits()` instead")]
 pub const NOTE_IDS_LIMIT: usize = 100;
 /// Maximum number of nullifier prefixes allowed per RPC request.
-#[deprecated(since = "0.10.0", note = "Use `RpcLimits` fetched from the node via `NodeRpcClient::get_rpc_limits()` instead")]
 pub const NULLIFIER_PREFIXES_LIMIT: usize = 1000;
 /// Maximum number of account IDs allowed per RPC request.
-#[deprecated(since = "0.10.0", note = "Use `RpcLimits` fetched from the node via `NodeRpcClient::get_rpc_limits()` instead")]
 pub const ACCOUNT_ID_LIMIT: usize = 1000;
 /// Maximum number of note tags allowed per RPC request.
-#[deprecated(since = "0.10.0", note = "Use `RpcLimits` fetched from the node via `NodeRpcClient::get_rpc_limits()` instead")]
 pub const NOTE_TAG_LIMIT: usize = 1000;
 
 // NODE RPC CLIENT TRAIT

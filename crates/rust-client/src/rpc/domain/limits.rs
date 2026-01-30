@@ -1,9 +1,8 @@
 // RPC LIMITS
 // ================================================================================================
 
-use super::generated::rpc::RpcLimits as ProtoRpcLimits;
+use crate::rpc::generated::rpc as proto;
 
-// Default limits matching the current hardcoded values
 const DEFAULT_NOTE_IDS_LIMIT: usize = 100;
 const DEFAULT_NULLIFIERS_LIMIT: usize = 1000;
 const DEFAULT_ACCOUNT_IDS_LIMIT: usize = 1000;
@@ -42,11 +41,11 @@ impl RpcLimits {
     ///
     /// This method extracts the relevant limits from the proto response and falls back to
     /// default values if limits are not present (e.g., when connecting to an older node).
-    pub fn from_proto(proto: ProtoRpcLimits) -> Self {
+    pub fn from_proto(proto_limits: proto::RpcLimits) -> Self {
         let mut limits = Self::default();
 
         // Extract note_id limit from GetNotesById endpoint
-        if let Some(endpoint) = proto.endpoints.get("GetNotesById") {
+        if let Some(endpoint) = proto_limits.endpoints.get("GetNotesById") {
             if let Some(&limit) = endpoint.parameters.get("note_id") {
                 limits.note_ids_limit = limit as usize;
             }
@@ -54,18 +53,18 @@ impl RpcLimits {
 
         // Extract nullifier limit from CheckNullifiers or SyncNullifiers endpoint
         // Both should have the same limit, so we check CheckNullifiers first
-        if let Some(endpoint) = proto.endpoints.get("CheckNullifiers") {
+        if let Some(endpoint) = proto_limits.endpoints.get("CheckNullifiers") {
             if let Some(&limit) = endpoint.parameters.get("nullifier") {
                 limits.nullifiers_limit = limit as usize;
             }
-        } else if let Some(endpoint) = proto.endpoints.get("SyncNullifiers") {
+        } else if let Some(endpoint) = proto_limits.endpoints.get("SyncNullifiers") {
             if let Some(&limit) = endpoint.parameters.get("nullifier") {
                 limits.nullifiers_limit = limit as usize;
             }
         }
 
         // Extract account_id limit from SyncState endpoint
-        if let Some(endpoint) = proto.endpoints.get("SyncState") {
+        if let Some(endpoint) = proto_limits.endpoints.get("SyncState") {
             if let Some(&limit) = endpoint.parameters.get("account_id") {
                 limits.account_ids_limit = limit as usize;
             }
@@ -73,11 +72,11 @@ impl RpcLimits {
 
         // Extract note_tag limit from SyncState or SyncNotes endpoint
         // Both should have the same limit, so we check SyncState first
-        if let Some(endpoint) = proto.endpoints.get("SyncState") {
+        if let Some(endpoint) = proto_limits.endpoints.get("SyncState") {
             if let Some(&limit) = endpoint.parameters.get("note_tag") {
                 limits.note_tags_limit = limit as usize;
             }
-        } else if let Some(endpoint) = proto.endpoints.get("SyncNotes") {
+        } else if let Some(endpoint) = proto_limits.endpoints.get("SyncNotes") {
             if let Some(&limit) = endpoint.parameters.get("note_tag") {
                 limits.note_tags_limit = limit as usize;
             }
