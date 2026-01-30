@@ -63,9 +63,7 @@ jobs:
       - name: Check React SDK version sync
         run: node scripts/check-react-sdk-sync.js
       - name: Install dependencies
-        run: |
-          cd ./packages/react-sdk
-          yarn install
+        run: ./scripts/retry-yarn-install.sh packages/react-sdk
       - name: Run lint
         run: make react-sdk-lint
       - name: Run typecheck
