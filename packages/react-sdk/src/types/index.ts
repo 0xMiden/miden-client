@@ -231,6 +231,24 @@ export interface SendOptions {
   timelockHeight?: number;
 }
 
+export interface MultiSendRecipient {
+  /** Recipient account ID */
+  to: string;
+  /** Amount to send */
+  amount: bigint;
+}
+
+export interface MultiSendOptions {
+  /** Sender account ID */
+  from: string;
+  /** Asset ID to send (token id) */
+  assetId: string;
+  /** Recipient list */
+  recipients: MultiSendRecipient[];
+  /** Note type. Default: private */
+  noteType?: "private" | "public" | "encrypted";
+}
+
 // Mint options
 export interface MintOptions {
   /** Target account to receive minted tokens */

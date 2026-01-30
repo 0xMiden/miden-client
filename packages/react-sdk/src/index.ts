@@ -22,6 +22,7 @@ export { useCreateWallet } from "./hooks/useCreateWallet";
 export { useCreateFaucet } from "./hooks/useCreateFaucet";
 export { useImportAccount } from "./hooks/useImportAccount";
 export { useSend } from "./hooks/useSend";
+export { useMultiSend } from "./hooks/useMultiSend";
 export { useMint } from "./hooks/useMint";
 export { useConsume } from "./hooks/useConsume";
 export { useSwap } from "./hooks/useSwap";
@@ -50,6 +51,8 @@ export type {
   CreateFaucetOptions,
   ImportAccountOptions,
   SendOptions,
+  MultiSendRecipient,
+  MultiSendOptions,
   MintOptions,
   ConsumeOptions,
   SwapOptions,
@@ -85,6 +88,7 @@ export type { UseCreateWalletResult } from "./hooks/useCreateWallet";
 export type { UseCreateFaucetResult } from "./hooks/useCreateFaucet";
 export type { UseImportAccountResult } from "./hooks/useImportAccount";
 export type { UseSendResult } from "./hooks/useSend";
+export type { UseMultiSendResult } from "./hooks/useMultiSend";
 export type { UseMintResult } from "./hooks/useMint";
 export type { UseConsumeResult } from "./hooks/useConsume";
 export type { UseSwapResult } from "./hooks/useSwap";

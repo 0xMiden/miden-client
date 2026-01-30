@@ -110,6 +110,54 @@ vi.mock("@miden-sdk/miden-sdk", () => {
       Encrypted: 3,
       Public: 1,
     },
+    Note: {
+      createP2IDNote: vi.fn(
+        (
+          sender: ReturnType<typeof createMockAccountId>,
+          receiver: ReturnType<typeof createMockAccountId>,
+          assets: unknown,
+          noteType: number,
+          attachment: unknown
+        ) => ({
+          sender,
+          receiver,
+          assets,
+          noteType,
+          attachment,
+        })
+      ),
+    },
+    NoteAssets: class NoteAssets {
+      assets: unknown[];
+      constructor(assets: unknown[]) {
+        this.assets = assets;
+      }
+    },
+    FungibleAsset: class FungibleAsset {
+      faucetId: ReturnType<typeof createMockAccountId>;
+      amount: bigint;
+      constructor(
+        faucetId: ReturnType<typeof createMockAccountId>,
+        amount: bigint
+      ) {
+        this.faucetId = faucetId;
+        this.amount = amount;
+      }
+    },
+    NoteAttachment: class NoteAttachment {},
+    OutputNoteArray: class OutputNoteArray {
+      notes: unknown[];
+      constructor(notes: unknown[]) {
+        this.notes = notes;
+      }
+    },
+    OutputNote: {
+      full: vi.fn((note: unknown) => ({ note })),
+    },
+    TransactionRequestBuilder: class TransactionRequestBuilder {
+      withOwnOutputNotes = vi.fn(() => this);
+      build = vi.fn(() => ({}));
+    },
     NoteFilter: vi.fn().mockImplementation(() => ({
       free: vi.fn(),
     })),

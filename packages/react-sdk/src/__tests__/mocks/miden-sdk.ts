@@ -197,6 +197,61 @@ export const MockNoteType = {
   Public: 1,
 };
 
+export const MockNote = {
+  createP2IDNote: vi.fn(
+    (
+      sender: ReturnType<typeof createMockAccountId>,
+      receiver: ReturnType<typeof createMockAccountId>,
+      assets: unknown,
+      noteType: number,
+      attachment: unknown
+    ) => ({
+      sender,
+      receiver,
+      assets,
+      noteType,
+      attachment,
+    })
+  ),
+};
+
+export const MockNoteAssets = class NoteAssets {
+  assets: unknown[];
+  constructor(assets: unknown[]) {
+    this.assets = assets;
+  }
+};
+
+export const MockFungibleAsset = class FungibleAsset {
+  faucetId: ReturnType<typeof createMockAccountId>;
+  amount: bigint;
+  constructor(
+    faucetId: ReturnType<typeof createMockAccountId>,
+    amount: bigint
+  ) {
+    this.faucetId = faucetId;
+    this.amount = amount;
+  }
+};
+
+export const MockNoteAttachment = class NoteAttachment {};
+
+export const MockOutputNoteArray = class OutputNoteArray {
+  notes: unknown[];
+  constructor(notes: unknown[]) {
+    this.notes = notes;
+  }
+};
+
+export const MockOutputNote = {
+  full: vi.fn((note: unknown) => ({ note })),
+};
+
+export const MockTransactionRequestBuilder = class TransactionRequestBuilder {
+  withOwnOutputNotes = vi.fn(() => this);
+  build = vi.fn(() => ({}));
+};
+
 // Mock NoteId static methods
 export const MockNoteId = {
   fromHex: vi.fn((hex: string) => ({ toString: () => hex })),
@@ -212,6 +267,7 @@ export const MockAccountStorageMode = {
 // Mock AccountId static methods
 export const MockAccountId = {
   fromHex: vi.fn((hex: string) => createMockAccountId(hex)),
+  fromBech32: vi.fn((bech32: string) => createMockAccountId(bech32)),
 };
 
 // Create a mock WebClient
@@ -335,6 +391,13 @@ export const createMockSdkModule = (
     },
     AccountStorageMode: MockAccountStorageMode,
     NoteType: MockNoteType,
+    Note: MockNote,
+    NoteAssets: MockNoteAssets,
+    FungibleAsset: MockFungibleAsset,
+    NoteAttachment: MockNoteAttachment,
+    OutputNoteArray: MockOutputNoteArray,
+    OutputNote: MockOutputNote,
+    TransactionRequestBuilder: MockTransactionRequestBuilder,
     TransactionFilter: {
       uncommitted: vi.fn(() => ({})),
       ids: vi.fn((ids: unknown) => ({ ids })),
