@@ -1,8 +1,4 @@
-use alloc::sync::Arc;
-
-use idxdb_store::WebStore;
-use miden_client::account::StorageSlotName;
-use miden_client::store::Store;
+use miden_client::account::{StorageReader as NativeStorageReader, StorageSlotName};
 use wasm_bindgen::prelude::*;
 
 use crate::js_error_with_context;
@@ -26,17 +22,19 @@ use crate::models::word::Word;
 /// const balance = await reader.getMapItem("balances", userKey);
 /// ```
 #[wasm_bindgen]
-pub struct StorageReader {
-    store: Arc<WebStore>,
-    account_id: miden_client::account::AccountId,
-}
+pub struct StorageReader(NativeStorageReader);
 
 #[wasm_bindgen]
 impl StorageReader {
+    /// Creates a new `StorageReader` with the given inner storage reader.
+    pub(crate) fn new(inner: NativeStorageReader) -> Self {
+        Self(inner)
+    }
+
     /// Returns the account ID this reader is associated with.
     #[wasm_bindgen(js_name = "accountId")]
     pub fn account_id(&self) -> AccountId {
-        self.account_id.into()
+        self.0.account_id().into()
     }
 
     /// Retrieves a storage slot value by name.
@@ -55,8 +53,8 @@ impl StorageReader {
             .map_err(|err| js_error_with_context(err, "invalid slot name"))?;
 
         let value = self
-            .store
-            .get_account_storage_item(self.account_id, slot_name)
+            .0
+            .get_item(slot_name)
             .await
             .map_err(|err| js_error_with_context(err, "failed to get storage item"))?;
 
@@ -64,7 +62,7 @@ impl StorageReader {
     }
 
     /// Retrieves a value from a storage map slot by name and key.
-    ///
+    /// 
     /// # Arguments
     /// * `slot_name` - The name of the storage map slot.
     /// * `key` - The key within the map.
@@ -76,19 +74,12 @@ impl StorageReader {
         let slot_name = StorageSlotName::new(slot_name)
             .map_err(|err| js_error_with_context(err, "invalid slot name"))?;
 
-        let (value, _witness) = self
-            .store
-            .get_account_map_item(self.account_id, slot_name, *key.as_native())
+        let value = self
+            .0
+            .get_map_item(slot_name, *key.as_native())
             .await
             .map_err(|err| js_error_with_context(err, "failed to get storage map item"))?;
 
         Ok(value.into())
-    }
-}
-
-impl StorageReader {
-    /// Creates a new `StorageReader` for the given account.
-    pub(crate) fn new(store: Arc<WebStore>, account_id: miden_client::account::AccountId) -> Self {
-        Self { store, account_id }
     }
 }
