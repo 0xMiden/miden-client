@@ -433,9 +433,8 @@ where
 
         let executed_transaction = tx_update.executed_transaction();
         let account_id = executed_transaction.account_id();
-        let account_record = self.try_get_account(account_id).await?;
 
-        if account_record.is_locked() {
+        if self.new_account_reader(account_id).is_locked().await? {
             return Err(ClientError::AccountLocked(account_id));
         }
 
@@ -604,8 +603,7 @@ where
             }
         }
 
-        let account: Account = self.try_get_account(account_id).await?.try_into()?;
-
+        let account = self.try_get_account(account_id).await?;
         if account.is_faucet() {
             // TODO(SantiagoPittella): Add faucet validations.
             Ok(())
@@ -660,8 +658,7 @@ where
         &self,
         account_id: AccountId,
     ) -> Result<AccountInterface, ClientError> {
-        let account: Account = self.try_get_account(account_id).await?.try_into()?;
-
+        let account = self.try_get_account(account_id).await?;
         Ok(AccountInterface::from_account(&account))
     }
 

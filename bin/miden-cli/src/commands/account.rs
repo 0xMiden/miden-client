@@ -83,7 +83,7 @@ impl AccountCmd {
                         let account_id: AccountId = parse_account_id(&client, id).await?;
 
                         // Check whether we're tracking that account
-                        let (account, _) = client.try_get_account_header(account_id).await?;
+                        let (account, _) = client.new_account_reader(account_id).header().await?;
 
                         client
                             .set_setting(DEFAULT_ACCOUNT_ID_KEY.to_string(), account.id())
@@ -109,12 +109,7 @@ async fn list_accounts<AUTH>(client: Client<AUTH>) -> Result<(), CliError> {
     let mut table =
         create_dynamic_table(&["Account ID", "Type", "Storage Mode", "Nonce", "Status"]);
     for (acc, _acc_seed) in &accounts {
-        let status = client
-            .get_account(acc.id())
-            .await?
-            .expect("Account should be in store")
-            .status()
-            .to_string();
+        let status = client.new_account_reader(acc.id()).status().await?.to_string();
 
         table.add_row(vec![
             acc.id().to_hex(),
@@ -139,8 +134,7 @@ pub async fn show_account<AUTH>(
     with_code: bool,
 ) -> Result<(), CliError> {
     let account = if let Some(account) = client.get_account(account_id).await? {
-        // TODO: Show partial accounts through CLI
-        account.try_into().map_err(|_| CliError::InvalidAccount(account_id))?
+        account
     } else {
         println!("Account {account_id} is not tracked by the client. Fetching from the network...",);
 
@@ -319,9 +313,7 @@ async fn account_bech_32<AUTH>(
     client: &Client<AUTH>,
     cli_config: &CliConfig,
 ) -> Result<String, CliError> {
-    let account_record = client.try_get_account(account_id).await?;
-    let account: Account =
-        account_record.try_into().map_err(|_| CliError::InvalidAccount(account_id))?;
+    let account = client.try_get_account(account_id).await?;
     let account_interface = AccountInterface::from_account(&account);
 
     let mut address = Address::new(account_id);

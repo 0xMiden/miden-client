@@ -3,8 +3,7 @@
 use alloc::vec::Vec;
 use core::fmt::Display;
 
-use miden_protocol::account::{Account, AccountCode, AccountId, PartialAccount};
-use miden_protocol::address::Address;
+use miden_protocol::account::{Account, AccountId, PartialAccount};
 use miden_protocol::{Felt, Word};
 
 use crate::ClientError;
@@ -20,59 +19,10 @@ pub enum AccountRecordData {
 }
 
 impl AccountRecordData {
-    pub fn id(&self) -> AccountId {
-        match self {
-            AccountRecordData::Full(account) => account.id(),
-            AccountRecordData::Partial(partial_account) => partial_account.id(),
-        }
-    }
-
-    pub fn commitment(&self) -> Word {
-        match self {
-            AccountRecordData::Full(account) => account.commitment(),
-            AccountRecordData::Partial(partial_account) => partial_account.commitment(),
-        }
-    }
-
-    pub fn initial_commitment(&self) -> Word {
-        match self {
-            AccountRecordData::Full(account) => account.initial_commitment(),
-            AccountRecordData::Partial(partial_account) => partial_account.initial_commitment(),
-        }
-    }
-
     pub fn nonce(&self) -> Felt {
         match self {
             AccountRecordData::Full(account) => account.nonce(),
             AccountRecordData::Partial(partial_account) => partial_account.nonce(),
-        }
-    }
-
-    pub fn seed(&self) -> Option<Word> {
-        match self {
-            AccountRecordData::Full(account) => account.seed(),
-            AccountRecordData::Partial(partial_account) => partial_account.seed(),
-        }
-    }
-
-    pub fn is_new(&self) -> bool {
-        match self {
-            AccountRecordData::Full(account) => account.is_new(),
-            AccountRecordData::Partial(partial_account) => partial_account.is_new(),
-        }
-    }
-
-    pub fn has_public_state(&self) -> bool {
-        match self {
-            AccountRecordData::Full(account) => account.has_public_state(),
-            AccountRecordData::Partial(partial_account) => partial_account.has_public_state(),
-        }
-    }
-
-    pub fn code(&self) -> &AccountCode {
-        match self {
-            AccountRecordData::Full(account) => account.code(),
-            AccountRecordData::Partial(partial_account) => partial_account.code(),
         }
     }
 }
@@ -91,16 +41,10 @@ pub struct AccountRecord {
     account_data: AccountRecordData,
     /// Status of the tracked account.
     status: AccountStatus,
-    /// Addresses by which this account can be referenced.
-    addresses: Vec<Address>,
 }
 
 impl AccountRecord {
-    pub fn new(
-        account_data: AccountRecordData,
-        status: AccountStatus,
-        addresses: Vec<Address>,
-    ) -> Self {
+    pub fn new(account_data: AccountRecordData, status: AccountStatus) -> Self {
         // TODO: remove this?
         #[cfg(debug_assertions)]
         {
@@ -111,58 +55,15 @@ impl AccountRecord {
             debug_assert_eq!(account_seed, status.seed().copied(), "account seed mismatch");
         }
 
-        Self { account_data, status, addresses }
-    }
-
-    pub fn id(&self) -> AccountId {
-        match &self.account_data {
-            AccountRecordData::Full(acc) => acc.id(),
-            AccountRecordData::Partial(acc) => acc.id(),
-        }
-    }
-
-    pub fn account_data(&self) -> &AccountRecordData {
-        &self.account_data
-    }
-
-    pub fn status(&self) -> &AccountStatus {
-        &self.status
+        Self { account_data, status }
     }
 
     pub fn is_locked(&self) -> bool {
         self.status.is_locked()
     }
 
-    pub fn seed(&self) -> Option<Word> {
-        match &self.account_data {
-            AccountRecordData::Full(acc) => acc.seed(),
-            AccountRecordData::Partial(acc) => acc.seed(),
-        }
-    }
-
     pub fn nonce(&self) -> Felt {
-        match &self.account_data {
-            AccountRecordData::Full(acc) => acc.nonce(),
-            AccountRecordData::Partial(acc) => acc.nonce(),
-        }
-    }
-
-    pub fn commitment(&self) -> Word {
-        match &self.account_data {
-            AccountRecordData::Full(acc) => acc.commitment(),
-            AccountRecordData::Partial(acc) => acc.commitment(),
-        }
-    }
-
-    pub fn addresses(&self) -> &Vec<Address> {
-        &self.addresses
-    }
-
-    pub fn code(&self) -> AccountCode {
-        match &self.account_data {
-            AccountRecordData::Full(acc) => acc.code().clone(),
-            AccountRecordData::Partial(acc) => acc.code().clone(),
-        }
+        self.account_data.nonce()
     }
 }
 

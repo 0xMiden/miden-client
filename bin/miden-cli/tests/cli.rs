@@ -547,7 +547,6 @@ async fn cli_export_import_account() -> Result<()> {
 
     assert!(client_2.get_account(AccountId::from_hex(&faucet_id)?).await.is_ok());
     assert!(client_2.get_account(AccountId::from_hex(&wallet_id)?).await.is_ok());
-
     sync_cli(&temp_dir_2);
 
     let note_id = mint_cli(&temp_dir_2, &wallet_id, &faucet_id);
@@ -899,17 +898,13 @@ async fn new_wallet_with_deploy_flag() -> Result<()> {
     // Create a client and retrieve the account to verify the nonce
     let (client, _) = create_rust_client_with_store_path(&store_path, endpoint).await?;
     let account_id = AccountId::from_hex(account_id_str)?;
-    let account = client
-        .get_account(account_id)
-        .await?
-        .expect("Account should exist in the store");
+    let nonce = client.new_account_reader(account_id).nonce().await?;
 
     // Verify that the nonce is non-zero (account was deployed)
     // By convention, a nonce of 0 indicates an undeployed account
     assert!(
-        account.nonce().as_int() > 0,
-        "Account nonce should be non-zero after deployment, but got: {}",
-        account.nonce()
+        nonce.as_int() > 0,
+        "Account nonce should be non-zero after deployment, but got: {nonce}"
     );
 
     Ok(())

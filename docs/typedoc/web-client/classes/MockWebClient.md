@@ -476,6 +476,10 @@ Uses an internal pagination mechanism to avoid fetching duplicate notes.
 
 > **getAccount**(`account_id`): `Promise`\<[`Account`](Account.md)\>
 
+Retrieves the full account data for the given account ID, returning `null` if not found.
+
+This method loads the complete account state including vault, storage, and code.
+
 #### Parameters
 
 ##### account\_id
@@ -878,6 +882,41 @@ Returns all the existing setting keys from the store.
 
 ***
 
+### newAccountReader()
+
+> **newAccountReader**(`account_id`): [`AccountReader`](AccountReader.md)
+
+Creates a new `AccountReader` for lazy access to account data.
+
+The `AccountReader` executes queries lazily - each method call fetches fresh data
+from storage, ensuring you always see the current state.
+
+# Arguments
+* `account_id` - The ID of the account to read.
+
+# Example
+```javascript
+const reader = client.newAccountReader(accountId);
+const nonce = await reader.nonce();
+const balance = await reader.getBalance(faucetId);
+```
+
+#### Parameters
+
+##### account\_id
+
+[`AccountId`](AccountId.md)
+
+#### Returns
+
+[`AccountReader`](AccountReader.md)
+
+#### Inherited from
+
+[`WebClient`](WebClient.md).[`newAccountReader`](WebClient.md#newaccountreader)
+
+***
+
 ### newConsumeTransactionRequest()
 
 > **newConsumeTransactionRequest**(`list_of_notes`): [`TransactionRequest`](TransactionRequest.md)
@@ -1011,37 +1050,6 @@ Returns all the existing setting keys from the store.
 #### Inherited from
 
 [`WebClient`](WebClient.md).[`newSendTransactionRequest`](WebClient.md#newsendtransactionrequest)
-
-***
-
-### newStorageReader()
-
-> **newStorageReader**(`account_id`): [`StorageReader`](StorageReader.md)
-
-Returns a [`StorageReader`] for reading storage slots of the specified account.
-
-The `StorageReader` provides lazy access to storage - each method call fetches
-only the requested slot from storage.
-
-# Arguments
-* `account_id` - The ID of the account to read storage from.
-
-# Errors
-Returns an error if the client is not initialized.
-
-#### Parameters
-
-##### account\_id
-
-[`AccountId`](AccountId.md)
-
-#### Returns
-
-[`StorageReader`](StorageReader.md)
-
-#### Inherited from
-
-[`WebClient`](WebClient.md).[`newStorageReader`](WebClient.md#newstoragereader)
 
 ***
 

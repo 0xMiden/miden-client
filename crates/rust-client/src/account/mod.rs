@@ -67,21 +67,21 @@ pub use miden_protocol::address::{Address, AddressInterface, AddressType, Networ
 pub use miden_protocol::errors::{AccountIdError, AddressError, NetworkIdError};
 use miden_protocol::note::NoteTag;
 
-mod storage_reader;
+mod account_reader;
+pub use account_reader::AccountReader;
 use miden_standards::account::auth::{AuthEcdsaK256Keccak, AuthFalcon512Rpo};
 // RE-EXPORTS
 // ================================================================================================
 pub use miden_standards::account::interface::AccountInterfaceExt;
 use miden_standards::account::wallets::BasicWallet;
 use miden_tx::utils::{Deserializable, Serializable};
-pub use storage_reader::StorageReader;
 
 use super::Client;
 use crate::Word;
 use crate::auth::AuthSchemeId;
 use crate::errors::ClientError;
 use crate::rpc::domain::account::FetchedAccount;
-use crate::store::{AccountRecord, AccountStatus};
+use crate::store::AccountStatus;
 use crate::sync::NoteTagRecord;
 
 const PUBLIC_KEY_COMMITMENT_SETTING_SUFFIX: &str = "_public_key_commitments";
@@ -307,57 +307,6 @@ impl<AUTH> Client<AUTH> {
         self.store.get_account_headers().await.map_err(Into::into)
     }
 
-    /// Retrieves a full [`AccountRecord`] object for the specified `account_id`. This result
-    /// represents data for the latest state known to the client, alongside its status. Returns
-    /// `None` if the account ID is not found.
-    pub async fn get_account(
-        &self,
-        account_id: AccountId,
-    ) -> Result<Option<AccountRecord>, ClientError> {
-        self.store.get_account(account_id).await.map_err(Into::into)
-    }
-
-    /// Retrieves an [`AccountHeader`] object for the specified [`AccountId`] along with its status.
-    /// Returns `None` if the account ID is not found.
-    ///
-    /// Said account's state is the state according to the last sync performed.
-    pub async fn get_account_header_by_id(
-        &self,
-        account_id: AccountId,
-    ) -> Result<Option<(AccountHeader, AccountStatus)>, ClientError> {
-        self.store.get_account_header(account_id).await.map_err(Into::into)
-    }
-
-    /// Attempts to retrieve an [`AccountRecord`] by its [`AccountId`].
-    ///
-    /// # Errors
-    ///
-    /// - If the account record is not found.
-    /// - If the underlying store operation fails.
-    pub async fn try_get_account(
-        &self,
-        account_id: AccountId,
-    ) -> Result<AccountRecord, ClientError> {
-        self.get_account(account_id)
-            .await?
-            .ok_or(ClientError::AccountDataNotFound(account_id))
-    }
-
-    /// Attempts to retrieve an [`AccountHeader`] by its [`AccountId`].
-    ///
-    /// # Errors
-    ///
-    /// - If the account header is not found.
-    /// - If the underlying store operation fails.
-    pub async fn try_get_account_header(
-        &self,
-        account_id: AccountId,
-    ) -> Result<(AccountHeader, AccountStatus), ClientError> {
-        self.get_account_header_by_id(account_id)
-            .await?
-            .ok_or(ClientError::AccountDataNotFound(account_id))
-    }
-
     /// Adds a list of public key commitments associated with the given account ID.
     ///
     /// Commitments are stored as a `BTreeSet`, so duplicates are ignored. If the account already
@@ -481,15 +430,56 @@ impl<AUTH> Client<AUTH> {
         }
     }
 
-    // ACCOUNT STORAGE ACCESS
+    // ACCOUNT ACCESS
     // --------------------------------------------------------------------------------------------
 
-    /// Returns a [`StorageReader`] for reading storage slots of the specified account.
+    /// Retrieves the full [`Account`] object from the store, returning `None` if not found.
     ///
-    /// The `StorageReader` provides lazy access to storage - each method call fetches
-    /// only the requested slot from storage.
-    pub fn new_storage_reader(&self, account_id: AccountId) -> StorageReader {
-        StorageReader::new(self.store.clone(), account_id)
+    /// This method loads the complete account state including vault, storage, and code.
+    ///
+    /// For lazy access that fetches only the data you need, use
+    /// [`Client::new_account_reader`] instead.
+    ///
+    /// Use [`Client::try_get_account`] if you want to error when the account is not found.
+    pub async fn get_account(&self, account_id: AccountId) -> Result<Option<Account>, ClientError> {
+        match self.store.get_account(account_id).await? {
+            Some(record) => Ok(Some(record.try_into()?)),
+            None => Ok(None),
+        }
+    }
+
+    /// Retrieves the full [`Account`] object from the store, erroring if not found.
+    ///
+    /// This method loads the complete account state including vault, storage, and code.
+    ///
+    /// Use [`Client::get_account`] if you want to handle missing accounts gracefully.
+    pub async fn try_get_account(&self, account_id: AccountId) -> Result<Account, ClientError> {
+        self.get_account(account_id)
+            .await?
+            .ok_or(ClientError::AccountDataNotFound(account_id))
+    }
+
+    /// Creates an [`AccountReader`] for lazy access to account data.
+    ///
+    /// The `AccountReader` provides lazy access to account state - each method call
+    /// fetches fresh data from storage, ensuring you always see the current state.
+    ///
+    /// For loading the full [`Account`] object, use [`Client::get_account`] instead.
+    ///
+    /// # Example
+    /// ```ignore
+    /// let reader = client.new_account_reader(account_id);
+    ///
+    /// // Each call fetches fresh data
+    /// let nonce = reader.nonce().await?;
+    /// let balance = reader.get_balance(faucet_id).await?;
+    ///
+    /// // Storage access is integrated
+    /// let value = reader.get_storage_item("my_slot").await?;
+    /// let (map_value, witness) = reader.get_storage_map_witness("balances", key).await?;
+    /// ```
+    pub fn new_account_reader(&self, account_id: AccountId) -> AccountReader {
+        AccountReader::new(self.store.clone(), account_id)
     }
 }
 
