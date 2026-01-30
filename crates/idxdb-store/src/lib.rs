@@ -262,6 +262,16 @@ impl Store for WebStore {
         self.get_account(account_id).await
     }
 
+    async fn get_account_code(
+        &self,
+        account_id: AccountId,
+    ) -> Result<Option<AccountCode>, StoreError> {
+        let Some((header, _)) = self.get_account_header(account_id).await? else {
+            return Ok(None);
+        };
+        Ok(Some(self.get_account_code(header.code_commitment()).await?))
+    }
+
     async fn get_minimal_partial_account(
         &self,
         account_id: AccountId,

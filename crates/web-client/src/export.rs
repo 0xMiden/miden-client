@@ -92,10 +92,12 @@ impl WebClient {
                         ),
                     )
                 })?
-                .ok_or(JsValue::from_str("No account found"))?;
-            let account = account
-                .try_into()
-                .map_err(|_| JsValue::from_str("partial accounts are still unsupported"))?;
+                .ok_or_else(|| {
+                    JsValue::from_str(&format!(
+                        "Account with ID {} not found",
+                        account_id.to_string()
+                    ))
+                })?;
 
             let mut key_pairs = vec![];
 

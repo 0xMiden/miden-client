@@ -84,12 +84,10 @@ async fn export_account<AUTH>(
 ) -> Result<File, CliError> {
     let account_id = parse_account_id(client, account_id).await?;
 
-    let account = client
+    let account: Account = client
         .get_account(account_id)
         .await?
-        .ok_or(CliError::Export(format!("Account with ID {account_id} not found")))?;
-
-    let account: Account = account.try_into()?;
+        .ok_or_else(|| CliError::Export(format!("Account with ID {account_id} not found")))?;
 
     let commitments = client.get_account_public_key_commitments(&account_id).await?;
 

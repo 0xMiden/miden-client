@@ -261,6 +261,13 @@ pub trait Store: Send + Sync {
     async fn get_account(&self, account_id: AccountId)
     -> Result<Option<AccountRecord>, StoreError>;
 
+    /// Retrieves the [`AccountCode`] for the specified account.
+    /// Returns `None` if the account is not found.
+    async fn get_account_code(
+        &self,
+        account_id: AccountId,
+    ) -> Result<Option<AccountCode>, StoreError>;
+
     /// Inserts an [`Account`] to the store.
     /// Receives an [`Address`] as the initial address to associate with the account. This address
     /// will be tracked for incoming notes and its derived note tag will be monitored.
