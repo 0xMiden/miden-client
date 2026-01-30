@@ -206,6 +206,7 @@ export const MockNote = {
       noteType: number,
       attachment: unknown
     ) => ({
+      id: vi.fn(() => ({ toString: () => "0xnote" })),
       sender,
       receiver,
       assets,
@@ -247,8 +248,25 @@ export const MockOutputNote = {
   full: vi.fn((note: unknown) => ({ note })),
 };
 
+export const MockNoteAndArgs = class NoteAndArgs {
+  note: unknown;
+  args: unknown;
+  constructor(note: unknown, args: unknown) {
+    this.note = note;
+    this.args = args;
+  }
+};
+
+export const MockNoteAndArgsArray = class NoteAndArgsArray {
+  notes: unknown[];
+  constructor(notes: unknown[]) {
+    this.notes = notes;
+  }
+};
+
 export const MockTransactionRequestBuilder = class TransactionRequestBuilder {
   withOwnOutputNotes = vi.fn(() => this);
+  withInputNotes = vi.fn(() => this);
   build = vi.fn(() => ({}));
 };
 
@@ -397,6 +415,8 @@ export const createMockSdkModule = (
     NoteAttachment: MockNoteAttachment,
     OutputNoteArray: MockOutputNoteArray,
     OutputNote: MockOutputNote,
+    NoteAndArgs: MockNoteAndArgs,
+    NoteAndArgsArray: MockNoteAndArgsArray,
     TransactionRequestBuilder: MockTransactionRequestBuilder,
     TransactionFilter: {
       uncommitted: vi.fn(() => ({})),

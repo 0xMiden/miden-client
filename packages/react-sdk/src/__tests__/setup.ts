@@ -119,6 +119,7 @@ vi.mock("@miden-sdk/miden-sdk", () => {
           noteType: number,
           attachment: unknown
         ) => ({
+          id: vi.fn(() => ({ toString: () => "0xnote" })),
           sender,
           receiver,
           assets,
@@ -154,8 +155,23 @@ vi.mock("@miden-sdk/miden-sdk", () => {
     OutputNote: {
       full: vi.fn((note: unknown) => ({ note })),
     },
+    NoteAndArgs: class NoteAndArgs {
+      note: unknown;
+      args: unknown;
+      constructor(note: unknown, args: unknown) {
+        this.note = note;
+        this.args = args;
+      }
+    },
+    NoteAndArgsArray: class NoteAndArgsArray {
+      notes: unknown[];
+      constructor(notes: unknown[]) {
+        this.notes = notes;
+      }
+    },
     TransactionRequestBuilder: class TransactionRequestBuilder {
       withOwnOutputNotes = vi.fn(() => this);
+      withInputNotes = vi.fn(() => this);
       build = vi.fn(() => ({}));
     },
     NoteFilter: vi.fn().mockImplementation(() => ({

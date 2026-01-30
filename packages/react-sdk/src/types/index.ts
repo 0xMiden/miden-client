@@ -249,6 +249,38 @@ export interface MultiSendOptions {
   noteType?: "private" | "public" | "encrypted";
 }
 
+export interface InternalTransferOptions {
+  /** Sender account ID */
+  from: string;
+  /** Recipient account ID */
+  to: string;
+  /** Asset ID to send (token id) */
+  assetId: string;
+  /** Amount to transfer */
+  amount: bigint;
+  /** Note type. Default: private */
+  noteType?: "private" | "public" | "encrypted";
+}
+
+export interface InternalTransferChainOptions {
+  /** Initial sender account ID */
+  from: string;
+  /** Ordered list of recipient account IDs */
+  recipients: string[];
+  /** Asset ID to send (token id) */
+  assetId: string;
+  /** Amount to transfer per hop */
+  amount: bigint;
+  /** Note type. Default: private */
+  noteType?: "private" | "public" | "encrypted";
+}
+
+export interface InternalTransferResult {
+  createTransactionId: string;
+  consumeTransactionId: string;
+  noteId: string;
+}
+
 // Mint options
 export interface MintOptions {
   /** Target account to receive minted tokens */
