@@ -559,7 +559,7 @@ Create multiple P2ID output notes in a single transaction. This is ideal for
 batched payouts or airdrops; with `noteType: 'private'`, the hook also delivers
 each note to recipients via `sendPrivateNote`.
 It builds the request and executes the full pipeline in one go. That means
-fewer chances to mis-handle batching or forget private note delivery.
+fewer chances to handle batching incorrectly or forget private note delivery.
 
 ```tsx
 import { useMultiSend } from '@miden-sdk/react';
