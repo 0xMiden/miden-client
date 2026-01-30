@@ -141,12 +141,20 @@ export const createMockSyncSummary = (blockNum: number = 100) => ({
 });
 
 // Mock TransactionId
+const createMockWord = (hex: string = "0xword") => ({
+  free: vi.fn(),
+  toHex: vi.fn(() => hex),
+  serialize: vi.fn(() => new Uint8Array()),
+  toU64s: vi.fn(() => new BigUint64Array()),
+  toFelts: vi.fn(() => []),
+});
+
 export const createMockTransactionId = (id: string = "0xtx123") => ({
   toString: vi.fn(() => id),
   toHex: vi.fn(() => id),
   asElements: vi.fn(() => []),
   asBytes: vi.fn(() => new Uint8Array()),
-  inner: vi.fn(() => ({})),
+  inner: vi.fn(() => createMockWord(id)),
   free: vi.fn(),
 });
 
