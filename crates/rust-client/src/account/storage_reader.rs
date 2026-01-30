@@ -35,7 +35,8 @@ pub struct StorageReader {
 impl StorageReader {
     /// Creates a new `StorageReader` for the given account.
     ///
-    /// This is typically called via [`Client::new_storage_reader`](crate::Client::new_storage_reader).
+    /// This is typically called via
+    /// [`Client::new_storage_reader`](crate::Client::new_storage_reader).
     pub(crate) fn new(store: Arc<dyn Store>, account_id: AccountId) -> Self {
         Self { store, account_id }
     }
