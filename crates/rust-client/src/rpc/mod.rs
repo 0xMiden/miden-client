@@ -95,18 +95,6 @@ pub enum AccountStateAt {
     Block(BlockNumber),
 }
 
-// RPC ENDPOINT LIMITS
-// ================================================================================================
-
-/// Maximum number of note IDs allowed per RPC request.
-pub const NOTE_IDS_LIMIT: usize = 100;
-/// Maximum number of nullifier prefixes allowed per RPC request.
-pub const NULLIFIER_PREFIXES_LIMIT: usize = 1000;
-/// Maximum number of account IDs allowed per RPC request.
-pub const ACCOUNT_ID_LIMIT: usize = 1000;
-/// Maximum number of note tags allowed per RPC request.
-pub const NOTE_TAG_LIMIT: usize = 1000;
-
 // NODE RPC CLIENT TRAIT
 // ================================================================================================
 
@@ -398,8 +386,7 @@ pub trait NodeRpcClient: Send + Sync {
     /// Fetches the RPC limits configured on the node.
     ///
     /// Returns the limits that define the maximum number of items that can be sent in a single
-    /// RPC request. If the node doesn't support the `GetLimits` endpoint (older nodes), default
-    /// limits are returned.
+    /// RPC request. If the request fails for any reason, default values are returned.
     async fn get_rpc_limits(&self) -> RpcLimits;
 }
 
