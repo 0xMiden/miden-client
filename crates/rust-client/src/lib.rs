@@ -373,9 +373,6 @@ where
             init_note_transport_cursor(store.clone()).await?;
         }
 
-        // Pre-fetch and cache RPC limits from the node
-        rpc_api.get_rpc_limits().await;
-
         let source_manager: Arc<dyn SourceManagerSync> = Arc::new(DefaultSourceManager::default());
 
         Ok(Self {
