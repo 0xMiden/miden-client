@@ -2,14 +2,14 @@ use std::fs;
 
 use miden_client::Client;
 use miden_client::account::AccountId;
-use miden_client::auth::TransactionAuthenticator;
+use miden_client::keystore::Keystore;
 use miden_client::store::NoteFilter;
 
 use super::config::CliConfig;
 use crate::commands::account::DEFAULT_ACCOUNT_ID_KEY;
 use crate::errors::CliError;
 
-pub async fn print_client_info<AUTH: TransactionAuthenticator + Sync + 'static>(
+pub async fn print_client_info<AUTH: Keystore + Sync + 'static>(
     client: &Client<AUTH>,
 ) -> Result<(), CliError> {
     let config = CliConfig::from_system()?;
@@ -21,7 +21,7 @@ pub async fn print_client_info<AUTH: TransactionAuthenticator + Sync + 'static>(
 
 // HELPERS
 // ================================================================================================
-async fn print_client_stats<AUTH: TransactionAuthenticator + Sync + 'static>(
+async fn print_client_stats<AUTH: Keystore + Sync + 'static>(
     client: &Client<AUTH>,
 ) -> Result<(), CliError> {
     println!("Block number: {}", client.get_sync_height().await?);

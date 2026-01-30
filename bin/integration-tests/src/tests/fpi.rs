@@ -18,7 +18,7 @@ use miden_client::auth::{
     AuthSecretKey,
     RPO_FALCON_SCHEME_ID,
 };
-use miden_client::keystore::FilesystemKeyStore;
+use miden_client::keystore::{FilesystemKeyStore, Keystore};
 use miden_client::rpc::domain::account::{AccountStorageRequirements, StorageMapKey};
 use miden_client::testing::common::*;
 use miden_client::transaction::{AdviceInputs, ForeignAccount, TransactionRequestBuilder};
@@ -492,7 +492,10 @@ async fn deploy_foreign_account(
         foreign_account_with_code(storage_mode, code, auth_scheme)?;
     let foreign_account_id = foreign_account.id();
 
-    keystore.add_key(&secret_key).with_context(|| "failed to add key to keystore")?;
+    keystore
+        .add_key(&secret_key, None)
+        .await
+        .with_context(|| "failed to add key to keystore")?;
     client.add_account(&foreign_account, false).await?;
 
     println!("Deploying foreign account");

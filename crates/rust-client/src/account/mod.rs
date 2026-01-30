@@ -300,6 +300,7 @@ impl<AUTH> Client<AUTH> {
     ///
     /// If the resulting set is empty, the settings entry is removed. Returns `true` if at least
     /// one commitment was removed, or `false` otherwise.
+    #[deprecated(since = "0.12.0", note = "Use Keystore::disassociate_key_from_account instead")]
     pub async fn deregister_account_public_key_commitment(
         &self,
         account_id: &AccountId,
@@ -346,11 +347,12 @@ impl<AUTH> Client<AUTH> {
     /// [`AccountId`], if any.
     ///
     /// Once retrieved, this list of public key commitments can be used in conjunction with
-    /// [`FilesystemKeyStore::get_key`](crate::keystore::FilesystemKeyStore::get_key) to retrieve
+    /// [`Keystore::get_key`](crate::keystore::Keystore::get_key) to retrieve
     /// secret keys.
     ///
     /// Commitments are stored as a `BTreeSet`, so the returned list is deduplicated. Returns an
     /// empty vector if the account is not registered or no commitments are stored.
+    #[deprecated(since = "0.12.0", note = "Use Keystore::get_account_key_commitments instead")]
     pub async fn get_account_public_key_commitments(
         &self,
         account_id: &AccountId,
@@ -374,7 +376,7 @@ impl<AUTH> Client<AUTH> {
     ///
     /// This is useful because with a public key commitment, we can retrieve its corresponding
     /// secret key using, for example,
-    /// [`FilesystemKeyStore::get_key`](crate::keystore::FilesystemKeyStore::get_key). This yields
+    /// [`Keystore::get_key`](crate::keystore::Keystore::get_key). This yields
     /// an indirect mapping from account ID to its secret keys: account ID -> public key commitments
     /// -> secret keys (via keystore).
     ///

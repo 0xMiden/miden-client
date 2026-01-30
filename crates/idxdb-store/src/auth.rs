@@ -1,3 +1,7 @@
+use alloc::format;
+use alloc::string::String;
+use alloc::vec::Vec;
+
 use serde::{Deserialize, Serialize};
 use serde_wasm_bindgen::from_value;
 use wasm_bindgen::JsValue;
@@ -27,6 +31,38 @@ extern "C" {
 
     #[wasm_bindgen(js_name = getAccountAuthByPubKeyCommitment)]
     pub fn idxdb_get_account_auth_by_pub_key_commitment(
+        db_id: &str,
+        pub_key_commitment_hex: String,
+    ) -> js_sys::Promise;
+
+    #[wasm_bindgen(js_name = removeAccountAuth)]
+    pub fn idxdb_remove_account_auth(
+        db_id: &str,
+        pub_key_commitment_hex: String,
+    ) -> js_sys::Promise;
+
+    #[wasm_bindgen(js_name = insertAccountKeyMapping)]
+    pub fn idxdb_insert_account_key_mapping(
+        db_id: &str,
+        account_id_hex: String,
+        pub_key_commitment_hex: String,
+    ) -> js_sys::Promise;
+
+    #[wasm_bindgen(js_name = removeAccountKeyMapping)]
+    pub fn idxdb_remove_account_key_mapping(
+        db_id: &str,
+        account_id_hex: String,
+        pub_key_commitment_hex: String,
+    ) -> js_sys::Promise;
+
+    #[wasm_bindgen(js_name = getKeyCommitmentsByAccountId)]
+    pub fn idxdb_get_key_commitments_by_account_id(
+        db_id: &str,
+        account_id_hex: String,
+    ) -> js_sys::Promise;
+
+    #[wasm_bindgen(js_name = removeAllMappingsForKey)]
+    pub fn idxdb_remove_all_mappings_for_key(
         db_id: &str,
         pub_key_commitment_hex: String,
     ) -> js_sys::Promise;
@@ -62,4 +98,56 @@ pub async fn get_account_auth_by_pub_key_commitment(
             "Pub key commitment {pub_key_commitment_hex} not found in the store"
         ))),
     }
+}
+
+pub async fn remove_account_auth(
+    db_id: &str,
+    pub_key_commitment_hex: String,
+) -> Result<(), JsValue> {
+    let promise = idxdb_remove_account_auth(db_id, pub_key_commitment_hex);
+    JsFuture::from(promise).await?;
+    Ok(())
+}
+
+pub async fn insert_account_key_mapping(
+    db_id: &str,
+    account_id_hex: String,
+    pub_key_commitment_hex: String,
+) -> Result<(), JsValue> {
+    let promise = idxdb_insert_account_key_mapping(db_id, account_id_hex, pub_key_commitment_hex);
+    JsFuture::from(promise).await?;
+    Ok(())
+}
+
+pub async fn remove_account_key_mapping(
+    db_id: &str,
+    account_id_hex: String,
+    pub_key_commitment_hex: String,
+) -> Result<bool, JsValue> {
+    let promise = idxdb_remove_account_key_mapping(db_id, account_id_hex, pub_key_commitment_hex);
+    let result = JsFuture::from(promise).await?;
+    Ok(result.as_bool().unwrap_or(false))
+}
+
+pub async fn get_key_commitments_by_account_id(
+    db_id: &str,
+    account_id_hex: String,
+) -> Result<Vec<String>, JsValue> {
+    let promise = idxdb_get_key_commitments_by_account_id(db_id, account_id_hex);
+    let js_commitments = JsFuture::from(promise).await?;
+
+    let commitments: Vec<String> = from_value(js_commitments).map_err(|err| {
+        JsValue::from_str(&format!("Error: failed to deserialize key commitments: {err}"))
+    })?;
+
+    Ok(commitments)
+}
+
+pub async fn remove_all_mappings_for_key(
+    db_id: &str,
+    pub_key_commitment_hex: String,
+) -> Result<(), JsValue> {
+    let promise = idxdb_remove_all_mappings_for_key(db_id, pub_key_commitment_hex);
+    JsFuture::from(promise).await?;
+    Ok(())
 }

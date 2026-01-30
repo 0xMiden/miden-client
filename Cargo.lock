@@ -2612,6 +2612,8 @@ dependencies = [
  "prost",
  "prost-types",
  "rand 0.9.2",
+ "serde",
+ "serde_json",
  "thiserror 2.0.18",
  "tokio",
  "tonic",
@@ -2703,6 +2705,7 @@ dependencies = [
 name = "miden-client-web"
 version = "0.13.0"
 dependencies = [
+ "async-trait",
  "console_error_panic_hook",
  "hex",
  "js-sys",

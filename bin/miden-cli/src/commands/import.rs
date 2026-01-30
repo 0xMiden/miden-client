@@ -3,11 +3,11 @@ use std::io::Read;
 use std::path::PathBuf;
 
 use miden_client::account::{AccountFile, AccountId};
-use miden_client::auth::TransactionAuthenticator;
+use miden_client::keystore::Keystore;
 use miden_client::note::NoteFile;
 use miden_client::utils::Deserializable;
 use miden_client::{Client, ClientError};
-use tracing::{info, warn};
+use tracing::info;
 
 use crate::commands::account::set_default_account_if_unset;
 use crate::errors::CliError;
@@ -25,7 +25,7 @@ pub struct ImportCmd {
 }
 
 impl ImportCmd {
-    pub async fn execute<AUTH: TransactionAuthenticator + Sync + 'static>(
+    pub async fn execute<AUTH: Keystore + Sync + 'static>(
         &self,
         mut client: Client<AUTH>,
         keystore: FilesystemKeyStore,
@@ -64,8 +64,7 @@ impl ImportCmd {
 ///
 /// This implies:
 ///
-/// - Reading all secret keys, and importing it to the CLI keystore
-/// - Storing account ID -> public key commitment mapping on the client's store
+/// - Reading all secret keys, and importing them to the CLI keystore with account association
 /// - Adding the [account][`miden_client::account::Account`] to the client
 async fn import_account<AUTH>(
     client: &mut Client<AUTH>,
@@ -77,20 +76,8 @@ async fn import_account<AUTH>(
     let AccountFile { account, auth_secret_keys } = account_file;
 
     for key in auth_secret_keys {
-        let public_key = key.public_key();
-        let public_key_commitment = public_key.to_commitment();
-        keystore.add_key(&key).map_err(CliError::KeyStore)?;
-        if let Err(err) =
-            client.register_account_public_key_commitments(&account_id, &[public_key]).await
-        {
-            if let Err(rollback_err) = keystore.remove_key(public_key_commitment) {
-                warn!(
-                    ?rollback_err,
-                    "Failed to rollback keystore entry after commitment add failure"
-                );
-            }
-            return Err(err.into());
-        }
+        // Use the Keystore trait method which handles both key storage and account association
+        keystore.add_key(&key, Some(account_id)).await.map_err(CliError::KeyStore)?;
     }
 
     client.add_account(&account, overwrite).await?;

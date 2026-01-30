@@ -1,4 +1,5 @@
 use miden_client::Word as NativeWord;
+use miden_client::keystore::Keystore;
 use wasm_bindgen::prelude::*;
 
 use crate::models::account::Account;
@@ -154,26 +155,23 @@ impl WebClient {
         &mut self,
         account_id: &AccountId,
     ) -> Result<Vec<Word>, JsValue> {
-        if let Some(client) = self.get_mut_inner() {
-            Ok(client
-                .get_account_public_key_commitments(account_id.as_native())
-                .await
-                .map_err(|err| {
-                    js_error_with_context(
-                        err,
-                        &format!(
-                            "failed to fetch public key commitments for account: {}",
-                            account_id.as_native()
-                        ),
-                    )
-                })?
-                .into_iter()
-                .map(NativeWord::from)
-                .map(Into::into)
-                .collect())
-        } else {
-            Err(JsValue::from_str("Client not initialized"))
-        }
+        let keystore = self.keystore.clone().expect("Keystore not initialized");
+        Ok(keystore
+            .get_account_key_commitments(account_id.as_native())
+            .await
+            .map_err(|err| {
+                js_error_with_context(
+                    err,
+                    &format!(
+                        "failed to fetch public key commitments for account: {}",
+                        account_id.as_native()
+                    ),
+                )
+            })?
+            .into_iter()
+            .map(NativeWord::from)
+            .map(Into::into)
+            .collect())
     }
 
     #[wasm_bindgen(js_name = "insertAccountAddress")]

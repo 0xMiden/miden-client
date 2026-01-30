@@ -24,7 +24,7 @@ use miden_client::auth::{
     RPO_FALCON_SCHEME_ID,
 };
 use miden_client::builder::ClientBuilder;
-use miden_client::keystore::FilesystemKeyStore;
+use miden_client::keystore::{FilesystemKeyStore, Keystore};
 use miden_client::note::{BlockNumber, NoteId};
 use miden_client::rpc::{NodeRpcClient, RpcLimits};
 use miden_client::store::input_note_states::ConsumedAuthenticatedLocalNoteState;
@@ -2107,7 +2107,7 @@ async fn empty_storage_map() {
 
     let account_id = account.id();
 
-    keystore.add_key(&key_pair).unwrap();
+    keystore.add_key(&key_pair, None).await.unwrap();
 
     client.add_account(&account, false).await.unwrap();
 
@@ -2214,7 +2214,7 @@ async fn storage_and_vault_proofs() {
         .build()
         .unwrap();
 
-    keystore.add_key(&key_pair).unwrap();
+    keystore.add_key(&key_pair, None).await.unwrap();
 
     client
         .test_store()
@@ -2753,7 +2753,7 @@ async fn insert_new_wallet(
         .build()
         .unwrap();
 
-    keystore.add_key(&key_pair).unwrap();
+    keystore.add_key(&key_pair, None).await.unwrap();
 
     client.add_account(&account, false).await?;
 
@@ -2779,7 +2779,7 @@ async fn insert_new_ecdsa_wallet(
         .build()
         .unwrap();
 
-    keystore.add_key(&key_pair).unwrap();
+    keystore.add_key(&key_pair, None).await.unwrap();
 
     client.add_account(&account, false).await?;
 
@@ -2810,7 +2810,7 @@ async fn insert_new_fungible_faucet(
         .build()
         .unwrap();
 
-    keystore.add_key(&key_pair).unwrap();
+    keystore.add_key(&key_pair, None).await.unwrap();
 
     client.add_account(&account, false).await?;
     Ok(account)
@@ -2843,7 +2843,7 @@ async fn insert_new_ecdsa_fungible_faucet(
         .build()
         .unwrap();
 
-    keystore.add_key(&key_pair).unwrap();
+    keystore.add_key(&key_pair, None).await.unwrap();
 
     client.add_account(&account, false).await?;
     Ok(account)
@@ -2913,7 +2913,7 @@ async fn storage_and_vault_proofs_ecdsa() {
         .build()
         .unwrap();
 
-    keystore.add_key(&key_pair).unwrap();
+    keystore.add_key(&key_pair, None).await.unwrap();
 
     client.add_account(&account, false).await.unwrap();
 
