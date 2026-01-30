@@ -119,7 +119,7 @@ fn silent_initialization_uses_default_values() {
     account_cmd.args(["account"]);
     account_cmd.current_dir(&temp_dir).assert().success();
 
-    // Read and verify the global config file contents (now in the isolated directory)
+    // Read and verify the global config file contents
     let global_config_path = miden_home.join("miden-client.toml");
     let config_content = std::fs::read_to_string(&global_config_path).unwrap();
 
@@ -956,7 +956,10 @@ fn set_isolated_miden_home() -> PathBuf {
     let path = temp_dir().join(format!("miden-home-{}", rand::rng().random::<u64>()));
     std::fs::create_dir_all(&path).unwrap();
     // SAFETY: Tests using this are serialized via #[serial_test::file_serial]
-    unsafe { env::set_var("MIDEN_CLIENT_HOME", &path); }
+    // These don't need to be executed in parallel as they aren't a bottleneck at all.
+    unsafe {
+        env::set_var("MIDEN_CLIENT_HOME", &path);
+    }
     path
 }
 
@@ -1445,7 +1448,7 @@ async fn test_from_system_user_config_local_priority() -> Result<()> {
     // Use isolated global miden directory
     let _miden_home = set_isolated_miden_home();
 
-    // Create a global config with testnet endpoint (will be created in the isolated directory)
+    // Create a global config with testnet endpoint
     let global_store_path = create_test_store_path();
     let global_endpoint = Endpoint::testnet();
 

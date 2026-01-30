@@ -25,10 +25,6 @@ pub const DEFAULT_REMOTE_PROVER_TIMEOUT: Duration = Duration::from_secs(20);
 ///
 /// If the `MIDEN_CLIENT_HOME` environment variable is set, returns that path directly.
 /// Otherwise, returns the `.miden` directory in the user's home directory.
-///
-/// The `MIDEN_CLIENT_HOME` environment variable is primarily intended for testing,
-/// allowing tests to use isolated temporary directories instead of the real
-/// home directory.
 pub fn get_global_miden_dir() -> Result<PathBuf, std::io::Error> {
     if let Ok(miden_home) = std::env::var("MIDEN_CLIENT_HOME") {
         return Ok(PathBuf::from(miden_home));
