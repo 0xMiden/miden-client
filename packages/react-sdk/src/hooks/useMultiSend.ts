@@ -8,15 +8,17 @@ import {
   NoteType,
   OutputNote,
   OutputNoteArray,
+  TransactionFilter,
   TransactionRequestBuilder,
 } from "@miden-sdk/miden-sdk";
+import type { TransactionId } from "@miden-sdk/miden-sdk";
 import type {
   MultiSendOptions,
   TransactionStage,
   TransactionResult,
 } from "../types";
 import { DEFAULTS } from "../types";
-import { parseAccountId } from "../utils/accountParsing";
+import { parseAccountId, parseAddress } from "../utils/accountParsing";
 import { runExclusiveDirect } from "../utils/runExclusive";
 
 export interface UseMultiSendResult {
@@ -33,6 +35,20 @@ export interface UseMultiSendResult {
   /** Reset the hook state */
   reset: () => void;
 }
+
+type ClientWithTransactions = {
+  syncState: () => Promise<unknown>;
+  getTransactions: (filter: TransactionFilter) => Promise<
+    Array<{
+      id: () => { toHex: () => string };
+      transactionStatus: () => {
+        isPending: () => boolean;
+        isCommitted: () => boolean;
+        isDiscarded: () => boolean;
+      };
+    }>
+  >;
+};
 
 /**
  * Hook to create a multi-send transaction (multiple P2ID notes).
@@ -90,7 +106,7 @@ export function useMultiSend(): UseMultiSendResult {
         const senderId = parseAccountId(options.from);
         const assetId = parseAccountId(options.assetId);
 
-        const outputNotes = options.recipients.map(({ to, amount }) => {
+        const outputs = options.recipients.map(({ to, amount }) => {
           const receiverId = parseAccountId(to);
           const assets = new NoteAssets([new FungibleAsset(assetId, amount)]);
           const note = Note.createP2IDNote(
@@ -100,32 +116,61 @@ export function useMultiSend(): UseMultiSendResult {
             noteType,
             new NoteAttachment()
           );
-          return OutputNote.full(note);
+          const recipientAddress = parseAddress(to, receiverId);
+          return {
+            outputNote: OutputNote.full(note),
+            note,
+            recipientAddress,
+          };
         });
+
+        const txRequest = new TransactionRequestBuilder()
+          .withOwnOutputNotes(
+            new OutputNoteArray(outputs.map((o) => o.outputNote))
+          )
+          .build();
+
+        const txResult = await runExclusiveSafe(() =>
+          client.executeTransaction(senderId, txRequest)
+        );
 
         setStage("proving");
-        const txResult = await runExclusiveSafe(async () => {
-          const txRequest = new TransactionRequestBuilder()
-            .withOwnOutputNotes(new OutputNoteArray(outputNotes))
-            .build();
+        const provenTransaction = await runExclusiveSafe(() =>
+          client.proveTransaction(txResult, prover ?? undefined)
+        );
 
-          const txId = prover
-            ? await client.submitNewTransactionWithProver(
-                senderId,
-                txRequest,
-                prover
-              )
-            : await client.submitNewTransaction(senderId, txRequest);
+        setStage("submitting");
+        const submissionHeight = await runExclusiveSafe(() =>
+          client.submitProvenTransaction(provenTransaction, txResult)
+        );
+        await runExclusiveSafe(() =>
+          client.applyTransaction(txResult, submissionHeight)
+        );
 
-          return { transactionId: txId.toString() };
-        });
+        const txId = txResult.id();
+
+        if (noteType === NoteType.Private) {
+          await waitForTransactionCommit(
+            client as ClientWithTransactions,
+            runExclusiveSafe,
+            txId
+          );
+
+          for (const output of outputs) {
+            await runExclusiveSafe(() =>
+              client.sendPrivateNote(output.note, output.recipientAddress)
+            );
+          }
+        }
+
+        const txSummary = { transactionId: txId.toString() };
 
         setStage("complete");
-        setResult(txResult);
+        setResult(txSummary);
 
         await sync();
 
-        return txResult;
+        return txSummary;
       } catch (err) {
         const error = err instanceof Error ? err : new Error(String(err));
         setError(error);
@@ -166,4 +211,34 @@ function getNoteType(type: "private" | "public" | "encrypted"): NoteType {
     default:
       return NoteType.Private;
   }
+}
+
+async function waitForTransactionCommit(
+  client: ClientWithTransactions,
+  runExclusiveSafe: <T>(fn: () => Promise<T>) => Promise<T>,
+  txId: TransactionId,
+  maxWaitMs = 10_000,
+  delayMs = 1_000
+) {
+  let waited = 0;
+
+  while (waited < maxWaitMs) {
+    await runExclusiveSafe(() => client.syncState());
+    const [record] = await runExclusiveSafe(() =>
+      client.getTransactions(TransactionFilter.ids([txId]))
+    );
+    if (record) {
+      const status = record.transactionStatus();
+      if (status.isCommitted()) {
+        return;
+      }
+      if (status.isDiscarded()) {
+        throw new Error("Transaction was discarded before commit");
+      }
+    }
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+    waited += delayMs;
+  }
+
+  throw new Error("Timeout waiting for transaction commit");
 }

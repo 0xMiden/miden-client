@@ -6,7 +6,7 @@ import { useMidenStore } from "../../store/MidenStore";
 import { Note, NoteType } from "@miden-sdk/miden-sdk";
 import {
   createMockWebClient,
-  createMockTransactionId,
+  createMockTransactionResult,
 } from "../mocks/miden-sdk";
 
 // Mock useMiden
@@ -80,10 +80,23 @@ describe("useMultiSend", () => {
     });
 
     it("should execute multi-send with default note type", async () => {
-      const mockTxId = createMockTransactionId("0xmultisend");
+      const mockTxResult = createMockTransactionResult("0xmultisend");
       const mockSync = vi.fn().mockResolvedValue(undefined);
+      const record = {
+        id: vi.fn(() => ({ toHex: () => "0xmultisend" })),
+        transactionStatus: vi.fn(() => ({
+          isPending: vi.fn(() => false),
+          isCommitted: vi.fn(() => true),
+          isDiscarded: vi.fn(() => false),
+        })),
+      };
       const mockClient = createMockWebClient({
-        submitNewTransaction: vi.fn().mockResolvedValue(mockTxId),
+        executeTransaction: vi.fn().mockResolvedValue(mockTxResult),
+        proveTransaction: vi.fn().mockResolvedValue({}),
+        submitProvenTransaction: vi.fn().mockResolvedValue(100),
+        applyTransaction: vi.fn().mockResolvedValue({}),
+        getTransactions: vi.fn().mockResolvedValue([record]),
+        sendPrivateNote: vi.fn().mockResolvedValue(undefined),
       });
 
       mockUseMiden.mockReturnValue({
@@ -110,6 +123,7 @@ describe("useMultiSend", () => {
       expect(result.current.result).toEqual({ transactionId: "0xmultisend" });
       expect(result.current.stage).toBe("complete");
       expect(mockSync).toHaveBeenCalled();
+      expect(mockClient.sendPrivateNote).toHaveBeenCalledTimes(2);
 
       const createP2IDNoteMock = (
         Note as unknown as { createP2IDNote: ReturnType<typeof vi.fn> }
@@ -126,9 +140,12 @@ describe("useMultiSend", () => {
     });
 
     it("should execute multi-send with custom note type", async () => {
-      const mockTxId = createMockTransactionId();
+      const mockTxResult = createMockTransactionResult();
       const mockClient = createMockWebClient({
-        submitNewTransaction: vi.fn().mockResolvedValue(mockTxId),
+        executeTransaction: vi.fn().mockResolvedValue(mockTxResult),
+        proveTransaction: vi.fn().mockResolvedValue({}),
+        submitProvenTransaction: vi.fn().mockResolvedValue(100),
+        applyTransaction: vi.fn().mockResolvedValue({}),
       });
 
       mockUseMiden.mockReturnValue({
@@ -159,6 +176,7 @@ describe("useMultiSend", () => {
         NoteType.Public,
         expect.anything()
       );
+      expect(mockClient.sendPrivateNote).not.toHaveBeenCalled();
     });
   });
 });
