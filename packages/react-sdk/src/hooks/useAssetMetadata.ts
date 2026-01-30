@@ -8,17 +8,11 @@ import {
 import { useMiden } from "../context/MidenProvider";
 import { useAssetMetadataStore, useMidenStore } from "../store/MidenStore";
 import type { AssetMetadata } from "../types";
+import { parseAccountId } from "../utils/accountParsing";
 import { runExclusiveDirect } from "../utils/runExclusive";
 
 const inflight = new Map<string, Promise<void>>();
 const rpcClients = new Map<string, RpcClient>();
-
-const parseAccountId = (assetId: string): AccountId => {
-  if (assetId.startsWith("m") || assetId.startsWith("M")) {
-    return AccountId.fromBech32(assetId);
-  }
-  return AccountId.fromHex(assetId);
-};
 
 const getRpcClient = (rpcUrl?: string): RpcClient | null => {
   const key = rpcUrl ?? "__default__";

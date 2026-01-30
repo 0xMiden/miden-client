@@ -1,16 +1,12 @@
 import { useCallback, useState } from "react";
 import { useMiden } from "../context/MidenProvider";
-import {
-  AccountId,
-  NoteFilter,
-  NoteFilterTypes,
-  NoteId,
-} from "@miden-sdk/miden-sdk";
+import { NoteFilter, NoteFilterTypes, NoteId } from "@miden-sdk/miden-sdk";
 import type {
   ConsumeOptions,
   TransactionStage,
   TransactionResult,
 } from "../types";
+import { parseAccountId } from "../utils/accountParsing";
 import { runExclusiveDirect } from "../utils/runExclusive";
 
 export interface UseConsumeResult {
@@ -81,7 +77,7 @@ export function useConsume(): UseConsumeResult {
 
       try {
         // Convert account ID string to AccountId object
-        const accountIdObj = AccountId.fromHex(options.accountId);
+        const accountIdObj = parseAccountId(options.accountId);
 
         setStage("proving");
         const txResult = await runExclusiveSafe(async () => {

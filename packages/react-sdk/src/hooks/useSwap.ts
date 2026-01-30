@@ -1,12 +1,13 @@
 import { useCallback, useState } from "react";
 import { useMiden } from "../context/MidenProvider";
-import { NoteType, AccountId } from "@miden-sdk/miden-sdk";
+import { NoteType } from "@miden-sdk/miden-sdk";
 import type {
   SwapOptions,
   TransactionStage,
   TransactionResult,
 } from "../types";
 import { DEFAULTS } from "../types";
+import { parseAccountId } from "../utils/accountParsing";
 import { runExclusiveDirect } from "../utils/runExclusive";
 
 export interface UseSwapResult {
@@ -81,11 +82,9 @@ export function useSwap(): UseSwapResult {
         );
 
         // Convert string IDs to AccountId objects
-        const accountIdObj = AccountId.fromHex(options.accountId);
-        const offeredFaucetIdObj = AccountId.fromHex(options.offeredFaucetId);
-        const requestedFaucetIdObj = AccountId.fromHex(
-          options.requestedFaucetId
-        );
+        const accountIdObj = parseAccountId(options.accountId);
+        const offeredFaucetIdObj = parseAccountId(options.offeredFaucetId);
+        const requestedFaucetIdObj = parseAccountId(options.requestedFaucetId);
 
         setStage("proving");
         const txResult = await runExclusiveSafe(async () => {

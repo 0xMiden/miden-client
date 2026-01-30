@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import { useMiden } from "../context/MidenProvider";
 import { useMidenStore } from "../store/MidenStore";
-import { AccountId, AccountFile } from "@miden-sdk/miden-sdk";
+import { AccountFile } from "@miden-sdk/miden-sdk";
 import type {
   Account,
   AccountId as AccountIdType,
@@ -10,6 +10,7 @@ import type {
 } from "@miden-sdk/miden-sdk";
 import type { ImportAccountOptions } from "../types";
 import { DEFAULTS } from "../types";
+import { parseAccountId } from "../utils/accountParsing";
 import { runExclusiveDirect } from "../utils/runExclusive";
 import { ensureAccountBech32 } from "../utils/accountBech32";
 
@@ -197,14 +198,7 @@ export function useImportAccount(): UseImportAccountResult {
 }
 
 function resolveAccountId(accountId: string | AccountIdType): AccountIdType {
-  if (typeof accountId !== "string") {
-    return accountId;
-  }
-  const normalized = accountId.trim().replace(/^miden:/i, "");
-  const isBech32 = normalized.startsWith("m") || normalized.startsWith("M");
-  return isBech32
-    ? AccountId.fromBech32(normalized)
-    : AccountId.fromHex(normalized);
+  return parseAccountId(accountId);
 }
 
 async function resolveAccountFile(

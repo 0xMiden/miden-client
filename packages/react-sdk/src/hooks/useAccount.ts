@@ -5,6 +5,7 @@ import { AccountId } from "@miden-sdk/miden-sdk";
 import type { AccountResult, AssetBalance } from "../types";
 import { runExclusiveDirect } from "../utils/runExclusive";
 import { ensureAccountBech32 } from "../utils/accountBech32";
+import { parseAccountId } from "../utils/accountParsing";
 import { useAssetMetadata } from "./useAssetMetadata";
 
 /**
@@ -71,7 +72,7 @@ export function useAccount(
     setError(null);
 
     try {
-      const accountIdObj = AccountId.fromHex(accountIdStr);
+      const accountIdObj = parseAccountId(accountIdStr);
       const fetchedAccount = await runExclusiveSafe(() =>
         client.getAccount(accountIdObj)
       );

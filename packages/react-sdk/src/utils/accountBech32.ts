@@ -6,6 +6,7 @@ import {
   NetworkId,
 } from "@miden-sdk/miden-sdk";
 import { useMidenStore } from "../store/MidenStore";
+import { parseAccountId } from "./accountParsing";
 
 type AccountPrototype = {
   bech32id?: () => string;
@@ -110,10 +111,7 @@ export const ensureAccountBech32 = (account?: Account | null) => {
 
 export const toBech32AccountId = (accountId: string): string => {
   try {
-    const id =
-      accountId.startsWith("m") || accountId.startsWith("M")
-        ? AccountId.fromBech32(accountId)
-        : AccountId.fromHex(accountId);
+    const id = parseAccountId(accountId);
     return toBech32FromAccountId(id);
   } catch {
     return accountId;

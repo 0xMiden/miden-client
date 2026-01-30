@@ -1,11 +1,6 @@
 import { useCallback, useState } from "react";
 import { useMiden } from "../context/MidenProvider";
-import {
-  NoteType,
-  AccountId,
-  Address,
-  TransactionFilter,
-} from "@miden-sdk/miden-sdk";
+import { NoteType, TransactionFilter } from "@miden-sdk/miden-sdk";
 import type { Note, TransactionId } from "@miden-sdk/miden-sdk";
 import type {
   SendOptions,
@@ -13,6 +8,7 @@ import type {
   TransactionResult,
 } from "../types";
 import { DEFAULTS } from "../types";
+import { parseAccountId, parseAddress } from "../utils/accountParsing";
 import { runExclusiveDirect } from "../utils/runExclusive";
 
 export interface UseSendResult {
@@ -95,34 +91,6 @@ export function useSend(): UseSendResult {
 
       try {
         const noteType = getNoteType(options.noteType ?? DEFAULTS.NOTE_TYPE);
-        const normalizeInput = (value: string) =>
-          value.trim().replace(/^miden:/i, "");
-        const isBech32Input = (value: string) =>
-          value.startsWith("m") || value.startsWith("M");
-
-        const parseAccountId = (value: string) => {
-          const normalized = normalizeInput(value);
-          if (isBech32Input(normalized)) {
-            try {
-              return Address.fromBech32(normalized).accountId();
-            } catch {
-              // Fall through to AccountId parsing.
-            }
-            return AccountId.fromBech32(normalized);
-          }
-          return AccountId.fromHex(normalized);
-        };
-
-        const resolveRecipientAddress = (
-          value: string,
-          accountId: AccountId
-        ) => {
-          const normalized = normalizeInput(value);
-          if (isBech32Input(normalized)) {
-            return Address.fromBech32(normalized);
-          }
-          return Address.fromAccountId(accountId, "BasicWallet");
-        };
 
         // Convert string IDs to AccountId objects
         const fromAccountId = parseAccountId(options.from);
@@ -173,10 +141,7 @@ export function useSend(): UseSendResult {
             throw new Error("Missing full note for private send");
           }
 
-          const recipientAddress = resolveRecipientAddress(
-            options.to,
-            toAccountId
-          );
+          const recipientAddress = parseAddress(options.to, toAccountId);
           await runExclusiveSafe(() =>
             client.sendPrivateNote(fullNote, recipientAddress)
           );

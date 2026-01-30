@@ -1,12 +1,13 @@
 import { useCallback, useState } from "react";
 import { useMiden } from "../context/MidenProvider";
-import { NoteType, AccountId } from "@miden-sdk/miden-sdk";
+import { NoteType } from "@miden-sdk/miden-sdk";
 import type {
   MintOptions,
   TransactionStage,
   TransactionResult,
 } from "../types";
 import { DEFAULTS } from "../types";
+import { parseAccountId } from "../utils/accountParsing";
 import { runExclusiveDirect } from "../utils/runExclusive";
 
 export interface UseMintResult {
@@ -76,8 +77,8 @@ export function useMint(): UseMintResult {
         const noteType = getNoteType(options.noteType ?? DEFAULTS.NOTE_TYPE);
 
         // Convert string IDs to AccountId objects
-        const targetAccountIdObj = AccountId.fromHex(options.targetAccountId);
-        const faucetIdObj = AccountId.fromHex(options.faucetId);
+        const targetAccountIdObj = parseAccountId(options.targetAccountId);
+        const faucetIdObj = parseAccountId(options.faucetId);
 
         setStage("proving");
         const txResult = await runExclusiveSafe(async () => {

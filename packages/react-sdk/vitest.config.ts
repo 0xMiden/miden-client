@@ -1,8 +1,16 @@
 import { defineConfig } from "vitest/config";
+import { fileURLToPath } from "url";
 
 process.env.VITE_CJS_IGNORE_WARNING = "1";
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      "@miden-sdk/miden-sdk": fileURLToPath(
+        new URL("./src/__tests__/mocks/miden-sdk-entry.ts", import.meta.url)
+      ),
+    },
+  },
   test: {
     environment: "jsdom",
     globals: true,

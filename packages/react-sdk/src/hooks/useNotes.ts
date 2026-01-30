@@ -6,11 +6,12 @@ import {
   useConsumableNotesStore,
   useSyncStateStore,
 } from "../store/MidenStore";
-import { NoteFilter, NoteFilterTypes, AccountId } from "@miden-sdk/miden-sdk";
+import { NoteFilter, NoteFilterTypes } from "@miden-sdk/miden-sdk";
 import type { NotesFilter, NotesResult, NoteSummary } from "../types";
 import { runExclusiveDirect } from "../utils/runExclusive";
 import { getNoteSummary } from "../utils/notes";
 import { useAssetMetadata } from "./useAssetMetadata";
+import { parseAccountId } from "../utils/accountParsing";
 
 /**
  * Hook to list notes.
@@ -75,7 +76,7 @@ export function useNotes(options?: NotesFilter): NotesResult {
 
           let consumableResult;
           if (options?.accountId) {
-            const accountIdObj = AccountId.fromHex(options.accountId);
+            const accountIdObj = parseAccountId(options.accountId);
             consumableResult = await client.getConsumableNotes(accountIdObj);
           } else {
             consumableResult = await client.getConsumableNotes();
