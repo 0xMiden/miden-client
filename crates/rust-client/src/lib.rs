@@ -117,6 +117,7 @@ use alloc::boxed::Box;
 extern crate std;
 
 pub mod account;
+pub mod grpc_support;
 pub mod keystore;
 pub mod note;
 pub mod note_transport;

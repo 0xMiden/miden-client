@@ -1,6 +1,4 @@
 use alloc::boxed::Box;
-#[cfg(feature = "std")]
-use alloc::string::ToString;
 use alloc::sync::Arc;
 
 use miden_protocol::assembly::{DefaultSourceManager, SourceManagerSync};
@@ -11,13 +9,15 @@ use miden_tx::auth::TransactionAuthenticator;
 use miden_tx::{ExecutionOptions, LocalTransactionProver};
 use rand::Rng;
 
+#[cfg(any(feature = "tonic", feature = "std"))]
+use crate::alloc::string::ToString;
 #[cfg(feature = "std")]
 use crate::keystore::FilesystemKeyStore;
 use crate::note_transport::NoteTransportClient;
 use crate::rpc::{Endpoint, NodeRpcClient};
 use crate::store::{Store, StoreError};
 use crate::transaction::TransactionProver;
-use crate::{Client, ClientError, ClientRng, ClientRngBox, DebugMode};
+use crate::{Client, ClientError, ClientRng, ClientRngBox, DebugMode, grpc_support};
 
 // CONSTANTS
 // ================================================================================================
@@ -26,45 +26,7 @@ use crate::{Client, ClientError, ClientRng, ClientRngBox, DebugMode};
 /// discarded.
 const TX_DISCARD_DELTA: u32 = 20;
 
-// GRPC SUPPORT
-// ================================================================================================
-
-/// Module containing gRPC-specific types and constants.
-///
-/// This module is only available when both `tonic` and `std` features are enabled.
-#[cfg(all(feature = "tonic", feature = "std"))]
-mod grpc_support {
-    use alloc::string::String;
-
-    pub use crate::RemoteTransactionProver;
-
-    /// Default remote prover endpoint for testnet.
-    pub const TESTNET_PROVER_ENDPOINT: &str = "https://tx-prover.testnet.miden.io";
-
-    /// Default remote prover endpoint for devnet.
-    pub const DEVNET_PROVER_ENDPOINT: &str = "https://tx-prover.devnet.miden.io";
-
-    /// Default timeout for note transport connections (10 seconds).
-    pub const NOTE_TRANSPORT_DEFAULT_TIMEOUT_MS: u64 = 10_000;
-
-    /// Configuration for lazy note transport initialization.
-    ///
-    /// Since `GrpcNoteTransportClient::connect()` is async, this struct allows us to defer
-    /// the connection until `build()` is called.
-    pub struct NoteTransportConfig {
-        pub endpoint: String,
-        pub timeout_ms: u64,
-    }
-}
-
-#[cfg(all(feature = "tonic", feature = "std"))]
-pub use grpc_support::{DEVNET_PROVER_ENDPOINT, TESTNET_PROVER_ENDPOINT};
-#[cfg(all(feature = "tonic", feature = "std"))]
-use grpc_support::{
-    NOTE_TRANSPORT_DEFAULT_TIMEOUT_MS,
-    NoteTransportConfig,
-    RemoteTransactionProver,
-};
+pub use grpc_support::*;
 
 // STORE BUILDER
 // ================================================================================================
@@ -157,7 +119,7 @@ pub struct ClientBuilder<AUTH> {
     /// An optional custom note transport client.
     note_transport_api: Option<Arc<dyn NoteTransportClient>>,
     /// Configuration for lazy note transport initialization (used by network constructors).
-    #[cfg(all(feature = "tonic", feature = "std"))]
+    #[allow(unused)]
     note_transport_config: Option<NoteTransportConfig>,
     /// An optional custom transaction prover.
     tx_prover: Option<Arc<dyn TransactionProver + Send + Sync>>,
@@ -176,7 +138,6 @@ impl<AUTH> Default for ClientBuilder<AUTH> {
             tx_discard_delta: Some(TX_DISCARD_DELTA),
             max_block_number_delta: None,
             note_transport_api: None,
-            #[cfg(all(feature = "tonic", feature = "std"))]
             note_transport_config: None,
             tx_prover: None,
             endpoint: None,
@@ -188,7 +149,7 @@ impl<AUTH> Default for ClientBuilder<AUTH> {
 ///
 /// These constructors automatically configure the builder for a specific network,
 /// including RPC endpoint, transaction prover, and note transport (where applicable).
-#[cfg(all(feature = "tonic", feature = "std"))]
+#[cfg(feature = "tonic")]
 impl<AUTH> ClientBuilder<AUTH>
 where
     AUTH: BuilderAuthenticator,
@@ -331,7 +292,7 @@ where
 
     /// Sets a gRPC client from the endpoint and optional timeout.
     #[must_use]
-    #[cfg(all(feature = "tonic", feature = "std"))]
+    #[cfg(feature = "tonic")]
     pub fn grpc_client(mut self, endpoint: &crate::rpc::Endpoint, timeout_ms: Option<u64>) -> Self {
         self.rpc_api =
             Some(Arc::new(crate::rpc::GrpcClient::new(endpoint, timeout_ms.unwrap_or(10_000))));
@@ -462,12 +423,13 @@ where
             rpc_api.set_genesis_commitment(genesis.commitment()).await?;
         }
 
-        // Initialize note transport: prefer explicit client, fall back to config (std only)
-        #[cfg(all(feature = "tonic", feature = "std"))]
+        // Initialize note transport: prefer explicit client, fall back to config (tonic only)
+        #[cfg(feature = "tonic")]
         let note_transport_api: Option<Arc<dyn NoteTransportClient>> =
-            if let Some(api) = self.note_transport_api {
-                Some(api)
+            if let Some(api) = &self.note_transport_api {
+                Some(api.clone())
             } else if let Some(config) = self.note_transport_config {
+                #[cfg(not(target_arch = "wasm32"))]
                 let transport = crate::note_transport::grpc::GrpcNoteTransportClient::connect(
                     config.endpoint,
                     config.timeout_ms,
@@ -478,16 +440,21 @@ where
                         "Failed to connect to note transport: {e}"
                     ))
                 })?;
+
+                #[cfg(target_arch = "wasm32")]
+                let transport =
+                    crate::note_transport::grpc::GrpcNoteTransportClient::new(config.endpoint);
+
                 Some(Arc::new(transport) as Arc<dyn NoteTransportClient>)
             } else {
                 None
             };
 
-        #[cfg(not(all(feature = "tonic", feature = "std")))]
-        let note_transport_api = self.note_transport_api;
+        #[cfg(not(feature = "tonic"))]
+        let note_transport_api = self.note_transport_api.clone();
 
         // Initialize the note transport cursor if the client uses it
-        if note_transport_api.is_some() {
+        if self.note_transport_api.is_some() {
             crate::note_transport::init_note_transport_cursor(store.clone()).await?;
         }
 
