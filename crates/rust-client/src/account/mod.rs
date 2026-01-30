@@ -488,7 +488,7 @@ impl<AUTH> Client<AUTH> {
     ///
     /// The `StorageReader` provides lazy access to storage - each method call fetches
     /// only the requested slot from storage.
-    pub fn storage(&self, account_id: AccountId) -> StorageReader {
+    pub fn new_storage_reader(&self, account_id: AccountId) -> StorageReader {
         StorageReader::new(self.store.clone(), account_id)
     }
 }

@@ -16,7 +16,7 @@ use crate::store::Store;
 /// # Example
 /// ```ignore
 /// // Get a storage reader for an account
-/// let reader = client.storage(account_id);
+/// let reader = client.new_storage_reader(account_id);
 ///
 /// // Read a value slot
 /// let metadata = reader.get_item("token_metadata").await?;
@@ -35,8 +35,8 @@ pub struct StorageReader {
 impl StorageReader {
     /// Creates a new `StorageReader` for the given account.
     ///
-    /// This is typically called via [`Client::storage`](crate::Client::storage).
-    pub fn new(store: Arc<dyn Store>, account_id: AccountId) -> Self {
+    /// This is typically called via [`Client::new_storage_reader`](crate::Client::new_storage_reader).
+    pub(crate) fn new(store: Arc<dyn Store>, account_id: AccountId) -> Self {
         Self { store, account_id }
     }
 
