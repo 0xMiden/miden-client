@@ -31,10 +31,7 @@ use crate::rpc::RpcError;
 use crate::store::{NoteFilter, TransactionFilter};
 use crate::sync::SyncSummary;
 use crate::transaction::{
-    NoteArgs,
-    TransactionRequest,
-    TransactionRequestBuilder,
-    TransactionRequestError,
+    NoteArgs, TransactionRequest, TransactionRequestBuilder, TransactionRequestError,
     TransactionStatus,
 };
 use crate::{Client, ClientError};
@@ -433,9 +430,8 @@ pub async fn assert_account_has_single_asset(
     let assets = client.new_account_reader(account_id).assets().await.unwrap();
 
     assert_eq!(assets.len(), 1);
-    let asset = &assets[0];
 
-    if let Asset::Fungible(fungible_asset) = asset {
+    if let Some(Asset::Fungible(fungible_asset)) = assets.first() {
         assert_eq!(fungible_asset.faucet_id(), asset_account_id);
         assert_eq!(fungible_asset.amount(), expected_amount);
     } else {
