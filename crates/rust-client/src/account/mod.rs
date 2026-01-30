@@ -56,6 +56,7 @@ pub use miden_protocol::account::{
     PartialStorage,
     PartialStorageMap,
     StorageMap,
+    StorageMapWitness,
     StorageSlot,
     StorageSlotContent,
     StorageSlotId,
@@ -65,12 +66,15 @@ pub use miden_protocol::account::{
 pub use miden_protocol::address::{Address, AddressInterface, AddressType, NetworkId};
 pub use miden_protocol::errors::{AccountIdError, AddressError, NetworkIdError};
 use miden_protocol::note::NoteTag;
+
+mod storage_reader;
 use miden_standards::account::auth::{AuthEcdsaK256Keccak, AuthFalcon512Rpo};
 // RE-EXPORTS
 // ================================================================================================
 pub use miden_standards::account::interface::AccountInterfaceExt;
 use miden_standards::account::wallets::BasicWallet;
 use miden_tx::utils::{Deserializable, Serializable};
+pub use storage_reader::StorageReader;
 
 use super::Client;
 use crate::Word;
@@ -475,6 +479,17 @@ impl<AUTH> Client<AUTH> {
             },
             None => Ok(vec![]),
         }
+    }
+
+    // ACCOUNT STORAGE ACCESS
+    // --------------------------------------------------------------------------------------------
+
+    /// Returns a [`StorageReader`] for reading storage slots of the specified account.
+    ///
+    /// The `StorageReader` provides lazy access to storage - each method call fetches
+    /// only the requested slot from storage.
+    pub fn new_storage_reader(&self, account_id: AccountId) -> StorageReader {
+        StorageReader::new(self.store.clone(), account_id)
     }
 }
 

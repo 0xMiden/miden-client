@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.14.0 (TBD)
+
+### Changes
+
+* Added a `StorageReader` accessible through `Client::new_storage_reader` to read storage slots without having to load the whole account ([#1713](https://github.com/0xMiden/miden-client/pull/1713)). 
+
+
 ## 0.13.0 (2026-01-28)
 
 ### Enhancements
