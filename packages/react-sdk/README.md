@@ -119,7 +119,9 @@ function App() {
 
 #### `useMiden()`
 
-Access the Miden client instance and initialization state.
+Access the Miden client instance and initialization state. This is your entry
+point for low-level control (syncing, direct client access, and prover-aware
+transactions) while still playing nicely with the provider lifecycle.
 
 ```tsx
 import { useMiden } from '@miden-sdk/react';
@@ -146,7 +148,9 @@ function MyComponent() {
 
 #### `useMidenClient()`
 
-Get the ready `WebClient` instance directly. Throws if the client isn't ready yet.
+Get the ready `WebClient` instance directly. It’s a convenience for advanced
+flows where you want to call SDK methods yourself without re-checking readiness
+every time; it throws if the client isn't ready yet.
 
 ```tsx
 import { useMidenClient } from '@miden-sdk/react';
@@ -160,7 +164,8 @@ function MyComponent() {
 
 #### `useSyncState()`
 
-Monitor network sync status and trigger manual syncs.
+Monitor network sync status and trigger manual syncs. Useful for UI indicators,
+pull-to-refresh, or forcing a sync before running a transaction pipeline.
 
 ```tsx
 import { useSyncState } from '@miden-sdk/react';
@@ -190,7 +195,9 @@ function SyncStatus() {
 
 #### `useAccounts()`
 
-List all accounts, automatically categorized into wallets and faucets.
+List all accounts tracked by the local client, automatically categorized into
+wallets and faucets. Great for dashboards, account pickers, and quick summaries
+without extra filtering logic.
 
 ```tsx
 import { useAccounts } from '@miden-sdk/react';
@@ -231,7 +238,9 @@ function AccountList() {
 
 #### `useAccount(accountId)`
 
-Get detailed information for a single account, including assets.
+Get detailed information for a single account, including assets. The hook
+hydrates balances with token metadata (symbol/decimals) and keeps data fresh
+after syncs.
 
 ```tsx
 import { useAccount } from '@miden-sdk/react';
@@ -272,7 +281,8 @@ function AccountDetails({ accountId }: { accountId: string }) {
 
 #### `useCreateWallet()`
 
-Create new wallet accounts.
+Create new wallet accounts. Supports storage mode, mutability, and auth scheme
+so you can quickly spin up accounts for demos or customize for production needs.
 
 ```tsx
 import { useCreateWallet } from '@miden-sdk/react';
@@ -324,7 +334,8 @@ function CreateWalletButton() {
 
 #### `useCreateFaucet()`
 
-Create new faucets for minting tokens.
+Create new faucets for minting tokens. Ideal for dev/test flows where you need
+a controlled token source and quick bootstrap of balances.
 
 ```tsx
 import { useCreateFaucet } from '@miden-sdk/react';
@@ -360,7 +371,8 @@ function CreateFaucetForm() {
 
 #### `useImportAccount()`
 
-Import an existing account into the client.
+Import an existing account into the client. This lets you start tracking an
+on-chain account by ID, or restore a private account from a file/seed.
 
 ```tsx
 import { useImportAccount } from '@miden-sdk/react';
@@ -384,7 +396,9 @@ function ImportAccountButton({ accountId }: { accountId: string }) {
 
 #### `useNotes(options?)`
 
-List and filter notes (incoming transactions).
+List and filter notes (incoming transactions). Includes consumable notes and
+optional summaries that bundle asset metadata so you can render balances and
+labels without extra lookups.
 
 ```tsx
 import { useNotes } from '@miden-sdk/react';
@@ -427,7 +441,8 @@ function NotesList() {
 
 #### `useAssetMetadata(assetIds)`
 
-Fetch asset symbols/decimals for a list of asset IDs.
+Fetch asset symbols/decimals for a list of asset IDs. This is the lightweight
+way to enrich balances and note lists with human-friendly token info.
 
 ```tsx
 import { useAssetMetadata } from '@miden-sdk/react';
@@ -463,7 +478,8 @@ All transaction hooks follow a consistent pattern with `stage` tracking:
 
 #### `useSend()`
 
-Send tokens from one account to another.
+Send tokens from one account to another. Handles the full lifecycle (execute,
+prove, submit, apply) and delivers private notes automatically when needed.
 
 ```tsx
 import { useSend } from '@miden-sdk/react';
@@ -513,9 +529,10 @@ function SendForm() {
 
 #### `useMultiSend()`
 
-Create multiple P2ID output notes in a single transaction. For `noteType: 'private'`,
-the hook also delivers each note to recipients via `sendPrivateNote`. Recipient IDs
-accept bech32 or hex (auto-detected).
+Create multiple P2ID output notes in a single transaction. This is ideal for
+batched payouts or airdrops; with `noteType: 'private'`, the hook also delivers
+each note to recipients via `sendPrivateNote`. Recipient IDs accept bech32 or
+hex (auto-detected).
 
 ```tsx
 import { useMultiSend } from '@miden-sdk/react';
@@ -545,7 +562,9 @@ function MultiSendButton() {
 
 #### `useInternalTransfer()`
 
-Create a P2ID note and immediately consume it (useful for transfers between accounts you control).
+Create a P2ID note and immediately consume it. This is useful for transfers
+between accounts you control (e.g., public → private), and mirrors the
+unauthenticated note transfer tutorial flow.
 
 ```tsx
 import { useInternalTransfer } from '@miden-sdk/react';
@@ -573,7 +592,8 @@ function InternalTransferButton() {
 
 #### `useWaitForCommit()`
 
-Wait for a transaction to be committed.
+Wait for a transaction to be committed. Handy for tutorial-style flows where
+you need to block until a tx is visible on-chain before the next step.
 
 ```tsx
 import { useWaitForCommit } from '@miden-sdk/react';
@@ -591,7 +611,8 @@ function WaitForTx({ txId }: { txId: string }) {
 
 #### `useWaitForNotes()`
 
-Wait until an account has consumable notes.
+Wait until an account has consumable notes. Great for mint → consume pipelines
+and other flows where you want to proceed only when notes are ready.
 
 ```tsx
 import { useWaitForNotes } from '@miden-sdk/react';
@@ -615,7 +636,8 @@ function WaitForNotes({ accountId }: { accountId: string }) {
 
 #### `useMint()`
 
-Mint new tokens from a faucet you control.
+Mint new tokens from a faucet you control. The hook handles the full tx pipeline
+and is perfect for quickly funding accounts in dev/test environments.
 
 ```tsx
 import { useMint } from '@miden-sdk/react';
@@ -648,7 +670,8 @@ function MintForm() {
 
 #### `useConsume()`
 
-Consume notes to claim tokens sent to your account.
+Consume notes to claim tokens sent to your account. Supports multiple note IDs
+and handles proof generation and submission automatically.
 
 ```tsx
 import { useConsume } from '@miden-sdk/react';
@@ -682,7 +705,8 @@ function ConsumeNotes() {
 
 #### `useSwap()`
 
-Create atomic swap offers.
+Create atomic swap offers. Use it to build escrow-style swaps with configurable
+note types for both the swap note and the payback note.
 
 ```tsx
 import { useSwap } from '@miden-sdk/react';
@@ -724,7 +748,8 @@ function SwapForm() {
 
 #### `useTransaction()`
 
-Execute a custom `TransactionRequest` or build one with the client.
+Execute a custom `TransactionRequest` or build one with the client. This is the
+escape hatch for advanced flows not covered by higher-level hooks.
 
 ```tsx
 import { useTransaction } from '@miden-sdk/react';
