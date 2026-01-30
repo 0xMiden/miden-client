@@ -565,8 +565,8 @@ function MultiSendButton() {
 #### `useInternalTransfer()`
 
 Create a P2ID note and immediately consume it. This is useful for transfers
-between accounts you control (e.g., public → private), and mirrors the
-unauthenticated note transfer tutorial flow.
+between accounts you control (e.g., public → private), since the receiver must
+be available in the local client to consume the note.
 
 ```tsx
 import { useInternalTransfer } from '@miden-sdk/react';
@@ -594,8 +594,8 @@ function InternalTransferButton() {
 
 #### `useWaitForCommit()`
 
-Wait for a transaction to be committed. Handy for tutorial-style flows where
-you need to block until a tx is visible on-chain before the next step.
+Wait for a transaction to be committed. Useful for gating UI transitions,
+follow-up actions, or polling-driven workflows that depend on finality.
 
 ```tsx
 import { useWaitForCommit } from '@miden-sdk/react';
