@@ -41,45 +41,45 @@ impl RpcLimits {
     ///
     /// This method extracts the relevant limits from the proto response and falls back to
     /// default values if limits are not present (e.g., when connecting to an older node).
-    pub fn from_proto(proto_limits: proto::RpcLimits) -> Self {
+    pub fn from_proto(proto_limits: &proto::RpcLimits) -> Self {
         let mut limits = Self::default();
 
         // Extract note_id limit from GetNotesById endpoint
-        if let Some(endpoint) = proto_limits.endpoints.get("GetNotesById") {
-            if let Some(&limit) = endpoint.parameters.get("note_id") {
-                limits.note_ids_limit = limit as usize;
-            }
+        if let Some(endpoint) = proto_limits.endpoints.get("GetNotesById")
+            && let Some(&limit) = endpoint.parameters.get("note_id")
+        {
+            limits.note_ids_limit = limit as usize;
         }
 
         // Extract nullifier limit from CheckNullifiers or SyncNullifiers endpoint
         // Both should have the same limit, so we check CheckNullifiers first
-        if let Some(endpoint) = proto_limits.endpoints.get("CheckNullifiers") {
-            if let Some(&limit) = endpoint.parameters.get("nullifier") {
-                limits.nullifiers_limit = limit as usize;
-            }
-        } else if let Some(endpoint) = proto_limits.endpoints.get("SyncNullifiers") {
-            if let Some(&limit) = endpoint.parameters.get("nullifier") {
-                limits.nullifiers_limit = limit as usize;
-            }
+        if let Some(endpoint) = proto_limits.endpoints.get("CheckNullifiers")
+            && let Some(&limit) = endpoint.parameters.get("nullifier")
+        {
+            limits.nullifiers_limit = limit as usize;
+        } else if let Some(endpoint) = proto_limits.endpoints.get("SyncNullifiers")
+            && let Some(&limit) = endpoint.parameters.get("nullifier")
+        {
+            limits.nullifiers_limit = limit as usize;
         }
 
         // Extract account_id limit from SyncState endpoint
-        if let Some(endpoint) = proto_limits.endpoints.get("SyncState") {
-            if let Some(&limit) = endpoint.parameters.get("account_id") {
-                limits.account_ids_limit = limit as usize;
-            }
+        if let Some(endpoint) = proto_limits.endpoints.get("SyncState")
+            && let Some(&limit) = endpoint.parameters.get("account_id")
+        {
+            limits.account_ids_limit = limit as usize;
         }
 
         // Extract note_tag limit from SyncState or SyncNotes endpoint
         // Both should have the same limit, so we check SyncState first
-        if let Some(endpoint) = proto_limits.endpoints.get("SyncState") {
-            if let Some(&limit) = endpoint.parameters.get("note_tag") {
-                limits.note_tags_limit = limit as usize;
-            }
-        } else if let Some(endpoint) = proto_limits.endpoints.get("SyncNotes") {
-            if let Some(&limit) = endpoint.parameters.get("note_tag") {
-                limits.note_tags_limit = limit as usize;
-            }
+        if let Some(endpoint) = proto_limits.endpoints.get("SyncState")
+            && let Some(&limit) = endpoint.parameters.get("note_tag")
+        {
+            limits.note_tags_limit = limit as usize;
+        } else if let Some(endpoint) = proto_limits.endpoints.get("SyncNotes")
+            && let Some(&limit) = endpoint.parameters.get("note_tag")
+        {
+            limits.note_tags_limit = limit as usize;
         }
 
         limits

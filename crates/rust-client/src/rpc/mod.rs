@@ -67,9 +67,8 @@ mod errors;
 pub use errors::*;
 
 mod endpoint;
-pub use endpoint::Endpoint;
-
 pub use domain::limits::RpcLimits;
+pub use endpoint::Endpoint;
 
 #[cfg(not(feature = "testing"))]
 mod generated;

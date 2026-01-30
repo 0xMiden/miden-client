@@ -267,7 +267,7 @@ impl GrpcClient {
             RpcError::from_grpc_error(NodeRpcClientEndpoint::GetLimits, status)
         })?;
 
-        Ok(RpcLimits::from_proto(response.into_inner()))
+        Ok(RpcLimits::from_proto(&response.into_inner()))
     }
 }
 

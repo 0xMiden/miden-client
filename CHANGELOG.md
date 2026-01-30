@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.14.0 (TBD)
+
+### Enhancements
+
+* Updated the `GrpcClient` to get the RPC limits from the node ([#1724](https://github.com/0xMiden/miden-client/pull/1724)).
+
 ## 0.13.0 (2026-01-28)
 
 ### Enhancements
