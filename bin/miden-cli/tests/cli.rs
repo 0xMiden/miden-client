@@ -1410,7 +1410,7 @@ async fn test_from_system_user_config_silent_init() -> Result<()> {
     // Use isolated global miden directory
     let miden_home = set_isolated_miden_home();
 
-    // Verify no config exists before we start (in the isolated directory)
+    // Verify no config exists before we start
     let global_config_path = miden_home.join("miden-client.toml");
     assert!(!global_config_path.exists(), "Global config should not exist before test");
 
@@ -1432,7 +1432,7 @@ async fn test_from_system_user_config_silent_init() -> Result<()> {
         client_result.err()
     );
 
-    // Verify that a global config was created by the silent initialization (in the isolated dir)
+    // Verify that a global config was created by the silent initialization
     assert!(
         global_config_path.exists(),
         "Expected global config to be created at {global_config_path:?} by silent initialization"
