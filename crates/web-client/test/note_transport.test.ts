@@ -36,7 +36,7 @@ test("transport basic", async ({ page }) => {
       recipientAccount.id(),
       noteAssets,
       window.NoteType.Private,
-      new window.Felt(0n)
+      new window.NoteAttachment()
     );
 
     // Sync-state / fetch notes

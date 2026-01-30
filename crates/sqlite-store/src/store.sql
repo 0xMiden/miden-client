@@ -42,6 +42,7 @@ CREATE TABLE storage_map_entries (
     value TEXT NOT NULL,    -- value of the storage map entry
     PRIMARY KEY (root, key)
 ) WITHOUT ROWID;
+
 CREATE INDEX idx_storage_map_entries_root ON storage_map_entries(root);
 
 -- Create account_assets table

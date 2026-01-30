@@ -1,8 +1,8 @@
 use miden_client::Word as NativeWord;
 use miden_client::account::component::{
     AccountComponent as NativeAccountComponent,
-    AuthRpoFalcon512MultisigConfig as NativeAuthRpoFalcon512MultisigConfig,
-    rpo_falcon_512_multisig_library,
+    AuthFalcon512RpoMultisigConfig as NativeAuthFalcon512RpoMultisigConfig,
+    falcon_512_rpo_multisig_library,
 };
 use miden_client::account::{
     StorageMap as NativeStorageMap,
@@ -44,10 +44,10 @@ impl ProcedureThreshold {
 /// Multisig auth configuration for `RpoFalcon512` signatures.
 #[wasm_bindgen]
 #[derive(Clone)]
-pub struct AuthRpoFalcon512MultisigConfig(NativeAuthRpoFalcon512MultisigConfig);
+pub struct AuthFalcon512RpoMultisigConfig(NativeAuthFalcon512RpoMultisigConfig);
 
 #[wasm_bindgen]
-impl AuthRpoFalcon512MultisigConfig {
+impl AuthFalcon512RpoMultisigConfig {
     /// Build a configuration with a list of approver public key commitments and a default
     /// threshold.
     ///
@@ -56,7 +56,7 @@ impl AuthRpoFalcon512MultisigConfig {
     pub fn new(
         approvers: Vec<Word>,
         default_threshold: u32,
-    ) -> Result<AuthRpoFalcon512MultisigConfig, JsValue> {
+    ) -> Result<AuthFalcon512RpoMultisigConfig, JsValue> {
         let native_approvers: Vec<PublicKeyCommitment> = approvers
             .into_iter()
             .map(|word| {
@@ -65,10 +65,10 @@ impl AuthRpoFalcon512MultisigConfig {
             })
             .collect();
 
-        let config = NativeAuthRpoFalcon512MultisigConfig::new(native_approvers, default_threshold)
+        let config = NativeAuthFalcon512RpoMultisigConfig::new(native_approvers, default_threshold)
             .map_err(|e| js_error_with_context(e, "Invalid multisig config"))?;
 
-        Ok(AuthRpoFalcon512MultisigConfig(config))
+        Ok(AuthFalcon512RpoMultisigConfig(config))
     }
 
     /// Attach per-procedure thresholds. Each threshold must be >= 1 and <= `approvers.length`.
@@ -76,7 +76,7 @@ impl AuthRpoFalcon512MultisigConfig {
     pub fn with_proc_thresholds(
         self,
         proc_thresholds: Vec<ProcedureThreshold>,
-    ) -> Result<AuthRpoFalcon512MultisigConfig, JsValue> {
+    ) -> Result<AuthFalcon512RpoMultisigConfig, JsValue> {
         let native_proc_thresholds = proc_thresholds
             .into_iter()
             .map(|entry| {
@@ -90,7 +90,7 @@ impl AuthRpoFalcon512MultisigConfig {
             .with_proc_thresholds(native_proc_thresholds)
             .map_err(|e| js_error_with_context(e, "Invalid per-procedure thresholds"))?;
 
-        Ok(AuthRpoFalcon512MultisigConfig(config))
+        Ok(AuthFalcon512RpoMultisigConfig(config))
     }
 
     #[wasm_bindgen(getter, js_name = "defaultThreshold")]
@@ -125,12 +125,12 @@ impl AuthRpoFalcon512MultisigConfig {
     }
 }
 
-/// Create an auth component for `RpoFalcon512` multisig.
-#[wasm_bindgen(js_name = "createAuthRpoFalcon512Multisig")]
-pub fn create_auth_rpo_falcon512_multisig(
-    config: AuthRpoFalcon512MultisigConfig,
+/// Create an auth component for `Falcon512Rpo` multisig.
+#[wasm_bindgen(js_name = "createAuthFalcon512RpoMultisig")]
+pub fn create_auth_falcon512_rpo_multisig(
+    config: AuthFalcon512RpoMultisigConfig,
 ) -> Result<AccountComponent, JsValue> {
-    let native_config: NativeAuthRpoFalcon512MultisigConfig = config.into();
+    let native_config: NativeAuthFalcon512RpoMultisigConfig = config.into();
 
     let mut storage_slots = Vec::with_capacity(4);
 
@@ -140,7 +140,7 @@ pub fn create_auth_rpo_falcon512_multisig(
 
     // Slot 0: threshold_config
     let threshold_config_name =
-        StorageSlotName::new("miden::standards::auth::rpo_falcon512_multisig::threshold_config")
+        StorageSlotName::new("miden::standards::auth::falcon512_rpo_multisig::threshold_config")
             .map_err(|e| {
                 js_error_with_context(e, "Failed to create storage slot name 'threshold_config'")
             })?;
@@ -163,7 +163,7 @@ pub fn create_auth_rpo_falcon512_multisig(
     let approver_map = NativeStorageMap::with_entries(map_entries.into_iter())
         .map_err(|e| js_error_with_context(e, "Failed to build approver map"))?;
     let approver_map_name = StorageSlotName::new(
-        "miden::standards::auth::rpo_falcon512_multisig::approver_public_keys",
+        "miden::standards::auth::falcon512_rpo_multisig::approver_public_keys",
     )
     .map_err(|e| {
         js_error_with_context(e, "Failed to create storage slot name 'approver_public_keys'")
@@ -172,7 +172,7 @@ pub fn create_auth_rpo_falcon512_multisig(
 
     // Slot 2: executed_transactions map (empty)
     let executed_tx_map_name = StorageSlotName::new(
-        "miden::standards::auth::rpo_falcon512_multisig::executed_transactions",
+        "miden::standards::auth::falcon512_rpo_multisig::executed_transactions",
     )
     .map_err(|e| {
         js_error_with_context(e, "Failed to create storage slot name 'executed_transactions'")
@@ -182,7 +182,7 @@ pub fn create_auth_rpo_falcon512_multisig(
 
     // Slot 3: procedure_thresholds map
     let proc_map_name = StorageSlotName::new(
-        "miden::standards::auth::rpo_falcon512_multisig::procedure_thresholds",
+        "miden::standards::auth::falcon512_rpo_multisig::procedure_thresholds",
     )
     .map_err(|e| {
         js_error_with_context(e, "Failed to create storage slot name 'procedure_thresholds'")
@@ -197,15 +197,15 @@ pub fn create_auth_rpo_falcon512_multisig(
     storage_slots.push(NativeStorageSlot::with_map(proc_map_name, proc_map));
 
     let native_component =
-        NativeAccountComponent::new(rpo_falcon_512_multisig_library(), storage_slots)
+        NativeAccountComponent::new(falcon_512_rpo_multisig_library(), storage_slots)
             .map_err(|e| js_error_with_context(e, "Failed to create multisig account component"))?
             .with_supports_all_types();
 
     Ok(native_component.into())
 }
 
-impl From<AuthRpoFalcon512MultisigConfig> for NativeAuthRpoFalcon512MultisigConfig {
-    fn from(config: AuthRpoFalcon512MultisigConfig) -> Self {
+impl From<AuthFalcon512RpoMultisigConfig> for NativeAuthFalcon512RpoMultisigConfig {
+    fn from(config: AuthFalcon512RpoMultisigConfig) -> Self {
         config.0
     }
 }

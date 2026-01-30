@@ -3,7 +3,7 @@ import { logWebStoreError, uint8ArrayToBase64 } from "./utils.js";
 
 export async function insertBlockHeader(
   dbId: string,
-  blockNum: string,
+  blockNum: number,
   header: Uint8Array,
   partialBlockchainPeaks: Uint8Array,
   hasClientNotes: boolean
@@ -54,7 +54,7 @@ export async function insertPartialBlockchainNodes(
     }
 
     const data = nodes.map((node, index) => ({
-      id: ids[index],
+      id: Number(ids[index]),
       node: node,
     }));
 
@@ -64,7 +64,7 @@ export async function insertPartialBlockchainNodes(
   }
 }
 
-export async function getBlockHeaders(dbId: string, blockNumbers: string[]) {
+export async function getBlockHeaders(dbId: string, blockNumbers: number[]) {
   try {
     const db = getDatabase(dbId);
     const results = await db.blockHeaders.bulkGet(blockNumbers);
@@ -128,7 +128,7 @@ export async function getTrackedBlockHeaders(dbId: string) {
 
 export async function getPartialBlockchainPeaksByBlockNum(
   dbId: string,
-  blockNum: string
+  blockNum: number
 ) {
   try {
     const db = getDatabase(dbId);
@@ -163,11 +163,29 @@ export async function getPartialBlockchainNodesAll(dbId: string) {
 export async function getPartialBlockchainNodes(dbId: string, ids: string[]) {
   try {
     const db = getDatabase(dbId);
-    const results = await db.partialBlockchainNodes.bulkGet(ids);
+    const numericIds = ids.map((id) => Number(id));
+    const results = await db.partialBlockchainNodes.bulkGet(numericIds);
 
     return results;
   } catch (err) {
     logWebStoreError(err, "Failed to get partial blockchain nodes");
+  }
+}
+
+export async function getPartialBlockchainNodesUpToInOrderIndex(
+  dbId: string,
+  maxInOrderIndex: string
+) {
+  try {
+    const db = getDatabase(dbId);
+    const maxNumericId = Number(maxInOrderIndex);
+    const results = await db.partialBlockchainNodes
+      .where("id")
+      .belowOrEqual(maxNumericId)
+      .toArray();
+    return results;
+  } catch (err) {
+    logWebStoreError(err, "Failed to get partial blockchain nodes up to index");
   }
 }
 
@@ -185,7 +203,7 @@ export async function pruneIrrelevantBlocks(dbId: string) {
       .equals("false")
       .and(
         (record) =>
-          record.blockNum !== "0" && record.blockNum !== syncHeight.blockNum
+          record.blockNum !== 0 && record.blockNum !== syncHeight.blockNum
       )
       .toArray();
 
