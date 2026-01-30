@@ -678,86 +678,6 @@ Retrieves the setting value for `key`, or `None` if it hasn’t been set.
 
 ***
 
-### getStorageItem()
-
-> **getStorageItem**(`account_id`, `slot_name`): `Promise`\<[`Word`](Word.md)\>
-
-Retrieves a storage slot value by name for the given account.
-
-This method fetches fresh data from storage on each call, providing lazy access
-to account storage without needing to fetch the full account first.
-
-For `Value` slots, returns the stored word.
-For `Map` slots, returns the map root.
-
-# Arguments
-* `account_id` - The ID of the account to read storage from.
-* `slot_name` - The name of the storage slot.
-
-# Errors
-Returns an error if the account or slot is not found.
-
-#### Parameters
-
-##### account\_id
-
-[`AccountId`](AccountId.md)
-
-##### slot\_name
-
-`string`
-
-#### Returns
-
-`Promise`\<[`Word`](Word.md)\>
-
-#### Inherited from
-
-[`WebClient`](WebClient.md).[`getStorageItem`](WebClient.md#getstorageitem)
-
-***
-
-### getStorageMapItem()
-
-> **getStorageMapItem**(`account_id`, `slot_name`, `key`): `Promise`\<[`Word`](Word.md)\>
-
-Retrieves a value from a storage map slot by name and key.
-
-This method fetches fresh data from storage on each call, providing lazy access
-to account storage maps without needing to fetch the full account first.
-
-# Arguments
-* `account_id` - The ID of the account to read storage from.
-* `slot_name` - The name of the storage map slot.
-* `key` - The key within the map.
-
-# Errors
-Returns an error if the account or slot is not found, or if the slot is not a map.
-
-#### Parameters
-
-##### account\_id
-
-[`AccountId`](AccountId.md)
-
-##### slot\_name
-
-`string`
-
-##### key
-
-[`Word`](Word.md)
-
-#### Returns
-
-`Promise`\<[`Word`](Word.md)\>
-
-#### Inherited from
-
-[`WebClient`](WebClient.md).[`getStorageMapItem`](WebClient.md#getstoragemapitem)
-
-***
-
 ### getSyncHeight()
 
 > **getSyncHeight**(): `Promise`\<`number`\>
@@ -1091,6 +1011,37 @@ Returns all the existing setting keys from the store.
 #### Inherited from
 
 [`WebClient`](WebClient.md).[`newSendTransactionRequest`](WebClient.md#newsendtransactionrequest)
+
+***
+
+### newStorageReader()
+
+> **newStorageReader**(`account_id`): [`StorageReader`](StorageReader.md)
+
+Returns a [`StorageReader`] for reading storage slots of the specified account.
+
+The `StorageReader` provides lazy access to storage - each method call fetches
+only the requested slot from storage.
+
+# Arguments
+* `account_id` - The ID of the account to read storage from.
+
+# Errors
+Returns an error if the client is not initialized.
+
+#### Parameters
+
+##### account\_id
+
+[`AccountId`](AccountId.md)
+
+#### Returns
+
+[`StorageReader`](StorageReader.md)
+
+#### Inherited from
+
+[`WebClient`](WebClient.md).[`newStorageReader`](WebClient.md#newstoragereader)
 
 ***
 
