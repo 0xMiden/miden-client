@@ -1,5 +1,3 @@
-//! Provides a JavaScript-accessible wrapper for account storage reading.
-
 use alloc::sync::Arc;
 
 use idxdb_store::WebStore;
