@@ -55,7 +55,7 @@ pub async fn test_client_builder_initializes_client_with_endpoint(
 
     let mut client = ClientBuilder::<FilesystemKeyStore>::new()
         .grpc_client(&endpoint, Some(10_000))
-        .filesystem_keystore(auth_path.to_str().context("failed to convert auth path to string")?)
+        .filesystem_keystore(auth_path)?
         .sqlite_store(store_config)
         .in_debug_mode(miden_client::DebugMode::Enabled)
         .build()

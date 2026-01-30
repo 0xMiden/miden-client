@@ -124,7 +124,7 @@ where
 
         let note_screener = NoteScreener::new(self.store.clone(), self.authenticator.clone());
         let state_sync =
-            StateSync::new(self.rpc_api.clone(), Arc::new(note_screener), self.tx_graceful_blocks);
+            StateSync::new(self.rpc_api.clone(), Arc::new(note_screener), self.tx_discard_delta);
 
         // Get current state of the client
         let accounts = self

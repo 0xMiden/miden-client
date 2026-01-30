@@ -10,6 +10,7 @@ use assert_cmd::cargo::cargo_bin_cmd;
 use miden_client::account::{AccountId, AccountStorageMode};
 use miden_client::address::AddressInterface;
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
+use miden_client::builder::ClientBuilder;
 use miden_client::crypto::{FeltRng, RpoRandomCoin};
 use miden_client::note::{
     Note,
@@ -22,7 +23,7 @@ use miden_client::note::{
     NoteTag,
     NoteType,
 };
-use miden_client::rpc::{Endpoint, GrpcClient};
+use miden_client::rpc::Endpoint;
 use miden_client::testing::account_id::ACCOUNT_ID_PRIVATE_SENDER;
 use miden_client::testing::common::{
     ACCOUNT_ID_REGULAR,
@@ -33,15 +34,7 @@ use miden_client::testing::common::{
 };
 use miden_client::transaction::{OutputNote, TransactionRequestBuilder};
 use miden_client::utils::Serializable;
-use miden_client::{
-    self,
-    Client,
-    DebugMode,
-    ExecutionOptions,
-    Felt,
-    MAX_TX_EXECUTION_CYCLES,
-    MIN_TX_EXECUTION_CYCLES,
-};
+use miden_client::{self, Client, DebugMode, Felt};
 use miden_client_cli::MIDEN_DIR;
 use miden_client_sqlite_store::SqliteStore;
 use predicates::str::contains;
@@ -1155,26 +1148,16 @@ async fn create_rust_client_with_store_path(
 
     let keystore = FilesystemKeyStore::new(temp_dir())?;
 
-    Ok((
-        TestClient::new(
-            Arc::new(GrpcClient::new(&endpoint, 10_000)),
-            rng,
-            store,
-            Some(std::sync::Arc::new(keystore.clone())),
-            ExecutionOptions::new(
-                Some(MAX_TX_EXECUTION_CYCLES),
-                MIN_TX_EXECUTION_CYCLES,
-                false,
-                true,
-            )?,
-            None,
-            None,
-            None,
-            None,
-        )
-        .await?,
-        keystore,
-    ))
+    let client = ClientBuilder::new()
+        .grpc_client(&endpoint, Some(10_000))
+        .rng(rng)
+        .store(store)
+        .authenticator(Arc::new(keystore.clone()))
+        .in_debug_mode(DebugMode::Enabled)
+        .build()
+        .await?;
+
+    Ok((client, keystore))
 }
 
 /// Executes a command and asserts that it fails but does not panic.

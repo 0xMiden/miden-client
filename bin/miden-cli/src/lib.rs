@@ -141,7 +141,7 @@ impl CliClient {
             .grpc_client(&config.rpc.endpoint.clone().into(), Some(config.rpc.timeout_ms))
             .authenticator(Arc::new(keystore))
             .in_debug_mode(debug_mode)
-            .tx_graceful_blocks(Some(TX_GRACEFUL_BLOCK_DELTA));
+            .tx_discard_delta(Some(TX_DISCARD_DELTA));
 
         // Add optional max_block_number_delta
         if let Some(delta) = config.max_block_number_delta {
@@ -314,7 +314,7 @@ pub fn client_binary_name() -> OsString {
 
 /// Number of blocks that must elapse after a transaction’s reference block before it is marked
 /// stale and discarded.
-const TX_GRACEFUL_BLOCK_DELTA: u32 = 20;
+const TX_DISCARD_DELTA: u32 = 20;
 
 /// Root CLI struct.
 #[derive(Parser, Debug)]

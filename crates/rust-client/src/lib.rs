@@ -51,72 +51,57 @@
 //!
 //! ## Example
 //!
-//! Below is a brief example illustrating how to instantiate the client:
+//! Below is a brief example illustrating how to instantiate the client using `ClientBuilder`:
 //!
 //! ```rust
 //! use std::sync::Arc;
 //!
-//! use miden_client::crypto::RpoRandomCoin;
+//! use miden_client::DebugMode;
+//! use miden_client::builder::ClientBuilder;
 //! use miden_client::keystore::FilesystemKeyStore;
-//! use miden_client::note_transport::NOTE_TRANSPORT_DEFAULT_ENDPOINT;
-//! use miden_client::note_transport::grpc::GrpcNoteTransportClient;
 //! use miden_client::rpc::{Endpoint, GrpcClient};
-//! use miden_client::store::Store;
-//! use miden_client::{Client, ExecutionOptions, Felt};
 //! use miden_client_sqlite_store::SqliteStore;
-//! use miden_protocol::crypto::rand::FeltRng;
-//! use miden_protocol::{MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES};
-//! use rand::Rng;
 //!
 //! # pub async fn create_test_client() -> Result<(), Box<dyn std::error::Error>> {
-//! // Create the SQLite store from the client configuration.
+//! // Create the SQLite store.
 //! let sqlite_store = SqliteStore::new("path/to/store".try_into()?).await?;
 //! let store = Arc::new(sqlite_store);
 //!
-//! // Generate a random seed for the RpoRandomCoin.
-//! let mut rng = rand::rng();
-//! let coin_seed: [u64; 4] = rng.random();
-//!
-//! // Initialize the random coin using the generated seed.
-//! let rng = RpoRandomCoin::new(coin_seed.map(Felt::new).into());
+//! // Create the keystore for transaction signing.
 //! let keystore = FilesystemKeyStore::new("path/to/keys/directory".try_into()?)?;
 //!
-//! // Determine the number of blocks to consider a transaction stale.
-//! // 20 is simply an example value.
-//! let tx_graceful_blocks = Some(20);
-//! // Determine the maximum number of blocks that the client can be behind from the network.
-//! // 256 is simply an example value.
-//! let max_block_number_delta = Some(256);
-//!
-//! // Optionally, connect to the note transport network to exchange private notes.
-//! let note_transport_api =
-//!     GrpcNoteTransportClient::connect(NOTE_TRANSPORT_DEFAULT_ENDPOINT.to_string(), 10_000)
-//!         .await?;
-//!
-//! // Instantiate the client using a gRPC client
+//! // Create the RPC client.
 //! let endpoint = Endpoint::new("https".into(), "localhost".into(), Some(57291));
-//! let client: Client<FilesystemKeyStore> = Client::new(
-//!     Arc::new(GrpcClient::new(&endpoint, 10_000)),
-//!     Box::new(rng),
-//!     store,
-//!     Some(Arc::new(keystore)), // or None if no authenticator is needed
-//!     ExecutionOptions::new(
-//!         Some(MAX_TX_EXECUTION_CYCLES),
-//!         MIN_TX_EXECUTION_CYCLES,
-//!         false,
-//!         false, // Set to true for debug mode, if needed.
-//!     )
-//!     .unwrap(),
-//!     tx_graceful_blocks,
-//!     max_block_number_delta,
-//!     Some(Arc::new(note_transport_api)),
-//!     None, // or Some(Arc::new(prover)) for a custom prover
-//! )
-//! .await
-//! .unwrap();
+//!
+//! // Instantiate the client using the builder.
+//! let client = ClientBuilder::new()
+//!     .rpc(Arc::new(GrpcClient::new(&endpoint, 10_000)))
+//!     .store(store)
+//!     .authenticator(Arc::new(keystore))
+//!     .in_debug_mode(DebugMode::Disabled)
+//!     .build()
+//!     .await?;
 //!
 //! # Ok(())
 //! # }
+//! ```
+//!
+//! For network-specific defaults, use the convenience constructors:
+//!
+//! ```ignore
+//! // For testnet (includes remote prover and note transport)
+//! let client = ClientBuilder::for_testnet()
+//!     .store(store)
+//!     .authenticator(Arc::new(keystore))
+//!     .build()
+//!     .await?;
+//!
+//! // For local development
+//! let client = ClientBuilder::for_localhost()
+//!     .store(store)
+//!     .authenticator(Arc::new(keystore))
+//!     .build()
+//!     .await?;
 //! ```
 //!
 //! For additional usage details, configuration options, and examples, consult the documentation for
@@ -132,6 +117,7 @@ use alloc::boxed::Box;
 extern crate std;
 
 pub mod account;
+pub mod grpc_support;
 pub mod keystore;
 pub mod note;
 pub mod note_transport;
@@ -142,7 +128,6 @@ pub mod sync;
 pub mod transaction;
 pub mod utils;
 
-#[cfg(feature = "std")]
 pub mod builder;
 
 #[cfg(feature = "testing")]
@@ -150,7 +135,6 @@ mod test_utils;
 
 pub mod errors;
 
-use miden_protocol::block::BlockNumber;
 pub use miden_protocol::utils::{Deserializable, Serializable, SliceReader};
 
 // RE-EXPORTS
@@ -277,7 +261,7 @@ pub mod vm {
 
 pub use async_trait::async_trait;
 pub use errors::*;
-use miden_protocol::assembly::{DefaultSourceManager, SourceManagerSync};
+use miden_protocol::assembly::SourceManagerSync;
 pub use miden_protocol::{
     EMPTY_WORD,
     Felt,
@@ -308,13 +292,12 @@ pub mod testing {
 use alloc::sync::Arc;
 
 use miden_protocol::crypto::rand::FeltRng;
-use miden_tx::LocalTransactionProver;
 use miden_tx::auth::TransactionAuthenticator;
 use rand::RngCore;
 use rpc::NodeRpcClient;
 use store::Store;
 
-use crate::note_transport::{NoteTransportClient, init_note_transport_cursor};
+use crate::note_transport::NoteTransportClient;
 use crate::rpc::{ACCOUNT_ID_LIMIT, NOTE_TAG_LIMIT};
 use crate::transaction::TransactionProver;
 
@@ -345,10 +328,10 @@ pub struct Client<AUTH> {
     authenticator: Option<Arc<AUTH>>,
     /// Shared source manager used to retain MASM source information for assembled programs.
     source_manager: Arc<dyn SourceManagerSync>,
-    /// Options that control the transaction executor’s runtime behaviour (e.g. debug mode).
+    /// Options that control the transaction executor's runtime behaviour (e.g. debug mode).
     exec_options: ExecutionOptions,
-    /// The number of blocks that are considered old enough to discard pending transactions.
-    tx_graceful_blocks: Option<u32>,
+    /// Number of blocks after which pending transactions are considered stale and discarded.
+    tx_discard_delta: Option<u32>,
     /// Maximum number of blocks the client can be behind the network for transactions and account
     /// proofs to be considered valid.
     max_block_number_delta: Option<u32>,
@@ -357,82 +340,35 @@ pub struct Client<AUTH> {
     note_transport_api: Option<Arc<dyn NoteTransportClient>>,
 }
 
-/// Construction and access methods.
+/// Constructors.
+impl<AUTH> Client<AUTH>
+where
+    AUTH: builder::BuilderAuthenticator,
+{
+    /// Returns a new [`ClientBuilder`](builder::ClientBuilder) for constructing a client.
+    ///
+    /// This is a convenience method equivalent to calling `ClientBuilder::new()`.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let client = Client::builder()
+    ///     .rpc(rpc_client)
+    ///     .store(store)
+    ///     .authenticator(Arc::new(keystore))
+    ///     .build()
+    ///     .await?;
+    /// ```
+    pub fn builder() -> builder::ClientBuilder<AUTH> {
+        builder::ClientBuilder::new()
+    }
+}
+
+/// Access methods.
 impl<AUTH> Client<AUTH>
 where
     AUTH: TransactionAuthenticator,
 {
-    // CONSTRUCTOR
-    // --------------------------------------------------------------------------------------------
-
-    /// Returns a new instance of [`Client`].
-    ///
-    /// ## Arguments
-    ///
-    /// - `rpc_api`: An instance of [`NodeRpcClient`] which provides a way for the client to connect
-    ///   to the Miden node.
-    /// - `rng`: An instance of [`FeltRng`] which provides randomness tools for generating new keys,
-    ///   serial numbers, etc. This can be any RNG that implements [`ClientFeltRng`] (ie `FeltRng`
-    ///   + `Send` + `Sync`).
-    /// - `store`: An instance of [`Store`], which provides a way to write and read entities to
-    ///   provide persistence.
-    /// - `authenticator`: Defines the transaction authenticator that will be used by the
-    ///   transaction executor whenever a signature is requested from within the VM.
-    /// - `exec_options`: Options that control the transaction executor’s runtime behaviour (e.g.
-    ///   debug mode).
-    /// - `tx_graceful_blocks`: The number of blocks that are considered old enough to discard
-    ///   pending transactions.
-    /// - `max_block_number_delta`: Determines the maximum number of blocks that the client can be
-    ///   behind the network for transactions and account proofs to be considered valid.
-    /// - `note_transport_api`: An instance of [`NoteTransportClient`] which provides a way for the
-    ///   client to connect to the Miden Note Transport network.
-    /// - `tx_prover`: An optional instance of [`TransactionProver`] which will be used as the
-    ///   default prover for the client. If not provided, a default local prover will be created.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the client couldn't be instantiated.
-    #[allow(clippy::too_many_arguments)]
-    pub async fn new(
-        rpc_api: Arc<dyn NodeRpcClient>,
-        rng: ClientRngBox,
-        store: Arc<dyn Store>,
-        authenticator: Option<Arc<AUTH>>,
-        exec_options: ExecutionOptions,
-        tx_graceful_blocks: Option<u32>,
-        max_block_number_delta: Option<u32>,
-        note_transport_api: Option<Arc<dyn NoteTransportClient>>,
-        tx_prover: Option<Arc<dyn TransactionProver + Send + Sync>>,
-    ) -> Result<Self, ClientError> {
-        let tx_prover: Arc<dyn TransactionProver + Send + Sync> =
-            tx_prover.unwrap_or_else(|| Arc::new(LocalTransactionProver::default()));
-
-        if let Some((genesis, _)) = store.get_block_header_by_num(BlockNumber::GENESIS).await? {
-            // Set the genesis commitment in the RPC API client for future requests.
-            rpc_api.set_genesis_commitment(genesis.commitment()).await?;
-        }
-
-        // Initialize the note transport cursor if the client uses it
-        if note_transport_api.is_some() {
-            init_note_transport_cursor(store.clone()).await?;
-        }
-
-        let source_manager: Arc<dyn SourceManagerSync> = Arc::new(DefaultSourceManager::default());
-
-        Ok(Self {
-            store,
-            rng: ClientRng::new(rng),
-            rpc_api,
-            tx_prover,
-            authenticator,
-            source_manager,
-            exec_options,
-            tx_graceful_blocks,
-            max_block_number_delta,
-            note_transport_api,
-        })
-    }
-
     /// Returns true if the client is in debug mode.
     pub fn in_debug_mode(&self) -> bool {
         self.exec_options.enable_debugging()
