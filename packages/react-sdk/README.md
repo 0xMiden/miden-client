@@ -141,6 +141,20 @@ function MyComponent() {
 }
 ```
 
+#### `useMidenClient()`
+
+Get the ready `WebClient` instance directly. Throws if the client isn't ready yet.
+
+```tsx
+import { useMidenClient } from '@miden-sdk/react';
+
+function MyComponent() {
+  const client = useMidenClient();
+  // Safe to use client here (initialized)
+  return <div>Client ready</div>;
+}
+```
+
 #### `useSyncState()`
 
 Monitor network sync status and trigger manual syncs.
@@ -341,6 +355,28 @@ function CreateFaucetForm() {
 }
 ```
 
+#### `useImportAccount()`
+
+Import an existing account into the client.
+
+```tsx
+import { useImportAccount } from '@miden-sdk/react';
+
+function ImportAccountButton({ accountId }: { accountId: string }) {
+  const { importAccount, account, isImporting, error, reset } = useImportAccount();
+
+  const handleImport = async () => {
+    await importAccount({ type: 'id', accountId });
+  };
+
+  return (
+    <button onClick={handleImport} disabled={isImporting}>
+      {isImporting ? 'Importing...' : 'Import Account'}
+    </button>
+  );
+}
+```
+
 ### Note Hooks
 
 #### `useNotes(options?)`
@@ -378,6 +414,30 @@ function NotesList() {
 }
 ```
 
+#### `useAssetMetadata(assetIds)`
+
+Fetch asset symbols/decimals for a list of asset IDs.
+
+```tsx
+import { useAssetMetadata } from '@miden-sdk/react';
+
+function AssetLabels({ assetIds }: { assetIds: string[] }) {
+  const { assetMetadata } = useAssetMetadata(assetIds);
+  return (
+    <ul>
+      {assetIds.map((id) => {
+        const meta = assetMetadata.get(id);
+        return (
+          <li key={id}>
+            {id} — {meta?.symbol ?? 'UNKNOWN'} ({meta?.decimals ?? 0})
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+```
+
 ### Transaction Hooks
 
 All transaction hooks follow a consistent pattern with `stage` tracking:
@@ -385,6 +445,7 @@ All transaction hooks follow a consistent pattern with `stage` tracking:
 | Stage | Description |
 |-------|-------------|
 | `'idle'` | Not started |
+| `'executing'` | Building/executing request |
 | `'proving'` | Generating ZK proof |
 | `'submitting'` | Submitting to network |
 | `'complete'` | Transaction confirmed |
@@ -435,6 +496,64 @@ function SendForm() {
 
       {result && <div>Success! TX: {result.transactionId}</div>}
     </div>
+  );
+}
+```
+
+#### `useMultiSend()`
+
+Create multiple P2ID output notes in a single transaction.
+
+```tsx
+import { useMultiSend } from '@miden-sdk/react';
+
+function MultiSendButton() {
+  const { sendMany, isLoading, stage } = useMultiSend();
+
+  const handleSend = async () => {
+    await sendMany({
+      from: '0xsender...',
+      assetId: '0xtoken...',
+      recipients: [
+        { to: '0xrec1...', amount: 100n },
+        { to: '0xrec2...', amount: 250n },
+      ],
+      noteType: 'public',
+    });
+  };
+
+  return (
+    <button onClick={handleSend} disabled={isLoading}>
+      {isLoading ? `Sending (${stage})...` : 'Multi-Send'}
+    </button>
+  );
+}
+```
+
+#### `useInternalTransfer()`
+
+Create a P2ID note and immediately consume it (useful for transfers between accounts you control).
+
+```tsx
+import { useInternalTransfer } from '@miden-sdk/react';
+
+function InternalTransferButton() {
+  const { transfer, isLoading, stage } = useInternalTransfer();
+
+  const handleTransfer = async () => {
+    await transfer({
+      from: '0xsender...',
+      to: '0xrecipient...',
+      assetId: '0xtoken...',
+      amount: 50n,
+      noteType: 'public',
+    });
+  };
+
+  return (
+    <button onClick={handleTransfer} disabled={isLoading}>
+      {isLoading ? `Transferring (${stage})...` : 'Transfer'}
+    </button>
   );
 }
 ```
@@ -547,6 +666,41 @@ function SwapForm() {
 }
 ```
 
+#### `useTransaction()`
+
+Execute a custom `TransactionRequest` or build one with the client.
+
+```tsx
+import { useTransaction } from '@miden-sdk/react';
+import { AccountId, NoteType } from '@miden-sdk/miden-sdk';
+
+function CustomTransactionButton({ accountId }: { accountId: string }) {
+  const { execute, isLoading, stage } = useTransaction();
+
+  const handleRun = async () => {
+    await execute({
+      accountId,
+      request: (client) =>
+        client.newSwapTransactionRequest(
+          AccountId.fromHex(accountId),
+          AccountId.fromHex('0xassetA'),
+          10n,
+          AccountId.fromHex('0xassetB'),
+          5n,
+          NoteType.Private,
+          NoteType.Private
+        ),
+    });
+  };
+
+  return (
+    <button onClick={handleRun} disabled={isLoading}>
+      {isLoading ? stage : 'Run Transaction'}
+    </button>
+  );
+}
+```
+
 ## Common Patterns
 
 ### Error Handling
@@ -651,10 +805,17 @@ import type {
   // Hook options
   CreateWalletOptions,
   CreateFaucetOptions,
+  ImportAccountOptions,
   SendOptions,
+  MultiSendRecipient,
+  MultiSendOptions,
+  InternalTransferOptions,
+  InternalTransferChainOptions,
+  InternalTransferResult,
   MintOptions,
   ConsumeOptions,
   SwapOptions,
+  ExecuteTransactionOptions,
   NotesFilter,
 
   // Hook results
