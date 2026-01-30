@@ -14,6 +14,7 @@ export {
 export { useAccounts } from "./hooks/useAccounts";
 export { useAccount } from "./hooks/useAccount";
 export { useNotes } from "./hooks/useNotes";
+export { useTransactionHistory } from "./hooks/useTransactionHistory";
 export { useSyncState } from "./hooks/useSyncState";
 export { useAssetMetadata } from "./hooks/useAssetMetadata";
 
@@ -47,6 +48,9 @@ export type {
   AssetBalance,
   NotesFilter,
   NotesResult,
+  TransactionHistoryOptions,
+  TransactionHistoryResult,
+  TransactionStatus,
   AssetMetadata,
   NoteAsset,
   NoteSummary,
@@ -78,6 +82,8 @@ export type {
   InputNoteRecord,
   ConsumableNoteRecord,
   TransactionId,
+  TransactionFilter,
+  TransactionRecord,
   TransactionRequest,
   NoteType,
   AccountStorageMode,
@@ -105,3 +111,4 @@ export type { UseConsumeResult } from "./hooks/useConsume";
 export type { UseSwapResult } from "./hooks/useSwap";
 export type { UseTransactionResult } from "./hooks/useTransaction";
 export type { UseSyncStateResult } from "./hooks/useSyncState";
+export type { UseTransactionHistoryResult } from "./hooks/useTransactionHistory";

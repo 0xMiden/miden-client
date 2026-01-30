@@ -611,6 +611,49 @@ function WaitForTx({ txId }: { txId: string }) {
 }
 ```
 
+#### `useTransactionHistory()`
+
+Query transaction history and get live state for a single transaction. You can
+pass a single ID, multiple IDs, or a custom `TransactionFilter`. Results refresh
+after each successful sync by default.
+
+```tsx
+import { useTransactionHistory } from '@miden-sdk/react';
+
+function TxHistory() {
+  const { records, isLoading, refetch } = useTransactionHistory();
+
+  if (isLoading) return <div>Loading...</div>;
+
+  return (
+    <div>
+      <button onClick={refetch}>Refresh</button>
+      <ul>
+        {records.map((record) => (
+          <li key={record.id().toHex()}>{record.id().toHex()}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+```
+
+```tsx
+import { useTransactionHistory } from '@miden-sdk/react';
+
+function TxStatus({ txId }: { txId: string }) {
+  const { record, status } = useTransactionHistory({ id: txId });
+
+  if (!record) return <div>Not found</div>;
+
+  return (
+    <div>
+      {record.id().toHex()} → {status}
+    </div>
+  );
+}
+```
+
 #### `useWaitForNotes()`
 
 Wait until an account has consumable notes. Great for mint → consume pipelines

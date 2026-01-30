@@ -6,7 +6,9 @@ import type {
   AccountFile,
   InputNoteRecord,
   ConsumableNoteRecord,
+  TransactionFilter,
   TransactionId,
+  TransactionRecord,
   TransactionRequest,
   NoteType,
   AccountStorageMode,
@@ -21,7 +23,9 @@ export type {
   AccountFile,
   InputNoteRecord,
   ConsumableNoteRecord,
+  TransactionFilter,
   TransactionId,
+  TransactionRecord,
   TransactionRequest,
   NoteType,
   AccountStorageMode,
@@ -146,6 +150,30 @@ export interface NotesResult {
   consumableNotes: ConsumableNoteRecord[];
   noteSummaries: NoteSummary[];
   consumableNoteSummaries: NoteSummary[];
+  isLoading: boolean;
+  error: Error | null;
+  refetch: () => Promise<void>;
+}
+
+export type TransactionStatus = "pending" | "committed" | "discarded";
+
+export interface TransactionHistoryOptions {
+  /** Single transaction ID to look up. */
+  id?: string | TransactionId;
+  /** List of transaction IDs to look up. */
+  ids?: Array<string | TransactionId>;
+  /** Custom transaction filter (overrides id/ids). */
+  filter?: TransactionFilter;
+  /** Refresh after provider syncs. Default: true */
+  refreshOnSync?: boolean;
+}
+
+export interface TransactionHistoryResult {
+  records: TransactionRecord[];
+  /** Convenience record when a single ID is provided. */
+  record: TransactionRecord | null;
+  /** Convenience status when a single ID is provided. */
+  status: TransactionStatus | null;
   isLoading: boolean;
   error: Error | null;
   refetch: () => Promise<void>;
