@@ -117,6 +117,9 @@ function App() {
 
 ### Core Hooks
 
+**ID formats:** All hooks that accept account IDs or asset IDs accept both
+bech32 and hex strings (auto-detected).
+
 #### `useMiden()`
 
 Access the Miden client instance and initialization state. This is your entry
@@ -531,8 +534,7 @@ function SendForm() {
 
 Create multiple P2ID output notes in a single transaction. This is ideal for
 batched payouts or airdrops; with `noteType: 'private'`, the hook also delivers
-each note to recipients via `sendPrivateNote`. Recipient IDs accept bech32 or
-hex (auto-detected).
+each note to recipients via `sendPrivateNote`.
 
 ```tsx
 import { useMultiSend } from '@miden-sdk/react';
