@@ -109,8 +109,7 @@ fn init_with_params() {
 #[test]
 #[serial_test::file_serial]
 fn silent_initialization_uses_default_values() {
-    // Clean up any existing global config first
-    cleanup_global_config();
+    let miden_home = set_isolated_miden_home();
 
     let temp_dir = temp_dir().join(format!("cli-test-{}", rand::rng().random::<u64>()));
     std::fs::create_dir_all(&temp_dir).unwrap();
@@ -120,8 +119,8 @@ fn silent_initialization_uses_default_values() {
     account_cmd.args(["account"]);
     account_cmd.current_dir(&temp_dir).assert().success();
 
-    // Read and verify the global config file contents
-    let global_config_path = dirs::home_dir().unwrap().join(MIDEN_DIR).join("miden-client.toml");
+    // Read and verify the global config file contents (now in the isolated directory)
+    let global_config_path = miden_home.join("miden-client.toml");
     let config_content = std::fs::read_to_string(&global_config_path).unwrap();
 
     // Verify default values are used
@@ -147,9 +146,6 @@ fn silent_initialization_uses_default_values() {
         !local_config_path.exists(),
         "Should not create local config during silent initialization"
     );
-
-    // Clean up
-    cleanup_global_config();
 }
 
 #[test]
@@ -953,20 +949,15 @@ fn init_cli_with_store_path(store_path: &Path, endpoint: &Endpoint) -> PathBuf {
     temp_dir
 }
 
-/// Helper function to clean up global config for testing
-fn cleanup_global_config() {
-    if let Some(home_dir) = dirs::home_dir() {
-        let global_miden_dir = home_dir.join(MIDEN_DIR);
-        if global_miden_dir.exists() {
-            // Try multiple times in case of file locks
-            for _ in 0..3 {
-                if std::fs::remove_dir_all(&global_miden_dir).is_ok() {
-                    break;
-                }
-                std::thread::sleep(std::time::Duration::from_millis(100));
-            }
-        }
-    }
+/// Creates an isolated temporary directory and sets `MIDEN_CLIENT_HOME` to point to it.
+/// This prevents tests from touching the real `~/.miden` directory.
+/// Tests using this MUST use `#[serial_test::file_serial]`.
+fn set_isolated_miden_home() -> PathBuf {
+    let path = temp_dir().join(format!("miden-home-{}", rand::rng().random::<u64>()));
+    std::fs::create_dir_all(&path).unwrap();
+    // SAFETY: Tests using this are serialized via #[serial_test::file_serial]
+    unsafe { env::set_var("MIDEN_CLIENT_HOME", &path); }
+    path
 }
 
 // Syncs CLI on directory. It'll try syncing until the command executes successfully. If it never
@@ -1373,8 +1364,8 @@ async fn test_from_system_user_config_with_local_config() -> Result<()> {
     // Initialize a local CLI configuration
     let (store_path, temp_dir, _endpoint) = init_cli();
 
-    // Ensure no global config exists to verify local config takes priority
-    cleanup_global_config();
+    // Use isolated global miden directory to ensure no global config interferes
+    let _miden_home = set_isolated_miden_home();
 
     // Change to the temp directory where local .miden config exists
     let original_dir = env::current_dir().unwrap();
@@ -1413,12 +1404,11 @@ async fn test_from_system_user_config_silent_init() -> Result<()> {
     let temp_dir = temp_dir().join(format!("cli-test-silent-init-{}", rand::rng().random::<u64>()));
     std::fs::create_dir_all(&temp_dir)?;
 
-    // Ensure no global config exists
-    cleanup_global_config();
+    // Use isolated global miden directory
+    let miden_home = set_isolated_miden_home();
 
-    // Verify no config exists before we start
-    let global_miden_dir = dirs::home_dir().unwrap().join(MIDEN_DIR);
-    let global_config_path = global_miden_dir.join("miden-client.toml");
+    // Verify no config exists before we start (in the isolated directory)
+    let global_config_path = miden_home.join("miden-client.toml");
     assert!(!global_config_path.exists(), "Global config should not exist before test");
 
     // Change to the temp directory
@@ -1439,15 +1429,11 @@ async fn test_from_system_user_config_silent_init() -> Result<()> {
         client_result.err()
     );
 
-    // Verify that a global config was created by the silent initialization
+    // Verify that a global config was created by the silent initialization (in the isolated dir)
     assert!(
         global_config_path.exists(),
         "Expected global config to be created at {global_config_path:?} by silent initialization"
     );
-
-    // Clean up temp directory and global config
-    let _ = std::fs::remove_dir_all(&temp_dir);
-    cleanup_global_config();
 
     Ok(())
 }
@@ -1456,10 +1442,10 @@ async fn test_from_system_user_config_silent_init() -> Result<()> {
 #[tokio::test]
 #[serial_test::file_serial]
 async fn test_from_system_user_config_local_priority() -> Result<()> {
-    // Clean up any existing global config
-    cleanup_global_config();
+    // Use isolated global miden directory
+    let _miden_home = set_isolated_miden_home();
 
-    // Create a global config with testnet endpoint
+    // Create a global config with testnet endpoint (will be created in the isolated directory)
     let global_store_path = create_test_store_path();
     let global_endpoint = Endpoint::testnet();
 
@@ -1488,11 +1474,6 @@ async fn test_from_system_user_config_local_priority() -> Result<()> {
 
     // Create client with local config
     let client = miden_client_cli::CliClient::from_config(config, DebugMode::Disabled).await;
-
-    // Clean up
-    let _ = std::fs::remove_dir_all(&temp_dir_for_global);
-    let _ = std::fs::remove_dir_all(&local_temp_dir);
-    cleanup_global_config();
 
     // Assert client was created with local config
     assert!(client.is_ok(), "Failed to create client with local config: {:?}", client.err());
