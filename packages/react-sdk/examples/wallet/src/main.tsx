@@ -8,9 +8,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <MidenProvider
       config={{
-        rpcUrl: "https://rpc.devnet.miden.io",
-        noteTransportUrl: "http://transport.miden.io:57292",
-        autoSyncInterval: 15000,
+        rpcUrl: "devnet",
       }}
     >
       <App />
