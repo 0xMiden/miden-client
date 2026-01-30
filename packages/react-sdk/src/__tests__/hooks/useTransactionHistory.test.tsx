@@ -63,9 +63,7 @@ describe("useTransactionHistory", () => {
       isReady: true,
     });
 
-    const { result } = renderHook(() =>
-      useTransactionHistory({ id: txId })
-    );
+    const { result } = renderHook(() => useTransactionHistory({ id: txId }));
 
     await waitFor(() => expect(result.current.record).not.toBeNull());
 
