@@ -9,6 +9,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     <MidenProvider
       config={{
         rpcUrl: "devnet",
+        prover: "devnet",
       }}
     >
       <App />
