@@ -558,6 +558,48 @@ function InternalTransferButton() {
 }
 ```
 
+#### `useWaitForCommit()`
+
+Wait for a transaction to be committed.
+
+```tsx
+import { useWaitForCommit } from '@miden-sdk/react';
+
+function WaitForTx({ txId }: { txId: string }) {
+  const { waitForCommit } = useWaitForCommit();
+
+  const handleWait = async () => {
+    await waitForCommit(txId, { timeoutMs: 10_000, intervalMs: 1_000 });
+  };
+
+  return <button onClick={handleWait}>Wait for Commit</button>;
+}
+```
+
+#### `useWaitForNotes()`
+
+Wait until an account has consumable notes.
+
+```tsx
+import { useWaitForNotes } from '@miden-sdk/react';
+
+function WaitForNotes({ accountId }: { accountId: string }) {
+  const { waitForConsumableNotes } = useWaitForNotes();
+
+  const handleWait = async () => {
+    const notes = await waitForConsumableNotes({
+      accountId,
+      minCount: 1,
+      timeoutMs: 10_000,
+      intervalMs: 1_000,
+    });
+    console.log('Notes ready:', notes.length);
+  };
+
+  return <button onClick={handleWait}>Wait for Notes</button>;
+}
+```
+
 #### `useMint()`
 
 Mint new tokens from a faucet you control.
@@ -812,6 +854,8 @@ import type {
   InternalTransferOptions,
   InternalTransferChainOptions,
   InternalTransferResult,
+  WaitForCommitOptions,
+  WaitForNotesOptions,
   MintOptions,
   ConsumeOptions,
   SwapOptions,

@@ -419,6 +419,7 @@ export const createMockSdkModule = (
     NoteAndArgsArray: MockNoteAndArgsArray,
     TransactionRequestBuilder: MockTransactionRequestBuilder,
     TransactionFilter: {
+      all: vi.fn(() => ({})),
       uncommitted: vi.fn(() => ({})),
       ids: vi.fn((ids: unknown) => ({ ids })),
     },

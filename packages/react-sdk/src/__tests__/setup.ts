@@ -189,6 +189,7 @@ vi.mock("@miden-sdk/miden-sdk", () => {
       Unverified: 8,
     },
     TransactionFilter: {
+      all: vi.fn(() => ({})),
       uncommitted: vi.fn(() => ({})),
       ids: vi.fn((ids: unknown) => ({ ids })),
     },

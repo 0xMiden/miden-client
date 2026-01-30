@@ -281,6 +281,24 @@ export interface InternalTransferResult {
   noteId: string;
 }
 
+export interface WaitForCommitOptions {
+  /** Timeout in milliseconds. Default: 10000 */
+  timeoutMs?: number;
+  /** Polling interval in milliseconds. Default: 1000 */
+  intervalMs?: number;
+}
+
+export interface WaitForNotesOptions {
+  /** Account ID to check for consumable notes */
+  accountId: string;
+  /** Minimum number of notes to wait for. Default: 1 */
+  minCount?: number;
+  /** Timeout in milliseconds. Default: 10000 */
+  timeoutMs?: number;
+  /** Polling interval in milliseconds. Default: 1000 */
+  intervalMs?: number;
+}
+
 // Mint options
 export interface MintOptions {
   /** Target account to receive minted tokens */
