@@ -148,10 +148,8 @@ impl WebClient {
     /// Returns an error if the client is not initialized.
     #[wasm_bindgen(js_name = "newStorageReader")]
     pub fn new_storage_reader(&self, account_id: &AccountId) -> Result<StorageReader, JsValue> {
-        let client = self
-            .inner
-            .as_ref()
-            .ok_or_else(|| JsValue::from_str("Client not initialized"))?;
+        let client =
+            self.inner.as_ref().ok_or_else(|| JsValue::from_str("Client not initialized"))?;
 
         Ok(StorageReader::new(client.new_storage_reader(account_id.into())))
     }

@@ -62,7 +62,7 @@ impl StorageReader {
     }
 
     /// Retrieves a value from a storage map slot by name and key.
-    /// 
+    ///
     /// # Arguments
     /// * `slot_name` - The name of the storage map slot.
     /// * `key` - The key within the map.
