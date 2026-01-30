@@ -147,10 +147,8 @@ impl<AUTH> Client<AUTH> {
     ///   being tracked.
     /// - If `overwrite` is set to `true` and the `account_data` commitment doesn't match the
     ///   network's account commitment.
-    /// - If the client has reached the accounts limit
-    ///   ([`ACCOUNT_ID_LIMIT`](crate::rpc::ACCOUNT_ID_LIMIT)).
-    /// - If the client has reached the note tags limit
-    ///   ([`NOTE_TAG_LIMIT`](crate::rpc::NOTE_TAG_LIMIT)).
+    /// - If the client has reached the accounts limit.
+    /// - If the client has reached the note tags limit.
     pub async fn add_account(
         &mut self,
         account: &Account,
@@ -245,8 +243,7 @@ impl<AUTH> Client<AUTH> {
     /// # Errors
     /// - If the account is not found on the network.
     /// - If the address is already being tracked.
-    /// - If the client has reached the note tags limit
-    ///   ([`NOTE_TAG_LIMIT`](crate::rpc::NOTE_TAG_LIMIT)).
+    /// - If the client has reached the note tags limit.
     pub async fn add_address(
         &mut self,
         address: Address,

@@ -6,6 +6,7 @@ pub mod account;
 pub mod account_vault;
 pub mod block;
 pub mod digest;
+pub mod limits;
 pub mod merkle;
 pub mod note;
 pub mod nullifier;
