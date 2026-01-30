@@ -89,12 +89,15 @@ function App() {
   return (
     <MidenProvider
       config={{
-        // RPC endpoint (defaults to testnet)
-        rpcUrl: 'https://rpc.testnet.miden.io',
+        // RPC endpoint (defaults to testnet). You can also use 'devnet' or 'testnet'.
+        rpcUrl: 'devnet',
 
         // Auto-sync interval in milliseconds (default: 15000)
         // Set to 0 to disable auto-sync
         autoSyncInterval: 15000,
+
+        // Optional: prover selection ('local' | 'devnet' | 'testnet' | URL)
+        // prover: 'local',
       }}
       // Optional: Custom loading component
       loadingComponent={<div>Loading Miden...</div>}
@@ -236,7 +239,7 @@ import { useAccount } from '@miden-sdk/react';
 function AccountDetails({ accountId }: { accountId: string }) {
   const {
     account,     // Full account object
-    assets,      // Array of { assetId, amount } balances
+    assets,      // Array of { assetId, amount, symbol?, decimals? } balances
     isLoading,
     error,
     refetch,
@@ -257,7 +260,7 @@ function AccountDetails({ accountId }: { accountId: string }) {
       <h3>Assets</h3>
       {assets.map(asset => (
         <div key={asset.assetId}>
-          {asset.assetId}: {asset.amount.toString()}
+          {asset.symbol ?? asset.assetId}: {asset.amount.toString()}
         </div>
       ))}
 
@@ -390,6 +393,7 @@ function NotesList() {
   const {
     notes,            // All notes matching filter
     consumableNotes,  // Notes ready to be consumed
+    noteSummaries,    // Summary objects with asset metadata
     isLoading,
     error,
     refetch,
@@ -407,6 +411,13 @@ function NotesList() {
       {consumableNotes.map(note => (
         <div key={note.id().toString()}>
           {note.id().toString()}
+        </div>
+      ))}
+
+      <h2>Note Summaries</h2>
+      {noteSummaries.map(summary => (
+        <div key={summary.id}>
+          {summary.id} — {summary.assets.map(a => `${a.amount} ${a.symbol ?? a.assetId}`).join(', ')}
         </div>
       ))}
     </div>
@@ -476,7 +487,7 @@ function SendForm() {
         amount: 100n,             // Amount in smallest units
 
         // Optional parameters
-        noteType: 'private',      // 'private' | 'public' (default: 'private')
+        noteType: 'private',      // 'private' | 'public' | 'encrypted' (default: 'private')
         recallHeight: 1000,       // Sender can reclaim after this block
       });
 
@@ -616,7 +627,7 @@ function MintForm() {
         faucetId: '0xmyfaucet...',      // Your faucet ID
         targetAccountId: '0xwallet...', // Recipient wallet
         amount: 1000n * 10n**8n,        // Amount to mint
-        noteType: 'private',            // Optional (default: 'private')
+        noteType: 'private',            // Optional: 'private' | 'public' | 'encrypted'
       });
 
       console.log('Minted! TX:', transactionId);
@@ -691,7 +702,8 @@ function SwapForm() {
         requestedAmount: 50n,
 
         // Optional
-        noteType: 'private',
+        noteType: 'private',        // Note type for swap note
+        paybackNoteType: 'private', // Note type for payback note
       });
 
       console.log('Swap created! TX:', transactionId);
