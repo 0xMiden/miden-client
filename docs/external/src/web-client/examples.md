@@ -50,5 +50,5 @@ Most if not all examples require you to initialize the Miden Web Client. You can
 import { WebClient } from "@miden-sdk/miden-sdk";
 
 // Initialize the web client
-const webClient = await WebClient.createClient();
+const webClient = await WebClient.createClient({});
 ```

@@ -18,7 +18,7 @@ import { WebClient } from "@miden-sdk/miden-sdk";
 
 try {
     // Initialize the web client
-    const webClient = await WebClient.createClient();
+    const webClient = await WebClient.createClient({});
 
     // Add a tag
     await webClient.addTag("123"); // Tag must be a valid u32 number passed as a string
@@ -37,7 +37,7 @@ import { WebClient } from "@miden-sdk/miden-sdk";
 
 try {
     // Initialize the web client
-    const webClient = await WebClient.createClient();
+    const webClient = await WebClient.createClient({});
 
     // Remove a tag
     await webClient.removeTag("123"); // Tag must be a valid u32 number passed as a string
@@ -56,7 +56,7 @@ import { WebClient } from "@miden-sdk/miden-sdk";
 
 try {
     // Initialize the web client
-    const webClient = await WebClient.createClient();
+    const webClient = await WebClient.createClient({});
 
     // Get all tags
     const tags = await webClient.listTags();
@@ -91,7 +91,7 @@ import { WebClient } from "@miden-sdk/miden-sdk";
 
 try {
     // Initialize the web client
-    const webClient = await WebClient.createClient();
+    const webClient = await WebClient.createClient({});
 
     // Add multiple tags
     const tagsToAdd = ["123", "456", "789"];

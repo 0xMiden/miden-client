@@ -16,7 +16,7 @@ import { TransactionFilter, WebClient } from "@miden-sdk/miden-sdk";
 
 try {
     // Initialize the web client
-    const webClient = await WebClient.createClient();
+    const webClient = await WebClient.createClient({});
 
     // Get all transactions
     const allTransactions = await webClient.getTransactions(TransactionFilter.all());
@@ -59,7 +59,7 @@ import { TransactionFilter, WebClient } from "@miden-sdk/miden-sdk";
 
 try {
     // Initialize the web client
-    const webClient = await WebClient.createClient();
+    const webClient = await WebClient.createClient({});
 
     // Get uncommitted transactions
     const uncommittedTransactions = await webClient.getTransactions(TransactionFilter.uncommitted());
@@ -88,7 +88,7 @@ import { WebClient } from "@miden-sdk/miden-sdk";
 
 try {
     // Initialize the web client
-    const webClient = await WebClient.createClient();
+    const webClient = await WebClient.createClient({});
 
     const transactions = await webClient.getTransactions(TransactionFilter.all());
 

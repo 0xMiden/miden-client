@@ -184,12 +184,10 @@ test.describe("Sync Lock Tests", () => {
       const result = await page.evaluate(async () => {
         // Create two clients pointing to the same store
         const client1 = window.client;
-        const client2 = await window.WebClient.createClient(
-          window.rpcUrl,
-          undefined,
-          undefined,
-          "tests" // Same store name as client1
-        );
+        const client2 = await window.WebClient.createClient({
+          rpcUrl: window.rpcUrl,
+          storeName: "tests", // Same store name as client1
+        });
 
         // Fire concurrent syncs from both clients
         const syncPromises = [client1.syncState(), client2.syncState()];
@@ -216,18 +214,14 @@ test.describe("Sync Lock Tests", () => {
     }) => {
       const result = await page.evaluate(async () => {
         const client1 = window.client;
-        const client2 = await window.WebClient.createClient(
-          window.rpcUrl,
-          undefined,
-          undefined,
-          "tests"
-        );
-        const client3 = await window.WebClient.createClient(
-          window.rpcUrl,
-          undefined,
-          undefined,
-          "tests"
-        );
+        const client2 = await window.WebClient.createClient({
+          rpcUrl: window.rpcUrl,
+          storeName: "tests",
+        });
+        const client3 = await window.WebClient.createClient({
+          rpcUrl: window.rpcUrl,
+          storeName: "tests",
+        });
 
         // Fire many concurrent syncs
         const syncPromises = [
@@ -258,18 +252,14 @@ test.describe("Sync Lock Tests", () => {
     }) => {
       const result = await page.evaluate(async () => {
         const client1 = window.client; // "tests" store
-        const client2 = await window.WebClient.createClient(
-          window.rpcUrl,
-          undefined,
-          undefined,
-          "SyncLockTestStore1"
-        );
-        const client3 = await window.WebClient.createClient(
-          window.rpcUrl,
-          undefined,
-          undefined,
-          "SyncLockTestStore2"
-        );
+        const client2 = await window.WebClient.createClient({
+          rpcUrl: window.rpcUrl,
+          storeName: "SyncLockTestStore1",
+        });
+        const client3 = await window.WebClient.createClient({
+          rpcUrl: window.rpcUrl,
+          storeName: "SyncLockTestStore2",
+        });
 
         // Fire concurrent syncs to different stores
         const syncPromises = [
@@ -440,12 +430,10 @@ test.describe("Cross-Tab Sync Lock Tests", () => {
             const rpcUrl = `http://localhost:${MIDEN_NODE_PORT}`;
             window.rpcUrl = rpcUrl;
             // Both pages use the same store name for cross-tab coordination
-            const client = await window.WebClient.createClient(
+            const client = await window.WebClient.createClient({
               rpcUrl,
-              undefined,
-              undefined,
-              "CrossTabTestStore"
-            );
+              storeName: "CrossTabTestStore",
+            });
             window.client = client;
           },
           { MIDEN_NODE_PORT }
@@ -508,12 +496,10 @@ test.describe("Cross-Tab Sync Lock Tests", () => {
 
             const rpcUrl = `http://localhost:${MIDEN_NODE_PORT}`;
             window.rpcUrl = rpcUrl;
-            const client = await window.WebClient.createClient(
+            const client = await window.WebClient.createClient({
               rpcUrl,
-              undefined,
-              undefined,
-              "RapidCrossTabStore"
-            );
+              storeName: "RapidCrossTabStore",
+            });
             window.client = client;
           },
           { MIDEN_NODE_PORT }

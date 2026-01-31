@@ -16,7 +16,7 @@ import { AccountId, WebClient } from "@miden-sdk/miden-sdk";
 
 try {
   // Initialize the web client
-  const webClient = await WebClient.createClient();
+  const webClient = await WebClient.createClient({});
 
   // Create an AccountId from a hex string
   const accountId = AccountId.fromHex("0x1234..."); // Replace with actual account ID
@@ -53,7 +53,7 @@ import { WebClient } from "@miden-sdk/miden-sdk";
 
 try {
   // Initialize the web client
-  const webClient = await WebClient.createClient();
+  const webClient = await WebClient.createClient({});
 
   // Get all account headers
   const accounts = await webClient.getAccounts();

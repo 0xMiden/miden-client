@@ -38,12 +38,10 @@ export const test = base.extend<{ forEachTest: void }>({
           let proverUrl = remoteProverPort
             ? `http://localhost:${remoteProverPort}`
             : undefined;
-          const client = await window.WebClient.createClient(
+          const client = await window.WebClient.createClient({
             rpcUrl,
-            undefined,
-            undefined,
-            "tests"
-          );
+            storeName: "tests",
+          });
           window.rpcUrl = rpcUrl;
 
           window.client = client;
@@ -135,11 +133,11 @@ export const test = base.extend<{ forEachTest: void }>({
           };
 
           window.helpers.refreshClient = async (initSeed) => {
-            const client = await WebClient.createClient(
+            const client = await WebClient.createClient({
               rpcUrl,
-              undefined,
-              initSeed
-            );
+              noteTransportUrl: undefined,
+              seed: initSeed,
+            });
             window.client = client;
             await window.client.syncState();
           };

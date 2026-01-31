@@ -32,6 +32,7 @@
 * Added a convenience function `fromBech32` to turn a bech32 string into an AccountId ([#1607](https://github.com/0xMiden/miden-client/pull/1607)).
 * Updated `SqliteStore`: replaced `MerkleStore` with `SmtForest` and introduced `AccountSmtForest`; simplified queries ([#1526](https://github.com/0xMiden/miden-client/pull/1526), [#1663](https://github.com/0xMiden/miden-client/pull/1663)).
 * Added filter to store query to improve how the MMR is built ([#1681](https://github.com/0xMiden/miden-client/pull/1681)).
+* [BREAKING] refactor(web-client): use config object for constructor and factory methods ([#1666](https://github.com/0xMiden/miden-client/pull/1666))
 * [BREAKING] Removed `getRpoFalcon512PublicKeyAsWord` and `getEcdsaK256KeccakPublicKeyAsWord` in `AuthSecretKey`
 * [BREAKING] Typed the `auth_scheme` plumbing across the Rust WebClient ID-building helpers and aligned the WebClient bindings with the native enum to avoid passing raw identifiers ([#1546](https://github.com/0xMiden/miden-client/pull/1546)).
 * [BREAKING] WebClient `AccountComponent.createAuthComponentFromCommitment` now takes `AuthScheme` (enum) instead of a numeric scheme id. The old `AccountComponent.createAuthComponent` method was removed; use `createAuthComponentFromSecretKey` instead ([#1578](https://github.com/0xMiden/miden-client/issues/1578)).

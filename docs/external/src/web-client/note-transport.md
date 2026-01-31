@@ -16,11 +16,11 @@ import { WebClient } from "@miden-sdk/miden-sdk";
 
 try {
     // Initialize the web client with note transport endpoint
-    const webClient = await WebClient.createClient(
-        null,                           // Miden node endpoint (optional, defaults to testnet)
-        "https://transport.miden.io",   // Miden Note Transport node (optional, defaults to none)
-        null                            // seed (optional)
-    );
+    const webClient = await WebClient.createClient({
+        // rpcUrl: "http://localhost:57291", // optional
+        noteTransportUrl: "https://transport.miden.io", // optional, defaults to none
+        // seed: new Uint8Array([...]) // optional
+    });
 
     console.log("Client initialized with note transport");
 } catch (error) {
@@ -37,7 +37,9 @@ import { WebClient, Note, Address } from "@miden-sdk/miden-sdk";
 
 try {
     // Initialize the web client with note transport endpoint
-    const webClient = await WebClient.createClient(null, "https://transport.miden.io", null);
+    const webClient = await WebClient.createClient({
+        noteTransportUrl: "https://transport.miden.io",
+    });
 
     const note = /* note to be sent here */;
     const address = /* recipient's address here */;
@@ -60,7 +62,9 @@ import { WebClient, NoteFilter, NoteFilterTypes } from "@miden-sdk/miden-sdk";
 
 try {
     // Initialize the web client with note transport endpoint
-    const webClient = await WebClient.createClient(null, "https://transport.miden.io", null);
+    const webClient = await WebClient.createClient({
+        noteTransportUrl: "https://transport.miden.io",
+    });
 
     // Fetch private notes using pagination
     await webClient.fetchPrivateNotes();

@@ -6,12 +6,9 @@ test.describe("Store Isolation Tests", () => {
     page,
   }) => {
     const result = await page.evaluate(async () => {
-      const client = await window.WebClient.createClient(
-        window.rpcUrl,
-        undefined,
-        undefined,
-        undefined
-      );
+      const client = await window.WebClient.createClient({
+        rpcUrl: window.rpcUrl,
+      });
       await client.syncState();
 
       const databases = await window.indexedDB.databases();
@@ -34,12 +31,10 @@ test.describe("Store Isolation Tests", () => {
 
       await client1.newWallet(window.AccountStorageMode.private(), true, 0);
 
-      const client2 = await window.WebClient.createClient(
-        window.rpcUrl,
-        undefined,
-        undefined,
-        "IsolatedStore1"
-      );
+      const client2 = await window.WebClient.createClient({
+        rpcUrl: window.rpcUrl,
+        storeName: "IsolatedStore1",
+      });
       await client2.syncState();
 
       const databases = await window.indexedDB.databases();
@@ -64,12 +59,10 @@ test.describe("Store Isolation Tests", () => {
 
   test("reconnecting to same store preserves data", async ({ page }) => {
     const result = await page.evaluate(async () => {
-      const client1 = await window.WebClient.createClient(
-        window.rpcUrl,
-        undefined,
-        undefined,
-        "PersistentStore"
-      );
+      const client1 = await window.WebClient.createClient({
+        rpcUrl: window.rpcUrl,
+        storeName: "PersistentStore",
+      });
       await client1.syncState();
 
       const wallet = await client1.newWallet(
@@ -79,12 +72,10 @@ test.describe("Store Isolation Tests", () => {
       );
       const walletId = wallet.id().toString();
 
-      const client1b = await window.WebClient.createClient(
-        window.rpcUrl,
-        undefined,
-        undefined,
-        "PersistentStore"
-      );
+      const client1b = await window.WebClient.createClient({
+        rpcUrl: window.rpcUrl,
+        storeName: "PersistentStore",
+      });
 
       const accounts = await client1b.getAccounts();
       const accountIds = accounts.map((a: any) => a.id().toString());
@@ -103,12 +94,10 @@ test.describe("Store Isolation Tests", () => {
   test("custom store name creates isolated database", async ({ page }) => {
     const result = await page.evaluate(async () => {
       const customStoreName = "MyCustomStore_v1";
-      const client = await window.WebClient.createClient(
-        window.rpcUrl,
-        undefined,
-        undefined,
-        customStoreName
-      );
+      const client = await window.WebClient.createClient({
+        rpcUrl: window.rpcUrl,
+        storeName: customStoreName,
+      });
       await client.syncState();
 
       await client.newWallet(window.AccountStorageMode.private(), true, 0);
@@ -134,18 +123,14 @@ test.describe("Store Isolation Tests", () => {
     page,
   }) => {
     const result = await page.evaluate(async () => {
-      const client1 = await window.WebClient.createClient(
-        window.rpcUrl,
-        undefined,
-        undefined,
-        "ConcurrentStore1"
-      );
-      const client2 = await window.WebClient.createClient(
-        window.rpcUrl,
-        undefined,
-        undefined,
-        "ConcurrentStore2"
-      );
+      const client1 = await window.WebClient.createClient({
+        rpcUrl: window.rpcUrl,
+        storeName: "ConcurrentStore1",
+      });
+      const client2 = await window.WebClient.createClient({
+        rpcUrl: window.rpcUrl,
+        storeName: "ConcurrentStore2",
+      });
 
       await Promise.all([client1.syncState(), client2.syncState()]);
 
@@ -172,18 +157,14 @@ test.describe("Store Isolation Tests", () => {
 
   test("multiple accounts per store remain isolated", async ({ page }) => {
     const result = await page.evaluate(async () => {
-      const client1 = await window.WebClient.createClient(
-        window.rpcUrl,
-        undefined,
-        undefined,
-        "MultiAccount1"
-      );
-      const client2 = await window.WebClient.createClient(
-        window.rpcUrl,
-        undefined,
-        undefined,
-        "MultiAccount2"
-      );
+      const client1 = await window.WebClient.createClient({
+        rpcUrl: window.rpcUrl,
+        storeName: "MultiAccount1",
+      });
+      const client2 = await window.WebClient.createClient({
+        rpcUrl: window.rpcUrl,
+        storeName: "MultiAccount2",
+      });
 
       await Promise.all([client1.syncState(), client2.syncState()]);
 
@@ -237,18 +218,14 @@ test.describe("Store Isolation Tests", () => {
 
   test("input notes are isolated between stores", async ({ page }) => {
     const result = await page.evaluate(async () => {
-      const client1 = await window.WebClient.createClient(
-        window.rpcUrl,
-        undefined,
-        undefined,
-        "NoteStore1"
-      );
-      const client2 = await window.WebClient.createClient(
-        window.rpcUrl,
-        undefined,
-        undefined,
-        "NoteStore2"
-      );
+      const client1 = await window.WebClient.createClient({
+        rpcUrl: window.rpcUrl,
+        storeName: "NoteStore1",
+      });
+      const client2 = await window.WebClient.createClient({
+        rpcUrl: window.rpcUrl,
+        storeName: "NoteStore2",
+      });
 
       await Promise.all([client1.syncState(), client2.syncState()]);
 

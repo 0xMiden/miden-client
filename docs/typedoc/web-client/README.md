@@ -149,6 +149,7 @@
 ## Interfaces
 
 - [WasmWebClient](interfaces/WasmWebClient.md)
+- [WebClientConfig](interfaces/WebClientConfig.md)
 
 ## Type Aliases
 

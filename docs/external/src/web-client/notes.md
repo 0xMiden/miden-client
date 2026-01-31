@@ -16,7 +16,7 @@ import { NoteFilter, NoteFilterTypes, WebClient } from "@miden-sdk/miden-sdk";
 
 try {
     // Initialize the web client
-    const webClient = await WebClient.createClient();
+    const webClient = await WebClient.createClient({});
 
     // Get a single input note by ID
     const note = await webClient.getInputNote(noteId);
@@ -44,7 +44,7 @@ import { NoteFilter, NoteFilterTypes, WebClient } from "@miden-sdk/miden-sdk";
 
 try {
     // Initialize the web client
-    const webClient = await WebClient.createClient();
+    const webClient = await WebClient.createClient({});
 
     // Get a single output note by ID
     const noteId = await webClient.getOutputNote(noteId);
@@ -70,7 +70,7 @@ import { AccountId, WebClient } from "@miden-sdk/miden-sdk";
 
 try {
     // Initialize the web client
-    const webClient = await WebClient.createClient();
+    const webClient = await WebClient.createClient({});
 
     // Get consumable notes for a specific account
     const accountId = AccountId.fromHex(accountIdHex);
@@ -101,7 +101,7 @@ import { CodeBuilder, CodeBuilderMode } from "@miden-sdk/miden-sdk";
 
 try {
     // Instance a script builder
-    const webClient = await WebClient.createClient();
+    const webClient = await WebClient.createClient({});
 
     const script = `
         # Your custom note script here
