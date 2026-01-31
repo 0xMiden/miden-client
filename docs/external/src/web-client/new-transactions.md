@@ -21,7 +21,7 @@ If you don't need to inspect the transaction intermediate structures manually, t
 import { NoteType, WebClient } from "@miden-sdk/miden-sdk";
 
 try {
-    const webClient = await WebClient.createClient();
+    const webClient = await WebClient.createClient({});
     // 1. Create a transaction request
     const transactionRequest = webClient.newMintTransactionRequest(
         recipientAccountId, // Account that will receive the minted tokens
@@ -51,7 +51,7 @@ When you need to inspect execution results before proving, fall back to the manu
 import { NoteType, TransactionProver, WebClient } from "@miden-sdk/miden-sdk";
 
 try {
-    const webClient = await WebClient.createClient();
+    const webClient = await WebClient.createClient({});
 
     // 1. Create a transaction request
     const transactionRequest = webClient.newMintTransactionRequest(
@@ -106,7 +106,7 @@ For better performance, you can offload the work of proving the transaction to a
 import { NoteType, TransactionProver, WebClient } from "@miden-sdk/miden-sdk";
 
 try {
-    const webClient = await WebClient.createClient();
+    const webClient = await WebClient.createClient({});
 
     const remoteProver = TransactionProver.newRemoteProver("https://prover.example.com", 10_000);
 
@@ -153,7 +153,7 @@ When using `submitNewTransaction`, the SDK uses a local prover by default. If yo
 ```typescript
 import { NoteType, TransactionProver, WebClient } from "@miden-sdk/miden-sdk";
 
-const webClient = await WebClient.createClient();
+const webClient = await WebClient.createClient({});
 
 const transactionRequest = webClient.newMintTransactionRequest(
     targetAccountId,
@@ -209,7 +209,7 @@ import { NoteType, TransactionProver, WebClient } from "@miden-sdk/miden-sdk";
 
 try {
     // Initialize the web client
-    const webClient = await WebClient.createClient();
+    const webClient = await WebClient.createClient({});
 
     const transactionRequest = webClient.newSendTransactionRequest(
         senderAccountId,  // Account sending tokens
@@ -257,7 +257,7 @@ import { TransactionProver, WebClient } from "@miden-sdk/miden-sdk";
 
 try {
     // Initialize the web client
-    const webClient = await WebClient.createClient();
+    const webClient = await WebClient.createClient({});
 
     const transactionRequest = webClient.newConsumeTransactionRequest(
         [note1, note2]  // Array of notes to consume, can be retrieved from the client by their noteID
@@ -325,7 +325,7 @@ import {
 
 try {
     // Initialize the web client
-    const webClient = await WebClient.createClient();
+    const webClient = await WebClient.createClient({});
 
     // Create note assets
     const noteAssets = new NoteAssets([

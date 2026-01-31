@@ -17,7 +17,7 @@ import { MockWebClient } from "@miden-sdk/miden-sdk";
 
 try {
   // Initialize the mock web client
-  const mockWebClient = await MockWebClient.createClient();
+  const mockWebClient = await MockWebClient.createClient({});
 
   const mintTransactionId = await mockWebClient.submitNewTransaction(
     faucetAccount.id(),
@@ -70,7 +70,7 @@ import { MockWebClient, NoteFilter, NoteFilterTypes } from "@miden-sdk/miden-sdk
 
 try {
   // Initialize the mock web client
-  const mockWebClient = await MockWebClient.createClient();
+  const mockWebClient = await MockWebClient.createClient({});
 
   // Send a private note (example with placeholders)
   const note = /* create your note */;

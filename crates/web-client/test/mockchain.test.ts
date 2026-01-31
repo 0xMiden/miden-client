@@ -16,7 +16,7 @@ const mockChainTest = async (testingPage: Page) => {
       request.onblocked = () => resolve();
     });
 
-    const client = await window.MockWebClient.createClient();
+    const client = await window.MockWebClient.createClient({});
     await client.syncState();
 
     const account = await client.newWallet(

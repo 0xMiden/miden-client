@@ -19,7 +19,7 @@ import { WebClient } from "@miden-sdk/miden-sdk";
 
 try {
     // Initialize the web client
-    const webClient = await WebClient.createClient();
+    const webClient = await WebClient.createClient({});
 
     // accountFile should be the result of a previous account export
     const result = await webClient.importAccountFile(accountFile);
@@ -38,7 +38,7 @@ import { WebClient } from "@miden-sdk/miden-sdk";
 
 try {
     // Initialize the web client
-    const webClient = await WebClient.createClient();
+    const webClient = await WebClient.createClient({});
 
     // initSeed should be a Uint8Array containing the initialization seed
     const account = await webClient.importPublicAccountFromSeed(initSeed, true); // true for mutable account
@@ -67,7 +67,7 @@ import { WebClient } from "@miden-sdk/miden-sdk";
 
 try {
     // Initialize the web client
-    const webClient = await WebClient.createClient();
+    const webClient = await WebClient.createClient({});
 
     // noteFile should be the result of a previous note export
     const noteId = await webClient.importNoteFile(noteFile);
@@ -86,7 +86,7 @@ import { WebClient } from "@miden-sdk/miden-sdk";
 
 try {
     // Initialize the web client
-    const webClient = await WebClient.createClient();
+    const webClient = await WebClient.createClient({});
 
     // storeDump should be the result of a previous store export
     const result = await webClient.forceImportStore(storeDump, "NewStoreName");

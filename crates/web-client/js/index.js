@@ -320,20 +320,19 @@ export class WebClient {
    * This method is async so you can await the asynchronous call to createClientWithExternalKeystore().
    *
    * @param {Object} config - The configuration object.
-   * @returns {Promise<WebClient>} The fully initialized WebClient.
    */
   static async createClientWithExternalKeystore(config) {
     const {
-      rpcUrl,
-      noteTransportUrl,
-      seed,
-      storeName,
-      getKeyCb,
-      insertKeyCb,
-      signCb,
-    } = config || {};
-    // Construct the instance (synchronously).
-    const instance = new WebClient(config);
+    rpcUrl,
+    noteTransportUrl,
+    seed,
+    storeName,
+    getKeyCb,
+    insertKeyCb,
+    signCb,
+  } = config || {};
+  // Construct the instance (synchronously).
+  const instance = new WebClient(config);
     // Wait for the underlying wasmWebClient to be initialized.
     const wasmWebClient = await instance.getWasmWebClient();
     await wasmWebClient.createClientWithExternalKeystore(
@@ -650,13 +649,11 @@ export class WebClient {
 }
 
 export class MockWebClient extends WebClient {
-  constructor(seed) {
-    super({
-      rpcUrl: null,
-      noteTransportUrl: null,
-      seed,
-      storeName: "mock",
-    });
+  constructor(config) {
+    const { seed } = config || {};
+    super(config);
+    this.seed = seed;
+    this.storeName = "mock";
   }
 
   initializeWorker() {
@@ -669,18 +666,17 @@ export class MockWebClient extends WebClient {
   /**
    * Factory method to create a WebClient with a mock chain for testing purposes.
    *
-   * @param serializedMockChain - Serialized mock chain data (optional). Will use an empty chain if not provided.
-   * @param serializedMockNoteTransportNode - Serialized mock note transport node data (optional). Will use a new instance if not provided.
-   * @param seed - The seed for the account (optional).
+   * @param {Object} config - The configuration object.
+   * @param {ArrayBuffer|Uint8Array} [config.serializedMockChain] - Serialized mock chain data (optional). Will use an empty chain if not provided.
+   * @param {ArrayBuffer|Uint8Array} [config.serializedMockNoteTransportNode] - Serialized mock note transport node data (optional). Will use a new instance if not provided.
+   * @param {Uint8Array} [config.seed] - The seed for the account (optional).
    * @returns A promise that resolves to a MockWebClient.
    */
-  static async createClient(
-    serializedMockChain,
-    serializedMockNoteTransportNode,
-    seed
-  ) {
+  static async createClient(config) {
+    const { serializedMockChain, serializedMockNoteTransportNode, seed } =
+      config || {};
     // Construct the instance (synchronously).
-    const instance = new MockWebClient(seed);
+    const instance = new MockWebClient({ seed });
 
     // Wait for the underlying wasmWebClient to be initialized.
     const wasmWebClient = await instance.getWasmWebClient();

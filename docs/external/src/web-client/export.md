@@ -16,7 +16,7 @@ import { WebClient } from "@miden-sdk/miden-sdk";
 
 try {
   // Initialize the web client
-  const webClient = await WebClient.createClient();
+  const webClient = await WebClient.createClient({});
 
   // Export a note with just its ID
   const noteIdExport = await webClient.exportNoteFile("0x1234...", "Id");
@@ -52,7 +52,7 @@ import { WebClient } from "@miden-sdk/miden-sdk";
 
 try {
   // Initialize the web client
-  const webClient = await WebClient.createClient();
+  const webClient = await WebClient.createClient({});
 
   // Export an account
   const accountFileExport = await webClient.exportAccountFile("0x5678...");
@@ -73,7 +73,7 @@ import { WebClient } from "@miden-sdk/miden-sdk";
 
 try {
   // Initialize the web client
-  const webClient = await WebClient.createClient();
+  const webClient = await WebClient.createClient({});
 
   const storeExport = await webClient.exportStore();
   console.log("Store Export:", storeExport);

@@ -8,9 +8,6 @@ test.describe("Store Isolation Tests", () => {
     const result = await page.evaluate(async () => {
       const client = await window.WebClient.createClient({
         rpcUrl: window.rpcUrl,
-        noteTransportUrl: undefined,
-        seed: undefined,
-        storeName: undefined,
       });
       await client.syncState();
 
@@ -36,8 +33,6 @@ test.describe("Store Isolation Tests", () => {
 
       const client2 = await window.WebClient.createClient({
         rpcUrl: window.rpcUrl,
-        noteTransportUrl: undefined,
-        seed: undefined,
         storeName: "IsolatedStore1",
       });
       await client2.syncState();
@@ -66,8 +61,6 @@ test.describe("Store Isolation Tests", () => {
     const result = await page.evaluate(async () => {
       const client1 = await window.WebClient.createClient({
         rpcUrl: window.rpcUrl,
-        noteTransportUrl: undefined,
-        seed: undefined,
         storeName: "PersistentStore",
       });
       await client1.syncState();
@@ -81,8 +74,6 @@ test.describe("Store Isolation Tests", () => {
 
       const client1b = await window.WebClient.createClient({
         rpcUrl: window.rpcUrl,
-        noteTransportUrl: undefined,
-        seed: undefined,
         storeName: "PersistentStore",
       });
 
@@ -105,8 +96,6 @@ test.describe("Store Isolation Tests", () => {
       const customStoreName = "MyCustomStore_v1";
       const client = await window.WebClient.createClient({
         rpcUrl: window.rpcUrl,
-        noteTransportUrl: undefined,
-        seed: undefined,
         storeName: customStoreName,
       });
       await client.syncState();
@@ -136,14 +125,10 @@ test.describe("Store Isolation Tests", () => {
     const result = await page.evaluate(async () => {
       const client1 = await window.WebClient.createClient({
         rpcUrl: window.rpcUrl,
-        noteTransportUrl: undefined,
-        seed: undefined,
         storeName: "ConcurrentStore1",
       });
       const client2 = await window.WebClient.createClient({
         rpcUrl: window.rpcUrl,
-        noteTransportUrl: undefined,
-        seed: undefined,
         storeName: "ConcurrentStore2",
       });
 
@@ -174,14 +159,10 @@ test.describe("Store Isolation Tests", () => {
     const result = await page.evaluate(async () => {
       const client1 = await window.WebClient.createClient({
         rpcUrl: window.rpcUrl,
-        noteTransportUrl: undefined,
-        seed: undefined,
         storeName: "MultiAccount1",
       });
       const client2 = await window.WebClient.createClient({
         rpcUrl: window.rpcUrl,
-        noteTransportUrl: undefined,
-        seed: undefined,
         storeName: "MultiAccount2",
       });
 
@@ -239,14 +220,10 @@ test.describe("Store Isolation Tests", () => {
     const result = await page.evaluate(async () => {
       const client1 = await window.WebClient.createClient({
         rpcUrl: window.rpcUrl,
-        noteTransportUrl: undefined,
-        seed: undefined,
         storeName: "NoteStore1",
       });
       const client2 = await window.WebClient.createClient({
         rpcUrl: window.rpcUrl,
-        noteTransportUrl: undefined,
-        seed: undefined,
         storeName: "NoteStore2",
       });
 

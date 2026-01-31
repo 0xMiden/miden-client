@@ -16,7 +16,7 @@ import { WebClient } from "@miden-sdk/miden-sdk";
 
 try {
     // Initialize the web client
-    const webClient = await WebClient.createClient();
+    const webClient = await WebClient.createClient({});
 
     const syncSummary = await webClient.syncState();
     

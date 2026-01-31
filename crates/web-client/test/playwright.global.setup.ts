@@ -40,8 +40,6 @@ export const test = base.extend<{ forEachTest: void }>({
             : undefined;
           const client = await window.WebClient.createClient({
             rpcUrl,
-            noteTransportUrl: undefined,
-            seed: undefined,
             storeName: "tests",
           });
           window.rpcUrl = rpcUrl;

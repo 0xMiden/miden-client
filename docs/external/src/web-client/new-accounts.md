@@ -16,7 +16,7 @@ import { AccountStorageMode, WebClient } from "@miden-sdk/miden-sdk";
 
 try {
     // Initialize the web client
-    const webClient = await WebClient.createClient();
+    const webClient = await WebClient.createClient({});
 
     // Set up account parameters
     const accountStorageMode = AccountStorageMode.private(); // Can be private() or public()
@@ -49,7 +49,7 @@ import { AccountStorageMode, WebClient } from "@miden-sdk/miden-sdk";
 
 try {
     // Initialize the web client
-    const webClient = await WebClient.createClient();
+    const webClient = await WebClient.createClient({});
 
     // Set up faucet parameters
     const faucetStorageMode = AccountStorageMode.public(); // Faucets are typically public

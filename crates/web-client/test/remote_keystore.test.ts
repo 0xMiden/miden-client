@@ -17,9 +17,6 @@ test.describe("remote keystore", () => {
       };
       const client = await window.WebClient.createClientWithExternalKeystore({
         rpcUrl: window.rpcUrl!,
-        noteTransportUrl: undefined,
-        seed: undefined,
-        storeName: "tests",
         getKeyCb,
         insertKeyCb,
         signCb,
@@ -44,12 +41,7 @@ test.describe("remote keystore", () => {
       };
       const client = await window.WebClient.createClientWithExternalKeystore({
         rpcUrl: window.rpcUrl!,
-        noteTransportUrl: undefined,
-        seed: undefined,
-        storeName: "tests",
-        getKeyCb: undefined,
         insertKeyCb,
-        signCb: undefined,
       });
       await client.newWallet(
         window.AccountStorageMode.private(),
@@ -90,12 +82,8 @@ test.describe("remote keystore", () => {
 
       const client = await window.WebClient.createClientWithExternalKeystore({
         rpcUrl: window.rpcUrl!,
-        noteTransportUrl: undefined,
-        seed: undefined,
-        storeName: "tests",
         getKeyCb,
         insertKeyCb,
-        signCb: undefined,
       });
 
       const wallet = await client.newWallet(
@@ -155,10 +143,6 @@ test.describe("remote keystore", () => {
 
       const client = await window.WebClient.createClientWithExternalKeystore({
         rpcUrl: window.rpcUrl!,
-        noteTransportUrl: undefined,
-        seed: undefined,
-        storeName: "tests",
-        getKeyCb: undefined,
         insertKeyCb,
         signCb,
       });
