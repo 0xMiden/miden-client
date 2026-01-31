@@ -6,24 +6,27 @@ test.describe("remote keystore", () => {
   test("should create a client with a remote keystore", async ({ page }) => {
     const client = await page.evaluate(async () => {
       const insertKeyCb = async (
-        _publicKeyCommitment: string,
-        _secretKey: string
+        _publicKeyCommitment: Uint8Array,
+        _secretKey: Uint8Array
       ) => {};
-      const getKeyCb = async (_publicKeyCommitment: string) => {
+      const getKeyCb = async (_publicKeyCommitment: Uint8Array) => {
         return undefined;
       };
-      const signCb = async (_publicKeyCommitment: string, _message: string) => {
+      const signCb = async (
+        _publicKeyCommitment: Uint8Array,
+        _signingInputs: Uint8Array
+      ) => {
         return undefined;
       };
-      const client = await window.WebClient.createClientWithExternalKeystore(
-        window.rpcUrl!,
-        undefined,
-        undefined,
-        undefined,
+      const client = await window.WebClient.createClientWithExternalKeystore({
+        rpcUrl: window.rpcUrl!,
+        noteTransportUrl: undefined,
+        seed: undefined,
+        storeName: undefined,
         getKeyCb,
         insertKeyCb,
-        signCb
-      );
+        signCb,
+      });
       return client;
     });
     expect(client).toBeDefined();
@@ -33,24 +36,24 @@ test.describe("remote keystore", () => {
     page,
   }) => {
     const { publicKeyCommitment, secretKey } = await page.evaluate(async () => {
-      let publicKeyCommitment: string | undefined;
-      let secretKey: string | undefined;
+      let publicKeyCommitment: number[] | undefined;
+      let secretKey: number[] | undefined;
       const insertKeyCb = async (
-        publicKeyCommitmentStr: string,
-        secretKeyStr: string
+        publicKeyCommitmentBytes: Uint8Array,
+        secretKeyBytes: Uint8Array
       ) => {
-        publicKeyCommitment = publicKeyCommitmentStr;
-        secretKey = secretKeyStr;
+        publicKeyCommitment = Array.from(publicKeyCommitmentBytes);
+        secretKey = Array.from(secretKeyBytes);
       };
-      const client = await window.WebClient.createClientWithExternalKeystore(
-        window.rpcUrl!,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
+      const client = await window.WebClient.createClientWithExternalKeystore({
+        rpcUrl: window.rpcUrl!,
+        noteTransportUrl: undefined,
+        seed: undefined,
+        storeName: undefined,
+        getKeyCb: undefined,
         insertKeyCb,
-        undefined
-      );
+        signCb: undefined,
+      });
       await client.newWallet(
         window.AccountStorageMode.private(),
         true,
@@ -89,13 +92,15 @@ test.describe("remote keystore", () => {
       };
 
       const client = await window.WebClient.createClientWithExternalKeystore(
-        window.rpcUrl!,
-        undefined,
-        undefined,
-        undefined,
-        getKeyCb,
-        insertKeyCb,
-        undefined
+        {
+          rpcUrl: window.rpcUrl!,
+          noteTransportUrl: undefined,
+          seed: undefined,
+          storeName: undefined,
+          getKeyCb,
+          insertKeyCb,
+          signCb: undefined,
+        }
       );
 
       const wallet = await client.newWallet(
@@ -154,13 +159,15 @@ test.describe("remote keystore", () => {
       };
 
       const client = await window.WebClient.createClientWithExternalKeystore(
-        window.rpcUrl!,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        insertKeyCb,
-        signCb
+        {
+          rpcUrl: window.rpcUrl!,
+          noteTransportUrl: undefined,
+          seed: undefined,
+          storeName: undefined,
+          getKeyCb: undefined,
+          insertKeyCb,
+          signCb,
+        }
       );
 
       // Create faucet first so insertKeyCb captures its public key
