@@ -1564,29 +1564,17 @@ Terminates the underlying worker.
 
 ### createClient()
 
-> `static` **createClient**(`serializedMockChain?`, `serializedMockNoteTransportNode?`, `seed?`): `Promise`\<`MockWebClient`\>
+> `static` **createClient**(`config?`): `Promise`\<`MockWebClient`\>
 
 Factory method to create and initialize a new wrapped MockWebClient.
 
 #### Parameters
 
-##### serializedMockChain?
+##### config?
 
-Serialized mock chain (optional).
+[`WebClientConfig`](../interfaces/WebClientConfig.md)
 
-`Uint8Array` | `ArrayBuffer`
-
-##### serializedMockNoteTransportNode?
-
-Serialized mock note transport node (optional).
-
-`Uint8Array` | `ArrayBuffer`
-
-##### seed?
-
-`Uint8Array`
-
-Seed for account initialization (optional).
+Client configuration (optional seed + optional serialized mock data).
 
 #### Returns
 
@@ -1602,53 +1590,17 @@ A promise that resolves to a fully initialized MockWebClient.
 
 ### createClientWithExternalKeystore()
 
-> `static` **createClientWithExternalKeystore**(`rpcUrl?`, `noteTransportUrl?`, `seed?`, `storeName?`, `getKeyCb?`, `insertKeyCb?`, `signCb?`): `Promise`\<[`WebClient`](WebClient.md)\>
+> `static` **createClientWithExternalKeystore**(`config?`): `Promise`\<[`WebClient`](WebClient.md)\>
 
 Factory method to create and initialize a new wrapped WebClient with a remote keystore.
 
 #### Parameters
 
-##### rpcUrl?
+##### config?
 
-`string`
+[`WebClientConfig`](../interfaces/WebClientConfig.md)
 
-The RPC URL (optional).
-
-##### noteTransportUrl?
-
-`string`
-
-The note transport URL (optional).
-
-##### seed?
-
-`Uint8Array`
-
-The seed for the account (optional).
-
-##### storeName?
-
-`string`
-
-Optional name for the store. Setting this allows multiple clients to be used in the same browser.
-
-##### getKeyCb?
-
-[`GetKeyCallback`](../type-aliases/GetKeyCallback.md)
-
-Callback used to retrieve secret keys for a given public key.
-
-##### insertKeyCb?
-
-[`InsertKeyCallback`](../type-aliases/InsertKeyCallback.md)
-
-Callback used to persist secret keys in the external store.
-
-##### signCb?
-
-[`SignCallback`](../type-aliases/SignCallback.md)
-
-Callback used to create signatures for the provided inputs.
+Client configuration (RPC URL, optional note transport URL, optional seed, optional store name, and callbacks).
 
 #### Returns
 
