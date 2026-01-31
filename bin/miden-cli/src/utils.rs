@@ -4,7 +4,13 @@ use miden_client::address::{Address, AddressId};
 
 use super::{CLIENT_CONFIG_FILE_NAME, get_account_with_id_prefix};
 use crate::commands::account::DEFAULT_ACCOUNT_ID_KEY;
-use crate::config::{CliConfig, get_global_miden_dir, get_local_miden_dir};
+use crate::config::{
+    CliConfig,
+    get_active_profile_from_env,
+    get_global_miden_dir,
+    get_local_miden_dir,
+    get_profile_dir,
+};
 use crate::errors::CliError;
 use crate::faucet_details_map::FaucetDetailsMap;
 
@@ -74,17 +80,28 @@ pub(crate) async fn parse_account_id<AUTH>(
 }
 
 /// Checks if either local or global configuration file exists.
+///
+/// This function respects the `MIDEN_PROFILE` environment variable. If set, it will look for
+/// the configuration in the profile subdirectory (e.g., `.miden/testnet/miden-client.toml`).
 pub(super) fn config_file_exists() -> Result<bool, CliError> {
+    let profile = get_active_profile_from_env();
+    config_file_exists_for_profile(profile.as_deref())
+}
+
+/// Checks if either local or global configuration file exists for a specific profile.
+pub(super) fn config_file_exists_for_profile(profile: Option<&str>) -> Result<bool, CliError> {
     let local_miden_dir = get_local_miden_dir()?;
-    if local_miden_dir.join(CLIENT_CONFIG_FILE_NAME).exists() {
+    let local_profile_dir = get_profile_dir(&local_miden_dir, profile);
+    if local_profile_dir.join(CLIENT_CONFIG_FILE_NAME).exists() {
         return Ok(true);
     }
 
     let global_miden_dir = get_global_miden_dir().map_err(|e| {
         CliError::Config(Box::new(e), "Failed to determine global config directory".to_string())
     })?;
+    let global_profile_dir = get_profile_dir(&global_miden_dir, profile);
 
-    Ok(global_miden_dir.join(CLIENT_CONFIG_FILE_NAME).exists())
+    Ok(global_profile_dir.join(CLIENT_CONFIG_FILE_NAME).exists())
 }
 
 /// Returns the faucet details map using the config file.

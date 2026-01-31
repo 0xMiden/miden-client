@@ -287,7 +287,14 @@ mod utils;
 /// Re-export `MIDEN_DIR` for use in tests
 pub use config::MIDEN_DIR;
 /// Re-export common types for external projects
-pub use config::{CLIENT_CONFIG_FILE_NAME, CliConfig};
+pub use config::{
+    CLIENT_CONFIG_FILE_NAME,
+    CliConfig,
+    MIDEN_PROFILE_ENV,
+    get_active_profile_from_env,
+    get_profile_dir,
+    list_profiles,
+};
 pub use errors::CliError as Error;
 /// Re-export the entire `miden_client` crate so external projects can use a single dependency.
 pub use miden_client::*;

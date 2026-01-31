@@ -15,6 +15,7 @@ use crate::config::{
     NoteTransportConfig,
     get_global_miden_dir,
     get_local_miden_dir,
+    get_profile_dir,
 };
 use crate::errors::CliError;
 
@@ -81,12 +82,19 @@ const DEFAULT_INCLUDED_PACKAGES: [(&str, &[u8]); 7] = [
 #[derive(Debug, Clone, Parser, Default)]
 #[command(
     about = "Initialize the client. By default creates a global `.miden` directory in the home directory. \
-Use --local to create a local `.miden` directory in the current working directory."
+Use --local to create a local `.miden` directory in the current working directory. \
+Use --profile to create a named profile (e.g., --profile testnet creates `.miden/testnet/`)."
 )]
 pub struct InitCmd {
     /// Create configuration in the local working directory instead of the global home directory
     #[clap(long)]
     local: bool,
+
+    /// Profile name for organizing multiple configurations (e.g., "testnet", "devnet").
+    /// When specified, creates `.miden/<profile>/` directory structure.
+    /// This allows maintaining separate configurations for different networks.
+    #[clap(long, short)]
+    profile: Option<String>,
 
     /// Network configuration to use. Options are `devnet`, `testnet`, `localhost` or a custom RPC
     /// endpoint. By default, the command uses the Testnet network.
@@ -122,8 +130,8 @@ pub struct InitCmd {
 
 impl InitCmd {
     pub fn execute(&self) -> Result<(), CliError> {
-        // Determine target directory based on flags
-        let (target_miden_dir, config_type) = if self.local {
+        // Determine base miden directory based on --local flag
+        let (base_miden_dir, config_type) = if self.local {
             (get_local_miden_dir()?, "local")
         } else {
             (
@@ -134,32 +142,35 @@ impl InitCmd {
             )
         };
 
-        let config_file_path = target_miden_dir.join(CLIENT_CONFIG_FILE_NAME);
+        // Determine target directory based on profile
+        let target_dir = get_profile_dir(&base_miden_dir, self.profile.as_deref());
+
+        // Build descriptive location string for messages
+        let location_desc = match &self.profile {
+            Some(profile) => format!("{} {} profile '{}'", config_type, MIDEN_DIR, profile),
+            None => format!("{} {}", config_type, MIDEN_DIR),
+        };
+
+        let config_file_path = target_dir.join(CLIENT_CONFIG_FILE_NAME);
 
         // Check if config already exists
         if config_file_path.exists() {
             return Err(CliError::Config(
                 "Error with the configuration file".to_string().into(),
                 format!(
-                    "The file \"{}\" already exists in the {} {} directory ({}). Please remove it first or use a different location.",
+                    "The file \"{}\" already exists in the {} directory ({}). Please remove it first or use a different location.",
                     CLIENT_CONFIG_FILE_NAME,
-                    config_type,
-                    MIDEN_DIR,
-                    target_miden_dir.display()
+                    location_desc,
+                    target_dir.display()
                 ),
             ));
         }
 
-        // Create the miden directory if not existent
-        fs::create_dir_all(&target_miden_dir).map_err(|err| {
+        // Create the target directory if not existent
+        fs::create_dir_all(&target_dir).map_err(|err| {
             CliError::Config(
                 Box::new(err),
-                format!(
-                    "failed to create {} {} directory in {}",
-                    config_type,
-                    MIDEN_DIR,
-                    target_miden_dir.display()
-                ),
+                format!("failed to create {} directory in {}", location_desc, target_dir.display()),
             )
         })?;
 
@@ -219,8 +230,15 @@ impl InitCmd {
         println!(
             "Config file successfully created at: {} ({})",
             config_file_path.display(),
-            config_type
+            location_desc
         );
+
+        if let Some(profile) = &self.profile {
+            println!(
+                "To use this profile, set the environment variable: export MIDEN_PROFILE={}",
+                profile
+            );
+        }
 
         Ok(())
     }
