@@ -52,9 +52,83 @@ miden-client init
 
 # Create local configuration in current directory
 miden-client init --local
+
+# Create a named profile (e.g., for testnet)
+miden-client init --local --profile testnet
+
+# Create a profile with specific network
+miden-client init --local --profile devnet --network devnet
 ```
 
 The global configuration approach reduces per-project setup overhead while still allowing project-specific customization when needed.
+
+### Network Profiles
+
+Profiles allow you to maintain separate configurations for different networks (testnet, devnet, localhost, etc.) within the same `.miden` directory:
+
+```
+.miden/
+├── testnet/
+│   ├── miden-client.toml
+│   ├── keystore/
+│   ├── store.sqlite3
+│   └── packages/
+├── devnet/
+│   ├── miden-client.toml
+│   ├── keystore/
+│   ├── store.sqlite3
+│   └── packages/
+└── localhost/
+    └── ...
+```
+
+#### Creating Profiles
+
+```bash
+# Create testnet profile
+miden-client init --local --profile testnet
+
+# Create devnet profile with devnet network
+miden-client init --local --profile devnet --network devnet
+
+# Create global profiles
+miden-client init --profile testnet
+miden-client init --profile devnet --network devnet
+```
+
+#### Using Profiles
+
+Set the `MIDEN_PROFILE` environment variable to use a specific profile:
+
+```bash
+# Use testnet profile
+export MIDEN_PROFILE=testnet
+miden-client account
+
+# Or inline
+MIDEN_PROFILE=devnet miden-client sync
+```
+
+#### Listing Profiles
+
+```bash
+# List all available profiles
+miden-client clear-config --list
+```
+
+#### Removing Profiles
+
+```bash
+# Remove a specific profile
+miden-client clear-config --profile testnet
+
+# Force removal without confirmation
+miden-client clear-config --profile devnet --force
+```
+
+#### Backward Compatibility
+
+The profile feature is fully backward compatible. If no profile is specified and no `MIDEN_PROFILE` environment variable is set, the client will use the root `.miden/` directory as before.
 
 ### Configuration Management
 
@@ -170,6 +244,8 @@ miden-client init --block-delta 256
 ```
 
 ### Environment variables
+
+- `MIDEN_PROFILE`: Specifies the active profile to use (e.g., `testnet`, `devnet`). When set, the client will look for configuration in `.miden/<profile>/` instead of the root `.miden/` directory. See [Network Profiles](#network-profiles) for more details.
 
 - `MIDEN_DEBUG`: When set to `true`, enables debug mode on the transaction executor and the script compiler. For any script that has been compiled and executed in this mode, debug logs will be output in order to facilitate MASM debugging ([these instructions](https://0xMiden.github.io/miden-vm/user_docs/assembly/debugging.html) can be used to do so). This variable can be overridden by the `--debug` CLI flag.
 

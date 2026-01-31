@@ -21,6 +21,9 @@ pub const STORE_FILENAME: &str = "store.sqlite3";
 pub const KEYSTORE_DIRECTORY: &str = "keystore";
 pub const DEFAULT_REMOTE_PROVER_TIMEOUT: Duration = Duration::from_secs(20);
 
+/// Environment variable name for specifying the active profile.
+pub const MIDEN_PROFILE_ENV: &str = "MIDEN_PROFILE";
+
 /// Returns the global miden directory path in the user's home directory
 pub fn get_global_miden_dir() -> Result<PathBuf, std::io::Error> {
     dirs::home_dir()
@@ -33,6 +36,51 @@ pub fn get_global_miden_dir() -> Result<PathBuf, std::io::Error> {
 /// Returns the local miden directory path relative to the current working directory
 pub fn get_local_miden_dir() -> Result<PathBuf, std::io::Error> {
     std::env::current_dir().map(|cwd| cwd.join(MIDEN_DIR))
+}
+
+/// Returns the profile directory path within a miden directory.
+///
+/// If a profile is specified, returns `<miden_dir>/<profile>/`.
+/// If no profile is specified, returns the miden directory itself (for backward compatibility).
+pub fn get_profile_dir(miden_dir: &Path, profile: Option<&str>) -> PathBuf {
+    match profile {
+        Some(p) => miden_dir.join(p),
+        None => miden_dir.to_path_buf(),
+    }
+}
+
+/// Returns the active profile from the environment variable, if set.
+pub fn get_active_profile_from_env() -> Option<String> {
+    std::env::var(MIDEN_PROFILE_ENV).ok().filter(|s| !s.is_empty())
+}
+
+/// Lists all available profiles in a miden directory.
+///
+/// A profile is identified by a subdirectory containing a `miden-client.toml` file.
+/// Returns an empty vector if no profiles are found or if only the legacy flat structure exists.
+pub fn list_profiles(miden_dir: &Path) -> Result<Vec<String>, std::io::Error> {
+    let mut profiles = Vec::new();
+
+    if !miden_dir.exists() {
+        return Ok(profiles);
+    }
+
+    for entry in std::fs::read_dir(miden_dir)? {
+        let entry = entry?;
+        let path = entry.path();
+
+        if path.is_dir() {
+            let config_path = path.join(CLIENT_CONFIG_FILE_NAME);
+            if config_path.exists() {
+                if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                    profiles.push(name.to_string());
+                }
+            }
+        }
+    }
+
+    profiles.sort();
+    Ok(profiles)
 }
 
 // CLI CONFIG
@@ -271,6 +319,9 @@ impl CliConfig {
     /// 1. Local `.miden/miden-client.toml` in the current working directory
     /// 2. Global `.miden/miden-client.toml` in the home directory (fallback)
     ///
+    /// If the `MIDEN_PROFILE` environment variable is set, it will look for the configuration
+    /// in the profile subdirectory (e.g., `.miden/testnet/miden-client.toml`).
+    ///
     /// This matches the CLI's configuration priority logic. For most use cases, you should
     /// use [`CliClient::from_system_user_config()`](crate::CliClient::from_system_user_config)
     /// instead, which uses this method internally.
@@ -304,17 +355,85 @@ impl CliConfig {
     /// # }
     /// ```
     pub fn from_system() -> Result<Self, CliError> {
+        let profile = get_active_profile_from_env();
+        Self::from_system_with_profile(profile.as_deref())
+    }
+
+    /// Loads configuration from system directories with a specific profile.
+    ///
+    /// This method is similar to [`from_system()`](Self::from_system) but allows specifying
+    /// a profile explicitly instead of relying on the `MIDEN_PROFILE` environment variable.
+    ///
+    /// # Profile Structure
+    ///
+    /// When a profile is specified, the configuration is loaded from:
+    /// - Local: `.miden/<profile>/miden-client.toml`
+    /// - Global: `~/.miden/<profile>/miden-client.toml`
+    ///
+    /// When no profile is specified (backward compatibility):
+    /// - Local: `.miden/miden-client.toml`
+    /// - Global: `~/.miden/miden-client.toml`
+    ///
+    /// # Arguments
+    ///
+    /// * `profile` - Optional profile name (e.g., "testnet", "devnet", "localhost")
+    ///
+    /// # Returns
+    ///
+    /// A configured [`CliConfig`] instance.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`CliError`](crate::errors::CliError):
+    /// - [`CliError::ConfigNotFound`](crate::errors::CliError::ConfigNotFound) if neither local nor
+    ///   global config file exists for the specified profile
+    /// - [`CliError::Config`](crate::errors::CliError::Config) if configuration file parsing fails
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use miden_client_cli::config::CliConfig;
+    ///
+    /// # fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// // Load testnet profile
+    /// let config = CliConfig::from_system_with_profile(Some("testnet"))?;
+    ///
+    /// // Load devnet profile
+    /// let config = CliConfig::from_system_with_profile(Some("devnet"))?;
+    ///
+    /// // Load default (no profile, backward compatible)
+    /// let config = CliConfig::from_system_with_profile(None)?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn from_system_with_profile(profile: Option<&str>) -> Result<Self, CliError> {
         // Try local first
-        match Self::from_local_dir() {
+        let local_miden_dir = get_local_miden_dir()?;
+        let local_profile_dir = get_profile_dir(&local_miden_dir, profile);
+
+        match Self::from_dir(&local_profile_dir) {
             Ok(config) => Ok(config),
             // Only fall back to global if the local config file was not found
             // (not for parse errors or other issues)
             Err(CliError::ConfigNotFound(_)) => {
                 // Fall back to global
-                Self::from_global_dir().map_err(|e| match e {
-                    CliError::ConfigNotFound(_) => CliError::ConfigNotFound(
-                        "Neither local nor global config file exists".to_string(),
-                    ),
+                let global_miden_dir = get_global_miden_dir().map_err(|e| {
+                    CliError::Config(
+                        Box::new(e),
+                        "Failed to determine global config directory".to_string(),
+                    )
+                })?;
+                let global_profile_dir = get_profile_dir(&global_miden_dir, profile);
+
+                Self::from_dir(&global_profile_dir).map_err(|e| match e {
+                    CliError::ConfigNotFound(_) => {
+                        let profile_msg =
+                            profile.map(|p| format!(" for profile '{}'", p)).unwrap_or_default();
+                        CliError::ConfigNotFound(format!(
+                            "Neither local nor global config file exists{}",
+                            profile_msg
+                        ))
+                    },
                     other => other,
                 })
             },

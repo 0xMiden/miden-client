@@ -42,7 +42,7 @@ use miden_client::{
     MAX_TX_EXECUTION_CYCLES,
     MIN_TX_EXECUTION_CYCLES,
 };
-use miden_client_cli::MIDEN_DIR;
+use miden_client_cli::{MIDEN_DIR, MIDEN_PROFILE_ENV};
 use miden_client_sqlite_store::SqliteStore;
 use predicates::str::contains;
 use rand::Rng;
@@ -1512,4 +1512,164 @@ async fn test_from_system_user_config_local_priority() -> Result<()> {
     );
 
     Ok(())
+}
+
+// PROFILE TESTS
+// ================================================================================================
+
+/// Tests that init with --profile creates the correct directory structure.
+#[test]
+fn init_with_profile() {
+    let temp_dir = temp_dir().join(format!("cli-test-profile-{}", rand::rng().random::<u64>()));
+    std::fs::create_dir_all(&temp_dir).unwrap();
+
+    // Init with a profile
+    let mut init_cmd = cargo_bin_cmd!("miden-client");
+    init_cmd.args(["init", "--local", "--profile", "testnet"]);
+    init_cmd.current_dir(&temp_dir).assert().success();
+
+    // Verify profile directory structure
+    let profile_dir = temp_dir.join(MIDEN_DIR).join("testnet");
+    assert!(profile_dir.exists(), "Profile directory should be created");
+    assert!(profile_dir.is_dir(), "Profile should be a directory");
+
+    let config_file = profile_dir.join("miden-client.toml");
+    assert!(config_file.exists(), "Config file should be created in profile directory");
+
+    let packages_dir = profile_dir.join("packages");
+    assert!(
+        packages_dir.exists(),
+        "Packages directory should be created in profile directory"
+    );
+}
+
+/// Tests that multiple profiles can be created.
+#[test]
+fn init_multiple_profiles() {
+    let temp_dir =
+        temp_dir().join(format!("cli-test-multi-profile-{}", rand::rng().random::<u64>()));
+    std::fs::create_dir_all(&temp_dir).unwrap();
+
+    // Init testnet profile
+    let mut init_cmd = cargo_bin_cmd!("miden-client");
+    init_cmd.args(["init", "--local", "--profile", "testnet"]);
+    init_cmd.current_dir(&temp_dir).assert().success();
+
+    // Init devnet profile
+    let mut init_cmd = cargo_bin_cmd!("miden-client");
+    init_cmd.args(["init", "--local", "--profile", "devnet", "--network", "devnet"]);
+    init_cmd.current_dir(&temp_dir).assert().success();
+
+    // Verify both profile directories exist
+    let testnet_dir = temp_dir.join(MIDEN_DIR).join("testnet");
+    let devnet_dir = temp_dir.join(MIDEN_DIR).join("devnet");
+
+    assert!(testnet_dir.exists(), "Testnet profile directory should exist");
+    assert!(devnet_dir.exists(), "Devnet profile directory should exist");
+
+    // Verify configs exist in both
+    assert!(testnet_dir.join("miden-client.toml").exists());
+    assert!(devnet_dir.join("miden-client.toml").exists());
+}
+
+/// Tests that duplicate profile init fails.
+#[test]
+fn init_duplicate_profile_fails() {
+    let temp_dir = temp_dir().join(format!("cli-test-dup-profile-{}", rand::rng().random::<u64>()));
+    std::fs::create_dir_all(&temp_dir).unwrap();
+
+    // Init testnet profile
+    let mut init_cmd = cargo_bin_cmd!("miden-client");
+    init_cmd.args(["init", "--local", "--profile", "testnet"]);
+    init_cmd.current_dir(&temp_dir).assert().success();
+
+    // Try to init the same profile again - should fail
+    let mut init_cmd = cargo_bin_cmd!("miden-client");
+    init_cmd.args(["init", "--local", "--profile", "testnet"]);
+    init_cmd.current_dir(&temp_dir).assert().failure();
+}
+
+/// Tests that clear-config --list shows profiles.
+#[test]
+fn clear_config_list_profiles() {
+    let temp_dir =
+        temp_dir().join(format!("cli-test-list-profile-{}", rand::rng().random::<u64>()));
+    std::fs::create_dir_all(&temp_dir).unwrap();
+
+    // Init multiple profiles
+    let mut init_cmd = cargo_bin_cmd!("miden-client");
+    init_cmd.args(["init", "--local", "--profile", "testnet"]);
+    init_cmd.current_dir(&temp_dir).assert().success();
+
+    let mut init_cmd = cargo_bin_cmd!("miden-client");
+    init_cmd.args(["init", "--local", "--profile", "devnet"]);
+    init_cmd.current_dir(&temp_dir).assert().success();
+
+    // List profiles
+    let mut list_cmd = cargo_bin_cmd!("miden-client");
+    list_cmd.args(["clear-config", "--list"]);
+    let output = list_cmd.current_dir(&temp_dir).output().unwrap();
+    assert!(output.status.success());
+
+    let output_str = String::from_utf8(output.stdout).unwrap();
+    assert!(output_str.contains("testnet"), "Output should list testnet profile");
+    assert!(output_str.contains("devnet"), "Output should list devnet profile");
+}
+
+/// Tests that clear-config --profile removes specific profile.
+#[test]
+fn clear_config_specific_profile() {
+    let temp_dir =
+        temp_dir().join(format!("cli-test-clear-profile-{}", rand::rng().random::<u64>()));
+    std::fs::create_dir_all(&temp_dir).unwrap();
+
+    // Init multiple profiles
+    let mut init_cmd = cargo_bin_cmd!("miden-client");
+    init_cmd.args(["init", "--local", "--profile", "testnet"]);
+    init_cmd.current_dir(&temp_dir).assert().success();
+
+    let mut init_cmd = cargo_bin_cmd!("miden-client");
+    init_cmd.args(["init", "--local", "--profile", "devnet"]);
+    init_cmd.current_dir(&temp_dir).assert().success();
+
+    // Clear only testnet profile
+    let mut clear_cmd = cargo_bin_cmd!("miden-client");
+    clear_cmd.args(["clear-config", "--profile", "testnet", "--force"]);
+    clear_cmd.current_dir(&temp_dir).assert().success();
+
+    // Verify testnet is gone but devnet remains
+    let testnet_dir = temp_dir.join(MIDEN_DIR).join("testnet");
+    let devnet_dir = temp_dir.join(MIDEN_DIR).join("devnet");
+
+    assert!(!testnet_dir.exists(), "Testnet profile should be removed");
+    assert!(devnet_dir.exists(), "Devnet profile should still exist");
+}
+
+/// Tests that MIDEN_PROFILE env var is respected.
+#[test]
+#[serial_test::file_serial]
+fn profile_env_var_respected() {
+    let temp_dir = temp_dir().join(format!("cli-test-env-profile-{}", rand::rng().random::<u64>()));
+    std::fs::create_dir_all(&temp_dir).unwrap();
+
+    // Clean up any global config
+    cleanup_global_config();
+
+    // Init a profile
+    let mut init_cmd = cargo_bin_cmd!("miden-client");
+    init_cmd.args(["init", "--local", "--profile", "myprofile"]);
+    init_cmd.current_dir(&temp_dir).assert().success();
+
+    // Run a command with MIDEN_PROFILE set - should use the profile
+    let mut account_cmd = cargo_bin_cmd!("miden-client");
+    account_cmd.args(["account"]);
+    account_cmd.env(MIDEN_PROFILE_ENV, "myprofile");
+    account_cmd.current_dir(&temp_dir).assert().success();
+
+    // Verify the store was created in the profile directory
+    let profile_store = temp_dir.join(MIDEN_DIR).join("myprofile").join("store.sqlite3");
+    assert!(
+        profile_store.exists(),
+        "Store should be created in profile directory when MIDEN_PROFILE is set"
+    );
 }
