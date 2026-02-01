@@ -323,16 +323,16 @@ export class WebClient {
    */
   static async createClientWithExternalKeystore(config) {
     const {
-    rpcUrl,
-    noteTransportUrl,
-    seed,
-    storeName,
-    getKeyCb,
-    insertKeyCb,
-    signCb,
-  } = config || {};
-  // Construct the instance (synchronously).
-  const instance = new WebClient(config);
+      rpcUrl,
+      noteTransportUrl,
+      seed,
+      storeName,
+      getKeyCb,
+      insertKeyCb,
+      signCb,
+    } = config || {};
+    // Construct the instance (synchronously).
+    const instance = new WebClient(config);
     // Wait for the underlying wasmWebClient to be initialized.
     const wasmWebClient = await instance.getWasmWebClient();
     await wasmWebClient.createClientWithExternalKeystore(

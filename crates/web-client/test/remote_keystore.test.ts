@@ -91,17 +91,15 @@ test.describe("remote keystore", () => {
         return undefined;
       };
 
-      const client = await window.WebClient.createClientWithExternalKeystore(
-        {
-          rpcUrl: window.rpcUrl!,
-          noteTransportUrl: undefined,
-          seed: undefined,
-          storeName: undefined,
-          getKeyCb,
-          insertKeyCb,
-          signCb: undefined,
-        }
-      );
+      const client = await window.WebClient.createClientWithExternalKeystore({
+        rpcUrl: window.rpcUrl!,
+        noteTransportUrl: undefined,
+        seed: undefined,
+        storeName: undefined,
+        getKeyCb,
+        insertKeyCb,
+        signCb: undefined,
+      });
 
       const wallet = await client.newWallet(
         window.AccountStorageMode.private(),
@@ -158,17 +156,15 @@ test.describe("remote keystore", () => {
         return serializedSig;
       };
 
-      const client = await window.WebClient.createClientWithExternalKeystore(
-        {
-          rpcUrl: window.rpcUrl!,
-          noteTransportUrl: undefined,
-          seed: undefined,
-          storeName: undefined,
-          getKeyCb: undefined,
-          insertKeyCb,
-          signCb,
-        }
-      );
+      const client = await window.WebClient.createClientWithExternalKeystore({
+        rpcUrl: window.rpcUrl!,
+        noteTransportUrl: undefined,
+        seed: undefined,
+        storeName: undefined,
+        getKeyCb: undefined,
+        insertKeyCb,
+        signCb,
+      });
 
       // Create faucet first so insertKeyCb captures its public key
       const faucet = await client.newFaucet(

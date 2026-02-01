@@ -55,9 +55,7 @@ export declare class WebClient extends WasmWebClient {
    * @param config - Client configuration (RPC URL, optional note transport URL, optional seed, optional store name).
    * @returns A promise that resolves to a fully initialized WebClient.
    */
-  static createClient(
-    config?: WebClientConfig
-  ): Promise<WebClient>;
+  static createClient(config?: WebClientConfig): Promise<WebClient>;
 
   /**
    * Factory method to create and initialize a new wrapped WebClient with a remote keystore.
@@ -110,9 +108,7 @@ export declare class MockWebClient extends WebClient {
    * @param config - Client configuration (optional seed + optional serialized mock data).
    * @returns A promise that resolves to a fully initialized MockWebClient.
    */
-  static createClient(
-    config?: WebClientConfig
-  ): Promise<MockWebClient>;
+  static createClient(config?: WebClientConfig): Promise<MockWebClient>;
 
   /** Syncs the mock state and returns the resulting summary. */
   syncState(): Promise<SyncSummary>;
