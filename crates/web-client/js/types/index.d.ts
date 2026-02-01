@@ -24,6 +24,12 @@ export interface WebClientConfig {
   signCb?: SignCallback;
 }
 
+export interface MockWebClientConfig {
+  serializedMockChain?: ArrayBuffer | Uint8Array;
+  serializedMockNoteTransportNode?: ArrayBuffer | Uint8Array;
+  seed?: Uint8Array;
+}
+
 // Callback types for external keystore support
 export type GetKeyCallback = (
   pubKey: Uint8Array
@@ -108,7 +114,7 @@ export declare class MockWebClient extends WebClient {
    * @param config - Client configuration (optional seed + optional serialized mock data).
    * @returns A promise that resolves to a fully initialized MockWebClient.
    */
-  static createClient(config?: WebClientConfig): Promise<MockWebClient>;
+  static createClient(config?: MockWebClientConfig): Promise<MockWebClient>;
 
   /** Syncs the mock state and returns the resulting summary. */
   syncState(): Promise<SyncSummary>;
