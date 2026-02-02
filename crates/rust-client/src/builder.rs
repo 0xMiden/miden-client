@@ -425,33 +425,27 @@ where
 
         // Initialize note transport: prefer explicit client, fall back to config (tonic only)
         #[cfg(feature = "tonic")]
-        let note_transport_api: Option<Arc<dyn NoteTransportClient>> =
-            if let Some(api) = &self.note_transport_api {
-                Some(api.clone())
-            } else if let Some(config) = self.note_transport_config {
-                #[cfg(not(target_arch = "wasm32"))]
-                let transport = crate::note_transport::grpc::GrpcNoteTransportClient::connect(
-                    config.endpoint,
-                    config.timeout_ms,
-                )
-                .await
-                .map_err(|e| {
-                    ClientError::ClientInitializationError(format!(
-                        "Failed to connect to note transport: {e}"
-                    ))
-                })?;
+        if self.note_transport_api.is_none()
+            && let Some(config) = self.note_transport_config
+        {
+            #[cfg(not(target_arch = "wasm32"))]
+            let transport = crate::note_transport::grpc::GrpcNoteTransportClient::connect(
+                config.endpoint,
+                config.timeout_ms,
+            )
+            .await
+            .map_err(|e| {
+                ClientError::ClientInitializationError(format!(
+                    "Failed to connect to note transport: {e}"
+                ))
+            })?;
 
-                #[cfg(target_arch = "wasm32")]
-                let transport =
-                    crate::note_transport::grpc::GrpcNoteTransportClient::new(config.endpoint);
+            #[cfg(target_arch = "wasm32")]
+            let transport =
+                crate::note_transport::grpc::GrpcNoteTransportClient::new(config.endpoint);
 
-                Some(Arc::new(transport) as Arc<dyn NoteTransportClient>)
-            } else {
-                None
-            };
-
-        #[cfg(not(feature = "tonic"))]
-        let note_transport_api = self.note_transport_api.clone();
+            self.note_transport_api = Some(Arc::new(transport) as Arc<dyn NoteTransportClient>);
+        }
 
         // Initialize the note transport cursor if the client uses it
         if self.note_transport_api.is_some() {
@@ -478,7 +472,7 @@ where
             .expect("Default executor's options should always be valid"),
             tx_discard_delta: self.tx_discard_delta,
             max_block_number_delta: self.max_block_number_delta,
-            note_transport_api,
+            note_transport_api: self.note_transport_api.clone(),
         })
     }
 }
