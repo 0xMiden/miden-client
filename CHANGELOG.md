@@ -21,6 +21,7 @@
 * Expanded the `GrpcClient` API with methods to fetch account proofs and rebuild the slots for an account ([#1591](https://github.com/0xMiden/miden-client/pull/1591)).
 * Added `CliClient` wrapper and `CliConfig::from_system()` to allow creating a CLI-configured client programmatically ([#1642](https://github.com/0xMiden/miden-client/pull/1642)).
 * Added sync lock to coordinate concurrent `syncState()` calls in the WebClient using the Web Locks API, with coalescing behavior where concurrent callers share results from an in-progress sync ([#1690](https://github.com/0xMiden/miden-client/pull/1690)).
+* Added an unversioned RPC status helper and `RpcStatusInfo` domain type for easier status access ([#1715](https://github.com/0xMiden/miden-client/pull/1715)).
 
 ### Changes
 
