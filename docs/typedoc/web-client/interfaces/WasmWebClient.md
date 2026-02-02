@@ -411,6 +411,22 @@ Returns the associated [`AuthSecretKey`] if found, or an error if not found.
 
 ***
 
+### getAccountByPublicKey()
+
+> **getAccountByPublicKey**(`pub_key`): `Promise`\<[`Account`](../classes/Account.md)\>
+
+#### Parameters
+
+##### pub\_key
+
+[`PublicKey`](../classes/PublicKey.md)
+
+#### Returns
+
+`Promise`\<[`Account`](../classes/Account.md)\>
+
+***
+
 ### getAccounts()
 
 > **getAccounts**(): `Promise`\<[`AccountHeader`](../classes/AccountHeader.md)[]\>

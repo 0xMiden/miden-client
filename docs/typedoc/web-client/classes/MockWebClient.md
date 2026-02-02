@@ -517,6 +517,26 @@ Returns the associated [`AuthSecretKey`] if found, or an error if not found.
 
 ***
 
+### getAccountByPublicKey()
+
+> **getAccountByPublicKey**(`pub_key`): `Promise`\<[`Account`](Account.md)\>
+
+#### Parameters
+
+##### pub\_key
+
+[`PublicKey`](PublicKey.md)
+
+#### Returns
+
+`Promise`\<[`Account`](Account.md)\>
+
+#### Inherited from
+
+[`WebClient`](WebClient.md).[`getAccountByPublicKey`](WebClient.md#getaccountbypublickey)
+
+***
+
 ### getAccounts()
 
 > **getAccounts**(): `Promise`\<[`AccountHeader`](AccountHeader.md)[]\>

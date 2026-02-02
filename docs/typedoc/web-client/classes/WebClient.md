@@ -531,6 +531,10 @@ Returns the associated [`AuthSecretKey`] if found, or an error if not found.
 
 `Promise`\<[`Account`](Account.md)\>
 
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`getAccountByPublicKey`](../interfaces/WasmWebClient.md#getaccountbypublickey)
+
 ***
 
 ### getAccounts()
