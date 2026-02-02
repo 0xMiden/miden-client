@@ -146,7 +146,7 @@ pub async fn test_swap_fully_onchain(client_config: ClientConfig) -> Result<()> 
 
     // first reload the account
     let account_a_assets = client1
-        .new_account_reader(account_a.id())
+        .account_reader(account_a.id())
         .assets()
         .await
         .context("failed to find account A after swap transaction")?;
@@ -175,7 +175,7 @@ pub async fn test_swap_fully_onchain(client_config: ClientConfig) -> Result<()> 
     }
 
     let account_b_assets = client2
-        .new_account_reader(account_b.id())
+        .account_reader(account_b.id())
         .assets()
         .await
         .context("failed to find account B after swap transaction")?;
@@ -346,7 +346,7 @@ pub async fn test_swap_private(client_config: ClientConfig) -> Result<()> {
 
     // first reload the account
     let account_a_assets = client1
-        .new_account_reader(account_a.id())
+        .account_reader(account_a.id())
         .assets()
         .await
         .context("failed to find account A after private swap transaction")?;
@@ -379,7 +379,7 @@ pub async fn test_swap_private(client_config: ClientConfig) -> Result<()> {
     }
 
     let account_b_assets = client2
-        .new_account_reader(account_b.id())
+        .account_reader(account_b.id())
         .assets()
         .await
         .context("failed to find account B after swap transaction")?;

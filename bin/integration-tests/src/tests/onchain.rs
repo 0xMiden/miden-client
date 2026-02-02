@@ -211,12 +211,12 @@ pub async fn test_onchain_accounts(client_config: ClientConfig) -> Result<()> {
     client_2.sync_state().await?;
 
     let (client_1_faucet, _) = client_1
-        .new_account_reader(faucet_account_header.id())
+        .account_reader(faucet_account_header.id())
         .header()
         .await
         .context("failed to find faucet account in client 1 after sync")?;
     let (client_2_faucet, _) = client_2
-        .new_account_reader(faucet_account_header.id())
+        .account_reader(faucet_account_header.id())
         .header()
         .await
         .context("failed to find faucet account in client 2 after sync")?;
@@ -255,12 +255,12 @@ pub async fn test_onchain_accounts(client_config: ClientConfig) -> Result<()> {
     .await;
 
     let (client_1_faucet, _) = client_1
-        .new_account_reader(faucet_account_header.id())
+        .account_reader(faucet_account_header.id())
         .header()
         .await
         .context("failed to find faucet account in client 1 after consume transactions")?;
     let (client_2_faucet, _) = client_2
-        .new_account_reader(faucet_account_header.id())
+        .account_reader(faucet_account_header.id())
         .header()
         .await
         .context("failed to find faucet account in client 2 after consume transactions")?;
@@ -273,12 +273,12 @@ pub async fn test_onchain_accounts(client_config: ClientConfig) -> Result<()> {
 
     // get initial balances
     let from_account_balance = client_1
-        .new_account_reader(from_account_id)
+        .account_reader(from_account_id)
         .get_balance(faucet_account_id)
         .await
         .context("failed to find from account for balance check")?;
     let to_account_balance = client_2
-        .new_account_reader(to_account_id)
+        .account_reader(to_account_id)
         .get_balance(faucet_account_id)
         .await
         .context("failed to find to account for balance check")?;
@@ -319,12 +319,12 @@ pub async fn test_onchain_accounts(client_config: ClientConfig) -> Result<()> {
     assert!(matches!(input_note.state(), InputNoteState::ConsumedExternal { .. }));
 
     let new_from_account_balance = client_1
-        .new_account_reader(from_account_id)
+        .account_reader(from_account_id)
         .get_balance(faucet_account_id)
         .await
         .context("failed to find from account after transfer")?;
     let new_to_account_balance = client_2
-        .new_account_reader(to_account_id)
+        .account_reader(to_account_id)
         .get_balance(faucet_account_id)
         .await
         .context("failed to find to account after transfer")?;
@@ -384,14 +384,14 @@ pub async fn test_import_account_by_id(client_config: ClientConfig) -> Result<()
     keystore_2.add_key(&secret_key)?;
 
     let original_commitment = client_1
-        .new_account_reader(first_regular_account.id())
+        .account_reader(first_regular_account.id())
         .commitment()
         .await
         .with_context(|| {
             format!("Original account {} not found in client_1", first_regular_account.id())
         })?;
     let imported_commitment = client_2
-        .new_account_reader(first_regular_account.id())
+        .account_reader(first_regular_account.id())
         .commitment()
         .await
         .with_context(|| {

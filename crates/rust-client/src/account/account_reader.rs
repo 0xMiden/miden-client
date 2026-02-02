@@ -24,7 +24,7 @@ use crate::store::{AccountStatus, Store};
 ///
 /// # Example
 /// ```ignore
-/// let reader = client.new_account_reader(account_id);
+/// let reader = client.account_reader(account_id);
 ///
 /// // Each call fetches fresh data
 /// let nonce = reader.nonce().await?;

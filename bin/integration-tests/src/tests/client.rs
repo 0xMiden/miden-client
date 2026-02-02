@@ -172,7 +172,7 @@ pub async fn test_multiple_tx_on_same_block(client_config: ClientConfig) -> Resu
     assert!(matches!(note.state(), OutputNoteState::CommittedFull { .. }));
 
     let sender_balance = client
-        .new_account_reader(from_account_id)
+        .account_reader(from_account_id)
         .get_balance(faucet_account_id)
         .await
         .context("failed to find sender account after transactions")?;
@@ -1044,7 +1044,7 @@ pub async fn test_discarded_transaction(client_config: ClientConfig) -> Result<(
 
     // Store the account state before applying the transaction
     let account_hash_before_tx =
-        client_1.new_account_reader(from_account_id).commitment().await.unwrap();
+        client_1.account_reader(from_account_id).commitment().await.unwrap();
 
     // Apply the transaction
     let submission_height = client_1.get_sync_height().await.unwrap();
@@ -1055,7 +1055,7 @@ pub async fn test_discarded_transaction(client_config: ClientConfig) -> Result<(
 
     // Check that the account state has changed after applying the transaction
     let account_hash_after_tx =
-        client_1.new_account_reader(from_account_id).commitment().await.unwrap();
+        client_1.account_reader(from_account_id).commitment().await.unwrap();
 
     assert_ne!(
         account_hash_before_tx, account_hash_after_tx,
@@ -1091,7 +1091,7 @@ pub async fn test_discarded_transaction(client_config: ClientConfig) -> Result<(
 
     // Check that the account state has been rolled back after the transaction was discarded
     let account_hash_after_sync =
-        client_1.new_account_reader(from_account_id).commitment().await.unwrap();
+        client_1.account_reader(from_account_id).commitment().await.unwrap();
 
     assert_ne!(
         account_hash_after_sync, account_hash_after_tx,
@@ -1208,7 +1208,7 @@ pub async fn test_locked_account(client_config: ClientConfig) -> Result<()> {
     wait_for_node(&mut client_2).await;
 
     // When imported the account shouldn't be locked
-    assert!(!client_2.new_account_reader(from_account_id).is_locked().await.unwrap());
+    assert!(!client_2.account_reader(from_account_id).is_locked().await.unwrap());
 
     // Consume note with private account in client 1
     let tx_id =
@@ -1219,9 +1219,9 @@ pub async fn test_locked_account(client_config: ClientConfig) -> Result<()> {
     // After sync the private account should be locked in client 2
     let summary = client_2.sync_state().await.unwrap();
     assert!(summary.locked_accounts.contains(&from_account_id));
-    assert!(client_2.new_account_reader(from_account_id).is_locked().await.unwrap());
+    assert!(client_2.account_reader(from_account_id).is_locked().await.unwrap());
     assert_eq!(
-        client_2.new_account_reader(from_account_id).seed().await.unwrap(),
+        client_2.account_reader(from_account_id).seed().await.unwrap(),
         original_seed
     );
 
@@ -1232,7 +1232,7 @@ pub async fn test_locked_account(client_config: ClientConfig) -> Result<()> {
 
     // After sync the private account shouldn't be locked in client 2
     client_2.sync_state().await.unwrap();
-    assert!(!client_2.new_account_reader(from_account_id).is_locked().await.unwrap());
+    assert!(!client_2.account_reader(from_account_id).is_locked().await.unwrap());
     Ok(())
 }
 

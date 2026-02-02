@@ -430,7 +430,7 @@ pub async fn assert_account_has_single_asset(
     asset_account_id: AccountId,
     expected_amount: u64,
 ) {
-    let assets = client.new_account_reader(account_id).assets().await.unwrap();
+    let assets = client.account_reader(account_id).assets().await.unwrap();
 
     assert_eq!(assets.len(), 1);
 

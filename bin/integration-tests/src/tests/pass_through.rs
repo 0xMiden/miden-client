@@ -144,7 +144,7 @@ pub async fn test_pass_through(client_config: ClientConfig) -> Result<()> {
 
     // Storing commitment to check later that (final_acc.commitment == initial_acc.commitment)
     let commitment_before_second_tx = client
-        .new_account_reader(pass_through_account.id())
+        .account_reader(pass_through_account.id())
         .commitment()
         .await
         .expect("pass-through account should exist");
@@ -173,7 +173,7 @@ pub async fn test_pass_through(client_config: ClientConfig) -> Result<()> {
     );
 
     let commitment_after_second_tx = client
-        .new_account_reader(pass_through_account.id())
+        .account_reader(pass_through_account.id())
         .commitment()
         .await
         .expect("pass-through account should exist");

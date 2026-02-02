@@ -83,7 +83,7 @@ impl AccountCmd {
                         let account_id: AccountId = parse_account_id(&client, id).await?;
 
                         // Check whether we're tracking that account
-                        let (account, _) = client.new_account_reader(account_id).header().await?;
+                        let (account, _) = client.account_reader(account_id).header().await?;
 
                         client
                             .set_setting(DEFAULT_ACCOUNT_ID_KEY.to_string(), account.id())
@@ -109,7 +109,7 @@ async fn list_accounts<AUTH>(client: Client<AUTH>) -> Result<(), CliError> {
     let mut table =
         create_dynamic_table(&["Account ID", "Type", "Storage Mode", "Nonce", "Status"]);
     for (acc, _acc_seed) in &accounts {
-        let status = client.new_account_reader(acc.id()).status().await?.to_string();
+        let status = client.account_reader(acc.id()).status().await?.to_string();
 
         table.add_row(vec![
             acc.id().to_hex(),

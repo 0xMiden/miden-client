@@ -161,7 +161,7 @@ pub async fn test_counter_contract_ntx(client_config: ClientConfig) -> Result<()
     let network_account = deploy_counter_contract(&mut client, AccountStorageMode::Network).await?;
 
     let counter_value = client
-        .new_account_reader(network_account.id())
+        .account_reader(network_account.id())
         .get_storage_item(COUNTER_SLOT_NAME.clone())
         .await
         .context("failed to find network account after deployment")?;
@@ -242,7 +242,7 @@ pub async fn test_recall_note_before_ntx_consumes_it(client_config: ClientConfig
 
     // The network account should have original value
     let network_counter = client
-        .new_account_reader(network_account.id())
+        .account_reader(network_account.id())
         .get_storage_item(COUNTER_SLOT_NAME.clone())
         .await
         .context("failed to find network account after recall test")?;
@@ -250,7 +250,7 @@ pub async fn test_recall_note_before_ntx_consumes_it(client_config: ClientConfig
 
     // The native account should have the incremented value
     let native_counter = client
-        .new_account_reader(native_account.id())
+        .account_reader(native_account.id())
         .get_storage_item(COUNTER_SLOT_NAME.clone())
         .await
         .context("failed to find native account after recall test")?;

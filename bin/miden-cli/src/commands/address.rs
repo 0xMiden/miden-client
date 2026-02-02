@@ -115,7 +115,7 @@ async fn list_all_addresses<AUTH>(
     let accounts = client.get_account_headers().await?;
     for (acc_header, _) in accounts {
         let addresses = client
-            .new_account_reader(acc_header.id())
+            .account_reader(acc_header.id())
             .addresses()
             .await
             .expect("account is expected to exist if retrieved");
@@ -131,7 +131,7 @@ async fn list_account_addresses<AUTH>(
     network_id: NetworkId,
 ) -> Result<(), CliError> {
     let id = parse_account_id(&client, account_id).await?;
-    let addresses = client.new_account_reader(id).addresses().await.map_err(|_| {
+    let addresses = client.account_reader(id).addresses().await.map_err(|_| {
         CliError::Input(format!("The account with id `{account_id}` does not exist"))
     })?;
 

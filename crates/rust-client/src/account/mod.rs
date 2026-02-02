@@ -438,7 +438,7 @@ impl<AUTH> Client<AUTH> {
     /// This method loads the complete account state including vault, storage, and code.
     ///
     /// For lazy access that fetches only the data you need, use
-    /// [`Client::new_account_reader`] instead.
+    /// [`Client::account_reader`] instead.
     ///
     /// Use [`Client::try_get_account`] if you want to error when the account is not found.
     pub async fn get_account(&self, account_id: AccountId) -> Result<Option<Account>, ClientError> {
@@ -468,7 +468,7 @@ impl<AUTH> Client<AUTH> {
     ///
     /// # Example
     /// ```ignore
-    /// let reader = client.new_account_reader(account_id);
+    /// let reader = client.account_reader(account_id);
     ///
     /// // Each call fetches fresh data
     /// let nonce = reader.nonce().await?;
@@ -478,7 +478,7 @@ impl<AUTH> Client<AUTH> {
     /// let value = reader.get_storage_item("my_slot").await?;
     /// let (map_value, witness) = reader.get_storage_map_witness("balances", key).await?;
     /// ```
-    pub fn new_account_reader(&self, account_id: AccountId) -> AccountReader {
+    pub fn account_reader(&self, account_id: AccountId) -> AccountReader {
         AccountReader::new(self.store.clone(), account_id)
     }
 }

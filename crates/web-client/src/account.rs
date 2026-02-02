@@ -55,12 +55,12 @@ impl WebClient {
     ///
     /// # Example
     /// ```javascript
-    /// const reader = client.newAccountReader(accountId);
+    /// const reader = client.accountReader(accountId);
     /// const nonce = await reader.nonce();
     /// const balance = await reader.getBalance(faucetId);
     /// ```
-    #[wasm_bindgen(js_name = "newAccountReader")]
-    pub fn new_account_reader(&self, account_id: &AccountId) -> Result<AccountReader, JsValue> {
+    #[wasm_bindgen(js_name = "accountReader")]
+    pub fn account_reader(&self, account_id: &AccountId) -> Result<AccountReader, JsValue> {
         let store = self.store.clone().ok_or(JsValue::from_str("Store not initialized"))?;
         Ok(AccountReader::new(store, account_id.into()))
     }
