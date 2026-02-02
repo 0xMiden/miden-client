@@ -375,11 +375,19 @@ pub trait Store: Send + Sync {
     /// Gets the note transport cursor.
     ///
     /// This is used to reduce the number of fetched notes from the note transport network.
+    /// If no cursor exists, initializes it to 0.
     async fn get_note_transport_cursor(&self) -> Result<NoteTransportCursor, StoreError> {
-        let cursor_bytes = self
-            .get_setting(NOTE_TRANSPORT_CURSOR_STORE_SETTING.into())
-            .await?
-            .ok_or(StoreError::NoteTransportCursorNotFound)?;
+        let cursor_bytes = if let Some(bytes) =
+            self.get_setting(NOTE_TRANSPORT_CURSOR_STORE_SETTING.into()).await?
+        {
+            bytes
+        } else {
+            // Lazy initialization: create cursor if not present
+            let initial = 0u64.to_be_bytes().to_vec();
+            self.set_setting(NOTE_TRANSPORT_CURSOR_STORE_SETTING.into(), initial.clone())
+                .await?;
+            initial
+        };
         let array: [u8; 8] = cursor_bytes
             .as_slice()
             .try_into()

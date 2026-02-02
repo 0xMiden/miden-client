@@ -54,6 +54,7 @@
 * [BREAKING] Updated `BlockNumber` IndexedDB type: changed from `string` to `number` ([#1684](https://github.com/0xMiden/miden-client/pull/1684)).
 * [BREAKING] Upgraded to protocol 0.13: exposed and aligned note-related structs to WebClient; `NoteTag` and `NoteAttachment` APIs updated renamed `NoteTag.fromAccountId` to `withAccountTarget`, added `withCustomAccountTarget`; added `NoteAttachmentScheme` wrapper and content accessors (`asWord`, `asArray`) to `NoteAttachment`; removed `NoteExecutionMode` ([#1685](https://github.com/0xMiden/miden-client/pull/1685)).
 * [BREAKING] Removed the `payback_note_type` field from the swap command ([#1700](https://github.com/0xMiden/miden-client/pull/1700)).
+* [BREAKING] Deprecated `Client::new()` in favor of `ClientBuilder`; added `ClientBuilder::for_testnet()`, `for_devnet()`, and `for_localhost()` constructors that pre-configure RPC endpoint, transaction prover, and note transport for each network ([#1712](https://github.com/0xMiden/miden-client/pull/1712)).
 
 ### Fixes
 
