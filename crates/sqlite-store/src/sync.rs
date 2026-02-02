@@ -22,7 +22,7 @@ impl SqliteStore {
     pub(crate) fn get_note_tags(conn: &mut Connection) -> Result<Vec<NoteTagRecord>, StoreError> {
         const QUERY: &str = "SELECT tag, source FROM tags";
 
-        conn.prepare(QUERY)
+        conn.prepare_cached(QUERY)
             .into_store_error()?
             .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
             .expect("no binding parameters used in query")
@@ -43,7 +43,7 @@ impl SqliteStore {
     ) -> Result<BTreeSet<NoteTag>, StoreError> {
         const QUERY: &str = "SELECT DISTINCT tag FROM tags";
 
-        conn.prepare(QUERY)
+        conn.prepare_cached(QUERY)
             .into_store_error()?
             .query_map([], |row| row.get(0))
             .expect("no binding parameters used in query")
@@ -85,7 +85,7 @@ impl SqliteStore {
     pub(super) fn get_sync_height(conn: &mut Connection) -> Result<BlockNumber, StoreError> {
         const QUERY: &str = "SELECT block_num FROM state_sync";
 
-        conn.prepare(QUERY)
+        conn.prepare_cached(QUERY)
             .into_store_error()?
             .query_map([], |row| row.get(0))
             .expect("no binding parameters used in query")

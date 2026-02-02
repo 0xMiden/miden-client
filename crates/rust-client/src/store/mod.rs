@@ -26,6 +26,7 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::fmt::Debug;
 
+use miden_protocol::Word;
 use miden_protocol::account::{
     Account,
     AccountCode,
@@ -40,10 +41,10 @@ use miden_protocol::account::{
 use miden_protocol::address::Address;
 use miden_protocol::asset::{Asset, AssetVault, AssetVaultKey, AssetWitness};
 use miden_protocol::block::{BlockHeader, BlockNumber};
-use miden_protocol::crypto::merkle::mmr::{InOrderIndex, MmrPeaks, PartialMmr};
+use miden_protocol::crypto::merkle::mmr::{Forest, InOrderIndex, MmrPeaks, PartialMmr};
+use miden_protocol::errors::AccountError;
 use miden_protocol::note::{NoteId, NoteScript, NoteTag, Nullifier};
 use miden_protocol::transaction::TransactionId;
-use miden_protocol::{AccountError, Word};
 
 use crate::note_transport::{NOTE_TRANSPORT_CURSOR_STORE_SETTING, NoteTransportCursor};
 use crate::sync::{NoteTagRecord, StateSyncUpdate};
@@ -413,20 +414,8 @@ pub trait Store: Send + Sync {
     async fn get_current_partial_mmr(&self) -> Result<PartialMmr, StoreError> {
         let current_block_num = self.get_sync_height().await?;
 
-        let tracked_nodes = self.get_partial_blockchain_nodes(PartialBlockchainFilter::All).await?;
         let current_peaks =
             self.get_partial_blockchain_peaks_by_block_num(current_block_num).await?;
-
-        // FIXME: Because each block stores the peaks for the MMR for the leaf of pos `block_num-1`,
-        // we can get an MMR based on those peaks, add the current block number and align it with
-        // the set of all nodes in the store.
-        // Otherwise, by doing `PartialMmr::from_parts` we would effectively have more nodes than
-        // we need for the passed peaks. The alternative here is to truncate the set of all nodes
-        // before calling `from_parts`
-        //
-        // This is a bit hacky but it works. One alternative would be to _just_ get nodes required
-        // for tracked blocks in the MMR. This would however block us from the convenience of
-        // just getting all nodes from the store.
 
         let (current_block, has_client_notes) = self
             .get_block_header_by_num(current_block_num)
@@ -440,6 +429,12 @@ pub trait Store: Send + Sync {
         // Only track the latest leaf if it is relevant (it has client notes) _and_ the forest
         // actually has a single leaf tree bit
         let track_latest = has_client_notes && current_partial_mmr.forest().has_single_leaf_tree();
+
+        let tracked_nodes = self
+            .get_partial_blockchain_nodes(PartialBlockchainFilter::Forest(
+                current_partial_mmr.forest(),
+            ))
+            .await?;
 
         let current_partial_mmr =
             PartialMmr::from_parts(current_partial_mmr.peaks(), tracked_nodes, track_latest);
@@ -482,6 +477,26 @@ pub trait Store: Send + Sync {
         account_id: AccountId,
         filter: AccountStorageFilter,
     ) -> Result<AccountStorage, StoreError>;
+
+    /// Retrieves a storage slot value by name.
+    ///
+    /// For `Value` slots, returns the stored word.
+    /// For `Map` slots, returns the map root.
+    ///
+    /// The default implementation of this method uses [`Store::get_account_storage`].
+    async fn get_account_storage_item(
+        &self,
+        account_id: AccountId,
+        slot_name: StorageSlotName,
+    ) -> Result<Word, StoreError> {
+        let storage = self
+            .get_account_storage(account_id, AccountStorageFilter::SlotName(slot_name.clone()))
+            .await?;
+        storage
+            .get(&slot_name)
+            .map(StorageSlot::value)
+            .ok_or(StoreError::AccountError(AccountError::StorageSlotNameNotFound { slot_name }))
+    }
 
     /// Retrieves a specific item from the account's storage map along with its Merkle proof.
     ///
@@ -530,6 +545,8 @@ pub enum PartialBlockchainFilter {
     All,
     /// Filter by the specified in-order indices.
     List(Vec<InOrderIndex>),
+    /// Return nodes with in-order indices within the specified forest.
+    Forest(Forest),
 }
 
 // TRANSACTION FILTERS

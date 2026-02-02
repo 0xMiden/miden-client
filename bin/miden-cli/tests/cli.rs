@@ -14,7 +14,6 @@ use miden_client::crypto::{FeltRng, RpoRandomCoin};
 use miden_client::note::{
     Note,
     NoteAssets,
-    NoteExecutionHint,
     NoteFile,
     NoteId,
     NoteInputs,
@@ -108,7 +107,7 @@ fn init_with_params() {
 }
 
 #[test]
-#[serial_test::serial(global_config)]
+#[serial_test::file_serial]
 fn silent_initialization_uses_default_values() {
     // Clean up any existing global config first
     cleanup_global_config();
@@ -667,6 +666,7 @@ async fn init_with_testnet() -> Result<()> {
 }
 
 #[tokio::test]
+#[serial_test::file_serial]
 async fn debug_mode_outputs_logs() -> Result<()> {
     // This test tries to execute a transaction with debug mode enabled and checks that the stack
     // state is printed. We need to use the CLI for this because the debug logs are always printed
@@ -703,11 +703,8 @@ async fn debug_mode_outputs_logs() -> Result<()> {
     let note_metadata = NoteMetadata::new(
         account.id(),
         NoteType::Private,
-        NoteTag::from_account_id(account.id()),
-        NoteExecutionHint::None,
-        Felt::default(),
-    )
-    .unwrap();
+        NoteTag::with_account_target(account.id()),
+    );
     let note_assets = NoteAssets::new(vec![]).unwrap();
     let note_recipient = NoteRecipient::new(serial_num, note_script, inputs);
     let note = Note::new(note_assets, note_metadata, note_recipient);
@@ -755,6 +752,10 @@ async fn debug_mode_outputs_logs() -> Result<()> {
         .assert()
         .success()
         .stdout(contains("Stack state"));
+
+    unsafe {
+        env::remove_var("MIDEN_DEBUG");
+    }
 
     Ok(())
 }
@@ -864,6 +865,52 @@ async fn list_addresses_remove() -> Result<()> {
     let formatted_output = String::from_utf8(output.stdout).unwrap();
     assert!(formatted_output.contains(&basic_account_id));
     assert_eq!(formatted_output.matches("Unspecified").count(), 0);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn new_wallet_with_deploy_flag() -> Result<()> {
+    let (store_path, temp_dir, endpoint) = init_cli();
+
+    sync_cli(&temp_dir);
+
+    let mut create_wallet_cmd = cargo_bin_cmd!("miden-client");
+    create_wallet_cmd.args(["new-wallet", "-s", "public", "--deploy"]);
+
+    let output = create_wallet_cmd.current_dir(&temp_dir).output().unwrap();
+    assert!(
+        output.status.success(),
+        "Failed to create and deploy wallet: {}",
+        String::from_utf8(output.stderr).unwrap()
+    );
+
+    // Extract the account ID from the output
+    let output_str = std::str::from_utf8(&output.stdout).unwrap();
+    let account_id_str = output_str
+        .split_whitespace()
+        .skip_while(|&word| word != "-s")
+        .nth(1)
+        .expect("Failed to extract account ID from output");
+
+    // Sync to ensure the transaction is committed
+    sync_cli(&temp_dir);
+
+    // Create a client and retrieve the account to verify the nonce
+    let (client, _) = create_rust_client_with_store_path(&store_path, endpoint).await?;
+    let account_id = AccountId::from_hex(account_id_str)?;
+    let account = client
+        .get_account(account_id)
+        .await?
+        .expect("Account should exist in the store");
+
+    // Verify that the nonce is non-zero (account was deployed)
+    // By convention, a nonce of 0 indicates an undeployed account
+    assert!(
+        account.nonce().as_int() > 0,
+        "Account nonce should be non-zero after deployment, but got: {}",
+        account.nonce()
+    );
 
     Ok(())
 }
@@ -1212,18 +1259,21 @@ fn create_account_with_multisig_auth() {
     let temp_dir = init_cli().1;
 
     // Create init storage data file for multisig
+    // threshold_config is a value slot with [threshold, num_approvers, 0, 0]
+    // approver_public_keys and procedure_thresholds are map slots
     let init_storage_data_toml = r#"
-        ["miden::standards::auth::rpo_falcon512_multisig::threshold_config"]
-        approvers = [
-            { key = "0x0000000000000000000000000000000000000000000000000000000000000001", value = "0x0000000000000000000000000000000000000000000000000000000000000001" }
+        "miden::standards::auth::falcon512_rpo_multisig::threshold_config.threshold" = "2"
+        "miden::standards::auth::falcon512_rpo_multisig::threshold_config.num_approvers" = "3"
+
+        "miden::standards::auth::falcon512_rpo_multisig::approver_public_keys" = [
+            { key = ["0", "0", "0", "0"], value = "0x0000000000000000000000000000000000000000000000000000000000000001" },
+            { key = ["0", "0", "0", "1"], value = "0x0000000000000000000000000000000000000000000000000000000000000002" },
+            { key = ["0", "0", "0", "2"], value = "0x0000000000000000000000000000000000000000000000000000000000000003" }
         ]
 
-        proc_thresholds = [
-            { key = "0xd2d1b6229d7cfb9f2ada31c5cb61453cf464f91828e124437c708eec55b9cd07", value = "0x00000000000000000000000000000000000000000000000000000000000001" }
+        "miden::standards::auth::falcon512_rpo_multisig::procedure_thresholds" = [
+            { key = "0xd2d1b6229d7cfb9f2ada31c5cb61453cf464f91828e124437c708eec55b9cd07", value = "1" }
         ]
-
-        threshold="2"
-        num_approvers="3"
         "#;
     let file_path = temp_dir.join("multisig_init_data.toml");
     fs::write(&file_path, init_storage_data_toml).unwrap();
@@ -1318,7 +1368,7 @@ fn create_account_with_ecdsa_auth() {
 /// Tests that `CliClient::from_system_user_config()` successfully creates a client with the same
 /// configuration as the CLI tool when a local config exists.
 #[tokio::test]
-#[serial_test::serial(global_config)]
+#[serial_test::file_serial]
 async fn test_from_system_user_config_with_local_config() -> Result<()> {
     // Initialize a local CLI configuration
     let (store_path, temp_dir, _endpoint) = init_cli();
@@ -1357,7 +1407,7 @@ async fn test_from_system_user_config_with_local_config() -> Result<()> {
 /// Tests that `CliClient::from_system_user_config()` silently initializes with default config
 /// when no configuration exists.
 #[tokio::test]
-#[serial_test::serial(global_config)]
+#[serial_test::file_serial]
 async fn test_from_system_user_config_silent_init() -> Result<()> {
     // Create a temporary directory with no .miden configuration
     let temp_dir = temp_dir().join(format!("cli-test-silent-init-{}", rand::rng().random::<u64>()));
@@ -1404,7 +1454,7 @@ async fn test_from_system_user_config_silent_init() -> Result<()> {
 
 /// Tests that `CliConfig::from_system()` prioritizes local config over global config.
 #[tokio::test]
-#[serial_test::serial(global_config)]
+#[serial_test::file_serial]
 async fn test_from_system_user_config_local_priority() -> Result<()> {
     // Clean up any existing global config
     cleanup_global_config();

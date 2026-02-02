@@ -12,10 +12,10 @@ test.describe("multisig auth component", () => {
         new window.Word(new BigUint64Array([3n, 0n, 0n, 0n])),
       ];
 
-      const config = new window.AuthRpoFalcon512MultisigConfig(commitments, 2);
+      const config = new window.AuthFalcon512RpoMultisigConfig(commitments, 2);
       const defaultThreshold = config.defaultThreshold;
       const approvers = config.approvers.length;
-      window.createAuthRpoFalcon512Multisig(config);
+      window.createAuthFalcon512RpoMultisig(config);
 
       return {
         ok: true,
@@ -35,14 +35,14 @@ test.describe("multisig auth component", () => {
       ];
       const procRoot = new window.Word(new BigUint64Array([10n, 0n, 0n, 0n]));
 
-      const config = new window.AuthRpoFalcon512MultisigConfig(
+      const config = new window.AuthFalcon512RpoMultisigConfig(
         commitments,
         2
       ).withProcThresholds([new window.ProcedureThreshold(procRoot, 1)]);
 
       const procThresholds = config.getProcThresholds();
 
-      window.createAuthRpoFalcon512Multisig(config);
+      window.createAuthFalcon512RpoMultisig(config);
       return {
         ok: true,
         procThresholds:
@@ -64,7 +64,7 @@ test.describe("multisig auth component", () => {
         const commitments = [
           new window.Word(new BigUint64Array([7n, 0n, 0n, 0n])),
         ];
-        new window.AuthRpoFalcon512MultisigConfig(commitments, 2);
+        new window.AuthFalcon512RpoMultisigConfig(commitments, 2);
         return false;
       } catch (err) {
         return true;

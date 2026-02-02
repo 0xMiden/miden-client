@@ -74,7 +74,7 @@ impl ClientConfig {
             .filesystem_keystore(auth_path.to_str().with_context(|| {
                 format!("failed to convert auth path to string: {}", auth_path.to_string_lossy())
             })?)
-            .in_debug_mode(DebugMode::Enabled)
+            .in_debug_mode(DebugMode::Disabled)
             .tx_graceful_blocks(None);
 
         Ok((builder, keystore))

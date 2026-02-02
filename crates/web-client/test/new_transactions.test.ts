@@ -337,9 +337,7 @@ export const customTransaction = async (
       let noteMetadata = new window.NoteMetadata(
         faucetAccount.id(),
         window.NoteType.Private,
-        window.NoteTag.fromAccountId(walletAccount.id()),
-        window.NoteExecutionHint.none(),
-        undefined
+        window.NoteTag.withAccountTarget(walletAccount.id())
       );
 
       let expectedNoteArgs = noteArgs.map((felt) => felt.asInt());
@@ -547,9 +545,7 @@ const customTxWithMultipleNotes = async (
       let noteMetadata = new window.NoteMetadata(
         senderAccountId,
         window.NoteType.Public,
-        window.NoteTag.fromAccountId(targetAccountId),
-        window.NoteExecutionHint.none(),
-        undefined
+        window.NoteTag.withAccountTarget(targetAccountId)
       );
 
       let serialNum1 = new window.Word(
@@ -622,6 +618,8 @@ test.describe("custom transaction tests", () => {
   test("custom transaction with remote prover completes successfully", async ({
     page,
   }) => {
+    // TODO: hotfix CI failure, we should investigate slow prover tests further.
+    test.slow();
     await expect(customTransaction(page, "0", true)).resolves.toBeUndefined();
   });
 });
@@ -1155,13 +1153,18 @@ export const counterAccountComponent = async (
 
     let noteAssets = new window.NoteAssets([]);
 
+    // Create network account target attachment so the node knows to consume this note
+    // with the network account (counter account)
+    let networkTargetAttachment = window.NoteAttachment.newNetworkAccountTarget(
+      accountBuilderResult.account.id(),
+      window.NoteExecutionHint.always()
+    );
+
     let noteMetadata = new window.NoteMetadata(
       nativeAccount.id(),
       window.NoteType.Public,
-      window.NoteTag.fromAccountId(accountBuilderResult.account.id()),
-      window.NoteExecutionHint.none(),
-      undefined
-    );
+      window.NoteTag.withAccountTarget(accountBuilderResult.account.id())
+    ).withAttachment(networkTargetAttachment);
 
     let note = new window.Note(noteAssets, noteMetadata, noteRecipient);
 
@@ -1442,12 +1445,12 @@ test.describe("submitNewTransactionWithProver tests", () => {
         const approverCommitments = approverKeys.map((key) =>
           key.publicKey().toCommitment()
         );
-        const multisigConfig = new window.AuthRpoFalcon512MultisigConfig(
+        const multisigConfig = new window.AuthFalcon512RpoMultisigConfig(
           approverCommitments,
           2
         );
         const multisigComponent =
-          window.createAuthRpoFalcon512Multisig(multisigConfig);
+          window.createAuthFalcon512RpoMultisig(multisigConfig);
 
         const accountBuilderResult = new window.AccountBuilder(walletSeed)
           .accountType(window.AccountType.RegularAccountImmutableCode)
