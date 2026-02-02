@@ -1,6 +1,7 @@
 use alloc::boxed::Box;
 use alloc::string::{String, ToString};
 use core::error::Error;
+use core::fmt;
 use core::num::TryFromIntError;
 
 use miden_protocol::account::AccountId;
@@ -29,10 +30,12 @@ pub enum RpcError {
     ExpectedDataMissing(String),
     #[error("rpc api response is invalid: {0}")]
     InvalidResponse(String),
-    #[error("grpc request failed for {endpoint}: {error_kind}")]
+    #[error("grpc request failed for {endpoint}: {error_kind}{}",
+        node_error.as_ref().map(|e| format!(" ({e})")).unwrap_or_default())]
     GrpcError {
         endpoint: NodeRpcClientEndpoint,
         error_kind: GrpcError,
+        node_error: Option<NodeRpcError>,
         #[source]
         source: Option<Box<dyn Error + Send + Sync + 'static>>,
     },
@@ -155,9 +158,6 @@ impl GrpcError {
 // ACCEPT HEADER ERROR
 // ================================================================================================
 
-// TODO: Once the node returns structure error information, replace this with a more structure
-// approach. See miden-client/#1129 for more information.
-
 /// Errors that can occur during accept header validation.
 #[derive(Debug, Error)]
 pub enum AcceptHeaderError {
@@ -182,5 +182,80 @@ impl AcceptHeaderError {
             return Some(Self::ParsingError(message.to_string()));
         }
         None
+    }
+}
+
+// NODE RPC ERROR
+// ================================================================================================
+
+/// Application-level errors returned by the node in gRPC status details.
+///
+/// These typed errors allow programmatic handling of specific error conditions
+/// instead of parsing error messages.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NodeRpcError {
+    SubmitProvenTransaction(SubmitProvenTransactionError),
+    // Future endpoints will add variants here
+}
+
+impl fmt::Display for NodeRpcError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            NodeRpcError::SubmitProvenTransaction(err) => write!(f, "{err}"),
+        }
+    }
+}
+
+// SUBMIT PROVEN TRANSACTION ERROR
+// ================================================================================================
+
+/// Application-level errors for the `SubmitProvenTransaction` endpoint.
+///
+/// These error codes match those defined in the node's `proto/types/errors.proto`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum SubmitProvenTransactionError {
+    Unspecified = 0,
+    InternalError = 1,
+    DeserializationFailed = 2,
+    InvalidTransactionProof = 3,
+    IncorrectAccountInitialCommitment = 4,
+    InputNotesAlreadyConsumed = 5,
+    UnauthenticatedNotesNotFound = 6,
+    OutputNotesAlreadyExist = 7,
+    TransactionExpired = 8,
+}
+
+impl From<u8> for SubmitProvenTransactionError {
+    fn from(code: u8) -> Self {
+        match code {
+            1 => Self::InternalError,
+            2 => Self::DeserializationFailed,
+            3 => Self::InvalidTransactionProof,
+            4 => Self::IncorrectAccountInitialCommitment,
+            5 => Self::InputNotesAlreadyConsumed,
+            6 => Self::UnauthenticatedNotesNotFound,
+            7 => Self::OutputNotesAlreadyExist,
+            8 => Self::TransactionExpired,
+            _ => Self::Unspecified,
+        }
+    }
+}
+
+impl fmt::Display for SubmitProvenTransactionError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Unspecified => write!(f, "unspecified error"),
+            Self::InternalError => write!(f, "internal server error"),
+            Self::DeserializationFailed => write!(f, "failed to deserialize transaction"),
+            Self::InvalidTransactionProof => write!(f, "invalid transaction proof"),
+            Self::IncorrectAccountInitialCommitment => {
+                write!(f, "incorrect account initial commitment")
+            },
+            Self::InputNotesAlreadyConsumed => write!(f, "input notes already consumed"),
+            Self::UnauthenticatedNotesNotFound => write!(f, "unauthenticated notes not found"),
+            Self::OutputNotesAlreadyExist => write!(f, "output notes already exist"),
+            Self::TransactionExpired => write!(f, "transaction expired"),
+        }
     }
 }

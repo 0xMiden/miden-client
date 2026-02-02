@@ -35,7 +35,9 @@ use super::{
 use crate::rpc::domain::account_vault::{AccountVaultInfo, AccountVaultUpdate};
 use crate::rpc::domain::storage_map::{StorageMapInfo, StorageMapUpdate};
 use crate::rpc::domain::transaction::TransactionsInfo;
-use crate::rpc::errors::{AcceptHeaderError, GrpcError, RpcConversionError};
+use crate::rpc::errors::{
+    AcceptHeaderError, GrpcError, NodeRpcError, RpcConversionError, SubmitProvenTransactionError,
+};
 use crate::rpc::generated::rpc::account_request::account_detail_request::storage_map_detail_request::SlotData;
 use crate::rpc::generated::rpc::account_request::account_detail_request::StorageMapDetailRequest;
 use crate::rpc::generated::rpc::BlockRange;
@@ -876,14 +878,32 @@ impl RpcError {
             return Self::AcceptHeaderError(accept_error);
         }
 
+        // Parse application-level error from status details
+        let node_error = parse_node_error(&endpoint, status.details());
+
         let error_kind = GrpcError::from(&status);
         let source = Box::new(status) as Box<dyn Error + Send + Sync + 'static>;
 
         Self::GrpcError {
             endpoint,
             error_kind,
+            node_error,
             source: Some(source),
         }
+    }
+}
+
+/// Parses application-level error codes from gRPC status details.
+///
+/// The node sends a single u8 byte in `status.details()` for certain endpoints.
+/// This function extracts that byte and converts it to the appropriate typed error.
+fn parse_node_error(endpoint: &NodeRpcClientEndpoint, details: &[u8]) -> Option<NodeRpcError> {
+    let code = *details.first()?;
+    match endpoint {
+        NodeRpcClientEndpoint::SubmitProvenTx => Some(NodeRpcError::SubmitProvenTransaction(
+            SubmitProvenTransactionError::from(code),
+        )),
+        _ => None,
     }
 }
 
