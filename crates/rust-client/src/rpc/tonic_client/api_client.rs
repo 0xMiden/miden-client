@@ -34,6 +34,7 @@ pub(crate) mod api_client_wrapper {
         /// Connects to the Miden node API using the provided URL and genesis commitment.
         ///
         /// The client is configured with an interceptor that sets all requisite request metadata.
+        // Kept async for API parity with the native client; in WASM this is synchronous.
         #[allow(clippy::unused_async)]
         pub async fn new_client(
             endpoint: String,
@@ -47,6 +48,7 @@ pub(crate) mod api_client_wrapper {
         }
 
         /// Connects to the Miden node API without injecting an Accept header.
+        // Kept async for API parity with the native client; in WASM this is synchronous.
         #[allow(clippy::unused_async)]
         pub async fn new_client_without_accept_header(
             endpoint: String,
