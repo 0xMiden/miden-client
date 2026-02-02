@@ -72,9 +72,9 @@ pub struct StateSync {
     /// Responsible for checking the relevance of notes and executing the
     /// [`OnNoteReceived`] callback when a new note inclusion is received.
     note_screener: Arc<dyn OnNoteReceived>,
-    /// The number of blocks that are considered old enough to discard pending transactions. If
-    /// `None`, there is no limit and transactions will be kept indefinitely.
-    tx_graceful_blocks: Option<u32>,
+    /// Number of blocks after which pending transactions are considered stale and discarded.
+    /// If `None`, there is no limit and transactions will be kept indefinitely.
+    tx_discard_delta: Option<u32>,
 }
 
 impl StateSync {
@@ -83,19 +83,14 @@ impl StateSync {
     /// # Arguments
     ///
     /// * `rpc_api` - The RPC client used to communicate with the node.
-    /// * `on_note_received` - A callback to be executed when a new note inclusion is received.
-    /// * `tx_graceful_blocks` - The number of blocks that are considered old enough to discard.
     /// * `note_screener` - The note screener used to check the relevance of notes.
+    /// * `tx_discard_delta` - Number of blocks after which pending transactions are discarded.
     pub fn new(
         rpc_api: Arc<dyn NodeRpcClient>,
         note_screener: Arc<dyn OnNoteReceived>,
-        tx_graceful_blocks: Option<u32>,
+        tx_discard_delta: Option<u32>,
     ) -> Self {
-        Self {
-            rpc_api,
-            note_screener,
-            tx_graceful_blocks,
-        }
+        Self { rpc_api, note_screener, tx_discard_delta }
     }
 
     /// Syncs the state of the client with the chain tip of the node, returning the updates that
@@ -466,7 +461,7 @@ impl StateSync {
         }
 
         transaction_updates
-            .apply_sync_height_update(new_block_header.block_num(), self.tx_graceful_blocks);
+            .apply_sync_height_update(new_block_header.block_num(), self.tx_discard_delta);
     }
 }
 
