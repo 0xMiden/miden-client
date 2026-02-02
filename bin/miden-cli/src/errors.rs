@@ -1,3 +1,6 @@
+// Suppress false positive from miette+thiserror proc-macro interaction.
+#![allow(unused_assignments)]
+
 use std::error::Error;
 
 use miden_client::account::{AccountId, AddressError};
@@ -34,11 +37,10 @@ pub enum CliError {
     #[error("asset error")]
     #[diagnostic(code(cli::asset_error))]
     Asset(#[source] AssetError),
-    #[error("client error: {error}")]
+    #[error("client error {error}")]
     #[diagnostic(code(cli::client_error))]
     Client {
         #[source]
-        #[allow(unused_assignments)]
         error: ClientError,
         #[help]
         help: Option<String>,

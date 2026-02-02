@@ -21,7 +21,7 @@ edition      = "2024"
 license      = "MIT"
 repository   = "https://github.com/0xMiden/miden-client"
 rust-version = "1.90"
-version      = "0.13.0"
+version      = "0.14.0"
 
 [profile.test-dev]
 inherits  = "dev"
@@ -29,22 +29,24 @@ opt-level = 1
 
 [workspace.dependencies]
 # Miden protocol dependencies
-miden-protocol  = { default-features = false, version = "0.13" }
-miden-standards = { default-features = false, version = "0.13" }
-miden-testing   = { default-features = false, version = "0.13" }
-miden-tx        = { default-features = false, version = "0.13" }
+miden-protocol  = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base" }
+miden-standards = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base" }
+miden-testing   = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base" }
+miden-tx        = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base" }
 
 # Miden node dependencies
-miden-node-block-producer        = { version = "0.13" }
-miden-node-ntx-builder           = { version = "0.13" }
-miden-node-proto-build           = { default-features = false, version = "0.13" }
-miden-node-rpc                   = { version = "0.13" }
-miden-node-store                 = { version = "0.13" }
-miden-node-utils                 = { version = "0.13" }
-miden-node-validator             = { version = "0.13" }
+miden-node-block-producer = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
+miden-node-ntx-builder = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
+miden-node-proto-build = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-node" }
+miden-node-rpc = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
+miden-node-store = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
+miden-node-utils = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
+miden-node-validator = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
 miden-note-transport-proto-build = { default-features = false, version = "0.2" }
-miden-remote-prover              = { features = ["concurrent"], version = "0.13" }
-miden-remote-prover-client       = { default-features = false, features = ["tx-prover"], version = "0.13" }
+miden-remote-prover = { branch = "next", features = ["concurrent"], git = "https://github.com/0xMiden/miden-node" }
+miden-remote-prover-client = { branch = "next", default-features = false, features = [
+  "tx-prover",
+], git = "https://github.com/0xMiden/miden-node" }
 
 # External dependencies
 anyhow      = { default-features = false, version = "1.0" }

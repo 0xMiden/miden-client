@@ -84,9 +84,9 @@ use miden_protocol::note::{
     Note,
     NoteAssets,
     NoteFile,
-    NoteInputs,
     NoteMetadata,
     NoteRecipient,
+    NoteStorage,
     NoteTag,
     NoteType,
 };
@@ -106,7 +106,7 @@ use miden_protocol::{EMPTY_WORD, Felt, ONE, Word};
 use miden_standards::account::faucets::BasicFungibleFaucet;
 use miden_standards::account::interface::AccountInterfaceError;
 use miden_standards::account::wallets::BasicWallet;
-use miden_standards::note::{NoteConsumptionStatus, WellKnownNote, utils};
+use miden_standards::note::{NoteConsumptionStatus, StandardNote, utils};
 use miden_standards::testing::mock_account::MockAccountExt;
 use miden_standards::testing::note::NoteBuilder;
 use miden_testing::{MockChain, MockChainBuilder, TxContextInput};
@@ -1879,8 +1879,8 @@ async fn missing_recipient_digest() {
 
     let dummy_recipient = NoteRecipient::new(
         Word::default(),
-        WellKnownNote::SWAP.script(),
-        NoteInputs::new(vec![]).unwrap(),
+        StandardNote::SWAP.script(),
+        NoteStorage::new(vec![]).unwrap(),
     );
 
     let dummy_recipient_digest = dummy_recipient.digest();
@@ -2401,7 +2401,7 @@ async fn consume_note_with_custom_script() {
     ";
     let note_script = client.code_builder().compile_note_script(custom_note_script).unwrap();
 
-    let note_inputs = NoteInputs::new(vec![]).unwrap();
+    let note_inputs = NoteStorage::new(vec![]).unwrap();
     let serial_num = client.rng().draw_word();
     let note_metadata =
         NoteMetadata::new(sender_id, NoteType::Private, NoteTag::with_account_target(receiver_id));

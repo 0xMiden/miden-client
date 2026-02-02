@@ -26,9 +26,9 @@ use miden_client::note::{
     NoteAssets,
     NoteAttachment,
     NoteExecutionHint,
-    NoteInputs,
     NoteMetadata,
     NoteRecipient,
+    NoteStorage,
     NoteTag,
     NoteType,
 };
@@ -314,7 +314,7 @@ fn get_network_note<T: Rng>(
             Felt::new(rng.random()),
         ]),
         script,
-        NoteInputs::new(vec![])?,
+        NoteStorage::new(vec![])?,
     );
 
     let network_note = Note::new(NoteAssets::new(vec![])?, metadata, recipient);

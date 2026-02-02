@@ -15,10 +15,10 @@ use miden_client::note::{
     NoteAssets,
     NoteDetails,
     NoteFile,
-    NoteInputs,
     NoteMetadata,
     NoteRecipient,
     NoteScript,
+    NoteStorage,
     NoteTag,
     NoteType,
     build_p2id_recipient,
@@ -238,7 +238,7 @@ fn create_pass_through_note(
 
     let target_recipient = build_p2id_recipient(target, rng.draw_word())?;
 
-    let inputs = NoteInputs::new(vec![
+    let inputs = NoteStorage::new(vec![
         asset_word[0],
         asset_word[1],
         asset_word[2],
