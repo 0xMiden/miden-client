@@ -1,7 +1,6 @@
 use alloc::boxed::Box;
 use alloc::string::{String, ToString};
 use core::error::Error;
-use core::fmt;
 use core::num::TryFromIntError;
 
 use miden_protocol::account::AccountId;
@@ -12,6 +11,9 @@ use miden_protocol::utils::DeserializationError;
 use thiserror::Error;
 
 use super::NodeRpcClientEndpoint;
+
+pub mod node;
+pub use node::NodeRpcError;
 
 // RPC ERROR
 // ================================================================================================
@@ -182,80 +184,5 @@ impl AcceptHeaderError {
             return Some(Self::ParsingError(message.to_string()));
         }
         None
-    }
-}
-
-// NODE RPC ERROR
-// ================================================================================================
-
-/// Application-level errors returned by the node in gRPC status details.
-///
-/// These typed errors allow programmatic handling of specific error conditions
-/// instead of parsing error messages.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum NodeRpcError {
-    SubmitProvenTransaction(SubmitProvenTransactionError),
-    // Future endpoints will add variants here
-}
-
-impl fmt::Display for NodeRpcError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            NodeRpcError::SubmitProvenTransaction(err) => write!(f, "{err}"),
-        }
-    }
-}
-
-// SUBMIT PROVEN TRANSACTION ERROR
-// ================================================================================================
-
-/// Application-level errors for the `SubmitProvenTransaction` endpoint.
-///
-/// These error codes match those defined in the node's `proto/types/errors.proto`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(u8)]
-pub enum SubmitProvenTransactionError {
-    Unspecified = 0,
-    InternalError = 1,
-    DeserializationFailed = 2,
-    InvalidTransactionProof = 3,
-    IncorrectAccountInitialCommitment = 4,
-    InputNotesAlreadyConsumed = 5,
-    UnauthenticatedNotesNotFound = 6,
-    OutputNotesAlreadyExist = 7,
-    TransactionExpired = 8,
-}
-
-impl From<u8> for SubmitProvenTransactionError {
-    fn from(code: u8) -> Self {
-        match code {
-            1 => Self::InternalError,
-            2 => Self::DeserializationFailed,
-            3 => Self::InvalidTransactionProof,
-            4 => Self::IncorrectAccountInitialCommitment,
-            5 => Self::InputNotesAlreadyConsumed,
-            6 => Self::UnauthenticatedNotesNotFound,
-            7 => Self::OutputNotesAlreadyExist,
-            8 => Self::TransactionExpired,
-            _ => Self::Unspecified,
-        }
-    }
-}
-
-impl fmt::Display for SubmitProvenTransactionError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Unspecified => write!(f, "unspecified error"),
-            Self::InternalError => write!(f, "internal server error"),
-            Self::DeserializationFailed => write!(f, "failed to deserialize transaction"),
-            Self::InvalidTransactionProof => write!(f, "invalid transaction proof"),
-            Self::IncorrectAccountInitialCommitment => {
-                write!(f, "incorrect account initial commitment")
-            },
-            Self::InputNotesAlreadyConsumed => write!(f, "input notes already consumed"),
-            Self::UnauthenticatedNotesNotFound => write!(f, "unauthenticated notes not found"),
-            Self::OutputNotesAlreadyExist => write!(f, "output notes already exist"),
-            Self::TransactionExpired => write!(f, "transaction expired"),
-        }
     }
 }
