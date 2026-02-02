@@ -447,11 +447,6 @@ where
             self.note_transport_api = Some(Arc::new(transport) as Arc<dyn NoteTransportClient>);
         }
 
-        // Initialize the note transport cursor if the client uses it
-        if self.note_transport_api.is_some() {
-            crate::note_transport::init_note_transport_cursor(store.clone()).await?;
-        }
-
         // Create source manager for MASM source information
         let source_manager: Arc<dyn SourceManagerSync> = Arc::new(DefaultSourceManager::default());
 
