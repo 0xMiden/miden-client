@@ -3,13 +3,7 @@
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
-use miden_protocol::account::{
-    AccountCode,
-    AccountHeader,
-    AccountId,
-    StorageMapWitness,
-    StorageSlotName,
-};
+use miden_protocol::account::{AccountHeader, AccountId, StorageMapWitness, StorageSlotName};
 use miden_protocol::address::Address;
 use miden_protocol::asset::{Asset, AssetVaultKey};
 use miden_protocol::{Felt, Word, ZERO};
@@ -113,17 +107,6 @@ impl AccountReader {
     pub async fn header(&self) -> Result<(AccountHeader, AccountStatus), ClientError> {
         self.store
             .get_account_header(self.account_id)
-            .await?
-            .ok_or(ClientError::AccountDataNotFound(self.account_id))
-    }
-
-    // ACCOUNT DATA ACCESS
-    // --------------------------------------------------------------------------------------------
-
-    /// Retrieves the account code.
-    pub async fn code(&self) -> Result<AccountCode, ClientError> {
-        self.store
-            .get_account_code(self.account_id)
             .await?
             .ok_or(ClientError::AccountDataNotFound(self.account_id))
     }

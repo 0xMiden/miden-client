@@ -9,7 +9,6 @@ use miden_client::account::{
 };
 use wasm_bindgen::prelude::*;
 
-use super::account_code::AccountCode;
 use super::account_header::AccountHeader;
 use super::account_id::AccountId;
 use super::address::Address;
@@ -128,15 +127,6 @@ impl AccountReader {
 
     // ACCOUNT DATA ACCESS
     // --------------------------------------------------------------------------------------------
-
-    /// Retrieves the account code.
-    pub async fn code(&self) -> Result<AccountCode, JsValue> {
-        self.0
-            .code()
-            .await
-            .map(Into::into)
-            .map_err(|err| js_error_with_context(err, "failed to get account code"))
-    }
 
     /// Retrieves the addresses associated with this account.
     pub async fn addresses(&self) -> Result<Vec<Address>, JsValue> {

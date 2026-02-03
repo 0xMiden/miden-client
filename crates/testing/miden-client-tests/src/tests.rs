@@ -316,7 +316,7 @@ async fn account_code() {
     assert_eq!(*account_code, reconstructed_code);
 
     client.add_account(&account, false).await.unwrap();
-    let retrieved_code = client.account_reader(account.id()).code().await.unwrap();
+    let retrieved_code = client.get_account_code(account.id()).await.unwrap().unwrap();
     assert_eq!(*account.code(), retrieved_code);
 }
 

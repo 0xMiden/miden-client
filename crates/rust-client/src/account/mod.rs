@@ -295,90 +295,6 @@ impl<AUTH> Client<AUTH> {
         Ok(())
     }
 
-    // ACCOUNT DATA RETRIEVAL
-    // --------------------------------------------------------------------------------------------
-
-    /// Retrieves the asset vault for a specific account.
-    ///
-    /// To check the balance for a single asset, use [`Client::account_reader`] instead.
-    pub async fn get_account_vault(
-        &self,
-        account_id: AccountId,
-    ) -> Result<AssetVault, ClientError> {
-        self.store.get_account_vault(account_id).await.map_err(ClientError::StoreError)
-    }
-
-    /// Retrieves the whole account storage for a specific account.
-    ///
-    /// To only load a specific slot, use [`Client::account_reader`] instead.
-    pub async fn get_account_storage(
-        &self,
-        account_id: AccountId,
-    ) -> Result<AccountStorage, ClientError> {
-        self.store
-            .get_account_storage(account_id, AccountStorageFilter::All)
-            .await
-            .map_err(ClientError::StoreError)
-    }
-
-    /// Returns a list of [`AccountHeader`] of all accounts stored in the database along with their
-    /// statuses.
-    ///
-    /// Said accounts' state is the state after the last performed sync.
-    pub async fn get_account_headers(
-        &self,
-    ) -> Result<Vec<(AccountHeader, AccountStatus)>, ClientError> {
-        self.store.get_account_headers().await.map_err(Into::into)
-    }
-
-    /// Adds a list of public key commitments associated with the given account ID.
-    ///
-    /// Commitments are stored as a `BTreeSet`, so duplicates are ignored. If the account already
-    /// has known commitments, the new ones are merged into the existing set.
-    ///
-    /// This is useful because with a public key commitment, we can retrieve its corresponding
-    /// secret key using, for example,
-    /// [`FilesystemKeyStore::get_key`](crate::keystore::FilesystemKeyStore::get_key). This yields
-    /// an indirect mapping from account ID to its secret keys: account ID -> public key commitments
-    /// -> secret keys (via keystore).
-    ///
-    /// To identify these keys and avoid collisions, the account ID is turned into its hex
-    /// representation and a suffix is added. If the resulting set is empty, any existing settings
-    /// entry is removed.
-    pub async fn register_account_public_key_commitments(
-        &self,
-        account_id: &AccountId,
-        pub_keys: &[PublicKey],
-    ) -> Result<(), ClientError> {
-        let setting_key =
-            format!("{}{}", account_id.to_hex(), PUBLIC_KEY_COMMITMENT_SETTING_SUFFIX);
-        // Store commitments as Words because PublicKeyCommitment doesn't implement
-        // (De)Serializable.
-        let (had_setting, mut commitments): (bool, BTreeSet<Word>) =
-            match self.store.get_setting(setting_key.clone()).await? {
-                Some(known) => {
-                    let known: BTreeSet<Word> = Deserializable::read_from_bytes(&known)
-                        .map_err(ClientError::DataDeserializationError)?;
-                    (true, known)
-                },
-                None => (false, BTreeSet::new()),
-            };
-
-        commitments.extend(pub_keys.iter().map(|pk| Word::from(pk.to_commitment())));
-
-        if commitments.is_empty() {
-            if had_setting {
-                self.store.remove_setting(setting_key).await.map_err(ClientError::StoreError)?;
-            }
-            return Ok(());
-        }
-
-        self.store
-            .set_setting(setting_key, Serializable::to_bytes(&commitments))
-            .await
-            .map_err(ClientError::StoreError)
-    }
-
     /// Removes a list of public key commitments associated with the given account ID.
     ///
     /// Commitments are stored as a `BTreeSet`, so duplicates in `pub_key_commitments` are ignored
@@ -454,8 +370,99 @@ impl<AUTH> Client<AUTH> {
         }
     }
 
-    // ACCOUNT ACCESS
+    /// Adds a list of public key commitments associated with the given account ID.
+    ///
+    /// Commitments are stored as a `BTreeSet`, so duplicates are ignored. If the account already
+    /// has known commitments, the new ones are merged into the existing set.
+    ///
+    /// This is useful because with a public key commitment, we can retrieve its corresponding
+    /// secret key using, for example,
+    /// [`FilesystemKeyStore::get_key`](crate::keystore::FilesystemKeyStore::get_key). This yields
+    /// an indirect mapping from account ID to its secret keys: account ID -> public key commitments
+    /// -> secret keys (via keystore).
+    ///
+    /// To identify these keys and avoid collisions, the account ID is turned into its hex
+    /// representation and a suffix is added. If the resulting set is empty, any existing settings
+    /// entry is removed.
+    pub async fn register_account_public_key_commitments(
+        &self,
+        account_id: &AccountId,
+        pub_keys: &[PublicKey],
+    ) -> Result<(), ClientError> {
+        let setting_key =
+            format!("{}{}", account_id.to_hex(), PUBLIC_KEY_COMMITMENT_SETTING_SUFFIX);
+        // Store commitments as Words because PublicKeyCommitment doesn't implement
+        // (De)Serializable.
+        let (had_setting, mut commitments): (bool, BTreeSet<Word>) =
+            match self.store.get_setting(setting_key.clone()).await? {
+                Some(known) => {
+                    let known: BTreeSet<Word> = Deserializable::read_from_bytes(&known)
+                        .map_err(ClientError::DataDeserializationError)?;
+                    (true, known)
+                },
+                None => (false, BTreeSet::new()),
+            };
+
+        commitments.extend(pub_keys.iter().map(|pk| Word::from(pk.to_commitment())));
+
+        if commitments.is_empty() {
+            if had_setting {
+                self.store.remove_setting(setting_key).await.map_err(ClientError::StoreError)?;
+            }
+            return Ok(());
+        }
+
+        self.store
+            .set_setting(setting_key, Serializable::to_bytes(&commitments))
+            .await
+            .map_err(ClientError::StoreError)
+    }
+
+    // ACCOUNT DATA RETRIEVAL
     // --------------------------------------------------------------------------------------------
+
+    /// Retrieves the asset vault for a specific account.
+    ///
+    /// To check the balance for a single asset, use [`Client::account_reader`] instead.
+    pub async fn get_account_vault(
+        &self,
+        account_id: AccountId,
+    ) -> Result<AssetVault, ClientError> {
+        self.store.get_account_vault(account_id).await.map_err(ClientError::StoreError)
+    }
+
+    /// Retrieves the whole account storage for a specific account.
+    ///
+    /// To only load a specific slot, use [`Client::account_reader`] instead.
+    pub async fn get_account_storage(
+        &self,
+        account_id: AccountId,
+    ) -> Result<AccountStorage, ClientError> {
+        self.store
+            .get_account_storage(account_id, AccountStorageFilter::All)
+            .await
+            .map_err(ClientError::StoreError)
+    }
+
+    /// Retrieves the account code for a specific account.
+    ///
+    /// Returns `None` if the account is not found.
+    pub async fn get_account_code(
+        &self,
+        account_id: AccountId,
+    ) -> Result<Option<AccountCode>, ClientError> {
+        self.store.get_account_code(account_id).await.map_err(ClientError::StoreError)
+    }
+
+    /// Returns a list of [`AccountHeader`] of all accounts stored in the database along with their
+    /// statuses.
+    ///
+    /// Said accounts' state is the state after the last performed sync.
+    pub async fn get_account_headers(
+        &self,
+    ) -> Result<Vec<(AccountHeader, AccountStatus)>, ClientError> {
+        self.store.get_account_headers().await.map_err(Into::into)
+    }
 
     /// Retrieves the full [`Account`] object from the store, returning `None` if not found.
     ///

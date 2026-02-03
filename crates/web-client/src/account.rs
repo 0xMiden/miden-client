@@ -2,10 +2,13 @@ use miden_client::Word as NativeWord;
 use wasm_bindgen::prelude::*;
 
 use crate::models::account::Account;
+use crate::models::account_code::AccountCode;
 use crate::models::account_header::AccountHeader;
 use crate::models::account_id::AccountId;
 use crate::models::account_reader::AccountReader;
+use crate::models::account_storage::AccountStorage;
 use crate::models::address::Address;
+use crate::models::asset_vault::AssetVault;
 use crate::models::auth_secret_key::AuthSecretKey;
 use crate::models::word::Word;
 use crate::{WebClient, js_error_with_context};
@@ -40,6 +43,63 @@ impl WebClient {
                 .await
                 .map(|opt| opt.map(Into::into))
                 .map_err(|err| js_error_with_context(err, "failed to get account"))
+        } else {
+            Err(JsValue::from_str("Client not initialized"))
+        }
+    }
+
+    /// Retrieves the asset vault for a specific account.
+    ///
+    /// To check the balance for a single asset, use `accountReader` instead.
+    #[wasm_bindgen(js_name = "getAccountVault")]
+    pub async fn get_account_vault(
+        &mut self,
+        account_id: &AccountId,
+    ) -> Result<AssetVault, JsValue> {
+        if let Some(client) = self.get_mut_inner() {
+            client
+                .get_account_vault(account_id.into())
+                .await
+                .map(Into::into)
+                .map_err(|err| js_error_with_context(err, "failed to get account vault"))
+        } else {
+            Err(JsValue::from_str("Client not initialized"))
+        }
+    }
+
+    /// Retrieves the storage for a specific account.
+    ///
+    /// To only load a specific slot, use `accountReader` instead.
+    #[wasm_bindgen(js_name = "getAccountStorage")]
+    pub async fn get_account_storage(
+        &mut self,
+        account_id: &AccountId,
+    ) -> Result<AccountStorage, JsValue> {
+        if let Some(client) = self.get_mut_inner() {
+            client
+                .get_account_storage(account_id.into())
+                .await
+                .map(Into::into)
+                .map_err(|err| js_error_with_context(err, "failed to get account storage"))
+        } else {
+            Err(JsValue::from_str("Client not initialized"))
+        }
+    }
+
+    /// Retrieves the account code for a specific account.
+    ///
+    /// Returns `null` if the account is not found.
+    #[wasm_bindgen(js_name = "getAccountCode")]
+    pub async fn get_account_code(
+        &mut self,
+        account_id: &AccountId,
+    ) -> Result<Option<AccountCode>, JsValue> {
+        if let Some(client) = self.get_mut_inner() {
+            client
+                .get_account_code(account_id.into())
+                .await
+                .map(|opt| opt.map(Into::into))
+                .map_err(|err| js_error_with_context(err, "failed to get account code"))
         } else {
             Err(JsValue::from_str("Client not initialized"))
         }

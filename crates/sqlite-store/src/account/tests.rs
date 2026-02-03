@@ -500,36 +500,6 @@ async fn account_reader_nonce_and_status() -> anyhow::Result<()> {
 }
 
 #[tokio::test]
-async fn account_reader_code_access() -> anyhow::Result<()> {
-    use std::sync::Arc;
-
-    use miden_client::account::AccountReader;
-
-    let store = Arc::new(create_test_store().await);
-
-    let dummy_component =
-        AccountComponent::new(basic_wallet_library(), vec![])?.with_supports_all_types();
-
-    let account = AccountBuilder::new([0; 32])
-        .account_type(AccountType::RegularAccountImmutableCode)
-        .with_auth_component(AuthFalcon512Rpo::new(PublicKeyCommitment::from(EMPTY_WORD)))
-        .with_component(dummy_component)
-        .build_existing()?;
-
-    let default_address = Address::new(account.id());
-    store.insert_account(&account, default_address).await?;
-
-    // Create an AccountReader
-    let reader = AccountReader::new(store.clone(), account.id());
-
-    // Test code access
-    let code = reader.code().await?;
-    assert_eq!(code.commitment(), account.code().commitment());
-
-    Ok(())
-}
-
-#[tokio::test]
 async fn account_reader_not_found_error() -> anyhow::Result<()> {
     use std::sync::Arc;
 
@@ -545,11 +515,6 @@ async fn account_reader_not_found_error() -> anyhow::Result<()> {
 
     // Test that header-based methods return AccountDataNotFound error
     let result = reader.nonce().await;
-    assert!(result.is_err());
-    assert!(matches!(result.unwrap_err(), miden_client::ClientError::AccountDataNotFound(_)));
-
-    // Test that code() returns AccountDataNotFound error
-    let result = reader.code().await;
     assert!(result.is_err());
     assert!(matches!(result.unwrap_err(), miden_client::ClientError::AccountDataNotFound(_)));
 
