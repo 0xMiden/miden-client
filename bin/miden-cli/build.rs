@@ -3,15 +3,28 @@ use std::sync::Arc;
 use std::{env, fs};
 
 use miden_client::account::component::{
-    AccountComponentMetadata, MIDEN_PACKAGE_EXTENSION, basic_fungible_faucet_library,
-    basic_wallet_library, ecdsa_k256_keccak_library, falcon_512_rpo_acl_library,
-    falcon_512_rpo_library, falcon_512_rpo_multisig_library, no_auth_library,
+    AccountComponentMetadata,
+    MIDEN_PACKAGE_EXTENSION,
+    basic_fungible_faucet_library,
+    basic_wallet_library,
+    ecdsa_k256_keccak_library,
+    falcon_512_rpo_acl_library,
+    falcon_512_rpo_library,
+    falcon_512_rpo_multisig_library,
+    no_auth_library,
 };
 use miden_client::assembly::Library;
 use miden_client::utils::Serializable;
 use miden_client::vm::{
-    MastArtifact, Package, PackageExport, PackageKind, PackageManifest, ProcedureExport,
-    QualifiedProcedureName, Section, SectionId,
+    MastArtifact,
+    Package,
+    PackageExport,
+    PackageKind,
+    PackageManifest,
+    ProcedureExport,
+    QualifiedProcedureName,
+    Section,
+    SectionId,
 };
 
 const PACKAGE_DIR: &str = "packages";

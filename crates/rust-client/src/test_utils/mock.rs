@@ -17,8 +17,15 @@ use miden_tx::utils::sync::RwLock;
 
 use crate::Client;
 use crate::rpc::domain::account::{
-    AccountDetails, AccountProof, AccountStorageDetails, AccountStorageMapDetails,
-    AccountUpdateSummary, AccountVaultDetails, FetchedAccount, StorageMapEntries, StorageMapEntry,
+    AccountDetails,
+    AccountProof,
+    AccountStorageDetails,
+    AccountStorageMapDetails,
+    AccountUpdateSummary,
+    AccountVaultDetails,
+    FetchedAccount,
+    StorageMapEntries,
+    StorageMapEntry,
 };
 use crate::rpc::domain::account_vault::{AccountVaultInfo, AccountVaultUpdate};
 use crate::rpc::domain::note::{CommittedNote, FetchedNote, NoteSyncInfo};

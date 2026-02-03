@@ -1,6 +1,8 @@
 use idxdb_store::account::JsStorageMapEntry;
 use miden_client::account::{
-    AccountStorage as NativeAccountStorage, StorageSlotContent, StorageSlotName,
+    AccountStorage as NativeAccountStorage,
+    StorageSlotContent,
+    StorageSlotName,
 };
 use wasm_bindgen::prelude::*;
 

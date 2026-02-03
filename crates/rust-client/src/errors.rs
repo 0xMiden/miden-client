@@ -7,7 +7,10 @@ use miden_protocol::account::AccountId;
 use miden_protocol::crypto::merkle::MerkleError;
 pub use miden_protocol::errors::{AccountError, AccountIdError, AssetError, NetworkIdError};
 use miden_protocol::errors::{
-    NoteError, PartialBlockchainError, TransactionInputError, TransactionScriptError,
+    NoteError,
+    PartialBlockchainError,
+    TransactionInputError,
+    TransactionScriptError,
 };
 use miden_protocol::note::{NoteId, NoteTag};
 use miden_standards::account::interface::AccountInterfaceError;

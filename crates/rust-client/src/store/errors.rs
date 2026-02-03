@@ -7,8 +7,14 @@ use miden_protocol::crypto::merkle::MerkleError;
 use miden_protocol::crypto::merkle::mmr::MmrError;
 use miden_protocol::crypto::merkle::smt::SmtProofError;
 use miden_protocol::errors::{
-    AccountError, AccountIdError, AddressError, AssetError, AssetVaultError, NoteError,
-    StorageMapError, TransactionScriptError,
+    AccountError,
+    AccountIdError,
+    AddressError,
+    AssetError,
+    AssetVaultError,
+    NoteError,
+    StorageMapError,
+    TransactionScriptError,
 };
 use miden_protocol::utils::{DeserializationError, HexParseError};
 use miden_protocol::{Word, WordError};

@@ -1,12 +1,15 @@
 use miden_client::Word as NativeWord;
 use miden_client::account::component::AccountComponent as NativeAccountComponent;
 use miden_client::account::{
-    AccountComponentCode as NativeAccountComponentCode, StorageSlot as NativeStorageSlot,
+    AccountComponentCode as NativeAccountComponentCode,
+    StorageSlot as NativeStorageSlot,
 };
 use miden_client::assembly::{Library as NativeLibrary, MastNodeExt};
 use miden_client::auth::{
-    AuthEcdsaK256Keccak as NativeEcdsaK256Keccak, AuthFalcon512Rpo as NativeFalcon512Rpo,
-    AuthSecretKey as NativeSecretKey, PublicKeyCommitment,
+    AuthEcdsaK256Keccak as NativeEcdsaK256Keccak,
+    AuthFalcon512Rpo as NativeFalcon512Rpo,
+    AuthSecretKey as NativeSecretKey,
+    PublicKeyCommitment,
 };
 use miden_client::vm::Package as NativePackage;
 use wasm_bindgen::prelude::*;

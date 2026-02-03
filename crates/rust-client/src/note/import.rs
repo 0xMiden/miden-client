@@ -14,7 +14,13 @@ use alloc::vec::Vec;
 
 use miden_protocol::block::BlockNumber;
 use miden_protocol::note::{
-    Note, NoteDetails, NoteFile, NoteId, NoteInclusionProof, NoteMetadata, NoteTag,
+    Note,
+    NoteDetails,
+    NoteFile,
+    NoteId,
+    NoteInclusionProof,
+    NoteMetadata,
+    NoteTag,
 };
 use miden_tx::auth::TransactionAuthenticator;
 

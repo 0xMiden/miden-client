@@ -31,7 +31,10 @@ use crate::rpc::RpcError;
 use crate::store::{NoteFilter, TransactionFilter};
 use crate::sync::SyncSummary;
 use crate::transaction::{
-    NoteArgs, TransactionRequest, TransactionRequestBuilder, TransactionRequestError,
+    NoteArgs,
+    TransactionRequest,
+    TransactionRequestBuilder,
+    TransactionRequestError,
     TransactionStatus,
 };
 use crate::{Client, ClientError};

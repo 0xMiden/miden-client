@@ -16,7 +16,10 @@ mod transaction;
 pub use block::{GetBlockByNumberError, GetBlockHeaderError};
 pub use note::{CheckNullifiersError, GetNoteScriptByRootError, GetNotesByIdError};
 pub use sync::{
-    NoteSyncError, SyncAccountStorageMapsError, SyncAccountVaultError, SyncNullifiersError,
+    NoteSyncError,
+    SyncAccountStorageMapsError,
+    SyncAccountVaultError,
+    SyncNullifiersError,
     SyncTransactionsError,
 };
 pub use transaction::AddTransactionError;

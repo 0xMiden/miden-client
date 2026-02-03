@@ -2,8 +2,11 @@ use miden_client::ClientError;
 use miden_client::asset::FungibleAsset;
 use miden_client::note::{BlockNumber, Note as NativeNote};
 use miden_client::transaction::{
-    PaymentNoteDescription, ProvenTransaction as NativeProvenTransaction, SwapTransactionData,
-    TransactionExecutorError, TransactionRequest as NativeTransactionRequest,
+    PaymentNoteDescription,
+    ProvenTransaction as NativeProvenTransaction,
+    SwapTransactionData,
+    TransactionExecutorError,
+    TransactionRequest as NativeTransactionRequest,
     TransactionRequestBuilder as NativeTransactionRequestBuilder,
     TransactionStoreUpdate as NativeTransactionStoreUpdate,
     TransactionSummary as NativeTransactionSummary,

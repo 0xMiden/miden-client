@@ -4,7 +4,12 @@ use miden_protocol::account::AccountDelta;
 use miden_protocol::block::BlockNumber;
 use miden_protocol::note::{NoteDetails, NoteTag};
 use miden_protocol::transaction::{
-    ExecutedTransaction, InputNote, InputNotes, OutputNotes, TransactionArgs, TransactionId,
+    ExecutedTransaction,
+    InputNote,
+    InputNotes,
+    OutputNotes,
+    TransactionArgs,
+    TransactionId,
     TransactionInputs,
 };
 use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};

@@ -4,18 +4,40 @@ use std::vec;
 use anyhow::{Context, Result, anyhow};
 use miden_client::account::component::AccountComponent;
 use miden_client::account::{
-    Account, AccountBuilder, AccountId, AccountStorageMode, StorageSlot, StorageSlotName,
+    Account,
+    AccountBuilder,
+    AccountId,
+    AccountStorageMode,
+    StorageSlot,
+    StorageSlotName,
 };
 use miden_client::assembly::{
-    CodeBuilder, DefaultSourceManager, Library, Module, ModuleKind, Path,
+    CodeBuilder,
+    DefaultSourceManager,
+    Library,
+    Module,
+    ModuleKind,
+    Path,
 };
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
 use miden_client::note::{
-    NetworkAccountTarget, Note, NoteAssets, NoteAttachment, NoteExecutionHint, NoteInputs,
-    NoteMetadata, NoteRecipient, NoteTag, NoteType,
+    NetworkAccountTarget,
+    Note,
+    NoteAssets,
+    NoteAttachment,
+    NoteExecutionHint,
+    NoteInputs,
+    NoteMetadata,
+    NoteRecipient,
+    NoteTag,
+    NoteType,
 };
 use miden_client::testing::common::{
-    TestClient, execute_tx_and_sync, insert_new_wallet, wait_for_blocks, wait_for_tx,
+    TestClient,
+    execute_tx_and_sync,
+    insert_new_wallet,
+    wait_for_blocks,
+    wait_for_tx,
 };
 use miden_client::transaction::{OutputNote, TransactionKernel, TransactionRequestBuilder};
 use miden_client::{Felt, Word, ZERO};

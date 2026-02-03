@@ -3,10 +3,20 @@ use std::time::Duration;
 
 use anyhow::{Context, Result};
 use miden_client::account::{
-    Account, AccountId, AccountStorageMode, StorageMap, StorageSlot, StorageSlotName,
+    Account,
+    AccountId,
+    AccountStorageMode,
+    StorageMap,
+    StorageSlot,
+    StorageSlotName,
 };
 use miden_client::assembly::{
-    CodeBuilder, DefaultSourceManager, MastForest, Module, ModuleKind, Path,
+    CodeBuilder,
+    DefaultSourceManager,
+    MastForest,
+    Module,
+    ModuleKind,
+    Path,
 };
 use miden_client::asset::{Asset, FungibleAsset};
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
@@ -15,12 +25,23 @@ use miden_client::keystore::FilesystemKeyStore;
 use miden_client::note::{NoteFile, NoteScript, NoteType};
 use miden_client::rpc::domain::account::FetchedAccount;
 use miden_client::store::{
-    InputNoteRecord, InputNoteState, NoteFilter, OutputNoteState, TransactionFilter,
+    InputNoteRecord,
+    InputNoteState,
+    NoteFilter,
+    OutputNoteState,
+    TransactionFilter,
 };
 use miden_client::testing::common::*;
 use miden_client::transaction::{
-    DiscardCause, PaymentNoteDescription, ProvenTransaction, TransactionInputs, TransactionKernel,
-    TransactionProver, TransactionProverError, TransactionRequestBuilder, TransactionStatus,
+    DiscardCause,
+    PaymentNoteDescription,
+    ProvenTransaction,
+    TransactionInputs,
+    TransactionKernel,
+    TransactionProver,
+    TransactionProverError,
+    TransactionRequestBuilder,
+    TransactionStatus,
 };
 use miden_client::{ClientError, Deserializable, Felt, Serializable};
 use miden_client_sqlite_store::ClientBuilderSqliteExt;

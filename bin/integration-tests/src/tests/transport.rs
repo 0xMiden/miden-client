@@ -10,8 +10,13 @@ use miden_client::note_transport::NOTE_TRANSPORT_DEFAULT_ENDPOINT;
 use miden_client::note_transport::grpc::GrpcNoteTransportClient;
 use miden_client::store::NoteFilter;
 use miden_client::testing::common::{
-    FilesystemKeyStore, TestClient, execute_tx_and_sync, insert_new_fungible_faucet,
-    insert_new_wallet, wait_for_blocks, wait_for_node,
+    FilesystemKeyStore,
+    TestClient,
+    execute_tx_and_sync,
+    insert_new_fungible_faucet,
+    insert_new_wallet,
+    wait_for_blocks,
+    wait_for_node,
 };
 use miden_client::transaction::TransactionRequestBuilder;
 

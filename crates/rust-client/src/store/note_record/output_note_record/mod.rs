@@ -4,8 +4,16 @@ use core::fmt::{self, Display};
 use miden_protocol::Word;
 use miden_protocol::block::BlockNumber;
 use miden_protocol::note::{
-    Note, NoteAssets, NoteDetails, NoteFile, NoteId, NoteInclusionProof, NoteMetadata,
-    NoteRecipient, Nullifier, PartialNote,
+    Note,
+    NoteAssets,
+    NoteDetails,
+    NoteFile,
+    NoteId,
+    NoteInclusionProof,
+    NoteMetadata,
+    NoteRecipient,
+    Nullifier,
+    PartialNote,
 };
 use miden_protocol::transaction::OutputNote;
 use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};

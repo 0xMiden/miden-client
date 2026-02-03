@@ -16,15 +16,29 @@ use base64::Engine;
 use base64::engine::general_purpose;
 use miden_client::Word;
 use miden_client::account::{
-    Account, AccountCode, AccountHeader, AccountId, AccountStorage, Address,
+    Account,
+    AccountCode,
+    AccountHeader,
+    AccountId,
+    AccountStorage,
+    Address,
 };
 use miden_client::asset::AssetVault;
 use miden_client::block::BlockHeader;
 use miden_client::crypto::{InOrderIndex, MmrPeaks};
 use miden_client::note::{BlockNumber, NoteScript, Nullifier};
 use miden_client::store::{
-    AccountRecord, AccountStatus, AccountStorageFilter, BlockRelevance, InputNoteRecord,
-    NoteFilter, OutputNoteRecord, PartialBlockchainFilter, Store, StoreError, TransactionFilter,
+    AccountRecord,
+    AccountStatus,
+    AccountStorageFilter,
+    BlockRelevance,
+    InputNoteRecord,
+    NoteFilter,
+    OutputNoteRecord,
+    PartialBlockchainFilter,
+    Store,
+    StoreError,
+    TransactionFilter,
 };
 use miden_client::sync::{NoteTagRecord, StateSyncUpdate};
 use miden_client::transaction::{TransactionRecord, TransactionStoreUpdate};

@@ -3,7 +3,10 @@ use miden_client::account::component::BasicFungibleFaucet;
 use miden_client::account::{AccountBuilder, AccountComponent, AccountType};
 use miden_client::asset::TokenSymbol;
 use miden_client::auth::{
-    AuthEcdsaK256Keccak, AuthFalcon512Rpo, AuthSchemeId as NativeAuthScheme, AuthSecretKey,
+    AuthEcdsaK256Keccak,
+    AuthFalcon512Rpo,
+    AuthSchemeId as NativeAuthScheme,
+    AuthSecretKey,
 };
 use rand::rngs::StdRng;
 use rand::{RngCore, SeedableRng};

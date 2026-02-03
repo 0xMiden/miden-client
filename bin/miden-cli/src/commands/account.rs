@@ -1,7 +1,11 @@
 use clap::Parser;
 use comfy_table::{Cell, ContentArrangement, presets};
 use miden_client::account::{
-    Account, AccountId, AccountInterfaceExt, AccountType, StorageSlotContent,
+    Account,
+    AccountId,
+    AccountInterfaceExt,
+    AccountType,
+    StorageSlotContent,
 };
 use miden_client::address::{Address, AddressInterface, RoutingParameters};
 use miden_client::asset::Asset;

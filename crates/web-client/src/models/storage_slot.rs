@@ -1,5 +1,6 @@
 use miden_client::account::{
-    StorageSlot as NativeStorageSlot, StorageSlotName as NativeStorageSlotName,
+    StorageSlot as NativeStorageSlot,
+    StorageSlotName as NativeStorageSlotName,
 };
 use wasm_bindgen::prelude::*;
 
