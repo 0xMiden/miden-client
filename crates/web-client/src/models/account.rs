@@ -1,8 +1,6 @@
 use miden_client::Word as NativeWord;
 use miden_client::account::{
-    Account as NativeAccount,
-    AccountInterfaceExt,
-    AccountType as NativeAccountType,
+    Account as NativeAccount, AccountInterfaceExt, AccountType as NativeAccountType,
 };
 use miden_client::transaction::AccountInterface;
 use wasm_bindgen::prelude::*;

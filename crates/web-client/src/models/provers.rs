@@ -3,9 +3,7 @@ use core::time::Duration;
 
 use miden_client::RemoteTransactionProver;
 use miden_client::transaction::{
-    LocalTransactionProver,
-    ProvingOptions,
-    TransactionProver as TransactionProverTrait,
+    LocalTransactionProver, ProvingOptions, TransactionProver as TransactionProverTrait,
 };
 use wasm_bindgen::prelude::*;
 

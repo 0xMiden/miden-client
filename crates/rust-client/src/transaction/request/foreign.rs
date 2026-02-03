@@ -4,11 +4,7 @@ use alloc::vec::Vec;
 use core::cmp::Ordering;
 
 use miden_protocol::account::{
-    AccountId,
-    PartialAccount,
-    PartialStorage,
-    PartialStorageMap,
-    StorageMap,
+    AccountId, PartialAccount, PartialStorage, PartialStorageMap, StorageMap,
 };
 use miden_protocol::asset::{AssetVault, PartialVault};
 use miden_protocol::transaction::AccountInputs;
@@ -16,10 +12,7 @@ use miden_tx::utils::{Deserializable, DeserializationError, Serializable};
 
 use super::TransactionRequestError;
 use crate::rpc::domain::account::{
-    AccountDetails,
-    AccountProof,
-    AccountStorageRequirements,
-    StorageMapEntries,
+    AccountDetails, AccountProof, AccountStorageRequirements, StorageMapEntries,
 };
 
 // FOREIGN ACCOUNT

@@ -4,34 +4,19 @@ use std::vec::Vec;
 use anyhow::Context;
 use miden_client::account::component::{AccountComponent, basic_wallet_library};
 use miden_client::account::{
-    Account,
-    AccountBuilder,
-    AccountCode,
-    AccountDelta,
-    AccountHeader,
-    AccountId,
-    AccountType,
-    Address,
-    StorageMap,
-    StorageSlot,
-    StorageSlotContent,
-    StorageSlotName,
+    Account, AccountBuilder, AccountCode, AccountDelta, AccountHeader, AccountId, AccountType,
+    Address, StorageMap, StorageSlot, StorageSlotContent, StorageSlotName,
 };
 use miden_client::assembly::CodeBuilder;
 use miden_client::asset::{
-    AccountStorageDelta,
-    AccountVaultDelta,
-    Asset,
-    FungibleAsset,
-    NonFungibleAsset,
+    AccountStorageDelta, AccountVaultDelta, Asset, FungibleAsset, NonFungibleAsset,
     NonFungibleAssetDetails,
 };
 use miden_client::auth::{AuthFalcon512Rpo, PublicKeyCommitment};
 use miden_client::store::Store;
 use miden_client::{EMPTY_WORD, ONE, ZERO};
 use miden_protocol::testing::account_id::{
-    ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
-    ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET,
+    ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET, ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET,
 };
 use miden_protocol::testing::constants::NON_FUNGIBLE_ASSET_DATA;
 

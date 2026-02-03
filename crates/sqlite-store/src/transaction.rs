@@ -9,11 +9,7 @@ use miden_client::Word;
 use miden_client::note::ToInputNoteCommitments;
 use miden_client::store::{StoreError, TransactionFilter};
 use miden_client::transaction::{
-    TransactionDetails,
-    TransactionId,
-    TransactionRecord,
-    TransactionScript,
-    TransactionStatus,
+    TransactionDetails, TransactionId, TransactionRecord, TransactionScript, TransactionStatus,
     TransactionStoreUpdate,
 };
 use miden_client::utils::{Deserializable as _, Serializable as _};

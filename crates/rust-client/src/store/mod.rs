@@ -28,15 +28,8 @@ use core::fmt::Debug;
 
 use miden_protocol::Word;
 use miden_protocol::account::{
-    Account,
-    AccountCode,
-    AccountHeader,
-    AccountId,
-    AccountStorage,
-    StorageMapWitness,
-    StorageSlot,
-    StorageSlotContent,
-    StorageSlotName,
+    Account, AccountCode, AccountHeader, AccountId, AccountStorage, StorageMapWitness, StorageSlot,
+    StorageSlotContent, StorageSlotName,
 };
 use miden_protocol::address::Address;
 use miden_protocol::asset::{Asset, AssetVault, AssetVaultKey, AssetWitness};
@@ -65,13 +58,8 @@ mod account;
 pub use account::{AccountRecord, AccountRecordData, AccountStatus, AccountUpdates};
 mod note_record;
 pub use note_record::{
-    InputNoteRecord,
-    InputNoteState,
-    NoteExportType,
-    NoteRecordError,
-    OutputNoteRecord,
-    OutputNoteState,
-    input_note_states,
+    InputNoteRecord, InputNoteState, NoteExportType, NoteRecordError, OutputNoteRecord,
+    OutputNoteState, input_note_states,
 };
 
 // STORE TRAIT

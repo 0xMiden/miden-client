@@ -13,23 +13,12 @@ use miden_client::auth::RPO_FALCON_SCHEME_ID;
 use miden_client::builder::ClientBuilder;
 use miden_client::crypto::{FeltRng, RpoRandomCoin};
 use miden_client::note::{
-    Note,
-    NoteAssets,
-    NoteFile,
-    NoteId,
-    NoteInputs,
-    NoteMetadata,
-    NoteRecipient,
-    NoteTag,
-    NoteType,
+    Note, NoteAssets, NoteFile, NoteId, NoteInputs, NoteMetadata, NoteRecipient, NoteTag, NoteType,
 };
 use miden_client::rpc::Endpoint;
 use miden_client::testing::account_id::ACCOUNT_ID_PRIVATE_SENDER;
 use miden_client::testing::common::{
-    ACCOUNT_ID_REGULAR,
-    FilesystemKeyStore,
-    create_test_store_path,
-    execute_tx_and_sync,
+    ACCOUNT_ID_REGULAR, FilesystemKeyStore, create_test_store_path, execute_tx_and_sync,
     insert_new_wallet,
 };
 use miden_client::transaction::{OutputNote, TransactionRequestBuilder};

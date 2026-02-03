@@ -5,9 +5,7 @@ use miden_client::account::AccountId as NativeAccountId;
 use miden_client::assembly::Assembler as NativeAssembler;
 use miden_client::testing::account_id::ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE;
 use miden_client::vm::{
-    MastArtifact as NativeMastArtifact,
-    Package as NativePackage,
-    PackageKind as NativePackageKind,
+    MastArtifact as NativeMastArtifact, Package as NativePackage, PackageKind as NativePackageKind,
     PackageManifest as NativePackageManifest,
 };
 use wasm_bindgen::prelude::*;

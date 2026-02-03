@@ -5,16 +5,8 @@ use core::fmt::{self, Debug, Display, Formatter};
 
 use miden_protocol::Word;
 use miden_protocol::account::{
-    Account,
-    AccountCode,
-    AccountHeader,
-    AccountId,
-    AccountStorageHeader,
-    StorageMap,
-    StorageMapWitness,
-    StorageSlotHeader,
-    StorageSlotName,
-    StorageSlotType,
+    Account, AccountCode, AccountHeader, AccountId, AccountStorageHeader, StorageMap,
+    StorageMapWitness, StorageSlotHeader, StorageSlotName, StorageSlotType,
 };
 use miden_protocol::asset::Asset;
 use miden_protocol::block::BlockNumber;

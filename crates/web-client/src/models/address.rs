@@ -1,11 +1,8 @@
 use js_sys::Uint8Array;
 use miden_client::account::AccountId as NativeAccountId;
 use miden_client::address::{
-    Address as NativeAddress,
-    AddressId,
-    AddressInterface as NativeAddressInterface,
-    NetworkId as NativeNetworkId,
-    RoutingParameters,
+    Address as NativeAddress, AddressId, AddressInterface as NativeAddressInterface,
+    NetworkId as NativeNetworkId, RoutingParameters,
 };
 use wasm_bindgen::JsValue;
 use wasm_bindgen::prelude::wasm_bindgen;

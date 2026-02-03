@@ -7,12 +7,7 @@ use std::vec::Vec;
 
 use miden_client::Word;
 use miden_client::account::{
-    AccountDelta,
-    AccountHeader,
-    StorageMap,
-    StorageSlot,
-    StorageSlotContent,
-    StorageSlotName,
+    AccountDelta, AccountHeader, StorageMap, StorageSlot, StorageSlotContent, StorageSlotName,
 };
 use miden_client::store::StoreError;
 use miden_protocol::crypto::merkle::MerkleError;

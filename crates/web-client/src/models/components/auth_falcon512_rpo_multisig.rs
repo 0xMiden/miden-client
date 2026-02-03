@@ -5,9 +5,7 @@ use miden_client::account::component::{
     falcon_512_rpo_multisig_library,
 };
 use miden_client::account::{
-    StorageMap as NativeStorageMap,
-    StorageSlot as NativeStorageSlot,
-    StorageSlotName,
+    StorageMap as NativeStorageMap, StorageSlot as NativeStorageSlot, StorageSlotName,
 };
 use miden_client::auth::PublicKeyCommitment;
 use wasm_bindgen::prelude::*;

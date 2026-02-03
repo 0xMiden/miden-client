@@ -87,9 +87,7 @@ pub fn parse_node_error(endpoint: &NodeRpcClientEndpoint, details: &[u8]) -> Opt
         NodeRpcClientEndpoint::GetBlockByNumber => {
             Some(NodeRpcError::GetBlockByNumber(GetBlockByNumberError::from(code)))
         },
-        NodeRpcClientEndpoint::SyncNotes => {
-            Some(NodeRpcError::NoteSync(NoteSyncError::from(code)))
-        },
+        NodeRpcClientEndpoint::SyncNotes => Some(NodeRpcError::NoteSync(NoteSyncError::from(code))),
         NodeRpcClientEndpoint::SyncNullifiers => {
             Some(NodeRpcError::SyncNullifiers(SyncNullifiersError::from(code)))
         },

@@ -3,15 +3,11 @@ use alloc::vec::Vec;
 use std::collections::BTreeSet;
 
 use miden_client::auth::{
-    AuthEcdsaK256Keccak,
-    AuthFalcon512Rpo,
-    AuthSecretKey,
-    PublicKeyCommitment,
+    AuthEcdsaK256Keccak, AuthFalcon512Rpo, AuthSecretKey, PublicKeyCommitment,
 };
 use miden_protocol::account::{Account, AccountFile};
 use miden_protocol::testing::account_id::{
-    ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
-    ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
+    ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET, ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
 };
 use miden_protocol::{EMPTY_WORD, Word, ZERO};
 use miden_standards::testing::mock_account::MockAccountExt;

@@ -2,10 +2,7 @@ use miden_client::asset::Asset as NativeAsset;
 use miden_client::block::BlockNumber as NativeBlockNumber;
 use miden_client::crypto::RpoRandomCoin;
 use miden_client::note::{
-    Note as NativeNote,
-    NoteAssets as NativeNoteAssets,
-    create_p2id_note,
-    create_p2ide_note,
+    Note as NativeNote, NoteAssets as NativeNoteAssets, create_p2id_note, create_p2ide_note,
 };
 use miden_client::{Felt as NativeFelt, Word as NativeWord};
 use rand::rngs::StdRng;

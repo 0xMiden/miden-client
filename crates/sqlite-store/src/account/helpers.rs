@@ -4,13 +4,7 @@ use std::collections::BTreeMap;
 use std::rc::Rc;
 
 use miden_client::account::{
-    AccountCode,
-    AccountHeader,
-    AccountId,
-    Address,
-    StorageMap,
-    StorageSlot,
-    StorageSlotName,
+    AccountCode, AccountHeader, AccountId, Address, StorageMap, StorageSlot, StorageSlotName,
     StorageSlotType,
 };
 use miden_client::asset::Asset;

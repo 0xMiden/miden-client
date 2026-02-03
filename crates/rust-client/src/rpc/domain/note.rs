@@ -3,16 +3,8 @@ use alloc::vec::Vec;
 use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::crypto::merkle::{MerklePath, SparseMerklePath};
 use miden_protocol::note::{
-    Note,
-    NoteAttachment,
-    NoteDetails,
-    NoteHeader,
-    NoteId,
-    NoteInclusionProof,
-    NoteMetadata,
-    NoteScript,
-    NoteTag,
-    NoteType,
+    Note, NoteAttachment, NoteDetails, NoteHeader, NoteId, NoteInclusionProof, NoteMetadata,
+    NoteScript, NoteTag, NoteType,
 };
 use miden_protocol::{MastForest, MastNodeId, Word};
 use miden_tx::utils::Deserializable;

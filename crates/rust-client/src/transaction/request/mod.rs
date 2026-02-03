@@ -11,11 +11,7 @@ use miden_protocol::asset::{Asset, NonFungibleAsset};
 use miden_protocol::crypto::merkle::MerkleError;
 use miden_protocol::crypto::merkle::store::MerkleStore;
 use miden_protocol::errors::{
-    AccountError,
-    AssetVaultError,
-    NoteError,
-    StorageMapError,
-    TransactionInputError,
+    AccountError, AssetVaultError, NoteError, StorageMapError, TransactionInputError,
     TransactionScriptError,
 };
 use miden_protocol::note::{Note, NoteDetails, NoteId, NoteRecipient, NoteTag, PartialNote};
@@ -482,18 +478,13 @@ mod tests {
 
     use miden_protocol::account::auth::PublicKeyCommitment;
     use miden_protocol::account::{
-        AccountBuilder,
-        AccountComponent,
-        AccountId,
-        AccountType,
-        StorageSlotName,
+        AccountBuilder, AccountComponent, AccountId, AccountType, StorageSlotName,
     };
     use miden_protocol::asset::FungibleAsset;
     use miden_protocol::crypto::rand::{FeltRng, RpoRandomCoin};
     use miden_protocol::note::{NoteAttachment, NoteTag, NoteType};
     use miden_protocol::testing::account_id::{
-        ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
-        ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
+        ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET, ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
         ACCOUNT_ID_SENDER,
     };
     use miden_protocol::transaction::OutputNote;

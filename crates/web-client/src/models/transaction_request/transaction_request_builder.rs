@@ -1,15 +1,11 @@
 use miden_client::Word as NativeWord;
 use miden_client::note::{
-    Note as NativeNote,
-    NoteDetails as NativeNoteDetails,
-    NoteRecipient as NativeNoteRecipient,
+    Note as NativeNote, NoteDetails as NativeNoteDetails, NoteRecipient as NativeNoteRecipient,
     NoteTag as NativeNoteTag,
 };
 use miden_client::transaction::{
-    ForeignAccount as NativeForeignAccount,
-    NoteArgs as NativeNoteArgs,
-    OutputNote as NativeOutputNote,
-    TransactionRequestBuilder as NativeTransactionRequestBuilder,
+    ForeignAccount as NativeForeignAccount, NoteArgs as NativeNoteArgs,
+    OutputNote as NativeOutputNote, TransactionRequestBuilder as NativeTransactionRequestBuilder,
     TransactionScript as NativeTransactionScript,
 };
 use miden_client::vm::AdviceMap as NativeAdviceMap;
@@ -17,10 +13,7 @@ use wasm_bindgen::prelude::*;
 
 use crate::models::advice_map::AdviceMap;
 use crate::models::miden_arrays::{
-    ForeignAccountArray,
-    NoteAndArgsArray,
-    NoteDetailsAndTagArray,
-    NoteRecipientArray,
+    ForeignAccountArray, NoteAndArgsArray, NoteDetailsAndTagArray, NoteRecipientArray,
     OutputNoteArray,
 };
 use crate::models::transaction_request::TransactionRequest;

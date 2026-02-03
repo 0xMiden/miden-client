@@ -1,10 +1,7 @@
 use miden_client::account::component::{AccountComponent, BasicWallet};
 use miden_client::account::{Account, AccountBuilder, AccountType};
 use miden_client::auth::{
-    AuthEcdsaK256Keccak,
-    AuthFalcon512Rpo,
-    AuthSchemeId as NativeAuthScheme,
-    AuthSecretKey,
+    AuthEcdsaK256Keccak, AuthFalcon512Rpo, AuthSchemeId as NativeAuthScheme, AuthSecretKey,
 };
 use rand::rngs::StdRng;
 use rand::{RngCore, SeedableRng};

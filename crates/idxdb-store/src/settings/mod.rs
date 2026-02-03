@@ -7,10 +7,7 @@ mod js_bindings;
 mod models;
 
 use js_bindings::{
-    idxdb_get_setting,
-    idxdb_insert_setting,
-    idxdb_list_setting_keys,
-    idxdb_remove_setting,
+    idxdb_get_setting, idxdb_insert_setting, idxdb_list_setting_keys, idxdb_remove_setting,
 };
 
 use crate::WebStore;

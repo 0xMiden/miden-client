@@ -9,8 +9,7 @@ use miden_client::utils::{Deserializable, Serializable};
 
 use super::WebStore;
 use super::chain_data::utils::{
-    SerializedPartialBlockchainNodeData,
-    serialize_partial_blockchain_node,
+    SerializedPartialBlockchainNodeData, serialize_partial_blockchain_node,
 };
 use super::note::utils::{serialize_input_note, serialize_output_note};
 use super::transaction::utils::serialize_transaction_record;
@@ -18,13 +17,8 @@ use crate::promise::{await_js, await_js_value};
 
 mod js_bindings;
 use js_bindings::{
-    JsAccountUpdate,
-    JsStateSyncUpdate,
-    idxdb_add_note_tag,
-    idxdb_apply_state_sync,
-    idxdb_get_note_tags,
-    idxdb_get_sync_height,
-    idxdb_remove_note_tag,
+    JsAccountUpdate, JsStateSyncUpdate, idxdb_add_note_tag, idxdb_apply_state_sync,
+    idxdb_get_note_tags, idxdb_get_sync_height, idxdb_remove_note_tag,
 };
 
 mod models;

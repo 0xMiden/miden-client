@@ -4,12 +4,7 @@ use miden_client::address::Address;
 use miden_client::asset::Asset;
 use miden_client::auth::TransactionAuthenticator;
 use miden_client::note::{
-    Note,
-    NoteConsumability,
-    NoteConsumptionStatus,
-    NoteInputs,
-    NoteMetadata,
-    WellKnownNote,
+    Note, NoteConsumability, NoteConsumptionStatus, NoteInputs, NoteMetadata, WellKnownNote,
     get_input_note_with_id_prefix,
 };
 use miden_client::store::{InputNoteRecord, NoteFilter as ClientNoteFilter, OutputNoteRecord};

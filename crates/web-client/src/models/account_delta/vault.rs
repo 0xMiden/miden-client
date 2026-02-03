@@ -1,7 +1,6 @@
 use miden_client::account::AccountId as NativeAccountId;
 use miden_client::asset::{
-    AccountVaultDelta as NativeAccountVaultDelta,
-    FungibleAssetDelta as NativeFungibleAssetDelta,
+    AccountVaultDelta as NativeAccountVaultDelta, FungibleAssetDelta as NativeFungibleAssetDelta,
 };
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys::Uint8Array;

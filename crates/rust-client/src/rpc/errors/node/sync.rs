@@ -293,8 +293,14 @@ mod tests {
             SyncAccountStorageMapsError::from(2),
             SyncAccountStorageMapsError::DeserializationFailed
         );
-        assert_eq!(SyncAccountStorageMapsError::from(3), SyncAccountStorageMapsError::AccountNotFound);
-        assert_eq!(SyncAccountStorageMapsError::from(4), SyncAccountStorageMapsError::AccountNotPublic);
+        assert_eq!(
+            SyncAccountStorageMapsError::from(3),
+            SyncAccountStorageMapsError::AccountNotFound
+        );
+        assert_eq!(
+            SyncAccountStorageMapsError::from(4),
+            SyncAccountStorageMapsError::AccountNotPublic
+        );
         assert_eq!(SyncAccountStorageMapsError::from(99), SyncAccountStorageMapsError::Internal);
     }
 

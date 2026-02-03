@@ -1,7 +1,6 @@
 use miden_client::account::AccountId as NativeAccountId;
 use miden_client::note::{
-    NetworkAccountTarget as NativeNetworkAccountTarget,
-    NoteAttachment as NativeNoteAttachment,
+    NetworkAccountTarget as NativeNetworkAccountTarget, NoteAttachment as NativeNoteAttachment,
     NoteAttachmentScheme as NativeNoteAttachmentScheme,
 };
 use miden_client::{Felt as NativeFelt, Word as NativeWord};

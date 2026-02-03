@@ -1,6 +1,5 @@
 use miden_client::note::{
-    NoteHeader as NativeNoteHeader,
-    NoteInclusionProof as NativeNoteInclusionProof,
+    NoteHeader as NativeNoteHeader, NoteInclusionProof as NativeNoteInclusionProof,
 };
 use wasm_bindgen::prelude::wasm_bindgen;
 

@@ -150,7 +150,10 @@ mod tests {
     #[test]
     fn test_get_note_script_by_root_error_from_code() {
         assert_eq!(GetNoteScriptByRootError::from(0), GetNoteScriptByRootError::Internal);
-        assert_eq!(GetNoteScriptByRootError::from(1), GetNoteScriptByRootError::DeserializationFailed);
+        assert_eq!(
+            GetNoteScriptByRootError::from(1),
+            GetNoteScriptByRootError::DeserializationFailed
+        );
         assert_eq!(GetNoteScriptByRootError::from(2), GetNoteScriptByRootError::ScriptNotFound);
         assert_eq!(GetNoteScriptByRootError::from(99), GetNoteScriptByRootError::Internal);
     }

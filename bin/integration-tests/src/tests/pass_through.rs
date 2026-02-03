@@ -1,8 +1,6 @@
 use anyhow::Result;
 use miden_client::account::component::{
-    AuthFalcon512RpoAcl,
-    AuthFalcon512RpoAclConfig,
-    BasicWallet,
+    AuthFalcon512RpoAcl, AuthFalcon512RpoAclConfig, BasicWallet,
 };
 use miden_client::account::{Account, AccountBuilder, AccountId, AccountStorageMode, AccountType};
 use miden_client::assembly::CodeBuilder;
@@ -11,17 +9,8 @@ use miden_client::auth::{AuthSchemeId, TransactionAuthenticator};
 use miden_client::crypto::FeltRng;
 use miden_client::crypto::rpo_falcon512::SecretKey;
 use miden_client::note::{
-    Note,
-    NoteAssets,
-    NoteDetails,
-    NoteFile,
-    NoteInputs,
-    NoteMetadata,
-    NoteRecipient,
-    NoteScript,
-    NoteTag,
-    NoteType,
-    build_p2id_recipient,
+    Note, NoteAssets, NoteDetails, NoteFile, NoteInputs, NoteMetadata, NoteRecipient, NoteScript,
+    NoteTag, NoteType, build_p2id_recipient,
 };
 use miden_client::store::{InputNoteState, TransactionFilter};
 use miden_client::testing::common::*;

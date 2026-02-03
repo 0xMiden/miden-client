@@ -7,10 +7,7 @@ use miden_protocol::asset::FungibleAsset;
 use miden_protocol::block::BlockNumber;
 use miden_protocol::note::{NoteHeader, Nullifier};
 use miden_protocol::transaction::{
-    InputNoteCommitment,
-    InputNotes,
-    TransactionHeader,
-    TransactionId,
+    InputNoteCommitment, InputNotes, TransactionHeader, TransactionId,
 };
 
 use crate::rpc::{RpcConversionError, RpcError, generated as proto};

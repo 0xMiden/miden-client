@@ -3,12 +3,8 @@ use alloc::sync::Arc;
 
 use miden_client::auth::{AuthFalcon512Rpo, AuthSecretKey, RPO_FALCON_SCHEME_ID};
 use miden_client::transaction::{
-    ProvenTransaction,
-    TransactionExecutorError,
-    TransactionInputs,
-    TransactionProver,
-    TransactionProverError,
-    TransactionRequestBuilder,
+    ProvenTransaction, TransactionExecutorError, TransactionInputs, TransactionProver,
+    TransactionProverError, TransactionRequestBuilder,
 };
 use miden_client::{ClientError, async_trait};
 use miden_protocol::account::{AccountBuilder, AccountStorageMode};
@@ -16,8 +12,7 @@ use miden_protocol::assembly::diagnostics::miette::GraphicalReportHandler;
 use miden_protocol::asset::{Asset, FungibleAsset};
 use miden_protocol::note::NoteType;
 use miden_protocol::testing::account_id::{
-    ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
-    ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
+    ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET, ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
     ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
 };
 use miden_standards::account::wallets::BasicWallet;
