@@ -1,12 +1,6 @@
-//! Transaction-related node RPC errors.
-
 use core::fmt;
 
-/// Errors for the `SubmitProvenTransaction` endpoint.
-///
 /// Error codes match `miden-node/crates/block-producer/src/errors.rs::AddTransactionError`.
-/// The node's `#[derive(GrpcError)]` macro assigns codes based on variant order,
-/// skipping `#[grpc(internal)]` variants which all map to code 0.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum AddTransactionError {

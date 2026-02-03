@@ -1,10 +1,4 @@
-//! Node RPC error types.
-//!
-//! This module contains typed error types for all node RPC endpoints that support
-//! application-level error codes. These allow programmatic handling of specific
-//! error conditions instead of parsing error messages.
-//!
-//! Error codes are parsed from the gRPC status details sent by the node.
+//! Typed error codes parsed from gRPC status details sent by the node.
 
 use core::fmt;
 
@@ -26,10 +20,6 @@ pub use transaction::AddTransactionError;
 
 use crate::rpc::NodeRpcClientEndpoint;
 
-/// Application-level errors returned by the node in gRPC status details.
-///
-/// These typed errors allow programmatic handling of specific error conditions
-/// instead of parsing error messages.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NodeRpcError {
     /// Error from the `SubmitProvenTransaction` endpoint
@@ -74,10 +64,7 @@ impl fmt::Display for NodeRpcError {
     }
 }
 
-/// Parses application-level error codes from gRPC status details.
-///
-/// The node sends a single u8 byte in `status.details()` for certain endpoints.
-/// This function extracts that byte and converts it to the appropriate typed error.
+/// Parses error code from `status.details()` (a single u8 byte).
 pub fn parse_node_error(endpoint: &NodeRpcClientEndpoint, details: &[u8]) -> Option<NodeRpcError> {
     let code = *details.first()?;
     match endpoint {

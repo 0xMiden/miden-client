@@ -1,12 +1,8 @@
-//! Block-related node RPC errors.
-
 use core::fmt;
 
 // GET BLOCK HEADER ERROR
 // ================================================================================================
 
-/// Errors for the `GetBlockHeaderByNumber` endpoint.
-///
 /// Error codes match `miden-node/crates/store/src/errors.rs::GetBlockHeaderError`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
@@ -33,8 +29,6 @@ impl fmt::Display for GetBlockHeaderError {
 // GET BLOCK BY NUMBER ERROR
 // ================================================================================================
 
-/// Errors for the `GetBlockByNumber` endpoint.
-///
 /// Error codes match `miden-node/crates/store/src/errors.rs::GetBlockByNumberError`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]

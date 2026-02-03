@@ -1,12 +1,8 @@
-//! Sync-related node RPC errors.
-
 use core::fmt;
 
 // NOTE SYNC ERROR
 // ================================================================================================
 
-/// Errors for the `SyncNotes` endpoint.
-///
 /// Error codes match `miden-node/crates/store/src/errors.rs::NoteSyncError`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
@@ -42,8 +38,6 @@ impl fmt::Display for NoteSyncError {
 // SYNC NULLIFIERS ERROR
 // ================================================================================================
 
-/// Errors for the `SyncNullifiers` endpoint.
-///
 /// Error codes match `miden-node/crates/store/src/errors.rs::SyncNullifiersError`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
@@ -83,8 +77,6 @@ impl fmt::Display for SyncNullifiersError {
 // SYNC ACCOUNT VAULT ERROR
 // ================================================================================================
 
-/// Errors for the `SyncAccountVault` endpoint.
-///
 /// Error codes match `miden-node/crates/store/src/errors.rs::SyncAccountVaultError`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
@@ -124,8 +116,6 @@ impl fmt::Display for SyncAccountVaultError {
 // SYNC ACCOUNT STORAGE MAPS ERROR
 // ================================================================================================
 
-/// Errors for the `SyncStorageMaps` endpoint.
-///
 /// Error codes match `miden-node/crates/store/src/errors.rs::SyncAccountStorageMapsError`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
@@ -169,8 +159,6 @@ impl fmt::Display for SyncAccountStorageMapsError {
 // SYNC TRANSACTIONS ERROR
 // ================================================================================================
 
-/// Errors for the `SyncTransactions` endpoint.
-///
 /// Error codes match `miden-node/crates/store/src/errors.rs::SyncTransactionsError`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]

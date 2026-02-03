@@ -1,12 +1,8 @@
-//! Note-related node RPC errors.
-
 use core::fmt;
 
 // GET NOTES BY ID ERROR
 // ================================================================================================
 
-/// Errors for the `GetNotesById` endpoint.
-///
 /// Error codes match `miden-node/crates/store/src/errors.rs::GetNotesByIdError`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
@@ -46,8 +42,6 @@ impl fmt::Display for GetNotesByIdError {
 // GET NOTE SCRIPT BY ROOT ERROR
 // ================================================================================================
 
-/// Errors for the `GetNoteScriptByRoot` endpoint.
-///
 /// Error codes match `miden-node/crates/store/src/errors.rs::GetNoteScriptByRootError`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
@@ -83,8 +77,6 @@ impl fmt::Display for GetNoteScriptByRootError {
 // CHECK NULLIFIERS ERROR
 // ================================================================================================
 
-/// Errors for the `CheckNullifiers` endpoint.
-///
 /// Error codes match `miden-node/crates/store/src/errors.rs::CheckNullifiersError`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
