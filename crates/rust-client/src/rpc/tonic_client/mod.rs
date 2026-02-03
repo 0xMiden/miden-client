@@ -28,16 +28,19 @@ use super::domain::account::{AccountProof, AccountStorageDetails, AccountUpdateS
 use super::domain::{note::FetchedNote, nullifier::NullifierUpdate};
 use super::generated::rpc::account_request::AccountDetailRequest;
 use super::generated::rpc::AccountRequest;
-use super::{Endpoint, FetchedAccount, NodeRpcClient, NoteSyncInfo, RpcError, StateSyncInfo};
+use super::{
+    Endpoint, FetchedAccount, NodeRpcClient, NodeRpcClientEndpoint, NoteSyncInfo, RpcError,
+    RpcStatusInfo, StateSyncInfo,
+};
 use crate::rpc::domain::account_vault::{AccountVaultInfo, AccountVaultUpdate};
 use crate::rpc::domain::storage_map::{StorageMapInfo, StorageMapUpdate};
 use crate::rpc::domain::transaction::TransactionsInfo;
-use crate::rpc::errors::{AcceptHeaderError, GrpcError, RpcConversionError};
+use crate::rpc::errors::{AcceptHeaderContext, AcceptHeaderError, GrpcError, RpcConversionError};
 use crate::rpc::generated::rpc::account_request::account_detail_request::storage_map_detail_request::SlotData;
 use crate::rpc::generated::rpc::account_request::account_detail_request::StorageMapDetailRequest;
 use crate::rpc::generated::rpc::BlockRange;
 use crate::rpc::domain::limits::RpcLimits;
-use crate::rpc::{AccountStateAt, NodeRpcClientEndpoint, generated as proto};
+use crate::rpc::{AccountStateAt, generated as proto};
 use crate::transaction::ForeignAccount;
 
 mod api_client;
@@ -105,6 +108,35 @@ impl GrpcClient {
         Ok(())
     }
 
+    fn rpc_error_from_status(&self, endpoint: NodeRpcClientEndpoint, status: Status) -> RpcError {
+        let genesis_commitment = self
+            .genesis_commitment
+            .read()
+            .as_ref()
+            .map_or_else(|| "none".to_string(), Word::to_hex);
+        let context = AcceptHeaderContext {
+            client_version: env!("CARGO_PKG_VERSION").to_string(),
+            genesis_commitment,
+        };
+        RpcError::from_grpc_error_with_context(endpoint, status, context)
+    }
+
+    /// Fetches RPC status without injecting an Accept header.
+    ///
+    /// This instantiates a separate API client without the Accept interceptor, so it does not
+    /// reuse the primary gRPC client.
+    pub async fn get_status_unversioned(&self) -> Result<RpcStatusInfo, RpcError> {
+        let mut rpc_api =
+            ApiClient::new_client_without_accept_header(self.endpoint.clone(), self.timeout_ms)
+                .await?;
+        rpc_api
+            .status(())
+            .await
+            .map_err(|status| self.rpc_error_from_status(NodeRpcClientEndpoint::Status, status))
+            .map(tonic::Response::into_inner)
+            .and_then(RpcStatusInfo::try_from)
+    }
+
     // GET ACCOUNT HELPERS
     // ============================================================================================
 
@@ -141,7 +173,9 @@ impl GrpcClient {
         let account_response = rpc_api
             .get_account(account_request)
             .await
-            .map_err(|status| RpcError::from_grpc_error(NodeRpcClientEndpoint::GetAccount, status))?
+            .map_err(|status| {
+                self.rpc_error_from_status(NodeRpcClientEndpoint::GetAccount, status)
+            })?
             .into_inner();
         let block_number = account_response.block_num.ok_or(RpcError::ExpectedDataMissing(
             "GetAccountDetails returned an account without a matching block number for the witness"
@@ -264,7 +298,7 @@ impl GrpcClient {
         let mut rpc_api = self.ensure_connected().await?;
 
         let response = rpc_api.get_limits(()).await.map_err(|status| {
-            RpcError::from_grpc_error(NodeRpcClientEndpoint::GetLimits, status)
+            self.rpc_error_from_status(NodeRpcClientEndpoint::GetLimits, status)
         })?;
 
         RpcLimits::try_from(response.into_inner()).map_err(RpcError::from)
@@ -311,7 +345,7 @@ impl NodeRpcClient for GrpcClient {
         let mut rpc_api = self.ensure_connected().await?;
 
         let api_response = rpc_api.submit_proven_transaction(request).await.map_err(|status| {
-            RpcError::from_grpc_error(NodeRpcClientEndpoint::SubmitProvenTx, status)
+            self.rpc_error_from_status(NodeRpcClientEndpoint::SubmitProvenTx, status)
         })?;
 
         Ok(BlockNumber::from(api_response.into_inner().block_num))
@@ -332,7 +366,7 @@ impl NodeRpcClient for GrpcClient {
         let mut rpc_api = self.ensure_connected().await?;
 
         let api_response = rpc_api.get_block_header_by_number(request).await.map_err(|status| {
-            RpcError::from_grpc_error(NodeRpcClientEndpoint::GetBlockHeaderByNumber, status)
+            self.rpc_error_from_status(NodeRpcClientEndpoint::GetBlockHeaderByNumber, status)
         })?;
 
         let response = api_response.into_inner();
@@ -374,7 +408,7 @@ impl NodeRpcClient for GrpcClient {
             let mut rpc_api = self.ensure_connected().await?;
 
             let api_response = rpc_api.get_notes_by_id(request).await.map_err(|status| {
-                RpcError::from_grpc_error(NodeRpcClientEndpoint::GetNotesById, status)
+                self.rpc_error_from_status(NodeRpcClientEndpoint::GetNotesById, status)
             })?;
 
             let response_notes = api_response
@@ -410,7 +444,7 @@ impl NodeRpcClient for GrpcClient {
         let mut rpc_api = self.ensure_connected().await?;
 
         let response = rpc_api.sync_state(request).await.map_err(|status| {
-            RpcError::from_grpc_error(NodeRpcClientEndpoint::SyncState, status)
+            self.rpc_error_from_status(NodeRpcClientEndpoint::SyncState, status)
         })?;
         response.into_inner().try_into()
     }
@@ -537,7 +571,9 @@ impl NodeRpcClient for GrpcClient {
         let response = rpc_api
             .get_account(request)
             .await
-            .map_err(|status| RpcError::from_grpc_error(NodeRpcClientEndpoint::GetAccount, status))?
+            .map_err(|status| {
+                self.rpc_error_from_status(NodeRpcClientEndpoint::GetAccount, status)
+            })?
             .into_inner();
 
         let account_witness: AccountWitness = response
@@ -589,7 +625,7 @@ impl NodeRpcClient for GrpcClient {
         let mut rpc_api = self.ensure_connected().await?;
 
         let response = rpc_api.sync_notes(request).await.map_err(|status| {
-            RpcError::from_grpc_error(NodeRpcClientEndpoint::SyncNotes, status)
+            self.rpc_error_from_status(NodeRpcClientEndpoint::SyncNotes, status)
         })?;
 
         response.into_inner().try_into()
@@ -625,7 +661,7 @@ impl NodeRpcClient for GrpcClient {
                 };
 
                 let response = rpc_api.sync_nullifiers(request).await.map_err(|status| {
-                    RpcError::from_grpc_error(NodeRpcClientEndpoint::SyncNullifiers, status)
+                    self.rpc_error_from_status(NodeRpcClientEndpoint::SyncNullifiers, status)
                 })?;
                 let response = response.into_inner();
 
@@ -678,7 +714,7 @@ impl NodeRpcClient for GrpcClient {
             let mut rpc_api = self.ensure_connected().await?;
 
             let response = rpc_api.check_nullifiers(request).await.map_err(|status| {
-                RpcError::from_grpc_error(NodeRpcClientEndpoint::CheckNullifiers, status)
+                self.rpc_error_from_status(NodeRpcClientEndpoint::CheckNullifiers, status)
             })?;
 
             let mut response = response.into_inner();
@@ -698,7 +734,7 @@ impl NodeRpcClient for GrpcClient {
         let mut rpc_api = self.ensure_connected().await?;
 
         let response = rpc_api.get_block_by_number(request).await.map_err(|status| {
-            RpcError::from_grpc_error(NodeRpcClientEndpoint::GetBlockByNumber, status)
+            self.rpc_error_from_status(NodeRpcClientEndpoint::GetBlockByNumber, status)
         })?;
 
         let response = response.into_inner();
@@ -716,7 +752,7 @@ impl NodeRpcClient for GrpcClient {
         let mut rpc_api = self.ensure_connected().await?;
 
         let response = rpc_api.get_note_script_by_root(request).await.map_err(|status| {
-            RpcError::from_grpc_error(NodeRpcClientEndpoint::GetNoteScriptByRoot, status)
+            self.rpc_error_from_status(NodeRpcClientEndpoint::GetNoteScriptByRoot, status)
         })?;
 
         let response = response.into_inner();
@@ -753,7 +789,7 @@ impl NodeRpcClient for GrpcClient {
             };
 
             let response = rpc_api.sync_account_storage_maps(request).await.map_err(|status| {
-                RpcError::from_grpc_error(NodeRpcClientEndpoint::SyncStorageMaps, status)
+                self.rpc_error_from_status(NodeRpcClientEndpoint::SyncStorageMaps, status)
             })?;
             let response = response.into_inner();
 
@@ -817,7 +853,7 @@ impl NodeRpcClient for GrpcClient {
                 .sync_account_vault(request)
                 .await
                 .map_err(|status| {
-                    RpcError::from_grpc_error(NodeRpcClientEndpoint::SyncAccountVault, status)
+                    self.rpc_error_from_status(NodeRpcClientEndpoint::SyncAccountVault, status)
                 })?
                 .into_inner();
 
@@ -872,7 +908,7 @@ impl NodeRpcClient for GrpcClient {
         let mut rpc_api = self.ensure_connected().await?;
 
         let response = rpc_api.sync_transactions(request).await.map_err(|status| {
-            RpcError::from_grpc_error(NodeRpcClientEndpoint::SyncTransactions, status)
+            self.rpc_error_from_status(NodeRpcClientEndpoint::SyncTransactions, status)
         })?;
 
         response.into_inner().try_into()
@@ -910,8 +946,14 @@ impl NodeRpcClient for GrpcClient {
 // ================================================================================================
 
 impl RpcError {
-    pub fn from_grpc_error(endpoint: NodeRpcClientEndpoint, status: Status) -> Self {
-        if let Some(accept_error) = AcceptHeaderError::try_from_message(status.message()) {
+    pub fn from_grpc_error_with_context(
+        endpoint: NodeRpcClientEndpoint,
+        status: Status,
+        context: AcceptHeaderContext,
+    ) -> Self {
+        if let Some(accept_error) =
+            AcceptHeaderError::try_from_message_with_context(status.message(), context)
+        {
             return Self::AcceptHeaderError(accept_error);
         }
 

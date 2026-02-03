@@ -68,6 +68,7 @@ pub use errors::*;
 
 mod endpoint;
 pub use domain::limits::RpcLimits;
+pub use domain::status::RpcStatusInfo;
 pub use endpoint::Endpoint;
 
 #[cfg(not(feature = "testing"))]
@@ -396,6 +397,7 @@ pub trait NodeRpcClient: Send + Sync {
 /// RPC methods for the Miden protocol.
 #[derive(Debug)]
 pub enum NodeRpcClientEndpoint {
+    Status,
     CheckNullifiers,
     SyncNullifiers,
     GetAccount,
@@ -416,6 +418,7 @@ pub enum NodeRpcClientEndpoint {
 impl fmt::Display for NodeRpcClientEndpoint {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            NodeRpcClientEndpoint::Status => write!(f, "status"),
             NodeRpcClientEndpoint::CheckNullifiers => write!(f, "check_nullifiers"),
             NodeRpcClientEndpoint::SyncNullifiers => {
                 write!(f, "sync_nullifiers")
