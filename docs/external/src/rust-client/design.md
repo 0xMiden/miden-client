@@ -39,19 +39,7 @@ The store can track any number of accounts, and any number of notes that those a
 
 The RPC client communicates with the node through a defined set of gRPC methods. The provided client works both in `std` and `wasm` environments.
 
-Currently, these include:
-
-- `CheckNullifiers`: Returns proofs for specific provided full nullifiers.
-- `SyncNullifiers`: Returns a list of tracked nullifiers that match specific prefixes. This is useful for checking if a note has been consumed without revealing the nullifiers that the client is tracking.
-- `GetAccountDetails`: Returns the account details for a specific account ID. The available information will depend on the account type (public or private).
-- `GetAccountProofs`: Returns the account data needed to perform a Foreign Procedure Invocation (FPI) on the specified foreign accounts.
-- `GetBlockByNumber`: Returns a proven block given a specific block number.
-- `GetBlockHeaderByNumber`: Returns the block header information given a specific block number.
-- `GetNotesById`: Returns a list of notes given a specific note ID. The available information for each note will depend on the note type (public or private).
-- `GetNoteScriptByRoot`: Returns the script associated with a specific note root.
-- `SubmitProvenTransaction`: Sends a locally-proved transaction to the node for inclusion in the blockchain.
-- `SyncNotes`: Asks the node for information about notes that have been created or consumed.
-- `SyncState`: Asks the node for information relevant to the client. For example, specific account changes, whether relevant notes have been created or consumed, etc.
+The available gRPC methods are documented in the [Node gRPC Reference](https://docs.miden.xyz/miden-node/rpc).
 
 ## Transaction executor
 
