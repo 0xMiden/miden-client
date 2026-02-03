@@ -45,7 +45,6 @@ Currently, these include:
 - `SyncNullifiers`: Returns a list of tracked nullifiers that match specific prefixes. This is useful for checking if a note has been consumed without revealing the nullifiers that the client is tracking.
 - `GetAccountDetails`: Returns the account details for a specific account ID. The available information will depend on the account type (public or private).
 - `GetAccountProofs`: Returns the account data needed to perform a Foreign Procedure Invocation (FPI) on the specified foreign accounts.
-- `GetAccountStateDelta`: Returns the state delta for a specific account ID between two block numbers.
 - `GetBlockByNumber`: Returns a proven block given a specific block number.
 - `GetBlockHeaderByNumber`: Returns the block header information given a specific block number.
 - `GetNotesById`: Returns a list of notes given a specific note ID. The available information for each note will depend on the note type (public or private).
