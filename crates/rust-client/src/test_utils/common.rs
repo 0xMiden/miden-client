@@ -430,11 +430,11 @@ pub async fn assert_account_has_single_asset(
     asset_account_id: AccountId,
     expected_amount: u64,
 ) {
-    let assets = client.account_reader(account_id).assets().await.unwrap();
+    let vault = client.get_account_vault(account_id).await.unwrap();
 
-    assert_eq!(assets.len(), 1);
+    assert_eq!(vault.num_assets(), 1);
 
-    if let Some(Asset::Fungible(fungible_asset)) = assets.first() {
+    if let Some(Asset::Fungible(fungible_asset)) = vault.assets().next() {
         assert_eq!(fungible_asset.faucet_id(), asset_account_id);
         assert_eq!(fungible_asset.amount(), expected_amount);
     } else {

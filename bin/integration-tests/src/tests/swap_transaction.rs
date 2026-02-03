@@ -145,14 +145,13 @@ pub async fn test_swap_fully_onchain(client_config: ClientConfig) -> Result<()> 
     // - accountB: 1 BTC, 975 ETH
 
     // first reload the account
-    let account_a_assets = client1
-        .account_reader(account_a.id())
-        .assets()
+    let account_a_vault = client1
+        .get_account_vault(account_a.id())
         .await
         .context("failed to find account A after swap transaction")?;
-    assert_eq!(account_a_assets.len(), 2);
+    assert_eq!(account_a_vault.num_assets(), 2);
 
-    let mut assets = account_a_assets.iter();
+    let mut assets = account_a_vault.assets();
     let asset_1 = assets.next().context("expected first asset in account A;s vault after swap")?;
     let asset_2 = assets.next().context("expected second asset in account A's vault after swap")?;
 
@@ -174,14 +173,13 @@ pub async fn test_swap_fully_onchain(client_config: ClientConfig) -> Result<()> 
         _ => panic!("should only have fungible assets!"),
     }
 
-    let account_b_assets = client2
-        .account_reader(account_b.id())
-        .assets()
+    let account_b_vault = client2
+        .get_account_vault(account_b.id())
         .await
         .context("failed to find account B after swap transaction")?;
-    assert_eq!(account_b_assets.len(), 2);
+    assert_eq!(account_b_vault.num_assets(), 2);
 
-    let mut assets = account_b_assets.iter();
+    let mut assets = account_b_vault.assets();
     let asset_1 = assets.next().context("expected first asset in account B's vault after swap")?;
     let asset_2 = assets.next().context("expected second asset in account B's vault after swap")?;
 
@@ -345,14 +343,13 @@ pub async fn test_swap_private(client_config: ClientConfig) -> Result<()> {
     // - accountB: 1 BTC, 975 ETH
 
     // first reload the account
-    let account_a_assets = client1
-        .account_reader(account_a.id())
-        .assets()
+    let account_a_vault = client1
+        .get_account_vault(account_a.id())
         .await
         .context("failed to find account A after private swap transaction")?;
-    assert_eq!(account_a_assets.len(), 2);
+    assert_eq!(account_a_vault.num_assets(), 2);
 
-    let mut assets = account_a_assets.iter();
+    let mut assets = account_a_vault.assets();
     let asset_1 = assets
         .next()
         .context("expected first asset in account A's vault after private swap")?;
@@ -378,14 +375,12 @@ pub async fn test_swap_private(client_config: ClientConfig) -> Result<()> {
         _ => panic!("should only have fungible assets!"),
     }
 
-    let account_b_assets = client2
-        .account_reader(account_b.id())
-        .assets()
+    let account_b_vault = client2
+        .get_account_vault(account_b.id())
         .await
         .context("failed to find account B after swap transaction")?;
-    assert_eq!(account_b_assets.len(), 2);
-
-    let mut assets = account_b_assets.iter();
+    assert_eq!(account_b_vault.num_assets(), 2);
+    let mut assets = account_b_vault.assets();
     let asset_1 = assets.next().context("expected first asset in account B's vault after swap")?;
     let asset_2 = assets.next().context("expected second asset in account B's vault after swap")?;
 

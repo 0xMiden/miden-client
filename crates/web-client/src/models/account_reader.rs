@@ -13,7 +13,6 @@ use super::account_code::AccountCode;
 use super::account_header::AccountHeader;
 use super::account_id::AccountId;
 use super::address::Address;
-use super::asset_vault::AssetVault;
 use super::felt::Felt;
 use super::word::Word;
 use crate::js_error_with_context;
@@ -150,15 +149,6 @@ impl AccountReader {
 
     // VAULT ACCESS
     // --------------------------------------------------------------------------------------------
-
-    /// Retrieves the account's asset vault.
-    pub async fn vault(&self) -> Result<AssetVault, JsValue> {
-        self.0
-            .vault()
-            .await
-            .map(Into::into)
-            .map_err(|err| js_error_with_context(err, "failed to get account vault"))
-    }
 
     /// Retrieves the balance of a fungible asset in the account's vault.
     ///

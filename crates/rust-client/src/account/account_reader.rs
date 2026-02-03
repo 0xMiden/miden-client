@@ -11,7 +11,7 @@ use miden_protocol::account::{
     StorageSlotName,
 };
 use miden_protocol::address::Address;
-use miden_protocol::asset::{Asset, AssetVault};
+use miden_protocol::asset::{Asset, AssetVaultKey};
 use miden_protocol::{Felt, Word, ZERO};
 
 use crate::errors::ClientError;
@@ -139,26 +139,21 @@ impl AccountReader {
     // VAULT ACCESS
     // --------------------------------------------------------------------------------------------
 
-    /// Retrieves the account's asset vault.
-    pub async fn vault(&self) -> Result<AssetVault, ClientError> {
-        self.store
-            .get_account_vault(self.account_id)
-            .await
-            .map_err(ClientError::StoreError)
-    }
-
     /// Retrieves the balance of a fungible asset in the account's vault.
     ///
-    /// Returns 0 if the asset is not present in the vault.
+    /// Returns `0` if the asset is not present in the vault or if the asset is not a fungible
+    /// asset.
+    ///
+    /// To load the entire vault, use
+    /// [`Client::get_account_vault`](crate::Client::get_account_vault).
     pub async fn get_balance(&self, faucet_id: AccountId) -> Result<u64, ClientError> {
-        let vault = self.vault().await?;
-        Ok(vault.get_balance(faucet_id).unwrap_or(0))
-    }
-
-    /// Retrieves all assets in the account's vault.
-    pub async fn assets(&self) -> Result<Vec<Asset>, ClientError> {
-        let vault = self.vault().await?;
-        Ok(vault.assets().collect())
+        if let Some(vault_key) = AssetVaultKey::from_account_id(faucet_id)
+            && let Some((Asset::Fungible(fungible_asset), _)) =
+                self.store.get_account_asset(self.account_id, vault_key).await?
+        {
+            return Ok(fungible_asset.amount());
+        }
+        Ok(0)
     }
 
     // STORAGE ACCESS

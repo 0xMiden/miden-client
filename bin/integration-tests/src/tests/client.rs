@@ -1220,10 +1220,7 @@ pub async fn test_locked_account(client_config: ClientConfig) -> Result<()> {
     let summary = client_2.sync_state().await.unwrap();
     assert!(summary.locked_accounts.contains(&from_account_id));
     assert!(client_2.account_reader(from_account_id).is_locked().await.unwrap());
-    assert_eq!(
-        client_2.account_reader(from_account_id).seed().await.unwrap(),
-        original_seed
-    );
+    assert_eq!(client_2.account_reader(from_account_id).seed().await.unwrap(), original_seed);
 
     // Get updated account from client 1 and import it in client 2 with `overwrite` flag
     let updated_private_account: Account =

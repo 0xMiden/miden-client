@@ -254,16 +254,18 @@ pub async fn test_onchain_accounts(client_config: ClientConfig) -> Result<()> {
     )
     .await;
 
-    let (client_1_faucet, _) = client_1
-        .account_reader(faucet_account_header.id())
-        .header()
-        .await
-        .context("failed to find faucet account in client 1 after consume transactions")?;
-    let (client_2_faucet, _) = client_2
-        .account_reader(faucet_account_header.id())
-        .header()
-        .await
-        .context("failed to find faucet account in client 2 after consume transactions")?;
+    let (client_1_faucet, _) =
+        client_1
+            .account_reader(faucet_account_header.id())
+            .header()
+            .await
+            .context("failed to find faucet account in client 1 after consume transactions")?;
+    let (client_2_faucet, _) =
+        client_2
+            .account_reader(faucet_account_header.id())
+            .header()
+            .await
+            .context("failed to find faucet account in client 2 after consume transactions")?;
 
     assert_eq!(client_1_faucet.commitment(), client_2_faucet.commitment());
 

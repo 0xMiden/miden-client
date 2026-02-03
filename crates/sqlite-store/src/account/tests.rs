@@ -500,42 +500,6 @@ async fn account_reader_nonce_and_status() -> anyhow::Result<()> {
 }
 
 #[tokio::test]
-async fn account_reader_vault_access() -> anyhow::Result<()> {
-    use std::sync::Arc;
-
-    use miden_client::account::AccountReader;
-
-    let store = Arc::new(create_test_store().await);
-
-    // Create account with some assets
-    let dummy_component =
-        AccountComponent::new(basic_wallet_library(), vec![])?.with_supports_all_types();
-
-    let fungible_asset =
-        FungibleAsset::new(AccountId::try_from(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET)?, 100)?;
-
-    let account = AccountBuilder::new([0; 32])
-        .account_type(AccountType::RegularAccountImmutableCode)
-        .with_auth_component(AuthFalcon512Rpo::new(PublicKeyCommitment::from(EMPTY_WORD)))
-        .with_component(dummy_component)
-        .with_assets([fungible_asset.into()])
-        .build_existing()?;
-
-    let default_address = Address::new(account.id());
-    store.insert_account(&account, default_address).await?;
-
-    // Create an AccountReader
-    let reader = AccountReader::new(store.clone(), account.id());
-
-    // Test vault access
-    let vault = reader.vault().await?;
-    assert_eq!(vault.root(), account.vault().root());
-    assert!(!vault.is_empty());
-
-    Ok(())
-}
-
-#[tokio::test]
 async fn account_reader_code_access() -> anyhow::Result<()> {
     use std::sync::Arc;
 

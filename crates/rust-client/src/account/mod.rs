@@ -64,6 +64,7 @@ pub use miden_protocol::account::{
     StorageSlotType,
 };
 pub use miden_protocol::address::{Address, AddressInterface, AddressType, NetworkId};
+use miden_protocol::asset::AssetVault;
 pub use miden_protocol::errors::{AccountIdError, AddressError, NetworkIdError};
 use miden_protocol::note::NoteTag;
 
@@ -296,6 +297,14 @@ impl<AUTH> Client<AUTH> {
 
     // ACCOUNT DATA RETRIEVAL
     // --------------------------------------------------------------------------------------------
+
+    /// Retrieves the asset vault for a specific account.
+    pub async fn get_account_vault(
+        &self,
+        account_id: AccountId,
+    ) -> Result<AssetVault, ClientError> {
+        self.store.get_account_vault(account_id).await.map_err(ClientError::StoreError)
+    }
 
     /// Returns a list of [`AccountHeader`] of all accounts stored in the database along with their
     /// statuses.

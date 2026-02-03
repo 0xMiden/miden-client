@@ -333,8 +333,7 @@ async fn get_account_by_id() {
     client.add_account(&account, false).await.unwrap();
 
     // Retrieving an existing account should succeed
-    let (acc_from_db, _account_seed) = match client.account_reader(account.id()).header().await
-    {
+    let (acc_from_db, _account_seed) = match client.account_reader(account.id()).header().await {
         Ok(header_and_status) => header_and_status,
         Err(err) => panic!("Error retrieving account: {err}"),
     };
@@ -1009,20 +1008,20 @@ async fn p2id_transfer() {
 
     // The seed should not be retrieved due to the account not being new
     assert!(!is_new && seed.is_none());
-    let assets = account_reader.assets().await.unwrap();
-    assert_eq!(assets.len(), 1);
+    let vault = client.get_account_vault(from_account_id).await.unwrap();
+    assert_eq!(vault.num_assets(), 1);
 
     // Validate the transferred amounts
-    if let Asset::Fungible(fungible_asset) = &assets[0] {
+    if let Asset::Fungible(fungible_asset) = vault.assets().next().unwrap() {
         assert_eq!(fungible_asset.amount(), MINT_AMOUNT - TRANSFER_AMOUNT);
     } else {
         panic!("Error: Account should have a fungible asset");
     }
 
-    let assets = client.account_reader(to_account_id).assets().await.unwrap();
-    assert_eq!(assets.len(), 1);
+    let vault = client.get_account_vault(to_account_id).await.unwrap();
+    assert_eq!(vault.num_assets(), 1);
 
-    if let Asset::Fungible(fungible_asset) = &assets[0] {
+    if let Asset::Fungible(fungible_asset) = vault.assets().next().unwrap() {
         assert_eq!(fungible_asset.amount(), TRANSFER_AMOUNT);
     } else {
         panic!("Error: Account should have a fungible asset");
@@ -1191,20 +1190,20 @@ async fn p2ide_transfer_consumed_by_target() {
     let from_reader = client.account_reader(from_account_id);
     // The seed should not be retrieved due to the account not being new
     assert!(!from_reader.is_new().await.unwrap() && from_reader.seed().await.unwrap().is_none());
-    let from_assets = from_reader.assets().await.unwrap();
-    assert_eq!(from_assets.len(), 1);
+    let vault = client.get_account_vault(from_account_id).await.unwrap();
+    assert_eq!(vault.num_assets(), 1);
 
     // Validate the transferred amounts
-    if let Asset::Fungible(fungible_asset) = &from_assets[0] {
+    if let Asset::Fungible(fungible_asset) = vault.assets().next().unwrap() {
         assert_eq!(fungible_asset.amount(), from_account_balance - TRANSFER_AMOUNT);
     } else {
         panic!("Error: Account should have a fungible asset");
     }
 
-    let to_assets = client.account_reader(to_account_id).assets().await.unwrap();
-    assert_eq!(to_assets.len(), 1);
+    let vault = client.get_account_vault(to_account_id).await.unwrap();
+    assert_eq!(vault.num_assets(), 1);
 
-    if let Asset::Fungible(fungible_asset) = &to_assets[0] {
+    if let Asset::Fungible(fungible_asset) = vault.assets().next().unwrap() {
         assert_eq!(fungible_asset.amount(), to_account_balance + TRANSFER_AMOUNT);
     } else {
         panic!("Error: Account should have a fungible asset");
@@ -1304,18 +1303,18 @@ async fn p2ide_transfer_consumed_by_sender() {
     let from_reader = client.account_reader(from_account_id);
     // The seed should not be retrieved due to the account not being new
     assert!(!from_reader.is_new().await.unwrap() && from_reader.seed().await.unwrap().is_none());
-    let from_assets = from_reader.assets().await.unwrap();
-    assert_eq!(from_assets.len(), 1);
+    let vault = client.get_account_vault(from_account_id).await.unwrap();
+    assert_eq!(vault.num_assets(), 1);
 
     // Validate the sender hasn't lost funds
-    if let Asset::Fungible(fungible_asset) = &from_assets[0] {
+    if let Asset::Fungible(fungible_asset) = vault.assets().next().unwrap() {
         assert_eq!(fungible_asset.amount(), from_account_balance);
     } else {
         panic!("Error: Account should have a fungible asset");
     }
 
-    let to_assets = client.account_reader(to_account_id).assets().await.unwrap();
-    assert_eq!(to_assets.len(), 0);
+    let vault = client.get_account_vault(to_account_id).await.unwrap();
+    assert_eq!(vault.num_assets(), 0);
 
     // Check that the target can't consume the note anymore
     assert_note_cannot_be_consumed_twice(
@@ -1658,8 +1657,7 @@ async fn account_rollback() {
         .unwrap();
 
     // Check that the account state has changed after applying the transaction
-    let account_commitment_after_tx =
-        client.account_reader(account_id).commitment().await.unwrap();
+    let account_commitment_after_tx = client.account_reader(account_id).commitment().await.unwrap();
 
     assert_ne!(
         account_commitment_before_tx, account_commitment_after_tx,
@@ -1727,8 +1725,7 @@ async fn account_rollback() {
         .unwrap();
 
     // Check that the account state has changed after applying the transaction
-    let account_commitment_after_tx =
-        client.account_reader(account_id).commitment().await.unwrap();
+    let account_commitment_after_tx = client.account_reader(account_id).commitment().await.unwrap();
 
     assert_ne!(
         account_commitment_after_tx, account_commitment_before_tx,
