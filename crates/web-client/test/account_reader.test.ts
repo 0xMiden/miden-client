@@ -19,7 +19,7 @@ test.describe("AccountReader tests", () => {
       const nonce = await reader.nonce();
       const commitment = await reader.commitment();
       const isNew = await reader.isNew();
-      const code = await reader.code();
+      const codeCommitment = await reader.codeCommitment();
 
       return {
         originalId: account.id().toString(),
@@ -29,7 +29,7 @@ test.describe("AccountReader tests", () => {
         accountCommitment: account.commitment().toHex(),
         readerCommitment: commitment.toHex(),
         accountCodeCommitment: account.code().commitment().toHex(),
-        readerCodeCommitment: code.commitment().toHex(),
+        readerCodeCommitment: codeCommitment.toHex(),
         isNew,
       };
     });
