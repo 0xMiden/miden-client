@@ -44,6 +44,41 @@
 
 ***
 
+### accountReader()
+
+> **accountReader**(`account_id`): [`AccountReader`](AccountReader.md)
+
+Creates a new `AccountReader` for lazy access to account data.
+
+The `AccountReader` executes queries lazily - each method call fetches fresh data
+from storage, ensuring you always see the current state.
+
+# Arguments
+* `account_id` - The ID of the account to read.
+
+# Example
+```javascript
+const reader = client.accountReader(accountId);
+const nonce = await reader.nonce();
+const balance = await reader.getBalance(faucetId);
+```
+
+#### Parameters
+
+##### account\_id
+
+[`AccountId`](AccountId.md)
+
+#### Returns
+
+[`AccountReader`](AccountReader.md)
+
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`accountReader`](../interfaces/WasmWebClient.md#accountreader)
+
+***
+
 ### addAccountSecretKeyToWebStore()
 
 > **addAccountSecretKeyToWebStore**(`account_id`, `secret_key`): `Promise`\<`void`\>
@@ -879,41 +914,6 @@ Returns all the existing setting keys from the store.
 #### Inherited from
 
 [`WasmWebClient`](../interfaces/WasmWebClient.md).[`newAccount`](../interfaces/WasmWebClient.md#newaccount)
-
-***
-
-### newAccountReader()
-
-> **newAccountReader**(`account_id`): [`AccountReader`](AccountReader.md)
-
-Creates a new `AccountReader` for lazy access to account data.
-
-The `AccountReader` executes queries lazily - each method call fetches fresh data
-from storage, ensuring you always see the current state.
-
-# Arguments
-* `account_id` - The ID of the account to read.
-
-# Example
-```javascript
-const reader = client.newAccountReader(accountId);
-const nonce = await reader.nonce();
-const balance = await reader.getBalance(faucetId);
-```
-
-#### Parameters
-
-##### account\_id
-
-[`AccountId`](AccountId.md)
-
-#### Returns
-
-[`AccountReader`](AccountReader.md)
-
-#### Inherited from
-
-[`WasmWebClient`](../interfaces/WasmWebClient.md).[`newAccountReader`](../interfaces/WasmWebClient.md#newaccountreader)
 
 ***
 

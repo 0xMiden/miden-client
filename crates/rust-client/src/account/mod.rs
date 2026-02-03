@@ -39,29 +39,10 @@ use alloc::vec::Vec;
 
 use miden_protocol::account::auth::{PublicKey, PublicKeyCommitment};
 pub use miden_protocol::account::{
-    Account,
-    AccountBuilder,
-    AccountCode,
-    AccountComponent,
-    AccountComponentCode,
-    AccountDelta,
-    AccountFile,
-    AccountHeader,
-    AccountId,
-    AccountIdPrefix,
-    AccountStorage,
-    AccountStorageMode,
-    AccountType,
-    PartialAccount,
-    PartialStorage,
-    PartialStorageMap,
-    StorageMap,
-    StorageMapWitness,
-    StorageSlot,
-    StorageSlotContent,
-    StorageSlotId,
-    StorageSlotName,
-    StorageSlotType,
+    Account, AccountBuilder, AccountCode, AccountComponent, AccountComponentCode, AccountDelta,
+    AccountFile, AccountHeader, AccountId, AccountIdPrefix, AccountStorage, AccountStorageMode,
+    AccountType, PartialAccount, PartialStorage, PartialStorageMap, StorageMap, StorageMapWitness,
+    StorageSlot, StorageSlotContent, StorageSlotId, StorageSlotName, StorageSlotType,
 };
 pub use miden_protocol::address::{Address, AddressInterface, AddressType, NetworkId};
 use miden_protocol::asset::AssetVault;
@@ -82,7 +63,7 @@ use crate::Word;
 use crate::auth::AuthSchemeId;
 use crate::errors::ClientError;
 use crate::rpc::domain::account::FetchedAccount;
-use crate::store::AccountStatus;
+use crate::store::{AccountStatus, AccountStorageFilter};
 use crate::sync::NoteTagRecord;
 
 const PUBLIC_KEY_COMMITMENT_SETTING_SUFFIX: &str = "_public_key_commitments";
@@ -92,26 +73,17 @@ pub mod component {
 
     pub use miden_protocol::account::auth::*;
     pub use miden_protocol::account::component::{
-        InitStorageData,
-        StorageSlotSchema,
-        StorageValueName,
+        InitStorageData, StorageSlotSchema, StorageValueName,
     };
     pub use miden_protocol::account::{AccountComponent, AccountComponentMetadata};
     pub use miden_standards::account::auth::*;
     pub use miden_standards::account::components::{
-        basic_fungible_faucet_library,
-        basic_wallet_library,
-        ecdsa_k256_keccak_library,
-        falcon_512_rpo_acl_library,
-        falcon_512_rpo_library,
-        falcon_512_rpo_multisig_library,
-        network_fungible_faucet_library,
-        no_auth_library,
+        basic_fungible_faucet_library, basic_wallet_library, ecdsa_k256_keccak_library,
+        falcon_512_rpo_acl_library, falcon_512_rpo_library, falcon_512_rpo_multisig_library,
+        network_fungible_faucet_library, no_auth_library,
     };
     pub use miden_standards::account::faucets::{
-        BasicFungibleFaucet,
-        FungibleFaucetExt,
-        NetworkFungibleFaucet,
+        BasicFungibleFaucet, FungibleFaucetExt, NetworkFungibleFaucet,
     };
     pub use miden_standards::account::wallets::BasicWallet;
 }
@@ -299,11 +271,26 @@ impl<AUTH> Client<AUTH> {
     // --------------------------------------------------------------------------------------------
 
     /// Retrieves the asset vault for a specific account.
+    ///
+    /// To check the balance for a single asset, use [`Client::account_reader`] instead.
     pub async fn get_account_vault(
         &self,
         account_id: AccountId,
     ) -> Result<AssetVault, ClientError> {
         self.store.get_account_vault(account_id).await.map_err(ClientError::StoreError)
+    }
+
+    /// Retrieves the whole account storage for a specific account.
+    ///
+    /// To only load a specific slot, use [`Client::account_reader`] instead.
+    pub async fn get_account_storage(
+        &self,
+        account_id: AccountId,
+    ) -> Result<AccountStorage, ClientError> {
+        self.store
+            .get_account_storage(account_id, AccountStorageFilter::All)
+            .await
+            .map_err(ClientError::StoreError)
     }
 
     /// Returns a list of [`AccountHeader`] of all accounts stored in the database along with their

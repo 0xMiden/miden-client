@@ -22,6 +22,37 @@
 
 ***
 
+### accountReader()
+
+> **accountReader**(`account_id`): [`AccountReader`](../classes/AccountReader.md)
+
+Creates a new `AccountReader` for lazy access to account data.
+
+The `AccountReader` executes queries lazily - each method call fetches fresh data
+from storage, ensuring you always see the current state.
+
+# Arguments
+* `account_id` - The ID of the account to read.
+
+# Example
+```javascript
+const reader = client.accountReader(accountId);
+const nonce = await reader.nonce();
+const balance = await reader.getBalance(faucetId);
+```
+
+#### Parameters
+
+##### account\_id
+
+[`AccountId`](../classes/AccountId.md)
+
+#### Returns
+
+[`AccountReader`](../classes/AccountReader.md)
+
+***
+
 ### addAccountSecretKeyToWebStore()
 
 > **addAccountSecretKeyToWebStore**(`account_id`, `secret_key`): `Promise`\<`void`\>
@@ -701,37 +732,6 @@ Returns all the existing setting keys from the store.
 #### Returns
 
 `Promise`\<`void`\>
-
-***
-
-### newAccountReader()
-
-> **newAccountReader**(`account_id`): [`AccountReader`](../classes/AccountReader.md)
-
-Creates a new `AccountReader` for lazy access to account data.
-
-The `AccountReader` executes queries lazily - each method call fetches fresh data
-from storage, ensuring you always see the current state.
-
-# Arguments
-* `account_id` - The ID of the account to read.
-
-# Example
-```javascript
-const reader = client.newAccountReader(accountId);
-const nonce = await reader.nonce();
-const balance = await reader.getBalance(faucetId);
-```
-
-#### Parameters
-
-##### account\_id
-
-[`AccountId`](../classes/AccountId.md)
-
-#### Returns
-
-[`AccountReader`](../classes/AccountReader.md)
 
 ***
 

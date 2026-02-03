@@ -228,18 +228,6 @@ Retrieves the storage commitment (root of the storage tree).
 
 ***
 
-### vault()
-
-> **vault**(): `Promise`\<[`AssetVault`](AssetVault.md)\>
-
-Retrieves the account's asset vault.
-
-#### Returns
-
-`Promise`\<[`AssetVault`](AssetVault.md)\>
-
-***
-
 ### vaultRoot()
 
 > **vaultRoot**(): `Promise`\<[`Word`](Word.md)\>
