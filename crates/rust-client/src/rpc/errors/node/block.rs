@@ -5,16 +5,20 @@ use core::fmt;
 
 /// Error codes match `miden-node/crates/store/src/errors.rs::GetBlockHeaderError`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(u8)]
 pub enum GetBlockHeaderError {
-    /// Internal server error
-    Internal = 0,
+    /// Internal server error (code 0)
+    Internal,
+    /// Error code not recognized by this client version. This can happen if the node
+    /// is newer than the client and has added new error variants.
+    Unknown(u8),
 }
 
 impl From<u8> for GetBlockHeaderError {
-    fn from(_code: u8) -> Self {
-        // This error type only has Internal, all codes map to it
-        Self::Internal
+    fn from(code: u8) -> Self {
+        match code {
+            0 => Self::Internal,
+            _ => Self::Unknown(code),
+        }
     }
 }
 
@@ -22,6 +26,7 @@ impl fmt::Display for GetBlockHeaderError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Internal => write!(f, "internal server error"),
+            Self::Unknown(code) => write!(f, "unknown error (code {code})"),
         }
     }
 }
@@ -31,19 +36,22 @@ impl fmt::Display for GetBlockHeaderError {
 
 /// Error codes match `miden-node/crates/store/src/errors.rs::GetBlockByNumberError`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(u8)]
 pub enum GetBlockByNumberError {
-    /// Internal server error
-    Internal = 0,
+    /// Internal server error (code 0)
+    Internal,
     /// Failed to deserialize data
-    DeserializationFailed = 1,
+    DeserializationFailed,
+    /// Error code not recognized by this client version. This can happen if the node
+    /// is newer than the client and has added new error variants.
+    Unknown(u8),
 }
 
 impl From<u8> for GetBlockByNumberError {
     fn from(code: u8) -> Self {
         match code {
+            0 => Self::Internal,
             1 => Self::DeserializationFailed,
-            _ => Self::Internal,
+            _ => Self::Unknown(code),
         }
     }
 }
@@ -53,6 +61,7 @@ impl fmt::Display for GetBlockByNumberError {
         match self {
             Self::Internal => write!(f, "internal server error"),
             Self::DeserializationFailed => write!(f, "deserialization failed"),
+            Self::Unknown(code) => write!(f, "unknown error (code {code})"),
         }
     }
 }
