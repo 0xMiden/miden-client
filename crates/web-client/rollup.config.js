@@ -22,6 +22,7 @@ const wasmOptArgs = [
   devMode ? "-O0" : "-O3",
   "--enable-bulk-memory",
   "--enable-nontrapping-float-to-int",
+  "--enable-simd",
 ];
 
 // Base cargo arguments
@@ -29,7 +30,7 @@ const baseCargoArgs = [
   "--features",
   "testing",
   "--config",
-  `build.rustflags=["-C", "target-feature=+atomics,+bulk-memory,+mutable-globals", "-C", "link-arg=--max-memory=4294967296", "-C", "panic=abort"]`,
+  `build.rustflags=["-C", "target-feature=+atomics,+bulk-memory,+mutable-globals,+simd128", "-C", "link-arg=--max-memory=4294967296", "-C", "panic=abort"]`,
   "--no-default-features",
 ].concat(devMode ? cargoArgsUseDebugSymbols : []);
 
