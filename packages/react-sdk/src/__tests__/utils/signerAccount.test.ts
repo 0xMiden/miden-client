@@ -50,11 +50,7 @@ vi.mock("@miden-sdk/miden-sdk", async () => {
 });
 
 // Import mocked modules for assertions
-import {
-  AccountBuilder,
-  AccountComponent,
-  Word,
-} from "@miden-sdk/miden-sdk";
+import { AccountBuilder, AccountComponent, Word } from "@miden-sdk/miden-sdk";
 
 describe("initializeSignerAccount", () => {
   let mockClient: any;

@@ -112,8 +112,7 @@ describe("MidenProvider signer integration contract", () => {
 
     it("condition: disconnected signer means wait for connection", () => {
       const signerContext = createDisconnectedSignerContext();
-      const shouldWait =
-        signerContext !== null && !signerContext.isConnected;
+      const shouldWait = signerContext !== null && !signerContext.isConnected;
       expect(shouldWait).toBe(true);
     });
 
@@ -166,7 +165,10 @@ describe("MidenProvider signer integration contract", () => {
       const mockSignCb = vi.fn().mockResolvedValue(expectedSignature);
       const signer = createMockSignerContext({ signCb: mockSignCb });
 
-      const result = await signer.signCb(new Uint8Array(32), new Uint8Array(100));
+      const result = await signer.signCb(
+        new Uint8Array(32),
+        new Uint8Array(100)
+      );
 
       expect(result).toBe(expectedSignature);
     });
