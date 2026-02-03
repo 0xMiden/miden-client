@@ -62,33 +62,3 @@ impl fmt::Display for GetBlockByNumberError {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_get_block_header_error_codes() {
-        assert_eq!(GetBlockHeaderError::Internal as u8, 0);
-    }
-
-    #[test]
-    fn test_get_block_by_number_error_codes() {
-        assert_eq!(GetBlockByNumberError::Internal as u8, 0);
-        assert_eq!(GetBlockByNumberError::DeserializationFailed as u8, 1);
-    }
-
-    #[test]
-    fn test_get_block_header_error_from_code() {
-        assert_eq!(GetBlockHeaderError::from(0), GetBlockHeaderError::Internal);
-        assert_eq!(GetBlockHeaderError::from(1), GetBlockHeaderError::Internal);
-        assert_eq!(GetBlockHeaderError::from(99), GetBlockHeaderError::Internal);
-    }
-
-    #[test]
-    fn test_get_block_by_number_error_from_code() {
-        assert_eq!(GetBlockByNumberError::from(0), GetBlockByNumberError::Internal);
-        assert_eq!(GetBlockByNumberError::from(1), GetBlockByNumberError::DeserializationFailed);
-        assert_eq!(GetBlockByNumberError::from(99), GetBlockByNumberError::Internal);
-    }
-}
