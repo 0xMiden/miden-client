@@ -54,7 +54,6 @@ import {
   AccountBuilder,
   AccountComponent,
   Word,
-  AccountType,
 } from "@miden-sdk/miden-sdk";
 
 describe("initializeSignerAccount", () => {

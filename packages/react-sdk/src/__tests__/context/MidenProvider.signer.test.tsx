@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { renderHook, render, screen, act } from "@testing-library/react";
+import { describe, it, expect, vi } from "vitest";
+import { renderHook, render, screen } from "@testing-library/react";
 import React from "react";
 import { SignerContext, useSignerContext } from "../../context/SignerContext";
 import {
@@ -208,8 +208,6 @@ describe("MidenProvider signer integration contract", () => {
 
     it("storageMode determines account visibility", () => {
       const publicMode = { toString: () => "public" };
-      const privateMode = { toString: () => "private" };
-      const networkMode = { toString: () => "network" };
 
       const publicSigner = createMockSignerContext({
         accountConfig: {
