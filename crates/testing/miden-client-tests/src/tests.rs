@@ -119,7 +119,7 @@ mod transport;
 
 /// Constant that represents the number of blocks until the transaction is considered
 /// stale.
-const TX_GRACEFUL_BLOCKS: u32 = 20;
+const TX_DISCARD_DELTA: u32 = 20;
 
 // TESTS
 // ================================================================================================
@@ -1600,7 +1600,7 @@ async fn get_output_notes() {
 async fn account_rollback() {
     let (builder, mock_rpc_api, authenticator) = Box::pin(create_test_client_builder()).await;
 
-    let mut client = builder.tx_graceful_blocks(Some(TX_GRACEFUL_BLOCKS)).build().await.unwrap();
+    let mut client = builder.tx_discard_delta(Some(TX_DISCARD_DELTA)).build().await.unwrap();
 
     client.sync_state().await.unwrap();
 
@@ -1671,7 +1671,7 @@ async fn account_rollback() {
     assert!(matches!(tx_record.status, TransactionStatus::Pending));
 
     // Sync the state, which should discard the old pending transaction
-    mock_rpc_api.advance_blocks(TX_GRACEFUL_BLOCKS + 1);
+    mock_rpc_api.advance_blocks(TX_DISCARD_DELTA + 1);
     client.sync_state().await.unwrap();
 
     // Verify the transaction is now discarded
@@ -2631,7 +2631,7 @@ pub async fn create_test_client_builder()
     let rng = RpoRandomCoin::new(coin_seed.map(Felt::new).into());
 
     let keystore_path = temp_dir();
-    let keystore = FilesystemKeyStore::new(keystore_path.clone()).unwrap();
+    let keystore = FilesystemKeyStore::new(keystore_path).unwrap();
 
     let rpc_api = MockRpcApi::new(Box::pin(create_prebuilt_mock_chain()).await);
     let arc_rpc_api = Arc::new(rpc_api.clone());
@@ -2640,9 +2640,9 @@ pub async fn create_test_client_builder()
         .rpc(arc_rpc_api)
         .rng(Box::new(rng))
         .sqlite_store(create_test_store_path())
-        .filesystem_keystore(keystore_path.to_str().unwrap())
+        .authenticator(Arc::new(keystore.clone()))
         .in_debug_mode(DebugMode::Enabled)
-        .tx_graceful_blocks(None);
+        .tx_discard_delta(None);
 
     (builder, rpc_api, keystore)
 }

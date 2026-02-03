@@ -2597,8 +2597,6 @@ dependencies = [
  "futures",
  "getrandom 0.3.4",
  "hex",
- "miden-client",
- "miden-client-sqlite-store",
  "miden-mast-package",
  "miden-node-proto-build",
  "miden-note-transport-proto-build",

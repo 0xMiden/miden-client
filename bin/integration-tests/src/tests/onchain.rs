@@ -422,7 +422,7 @@ pub async fn test_incorrect_genesis(client_config: ClientConfig) -> Result<()> {
     let result = client.test_rpc_api().get_block_header_by_number(None, false).await;
 
     match result {
-        Err(RpcError::AcceptHeaderError(AcceptHeaderError::NoSupportedMediaRange)) => Ok(()),
+        Err(RpcError::AcceptHeaderError(AcceptHeaderError::NoSupportedMediaRange(_))) => Ok(()),
         Ok(_) => anyhow::bail!("grpc request was unexpectedly successful"),
         _ => anyhow::bail!("expected accept header error"),
     }
