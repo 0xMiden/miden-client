@@ -8,6 +8,7 @@ use crate::models::account_id::AccountId;
 use crate::models::address::Address;
 use crate::models::auth_secret_key::AuthSecretKey;
 use crate::models::word::Word;
+use crate::storage_reader::StorageReader;
 use crate::{WebClient, js_error_with_context};
 
 #[wasm_bindgen]
@@ -133,5 +134,23 @@ impl WebClient {
         } else {
             Err(JsValue::from_str("Client not initialized"))
         }
+    }
+
+    /// Returns a [`StorageReader`] for reading storage slots of the specified account.
+    ///
+    /// The `StorageReader` provides lazy access to storage - each method call fetches
+    /// only the requested slot from storage.
+    ///
+    /// # Arguments
+    /// * `account_id` - The ID of the account to read storage from.
+    ///
+    /// # Errors
+    /// Returns an error if the client is not initialized.
+    #[wasm_bindgen(js_name = "newStorageReader")]
+    pub fn new_storage_reader(&self, account_id: &AccountId) -> Result<StorageReader, JsValue> {
+        let client =
+            self.inner.as_ref().ok_or_else(|| JsValue::from_str("Client not initialized"))?;
+
+        Ok(StorageReader::new(client.new_storage_reader(account_id.into())))
     }
 }

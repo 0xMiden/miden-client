@@ -123,6 +123,7 @@
 - [SlotAndKeys](classes/SlotAndKeys.md)
 - [SparseMerklePath](classes/SparseMerklePath.md)
 - [StorageMap](classes/StorageMap.md)
+- [StorageReader](classes/StorageReader.md)
 - [StorageSlot](classes/StorageSlot.md)
 - [StorageSlotArray](classes/StorageSlotArray.md)
 - [SyncSummary](classes/SyncSummary.md)

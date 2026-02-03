@@ -114,7 +114,8 @@ pub fn parse_node_error(endpoint: &NodeRpcClientEndpoint, details: &[u8]) -> Opt
         // These endpoints don't have typed errors from the node
         NodeRpcClientEndpoint::GetAccount
         | NodeRpcClientEndpoint::GetAccountStateDelta
-        | NodeRpcClientEndpoint::SyncState => None,
+        | NodeRpcClientEndpoint::SyncState
+        | NodeRpcClientEndpoint::Status => None,
     }
 }
 
@@ -223,5 +224,6 @@ mod tests {
         assert_eq!(parse_node_error(&NodeRpcClientEndpoint::GetAccount, &[1]), None);
         assert_eq!(parse_node_error(&NodeRpcClientEndpoint::GetAccountStateDelta, &[1]), None);
         assert_eq!(parse_node_error(&NodeRpcClientEndpoint::SyncState, &[1]), None);
+        assert_eq!(parse_node_error(&NodeRpcClientEndpoint::Status, &[1]), None);
     }
 }

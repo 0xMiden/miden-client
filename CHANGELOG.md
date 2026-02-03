@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.14.0 (TBD)
+
+### Changes
+
+* Added a `StorageReader` accessible through `Client::new_storage_reader` to read storage slots without having to load the whole account ([#1713](https://github.com/0xMiden/miden-client/pull/1713)). 
+
+
 ## 0.13.0 (2026-01-28)
 
 ### Enhancements
@@ -14,6 +21,7 @@
 * Expanded the `GrpcClient` API with methods to fetch account proofs and rebuild the slots for an account ([#1591](https://github.com/0xMiden/miden-client/pull/1591)).
 * Added `CliClient` wrapper and `CliConfig::from_system()` to allow creating a CLI-configured client programmatically ([#1642](https://github.com/0xMiden/miden-client/pull/1642)).
 * Added sync lock to coordinate concurrent `syncState()` calls in the WebClient using the Web Locks API, with coalescing behavior where concurrent callers share results from an in-progress sync ([#1690](https://github.com/0xMiden/miden-client/pull/1690)).
+* Added an unversioned RPC status helper and `RpcStatusInfo` domain type for easier status access ([#1715](https://github.com/0xMiden/miden-client/pull/1715)).
 
 ### Changes
 
@@ -43,6 +51,7 @@
 * [BREAKING] Updated `BlockNumber` IndexedDB type: changed from `string` to `number` ([#1684](https://github.com/0xMiden/miden-client/pull/1684)).
 * [BREAKING] Upgraded to protocol 0.13: exposed and aligned note-related structs to WebClient; `NoteTag` and `NoteAttachment` APIs updated renamed `NoteTag.fromAccountId` to `withAccountTarget`, added `withCustomAccountTarget`; added `NoteAttachmentScheme` wrapper and content accessors (`asWord`, `asArray`) to `NoteAttachment`; removed `NoteExecutionMode` ([#1685](https://github.com/0xMiden/miden-client/pull/1685)).
 * [BREAKING] Removed the `payback_note_type` field from the swap command ([#1700](https://github.com/0xMiden/miden-client/pull/1700)).
+* [BREAKING] Deprecated `Client::new()` in favor of `ClientBuilder`; added `ClientBuilder::for_testnet()`, `for_devnet()`, and `for_localhost()` constructors that pre-configure RPC endpoint, transaction prover, and note transport for each network ([#1712](https://github.com/0xMiden/miden-client/pull/1712)).
 
 ### Fixes
 
