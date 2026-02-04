@@ -110,6 +110,10 @@ pub enum AccountStatus {
 }
 
 impl AccountStatus {
+    pub fn is_new(&self) -> bool {
+        matches!(self, AccountStatus::New { .. })
+    }
+
     pub fn is_locked(&self) -> bool {
         matches!(self, AccountStatus::Locked { .. })
     }

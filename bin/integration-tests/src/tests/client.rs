@@ -1208,7 +1208,7 @@ pub async fn test_locked_account(client_config: ClientConfig) -> Result<()> {
     wait_for_node(&mut client_2).await;
 
     // When imported the account shouldn't be locked
-    assert!(!client_2.account_reader(from_account_id).is_locked().await.unwrap());
+    assert!(!client_2.account_reader(from_account_id).status().await.unwrap().is_locked());
 
     // Consume note with private account in client 1
     let tx_id =
@@ -1219,8 +1219,9 @@ pub async fn test_locked_account(client_config: ClientConfig) -> Result<()> {
     // After sync the private account should be locked in client 2
     let summary = client_2.sync_state().await.unwrap();
     assert!(summary.locked_accounts.contains(&from_account_id));
-    assert!(client_2.account_reader(from_account_id).is_locked().await.unwrap());
-    assert_eq!(client_2.account_reader(from_account_id).seed().await.unwrap(), original_seed);
+    let status = client_2.account_reader(from_account_id).status().await.unwrap();
+    assert!(status.is_locked());
+    assert_eq!(status.seed(), original_seed.as_ref());
 
     // Get updated account from client 1 and import it in client 2 with `overwrite` flag
     let updated_private_account: Account =
@@ -1229,7 +1230,7 @@ pub async fn test_locked_account(client_config: ClientConfig) -> Result<()> {
 
     // After sync the private account shouldn't be locked in client 2
     client_2.sync_state().await.unwrap();
-    assert!(!client_2.account_reader(from_account_id).is_locked().await.unwrap());
+    assert!(!client_2.account_reader(from_account_id).status().await.unwrap().is_locked());
     Ok(())
 }
 

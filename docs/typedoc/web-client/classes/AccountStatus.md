@@ -47,6 +47,18 @@ rendering it unusable for transactions.
 
 ***
 
+### isNew()
+
+> **isNew**(): `boolean`
+
+Returns `true` if the account is new and hasn't been used yet.
+
+#### Returns
+
+`boolean`
+
+***
+
 ### seed()
 
 > **seed**(): [`Word`](Word.md)

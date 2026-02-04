@@ -218,7 +218,7 @@ where
     // Verify seed
     let account_seed = account.seed();
     assert!(account_seed.is_some(), "newly built account should always contain a seed");
-    assert_eq!(account_seed, account_reader.seed().await.unwrap());
+    assert_eq!(account_seed, account_reader.status().await.unwrap().seed().copied());
 }
 
 async fn assert_faucet_insertion<F>(insert_fn: F)
@@ -249,7 +249,7 @@ where
     // Verify seed
     let account_seed = account.seed();
     assert!(account_seed.is_some(), "newly built account should always contain a seed");
-    assert_eq!(account_seed, account_reader.seed().await.unwrap());
+    assert_eq!(account_seed, account_reader.status().await.unwrap().seed().copied());
 }
 
 #[tokio::test]
@@ -1002,12 +1002,10 @@ async fn p2id_transfer() {
     let current_notes = client.get_input_notes(NoteFilter::Committed).await.unwrap();
     assert!(current_notes.is_empty());
 
-    let account_reader = client.account_reader(from_account_id);
-    let seed = account_reader.seed().await.unwrap();
-    let is_new = account_reader.is_new().await.unwrap();
+    let status = client.account_reader(from_account_id).status().await.unwrap();
 
     // The seed should not be retrieved due to the account not being new
-    assert!(!is_new && seed.is_none());
+    assert!(!status.is_new() && status.seed().is_none());
 
     // Validate the transferred amounts
     let from_balance = client
@@ -1184,9 +1182,9 @@ async fn p2ide_transfer_consumed_by_target() {
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
 
-    let from_reader = client.account_reader(from_account_id);
+    let from_status = client.account_reader(from_account_id).status().await.unwrap();
     // The seed should not be retrieved due to the account not being new
-    assert!(!from_reader.is_new().await.unwrap() && from_reader.seed().await.unwrap().is_none());
+    assert!(!from_status.is_new() && from_status.seed().is_none());
 
     // Validate the transferred amounts
     let new_from_balance = client
@@ -1294,9 +1292,9 @@ async fn p2ide_transfer_consumed_by_sender() {
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
 
-    let from_reader = client.account_reader(from_account_id);
+    let from_status = client.account_reader(from_account_id).status().await.unwrap();
     // The seed should not be retrieved due to the account not being new
-    assert!(!from_reader.is_new().await.unwrap() && from_reader.seed().await.unwrap().is_none());
+    assert!(!from_status.is_new() && from_status.seed().is_none());
 
     // Validate the sender hasn't lost funds
     let new_from_balance = client

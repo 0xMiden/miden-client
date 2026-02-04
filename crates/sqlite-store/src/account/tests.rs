@@ -488,10 +488,6 @@ async fn account_reader_nonce_and_status() -> anyhow::Result<()> {
     assert!(!status.is_locked());
     assert!(status.seed().is_some()); // New account should have a seed
 
-    // Test is_locked
-    let is_locked = reader.is_locked().await?;
-    assert!(!is_locked);
-
     // Test commitment
     let commitment = reader.commitment().await?;
     assert_eq!(commitment, account.commitment());

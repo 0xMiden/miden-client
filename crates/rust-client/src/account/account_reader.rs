@@ -26,7 +26,6 @@ use crate::store::{AccountStatus, Store};
 /// let commitment = reader.commitment().await?;
 ///
 /// // Vault access
-/// let vault = reader.vault().await?;
 /// let balance = reader.get_balance(faucet_id).await?;
 ///
 /// // Storage access

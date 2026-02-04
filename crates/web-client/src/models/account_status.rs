@@ -12,6 +12,12 @@ pub struct AccountStatus(NativeAccountStatus);
 
 #[wasm_bindgen]
 impl AccountStatus {
+    /// Returns `true` if the account is new and hasn't been used yet.
+    #[wasm_bindgen(js_name = "isNew")]
+    pub fn is_new(&self) -> bool {
+        self.0.is_new()
+    }
+
     /// Returns `true` if the account is locked.
     ///
     /// A locked account has a local state that doesn't match the node's state,
