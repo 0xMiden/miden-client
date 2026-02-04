@@ -1,19 +1,21 @@
-use core::fmt;
-
 // NOTE SYNC ERROR
 // ================================================================================================
 
 // Error codes match `miden-node/crates/store/src/errors.rs::NoteSyncError`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 pub enum NoteSyncError {
     /// Internal server error (code 0)
+    #[error("internal server error")]
     Internal,
     /// Invalid block range specified
+    #[error("invalid block range")]
     InvalidBlockRange,
     /// Failed to deserialize data
+    #[error("deserialization failed")]
     DeserializationFailed,
     /// Error code not recognized by this client version. This can happen if the node
     /// is newer than the client and has added new error variants.
+    #[error("unknown error (code {0})")]
     Unknown(u8),
 }
 
@@ -28,33 +30,27 @@ impl From<u8> for NoteSyncError {
     }
 }
 
-impl fmt::Display for NoteSyncError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Internal => write!(f, "internal server error"),
-            Self::InvalidBlockRange => write!(f, "invalid block range"),
-            Self::DeserializationFailed => write!(f, "deserialization failed"),
-            Self::Unknown(code) => write!(f, "unknown error (code {code})"),
-        }
-    }
-}
-
 // SYNC NULLIFIERS ERROR
 // ================================================================================================
 
 // Error codes match `miden-node/crates/store/src/errors.rs::SyncNullifiersError`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 pub enum SyncNullifiersError {
     /// Internal server error (code 0)
+    #[error("internal server error")]
     Internal,
     /// Invalid block range specified
+    #[error("invalid block range")]
     InvalidBlockRange,
     /// Invalid prefix length
+    #[error("invalid prefix length")]
     InvalidPrefixLength,
     /// Failed to deserialize data
+    #[error("deserialization failed")]
     DeserializationFailed,
     /// Error code not recognized by this client version. This can happen if the node
     /// is newer than the client and has added new error variants.
+    #[error("unknown error (code {0})")]
     Unknown(u8),
 }
 
@@ -70,34 +66,27 @@ impl From<u8> for SyncNullifiersError {
     }
 }
 
-impl fmt::Display for SyncNullifiersError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Internal => write!(f, "internal server error"),
-            Self::InvalidBlockRange => write!(f, "invalid block range"),
-            Self::InvalidPrefixLength => write!(f, "invalid prefix length"),
-            Self::DeserializationFailed => write!(f, "deserialization failed"),
-            Self::Unknown(code) => write!(f, "unknown error (code {code})"),
-        }
-    }
-}
-
 // SYNC ACCOUNT VAULT ERROR
 // ================================================================================================
 
 // Error codes match `miden-node/crates/store/src/errors.rs::SyncAccountVaultError`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 pub enum SyncAccountVaultError {
     /// Internal server error (code 0)
+    #[error("internal server error")]
     Internal,
     /// Invalid block range specified
+    #[error("invalid block range")]
     InvalidBlockRange,
     /// Failed to deserialize data
+    #[error("deserialization failed")]
     DeserializationFailed,
     /// Account is not public
+    #[error("account is not public")]
     AccountNotPublic,
     /// Error code not recognized by this client version. This can happen if the node
     /// is newer than the client and has added new error variants.
+    #[error("unknown error (code {0})")]
     Unknown(u8),
 }
 
@@ -113,36 +102,30 @@ impl From<u8> for SyncAccountVaultError {
     }
 }
 
-impl fmt::Display for SyncAccountVaultError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Internal => write!(f, "internal server error"),
-            Self::InvalidBlockRange => write!(f, "invalid block range"),
-            Self::DeserializationFailed => write!(f, "deserialization failed"),
-            Self::AccountNotPublic => write!(f, "account is not public"),
-            Self::Unknown(code) => write!(f, "unknown error (code {code})"),
-        }
-    }
-}
-
 // SYNC ACCOUNT STORAGE MAPS ERROR
 // ================================================================================================
 
 // Error codes match `miden-node/crates/store/src/errors.rs::SyncAccountStorageMapsError`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 pub enum SyncAccountStorageMapsError {
     /// Internal server error (code 0)
+    #[error("internal server error")]
     Internal,
     /// Invalid block range specified
+    #[error("invalid block range")]
     InvalidBlockRange,
     /// Failed to deserialize data
+    #[error("deserialization failed")]
     DeserializationFailed,
     /// Account was not found
+    #[error("account not found")]
     AccountNotFound,
     /// Account is not public
+    #[error("account is not public")]
     AccountNotPublic,
     /// Error code not recognized by this client version. This can happen if the node
     /// is newer than the client and has added new error variants.
+    #[error("unknown error (code {0})")]
     Unknown(u8),
 }
 
@@ -159,37 +142,30 @@ impl From<u8> for SyncAccountStorageMapsError {
     }
 }
 
-impl fmt::Display for SyncAccountStorageMapsError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Internal => write!(f, "internal server error"),
-            Self::InvalidBlockRange => write!(f, "invalid block range"),
-            Self::DeserializationFailed => write!(f, "deserialization failed"),
-            Self::AccountNotFound => write!(f, "account not found"),
-            Self::AccountNotPublic => write!(f, "account is not public"),
-            Self::Unknown(code) => write!(f, "unknown error (code {code})"),
-        }
-    }
-}
-
 // SYNC TRANSACTIONS ERROR
 // ================================================================================================
 
 // Error codes match `miden-node/crates/store/src/errors.rs::SyncTransactionsError`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 pub enum SyncTransactionsError {
     /// Internal server error (code 0)
+    #[error("internal server error")]
     Internal,
     /// Invalid block range specified
+    #[error("invalid block range")]
     InvalidBlockRange,
     /// Failed to deserialize data
+    #[error("deserialization failed")]
     DeserializationFailed,
     /// Account was not found
+    #[error("account not found")]
     AccountNotFound,
     /// Witness error
+    #[error("witness error")]
     WitnessError,
     /// Error code not recognized by this client version. This can happen if the node
     /// is newer than the client and has added new error variants.
+    #[error("unknown error (code {0})")]
     Unknown(u8),
 }
 
@@ -202,19 +178,6 @@ impl From<u8> for SyncTransactionsError {
             3 => Self::AccountNotFound,
             4 => Self::WitnessError,
             _ => Self::Unknown(code),
-        }
-    }
-}
-
-impl fmt::Display for SyncTransactionsError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Internal => write!(f, "internal server error"),
-            Self::InvalidBlockRange => write!(f, "invalid block range"),
-            Self::DeserializationFailed => write!(f, "deserialization failed"),
-            Self::AccountNotFound => write!(f, "account not found"),
-            Self::WitnessError => write!(f, "witness error"),
-            Self::Unknown(code) => write!(f, "unknown error (code {code})"),
         }
     }
 }

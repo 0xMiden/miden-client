@@ -1,7 +1,5 @@
 //! Typed error codes parsed from gRPC status details sent by the node.
 
-use core::fmt;
-
 mod block;
 mod note;
 mod sync;
@@ -20,48 +18,41 @@ pub use transaction::AddTransactionError;
 
 use crate::rpc::NodeRpcClientEndpoint;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 pub enum NodeRpcError {
     /// Error from the `SubmitProvenTransaction` endpoint
-    AddTransaction(AddTransactionError),
+    #[error(transparent)]
+    AddTransaction(#[from] AddTransactionError),
     /// Error from the `GetBlockHeaderByNumber` endpoint
-    GetBlockHeader(GetBlockHeaderError),
+    #[error(transparent)]
+    GetBlockHeader(#[from] GetBlockHeaderError),
     /// Error from the `GetBlockByNumber` endpoint
-    GetBlockByNumber(GetBlockByNumberError),
+    #[error(transparent)]
+    GetBlockByNumber(#[from] GetBlockByNumberError),
     /// Error from the `SyncNotes` endpoint
-    NoteSync(NoteSyncError),
+    #[error(transparent)]
+    NoteSync(#[from] NoteSyncError),
     /// Error from the `SyncNullifiers` endpoint
-    SyncNullifiers(SyncNullifiersError),
+    #[error(transparent)]
+    SyncNullifiers(#[from] SyncNullifiersError),
     /// Error from the `SyncAccountVault` endpoint
-    SyncAccountVault(SyncAccountVaultError),
+    #[error(transparent)]
+    SyncAccountVault(#[from] SyncAccountVaultError),
     /// Error from the `SyncStorageMaps` endpoint
-    SyncStorageMaps(SyncAccountStorageMapsError),
+    #[error(transparent)]
+    SyncStorageMaps(#[from] SyncAccountStorageMapsError),
     /// Error from the `SyncTransactions` endpoint
-    SyncTransactions(SyncTransactionsError),
+    #[error(transparent)]
+    SyncTransactions(#[from] SyncTransactionsError),
     /// Error from the `GetNotesById` endpoint
-    GetNotesById(GetNotesByIdError),
+    #[error(transparent)]
+    GetNotesById(#[from] GetNotesByIdError),
     /// Error from the `GetNoteScriptByRoot` endpoint
-    GetNoteScriptByRoot(GetNoteScriptByRootError),
+    #[error(transparent)]
+    GetNoteScriptByRoot(#[from] GetNoteScriptByRootError),
     /// Error from the `CheckNullifiers` endpoint
-    CheckNullifiers(CheckNullifiersError),
-}
-
-impl fmt::Display for NodeRpcError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::AddTransaction(err) => write!(f, "{err}"),
-            Self::GetBlockHeader(err) => write!(f, "{err}"),
-            Self::GetBlockByNumber(err) => write!(f, "{err}"),
-            Self::NoteSync(err) => write!(f, "{err}"),
-            Self::SyncNullifiers(err) => write!(f, "{err}"),
-            Self::SyncAccountVault(err) => write!(f, "{err}"),
-            Self::SyncStorageMaps(err) => write!(f, "{err}"),
-            Self::SyncTransactions(err) => write!(f, "{err}"),
-            Self::GetNotesById(err) => write!(f, "{err}"),
-            Self::GetNoteScriptByRoot(err) => write!(f, "{err}"),
-            Self::CheckNullifiers(err) => write!(f, "{err}"),
-        }
-    }
+    #[error(transparent)]
+    CheckNullifiers(#[from] CheckNullifiersError),
 }
 
 /// Parses error code from `status.details()` (a single u8 byte).
