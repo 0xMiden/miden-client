@@ -156,30 +156,6 @@ Retrieves the account header.
 
 ***
 
-### isLocked()
-
-> **isLocked**(): `Promise`\<`boolean`\>
-
-Returns whether the account is locked.
-
-#### Returns
-
-`Promise`\<`boolean`\>
-
-***
-
-### isNew()
-
-> **isNew**(): `Promise`\<`boolean`\>
-
-Returns whether the account is new.
-
-#### Returns
-
-`Promise`\<`boolean`\>
-
-***
-
 ### nonce()
 
 > **nonce**(): `Promise`\<[`Felt`](Felt.md)\>
@@ -192,15 +168,15 @@ Retrieves the current account nonce.
 
 ***
 
-### seed()
+### status()
 
-> **seed**(): `Promise`\<[`Word`](Word.md)\>
+> **status**(): `Promise`\<[`AccountStatus`](AccountStatus.md)\>
 
-Retrieves the account seed (if available for new/locked accounts).
+Retrieves the account status.
 
 #### Returns
 
-`Promise`\<[`Word`](Word.md)\>
+`Promise`\<[`AccountStatus`](AccountStatus.md)\>
 
 ***
 

@@ -434,7 +434,7 @@ where
         let executed_transaction = tx_update.executed_transaction();
         let account_id = executed_transaction.account_id();
 
-        if self.account_reader(account_id).is_locked().await? {
+        if self.account_reader(account_id).status().await?.is_locked() {
             return Err(ClientError::AccountLocked(account_id));
         }
 

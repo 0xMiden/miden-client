@@ -95,7 +95,7 @@ impl TryFrom<AccountRecord> for PartialAccount {
 /// Represents the status of an account tracked by the client.
 ///
 /// The status of an account may change by local or external factors.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum AccountStatus {
     /// The account is new and hasn't been used yet. The seed used to create the account is
     /// stored in this state.

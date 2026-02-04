@@ -11,6 +11,7 @@ use wasm_bindgen::prelude::*;
 
 use super::account_header::AccountHeader;
 use super::account_id::AccountId;
+use super::account_status::AccountStatus;
 use super::address::Address;
 use super::felt::Felt;
 use super::word::Word;
@@ -88,33 +89,6 @@ impl AccountReader {
             .map_err(|err| js_error_with_context(err, "failed to get code commitment"))
     }
 
-    /// Returns whether the account is locked.
-    #[wasm_bindgen(js_name = "isLocked")]
-    pub async fn is_locked(&self) -> Result<bool, JsValue> {
-        self.0
-            .is_locked()
-            .await
-            .map_err(|err| js_error_with_context(err, "failed to check if account is locked"))
-    }
-
-    /// Returns whether the account is new.
-    #[wasm_bindgen(js_name = "isNew")]
-    pub async fn is_new(&self) -> Result<bool, JsValue> {
-        self.0
-            .is_new()
-            .await
-            .map_err(|err| js_error_with_context(err, "failed to check if account is new"))
-    }
-
-    /// Retrieves the account seed (if available for new/locked accounts).
-    pub async fn seed(&self) -> Result<Option<Word>, JsValue> {
-        self.0
-            .seed()
-            .await
-            .map(|opt| opt.map(Into::into))
-            .map_err(|err| js_error_with_context(err, "failed to get account seed"))
-    }
-
     /// Retrieves the account header.
     pub async fn header(&self) -> Result<AccountHeader, JsValue> {
         let (header, _) = self
@@ -123,6 +97,15 @@ impl AccountReader {
             .await
             .map_err(|err| js_error_with_context(err, "failed to get account header"))?;
         Ok(header.into())
+    }
+
+    /// Retrieves the account status.
+    pub async fn status(&self) -> Result<AccountStatus, JsValue> {
+        self.0
+            .status()
+            .await
+            .map(Into::into)
+            .map_err(|err| js_error_with_context(err, "failed to get account status"))
     }
 
     // ACCOUNT DATA ACCESS

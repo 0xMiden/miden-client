@@ -6,7 +6,7 @@ use alloc::vec::Vec;
 use miden_protocol::account::{AccountHeader, AccountId, StorageMapWitness, StorageSlotName};
 use miden_protocol::address::Address;
 use miden_protocol::asset::{Asset, AssetVaultKey};
-use miden_protocol::{Felt, Word, ZERO};
+use miden_protocol::{Felt, Word};
 
 use crate::errors::ClientError;
 use crate::store::{AccountStatus, Store};
@@ -85,22 +85,6 @@ impl AccountReader {
     pub async fn status(&self) -> Result<AccountStatus, ClientError> {
         let (_, status) = self.header().await?;
         Ok(status)
-    }
-
-    /// Returns whether the account is locked.
-    pub async fn is_locked(&self) -> Result<bool, ClientError> {
-        Ok(self.status().await?.is_locked())
-    }
-
-    /// Returns whether the account is new.
-    pub async fn is_new(&self) -> Result<bool, ClientError> {
-        Ok(self.nonce().await? == ZERO)
-    }
-
-    /// Retrieves the account seed (if available for new/locked accounts).
-    pub async fn seed(&self) -> Result<Option<Word>, ClientError> {
-        let (_, status) = self.header().await?;
-        Ok(status.seed().copied())
     }
 
     /// Retrieves the account header and status.
