@@ -232,6 +232,59 @@ impl Display for AccountStatus {
     }
 }
 
+// PRUNABLE ACCOUNT DATA
+// ================================================================================================
+
+/// Information about a single account state that can be pruned.
+///
+/// This represents a historical account state that is safe to delete because:
+/// - It is a committed state (not pending)
+/// - It is not the latest committed state
+#[derive(Debug, Clone)]
+pub struct PrunableAccountState {
+    /// The account ID this state belongs to.
+    pub account_id: AccountId,
+    /// The nonce of this state.
+    pub nonce: u64,
+    /// The commitment (hash) that uniquely identifies this state.
+    pub commitment: Word,
+}
+
+/// Information about account data that can be safely pruned.
+///
+/// This is returned by `get_prunable_account_data()` to allow users to review
+/// what would be deleted before actually pruning. This is a safety mechanism
+/// to prevent accidental data loss.
+#[derive(Debug, Clone, Default)]
+pub struct PrunableAccountData {
+    /// Account states that can be pruned.
+    pub states: Vec<PrunableAccountState>,
+    /// Number of orphaned storage rows that would be deleted.
+    /// These are rows in `account_storage` that are no longer referenced.
+    pub orphaned_storage_rows: usize,
+    /// Number of orphaned asset rows that would be deleted.
+    /// These are rows in `account_assets` that are no longer referenced.
+    pub orphaned_asset_rows: usize,
+    /// Number of orphaned storage map entries that would be deleted.
+    /// These are rows in `storage_map_entries` that are no longer referenced.
+    pub orphaned_map_entries: usize,
+}
+
+impl PrunableAccountData {
+    /// Returns true if there is nothing to prune.
+    pub fn is_empty(&self) -> bool {
+        self.states.is_empty()
+            && self.orphaned_storage_rows == 0
+            && self.orphaned_asset_rows == 0
+            && self.orphaned_map_entries == 0
+    }
+
+    /// Returns the total number of account states that would be pruned.
+    pub fn state_count(&self) -> usize {
+        self.states.len()
+    }
+}
+
 // ACCOUNT UPDATES
 // ================================================================================================
 

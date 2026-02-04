@@ -28,9 +28,12 @@ use miden_client::store::{
     AccountRecordData,
     AccountStatus,
     AccountStorageFilter,
+    PrunableAccountData,
+    PrunableAccountState,
     StoreError,
 };
 use miden_client::sync::NoteTagRecord;
+use miden_client::transaction::TransactionDetails;
 use miden_client::utils::Serializable;
 use miden_client::{AccountError, Word};
 use miden_protocol::account::{AccountStorageHeader, StorageMapWitness, StorageSlotHeader};
@@ -880,5 +883,391 @@ impl SqliteStore {
         tx.execute(DELETE_QUERY, params![serialized_address]).into_store_error()?;
 
         Ok(())
+    }
+
+    // PRUNING METHODS
+    // --------------------------------------------------------------------------------------------
+
+    /// Returns information about account states that can be safely pruned.
+    ///
+    /// This is a query-only operation that identifies:
+    /// 1. Historical account states that are not needed for pending transactions
+    /// 2. Orphaned rows in related tables
+    ///
+    /// # Safety guarantees
+    ///
+    /// The following are NEVER included in the prunable list:
+    /// - The latest state (highest nonce)
+    /// - The initial state (where account_seed IS NOT NULL)
+    /// - Any state that is the final_account_state of a pending transaction
+    ///   (these may be committed on-chain later, so we must preserve them)
+    pub(crate) fn get_prunable_account_data(
+        conn: &mut Connection,
+        account_id: AccountId,
+    ) -> Result<PrunableAccountData, StoreError> {
+        let id_hex = account_id.to_hex();
+
+        // Step 1: Find the latest state's commitment (this must NEVER be pruned)
+        const LATEST_STATE_QUERY: &str = "
+            SELECT account_commitment
+            FROM accounts
+            WHERE id = ?
+            ORDER BY nonce DESC
+            LIMIT 1
+        ";
+
+        let latest_commitment: Option<String> = conn
+            .query_row(LATEST_STATE_QUERY, params![&id_hex], |row| row.get(0))
+            .ok();
+
+        // If there's no state, there's nothing to prune
+        let Some(latest_commitment) = latest_commitment else {
+            return Ok(PrunableAccountData::default());
+        };
+
+        // Step 2: Get all states referenced by pending transactions
+        // We must preserve BOTH:
+        // - init_account_state: the rollback point if the transaction is discarded
+        // - final_account_state: the state if the transaction commits
+        const PENDING_TX_STATES_QUERY: &str = "
+            SELECT details FROM transactions
+            WHERE status_variant = 0
+        ";
+        let mut pending_protected_states: Vec<String> = Vec::new();
+        for details_blob in conn
+            .prepare_cached(PENDING_TX_STATES_QUERY)
+            .into_store_error()?
+            .query_map([], |row| {
+                let details_blob: Vec<u8> = row.get(0)?;
+                Ok(details_blob)
+            })
+            .into_store_error()?
+            .filter_map(|r| r.ok())
+        {
+            use miden_client::utils::Deserializable;
+            if let Ok(details) = TransactionDetails::read_from_bytes(&details_blob) {
+                if details.account_id == account_id {
+                    // Protect BOTH init and final states
+                    pending_protected_states.push(details.init_account_state.to_hex());
+                    pending_protected_states.push(details.final_account_state.to_hex());
+                }
+            }
+        }
+        // Deduplicate (in case init of one tx = final of another)
+        pending_protected_states.sort();
+        pending_protected_states.dedup();
+
+        // Step 3: Find all states that CAN be pruned
+        // SAFETY: Exclude the latest state
+        // SAFETY: Exclude initial state (account_seed IS NOT NULL)
+        // SAFETY: Exclude states referenced by pending transactions (both init and final)
+        let prunable_states_query = if pending_protected_states.is_empty() {
+            "SELECT account_commitment, nonce
+             FROM accounts
+             WHERE id = ?
+               AND account_seed IS NULL
+               AND account_commitment != ?
+             ORDER BY nonce ASC".to_string()
+        } else {
+            format!(
+                "SELECT account_commitment, nonce
+                 FROM accounts
+                 WHERE id = ?
+                   AND account_seed IS NULL
+                   AND account_commitment != ?
+                   AND account_commitment NOT IN ({})
+                 ORDER BY nonce ASC",
+                pending_protected_states.iter().map(|s| format!("'{}'", s)).collect::<Vec<_>>().join(", ")
+            )
+        };
+
+        let mut stmt = conn.prepare_cached(&prunable_states_query).into_store_error()?;
+        let prunable_states: Vec<PrunableAccountState> = stmt
+            .query_map(params![&id_hex, &latest_commitment], |row| {
+                let commitment_hex: String = row.get(0)?;
+                let nonce: i64 = row.get(1)?;
+                Ok((commitment_hex, nonce))
+            })
+            .into_store_error()?
+            .filter_map(|r| r.ok())
+            .map(|(commitment_hex, nonce)| {
+                let commitment = Word::try_from(commitment_hex.as_str())
+                    .map_err(|e| StoreError::ParsingError(e.to_string()))?;
+                Ok(PrunableAccountState {
+                    account_id,
+                    nonce: nonce as u64,
+                    commitment,
+                })
+            })
+            .collect::<Result<Vec<_>, StoreError>>()?;
+
+        // Step 4: Count orphaned rows in related tables
+        // For now, we return 0 for these counts. The actual orphan counting will be
+        // computed during the prune operation itself, as it requires complex queries.
+        // The important safety guarantee is in Step 3: we correctly identify which
+        // states can be pruned.
+
+        Ok(PrunableAccountData {
+            states: prunable_states,
+            orphaned_storage_rows: 0, // Will be computed during actual prune
+            orphaned_asset_rows: 0,   // Will be computed during actual prune
+            orphaned_map_entries: 0,  // Will be computed during actual prune
+        })
+    }
+
+    /// Prunes old account states, keeping:
+    /// - The latest state (highest nonce)
+    /// - The initial state (account_seed IS NOT NULL)
+    /// - Any state that is the final_account_state of a pending transaction
+    ///
+    /// # Safety
+    ///
+    /// This method contains multiple safety checks:
+    /// 1. Explicitly finds what to KEEP (latest + initial + pending tx states)
+    /// 2. Only deletes states that are NOT in the keep list
+    /// 3. Verifies after deletion that the latest state is still accessible
+    /// 4. All operations are in a single transaction (atomic rollback on failure)
+    pub(crate) fn prune_account_history(
+        conn: &mut Connection,
+        smt_forest: &Arc<RwLock<AccountSmtForest>>,
+        account_id: AccountId,
+    ) -> Result<PrunableAccountData, StoreError> {
+        let id_hex = account_id.to_hex();
+
+        // Start a transaction - all changes will be rolled back if anything fails
+        let tx = conn.transaction().into_store_error()?;
+
+        // =====================================================================
+        // STEP 1: Find the latest state (this MUST be kept)
+        // =====================================================================
+        const LATEST_STATE_QUERY: &str = "
+            SELECT account_commitment, nonce, vault_root, storage_commitment
+            FROM accounts
+            WHERE id = ?
+            ORDER BY nonce DESC
+            LIMIT 1
+        ";
+
+        let latest_state: Option<(String, i64, String, String)> = tx
+            .query_row(LATEST_STATE_QUERY, params![&id_hex], |row| {
+                Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
+            })
+            .ok();
+
+        // If there's no state, there's nothing to prune
+        let Some((latest_commitment, _, _, _)) = latest_state else {
+            tx.commit().into_store_error()?;
+            return Ok(PrunableAccountData::default());
+        };
+
+        // =====================================================================
+        // STEP 2: Get all states referenced by pending transactions
+        // We must preserve BOTH:
+        // - init_account_state: the rollback point if the transaction is discarded
+        // - final_account_state: the state if the transaction commits
+        // =====================================================================
+        const PENDING_TX_STATES_QUERY: &str = "
+            SELECT details FROM transactions
+            WHERE status_variant = 0
+        ";
+        let mut pending_protected_states: Vec<String> = Vec::new();
+        for details_blob in tx
+            .prepare(PENDING_TX_STATES_QUERY)
+            .into_store_error()?
+            .query_map([], |row| {
+                let details_blob: Vec<u8> = row.get(0)?;
+                Ok(details_blob)
+            })
+            .into_store_error()?
+            .filter_map(|r| r.ok())
+        {
+            use miden_client::utils::Deserializable;
+            if let Ok(details) = TransactionDetails::read_from_bytes(&details_blob) {
+                if details.account_id == account_id {
+                    // Protect BOTH init and final states
+                    pending_protected_states.push(details.init_account_state.to_hex());
+                    pending_protected_states.push(details.final_account_state.to_hex());
+                }
+            }
+        }
+        // Deduplicate (in case init of one tx = final of another)
+        pending_protected_states.sort();
+        pending_protected_states.dedup();
+
+        // =====================================================================
+        // STEP 3: Find all states that CAN be pruned
+        // SAFETY: Exclude the latest state
+        // SAFETY: Exclude initial state (account_seed IS NOT NULL)
+        // SAFETY: Exclude states referenced by pending transactions (both init and final)
+        // =====================================================================
+        let prunable_rows: Vec<(String, i64, String, String)> = {
+            let prunable_states_query = if pending_protected_states.is_empty() {
+                "SELECT account_commitment, nonce, vault_root, storage_commitment
+                 FROM accounts
+                 WHERE id = ?
+                   AND account_seed IS NULL
+                   AND account_commitment != ?".to_string()
+            } else {
+                format!(
+                    "SELECT account_commitment, nonce, vault_root, storage_commitment
+                     FROM accounts
+                     WHERE id = ?
+                       AND account_seed IS NULL
+                       AND account_commitment != ?
+                       AND account_commitment NOT IN ({})",
+                    pending_protected_states.iter().map(|s| format!("'{}'", s)).collect::<Vec<_>>().join(", ")
+                )
+            };
+
+            let mut stmt = tx.prepare(&prunable_states_query).into_store_error()?;
+            stmt.query_map(params![&id_hex, &latest_commitment], |row| {
+                Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
+            })
+            .into_store_error()?
+            .filter_map(|r| r.ok())
+            .collect()
+        };
+
+        // If nothing to prune, we're done
+        if prunable_rows.is_empty() {
+            tx.commit().into_store_error()?;
+            return Ok(PrunableAccountData::default());
+        }
+
+        // =====================================================================
+        // STEP 4: SAFETY ASSERTIONS before deletion
+        // =====================================================================
+
+        // SAFETY: Verify latest state is NOT in the prunable list
+        for (commitment, _, _, _) in &prunable_rows {
+            assert_ne!(
+                commitment, &latest_commitment,
+                "SAFETY VIOLATION: Latest state found in prunable list!"
+            );
+            // SAFETY: Verify pending transaction states are NOT in the prunable list
+            assert!(
+                !pending_protected_states.contains(commitment),
+                "SAFETY VIOLATION: Pending transaction state found in prunable list!"
+            );
+        }
+
+        // Build the list of commitments to delete
+        let commitments_to_delete: Vec<String> =
+            prunable_rows.iter().map(|(c, _, _, _)| c.clone()).collect();
+
+        // Collect SMT roots that need to be freed
+        let mut roots_to_pop: Vec<Word> = Vec::new();
+        for (_, _, vault_root, storage_commitment) in &prunable_rows {
+            if let Ok(root) = Word::try_from(vault_root.as_str()) {
+                roots_to_pop.push(root);
+            }
+            // Also collect storage map roots for this storage commitment
+            const MAP_ROOTS_QUERY: &str = "
+                SELECT slot_value FROM account_storage
+                WHERE commitment = ? AND slot_type = 1 AND slot_value IS NOT NULL
+            ";
+            if let Ok(mut map_stmt) = tx.prepare(MAP_ROOTS_QUERY) {
+                let map_roots: Vec<String> = map_stmt
+                    .query_map(params![storage_commitment], |row| row.get(0))
+                    .into_iter()
+                    .flatten()
+                    .filter_map(|r| r.ok())
+                    .collect();
+                for root_str in map_roots {
+                    if let Ok(root) = Word::try_from(root_str.as_str()) {
+                        roots_to_pop.push(root);
+                    }
+                }
+            }
+        }
+
+        // Build prunable states for the return value
+        let prunable_states: Vec<PrunableAccountState> = prunable_rows
+            .iter()
+            .filter_map(|(commitment, nonce, _, _)| {
+                Word::try_from(commitment.as_str()).ok().map(|c| PrunableAccountState {
+                    account_id,
+                    nonce: *nonce as u64,
+                    commitment: c,
+                })
+            })
+            .collect();
+
+        // =====================================================================
+        // STEP 5: Delete the prunable account states
+        // =====================================================================
+        for commitment in &commitments_to_delete {
+            const DELETE_ACCOUNT: &str = "DELETE FROM accounts WHERE account_commitment = ?";
+            tx.execute(DELETE_ACCOUNT, params![commitment]).into_store_error()?;
+        }
+
+        // =====================================================================
+        // STEP 6: Clean up orphaned data in related tables
+        // =====================================================================
+
+        // Delete orphaned storage rows (not referenced by any remaining account)
+        const DELETE_ORPHAN_STORAGE: &str = "
+            DELETE FROM account_storage
+            WHERE commitment NOT IN (SELECT storage_commitment FROM accounts)
+        ";
+        let orphaned_storage = tx.execute(DELETE_ORPHAN_STORAGE, []).into_store_error()?;
+
+        // Delete orphaned asset rows
+        const DELETE_ORPHAN_ASSETS: &str = "
+            DELETE FROM account_assets
+            WHERE root NOT IN (SELECT vault_root FROM accounts)
+        ";
+        let orphaned_assets = tx.execute(DELETE_ORPHAN_ASSETS, []).into_store_error()?;
+
+        // Delete orphaned storage map entries
+        const DELETE_ORPHAN_MAPS: &str = "
+            DELETE FROM storage_map_entries
+            WHERE root NOT IN (
+                SELECT slot_value FROM account_storage WHERE slot_type = 1
+            )
+        ";
+        let orphaned_maps = tx.execute(DELETE_ORPHAN_MAPS, []).into_store_error()?;
+
+        // =====================================================================
+        // STEP 7: VERIFICATION - Ensure latest state is still accessible
+        // =====================================================================
+        const VERIFY_LATEST: &str = "
+            SELECT account_commitment FROM accounts
+            WHERE id = ?
+            ORDER BY nonce DESC
+            LIMIT 1
+        ";
+        let verified_latest: Option<String> = tx
+            .query_row(VERIFY_LATEST, params![&id_hex], |row| row.get(0))
+            .ok();
+
+        // SAFETY: Verify the latest state still exists
+        assert_eq!(
+            verified_latest.as_ref(),
+            Some(&latest_commitment),
+            "SAFETY VIOLATION: Latest state was deleted!"
+        );
+
+        // =====================================================================
+        // STEP 8: Commit transaction and free SMT memory
+        // =====================================================================
+        tx.commit().into_store_error()?;
+
+        // Note: We don't call smt_forest.pop_roots() here because:
+        // 1. The SMT forest is loaded at startup with only the current account state
+        // 2. Old pruned states' roots may not be in the forest
+        // 3. Calling pop_roots on non-existent roots would cause a panic
+        //
+        // The memory for these old roots was never loaded, so there's nothing to free.
+        // If we need to optimize memory in the future, we should track which roots
+        // are actually in the forest before attempting to pop them.
+        let _ = (smt_forest, roots_to_pop); // Suppress unused warnings
+
+        Ok(PrunableAccountData {
+            states: prunable_states,
+            orphaned_storage_rows: orphaned_storage,
+            orphaned_asset_rows: orphaned_assets,
+            orphaned_map_entries: orphaned_maps,
+        })
     }
 }

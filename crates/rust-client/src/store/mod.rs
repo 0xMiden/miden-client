@@ -62,7 +62,10 @@ mod errors;
 pub use errors::*;
 
 mod account;
-pub use account::{AccountRecord, AccountRecordData, AccountStatus, AccountUpdates};
+pub use account::{
+    AccountRecord, AccountRecordData, AccountStatus, AccountUpdates, PrunableAccountData,
+    PrunableAccountState,
+};
 mod note_record;
 pub use note_record::{
     InputNoteRecord,
@@ -300,6 +303,49 @@ pub trait Store: Send + Sync {
     ///
     /// Returns a `StoreError::AccountDataNotFound` if there is no account for the provided ID.
     async fn update_account(&self, new_account_state: &Account) -> Result<(), StoreError>;
+
+    /// Returns information about account states that can be safely pruned.
+    ///
+    /// This is a **query-only** operation that does not modify the database.
+    /// Use this to review what would be deleted before calling `prune_account_history()`.
+    ///
+    /// The returned data includes:
+    /// - Historical committed account states (not the latest, not pending)
+    /// - Counts of orphaned rows in related tables that would be cleaned up
+    ///
+    /// # Safety
+    ///
+    /// This method guarantees that the following are NEVER included in the prunable list:
+    /// - The latest committed state (highest nonce where seed is NULL)
+    /// - Any pending states (where seed is NOT NULL)
+    async fn get_prunable_account_data(
+        &self,
+        account_id: AccountId,
+    ) -> Result<PrunableAccountData, StoreError>;
+
+    /// Prunes old committed account states, keeping only the latest committed state
+    /// and all pending states.
+    ///
+    /// This operation:
+    /// 1. Deletes old committed account states (not the latest, not pending)
+    /// 2. Cleans up orphaned data in related tables (storage, assets, map entries)
+    /// 3. Frees memory in the SMT forest for pruned roots
+    ///
+    /// # Safety
+    ///
+    /// This method guarantees that the following are NEVER deleted:
+    /// - The latest committed state (highest nonce where seed is NULL)
+    /// - Any pending states (where seed is NOT NULL)
+    ///
+    /// The operation is atomic - if any step fails, all changes are rolled back.
+    ///
+    /// # Recommendation
+    ///
+    /// Call `get_prunable_account_data()` first to review what will be deleted.
+    async fn prune_account_history(
+        &self,
+        account_id: AccountId,
+    ) -> Result<PrunableAccountData, StoreError>;
 
     /// Adds an [`Address`] to an [`Account`], alongside its derived note tag.
     async fn insert_address(

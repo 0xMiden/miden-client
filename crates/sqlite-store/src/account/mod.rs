@@ -9,3 +9,6 @@ mod vault;
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod pruning_tests;

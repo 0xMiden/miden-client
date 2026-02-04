@@ -5,5 +5,6 @@ pub mod fpi;
 pub mod network_transaction;
 pub mod onchain;
 pub mod pass_through;
+pub mod pruning;
 pub mod swap_transaction;
 pub mod transport;
