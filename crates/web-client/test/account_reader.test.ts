@@ -18,7 +18,7 @@ test.describe("AccountReader tests", () => {
 
       const nonce = await reader.nonce();
       const commitment = await reader.commitment();
-      const isNew = await reader.isNew();
+      const isNew = (await reader.status()).isNew();
       const codeCommitment = await reader.codeCommitment();
 
       return {
