@@ -391,6 +391,12 @@ pub trait NodeRpcClient: Send + Sync {
     /// Errors:
     /// - [`RpcError::ExpectedDataMissing`] if the note with the specified root is not found.
     async fn get_network_id(&self) -> Result<NetworkId, RpcError>;
+
+    /// Fetches the RPC status without requiring Accept header validation.
+    ///
+    /// This is useful for diagnostics when version negotiation fails, as it allows
+    /// retrieving node information even when there's a version mismatch.
+    async fn get_status_unversioned(&self) -> Result<RpcStatusInfo, RpcError>;
 }
 
 // RPC API ENDPOINT

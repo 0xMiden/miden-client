@@ -3,6 +3,8 @@ use std::fs;
 use miden_client::Client;
 use miden_client::account::AccountId;
 use miden_client::auth::TransactionAuthenticator;
+use miden_client::block::BlockNumber;
+use miden_client::rpc::RpcStatusInfo;
 use miden_client::store::NoteFilter;
 
 use super::config::CliConfig;
@@ -11,12 +13,27 @@ use crate::errors::CliError;
 
 pub async fn print_client_info<AUTH: TransactionAuthenticator + Sync + 'static>(
     client: &Client<AUTH>,
+    show_rpc_status: bool,
 ) -> Result<(), CliError> {
     let config = CliConfig::from_system()?;
 
     println!("Client version: {}", env!("CARGO_PKG_VERSION"));
+
+    // Get and display local genesis commitment
+    if let Ok(Some((genesis_header, _))) =
+        client.get_block_header_by_num(BlockNumber::GENESIS).await
+    {
+        println!("Genesis commitment: {}", genesis_header.commitment().to_hex());
+    }
+
     print_config_stats(&config)?;
-    print_client_stats(client).await
+    print_client_stats(client).await?;
+
+    if show_rpc_status {
+        print_rpc_status(client).await?;
+    }
+
+    Ok(())
 }
 
 // HELPERS
@@ -42,4 +59,38 @@ fn print_config_stats(config: &CliConfig) -> Result<(), CliError> {
     let store_len = fs::metadata(config.store_filepath.clone())?.len();
     println!("Store size: {} kB", store_len / 1024);
     Ok(())
+}
+
+async fn print_rpc_status<AUTH: TransactionAuthenticator + Sync + 'static>(
+    client: &Client<AUTH>,
+) -> Result<(), CliError> {
+    println!("\n--- RPC Node Status ---");
+    match client.rpc_api().get_status_unversioned().await {
+        Ok(status) => {
+            print_status_info(&status);
+        },
+        Err(e) => {
+            println!("Failed to fetch RPC status: {e}");
+        },
+    }
+    Ok(())
+}
+
+fn print_status_info(status: &RpcStatusInfo) {
+    println!("Node version: {}", status.version);
+    if let Some(genesis) = status.genesis_commitment {
+        println!("Node genesis: {}", genesis.to_hex());
+    }
+    if let Some(ref store) = status.store {
+        println!("Store: {} (chain tip: {})", store.status, store.chain_tip);
+    }
+    if let Some(ref bp) = status.block_producer {
+        println!("Block producer: {} (chain tip: {})", bp.status, bp.chain_tip);
+        if let Some(ref mempool) = bp.mempool_stats {
+            println!(
+                "  Unbatched txs: {}, Proposed batches: {}, Proven batches: {}",
+                mempool.unbatched_transactions, mempool.proposed_batches, mempool.proven_batches
+            );
+        }
+    }
 }

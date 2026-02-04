@@ -388,6 +388,13 @@ where
     pub fn prover(&self) -> Arc<dyn TransactionProver + Send + Sync> {
         self.tx_prover.clone()
     }
+
+    /// Returns a reference to the RPC client.
+    ///
+    /// This is useful for diagnostic purposes, such as fetching node status information.
+    pub fn rpc_api(&self) -> &Arc<dyn NodeRpcClient> {
+        &self.rpc_api
+    }
 }
 
 impl<AUTH> Client<AUTH> {
