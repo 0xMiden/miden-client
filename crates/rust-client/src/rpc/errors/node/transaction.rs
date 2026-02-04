@@ -1,6 +1,6 @@
 use core::fmt;
 
-/// Error codes match `miden-node/crates/block-producer/src/errors.rs::AddTransactionError`.
+// Error codes match `miden-node/crates/block-producer/src/errors.rs::AddTransactionError`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AddTransactionError {
     /// Internal server error (code 0)

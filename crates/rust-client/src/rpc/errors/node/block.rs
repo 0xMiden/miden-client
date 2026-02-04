@@ -3,7 +3,7 @@ use core::fmt;
 // GET BLOCK HEADER ERROR
 // ================================================================================================
 
-/// Error codes match `miden-node/crates/store/src/errors.rs::GetBlockHeaderError`.
+// Error codes match `miden-node/crates/store/src/errors.rs::GetBlockHeaderError`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GetBlockHeaderError {
     /// Internal server error (code 0)
@@ -34,7 +34,7 @@ impl fmt::Display for GetBlockHeaderError {
 // GET BLOCK BY NUMBER ERROR
 // ================================================================================================
 
-/// Error codes match `miden-node/crates/store/src/errors.rs::GetBlockByNumberError`.
+// Error codes match `miden-node/crates/store/src/errors.rs::GetBlockByNumberError`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GetBlockByNumberError {
     /// Internal server error (code 0)

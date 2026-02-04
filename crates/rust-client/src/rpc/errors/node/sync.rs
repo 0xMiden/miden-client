@@ -3,7 +3,7 @@ use core::fmt;
 // NOTE SYNC ERROR
 // ================================================================================================
 
-/// Error codes match `miden-node/crates/store/src/errors.rs::NoteSyncError`.
+// Error codes match `miden-node/crates/store/src/errors.rs::NoteSyncError`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NoteSyncError {
     /// Internal server error (code 0)
@@ -42,7 +42,7 @@ impl fmt::Display for NoteSyncError {
 // SYNC NULLIFIERS ERROR
 // ================================================================================================
 
-/// Error codes match `miden-node/crates/store/src/errors.rs::SyncNullifiersError`.
+// Error codes match `miden-node/crates/store/src/errors.rs::SyncNullifiersError`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SyncNullifiersError {
     /// Internal server error (code 0)
@@ -85,7 +85,7 @@ impl fmt::Display for SyncNullifiersError {
 // SYNC ACCOUNT VAULT ERROR
 // ================================================================================================
 
-/// Error codes match `miden-node/crates/store/src/errors.rs::SyncAccountVaultError`.
+// Error codes match `miden-node/crates/store/src/errors.rs::SyncAccountVaultError`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SyncAccountVaultError {
     /// Internal server error (code 0)
@@ -128,7 +128,7 @@ impl fmt::Display for SyncAccountVaultError {
 // SYNC ACCOUNT STORAGE MAPS ERROR
 // ================================================================================================
 
-/// Error codes match `miden-node/crates/store/src/errors.rs::SyncAccountStorageMapsError`.
+// Error codes match `miden-node/crates/store/src/errors.rs::SyncAccountStorageMapsError`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SyncAccountStorageMapsError {
     /// Internal server error (code 0)
@@ -175,7 +175,7 @@ impl fmt::Display for SyncAccountStorageMapsError {
 // SYNC TRANSACTIONS ERROR
 // ================================================================================================
 
-/// Error codes match `miden-node/crates/store/src/errors.rs::SyncTransactionsError`.
+// Error codes match `miden-node/crates/store/src/errors.rs::SyncTransactionsError`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SyncTransactionsError {
     /// Internal server error (code 0)

@@ -3,7 +3,7 @@ use core::fmt;
 // GET NOTES BY ID ERROR
 // ================================================================================================
 
-/// Error codes match `miden-node/crates/store/src/errors.rs::GetNotesByIdError`.
+// Error codes match `miden-node/crates/store/src/errors.rs::GetNotesByIdError`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GetNotesByIdError {
     /// Internal server error (code 0)
@@ -46,7 +46,7 @@ impl fmt::Display for GetNotesByIdError {
 // GET NOTE SCRIPT BY ROOT ERROR
 // ================================================================================================
 
-/// Error codes match `miden-node/crates/store/src/errors.rs::GetNoteScriptByRootError`.
+// Error codes match `miden-node/crates/store/src/errors.rs::GetNoteScriptByRootError`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GetNoteScriptByRootError {
     /// Internal server error (code 0)
@@ -85,7 +85,7 @@ impl fmt::Display for GetNoteScriptByRootError {
 // CHECK NULLIFIERS ERROR
 // ================================================================================================
 
-/// Error codes match `miden-node/crates/store/src/errors.rs::CheckNullifiersError`.
+// Error codes match `miden-node/crates/store/src/errors.rs::CheckNullifiersError`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CheckNullifiersError {
     /// Internal server error (code 0)
