@@ -43,6 +43,15 @@ pub struct AccountCmd {
     /// account to the provided ID.
     #[arg(short, long, group = "action", value_name = "ID")]
     default: Option<Option<String>>,
+    /// Prune old committed states for the specified account.
+    ///
+    /// This removes historical account states that are no longer needed, freeing up storage space.
+    /// The latest state and any states needed by pending transactions are preserved.
+    #[arg(short, long, group = "action", value_name = "ID")]
+    prune: Option<String>,
+    /// Prune old committed states for all tracked accounts.
+    #[arg(long, group = "action")]
+    prune_all: bool,
 }
 
 impl AccountCmd {
@@ -53,6 +62,8 @@ impl AccountCmd {
                 list: false,
                 show: Some(id),
                 default: None,
+                prune: None,
+                prune_all: false,
                 ..
             } => {
                 let account_id = parse_account_id(&client, id).await?;
@@ -62,6 +73,8 @@ impl AccountCmd {
                 list: false,
                 show: None,
                 default: Some(id),
+                prune: None,
+                prune_all: false,
                 ..
             } => {
                 match id {
@@ -91,6 +104,27 @@ impl AccountCmd {
                         println!("Setting default account to {id}...");
                     },
                 }
+            },
+            AccountCmd {
+                list: false,
+                show: None,
+                default: None,
+                prune: Some(id),
+                prune_all: false,
+                ..
+            } => {
+                let account_id = parse_account_id(&client, id).await?;
+                prune_account(&mut client, account_id).await?;
+            },
+            AccountCmd {
+                list: false,
+                show: None,
+                default: None,
+                prune: None,
+                prune_all: true,
+                ..
+            } => {
+                prune_all_accounts(&mut client).await?;
             },
             _ => {
                 list_accounts(client).await?;
@@ -126,6 +160,57 @@ async fn list_accounts<AUTH>(client: Client<AUTH>) -> Result<(), CliError> {
     }
 
     println!("{table}");
+    Ok(())
+}
+
+// PRUNE ACCOUNT
+// ================================================================================================
+
+async fn prune_account<AUTH>(client: &mut Client<AUTH>, account_id: AccountId) -> Result<(), CliError> {
+    let pruned = client.prune_account_history(account_id).await?;
+
+    if pruned.is_empty() {
+        println!("No states to prune for account {account_id}");
+    } else {
+        println!("Pruned {} account state(s) for {account_id}", pruned.state_count());
+        if pruned.orphaned_storage_rows > 0 {
+            println!("  Cleaned up {} orphaned storage row(s)", pruned.orphaned_storage_rows);
+        }
+        if pruned.orphaned_asset_rows > 0 {
+            println!("  Cleaned up {} orphaned asset row(s)", pruned.orphaned_asset_rows);
+        }
+        if pruned.orphaned_map_entries > 0 {
+            println!("  Cleaned up {} orphaned map entry(ies)", pruned.orphaned_map_entries);
+        }
+    }
+
+    Ok(())
+}
+
+async fn prune_all_accounts<AUTH>(client: &mut Client<AUTH>) -> Result<(), CliError> {
+    let accounts = client.get_account_headers().await?;
+
+    if accounts.is_empty() {
+        println!("No accounts to prune");
+        return Ok(());
+    }
+
+    let mut total_states_pruned = 0;
+
+    for (header, _) in &accounts {
+        let pruned = client.prune_account_history(header.id()).await?;
+        if !pruned.is_empty() {
+            println!("Pruned {} state(s) for account {}", pruned.state_count(), header.id());
+            total_states_pruned += pruned.state_count();
+        }
+    }
+
+    if total_states_pruned == 0 {
+        println!("No states to prune across {} account(s)", accounts.len());
+    } else {
+        println!("Total: pruned {} state(s) across {} account(s)", total_states_pruned, accounts.len());
+    }
+
     Ok(())
 }
 
