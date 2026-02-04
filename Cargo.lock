@@ -2674,7 +2674,6 @@ name = "miden-client-service"
 version = "0.13.0"
 dependencies = [
  "async-trait",
- "futures",
  "miden-client",
  "miden-protocol",
  "thiserror 2.0.18",

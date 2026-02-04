@@ -4,6 +4,7 @@
 
 ### Enhancements
 
+* Added `miden-client-service` crate that wraps `Client` to provide operation coordination (sync/transaction mutual exclusion), event system for state changes, background sync, and customizable sync behavior via the `Syncer` trait ([#1734](https://github.com/0xMiden/miden-client/pull/1734)).
 * Updated the `GrpcClient` to fetch the RPC limits from the node ([#1724](https://github.com/0xMiden/miden-client/pull/1724)).
 
 ### Changes

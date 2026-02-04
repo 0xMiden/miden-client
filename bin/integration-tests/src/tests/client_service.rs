@@ -153,7 +153,10 @@ pub async fn test_client_service_background_sync(client_config: ClientConfig) ->
     // Verify we got the manual sync event
     let manual_sync_count = handler.sync_completed_count();
     println!("After manual sync, event count: {manual_sync_count}");
-    assert_eq!(manual_sync_count, 1, "Should have received 1 SyncCompleted event from manual sync");
+    assert_eq!(
+        manual_sync_count, 1,
+        "Should have received 1 SyncCompleted event from manual sync"
+    );
 
     // Start background sync
     let mut sync_handle = service.start_background_sync();

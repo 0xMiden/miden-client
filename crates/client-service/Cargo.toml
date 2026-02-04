@@ -12,7 +12,7 @@ version.workspace      = true
 
 [features]
 default = ["std"]
-std = ["miden-client/std", "tokio"]
+std     = ["miden-client/std", "tokio"]
 testing = ["miden-client/testing"]
 
 [dependencies]
@@ -24,15 +24,14 @@ miden-protocol = { workspace = true }
 
 # External dependencies
 async-trait = { workspace = true }
-futures = "0.3"
-thiserror = { workspace = true }
-tracing = { workspace = true }
+thiserror   = { workspace = true }
+tracing     = { workspace = true }
 
 # Optional native dependencies
-tokio = { workspace = true, optional = true, features = ["sync", "time", "rt"] }
+tokio = { features = ["rt", "sync", "time"], optional = true, workspace = true }
 
 [dev-dependencies]
-tokio = { workspace = true, features = ["rt", "macros"] }
+tokio = { features = ["macros", "rt"], workspace = true }
 
 [lints]
 workspace = true
