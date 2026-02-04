@@ -148,6 +148,7 @@
 
 ## Interfaces
 
+- [MockWebClientConfig](interfaces/MockWebClientConfig.md)
 - [WasmWebClient](interfaces/WasmWebClient.md)
 - [WebClientConfig](interfaces/WebClientConfig.md)
 

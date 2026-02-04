@@ -1572,7 +1572,7 @@ Factory method to create and initialize a new wrapped MockWebClient.
 
 ##### config?
 
-[`WebClientConfig`](../interfaces/WebClientConfig.md)
+[`MockWebClientConfig`](../interfaces/MockWebClientConfig.md)
 
 Client configuration (optional seed + optional serialized mock data).
 
