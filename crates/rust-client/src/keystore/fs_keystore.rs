@@ -92,11 +92,14 @@ impl TransactionAuthenticator for FilesystemKeyStore {
         Ok(signature)
     }
 
+    /// Retrieves a public key for a specific public key commitment.
     async fn get_public_key(
         &self,
-        _pub_key_commitment: PublicKeyCommitment,
+        pub_key_commitment: PublicKeyCommitment,
     ) -> Option<Arc<PublicKey>> {
-        None
+        self.get_key(pub_key_commitment)
+            .unwrap_or(None)
+            .map(|key| Arc::new(key.public_key()))
     }
 }
 

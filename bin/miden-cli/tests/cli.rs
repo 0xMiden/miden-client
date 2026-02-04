@@ -9,7 +9,7 @@ use assert_cmd::Command;
 use assert_cmd::cargo::cargo_bin_cmd;
 use miden_client::account::{AccountId, AccountStorageMode};
 use miden_client::address::AddressInterface;
-use miden_client::auth::RPO_FALCON_SCHEME_ID;
+use miden_client::auth::{RPO_FALCON_SCHEME_ID, TransactionAuthenticator};
 use miden_client::builder::ClientBuilder;
 use miden_client::crypto::{FeltRng, RpoRandomCoin};
 use miden_client::note::{
@@ -558,6 +558,10 @@ async fn cli_export_import_account() -> Result<()> {
         let matching_secret_key = cli_keystore.get_key(stored_pk_commitment).unwrap();
         assert!(matching_secret_key.is_some());
         assert!(matching_secret_key.unwrap().public_key().to_commitment() == stored_pk_commitment);
+
+        let public_key = cli_keystore.get_public_key(stored_pk_commitment).await;
+        assert!(public_key.is_some());
+        assert!(public_key.unwrap().to_commitment() == stored_pk_commitment);
     }
 
     let wallet_pks = client_2
@@ -568,6 +572,10 @@ async fn cli_export_import_account() -> Result<()> {
         let matching_secret_key = cli_keystore.get_key(stored_pk_commitment).unwrap();
         assert!(matching_secret_key.is_some());
         assert!(matching_secret_key.unwrap().public_key().to_commitment() == stored_pk_commitment);
+
+        let public_key = cli_keystore.get_public_key(stored_pk_commitment).await;
+        assert!(public_key.is_some());
+        assert!(public_key.unwrap().to_commitment() == stored_pk_commitment);
     }
 
     Ok(())
