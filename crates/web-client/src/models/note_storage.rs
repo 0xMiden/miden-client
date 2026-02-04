@@ -11,25 +11,22 @@ use crate::models::miden_arrays::FeltArray;
 ///
 /// All storage items associated with a note can be reduced to a single commitment which is
 /// computed as an RPO256 hash over the storage elements.
-///
-/// Note: This type is named `NoteInputs` in the JavaScript API for backwards compatibility,
-/// but internally uses `NoteStorage` from miden-protocol.
 #[derive(Clone)]
 #[wasm_bindgen]
-pub struct NoteInputs(NativeNoteStorage);
+pub struct NoteStorage(NativeNoteStorage);
 
 #[wasm_bindgen]
-impl NoteInputs {
+impl NoteStorage {
     /// Creates note storage from a list of field elements.
     #[wasm_bindgen(constructor)]
-    pub fn new(felt_array: &FeltArray) -> NoteInputs {
+    pub fn new(felt_array: &FeltArray) -> NoteStorage {
         let native_felts = felt_array.into();
         let native_note_storage = NativeNoteStorage::new(native_felts).unwrap();
-        NoteInputs(native_note_storage)
+        NoteStorage(native_note_storage)
     }
 
     /// Returns the raw storage items as an array of field elements.
-    pub fn values(&self) -> Vec<Felt> {
+    pub fn items(&self) -> Vec<Felt> {
         self.0.items().iter().map(Into::into).collect()
     }
 }
@@ -37,26 +34,26 @@ impl NoteInputs {
 // CONVERSIONS
 // ================================================================================================
 
-impl From<NativeNoteStorage> for NoteInputs {
+impl From<NativeNoteStorage> for NoteStorage {
     fn from(native_note_storage: NativeNoteStorage) -> Self {
-        NoteInputs(native_note_storage)
+        NoteStorage(native_note_storage)
     }
 }
 
-impl From<&NativeNoteStorage> for NoteInputs {
+impl From<&NativeNoteStorage> for NoteStorage {
     fn from(native_note_storage: &NativeNoteStorage) -> Self {
-        NoteInputs(native_note_storage.clone())
+        NoteStorage(native_note_storage.clone())
     }
 }
 
-impl From<NoteInputs> for NativeNoteStorage {
-    fn from(note_inputs: NoteInputs) -> Self {
-        note_inputs.0
+impl From<NoteStorage> for NativeNoteStorage {
+    fn from(note_storage: NoteStorage) -> Self {
+        note_storage.0
     }
 }
 
-impl From<&NoteInputs> for NativeNoteStorage {
-    fn from(note_inputs: &NoteInputs) -> Self {
-        note_inputs.0.clone()
+impl From<&NoteStorage> for NativeNoteStorage {
+    fn from(note_storage: &NoteStorage) -> Self {
+        note_storage.0.clone()
     }
 }

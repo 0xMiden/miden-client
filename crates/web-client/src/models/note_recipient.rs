@@ -6,8 +6,8 @@ use miden_client::note::{
 };
 use wasm_bindgen::prelude::*;
 
-use super::note_inputs::NoteInputs;
 use super::note_script::NoteScript;
+use super::note_storage::NoteStorage;
 use super::word::Word;
 use crate::models::miden_arrays::NoteRecipientArray as RecipientArray;
 
@@ -28,10 +28,14 @@ pub struct NoteRecipient(NativeNoteRecipient);
 impl NoteRecipient {
     /// Creates a note recipient from its serial number, script, and storage.
     #[wasm_bindgen(constructor)]
-    pub fn new(serial_num: &Word, note_script: &NoteScript, inputs: &NoteInputs) -> NoteRecipient {
+    pub fn new(
+        serial_num: &Word,
+        note_script: &NoteScript,
+        storage: &NoteStorage,
+    ) -> NoteRecipient {
         let native_serial_num: NativeWord = serial_num.into();
         let native_note_script: NativeNoteScript = note_script.into();
-        let native_note_storage: NativeNoteStorage = inputs.into();
+        let native_note_storage: NativeNoteStorage = storage.into();
         let native_note_recipient =
             NativeNoteRecipient::new(native_serial_num, native_note_script, native_note_storage);
 
@@ -55,7 +59,7 @@ impl NoteRecipient {
     }
 
     /// Returns the storage provided to the script.
-    pub fn inputs(&self) -> NoteInputs {
+    pub fn storage(&self) -> NoteStorage {
         self.0.storage().into()
     }
 }

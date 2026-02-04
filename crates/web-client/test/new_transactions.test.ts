@@ -421,7 +421,7 @@ export const customTransaction = async (
 
       let builder = client.createCodeBuilder();
       let compiledNoteScript = builder.compileNoteScript(noteScript);
-      let noteInputs = new window.NoteInputs(
+      let noteStorage = new window.NoteStorage(
         new window.MidenArrays.FeltArray([
           walletAccount.id().prefix(),
           walletAccount.id().suffix(),
@@ -435,7 +435,7 @@ export const customTransaction = async (
       let noteRecipient = new window.NoteRecipient(
         serialNum,
         compiledNoteScript,
-        noteInputs
+        noteStorage
       );
 
       let note = new window.Note(noteAssets, noteMetadata, noteRecipient);
@@ -562,17 +562,17 @@ const customTxWithMultipleNotes = async (
         targetAccount.id().prefix(),
       ]);
 
-      let noteInputs = new window.NoteInputs(inputNotes);
+      let noteStorage = new window.NoteStorage(inputNotes);
 
       let noteRecipient1 = new window.NoteRecipient(
         serialNum1,
         p2idScript,
-        noteInputs
+        noteStorage
       );
       let noteRecipient2 = new window.NoteRecipient(
         isSerialNumSame ? serialNum1 : serialNum2,
         p2idScript,
-        noteInputs
+        noteStorage
       );
 
       let note1 = new window.Note(noteAssets1, noteMetadata, noteRecipient1);
@@ -1135,7 +1135,7 @@ export const counterAccountComponent = async (
     // Create transaction with network note
     let compiledNoteScript = await builder.compileNoteScript(scriptCode);
 
-    let noteInputs = new window.NoteInputs(
+    let noteStorage = new window.NoteStorage(
       new window.MidenArrays.FeltArray([])
     );
 
@@ -1148,7 +1148,7 @@ export const counterAccountComponent = async (
     let noteRecipient = new window.NoteRecipient(
       serialNum,
       compiledNoteScript,
-      noteInputs
+      noteStorage
     );
 
     let noteAssets = new window.NoteAssets([]);
