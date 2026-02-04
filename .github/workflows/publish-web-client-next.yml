@@ -1,5 +1,5 @@
-# This workflow publishes the 'web-client' package to npm if a patch release label is applied to the PR and 
-# the 'web-client' package.json file has been updated.
+# This workflow publishes the web-client and react-sdk packages to npm if a patch release
+# label is applied to the PR and the corresponding package.json version is bumped.
 
 name: Publish Web Client SDK to NPM on Next
 
@@ -42,38 +42,74 @@ jobs:
           target: wasm32-unknown-unknown
           components: rust-src
 
-      - name: Verify version bump against next
-        id: check_version
+      - name: Verify web-client version bump against next
+        id: check_web_version
         run: ./scripts/check-web-client-version-pr.sh "${{ github.event.pull_request.base.sha }}"
 
+      - name: Verify react-sdk version bump against next
+        id: check_react_version
+        run: ./scripts/check-react-sdk-version-pr.sh "${{ github.event.pull_request.base.sha }}"
+
       - name: Install & build web-client
-        if: steps.check_version.outputs.should_publish == 'true'
+        if: steps.check_web_version.outputs.should_publish == 'true' || steps.check_react_version.outputs.should_publish == 'true'
         run: |
           cd crates/web-client
           yarn install --frozen-lockfile
           yarn build
 
       - name: Publish to npm
-        if: steps.check_version.outputs.should_publish == 'true'
+        if: steps.check_web_version.outputs.should_publish == 'true'
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_WEBCLIENT_TOKEN }}
         run: |
           cd crates/web-client
           npm publish --tag next
 
-      - name: Done
-        if: steps.check_version.outputs.should_publish == 'true'
+      - name: Install & build react-sdk
+        if: steps.check_react_version.outputs.should_publish == 'true'
+        run: |
+          cd packages/react-sdk
+          yarn install --frozen-lockfile
+          yarn build
+
+      - name: Publish react-sdk to npm
+        if: steps.check_react_version.outputs.should_publish == 'true'
         env:
-          CURRENT_VERSION: ${{ steps.check_version.outputs.current_version }}
-        run: echo "✅ Build complete; published version $CURRENT_VERSION."
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_WEBCLIENT_TOKEN }}
+        run: |
+          cd packages/react-sdk
+          npm publish --tag next
+
+      - name: Done
+        if: steps.check_web_version.outputs.should_publish == 'true'
+        env:
+          CURRENT_VERSION: ${{ steps.check_web_version.outputs.current_version }}
+        run: echo "✅ Web-client published version $CURRENT_VERSION."
+
+      - name: Done (react-sdk)
+        if: steps.check_react_version.outputs.should_publish == 'true'
+        env:
+          CURRENT_VERSION: ${{ steps.check_react_version.outputs.current_version }}
+        run: echo "✅ React SDK published version $CURRENT_VERSION."
 
       - name: Skipped publish
-        if: steps.check_version.outputs.should_publish != 'true'
+        if: steps.check_web_version.outputs.should_publish != 'true'
         env:
-          SHOULD_PUBLISH: ${{ steps.check_version.outputs.should_publish }}
-          CURRENT_VERSION: ${{ steps.check_version.outputs.current_version }}
+          SHOULD_PUBLISH: ${{ steps.check_web_version.outputs.should_publish }}
+          CURRENT_VERSION: ${{ steps.check_web_version.outputs.current_version }}
         run: |
-          echo "ℹ️ Publish skipped; should_publish=$SHOULD_PUBLISH"
+          echo "ℹ️ Web-client publish skipped; should_publish=$SHOULD_PUBLISH"
+          if [ -n "$CURRENT_VERSION" ]; then
+            echo "Current version: $CURRENT_VERSION"
+          fi
+
+      - name: Skipped publish (react-sdk)
+        if: steps.check_react_version.outputs.should_publish != 'true'
+        env:
+          SHOULD_PUBLISH: ${{ steps.check_react_version.outputs.should_publish }}
+          CURRENT_VERSION: ${{ steps.check_react_version.outputs.current_version }}
+        run: |
+          echo "ℹ️ React SDK publish skipped; should_publish=$SHOULD_PUBLISH"
           if [ -n "$CURRENT_VERSION" ]; then
             echo "Current version: $CURRENT_VERSION"
           fi

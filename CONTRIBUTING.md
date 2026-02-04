@@ -84,6 +84,15 @@ You can find more information about other `make` commands in the [Makefile](Make
 ### Versioning
 We use [semver](https://semver.org/) naming convention.
 
+### React SDK version sync
+When you bump the web-client version (especially major/minor), keep the React SDK version and peer range in sync. From the repo root, run:
+
+```
+yarn check:sync:react-sdk --fix
+```
+
+Run without `--fix` to check only. This syncs `packages/react-sdk/package.json` to the current web-client version.
+
 ## Pre-PR checklist
 
 > [!TIP]

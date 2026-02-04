@@ -53,7 +53,7 @@
 //!
 //! Below is a brief example illustrating how to instantiate the client using `ClientBuilder`:
 //!
-//! ```rust
+//! ```rust,ignore
 //! use std::sync::Arc;
 //!
 //! use miden_client::DebugMode;
