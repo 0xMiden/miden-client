@@ -101,7 +101,6 @@ pub fn parse_node_error(endpoint: &NodeRpcClientEndpoint, details: &[u8]) -> Opt
         },
         // These endpoints don't have typed errors from the node
         NodeRpcClientEndpoint::GetAccount
-        | NodeRpcClientEndpoint::GetAccountStateDelta
         | NodeRpcClientEndpoint::SyncState
         | NodeRpcClientEndpoint::Status => None,
     }
