@@ -1008,24 +1008,21 @@ async fn p2id_transfer() {
 
     // The seed should not be retrieved due to the account not being new
     assert!(!is_new && seed.is_none());
-    let vault = client.get_account_vault(from_account_id).await.unwrap();
-    assert_eq!(vault.num_assets(), 1);
 
     // Validate the transferred amounts
-    if let Asset::Fungible(fungible_asset) = vault.assets().next().unwrap() {
-        assert_eq!(fungible_asset.amount(), MINT_AMOUNT - TRANSFER_AMOUNT);
-    } else {
-        panic!("Error: Account should have a fungible asset");
-    }
+    let from_balance = client
+        .account_reader(from_account_id)
+        .get_balance(faucet_account_id)
+        .await
+        .unwrap();
+    assert_eq!(from_balance, MINT_AMOUNT - TRANSFER_AMOUNT);
 
-    let vault = client.get_account_vault(to_account_id).await.unwrap();
-    assert_eq!(vault.num_assets(), 1);
-
-    if let Asset::Fungible(fungible_asset) = vault.assets().next().unwrap() {
-        assert_eq!(fungible_asset.amount(), TRANSFER_AMOUNT);
-    } else {
-        panic!("Error: Account should have a fungible asset");
-    }
+    let to_balance = client
+        .account_reader(to_account_id)
+        .get_balance(faucet_account_id)
+        .await
+        .unwrap();
+    assert_eq!(to_balance, TRANSFER_AMOUNT);
 
     assert_note_cannot_be_consumed_twice(
         &mut client,
@@ -1190,24 +1187,21 @@ async fn p2ide_transfer_consumed_by_target() {
     let from_reader = client.account_reader(from_account_id);
     // The seed should not be retrieved due to the account not being new
     assert!(!from_reader.is_new().await.unwrap() && from_reader.seed().await.unwrap().is_none());
-    let vault = client.get_account_vault(from_account_id).await.unwrap();
-    assert_eq!(vault.num_assets(), 1);
 
     // Validate the transferred amounts
-    if let Asset::Fungible(fungible_asset) = vault.assets().next().unwrap() {
-        assert_eq!(fungible_asset.amount(), from_account_balance - TRANSFER_AMOUNT);
-    } else {
-        panic!("Error: Account should have a fungible asset");
-    }
+    let new_from_balance = client
+        .account_reader(from_account_id)
+        .get_balance(faucet_account_id)
+        .await
+        .unwrap();
+    assert_eq!(new_from_balance, from_account_balance - TRANSFER_AMOUNT);
 
-    let vault = client.get_account_vault(to_account_id).await.unwrap();
-    assert_eq!(vault.num_assets(), 1);
-
-    if let Asset::Fungible(fungible_asset) = vault.assets().next().unwrap() {
-        assert_eq!(fungible_asset.amount(), to_account_balance + TRANSFER_AMOUNT);
-    } else {
-        panic!("Error: Account should have a fungible asset");
-    }
+    let new_to_balance = client
+        .account_reader(to_account_id)
+        .get_balance(faucet_account_id)
+        .await
+        .unwrap();
+    assert_eq!(new_to_balance, to_account_balance + TRANSFER_AMOUNT);
 
     assert_note_cannot_be_consumed_twice(&mut client, to_account_id, note).await;
 }
@@ -1303,18 +1297,22 @@ async fn p2ide_transfer_consumed_by_sender() {
     let from_reader = client.account_reader(from_account_id);
     // The seed should not be retrieved due to the account not being new
     assert!(!from_reader.is_new().await.unwrap() && from_reader.seed().await.unwrap().is_none());
-    let vault = client.get_account_vault(from_account_id).await.unwrap();
-    assert_eq!(vault.num_assets(), 1);
 
     // Validate the sender hasn't lost funds
-    if let Asset::Fungible(fungible_asset) = vault.assets().next().unwrap() {
-        assert_eq!(fungible_asset.amount(), from_account_balance);
-    } else {
-        panic!("Error: Account should have a fungible asset");
-    }
+    let new_from_balance = client
+        .account_reader(from_account_id)
+        .get_balance(faucet_account_id)
+        .await
+        .unwrap();
+    assert_eq!(new_from_balance, from_account_balance);
 
-    let vault = client.get_account_vault(to_account_id).await.unwrap();
-    assert_eq!(vault.num_assets(), 0);
+    // Validate the target has no funds
+    let to_balance = client
+        .account_reader(to_account_id)
+        .get_balance(faucet_account_id)
+        .await
+        .unwrap();
+    assert_eq!(to_balance, 0);
 
     // Check that the target can't consume the note anymore
     assert_note_cannot_be_consumed_twice(

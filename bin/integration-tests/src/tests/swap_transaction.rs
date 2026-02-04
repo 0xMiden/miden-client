@@ -144,62 +144,20 @@ pub async fn test_swap_fully_onchain(client_config: ClientConfig) -> Result<()> 
     // - accountA: 999 BTC, 25 ETH
     // - accountB: 1 BTC, 975 ETH
 
-    // first reload the account
-    let account_a_vault = client1
-        .get_account_vault(account_a.id())
-        .await
-        .context("failed to find account A after swap transaction")?;
-    assert_eq!(account_a_vault.num_assets(), 2);
+    let account_a_reader = client1.account_reader(account_a.id());
+    let account_a_btc = account_a_reader.get_balance(btc_faucet_account.id()).await?;
+    let account_a_eth = account_a_reader.get_balance(eth_faucet_account.id()).await?;
 
-    let mut assets = account_a_vault.assets();
-    let asset_1 = assets.next().context("expected first asset in account A;s vault after swap")?;
-    let asset_2 = assets.next().context("expected second asset in account A's vault after swap")?;
+    assert_eq!(account_a_btc, 999);
+    assert_eq!(account_a_eth, 25);
 
-    match (asset_1, asset_2) {
-        (Asset::Fungible(btc_asset), Asset::Fungible(eth_asset))
-            if btc_asset.faucet_id() == btc_faucet_account.id()
-                && eth_asset.faucet_id() == eth_faucet_account.id() =>
-        {
-            assert_eq!(btc_asset.amount(), 999);
-            assert_eq!(eth_asset.amount(), 25);
-        },
-        (Asset::Fungible(eth_asset), Asset::Fungible(btc_asset))
-            if btc_asset.faucet_id() == btc_faucet_account.id()
-                && eth_asset.faucet_id() == eth_faucet_account.id() =>
-        {
-            assert_eq!(btc_asset.amount(), 999);
-            assert_eq!(eth_asset.amount(), 25);
-        },
-        _ => panic!("should only have fungible assets!"),
-    }
+    let account_b_reader = client2.account_reader(account_b.id());
+    let account_b_btc = account_b_reader.get_balance(btc_faucet_account.id()).await?;
+    let account_b_eth = account_b_reader.get_balance(eth_faucet_account.id()).await?;
 
-    let account_b_vault = client2
-        .get_account_vault(account_b.id())
-        .await
-        .context("failed to find account B after swap transaction")?;
-    assert_eq!(account_b_vault.num_assets(), 2);
+    assert_eq!(account_b_btc, 1);
+    assert_eq!(account_b_eth, 975);
 
-    let mut assets = account_b_vault.assets();
-    let asset_1 = assets.next().context("expected first asset in account B's vault after swap")?;
-    let asset_2 = assets.next().context("expected second asset in account B's vault after swap")?;
-
-    match (asset_1, asset_2) {
-        (Asset::Fungible(btc_asset), Asset::Fungible(eth_asset))
-            if btc_asset.faucet_id() == btc_faucet_account.id()
-                && eth_asset.faucet_id() == eth_faucet_account.id() =>
-        {
-            assert_eq!(btc_asset.amount(), 1);
-            assert_eq!(eth_asset.amount(), 975);
-        },
-        (Asset::Fungible(eth_asset), Asset::Fungible(btc_asset))
-            if btc_asset.faucet_id() == btc_faucet_account.id()
-                && eth_asset.faucet_id() == eth_faucet_account.id() =>
-        {
-            assert_eq!(btc_asset.amount(), 1);
-            assert_eq!(eth_asset.amount(), 975);
-        },
-        _ => panic!("should only have fungible assets!"),
-    }
     Ok(())
 }
 
@@ -342,64 +300,19 @@ pub async fn test_swap_private(client_config: ClientConfig) -> Result<()> {
     // - accountA: 999 BTC, 25 ETH
     // - accountB: 1 BTC, 975 ETH
 
-    // first reload the account
-    let account_a_vault = client1
-        .get_account_vault(account_a.id())
-        .await
-        .context("failed to find account A after private swap transaction")?;
-    assert_eq!(account_a_vault.num_assets(), 2);
+    let account_a_reader = client1.account_reader(account_a.id());
+    let account_a_btc = account_a_reader.get_balance(btc_faucet_account.id()).await?;
+    let account_a_eth = account_a_reader.get_balance(eth_faucet_account.id()).await?;
 
-    let mut assets = account_a_vault.assets();
-    let asset_1 = assets
-        .next()
-        .context("expected first asset in account A's vault after private swap")?;
-    let asset_2 = assets
-        .next()
-        .context("expected second asset in account A's vault after private swap")?;
+    assert_eq!(account_a_btc, 999);
+    assert_eq!(account_a_eth, 25);
 
-    match (asset_1, asset_2) {
-        (Asset::Fungible(btc_asset), Asset::Fungible(eth_asset))
-            if btc_asset.faucet_id() == btc_faucet_account.id()
-                && eth_asset.faucet_id() == eth_faucet_account.id() =>
-        {
-            assert_eq!(btc_asset.amount(), 999);
-            assert_eq!(eth_asset.amount(), 25);
-        },
-        (Asset::Fungible(eth_asset), Asset::Fungible(btc_asset))
-            if btc_asset.faucet_id() == btc_faucet_account.id()
-                && eth_asset.faucet_id() == eth_faucet_account.id() =>
-        {
-            assert_eq!(btc_asset.amount(), 999);
-            assert_eq!(eth_asset.amount(), 25);
-        },
-        _ => panic!("should only have fungible assets!"),
-    }
+    let account_b_reader = client2.account_reader(account_b.id());
+    let account_b_btc = account_b_reader.get_balance(btc_faucet_account.id()).await?;
+    let account_b_eth = account_b_reader.get_balance(eth_faucet_account.id()).await?;
 
-    let account_b_vault = client2
-        .get_account_vault(account_b.id())
-        .await
-        .context("failed to find account B after swap transaction")?;
-    assert_eq!(account_b_vault.num_assets(), 2);
-    let mut assets = account_b_vault.assets();
-    let asset_1 = assets.next().context("expected first asset in account B's vault after swap")?;
-    let asset_2 = assets.next().context("expected second asset in account B's vault after swap")?;
+    assert_eq!(account_b_btc, 1);
+    assert_eq!(account_b_eth, 975);
 
-    match (asset_1, asset_2) {
-        (Asset::Fungible(btc_asset), Asset::Fungible(eth_asset))
-            if btc_asset.faucet_id() == btc_faucet_account.id()
-                && eth_asset.faucet_id() == eth_faucet_account.id() =>
-        {
-            assert_eq!(btc_asset.amount(), 1);
-            assert_eq!(eth_asset.amount(), 975);
-        },
-        (Asset::Fungible(eth_asset), Asset::Fungible(btc_asset))
-            if btc_asset.faucet_id() == btc_faucet_account.id()
-                && eth_asset.faucet_id() == eth_faucet_account.id() =>
-        {
-            assert_eq!(btc_asset.amount(), 1);
-            assert_eq!(eth_asset.amount(), 975);
-        },
-        _ => panic!("should only have fungible assets!"),
-    }
     Ok(())
 }

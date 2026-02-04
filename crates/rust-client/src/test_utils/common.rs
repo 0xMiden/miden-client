@@ -12,7 +12,7 @@ use anyhow::{Context, Result};
 use miden_protocol::Felt;
 use miden_protocol::account::auth::AuthSecretKey;
 use miden_protocol::account::{Account, AccountId, AccountStorageMode};
-use miden_protocol::asset::{Asset, FungibleAsset, TokenSymbol};
+use miden_protocol::asset::{FungibleAsset, TokenSymbol};
 use miden_protocol::note::NoteType;
 use miden_protocol::testing::account_id::ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE;
 use miden_protocol::transaction::{OutputNote, TransactionId};
@@ -427,19 +427,15 @@ pub async fn consume_notes(
 pub async fn assert_account_has_single_asset(
     client: &TestClient,
     account_id: AccountId,
-    asset_account_id: AccountId,
+    faucet_id: AccountId,
     expected_amount: u64,
 ) {
-    let vault = client.get_account_vault(account_id).await.unwrap();
-
-    assert_eq!(vault.num_assets(), 1);
-
-    if let Some(Asset::Fungible(fungible_asset)) = vault.assets().next() {
-        assert_eq!(fungible_asset.faucet_id(), asset_account_id);
-        assert_eq!(fungible_asset.amount(), expected_amount);
-    } else {
-        panic!("Account has consumed a note and should have a fungible asset");
-    }
+    let balance = client
+        .account_reader(account_id)
+        .get_balance(faucet_id)
+        .await
+        .expect("Account should have the asset");
+    assert_eq!(balance, expected_amount);
 }
 
 /// Tries to consume the note and asserts that the expected error is returned.
