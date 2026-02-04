@@ -491,6 +491,18 @@ impl<AUTH> Client<AUTH> {
     pub fn new_storage_reader(&self, account_id: AccountId) -> StorageReader {
         StorageReader::new(self.store.clone(), account_id)
     }
+
+    // ACCOUNT HISTORY MANAGEMENT
+    // --------------------------------------------------------------------------------------------
+
+    /// Prunes old committed account states from the store, keeping only the latest state for
+    /// each tracked account. States referenced by pending transactions are preserved for rollback
+    /// support.
+    ///
+    /// Returns the number of account states that were pruned.
+    pub async fn prune_account_history(&self) -> Result<usize, ClientError> {
+        self.store.prune_old_account_states().await.map_err(Into::into)
+    }
 }
 
 // UTILITY FUNCTIONS

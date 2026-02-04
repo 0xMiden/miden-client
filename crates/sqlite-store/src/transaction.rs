@@ -261,3 +261,32 @@ fn parse_transaction(
         status: TransactionStatus::read_from_bytes(&status)?,
     })
 }
+
+/// Returns the account commitments (initial and final states) from all pending transactions.
+///
+/// These commitments are used to protect account states from being pruned while the
+/// corresponding transactions are still pending and may need to be rolled back.
+pub(crate) fn get_pending_transaction_account_commitments(
+    conn: &Connection,
+) -> Result<Vec<Word>, StoreError> {
+    const QUERY: &str = "SELECT details FROM transactions WHERE status_variant = ?";
+
+    let pending_status_variant = miden_client::transaction::TransactionStatusVariant::Pending as u8;
+
+    let mut stmt = conn.prepare(QUERY).into_store_error()?;
+    let rows = stmt
+        .query_map(params![pending_status_variant], |row| row.get::<_, Vec<u8>>(0))
+        .into_store_error()?;
+
+    let mut commitments = Vec::new();
+    for row in rows {
+        let details_bytes = row.into_store_error()?;
+        let details = TransactionDetails::read_from_bytes(&details_bytes)?;
+
+        // Both the initial and final states need to be preserved for potential rollback
+        commitments.push(details.init_account_state);
+        commitments.push(details.final_account_state);
+    }
+
+    Ok(commitments)
+}

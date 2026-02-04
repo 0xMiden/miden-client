@@ -411,3 +411,130 @@ async fn get_account_map_item_value_slot_error() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+#[tokio::test]
+async fn prune_old_account_states_removes_history() -> anyhow::Result<()> {
+    let store = create_test_store().await;
+
+    let value_slot_name =
+        StorageSlotName::new("miden::testing::sqlite_store::value").expect("valid slot name");
+
+    let dummy_component = AccountComponent::new(
+        basic_wallet_library(),
+        vec![StorageSlot::with_empty_value(value_slot_name.clone())],
+    )?
+    .with_supports_all_types();
+
+    // Create and insert an initial account
+    let account = AccountBuilder::new([0; 32])
+        .account_type(AccountType::RegularAccountUpdatableCode)
+        .with_auth_component(AuthFalcon512Rpo::new(PublicKeyCommitment::from(EMPTY_WORD)))
+        .with_component(dummy_component.clone())
+        .build()?;
+
+    let account_id = account.id();
+    let default_address = Address::new(account_id);
+    store.insert_account(&account, default_address).await?;
+
+    // Create deltas to simulate multiple updates/transactions
+    let mut storage_delta1 = AccountStorageDelta::new();
+    storage_delta1.set_item(value_slot_name.clone(), [ZERO, ZERO, ZERO, ONE].into())?;
+    let empty_vault_delta: AccountVaultDelta = AccountVaultDelta::from_iters([], []);
+    let delta1 = AccountDelta::new(account_id, storage_delta1, empty_vault_delta.clone(), ONE)?;
+
+    let mut account_state_1 = account.clone();
+    account_state_1.apply_delta(&delta1)?;
+
+    let mut storage_delta2 = AccountStorageDelta::new();
+    storage_delta2.set_item(value_slot_name.clone(), [ZERO, ZERO, ONE, ONE].into())?;
+    let delta2 = AccountDelta::new(account_id, storage_delta2, empty_vault_delta, ONE)?;
+
+    let mut account_state_2 = account_state_1.clone();
+    account_state_2.apply_delta(&delta2)?;
+
+    // Apply both deltas to create history
+    let smt_forest = store.smt_forest.clone();
+    let final_state_1: AccountHeader = (&account_state_1).into();
+    let account_clone = account.clone();
+    let delta1_clone = delta1.clone();
+    let smt_forest_clone = smt_forest.clone();
+    store
+        .interact_with_connection(move |conn| {
+            let tx = conn.transaction().into_store_error()?;
+            let mut smt_forest =
+                smt_forest_clone.write().expect("smt_forest write lock not poisoned");
+
+            SqliteStore::apply_account_delta(
+                &tx,
+                &mut smt_forest,
+                &account_clone.into(),
+                &final_state_1,
+                BTreeMap::default(),
+                BTreeMap::default(),
+                &delta1_clone,
+            )?;
+
+            tx.commit().into_store_error()?;
+            Ok(())
+        })
+        .await?;
+
+    let final_state_2: AccountHeader = (&account_state_2).into();
+    let account_state_1_clone = account_state_1.clone();
+    let delta2_clone = delta2.clone();
+    let smt_forest_clone = smt_forest.clone();
+    store
+        .interact_with_connection(move |conn| {
+            let tx = conn.transaction().into_store_error()?;
+            let mut smt_forest =
+                smt_forest_clone.write().expect("smt_forest write lock not poisoned");
+
+            SqliteStore::apply_account_delta(
+                &tx,
+                &mut smt_forest,
+                &account_state_1_clone.into(),
+                &final_state_2,
+                BTreeMap::default(),
+                BTreeMap::default(),
+                &delta2_clone,
+            )?;
+
+            tx.commit().into_store_error()?;
+            Ok(())
+        })
+        .await?;
+
+    // Verify we have 3 account states (initial + 2 updates)
+    let state_count_before: usize = store
+        .interact_with_connection(move |conn| {
+            conn.query_row("SELECT Count(*) FROM accounts", [], |row| row.get(0))
+                .into_store_error()
+        })
+        .await?;
+    assert_eq!(state_count_before, 3, "Should have 3 account states before pruning");
+
+    // Prune old account states (no pending transactions)
+    let pruned_count = store.prune_old_account_states().await?;
+
+    // Should have pruned 2 old states
+    assert_eq!(pruned_count, 2, "Should have pruned 2 old states");
+
+    // Verify only 1 state remains
+    let state_count_after: usize = store
+        .interact_with_connection(move |conn| {
+            conn.query_row("SELECT Count(*) FROM accounts", [], |row| row.get(0))
+                .into_store_error()
+        })
+        .await?;
+    assert_eq!(state_count_after, 1, "Should have 1 account state after pruning");
+
+    // Verify the remaining state is the latest one
+    let remaining_account = store.get_account(account_id).await?.expect("account should exist");
+    assert_eq!(
+        remaining_account.commitment(),
+        account_state_2.commitment(),
+        "Remaining account should be the latest state"
+    );
+
+    Ok(())
+}

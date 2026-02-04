@@ -228,6 +228,12 @@ pub trait Store: Send + Sync {
     /// block.
     async fn prune_irrelevant_blocks(&self) -> Result<(), StoreError>;
 
+    /// Prunes old committed account states, keeping only the latest committed state for each
+    /// account. States referenced by pending transactions are preserved for rollback.
+    ///
+    /// Returns the number of pruned account states.
+    async fn prune_old_account_states(&self) -> Result<usize, StoreError>;
+
     // ACCOUNT
     // --------------------------------------------------------------------------------------------
 
