@@ -9,7 +9,7 @@
 ### Enhancements
 
 * Added the `@miden-sdk/react` hooks library with a provider, hooks, and an example app for the web client ([#1711](https://github.com/0xMiden/miden-client/pull/1711)).
-* Added `prune_account_history` method to prune old committed account states, keeping only the latest state per account while preserving pending transaction states for rollback support. Also added `prune` CLI command and `pruneAccountHistory` WebClient binding ([#1158](https://github.com/0xMiden/miden-client/issues/1158)).
+* Added `prune_account_history` method to prune old committed account states, keeping only the latest state per account while preserving pending transaction states for rollback support. Also added `prune` CLI command and `pruneAccountHistory` WebClient binding ([#1741](https://github.com/0xMiden/miden-client/pull/1741)).
 
 ## 0.13.0 (2026-01-28)
 
