@@ -8,7 +8,7 @@
 
 ### Changes
 
-* Added a `StorageReader` accessible through `Client::new_storage_reader` to read storage slots without having to load the whole account ([#1713](https://github.com/0xMiden/miden-client/pull/1713)). 
+* [BREAKING] Added a `AccountReader` accessible through `Client::account_reader` to read account data without needing to load the whole `Account` ([#1713](https://github.com/0xMiden/miden-client/pull/1713), [#1716](https://github.com/0xMiden/miden-client/pull/1716)). 
 
 ### Enhancements
 
