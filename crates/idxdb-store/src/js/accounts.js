@@ -460,10 +460,7 @@ export async function pruneOldAccountStates(dbId, pendingAccountCommitments) {
             return 0;
         }
         // Delete the old account states
-        await db.accounts
-            .where("accountCommitment")
-            .anyOf(statesToPrune)
-            .delete();
+        await db.accounts.where("accountCommitment").anyOf(statesToPrune).delete();
         // Clean up orphaned vault assets
         for (const vaultRoot of vaultRootsToCheck) {
             const stillReferenced = await db.accounts
@@ -495,7 +492,10 @@ export async function pruneOldAccountStates(dbId, pendingAccountCommitments) {
                             .delete();
                     }
                 }
-                await db.accountStorages.where("commitment").equals(storageRoot).delete();
+                await db.accountStorages
+                    .where("commitment")
+                    .equals(storageRoot)
+                    .delete();
             }
         }
         // Clean up orphaned code (not referenced by accounts or foreign accounts)
