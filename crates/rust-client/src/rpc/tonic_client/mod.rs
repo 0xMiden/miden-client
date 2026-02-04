@@ -927,7 +927,6 @@ impl NodeRpcClient for GrpcClient {
             return Ok(limits);
         }
 
-        // Fetch from node (propagate error instead of falling back to defaults)
         let limits = self.fetch_rpc_limits().await?;
         self.limits.write().replace(limits);
         Ok(limits)

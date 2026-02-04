@@ -46,7 +46,6 @@ impl Default for RpcLimits {
 
 impl Serializable for RpcLimits {
     fn write_into<W: ByteWriter>(&self, target: &mut W) {
-        // Use u64 for portability (usize varies by platform)
         (self.note_ids_limit as u64).write_into(target);
         (self.nullifiers_limit as u64).write_into(target);
         (self.account_ids_limit as u64).write_into(target);
