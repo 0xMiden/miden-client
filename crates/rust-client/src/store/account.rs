@@ -250,11 +250,9 @@ pub struct PrunableAccountState {
     pub commitment: Word,
 }
 
-/// Information about account data that can be safely pruned.
+/// Information about account data that was pruned.
 ///
-/// This is returned by `get_prunable_account_data()` to allow users to review
-/// what would be deleted before actually pruning. This is a safety mechanism
-/// to prevent accidental data loss.
+/// This is returned by `prune_account_history()` to indicate what was deleted.
 #[derive(Debug, Clone, Default)]
 pub struct PrunableAccountData {
     /// Account states that can be pruned.

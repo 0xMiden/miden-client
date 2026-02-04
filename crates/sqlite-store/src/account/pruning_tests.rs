@@ -809,198 +809,6 @@ mod tests {
         Ok(())
     }
 
-    /// Test that get_prunable_account_data returns nothing for an account with only one state.
-    /// SAFETY: An account with a single state should never have anything to prune.
-    #[tokio::test]
-    async fn prunable_data_single_state_account_returns_empty() -> anyhow::Result<()> {
-        let store = create_test_store().await;
-
-        let value_slot_name =
-            StorageSlotName::new("miden::testing::pruning::value").expect("valid slot name");
-
-        let dummy_component = AccountComponent::new(
-            basic_wallet_library(),
-            vec![StorageSlot::with_empty_value(value_slot_name)],
-        )?
-        .with_supports_all_types();
-
-        let account = AccountBuilder::new([0; 32])
-            .account_type(AccountType::RegularAccountImmutableCode)
-            .with_auth_component(AuthFalcon512Rpo::new(PublicKeyCommitment::from(EMPTY_WORD)))
-            .with_component(dummy_component)
-            .build()?;
-
-        let account_id = account.id();
-        let default_address = Address::new(account_id);
-        store.insert_account(&account, default_address).await?;
-
-        // Get prunable data
-        let prunable = store.get_prunable_account_data(account_id).await?;
-
-        // SAFETY CHECK: Nothing should be prunable
-        assert!(
-            prunable.is_empty(),
-            "Account with single state should have nothing to prune, got {} states",
-            prunable.state_count()
-        );
-
-        Ok(())
-    }
-
-    /// Test that get_prunable_account_data never includes pending states.
-    /// SAFETY: Pending states (with account_seed) must NEVER be pruned.
-    #[tokio::test]
-    async fn prunable_data_never_includes_pending_states() -> anyhow::Result<()> {
-        let store = create_test_store().await;
-
-        let value_slot_name =
-            StorageSlotName::new("miden::testing::pruning::value").expect("valid slot name");
-
-        let dummy_component = AccountComponent::new(
-            basic_wallet_library(),
-            vec![StorageSlot::with_empty_value(value_slot_name)],
-        )?
-        .with_supports_all_types();
-
-        // Create account - this creates a pending state (has account_seed)
-        let account = AccountBuilder::new([0; 32])
-            .account_type(AccountType::RegularAccountImmutableCode)
-            .with_auth_component(AuthFalcon512Rpo::new(PublicKeyCommitment::from(EMPTY_WORD)))
-            .with_component(dummy_component)
-            .build()?;
-
-        let account_id = account.id();
-        let default_address = Address::new(account_id);
-        store.insert_account(&account, default_address).await?;
-
-        // Get prunable data - should be empty (only pending state exists)
-        let prunable = store.get_prunable_account_data(account_id).await?;
-
-        // SAFETY CHECK: Pending state must not be in prunable list
-        assert!(
-            prunable.is_empty(),
-            "Pending states should never be prunable"
-        );
-
-        Ok(())
-    }
-
-    /// Test that get_prunable_account_data correctly identifies old committed states
-    /// but NEVER includes the latest committed state.
-    /// SAFETY: The latest committed state must NEVER be pruned.
-    #[tokio::test]
-    async fn prunable_data_identifies_old_committed_but_not_latest() -> anyhow::Result<()> {
-        let store = create_test_store().await;
-
-        let value_slot_name =
-            StorageSlotName::new("miden::testing::pruning::value").expect("valid slot name");
-
-        let dummy_component = AccountComponent::new(
-            basic_wallet_library(),
-            vec![StorageSlot::with_empty_value(value_slot_name.clone())],
-        )?
-        .with_supports_all_types();
-
-        let account = AccountBuilder::new([0; 32])
-            .account_type(AccountType::RegularAccountImmutableCode)
-            .with_auth_component(AuthFalcon512Rpo::new(PublicKeyCommitment::from(EMPTY_WORD)))
-            .with_component(dummy_component)
-            .build()?;
-
-        let account_id = account.id();
-        let default_address = Address::new(account_id);
-        store.insert_account(&account, default_address).await?;
-
-        // Apply multiple transactions to create committed states
-        const NUM_TRANSACTIONS: usize = 5;
-        let mut current_account = account;
-
-        for i in 1..=NUM_TRANSACTIONS {
-            let mut storage_delta = AccountStorageDelta::new();
-            let new_value = [
-                Felt::new(i as u64),
-                Felt::new(i as u64 + 1),
-                Felt::new(i as u64 + 2),
-                Felt::new(i as u64 + 3),
-            ];
-            storage_delta.set_item(value_slot_name.clone(), new_value.into())?;
-
-            let vault_delta = AccountVaultDelta::default();
-            let delta = AccountDelta::new(current_account.id(), storage_delta, vault_delta, ONE)?;
-
-            let init_header: AccountHeader = (&current_account).into();
-            current_account.apply_delta(&delta)?;
-            let final_header: AccountHeader = (&current_account).into();
-
-            let smt_forest = store.smt_forest.clone();
-            let delta_clone = delta.clone();
-
-            store
-                .interact_with_connection(move |conn| {
-                    let tx = conn.transaction().into_store_error()?;
-                    let mut smt_forest =
-                        smt_forest.write().expect("smt_forest write lock not poisoned");
-
-                    SqliteStore::apply_account_delta(
-                        &tx,
-                        &mut smt_forest,
-                        &init_header,
-                        &final_header,
-                        BTreeMap::default(),
-                        BTreeMap::default(),
-                        &delta_clone,
-                    )?;
-
-                    tx.commit().into_store_error()?;
-                    Ok(())
-                })
-                .await?;
-        }
-
-        // Now we have: 1 pending state (initial with seed) + 5 committed states
-        // Prunable should be: 4 committed states (all except the latest with nonce=5)
-
-        let prunable = store.get_prunable_account_data(account_id).await?;
-
-        // SAFETY CHECK: Should identify exactly 4 old committed states
-        assert_eq!(
-            prunable.state_count(),
-            NUM_TRANSACTIONS - 1, // All committed except the latest
-            "Expected {} prunable states, got {}",
-            NUM_TRANSACTIONS - 1,
-            prunable.state_count()
-        );
-
-        // SAFETY CHECK: Latest committed state (nonce=5) must NOT be in the list
-        let latest_nonce = NUM_TRANSACTIONS as u64;
-        for state in &prunable.states {
-            assert_ne!(
-                state.nonce, latest_nonce,
-                "Latest committed state (nonce={}) must NEVER be in prunable list",
-                latest_nonce
-            );
-        }
-
-        // SAFETY CHECK: All prunable states should have nonce < latest_nonce
-        for state in &prunable.states {
-            assert!(
-                state.nonce < latest_nonce,
-                "Prunable state nonce {} should be less than latest {}",
-                state.nonce,
-                latest_nonce
-            );
-        }
-
-        // Print what would be pruned
-        println!("\n=== Prunable States (would be deleted) ===");
-        for state in &prunable.states {
-            println!("  - nonce: {}, commitment: {}", state.nonce, state.commitment);
-        }
-        println!("\n=== Latest committed state (nonce={}) is PROTECTED ===", latest_nonce);
-
-        Ok(())
-    }
-
     /// Test that states corresponding to pending transactions are NOT prunable.
     /// SAFETY: States from pending transactions may be committed on-chain later
     /// and must NEVER be pruned.
@@ -1140,35 +948,19 @@ mod tests {
             })
             .await?;
 
-        // Now check what's prunable
-        // We have: initial (nonce=0), states 1, 2, 3, 4
-        // State 4 is latest (not prunable)
-        // State 1 is init_account_state of pending tx2 (not prunable - rollback point!)
-        // State 2 is final_account_state of pending tx2 AND init_account_state of tx3 (not prunable)
-        // State 3 is final_account_state of pending tx3 (not prunable)
-        // NOTHING should be prunable because all states are protected
-        let prunable = store.get_prunable_account_data(account_id).await?;
-
-        println!("\n=== Pending Transaction Protection Test ===");
-        println!("Account states: nonces 0 (initial), 1, 2, 3, 4 (latest)");
-        println!("Pending tx2: S1 -> S2 (protects both S1 and S2)");
-        println!("Pending tx3: S2 -> S3 (protects both S2 and S3)");
-        println!("Latest: S4 (protected)");
-        println!("Prunable states: {:?}", prunable.states.iter().map(|s| s.nonce).collect::<Vec<_>>());
-
-        // SAFETY CHECK: Nothing should be prunable because all states are protected
+        // Now prune - nothing should be pruned because all states are protected:
         // - S0: initial state (has account_seed)
         // - S1: init_account_state of pending tx2 (rollback point if tx2 fails)
         // - S2: final of tx2 / init of tx3
         // - S3: final of tx3
         // - S4: latest state
-        assert!(
-            prunable.is_empty(),
-            "Expected nothing prunable (all states protected by pending txs), got {} states",
-            prunable.state_count()
-        );
+        println!("\n=== Pending Transaction Protection Test ===");
+        println!("Account states: nonces 0 (initial), 1, 2, 3, 4 (latest)");
+        println!("Pending tx2: S1 -> S2 (protects both S1 and S2)");
+        println!("Pending tx3: S2 -> S3 (protects both S2 and S3)");
+        println!("Latest: S4 (protected)");
 
-        // Verify pruning actually does nothing
+        // Verify pruning does nothing
         let pruned = store.prune_account_history(account_id).await?;
         assert!(
             pruned.is_empty(),
@@ -1400,26 +1192,7 @@ mod tests {
         println!("  S3 (nonce=3): PENDING tx (KEEP)");
         println!("  S4 (nonce=4): PENDING tx, also latest (KEEP)");
 
-        // Check what's prunable
-        let prunable = store.get_prunable_account_data(account_id).await?;
-        println!(
-            "\nPrunable states: {:?}",
-            prunable.states.iter().map(|s| s.nonce).collect::<Vec<_>>()
-        );
-
-        // CRITICAL CHECK: Only S1 should be prunable
-        assert_eq!(
-            prunable.state_count(),
-            1,
-            "Expected exactly 1 prunable state (S1), got {}",
-            prunable.state_count()
-        );
-        assert_eq!(
-            prunable.states[0].nonce, 1,
-            "Expected prunable state to be nonce=1 (old committed)"
-        );
-
-        // Actually prune
+        // Prune - only S1 should be pruned
         let pruned = store.prune_account_history(account_id).await?;
         println!(
             "Pruned states: {:?}",

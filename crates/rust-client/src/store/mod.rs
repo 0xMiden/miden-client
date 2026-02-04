@@ -304,25 +304,6 @@ pub trait Store: Send + Sync {
     /// Returns a `StoreError::AccountDataNotFound` if there is no account for the provided ID.
     async fn update_account(&self, new_account_state: &Account) -> Result<(), StoreError>;
 
-    /// Returns information about account states that can be safely pruned.
-    ///
-    /// This is a **query-only** operation that does not modify the database.
-    /// Use this to review what would be deleted before calling `prune_account_history()`.
-    ///
-    /// The returned data includes:
-    /// - Historical committed account states (not the latest, not pending)
-    /// - Counts of orphaned rows in related tables that would be cleaned up
-    ///
-    /// # Safety
-    ///
-    /// This method guarantees that the following are NEVER included in the prunable list:
-    /// - The latest committed state (highest nonce where seed is NULL)
-    /// - Any pending states (where seed is NOT NULL)
-    async fn get_prunable_account_data(
-        &self,
-        account_id: AccountId,
-    ) -> Result<PrunableAccountData, StoreError>;
-
     /// Prunes old committed account states, keeping only the latest committed state
     /// and all pending states.
     ///
@@ -338,10 +319,6 @@ pub trait Store: Send + Sync {
     /// - Any pending states (where seed is NOT NULL)
     ///
     /// The operation is atomic - if any step fails, all changes are rolled back.
-    ///
-    /// # Recommendation
-    ///
-    /// Call `get_prunable_account_data()` first to review what will be deleted.
     async fn prune_account_history(
         &self,
         account_id: AccountId,

@@ -323,16 +323,6 @@ impl Store for SqliteStore {
         .await
     }
 
-    async fn get_prunable_account_data(
-        &self,
-        account_id: AccountId,
-    ) -> Result<PrunableAccountData, StoreError> {
-        self.interact_with_connection(move |conn| {
-            SqliteStore::get_prunable_account_data(conn, account_id)
-        })
-        .await
-    }
-
     async fn prune_account_history(
         &self,
         account_id: AccountId,

@@ -495,30 +495,10 @@ impl<AUTH> Client<AUTH> {
     // ACCOUNT HISTORY PRUNING
     // --------------------------------------------------------------------------------------------
 
-    /// Returns information about account states that can be safely pruned.
-    ///
-    /// This is a query-only operation that identifies historical account states
-    /// that are no longer needed. Use this to preview what would be deleted
-    /// before calling [`prune_account_history`](Self::prune_account_history).
-    ///
-    /// # Safety guarantees
-    ///
-    /// The following are NEVER included in the prunable list:
-    /// - The latest state (current account state)
-    /// - The initial state (needed for account reconstruction)
-    /// - States referenced by pending transactions (needed for rollback)
-    pub async fn get_prunable_account_data(
-        &self,
-        account_id: AccountId,
-    ) -> Result<crate::store::PrunableAccountData, ClientError> {
-        self.store.get_prunable_account_data(account_id).await.map_err(ClientError::StoreError)
-    }
-
     /// Prunes old account states, keeping only what's needed for the account to function.
     ///
     /// This removes historical account states that are no longer needed, freeing up
-    /// storage space. It's recommended to call [`get_prunable_account_data`](Self::get_prunable_account_data)
-    /// first to see what will be deleted.
+    /// storage space.
     ///
     /// # What is preserved
     ///

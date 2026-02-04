@@ -75,24 +75,9 @@ pub async fn test_prune_account_history_with_transactions(
         println!("Transfer {} committed: {}", i, tx_id);
     }
 
-    // Step 3: Check how many states we have accumulated
-    println!("\n--- Step 3: Check prunable states ---");
-    let prunable = client.get_prunable_account_data(sender_id).await?;
-    println!(
-        "Sender account has {} prunable states",
-        prunable.state_count()
-    );
-    for state in &prunable.states {
-        println!("  - nonce: {}", state.nonce);
-    }
-
-    // We should have some prunable states (the old committed states)
-    // The exact count depends on how many transactions were executed
-    let _states_before_prune = prunable.state_count();
-
-    // Step 4: Execute another transfer but DON'T wait for it to commit
+    // Step 3: Execute another transfer but DON'T wait for it to commit
     // This creates a pending transaction whose state should be preserved
-    println!("\n--- Step 4: Create pending transaction ---");
+    println!("\n--- Step 3: Create pending transaction ---");
     let asset = FungibleAsset::new(faucet_id, transfer_amount)?;
     let tx_request = TransactionRequestBuilder::new()
         .build_pay_to_id(
@@ -116,32 +101,21 @@ pub async fn test_prune_account_history_with_transactions(
         "Transaction should be pending"
     );
 
-    // Step 5: Check prunable states again (should account for pending tx)
-    println!("\n--- Step 5: Check prunable states with pending tx ---");
-    let prunable_with_pending = client.get_prunable_account_data(sender_id).await?;
-    println!(
-        "Prunable states (with pending tx): {}",
-        prunable_with_pending.state_count()
-    );
-
-    // The pending transaction's init state should be protected
-    // So we might have fewer prunable states now
-
-    // Step 6: Actually prune
-    println!("\n--- Step 6: Prune old states ---");
+    // Step 4: Prune old states (pending transaction's state should be preserved)
+    println!("\n--- Step 4: Prune old states ---");
     let pruned = client.prune_account_history(sender_id).await?;
     println!("Pruned {} states", pruned.state_count());
     println!("Pruned {} orphaned storage rows", pruned.orphaned_storage_rows);
     println!("Pruned {} orphaned asset rows", pruned.orphaned_asset_rows);
     println!("Pruned {} orphaned map entries", pruned.orphaned_map_entries);
 
-    // Step 7: Wait for pending transaction to commit
-    println!("\n--- Step 7: Wait for pending transaction to commit ---");
+    // Step 5: Wait for pending transaction to commit
+    println!("\n--- Step 5: Wait for pending transaction to commit ---");
     wait_for_tx(&mut client, pending_tx_id).await?;
     println!("Pending transaction committed: {}", pending_tx_id);
 
-    // Step 8: Verify account still works after pruning
-    println!("\n--- Step 8: Verify account works after pruning ---");
+    // Step 6: Verify account still works after pruning
+    println!("\n--- Step 6: Verify account works after pruning ---");
 
     // Check account can be retrieved
     let account = client
@@ -175,14 +149,8 @@ pub async fn test_prune_account_history_with_transactions(
         final_account.commitment()
     );
 
-    // Step 9: Prune again and verify minimal states remain
-    println!("\n--- Step 9: Final prune check ---");
-    let final_prunable = client.get_prunable_account_data(sender_id).await?;
-    println!(
-        "Final prunable states: {}",
-        final_prunable.state_count()
-    );
-
+    // Step 7: Prune again and verify minimal states remain
+    println!("\n--- Step 7: Final prune check ---");
     let final_pruned = client.prune_account_history(sender_id).await?;
     println!("Final pruned: {} states", final_pruned.state_count());
 
