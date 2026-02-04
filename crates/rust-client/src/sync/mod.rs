@@ -90,7 +90,7 @@ pub use state_sync_update::{
 /// Client synchronization methods.
 impl<AUTH> Client<AUTH>
 where
-    AUTH: TransactionAuthenticator + Sync + 'static,
+    AUTH: TransactionAuthenticator + Send + Sync + 'static,
 {
     // SYNC STATE
     // --------------------------------------------------------------------------------------------
@@ -181,6 +181,60 @@ where
         Ok(sync_summary)
     }
 
+    /// Gets the state sync update from the network without applying it.
+    ///
+    /// This method performs the same network requests as [`sync_state()`](Self::sync_state) but
+    /// returns the raw [`StateSyncUpdate`] instead of applying it to the store. This is useful
+    /// when you want to inspect or modify the update before applying it, or when implementing
+    /// custom sync logic.
+    ///
+    /// Use [`apply_state_sync()`](Self::apply_state_sync) to apply the returned update.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// let update = client.get_sync_update().await?;
+    /// println!("Sync would update {} accounts", update.accounts.updated_accounts.len());
+    /// client.apply_state_sync(update).await?;
+    /// ```
+    pub async fn get_sync_update(&self) -> Result<StateSyncUpdate, ClientError> {
+        let note_screener = NoteScreener::new(self.store.clone(), self.authenticator.clone());
+        let state_sync =
+            StateSync::new(self.rpc_api.clone(), Arc::new(note_screener), self.tx_discard_delta);
+
+        // Get current state of the client
+        let accounts = self
+            .store
+            .get_account_headers()
+            .await?
+            .into_iter()
+            .map(|(acc_header, _)| acc_header)
+            .collect();
+
+        let note_tags: BTreeSet<NoteTag> = self.store.get_unique_note_tags().await?;
+
+        let unspent_input_notes = self.store.get_input_notes(NoteFilter::Unspent).await?;
+        let unspent_output_notes = self.store.get_output_notes(NoteFilter::Unspent).await?;
+
+        let uncommitted_transactions =
+            self.store.get_transactions(TransactionFilter::Uncommitted).await?;
+
+        // Build current partial MMR
+        let current_partial_mmr = self.store.get_current_partial_mmr().await?;
+
+        // Get the sync update from the network
+        state_sync
+            .sync_state(
+                current_partial_mmr,
+                accounts,
+                note_tags,
+                unspent_input_notes,
+                unspent_output_notes,
+                uncommitted_transactions,
+            )
+            .await
+    }
+
     /// Applies the state sync update to the store.
     ///
     /// See [`crate::Store::apply_state_sync()`] for what the update implies.
@@ -196,7 +250,7 @@ where
 // ================================================================================================
 
 /// Contains stats about the sync operation.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct SyncSummary {
     /// Block number up to which the client has been synced.
     pub block_num: BlockNumber,

@@ -9,7 +9,7 @@ use super::config::CliConfig;
 use crate::commands::account::DEFAULT_ACCOUNT_ID_KEY;
 use crate::errors::CliError;
 
-pub async fn print_client_info<AUTH: TransactionAuthenticator + Sync + 'static>(
+pub async fn print_client_info<AUTH: TransactionAuthenticator + Send + Sync + 'static>(
     client: &Client<AUTH>,
 ) -> Result<(), CliError> {
     let config = CliConfig::from_system()?;
@@ -21,7 +21,7 @@ pub async fn print_client_info<AUTH: TransactionAuthenticator + Sync + 'static>(
 
 // HELPERS
 // ================================================================================================
-async fn print_client_stats<AUTH: TransactionAuthenticator + Sync + 'static>(
+async fn print_client_stats<AUTH: TransactionAuthenticator + Send + Sync + 'static>(
     client: &Client<AUTH>,
 ) -> Result<(), CliError> {
     println!("Block number: {}", client.get_sync_height().await?);

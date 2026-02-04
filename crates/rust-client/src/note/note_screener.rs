@@ -119,10 +119,11 @@ where
 // DEFAULT CALLBACK IMPLEMENTATIONS
 // ================================================================================================
 
-#[async_trait(?Send)]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 impl<AUTH> OnNoteReceived for NoteScreener<AUTH>
 where
-    AUTH: TransactionAuthenticator + Sync,
+    AUTH: TransactionAuthenticator + Send + Sync,
 {
     /// Default implementation of the [`OnNoteReceived`] callback. It queries the store for the
     /// committed note to check if it's relevant. If the note wasn't being tracked but it came in

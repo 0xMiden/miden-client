@@ -1,0 +1,38 @@
+[package]
+authors.workspace      = true
+description            = "Service wrapper for miden-client with operation coordination, events, and background sync"
+edition.workspace      = true
+keywords               = ["client", "miden", "service"]
+license.workspace      = true
+name                   = "miden-client-service"
+readme                 = "README.md"
+repository.workspace   = true
+rust-version.workspace = true
+version.workspace      = true
+
+[features]
+default = ["std"]
+std = ["miden-client/std", "tokio"]
+testing = ["miden-client/testing"]
+
+[dependencies]
+# Workspace crates
+miden-client = { workspace = true }
+
+# Miden protocol dependencies
+miden-protocol = { workspace = true }
+
+# External dependencies
+async-trait = { workspace = true }
+futures = "0.3"
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+# Optional native dependencies
+tokio = { workspace = true, optional = true, features = ["sync", "time", "rt"] }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt", "macros"] }
+
+[lints]
+workspace = true

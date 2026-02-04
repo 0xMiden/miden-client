@@ -152,7 +152,7 @@ pub use result::TransactionResult;
 /// Transaction management methods
 impl<AUTH> Client<AUTH>
 where
-    AUTH: TransactionAuthenticator + Sync + 'static,
+    AUTH: TransactionAuthenticator + Send + Sync + 'static,
 {
     // TRANSACTION DATA RETRIEVAL
     // --------------------------------------------------------------------------------------------

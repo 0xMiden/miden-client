@@ -50,7 +50,7 @@ pub struct ExecCmd {
 }
 
 impl ExecCmd {
-    pub async fn execute<AUTH: TransactionAuthenticator + Sync + 'static>(
+    pub async fn execute<AUTH: TransactionAuthenticator + Send + Sync + 'static>(
         &self,
         mut client: Client<AUTH>,
     ) -> Result<(), CliError> {
