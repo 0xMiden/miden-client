@@ -754,6 +754,10 @@ impl NodeRpcClient for MockRpcApi {
     async fn get_network_id(&self) -> Result<NetworkId, RpcError> {
         Ok(NetworkId::Testnet)
     }
+
+    async fn get_rpc_limits(&self) -> crate::rpc::RpcLimits {
+        crate::rpc::RpcLimits::default()
+    }
 }
 
 // CONVERSIONS
