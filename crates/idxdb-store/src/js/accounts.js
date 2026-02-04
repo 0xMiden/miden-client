@@ -433,7 +433,7 @@ export async function pruneOldAccountStates(dbId, pendingAccountCommitments) {
         const vaultRootsToCheck = new Set();
         const storageRootsToCheck = new Set();
         const codeRootsToCheck = new Set();
-        for (const [_accountId, records] of accountsByIdMap) {
+        for (const records of accountsByIdMap.values()) {
             if (records.length <= 1)
                 continue;
             // Sort by nonce descending

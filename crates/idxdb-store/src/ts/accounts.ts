@@ -582,7 +582,7 @@ export async function pruneOldAccountStates(
     const storageRootsToCheck: Set<string> = new Set();
     const codeRootsToCheck: Set<string> = new Set();
 
-    for (const [_accountId, records] of accountsByIdMap) {
+    for (const records of accountsByIdMap.values()) {
       if (records.length <= 1) continue;
 
       // Sort by nonce descending
