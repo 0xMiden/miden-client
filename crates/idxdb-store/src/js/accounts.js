@@ -417,3 +417,105 @@ export async function undoAccountStates(dbId, accountCommitments) {
         logWebStoreError(error, `Error undoing account states: ${accountCommitments.join(",")}`);
     }
 }
+export async function pruneOldAccountStates(dbId, pendingAccountCommitments) {
+    try {
+        const db = getDatabase(dbId);
+        const pendingSet = new Set(pendingAccountCommitments);
+        // Group accounts by ID
+        const accountsByIdMap = new Map();
+        await db.accounts.each((record) => {
+            const existing = accountsByIdMap.get(record.id) || [];
+            existing.push(record);
+            accountsByIdMap.set(record.id, existing);
+        });
+        // Find states to prune (non-latest and not in pending)
+        const statesToPrune = [];
+        const vaultRootsToCheck = new Set();
+        const storageRootsToCheck = new Set();
+        const codeRootsToCheck = new Set();
+        for (const [_accountId, records] of accountsByIdMap) {
+            if (records.length <= 1)
+                continue;
+            // Sort by nonce descending
+            records.sort((a, b) => {
+                const bigIntA = BigInt(a.nonce);
+                const bigIntB = BigInt(b.nonce);
+                return bigIntA > bigIntB ? -1 : bigIntA < bigIntB ? 1 : 0;
+            });
+            // Skip the latest (first after sorting), prune the rest if not pending
+            for (let i = 1; i < records.length; i++) {
+                const record = records[i];
+                if (!pendingSet.has(record.accountCommitment)) {
+                    statesToPrune.push(record.accountCommitment);
+                    if (record.vaultRoot)
+                        vaultRootsToCheck.add(record.vaultRoot);
+                    if (record.storageRoot)
+                        storageRootsToCheck.add(record.storageRoot);
+                    if (record.codeRoot)
+                        codeRootsToCheck.add(record.codeRoot);
+                }
+            }
+        }
+        if (statesToPrune.length === 0) {
+            return 0;
+        }
+        // Delete the old account states
+        await db.accounts
+            .where("accountCommitment")
+            .anyOf(statesToPrune)
+            .delete();
+        // Clean up orphaned vault assets
+        for (const vaultRoot of vaultRootsToCheck) {
+            const stillReferenced = await db.accounts
+                .where("vaultRoot")
+                .equals(vaultRoot)
+                .count();
+            if (stillReferenced === 0) {
+                await db.accountAssets.where("root").equals(vaultRoot).delete();
+            }
+        }
+        // Clean up orphaned storage
+        for (const storageRoot of storageRootsToCheck) {
+            const stillReferenced = await db.accounts
+                .where("storageRoot")
+                .equals(storageRoot)
+                .count();
+            if (stillReferenced === 0) {
+                // Get storage slots to find map roots
+                const slots = await db.accountStorages
+                    .where("commitment")
+                    .equals(storageRoot)
+                    .toArray();
+                // Delete storage map entries for map-type slots
+                for (const slot of slots) {
+                    if (slot.slotType === 1) {
+                        await db.storageMapEntries
+                            .where("root")
+                            .equals(slot.slotValue)
+                            .delete();
+                    }
+                }
+                await db.accountStorages.where("commitment").equals(storageRoot).delete();
+            }
+        }
+        // Clean up orphaned code (not referenced by accounts or foreign accounts)
+        // foreignAccountCode doesn't have an index on codeRoot, so fetch all and filter
+        const allForeignAccountCodes = await db.foreignAccountCode.toArray();
+        const foreignCodeRoots = new Set(allForeignAccountCodes.map((f) => f.codeRoot));
+        for (const codeRoot of codeRootsToCheck) {
+            const accountsWithCode = await db.accounts
+                .where("codeRoot")
+                .equals(codeRoot)
+                .count();
+            const foreignWithCode = foreignCodeRoots.has(codeRoot);
+            if (accountsWithCode === 0 && !foreignWithCode) {
+                await db.accountCodes.where("root").equals(codeRoot).delete();
+            }
+        }
+        return statesToPrune.length;
+    }
+    catch (error) {
+        logWebStoreError(error, `Error pruning old account states`);
+        return 0;
+    }
+}

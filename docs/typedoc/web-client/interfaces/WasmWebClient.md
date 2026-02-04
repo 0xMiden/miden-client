@@ -948,6 +948,21 @@ prover if none is supplied.
 
 ***
 
+### pruneAccountHistory()
+
+> **pruneAccountHistory**(): `Promise`\<`number`\>
+
+Prunes old committed account states from the store, keeping only the latest state for
+each tracked account. Pending transaction states are preserved for rollback support.
+
+Returns the number of account states that were pruned.
+
+#### Returns
+
+`Promise`\<`number`\>
+
+***
+
 ### removeAccountAddress()
 
 > **removeAccountAddress**(`account_id`, `address`): `Promise`\<`void`\>

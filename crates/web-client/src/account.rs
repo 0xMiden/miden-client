@@ -153,4 +153,20 @@ impl WebClient {
 
         Ok(StorageReader::new(client.new_storage_reader(account_id.into())))
     }
+
+    /// Prunes old committed account states from the store, keeping only the latest state for
+    /// each tracked account. Pending transaction states are preserved for rollback support.
+    ///
+    /// Returns the number of account states that were pruned.
+    #[wasm_bindgen(js_name = "pruneAccountHistory")]
+    pub async fn prune_account_history(&mut self) -> Result<usize, JsValue> {
+        if let Some(client) = self.get_mut_inner() {
+            client
+                .prune_account_history()
+                .await
+                .map_err(|err| js_error_with_context(err, "failed to prune account history"))
+        } else {
+            Err(JsValue::from_str("Client not initialized"))
+        }
+    }
 }
