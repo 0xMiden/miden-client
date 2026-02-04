@@ -356,11 +356,11 @@ export const customTransaction = async (
             # This note script is based off of the P2ID note script because notes currently need to have
             # assets, otherwise it could have been boiled down to the assert.
 
-            use miden::protocol::native_account
+            use miden::protocol::active_account
+            use miden::protocol::account_id
             use miden::protocol::active_note
-            use miden::core::sys
-            use miden::core::mem
             use miden::standards::wallets::basic->basic_wallet
+            use miden::core::mem
             begin
                 # push data from the advice map into the advice stack
                 adv.push_mapval
@@ -395,27 +395,27 @@ export const customTransaction = async (
                 push.${expectedNoteArg2} assert_eqw.err="Second note argument didn't match expected"
                 # => []
 
-                # store the note inputs to memory starting at address 0
-                push.0 exec.active_note::get_inputs
-                # => [num_inputs, inputs_ptr]
+                # store the note storage to memory starting at address 0
+                padw push.0 exec.active_note::get_storage
+                # => [num_storage_items, storage_ptr, EMPTY_WORD]
 
-                # make sure the number of inputs is 2
-                eq.2 assert.err="P2ID script expects exactly 2 note inputs"
-                # => [inputs_ptr]
+                # make sure the number of storage items is 2
+                eq.2 assert.err="P2ID script expects exactly 2 note storage items"
+                # => [storage_ptr, EMPTY_WORD]
 
-                # read the target account id from the note inputs
-                mem_load
-                # => [target_account_id_prefix]
+                # read the target account id from the note storage
+                mem_loadw_be drop drop
+                # => [target_account_id_prefix, target_account_id_suffix]
 
-                exec.native_account::get_id swap drop
-                # => [account_id_prefix, target_account_id_prefix, ...]
+                exec.active_account::get_id
+                # => [account_id_prefix, account_id_suffix, target_account_id_prefix, target_account_id_suffix, ...]
 
                 # ensure account_id = target_account_id, fails otherwise
-                assert_eq.err="P2ID's target account address and transaction address do not match"
-                # => [...]
+                exec.account_id::is_equal assert.err="P2ID's target account address and transaction address do not match"
+                # => []
 
                 exec.basic_wallet::add_assets_to_account
-                # => [...]
+                # => []
             end
         `;
 

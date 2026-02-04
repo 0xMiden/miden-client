@@ -372,7 +372,7 @@ fn create_custom_note(
         .context("failed to compile custom note script")?;
 
     let inputs =
-        NoteStorage::new(vec![target_account_id.prefix().as_felt(), target_account_id.suffix()])
+        NoteStorage::new(vec![target_account_id.suffix(), target_account_id.prefix().as_felt()])
             .context("failed to create note inputs")?;
     let serial_num = rng.draw_word();
     let note_metadata = NoteMetadata::new(
