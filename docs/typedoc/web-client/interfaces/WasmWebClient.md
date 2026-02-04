@@ -446,6 +446,26 @@ Returns the associated [`AuthSecretKey`] if found, or an error if not found.
 
 ***
 
+### getAccountCode()
+
+> **getAccountCode**(`account_id`): `Promise`\<[`AccountCode`](../classes/AccountCode.md)\>
+
+Retrieves the account code for a specific account.
+
+Returns `null` if the account is not found.
+
+#### Parameters
+
+##### account\_id
+
+[`AccountId`](../classes/AccountId.md)
+
+#### Returns
+
+`Promise`\<[`AccountCode`](../classes/AccountCode.md)\>
+
+***
+
 ### getAccounts()
 
 > **getAccounts**(): `Promise`\<[`AccountHeader`](../classes/AccountHeader.md)[]\>
@@ -453,6 +473,46 @@ Returns the associated [`AuthSecretKey`] if found, or an error if not found.
 #### Returns
 
 `Promise`\<[`AccountHeader`](../classes/AccountHeader.md)[]\>
+
+***
+
+### getAccountStorage()
+
+> **getAccountStorage**(`account_id`): `Promise`\<[`AccountStorage`](../classes/AccountStorage.md)\>
+
+Retrieves the storage for a specific account.
+
+To only load a specific slot, use `accountReader` instead.
+
+#### Parameters
+
+##### account\_id
+
+[`AccountId`](../classes/AccountId.md)
+
+#### Returns
+
+`Promise`\<[`AccountStorage`](../classes/AccountStorage.md)\>
+
+***
+
+### getAccountVault()
+
+> **getAccountVault**(`account_id`): `Promise`\<[`AssetVault`](../classes/AssetVault.md)\>
+
+Retrieves the asset vault for a specific account.
+
+To check the balance for a single asset, use `accountReader` instead.
+
+#### Parameters
+
+##### account\_id
+
+[`AccountId`](../classes/AccountId.md)
+
+#### Returns
+
+`Promise`\<[`AssetVault`](../classes/AssetVault.md)\>
 
 ***
 

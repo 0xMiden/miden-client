@@ -556,6 +556,30 @@ Returns the associated [`AuthSecretKey`] if found, or an error if not found.
 
 ***
 
+### getAccountCode()
+
+> **getAccountCode**(`account_id`): `Promise`\<[`AccountCode`](AccountCode.md)\>
+
+Retrieves the account code for a specific account.
+
+Returns `null` if the account is not found.
+
+#### Parameters
+
+##### account\_id
+
+[`AccountId`](AccountId.md)
+
+#### Returns
+
+`Promise`\<[`AccountCode`](AccountCode.md)\>
+
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`getAccountCode`](../interfaces/WasmWebClient.md#getaccountcode)
+
+***
+
 ### getAccounts()
 
 > **getAccounts**(): `Promise`\<[`AccountHeader`](AccountHeader.md)[]\>
@@ -567,6 +591,54 @@ Returns the associated [`AuthSecretKey`] if found, or an error if not found.
 #### Inherited from
 
 [`WasmWebClient`](../interfaces/WasmWebClient.md).[`getAccounts`](../interfaces/WasmWebClient.md#getaccounts)
+
+***
+
+### getAccountStorage()
+
+> **getAccountStorage**(`account_id`): `Promise`\<[`AccountStorage`](AccountStorage.md)\>
+
+Retrieves the storage for a specific account.
+
+To only load a specific slot, use `accountReader` instead.
+
+#### Parameters
+
+##### account\_id
+
+[`AccountId`](AccountId.md)
+
+#### Returns
+
+`Promise`\<[`AccountStorage`](AccountStorage.md)\>
+
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`getAccountStorage`](../interfaces/WasmWebClient.md#getaccountstorage)
+
+***
+
+### getAccountVault()
+
+> **getAccountVault**(`account_id`): `Promise`\<[`AssetVault`](AssetVault.md)\>
+
+Retrieves the asset vault for a specific account.
+
+To check the balance for a single asset, use `accountReader` instead.
+
+#### Parameters
+
+##### account\_id
+
+[`AccountId`](AccountId.md)
+
+#### Returns
+
+`Promise`\<[`AssetVault`](AssetVault.md)\>
+
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`getAccountVault`](../interfaces/WasmWebClient.md#getaccountvault)
 
 ***
 

@@ -47,18 +47,6 @@ Retrieves the addresses associated with this account.
 
 ***
 
-### code()
-
-> **code**(): `Promise`\<[`AccountCode`](AccountCode.md)\>
-
-Retrieves the account code.
-
-#### Returns
-
-`Promise`\<[`AccountCode`](AccountCode.md)\>
-
-***
-
 ### codeCommitment()
 
 > **codeCommitment**(): `Promise`\<[`Word`](Word.md)\>
