@@ -398,7 +398,7 @@ impl NodeRpcClient for GrpcClient {
     }
 
     async fn get_notes_by_id(&self, note_ids: &[NoteId]) -> Result<Vec<FetchedNote>, RpcError> {
-        let limits = self.get_rpc_limits().await;
+        let limits = self.get_rpc_limits().await?;
         let mut notes = Vec::with_capacity(note_ids.len());
         for chunk in note_ids.chunks(limits.note_ids_limit) {
             let request = proto::note::NoteIdList {
@@ -639,7 +639,7 @@ impl NodeRpcClient for GrpcClient {
     ) -> Result<Vec<NullifierUpdate>, RpcError> {
         const MAX_ITERATIONS: u32 = 1000; // Safety limit to prevent infinite loops
 
-        let limits = self.get_rpc_limits().await;
+        let limits = self.get_rpc_limits().await?;
         let mut all_nullifiers = BTreeSet::new();
 
         // Establish RPC connection once before the loop
@@ -704,7 +704,7 @@ impl NodeRpcClient for GrpcClient {
     }
 
     async fn check_nullifiers(&self, nullifiers: &[Nullifier]) -> Result<Vec<SmtProof>, RpcError> {
-        let limits = self.get_rpc_limits().await;
+        let limits = self.get_rpc_limits().await?;
         let mut proofs: Vec<SmtProof> = Vec::with_capacity(nullifiers.len());
         for chunk in nullifiers.chunks(limits.nullifiers_limit) {
             let request = proto::rpc::NullifierList {
@@ -921,24 +921,24 @@ impl NodeRpcClient for GrpcClient {
         Ok(endpoint.to_network_id())
     }
 
-    async fn get_rpc_limits(&self) -> RpcLimits {
+    async fn get_rpc_limits(&self) -> Result<RpcLimits, RpcError> {
         // Return cached limits if available
         if let Some(limits) = *self.limits.read() {
-            return limits;
+            return Ok(limits);
         }
 
-        // Try to fetch limits from the node
-        match self.fetch_rpc_limits().await {
-            Ok(limits) => {
-                // Cache and return on success
-                self.limits.write().replace(limits);
-                limits
-            },
-            Err(_) => {
-                // Fall back to defaults if fetch fails. Don't cache so we can retry on next call.
-                RpcLimits::default()
-            },
-        }
+        // Fetch from node (propagate error instead of falling back to defaults)
+        let limits = self.fetch_rpc_limits().await?;
+        self.limits.write().replace(limits);
+        Ok(limits)
+    }
+
+    async fn set_cached_rpc_limits(&self, limits: RpcLimits) {
+        self.limits.write().replace(limits);
+    }
+
+    async fn clear_cached_rpc_limits(&self) {
+        self.limits.write().take();
     }
 }
 

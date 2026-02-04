@@ -294,7 +294,7 @@ use alloc::sync::Arc;
 use miden_protocol::crypto::rand::FeltRng;
 use miden_tx::auth::TransactionAuthenticator;
 use rand::RngCore;
-use rpc::NodeRpcClient;
+use rpc::{NodeRpcClient, RpcLimits};
 use store::Store;
 
 use crate::note_transport::NoteTransportClient;
@@ -395,7 +395,7 @@ impl<AUTH> Client<AUTH> {
 
     /// Checks if the note tag limit has been exceeded.
     pub async fn check_note_tag_limit(&self) -> Result<(), ClientError> {
-        let limits = self.rpc_api.get_rpc_limits().await;
+        let limits = self.rpc_api.get_rpc_limits().await.unwrap_or_default();
         if self.store.get_unique_note_tags().await?.len() >= limits.note_tags_limit {
             return Err(ClientError::NoteTagsLimitExceeded(limits.note_tags_limit));
         }
@@ -404,11 +404,19 @@ impl<AUTH> Client<AUTH> {
 
     /// Checks if the account limit has been exceeded.
     pub async fn check_account_limit(&self) -> Result<(), ClientError> {
-        let limits = self.rpc_api.get_rpc_limits().await;
+        let limits = self.rpc_api.get_rpc_limits().await.unwrap_or_default();
         if self.store.get_account_ids().await?.len() >= limits.account_ids_limit {
             return Err(ClientError::AccountsLimitExceeded(limits.account_ids_limit));
         }
         Ok(())
+    }
+
+    /// Refreshes RPC limits from node and persists to store.
+    pub async fn refresh_rpc_limits(&self) -> Result<RpcLimits, ClientError> {
+        self.rpc_api.clear_cached_rpc_limits().await;
+        let limits = self.rpc_api.get_rpc_limits().await?;
+        self.store.set_rpc_limits(limits).await?;
+        Ok(limits)
     }
 
     // TEST HELPERS

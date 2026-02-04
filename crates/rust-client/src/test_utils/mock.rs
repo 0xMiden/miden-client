@@ -755,8 +755,16 @@ impl NodeRpcClient for MockRpcApi {
         Ok(NetworkId::Testnet)
     }
 
-    async fn get_rpc_limits(&self) -> crate::rpc::RpcLimits {
-        crate::rpc::RpcLimits::default()
+    async fn get_rpc_limits(&self) -> Result<crate::rpc::RpcLimits, RpcError> {
+        Ok(crate::rpc::RpcLimits::default())
+    }
+
+    async fn set_cached_rpc_limits(&self, _limits: crate::rpc::RpcLimits) {
+        // Mock doesn't need caching
+    }
+
+    async fn clear_cached_rpc_limits(&self) {
+        // Mock doesn't need caching
     }
 }
 

@@ -3,8 +3,13 @@
 
 use core::convert::TryFrom;
 
+use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
+
 use crate::rpc::errors::RpcConversionError;
 use crate::rpc::generated::rpc as proto;
+
+/// Key used to store RPC limits in the settings table.
+pub const RPC_LIMITS_STORE_SETTING: &str = "rpc_limits";
 
 const DEFAULT_NOTE_IDS_LIMIT: usize = 100;
 const DEFAULT_NULLIFIERS_LIMIT: usize = 1000;
@@ -36,6 +41,28 @@ impl Default for RpcLimits {
             account_ids_limit: DEFAULT_ACCOUNT_IDS_LIMIT,
             note_tags_limit: DEFAULT_NOTE_TAGS_LIMIT,
         }
+    }
+}
+
+impl Serializable for RpcLimits {
+    fn write_into<W: ByteWriter>(&self, target: &mut W) {
+        // Use u64 for portability (usize varies by platform)
+        (self.note_ids_limit as u64).write_into(target);
+        (self.nullifiers_limit as u64).write_into(target);
+        (self.account_ids_limit as u64).write_into(target);
+        (self.note_tags_limit as u64).write_into(target);
+    }
+}
+
+impl Deserializable for RpcLimits {
+    #[allow(clippy::cast_possible_truncation)]
+    fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
+        Ok(Self {
+            note_ids_limit: u64::read_from(source)? as usize,
+            nullifiers_limit: u64::read_from(source)? as usize,
+            account_ids_limit: u64::read_from(source)? as usize,
+            note_tags_limit: u64::read_from(source)? as usize,
+        })
     }
 }
 

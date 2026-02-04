@@ -14,7 +14,7 @@ use crate::alloc::string::ToString;
 #[cfg(feature = "std")]
 use crate::keystore::FilesystemKeyStore;
 use crate::note_transport::NoteTransportClient;
-use crate::rpc::{Endpoint, NodeRpcClient};
+use crate::rpc::{Endpoint, NodeRpcClient, RpcLimits};
 use crate::store::{Store, StoreError};
 use crate::transaction::TransactionProver;
 use crate::{Client, ClientError, ClientRng, ClientRngBox, DebugMode, grpc_support};
@@ -421,6 +421,20 @@ where
         // Initialize genesis commitment in RPC client
         if let Some((genesis, _)) = store.get_block_header_by_num(BlockNumber::GENESIS).await? {
             rpc_api.set_genesis_commitment(genesis.commitment()).await?;
+        }
+
+        // Initialize RPC limits from store or fetch from node
+        if let Some(limits) = store.get_rpc_limits().await? {
+            rpc_api.set_cached_rpc_limits(limits).await;
+        } else {
+            match rpc_api.get_rpc_limits().await {
+                Ok(limits) => {
+                    store.set_rpc_limits(limits).await?;
+                },
+                Err(_) => {
+                    rpc_api.set_cached_rpc_limits(RpcLimits::default()).await;
+                },
+            }
         }
 
         // Initialize note transport: prefer explicit client, fall back to config (tonic only)

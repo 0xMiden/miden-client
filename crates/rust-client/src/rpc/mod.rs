@@ -67,7 +67,7 @@ mod errors;
 pub use errors::*;
 
 mod endpoint;
-pub use domain::limits::RpcLimits;
+pub use domain::limits::{RPC_LIMITS_STORE_SETTING, RpcLimits};
 pub use domain::status::RpcStatusInfo;
 pub use endpoint::Endpoint;
 
@@ -387,8 +387,14 @@ pub trait NodeRpcClient: Send + Sync {
     /// Fetches the RPC limits configured on the node.
     ///
     /// Returns the limits that define the maximum number of items that can be sent in a single
-    /// RPC request. If the request fails for any reason, default values are returned.
-    async fn get_rpc_limits(&self) -> RpcLimits;
+    /// RPC request.
+    async fn get_rpc_limits(&self) -> Result<RpcLimits, RpcError>;
+
+    /// Sets the cached RPC limits from persisted storage during client startup.
+    async fn set_cached_rpc_limits(&self, limits: RpcLimits);
+
+    /// Clears the cached RPC limits, forcing next call to fetch fresh from node.
+    async fn clear_cached_rpc_limits(&self);
 }
 
 // RPC API ENDPOINT

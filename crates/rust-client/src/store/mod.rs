@@ -47,6 +47,7 @@ use miden_protocol::note::{NoteId, NoteScript, NoteTag, Nullifier};
 use miden_protocol::transaction::TransactionId;
 
 use crate::note_transport::{NOTE_TRANSPORT_CURSOR_STORE_SETTING, NoteTransportCursor};
+use crate::rpc::{RPC_LIMITS_STORE_SETTING, RpcLimits};
 use crate::sync::{NoteTagRecord, StateSyncUpdate};
 use crate::transaction::{TransactionRecord, TransactionStatusVariant, TransactionStoreUpdate};
 
@@ -408,6 +409,25 @@ pub trait Store: Send + Sync {
         self.set_setting(NOTE_TRANSPORT_CURSOR_STORE_SETTING.into(), cursor_bytes)
             .await?;
         Ok(())
+    }
+
+    // RPC LIMITS
+    // --------------------------------------------------------------------------------------------
+
+    /// Gets persisted RPC limits. Returns None if not stored.
+    async fn get_rpc_limits(&self) -> Result<Option<RpcLimits>, StoreError> {
+        use miden_tx::utils::Deserializable;
+        let Some(bytes) = self.get_setting(RPC_LIMITS_STORE_SETTING.into()).await? else {
+            return Ok(None);
+        };
+        let limits = RpcLimits::read_from_bytes(&bytes)?;
+        Ok(Some(limits))
+    }
+
+    /// Persists RPC limits to the store.
+    async fn set_rpc_limits(&self, limits: RpcLimits) -> Result<(), StoreError> {
+        use miden_tx::utils::Serializable;
+        self.set_setting(RPC_LIMITS_STORE_SETTING.into(), limits.to_bytes()).await
     }
 
     // PARTIAL MMR
