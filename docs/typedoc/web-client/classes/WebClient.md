@@ -1583,11 +1583,30 @@ A promise that resolves to a SyncSummary with the sync results.
 
 > **terminate**(): `void`
 
-Terminates the underlying worker.
+Terminates the underlying Web Worker used by this WebClient instance.
+
+Call this method when you're done using a WebClient to free up browser
+resources.
+
+After calling terminate(), the WebClient instance should not be used for
+any further operations that require the worker.
 
 #### Returns
 
 `void`
+
+#### Example
+
+```typescript
+// Create a client
+const client = await WebClient.createClient(rpcUrl);
+
+// Use the client...
+await client.syncState();
+
+// Clean up when done
+client.terminate();
+```
 
 ***
 
