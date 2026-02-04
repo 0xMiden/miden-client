@@ -8,6 +8,7 @@
 
 ### Enhancements
 
+* Enabled SIMD (`+simd128`) for WASM builds ([#1738](https://github.com/0xMiden/miden-client/pull/1738)).
 * Added the `@miden-sdk/react` hooks library with a provider, hooks, and an example app for the web client ([#1711](https://github.com/0xMiden/miden-client/pull/1711)).
 
 ## 0.13.0 (2026-01-28)
