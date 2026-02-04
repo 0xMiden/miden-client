@@ -8,6 +8,7 @@
 
 ### Enhancements
 
+* Added `--rpc-status` flag to `miden-client info` command to display RPC node status information including node version, genesis commitment, store status, and block producer status; also added `get_status_unversioned` to `NodeRpcClient` trait and `rpc_api()` accessor to `Client` ([#1742](https://github.com/0xMiden/miden-client/pull/1742)).
 * Added the `@miden-sdk/react` hooks library with a provider, hooks, and an example app for the web client ([#1711](https://github.com/0xMiden/miden-client/pull/1711)).
 
 ## 0.13.0 (2026-01-28)
