@@ -45,6 +45,7 @@ use miden_protocol::crypto::merkle::mmr::{Forest, InOrderIndex, MmrPeaks, Partia
 use miden_protocol::errors::AccountError;
 use miden_protocol::note::{NoteId, NoteScript, NoteTag, Nullifier};
 use miden_protocol::transaction::TransactionId;
+use miden_tx::utils::{Deserializable, Serializable};
 
 use crate::note_transport::{NOTE_TRANSPORT_CURSOR_STORE_SETTING, NoteTransportCursor};
 use crate::rpc::{RPC_LIMITS_STORE_SETTING, RpcLimits};
@@ -414,9 +415,8 @@ pub trait Store: Send + Sync {
     // RPC LIMITS
     // --------------------------------------------------------------------------------------------
 
-    /// Gets persisted RPC limits. Returns None if not stored.
+    /// Gets persisted RPC limits. Returns `None` if not stored.
     async fn get_rpc_limits(&self) -> Result<Option<RpcLimits>, StoreError> {
-        use miden_tx::utils::Deserializable;
         let Some(bytes) = self.get_setting(RPC_LIMITS_STORE_SETTING.into()).await? else {
             return Ok(None);
         };
@@ -426,7 +426,6 @@ pub trait Store: Send + Sync {
 
     /// Persists RPC limits to the store.
     async fn set_rpc_limits(&self, limits: RpcLimits) -> Result<(), StoreError> {
-        use miden_tx::utils::Serializable;
         self.set_setting(RPC_LIMITS_STORE_SETTING.into(), limits.to_bytes()).await
     }
 

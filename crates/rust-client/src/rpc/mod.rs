@@ -67,7 +67,8 @@ mod errors;
 pub use errors::*;
 
 mod endpoint;
-pub use domain::limits::{RPC_LIMITS_STORE_SETTING, RpcLimits};
+pub(crate) use domain::limits::RPC_LIMITS_STORE_SETTING;
+pub use domain::limits::RpcLimits;
 pub use domain::status::RpcStatusInfo;
 pub use endpoint::Endpoint;
 

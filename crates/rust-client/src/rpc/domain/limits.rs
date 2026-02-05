@@ -9,7 +9,7 @@ use crate::rpc::errors::RpcConversionError;
 use crate::rpc::generated::rpc as proto;
 
 /// Key used to store RPC limits in the settings table.
-pub const RPC_LIMITS_STORE_SETTING: &str = "rpc_limits";
+pub(crate) const RPC_LIMITS_STORE_SETTING: &str = "rpc_limits";
 
 const DEFAULT_NOTE_IDS_LIMIT: usize = 100;
 const DEFAULT_NULLIFIERS_LIMIT: usize = 1000;
@@ -20,7 +20,7 @@ const DEFAULT_NOTE_TAGS_LIMIT: usize = 1000;
 ///
 /// These limits define the maximum number of items that can be sent in a single RPC request.
 /// Exceeding these limits will result in the request being rejected by the node.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RpcLimits {
     /// Maximum number of note IDs that can be sent in a single `GetNotesById` request.
     pub note_ids_limit: usize,
@@ -65,94 +65,38 @@ impl Deserializable for RpcLimits {
     }
 }
 
+/// Extracts a parameter limit from the proto response for a given endpoint and parameter name.
+fn get_param(
+    proto: &proto::RpcLimits,
+    endpoint: &str,
+    param: &'static str,
+) -> Result<usize, RpcConversionError> {
+    let ep = proto.endpoints.get(endpoint).ok_or(
+        RpcConversionError::MissingFieldInProtobufRepresentation {
+            entity: "RpcLimits",
+            field_name: param,
+        },
+    )?;
+    let limit = ep.parameters.get(param).ok_or(
+        RpcConversionError::MissingFieldInProtobufRepresentation {
+            entity: "RpcLimits",
+            field_name: param,
+        },
+    )?;
+    Ok(*limit as usize)
+}
+
 impl TryFrom<proto::RpcLimits> for RpcLimits {
     type Error = RpcConversionError;
 
-    fn try_from(proto_limits: proto::RpcLimits) -> Result<Self, Self::Error> {
-        // Extract note_id limit from GetNotesById endpoint
-        let endpoint = proto_limits.endpoints.get("GetNotesById").ok_or_else(|| {
-            RpcConversionError::MissingFieldInProtobufRepresentation {
-                entity: "RpcLimits",
-                field_name: "note_id",
-            }
-        })?;
-        let limit = endpoint.parameters.get("note_id").ok_or_else(|| {
-            RpcConversionError::MissingFieldInProtobufRepresentation {
-                entity: "RpcLimits",
-                field_name: "note_id",
-            }
-        })?;
-        let note_ids_limit = *limit as usize;
-
-        // Extract nullifier limit from CheckNullifiers or SyncNullifiers endpoint
-        // Both should have the same limit, so we check CheckNullifiers first
-        let nullifiers_limit = if let Some(endpoint) = proto_limits.endpoints.get("CheckNullifiers")
-        {
-            endpoint.parameters.get("nullifier").ok_or_else(|| {
-                RpcConversionError::MissingFieldInProtobufRepresentation {
-                    entity: "RpcLimits",
-                    field_name: "nullifier",
-                }
-            })?
-        } else if let Some(endpoint) = proto_limits.endpoints.get("SyncNullifiers") {
-            endpoint.parameters.get("nullifier").ok_or_else(|| {
-                RpcConversionError::MissingFieldInProtobufRepresentation {
-                    entity: "RpcLimits",
-                    field_name: "nullifier",
-                }
-            })?
-        } else {
-            return Err(RpcConversionError::MissingFieldInProtobufRepresentation {
-                entity: "RpcLimits",
-                field_name: "nullifier",
-            });
-        };
-        let nullifiers_limit = *nullifiers_limit as usize;
-
-        // Extract account_id limit from SyncState endpoint
-        let endpoint = proto_limits.endpoints.get("SyncState").ok_or_else(|| {
-            RpcConversionError::MissingFieldInProtobufRepresentation {
-                entity: "RpcLimits",
-                field_name: "SyncState",
-            }
-        })?;
-        let limit = endpoint.parameters.get("account_id").ok_or_else(|| {
-            RpcConversionError::MissingFieldInProtobufRepresentation {
-                entity: "RpcLimits",
-                field_name: "account_id",
-            }
-        })?;
-        let account_ids_limit = *limit as usize;
-
-        // Extract note_tag limit from SyncState or SyncNotes endpoint
-        // Both should have the same limit, so we check SyncState first
-        let note_tags_limit = if let Some(endpoint) = proto_limits.endpoints.get("SyncState") {
-            endpoint.parameters.get("note_tag").ok_or_else(|| {
-                RpcConversionError::MissingFieldInProtobufRepresentation {
-                    entity: "RpcLimits",
-                    field_name: "note_tag",
-                }
-            })?
-        } else if let Some(endpoint) = proto_limits.endpoints.get("SyncNotes") {
-            endpoint.parameters.get("note_tag").ok_or_else(|| {
-                RpcConversionError::MissingFieldInProtobufRepresentation {
-                    entity: "RpcLimits",
-                    field_name: "note_tag",
-                }
-            })?
-        } else {
-            return Err(RpcConversionError::MissingFieldInProtobufRepresentation {
-                entity: "RpcLimits",
-                field_name: "note_tag",
-            });
-        };
-        let note_tags_limit = *note_tags_limit as usize;
-
+    fn try_from(proto: proto::RpcLimits) -> Result<Self, Self::Error> {
         Ok(Self {
-            note_ids_limit,
-            nullifiers_limit,
-            account_ids_limit,
-            note_tags_limit,
+            note_ids_limit: get_param(&proto, "GetNotesById", "note_id")?,
+            nullifiers_limit: get_param(&proto, "CheckNullifiers", "nullifier")
+                .or_else(|_| get_param(&proto, "SyncNullifiers", "nullifier"))?,
+            account_ids_limit: get_param(&proto, "SyncState", "account_id")?,
+            note_tags_limit: get_param(&proto, "SyncState", "note_tag")
+                .or_else(|_| get_param(&proto, "SyncNotes", "note_tag"))?,
         })
     }
 }
