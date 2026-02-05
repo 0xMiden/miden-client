@@ -656,6 +656,15 @@ export class WebClient {
     }
   }
 
+  /**
+   * Terminates the underlying Web Worker used by this WebClient instance.
+   *
+   * Call this method when you're done using a WebClient to free up browser
+   * resources. Each WebClient instance uses a dedicated Web Worker for
+   * computationally intensive operations. Terminating releases that thread.
+   *
+   * After calling terminate(), the WebClient should not be used.
+   */
   terminate() {
     if (this.worker) {
       this.worker.terminate();
