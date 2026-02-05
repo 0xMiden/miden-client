@@ -423,8 +423,8 @@ export const customTransaction = async (
       let compiledNoteScript = builder.compileNoteScript(noteScript);
       let noteStorage = new window.NoteStorage(
         new window.MidenArrays.FeltArray([
-          walletAccount.id().prefix(),
           walletAccount.id().suffix(),
+          walletAccount.id().prefix(),
         ])
       );
 
@@ -1192,8 +1192,8 @@ export const counterAccountComponent = async (
     let code = account?.code();
     let hasCounterComponent = code
       ? counterAccountComponent
-          .getProcedures()
-          .every((procedure) => code.hasProcedure(procedure.digest))
+        .getProcedures()
+        .every((procedure) => code.hasProcedure(procedure.digest))
       : false;
 
     return {
