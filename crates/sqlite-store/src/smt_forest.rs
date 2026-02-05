@@ -112,15 +112,16 @@ impl AccountSmtForest {
     }
 
     /// Inserts all storage map SMT nodes to the SMT forest.
-    pub fn insert_storage_map_nodes(&mut self, storage: &AccountStorage) {
+    pub fn insert_storage_map_nodes(&mut self, storage: &AccountStorage) -> Result<(), StoreError> {
         let maps = storage.slots().iter().filter_map(|slot| match slot.content() {
             StorageSlotContent::Map(map) => Some(map),
             StorageSlotContent::Value(_) => None,
         });
 
         for map in maps {
-            self.insert_storage_map_nodes_for_map(map);
+            self.insert_storage_map_nodes_for_map(map)?;
         }
+        Ok(())
     }
 
     pub fn insert_account_state(
@@ -128,16 +129,17 @@ impl AccountSmtForest {
         vault: &AssetVault,
         storage: &AccountStorage,
     ) -> Result<(), StoreError> {
-        self.insert_storage_map_nodes(storage);
+        self.insert_storage_map_nodes(storage)?;
         self.insert_asset_nodes(vault)?;
         Ok(())
     }
 
-    pub fn insert_storage_map_nodes_for_map(&mut self, map: &StorageMap) {
+    pub fn insert_storage_map_nodes_for_map(&mut self, map: &StorageMap) -> Result<(), StoreError> {
         let empty_root = *EmptySubtreeRoots::entry(SMT_DEPTH, 0);
         let entries: Vec<(Word, Word)> =
             map.entries().map(|(k, v)| (StorageMap::hash_key(*k), *v)).collect();
-        self.forest.batch_insert(empty_root, entries).unwrap(); // TODO: handle unwrap
+        self.forest.batch_insert(empty_root, entries).map_err(StoreError::from)?;
+        Ok(())
     }
 
     /// Removes the specified SMT roots from the forest, releasing memory used by nodes
