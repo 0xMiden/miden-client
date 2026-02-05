@@ -9,7 +9,7 @@
 ### Changes
 
 * [BREAKING] Added a `AccountReader` accessible through `Client::account_reader` to read account data without needing to load the whole `Account` ([#1713](https://github.com/0xMiden/miden-client/pull/1713), [#1716](https://github.com/0xMiden/miden-client/pull/1716)). 
-* Refactored integration tests binary with subprocess-per-test execution; added automatic retry of failed tests (`--retry-count`, `--no-retry`), JSON output format (`--output-format json`), captured stdout/stderr per test, and tracing support via `RUST_LOG`.
+* Refactored integration tests binary with subprocess-per-test execution; added automatic retry of failed tests (`--retry-count`), captured stdout/stderr per test, and tracing support via `RUST_LOG`.
 
 ### Enhancements
 

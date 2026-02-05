@@ -38,8 +38,8 @@ miden-client-integration-tests [OPTIONS]
 - `-f, --filter <REGEX>` - Filter tests by name using regex patterns
 - `--contains <STRING>` - Only run tests whose names contain this substring
 - `--exclude <REGEX>` - Exclude tests whose names match this regex pattern
+- `--retry-count <NUMBER>` - Number of times to retry failed tests (default: `1`, set to `0` to disable retries)
 - `--list` - List all available tests without running them
-- `-v, --verbose` - Show verbose output including individual test timings and worker information
 - `-h, --help` - Show help information
 - `-V, --version` - Show version information
 
@@ -80,11 +80,6 @@ Exclude swap-related tests:
 miden-client-integration-tests --exclude "swap"
 ```
 
-Run tests with verbose output showing worker information:
-```bash
-miden-client-integration-tests --verbose
-```
-
 Run tests against devnet:
 ```bash
 miden-client-integration-tests --network devnet
@@ -100,9 +95,9 @@ Run tests against a custom RPC endpoint with timeout:
 miden-client-integration-tests --network http://192.168.1.100:57291 --timeout 30000
 ```
 
-Complex example: Run non-swap tests in parallel with verbose output:
+Complex example: Run non-swap tests in parallel excluding swap tests:
 ```bash
-miden-client-integration-tests --exclude "swap" --verbose
+miden-client-integration-tests --exclude "swap"
 ```
 
 Show help:

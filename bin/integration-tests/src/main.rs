@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use clap::{Parser, ValueEnum};
+use clap::Parser;
 use miden_client::rpc::Endpoint;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -62,17 +62,10 @@ fn main() {
     let start_time = Instant::now();
 
     // Run initial test pass
-    let results = run_tests_parallel(
-        filtered_tests,
-        base_config.clone(),
-        args.jobs,
-        args.verbose,
-        args.output_format,
-        false,
-    );
+    let results = run_tests_parallel(filtered_tests, base_config.clone(), args.jobs, false);
 
     // Determine retry configuration
-    let retry_enabled = !args.no_retry && args.retry_count > 0;
+    let retry_enabled = args.retry_count > 0;
     let mut retry_results: Vec<TestResult> = Vec::new();
 
     if retry_enabled {
@@ -81,13 +74,11 @@ fn main() {
 
         if !failed_test_names.is_empty() {
             for retry_attempt in 1..=args.retry_count {
-                if !matches!(args.output_format, OutputFormat::Json) {
-                    println!("\n=== RETRY ATTEMPT {}/{} ===", retry_attempt, args.retry_count);
-                    println!(
-                        "Retrying {} failed test(s) with reduced parallelism...",
-                        failed_test_names.len()
-                    );
-                }
+                println!("\n=== RETRY ATTEMPT {}/{} ===", retry_attempt, args.retry_count);
+                println!(
+                    "Retrying {} failed test(s) with reduced parallelism...",
+                    failed_test_names.len()
+                );
 
                 // Get fresh test cases for the failed tests
                 let all_tests = generated_tests::get_all_tests();
@@ -101,14 +92,8 @@ fn main() {
                 // Retry with reduced parallelism (half the jobs, minimum 1)
                 let retry_jobs = (args.jobs / 2).max(1);
 
-                let current_retry_results = run_tests_parallel(
-                    tests_to_retry,
-                    base_config.clone(),
-                    retry_jobs,
-                    args.verbose,
-                    args.output_format,
-                    true,
-                );
+                let current_retry_results =
+                    run_tests_parallel(tests_to_retry, base_config.clone(), retry_jobs, true);
 
                 // Check if all retries passed
                 let all_passed = current_retry_results.iter().all(|r| r.passed);
@@ -122,7 +107,7 @@ fn main() {
     }
 
     let total_duration = start_time.elapsed();
-    print_summary(&results, &retry_results, total_duration, args.output_format);
+    print_summary(&results, &retry_results, total_duration);
 
     // Exit with error code if any tests failed after retries
     let final_failed_count = if retry_results.is_empty() {
@@ -190,10 +175,6 @@ struct Args {
     #[arg(long)]
     list: bool,
 
-    /// Show verbose output including worker IDs. Use RUST_LOG env var for tracing.
-    #[arg(short, long)]
-    verbose: bool,
-
     /// Only run tests whose names contain this substring.
     #[arg(long)]
     contains: Option<String>,
@@ -203,32 +184,13 @@ struct Args {
     exclude: Option<String>,
 
     /// Number of times to retry failed tests. Set to 0 to disable retries.
-    #[arg(long, default_value = "1")]
+    #[arg(long, default_value = "3")]
     retry_count: usize,
-
-    /// Disable automatic retry of failed tests.
-    #[arg(long)]
-    no_retry: bool,
-
-    /// Output format for test results.
-    #[arg(long, default_value = "human", value_enum)]
-    output_format: OutputFormat,
 
     /// Internal: run a single test by name and exit (hidden from help).
     /// Used by the test runner to spawn subprocesses for parallel execution.
     #[arg(long, hide = true)]
     internal_run_test: Option<String>,
-}
-
-/// Output format for test results.
-#[derive(Debug, Clone, Copy, Default, ValueEnum, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-enum OutputFormat {
-    /// Human-readable output format.
-    #[default]
-    Human,
-    /// JSON output format for machine parsing.
-    Json,
 }
 
 /// Base configuration derived from command line arguments.
@@ -326,26 +288,17 @@ impl AsRef<str> for TestCategory {
 }
 
 /// Represents the result of executing a test case.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone)]
 struct TestResult {
     name: String,
     category: String,
     passed: bool,
-    #[serde(serialize_with = "serialize_duration")]
     duration: Duration,
     error_message: Option<String>,
     /// Indicates whether this result is from a retry attempt.
     is_retry: bool,
     /// Captured stdout from the test (only shown for failed tests).
-    #[serde(skip_serializing_if = "Option::is_none")]
     captured_output: Option<String>,
-}
-
-fn serialize_duration<S>(duration: &Duration, serializer: S) -> Result<S::Ok, S::Error>
-where
-    S: serde::Serializer,
-{
-    serializer.serialize_f64(duration.as_secs_f64())
 }
 
 // SUBPROCESS RESULT
@@ -538,26 +491,21 @@ fn run_tests_parallel(
     tests: Vec<TestCase>,
     base_config: BaseConfig,
     jobs: usize,
-    _verbose: bool,
-    output_format: OutputFormat,
     is_retry: bool,
 ) -> Vec<TestResult> {
     let total_tests = tests.len();
-    let is_json = matches!(output_format, OutputFormat::Json);
     let current_exe = std::env::current_exe().expect("Failed to get current executable");
 
-    if !is_json {
-        println!();
-        let run_type = if is_retry { "Retrying" } else { "Starting" };
-        println!("{run_type} {total_tests} tests across {jobs} workers");
-        if !is_retry {
-            println!("─────────────────────────────────────────────────────────");
-            println!("  RPC endpoint: {}", base_config.rpc_endpoint);
-            println!("  Timeout:      {}ms", base_config.timeout);
-            println!("─────────────────────────────────────────────────────────");
-        }
-        println!();
+    println!();
+    let run_type = if is_retry { "Retrying" } else { "Starting" };
+    println!("{run_type} {total_tests} tests across {jobs} workers");
+    if !is_retry {
+        println!("─────────────────────────────────────────────────────────");
+        println!("  RPC endpoint: {}", base_config.rpc_endpoint);
+        println!("  Timeout:      {}ms", base_config.timeout);
+        println!("─────────────────────────────────────────────────────────");
     }
+    println!();
 
     // Convert tests to (name, category) pairs for subprocess spawning
     let test_info: Vec<(String, String)> = tests
@@ -601,7 +549,7 @@ fn run_tests_parallel(
                 };
 
                 // Print "START" message
-                if !is_json {
+                {
                     let _lock = output_mutex.lock().unwrap();
                     println!("        START  {}::{}", test_category, test_name);
                 }
@@ -702,12 +650,7 @@ fn run_tests_parallel(
                 };
 
                 // Print result
-                if is_json {
-                    if let Ok(json) = serde_json::to_string(&result) {
-                        let _lock = output_mutex.lock().unwrap();
-                        println!("{json}");
-                    }
-                } else {
+                {
                     let _lock = output_mutex.lock().unwrap();
 
                     let status = if result.passed { "PASS" } else { "FAIL" };
@@ -766,67 +709,6 @@ fn format_duration(duration: Duration) -> String {
 /// Shows pass/fail counts, failed test details, retry statistics, and timing statistics including
 /// average, median, min, and max execution times.
 fn print_summary(
-    initial_results: &[TestResult],
-    retry_results: &[TestResult],
-    total_duration: Duration,
-    output_format: OutputFormat,
-) {
-    if matches!(output_format, OutputFormat::Json) {
-        print_summary_json(initial_results, retry_results, total_duration);
-    } else {
-        print_summary_human(initial_results, retry_results, total_duration);
-    }
-}
-
-/// Prints a JSON summary of test results.
-fn print_summary_json(
-    initial_results: &[TestResult],
-    retry_results: &[TestResult],
-    total_duration: Duration,
-) {
-    let initial_passed = initial_results.iter().filter(|r| r.passed).count();
-    let initial_failed = initial_results.len() - initial_passed;
-
-    let retry_passed = retry_results.iter().filter(|r| r.passed).count();
-    let retry_failed = retry_results.len() - retry_passed;
-
-    // Find flaky tests
-    let initial_failed_names: std::collections::HashSet<_> =
-        initial_results.iter().filter(|r| !r.passed).map(|r| &r.name).collect();
-
-    let flaky_tests: Vec<_> = retry_results
-        .iter()
-        .filter(|r| r.passed && initial_failed_names.contains(&r.name))
-        .map(|r| r.name.clone())
-        .collect();
-
-    let persistent_failures: Vec<_> =
-        retry_results.iter().filter(|r| !r.passed).map(|r| r.name.clone()).collect();
-
-    let summary = serde_json::json!({
-        "summary": {
-            "initial_run": {
-                "total": initial_results.len(),
-                "passed": initial_passed,
-                "failed": initial_failed,
-            },
-            "retries": {
-                "total": retry_results.len(),
-                "passed": retry_passed,
-                "failed": retry_failed,
-            },
-            "flaky_tests": flaky_tests,
-            "persistent_failures": persistent_failures,
-            "total_duration_secs": total_duration.as_secs_f64(),
-        }
-    });
-
-    println!("{}", serde_json::to_string_pretty(&summary).unwrap_or_default());
-}
-
-/// Prints a human-readable summary of test results.
-/// Shows captured stdout only for failed tests.
-fn print_summary_human(
     initial_results: &[TestResult],
     retry_results: &[TestResult],
     total_duration: Duration,
