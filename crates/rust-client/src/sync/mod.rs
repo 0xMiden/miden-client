@@ -31,7 +31,7 @@
 //! # use miden_client::{Client, ClientError};
 //! # use miden_protocol::{block::BlockHeader, Felt, Word, StarkField};
 //! # use miden_protocol::crypto::rand::FeltRng;
-//! # async fn run_sync<AUTH: TransactionAuthenticator + Sync + 'static>(client: &mut Client<AUTH>) -> Result<(), ClientError> {
+//! # async fn run_sync<AUTH: TransactionAuthenticator + Send + Sync + 'static>(client: &mut Client<AUTH>) -> Result<(), ClientError> {
 //! // Attempt to synchronize the client's state with the Miden network.
 //! // The requested data is based on the client's state: it gets updates for accounts, relevant
 //! // notes, etc. For more information on the data that gets requested, see the doc comments for
