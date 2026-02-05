@@ -100,6 +100,7 @@ pub fn parse_node_error(
         // These endpoints don't have typed errors from the node
         NodeRpcClientEndpoint::GetAccount
         | NodeRpcClientEndpoint::SyncState
-        | NodeRpcClientEndpoint::Status => None,
+        | NodeRpcClientEndpoint::Status
+        | NodeRpcClientEndpoint::GetLimits => None,
     }
 }
