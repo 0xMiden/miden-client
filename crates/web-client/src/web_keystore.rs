@@ -164,11 +164,15 @@ impl<R: Rng> TransactionAuthenticator for WebKeyStore<R> {
         Ok(signature)
     }
 
-    // TODO: add this (related to #1417)
+    /// Retrieves a public key for a specific public key commitment.
     async fn get_public_key(
         &self,
-        _pub_key_commitment: PublicKeyCommitment,
+        pub_key_commitment: PublicKeyCommitment,
     ) -> Option<Arc<PublicKey>> {
-        None
+        self.get_key(pub_key_commitment)
+            .await
+            .ok()
+            .flatten()
+            .map(|key| Arc::new(key.public_key()))
     }
 }
