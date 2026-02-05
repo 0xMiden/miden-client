@@ -429,12 +429,9 @@ where
 
             // Emit NoteConsumed events
             for note_id in &summary.consumed_notes {
-                let record = match note_records.get(note_id) {
-                    Some(record) => record,
-                    None => {
-                        warn!(?note_id, "Skipping NoteConsumed event; note not found");
-                        continue;
-                    },
+                let Some(record) = note_records.get(note_id) else {
+                    warn!(?note_id, "Skipping NoteConsumed event; note not found");
+                    continue;
                 };
 
                 let block_num = Self::consumed_block_num(record, summary.block_num);
