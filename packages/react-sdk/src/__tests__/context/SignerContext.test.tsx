@@ -1,11 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { renderHook, render, screen } from "@testing-library/react";
 import React from "react";
-import {
-  SignerContext,
-  useSignerContext,
-  useSigner,
-} from "../../context/SignerContext";
+import { SignerContext, useSigner } from "../../context/SignerContext";
 import { createMockSignerContext } from "../mocks/signer-context";
 
 describe("SignerContext", () => {
@@ -47,9 +43,9 @@ describe("SignerContext", () => {
     });
   });
 
-  describe("useSignerContext", () => {
+  describe("useSigner", () => {
     it("should return null when outside provider", () => {
-      const { result } = renderHook(() => useSignerContext());
+      const { result } = renderHook(() => useSigner());
 
       expect(result.current).toBeNull();
     });
@@ -63,7 +59,7 @@ describe("SignerContext", () => {
         </SignerContext.Provider>
       );
 
-      const { result } = renderHook(() => useSignerContext(), { wrapper });
+      const { result } = renderHook(() => useSigner(), { wrapper });
 
       expect(result.current).toBe(mockContext);
       expect(result.current?.name).toBe("InternalSigner");
@@ -74,7 +70,7 @@ describe("SignerContext", () => {
         <SignerContext.Provider value={null}>{children}</SignerContext.Provider>
       );
 
-      const { result } = renderHook(() => useSignerContext(), { wrapper });
+      const { result } = renderHook(() => useSigner(), { wrapper });
 
       expect(result.current).toBeNull();
     });

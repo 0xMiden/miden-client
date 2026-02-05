@@ -71,15 +71,7 @@ export interface SignerContextValue {
 export const SignerContext = createContext<SignerContextValue | null>(null);
 
 /**
- * Internal hook for MidenProvider to detect signer context.
- * Returns null if no signer provider is present (local keystore mode).
- */
-export function useSignerContext(): SignerContextValue | null {
-  return useContext(SignerContext);
-}
-
-/**
- * Public hook for apps to interact with the current signer.
+ * Hook for apps and MidenProvider to interact with the current signer.
  * Returns null if no signer provider is present (local keystore mode).
  *
  * @example

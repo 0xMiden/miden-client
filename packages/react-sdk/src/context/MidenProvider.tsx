@@ -15,7 +15,7 @@ import { DEFAULTS } from "../types";
 import { AsyncLock } from "../utils/asyncLock";
 import { resolveRpcUrl } from "../utils/network";
 import { resolveTransactionProver } from "../utils/prover";
-import { useSignerContext } from "./SignerContext";
+import { useSigner } from "./SignerContext";
 import { initializeSignerAccount } from "../utils/signerAccount";
 
 interface MidenContextValue {
@@ -64,7 +64,7 @@ export function MidenProvider({
   const clientLockRef = useRef(new AsyncLock());
 
   // Detect signer from context (null if no signer provider above)
-  const signerContext = useSignerContext();
+  const signerContext = useSigner();
   const [signerAccountId, setSignerAccountId] = useState<string | null>(null);
 
   const resolvedConfig = useMemo(
@@ -134,6 +134,7 @@ export function MidenProvider({
       // Reset state when signer disconnects
       if (client) {
         useMidenStore.getState().reset();
+        setClient(null);
         setSignerAccountId(null);
       }
       return;

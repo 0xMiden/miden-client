@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { renderHook, render, screen } from "@testing-library/react";
 import React from "react";
-import { SignerContext, useSignerContext } from "../../context/SignerContext";
+import { SignerContext, useSigner } from "../../context/SignerContext";
 import {
   createMockSignerContext,
   createDisconnectedSignerContext,
@@ -14,9 +14,9 @@ import {
  */
 
 describe("MidenProvider signer integration contract", () => {
-  describe("useSignerContext behavior", () => {
+  describe("useSigner behavior", () => {
     it("returns null when no SignerContext provider is present", () => {
-      const { result } = renderHook(() => useSignerContext());
+      const { result } = renderHook(() => useSigner());
       expect(result.current).toBeNull();
     });
 
@@ -25,7 +25,7 @@ describe("MidenProvider signer integration contract", () => {
         <SignerContext.Provider value={null}>{children}</SignerContext.Provider>
       );
 
-      const { result } = renderHook(() => useSignerContext(), { wrapper });
+      const { result } = renderHook(() => useSigner(), { wrapper });
       expect(result.current).toBeNull();
     });
 
@@ -37,7 +37,7 @@ describe("MidenProvider signer integration contract", () => {
         </SignerContext.Provider>
       );
 
-      const { result } = renderHook(() => useSignerContext(), { wrapper });
+      const { result } = renderHook(() => useSigner(), { wrapper });
       expect(result.current).toBe(mockSigner);
       expect(result.current?.isConnected).toBe(true);
     });
@@ -50,7 +50,7 @@ describe("MidenProvider signer integration contract", () => {
         </SignerContext.Provider>
       );
 
-      const { result } = renderHook(() => useSignerContext(), { wrapper });
+      const { result } = renderHook(() => useSigner(), { wrapper });
       expect(result.current).toBe(mockSigner);
       expect(result.current?.isConnected).toBe(false);
     });
@@ -258,7 +258,7 @@ describe("MidenProvider signer integration contract", () => {
 
     it("name is displayed in UI", () => {
       const TestUI = () => {
-        const signer = useSignerContext();
+        const signer = useSigner();
         return <span data-testid="signer-name">{signer?.name}</span>;
       };
 

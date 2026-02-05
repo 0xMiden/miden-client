@@ -66,7 +66,7 @@ export async function initializeSignerAccount(
   const commitmentWord = Word.deserialize(config.publicKeyCommitment);
 
   // Build account with auth component from public key commitment
-  const seed = config.accountSeed ?? new Uint8Array(32);
+  const seed = config.accountSeed ?? crypto.getRandomValues(new Uint8Array(32));
   const accountType = await getAccountType(config.accountType);
 
   const builder = new AccountBuilder(seed);
