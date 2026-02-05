@@ -4,7 +4,7 @@ use miden_client::Client;
 use miden_client::account::AccountId;
 use miden_client::auth::TransactionAuthenticator;
 use miden_client::block::BlockNumber;
-use miden_client::rpc::RpcStatusInfo;
+use miden_client::rpc::{GrpcClient, RpcStatusInfo};
 use miden_client::store::NoteFilter;
 
 use super::config::CliConfig;
@@ -30,7 +30,7 @@ pub async fn print_client_info<AUTH: TransactionAuthenticator + Sync + 'static>(
     print_client_stats(client).await?;
 
     if show_rpc_status {
-        print_rpc_status(client).await?;
+        print_rpc_status(&config).await?;
     }
 
     Ok(())
@@ -61,11 +61,10 @@ fn print_config_stats(config: &CliConfig) -> Result<(), CliError> {
     Ok(())
 }
 
-async fn print_rpc_status<AUTH: TransactionAuthenticator + Sync + 'static>(
-    client: &Client<AUTH>,
-) -> Result<(), CliError> {
+async fn print_rpc_status(config: &CliConfig) -> Result<(), CliError> {
     println!("\n--- RPC Node Status ---");
-    match client.rpc_api().get_status_unversioned().await {
+    let rpc_client = GrpcClient::new(&config.rpc.endpoint.clone().into(), config.rpc.timeout_ms);
+    match rpc_client.get_status_unversioned().await {
         Ok(status) => {
             print_status_info(&status);
         },
