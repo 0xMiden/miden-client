@@ -1192,8 +1192,8 @@ export const counterAccountComponent = async (
     let code = account?.code();
     let hasCounterComponent = code
       ? counterAccountComponent
-        .getProcedures()
-        .every((procedure) => code.hasProcedure(procedure.digest))
+          .getProcedures()
+          .every((procedure) => code.hasProcedure(procedure.digest))
       : false;
 
     return {
