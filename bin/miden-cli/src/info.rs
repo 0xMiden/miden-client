@@ -86,11 +86,5 @@ fn print_status_info(status: &RpcStatusInfo) {
     }
     if let Some(ref bp) = status.block_producer {
         println!("Block producer: {} (chain tip: {})", bp.status, bp.chain_tip);
-        if let Some(ref mempool) = bp.mempool_stats {
-            println!(
-                "  Unbatched txs: {}, Proposed batches: {}, Proven batches: {}",
-                mempool.unbatched_transactions, mempool.proposed_batches, mempool.proven_batches
-            );
-        }
     }
 }
