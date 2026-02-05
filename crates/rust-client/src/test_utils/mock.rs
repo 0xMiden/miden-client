@@ -755,6 +755,10 @@ impl NodeRpcClient for MockRpcApi {
         Ok(NetworkId::Testnet)
     }
 
+    async fn get_rpc_limits(&self) -> crate::rpc::RpcLimits {
+        crate::rpc::RpcLimits::default()
+    }
+
     async fn get_status_unversioned(&self) -> Result<RpcStatusInfo, RpcError> {
         Ok(RpcStatusInfo {
             version: env!("CARGO_PKG_VERSION").into(),

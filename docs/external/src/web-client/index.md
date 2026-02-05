@@ -38,3 +38,23 @@ yarn add @miden-sdk/miden-sdk
 ```
 
 See the [README](https://github.com/0xMiden/miden-client/blob/main/crates/web-client/README) for full installation instructions and some usage instructions, including code examples for wallet creation, transaction execution, and syncing state.
+
+## Resource Management
+
+The WebClient uses a dedicated [Web Worker](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API) to offload computationally intensive operations like wallet creation, transaction proving, and state synchronization. This keeps the main thread responsive.
+
+When building applications that create multiple WebClient instances (e.g., multi-wallet apps or when switching between networks), it's important to properly clean up instances you no longer need:
+
+```typescript
+// Create client
+const client = await WebClient.createClient(rpcUrl);
+
+// ... use the client ...
+
+// Clean up when done to free the worker thread
+client.terminate();
+```
+
+Each active WebClient holds a Web Worker thread. Calling `terminate()` releases this resource. Failure to terminate unused clients may lead to memory leaks in long-running applications.
+
+**Note:** After calling `terminate()`, the WebClient instance should not be used for further operations.
