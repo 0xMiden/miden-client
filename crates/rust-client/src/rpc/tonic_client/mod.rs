@@ -931,14 +931,6 @@ impl NodeRpcClient for GrpcClient {
         self.limits.write().replace(limits);
         Ok(limits)
     }
-
-    async fn set_cached_rpc_limits(&self, limits: RpcLimits) {
-        self.limits.write().replace(limits);
-    }
-
-    async fn clear_cached_rpc_limits(&self) {
-        self.limits.write().take();
-    }
 }
 
 // ERRORS

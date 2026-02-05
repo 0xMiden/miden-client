@@ -758,14 +758,6 @@ impl NodeRpcClient for MockRpcApi {
     async fn get_rpc_limits(&self) -> Result<crate::rpc::RpcLimits, RpcError> {
         Ok(crate::rpc::RpcLimits::default())
     }
-
-    async fn set_cached_rpc_limits(&self, _limits: crate::rpc::RpcLimits) {
-        // Mock doesn't need caching
-    }
-
-    async fn clear_cached_rpc_limits(&self) {
-        // Mock doesn't need caching
-    }
 }
 
 // CONVERSIONS

@@ -386,15 +386,8 @@ pub trait NodeRpcClient: Send + Sync {
 
     /// Fetches the RPC limits configured on the node.
     ///
-    /// Returns the limits that define the maximum number of items that can be sent in a single
-    /// RPC request.
+    /// Implementations may cache the result internally to avoid repeated network calls.
     async fn get_rpc_limits(&self) -> Result<RpcLimits, RpcError>;
-
-    /// Sets the cached RPC limits from persisted storage during client startup.
-    async fn set_cached_rpc_limits(&self, limits: RpcLimits);
-
-    /// Clears the cached RPC limits, forcing next call to fetch fresh from node.
-    async fn clear_cached_rpc_limits(&self);
 }
 
 // RPC API ENDPOINT
