@@ -34,7 +34,7 @@ pub enum RpcError {
     #[error("rpc api response is invalid: {0}")]
     InvalidResponse(String),
     #[error("grpc request failed for {endpoint}: {error_kind}{}",
-        node_error.as_ref().map(|e| format!(" ({e})")).unwrap_or_default())]
+        node_error.as_ref().map_or(String::new(), |e| format!(" ({e})")))]
     GrpcError {
         endpoint: NodeRpcClientEndpoint,
         error_kind: GrpcError,
