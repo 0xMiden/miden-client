@@ -18,7 +18,7 @@ pub use transaction::AddTransactionError;
 
 use crate::rpc::NodeRpcClientEndpoint;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum NodeRpcError {
     /// Error from the `SubmitProvenTransaction` endpoint
     #[error(transparent)]
@@ -55,40 +55,49 @@ pub enum NodeRpcError {
     CheckNullifiers(#[from] CheckNullifiersError),
 }
 
-/// Parses error code from `status.details()` (a single u8 byte).
-pub fn parse_node_error(endpoint: &NodeRpcClientEndpoint, details: &[u8]) -> Option<NodeRpcError> {
+/// Parses the application-level error code into a typed error for the given endpoint.
+///
+/// Returns `None` if details are empty or if the endpoint doesn't have typed errors.
+pub fn parse_node_error(
+    endpoint: &NodeRpcClientEndpoint,
+    details: &[u8],
+    message: &str,
+) -> Option<NodeRpcError> {
     let code = *details.first()?;
+
     match endpoint {
         NodeRpcClientEndpoint::SubmitProvenTx => {
-            Some(NodeRpcError::AddTransaction(AddTransactionError::from(code)))
+            Some(NodeRpcError::AddTransaction(AddTransactionError::from_code(code, message)))
         },
         NodeRpcClientEndpoint::GetBlockHeaderByNumber => {
-            Some(NodeRpcError::GetBlockHeader(GetBlockHeaderError::from(code)))
+            Some(NodeRpcError::GetBlockHeader(GetBlockHeaderError::from_code(code, message)))
         },
         NodeRpcClientEndpoint::GetBlockByNumber => {
-            Some(NodeRpcError::GetBlockByNumber(GetBlockByNumberError::from(code)))
+            Some(NodeRpcError::GetBlockByNumber(GetBlockByNumberError::from_code(code, message)))
         },
-        NodeRpcClientEndpoint::SyncNotes => Some(NodeRpcError::NoteSync(NoteSyncError::from(code))),
+        NodeRpcClientEndpoint::SyncNotes => {
+            Some(NodeRpcError::NoteSync(NoteSyncError::from_code(code, message)))
+        },
         NodeRpcClientEndpoint::SyncNullifiers => {
-            Some(NodeRpcError::SyncNullifiers(SyncNullifiersError::from(code)))
+            Some(NodeRpcError::SyncNullifiers(SyncNullifiersError::from_code(code, message)))
         },
         NodeRpcClientEndpoint::SyncAccountVault => {
-            Some(NodeRpcError::SyncAccountVault(SyncAccountVaultError::from(code)))
+            Some(NodeRpcError::SyncAccountVault(SyncAccountVaultError::from_code(code, message)))
         },
-        NodeRpcClientEndpoint::SyncStorageMaps => {
-            Some(NodeRpcError::SyncStorageMaps(SyncAccountStorageMapsError::from(code)))
-        },
+        NodeRpcClientEndpoint::SyncStorageMaps => Some(NodeRpcError::SyncStorageMaps(
+            SyncAccountStorageMapsError::from_code(code, message),
+        )),
         NodeRpcClientEndpoint::SyncTransactions => {
-            Some(NodeRpcError::SyncTransactions(SyncTransactionsError::from(code)))
+            Some(NodeRpcError::SyncTransactions(SyncTransactionsError::from_code(code, message)))
         },
         NodeRpcClientEndpoint::GetNotesById => {
-            Some(NodeRpcError::GetNotesById(GetNotesByIdError::from(code)))
+            Some(NodeRpcError::GetNotesById(GetNotesByIdError::from_code(code, message)))
         },
-        NodeRpcClientEndpoint::GetNoteScriptByRoot => {
-            Some(NodeRpcError::GetNoteScriptByRoot(GetNoteScriptByRootError::from(code)))
-        },
+        NodeRpcClientEndpoint::GetNoteScriptByRoot => Some(NodeRpcError::GetNoteScriptByRoot(
+            GetNoteScriptByRootError::from_code(code, message),
+        )),
         NodeRpcClientEndpoint::CheckNullifiers => {
-            Some(NodeRpcError::CheckNullifiers(CheckNullifiersError::from(code)))
+            Some(NodeRpcError::CheckNullifiers(CheckNullifiersError::from_code(code, message)))
         },
         // These endpoints don't have typed errors from the node
         NodeRpcClientEndpoint::GetAccount

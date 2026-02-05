@@ -1,8 +1,10 @@
+use alloc::string::String;
+
 // NOTE SYNC ERROR
 // ================================================================================================
 
 // Error codes match `miden-node/crates/store/src/errors.rs::NoteSyncError`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum NoteSyncError {
     /// Internal server error (code 0)
     #[error("internal server error")]
@@ -15,17 +17,17 @@ pub enum NoteSyncError {
     DeserializationFailed,
     /// Error code not recognized by this client version. This can happen if the node
     /// is newer than the client and has added new error variants.
-    #[error("unknown error (code {0})")]
-    Unknown(u8),
+    #[error("unknown error code {code}: {message}")]
+    Unknown { code: u8, message: String },
 }
 
-impl From<u8> for NoteSyncError {
-    fn from(code: u8) -> Self {
+impl NoteSyncError {
+    pub fn from_code(code: u8, message: &str) -> Self {
         match code {
             0 => Self::Internal,
             1 => Self::InvalidBlockRange,
             2 => Self::DeserializationFailed,
-            _ => Self::Unknown(code),
+            _ => Self::Unknown { code, message: String::from(message) },
         }
     }
 }
@@ -34,7 +36,7 @@ impl From<u8> for NoteSyncError {
 // ================================================================================================
 
 // Error codes match `miden-node/crates/store/src/errors.rs::SyncNullifiersError`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum SyncNullifiersError {
     /// Internal server error (code 0)
     #[error("internal server error")]
@@ -50,18 +52,18 @@ pub enum SyncNullifiersError {
     DeserializationFailed,
     /// Error code not recognized by this client version. This can happen if the node
     /// is newer than the client and has added new error variants.
-    #[error("unknown error (code {0})")]
-    Unknown(u8),
+    #[error("unknown error code {code}: {message}")]
+    Unknown { code: u8, message: String },
 }
 
-impl From<u8> for SyncNullifiersError {
-    fn from(code: u8) -> Self {
+impl SyncNullifiersError {
+    pub fn from_code(code: u8, message: &str) -> Self {
         match code {
             0 => Self::Internal,
             1 => Self::InvalidBlockRange,
             2 => Self::InvalidPrefixLength,
             3 => Self::DeserializationFailed,
-            _ => Self::Unknown(code),
+            _ => Self::Unknown { code, message: String::from(message) },
         }
     }
 }
@@ -70,7 +72,7 @@ impl From<u8> for SyncNullifiersError {
 // ================================================================================================
 
 // Error codes match `miden-node/crates/store/src/errors.rs::SyncAccountVaultError`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum SyncAccountVaultError {
     /// Internal server error (code 0)
     #[error("internal server error")]
@@ -86,18 +88,18 @@ pub enum SyncAccountVaultError {
     AccountNotPublic,
     /// Error code not recognized by this client version. This can happen if the node
     /// is newer than the client and has added new error variants.
-    #[error("unknown error (code {0})")]
-    Unknown(u8),
+    #[error("unknown error code {code}: {message}")]
+    Unknown { code: u8, message: String },
 }
 
-impl From<u8> for SyncAccountVaultError {
-    fn from(code: u8) -> Self {
+impl SyncAccountVaultError {
+    pub fn from_code(code: u8, message: &str) -> Self {
         match code {
             0 => Self::Internal,
             1 => Self::InvalidBlockRange,
             2 => Self::DeserializationFailed,
             3 => Self::AccountNotPublic,
-            _ => Self::Unknown(code),
+            _ => Self::Unknown { code, message: String::from(message) },
         }
     }
 }
@@ -106,7 +108,7 @@ impl From<u8> for SyncAccountVaultError {
 // ================================================================================================
 
 // Error codes match `miden-node/crates/store/src/errors.rs::SyncAccountStorageMapsError`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum SyncAccountStorageMapsError {
     /// Internal server error (code 0)
     #[error("internal server error")]
@@ -125,19 +127,19 @@ pub enum SyncAccountStorageMapsError {
     AccountNotPublic,
     /// Error code not recognized by this client version. This can happen if the node
     /// is newer than the client and has added new error variants.
-    #[error("unknown error (code {0})")]
-    Unknown(u8),
+    #[error("unknown error code {code}: {message}")]
+    Unknown { code: u8, message: String },
 }
 
-impl From<u8> for SyncAccountStorageMapsError {
-    fn from(code: u8) -> Self {
+impl SyncAccountStorageMapsError {
+    pub fn from_code(code: u8, message: &str) -> Self {
         match code {
             0 => Self::Internal,
             1 => Self::InvalidBlockRange,
             2 => Self::DeserializationFailed,
             3 => Self::AccountNotFound,
             4 => Self::AccountNotPublic,
-            _ => Self::Unknown(code),
+            _ => Self::Unknown { code, message: String::from(message) },
         }
     }
 }
@@ -146,7 +148,7 @@ impl From<u8> for SyncAccountStorageMapsError {
 // ================================================================================================
 
 // Error codes match `miden-node/crates/store/src/errors.rs::SyncTransactionsError`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum SyncTransactionsError {
     /// Internal server error (code 0)
     #[error("internal server error")]
@@ -165,19 +167,19 @@ pub enum SyncTransactionsError {
     WitnessError,
     /// Error code not recognized by this client version. This can happen if the node
     /// is newer than the client and has added new error variants.
-    #[error("unknown error (code {0})")]
-    Unknown(u8),
+    #[error("unknown error code {code}: {message}")]
+    Unknown { code: u8, message: String },
 }
 
-impl From<u8> for SyncTransactionsError {
-    fn from(code: u8) -> Self {
+impl SyncTransactionsError {
+    pub fn from_code(code: u8, message: &str) -> Self {
         match code {
             0 => Self::Internal,
             1 => Self::InvalidBlockRange,
             2 => Self::DeserializationFailed,
             3 => Self::AccountNotFound,
             4 => Self::WitnessError,
-            _ => Self::Unknown(code),
+            _ => Self::Unknown { code, message: String::from(message) },
         }
     }
 }

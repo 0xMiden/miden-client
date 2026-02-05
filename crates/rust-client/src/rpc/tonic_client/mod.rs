@@ -917,7 +917,7 @@ impl RpcError {
         }
 
         // Parse application-level error from status details
-        let node_error = parse_node_error(&endpoint, status.details());
+        let node_error = parse_node_error(&endpoint, status.details(), status.message());
 
         let error_kind = GrpcError::from(&status);
         let source = Box::new(status) as Box<dyn Error + Send + Sync + 'static>;

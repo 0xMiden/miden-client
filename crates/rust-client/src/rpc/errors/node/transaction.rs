@@ -1,5 +1,7 @@
+use alloc::string::String;
+
 // Error codes match `miden-node/crates/block-producer/src/errors.rs::AddTransactionError`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum AddTransactionError {
     /// Internal server error (code 0)
     #[error("internal server error")]
@@ -30,12 +32,12 @@ pub enum AddTransactionError {
     CapacityExceeded,
     /// Error code not recognized by this client version. This can happen if the node
     /// is newer than the client and has added new error variants.
-    #[error("unknown error (code {0})")]
-    Unknown(u8),
+    #[error("unknown error code {code}: {message}")]
+    Unknown { code: u8, message: String },
 }
 
-impl From<u8> for AddTransactionError {
-    fn from(code: u8) -> Self {
+impl AddTransactionError {
+    pub fn from_code(code: u8, message: &str) -> Self {
         match code {
             0 => Self::Internal,
             1 => Self::InputNotesAlreadyConsumed,
@@ -46,7 +48,7 @@ impl From<u8> for AddTransactionError {
             6 => Self::TransactionDeserializationFailed,
             7 => Self::Expired,
             8 => Self::CapacityExceeded,
-            _ => Self::Unknown(code),
+            _ => Self::Unknown { code, message: String::from(message) },
         }
     }
 }

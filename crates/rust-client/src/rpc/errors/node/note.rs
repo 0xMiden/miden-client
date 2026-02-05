@@ -1,8 +1,10 @@
+use alloc::string::String;
+
 // GET NOTES BY ID ERROR
 // ================================================================================================
 
 // Error codes match `miden-node/crates/store/src/errors.rs::GetNotesByIdError`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum GetNotesByIdError {
     /// Internal server error (code 0)
     #[error("internal server error")]
@@ -18,18 +20,18 @@ pub enum GetNotesByIdError {
     NoteNotPublic,
     /// Error code not recognized by this client version. This can happen if the node
     /// is newer than the client and has added new error variants.
-    #[error("unknown error (code {0})")]
-    Unknown(u8),
+    #[error("unknown error code {code}: {message}")]
+    Unknown { code: u8, message: String },
 }
 
-impl From<u8> for GetNotesByIdError {
-    fn from(code: u8) -> Self {
+impl GetNotesByIdError {
+    pub fn from_code(code: u8, message: &str) -> Self {
         match code {
             0 => Self::Internal,
             1 => Self::DeserializationFailed,
             2 => Self::NoteNotFound,
             3 => Self::NoteNotPublic,
-            _ => Self::Unknown(code),
+            _ => Self::Unknown { code, message: String::from(message) },
         }
     }
 }
@@ -38,7 +40,7 @@ impl From<u8> for GetNotesByIdError {
 // ================================================================================================
 
 // Error codes match `miden-node/crates/store/src/errors.rs::GetNoteScriptByRootError`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum GetNoteScriptByRootError {
     /// Internal server error (code 0)
     #[error("internal server error")]
@@ -51,17 +53,17 @@ pub enum GetNoteScriptByRootError {
     ScriptNotFound,
     /// Error code not recognized by this client version. This can happen if the node
     /// is newer than the client and has added new error variants.
-    #[error("unknown error (code {0})")]
-    Unknown(u8),
+    #[error("unknown error code {code}: {message}")]
+    Unknown { code: u8, message: String },
 }
 
-impl From<u8> for GetNoteScriptByRootError {
-    fn from(code: u8) -> Self {
+impl GetNoteScriptByRootError {
+    pub fn from_code(code: u8, message: &str) -> Self {
         match code {
             0 => Self::Internal,
             1 => Self::DeserializationFailed,
             2 => Self::ScriptNotFound,
-            _ => Self::Unknown(code),
+            _ => Self::Unknown { code, message: String::from(message) },
         }
     }
 }
@@ -70,7 +72,7 @@ impl From<u8> for GetNoteScriptByRootError {
 // ================================================================================================
 
 // Error codes match `miden-node/crates/store/src/errors.rs::CheckNullifiersError`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum CheckNullifiersError {
     /// Internal server error (code 0)
     #[error("internal server error")]
@@ -80,16 +82,16 @@ pub enum CheckNullifiersError {
     DeserializationFailed,
     /// Error code not recognized by this client version. This can happen if the node
     /// is newer than the client and has added new error variants.
-    #[error("unknown error (code {0})")]
-    Unknown(u8),
+    #[error("unknown error code {code}: {message}")]
+    Unknown { code: u8, message: String },
 }
 
-impl From<u8> for CheckNullifiersError {
-    fn from(code: u8) -> Self {
+impl CheckNullifiersError {
+    pub fn from_code(code: u8, message: &str) -> Self {
         match code {
             0 => Self::Internal,
             1 => Self::DeserializationFailed,
-            _ => Self::Unknown(code),
+            _ => Self::Unknown { code, message: String::from(message) },
         }
     }
 }

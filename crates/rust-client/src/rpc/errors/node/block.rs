@@ -1,23 +1,25 @@
+use alloc::string::String;
+
 // GET BLOCK HEADER ERROR
 // ================================================================================================
 
 // Error codes match `miden-node/crates/store/src/errors.rs::GetBlockHeaderError`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum GetBlockHeaderError {
     /// Internal server error (code 0)
     #[error("internal server error")]
     Internal,
     /// Error code not recognized by this client version. This can happen if the node
     /// is newer than the client and has added new error variants.
-    #[error("unknown error (code {0})")]
-    Unknown(u8),
+    #[error("unknown error code {code}: {message}")]
+    Unknown { code: u8, message: String },
 }
 
-impl From<u8> for GetBlockHeaderError {
-    fn from(code: u8) -> Self {
+impl GetBlockHeaderError {
+    pub fn from_code(code: u8, message: &str) -> Self {
         match code {
             0 => Self::Internal,
-            _ => Self::Unknown(code),
+            _ => Self::Unknown { code, message: String::from(message) },
         }
     }
 }
@@ -26,7 +28,7 @@ impl From<u8> for GetBlockHeaderError {
 // ================================================================================================
 
 // Error codes match `miden-node/crates/store/src/errors.rs::GetBlockByNumberError`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum GetBlockByNumberError {
     /// Internal server error (code 0)
     #[error("internal server error")]
@@ -36,16 +38,16 @@ pub enum GetBlockByNumberError {
     DeserializationFailed,
     /// Error code not recognized by this client version. This can happen if the node
     /// is newer than the client and has added new error variants.
-    #[error("unknown error (code {0})")]
-    Unknown(u8),
+    #[error("unknown error code {code}: {message}")]
+    Unknown { code: u8, message: String },
 }
 
-impl From<u8> for GetBlockByNumberError {
-    fn from(code: u8) -> Self {
+impl GetBlockByNumberError {
+    pub fn from_code(code: u8, message: &str) -> Self {
         match code {
             0 => Self::Internal,
             1 => Self::DeserializationFailed,
-            _ => Self::Unknown(code),
+            _ => Self::Unknown { code, message: String::from(message) },
         }
     }
 }
