@@ -22,7 +22,10 @@ use miden_client::asset::{
     AccountStorageHeader,
     Asset,
     AssetVault,
+    AssetVaultKey,
+    AssetWitness,
     PartialVault,
+    StorageMapWitness,
     StorageSlotContent,
     StorageSlotHeader,
 };
@@ -574,9 +577,8 @@ impl WebStore {
     pub(crate) async fn get_account_asset(
         &self,
         account_id: AccountId,
-        vault_key: miden_client::asset::AssetVaultKey,
-    ) -> Result<Option<(miden_client::asset::Asset, miden_client::asset::AssetWitness)>, StoreError>
-    {
+        vault_key: AssetVaultKey,
+    ) -> Result<Option<(Asset, AssetWitness)>, StoreError> {
         let account_header = self
             .get_account_header(account_id)
             .await?
@@ -596,9 +598,9 @@ impl WebStore {
     pub(crate) async fn get_account_map_item(
         &self,
         account_id: AccountId,
-        slot_name: miden_client::account::StorageSlotName,
+        slot_name: StorageSlotName,
         key: Word,
-    ) -> Result<(Word, miden_client::asset::StorageMapWitness), StoreError> {
+    ) -> Result<(Word, StorageMapWitness), StoreError> {
         let storage = self
             .get_account_storage(account_id, AccountStorageFilter::SlotName(slot_name.clone()))
             .await?;
