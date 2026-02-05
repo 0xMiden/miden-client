@@ -601,6 +601,8 @@ impl WebStore {
         slot_name: StorageSlotName,
         key: Word,
     ) -> Result<(Word, StorageMapWitness), StoreError> {
+        // TODO: prevent fetching the full storage when we only need one map item
+        // https://github.com/0xMiden/miden-client/issues/1746
         let storage = self
             .get_account_storage(account_id, AccountStorageFilter::SlotName(slot_name.clone()))
             .await?;
