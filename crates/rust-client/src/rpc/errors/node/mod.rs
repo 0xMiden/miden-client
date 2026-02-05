@@ -1,5 +1,3 @@
-//! Typed error codes parsed from gRPC status details sent by the node.
-
 mod block;
 mod note;
 mod sync;
