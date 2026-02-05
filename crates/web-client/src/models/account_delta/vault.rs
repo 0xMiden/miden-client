@@ -49,7 +49,7 @@ impl AccountVaultDelta {
         self.0
             .fungible()
             .iter()
-            .filter(|&(_, &value)| value >= 0)
+            .filter(|&(_, &value)| value > 0)
             .map(|(faucet_id, &diff)| FungibleAsset::new(&faucet_id.into(), diff.unsigned_abs()))
             .collect()
     }
@@ -187,5 +187,21 @@ impl From<FungibleAssetDelta> for NativeFungibleAssetDelta {
 impl From<&FungibleAssetDelta> for NativeFungibleAssetDelta {
     fn from(fungible_asset_delta: &FungibleAssetDelta) -> Self {
         fungible_asset_delta.0.clone()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fungible_delta_sign_classification_excludes_zero() {
+        let deltas = [10_i64, 0_i64, -5_i64];
+
+        let added: Vec<i64> = deltas.iter().copied().filter(|&v| v > 0).collect();
+        let removed: Vec<i64> = deltas.iter().copied().filter(|&v| v < 0).collect();
+
+        assert_eq!(added, vec![10]);
+        assert_eq!(removed, vec![-5]);
     }
 }
