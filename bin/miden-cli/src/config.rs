@@ -21,8 +21,14 @@ pub const STORE_FILENAME: &str = "store.sqlite3";
 pub const KEYSTORE_DIRECTORY: &str = "keystore";
 pub const DEFAULT_REMOTE_PROVER_TIMEOUT: Duration = Duration::from_secs(20);
 
-/// Returns the global miden directory path in the user's home directory
+/// Returns the global miden directory path.
+///
+/// If the `MIDEN_CLIENT_HOME` environment variable is set, returns that path directly.
+/// Otherwise, returns the `.miden` directory in the user's home directory.
 pub fn get_global_miden_dir() -> Result<PathBuf, std::io::Error> {
+    if let Ok(miden_home) = std::env::var("MIDEN_CLIENT_HOME") {
+        return Ok(PathBuf::from(miden_home));
+    }
     dirs::home_dir()
         .ok_or_else(|| {
             std::io::Error::new(std::io::ErrorKind::NotFound, "Could not determine home directory")
