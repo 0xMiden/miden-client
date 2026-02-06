@@ -1,10 +1,12 @@
 use alloc::string::String;
 
+use thiserror::Error;
+
 // NOTE SYNC ERROR
 // ================================================================================================
 
 // Error codes match `miden-node/crates/store/src/errors.rs::NoteSyncError`.
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum NoteSyncError {
     /// Internal server error (code 0)
     #[error("internal server error")]
@@ -36,7 +38,7 @@ impl NoteSyncError {
 // ================================================================================================
 
 // Error codes match `miden-node/crates/store/src/errors.rs::SyncNullifiersError`.
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum SyncNullifiersError {
     /// Internal server error (code 0)
     #[error("internal server error")]
@@ -72,7 +74,7 @@ impl SyncNullifiersError {
 // ================================================================================================
 
 // Error codes match `miden-node/crates/store/src/errors.rs::SyncAccountVaultError`.
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum SyncAccountVaultError {
     /// Internal server error (code 0)
     #[error("internal server error")]
@@ -108,7 +110,7 @@ impl SyncAccountVaultError {
 // ================================================================================================
 
 // Error codes match `miden-node/crates/store/src/errors.rs::SyncAccountStorageMapsError`.
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum SyncAccountStorageMapsError {
     /// Internal server error (code 0)
     #[error("internal server error")]
@@ -148,7 +150,7 @@ impl SyncAccountStorageMapsError {
 // ================================================================================================
 
 // Error codes match `miden-node/crates/store/src/errors.rs::SyncTransactionsError`.
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum SyncTransactionsError {
     /// Internal server error (code 0)
     #[error("internal server error")]

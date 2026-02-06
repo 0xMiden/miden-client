@@ -12,11 +12,12 @@ pub use sync::{
     SyncNullifiersError,
     SyncTransactionsError,
 };
+use thiserror::Error;
 pub use transaction::AddTransactionError;
 
 use crate::rpc::NodeRpcClientEndpoint;
 
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum NodeRpcError {
     /// Error from the `SubmitProvenTransaction` endpoint
     #[error(transparent)]

@@ -1,10 +1,12 @@
 use alloc::string::String;
 
+use thiserror::Error;
+
 // GET BLOCK HEADER ERROR
 // ================================================================================================
 
 // Error codes match `miden-node/crates/store/src/errors.rs::GetBlockHeaderError`.
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum GetBlockHeaderError {
     /// Internal server error (code 0)
     #[error("internal server error")]
@@ -28,7 +30,7 @@ impl GetBlockHeaderError {
 // ================================================================================================
 
 // Error codes match `miden-node/crates/store/src/errors.rs::GetBlockByNumberError`.
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum GetBlockByNumberError {
     /// Internal server error (code 0)
     #[error("internal server error")]

@@ -1,7 +1,9 @@
 use alloc::string::String;
 
+use thiserror::Error;
+
 // Error codes match `miden-node/crates/block-producer/src/errors.rs::AddTransactionError`.
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum AddTransactionError {
     /// Internal server error (code 0)
     #[error("internal server error")]

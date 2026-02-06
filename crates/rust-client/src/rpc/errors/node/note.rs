@@ -1,10 +1,12 @@
 use alloc::string::String;
 
+use thiserror::Error;
+
 // GET NOTES BY ID ERROR
 // ================================================================================================
 
 // Error codes match `miden-node/crates/store/src/errors.rs::GetNotesByIdError`.
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum GetNotesByIdError {
     /// Internal server error (code 0)
     #[error("internal server error")]
@@ -40,7 +42,7 @@ impl GetNotesByIdError {
 // ================================================================================================
 
 // Error codes match `miden-node/crates/store/src/errors.rs::GetNoteScriptByRootError`.
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum GetNoteScriptByRootError {
     /// Internal server error (code 0)
     #[error("internal server error")]
@@ -72,7 +74,7 @@ impl GetNoteScriptByRootError {
 // ================================================================================================
 
 // Error codes match `miden-node/crates/store/src/errors.rs::CheckNullifiersError`.
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum CheckNullifiersError {
     /// Internal server error (code 0)
     #[error("internal server error")]
