@@ -36,7 +36,8 @@ var Table;
     Table["AccountAssets"] = "accountAssets";
     Table["StorageMapEntries"] = "storageMapEntries";
     Table["AccountAuth"] = "accountAuth";
-    Table["Accounts"] = "accounts";
+    Table["AccountsHistory"] = "accounts";
+    Table["AccountsLatest"] = "accountsLatest";
     Table["Addresses"] = "addresses";
     Table["Transactions"] = "transactions";
     Table["TransactionScripts"] = "transactionScripts";
@@ -61,7 +62,8 @@ export class MidenDatabase {
     storageMapEntries;
     accountAssets;
     accountAuths;
-    accounts;
+    accountsHistory;
+    accountsLatest;
     addresses;
     transactions;
     transactionScripts;
@@ -83,7 +85,29 @@ export class MidenDatabase {
             [Table.StorageMapEntries]: indexes("[root+key]", "root"),
             [Table.AccountAssets]: indexes("[root+vaultKey]", "root", "faucetIdPrefix"),
             [Table.AccountAuth]: indexes("pubKeyCommitmentHex"),
-            [Table.Accounts]: indexes("&accountCommitment", "id", "[id+nonce]", "codeRoot", "storageRoot", "vaultRoot"),
+            [Table.AccountsHistory]: indexes("&accountCommitment", "id", "[id+nonce]", "codeRoot", "storageRoot", "vaultRoot"),
+            [Table.Addresses]: indexes("address", "id"),
+            [Table.Transactions]: indexes("id", "statusVariant"),
+            [Table.TransactionScripts]: indexes("scriptRoot"),
+            [Table.InputNotes]: indexes("noteId", "nullifier", "stateDiscriminant"),
+            [Table.OutputNotes]: indexes("noteId", "recipientDigest", "stateDiscriminant", "nullifier"),
+            [Table.NotesScripts]: indexes("scriptRoot"),
+            [Table.StateSync]: indexes("id"),
+            [Table.BlockHeaders]: indexes("blockNum", "hasClientNotes"),
+            [Table.PartialBlockchainNodes]: indexes("id"),
+            [Table.Tags]: indexes("id++", "tag", "source_note_id", "source_account_id"),
+            [Table.ForeignAccountCode]: indexes("accountId"),
+            [Table.Settings]: indexes("key"),
+            [Table.TrackedAccounts]: indexes("&id"),
+        });
+        this.dexie.version(2).stores({
+            [Table.AccountCode]: indexes("root"),
+            [Table.AccountStorage]: indexes("[commitment+slotName]", "commitment"),
+            [Table.StorageMapEntries]: indexes("[root+key]", "root"),
+            [Table.AccountAssets]: indexes("[root+vaultKey]", "root", "faucetIdPrefix"),
+            [Table.AccountAuth]: indexes("pubKeyCommitmentHex"),
+            [Table.AccountsHistory]: indexes("&accountCommitment", "id"),
+            [Table.AccountsLatest]: indexes("id", "&accountCommitment"),
             [Table.Addresses]: indexes("address", "id"),
             [Table.Transactions]: indexes("id", "statusVariant"),
             [Table.TransactionScripts]: indexes("scriptRoot"),
@@ -103,7 +127,8 @@ export class MidenDatabase {
         this.storageMapEntries = this.dexie.table(Table.StorageMapEntries);
         this.accountAssets = this.dexie.table(Table.AccountAssets);
         this.accountAuths = this.dexie.table(Table.AccountAuth);
-        this.accounts = this.dexie.table(Table.Accounts);
+        this.accountsHistory = this.dexie.table(Table.AccountsHistory);
+        this.accountsLatest = this.dexie.table(Table.AccountsLatest);
         this.addresses = this.dexie.table(Table.Addresses);
         this.transactions = this.dexie.table(Table.Transactions);
         this.transactionScripts = this.dexie.table(Table.TransactionScripts);
@@ -128,6 +153,7 @@ export class MidenDatabase {
         try {
             await this.dexie.open();
             await this.ensureClientVersion(clientVersion);
+            await this.ensureLatestAccountsSnapshot();
             console.log("Database opened successfully");
             return true;
         }
@@ -182,5 +208,23 @@ export class MidenDatabase {
             key: CLIENT_VERSION_SETTING_KEY,
             value: textEncoder.encode(clientVersion),
         });
+    }
+    async ensureLatestAccountsSnapshot() {
+        const latestCount = await this.accountsLatest.count();
+        if (latestCount > 0) {
+            return;
+        }
+        const history = await this.accountsHistory.toArray();
+        if (history.length === 0) {
+            return;
+        }
+        const latestById = new Map();
+        for (const record of history) {
+            const current = latestById.get(record.id);
+            if (!current || BigInt(record.nonce) > BigInt(current.nonce)) {
+                latestById.set(record.id, record);
+            }
+        }
+        await this.accountsLatest.bulkPut(Array.from(latestById.values()));
     }
 }

@@ -1,6 +1,6 @@
 //! Account-related database operations.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::rc::Rc;
 use std::string::{String, ToString};
 use std::sync::{Arc, RwLock};
@@ -40,14 +40,14 @@ use rusqlite::types::Value;
 use rusqlite::{Connection, Transaction, named_params, params};
 
 use crate::account::helpers::{
-    SerializedHeaderData,
-    parse_accounts,
+    build_storage_slots_from_values,
     query_account_addresses,
     query_account_code,
     query_account_headers,
+    query_latest_storage_values,
+    query_storage_map_roots_at_or_before_nonce,
     query_storage_maps,
-    query_storage_slots,
-    query_storage_values,
+    query_storage_values_at_or_before_nonce,
     query_vault_assets,
 };
 use crate::smt_forest::AccountSmtForest;
@@ -76,62 +76,17 @@ impl SqliteStore {
     pub(crate) fn get_account_headers(
         conn: &mut Connection,
     ) -> Result<Vec<(AccountHeader, AccountStatus)>, StoreError> {
-        const QUERY: &str = "
-            SELECT
-                a.id,
-                a.nonce,
-                a.vault_root,
-                a.storage_commitment,
-                a.code_commitment,
-                a.account_seed,
-                a.locked
-            FROM accounts AS a
-            JOIN (
-                SELECT id, MAX(nonce) AS nonce
-                FROM accounts
-                GROUP BY id
-            ) AS latest
-            ON a.id = latest.id
-            AND a.nonce = latest.nonce
-            ORDER BY a.id;
-            ";
-
-        conn.prepare_cached(QUERY)
-            .into_store_error()?
-            .query_map(params![], |row| {
-                let id: String = row.get(0)?;
-                let nonce: u64 = column_value_as_u64(row, 1)?;
-                let vault_root: String = row.get(2)?;
-                let storage_commitment: String = row.get(3)?;
-                let code_commitment: String = row.get(4)?;
-                let account_seed: Option<Vec<u8>> = row.get(5)?;
-                let locked: bool = row.get(6)?;
-
-                Ok(SerializedHeaderData {
-                    id,
-                    nonce,
-                    vault_root,
-                    storage_commitment,
-                    code_commitment,
-                    account_seed,
-                    locked,
-                })
-            })
-            .into_store_error()?
-            .map(|result| parse_accounts(result.into_store_error()?))
-            .collect::<Result<Vec<(AccountHeader, AccountStatus)>, StoreError>>()
+        query_account_headers(conn, "accounts_latest", "1 = 1 ORDER BY id", params![])
     }
 
     pub(crate) fn get_account_header(
         conn: &mut Connection,
         account_id: AccountId,
     ) -> Result<Option<(AccountHeader, AccountStatus)>, StoreError> {
-        Ok(query_account_headers(
-            conn,
-            "id = ? ORDER BY nonce DESC LIMIT 1",
-            params![account_id.to_hex()],
-        )?
-        .pop())
+        Ok(
+            query_account_headers(conn, "accounts_latest", "id = ?", params![account_id.to_hex()])?
+                .pop(),
+        )
     }
 
     pub(crate) fn get_account_header_by_commitment(
@@ -139,11 +94,14 @@ impl SqliteStore {
         account_commitment: Word,
     ) -> Result<Option<AccountHeader>, StoreError> {
         let account_commitment_str: String = account_commitment.to_string();
-        Ok(
-            query_account_headers(conn, "account_commitment = ?", params![account_commitment_str])?
-                .pop()
-                .map(|(header, _)| header),
-        )
+        Ok(query_account_headers(
+            conn,
+            "accounts_history",
+            "account_commitment = ?",
+            params![account_commitment_str],
+        )?
+        .pop()
+        .map(|(header, _)| header))
     }
 
     /// Retrieves a complete account record with full vault and storage data.
@@ -158,13 +116,10 @@ impl SqliteStore {
         let assets = query_vault_assets(conn, "root = ?", params![header.vault_root().to_hex()])?;
         let vault = AssetVault::new(&assets)?;
 
-        let slots = query_storage_slots(
-            conn,
-            "commitment = ?",
-            params![header.storage_commitment().to_hex()],
-        )?
-        .into_values()
-        .collect();
+        let slots =
+            build_storage_slots_from_values(conn, query_latest_storage_values(conn, header.id())?)?
+                .into_values()
+                .collect();
 
         let storage = AccountStorage::new(slots)?;
 
@@ -202,11 +157,7 @@ impl SqliteStore {
         let mut storage_header = Vec::new();
         let mut maps = vec![];
 
-        let storage_values = query_storage_values(
-            conn,
-            "commitment = ?",
-            params![header.storage_commitment().to_hex()],
-        )?;
+        let storage_values = query_latest_storage_values(conn, header.id())?;
 
         // Collect all map roots for a single batched query
         let map_roots: Vec<Value> = storage_values
@@ -299,7 +250,7 @@ impl SqliteStore {
     ) -> Result<AssetVault, StoreError> {
         let assets = query_vault_assets(
             conn,
-            "root = (SELECT vault_root FROM accounts WHERE id = ? ORDER BY nonce DESC LIMIT 1)",
+            "root = (SELECT vault_root FROM accounts_latest WHERE id = ?)",
             params![account_id.to_hex()],
         )?;
 
@@ -312,22 +263,18 @@ impl SqliteStore {
         account_id: AccountId,
         filter: &AccountStorageFilter,
     ) -> Result<AccountStorage, StoreError> {
-        let (where_clause, params) = match filter {
-            AccountStorageFilter::All => (
-                "commitment = (SELECT storage_commitment FROM accounts WHERE id = ? ORDER BY nonce DESC LIMIT 1)",
-                params![account_id.to_hex()],
-            ),
-            AccountStorageFilter::Root(root) => (
-                "commitment = (SELECT storage_commitment FROM accounts WHERE id = ? ORDER BY nonce DESC LIMIT 1) AND slot_value = ?",
-                params![account_id.to_hex(), root.to_hex()],
-            ),
-            AccountStorageFilter::SlotName(slot_name) => (
-                "commitment = (SELECT storage_commitment FROM accounts WHERE id = ? ORDER BY nonce DESC LIMIT 1) AND slot_name = ?",
-                params![account_id.to_hex(), slot_name.to_string()],
-            ),
-        };
+        let mut storage_values = query_latest_storage_values(conn, account_id)?;
+        match filter {
+            AccountStorageFilter::All => {},
+            AccountStorageFilter::Root(root) => {
+                storage_values.retain(|_, (_, value)| value == root);
+            },
+            AccountStorageFilter::SlotName(slot_name) => {
+                storage_values.retain(|name, _| name == slot_name);
+            },
+        }
 
-        let slots = query_storage_slots(conn, where_clause, params)?.into_values().collect();
+        let slots = build_storage_slots_from_values(conn, storage_values)?.into_values().collect();
 
         Ok(AccountStorage::new(slots)?)
     }
@@ -365,11 +312,8 @@ impl SqliteStore {
             .ok_or(StoreError::AccountDataNotFound(account_id))?
             .0;
 
-        let mut storage_values = query_storage_values(
-            conn,
-            "commitment = ? AND slot_name = ?",
-            params![header.storage_commitment().to_hex(), slot_name.to_string()],
-        )?;
+        let mut storage_values = query_latest_storage_values(conn, account_id)?;
+        storage_values.retain(|stored_name, _| stored_name == &slot_name);
         let (slot_type, map_root) = storage_values
             .remove(&slot_name)
             .ok_or(StoreError::AccountStorageRootNotFound(header.storage_commitment()))?;
@@ -396,13 +340,11 @@ impl SqliteStore {
         conn: &mut Connection,
         account_id: AccountId,
     ) -> Result<Option<AccountCode>, StoreError> {
-        let Some((header, _)) = query_account_headers(
-            conn,
-            "id = ? ORDER BY nonce DESC LIMIT 1",
-            params![account_id.to_hex()],
-        )?
-        .into_iter()
-        .next() else {
+        let Some((header, _)) =
+            query_account_headers(conn, "accounts_latest", "id = ?", params![account_id.to_hex()])?
+                .into_iter()
+                .next()
+        else {
             return Ok(None);
         };
 
@@ -422,9 +364,10 @@ impl SqliteStore {
 
         Self::insert_account_code(&tx, account.code())?;
 
-        Self::insert_storage_slots(
+        Self::upsert_account_storage_slot_updates(
             &tx,
-            account.storage().to_commitment(),
+            account.id(),
+            account.nonce().as_int(),
             account.storage().slots().iter(),
         )?;
 
@@ -446,7 +389,7 @@ impl SqliteStore {
         smt_forest: &Arc<RwLock<AccountSmtForest>>,
         new_account_state: &Account,
     ) -> Result<(), StoreError> {
-        const QUERY: &str = "SELECT id FROM accounts WHERE id = ?";
+        const QUERY: &str = "SELECT id FROM accounts_latest WHERE id = ?";
         if conn
             .prepare(QUERY)
             .into_store_error()?
@@ -566,9 +509,10 @@ impl SqliteStore {
         let updated_storage_slots =
             Self::apply_account_storage_delta(smt_forest, updated_storage_maps, delta)?;
 
-        Self::insert_storage_slots(
+        Self::upsert_account_storage_slot_updates(
             tx,
-            final_account_state.storage_commitment(),
+            final_account_state.id(),
+            final_account_state.nonce().as_int(),
             updated_storage_slots.values(),
         )?;
 
@@ -595,12 +539,26 @@ impl SqliteStore {
         let account_hash_params = Rc::new(
             account_commitments.iter().map(|h| Value::from(h.to_hex())).collect::<Vec<_>>(),
         );
+        let deleted_account_states =
+            Self::get_account_state_refs_by_commitment(tx, &account_hash_params)?;
 
         // Query all SMT roots before deletion so we can pop them from the forest
         let smt_roots = Self::get_smt_roots_by_account_commitment(tx, &account_hash_params)?;
 
-        const DELETE_QUERY: &str = "DELETE FROM accounts WHERE account_commitment IN rarray(?)";
+        const DELETE_QUERY: &str =
+            "DELETE FROM accounts_history WHERE account_commitment IN rarray(?)";
         tx.execute(DELETE_QUERY, params![account_hash_params]).into_store_error()?;
+
+        if !deleted_account_states.is_empty() {
+            Self::delete_storage_deltas_for_account_states(tx, &deleted_account_states)?;
+
+            let affected_accounts: BTreeSet<AccountId> =
+                deleted_account_states.iter().map(|(account_id, _)| *account_id).collect();
+            for account_id in affected_accounts {
+                Self::refresh_latest_account_header(tx, account_id)?;
+                Self::refresh_latest_account_storage(tx, account_id)?;
+            }
+        }
 
         // Pop the roots from the forest to release memory for nodes that are no longer reachable
         smt_forest.pop_roots(smt_roots);
@@ -636,9 +594,10 @@ impl SqliteStore {
         let old_roots = Self::get_smt_roots_by_account_id(tx, new_account_state.id())?;
 
         smt_forest.insert_account_state(new_account_state.vault(), new_account_state.storage())?;
-        Self::insert_storage_slots(
+        Self::upsert_account_storage_slot_updates(
             tx,
-            new_account_state.storage().to_commitment(),
+            new_account_state.id(),
+            new_account_state.nonce().as_int(),
             new_account_state.storage().slots().iter(),
         )?;
         Self::insert_assets(
@@ -664,7 +623,8 @@ impl SqliteStore {
         // Mismatched digests may be due to stale network data. If the mismatched digest is
         // tracked in the db and corresponds to the mismatched account, it means we
         // got a past update and shouldn't lock the account.
-        const QUERY: &str = "UPDATE accounts SET locked = true WHERE id = :account_id AND NOT EXISTS (SELECT 1 FROM accounts WHERE id = :account_id AND account_commitment = :digest)";
+        const QUERY: &str = "UPDATE accounts_latest SET locked = true WHERE id = :account_id AND \
+            NOT EXISTS (SELECT 1 FROM accounts_history WHERE id = :account_id AND account_commitment = :digest)";
         tx.execute(
             QUERY,
             named_params! {
@@ -701,7 +661,7 @@ impl SqliteStore {
                     faucet_id_prefix,
                     asset
                 FROM account_assets
-                WHERE root = (SELECT vault_root FROM accounts WHERE account_commitment = ?)
+                WHERE root = (SELECT vault_root FROM accounts_history WHERE account_commitment = ?)
                 ";
             tx.execute(
                 VAULT_QUERY,
@@ -713,30 +673,155 @@ impl SqliteStore {
             .into_store_error()?;
         }
 
-        if init_account_header.storage_commitment() != final_account_header.storage_commitment() {
-            const STORAGE_QUERY: &str = "
-                INSERT OR IGNORE INTO account_storage (
-                    commitment,
-                    slot_name,
-                    slot_value,
-                    slot_type
-                )
-                SELECT
-                    ?, -- new commitment
-                    slot_name,
-                    slot_value,
-                    slot_type
-                FROM account_storage
-                WHERE commitment = (SELECT storage_commitment FROM accounts WHERE account_commitment = ?)
-                ";
+        Ok(())
+    }
 
-            tx.execute(
-                STORAGE_QUERY,
-                params![
-                    final_account_header.storage_commitment().to_hex(),
-                    init_account_header.commitment().to_hex()
-                ],
+    fn get_account_state_refs_by_commitment(
+        tx: &Transaction<'_>,
+        account_hash_params: &Rc<Vec<Value>>,
+    ) -> Result<Vec<(AccountId, u64)>, StoreError> {
+        const QUERY: &str = "
+            SELECT id, nonce
+            FROM accounts_history
+            WHERE account_commitment IN rarray(?1)";
+
+        tx.prepare_cached(QUERY)
+            .into_store_error()?
+            .query_map(params![account_hash_params], |row| {
+                Ok((row.get::<_, String>(0)?, column_value_as_u64(row, 1)?))
+            })
+            .into_store_error()?
+            .map(|row| {
+                let (account_id_hex, nonce) = row.into_store_error()?;
+                let account_id =
+                    AccountId::from_hex(&account_id_hex).map_err(StoreError::AccountIdError)?;
+                Ok((account_id, nonce))
+            })
+            .collect()
+    }
+
+    fn delete_storage_deltas_for_account_states(
+        tx: &Transaction<'_>,
+        account_states: &[(AccountId, u64)],
+    ) -> Result<(), StoreError> {
+        const DELETE_QUERY: &str =
+            "DELETE FROM account_storage_deltas WHERE account_id = ?1 AND nonce = ?2";
+        let mut stmt = tx.prepare_cached(DELETE_QUERY).into_store_error()?;
+        for (account_id, nonce) in account_states {
+            stmt.execute(params![account_id.to_hex(), u64_to_value(*nonce)])
+                .into_store_error()?;
+        }
+
+        Ok(())
+    }
+
+    fn refresh_latest_account_header(
+        tx: &Transaction<'_>,
+        account_id: AccountId,
+    ) -> Result<(), StoreError> {
+        const DELETE_LATEST_QUERY: &str = "DELETE FROM accounts_latest WHERE id = ?1";
+        const INSERT_LATEST_QUERY: &str = "
+            INSERT INTO accounts_latest (
+                id,
+                account_commitment,
+                code_commitment,
+                storage_commitment,
+                vault_root,
+                nonce,
+                account_seed,
+                locked
             )
+            SELECT
+                id,
+                account_commitment,
+                code_commitment,
+                storage_commitment,
+                vault_root,
+                nonce,
+                account_seed,
+                locked
+            FROM accounts_history
+            WHERE id = ?1
+            ORDER BY nonce DESC
+            LIMIT 1";
+
+        let account_id_hex = account_id.to_hex();
+        tx.execute(DELETE_LATEST_QUERY, params![account_id_hex.as_str()])
+            .into_store_error()?;
+        tx.execute(INSERT_LATEST_QUERY, params![account_id_hex.as_str()])
+            .into_store_error()?;
+
+        Ok(())
+    }
+
+    fn refresh_latest_account_storage(
+        tx: &Transaction<'_>,
+        account_id: AccountId,
+    ) -> Result<(), StoreError> {
+        const SELECT_LATEST_STATE: &str = "
+            SELECT nonce
+            FROM accounts_latest
+            WHERE id = ?1";
+        const DELETE_LATEST_QUERY: &str = "DELETE FROM account_storage_latest WHERE account_id = ?";
+        const DELETE_DELTAS_QUERY: &str = "DELETE FROM account_storage_deltas WHERE account_id = ?";
+
+        let account_id_hex = account_id.to_hex();
+        let latest_state = tx
+            .prepare_cached(SELECT_LATEST_STATE)
+            .into_store_error()?
+            .query_map(params![account_id_hex.clone()], |row| column_value_as_u64(row, 0))
+            .into_store_error()?
+            .next()
+            .transpose()
+            .map_err(|err| StoreError::ParsingError(err.to_string()))?;
+
+        let Some(latest_nonce) = latest_state else {
+            tx.execute(DELETE_LATEST_QUERY, params![account_id_hex.as_str()])
+                .into_store_error()?;
+            tx.execute(DELETE_DELTAS_QUERY, params![account_id_hex.as_str()])
+                .into_store_error()?;
+            return Ok(());
+        };
+
+        let storage_values = query_storage_values_at_or_before_nonce(tx, account_id, latest_nonce)?;
+
+        Self::replace_latest_storage_rows(tx, account_id, latest_nonce, storage_values)
+    }
+
+    fn replace_latest_storage_rows(
+        tx: &Transaction<'_>,
+        account_id: AccountId,
+        latest_nonce: u64,
+        storage_values: BTreeMap<StorageSlotName, (StorageSlotType, Word)>,
+    ) -> Result<(), StoreError> {
+        const DELETE_QUERY: &str = "DELETE FROM account_storage_latest WHERE account_id = ?";
+        const INSERT_QUERY: &str = insert_sql!(
+            account_storage_latest {
+                account_id,
+                slot_name,
+                slot_value,
+                slot_type,
+                nonce
+            } | REPLACE
+        );
+
+        let account_id_hex = account_id.to_hex();
+        tx.execute(DELETE_QUERY, params![account_id_hex.as_str()]).into_store_error()?;
+
+        if storage_values.is_empty() {
+            return Ok(());
+        }
+
+        let nonce_value = u64_to_value(latest_nonce);
+        let mut stmt = tx.prepare_cached(INSERT_QUERY).into_store_error()?;
+        for (slot_name, (slot_type, slot_value)) in storage_values {
+            stmt.execute(params![
+                &account_id_hex,
+                slot_name.to_string(),
+                slot_value.to_hex(),
+                slot_type as u8,
+                &nonce_value
+            ])
             .into_store_error()?;
         }
 
@@ -753,27 +838,15 @@ impl SqliteStore {
         account_id: AccountId,
     ) -> Result<Vec<Word>, StoreError> {
         const LATEST_ACCOUNT_QUERY: &str = r"
-        SELECT vault_root, storage_commitment
-        FROM accounts
+        SELECT vault_root, nonce
+        FROM accounts_latest
         WHERE id = ?1
-        ORDER BY nonce DESC
-        LIMIT 1
     ";
 
-        const STORAGE_MAP_ROOTS_QUERY: &str = r"
-        SELECT slot_value
-        FROM account_storage
-        WHERE commitment = ?1
-          AND slot_type = ?2
-          AND slot_value IS NOT NULL
-    ";
-
-        let map_slot_type = StorageSlotType::Map as u8;
-
-        // 1) Fetch latest vault root + storage commitment.
-        let (vault_root, storage_commitment): (String, String) = tx
+        // 1) Fetch latest vault root + nonce.
+        let (vault_root, nonce): (String, u64) = tx
             .query_row(LATEST_ACCOUNT_QUERY, params![account_id.to_hex()], |row| {
-                Ok((row.get(0)?, row.get(1)?))
+                Ok((row.get(0)?, column_value_as_u64(row, 1)?))
             })
             .into_store_error()?;
 
@@ -784,13 +857,8 @@ impl SqliteStore {
             roots.push(root);
         }
 
-        // 2) Fetch storage map roots for the latest storage commitment.
-        let mut stmt = tx.prepare(STORAGE_MAP_ROOTS_QUERY).into_store_error()?;
-        let iter = stmt
-            .query_map(params![storage_commitment, map_slot_type], |row| row.get::<_, String>(0))
-            .into_store_error()?;
-
-        roots.extend(iter.filter_map(Result::ok).filter_map(|r| Word::try_from(r.as_str()).ok()));
+        // 2) Fetch storage map roots from nonce-indexed storage.
+        roots.extend(query_storage_map_roots_at_or_before_nonce(tx, account_id, nonce)?);
 
         Ok(roots)
     }
@@ -800,22 +868,34 @@ impl SqliteStore {
         tx: &Transaction<'_>,
         account_hash_params: &Rc<Vec<Value>>,
     ) -> Result<Vec<Word>, StoreError> {
-        const ROOTS_QUERY: &str = "
-            SELECT vault_root FROM accounts WHERE account_commitment IN rarray(?1)
-            UNION ALL
-            SELECT slot_value FROM account_storage
-            WHERE commitment IN (
-                SELECT storage_commitment FROM accounts WHERE account_commitment IN rarray(?1)
-            ) AND slot_type = ?2";
+        const ACCOUNT_STATES_QUERY: &str = "
+            SELECT id, nonce, vault_root
+            FROM accounts_history
+            WHERE account_commitment IN rarray(?1)";
 
-        let map_slot_type = StorageSlotType::Map as u8;
-        let mut stmt = tx.prepare(ROOTS_QUERY).into_store_error()?;
-        let roots = stmt
-            .query_map(params![account_hash_params, map_slot_type], |row| row.get::<_, String>(0))
-            .into_store_error()?
-            .filter_map(Result::ok)
-            .filter_map(|r| Word::try_from(r.as_str()).ok())
-            .collect();
+        let mut roots = Vec::new();
+
+        let mut account_stmt = tx.prepare(ACCOUNT_STATES_QUERY).into_store_error()?;
+        let account_rows = account_stmt
+            .query_map(params![account_hash_params], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    column_value_as_u64(row, 1)?,
+                    row.get::<_, String>(2)?,
+                ))
+            })
+            .into_store_error()?;
+
+        for account_row in account_rows {
+            let (account_id_hex, nonce, vault_root) = account_row.into_store_error()?;
+            if let Ok(vault_root) = Word::try_from(vault_root.as_str()) {
+                roots.push(vault_root);
+            }
+
+            let account_id =
+                AccountId::from_hex(&account_id_hex).map_err(StoreError::AccountIdError)?;
+            roots.extend(query_storage_map_roots_at_or_before_nonce(tx, account_id, nonce)?);
+        }
 
         Ok(roots)
     }
@@ -835,8 +915,8 @@ impl SqliteStore {
 
         let account_seed = account_seed.map(|seed| seed.to_bytes());
 
-        const QUERY: &str = insert_sql!(
-            accounts {
+        const INSERT_HISTORY_QUERY: &str = insert_sql!(
+            accounts_history {
                 id,
                 code_commitment,
                 storage_commitment,
@@ -847,17 +927,52 @@ impl SqliteStore {
                 locked
             } | REPLACE
         );
-
-        tx.execute(
-            QUERY,
-            params![
+        const UPSERT_LATEST_QUERY: &str = "
+            INSERT INTO accounts_latest (
                 id,
+                account_commitment,
                 code_commitment,
                 storage_commitment,
                 vault_root,
                 nonce,
                 account_seed,
-                commitment,
+                locked
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id)
+            DO UPDATE SET
+                account_commitment = excluded.account_commitment,
+                code_commitment = excluded.code_commitment,
+                storage_commitment = excluded.storage_commitment,
+                vault_root = excluded.vault_root,
+                nonce = excluded.nonce,
+                account_seed = excluded.account_seed,
+                locked = excluded.locked
+            WHERE excluded.nonce >= accounts_latest.nonce";
+
+        tx.execute(
+            INSERT_HISTORY_QUERY,
+            params![
+                &id,
+                &code_commitment,
+                &storage_commitment,
+                &vault_root,
+                &nonce,
+                &account_seed,
+                &commitment,
+                false,
+            ],
+        )
+        .into_store_error()?;
+        tx.execute(
+            UPSERT_LATEST_QUERY,
+            params![
+                &id,
+                &commitment,
+                &code_commitment,
+                &storage_commitment,
+                &vault_root,
+                &nonce,
+                &account_seed,
                 false,
             ],
         )

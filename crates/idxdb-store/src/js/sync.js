@@ -75,14 +75,14 @@ export async function applyStateSync(dbId, stateUpdate) {
     const { blockNum, flattenedNewBlockHeaders, flattenedPartialBlockChainPeaks, newBlockNums, blockHasRelevantNotes, serializedNodeIds, serializedNodes, committedNoteIds, serializedInputNotes, serializedOutputNotes, accountUpdates, transactionUpdates, } = stateUpdate;
     const newBlockHeaders = reconstructFlattenedVec(flattenedNewBlockHeaders);
     const partialBlockchainPeaks = reconstructFlattenedVec(flattenedPartialBlockChainPeaks);
-    let inputNotesWriteOp = Promise.all(serializedInputNotes.map((note) => {
+    const inputNotesWriteOp = () => Promise.all(serializedInputNotes.map((note) => {
         return upsertInputNote(dbId, note.noteId, note.noteAssets, note.serialNumber, note.inputs, note.noteScriptRoot, note.noteScript, note.nullifier, note.createdAt, note.stateDiscriminant, note.state);
     }));
-    let outputNotesWriteOp = Promise.all(serializedOutputNotes.map((note) => {
+    const outputNotesWriteOp = () => Promise.all(serializedOutputNotes.map((note) => {
         return upsertOutputNote(dbId, note.noteId, note.noteAssets, note.recipientDigest, note.metadata, note.nullifier, note.expectedHeight, note.stateDiscriminant, note.state);
     }));
-    let transactionWriteOp = Promise.all(transactionUpdates.map((transactionRecord) => {
-        let promises = [
+    const transactionWriteOp = () => Promise.all(transactionUpdates.map((transactionRecord) => {
+        const promises = [
             upsertTransactionRecord(dbId, transactionRecord.id, transactionRecord.details, transactionRecord.blockNum, transactionRecord.statusVariant, transactionRecord.status, transactionRecord.scriptRoot),
         ];
         if (transactionRecord.scriptRoot && transactionRecord.txScript) {
@@ -90,7 +90,7 @@ export async function applyStateSync(dbId, stateUpdate) {
         }
         return Promise.all(promises);
     }));
-    let accountUpdatesWriteOp = Promise.all(accountUpdates.flatMap((accountUpdate) => {
+    const accountUpdatesWriteOp = () => Promise.all(accountUpdates.flatMap((accountUpdate) => {
         return [
             upsertAccountStorage(dbId, accountUpdate.storageSlots),
             upsertStorageMapEntries(dbId, accountUpdate.storageMapEntries),
@@ -102,17 +102,25 @@ export async function applyStateSync(dbId, stateUpdate) {
         db.stateSync,
         db.inputNotes,
         db.outputNotes,
+        db.notesScripts,
         db.transactions,
+        db.transactionScripts,
+        db.accountStorages,
+        db.storageMapEntries,
+        db.accountAssets,
+        db.accountsHistory,
+        db.accountsLatest,
+        db.trackedAccounts,
         db.blockHeaders,
         db.partialBlockchainNodes,
         db.tags,
     ];
     return await db.dexie.transaction("rw", tablesToAccess, async (tx) => {
         await Promise.all([
-            inputNotesWriteOp,
-            outputNotesWriteOp,
-            transactionWriteOp,
-            accountUpdatesWriteOp,
+            inputNotesWriteOp(),
+            outputNotesWriteOp(),
+            transactionWriteOp(),
+            accountUpdatesWriteOp(),
             updateSyncHeight(tx, blockNum),
             updatePartialBlockchainNodes(tx, serializedNodeIds, serializedNodes),
             updateCommittedNoteTags(tx, committedNoteIds),

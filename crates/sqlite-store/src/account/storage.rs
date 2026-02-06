@@ -1,7 +1,6 @@
 //! Storage-related database operations for accounts.
 
 use std::collections::BTreeMap;
-use std::rc::Rc;
 use std::string::ToString;
 use std::vec::Vec;
 
@@ -9,6 +8,7 @@ use miden_client::Word;
 use miden_client::account::{
     AccountDelta,
     AccountHeader,
+    AccountId,
     StorageMap,
     StorageSlot,
     StorageSlotContent,
@@ -16,13 +16,15 @@ use miden_client::account::{
 };
 use miden_client::store::StoreError;
 use miden_protocol::crypto::merkle::MerkleError;
-use rusqlite::types::Value;
 use rusqlite::{Connection, Transaction, params};
 
-use crate::account::helpers::query_storage_slots;
+use crate::account::helpers::{
+    build_storage_slots_from_values,
+    query_storage_values_at_or_before_nonce_for_slots,
+};
 use crate::smt_forest::AccountSmtForest;
 use crate::sql_error::SqlResultExt;
-use crate::{SqliteStore, insert_sql, subst};
+use crate::{SqliteStore, insert_sql, subst, u64_to_value};
 
 impl SqliteStore {
     // READER METHODS
@@ -35,62 +37,89 @@ impl SqliteStore {
         header: &AccountHeader,
         delta: &AccountDelta,
     ) -> Result<BTreeMap<StorageSlotName, StorageMap>, StoreError> {
-        let updated_map_names = delta
-            .storage()
-            .maps()
-            .map(|(slot_name, _)| Value::Text(slot_name.to_string()))
-            .collect::<Vec<Value>>();
+        let updated_map_names: Vec<StorageSlotName> =
+            delta.storage().maps().map(|(slot_name, _)| slot_name.clone()).collect();
+        if updated_map_names.is_empty() {
+            return Ok(BTreeMap::new());
+        }
 
-        query_storage_slots(
+        let storage_values = query_storage_values_at_or_before_nonce_for_slots(
             conn,
-            "commitment = ? AND slot_name IN rarray(?)",
-            params![header.storage_commitment().to_hex(), Rc::new(updated_map_names)],
-        )?
-        .into_iter()
-        .map(|(slot_name, slot)| {
-            let StorageSlotContent::Map(map) = slot.into_parts().1 else {
-                return Err(StoreError::AccountError(
-                    miden_client::AccountError::StorageSlotNotMap(slot_name),
-                ));
-            };
+            header.id(),
+            header.nonce().as_int(),
+            updated_map_names.iter(),
+        )?;
+        let slots = build_storage_slots_from_values(conn, storage_values)?;
 
-            Ok((slot_name, map))
-        })
-        .collect()
+        slots
+            .into_iter()
+            .map(|(slot_name, slot)| {
+                let StorageSlotContent::Map(map) = slot.into_parts().1 else {
+                    return Err(StoreError::AccountError(
+                        miden_client::AccountError::StorageSlotNotMap(slot_name),
+                    ));
+                };
+
+                Ok((slot_name, map))
+            })
+            .collect()
     }
 
     // MUTATOR/WRITER METHODS
     // --------------------------------------------------------------------------------------------
 
-    /// Inserts storage slots into the database for a given storage commitment.
-    pub(crate) fn insert_storage_slots<'a>(
+    /// Inserts storage slot updates for an account at a specific nonce and refreshes the
+    /// materialized latest rows used by read paths.
+    pub(crate) fn upsert_account_storage_slot_updates<'a>(
         tx: &Transaction<'_>,
-        commitment: Word,
+        account_id: AccountId,
+        nonce: u64,
         account_storage: impl Iterator<Item = &'a StorageSlot>,
     ) -> Result<(), StoreError> {
-        const SLOT_QUERY: &str = insert_sql!(
-            account_storage {
-                commitment,
+        const DELTA_QUERY: &str = insert_sql!(
+            account_storage_deltas {
+                account_id,
+                nonce,
                 slot_name,
                 slot_value,
                 slot_type
             } | REPLACE
         );
+        const LATEST_QUERY: &str = "
+            INSERT INTO account_storage_latest (
+                account_id,
+                slot_name,
+                slot_value,
+                slot_type,
+                nonce
+            ) VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(account_id, slot_name)
+            DO UPDATE SET
+                slot_value = excluded.slot_value,
+                slot_type = excluded.slot_type,
+                nonce = excluded.nonce
+            WHERE excluded.nonce >= account_storage_latest.nonce";
         const MAP_ENTRY_QUERY: &str =
             insert_sql!(storage_map_entries { root, key, value } | REPLACE);
 
-        let mut slot_stmt = tx.prepare_cached(SLOT_QUERY).into_store_error()?;
+        let mut delta_stmt = tx.prepare_cached(DELTA_QUERY).into_store_error()?;
+        let mut latest_stmt = tx.prepare_cached(LATEST_QUERY).into_store_error()?;
         let mut map_entry_stmt = tx.prepare_cached(MAP_ENTRY_QUERY).into_store_error()?;
-        let commitment_hex = commitment.to_hex();
+
+        let account_id_hex = account_id.to_hex();
+        let nonce_value = u64_to_value(nonce);
 
         for slot in account_storage {
-            slot_stmt
-                .execute(params![
-                    &commitment_hex,
-                    slot.name().to_string(),
-                    slot.value().to_hex(),
-                    slot.slot_type() as u8
-                ])
+            let slot_name = slot.name().to_string();
+            let slot_value = slot.value().to_hex();
+            let slot_type = slot.slot_type() as u8;
+
+            delta_stmt
+                .execute(params![&account_id_hex, &nonce_value, &slot_name, &slot_value, slot_type])
+                .into_store_error()?;
+
+            latest_stmt
+                .execute(params![&account_id_hex, &slot_name, &slot_value, slot_type, &nonce_value])
                 .into_store_error()?;
 
             if let StorageSlotContent::Map(map) = slot.content() {

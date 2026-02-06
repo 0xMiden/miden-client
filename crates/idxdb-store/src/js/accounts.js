@@ -1,5 +1,31 @@
 import { getDatabase, } from "./schema.js";
 import { logWebStoreError, uint8ArrayToBase64 } from "./utils.js";
+function isNewerNonce(candidate, current) {
+    return BigInt(candidate) > BigInt(current);
+}
+function toHeaderObject(record) {
+    let accountSeedBase64 = undefined;
+    if (record.accountSeed && record.accountSeed.length > 0) {
+        accountSeedBase64 = uint8ArrayToBase64(record.accountSeed);
+    }
+    return {
+        id: record.id,
+        nonce: record.nonce,
+        vaultRoot: record.vaultRoot,
+        storageRoot: record.storageRoot || "",
+        codeRoot: record.codeRoot || "",
+        accountSeed: accountSeedBase64,
+        locked: record.locked,
+        committed: record.committed,
+        accountCommitment: record.accountCommitment || "",
+    };
+}
+function pickLatestRecord(records) {
+    if (records.length === 0) {
+        return undefined;
+    }
+    return records.reduce((latest, record) => isNewerNonce(record.nonce, latest.nonce) ? record : latest);
+}
 export async function getAccountIds(dbId) {
     try {
         const db = getDatabase(dbId);
@@ -14,36 +40,8 @@ export async function getAccountIds(dbId) {
 export async function getAllAccountHeaders(dbId) {
     try {
         const db = getDatabase(dbId);
-        const latestRecordsMap = new Map();
-        await db.accounts.each((record) => {
-            const existingRecord = latestRecordsMap.get(record.id);
-            if (!existingRecord ||
-                BigInt(record.nonce) > BigInt(existingRecord.nonce)) {
-                latestRecordsMap.set(record.id, record);
-            }
-        });
-        const latestRecords = Array.from(latestRecordsMap.values());
-        const resultObject = await Promise.all(latestRecords.map((record) => {
-            let accountSeedBase64 = undefined;
-            if (record.accountSeed) {
-                const seedAsBytes = new Uint8Array(record.accountSeed);
-                if (seedAsBytes.length > 0) {
-                    accountSeedBase64 = uint8ArrayToBase64(seedAsBytes);
-                }
-            }
-            return {
-                id: record.id,
-                nonce: record.nonce,
-                vaultRoot: record.vaultRoot,
-                storageRoot: record.storageRoot || "",
-                codeRoot: record.codeRoot || "",
-                accountSeed: accountSeedBase64,
-                locked: record.locked,
-                committed: record.committed,
-                accountCommitment: record.accountCommitment || "",
-            };
-        }));
-        return resultObject;
+        const latestRecords = await db.accountsLatest.toArray();
+        return latestRecords.map(toHeaderObject);
     }
     catch (error) {
         logWebStoreError(error, "Error while fetching account headers");
@@ -52,39 +50,12 @@ export async function getAllAccountHeaders(dbId) {
 export async function getAccountHeader(dbId, accountId) {
     try {
         const db = getDatabase(dbId);
-        const allMatchingRecords = await db.accounts
-            .where("id")
-            .equals(accountId)
-            .toArray();
-        if (allMatchingRecords.length === 0) {
+        const latestRecord = await db.accountsLatest.get(accountId);
+        if (!latestRecord) {
             console.log("No account header record found for given ID.");
             return null;
         }
-        const sortedRecords = allMatchingRecords.sort((a, b) => {
-            const bigIntA = BigInt(a.nonce);
-            const bigIntB = BigInt(b.nonce);
-            return bigIntA > bigIntB ? -1 : bigIntA < bigIntB ? 1 : 0;
-        });
-        const mostRecentRecord = sortedRecords[0];
-        if (mostRecentRecord === undefined) {
-            return null;
-        }
-        let accountSeedBase64 = undefined;
-        if (mostRecentRecord.accountSeed) {
-            if (mostRecentRecord.accountSeed.length > 0) {
-                accountSeedBase64 = uint8ArrayToBase64(mostRecentRecord.accountSeed);
-            }
-        }
-        const AccountHeader = {
-            id: mostRecentRecord.id,
-            nonce: mostRecentRecord.nonce,
-            vaultRoot: mostRecentRecord.vaultRoot,
-            storageRoot: mostRecentRecord.storageRoot,
-            codeRoot: mostRecentRecord.codeRoot,
-            accountSeed: accountSeedBase64,
-            locked: mostRecentRecord.locked,
-        };
-        return AccountHeader;
+        return toHeaderObject(latestRecord);
     }
     catch (error) {
         logWebStoreError(error, `Error while fetching account header for id: ${accountId}`);
@@ -93,32 +64,14 @@ export async function getAccountHeader(dbId, accountId) {
 export async function getAccountHeaderByCommitment(dbId, accountCommitment) {
     try {
         const db = getDatabase(dbId);
-        const allMatchingRecords = await db.accounts
+        const matchingRecord = await db.accountsHistory
             .where("accountCommitment")
             .equals(accountCommitment)
-            .toArray();
-        if (allMatchingRecords.length == 0) {
+            .first();
+        if (!matchingRecord) {
             return undefined;
         }
-        const matchingRecord = allMatchingRecords[0];
-        if (matchingRecord === undefined) {
-            console.log("No account header record found for given commitment.");
-            return null;
-        }
-        let accountSeedBase64 = undefined;
-        if (matchingRecord.accountSeed) {
-            accountSeedBase64 = uint8ArrayToBase64(matchingRecord.accountSeed);
-        }
-        const AccountHeader = {
-            id: matchingRecord.id,
-            nonce: matchingRecord.nonce,
-            vaultRoot: matchingRecord.vaultRoot,
-            storageRoot: matchingRecord.storageRoot,
-            codeRoot: matchingRecord.codeRoot,
-            accountSeed: accountSeedBase64,
-            locked: matchingRecord.locked,
-        };
-        return AccountHeader;
+        return toHeaderObject(matchingRecord);
     }
     catch (error) {
         logWebStoreError(error, `Error fetching account header for commitment ${accountCommitment}`);
@@ -305,7 +258,11 @@ export async function upsertAccountRecord(dbId, accountId, codeRoot, storageRoot
             accountCommitment: commitment,
             locked: false,
         };
-        await db.accounts.put(data);
+        await db.accountsHistory.put(data);
+        const currentLatest = await db.accountsLatest.get(accountId);
+        if (!currentLatest || !isNewerNonce(currentLatest.nonce, nonce)) {
+            await db.accountsLatest.put(data);
+        }
         await db.trackedAccounts.put({ id: accountId });
     }
     catch (error) {
@@ -399,7 +356,10 @@ export async function getForeignAccountCode(dbId, accountIds) {
 export async function lockAccount(dbId, accountId) {
     try {
         const db = getDatabase(dbId);
-        await db.accounts.where("id").equals(accountId).modify({ locked: true });
+        await db.accountsLatest
+            .where("id")
+            .equals(accountId)
+            .modify({ locked: true });
     }
     catch (error) {
         logWebStoreError(error, `Error locking account: ${accountId}`);
@@ -408,10 +368,33 @@ export async function lockAccount(dbId, accountId) {
 export async function undoAccountStates(dbId, accountCommitments) {
     try {
         const db = getDatabase(dbId);
-        await db.accounts
-            .where("accountCommitment")
-            .anyOf(accountCommitments)
-            .delete();
+        await db.dexie.transaction("rw", db.accountsHistory, db.accountsLatest, async () => {
+            const removedStates = await db.accountsHistory
+                .where("accountCommitment")
+                .anyOf(accountCommitments)
+                .toArray();
+            if (removedStates.length === 0) {
+                return;
+            }
+            await db.accountsHistory
+                .where("accountCommitment")
+                .anyOf(accountCommitments)
+                .delete();
+            const affectedAccountIds = Array.from(new Set(removedStates.map((state) => state.id)));
+            for (const accountId of affectedAccountIds) {
+                const historyRows = await db.accountsHistory
+                    .where("id")
+                    .equals(accountId)
+                    .toArray();
+                const latest = pickLatestRecord(historyRows);
+                if (latest) {
+                    await db.accountsLatest.put(latest);
+                }
+                else {
+                    await db.accountsLatest.delete(accountId);
+                }
+            }
+        });
     }
     catch (error) {
         logWebStoreError(error, `Error undoing account states: ${accountCommitments.join(",")}`);

@@ -24,16 +24,28 @@ CREATE TABLE account_code (
     PRIMARY KEY (commitment)
 );
 
--- Create account_storage table
-CREATE TABLE account_storage (
-    commitment TEXT NOT NULL,               -- commitment to the account storage
-    slot_name TEXT NOT NULL,                -- name of the storage slot
-    slot_value TEXT NULL,                   -- top-level value of the slot (e.g., if the slot is a map it contains the root)
-    slot_type INTEGER NOT NULL,             -- type of the slot (0 = Value, 1 = Map)
-    PRIMARY KEY (commitment, slot_name)
+-- Create account_storage_deltas table
+CREATE TABLE account_storage_deltas (
+    account_id TEXT NOT NULL,                -- account identifier
+    nonce BIGINT NOT NULL,                   -- account nonce for this slot value
+    slot_name TEXT NOT NULL,                 -- storage slot name
+    slot_value TEXT NULL,                    -- slot value or map root
+    slot_type INTEGER NOT NULL,              -- type of the slot (0 = Value, 1 = Map)
+    PRIMARY KEY (account_id, nonce, slot_name)
 ) WITHOUT ROWID;
 
-CREATE INDEX idx_account_storage_commitment ON account_storage(commitment);
+CREATE INDEX idx_account_storage_deltas_lookup
+    ON account_storage_deltas(account_id, slot_name, nonce DESC);
+
+-- Create account_storage_latest table
+CREATE TABLE account_storage_latest (
+    account_id TEXT NOT NULL,                -- account identifier
+    slot_name TEXT NOT NULL,                 -- storage slot name
+    slot_value TEXT NULL,                    -- slot value or map root
+    slot_type INTEGER NOT NULL,              -- type of the slot (0 = Value, 1 = Map)
+    nonce BIGINT NOT NULL,                   -- nonce at which this value was last changed
+    PRIMARY KEY (account_id, slot_name)
+) WITHOUT ROWID;
 
 -- Create storage_map_entries table
 CREATE TABLE storage_map_entries (
@@ -42,8 +54,6 @@ CREATE TABLE storage_map_entries (
     value TEXT NOT NULL,    -- value of the storage map entry
     PRIMARY KEY (root, key)
 ) WITHOUT ROWID;
-
-CREATE INDEX idx_storage_map_entries_root ON storage_map_entries(root);
 
 -- Create account_assets table
 CREATE TABLE account_assets (
@@ -54,7 +64,6 @@ CREATE TABLE account_assets (
     PRIMARY KEY (root, vault_key)
 ) WITHOUT ROWID;
 
-CREATE INDEX idx_account_assets_root ON account_assets(root);
 CREATE INDEX idx_account_assets_root_faucet_prefix ON account_assets(root, faucet_id_prefix);
 
 -- Create foreign_account_code table
@@ -65,8 +74,8 @@ CREATE TABLE foreign_account_code(
     FOREIGN KEY (code_commitment) REFERENCES account_code(commitment)
 );
 
--- Create accounts table
-CREATE TABLE accounts (
+-- Create accounts_history table
+CREATE TABLE accounts_history (
     id UNSIGNED BIG INT NOT NULL,               -- Account ID.
     account_commitment TEXT NOT NULL UNIQUE,    -- Account state commitment
     code_commitment TEXT NOT NULL,              -- Commitment to the account code
@@ -80,8 +89,23 @@ CREATE TABLE accounts (
 
     CONSTRAINT check_seed_nonzero CHECK (NOT (nonce = 0 AND account_seed IS NULL))
 );
-CREATE INDEX idx_accounts_id_nonce ON accounts(id, nonce DESC);
-CREATE INDEX idx_accounts_id ON accounts(id);
+CREATE INDEX idx_accounts_history_id_nonce ON accounts_history(id, nonce DESC);
+
+-- Create accounts_latest table
+CREATE TABLE accounts_latest (
+    id UNSIGNED BIG INT NOT NULL,               -- Account ID.
+    account_commitment TEXT NOT NULL UNIQUE,    -- Latest account state commitment
+    code_commitment TEXT NOT NULL,              -- Commitment to the account code
+    storage_commitment TEXT NOT NULL,           -- Commitment to the account storage
+    vault_root TEXT NOT NULL,                   -- Root of the account_vault Merkle tree.
+    nonce BIGINT NOT NULL,                      -- Account nonce.
+    account_seed BLOB NULL,                     -- Account seed used to generate the ID. Expected to be NULL for non-new accounts
+    locked BOOLEAN NOT NULL,                    -- True if the account is locked, false if not.
+    PRIMARY KEY (id),
+    FOREIGN KEY (code_commitment) REFERENCES account_code(commitment),
+
+    CONSTRAINT check_seed_nonzero CHECK (NOT (nonce = 0 AND account_seed IS NULL))
+);
 
 -- Create transactions table
 CREATE TABLE transactions (
