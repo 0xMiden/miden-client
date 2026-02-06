@@ -157,6 +157,19 @@ token_metadata.ticker = "TEST"
 
 View a summary of the current client state.
 
+#### Action Flags
+
+| Flag           | Description                                  | Short Flag |
+| -------------- | -------------------------------------------- | ---------- |
+| `--rpc-status` | Display detailed RPC node status information | `-r`       |
+
+When using the `--rpc-status` flag, the command displays additional information about the RPC node including:
+
+- Node version
+- Genesis commitment
+- Store connection status and chain tip
+- Block producer status and chain tip
+
 ### `notes`
 
 View and manage notes. Also, exchange private notes using the note transport network.

@@ -389,6 +389,12 @@ pub trait NodeRpcClient: Send + Sync {
     /// Returns the limits that define the maximum number of items that can be sent in a single
     /// RPC request. If the request fails for any reason, default values are returned.
     async fn get_rpc_limits(&self) -> RpcLimits;
+
+    /// Fetches the RPC status without requiring Accept header validation.
+    ///
+    /// This is useful for diagnostics when version negotiation fails, as it allows
+    /// retrieving node information even when there's a version mismatch.
+    async fn get_status_unversioned(&self) -> Result<RpcStatusInfo, RpcError>;
 }
 
 // RPC API ENDPOINT
