@@ -940,6 +940,10 @@ impl NodeRpcClient for GrpcClient {
             },
         }
     }
+
+    async fn get_status_unversioned(&self) -> Result<RpcStatusInfo, RpcError> {
+        GrpcClient::get_status_unversioned(self).await
+    }
 }
 
 // ERRORS
