@@ -22,6 +22,37 @@
 
 ***
 
+### accountReader()
+
+> **accountReader**(`account_id`): [`AccountReader`](../classes/AccountReader.md)
+
+Creates a new `AccountReader` for lazy access to account data.
+
+The `AccountReader` executes queries lazily - each method call fetches fresh data
+from storage, ensuring you always see the current state.
+
+# Arguments
+* `account_id` - The ID of the account to read.
+
+# Example
+```javascript
+const reader = client.accountReader(accountId);
+const nonce = await reader.nonce();
+const balance = await reader.getBalance(faucetId);
+```
+
+#### Parameters
+
+##### account\_id
+
+[`AccountId`](../classes/AccountId.md)
+
+#### Returns
+
+[`AccountReader`](../classes/AccountReader.md)
+
+***
+
 ### addAccountSecretKeyToWebStore()
 
 > **addAccountSecretKeyToWebStore**(`account_id`, `secret_key`): `Promise`\<`void`\>
@@ -378,6 +409,10 @@ Uses an internal pagination mechanism to avoid fetching duplicate notes.
 
 > **getAccount**(`account_id`): `Promise`\<[`Account`](../classes/Account.md)\>
 
+Retrieves the full account data for the given account ID, returning `null` if not found.
+
+This method loads the complete account state including vault, storage, and code.
+
 #### Parameters
 
 ##### account\_id
@@ -411,6 +446,26 @@ Returns the associated [`AuthSecretKey`] if found, or an error if not found.
 
 ***
 
+### getAccountCode()
+
+> **getAccountCode**(`account_id`): `Promise`\<[`AccountCode`](../classes/AccountCode.md)\>
+
+Retrieves the account code for a specific account.
+
+Returns `null` if the account is not found.
+
+#### Parameters
+
+##### account\_id
+
+[`AccountId`](../classes/AccountId.md)
+
+#### Returns
+
+`Promise`\<[`AccountCode`](../classes/AccountCode.md)\>
+
+***
+
 ### getAccounts()
 
 > **getAccounts**(): `Promise`\<[`AccountHeader`](../classes/AccountHeader.md)[]\>
@@ -418,6 +473,46 @@ Returns the associated [`AuthSecretKey`] if found, or an error if not found.
 #### Returns
 
 `Promise`\<[`AccountHeader`](../classes/AccountHeader.md)[]\>
+
+***
+
+### getAccountStorage()
+
+> **getAccountStorage**(`account_id`): `Promise`\<[`AccountStorage`](../classes/AccountStorage.md)\>
+
+Retrieves the storage for a specific account.
+
+To only load a specific slot, use `accountReader` instead.
+
+#### Parameters
+
+##### account\_id
+
+[`AccountId`](../classes/AccountId.md)
+
+#### Returns
+
+`Promise`\<[`AccountStorage`](../classes/AccountStorage.md)\>
+
+***
+
+### getAccountVault()
+
+> **getAccountVault**(`account_id`): `Promise`\<[`AssetVault`](../classes/AssetVault.md)\>
+
+Retrieves the asset vault for a specific account.
+
+To check the balance for a single asset, use `accountReader` instead.
+
+#### Parameters
+
+##### account\_id
+
+[`AccountId`](../classes/AccountId.md)
+
+#### Returns
+
+`Promise`\<[`AssetVault`](../classes/AssetVault.md)\>
 
 ***
 

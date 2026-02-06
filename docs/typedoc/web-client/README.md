@@ -31,6 +31,8 @@
 - [AccountHeader](classes/AccountHeader.md)
 - [AccountId](classes/AccountId.md)
 - [AccountIdArray](classes/AccountIdArray.md)
+- [AccountReader](classes/AccountReader.md)
+- [AccountStatus](classes/AccountStatus.md)
 - [AccountStorage](classes/AccountStorage.md)
 - [AccountStorageDelta](classes/AccountStorageDelta.md)
 - [AccountStorageMode](classes/AccountStorageMode.md)

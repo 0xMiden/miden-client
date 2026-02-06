@@ -28,6 +28,7 @@ use miden_client::asset::{
 };
 use miden_client::auth::{AuthFalcon512Rpo, PublicKeyCommitment};
 use miden_client::store::Store;
+use miden_client::testing::common::ACCOUNT_ID_REGULAR;
 use miden_client::{EMPTY_WORD, ONE, ZERO};
 use miden_protocol::testing::account_id::{
     ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
@@ -277,6 +278,315 @@ async fn apply_account_delta_removals() -> anyhow::Result<()> {
         panic!("Expected map slot content");
     };
     assert_eq!(updated_map.entries().count(), 0);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn get_account_storage_item_success() -> anyhow::Result<()> {
+    let store = create_test_store().await;
+
+    let value_slot_name =
+        StorageSlotName::new("miden::testing::sqlite_store::value").expect("valid slot name");
+    let test_value: [miden_client::Felt; 4] = [ONE, ONE, ONE, ONE];
+
+    let dummy_component = AccountComponent::new(
+        basic_wallet_library(),
+        vec![StorageSlot::with_value(value_slot_name.clone(), test_value.into())],
+    )?
+    .with_supports_all_types();
+
+    let account = AccountBuilder::new([0; 32])
+        .account_type(AccountType::RegularAccountImmutableCode)
+        .with_auth_component(AuthFalcon512Rpo::new(PublicKeyCommitment::from(EMPTY_WORD)))
+        .with_component(dummy_component)
+        .build_existing()?;
+
+    let default_address = Address::new(account.id());
+    store.insert_account(&account, default_address).await?;
+
+    // Test get_account_storage_item
+    let result = store.get_account_storage_item(account.id(), value_slot_name).await?;
+
+    assert_eq!(result, test_value.into());
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn get_account_storage_item_not_found() -> anyhow::Result<()> {
+    let store = create_test_store().await;
+
+    let value_slot_name =
+        StorageSlotName::new("miden::testing::sqlite_store::value").expect("valid slot name");
+
+    let dummy_component = AccountComponent::new(
+        basic_wallet_library(),
+        vec![StorageSlot::with_empty_value(value_slot_name)],
+    )?
+    .with_supports_all_types();
+
+    let account = AccountBuilder::new([0; 32])
+        .account_type(AccountType::RegularAccountImmutableCode)
+        .with_auth_component(AuthFalcon512Rpo::new(PublicKeyCommitment::from(EMPTY_WORD)))
+        .with_component(dummy_component)
+        .build_existing()?;
+
+    let default_address = Address::new(account.id());
+    store.insert_account(&account, default_address).await?;
+
+    // Test get_account_storage_item with missing slot name
+    let missing_name =
+        StorageSlotName::new("miden::testing::sqlite_store::missing").expect("valid slot name");
+    let result = store.get_account_storage_item(account.id(), missing_name).await;
+
+    assert!(result.is_err());
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn get_account_map_item_success() -> anyhow::Result<()> {
+    let store = create_test_store().await;
+
+    let map_slot_name =
+        StorageSlotName::new("miden::testing::sqlite_store::map").expect("valid slot name");
+
+    let test_key: miden_client::Word = [ONE, ZERO, ZERO, ZERO].into();
+    let test_value: miden_client::Word = [ONE, ONE, ONE, ONE].into();
+
+    let mut storage_map = StorageMap::new();
+    storage_map.insert(test_key, test_value)?;
+
+    let dummy_component = AccountComponent::new(
+        basic_wallet_library(),
+        vec![StorageSlot::with_map(map_slot_name.clone(), storage_map)],
+    )?
+    .with_supports_all_types();
+
+    let account = AccountBuilder::new([0; 32])
+        .account_type(AccountType::RegularAccountImmutableCode)
+        .with_auth_component(AuthFalcon512Rpo::new(PublicKeyCommitment::from(EMPTY_WORD)))
+        .with_component(dummy_component)
+        .build_existing()?;
+
+    let default_address = Address::new(account.id());
+    store.insert_account(&account, default_address).await?;
+
+    // Test get_account_map_item
+    let (value, _witness) =
+        store.get_account_map_item(account.id(), map_slot_name, test_key).await?;
+
+    assert_eq!(value, test_value);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn get_account_map_item_value_slot_error() -> anyhow::Result<()> {
+    let store = create_test_store().await;
+
+    let value_slot_name =
+        StorageSlotName::new("miden::testing::sqlite_store::value").expect("valid slot name");
+
+    let dummy_component = AccountComponent::new(
+        basic_wallet_library(),
+        vec![StorageSlot::with_empty_value(value_slot_name.clone())],
+    )?
+    .with_supports_all_types();
+
+    let account = AccountBuilder::new([0; 32])
+        .account_type(AccountType::RegularAccountImmutableCode)
+        .with_auth_component(AuthFalcon512Rpo::new(PublicKeyCommitment::from(EMPTY_WORD)))
+        .with_component(dummy_component)
+        .build_existing()?;
+
+    let default_address = Address::new(account.id());
+    store.insert_account(&account, default_address).await?;
+
+    // Test get_account_map_item on a value slot (should error)
+    let test_key: miden_client::Word = [ONE, ZERO, ZERO, ZERO].into();
+    let result = store.get_account_map_item(account.id(), value_slot_name, test_key).await;
+
+    assert!(result.is_err());
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn get_account_code() -> anyhow::Result<()> {
+    let store = create_test_store().await;
+
+    let dummy_component =
+        AccountComponent::new(basic_wallet_library(), vec![])?.with_supports_all_types();
+
+    let account = AccountBuilder::new([0; 32])
+        .account_type(AccountType::RegularAccountImmutableCode)
+        .with_auth_component(AuthFalcon512Rpo::new(PublicKeyCommitment::from(EMPTY_WORD)))
+        .with_component(dummy_component)
+        .build_existing()?;
+
+    let default_address = Address::new(account.id());
+    store.insert_account(&account, default_address).await?;
+
+    let code = store.get_account_code(account.id()).await?;
+
+    assert!(code.is_some());
+    let code = code.unwrap();
+    assert_eq!(code.commitment(), account.code().commitment());
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn get_account_code_not_found() -> anyhow::Result<()> {
+    let store = create_test_store().await;
+
+    // Create a valid but non-existent account ID
+    let non_existent_id = AccountId::try_from(ACCOUNT_ID_REGULAR)?;
+
+    // Test get_account_code with non-existent account
+    let result = store.get_account_code(non_existent_id).await?;
+
+    assert!(result.is_none());
+
+    Ok(())
+}
+
+// ACCOUNT READER TESTS
+// ================================================================================================
+
+#[tokio::test]
+async fn account_reader_nonce_and_status() -> anyhow::Result<()> {
+    use std::sync::Arc;
+
+    use miden_client::account::AccountReader;
+
+    let store = Arc::new(create_test_store().await);
+
+    let dummy_component =
+        AccountComponent::new(basic_wallet_library(), vec![])?.with_supports_all_types();
+
+    let account = AccountBuilder::new([0; 32])
+        .account_type(AccountType::RegularAccountImmutableCode)
+        .with_auth_component(AuthFalcon512Rpo::new(PublicKeyCommitment::from(EMPTY_WORD)))
+        .with_component(dummy_component)
+        .build()?;
+
+    let default_address = Address::new(account.id());
+    store.insert_account(&account, default_address).await?;
+
+    // Create an AccountReader
+    let reader = AccountReader::new(store.clone(), account.id());
+
+    // Test nonce access
+    let nonce = reader.nonce().await?;
+    assert_eq!(nonce, account.nonce());
+
+    // Test status access
+    let status = reader.status().await?;
+    assert!(!status.is_locked());
+    assert!(status.seed().is_some()); // New account should have a seed
+
+    // Test commitment
+    let commitment = reader.commitment().await?;
+    assert_eq!(commitment, account.commitment());
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn account_reader_not_found_error() -> anyhow::Result<()> {
+    use std::sync::Arc;
+
+    use miden_client::account::AccountReader;
+
+    let store = Arc::new(create_test_store().await);
+
+    // Create a valid but non-existent account ID
+    let non_existent_id = AccountId::try_from(ACCOUNT_ID_REGULAR)?;
+
+    // Create an AccountReader for non-existent account
+    let reader = AccountReader::new(store.clone(), non_existent_id);
+
+    // Test that header-based methods return AccountDataNotFound error
+    let result = reader.nonce().await;
+    assert!(result.is_err());
+    assert!(matches!(result.unwrap_err(), miden_client::ClientError::AccountDataNotFound(_)));
+
+    // Test that status() returns AccountDataNotFound error
+    let result = reader.status().await;
+    assert!(result.is_err());
+    assert!(matches!(result.unwrap_err(), miden_client::ClientError::AccountDataNotFound(_)));
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn account_reader_storage_access() -> anyhow::Result<()> {
+    use std::sync::Arc;
+
+    use miden_client::account::AccountReader;
+
+    let store = Arc::new(create_test_store().await);
+
+    let value_slot_name =
+        StorageSlotName::new("miden::testing::sqlite_store::value").expect("valid slot name");
+    let test_value: [miden_client::Felt; 4] = [ONE, ONE, ONE, ONE];
+
+    let dummy_component = AccountComponent::new(
+        basic_wallet_library(),
+        vec![StorageSlot::with_value(value_slot_name.clone(), test_value.into())],
+    )?
+    .with_supports_all_types();
+
+    let account = AccountBuilder::new([0; 32])
+        .account_type(AccountType::RegularAccountImmutableCode)
+        .with_auth_component(AuthFalcon512Rpo::new(PublicKeyCommitment::from(EMPTY_WORD)))
+        .with_component(dummy_component)
+        .build_existing()?;
+
+    let default_address = Address::new(account.id());
+    store.insert_account(&account, default_address).await?;
+
+    // Create an AccountReader
+    let reader = AccountReader::new(store.clone(), account.id());
+
+    // Test storage access via integrated method
+    let result = reader.get_storage_item(value_slot_name).await?;
+
+    assert_eq!(result, test_value.into());
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn account_reader_addresses_access() -> anyhow::Result<()> {
+    use std::sync::Arc;
+
+    use miden_client::account::AccountReader;
+
+    let store = Arc::new(create_test_store().await);
+
+    let dummy_component =
+        AccountComponent::new(basic_wallet_library(), vec![])?.with_supports_all_types();
+
+    let account = AccountBuilder::new([0; 32])
+        .account_type(AccountType::RegularAccountImmutableCode)
+        .with_auth_component(AuthFalcon512Rpo::new(PublicKeyCommitment::from(EMPTY_WORD)))
+        .with_component(dummy_component)
+        .build_existing()?;
+
+    let default_address = Address::new(account.id());
+    store.insert_account(&account, default_address.clone()).await?;
+
+    // Create an AccountReader
+    let reader = AccountReader::new(store.clone(), account.id());
+
+    // Test addresses access
+    let addresses = reader.addresses().await?;
+    assert_eq!(addresses.len(), 1);
+    assert_eq!(addresses[0], default_address);
 
     Ok(())
 }

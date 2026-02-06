@@ -114,12 +114,12 @@ async fn list_all_addresses<AUTH>(
     println!("Listing addresses for all accounts:\n");
     let accounts = client.get_account_headers().await?;
     for (acc_header, _) in accounts {
-        let account_record = client
-            .get_account(acc_header.id())
-            .await?
+        let addresses = client
+            .account_reader(acc_header.id())
+            .addresses()
+            .await
             .expect("account is expected to exist if retrieved");
-        let addresses = account_record.addresses();
-        print_account_addresses(&acc_header.id().to_string(), addresses, &network_id);
+        print_account_addresses(&acc_header.id().to_string(), &addresses, &network_id);
         println!();
     }
     Ok(())
@@ -131,14 +131,9 @@ async fn list_account_addresses<AUTH>(
     network_id: NetworkId,
 ) -> Result<(), CliError> {
     let id = parse_account_id(&client, account_id).await?;
-    let addresses = match client.get_account(id).await? {
-        Some(account) => account.addresses().clone(),
-        _ => {
-            return Err(CliError::Input(format!(
-                "The account with id `{account_id}` does not exist",
-            )));
-        },
-    };
+    let addresses = client.account_reader(id).addresses().await.map_err(|_| {
+        CliError::Input(format!("The account with id `{account_id}` does not exist"))
+    })?;
 
     print_account_addresses(&id.to_hex(), &addresses, &network_id);
     Ok(())
