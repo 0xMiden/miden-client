@@ -1,4 +1,7 @@
 {
+  "scripts": {
+    "check:sync:react-sdk": "node scripts/check-react-sdk-sync.js"
+  },
   "dependencies": {
     "prettier": "^3.6.2"
   },

@@ -70,6 +70,10 @@ typos-check: ## Run typos to check for spelling mistakes
 rust-client-ts-lint:
 	cd crates/idxdb-store/src && yarn && yarn lint
 
+.PHONY: react-sdk-lint
+react-sdk-lint: ## Run lint for the React SDK
+	cd packages/react-sdk && yarn && yarn lint
+
 # --- Documentation -------------------------------------------------------------------------------
 
 .PHONY: doc
@@ -100,6 +104,10 @@ test: ## Run tests
 .PHONY: test-docs
 test-docs: ## Run documentation tests
 	cargo test --doc $(FEATURES_CLIENT)
+
+.PHONY: test-react-sdk
+test-react-sdk: ## Run React SDK unit tests
+	cd packages/react-sdk && yarn && yarn test:unit
 
 # --- Integration testing -------------------------------------------------------------------------
 
@@ -197,6 +205,11 @@ build-wasm: rust-client-ts-build ## Build the wasm packages (web client and idxd
 .PHONY: rust-client-ts-build
 rust-client-ts-build:
 	cd crates/idxdb-store/src && yarn && yarn build
+
+.PHONY: build-react-sdk
+build-react-sdk: ## Build the React SDK package
+	cd crates/web-client && yarn && yarn build
+	cd packages/react-sdk && yarn && yarn build
 
 # --- Check ---------------------------------------------------------------------------------------
 

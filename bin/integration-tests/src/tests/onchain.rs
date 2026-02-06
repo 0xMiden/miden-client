@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use miden_client::EMPTY_WORD;
-use miden_client::account::{Account, AccountStorageMode, build_wallet_id};
+use miden_client::account::{AccountStorageMode, build_wallet_id};
 use miden_client::asset::{Asset, FungibleAsset};
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
 use miden_client::note::{NoteFile, NoteType};
@@ -211,12 +211,14 @@ pub async fn test_onchain_accounts(client_config: ClientConfig) -> Result<()> {
     client_2.sync_state().await?;
 
     let (client_1_faucet, _) = client_1
-        .get_account_header_by_id(faucet_account_header.id())
-        .await?
+        .account_reader(faucet_account_header.id())
+        .header()
+        .await
         .context("failed to find faucet account in client 1 after sync")?;
     let (client_2_faucet, _) = client_2
-        .get_account_header_by_id(faucet_account_header.id())
-        .await?
+        .account_reader(faucet_account_header.id())
+        .header()
+        .await
         .context("failed to find faucet account in client 2 after sync")?;
 
     assert_eq!(client_1_faucet.commitment(), client_2_faucet.commitment());
@@ -252,14 +254,18 @@ pub async fn test_onchain_accounts(client_config: ClientConfig) -> Result<()> {
     )
     .await;
 
-    let (client_1_faucet, _) = client_1
-        .get_account_header_by_id(faucet_account_header.id())
-        .await?
-        .context("failed to find faucet account in client 1 after consume transactions")?;
-    let (client_2_faucet, _) = client_2
-        .get_account_header_by_id(faucet_account_header.id())
-        .await?
-        .context("failed to find faucet account in client 2 after consume transactions")?;
+    let (client_1_faucet, _) =
+        client_1
+            .account_reader(faucet_account_header.id())
+            .header()
+            .await
+            .context("failed to find faucet account in client 1 after consume transactions")?;
+    let (client_2_faucet, _) =
+        client_2
+            .account_reader(faucet_account_header.id())
+            .header()
+            .await
+            .context("failed to find faucet account in client 2 after consume transactions")?;
 
     assert_eq!(client_1_faucet.commitment(), client_2_faucet.commitment());
 
@@ -268,18 +274,16 @@ pub async fn test_onchain_accounts(client_config: ClientConfig) -> Result<()> {
     let to_account_id = second_client_target_account_id;
 
     // get initial balances
-    let account_client_1: Account = client_1
-        .get_account(from_account_id)
-        .await?
-        .context("failed to find from account for balance check")?
-        .try_into()?;
-    let from_account_balance = account_client_1.vault().get_balance(faucet_account_id).unwrap_or(0);
-    let account_client_2: Account = client_2
-        .get_account(to_account_id)
-        .await?
-        .context("failed to find from account for balance check")?
-        .try_into()?;
-    let to_account_balance = account_client_2.vault().get_balance(faucet_account_id).unwrap_or(0);
+    let from_account_balance = client_1
+        .account_reader(from_account_id)
+        .get_balance(faucet_account_id)
+        .await
+        .context("failed to find from account for balance check")?;
+    let to_account_balance = client_2
+        .account_reader(to_account_id)
+        .get_balance(faucet_account_id)
+        .await
+        .context("failed to find to account for balance check")?;
 
     let asset = FungibleAsset::new(faucet_account_id, TRANSFER_AMOUNT)?;
 
@@ -316,20 +320,16 @@ pub async fn test_onchain_accounts(client_config: ClientConfig) -> Result<()> {
         .with_context(|| format!("input note {} not found", notes[0].id()))?;
     assert!(matches!(input_note.state(), InputNoteState::ConsumedExternal { .. }));
 
-    let account_client_1: Account = client_1
-        .get_account(from_account_id)
-        .await?
-        .context("failed to find from account after transfer")?
-        .try_into()?;
-    let new_from_account_balance =
-        account_client_1.vault().get_balance(faucet_account_id).unwrap_or(0);
-    let account_client_2: Account = client_2
-        .get_account(to_account_id)
-        .await?
-        .context("failed to find from account after transfer")?
-        .try_into()?;
-    let new_to_account_balance =
-        account_client_2.vault().get_balance(faucet_account_id).unwrap_or(0);
+    let new_from_account_balance = client_1
+        .account_reader(from_account_id)
+        .get_balance(faucet_account_id)
+        .await
+        .context("failed to find from account after transfer")?;
+    let new_to_account_balance = client_2
+        .account_reader(to_account_id)
+        .get_balance(faucet_account_id)
+        .await
+        .context("failed to find to account after transfer")?;
 
     assert_eq!(new_from_account_balance, from_account_balance - TRANSFER_AMOUNT);
     assert_eq!(new_to_account_balance, to_account_balance + TRANSFER_AMOUNT);
@@ -385,15 +385,21 @@ pub async fn test_import_account_by_id(client_config: ClientConfig) -> Result<()
     client_2.import_account_by_id(built_wallet_id).await?;
     keystore_2.add_key(&secret_key)?;
 
-    let original_account =
-        client_1.get_account(first_regular_account.id()).await?.with_context(|| {
+    let original_commitment = client_1
+        .account_reader(first_regular_account.id())
+        .commitment()
+        .await
+        .with_context(|| {
             format!("Original account {} not found in client_1", first_regular_account.id())
         })?;
-    let imported_account =
-        client_2.get_account(first_regular_account.id()).await?.with_context(|| {
+    let imported_commitment = client_2
+        .account_reader(first_regular_account.id())
+        .commitment()
+        .await
+        .with_context(|| {
             format!("Imported account {} not found in client_2", first_regular_account.id())
         })?;
-    assert_eq!(imported_account.commitment(), original_account.commitment());
+    assert_eq!(imported_commitment, original_commitment);
 
     // Now use the wallet in the second client to consume the generated note
     println!("Second client consuming note");
@@ -422,7 +428,7 @@ pub async fn test_incorrect_genesis(client_config: ClientConfig) -> Result<()> {
     let result = client.test_rpc_api().get_block_header_by_number(None, false).await;
 
     match result {
-        Err(RpcError::AcceptHeaderError(AcceptHeaderError::NoSupportedMediaRange)) => Ok(()),
+        Err(RpcError::AcceptHeaderError(AcceptHeaderError::NoSupportedMediaRange(_))) => Ok(()),
         Ok(_) => anyhow::bail!("grpc request was unexpectedly successful"),
         _ => anyhow::bail!("expected accept header error"),
     }
