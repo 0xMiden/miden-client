@@ -14,7 +14,7 @@ use thiserror::Error;
 use super::NodeRpcClientEndpoint;
 
 pub mod node;
-pub use node::NodeRpcError;
+pub use node::EndpointError;
 
 // RPC ERROR
 // ================================================================================================
@@ -38,7 +38,7 @@ pub enum RpcError {
     GrpcError {
         endpoint: NodeRpcClientEndpoint,
         error_kind: GrpcError,
-        node_error: Option<NodeRpcError>,
+        node_error: Option<EndpointError>,
         #[source]
         source: Option<Box<dyn Error + Send + Sync + 'static>>,
     },
