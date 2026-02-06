@@ -40,6 +40,41 @@
 
 ***
 
+### accountReader()
+
+> **accountReader**(`account_id`): [`AccountReader`](AccountReader.md)
+
+Creates a new `AccountReader` for lazy access to account data.
+
+The `AccountReader` executes queries lazily - each method call fetches fresh data
+from storage, ensuring you always see the current state.
+
+# Arguments
+* `account_id` - The ID of the account to read.
+
+# Example
+```javascript
+const reader = client.accountReader(accountId);
+const nonce = await reader.nonce();
+const balance = await reader.getBalance(faucetId);
+```
+
+#### Parameters
+
+##### account\_id
+
+[`AccountId`](AccountId.md)
+
+#### Returns
+
+[`AccountReader`](AccountReader.md)
+
+#### Inherited from
+
+[`WebClient`](WebClient.md).[`accountReader`](WebClient.md#accountreader)
+
+***
+
 ### addAccountSecretKeyToWebStore()
 
 > **addAccountSecretKeyToWebStore**(`account_id`, `secret_key`): `Promise`\<`void`\>
@@ -476,6 +511,10 @@ Uses an internal pagination mechanism to avoid fetching duplicate notes.
 
 > **getAccount**(`account_id`): `Promise`\<[`Account`](Account.md)\>
 
+Retrieves the full account data for the given account ID, returning `null` if not found.
+
+This method loads the complete account state including vault, storage, and code.
+
 #### Parameters
 
 ##### account\_id
@@ -517,6 +556,30 @@ Returns the associated [`AuthSecretKey`] if found, or an error if not found.
 
 ***
 
+### getAccountCode()
+
+> **getAccountCode**(`account_id`): `Promise`\<[`AccountCode`](AccountCode.md)\>
+
+Retrieves the account code for a specific account.
+
+Returns `null` if the account is not found.
+
+#### Parameters
+
+##### account\_id
+
+[`AccountId`](AccountId.md)
+
+#### Returns
+
+`Promise`\<[`AccountCode`](AccountCode.md)\>
+
+#### Inherited from
+
+[`WebClient`](WebClient.md).[`getAccountCode`](WebClient.md#getaccountcode)
+
+***
+
 ### getAccounts()
 
 > **getAccounts**(): `Promise`\<[`AccountHeader`](AccountHeader.md)[]\>
@@ -528,6 +591,54 @@ Returns the associated [`AuthSecretKey`] if found, or an error if not found.
 #### Inherited from
 
 [`WebClient`](WebClient.md).[`getAccounts`](WebClient.md#getaccounts)
+
+***
+
+### getAccountStorage()
+
+> **getAccountStorage**(`account_id`): `Promise`\<[`AccountStorage`](AccountStorage.md)\>
+
+Retrieves the storage for a specific account.
+
+To only load a specific slot, use `accountReader` instead.
+
+#### Parameters
+
+##### account\_id
+
+[`AccountId`](AccountId.md)
+
+#### Returns
+
+`Promise`\<[`AccountStorage`](AccountStorage.md)\>
+
+#### Inherited from
+
+[`WebClient`](WebClient.md).[`getAccountStorage`](WebClient.md#getaccountstorage)
+
+***
+
+### getAccountVault()
+
+> **getAccountVault**(`account_id`): `Promise`\<[`AssetVault`](AssetVault.md)\>
+
+Retrieves the asset vault for a specific account.
+
+To check the balance for a single asset, use `accountReader` instead.
+
+#### Parameters
+
+##### account\_id
+
+[`AccountId`](AccountId.md)
+
+#### Returns
+
+`Promise`\<[`AssetVault`](AssetVault.md)\>
+
+#### Inherited from
+
+[`WebClient`](WebClient.md).[`getAccountVault`](WebClient.md#getaccountvault)
 
 ***
 
@@ -1014,37 +1125,6 @@ Returns all the existing setting keys from the store.
 
 ***
 
-### newStorageReader()
-
-> **newStorageReader**(`account_id`): [`StorageReader`](StorageReader.md)
-
-Returns a [`StorageReader`] for reading storage slots of the specified account.
-
-The `StorageReader` provides lazy access to storage - each method call fetches
-only the requested slot from storage.
-
-# Arguments
-* `account_id` - The ID of the account to read storage from.
-
-# Errors
-Returns an error if the client is not initialized.
-
-#### Parameters
-
-##### account\_id
-
-[`AccountId`](AccountId.md)
-
-#### Returns
-
-[`StorageReader`](StorageReader.md)
-
-#### Inherited from
-
-[`WebClient`](WebClient.md).[`newStorageReader`](WebClient.md#newstoragereader)
-
-***
-
 ### newSwapTransactionRequest()
 
 > **newSwapTransactionRequest**(`sender_account_id`, `offered_asset_faucet_id`, `offered_asset_amount`, `requested_asset_faucet_id`, `requested_asset_amount`, `note_type`, `payback_note_type`): [`TransactionRequest`](TransactionRequest.md)
@@ -1519,11 +1599,30 @@ A promise that resolves to a SyncSummary with the sync results.
 
 > **terminate**(): `void`
 
-Terminates the underlying worker.
+Terminates the underlying Web Worker used by this WebClient instance.
+
+Call this method when you're done using a WebClient to free up browser
+resources.
+
+After calling terminate(), the WebClient instance should not be used for
+any further operations that require the worker.
 
 #### Returns
 
 `void`
+
+#### Example
+
+```typescript
+// Create a client
+const client = await WebClient.createClient(rpcUrl);
+
+// Use the client...
+await client.syncState();
+
+// Clean up when done
+client.terminate();
+```
 
 #### Inherited from
 

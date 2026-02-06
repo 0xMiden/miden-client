@@ -67,6 +67,7 @@ mod errors;
 pub use errors::*;
 
 mod endpoint;
+pub use domain::limits::RpcLimits;
 pub use domain::status::RpcStatusInfo;
 pub use endpoint::Endpoint;
 
@@ -94,15 +95,6 @@ pub enum AccountStateAt {
     /// Gets the state at a specific block number
     Block(BlockNumber),
 }
-
-// RPC ENDPOINT LIMITS
-// ================================================================================================
-
-// TODO: We need a better structured way of getting limits as defined by the node (#1139)
-pub const NOTE_IDS_LIMIT: usize = 100;
-pub const NULLIFIER_PREFIXES_LIMIT: usize = 1000;
-pub const ACCOUNT_ID_LIMIT: usize = 1000;
-pub const NOTE_TAG_LIMIT: usize = 1000;
 
 // NODE RPC CLIENT TRAIT
 // ================================================================================================
@@ -391,6 +383,12 @@ pub trait NodeRpcClient: Send + Sync {
     /// Errors:
     /// - [`RpcError::ExpectedDataMissing`] if the note with the specified root is not found.
     async fn get_network_id(&self) -> Result<NetworkId, RpcError>;
+
+    /// Fetches the RPC limits configured on the node.
+    ///
+    /// Returns the limits that define the maximum number of items that can be sent in a single
+    /// RPC request. If the request fails for any reason, default values are returned.
+    async fn get_rpc_limits(&self) -> RpcLimits;
 }
 
 // RPC API ENDPOINT
@@ -413,6 +411,7 @@ pub enum NodeRpcClientEndpoint {
     SyncStorageMaps,
     SyncAccountVault,
     SyncTransactions,
+    GetLimits,
 }
 
 impl fmt::Display for NodeRpcClientEndpoint {
@@ -436,6 +435,7 @@ impl fmt::Display for NodeRpcClientEndpoint {
             NodeRpcClientEndpoint::SyncStorageMaps => write!(f, "sync_storage_maps"),
             NodeRpcClientEndpoint::SyncAccountVault => write!(f, "sync_account_vault"),
             NodeRpcClientEndpoint::SyncTransactions => write!(f, "sync_transactions"),
+            NodeRpcClientEndpoint::GetLimits => write!(f, "get_limits"),
         }
     }
 }

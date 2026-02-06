@@ -171,16 +171,12 @@ pub async fn test_multiple_tx_on_same_block(client_config: ClientConfig) -> Resu
     let note = client.get_output_note(note_id).await.unwrap().unwrap();
     assert!(matches!(note.state(), OutputNoteState::CommittedFull { .. }));
 
-    let sender_account: Account = client
-        .get_account(from_account_id)
-        .await?
-        .context("failed to find sender account after transactions")?
-        .try_into()
-        .unwrap();
-    assert_eq!(
-        sender_account.vault().get_balance(faucet_account_id).unwrap(),
-        MINT_AMOUNT - (TRANSFER_AMOUNT * 2)
-    );
+    let sender_balance = client
+        .account_reader(from_account_id)
+        .get_balance(faucet_account_id)
+        .await
+        .context("failed to find sender account after transactions")?;
+    assert_eq!(sender_balance, MINT_AMOUNT - (TRANSFER_AMOUNT * 2));
     Ok(())
 }
 
@@ -1047,8 +1043,8 @@ pub async fn test_discarded_transaction(client_config: ClientConfig) -> Result<(
     let tx_id = transaction_result.id();
 
     // Store the account state before applying the transaction
-    let account_before_tx = client_1.get_account(from_account_id).await.unwrap().unwrap();
-    let account_hash_before_tx = account_before_tx.commitment();
+    let account_hash_before_tx =
+        client_1.account_reader(from_account_id).commitment().await.unwrap();
 
     // Apply the transaction
     let submission_height = client_1.get_sync_height().await.unwrap();
@@ -1058,8 +1054,8 @@ pub async fn test_discarded_transaction(client_config: ClientConfig) -> Result<(
         .unwrap();
 
     // Check that the account state has changed after applying the transaction
-    let account_after_tx = client_1.get_account(from_account_id).await.unwrap().unwrap();
-    let account_hash_after_tx = account_after_tx.commitment();
+    let account_hash_after_tx =
+        client_1.account_reader(from_account_id).commitment().await.unwrap();
 
     assert_ne!(
         account_hash_before_tx, account_hash_after_tx,
@@ -1094,8 +1090,8 @@ pub async fn test_discarded_transaction(client_config: ClientConfig) -> Result<(
     ));
 
     // Check that the account state has been rolled back after the transaction was discarded
-    let account_after_sync = client_1.get_account(from_account_id).await.unwrap().unwrap();
-    let account_hash_after_sync = account_after_sync.commitment();
+    let account_hash_after_sync =
+        client_1.account_reader(from_account_id).commitment().await.unwrap();
 
     assert_ne!(
         account_hash_after_sync, account_hash_after_tx,
@@ -1196,13 +1192,9 @@ pub async fn test_locked_account(client_config: ClientConfig) -> Result<()> {
             .await;
     wait_for_tx(&mut client_1, tx_id).await?;
 
-    let private_account: Account = client_1
-        .get_account(from_account_id)
-        .await
-        .unwrap()
-        .unwrap()
-        .try_into()
-        .unwrap();
+    // Get full account from store for export to client_2
+    let private_account: Account =
+        client_1.get_account(from_account_id).await?.context("Account not found")?;
 
     let original_seed = private_account.seed();
 
@@ -1216,8 +1208,7 @@ pub async fn test_locked_account(client_config: ClientConfig) -> Result<()> {
     wait_for_node(&mut client_2).await;
 
     // When imported the account shouldn't be locked
-    let account_record = client_2.get_account(from_account_id).await.unwrap().unwrap();
-    assert!(!account_record.is_locked());
+    assert!(!client_2.account_reader(from_account_id).status().await.unwrap().is_locked());
 
     // Consume note with private account in client 1
     let tx_id =
@@ -1228,24 +1219,18 @@ pub async fn test_locked_account(client_config: ClientConfig) -> Result<()> {
     // After sync the private account should be locked in client 2
     let summary = client_2.sync_state().await.unwrap();
     assert!(summary.locked_accounts.contains(&from_account_id));
-    let account_record = client_2.get_account(from_account_id).await.unwrap().unwrap();
-    assert!(account_record.is_locked());
-    assert_eq!(account_record.status().seed().copied(), original_seed);
+    let status = client_2.account_reader(from_account_id).status().await.unwrap();
+    assert!(status.is_locked());
+    assert_eq!(status.seed(), original_seed.as_ref());
 
     // Get updated account from client 1 and import it in client 2 with `overwrite` flag
-    let updated_private_account = client_1
-        .get_account(from_account_id)
-        .await
-        .unwrap()
-        .unwrap()
-        .try_into()
-        .unwrap();
+    let updated_private_account: Account =
+        client_1.get_account(from_account_id).await?.context("Account not found")?;
     client_2.add_account(&updated_private_account, true).await.unwrap();
 
     // After sync the private account shouldn't be locked in client 2
     client_2.sync_state().await.unwrap();
-    let account_record = client_2.get_account(from_account_id).await.unwrap().unwrap();
-    assert!(!account_record.is_locked());
+    assert!(!client_2.account_reader(from_account_id).status().await.unwrap().is_locked());
     Ok(())
 }
 
