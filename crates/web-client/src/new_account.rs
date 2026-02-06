@@ -181,7 +181,10 @@ impl WebClient {
         let native_secret_key: AuthSecretKey = secret_key.into();
         let native_account_id = account_id.into();
 
-        keystore.add_secret_key(&native_secret_key).await.map_err(|err| err.to_string())?;
+        keystore
+            .add_secret_key(&native_secret_key)
+            .await
+            .map_err(|err| err.to_string())?;
 
         if let Some(client) = self.get_mut_inner() {
             client
