@@ -8,11 +8,21 @@ use miden_protocol::crypto::merkle::mmr::{Forest, InOrderIndex, MmrPeaks, Partia
 use tracing::warn;
 
 use crate::rpc::NodeRpcClient;
-use crate::store::StoreError;
+use crate::store::{BlockRelevance, StoreError};
 use crate::{Client, ClientError};
 
 /// Network information management methods.
 impl<AUTH> Client<AUTH> {
+    /// Retrieves a block header by its block number from the store.
+    ///
+    /// Returns `None` if the block header is not found in the store.
+    pub async fn get_block_header_by_num(
+        &self,
+        block_num: BlockNumber,
+    ) -> Result<Option<(BlockHeader, BlockRelevance)>, ClientError> {
+        self.store.get_block_header_by_num(block_num).await.map_err(Into::into)
+    }
+
     /// Attempts to retrieve the genesis block from the store. If not found,
     /// it requests it from the node and store it.
     pub async fn ensure_genesis_in_place(&mut self) -> Result<BlockHeader, ClientError> {

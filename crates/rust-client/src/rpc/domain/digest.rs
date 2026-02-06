@@ -1,5 +1,4 @@
 use alloc::string::String;
-use alloc::vec::Vec;
 use core::fmt::{self, Debug, Display, Formatter};
 
 use hex::ToHex;
@@ -36,21 +35,23 @@ impl ToHex for &proto::primitives::Digest {
 
 impl ToHex for proto::primitives::Digest {
     fn encode_hex<T: FromIterator<char>>(&self) -> T {
-        let mut data: Vec<char> = Vec::with_capacity(Word::SERIALIZED_SIZE);
-        data.extend(format!("{:016x}", self.d0).chars());
-        data.extend(format!("{:016x}", self.d1).chars());
-        data.extend(format!("{:016x}", self.d2).chars());
-        data.extend(format!("{:016x}", self.d3).chars());
-        data.into_iter().collect()
+        const HEX_LOWER: [char; 16] =
+            ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'];
+        [self.d0, self.d1, self.d2, self.d3]
+            .into_iter()
+            .flat_map(u64::to_be_bytes)
+            .flat_map(|b| [HEX_LOWER[(b >> 4) as usize], HEX_LOWER[(b & 0xf) as usize]])
+            .collect()
     }
 
     fn encode_hex_upper<T: FromIterator<char>>(&self) -> T {
-        let mut data: Vec<char> = Vec::with_capacity(Word::SERIALIZED_SIZE);
-        data.extend(format!("{:016X}", self.d0).chars());
-        data.extend(format!("{:016X}", self.d1).chars());
-        data.extend(format!("{:016X}", self.d2).chars());
-        data.extend(format!("{:016X}", self.d3).chars());
-        data.into_iter().collect()
+        const HEX_UPPER: [char; 16] =
+            ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'];
+        [self.d0, self.d1, self.d2, self.d3]
+            .into_iter()
+            .flat_map(u64::to_be_bytes)
+            .flat_map(|b| [HEX_UPPER[(b >> 4) as usize], HEX_UPPER[(b & 0xf) as usize]])
+            .collect()
     }
 }
 

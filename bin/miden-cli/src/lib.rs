@@ -19,6 +19,7 @@ use commands::clear_config::ClearConfigCmd;
 use commands::exec::ExecCmd;
 use commands::export::ExportCmd;
 use commands::import::ImportCmd;
+use commands::info::InfoCmd;
 use commands::init::InitCmd;
 use commands::new_account::{NewAccountCmd, NewWalletCmd};
 use commands::new_transactions::{ConsumeNotesCmd, MintCmd, SendCmd, SwapCmd};
@@ -388,7 +389,7 @@ pub enum Command {
     Notes(NotesCmd),
     Sync(SyncCmd),
     /// View a summary of the current client state.
-    Info,
+    Info(InfoCmd),
     Tags(TagsCmd),
     Address(AddressCmd),
     #[command(name = "tx")]
@@ -451,7 +452,7 @@ impl Cli {
             },
             Command::Import(import) => import.execute(client, keystore).await,
             Command::Init(_) | Command::ClearConfig(_) => Ok(()), // Already handled earlier
-            Command::Info => info::print_client_info(&client).await,
+            Command::Info(info_cmd) => info::print_client_info(&client, info_cmd.rpc_status).await,
             Command::Notes(notes) => Box::pin(notes.execute(client)).await,
             Command::Sync(sync) => sync.execute(client).await,
             Command::Tags(tags) => tags.execute(client).await,
