@@ -294,7 +294,7 @@ use alloc::sync::Arc;
 use miden_protocol::crypto::rand::FeltRng;
 use miden_tx::auth::TransactionAuthenticator;
 use rand::RngCore;
-use rpc::{NodeRpcClient, RpcLimits};
+use rpc::NodeRpcClient;
 use store::Store;
 
 use crate::note_transport::NoteTransportClient;
@@ -393,33 +393,9 @@ impl<AUTH> Client<AUTH> {
     // LIMITS
     // --------------------------------------------------------------------------------------------
 
-    /// Returns the RPC limits, loading from the store if available or fetching from the node
-    /// and persisting the result.
-    ///
-    /// If limits cant be fetched from the node, the default values are returned.
-    pub async fn get_rpc_limits(&self) -> Result<RpcLimits, ClientError> {
-        // Try to get limits from the local store first.
-        match self.store.get_rpc_limits().await? {
-            Some(limits) => Ok(limits),
-            None => {
-                // Try to fetch from the node if not present in the store.
-                match self.rpc_api.get_rpc_limits().await {
-                    Ok(fetched_limits) => {
-                        self.store.set_rpc_limits(fetched_limits).await?;
-                        Ok(fetched_limits)
-                    },
-                    Err(_) => {
-                        // If node fetch fails, return default limits.
-                        Ok(RpcLimits::default())
-                    },
-                }
-            },
-        }
-    }
-
     /// Checks if the note tag limit has been exceeded.
     pub async fn check_note_tag_limit(&self) -> Result<(), ClientError> {
-        let limits = self.get_rpc_limits().await?;
+        let limits = self.rpc_api.get_rpc_limits().await?;
         if self.store.get_unique_note_tags().await?.len() >= limits.note_tags_limit {
             return Err(ClientError::NoteTagsLimitExceeded(limits.note_tags_limit));
         }
@@ -428,7 +404,7 @@ impl<AUTH> Client<AUTH> {
 
     /// Checks if the account limit has been exceeded.
     pub async fn check_account_limit(&self) -> Result<(), ClientError> {
-        let limits = self.get_rpc_limits().await?;
+        let limits = self.rpc_api.get_rpc_limits().await?;
         if self.store.get_account_ids().await?.len() >= limits.account_ids_limit {
             return Err(ClientError::AccountsLimitExceeded(limits.account_ids_limit));
         }

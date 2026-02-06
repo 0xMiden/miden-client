@@ -292,17 +292,6 @@ impl GrpcClient {
         }
         Ok(slots)
     }
-
-    /// Fetches the RPC limits from the node.
-    async fn fetch_rpc_limits(&self) -> Result<RpcLimits, RpcError> {
-        let mut rpc_api = self.ensure_connected().await?;
-
-        let response = rpc_api.get_limits(()).await.map_err(|status| {
-            self.rpc_error_from_status(NodeRpcClientEndpoint::GetLimits, status)
-        })?;
-
-        RpcLimits::try_from(response.into_inner()).map_err(RpcError::from)
-    }
 }
 
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
@@ -927,9 +916,20 @@ impl NodeRpcClient for GrpcClient {
             return Ok(limits);
         }
 
-        let limits = self.fetch_rpc_limits().await?;
+        // Fetch limits from the node
+        let mut rpc_api = self.ensure_connected().await?;
+        let response = rpc_api.get_limits(()).await.map_err(|status| {
+            self.rpc_error_from_status(NodeRpcClientEndpoint::GetLimits, status)
+        })?;
+        let limits = RpcLimits::try_from(response.into_inner()).map_err(RpcError::from)?;
+
+        // Cache fetched values
         self.limits.write().replace(limits);
         Ok(limits)
+    }
+
+    async fn set_rpc_limits(&self, limits: RpcLimits) {
+        self.limits.write().replace(limits);
     }
 }
 

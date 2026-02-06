@@ -758,6 +758,10 @@ impl NodeRpcClient for MockRpcApi {
     async fn get_rpc_limits(&self) -> Result<crate::rpc::RpcLimits, RpcError> {
         Ok(crate::rpc::RpcLimits::default())
     }
+
+    async fn set_rpc_limits(&self, _limits: crate::rpc::RpcLimits) {
+        // Not needed for mock client
+    }
 }
 
 // CONVERSIONS

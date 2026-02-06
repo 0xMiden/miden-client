@@ -423,10 +423,10 @@ where
             rpc_api.set_genesis_commitment(genesis.commitment()).await?;
         }
 
-        // Fetch and persist RPC limits if not already stored.
-        if store.get_rpc_limits().await?.is_none()
-            && let Ok(limits) = rpc_api.get_rpc_limits().await
-        {
+        // Set the RPC client with persisted limits if available.
+        if let Some(limits) = store.get_rpc_limits().await? {
+            rpc_api.set_rpc_limits(limits).await;
+        } else if let Ok(limits) = rpc_api.get_rpc_limits().await {
             store.set_rpc_limits(limits).await?;
         }
 
