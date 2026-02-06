@@ -1,3 +1,9 @@
 mod large_account;
 
-pub use large_account::{LargeAccountConfig, create_large_account, generate_reader_component_code};
+pub use large_account::{
+    LargeAccountConfig,
+    create_large_account,
+    generate_reader_component_code,
+    random_word,
+    slot_rng,
+};

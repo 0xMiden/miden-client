@@ -9,21 +9,12 @@ pub struct BenchConfig {
     pub network: Endpoint,
     /// Number of benchmark iterations
     pub iterations: usize,
-    /// Number of storage maps in the account
-    pub maps: usize,
-    /// Number of key/value entries per storage map
-    pub entries_per_map: usize,
 }
 
 impl BenchConfig {
     /// Creates a new benchmark configuration
-    pub fn new(network: Endpoint, iterations: usize, maps: usize, entries_per_map: usize) -> Self {
-        Self {
-            network,
-            iterations,
-            maps,
-            entries_per_map,
-        }
+    pub fn new(network: Endpoint, iterations: usize) -> Self {
+        Self { network, iterations }
     }
 
     /// Returns a temporary directory for benchmark artifacts

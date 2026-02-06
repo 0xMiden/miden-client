@@ -17,12 +17,19 @@ impl BenchmarkRunner {
     pub async fn run_transaction_benchmarks(
         &mut self,
         account_id: String,
-        seed: [u8; 32],
+        seed: Option<[u8; 32]>,
+        entries_per_map: Option<usize>,
     ) -> anyhow::Result<Vec<BenchmarkResult>> {
         println!("Network: {}", self.config.network);
         println!("Account ID: {account_id}");
         println!();
 
-        Box::pin(transaction::run_transaction_benchmarks(&self.config, account_id, seed)).await
+        Box::pin(transaction::run_transaction_benchmarks(
+            &self.config,
+            account_id,
+            seed,
+            entries_per_map,
+        ))
+        .await
     }
 }

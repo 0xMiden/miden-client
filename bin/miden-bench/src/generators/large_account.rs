@@ -80,7 +80,7 @@ pub fn generate_deterministic_seed(index: u32) -> [u8; 32] {
 /// must be called from within account context (via `call` from a transaction script), because
 /// the kernel's `get_map_item` handler verifies the caller is an account procedure.
 pub fn generate_reader_component_code(num_slots: usize) -> String {
-    let mut code = String::from("use miden::core::word\n\n");
+    let mut code = String::new();
 
     for i in 0..num_slots {
         let slot_name = format!("miden::bench::map_slot_{i}");
@@ -146,14 +146,39 @@ pub fn create_large_account(
     Ok((account, sk))
 }
 
+/// Generates a random non-zero `[Felt; 4]` value suitable for storage map entries.
+///
+/// Values must be non-zero because the SMT treats zero values as deletions.
+/// The probability of generating an all-zero word is astronomically small (~2^-256),
+/// but we guard against it for correctness.
+pub fn random_word(rng: &mut impl Rng) -> [Felt; 4] {
+    loop {
+        let word: [Felt; 4] = std::array::from_fn(|_| Felt::new(rng.random::<u64>() >> 1));
+        if word.iter().any(|f| f.as_int() != 0) {
+            return word;
+        }
+    }
+}
+
+/// Creates an RNG seeded from a slot index, for deterministic random value generation.
+pub fn slot_rng(seed: u32) -> ChaCha20Rng {
+    let mut rng_seed = [0u8; 32];
+    rng_seed[0..4].copy_from_slice(&seed.to_le_bytes());
+    ChaCha20Rng::from_seed(rng_seed)
+}
+
 /// Creates a storage slot with many map entries
 pub fn create_large_storage_slot(name: &str, num_entries: usize, seed: u32) -> StorageSlot {
-    let map_entries = (0..num_entries as u32).map(|i| {
-        let key_val = seed.wrapping_mul(1000).wrapping_add(i);
-        let key = [Felt::new(key_val as u64); 4];
-        let value = [Felt::new(i as u64); 4];
-        (key.into(), value.into())
-    });
+    let mut rng = slot_rng(seed);
+
+    let map_entries: Vec<_> = (0..num_entries as u32)
+        .map(|i| {
+            let key_val = seed.wrapping_mul(1000).wrapping_add(i);
+            let key = [Felt::new(key_val as u64); 4];
+            let value = random_word(&mut rng);
+            (key.into(), value.into())
+        })
+        .collect();
 
     StorageSlot::with_map(
         StorageSlotName::new(name).expect("slot name should be valid"),

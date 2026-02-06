@@ -2,7 +2,7 @@ use std::fmt::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use miden_client::account::AccountId;
+use miden_client::account::{AccountId, StorageSlotContent};
 use miden_client::builder::ClientBuilder;
 use miden_client::crypto::RpoRandomCoin;
 use miden_client::keystore::FilesystemKeyStore;
@@ -70,10 +70,15 @@ struct StorageMapInfo {
 ///
 /// The benchmark uses the specified account as the native account executing transactions.
 /// Each transaction reads all storage map entries from the account's own storage.
+///
+/// The number of maps is auto-detected from the account storage. When `entries_per_map`
+/// is provided, keys are generated deterministically (required for two-phase deployed
+/// accounts whose expansion entries aren't visible via the import RPC).
 pub async fn run_transaction_benchmarks(
     config: &BenchConfig,
     account_id_str: String,
-    seed: [u8; 32],
+    seed: Option<[u8; 32]>,
+    entries_per_map: Option<usize>,
 ) -> anyhow::Result<Vec<BenchmarkResult>> {
     let mut results = Vec::new();
 
@@ -114,50 +119,89 @@ pub async fn run_transaction_benchmarks(
     println!("Importing account {account_id}...");
     client.import_account_by_id(account_id).await?;
 
-    // Generate storage map keys from config (same key scheme used during deployment).
-    // We can't rely on the imported account's entries() because kernel syscalls
-    // (used during two-phase expansion) update the SMT but not the client-side BTreeMap.
-    let storage_maps = generate_storage_map_info(config.maps, config.entries_per_map);
+    // Auto-detect the number of map-type storage slots from the imported account.
+    let storage = client.get_account_storage(account_id).await?;
+    let num_maps = storage
+        .slots()
+        .iter()
+        .filter(|slot| matches!(slot.content(), StorageSlotContent::Map(_)))
+        .count();
+
+    if num_maps == 0 {
+        anyhow::bail!("Account has no storage map slots to benchmark");
+    }
+
+    // Build storage map keys. When entries_per_map is provided, generate keys
+    // deterministically using the same scheme as the deploy command. This is
+    // required for two-phase deployed accounts: the node only returns initial
+    // component entries via the import RPC, not entries added by expansion
+    // transactions. When omitted, read keys from the imported account directly
+    // (works for single-tx deployed accounts where all entries are in the component).
+    let storage_maps: Vec<StorageMapInfo> = if let Some(entries_per_map) = entries_per_map {
+        generate_storage_map_keys(num_maps, entries_per_map)
+    } else {
+        storage
+            .slots()
+            .iter()
+            .filter_map(|slot| match slot.content() {
+                StorageSlotContent::Map(map) => {
+                    let keys = map.entries().map(|(k, _v)| *k).collect();
+                    Some(StorageMapInfo { keys })
+                },
+                StorageSlotContent::Value(_) => None,
+            })
+            .collect()
+    };
+
     let total_entries: usize = storage_maps.iter().map(|m| m.keys.len()).sum();
+    if total_entries == 0 {
+        anyhow::bail!(
+            "Account has no visible storage map entries. If this account was deployed \
+             with two-phase expansion, pass --entries-per-map to generate keys."
+        );
+    }
 
-    println!(
-        "Storage maps: {}, entries per map: {}, total reads: {total_entries}",
-        config.maps, config.entries_per_map
-    );
+    println!("Storage maps: {num_maps}, total entries: {total_entries}");
 
-    // Regenerate the signing key from the deployment seed
-    let secret_key = AuthSecretKey::new_falcon512_rpo_with_rng(&mut ChaCha20Rng::from_seed(seed));
+    // Regenerate the signing key from the deployment seed (if provided)
+    let secret_key =
+        seed.map(|s| AuthSecretKey::new_falcon512_rpo_with_rng(&mut ChaCha20Rng::from_seed(s)));
 
     // Benchmark 1: Transaction execution time (without proving)
     let execution_result = with_spinner("Benchmarking transaction execution", || {
-        benchmark_tx_execution(config, account_id, &storage_maps, &secret_key)
+        benchmark_tx_execution(config, account_id, &storage_maps, secret_key.as_ref())
     })
     .await?;
     results.push(execution_result);
 
-    // Benchmark 2: Transaction proving time
-    let proving_result = with_spinner("Benchmarking transaction proving", || {
-        benchmark_tx_proving(config, account_id, &storage_maps, &secret_key)
-    })
-    .await?;
-    results.push(proving_result);
+    // Benchmarks 2 & 3 require the signing key for proving and submission
+    if let Some(ref sk) = secret_key {
+        // Benchmark 2: Transaction proving time
+        let proving_result = with_spinner("Benchmarking transaction proving", || {
+            benchmark_tx_proving(config, account_id, &storage_maps, sk)
+        })
+        .await?;
+        results.push(proving_result);
 
-    // Benchmark 3: Full transaction (execute + prove + submit)
-    let full_result = with_spinner("Benchmarking full transaction", || {
-        Box::pin(benchmark_tx_full(config, account_id, &storage_maps, &secret_key))
-    })
-    .await?;
-    results.push(full_result);
+        // Benchmark 3: Full transaction (execute + prove + submit)
+        let full_result = with_spinner("Benchmarking full transaction", || {
+            Box::pin(benchmark_tx_full(config, account_id, &storage_maps, sk))
+        })
+        .await?;
+        results.push(full_result);
+    } else {
+        println!("Skipping proving and submission benchmarks (no seed provided).");
+    }
 
     Ok(results)
 }
 
-/// Generates storage map key information matching the deployment key scheme.
+/// Generates storage map keys deterministically using the same scheme as the deploy command.
 ///
-/// Both deployment paths (single-tx and two-phase) use the same formula:
+/// Both deployment paths (single-tx and two-phase) use the formula:
 /// `key_val = map_index * 1000 + entry_index` for each entry.
 #[allow(clippy::cast_possible_truncation)]
-fn generate_storage_map_info(num_maps: usize, entries_per_map: usize) -> Vec<StorageMapInfo> {
+fn generate_storage_map_keys(num_maps: usize, entries_per_map: usize) -> Vec<StorageMapInfo> {
     (0..num_maps)
         .map(|map_idx| {
             let seed = map_idx as u32;
@@ -219,7 +263,7 @@ async fn benchmark_tx_execution(
     config: &BenchConfig,
     account_id: AccountId,
     storage_maps: &[StorageMapInfo],
-    secret_key: &AuthSecretKey,
+    secret_key: Option<&AuthSecretKey>,
 ) -> anyhow::Result<BenchmarkResult> {
     let total_entries: usize = storage_maps.iter().map(|m| m.keys.len()).sum();
     let bench_name = format!("execute ({total_entries} storage reads)");
@@ -231,9 +275,11 @@ async fn benchmark_tx_execution(
             create_benchmark_client(config, &format!("tx-exec-iter-{i}")).await?;
         client.sync_state().await?;
 
-        // Import the account and add the signing key
+        // Import the account and add the signing key (if available)
         client.import_account_by_id(account_id).await?;
-        keystore.add_key(secret_key)?;
+        if let Some(sk) = secret_key {
+            keystore.add_key(sk)?;
+        }
 
         // Generate the script that reads all storage entries from active account
         let script_code = generate_storage_read_script(storage_maps);

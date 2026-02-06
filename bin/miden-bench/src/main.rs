@@ -44,8 +44,8 @@ fn main() {
                 println!();
                 println!("Run benchmarks with:");
                 println!(
-                    "  miden-bench transaction --account-id {account_id} --seed {seed_hex} --maps {} --entries-per-map {}",
-                    deploy_args.maps, deploy_args.entries_per_map
+                    "  miden-bench transaction --account-id {account_id} --seed {seed_hex} --entries-per-map {}",
+                    deploy_args.entries_per_map
                 );
             },
             Err(e) => {
@@ -80,15 +80,15 @@ fn main() {
 async fn run_benchmarks(args: &CliArgs) -> anyhow::Result<Vec<BenchmarkResult>> {
     match &args.command {
         Command::Transaction(tx_args) => {
-            let config = BenchConfig::new(
-                args.network.to_endpoint(),
-                args.iterations,
-                tx_args.maps,
-                tx_args.entries_per_map,
-            );
+            let config = BenchConfig::new(args.network.to_endpoint(), args.iterations);
             let mut runner = BenchmarkRunner::new(config);
-            let seed = parse_seed_hex(&tx_args.seed)?;
-            Box::pin(runner.run_transaction_benchmarks(tx_args.account_id.clone(), seed)).await
+            let seed = tx_args.seed.as_deref().map(parse_seed_hex).transpose()?;
+            Box::pin(runner.run_transaction_benchmarks(
+                tx_args.account_id.clone(),
+                seed,
+                tx_args.entries_per_map,
+            ))
+            .await
         },
         Command::Deploy(_) => unreachable!("Deploy is handled separately"),
     }
@@ -140,17 +140,15 @@ struct TransactionArgs {
     #[arg(short, long)]
     account_id: String,
 
-    /// Account seed for signing (hex, output by the deploy command)
+    /// Account seed for signing (hex, output by the deploy command).
+    /// When omitted, only execution is benchmarked (no proving or submission).
     #[arg(short, long)]
-    seed: String,
+    seed: Option<String>,
 
-    /// Number of storage maps in the account (must match deploy config)
-    #[arg(short, long, default_value = "1")]
-    maps: usize,
-
-    /// Number of key/value entries per storage map (must match deploy config)
-    #[arg(short, long, default_value = "10")]
-    entries_per_map: usize,
+    /// Number of key/value entries per storage map (required for two-phase deployed accounts).
+    /// When omitted, entries are read from the imported account (works for small accounts).
+    #[arg(short, long)]
+    entries_per_map: Option<usize>,
 }
 
 #[derive(Subcommand, Clone)]

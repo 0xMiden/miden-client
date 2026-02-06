@@ -20,7 +20,12 @@ use rand::Rng;
 use rand_chacha::ChaCha20Rng;
 use rand_chacha::rand_core::SeedableRng;
 
-use crate::generators::{LargeAccountConfig, generate_reader_component_code};
+use crate::generators::{
+    LargeAccountConfig,
+    generate_reader_component_code,
+    random_word,
+    slot_rng,
+};
 use crate::spinner::with_spinner;
 
 /// Maximum storage entries for a single-transaction deployment.
@@ -29,7 +34,7 @@ use crate::spinner::with_spinner;
 const MAX_ENTRIES_SINGLE_DEPLOY: usize = 200;
 
 /// Maximum entries to set per expansion transaction.
-const ENTRIES_PER_EXPANSION_TX: usize = 500;
+const ENTRIES_PER_EXPANSION_TX: usize = 1000;
 
 /// Waits for the chain height to advance, ensuring transaction is in a block
 async fn wait_for_block_advancement(client: &mut Client<FilesystemKeyStore>) -> anyhow::Result<()> {
@@ -72,25 +77,29 @@ fn create_minimal_account(
 
         // Use the same key scheme as the single-tx path: key_val = slot_index * 1000 + j
         let seed = i as u32;
+        let mut rng = slot_rng(seed);
+
+        // Generate the initial entry (j=0) first so the RNG stays in sync with
+        // the single-tx path in `create_large_storage_slot`.
+        let initial_key_val = seed.wrapping_mul(1000); // j=0
+        let initial_key = [Felt::new(initial_key_val as u64); 4];
+        let initial_value = random_word(&mut rng);
 
         // Generate the entries that will be added later via expansion transactions (j=1..N-1)
         let entries: Vec<([Felt; 4], [Felt; 4])> = (1..config.num_storage_map_entries as u32)
             .map(|j| {
                 let key_val = seed.wrapping_mul(1000).wrapping_add(j);
                 let key = [Felt::new(key_val as u64); 4];
-                let value = [Felt::new(j as u64); 4];
+                let value = random_word(&mut rng);
                 (key, value)
             })
             .collect();
 
         deferred_entries.push(DeferredMapEntries { entries });
 
-        // Create storage map with one initial entry (j=0).
-        // Value must be non-zero: the SMT treats zero values as deletions, which would
-        // leave the map root identical to an empty map and cause the node to lose track.
-        let initial_key_val = seed.wrapping_mul(1000); // j=0
-        let initial_key = [Felt::new(initial_key_val as u64); 4];
-        let initial_value = [Felt::new(1); 4]; // non-zero sentinel
+        // Create storage map with the initial entry (j=0).
+        // Value is random (non-zero with overwhelming probability) — the SMT treats
+        // zero values as deletions, but random_word guarantees non-zero.
         let mut initial_map = StorageMap::new();
         initial_map
             .insert(initial_key.into(), initial_value.into())
@@ -145,7 +154,7 @@ fn create_minimal_account(
 /// Generates MASM code for an account component that can set items in multiple storage maps.
 /// Creates a procedure `set_item_slot_N` for each slot that reads key/value from memory.
 fn generate_expansion_component_code(num_slots: usize) -> String {
-    let mut code = String::from("use miden::core::word\n\n");
+    let mut code = String::new();
 
     for i in 0..num_slots {
         let slot_name = format!("miden::bench::map_slot_{i}");
@@ -397,6 +406,10 @@ pub async fn deploy_account(
         })
         .await?;
 
+        println!();
+        println!("Account ID: {account_id}");
+        println!("Seed: 0x{}", hex::encode(account_config.seed));
+        println!();
         println!("Waiting for chain block height to advance...");
         for _ in 0..4 {
             wait_for_block_advancement(&mut client).await?;
@@ -440,9 +453,6 @@ pub async fn deploy_account(
 
         account_id
     };
-
-    println!();
-    println!("Deployed public wallet with {total_entries} storage entries.");
 
     let seed = account_config.seed;
 

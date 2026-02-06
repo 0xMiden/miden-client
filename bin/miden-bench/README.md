@@ -37,8 +37,13 @@ Account ID: 0xabcdef1234567890...
 Seed: 0123456789abcdef...
 
 Run benchmarks with:
-  miden-bench transaction --account-id 0xabcdef1234567890 --seed 0123456789abcdef... --maps 2 --entries-per-map 50
+  miden-bench transaction --account-id 0xabcdef1234567890 --seed 0123456789abcdef... --entries-per-map 50
 ```
+
+**Deployment modes:**
+
+- **Single transaction** (≤200 total entries): all storage entries are included in the initial account.
+- **Two-phase** (>200 total entries): deploys an account with sentinel entries, then expands storage via batched transactions. Storage map values are random.
 
 **Limits:**
 
@@ -59,13 +64,18 @@ Benchmarks transaction operations that read storage from an account (requires a 
 
 The benchmark executes transactions that read all storage map entries from the specified account. The account must be a public account deployed to the network via `deploy`.
 
+The number of storage maps is auto-detected from the account. The `--entries-per-map` flag controls how many entries per map are read:
+
+- **Small accounts** (single-tx deployment, ≤200 entries): `--entries-per-map` can be omitted — entries are read directly from the imported account.
+- **Large accounts** (two-phase deployment, >200 entries): `--entries-per-map` is required. The node's import RPC only returns the initial component entries, not entries added by expansion transactions. The `deploy` command prints the correct value in its suggested command.
+
 ```bash
 # First deploy an account with storage
 miden-bench --network localhost deploy --maps 2 --entries-per-map 50
 # Copy the transaction command from the output
 
 # Then benchmark transactions against it
-miden-bench --network localhost transaction --account-id 0x... --seed <hex> --maps 2 --entries-per-map 50
+miden-bench --network localhost transaction --account-id 0x... --seed <hex> --entries-per-map 50
 ```
 
 ## Global Options
@@ -106,7 +116,7 @@ Number of measured iterations per benchmark. Default: 5.
 miden-bench --iterations 20 transaction --account-id 0x... --seed <hex>
 ```
 
-### Storage Configuration (`deploy`, `transaction`)
+### Deploy Options
 
 - `-m, --maps <N>` - Number of storage maps in the account (default: 1)
 - `-e, --entries-per-map <N>` - Number of key/value entries per storage map (default: 10)
@@ -119,9 +129,8 @@ miden-bench deploy --maps 3 --entries-per-map 100
 ### Transaction Options
 
 - `-a, --account-id <ID>` - Public account ID to benchmark against (required, hex format)
-- `-s, --seed <HEX>` - Account seed for signing (required, hex-encoded 32 bytes, output by `deploy`)
-- `-m, --maps <N>` - Number of storage maps (must match deploy config)
-- `-e, --entries-per-map <N>` - Entries per map (must match deploy config)
+- `-s, --seed <HEX>` - Account seed for signing (hex-encoded 32 bytes, output by `deploy`). When omitted, only execution is benchmarked (no proving or submission).
+- `-e, --entries-per-map <N>` - Entries per map (required for two-phase deployed accounts, optional for small accounts)
 
 ## Examples
 
@@ -132,7 +141,7 @@ miden-bench deploy --maps 3 --entries-per-map 100
 miden-bench --network localhost deploy --maps 2 --entries-per-map 100
 
 # Copy the transaction command from the output and run it
-miden-bench --network localhost transaction --account-id 0x... --seed <hex>
+miden-bench --network localhost transaction --account-id 0x... --seed <hex> --entries-per-map 100
 ```
 
 ## Metrics
