@@ -181,9 +181,8 @@ impl SqliteStore {
             status.seed().copied(),
         );
 
-        let addresses = query_account_addresses(conn, header.id())?;
         let account_data = AccountRecordData::Full(account);
-        Ok(Some(AccountRecord::new(account_data, status, addresses)))
+        Ok(Some(AccountRecord::new(account_data, status)))
     }
 
     /// Retrieves a minimal partial account record with storage and vault witnesses.
@@ -258,8 +257,7 @@ impl SqliteStore {
             status.seed().copied(),
         )?;
         let account_record_data = AccountRecordData::Partial(partial_account);
-        let addresses = query_account_addresses(conn, header.id())?;
-        Ok(Some(AccountRecord::new(account_record_data, status, addresses)))
+        Ok(Some(AccountRecord::new(account_record_data, status)))
     }
 
     pub fn get_foreign_account_code(
@@ -391,6 +389,24 @@ impl SqliteStore {
         account_id: AccountId,
     ) -> Result<Vec<Address>, StoreError> {
         query_account_addresses(conn, account_id)
+    }
+
+    /// Retrieves the account code for a specific account by ID.
+    pub(crate) fn get_account_code_by_id(
+        conn: &mut Connection,
+        account_id: AccountId,
+    ) -> Result<Option<AccountCode>, StoreError> {
+        let Some((header, _)) = query_account_headers(
+            conn,
+            "id = ? ORDER BY nonce DESC LIMIT 1",
+            params![account_id.to_hex()],
+        )?
+        .into_iter()
+        .next() else {
+            return Ok(None);
+        };
+
+        query_account_code(conn, header.code_commitment())
     }
 
     // MUTATOR/WRITER METHODS

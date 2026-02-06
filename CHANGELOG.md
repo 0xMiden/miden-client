@@ -2,13 +2,18 @@
 
 ## 0.14.0 (TBD)
 
+### Enhancements
+
+* Updated the `GrpcClient` to fetch the RPC limits from the node ([#1724](https://github.com/0xMiden/miden-client/pull/1724)).
+
 ### Changes
 
-* Added a `StorageReader` accessible through `Client::new_storage_reader` to read storage slots without having to load the whole account ([#1713](https://github.com/0xMiden/miden-client/pull/1713)). 
+* [BREAKING] Added a `AccountReader` accessible through `Client::account_reader` to read account data without needing to load the whole `Account` ([#1713](https://github.com/0xMiden/miden-client/pull/1713), [#1716](https://github.com/0xMiden/miden-client/pull/1716)). 
 
 ### Enhancements
 
 * Enabled SIMD (`+simd128`) for WASM builds ([#1738](https://github.com/0xMiden/miden-client/pull/1738)).
+* Added `--rpc-status` flag to `miden-client info` command to display RPC node status information including node version, genesis commitment, store status, and block producer status; also added `get_status_unversioned` to `NodeRpcClient` trait ([#1742](https://github.com/0xMiden/miden-client/pull/1742)).
 * Added the `@miden-sdk/react` hooks library with a provider, hooks, and an example app for the web client ([#1711](https://github.com/0xMiden/miden-client/pull/1711)).
 
 ## 0.13.0 (2026-01-28)
