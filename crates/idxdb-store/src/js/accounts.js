@@ -368,6 +368,7 @@ export async function lockAccount(dbId, accountId) {
 export async function undoAccountStates(dbId, accountCommitments) {
     try {
         const db = getDatabase(dbId);
+        const removedCommitments = new Set(accountCommitments);
         await db.dexie.transaction("rw", db.accountsHistory, db.accountsLatest, async () => {
             const removedStates = await db.accountsHistory
                 .where("accountCommitment")
@@ -382,6 +383,11 @@ export async function undoAccountStates(dbId, accountCommitments) {
                 .delete();
             const affectedAccountIds = Array.from(new Set(removedStates.map((state) => state.id)));
             for (const accountId of affectedAccountIds) {
+                const currentLatest = await db.accountsLatest.get(accountId);
+                if (currentLatest &&
+                    !removedCommitments.has(currentLatest.accountCommitment)) {
+                    continue;
+                }
                 const historyRows = await db.accountsHistory
                     .where("id")
                     .equals(accountId)

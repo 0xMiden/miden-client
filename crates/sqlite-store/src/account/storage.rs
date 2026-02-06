@@ -18,10 +18,8 @@ use miden_client::store::StoreError;
 use miden_protocol::crypto::merkle::MerkleError;
 use rusqlite::{Connection, Transaction, params};
 
-use crate::account::helpers::{
-    build_storage_slots_from_values,
-    query_storage_values_at_or_before_nonce_for_slots,
-};
+use crate::account::helpers::build_storage_slots_from_values;
+use crate::account::query::history::query_storage_values_at_or_before_nonce_for_slots;
 use crate::smt_forest::AccountSmtForest;
 use crate::sql_error::SqlResultExt;
 use crate::{SqliteStore, insert_sql, subst, u64_to_value};

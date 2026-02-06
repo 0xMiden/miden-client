@@ -314,7 +314,11 @@ export class MidenDatabase {
         "faucetIdPrefix"
       ),
       [Table.AccountAuth]: indexes("pubKeyCommitmentHex"),
-      [Table.AccountsHistory]: indexes("&accountCommitment", "id"),
+      [Table.AccountsHistory]: indexes(
+        "&accountCommitment",
+        "id",
+        "[id+nonce]"
+      ),
       [Table.AccountsLatest]: indexes("id", "&accountCommitment"),
       [Table.Addresses]: indexes("address", "id"),
       [Table.Transactions]: indexes("id", "statusVariant"),
@@ -407,7 +411,6 @@ export class MidenDatabase {
     try {
       await this.dexie.open();
       await this.ensureClientVersion(clientVersion);
-      await this.ensureLatestAccountsSnapshot();
       console.log("Database opened successfully");
       return true;
     } catch (err) {
@@ -474,27 +477,5 @@ export class MidenDatabase {
       key: CLIENT_VERSION_SETTING_KEY,
       value: textEncoder.encode(clientVersion),
     });
-  }
-
-  private async ensureLatestAccountsSnapshot(): Promise<void> {
-    const latestCount = await this.accountsLatest.count();
-    if (latestCount > 0) {
-      return;
-    }
-
-    const history = await this.accountsHistory.toArray();
-    if (history.length === 0) {
-      return;
-    }
-
-    const latestById = new Map<string, IAccount>();
-    for (const record of history) {
-      const current = latestById.get(record.id);
-      if (!current || BigInt(record.nonce) > BigInt(current.nonce)) {
-        latestById.set(record.id, record);
-      }
-    }
-
-    await this.accountsLatest.bulkPut(Array.from(latestById.values()));
   }
 }

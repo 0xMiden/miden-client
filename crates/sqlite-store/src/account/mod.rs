@@ -4,6 +4,7 @@
 
 mod accounts;
 mod helpers;
+mod query;
 mod storage;
 mod vault;
 

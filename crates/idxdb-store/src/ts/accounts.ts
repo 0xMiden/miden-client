@@ -496,6 +496,7 @@ export async function undoAccountStates(
 ) {
   try {
     const db = getDatabase(dbId);
+    const removedCommitments = new Set(accountCommitments);
     await db.dexie.transaction(
       "rw",
       db.accountsHistory,
@@ -520,6 +521,14 @@ export async function undoAccountStates(
         );
 
         for (const accountId of affectedAccountIds) {
+          const currentLatest = await db.accountsLatest.get(accountId);
+          if (
+            currentLatest &&
+            !removedCommitments.has(currentLatest.accountCommitment)
+          ) {
+            continue;
+          }
+
           const historyRows = await db.accountsHistory
             .where("id")
             .equals(accountId)
