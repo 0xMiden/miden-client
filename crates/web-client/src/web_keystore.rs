@@ -80,7 +80,7 @@ impl<R: Rng> WebKeyStore<R> {
         }
     }
 
-    pub async fn add_key(&self, key: &AuthSecretKey) -> Result<(), KeyStoreError> {
+    pub async fn add_secret_key(&self, key: &AuthSecretKey) -> Result<(), KeyStoreError> {
         if let Some(insert_key_cb) = &self.callbacks.as_ref().insert_key {
             let sk = WebAuthSecretKey::from(key.clone());
             insert_key_cb.insert_key(&sk).await?;
@@ -99,7 +99,7 @@ impl<R: Rng> WebKeyStore<R> {
         Ok(())
     }
 
-    pub async fn get_key(
+    pub async fn get_secret_key(
         &self,
         pub_key: PublicKeyCommitment,
     ) -> Result<Option<AuthSecretKey>, KeyStoreError> {
@@ -146,7 +146,7 @@ impl<R: Rng> TransactionAuthenticator for WebKeyStore<R> {
         let message = signing_inputs.to_commitment();
 
         let secret_key = self
-            .get_key(pub_key)
+            .get_secret_key(pub_key)
             .await
             .map_err(|err| AuthenticationError::other(err.to_string()))?;
 
@@ -169,7 +169,7 @@ impl<R: Rng> TransactionAuthenticator for WebKeyStore<R> {
         &self,
         pub_key_commitment: PublicKeyCommitment,
     ) -> Option<Arc<PublicKey>> {
-        self.get_key(pub_key_commitment)
+        self.get_secret_key(pub_key_commitment)
             .await
             .ok()
             .flatten()
