@@ -959,15 +959,15 @@ impl RpcError {
         }
 
         // Parse application-level error from status details
-        let node_error = parse_node_error(&endpoint, status.details(), status.message());
+        let endpoint_error = parse_node_error(&endpoint, status.details(), status.message());
 
         let error_kind = GrpcError::from(&status);
         let source = Box::new(status) as Box<dyn Error + Send + Sync + 'static>;
 
-        Self::GrpcError {
+        Self::RequestError {
             endpoint,
             error_kind,
-            node_error,
+            endpoint_error,
             source: Some(source),
         }
     }
