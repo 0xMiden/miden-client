@@ -161,6 +161,9 @@ impl GrpcError {
 // ACCEPT HEADER ERROR
 // ================================================================================================
 
+// TODO: Accept header errors are still parsed from message strings, which is fragile.
+// Ideally the node would return structured error codes for these too. See #1129.
+
 /// Errors that can occur during accept header validation.
 #[derive(Debug, Error)]
 pub enum AcceptHeaderError {
