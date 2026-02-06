@@ -121,19 +121,25 @@ impl<R: Rng> WebKeyStore<R> {
             return get_key_cb.get_secret_key(pub_key).await;
         }
         let pub_key_commitment = NativeWord::from(pub_key).to_hex();
-        let result = get_account_auth_by_pub_key_commitment(&self.db_id, pub_key_commitment).await;
-
-        match result {
-            Ok(secret_key_hex) => {
-                let secret_key_bytes = hex::decode(secret_key_hex).map_err(|err| {
-                    KeyStoreError::DecodingError(format!("error decoding secret key hex: {err:?}"))
+        let secret_key_hex =
+            get_account_auth_by_pub_key_commitment(&self.db_id, pub_key_commitment)
+                .await
+                .map_err(|_| {
+                    KeyStoreError::StorageError(
+                        "Failed to get secret key from IndexedDB".to_string(),
+                    )
                 })?;
 
-                let secret_key = decode_secret_key_from_bytes(&secret_key_bytes)?;
-                Ok(Some(secret_key))
-            },
-            Err(_) => Ok(None),
-        }
+        let Some(secret_key_hex) = secret_key_hex else {
+            return Ok(None);
+        };
+
+        let secret_key_bytes = hex::decode(secret_key_hex).map_err(|err| {
+            KeyStoreError::DecodingError(format!("error decoding secret key hex: {err:?}"))
+        })?;
+
+        let secret_key = decode_secret_key_from_bytes(&secret_key_bytes)?;
+        Ok(Some(secret_key))
     }
 }
 

@@ -82,7 +82,7 @@ pub async fn insert_account_auth(
 pub async fn get_account_auth_by_pub_key_commitment(
     db_id: &str,
     pub_key_commitment_hex: String,
-) -> Result<String, JsValue> {
+) -> Result<Option<String>, JsValue> {
     let promise =
         idxdb_get_account_auth_by_pub_key_commitment(db_id, pub_key_commitment_hex.clone());
     let js_secret_key = JsFuture::from(promise).await?;
@@ -92,12 +92,7 @@ pub async fn get_account_auth_by_pub_key_commitment(
             JsValue::from_str(&format!("Error: failed to deserialize secret key: {err}"))
         })?;
 
-    match account_auth_idxdb {
-        Some(account_auth) => Ok(account_auth.secret_key),
-        None => Err(JsValue::from_str(&format!(
-            "Pub key commitment {pub_key_commitment_hex} not found in the store"
-        ))),
-    }
+    Ok(account_auth_idxdb.map(|auth| auth.secret_key))
 }
 
 pub async fn remove_account_auth(
