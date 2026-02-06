@@ -931,6 +931,10 @@ impl NodeRpcClient for GrpcClient {
     async fn set_rpc_limits(&self, limits: RpcLimits) {
         self.limits.write().replace(limits);
     }
+
+    async fn get_status_unversioned(&self) -> Result<RpcStatusInfo, RpcError> {
+        GrpcClient::get_status_unversioned(self).await
+    }
 }
 
 // ERRORS

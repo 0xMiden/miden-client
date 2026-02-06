@@ -392,6 +392,12 @@ pub trait NodeRpcClient: Send + Sync {
 
     /// Sets the RPC limits internally to be used by the client.
     async fn set_rpc_limits(&self, limits: RpcLimits);
+
+    /// Fetches the RPC status without requiring Accept header validation.
+    ///
+    /// This is useful for diagnostics when version negotiation fails, as it allows
+    /// retrieving node information even when there's a version mismatch.
+    async fn get_status_unversioned(&self) -> Result<RpcStatusInfo, RpcError>;
 }
 
 // RPC API ENDPOINT
