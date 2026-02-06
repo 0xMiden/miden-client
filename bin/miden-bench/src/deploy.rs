@@ -361,9 +361,9 @@ pub async fn deploy_account(
         .rpc(Arc::new(GrpcClient::new(endpoint, 30_000)))
         .rng(Box::new(rng_coin))
         .sqlite_store(store_path)
-        .filesystem_keystore(keystore_path.to_str().expect("keystore path should be valid UTF-8"))
+        .filesystem_keystore(keystore_path.to_str().expect("keystore path should be valid UTF-8"))?
         .in_debug_mode(DebugMode::Disabled)
-        .tx_graceful_blocks(None)
+        .tx_discard_delta(None)
         .build()
         .await?;
 
