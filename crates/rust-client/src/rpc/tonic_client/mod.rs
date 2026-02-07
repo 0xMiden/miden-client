@@ -1038,9 +1038,11 @@ impl From<&Status> for GrpcError {
 mod tests {
     use std::boxed::Box;
 
+    use miden_protocol::block::BlockNumber;
     use miden_protocol::Word;
 
-    use super::GrpcClient;
+    use super::{BlockPagination, GrpcClient, PaginationResult};
+    use crate::rpc::RpcError;
     use crate::rpc::{Endpoint, NodeRpcClient};
 
     fn assert_send_sync<T: Send + Sync>() {}
@@ -1049,6 +1051,60 @@ mod tests {
     fn is_send_sync() {
         assert_send_sync::<GrpcClient>();
         assert_send_sync::<Box<dyn NodeRpcClient>>();
+    }
+
+    #[test]
+    fn block_pagination_errors_when_block_num_goes_backwards() {
+        let mut pagination = BlockPagination::new(10_u32.into(), None);
+
+        let res = pagination.advance(9_u32.into(), 20_u32.into());
+        assert!(matches!(res, Err(RpcError::PaginationError(_))));
+    }
+
+    #[test]
+    fn block_pagination_errors_after_max_iterations() {
+        let mut pagination = BlockPagination::new(0_u32.into(), None);
+        let chain_tip: BlockNumber = 10_000_u32.into();
+
+        for _ in 0..BlockPagination::MAX_ITERATIONS {
+            let current = pagination.current_block_from();
+            let res = pagination
+                .advance(current, chain_tip)
+                .expect("expected pagination to continue within iteration limit");
+            assert!(matches!(res, PaginationResult::Continue));
+        }
+
+        let res = pagination.advance(pagination.current_block_from(), chain_tip);
+        assert!(matches!(res, Err(RpcError::PaginationError(_))));
+    }
+
+    #[test]
+    fn block_pagination_stops_at_min_of_block_to_and_chain_tip() {
+        // block_to is beyond chain tip, so target should be chain_tip.
+        let mut pagination = BlockPagination::new(0_u32.into(), Some(50_u32.into()));
+
+        let res = pagination
+            .advance(30_u32.into(), 30_u32.into())
+            .expect("expected pagination to succeed");
+
+        assert!(matches!(
+            res,
+            PaginationResult::Done {
+                chain_tip,
+                block_num
+            } if chain_tip.as_u32() == 30 && block_num.as_u32() == 30
+        ));
+    }
+
+    #[test]
+    fn block_pagination_advances_cursor_by_one() {
+        let mut pagination = BlockPagination::new(5_u32.into(), None);
+
+        let res = pagination
+            .advance(5_u32.into(), 100_u32.into())
+            .expect("expected pagination to succeed");
+        assert!(matches!(res, PaginationResult::Continue));
+        assert_eq!(pagination.current_block_from().as_u32(), 6);
     }
 
     // Function that returns a `Send` future from a dynamic trait that must be `Sync`.
