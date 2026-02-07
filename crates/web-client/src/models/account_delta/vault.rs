@@ -192,8 +192,6 @@ impl From<&FungibleAssetDelta> for NativeFungibleAssetDelta {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[test]
     fn fungible_delta_sign_classification_excludes_zero() {
         let deltas = [10_i64, 0_i64, -5_i64];
