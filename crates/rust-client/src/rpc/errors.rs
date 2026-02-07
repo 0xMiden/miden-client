@@ -28,6 +28,8 @@ pub enum RpcError {
     DeserializationError(String),
     #[error("rpc api response missing an expected field: {0}")]
     ExpectedDataMissing(String),
+    #[error("rpc pagination error: {0}")]
+    PaginationError(String),
     #[error("rpc api response is invalid: {0}")]
     InvalidResponse(String),
     #[error("grpc request failed for {endpoint}: {error_kind}")]
