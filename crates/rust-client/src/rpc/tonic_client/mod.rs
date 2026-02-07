@@ -35,6 +35,7 @@ use super::{
 use crate::rpc::domain::account_vault::{AccountVaultInfo, AccountVaultUpdate};
 use crate::rpc::domain::storage_map::{StorageMapInfo, StorageMapUpdate};
 use crate::rpc::domain::transaction::TransactionsInfo;
+use crate::rpc::errors::node::parse_node_error;
 use crate::rpc::errors::{AcceptHeaderContext, AcceptHeaderError, GrpcError, RpcConversionError};
 use crate::rpc::generated::rpc::account_request::account_detail_request::storage_map_detail_request::SlotData;
 use crate::rpc::generated::rpc::account_request::account_detail_request::StorageMapDetailRequest;
@@ -991,6 +992,10 @@ impl NodeRpcClient for GrpcClient {
             },
         }
     }
+
+    async fn get_status_unversioned(&self) -> Result<RpcStatusInfo, RpcError> {
+        GrpcClient::get_status_unversioned(self).await
+    }
 }
 
 // ERRORS
@@ -1008,12 +1013,16 @@ impl RpcError {
             return Self::AcceptHeaderError(accept_error);
         }
 
+        // Parse application-level error from status details
+        let endpoint_error = parse_node_error(&endpoint, status.details(), status.message());
+
         let error_kind = GrpcError::from(&status);
         let source = Box::new(status) as Box<dyn Error + Send + Sync + 'static>;
 
-        Self::GrpcError {
+        Self::RequestError {
             endpoint,
             error_kind,
+            endpoint_error,
             source: Some(source),
         }
     }
