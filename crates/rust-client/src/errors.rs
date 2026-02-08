@@ -52,7 +52,7 @@ impl fmt::Display for ErrorHint {
     }
 }
 
-// TODO: This is mostly illustrative but we could add a URL with fragemtn identifiers
+// TODO: This is mostly illustrative but we could add a URL with fragment identifiers
 // for each error
 const TROUBLESHOOTING_DOC: &str = "https://0xmiden.github.io/miden-client/cli-troubleshooting.html";
 

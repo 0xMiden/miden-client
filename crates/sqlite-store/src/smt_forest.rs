@@ -13,8 +13,8 @@ use miden_protocol::crypto::merkle::{EmptySubtreeRoots, MerkleError};
 pub struct AccountSmtForest {
     forest: SmtForest,
 }
-
 impl AccountSmtForest {
+    /// Creates a new empty [[`AccountSmtForest`].
     pub fn new() -> Self {
         Self::default()
     }
@@ -123,6 +123,7 @@ impl AccountSmtForest {
         }
     }
 
+    /// Inserts the full account state (storage maps and asset vault) into the SMT forest.
     pub fn insert_account_state(
         &mut self,
         vault: &AssetVault,
@@ -133,6 +134,7 @@ impl AccountSmtForest {
         Ok(())
     }
 
+    /// Inserts the SMT nodes for a single storage map into the forest.
     pub fn insert_storage_map_nodes_for_map(&mut self, map: &StorageMap) {
         let empty_root = *EmptySubtreeRoots::entry(SMT_DEPTH, 0);
         let entries: Vec<(Word, Word)> =
