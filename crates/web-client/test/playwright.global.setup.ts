@@ -3,7 +3,7 @@ import { test as base, TestInfo } from "@playwright/test";
 import { MockWebClient } from "../js";
 
 // Unique per test run so concurrent suites don't share IndexedDB stores.
-const RUN_ID = crypto.randomUUID().slice(0, 8);
+export const RUN_ID = crypto.randomUUID().slice(0, 8);
 
 function generateStoreName(testInfo: TestInfo): string {
   return `test_${RUN_ID}_${testInfo.testId}`;
