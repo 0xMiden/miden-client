@@ -75,6 +75,8 @@ pub struct StateSync {
     /// Number of blocks after which pending transactions are considered stale and discarded.
     /// If `None`, there is no limit and transactions will be kept indefinitely.
     tx_discard_delta: Option<u32>,
+    /// Whether to sync nullifiers during state sync.
+    sync_nullifiers: bool,
 }
 
 impl StateSync {
@@ -85,12 +87,19 @@ impl StateSync {
     /// * `rpc_api` - The RPC client used to communicate with the node.
     /// * `note_screener` - The note screener used to check the relevance of notes.
     /// * `tx_discard_delta` - Number of blocks after which pending transactions are discarded.
+    /// * `sync_nullifiers` - Whether to sync nullifiers during state sync.
     pub fn new(
         rpc_api: Arc<dyn NodeRpcClient>,
         note_screener: Arc<dyn OnNoteReceived>,
         tx_discard_delta: Option<u32>,
+        sync_nullifiers: bool,
     ) -> Self {
-        Self { rpc_api, note_screener, tx_discard_delta }
+        Self {
+            rpc_api,
+            note_screener,
+            tx_discard_delta,
+            sync_nullifiers,
+        }
     }
 
     /// Syncs the state of the client with the chain tip of the node, returning the updates that
@@ -224,9 +233,10 @@ impl StateSync {
                 );
             }
         }
-        info!("Syncing nullifiers.");
-
-        self.sync_nullifiers(&mut state_sync_update, block_num).await?;
+        if self.sync_nullifiers {
+            info!("Syncing nullifiers.");
+            self.nullifiers_state_sync(&mut state_sync_update, block_num).await?;
+        }
 
         Ok(state_sync_update)
     }
@@ -398,7 +408,7 @@ impl StateSync {
     /// notes. It then processes the nullifiers to apply the state transitions on the note updates.
     ///
     /// The `state_sync_update` parameter will be updated to track the new discarded transactions.
-    async fn sync_nullifiers(
+    async fn nullifiers_state_sync(
         &self,
         state_sync_update: &mut StateSyncUpdate,
         current_block_num: BlockNumber,
