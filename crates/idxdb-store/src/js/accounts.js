@@ -417,10 +417,10 @@ export async function undoAccountStates(dbId, accountCommitments) {
         logWebStoreError(error, `Error undoing account states: ${accountCommitments.join(",")}`);
     }
 }
-export async function insertAccountPublicKey(dbId, pubKeyCommitmentHex, accountId) {
-    return insertAccountPublicKeys(dbId, [pubKeyCommitmentHex], accountId);
+export async function insertAccountPubKeyCommitment(dbId, pubKeyCommitmentHex, accountId) {
+    return insertAccountPubKeyCommitments(dbId, [pubKeyCommitmentHex], accountId);
 }
-export async function insertAccountPublicKeys(dbId, pubKeyCommitmentHexes, accountId) {
+export async function insertAccountPubKeyCommitments(dbId, pubKeyCommitmentHexes, accountId) {
     try {
         const db = getDatabase(dbId);
         const entries = pubKeyCommitmentHexes.map((pubKeyCommitmentHex) => ({
@@ -430,20 +430,20 @@ export async function insertAccountPublicKeys(dbId, pubKeyCommitmentHexes, accou
         await db.accountPublicKeys.bulkPut(entries);
     }
     catch (error) {
-        logWebStoreError(error, `Error inserting account public key mappings for account: ${accountId}`);
+        logWebStoreError(error, `Error inserting account public key commitment mappings for account: ${accountId}`);
     }
 }
-export async function getAccountIdByPublicKey(dbId, pubKeyCommitmentHex) {
+export async function getAccountIdByPubKeyCommitment(dbId, pubKeyCommitmentHex) {
     try {
         const db = getDatabase(dbId);
         const record = await db.accountPublicKeys.get(pubKeyCommitmentHex);
         return record?.accountId ?? null;
     }
     catch (error) {
-        logWebStoreError(error, `Error fetching account by public key: ${pubKeyCommitmentHex}`);
+        logWebStoreError(error, `Error fetching account by public key commitment: ${pubKeyCommitmentHex}`);
     }
 }
-export async function getPublicKeysByAccountId(dbId, accountId) {
+export async function getPubKeyCommitmentsByAccountId(dbId, accountId) {
     try {
         const db = getDatabase(dbId);
         const records = await db.accountPublicKeys
@@ -453,15 +453,15 @@ export async function getPublicKeysByAccountId(dbId, accountId) {
         return records.map((r) => r.pubKeyCommitmentHex);
     }
     catch (error) {
-        logWebStoreError(error, `Error fetching public keys for account: ${accountId}`);
+        logWebStoreError(error, `Error fetching public key commitments for account: ${accountId}`);
     }
 }
-export async function removeAccountPublicKey(dbId, pubKeyCommitmentHex) {
+export async function removeAccountPubKeyCommitment(dbId, pubKeyCommitmentHex) {
     try {
         const db = getDatabase(dbId);
         await db.accountPublicKeys.delete(pubKeyCommitmentHex);
     }
     catch (error) {
-        logWebStoreError(error, `Error removing account public key: ${pubKeyCommitmentHex}`);
+        logWebStoreError(error, `Error removing account public key commitment: ${pubKeyCommitmentHex}`);
     }
 }

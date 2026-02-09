@@ -49,7 +49,7 @@ impl WebClient {
             let commitments: Vec<_> =
                 pub_keys.iter().map(miden_client::auth::PublicKey::to_commitment).collect();
             store
-                .insert_account_public_keys(&commitments, account.id())
+                .insert_account_pub_key_commitments(&commitments, account.id())
                 .await
                 .map_err(|err| {
                     js_error_with_context(err, "failed to index account by public key")
@@ -94,7 +94,7 @@ impl WebClient {
 
         let store = self.store.as_ref().expect("Store should be initialized");
         store
-            .insert_account_public_key(key_pair.public_key().to_commitment(), native_id)
+            .insert_account_pub_key_commitment(key_pair.public_key().to_commitment(), native_id)
             .await
             .map_err(|err| js_error_with_context(err, "failed to index account by public key"))?;
 

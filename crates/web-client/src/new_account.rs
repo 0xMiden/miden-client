@@ -58,7 +58,10 @@ impl WebClient {
 
             let store = self.store.as_ref().expect("Store should be initialized");
             store
-                .insert_account_public_key(key_pair.public_key().to_commitment(), new_account.id())
+                .insert_account_pub_key_commitment(
+                    key_pair.public_key().to_commitment(),
+                    new_account.id(),
+                )
                 .await
                 .map_err(|err| {
                     js_error_with_context(err, "failed to index account by public key")
@@ -158,7 +161,10 @@ impl WebClient {
                 })?;
 
             store
-                .insert_account_public_key(key_pair.public_key().to_commitment(), new_account.id())
+                .insert_account_pub_key_commitment(
+                    key_pair.public_key().to_commitment(),
+                    new_account.id(),
+                )
                 .await
                 .map_err(|err| {
                     js_error_with_context(err, "failed to index account by public key")
@@ -216,7 +222,7 @@ impl WebClient {
 
             let store = self.store.as_ref().expect("Store should be initialized");
             store
-                .insert_account_public_key(
+                .insert_account_pub_key_commitment(
                     native_secret_key.public_key().to_commitment(),
                     native_account_id,
                 )

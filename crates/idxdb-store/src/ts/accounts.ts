@@ -560,15 +560,15 @@ export async function undoAccountStates(
   }
 }
 
-export async function insertAccountPublicKey(
+export async function insertAccountPubKeyCommitment(
   dbId: string,
   pubKeyCommitmentHex: string,
   accountId: string
 ): Promise<void> {
-  return insertAccountPublicKeys(dbId, [pubKeyCommitmentHex], accountId);
+  return insertAccountPubKeyCommitments(dbId, [pubKeyCommitmentHex], accountId);
 }
 
-export async function insertAccountPublicKeys(
+export async function insertAccountPubKeyCommitments(
   dbId: string,
   pubKeyCommitmentHexes: string[],
   accountId: string
@@ -583,12 +583,12 @@ export async function insertAccountPublicKeys(
   } catch (error) {
     logWebStoreError(
       error,
-      `Error inserting account public key mappings for account: ${accountId}`
+      `Error inserting account public key commitment mappings for account: ${accountId}`
     );
   }
 }
 
-export async function getAccountIdByPublicKey(
+export async function getAccountIdByPubKeyCommitment(
   dbId: string,
   pubKeyCommitmentHex: string
 ) {
@@ -599,12 +599,12 @@ export async function getAccountIdByPublicKey(
   } catch (error) {
     logWebStoreError(
       error,
-      `Error fetching account by public key: ${pubKeyCommitmentHex}`
+      `Error fetching account by public key commitment: ${pubKeyCommitmentHex}`
     );
   }
 }
 
-export async function getPublicKeysByAccountId(
+export async function getPubKeyCommitmentsByAccountId(
   dbId: string,
   accountId: string
 ) {
@@ -618,12 +618,12 @@ export async function getPublicKeysByAccountId(
   } catch (error) {
     logWebStoreError(
       error,
-      `Error fetching public keys for account: ${accountId}`
+      `Error fetching public key commitments for account: ${accountId}`
     );
   }
 }
 
-export async function removeAccountPublicKey(
+export async function removeAccountPubKeyCommitment(
   dbId: string,
   pubKeyCommitmentHex: string
 ): Promise<void> {
@@ -633,7 +633,7 @@ export async function removeAccountPublicKey(
   } catch (error) {
     logWebStoreError(
       error,
-      `Error removing account public key: ${pubKeyCommitmentHex}`
+      `Error removing account public key commitment: ${pubKeyCommitmentHex}`
     );
   }
 }

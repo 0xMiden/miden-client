@@ -149,7 +149,7 @@ impl WebClient {
         let commitment = native_pub_key.to_commitment();
 
         let account_id = store
-            .get_account_id_by_public_key(commitment)
+            .get_account_id_by_pub_key_commitment(commitment)
             .await
             .map_err(|err| js_error_with_context(err, "failed to get account by public key"))?;
 
