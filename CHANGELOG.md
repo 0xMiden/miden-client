@@ -1,10 +1,10 @@
 # Changelog
 
-## 0.14.0 (TBD)
+## 0.13.1 (TBD)
 
-* Added the `@miden-sdk/react` hooks library with a provider, hooks, and an example app for the web client ([#1711](https://github.com/0xMiden/miden-client/pull/1711)).
+* Added the `@miden-sdk/react` hooks library (see [its own changelog](packages/react-sdk/CHANGELOG.md)) ([#1711](https://github.com/0xMiden/miden-client/pull/1711)).
 
-## 0.13.0 (TBD)
+## 0.13.0
 
 * [BREAKING] Removed `getRpoFalcon512PublicKeyAsWord` and `getEcdsaK256KeccakPublicKeyAsWord` in `AuthSecretKey`
 * Improved auth scheme handling across the Rust and web clients (typed `build_wallet_id`, unified transaction tests, new shared `getPublicKeyAsWord` binding, and refreshed typedoc output) ([#1556](https://github.com/0xMiden/miden-client/pull/1556)).

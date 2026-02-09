@@ -31,6 +31,14 @@ export type {
   AccountStorageMode,
 };
 
+// Re-export signer types for external signer providers
+export type {
+  SignCallback,
+  SignerAccountType,
+  SignerAccountConfig,
+  SignerContextValue,
+} from "../context/SignerContext";
+
 export type RpcUrlConfig =
   | string
   | "devnet"
