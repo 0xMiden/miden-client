@@ -15,10 +15,10 @@ use miden_client::note::{
     NoteAssets,
     NoteDetails,
     NoteFile,
-    NoteInputs,
     NoteMetadata,
     NoteRecipient,
     NoteScript,
+    NoteStorage,
     NoteTag,
     NoteType,
     build_p2id_recipient,
@@ -142,13 +142,12 @@ pub async fn test_pass_through(client_config: ClientConfig) -> Result<()> {
         pass_through_account.id()
     );
 
-    let pass_through_before_second_tx = client
-        .get_account(pass_through_account.id())
-        .await?
-        .expect("pass-through account should exist");
-
     // Storing commitment to check later that (final_acc.commitment == initial_acc.commitment)
-    let commitment_before_second_tx = pass_through_before_second_tx.account_data().commitment();
+    let commitment_before_second_tx = client
+        .account_reader(pass_through_account.id())
+        .commitment()
+        .await
+        .expect("pass-through account should exist");
 
     // now try another transaction against the pass-through account
     let tx_request = TransactionRequestBuilder::new()
@@ -173,14 +172,14 @@ pub async fn test_pass_through(client_config: ClientConfig) -> Result<()> {
         pass_through_account.id()
     );
 
-    let pass_through_after_second_tx = client
-        .get_account(pass_through_account.id())
-        .await?
+    let commitment_after_second_tx = client
+        .account_reader(pass_through_account.id())
+        .commitment()
+        .await
         .expect("pass-through account should exist");
 
     assert_eq!(
-        pass_through_after_second_tx.account_data().commitment(),
-        commitment_before_second_tx,
+        commitment_after_second_tx, commitment_before_second_tx,
         "pass-through transaction should not change account commitment"
     );
 
@@ -238,7 +237,7 @@ fn create_pass_through_note(
 
     let target_recipient = build_p2id_recipient(target, rng.draw_word())?;
 
-    let inputs = NoteInputs::new(vec![
+    let inputs = NoteStorage::new(vec![
         asset_word[0],
         asset_word[1],
         asset_word[2],

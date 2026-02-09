@@ -1,11 +1,14 @@
 use miden_client::Word as NativeWord;
-use miden_client::account::Account as NativeAccount;
 use wasm_bindgen::prelude::*;
 
 use crate::models::account::Account;
+use crate::models::account_code::AccountCode;
 use crate::models::account_header::AccountHeader;
 use crate::models::account_id::AccountId;
+use crate::models::account_reader::AccountReader;
+use crate::models::account_storage::AccountStorage;
 use crate::models::address::Address;
+use crate::models::asset_vault::AssetVault;
 use crate::models::auth_secret_key::AuthSecretKey;
 use crate::models::word::Word;
 use crate::{WebClient, js_error_with_context};
@@ -26,29 +29,100 @@ impl WebClient {
         }
     }
 
+    /// Retrieves the full account data for the given account ID, returning `null` if not found.
+    ///
+    /// This method loads the complete account state including vault, storage, and code.
     #[wasm_bindgen(js_name = "getAccount")]
     pub async fn get_account(
         &mut self,
         account_id: &AccountId,
     ) -> Result<Option<Account>, JsValue> {
         if let Some(client) = self.get_mut_inner() {
-            let result = client
+            client
                 .get_account(account_id.into())
                 .await
-                .map_err(|err| js_error_with_context(err, "failed to get account"))?;
-
-            if let Some(account_record) = result {
-                // TODO: add partial account support for web client
-                let native_account: NativeAccount = account_record
-                    .try_into()
-                    .map_err(|_| JsValue::from_str("retrieval of partial account unsupported"))?;
-                Ok(Some(native_account.into()))
-            } else {
-                Ok(None)
-            }
+                .map(|opt| opt.map(Into::into))
+                .map_err(|err| js_error_with_context(err, "failed to get account"))
         } else {
             Err(JsValue::from_str("Client not initialized"))
         }
+    }
+
+    /// Retrieves the asset vault for a specific account.
+    ///
+    /// To check the balance for a single asset, use `accountReader` instead.
+    #[wasm_bindgen(js_name = "getAccountVault")]
+    pub async fn get_account_vault(
+        &mut self,
+        account_id: &AccountId,
+    ) -> Result<AssetVault, JsValue> {
+        if let Some(client) = self.get_mut_inner() {
+            client
+                .get_account_vault(account_id.into())
+                .await
+                .map(Into::into)
+                .map_err(|err| js_error_with_context(err, "failed to get account vault"))
+        } else {
+            Err(JsValue::from_str("Client not initialized"))
+        }
+    }
+
+    /// Retrieves the storage for a specific account.
+    ///
+    /// To only load a specific slot, use `accountReader` instead.
+    #[wasm_bindgen(js_name = "getAccountStorage")]
+    pub async fn get_account_storage(
+        &mut self,
+        account_id: &AccountId,
+    ) -> Result<AccountStorage, JsValue> {
+        if let Some(client) = self.get_mut_inner() {
+            client
+                .get_account_storage(account_id.into())
+                .await
+                .map(Into::into)
+                .map_err(|err| js_error_with_context(err, "failed to get account storage"))
+        } else {
+            Err(JsValue::from_str("Client not initialized"))
+        }
+    }
+
+    /// Retrieves the account code for a specific account.
+    ///
+    /// Returns `null` if the account is not found.
+    #[wasm_bindgen(js_name = "getAccountCode")]
+    pub async fn get_account_code(
+        &mut self,
+        account_id: &AccountId,
+    ) -> Result<Option<AccountCode>, JsValue> {
+        if let Some(client) = self.get_mut_inner() {
+            client
+                .get_account_code(account_id.into())
+                .await
+                .map(|opt| opt.map(Into::into))
+                .map_err(|err| js_error_with_context(err, "failed to get account code"))
+        } else {
+            Err(JsValue::from_str("Client not initialized"))
+        }
+    }
+
+    /// Creates a new `AccountReader` for lazy access to account data.
+    ///
+    /// The `AccountReader` executes queries lazily - each method call fetches fresh data
+    /// from storage, ensuring you always see the current state.
+    ///
+    /// # Arguments
+    /// * `account_id` - The ID of the account to read.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const reader = client.accountReader(accountId);
+    /// const nonce = await reader.nonce();
+    /// const balance = await reader.getBalance(faucetId);
+    /// ```
+    #[wasm_bindgen(js_name = "accountReader")]
+    pub fn account_reader(&self, account_id: &AccountId) -> Result<AccountReader, JsValue> {
+        let store = self.store.clone().ok_or(JsValue::from_str("Store not initialized"))?;
+        Ok(AccountReader::new(store, account_id.into()))
     }
 
     /// Retrieves an authentication secret key from the keystore given a public key commitment.
@@ -63,7 +137,7 @@ impl WebClient {
         let keystore = self.keystore.clone().expect("Keystore not initialized");
 
         let auth_secret_key = keystore
-            .get_key((*pub_key_commitment.as_native()).into())
+            .get_secret_key((*pub_key_commitment.as_native()).into())
             .await
             .map_err(|err| js_error_with_context(err, "failed to get auth key for account"))?
             .ok_or(JsValue::from_str("Auth not found for account"))?;

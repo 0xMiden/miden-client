@@ -20,6 +20,7 @@ use commands::clear_config::ClearConfigCmd;
 use commands::exec::ExecCmd;
 use commands::export::ExportCmd;
 use commands::import::ImportCmd;
+use commands::info::InfoCmd;
 use commands::init::InitCmd;
 use commands::new_account::{NewAccountCmd, NewWalletCmd};
 use commands::new_transactions::{ConsumeNotesCmd, MintCmd, SendCmd, SwapCmd};
@@ -141,7 +142,7 @@ impl CliClient {
             .grpc_client(&config.rpc.endpoint.clone().into(), Some(config.rpc.timeout_ms))
             .authenticator(Arc::new(keystore))
             .in_debug_mode(debug_mode)
-            .tx_graceful_blocks(Some(TX_GRACEFUL_BLOCK_DELTA));
+            .tx_discard_delta(Some(TX_DISCARD_DELTA));
 
         // Add optional max_block_number_delta
         if let Some(delta) = config.max_block_number_delta {
@@ -314,7 +315,7 @@ pub fn client_binary_name() -> OsString {
 
 /// Number of blocks that must elapse after a transaction’s reference block before it is marked
 /// stale and discarded.
-const TX_GRACEFUL_BLOCK_DELTA: u32 = 20;
+const TX_DISCARD_DELTA: u32 = 20;
 
 /// Root CLI struct.
 #[derive(Parser, Debug)]
@@ -389,7 +390,7 @@ pub enum Command {
     Notes(NotesCmd),
     Sync(SyncCmd),
     /// View a summary of the current client state.
-    Info,
+    Info(InfoCmd),
     Tags(TagsCmd),
     Address(AddressCmd),
     #[command(name = "tx")]
@@ -452,7 +453,7 @@ impl Cli {
             },
             Command::Import(import) => import.execute(client, keystore).await,
             Command::Init(_) | Command::ClearConfig(_) => Ok(()), // Already handled earlier
-            Command::Info => info::print_client_info(&client).await,
+            Command::Info(info_cmd) => info::print_client_info(&client, info_cmd.rpc_status).await,
             Command::Notes(notes) => Box::pin(notes.execute(client)).await,
             Command::Sync(sync) => sync.execute(client).await,
             Command::Tags(tags) => tags.execute(client).await,
