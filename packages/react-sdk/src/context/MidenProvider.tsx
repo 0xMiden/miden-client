@@ -148,80 +148,101 @@ export function MidenProvider({
 
     let cancelled = false;
 
+    // Wrap the entire init in runExclusive so that if the effect re-triggers
+    // while a previous init is still running, the new init waits for the old
+    // one to finish.  This prevents concurrent WASM access (which crashes
+    // with "recursive use of an object detected").
     const initClient = async () => {
-      setInitializing(true);
-      setConfig(resolvedConfig);
+      await runExclusive(async () => {
+        // Re-check cancelled after potentially waiting for the lock
+        if (cancelled) return;
 
-      try {
-        let webClient: WebClient;
+        setInitializing(true);
+        setConfig(resolvedConfig);
 
-        if (signerContext && signerContext.isConnected) {
-          // External keystore mode - signer provider is present and connected
-          const storeName = `MidenClientDB_${signerContext.storeName}`;
-
-          webClient = await WebClient.createClientWithExternalKeystore(
-            resolvedConfig.rpcUrl,
-            resolvedConfig.noteTransportUrl,
-            resolvedConfig.seed,
-            storeName,
-            undefined, // getKeyCb - not needed for public accounts
-            undefined, // insertKeyCb - not needed for public accounts
-            signerContext.signCb
-          );
-
-          if (cancelled) return;
-
-          // Initialize account from signer config
-          const accountId = await initializeSignerAccount(
-            webClient,
-            signerContext.accountConfig
-          );
-          if (cancelled) return;
-          setSignerAccountId(accountId);
-        } else {
-          // No signer provider - standard local keystore (existing behavior)
-          const seed = resolvedConfig.seed as Parameters<
-            typeof WebClient.createClient
-          >[2];
-          webClient = await WebClient.createClient(
-            resolvedConfig.rpcUrl,
-            resolvedConfig.noteTransportUrl,
-            seed
-          );
-          if (cancelled) return;
-        }
-
-        // Initial sync BEFORE setClient — setClient atomically sets isReady=true
-        // which triggers auto-sync and consumer hooks. Doing sync first avoids
-        // concurrent WASM access between init sync and auto-sync.
         try {
-          const summary = await webClient.syncState();
-          if (cancelled) return;
-          setSyncState({
-            syncHeight: summary.blockNum(),
-            lastSyncTime: Date.now(),
-          });
+          let webClient: WebClient;
+          let didSignerInit = false;
 
-          // Load accounts after sync
-          const accounts = await webClient.getAccounts();
-          if (cancelled) return;
-          useMidenStore.getState().setAccounts(accounts);
-        } catch {
-          // Initial sync failure is non-fatal
-        }
+          if (signerContext && signerContext.isConnected) {
+            // External keystore mode - signer provider is present and connected
+            const storeName = `MidenClientDB_${signerContext.storeName}`;
 
-        // Set client LAST — this atomically sets isReady=true and
-        // isInitializing=false, which enables auto-sync and consumer hooks.
-        if (!cancelled) {
-          setClient(webClient);
+            webClient = await WebClient.createClientWithExternalKeystore(
+              resolvedConfig.rpcUrl,
+              resolvedConfig.noteTransportUrl,
+              resolvedConfig.seed,
+              storeName,
+              undefined, // getKeyCb - not needed for public accounts
+              undefined, // insertKeyCb - not needed for public accounts
+              signerContext.signCb
+            );
+
+            if (cancelled) return;
+
+            // Initialize account from signer config
+            // (this already syncs the client internally)
+            const accountId = await initializeSignerAccount(
+              webClient,
+              signerContext.accountConfig
+            );
+            if (cancelled) return;
+            setSignerAccountId(accountId);
+            didSignerInit = true;
+          } else {
+            // No signer provider - standard local keystore (existing behavior)
+            const seed = resolvedConfig.seed as Parameters<
+              typeof WebClient.createClient
+            >[2];
+            webClient = await WebClient.createClient(
+              resolvedConfig.rpcUrl,
+              resolvedConfig.noteTransportUrl,
+              seed
+            );
+            if (cancelled) return;
+          }
+
+          // Initial sync BEFORE setClient — setClient atomically sets isReady=true
+          // which triggers auto-sync and consumer hooks. Doing sync first avoids
+          // concurrent WASM access between init sync and auto-sync.
+          // Skip for signer mode: initializeSignerAccount already synced.
+          if (!didSignerInit) {
+            try {
+              const summary = await webClient.syncState();
+              if (cancelled) return;
+              setSyncState({
+                syncHeight: summary.blockNum(),
+                lastSyncTime: Date.now(),
+              });
+            } catch {
+              // Initial sync failure is non-fatal
+            }
+          }
+
+          // Load accounts before making client ready
+          if (!cancelled) {
+            try {
+              const accounts = await webClient.getAccounts();
+              if (cancelled) return;
+              useMidenStore.getState().setAccounts(accounts);
+            } catch {
+              // Non-fatal
+            }
+          }
+
+          // Set client LAST — this atomically sets isReady=true and
+          // isInitializing=false, which enables auto-sync and consumer hooks.
+          if (!cancelled) {
+            setClient(webClient);
+          }
+        } catch (error) {
+          if (!cancelled) {
+            setInitError(
+              error instanceof Error ? error : new Error(String(error))
+            );
+          }
         }
-      } catch (error) {
-        if (!cancelled) {
-          setInitError(
-            error instanceof Error ? error : new Error(String(error))
-          );
-        }
-      }
+      });
     };
 
     initClient();
@@ -229,6 +250,7 @@ export function MidenProvider({
       cancelled = true;
     };
   }, [
+    runExclusive,
     resolvedConfig,
     setClient,
     setConfig,
