@@ -1,11 +1,15 @@
 # Changelog
 
-## 0.13.0 (2026-01-28)
+## 0.14.0 (TBD)
 
 ### Enhancements
 
 * Added TypeDoc API reference links for web SDK in main README and Docusaurus documentation ([#1356](https://github.com/0xMiden/miden-client/issues/1356)).
-* [BREAKING] Removed `getRpoFalcon512PublicKeyAsWord` and `getEcdsaK256KeccakPublicKeyAsWord` in `AuthSecretKey`
+
+## 0.13.0 (2026-01-28)
+
+### Enhancements
+
 * Improved auth scheme handling across the Rust and web clients (typed `build_wallet_id`, unified transaction tests, new shared `getPublicKeyAsWord` binding, and refreshed typedoc output) ([#1556](https://github.com/0xMiden/miden-client/pull/1556)).
 * Added the `--remote-prover-timeout` configuration to the CLI ([#1551](https://github.com/0xMiden/miden-client/pull/1551)).
 * Added pagination handling for `sync_storage_maps` and `sync_account_vault` RPC endpoints.
