@@ -2,6 +2,8 @@
 
 ## 0.14.0 (TBD)
 
+- Prevent a potential unwrap panic in `insert_storage_map_nodes_for_map`.
+
 ### Enhancements
 
 * Updated the `GrpcClient` to fetch the RPC limits from the node ([#1724](https://github.com/0xMiden/miden-client/pull/1724)).
