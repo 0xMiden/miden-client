@@ -13,6 +13,9 @@ use thiserror::Error;
 
 use super::NodeRpcClientEndpoint;
 
+pub mod node;
+pub use node::EndpointError;
+
 // RPC ERROR
 // ================================================================================================
 
@@ -30,10 +33,12 @@ pub enum RpcError {
     ExpectedDataMissing(String),
     #[error("rpc api response is invalid: {0}")]
     InvalidResponse(String),
-    #[error("grpc request failed for {endpoint}: {error_kind}")]
-    GrpcError {
+    #[error("grpc request failed for {endpoint}: {error_kind}{}",
+        endpoint_error.as_ref().map_or(String::new(), |e| format!(" ({e})")))]
+    RequestError {
         endpoint: NodeRpcClientEndpoint,
         error_kind: GrpcError,
+        endpoint_error: Option<EndpointError>,
         #[source]
         source: Option<Box<dyn Error + Send + Sync + 'static>>,
     },
@@ -156,8 +161,8 @@ impl GrpcError {
 // ACCEPT HEADER ERROR
 // ================================================================================================
 
-// TODO: Once the node returns structure error information, replace this with a more structure
-// approach. See miden-client/#1129 for more information.
+// TODO: Accept header errors are still parsed from message strings, which is fragile.
+// Ideally the node would return structured error codes for these too. See #1129.
 
 /// Errors that can occur during accept header validation.
 #[derive(Debug, Error)]
