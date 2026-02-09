@@ -252,20 +252,36 @@ const { para, wallet, isConnected } = useParaSigner();
 
 ### Turnkey
 ```tsx
-import { TurnkeySignerProvider } from "@miden-sdk/turnkey";
-import { TurnkeyBrowserClient } from "@turnkey/sdk-browser";
+import { TurnkeySignerProvider } from "@miden-sdk/miden-turnkey-react";
 
-const turnkeyClient = new TurnkeyBrowserClient({ ... });
-
-<TurnkeySignerProvider client={turnkeyClient} organizationId="your-org-id">
+// Config is optional — defaults to https://api.turnkey.com
+// and reads VITE_TURNKEY_ORG_ID from environment
+<TurnkeySignerProvider>
   <MidenProvider config={{ rpcUrl: "testnet" }}>
     <App />
   </MidenProvider>
 </TurnkeySignerProvider>
 
-// After Turnkey auth flow, set the account
-const { setAccount, isConnected } = useTurnkeySigner();
-setAccount(walletAccount);
+// Or with explicit config:
+<TurnkeySignerProvider config={{
+  apiBaseUrl: "https://api.turnkey.com",
+  defaultOrganizationId: "your-org-id",
+}}>
+  ...
+</TurnkeySignerProvider>
+```
+
+Connect via passkey authentication:
+```tsx
+import { useSigner } from "@miden-sdk/react";
+import { useTurnkeySigner } from "@miden-sdk/miden-turnkey-react";
+
+// useSigner() handles connect/disconnect
+const { isConnected, connect, disconnect } = useSigner();
+await connect();  // triggers passkey flow, auto-selects account
+
+// useTurnkeySigner() exposes Turnkey-specific extras
+const { client, account, setAccount } = useTurnkeySigner();
 ```
 
 ### MidenFi Wallet Adapter
