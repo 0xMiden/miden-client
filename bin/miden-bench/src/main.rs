@@ -44,8 +44,7 @@ fn main() {
                 println!();
                 println!("Run benchmarks with:");
                 println!(
-                    "  miden-bench transaction --account-id {account_id} --seed {seed_hex} --entries-per-map {}",
-                    deploy_args.entries_per_map
+                    "  miden-bench transaction --account-id {account_id} --seed {seed_hex}"
                 );
             },
             Err(e) => {
@@ -86,7 +85,7 @@ async fn run_benchmarks(args: &CliArgs) -> anyhow::Result<Vec<BenchmarkResult>> 
             Box::pin(runner.run_transaction_benchmarks(
                 tx_args.account_id.clone(),
                 seed,
-                tx_args.entries_per_map,
+                tx_args.reads,
             ))
             .await
         },
@@ -145,10 +144,12 @@ struct TransactionArgs {
     #[arg(short, long)]
     seed: Option<String>,
 
-    /// Number of key/value entries per storage map (required for two-phase deployed accounts).
-    /// When omitted, entries are read from the imported account (works for small accounts).
+    /// Maximum storage reads per transaction. When total entries exceed this limit,
+    /// reads are split across multiple transactions per benchmark iteration.
+    /// Each iteration's time is the sum across all transactions.
+    /// When omitted, all entries are read in a single transaction.
     #[arg(short, long)]
-    entries_per_map: Option<usize>,
+    reads: Option<usize>,
 }
 
 #[derive(Subcommand, Clone)]

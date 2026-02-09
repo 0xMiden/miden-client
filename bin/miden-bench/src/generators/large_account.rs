@@ -21,6 +21,18 @@ use rand::Rng;
 use rand_chacha::ChaCha20Rng;
 use rand_chacha::rand_core::SeedableRng;
 
+/// Describes a storage slot for reader procedure generation.
+///
+/// Used to generate MASM reader component code that provides procedures
+/// to read from both value and map storage slots.
+#[derive(Clone, Debug)]
+pub struct SlotDescriptor {
+    /// The full slot name (e.g., `miden::bench::map_slot_0`)
+    pub name: String,
+    /// Whether this is a map slot (`true`) or value slot (`false`)
+    pub is_map: bool,
+}
+
 /// Configuration for generating large accounts
 #[derive(Clone, Debug)]
 pub struct LargeAccountConfig {
@@ -74,21 +86,24 @@ pub fn generate_deterministic_seed(index: u32) -> [u8; 32] {
     seed
 }
 
-/// Generates MASM code for a storage reader component with `get_map_item_slot_N` procedures.
+/// Generates MASM code for a storage reader component with procedures for each slot.
 ///
-/// Each procedure reads a map item from the corresponding storage slot. These procedures
-/// must be called from within account context (via `call` from a transaction script), because
-/// the kernel's `get_map_item` handler verifies the caller is an account procedure.
-pub fn generate_reader_component_code(num_slots: usize) -> String {
+/// For map slots: generates `get_map_item_slot_N` (reads a key-value entry).
+/// For value slots: generates `get_value_slot_N` (reads the slot value directly).
+///
+/// These procedures must be called from within account context (via `call` from a
+/// transaction script), because the kernel verifies the caller is an account procedure.
+pub fn generate_reader_component_code(slots: &[SlotDescriptor]) -> String {
     let mut code = String::new();
 
-    for i in 0..num_slots {
-        let slot_name = format!("miden::bench::map_slot_{i}");
-        write!(
-            code,
-            r#"const MAP_SLOT_{i} = word("{slot_name}")
+    for (i, slot) in slots.iter().enumerate() {
+        let slot_name = &slot.name;
+        if slot.is_map {
+            write!(
+                code,
+                r#"const MAP_SLOT_{i} = word("{slot_name}")
 
-# Reads an item from storage slot {i}.
+# Reads an item from map storage slot {i}.
 # Stack input: [KEY]
 # Stack output: [VALUE]
 pub proc get_map_item_slot_{i}
@@ -97,8 +112,25 @@ pub proc get_map_item_slot_{i}
 end
 
 "#
-        )
-        .expect("writing to String should not fail");
+            )
+            .expect("writing to String should not fail");
+        } else {
+            write!(
+                code,
+                r#"const SLOT_{i} = word("{slot_name}")
+
+# Reads the value from storage slot {i}.
+# Stack input: []
+# Stack output: [VALUE]
+pub proc get_value_slot_{i}
+    push.SLOT_{i}[0..2]
+    exec.::miden::protocol::active_account::get_item
+end
+
+"#
+            )
+            .expect("writing to String should not fail");
+        }
     }
 
     code
@@ -122,7 +154,13 @@ pub fn create_large_account(
     }
 
     // Reader component: owns storage slots and provides get_map_item_slot_N procedures
-    let reader_code = generate_reader_component_code(config.num_map_slots);
+    let descriptors: Vec<SlotDescriptor> = (0..config.num_map_slots)
+        .map(|i| SlotDescriptor {
+            name: format!("miden::bench::map_slot_{i}"),
+            is_map: true,
+        })
+        .collect();
+    let reader_code = generate_reader_component_code(&descriptors);
     let reader_component_code = CodeBuilder::default()
         .compile_component_code("miden::bench::storage_reader", &reader_code)
         .map_err(|e| anyhow::anyhow!("Failed to compile reader component: {e}"))?;

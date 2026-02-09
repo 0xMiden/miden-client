@@ -43,16 +43,7 @@ Run benchmarks with:
 **Deployment modes:**
 
 - **Single transaction** (≤200 total entries): all storage entries are included in the initial account.
-- **Two-phase** (>200 total entries): deploys an account with sentinel entries, then expands storage via batched transactions. Storage map values are random.
-
-**Limits:**
-
-*gRPC Message Size:* The default node gRPC limit is 4MB. Accounts above ~200 total entries use two-phase deployment (deploy + expand via batched transactions).
-
-*Memory Requirements:* Transaction proving is memory-intensive:
-- Small (10-50 total entries): Works on any machine
-- Medium (100-200 total entries): Works on most machines
-- Large (500+ total entries): Requires ~32GB RAM and increased gRPC limits
+- **Two-phase** (>200 total entries): deploys an account with map entries, then expands storage via batched transactions. Storage map values are random.
 
 ### `transaction`
 
@@ -62,7 +53,7 @@ Benchmarks transaction operations that read storage from an account (requires a 
 - **prove** - Measures transaction proving time and proof size
 - **full** - Measures full transaction (execute + prove + submit)
 
-The benchmark executes transactions that read all storage map entries from the specified account. The account must be a public account deployed to the network via `deploy`.
+The benchmark executes transactions that read all storage map entries from the specified account. Accounts deployed to the network via `deploy` can test `execute`, `prove` and `full`, while other type of accounts may only measure `execute` times.
 
 The number of storage maps is auto-detected from the account. The `--entries-per-map` flag controls how many entries per map are read:
 
@@ -131,6 +122,7 @@ miden-bench deploy --maps 3 --entries-per-map 100
 - `-a, --account-id <ID>` - Public account ID to benchmark against (required, hex format)
 - `-s, --seed <HEX>` - Account seed for signing (hex-encoded 32 bytes, output by `deploy`). When omitted, only execution is benchmarked (no proving or submission).
 - `-e, --entries-per-map <N>` - Entries per map (required for two-phase deployed accounts, optional for small accounts)
+- `-r, --reads <N>` - Maximum storage reads per transaction. When total entries exceed this limit, reads are split across multiple transactions per benchmark iteration. Each iteration's time is the sum across all transactions. When omitted, all entries are read in a single transaction.
 
 ## Examples
 

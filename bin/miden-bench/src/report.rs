@@ -65,7 +65,7 @@ fn format_duration(d: Duration) -> String {
     }
 }
 
-fn format_size(bytes: usize) -> String {
+pub fn format_size(bytes: usize) -> String {
     if bytes < 1024 {
         format!("{bytes} B")
     } else if bytes < 1024 * 1024 {

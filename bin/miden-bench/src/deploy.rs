@@ -2,6 +2,7 @@
 
 use std::fmt::Write;
 use std::sync::Arc;
+use std::time::Instant;
 
 use miden_client::account::{AccountId, StorageMap, StorageSlot, StorageSlotName};
 use miden_client::assembly::{CodeBuilder, DefaultSourceManager, Module, ModuleKind, Path};
@@ -10,7 +11,7 @@ use miden_client::crypto::RpoRandomCoin;
 use miden_client::keystore::FilesystemKeyStore;
 use miden_client::rpc::{Endpoint, GrpcClient};
 use miden_client::transaction::{TransactionKernel, TransactionRequestBuilder};
-use miden_client::{Client, DebugMode, Felt};
+use miden_client::{Client, DebugMode, Felt, Serializable};
 use miden_client_sqlite_store::ClientBuilderSqliteExt;
 use miden_protocol::account::auth::AuthSecretKey;
 use miden_protocol::account::{AccountBuilder, AccountComponent, AccountStorageMode, AccountType};
@@ -22,10 +23,12 @@ use rand_chacha::rand_core::SeedableRng;
 
 use crate::generators::{
     LargeAccountConfig,
+    SlotDescriptor,
     generate_reader_component_code,
     random_word,
     slot_rng,
 };
+use crate::report::format_size;
 use crate::spinner::with_spinner;
 
 /// Maximum storage entries for a single-transaction deployment.
@@ -53,8 +56,8 @@ async fn wait_for_block_advancement(client: &mut Client<FilesystemKeyStore>) -> 
     Ok(())
 }
 
-/// Deferred map entries to be added after initial deployment
-struct DeferredMapEntries {
+/// Map entries to be added after initial deployment via expansion transactions
+struct MapEntries {
     entries: Vec<([Felt; 4], [Felt; 4])>,
 }
 
@@ -64,7 +67,7 @@ fn create_minimal_account(
 ) -> anyhow::Result<(
     miden_protocol::account::Account,
     miden_protocol::account::auth::AuthSecretKey,
-    Vec<DeferredMapEntries>,
+    Vec<MapEntries>,
 )> {
     let sk = AuthSecretKey::new_falcon512_rpo_with_rng(&mut ChaCha20Rng::from_seed(config.seed));
 
@@ -95,7 +98,7 @@ fn create_minimal_account(
             })
             .collect();
 
-        deferred_entries.push(DeferredMapEntries { entries });
+        deferred_entries.push(MapEntries { entries });
 
         // Create storage map with the initial entry (j=0).
         // Value is random (non-zero with overwhelming probability) — the SMT treats
@@ -126,7 +129,13 @@ fn create_minimal_account(
 
     // Reader component: provides get_map_item_slot_N procedures for transaction benchmarks.
     // No storage slots needed — the procedures access slots by name from any component.
-    let reader_code = generate_reader_component_code(config.num_map_slots);
+    let descriptors: Vec<SlotDescriptor> = (0..config.num_map_slots)
+        .map(|i| SlotDescriptor {
+            name: format!("miden::bench::map_slot_{i}"),
+            is_map: true,
+        })
+        .collect();
+    let reader_code = generate_reader_component_code(&descriptors);
     let reader_component_code = CodeBuilder::default()
         .compile_component_code("miden::bench::storage_reader", &reader_code)
         .map_err(|e| anyhow::anyhow!("Failed to compile reader component: {e}"))?;
@@ -152,7 +161,7 @@ fn create_minimal_account(
 }
 
 /// Generates MASM code for an account component that can set items in multiple storage maps.
-/// Creates a procedure `set_item_slot_N` for each slot that reads key/value from memory.
+/// Creates a procedure `set_item_slot_N` for each slot that receives key/value from the stack.
 fn generate_expansion_component_code(num_slots: usize) -> String {
     let mut code = String::new();
 
@@ -162,32 +171,17 @@ fn generate_expansion_component_code(num_slots: usize) -> String {
             code,
             r#"const MAP_SLOT_{i} = word("{slot_name}")
 
-# Sets an item in storage slot {i}. Key at mem[0], value at mem[4].
+# Sets an item in storage slot {i}.
+# Stack input:  [KEY, VALUE, ...]
+# Stack output: [...]
 pub proc set_item_slot_{i}
-    # Load key from memory address 0
-    push.0
-    mem_loadw_be
-    # Stack: [KEY]
-
-    # Load value from memory address 4
-    push.4
-    mem_loadw_be
-    # Stack: [VALUE, KEY]
-
-    # Reorder for set_map_item: need [slot_suffix, slot_prefix, KEY, VALUE]
-    # Move KEY above VALUE
-    movup.4 movup.4 movup.4 movup.4
-    # Stack: [KEY, VALUE]
-
-    # Push slot identifiers (push.word[0..2] puts [suffix, prefix] on top of stack)
     push.MAP_SLOT_{i}[0..2]
-    # Stack: [slot_suffix, slot_prefix, KEY, VALUE]
+    # Stack: [slot_suffix, slot_prefix, KEY, VALUE, ...]
 
     exec.::miden::protocol::native_account::set_map_item
-    # Stack: [OLD_VALUE]
+    # Stack: [OLD_VALUE, ...]
 
     dropw
-    # Stack: []
 end
 
 "#
@@ -198,40 +192,26 @@ end
     code
 }
 
-/// Entry with its associated slot index for cross-map batching
-struct SlottedEntry {
-    slot_idx: usize,
-    key: [Felt; 4],
-    value: [Felt; 4],
-}
-
 /// Expands storage maps by submitting batched transactions.
-/// Batches entries across ALL maps to minimize the number of transactions.
+/// Processes one map at a time, filling entries sequentially before moving to the next map.
 async fn expand_storage_maps(
     client: &mut Client<FilesystemKeyStore>,
     account_id: AccountId,
-    deferred_entries: Vec<DeferredMapEntries>,
+    map_entries: Vec<MapEntries>,
     num_slots: usize,
 ) -> anyhow::Result<()> {
-    // Flatten all entries with their slot indices for cross-map batching
-    let all_entries: Vec<SlottedEntry> = deferred_entries
-        .into_iter()
-        .enumerate()
-        .flat_map(|(slot_idx, deferred)| {
-            deferred.entries.into_iter().map(move |(key, value)| SlottedEntry {
-                slot_idx,
-                key,
-                value,
-            })
-        })
-        .collect();
-
-    let total_entries = all_entries.len();
+    let total_entries: usize = map_entries.iter().map(|m| m.entries.len()).sum();
     if total_entries == 0 {
         return Ok(());
     }
 
+    let total_batches: usize = map_entries
+        .iter()
+        .map(|m| m.entries.len().div_ceil(ENTRIES_PER_EXPANSION_TX))
+        .sum();
+
     let mut processed = 0;
+    let mut batch_num = 0;
 
     // Generate expansion component code (same as what's in the account)
     let expansion_code = generate_expansion_component_code(num_slots);
@@ -246,74 +226,86 @@ async fn expand_storage_maps(
         .assemble_library([module])
         .map_err(|e| anyhow::anyhow!("Failed to assemble library: {e}"))?;
 
-    // Process entries in batches across all maps
-    let num_batches = total_entries.div_ceil(ENTRIES_PER_EXPANSION_TX);
-    for (batch_idx, chunk) in all_entries.chunks(ENTRIES_PER_EXPANSION_TX).enumerate() {
-        // Generate transaction script that sets entries across multiple maps
-        let script_code = generate_multi_slot_expansion_tx_script(chunk);
+    // Process each map sequentially, batching entries within each map
+    for (slot_idx, map) in map_entries.iter().enumerate() {
+        let entries = &map.entries;
+        let mut start = 0;
 
-        // Compile transaction script with dynamic linking
-        let tx_script = CodeBuilder::new()
-            .with_dynamically_linked_library(library.clone())
-            .map_err(|e| anyhow::anyhow!("Failed to link library: {e}"))?
-            .compile_tx_script(&script_code)
-            .map_err(|e| anyhow::anyhow!("Failed to compile tx script: {e}"))?;
+        while start < entries.len() {
+            let batch_t = Instant::now();
+            let count = ENTRIES_PER_EXPANSION_TX.min(entries.len() - start);
+            let batch = &entries[start..start + count];
 
-        // Build and submit transaction
-        let tx_request = TransactionRequestBuilder::new().custom_script(tx_script).build()?;
+            // Generate transaction script targeting a single map
+            let script_code = generate_single_map_expansion_tx_script(slot_idx, batch);
 
-        client.submit_new_transaction(account_id, tx_request).await?;
+            // Compile transaction script with dynamic linking
+            let tx_script = CodeBuilder::new()
+                .with_dynamically_linked_library(library.clone())
+                .map_err(|e| anyhow::anyhow!("Failed to link library: {e}"))?
+                .compile_tx_script(&script_code)
+                .map_err(|e| anyhow::anyhow!("Failed to compile tx script: {e}"))?;
 
-        // Wait for 3 blocks to ensure storage is properly indexed
-        for _ in 0..3 {
-            wait_for_block_advancement(&mut *client).await?;
+            // Build, prove, and submit transaction
+            let tx_request = TransactionRequestBuilder::new().custom_script(tx_script).build()?;
+
+            let tx_result = client.execute_transaction(account_id, tx_request).await?;
+            let proven_tx = client.prove_transaction(&tx_result).await?;
+            let tx_size = proven_tx.to_bytes().len();
+            let submission_height =
+                client.submit_proven_transaction(proven_tx, &tx_result).await?;
+            client.apply_transaction(&tx_result, submission_height).await?;
+
+            // Wait for 3 blocks to ensure storage is properly indexed
+            for _ in 0..3 {
+                wait_for_block_advancement(&mut *client).await?;
+            }
+
+            batch_num += 1;
+            processed += count;
+            start += count;
+            println!(
+                "  Batch {batch_num}/{total_batches}: map {slot_idx} entries [{start_off}..{end}] \
+                 ({processed}/{total_entries} total) in {:.2?} (tx size: {})",
+                batch_t.elapsed(),
+                format_size(tx_size),
+                start_off = start - count,
+                end = start,
+            );
         }
-
-        processed += chunk.len();
-        println!(
-            "  Batch {}/{}: expanded {} entries ({processed}/{total_entries} total)",
-            batch_idx + 1,
-            num_batches,
-            chunk.len()
-        );
     }
 
     Ok(())
 }
 
-/// Generates a transaction script that sets multiple map items across different slots.
-fn generate_multi_slot_expansion_tx_script(entries: &[SlottedEntry]) -> String {
+/// Generates a transaction script that sets map items in a single storage slot.
+/// Key and value are passed via the stack (not memory), because `call` switches
+/// to the account's memory context which is separate from the tx script's memory.
+fn generate_single_map_expansion_tx_script(
+    slot_idx: usize,
+    entries: &[([Felt; 4], [Felt; 4])],
+) -> String {
     let mut script = String::from("use expander::storage_expander\n\nbegin\n");
+    let procedure_name = format!("set_item_slot_{slot_idx}");
 
-    for entry in entries {
-        let procedure_name = format!("set_item_slot_{}", entry.slot_idx);
+    for (key, value) in entries {
         write!(
             script,
-            r"    # Store key at memory address 0
-    push.{key3}.{key2}.{key1}.{key0}
-    push.0
-    mem_storew_be
-    dropw
-
-    # Store value at memory address 4
+            r"    # Push value then key onto stack (key on top for the procedure)
     push.{val3}.{val2}.{val1}.{val0}
-    push.4
-    mem_storew_be
-    dropw
-
-    # Call the procedure for slot {slot_idx}
+    push.{key3}.{key2}.{key1}.{key0}
     call.storage_expander::{procedure_name}
+    dropw dropw dropw dropw
 
 ",
-            key3 = entry.key[3].as_int(),
-            key2 = entry.key[2].as_int(),
-            key1 = entry.key[1].as_int(),
-            key0 = entry.key[0].as_int(),
-            val3 = entry.value[3].as_int(),
-            val2 = entry.value[2].as_int(),
-            val1 = entry.value[1].as_int(),
-            val0 = entry.value[0].as_int(),
-            slot_idx = entry.slot_idx,
+            key3 = key[3].as_int(),
+            key2 = key[2].as_int(),
+            key1 = key[1].as_int(),
+            key0 = key[0].as_int(),
+            val3 = value[3].as_int(),
+            val2 = value[2].as_int(),
+            val1 = value[1].as_int(),
+            val0 = value[0].as_int(),
         )
         .expect("writing to String should not fail");
     }
@@ -328,6 +320,7 @@ fn generate_multi_slot_expansion_tx_script(entries: &[SlottedEntry]) -> String {
 /// For accounts with more than `MAX_ENTRIES_SINGLE_DEPLOY` entries, uses a two-phase deployment:
 /// 1. Deploy account with empty storage maps
 /// 2. Expand storage through batched transactions
+#[allow(clippy::too_many_lines)]
 pub async fn deploy_account(
     endpoint: &Endpoint,
     maps: usize,
@@ -349,6 +342,8 @@ pub async fn deploy_account(
     }
 
     println!();
+
+    let total_t = Instant::now();
 
     // Create temp directory for client data
     let temp_dir =
@@ -386,11 +381,13 @@ pub async fn deploy_account(
         // Two-phase deployment for large accounts
 
         // Phase 1: Create account with empty storage maps
+        let t = Instant::now();
         let (account, secret_key, deferred_entries) =
             with_spinner("Creating account with empty storage maps", || async {
                 create_minimal_account(&account_config)
             })
             .await?;
+        println!("  Done in {:.2?}", t.elapsed());
 
         let account_id = account.id();
 
@@ -399,43 +396,57 @@ pub async fn deploy_account(
         client.add_account(&account, false).await?;
 
         // Deploy the minimal account
-        with_spinner("Deploying minimal account to network", || async {
+        let t = Instant::now();
+        let tx_size = with_spinner("Deploying minimal account to network", || async {
             let tx_request = TransactionRequestBuilder::new().build()?;
-            client.submit_new_transaction(account_id, tx_request).await?;
-            Ok::<_, anyhow::Error>(())
+            let tx_result = client.execute_transaction(account_id, tx_request).await?;
+            let proven_tx = client.prove_transaction(&tx_result).await?;
+            let tx_size = proven_tx.to_bytes().len();
+            let submission_height = client.submit_proven_transaction(proven_tx, &tx_result).await?;
+            client.apply_transaction(&tx_result, submission_height).await?;
+            Ok::<_, anyhow::Error>(tx_size)
         })
         .await?;
+        println!("  Done in {:.2?} (tx size: {})", t.elapsed(), format_size(tx_size));
 
         println!();
         println!("Account ID: {account_id}");
         println!("Seed: 0x{}", hex::encode(account_config.seed));
         println!();
+        let t = Instant::now();
         println!("Waiting for chain block height to advance...");
         for _ in 0..4 {
             wait_for_block_advancement(&mut client).await?;
         }
+        println!("  Done in {:.2?}", t.elapsed());
 
         // Phase 2: Expand storage maps through batched transactions
         println!();
+        let t = Instant::now();
         println!(
             "Expanding storage maps ({total_entries} entries in batches of {ENTRIES_PER_EXPANSION_TX})..."
         );
         expand_storage_maps(&mut client, account_id, deferred_entries, maps).await?;
+        println!("  Done in {:.2?}", t.elapsed());
 
         // Wait for the node to fully index all storage changes
+        let t = Instant::now();
         println!("Waiting for storage indexing to complete...");
         for _ in 0..5 {
             wait_for_block_advancement(&mut client).await?;
         }
+        println!("  Done in {:.2?}", t.elapsed());
 
         account_id
     } else {
         // Single-transaction deployment for small accounts
         use crate::generators::create_large_account;
 
+        let t = Instant::now();
         let (account, secret_key) =
             with_spinner("Creating account", || async { create_large_account(&account_config) })
                 .await?;
+        println!("  Done in {:.2?}", t.elapsed());
 
         let account_id = account.id();
 
@@ -444,17 +455,26 @@ pub async fn deploy_account(
         client.add_account(&account, false).await?;
 
         // Deploy the account by submitting an empty transaction
-        with_spinner("Deploying account to network", || async {
+        let t = Instant::now();
+        let tx_size = with_spinner("Deploying account to network", || async {
             let tx_request = TransactionRequestBuilder::new().build()?;
-            client.submit_new_transaction(account_id, tx_request).await?;
-            Ok::<_, anyhow::Error>(())
+            let tx_result = client.execute_transaction(account_id, tx_request).await?;
+            let proven_tx = client.prove_transaction(&tx_result).await?;
+            let tx_size = proven_tx.to_bytes().len();
+            let submission_height = client.submit_proven_transaction(proven_tx, &tx_result).await?;
+            client.apply_transaction(&tx_result, submission_height).await?;
+            Ok::<_, anyhow::Error>(tx_size)
         })
         .await?;
+        println!("  Done in {:.2?} (tx size: {})", t.elapsed(), format_size(tx_size));
 
         account_id
     };
 
     let seed = account_config.seed;
+
+    println!();
+    println!("Total deploy time: {:.2?}", total_t.elapsed());
 
     // Cleanup temp directory
     let _ = std::fs::remove_dir_all(&temp_dir);

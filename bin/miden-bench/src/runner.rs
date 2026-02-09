@@ -18,7 +18,7 @@ impl BenchmarkRunner {
         &mut self,
         account_id: String,
         seed: Option<[u8; 32]>,
-        entries_per_map: Option<usize>,
+        max_reads: Option<usize>,
     ) -> anyhow::Result<Vec<BenchmarkResult>> {
         println!("Network: {}", self.config.network);
         println!("Account ID: {account_id}");
@@ -28,7 +28,7 @@ impl BenchmarkRunner {
             &self.config,
             account_id,
             seed,
-            entries_per_map,
+            max_reads,
         ))
         .await
     }
