@@ -713,6 +713,29 @@ pub mod api_client {
             req.extensions_mut().insert(GrpcMethod::new("rpc.Api", "Status"));
             self.inner.unary(req, path, codec).await
         }
+        /// Returns the query parameter limits configured for RPC methods.
+        ///
+        /// These define the maximum number of each parameter a method will accept.
+        /// Exceeding the limit will result in the request being rejected and you should instead send
+        /// multiple smaller requests.
+        pub async fn get_limits(
+            &mut self,
+            request: impl tonic::IntoRequest<()>,
+        ) -> std::result::Result<tonic::Response<super::RpcLimits>, tonic::Status> {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic_prost::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static("/rpc.Api/GetLimits");
+            let mut req = request.into_request();
+            req.extensions_mut().insert(GrpcMethod::new("rpc.Api", "GetLimits"));
+            self.inner.unary(req, path, codec).await
+        }
         /// Returns a Sparse Merkle Tree opening proof for each requested nullifier
         ///
         /// Each proof demonstrates either:
@@ -928,6 +951,60 @@ pub mod api_client {
             req.extensions_mut().insert(GrpcMethod::new("rpc.Api", "SubmitProvenBatch"));
             self.inner.unary(req, path, codec).await
         }
+        /// Returns transactions records for specific accounts within a block range.
+        pub async fn sync_transactions(
+            &mut self,
+            request: impl tonic::IntoRequest<super::SyncTransactionsRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::SyncTransactionsResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic_prost::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static("/rpc.Api/SyncTransactions");
+            let mut req = request.into_request();
+            req.extensions_mut().insert(GrpcMethod::new("rpc.Api", "SyncTransactions"));
+            self.inner.unary(req, path, codec).await
+        }
+        /// Returns info which can be used by the client to sync up to the tip of chain for the notes
+        /// they are interested in.
+        ///
+        /// Client specifies the `note_tags` they are interested in, and the block height from which to
+        /// search for new for matching notes for. The request will then return the next block containing
+        /// any note matching the provided tags.
+        ///
+        /// The response includes each note's metadata and inclusion proof.
+        ///
+        /// A basic note sync can be implemented by repeatedly requesting the previous response's block
+        /// until reaching the tip of the chain.
+        pub async fn sync_notes(
+            &mut self,
+            request: impl tonic::IntoRequest<super::SyncNotesRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::SyncNotesResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic_prost::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static("/rpc.Api/SyncNotes");
+            let mut req = request.into_request();
+            req.extensions_mut().insert(GrpcMethod::new("rpc.Api", "SyncNotes"));
+            self.inner.unary(req, path, codec).await
+        }
         /// Returns a list of nullifiers that match the specified prefixes and are recorded in the node.
         ///
         /// Note that only 16-bit prefixes are supported at this time.
@@ -974,72 +1051,6 @@ pub mod api_client {
             req.extensions_mut().insert(GrpcMethod::new("rpc.Api", "SyncAccountVault"));
             self.inner.unary(req, path, codec).await
         }
-        /// Returns info which can be used by the client to sync up to the tip of chain for the notes they are interested in.
-        ///
-        /// Client specifies the `note_tags` they are interested in, and the block height from which to search for new for
-        /// matching notes for. The request will then return the next block containing any note matching the provided tags.
-        ///
-        /// The response includes each note's metadata and inclusion proof.
-        ///
-        /// A basic note sync can be implemented by repeatedly requesting the previous response's block until reaching the
-        /// tip of the chain.
-        pub async fn sync_notes(
-            &mut self,
-            request: impl tonic::IntoRequest<super::SyncNotesRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::SyncNotesResponse>,
-            tonic::Status,
-        > {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::unknown(
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
-            let codec = tonic_prost::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/rpc.Api/SyncNotes");
-            let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new("rpc.Api", "SyncNotes"));
-            self.inner.unary(req, path, codec).await
-        }
-        /// Returns info which can be used by the client to sync up to the latest state of the chain
-        /// for the objects (accounts and notes) the client is interested in.
-        ///
-        /// This request returns the next block containing requested data. It also returns `chain_tip`
-        /// which is the latest block number in the chain. Client is expected to repeat these requests
-        /// in a loop until `response.block_header.block_num == response.chain_tip`, at which point
-        /// the client is fully synchronized with the chain.
-        ///
-        /// Each update response also contains info about new notes, accounts etc. created. It also returns
-        /// Chain MMR delta that can be used to update the state of Chain MMR. This includes both chain
-        /// MMR peaks and chain MMR nodes.
-        ///
-        /// For preserving some degree of privacy, note tags contain only high
-        /// part of hashes. Thus, returned data contains excessive notes, client can make
-        /// additional filtering of that data on its side.
-        pub async fn sync_state(
-            &mut self,
-            request: impl tonic::IntoRequest<super::SyncStateRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::SyncStateResponse>,
-            tonic::Status,
-        > {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::unknown(
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
-            let codec = tonic_prost::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/rpc.Api/SyncState");
-            let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new("rpc.Api", "SyncState"));
-            self.inner.unary(req, path, codec).await
-        }
         /// Returns storage map updates for specified account and storage slots within a block range.
         pub async fn sync_account_storage_maps(
             &mut self,
@@ -1065,12 +1076,26 @@ pub mod api_client {
                 .insert(GrpcMethod::new("rpc.Api", "SyncAccountStorageMaps"));
             self.inner.unary(req, path, codec).await
         }
-        /// Returns transactions records for specific accounts within a block range.
-        pub async fn sync_transactions(
+        /// Returns info which can be used by the client to sync up to the latest state of the chain
+        /// for the objects (accounts and notes) the client is interested in.
+        ///
+        /// This request returns the next block containing requested data. It also returns `chain_tip`
+        /// which is the latest block number in the chain. Client is expected to repeat these requests
+        /// in a loop until `response.block_header.block_num == response.chain_tip`, at which point
+        /// the client is fully synchronized with the chain.
+        ///
+        /// Each update response also contains info about new notes, accounts etc. created. It also
+        /// returns Chain MMR delta that can be used to update the state of Chain MMR. This includes
+        /// both chain MMR peaks and chain MMR nodes.
+        ///
+        /// For preserving some degree of privacy, note tags contain only high
+        /// part of hashes. Thus, returned data contains excessive notes, client can make
+        /// additional filtering of that data on its side.
+        pub async fn sync_state(
             &mut self,
-            request: impl tonic::IntoRequest<super::SyncTransactionsRequest>,
+            request: impl tonic::IntoRequest<super::SyncStateRequest>,
         ) -> std::result::Result<
-            tonic::Response<super::SyncTransactionsResponse>,
+            tonic::Response<super::SyncStateResponse>,
             tonic::Status,
         > {
             self.inner
@@ -1082,32 +1107,9 @@ pub mod api_client {
                     )
                 })?;
             let codec = tonic_prost::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/rpc.Api/SyncTransactions");
+            let path = http::uri::PathAndQuery::from_static("/rpc.Api/SyncState");
             let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new("rpc.Api", "SyncTransactions"));
-            self.inner.unary(req, path, codec).await
-        }
-        /// Returns the query parameter limits configured for RPC methods.
-        ///
-        /// These define the maximum number of each parameter a method will accept.
-        /// Exceeding the limit will result in the request being rejected and you should instead send
-        /// multiple smaller requests.
-        pub async fn get_limits(
-            &mut self,
-            request: impl tonic::IntoRequest<()>,
-        ) -> std::result::Result<tonic::Response<super::RpcLimits>, tonic::Status> {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::unknown(
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
-            let codec = tonic_prost::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/rpc.Api/GetLimits");
-            let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new("rpc.Api", "GetLimits"));
+            req.extensions_mut().insert(GrpcMethod::new("rpc.Api", "SyncState"));
             self.inner.unary(req, path, codec).await
         }
     }

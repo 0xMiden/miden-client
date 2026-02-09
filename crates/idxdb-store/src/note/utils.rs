@@ -6,10 +6,10 @@ use miden_client::Word;
 use miden_client::note::{
     NoteAssets,
     NoteDetails,
-    NoteInputs,
     NoteMetadata,
     NoteRecipient,
     NoteScript,
+    NoteStorage,
     NoteUpdateTracker,
 };
 use miden_client::store::{
@@ -82,7 +82,7 @@ pub(crate) fn serialize_input_note(note: &InputNoteRecord) -> SerializedInputNot
 
     let details = note.details();
     let serial_number = details.serial_num().to_bytes();
-    let inputs = details.inputs().to_bytes();
+    let inputs = details.storage().to_bytes();
     let nullifier = details.nullifier().to_hex();
 
     let recipient = details.recipient();
@@ -199,7 +199,7 @@ pub fn parse_input_note_idxdb_object(
 
     let serial_number = Word::read_from_bytes(&serial_number)?;
     let script = NoteScript::read_from_bytes(&serialized_note_script)?;
-    let inputs = NoteInputs::read_from_bytes(&inputs)?;
+    let inputs = NoteStorage::read_from_bytes(&inputs)?;
     let recipient = NoteRecipient::new(serial_number, script, inputs);
 
     let details = NoteDetails::new(assets, recipient);
