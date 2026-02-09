@@ -38,7 +38,7 @@ miden-client-integration-tests [OPTIONS]
 - `-f, --filter <REGEX>` - Filter tests by name using regex patterns
 - `--contains <STRING>` - Only run tests whose names contain this substring
 - `--exclude <REGEX>` - Exclude tests whose names match this regex pattern
-- `--retry-count <NUMBER>` - Number of times to retry failed tests (default: `1`, set to `0` to disable retries)
+- `--retry-count <NUMBER>` - Number of times to retry failed tests (default: `3`, set to `0` to disable retries)
 - `--list` - List all available tests without running them
 - `-h, --help` - Show help information
 - `-V, --version` - Show version information

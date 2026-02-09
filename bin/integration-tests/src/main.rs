@@ -30,14 +30,15 @@ mod tests;
 fn main() {
     let args = Args::parse();
 
+    // Initialize tracing from RUST_LOG if set (before subprocess check so subprocesses get
+    // tracing too)
+    init_tracing();
+
     // If running as a subprocess for a single test, execute it and exit
     if let Some(ref test_name) = args.internal_run_test {
         run_single_test_subprocess(&args, test_name);
         return;
     }
-
-    // Initialize tracing from RUST_LOG if set
-    init_tracing();
 
     let all_tests = generated_tests::get_all_tests();
     let filtered_tests = filter_tests(all_tests, &args);
@@ -61,71 +62,13 @@ fn main() {
     };
     let start_time = Instant::now();
 
-    // Run initial test pass
-    let results = run_tests_parallel(filtered_tests, base_config.clone(), args.jobs, false);
-
-    // Determine retry configuration
-    let retry_enabled = args.retry_count > 0;
-    let mut retry_results: Vec<TestResult> = Vec::new();
-
-    if retry_enabled {
-        let failed_test_names: Vec<String> =
-            results.iter().filter(|r| !r.passed).map(|r| r.name.clone()).collect();
-
-        if !failed_test_names.is_empty() {
-            for retry_attempt in 1..=args.retry_count {
-                println!("\n=== RETRY ATTEMPT {}/{} ===", retry_attempt, args.retry_count);
-                println!(
-                    "Retrying {} failed test(s) with reduced parallelism...",
-                    failed_test_names.len()
-                );
-
-                // Get fresh test cases for the failed tests
-                let all_tests = generated_tests::get_all_tests();
-                let tests_to_retry: Vec<TestCase> =
-                    all_tests.into_iter().filter(|t| failed_test_names.contains(&t.name)).collect();
-
-                if tests_to_retry.is_empty() {
-                    break;
-                }
-
-                // Retry with reduced parallelism (half the jobs, minimum 1)
-                let retry_jobs = (args.jobs / 2).max(1);
-
-                let current_retry_results =
-                    run_tests_parallel(tests_to_retry, base_config.clone(), retry_jobs, true);
-
-                // Check if all retries passed
-                let all_passed = current_retry_results.iter().all(|r| r.passed);
-                retry_results.extend(current_retry_results);
-
-                if all_passed {
-                    break;
-                }
-            }
-        }
-    }
+    let results = run_tests_with_retries(filtered_tests, base_config, args.jobs, args.retry_count);
 
     let total_duration = start_time.elapsed();
-    print_summary(&results, &retry_results, total_duration);
+    print_summary(&results, total_duration);
 
     // Exit with error code if any tests failed after retries
-    let final_failed_count = if retry_results.is_empty() {
-        results.iter().filter(|r| !r.passed).count()
-    } else {
-        // For tests that were retried, only count as failed if they failed in ALL retries
-        let retried_test_names: std::collections::HashSet<_> =
-            retry_results.iter().map(|r| &r.name).collect();
-
-        let non_retried_failures = results
-            .iter()
-            .filter(|r| !r.passed && !retried_test_names.contains(&r.name))
-            .count();
-
-        let retry_failures = retry_results.iter().filter(|r| !r.passed).count();
-
-        non_retried_failures + retry_failures
-    };
+    let final_failed_count = results.iter().filter(|r| r.failed()).count();
 
     if final_failed_count > 0 {
         std::process::exit(1);
@@ -287,18 +230,61 @@ impl AsRef<str> for TestCategory {
     }
 }
 
-/// Represents the result of executing a test case.
+/// Represents the result of a single test attempt (one execution of a test case).
 #[derive(Debug, Clone)]
-struct TestResult {
+struct AttemptResult {
     name: String,
     category: String,
     passed: bool,
     duration: Duration,
     error_message: Option<String>,
-    /// Indicates whether this result is from a retry attempt.
-    is_retry: bool,
     /// Captured stdout from the test (only shown for failed tests).
     captured_output: Option<String>,
+}
+
+/// Represents the final result of a test case, including all retry attempts.
+#[derive(Debug, Clone)]
+struct TestResult {
+    name: String,
+    category: String,
+    attempts: Vec<AttemptResult>,
+}
+
+impl TestResult {
+    /// Returns `true` if the test ultimately passed (last attempt passed).
+    fn passed(&self) -> bool {
+        self.attempts.last().is_some_and(|a| a.passed)
+    }
+
+    /// Returns `true` if the test ultimately failed (last attempt failed).
+    fn failed(&self) -> bool {
+        !self.passed()
+    }
+
+    /// Returns the number of retries (attempts beyond the first).
+    fn retries(&self) -> usize {
+        self.attempts.len().saturating_sub(1)
+    }
+
+    /// Returns `true` if the test was flaky (failed initially but passed on retry).
+    fn is_flaky(&self) -> bool {
+        self.passed() && self.retries() > 0
+    }
+
+    /// Returns the duration of the last attempt.
+    fn duration(&self) -> Duration {
+        self.attempts.last().map_or(Duration::ZERO, |a| a.duration)
+    }
+
+    /// Returns the error message from the last attempt, if any.
+    fn error_message(&self) -> Option<&str> {
+        self.attempts.last().and_then(|a| a.error_message.as_deref())
+    }
+
+    /// Returns the captured output from the last attempt, if any.
+    fn captured_output(&self) -> Option<&str> {
+        self.attempts.last().and_then(|a| a.captured_output.as_deref())
+    }
 }
 
 // SUBPROCESS RESULT
@@ -402,14 +388,6 @@ fn run_single_test_subprocess(args: &Args, test_name: &str) {
     std::process::exit(if subprocess_result.passed { 0 } else { 1 });
 }
 
-impl TestResult {
-    /// Marks this result as coming from a retry attempt.
-    fn with_retry(mut self) -> Self {
-        self.is_retry = true;
-        self
-    }
-}
-
 /// Filters the list of tests based on command line arguments.
 ///
 /// Applies regex patterns, substring matching, and exclusion filters to select which tests should
@@ -482,6 +460,53 @@ fn format_error_report(error: anyhow::Error) -> String {
     output
 }
 
+/// Runs tests with retries for failed tests.
+///
+/// Executes tests in parallel, then retries any failures up to `retry_count` times.
+/// Returns the final results for all tests, including attempt history.
+fn run_tests_with_retries(
+    tests: Vec<TestCase>,
+    base_config: BaseConfig,
+    jobs: usize,
+    retry_count: usize,
+) -> Vec<TestResult> {
+    let initial_attempts = run_tests_parallel(tests, base_config.clone(), jobs, false);
+
+    let mut results: Vec<TestResult> = initial_attempts
+        .into_iter()
+        .map(|attempt| TestResult {
+            name: attempt.name.clone(),
+            category: attempt.category.clone(),
+            attempts: vec![attempt],
+        })
+        .collect();
+
+    for retry in 1..=retry_count {
+        let failed_names: Vec<&str> =
+            results.iter().filter(|r| r.failed()).map(|r| r.name.as_str()).collect();
+
+        if failed_names.is_empty() {
+            break;
+        }
+
+        println!("\n=== RETRY ATTEMPT {retry}/{retry_count} ===");
+        println!("Retrying {} failed test(s)...", failed_names.len());
+
+        let tests_to_retry: Vec<TestCase> = generated_tests::get_all_tests()
+            .into_iter()
+            .filter(|t| failed_names.contains(&t.name.as_str()))
+            .collect();
+
+        for attempt in run_tests_parallel(tests_to_retry, base_config.clone(), jobs, true) {
+            if let Some(result) = results.iter_mut().find(|r| r.name == attempt.name) {
+                result.attempts.push(attempt);
+            }
+        }
+    }
+
+    results
+}
+
 /// Runs multiple tests in parallel using subprocess execution.
 ///
 /// Each test is spawned as a separate subprocess, enabling true OS-level parallelism.
@@ -492,7 +517,7 @@ fn run_tests_parallel(
     base_config: BaseConfig,
     jobs: usize,
     is_retry: bool,
-) -> Vec<TestResult> {
+) -> Vec<AttemptResult> {
     let total_tests = tests.len();
     let current_exe = std::env::current_exe().expect("Failed to get current executable");
 
@@ -597,55 +622,34 @@ fn run_tests_parallel(
                             };
 
                         match subprocess_result {
-                            Some(sr) => {
-                                let mut res = TestResult {
-                                    name: sr.name,
-                                    category: sr.category,
-                                    passed: sr.passed,
-                                    duration: Duration::from_secs_f64(sr.duration_secs),
-                                    error_message: sr.error_message,
-                                    is_retry: false,
-                                    captured_output,
-                                };
-                                if is_retry {
-                                    res = res.with_retry();
-                                }
-                                res
+                            Some(sr) => AttemptResult {
+                                name: sr.name,
+                                category: sr.category,
+                                passed: sr.passed,
+                                duration: Duration::from_secs_f64(sr.duration_secs),
+                                error_message: sr.error_message,
+                                captured_output,
                             },
-                            None => {
-                                let mut res = TestResult {
-                                    name: test_name.clone(),
-                                    category: test_category.clone(),
-                                    passed: false,
-                                    duration: Duration::ZERO,
-                                    error_message: Some(format!(
-                                        "Failed to parse subprocess output: {}",
-                                        stdout
-                                    )),
-                                    is_retry: false,
-                                    captured_output: Some(stderr.to_string()),
-                                };
-                                if is_retry {
-                                    res = res.with_retry();
-                                }
-                                res
+                            None => AttemptResult {
+                                name: test_name.clone(),
+                                category: test_category.clone(),
+                                passed: false,
+                                duration: Duration::ZERO,
+                                error_message: Some(format!(
+                                    "Failed to parse subprocess output: {}",
+                                    stdout
+                                )),
+                                captured_output: Some(stderr.to_string()),
                             },
                         }
                     },
-                    Err(e) => {
-                        let mut res = TestResult {
-                            name: test_name.clone(),
-                            category: test_category.clone(),
-                            passed: false,
-                            duration: Duration::ZERO,
-                            error_message: Some(format!("Failed to spawn subprocess: {}", e)),
-                            is_retry: false,
-                            captured_output: None,
-                        };
-                        if is_retry {
-                            res = res.with_retry();
-                        }
-                        res
+                    Err(e) => AttemptResult {
+                        name: test_name.clone(),
+                        category: test_category.clone(),
+                        passed: false,
+                        duration: Duration::ZERO,
+                        error_message: Some(format!("Failed to spawn subprocess: {}", e)),
+                        captured_output: None,
                     },
                 };
 
@@ -708,118 +712,77 @@ fn format_duration(duration: Duration) -> String {
 ///
 /// Shows pass/fail counts, failed test details, retry statistics, and timing statistics including
 /// average, median, min, and max execution times.
-fn print_summary(
-    initial_results: &[TestResult],
-    retry_results: &[TestResult],
-    total_duration: Duration,
-) {
-    let initial_passed = initial_results.iter().filter(|r| r.passed).count();
-    let initial_failed = initial_results.len() - initial_passed;
+fn print_summary(results: &[TestResult], total_duration: Duration) {
+    let passed_count = results.iter().filter(|r| r.passed()).count();
+    let failed_count = results.iter().filter(|r| r.failed()).count();
+    let flaky_tests: Vec<_> = results.iter().filter(|r| r.is_flaky()).collect();
+    let has_retries = results.iter().any(|r| r.retries() > 0);
 
     println!();
     println!("─────────────────────────────────────────────────────────");
     println!("  Summary");
     println!("─────────────────────────────────────────────────────────");
 
-    // Report retry statistics if there were retries
-    if !retry_results.is_empty() {
-        let retry_passed = retry_results.iter().filter(|r| r.passed).count();
-
-        // Find flaky tests: failed initially but passed on retry
-        let initial_failed_names: std::collections::HashSet<_> =
-            initial_results.iter().filter(|r| !r.passed).map(|r| &r.name).collect();
-
-        let flaky_tests: Vec<_> = retry_results
-            .iter()
-            .filter(|r| r.passed && initial_failed_names.contains(&r.name))
-            .collect();
-
-        // Persistent failures: failed in initial run and in all retries
-        let persistent_failures: Vec<_> = retry_results.iter().filter(|r| !r.passed).collect();
-
-        // Final counts after retries
-        let final_passed = initial_passed + retry_passed;
-        let final_failed = persistent_failures.len();
-
+    if has_retries {
         println!(
             "  {} passed, {} failed, {} flaky in {}",
-            final_passed,
-            final_failed,
+            passed_count,
+            failed_count,
             flaky_tests.len(),
             format_duration(total_duration)
         );
-
-        if !flaky_tests.is_empty() {
-            println!();
-            println!("  Flaky tests (passed on retry):");
-            for result in &flaky_tests {
-                println!("    {}::{}", result.category, result.name);
-            }
-        }
-
-        if !persistent_failures.is_empty() {
-            println!();
-            println!("  Failures:");
-            for result in &persistent_failures {
-                println!("    FAIL {}::{}", result.category, result.name);
-                if let Some(ref error) = result.error_message {
-                    println!("         Error: {error}");
-                }
-                // Show captured output for failed tests
-                if let Some(ref output) = result.captured_output {
-                    println!("         ─── Captured stdout ───");
-                    for line in output.lines() {
-                        println!("         {line}");
-                    }
-                    println!("         ─── End stdout ───");
-                }
-            }
-        }
     } else {
         println!(
             "  {} passed, {} failed in {}",
-            initial_passed,
-            initial_failed,
+            passed_count,
+            failed_count,
             format_duration(total_duration)
         );
+    }
 
-        if initial_failed > 0 {
-            println!();
-            println!("  Failures:");
-            for result in initial_results.iter().filter(|r| !r.passed) {
-                println!("    FAIL {}::{}", result.category, result.name);
-                if let Some(ref error) = result.error_message {
-                    println!("         Error: {error}");
+    if !flaky_tests.is_empty() {
+        println!();
+        println!("  Flaky tests (passed on retry):");
+        for result in &flaky_tests {
+            println!("    {}::{}", result.category, result.name);
+        }
+    }
+
+    let failures: Vec<_> = results.iter().filter(|r| r.failed()).collect();
+    if !failures.is_empty() {
+        println!();
+        println!("  Failures:");
+        for result in &failures {
+            println!("    FAIL {}::{}", result.category, result.name);
+            if let Some(error) = result.error_message() {
+                println!("         Error: {error}");
+            }
+            // Show captured output for failed tests
+            if let Some(output) = result.captured_output() {
+                println!("         ─── Captured stdout ───");
+                for line in output.lines() {
+                    println!("         {line}");
                 }
-                // Show captured output for failed tests
-                if let Some(ref output) = result.captured_output {
-                    println!("         ─── Captured stdout ───");
-                    for line in output.lines() {
-                        println!("         {line}");
-                    }
-                    println!("         ─── End stdout ───");
-                }
+                println!("         ─── End stdout ───");
             }
         }
     }
 
-    // Print timing statistics using all results (initial + retries)
-    let all_results: Vec<_> = initial_results.iter().chain(retry_results.iter()).collect();
-
-    if all_results.len() > 1 {
-        let mut durations: Vec<_> = all_results.iter().map(|r| r.duration).collect();
+    // Print timing statistics
+    if results.len() > 1 {
+        let mut durations: Vec<_> = results.iter().map(|r| r.duration()).collect();
         durations.sort();
 
         let avg_duration = durations.iter().sum::<Duration>() / durations.len() as u32;
         let median_duration = durations[durations.len() / 2];
-        let slowest = all_results.iter().max_by_key(|r| r.duration).unwrap();
+        let slowest = results.iter().max_by_key(|r| r.duration()).unwrap();
 
         println!();
         println!(
             "  Timing: avg {} | median {} | slowest {} ({}::{})",
             format_duration(avg_duration),
             format_duration(median_duration),
-            format_duration(slowest.duration),
+            format_duration(slowest.duration()),
             slowest.category,
             slowest.name,
         );
