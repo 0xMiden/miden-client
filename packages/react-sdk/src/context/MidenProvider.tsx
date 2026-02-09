@@ -132,7 +132,8 @@ export function MidenProvider({
     // If signer provider exists but not connected, wait for user to connect
     if (signerContext && !signerContext.isConnected) {
       // Reset state when signer disconnects
-      if (client) {
+      // Read client from store directly (not closure) since client is not in deps
+      if (useMidenStore.getState().client) {
         useMidenStore.getState().reset();
         setClient(null);
         setSignerAccountId(null);
@@ -144,6 +145,8 @@ export function MidenProvider({
     if (!signerContext) {
       isInitializedRef.current = true;
     }
+
+    let cancelled = false;
 
     const initClient = async () => {
       setInitializing(true);
@@ -166,11 +169,14 @@ export function MidenProvider({
             signerContext.signCb
           );
 
+          if (cancelled) return;
+
           // Initialize account from signer config
           const accountId = await initializeSignerAccount(
             webClient,
             signerContext.accountConfig
           );
+          if (cancelled) return;
           setSignerAccountId(accountId);
         } else {
           // No signer provider - standard local keystore (existing behavior)
@@ -182,13 +188,15 @@ export function MidenProvider({
             resolvedConfig.noteTransportUrl,
             seed
           );
+          if (cancelled) return;
         }
 
-        setClient(webClient);
-
-        // Initial sync
+        // Initial sync BEFORE setClient — setClient atomically sets isReady=true
+        // which triggers auto-sync and consumer hooks. Doing sync first avoids
+        // concurrent WASM access between init sync and auto-sync.
         try {
-          const summary = await runExclusive(() => webClient.syncState());
+          const summary = await webClient.syncState();
+          if (cancelled) return;
           setSyncState({
             syncHeight: summary.blockNum(),
             lastSyncTime: Date.now(),
@@ -196,18 +204,31 @@ export function MidenProvider({
 
           // Load accounts after sync
           const accounts = await webClient.getAccounts();
+          if (cancelled) return;
           useMidenStore.getState().setAccounts(accounts);
         } catch {
           // Initial sync failure is non-fatal
         }
+
+        // Set client LAST — this atomically sets isReady=true and
+        // isInitializing=false, which enables auto-sync and consumer hooks.
+        if (!cancelled) {
+          setClient(webClient);
+        }
       } catch (error) {
-        setInitError(error instanceof Error ? error : new Error(String(error)));
+        if (!cancelled) {
+          setInitError(
+            error instanceof Error ? error : new Error(String(error))
+          );
+        }
       }
     };
 
     initClient();
+    return () => {
+      cancelled = true;
+    };
   }, [
-    runExclusive,
     resolvedConfig,
     setClient,
     setConfig,
@@ -215,7 +236,6 @@ export function MidenProvider({
     setInitializing,
     setSyncState,
     signerContext,
-    client,
   ]);
 
   // Auto-sync interval
