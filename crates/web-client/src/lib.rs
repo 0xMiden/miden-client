@@ -5,21 +5,14 @@ use core::fmt::Write;
 
 use idxdb_store::WebStore;
 use js_sys::{Function, Reflect};
+use miden_client::builder::ClientBuilder;
 use miden_client::crypto::RpoRandomCoin;
 use miden_client::note_transport::NoteTransportClient;
 use miden_client::note_transport::grpc::GrpcNoteTransportClient;
 use miden_client::rpc::{Endpoint, GrpcClient, NodeRpcClient};
 use miden_client::testing::mock::MockRpcApi;
 use miden_client::testing::note_transport::MockNoteTransportApi;
-use miden_client::{
-    Client,
-    ClientError,
-    ErrorHint,
-    ExecutionOptions,
-    Felt,
-    MAX_TX_EXECUTION_CYCLES,
-    MIN_TX_EXECUTION_CYCLES,
-};
+use miden_client::{Client, ClientError, DebugMode, ErrorHint, Felt};
 use models::code_builder::CodeBuilder;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
@@ -57,6 +50,7 @@ pub struct WebClient {
     inner: Option<Client<WebKeyStore<RpoRandomCoin>>>,
     mock_rpc_api: Option<Arc<MockRpcApi>>,
     mock_note_transport_api: Option<Arc<MockNoteTransportApi>>,
+    debug_mode: bool,
 }
 
 impl Default for WebClient {
@@ -76,7 +70,20 @@ impl WebClient {
             keystore: None,
             mock_rpc_api: None,
             mock_note_transport_api: None,
+            debug_mode: false,
         }
+    }
+
+    /// Sets the debug mode for transaction execution.
+    ///
+    /// When enabled, the transaction executor will record additional information useful for
+    /// debugging (the values on the VM stack and the state of the advice provider). This is
+    /// disabled by default since it adds overhead.
+    ///
+    /// Must be called before `createClient`.
+    #[wasm_bindgen(js_name = "setDebugMode")]
+    pub fn set_debug_mode(&mut self, enabled: bool) {
+        self.debug_mode = enabled;
     }
 
     pub(crate) fn get_mut_inner(&mut self) -> Option<&mut Client<WebKeyStore<RpoRandomCoin>>> {
@@ -174,8 +181,6 @@ impl WebClient {
 
         Ok(JsValue::from_str("Client created successfully"))
     }
-
-    /// Initializes the inner client and components with the given RPC client and optional seed.
     async fn setup_client(
         &mut self,
         rpc_client: Arc<dyn NodeRpcClient>,
@@ -211,25 +216,25 @@ impl WebClient {
         let keystore =
             WebKeyStore::new_with_callbacks(rng, store_name, get_key_cb, insert_key_cb, sign_cb);
 
-        let mut client = Client::new(
-            rpc_client,
-            Box::new(rng),
-            web_store.clone(),
-            Some(Arc::new(keystore.clone())),
-            ExecutionOptions::new(
-                Some(MAX_TX_EXECUTION_CYCLES),
-                MIN_TX_EXECUTION_CYCLES,
-                false,
-                false,
-            )
-            .expect("Default executor's options should always be valid"),
-            None,
-            None,
-            note_transport_client,
-            None,
-        )
-        .await
-        .map_err(|err| js_error_with_context(err, "Failed to create client"))?;
+        let mut builder = ClientBuilder::new()
+            .rpc(rpc_client)
+            .rng(Box::new(rng))
+            .store(web_store.clone())
+            .authenticator(Arc::new(keystore.clone()))
+            .in_debug_mode(if self.debug_mode {
+                DebugMode::Enabled
+            } else {
+                DebugMode::Disabled
+            });
+
+        if let Some(transport) = note_transport_client {
+            builder = builder.note_transport(transport);
+        }
+
+        let mut client = builder
+            .build()
+            .await
+            .map_err(|err| js_error_with_context(err, "Failed to create client"))?;
 
         // Ensure genesis block is fetched and stored in IndexedDB.
         // This is important for web workers that create their own client instances -

@@ -11,6 +11,7 @@
 - [AuthScheme](enumerations/AuthScheme.md)
 - [InputNoteState](enumerations/InputNoteState.md)
 - [NetworkType](enumerations/NetworkType.md)
+- [NoteAttachmentKind](enumerations/NoteAttachmentKind.md)
 - [NoteFilterTypes](enumerations/NoteFilterTypes.md)
 - [NoteType](enumerations/NoteType.md)
 - [OutputNoteState](enumerations/OutputNoteState.md)
@@ -30,6 +31,8 @@
 - [AccountHeader](classes/AccountHeader.md)
 - [AccountId](classes/AccountId.md)
 - [AccountIdArray](classes/AccountIdArray.md)
+- [AccountReader](classes/AccountReader.md)
+- [AccountStatus](classes/AccountStatus.md)
 - [AccountStorage](classes/AccountStorage.md)
 - [AccountStorageDelta](classes/AccountStorageDelta.md)
 - [AccountStorageMode](classes/AccountStorageMode.md)
@@ -39,7 +42,7 @@
 - [AdviceInputs](classes/AdviceInputs.md)
 - [AdviceMap](classes/AdviceMap.md)
 - [AssetVault](classes/AssetVault.md)
-- [AuthRpoFalcon512MultisigConfig](classes/AuthRpoFalcon512MultisigConfig.md)
+- [AuthFalcon512RpoMultisigConfig](classes/AuthFalcon512RpoMultisigConfig.md)
 - [AuthSecretKey](classes/AuthSecretKey.md)
 - [BasicFungibleFaucetComponent](classes/BasicFungibleFaucetComponent.md)
 - [BlockHeader](classes/BlockHeader.md)
@@ -72,18 +75,20 @@
 - [JsVaultAsset](classes/JsVaultAsset.md)
 - [Library](classes/Library.md)
 - [MerklePath](classes/MerklePath.md)
+- [MockWebClient](classes/MockWebClient.md)
 - [NetworkId](classes/NetworkId.md)
 - [Note](classes/Note.md)
 - [NoteAndArgs](classes/NoteAndArgs.md)
 - [NoteAndArgsArray](classes/NoteAndArgsArray.md)
 - [NoteAssets](classes/NoteAssets.md)
+- [NoteAttachment](classes/NoteAttachment.md)
+- [NoteAttachmentScheme](classes/NoteAttachmentScheme.md)
 - [NoteConsumability](classes/NoteConsumability.md)
 - [NoteConsumptionStatus](classes/NoteConsumptionStatus.md)
 - [NoteDetails](classes/NoteDetails.md)
 - [NoteDetailsAndTag](classes/NoteDetailsAndTag.md)
 - [NoteDetailsAndTagArray](classes/NoteDetailsAndTagArray.md)
 - [NoteExecutionHint](classes/NoteExecutionHint.md)
-- [NoteExecutionMode](classes/NoteExecutionMode.md)
 - [NoteFile](classes/NoteFile.md)
 - [NoteFilter](classes/NoteFilter.md)
 - [NoteHeader](classes/NoteHeader.md)
@@ -91,12 +96,12 @@
 - [NoteIdAndArgs](classes/NoteIdAndArgs.md)
 - [NoteIdAndArgsArray](classes/NoteIdAndArgsArray.md)
 - [NoteInclusionProof](classes/NoteInclusionProof.md)
-- [NoteInputs](classes/NoteInputs.md)
 - [NoteLocation](classes/NoteLocation.md)
 - [NoteMetadata](classes/NoteMetadata.md)
 - [NoteRecipient](classes/NoteRecipient.md)
 - [NoteRecipientArray](classes/NoteRecipientArray.md)
 - [NoteScript](classes/NoteScript.md)
+- [NoteStorage](classes/NoteStorage.md)
 - [NoteSyncInfo](classes/NoteSyncInfo.md)
 - [NoteTag](classes/NoteTag.md)
 - [OutputNote](classes/OutputNote.md)
@@ -142,11 +147,22 @@
 - [WebClient](classes/WebClient.md)
 - [Word](classes/Word.md)
 
+## Interfaces
+
+- [WasmWebClient](interfaces/WasmWebClient.md)
+
 ## Type Aliases
 
 - [AddressInterface](type-aliases/AddressInterface.md)
+- [GetKeyCallback](type-aliases/GetKeyCallback.md)
+- [InsertKeyCallback](type-aliases/InsertKeyCallback.md)
 - [ReadableStreamType](type-aliases/ReadableStreamType.md)
+- [SignCallback](type-aliases/SignCallback.md)
+
+## Variables
+
+- [MidenArrays](variables/MidenArrays.md)
 
 ## Functions
 
-- [createAuthRpoFalcon512Multisig](functions/createAuthRpoFalcon512Multisig.md)
+- [createAuthFalcon512RpoMultisig](functions/createAuthFalcon512RpoMultisig.md)

@@ -5,18 +5,17 @@ use std::fs::File;
 use std::io::Write;
 use std::net::SocketAddr;
 use std::path::PathBuf;
-use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use ::rand::{Rng, random};
-use anyhow::{Context, Error, Result};
+use anyhow::{Context, Result};
 use miden_node_block_producer::{
     BlockProducer,
     DEFAULT_MAX_BATCHES_PER_BLOCK,
     DEFAULT_MAX_TXS_PER_BATCH,
     DEFAULT_MEMPOOL_TX_CAPACITY,
 };
-use miden_node_ntx_builder::NetworkTransactionBuilder;
+use miden_node_ntx_builder::NtxBuilderConfig;
 use miden_node_rpc::Rpc;
 use miden_node_store::{GenesisState, Store};
 use miden_node_utils::crypto::get_rpo_random_coin;
@@ -35,7 +34,6 @@ use miden_standards::account::faucets::create_basic_fungible_faucet;
 use rand_chacha::ChaCha20Rng;
 use rand_chacha::rand_core::SeedableRng;
 use tokio::net::TcpListener;
-use tokio::sync::Barrier;
 use tokio::task::{Id, JoinSet};
 use url::Url;
 
@@ -179,12 +177,10 @@ impl NodeBuilder {
         )
         .context("failed to start store")?;
 
-        let checkpoint = Arc::new(Barrier::new(2));
-
         let ntx_builder_id = Self::start_ntx_builder(
             block_producer_address,
             store_ntx_builder_address,
-            checkpoint.clone(),
+            validator_address,
             &mut join_set,
         );
 
@@ -192,7 +188,6 @@ impl NodeBuilder {
             block_producer_address,
             store_block_producer_address,
             validator_address,
-            checkpoint,
             &mut join_set,
         );
 
@@ -282,6 +277,7 @@ impl NodeBuilder {
                         rpc_listener,
                         block_producer_listener,
                         ntx_builder_listener,
+                        block_prover_url: None,
                         grpc_timeout: DEFAULT_TIMEOUT_DURATION,
                     }
                     .serve()
@@ -300,7 +296,6 @@ impl NodeBuilder {
         block_producer_address: SocketAddr,
         store_address: SocketAddr,
         validator_address: SocketAddr,
-        checkpoint: Arc<Barrier>,
         join_set: &mut JoinSet<Result<()>>,
     ) -> Id {
         let batch_interval = self.batch_interval;
@@ -316,13 +311,11 @@ impl NodeBuilder {
                     store_url,
                     grpc_timeout: DEFAULT_TIMEOUT_DURATION,
                     batch_prover_url: None,
-                    block_prover_url: None,
                     validator_url,
                     batch_interval,
                     block_interval,
                     max_txs_per_batch: DEFAULT_MAX_TXS_PER_BATCH,
                     max_batches_per_block: DEFAULT_MAX_BATCHES_PER_BLOCK,
-                    production_checkpoint: checkpoint,
                     mempool_tx_capacity: DEFAULT_MEMPOOL_TX_CAPACITY,
                 }
                 .serve()
@@ -336,7 +329,7 @@ impl NodeBuilder {
     fn start_ntx_builder(
         block_producer_address: SocketAddr,
         store_address: SocketAddr,
-        production_checkpoint: Arc<Barrier>,
+        validator_address: SocketAddr,
         join_set: &mut JoinSet<Result<()>>,
     ) -> Id {
         let store_url =
@@ -348,19 +341,19 @@ impl NodeBuilder {
             block_producer_address.port()
         ))
         .unwrap();
+        let validator_url =
+            Url::parse(&format!("http://{}:{}/", validator_address.ip(), validator_address.port()))
+                .unwrap();
 
         join_set
             .spawn(async move {
-                NetworkTransactionBuilder::new(
-                    store_url,
-                    block_producer_url,
-                    None,
-                    Duration::from_millis(200),
-                    production_checkpoint,
-                )
-                .run()
-                .await
-                .context("failed while serving ntx builder component")
+                NtxBuilderConfig::new(store_url, block_producer_url, validator_url)
+                    .build()
+                    .await
+                    .context("failed to build ntx builder")?
+                    .run()
+                    .await
+                    .context("failed while serving ntx builder component")
             })
             .id()
     }
@@ -393,6 +386,43 @@ impl NodeHandle {
 }
 
 // UTILS
+// ================================================================================================
+
+fn generate_genesis_account() -> anyhow::Result<AccountFile> {
+    let mut rng = ChaCha20Rng::from_seed(random());
+    let secret = AuthSecretKey::new_falcon512_rpo_with_rng(&mut get_rpo_random_coin(&mut rng));
+
+    let account = create_basic_fungible_faucet(
+        rng.random(),
+        TokenSymbol::try_from("TST").expect("TST should be a valid token symbol"),
+        12,
+        Felt::from(1_000_000u32),
+        miden_protocol::account::AccountStorageMode::Public,
+        AuthScheme::Falcon512Rpo {
+            pub_key: secret.public_key().to_commitment(),
+        },
+    )?;
+
+    // Force the account nonce to 1.
+    //
+    // By convention, a nonce of zero indicates a freshly generated local account that has yet
+    // to be deployed. An account is deployed onchain along within its first transaction which
+    // results in a non-zero nonce onchain.
+    //
+    // The genesis block is special in that accounts are "deployed" without transactions and
+    // therefore we need bump the nonce manually to uphold this invariant.
+    let (id, vault, storage, code, ..) = account.into_parts();
+    let updated_account = Account::new_unchecked(id, vault, storage, code, ONE, None);
+
+    Ok(AccountFile::new(updated_account, vec![secret]))
+}
+
+async fn available_socket_addr() -> Result<SocketAddr> {
+    let listener = TcpListener::bind("127.0.0.1:0").await.context("failed to bind to endpoint")?;
+    listener.local_addr().context("failed to retrieve the address")
+}
+
+// UTILS (GENESIS ACCOUNTS)
 // ================================================================================================
 
 /// Expected account ID for the test account. Used to verify deterministic generation.
@@ -438,7 +468,7 @@ fn create_test_faucets(secret: &AuthSecretKey) -> anyhow::Result<Vec<Account>> {
     (0..NUM_TEST_FAUCETS)
         .map(|i| create_single_test_faucet(i, secret))
         .collect::<Result<Vec<_>>>()
-        .map_err(|err| Error::msg(format!("failed to create test faucets: {err}")))
+        .map_err(|err| anyhow::Error::msg(format!("failed to create test faucets: {err}")))
 }
 
 fn create_single_test_faucet(index: u128, secret: &AuthSecretKey) -> anyhow::Result<Account> {
@@ -447,7 +477,7 @@ fn create_single_test_faucet(index: u128, secret: &AuthSecretKey) -> anyhow::Res
         .try_into()
         .expect("concatenating two 16-byte arrays yields exactly 32 bytes");
 
-    let auth_scheme = AuthScheme::RpoFalcon512 {
+    let auth_scheme = AuthScheme::Falcon512Rpo {
         pub_key: secret.public_key().to_commitment(),
     };
 
@@ -484,7 +514,7 @@ fn create_test_account_with_many_assets(faucets: &[Account]) -> anyhow::Result<A
     });
 
     let account = AccountBuilder::new(TEST_ACCOUNT_SEED)
-        .with_auth_component(miden_standards::account::auth::AuthRpoFalcon512::new(
+        .with_auth_component(miden_standards::account::auth::AuthFalcon512Rpo::new(
             sk.public_key().to_commitment(),
         ))
         .account_type(miden_protocol::account::AccountType::RegularAccountUpdatableCode)
@@ -506,38 +536,4 @@ fn create_large_storage_map() -> miden_protocol::account::StorageSlot {
             .expect("slot name should be valid"),
         StorageMap::with_entries(map_entries).expect("map entries should be valid"),
     )
-}
-
-fn generate_genesis_account() -> anyhow::Result<AccountFile> {
-    let mut rng = ChaCha20Rng::from_seed(random());
-    let secret = AuthSecretKey::new_falcon512_rpo_with_rng(&mut get_rpo_random_coin(&mut rng));
-
-    let account = create_basic_fungible_faucet(
-        rng.random(),
-        TokenSymbol::try_from("TST").expect("TST should be a valid token symbol"),
-        12,
-        Felt::from(1_000_000u32),
-        miden_protocol::account::AccountStorageMode::Public,
-        AuthScheme::RpoFalcon512 {
-            pub_key: secret.public_key().to_commitment(),
-        },
-    )?;
-
-    // Force the account nonce to 1.
-    //
-    // By convention, a nonce of zero indicates a freshly generated local account that has yet
-    // to be deployed. An account is deployed onchain along within its first transaction which
-    // results in a non-zero nonce onchain.
-    //
-    // The genesis block is special in that accounts are "deployed" without transactions and
-    // therefore we need bump the nonce manually to uphold this invariant.
-    let (id, vault, storage, code, ..) = account.into_parts();
-    let updated_account = Account::new_unchecked(id, vault, storage, code, ONE, None);
-
-    Ok(AccountFile::new(updated_account, vec![secret]))
-}
-
-async fn available_socket_addr() -> Result<SocketAddr> {
-    let listener = TcpListener::bind("127.0.0.1:0").await.context("failed to bind to endpoint")?;
-    listener.local_addr().context("failed to retrieve the address")
 }

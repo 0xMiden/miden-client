@@ -15,7 +15,7 @@ import {
   Address,
   AddressInterface,
   AdviceMap,
-  AuthRpoFalcon512MultisigConfig,
+  AuthFalcon512RpoMultisigConfig,
   AuthSecretKey,
   BasicFungibleFaucetComponent,
   ConsumableNoteRecord,
@@ -31,14 +31,13 @@ import {
   NoteAssets,
   NoteConsumability,
   NoteExecutionHint,
-  NoteExecutionMode,
   NoteFilter,
   NoteFile,
   NoteFilterTypes,
   NoteId,
   NoteIdAndArgs,
   NoteIdAndArgsArray,
-  NoteInputs,
+  NoteStorage,
   NoteMetadata,
   NoteRecipient,
   NoteTag,
@@ -75,7 +74,7 @@ import {
   MidenArrays,
   CodeBuilder,
   CodeBuilderMode,
-  createAuthRpoFalcon512Multisig,
+  createAuthFalcon512RpoMultisig,
 } from "../dist/index";
 import { MockWebClient, WebClient } from "../js";
 
@@ -103,7 +102,7 @@ declare global {
     Address: typeof Address;
     AddressInterface: typeof AddressInterface;
     AdviceMap: typeof AdviceMap;
-    AuthRpoFalcon512MultisigConfig: typeof AuthRpoFalcon512MultisigConfig;
+    AuthFalcon512RpoMultisigConfig: typeof AuthFalcon512RpoMultisigConfig;
     AuthSecretKey: typeof AuthSecretKey;
     BasicFungibleFaucetComponent: typeof BasicFungibleFaucetComponent;
     ConsumableNoteRecord: typeof ConsumableNoteRecord;
@@ -122,14 +121,13 @@ declare global {
     NoteAssets: typeof NoteAssets;
     NoteConsumability: typeof NoteConsumability;
     NoteExecutionHint: typeof NoteExecutionHint;
-    NoteExecutionMode: typeof NoteExecutionMode;
     NoteFilter: typeof NoteFilter;
     NoteFile: typeof NoteFile;
     NoteFilterTypes: typeof NoteFilterTypes;
     NoteId: typeof NoteId;
     NoteIdAndArgs: typeof NoteIdAndArgs;
     NoteIdAndArgsArray: typeof NoteIdAndArgsArray;
-    NoteInputs: typeof NoteInputs;
+    NoteStorage: typeof NoteStorage;
     NoteMetadata: typeof NoteMetadata;
     NoteRecipient: typeof NoteRecipient;
     NoteScript: typeof NoteScript;
@@ -167,8 +165,10 @@ declare global {
     MidenArrays: typeof MidenArrays;
     CodeBuilder: typeof CodeBuilder;
     CodeBuilderMode: typeof CodeBuilderMode;
-    createAuthRpoFalcon512Multisig: typeof createAuthRpoFalcon512Multisig;
+    createAuthFalcon512RpoMultisig: typeof createAuthFalcon512RpoMultisig;
     createClient: () => Promise<void>;
+
+    rpcUrl: string;
 
     // Add the helpers namespace
     helpers: {

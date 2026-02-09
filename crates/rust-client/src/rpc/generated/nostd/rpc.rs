@@ -93,9 +93,9 @@ pub struct MaybeNoteScript {
     #[prost(message, optional, tag = "1")]
     pub script: ::core::option::Option<super::note::NoteScript>,
 }
-/// Returns the latest state proof of the specified account.
+/// Defines the request for account details.
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct AccountProofRequest {
+pub struct AccountRequest {
     /// ID of the account for which we want to get data
     #[prost(message, optional, tag = "1")]
     pub account_id: ::core::option::Option<super::account::AccountId>,
@@ -106,10 +106,10 @@ pub struct AccountProofRequest {
     pub block_num: ::core::option::Option<super::blockchain::BlockNumber>,
     /// Request for additional account details; valid only for public accounts.
     #[prost(message, optional, tag = "3")]
-    pub details: ::core::option::Option<account_proof_request::AccountDetailRequest>,
+    pub details: ::core::option::Option<account_request::AccountDetailRequest>,
 }
-/// Nested message and enum types in `AccountProofRequest`.
-pub mod account_proof_request {
+/// Nested message and enum types in `AccountRequest`.
+pub mod account_request {
     /// Request the details for a public account.
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct AccountDetailRequest {
@@ -171,7 +171,7 @@ pub mod account_proof_request {
 }
 /// Represents the result of getting account proof.
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct AccountProofResponse {
+pub struct AccountResponse {
     /// The block number at which the account witness was created and the account details were observed.
     #[prost(message, optional, tag = "1")]
     pub block_num: ::core::option::Option<super::blockchain::BlockNumber>,
@@ -180,10 +180,10 @@ pub struct AccountProofResponse {
     pub witness: ::core::option::Option<super::account::AccountWitness>,
     /// Additional details for public accounts.
     #[prost(message, optional, tag = "3")]
-    pub details: ::core::option::Option<account_proof_response::AccountDetails>,
+    pub details: ::core::option::Option<account_response::AccountDetails>,
 }
-/// Nested message and enum types in `AccountProofResponse`.
-pub mod account_proof_response {
+/// Nested message and enum types in `AccountResponse`.
+pub mod account_response {
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct AccountDetails {
         /// Account header.
@@ -201,7 +201,7 @@ pub mod account_proof_response {
         pub vault_details: ::core::option::Option<super::AccountVaultDetails>,
     }
 }
-/// Account vault details for AccountProofResponse
+/// Account vault details for AccountResponse
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct AccountVaultDetails {
     /// A flag that is set to true if the account contains too many assets. This indicates
@@ -214,7 +214,7 @@ pub struct AccountVaultDetails {
     #[prost(message, repeated, tag = "2")]
     pub assets: ::prost::alloc::vec::Vec<super::primitives::Asset>,
 }
-/// Account storage details for AccountProofResponse
+/// Account storage details for AccountResponse
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct AccountStorageDetails {
     /// Account storage header (storage slot info for up to 256 slots)
@@ -233,25 +233,53 @@ pub mod account_storage_details {
         /// Storage slot name.
         #[prost(string, tag = "1")]
         pub slot_name: ::prost::alloc::string::String,
-        /// A flag that is set to `true` if the number of to-be-returned entries in the
-        /// storage map would exceed a threshold. This indicates to the user that `SyncStorageMaps`
-        /// endpoint should be used to get all storage map data.
+        /// True when the number of entries exceeds the response limit.
+        /// When set, clients should use the `SyncAccountStorageMaps` endpoint.
         #[prost(bool, tag = "2")]
         pub too_many_entries: bool,
-        /// By default we provide all storage entries.
-        #[prost(message, optional, tag = "3")]
-        pub entries: ::core::option::Option<account_storage_map_details::MapEntries>,
+        /// The map entries (with or without proofs). Empty when too_many_entries is true.
+        #[prost(oneof = "account_storage_map_details::Entries", tags = "3, 4")]
+        pub entries: ::core::option::Option<account_storage_map_details::Entries>,
     }
     /// Nested message and enum types in `AccountStorageMapDetails`.
     pub mod account_storage_map_details {
-        /// Wrapper for repeated storage map entries
+        /// Wrapper for repeated storage map entries including their proofs.
+        /// Used when specific keys are requested to enable client-side verification.
         #[derive(Clone, PartialEq, ::prost::Message)]
-        pub struct MapEntries {
+        pub struct MapEntriesWithProofs {
             #[prost(message, repeated, tag = "1")]
-            pub entries: ::prost::alloc::vec::Vec<map_entries::StorageMapEntry>,
+            pub entries: ::prost::alloc::vec::Vec<
+                map_entries_with_proofs::StorageMapEntryWithProof,
+            >,
         }
-        /// Nested message and enum types in `MapEntries`.
-        pub mod map_entries {
+        /// Nested message and enum types in `MapEntriesWithProofs`.
+        pub mod map_entries_with_proofs {
+            /// Definition of individual storage entries including a proof.
+            #[derive(Clone, PartialEq, ::prost::Message)]
+            pub struct StorageMapEntryWithProof {
+                #[prost(message, optional, tag = "1")]
+                pub key: ::core::option::Option<
+                    super::super::super::super::primitives::Digest,
+                >,
+                #[prost(message, optional, tag = "2")]
+                pub value: ::core::option::Option<
+                    super::super::super::super::primitives::Digest,
+                >,
+                #[prost(message, optional, tag = "3")]
+                pub proof: ::core::option::Option<
+                    super::super::super::super::primitives::SmtOpening,
+                >,
+            }
+        }
+        /// Wrapper for repeated storage map entries (without proofs).
+        /// Used when all entries are requested for small maps.
+        #[derive(Clone, PartialEq, ::prost::Message)]
+        pub struct AllMapEntries {
+            #[prost(message, repeated, tag = "1")]
+            pub entries: ::prost::alloc::vec::Vec<all_map_entries::StorageMapEntry>,
+        }
+        /// Nested message and enum types in `AllMapEntries`.
+        pub mod all_map_entries {
             /// Definition of individual storage entries.
             #[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
             pub struct StorageMapEntry {
@@ -264,6 +292,16 @@ pub mod account_storage_details {
                     super::super::super::super::primitives::Digest,
                 >,
             }
+        }
+        /// The map entries (with or without proofs). Empty when too_many_entries is true.
+        #[derive(Clone, PartialEq, ::prost::Oneof)]
+        pub enum Entries {
+            /// All storage entries without proofs (for small maps or full requests).
+            #[prost(message, tag = "3")]
+            AllEntries(AllMapEntries),
+            /// Specific entries with their SMT proofs (for partial requests).
+            #[prost(message, tag = "4")]
+            EntriesWithProofs(MapEntriesWithProofs),
         }
     }
 }
@@ -441,7 +479,7 @@ pub struct SyncStateResponse {
 /// Allows requesters to sync storage map values for specific public accounts within a block range,
 /// with support for cursor-based pagination to handle large storage maps.
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
-pub struct SyncStorageMapsRequest {
+pub struct SyncAccountStorageMapsRequest {
     /// Block range from which to start synchronizing.
     ///
     /// If the `block_to` is specified, this block must be close to the chain tip (i.e., within 30 blocks),
@@ -453,7 +491,7 @@ pub struct SyncStorageMapsRequest {
     pub account_id: ::core::option::Option<super::account::AccountId>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct SyncStorageMapsResponse {
+pub struct SyncAccountStorageMapsResponse {
     /// Pagination information.
     #[prost(message, optional, tag = "1")]
     pub pagination_info: ::core::option::Option<PaginationInfo>,
@@ -667,6 +705,29 @@ pub mod api_client {
             req.extensions_mut().insert(GrpcMethod::new("rpc.Api", "Status"));
             self.inner.unary(req, path, codec).await
         }
+        /// Returns the query parameter limits configured for RPC methods.
+        ///
+        /// These define the maximum number of each parameter a method will accept.
+        /// Exceeding the limit will result in the request being rejected and you should instead send
+        /// multiple smaller requests.
+        pub async fn get_limits(
+            &mut self,
+            request: impl tonic::IntoRequest<()>,
+        ) -> core::result::Result<tonic::Response<super::RpcLimits>, tonic::Status> {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic_prost::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static("/rpc.Api/GetLimits");
+            let mut req = request.into_request();
+            req.extensions_mut().insert(GrpcMethod::new("rpc.Api", "GetLimits"));
+            self.inner.unary(req, path, codec).await
+        }
         /// Returns a Sparse Merkle Tree opening proof for each requested nullifier
         ///
         /// Each proof demonstrates either:
@@ -701,12 +762,12 @@ pub mod api_client {
             req.extensions_mut().insert(GrpcMethod::new("rpc.Api", "CheckNullifiers"));
             self.inner.unary(req, path, codec).await
         }
-        /// Returns the latest state of an account with the specified ID.
-        pub async fn get_account_details(
+        /// Returns the latest details of the specified account.
+        pub async fn get_account(
             &mut self,
-            request: impl tonic::IntoRequest<super::super::account::AccountId>,
+            request: impl tonic::IntoRequest<super::AccountRequest>,
         ) -> core::result::Result<
-            tonic::Response<super::super::account::AccountDetails>,
+            tonic::Response<super::AccountResponse>,
             tonic::Status,
         > {
             self.inner
@@ -718,33 +779,9 @@ pub mod api_client {
                     )
                 })?;
             let codec = tonic_prost::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static(
-                "/rpc.Api/GetAccountDetails",
-            );
+            let path = http::uri::PathAndQuery::from_static("/rpc.Api/GetAccount");
             let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new("rpc.Api", "GetAccountDetails"));
-            self.inner.unary(req, path, codec).await
-        }
-        /// Returns the latest state proof of the specified account.
-        pub async fn get_account_proof(
-            &mut self,
-            request: impl tonic::IntoRequest<super::AccountProofRequest>,
-        ) -> core::result::Result<
-            tonic::Response<super::AccountProofResponse>,
-            tonic::Status,
-        > {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::unknown(
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
-            let codec = tonic_prost::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/rpc.Api/GetAccountProof");
-            let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new("rpc.Api", "GetAccountProof"));
+            req.extensions_mut().insert(GrpcMethod::new("rpc.Api", "GetAccount"));
             self.inner.unary(req, path, codec).await
         }
         /// Returns raw block data for the specified block number.
@@ -906,6 +943,60 @@ pub mod api_client {
             req.extensions_mut().insert(GrpcMethod::new("rpc.Api", "SubmitProvenBatch"));
             self.inner.unary(req, path, codec).await
         }
+        /// Returns transactions records for specific accounts within a block range.
+        pub async fn sync_transactions(
+            &mut self,
+            request: impl tonic::IntoRequest<super::SyncTransactionsRequest>,
+        ) -> core::result::Result<
+            tonic::Response<super::SyncTransactionsResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic_prost::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static("/rpc.Api/SyncTransactions");
+            let mut req = request.into_request();
+            req.extensions_mut().insert(GrpcMethod::new("rpc.Api", "SyncTransactions"));
+            self.inner.unary(req, path, codec).await
+        }
+        /// Returns info which can be used by the client to sync up to the tip of chain for the notes
+        /// they are interested in.
+        ///
+        /// Client specifies the `note_tags` they are interested in, and the block height from which to
+        /// search for new for matching notes for. The request will then return the next block containing
+        /// any note matching the provided tags.
+        ///
+        /// The response includes each note's metadata and inclusion proof.
+        ///
+        /// A basic note sync can be implemented by repeatedly requesting the previous response's block
+        /// until reaching the tip of the chain.
+        pub async fn sync_notes(
+            &mut self,
+            request: impl tonic::IntoRequest<super::SyncNotesRequest>,
+        ) -> core::result::Result<
+            tonic::Response<super::SyncNotesResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic_prost::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static("/rpc.Api/SyncNotes");
+            let mut req = request.into_request();
+            req.extensions_mut().insert(GrpcMethod::new("rpc.Api", "SyncNotes"));
+            self.inner.unary(req, path, codec).await
+        }
         /// Returns a list of nullifiers that match the specified prefixes and are recorded in the node.
         ///
         /// Note that only 16-bit prefixes are supported at this time.
@@ -952,20 +1043,12 @@ pub mod api_client {
             req.extensions_mut().insert(GrpcMethod::new("rpc.Api", "SyncAccountVault"));
             self.inner.unary(req, path, codec).await
         }
-        /// Returns info which can be used by the client to sync up to the tip of chain for the notes they are interested in.
-        ///
-        /// Client specifies the `note_tags` they are interested in, and the block height from which to search for new for
-        /// matching notes for. The request will then return the next block containing any note matching the provided tags.
-        ///
-        /// The response includes each note's metadata and inclusion proof.
-        ///
-        /// A basic note sync can be implemented by repeatedly requesting the previous response's block until reaching the
-        /// tip of the chain.
-        pub async fn sync_notes(
+        /// Returns storage map updates for specified account and storage slots within a block range.
+        pub async fn sync_account_storage_maps(
             &mut self,
-            request: impl tonic::IntoRequest<super::SyncNotesRequest>,
+            request: impl tonic::IntoRequest<super::SyncAccountStorageMapsRequest>,
         ) -> core::result::Result<
-            tonic::Response<super::SyncNotesResponse>,
+            tonic::Response<super::SyncAccountStorageMapsResponse>,
             tonic::Status,
         > {
             self.inner
@@ -977,9 +1060,12 @@ pub mod api_client {
                     )
                 })?;
             let codec = tonic_prost::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/rpc.Api/SyncNotes");
+            let path = http::uri::PathAndQuery::from_static(
+                "/rpc.Api/SyncAccountStorageMaps",
+            );
             let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new("rpc.Api", "SyncNotes"));
+            req.extensions_mut()
+                .insert(GrpcMethod::new("rpc.Api", "SyncAccountStorageMaps"));
             self.inner.unary(req, path, codec).await
         }
         /// Returns info which can be used by the client to sync up to the latest state of the chain
@@ -990,9 +1076,9 @@ pub mod api_client {
         /// in a loop until `response.block_header.block_num == response.chain_tip`, at which point
         /// the client is fully synchronized with the chain.
         ///
-        /// Each update response also contains info about new notes, accounts etc. created. It also returns
-        /// Chain MMR delta that can be used to update the state of Chain MMR. This includes both chain
-        /// MMR peaks and chain MMR nodes.
+        /// Each update response also contains info about new notes, accounts etc. created. It also
+        /// returns Chain MMR delta that can be used to update the state of Chain MMR. This includes
+        /// both chain MMR peaks and chain MMR nodes.
         ///
         /// For preserving some degree of privacy, note tags contain only high
         /// part of hashes. Thus, returned data contains excessive notes, client can make
@@ -1016,73 +1102,6 @@ pub mod api_client {
             let path = http::uri::PathAndQuery::from_static("/rpc.Api/SyncState");
             let mut req = request.into_request();
             req.extensions_mut().insert(GrpcMethod::new("rpc.Api", "SyncState"));
-            self.inner.unary(req, path, codec).await
-        }
-        /// Returns storage map updates for specified account and storage slots within a block range.
-        pub async fn sync_storage_maps(
-            &mut self,
-            request: impl tonic::IntoRequest<super::SyncStorageMapsRequest>,
-        ) -> core::result::Result<
-            tonic::Response<super::SyncStorageMapsResponse>,
-            tonic::Status,
-        > {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::unknown(
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
-            let codec = tonic_prost::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/rpc.Api/SyncStorageMaps");
-            let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new("rpc.Api", "SyncStorageMaps"));
-            self.inner.unary(req, path, codec).await
-        }
-        /// Returns transactions records for specific accounts within a block range.
-        pub async fn sync_transactions(
-            &mut self,
-            request: impl tonic::IntoRequest<super::SyncTransactionsRequest>,
-        ) -> core::result::Result<
-            tonic::Response<super::SyncTransactionsResponse>,
-            tonic::Status,
-        > {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::unknown(
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
-            let codec = tonic_prost::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/rpc.Api/SyncTransactions");
-            let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new("rpc.Api", "SyncTransactions"));
-            self.inner.unary(req, path, codec).await
-        }
-        /// Returns the query parameter limits configured for RPC methods.
-        ///
-        /// These define the maximum number of each parameter a method will accept.
-        /// Exceeding the limit will result in the request being rejected and you should instead send
-        /// multiple smaller requests.
-        pub async fn get_limits(
-            &mut self,
-            request: impl tonic::IntoRequest<()>,
-        ) -> core::result::Result<tonic::Response<super::RpcLimits>, tonic::Status> {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::unknown(
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
-            let codec = tonic_prost::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/rpc.Api/GetLimits");
-            let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new("rpc.Api", "GetLimits"));
             self.inner.unary(req, path, codec).await
         }
     }

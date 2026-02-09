@@ -71,11 +71,9 @@ impl ClientConfig {
             .rpc(Arc::new(GrpcClient::new(&rpc_endpoint, rpc_timeout)))
             .rng(Box::new(rng))
             .sqlite_store(store_config)
-            .filesystem_keystore(auth_path.to_str().with_context(|| {
-                format!("failed to convert auth path to string: {}", auth_path.to_string_lossy())
-            })?)
-            .in_debug_mode(DebugMode::Enabled)
-            .tx_graceful_blocks(None);
+            .authenticator(Arc::new(keystore.clone()))
+            .in_debug_mode(DebugMode::Disabled)
+            .tx_discard_delta(None);
 
         Ok((builder, keystore))
     }

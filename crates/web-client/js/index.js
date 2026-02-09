@@ -1,5 +1,10 @@
 import loadWasm from "./wasm.js";
 import { CallbackType, MethodName, WorkerAction } from "./constants.js";
+import {
+  acquireSyncLock,
+  releaseSyncLock,
+  releaseSyncLockWithError,
+} from "./syncLock.js";
 export * from "../Cargo.toml";
 
 const buildTypedArraysExport = (exportObject) => {
@@ -585,27 +590,81 @@ export class WebClient {
     }
   }
 
+  /**
+   * Syncs the client state with the node.
+   *
+   * This method coordinates concurrent sync calls using the Web Locks API when available,
+   * with an in-process mutex fallback for older browsers. If a sync is already in progress,
+   * subsequent callers will wait and receive the same result (coalescing behavior).
+   *
+   * @returns {Promise<SyncSummary>} The sync summary
+   */
   async syncState() {
+    return this.syncStateWithTimeout(0);
+  }
+
+  /**
+   * Syncs the client state with the node with an optional timeout.
+   *
+   * This method coordinates concurrent sync calls using the Web Locks API when available,
+   * with an in-process mutex fallback for older browsers. If a sync is already in progress,
+   * subsequent callers will wait and receive the same result (coalescing behavior).
+   *
+   * @param {number} timeoutMs - Timeout in milliseconds (0 = no timeout)
+   * @returns {Promise<SyncSummary>} The sync summary
+   */
+  async syncStateWithTimeout(timeoutMs = 0) {
+    // Use storeName as the database ID for lock coordination
+    const dbId = this.storeName || "default";
+
     try {
-      if (!this.worker) {
-        const wasmWebClient = await this.getWasmWebClient();
-        return await wasmWebClient.syncState();
+      // Acquire the sync lock (coordinates concurrent calls)
+      const lockHandle = await acquireSyncLock(dbId, timeoutMs);
+
+      if (!lockHandle.acquired) {
+        // We're coalescing - return the result from the in-progress sync
+        return lockHandle.coalescedResult;
       }
 
-      const wasm = await getWasmOrThrow();
-      const serializedSyncSummaryBytes = await this.callMethodWithWorker(
-        MethodName.SYNC_STATE
-      );
+      // We acquired the lock - perform the sync
+      try {
+        let result;
+        if (!this.worker) {
+          const wasmWebClient = await this.getWasmWebClient();
+          result = await wasmWebClient.syncStateImpl();
+        } else {
+          const wasm = await getWasmOrThrow();
+          const serializedSyncSummaryBytes = await this.callMethodWithWorker(
+            MethodName.SYNC_STATE
+          );
+          result = wasm.SyncSummary.deserialize(
+            new Uint8Array(serializedSyncSummaryBytes)
+          );
+        }
 
-      return wasm.SyncSummary.deserialize(
-        new Uint8Array(serializedSyncSummaryBytes)
-      );
+        // Release the lock with the result
+        releaseSyncLock(dbId, result);
+        return result;
+      } catch (error) {
+        // Release the lock with the error
+        releaseSyncLockWithError(dbId, error);
+        throw error;
+      }
     } catch (error) {
       console.error("INDEX.JS: Error in syncState:", error);
       throw error;
     }
   }
 
+  /**
+   * Terminates the underlying Web Worker used by this WebClient instance.
+   *
+   * Call this method when you're done using a WebClient to free up browser
+   * resources. Each WebClient instance uses a dedicated Web Worker for
+   * computationally intensive operations. Terminating releases that thread.
+   *
+   * After calling terminate(), the WebClient should not be used.
+   */
   terminate() {
     if (this.worker) {
       this.worker.terminate();
@@ -672,28 +731,65 @@ export class MockWebClient extends WebClient {
     });
   }
 
+  /**
+   * Syncs the mock client state.
+   *
+   * This method coordinates concurrent sync calls using the Web Locks API when available,
+   * with an in-process mutex fallback for older browsers. If a sync is already in progress,
+   * subsequent callers will wait and receive the same result (coalescing behavior).
+   *
+   * @returns {Promise<SyncSummary>} The sync summary
+   */
   async syncState() {
+    return this.syncStateWithTimeout(0);
+  }
+
+  /**
+   * Syncs the mock client state with an optional timeout.
+   *
+   * @param {number} timeoutMs - Timeout in milliseconds (0 = no timeout)
+   * @returns {Promise<SyncSummary>} The sync summary
+   */
+  async syncStateWithTimeout(timeoutMs = 0) {
+    const dbId = this.storeName || "mock";
+
     try {
-      const wasmWebClient = await this.getWasmWebClient();
-      if (!this.worker) {
-        return await wasmWebClient.syncState();
+      const lockHandle = await acquireSyncLock(dbId, timeoutMs);
+
+      if (!lockHandle.acquired) {
+        return lockHandle.coalescedResult;
       }
 
-      let serializedMockChain = wasmWebClient.serializeMockChain().buffer;
-      let serializedMockNoteTransportNode =
-        wasmWebClient.serializeMockNoteTransportNode().buffer;
+      try {
+        let result;
+        const wasmWebClient = await this.getWasmWebClient();
 
-      const wasm = await getWasmOrThrow();
+        if (!this.worker) {
+          result = await wasmWebClient.syncStateImpl();
+        } else {
+          let serializedMockChain = wasmWebClient.serializeMockChain().buffer;
+          let serializedMockNoteTransportNode =
+            wasmWebClient.serializeMockNoteTransportNode().buffer;
 
-      const serializedSyncSummaryBytes = await this.callMethodWithWorker(
-        MethodName.SYNC_STATE_MOCK,
-        serializedMockChain,
-        serializedMockNoteTransportNode
-      );
+          const wasm = await getWasmOrThrow();
 
-      return wasm.SyncSummary.deserialize(
-        new Uint8Array(serializedSyncSummaryBytes)
-      );
+          const serializedSyncSummaryBytes = await this.callMethodWithWorker(
+            MethodName.SYNC_STATE_MOCK,
+            serializedMockChain,
+            serializedMockNoteTransportNode
+          );
+
+          result = wasm.SyncSummary.deserialize(
+            new Uint8Array(serializedSyncSummaryBytes)
+          );
+        }
+
+        releaseSyncLock(dbId, result);
+        return result;
+      } catch (error) {
+        releaseSyncLockWithError(dbId, error);
+        throw error;
+      }
     } catch (error) {
       console.error("INDEX.JS: Error in syncState:", error);
       throw error;

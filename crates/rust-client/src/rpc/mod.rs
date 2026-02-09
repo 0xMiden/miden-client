@@ -67,6 +67,8 @@ mod errors;
 pub use errors::*;
 
 mod endpoint;
+pub use domain::limits::RpcLimits;
+pub use domain::status::RpcStatusInfo;
 pub use endpoint::Endpoint;
 
 #[cfg(not(feature = "testing"))]
@@ -93,15 +95,6 @@ pub enum AccountStateAt {
     /// Gets the state at a specific block number
     Block(BlockNumber),
 }
-
-// RPC ENDPOINT LIMITS
-// ================================================================================================
-
-// TODO: We need a better structured way of getting limits as defined by the node (#1139)
-pub const NOTE_IDS_LIMIT: usize = 100;
-pub const NULLIFIER_PREFIXES_LIMIT: usize = 1000;
-pub const ACCOUNT_ID_LIMIT: usize = 1000;
-pub const NOTE_TAG_LIMIT: usize = 1000;
 
 // NODE RPC CLIENT TRAIT
 // ================================================================================================
@@ -220,7 +213,7 @@ pub trait NodeRpcClient: Send + Sync {
     /// The `known_account_code` parameter is the known code commitment
     /// to prevent unnecessary data fetching. Returns the block number and the FPI account data. If
     /// the tracked account is not found in the node, the method will return an error.
-    async fn get_account_proof(
+    async fn get_account(
         &self,
         foreign_account: ForeignAccount,
         account_state: AccountStateAt,
@@ -276,7 +269,7 @@ pub trait NodeRpcClient: Send + Sync {
         for detail in note_details {
             if let FetchedNote::Public(note, inclusion_proof) = detail {
                 let state = UnverifiedNoteState {
-                    metadata: *note.metadata(),
+                    metadata: note.metadata().clone(),
                     inclusion_proof,
                 }
                 .into();
@@ -390,19 +383,30 @@ pub trait NodeRpcClient: Send + Sync {
     /// Errors:
     /// - [`RpcError::ExpectedDataMissing`] if the note with the specified root is not found.
     async fn get_network_id(&self) -> Result<NetworkId, RpcError>;
+
+    /// Fetches the RPC limits configured on the node.
+    ///
+    /// Returns the limits that define the maximum number of items that can be sent in a single
+    /// RPC request. If the request fails for any reason, default values are returned.
+    async fn get_rpc_limits(&self) -> RpcLimits;
+
+    /// Fetches the RPC status without requiring Accept header validation.
+    ///
+    /// This is useful for diagnostics when version negotiation fails, as it allows
+    /// retrieving node information even when there's a version mismatch.
+    async fn get_status_unversioned(&self) -> Result<RpcStatusInfo, RpcError>;
 }
 
 // RPC API ENDPOINT
 // ================================================================================================
 //
 /// RPC methods for the Miden protocol.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum NodeRpcClientEndpoint {
+    Status,
     CheckNullifiers,
     SyncNullifiers,
     GetAccount,
-    GetAccountStateDelta,
-    GetAccountProofs,
     GetBlockByNumber,
     GetBlockHeaderByNumber,
     GetNotesById,
@@ -413,18 +417,18 @@ pub enum NodeRpcClientEndpoint {
     SyncStorageMaps,
     SyncAccountVault,
     SyncTransactions,
+    GetLimits,
 }
 
 impl fmt::Display for NodeRpcClientEndpoint {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            NodeRpcClientEndpoint::Status => write!(f, "status"),
             NodeRpcClientEndpoint::CheckNullifiers => write!(f, "check_nullifiers"),
             NodeRpcClientEndpoint::SyncNullifiers => {
                 write!(f, "sync_nullifiers")
             },
-            NodeRpcClientEndpoint::GetAccount => write!(f, "get_account_details"),
-            NodeRpcClientEndpoint::GetAccountStateDelta => write!(f, "get_account_state_delta"),
-            NodeRpcClientEndpoint::GetAccountProofs => write!(f, "get_account_proofs"),
+            NodeRpcClientEndpoint::GetAccount => write!(f, "get_account"),
             NodeRpcClientEndpoint::GetBlockByNumber => write!(f, "get_block_by_number"),
             NodeRpcClientEndpoint::GetBlockHeaderByNumber => {
                 write!(f, "get_block_header_by_number")
@@ -437,6 +441,7 @@ impl fmt::Display for NodeRpcClientEndpoint {
             NodeRpcClientEndpoint::SyncStorageMaps => write!(f, "sync_storage_maps"),
             NodeRpcClientEndpoint::SyncAccountVault => write!(f, "sync_account_vault"),
             NodeRpcClientEndpoint::SyncTransactions => write!(f, "sync_transactions"),
+            NodeRpcClientEndpoint::GetLimits => write!(f, "get_limits"),
         }
     }
 }

@@ -17,6 +17,7 @@ use js_bindings::{
     idxdb_get_block_headers,
     idxdb_get_partial_blockchain_nodes,
     idxdb_get_partial_blockchain_nodes_all,
+    idxdb_get_partial_blockchain_nodes_up_to_inorder_index,
     idxdb_get_partial_blockchain_peaks_by_block_num,
     idxdb_get_tracked_block_headers,
     idxdb_insert_block_header,
@@ -71,10 +72,8 @@ impl WebStore {
         &self,
         block_numbers: &BTreeSet<BlockNumber>,
     ) -> Result<Vec<(BlockHeader, BlockRelevance)>, StoreError> {
-        let formatted_block_numbers_list: Vec<String> = block_numbers
-            .iter()
-            .map(|block_number| i64::from(block_number.as_u32()).to_string())
-            .collect();
+        let formatted_block_numbers_list: Vec<u32> =
+            block_numbers.iter().map(BlockNumber::as_u32).collect();
 
         let promise = idxdb_get_block_headers(self.db_id(), formatted_block_numbers_list);
         let block_headers_idxdb: Vec<Option<BlockHeaderIdxdbObject>> =
@@ -133,6 +132,21 @@ impl WebStore {
                     await_js_value(promise, "failed to get partial blockchain nodes").await?;
                 process_partial_blockchain_nodes_from_js_value(js_value)
             },
+            PartialBlockchainFilter::Forest(forest) => {
+                if forest.is_empty() {
+                    return Ok(BTreeMap::new());
+                }
+
+                let max_in_order_index = forest.rightmost_in_order_index().inner().to_string();
+                let promise = idxdb_get_partial_blockchain_nodes_up_to_inorder_index(
+                    self.db_id(),
+                    max_in_order_index,
+                );
+                let js_value =
+                    await_js_value(promise, "failed to get partial blockchain nodes up to index")
+                        .await?;
+                process_partial_blockchain_nodes_from_js_value(js_value)
+            },
         }
     }
 
@@ -140,10 +154,10 @@ impl WebStore {
         &self,
         block_num: BlockNumber,
     ) -> Result<MmrPeaks, StoreError> {
-        let block_num_as_str = block_num.to_string();
+        let block_num_as_u32 = block_num.as_u32();
 
         let promise =
-            idxdb_get_partial_blockchain_peaks_by_block_num(self.db_id(), block_num_as_str);
+            idxdb_get_partial_blockchain_peaks_by_block_num(self.db_id(), block_num_as_u32);
         let mmr_peaks_idxdb: PartialBlockchainPeaksIdxdbObject =
             await_js(promise, "failed to get partial blockchain peaks by block number").await?;
 

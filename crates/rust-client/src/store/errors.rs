@@ -6,8 +6,7 @@ use miden_protocol::block::BlockNumber;
 use miden_protocol::crypto::merkle::MerkleError;
 use miden_protocol::crypto::merkle::mmr::MmrError;
 use miden_protocol::crypto::merkle::smt::SmtProofError;
-use miden_protocol::utils::{DeserializationError, HexParseError};
-use miden_protocol::{
+use miden_protocol::errors::{
     AccountError,
     AccountIdError,
     AddressError,
@@ -16,9 +15,9 @@ use miden_protocol::{
     NoteError,
     StorageMapError,
     TransactionScriptError,
-    Word,
-    WordError,
 };
+use miden_protocol::utils::{DeserializationError, HexParseError};
+use miden_protocol::{Word, WordError};
 use miden_tx::DataStoreError;
 use thiserror::Error;
 
@@ -75,8 +74,6 @@ pub enum StoreError {
     NoteInclusionProofError(#[from] NoteError),
     #[error("note tag {0} is already being tracked")]
     NoteTagAlreadyTracked(u64),
-    #[error("note transport cursor not found")]
-    NoteTransportCursorNotFound,
     #[error("note script with root {0} not found")]
     NoteScriptNotFound(String),
     #[error("failed to parse data retrieved from the database: {0}")]

@@ -6,10 +6,28 @@
 
 # Class: NoteTag
 
-Note tags are best-effort filters for notes registered with the network. They hint whether a
-note is meant for network or local execution and optionally embed a target (like part of an
-`AccountId`) or a use-case payload. Public notes are required for network execution so that full
-details are available for validation.
+Note tags are 32-bits of data that serve as best-effort filters for notes.
+
+Tags enable quick lookups for notes related to particular use cases, scripts, or account
+prefixes.
+
+## Constructors
+
+### Constructor
+
+> **new NoteTag**(`tag`): `NoteTag`
+
+Creates a new `NoteTag` from an arbitrary u32.
+
+#### Parameters
+
+##### tag
+
+`number`
+
+#### Returns
+
+`NoteTag`
 
 ## Methods
 
@@ -27,23 +45,11 @@ details are available for validation.
 
 > **asU32**(): `number`
 
-Returns the underlying 32-bit representation.
+Returns the inner u32 value of this tag.
 
 #### Returns
 
 `number`
-
-***
-
-### executionMode()
-
-> **executionMode**(): [`NoteExecutionMode`](NoteExecutionMode.md)
-
-Returns the execution mode encoded in this tag.
-
-#### Returns
-
-[`NoteExecutionMode`](NoteExecutionMode.md)
 
 ***
 
@@ -57,71 +63,11 @@ Returns the execution mode encoded in this tag.
 
 ***
 
-### isSingleTarget()
+### withAccountTarget()
 
-> **isSingleTarget**(): `boolean`
+> `static` **withAccountTarget**(`account_id`): `NoteTag`
 
-Returns true if the tag targets a single account.
-
-#### Returns
-
-`boolean`
-
-***
-
-### forLocalUseCase()
-
-> `static` **forLocalUseCase**(`use_case_id`, `payload`): `NoteTag`
-
-Builds a tag for a local-only use case.
-
-#### Parameters
-
-##### use\_case\_id
-
-`number`
-
-##### payload
-
-`number`
-
-#### Returns
-
-`NoteTag`
-
-***
-
-### forPublicUseCase()
-
-> `static` **forPublicUseCase**(`use_case_id`, `payload`, `execution`): `NoteTag`
-
-Builds a tag for a public use case with an explicit payload and execution mode.
-
-#### Parameters
-
-##### use\_case\_id
-
-`number`
-
-##### payload
-
-`number`
-
-##### execution
-
-[`NoteExecutionMode`](NoteExecutionMode.md)
-
-#### Returns
-
-`NoteTag`
-
-***
-
-### fromAccountId()
-
-> `static` **fromAccountId**(`account_id`): `NoteTag`
-
-Builds a single-target tag derived from an account ID.
+Constructs a note tag that targets the given account ID.
 
 #### Parameters
 
@@ -135,33 +81,19 @@ Builds a single-target tag derived from an account ID.
 
 ***
 
-### fromHex()
+### withCustomAccountTarget()
 
-> `static` **fromHex**(`hex`): `NoteTag`
+> `static` **withCustomAccountTarget**(`account_id`, `tag_len`): `NoteTag`
 
-Builds a note tag from a hex-encoded string (with or without 0x prefix).
-
-#### Parameters
-
-##### hex
-
-`string`
-
-#### Returns
-
-`NoteTag`
-
-***
-
-### fromU32()
-
-> `static` **fromU32**(`raw`): `NoteTag`
-
-Builds a note tag from its raw u32 representation.
+Constructs a note tag that targets the given account ID with a custom tag length.
 
 #### Parameters
 
-##### raw
+##### account\_id
+
+[`AccountId`](AccountId.md)
+
+##### tag\_len
 
 `number`
 

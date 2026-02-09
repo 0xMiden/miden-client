@@ -168,7 +168,7 @@ test.describe("get public account with details", () => {
     const [assetCount, balances, mapEntriesCount] = await page.evaluate(
       async () => {
         // This account is inserted into the genesis block when test node is started,
-        // it starts with assets from 1500 faucets, the function "build_test_faucets_and_accoung"
+        // it starts with assets from 1500 faucets, the function "build_test_faucets_and_account"
         // is called when the node starts and does the setup for this account, you can find it
         // in: miden-client/crates/testing/node-builder/src/lib.rs
         const accountID = window.AccountId.fromHex(

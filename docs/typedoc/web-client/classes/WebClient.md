@@ -6,6 +6,14 @@
 
 # Class: WebClient
 
+## Extends
+
+- [`WasmWebClient`](../interfaces/WasmWebClient.md)
+
+## Extended by
+
+- [`MockWebClient`](MockWebClient.md)
+
 ## Constructors
 
 ### Constructor
@@ -16,6 +24,10 @@
 
 `WebClient`
 
+#### Inherited from
+
+`WasmWebClient.constructor`
+
 ## Methods
 
 ### \[dispose\]()
@@ -25,6 +37,45 @@
 #### Returns
 
 `void`
+
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`[dispose]`](../interfaces/WasmWebClient.md#dispose)
+
+***
+
+### accountReader()
+
+> **accountReader**(`account_id`): [`AccountReader`](AccountReader.md)
+
+Creates a new `AccountReader` for lazy access to account data.
+
+The `AccountReader` executes queries lazily - each method call fetches fresh data
+from storage, ensuring you always see the current state.
+
+# Arguments
+* `account_id` - The ID of the account to read.
+
+# Example
+```javascript
+const reader = client.accountReader(accountId);
+const nonce = await reader.nonce();
+const balance = await reader.getBalance(faucetId);
+```
+
+#### Parameters
+
+##### account\_id
+
+[`AccountId`](AccountId.md)
+
+#### Returns
+
+[`AccountReader`](AccountReader.md)
+
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`accountReader`](../interfaces/WasmWebClient.md#accountreader)
 
 ***
 
@@ -46,6 +97,10 @@
 
 `Promise`\<`void`\>
 
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`addAccountSecretKeyToWebStore`](../interfaces/WasmWebClient.md#addaccountsecretkeytowebstore)
+
 ***
 
 ### addTag()
@@ -61,6 +116,10 @@
 #### Returns
 
 `Promise`\<`void`\>
+
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`addTag`](../interfaces/WasmWebClient.md#addtag)
 
 ***
 
@@ -81,6 +140,10 @@
 #### Returns
 
 `Promise`\<[`TransactionStoreUpdate`](TransactionStoreUpdate.md)\>
+
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`applyTransaction`](../interfaces/WasmWebClient.md#applytransaction)
 
 ***
 
@@ -119,6 +182,10 @@ Creates a new `WebClient` instance with the specified configuration.
 #### Returns
 
 `Promise`\<`any`\>
+
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`createClient`](../interfaces/WasmWebClient.md#createclient)
 
 ***
 
@@ -173,6 +240,10 @@ Creates a new `WebClient` instance with external keystore callbacks.
 
 `Promise`\<`any`\>
 
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`createClientWithExternalKeystore`](../interfaces/WasmWebClient.md#createclientwithexternalkeystore)
+
 ***
 
 ### createCodeBuilder()
@@ -182,6 +253,10 @@ Creates a new `WebClient` instance with external keystore callbacks.
 #### Returns
 
 [`CodeBuilder`](CodeBuilder.md)
+
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`createCodeBuilder`](../interfaces/WasmWebClient.md#createcodebuilder)
 
 ***
 
@@ -209,6 +284,22 @@ applications as it uses a mock chain that simulates the behavior of a real node.
 #### Returns
 
 `Promise`\<`any`\>
+
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`createMockClient`](../interfaces/WasmWebClient.md#createmockclient)
+
+***
+
+### defaultTransactionProver()
+
+> **defaultTransactionProver**(): [`TransactionProver`](TransactionProver.md)
+
+Returns the default transaction prover configured on the client.
+
+#### Returns
+
+[`TransactionProver`](TransactionProver.md)
 
 ***
 
@@ -240,6 +331,10 @@ request as the salt (or a zero salt if not provided).
 
 `Promise`\<[`TransactionSummary`](TransactionSummary.md)\>
 
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`executeForSummary`](../interfaces/WasmWebClient.md#executeforsummary)
+
 ***
 
 ### executeTransaction()
@@ -268,6 +363,10 @@ the chain tip is performed, and the required block header is retrieved.
 
 `Promise`\<[`TransactionResult`](TransactionResult.md)\>
 
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`executeTransaction`](../interfaces/WasmWebClient.md#executetransaction)
+
 ***
 
 ### exportAccountFile()
@@ -283,6 +382,10 @@ the chain tip is performed, and the required block header is retrieved.
 #### Returns
 
 `Promise`\<[`AccountFile`](AccountFile.md)\>
+
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`exportAccountFile`](../interfaces/WasmWebClient.md#exportaccountfile)
 
 ***
 
@@ -304,6 +407,10 @@ the chain tip is performed, and the required block header is retrieved.
 
 `Promise`\<[`NoteFile`](NoteFile.md)\>
 
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`exportNoteFile`](../interfaces/WasmWebClient.md#exportnotefile)
+
 ***
 
 ### exportStore()
@@ -317,6 +424,10 @@ Meant to be used in conjunction with the `force_import_store` method
 #### Returns
 
 `Promise`\<`any`\>
+
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`exportStore`](../interfaces/WasmWebClient.md#exportstore)
 
 ***
 
@@ -334,6 +445,10 @@ fetching mechanism.
 
 `Promise`\<`void`\>
 
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`fetchAllPrivateNotes`](../interfaces/WasmWebClient.md#fetchallprivatenotes)
+
 ***
 
 ### fetchPrivateNotes()
@@ -347,6 +462,10 @@ Uses an internal pagination mechanism to avoid fetching duplicate notes.
 #### Returns
 
 `Promise`\<`void`\>
+
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`fetchPrivateNotes`](../interfaces/WasmWebClient.md#fetchprivatenotes)
 
 ***
 
@@ -368,6 +487,10 @@ Uses an internal pagination mechanism to avoid fetching duplicate notes.
 
 `Promise`\<`any`\>
 
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`forceImportStore`](../interfaces/WasmWebClient.md#forceimportstore)
+
 ***
 
 ### free()
@@ -378,11 +501,19 @@ Uses an internal pagination mechanism to avoid fetching duplicate notes.
 
 `void`
 
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`free`](../interfaces/WasmWebClient.md#free)
+
 ***
 
 ### getAccount()
 
 > **getAccount**(`account_id`): `Promise`\<[`Account`](Account.md)\>
+
+Retrieves the full account data for the given account ID, returning `null` if not found.
+
+This method loads the complete account state including vault, storage, and code.
 
 #### Parameters
 
@@ -393,6 +524,10 @@ Uses an internal pagination mechanism to avoid fetching duplicate notes.
 #### Returns
 
 `Promise`\<[`Account`](Account.md)\>
+
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`getAccount`](../interfaces/WasmWebClient.md#getaccount)
 
 ***
 
@@ -414,6 +549,34 @@ Returns the associated [`AuthSecretKey`] if found, or an error if not found.
 #### Returns
 
 `Promise`\<[`AuthSecretKey`](AuthSecretKey.md)\>
+
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`getAccountAuthByPubKeyCommitment`](../interfaces/WasmWebClient.md#getaccountauthbypubkeycommitment)
+
+***
+
+### getAccountCode()
+
+> **getAccountCode**(`account_id`): `Promise`\<[`AccountCode`](AccountCode.md)\>
+
+Retrieves the account code for a specific account.
+
+Returns `null` if the account is not found.
+
+#### Parameters
+
+##### account\_id
+
+[`AccountId`](AccountId.md)
+
+#### Returns
+
+`Promise`\<[`AccountCode`](AccountCode.md)\>
+
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`getAccountCode`](../interfaces/WasmWebClient.md#getaccountcode)
 
 ***
 
@@ -441,6 +604,58 @@ Returns the associated [`AuthSecretKey`] if found, or an error if not found.
 
 `Promise`\<[`AccountHeader`](AccountHeader.md)[]\>
 
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`getAccounts`](../interfaces/WasmWebClient.md#getaccounts)
+
+***
+
+### getAccountStorage()
+
+> **getAccountStorage**(`account_id`): `Promise`\<[`AccountStorage`](AccountStorage.md)\>
+
+Retrieves the storage for a specific account.
+
+To only load a specific slot, use `accountReader` instead.
+
+#### Parameters
+
+##### account\_id
+
+[`AccountId`](AccountId.md)
+
+#### Returns
+
+`Promise`\<[`AccountStorage`](AccountStorage.md)\>
+
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`getAccountStorage`](../interfaces/WasmWebClient.md#getaccountstorage)
+
+***
+
+### getAccountVault()
+
+> **getAccountVault**(`account_id`): `Promise`\<[`AssetVault`](AssetVault.md)\>
+
+Retrieves the asset vault for a specific account.
+
+To check the balance for a single asset, use `accountReader` instead.
+
+#### Parameters
+
+##### account\_id
+
+[`AccountId`](AccountId.md)
+
+#### Returns
+
+`Promise`\<[`AssetVault`](AssetVault.md)\>
+
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`getAccountVault`](../interfaces/WasmWebClient.md#getaccountvault)
+
 ***
 
 ### getConsumableNotes()
@@ -456,6 +671,10 @@ Returns the associated [`AuthSecretKey`] if found, or an error if not found.
 #### Returns
 
 `Promise`\<[`ConsumableNoteRecord`](ConsumableNoteRecord.md)[]\>
+
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`getConsumableNotes`](../interfaces/WasmWebClient.md#getconsumablenotes)
 
 ***
 
@@ -473,6 +692,10 @@ Returns the associated [`AuthSecretKey`] if found, or an error if not found.
 
 `Promise`\<[`InputNoteRecord`](InputNoteRecord.md)\>
 
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`getInputNote`](../interfaces/WasmWebClient.md#getinputnote)
+
 ***
 
 ### getInputNotes()
@@ -488,6 +711,10 @@ Returns the associated [`AuthSecretKey`] if found, or an error if not found.
 #### Returns
 
 `Promise`\<[`InputNoteRecord`](InputNoteRecord.md)[]\>
+
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`getInputNotes`](../interfaces/WasmWebClient.md#getinputnotes)
 
 ***
 
@@ -505,6 +732,10 @@ Returns the associated [`AuthSecretKey`] if found, or an error if not found.
 
 `Promise`\<[`OutputNoteRecord`](OutputNoteRecord.md)\>
 
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`getOutputNote`](../interfaces/WasmWebClient.md#getoutputnote)
+
 ***
 
 ### getOutputNotes()
@@ -520,6 +751,10 @@ Returns the associated [`AuthSecretKey`] if found, or an error if not found.
 #### Returns
 
 `Promise`\<[`OutputNoteRecord`](OutputNoteRecord.md)[]\>
+
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`getOutputNotes`](../interfaces/WasmWebClient.md#getoutputnotes)
 
 ***
 
@@ -542,6 +777,10 @@ to retrieve the corresponding secret keys from the keystore.
 
 `Promise`\<[`Word`](Word.md)[]\>
 
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`getPublicKeyCommitmentsOfAccount`](../interfaces/WasmWebClient.md#getpublickeycommitmentsofaccount)
+
 ***
 
 ### getSetting()
@@ -560,6 +799,10 @@ Retrieves the setting value for `key`, or `None` if it hasn’t been set.
 
 `Promise`\<`any`\>
 
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`getSetting`](../interfaces/WasmWebClient.md#getsetting)
+
 ***
 
 ### getSyncHeight()
@@ -569,6 +812,10 @@ Retrieves the setting value for `key`, or `None` if it hasn’t been set.
 #### Returns
 
 `Promise`\<`number`\>
+
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`getSyncHeight`](../interfaces/WasmWebClient.md#getsyncheight)
 
 ***
 
@@ -586,6 +833,10 @@ Retrieves the setting value for `key`, or `None` if it hasn’t been set.
 
 `Promise`\<[`TransactionRecord`](TransactionRecord.md)[]\>
 
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`getTransactions`](../interfaces/WasmWebClient.md#gettransactions)
+
 ***
 
 ### importAccountById()
@@ -601,6 +852,10 @@ Retrieves the setting value for `key`, or `None` if it hasn’t been set.
 #### Returns
 
 `Promise`\<`any`\>
+
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`importAccountById`](../interfaces/WasmWebClient.md#importaccountbyid)
 
 ***
 
@@ -618,6 +873,10 @@ Retrieves the setting value for `key`, or `None` if it hasn’t been set.
 
 `Promise`\<`any`\>
 
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`importAccountFile`](../interfaces/WasmWebClient.md#importaccountfile)
+
 ***
 
 ### importNoteFile()
@@ -633,6 +892,10 @@ Retrieves the setting value for `key`, or `None` if it hasn’t been set.
 #### Returns
 
 `Promise`\<[`NoteId`](NoteId.md)\>
+
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`importNoteFile`](../interfaces/WasmWebClient.md#importnotefile)
 
 ***
 
@@ -658,6 +921,10 @@ Retrieves the setting value for `key`, or `None` if it hasn’t been set.
 
 `Promise`\<[`Account`](Account.md)\>
 
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`importPublicAccountFromSeed`](../interfaces/WasmWebClient.md#importpublicaccountfromseed)
+
 ***
 
 ### insertAccountAddress()
@@ -678,6 +945,10 @@ Retrieves the setting value for `key`, or `None` if it hasn’t been set.
 
 `Promise`\<`void`\>
 
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`insertAccountAddress`](../interfaces/WasmWebClient.md#insertaccountaddress)
+
 ***
 
 ### listSettingKeys()
@@ -690,6 +961,10 @@ Returns all the existing setting keys from the store.
 
 `Promise`\<`string`[]\>
 
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`listSettingKeys`](../interfaces/WasmWebClient.md#listsettingkeys)
+
 ***
 
 ### listTags()
@@ -699,6 +974,10 @@ Returns all the existing setting keys from the store.
 #### Returns
 
 `Promise`\<`any`\>
+
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`listTags`](../interfaces/WasmWebClient.md#listtags)
 
 ***
 
@@ -720,6 +999,10 @@ Returns all the existing setting keys from the store.
 
 `Promise`\<`void`\>
 
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`newAccount`](../interfaces/WasmWebClient.md#newaccount)
+
 ***
 
 ### newConsumeTransactionRequest()
@@ -735,6 +1018,10 @@ Returns all the existing setting keys from the store.
 #### Returns
 
 [`TransactionRequest`](TransactionRequest.md)
+
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`newConsumeTransactionRequest`](../interfaces/WasmWebClient.md#newconsumetransactionrequest)
 
 ***
 
@@ -772,6 +1059,10 @@ Returns all the existing setting keys from the store.
 
 `Promise`\<[`Account`](Account.md)\>
 
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`newFaucet`](../interfaces/WasmWebClient.md#newfaucet)
+
 ***
 
 ### newMintTransactionRequest()
@@ -799,6 +1090,10 @@ Returns all the existing setting keys from the store.
 #### Returns
 
 [`TransactionRequest`](TransactionRequest.md)
+
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`newMintTransactionRequest`](../interfaces/WasmWebClient.md#newminttransactionrequest)
 
 ***
 
@@ -840,6 +1135,10 @@ Returns all the existing setting keys from the store.
 
 [`TransactionRequest`](TransactionRequest.md)
 
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`newSendTransactionRequest`](../interfaces/WasmWebClient.md#newsendtransactionrequest)
+
 ***
 
 ### newSwapTransactionRequest()
@@ -880,6 +1179,10 @@ Returns all the existing setting keys from the store.
 
 [`TransactionRequest`](TransactionRequest.md)
 
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`newSwapTransactionRequest`](../interfaces/WasmWebClient.md#newswaptransactionrequest)
+
 ***
 
 ### newWallet()
@@ -908,6 +1211,10 @@ Returns all the existing setting keys from the store.
 
 `Promise`\<[`Account`](Account.md)\>
 
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`newWallet`](../interfaces/WasmWebClient.md#newwallet)
+
 ***
 
 ### proveBlock()
@@ -917,6 +1224,10 @@ Returns all the existing setting keys from the store.
 #### Returns
 
 `void`
+
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`proveBlock`](../interfaces/WasmWebClient.md#proveblock)
 
 ***
 
@@ -941,6 +1252,10 @@ prover if none is supplied.
 
 `Promise`\<[`ProvenTransaction`](ProvenTransaction.md)\>
 
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`proveTransaction`](../interfaces/WasmWebClient.md#provetransaction)
+
 ***
 
 ### removeAccountAddress()
@@ -961,6 +1276,10 @@ prover if none is supplied.
 
 `Promise`\<`void`\>
 
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`removeAccountAddress`](../interfaces/WasmWebClient.md#removeaccountaddress)
+
 ***
 
 ### removeSetting()
@@ -979,6 +1298,10 @@ Deletes a setting key-value from the store.
 
 `Promise`\<`void`\>
 
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`removeSetting`](../interfaces/WasmWebClient.md#removesetting)
+
 ***
 
 ### removeTag()
@@ -994,6 +1317,10 @@ Deletes a setting key-value from the store.
 #### Returns
 
 `Promise`\<`void`\>
+
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`removeTag`](../interfaces/WasmWebClient.md#removetag)
 
 ***
 
@@ -1017,6 +1344,10 @@ Send a private note via the note transport layer
 
 `Promise`\<`void`\>
 
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`sendPrivateNote`](../interfaces/WasmWebClient.md#sendprivatenote)
+
 ***
 
 ### serializeMockChain()
@@ -1029,6 +1360,10 @@ Returns the inner serialized mock chain if it exists.
 
 `Uint8Array`
 
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`serializeMockChain`](../interfaces/WasmWebClient.md#serializemockchain)
+
 ***
 
 ### serializeMockNoteTransportNode()
@@ -1040,6 +1375,38 @@ Returns the inner serialized mock note transport node if it exists.
 #### Returns
 
 `Uint8Array`
+
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`serializeMockNoteTransportNode`](../interfaces/WasmWebClient.md#serializemocknotetransportnode)
+
+***
+
+### setDebugMode()
+
+> **setDebugMode**(`enabled`): `void`
+
+Sets the debug mode for transaction execution.
+
+When enabled, the transaction executor will record additional information useful for
+debugging (the values on the VM stack and the state of the advice provider). This is
+disabled by default since it adds overhead.
+
+Must be called before `createClient`.
+
+#### Parameters
+
+##### enabled
+
+`boolean`
+
+#### Returns
+
+`void`
+
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`setDebugMode`](../interfaces/WasmWebClient.md#setdebugmode)
 
 ***
 
@@ -1062,6 +1429,10 @@ Sets a setting key-value in the store. It can then be retrieved using `get_setti
 #### Returns
 
 `Promise`\<`void`\>
+
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`setSetting`](../interfaces/WasmWebClient.md#setsetting)
 
 ***
 
@@ -1091,6 +1462,10 @@ the chain tip is performed, and the required block header is retrieved.
 #### Returns
 
 `Promise`\<[`TransactionId`](TransactionId.md)\>
+
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`submitNewTransaction`](../interfaces/WasmWebClient.md#submitnewtransaction)
 
 ***
 
@@ -1123,6 +1498,10 @@ chain tip is performed, and the required block header is retrieved.
 
 `Promise`\<[`TransactionId`](TransactionId.md)\>
 
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`submitNewTransactionWithProver`](../interfaces/WasmWebClient.md#submitnewtransactionwithprover)
+
 ***
 
 ### submitProvenTransaction()
@@ -1143,15 +1522,107 @@ chain tip is performed, and the required block header is retrieved.
 
 `Promise`\<`number`\>
 
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`submitProvenTransaction`](../interfaces/WasmWebClient.md#submitproventransaction)
+
 ***
 
 ### syncState()
 
 > **syncState**(): `Promise`\<[`SyncSummary`](SyncSummary.md)\>
 
+Syncs the client state with the Miden node.
+
+This method coordinates concurrent calls using the Web Locks API:
+- If a sync is already in progress, callers wait and receive the same result
+- Cross-tab coordination ensures only one sync runs at a time per database
+
 #### Returns
 
 `Promise`\<[`SyncSummary`](SyncSummary.md)\>
+
+A promise that resolves to a SyncSummary with the sync results.
+
+***
+
+### syncStateImpl()
+
+> **syncStateImpl**(): `Promise`\<[`SyncSummary`](SyncSummary.md)\>
+
+Internal implementation of `sync_state`.
+
+This method performs the actual sync operation. Concurrent call coordination
+is handled at the JavaScript layer using the Web Locks API.
+
+**Note:** Do not call this method directly. Use `syncState()` from JavaScript instead,
+which provides proper coordination for concurrent calls.
+
+#### Returns
+
+`Promise`\<[`SyncSummary`](SyncSummary.md)\>
+
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`syncStateImpl`](../interfaces/WasmWebClient.md#syncstateimpl)
+
+***
+
+### syncStateWithTimeout()
+
+> **syncStateWithTimeout**(`timeoutMs?`): `Promise`\<[`SyncSummary`](SyncSummary.md)\>
+
+Syncs the client state with the Miden node with an optional timeout.
+
+This method coordinates concurrent calls using the Web Locks API:
+- If a sync is already in progress, callers wait and receive the same result
+- Cross-tab coordination ensures only one sync runs at a time per database
+- If a timeout is specified and exceeded, the method throws an error
+
+#### Parameters
+
+##### timeoutMs?
+
+`number`
+
+Optional timeout in milliseconds. If 0 or not provided, waits indefinitely.
+
+#### Returns
+
+`Promise`\<[`SyncSummary`](SyncSummary.md)\>
+
+A promise that resolves to a SyncSummary with the sync results.
+
+***
+
+### terminate()
+
+> **terminate**(): `void`
+
+Terminates the underlying Web Worker used by this WebClient instance.
+
+Call this method when you're done using a WebClient to free up browser
+resources.
+
+After calling terminate(), the WebClient instance should not be used for
+any further operations that require the worker.
+
+#### Returns
+
+`void`
+
+#### Example
+
+```typescript
+// Create a client
+const client = await WebClient.createClient(rpcUrl);
+
+// Use the client...
+await client.syncState();
+
+// Clean up when done
+client.terminate();
+```
 
 ***
 
@@ -1162,6 +1633,10 @@ chain tip is performed, and the required block header is retrieved.
 #### Returns
 
 `boolean`
+
+#### Inherited from
+
+[`WasmWebClient`](../interfaces/WasmWebClient.md).[`usesMockChain`](../interfaces/WasmWebClient.md#usesmockchain)
 
 ***
 
@@ -1194,3 +1669,105 @@ chain tip is performed, and the required block header is retrieved.
 #### Returns
 
 [`NoteTag`](NoteTag.md)
+
+#### Inherited from
+
+`WasmWebClient.buildSwapTag`
+
+***
+
+### createClient()
+
+> `static` **createClient**(`rpcUrl?`, `noteTransportUrl?`, `seed?`, `network?`): `Promise`\<`WebClient`\>
+
+Factory method to create and initialize a new wrapped WebClient.
+
+#### Parameters
+
+##### rpcUrl?
+
+`string`
+
+The RPC URL (optional).
+
+##### noteTransportUrl?
+
+`string`
+
+The note transport URL (optional).
+
+##### seed?
+
+`Uint8Array`
+
+The seed for the account (optional).
+
+##### network?
+
+`string`
+
+Optional name for the store. Setting this allows multiple clients to be used in the same browser.
+
+#### Returns
+
+`Promise`\<`WebClient`\>
+
+A promise that resolves to a fully initialized WebClient.
+
+***
+
+### createClientWithExternalKeystore()
+
+> `static` **createClientWithExternalKeystore**(`rpcUrl?`, `noteTransportUrl?`, `seed?`, `storeName?`, `getKeyCb?`, `insertKeyCb?`, `signCb?`): `Promise`\<`WebClient`\>
+
+Factory method to create and initialize a new wrapped WebClient with a remote keystore.
+
+#### Parameters
+
+##### rpcUrl?
+
+`string`
+
+The RPC URL (optional).
+
+##### noteTransportUrl?
+
+`string`
+
+The note transport URL (optional).
+
+##### seed?
+
+`Uint8Array`
+
+The seed for the account (optional).
+
+##### storeName?
+
+`string`
+
+Optional name for the store. Setting this allows multiple clients to be used in the same browser.
+
+##### getKeyCb?
+
+[`GetKeyCallback`](../type-aliases/GetKeyCallback.md)
+
+Callback used to retrieve secret keys for a given public key.
+
+##### insertKeyCb?
+
+[`InsertKeyCallback`](../type-aliases/InsertKeyCallback.md)
+
+Callback used to persist secret keys in the external store.
+
+##### signCb?
+
+[`SignCallback`](../type-aliases/SignCallback.md)
+
+Callback used to create signatures for the provided inputs.
+
+#### Returns
+
+`Promise`\<`WebClient`\>
+
+A promise that resolves to a fully initialized WebClient.

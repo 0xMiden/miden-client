@@ -4,6 +4,7 @@ use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::crypto::merkle::{MerklePath, SparseMerklePath};
 use miden_protocol::note::{
     Note,
+    NoteAttachment,
     NoteDetails,
     NoteHeader,
     NoteId,
@@ -13,7 +14,7 @@ use miden_protocol::note::{
     NoteTag,
     NoteType,
 };
-use miden_protocol::{Felt, MastForest, MastNodeId, Word};
+use miden_protocol::{MastForest, MastNodeId, Word};
 use miden_tx::utils::Deserializable;
 
 use super::{MissingFieldHelper, RpcConversionError};
@@ -43,24 +44,30 @@ impl TryFrom<proto::note::NoteMetadata> for NoteMetadata {
             .sender
             .ok_or_else(|| proto::note::NoteMetadata::missing_field(stringify!(sender)))?
             .try_into()?;
-        let note_type = NoteType::try_from(u64::from(value.note_type))?;
-        let tag = NoteTag::from(value.tag);
-        let execution_hint = value.execution_hint.try_into()?;
+        let note_type =
+            NoteType::try_from(u64::try_from(value.note_type).expect("invalid note type"))?;
+        let tag = NoteTag::new(value.tag);
 
-        let aux = Felt::try_from(value.aux).map_err(|_| RpcConversionError::NotAValidFelt)?;
+        // Deserialize attachment if present
+        let attachment = if value.attachment.is_empty() {
+            NoteAttachment::default()
+        } else {
+            NoteAttachment::read_from_bytes(&value.attachment)
+                .map_err(RpcConversionError::DeserializationError)?
+        };
 
-        Ok(NoteMetadata::new(sender, note_type, tag, execution_hint, aux)?)
+        Ok(NoteMetadata::new(sender, note_type, tag).with_attachment(attachment))
     }
 }
 
 impl From<NoteMetadata> for proto::note::NoteMetadata {
     fn from(value: NoteMetadata) -> Self {
+        use miden_tx::utils::Serializable;
         proto::note::NoteMetadata {
             sender: Some(value.sender().into()),
-            note_type: value.note_type() as u32,
-            tag: value.tag().into(),
-            execution_hint: value.execution_hint().into(),
-            aux: value.aux().into(),
+            note_type: value.note_type() as i32,
+            tag: value.tag().as_u32(),
+            attachment: value.attachment().to_bytes(),
         }
     }
 }
@@ -209,7 +216,7 @@ impl CommittedNote {
     }
 
     pub fn metadata(&self) -> NoteMetadata {
-        self.metadata
+        self.metadata.clone()
     }
 }
 

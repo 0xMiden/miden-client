@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use miden_client::Client;
 use miden_client::address::{Address, AddressInterface, NetworkId, RoutingParameters};
-use miden_client::note::{NoteExecutionMode, NoteTag};
+use miden_client::note::NoteTag;
 
 use crate::config::CliConfig;
 use crate::errors::CliError;
@@ -114,12 +114,12 @@ async fn list_all_addresses<AUTH>(
     println!("Listing addresses for all accounts:\n");
     let accounts = client.get_account_headers().await?;
     for (acc_header, _) in accounts {
-        let account_record = client
-            .get_account(acc_header.id())
-            .await?
+        let addresses = client
+            .account_reader(acc_header.id())
+            .addresses()
+            .await
             .expect("account is expected to exist if retrieved");
-        let addresses = account_record.addresses();
-        print_account_addresses(&acc_header.id().to_string(), addresses, &network_id);
+        print_account_addresses(&acc_header.id().to_string(), &addresses, &network_id);
         println!();
     }
     Ok(())
@@ -131,14 +131,9 @@ async fn list_account_addresses<AUTH>(
     network_id: NetworkId,
 ) -> Result<(), CliError> {
     let id = parse_account_id(&client, account_id).await?;
-    let addresses = match client.get_account(id).await? {
-        Some(account) => account.addresses().clone(),
-        _ => {
-            return Err(CliError::Input(format!(
-                "The account with id `{account_id}` does not exist",
-            )));
-        },
-    };
+    let addresses = client.account_reader(id).addresses().await.map_err(|_| {
+        CliError::Input(format!("The account with id `{account_id}` does not exist"))
+    })?;
 
     print_account_addresses(&id.to_hex(), &addresses, &network_id);
     Ok(())
@@ -162,14 +157,10 @@ async fn add_address<AUTH>(
         .with_routing_parameters(routing_params)
         .map_err(|err| CliError::Address(err, "Failed to set routing params".to_string()))?;
 
-    let note_tag = NoteTag::from_account_id(account_id);
-    let execution_mode = match note_tag.execution_mode() {
-        NoteExecutionMode::Local => "Local",
-        NoteExecutionMode::Network => "Network",
-    };
+    let note_tag = NoteTag::with_account_target(account_id);
     client.add_address(address, account_id).await?;
 
-    println!("Address added: Account Id {account_id} - Execution mode: {execution_mode}");
+    println!("Address added: Account Id {account_id} - Note tag: {note_tag}");
     Ok(())
 }
 
@@ -180,12 +171,9 @@ async fn remove_address<AUTH>(
 ) -> Result<(), CliError> {
     let account_id = parse_account_id(&client, &account_id).await?;
     let (_, address) = Address::decode(&address).map_err(|e| CliError::Address(e, address))?;
-    let execution_mode = match address.to_note_tag().execution_mode() {
-        NoteExecutionMode::Local => "Local",
-        NoteExecutionMode::Network => "Network",
-    };
+    let note_tag = address.to_note_tag();
 
-    println!("removing address - Account Id {account_id} - Execution mode: {execution_mode}");
+    println!("removing address - Account Id {account_id} - Note tag: {note_tag}");
 
     client.remove_address(address, account_id).await?;
     Ok(())

@@ -31,7 +31,7 @@ impl WebClient {
                 .map_err(|err| js_error_with_context(err, "failed to import account"))?;
 
             for key in &auth_secret_keys {
-                keystore.add_key(key).await.map_err(|err| err.to_string())?;
+                keystore.add_secret_key(key).await.map_err(|err| err.to_string())?;
             }
 
             let pub_keys: Vec<_> = auth_secret_keys
@@ -83,7 +83,7 @@ impl WebClient {
 
         keystore
             .expect("KeyStore should be initialized")
-            .add_key(&key_pair)
+            .add_secret_key(&key_pair)
             .await
             .map_err(|err| err.to_string())?;
 

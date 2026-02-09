@@ -15,7 +15,6 @@ use miden_tx::auth::TransactionAuthenticator;
 use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, SliceReader};
 
 pub use self::errors::NoteTransportError;
-use crate::store::Store;
 use crate::{Client, ClientError};
 
 pub const NOTE_TRANSPORT_DEFAULT_ENDPOINT: &str = "https://transport.miden.io";
@@ -49,7 +48,7 @@ impl<AUTH> Client<AUTH> {
     ) -> Result<(), ClientError> {
         let api = self.get_note_transport_api()?;
 
-        let header = *note.header();
+        let header = note.header().clone();
         let details = NoteDetails::from(note);
         let details_bytes = details.to_bytes();
         // e2ee impl hint:
@@ -145,16 +144,6 @@ where
 
         Ok(())
     }
-}
-
-/// Populates the note transport cursor setting with 0, if it is not setup
-pub(crate) async fn init_note_transport_cursor(store: Arc<dyn Store>) -> Result<(), ClientError> {
-    let setting = NOTE_TRANSPORT_CURSOR_STORE_SETTING;
-    if store.get_setting(setting.into()).await?.is_none() {
-        let initial_cursor = 0u64.to_be_bytes().to_vec();
-        store.set_setting(setting.into(), initial_cursor).await?;
-    }
-    Ok(())
 }
 
 /// Note transport cursor
@@ -270,6 +259,6 @@ impl Deserializable for NoteTransportCursor {
 fn rejoin_note(header: &NoteHeader, details_bytes: &[u8]) -> Result<Note, DeserializationError> {
     let mut reader = SliceReader::new(details_bytes);
     let details = NoteDetails::read_from(&mut reader)?;
-    let metadata = *header.metadata();
+    let metadata = header.metadata().clone();
     Ok(Note::new(details.assets().clone(), metadata, details.recipient().clone()))
 }

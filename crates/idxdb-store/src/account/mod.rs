@@ -188,9 +188,8 @@ impl WebStore {
             status.seed().copied(),
         )?;
 
-        let addresses = self.get_account_addresses(account_id).await?;
         let account_data = AccountRecordData::Full(account);
-        Ok(Some(AccountRecord::new(account_data, status, addresses)))
+        Ok(Some(AccountRecord::new(account_data, status)))
     }
 
     // TODO: current implementation is a copy of `get_account`,
@@ -222,8 +221,7 @@ impl WebStore {
         )?;
 
         let account_data = AccountRecordData::Partial((&account).into());
-        let addresses = self.get_account_addresses(account_id).await?;
-        Ok(Some(AccountRecord::new(account_data, status, addresses)))
+        Ok(Some(AccountRecord::new(account_data, status)))
     }
 
     pub(super) async fn get_account_code(&self, root: Word) -> Result<AccountCode, StoreError> {

@@ -211,13 +211,13 @@ impl TransactionUpdateTracker {
     pub fn apply_sync_height_update(
         &mut self,
         new_sync_height: BlockNumber,
-        tx_graceful_blocks: Option<u32>,
+        tx_discard_delta: Option<u32>,
     ) {
-        if let Some(tx_graceful_blocks) = tx_graceful_blocks {
+        if let Some(tx_discard_delta) = tx_discard_delta {
             self.discard_transaction_with_predicate(
                 |transaction| {
                     transaction.details.submission_height
-                        < new_sync_height.checked_sub(tx_graceful_blocks).unwrap_or_default()
+                        < new_sync_height.checked_sub(tx_discard_delta).unwrap_or_default()
                 },
                 DiscardCause::Stale,
             );

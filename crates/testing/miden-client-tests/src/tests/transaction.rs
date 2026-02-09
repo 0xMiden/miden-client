@@ -1,7 +1,7 @@
 use alloc::boxed::Box;
 use alloc::sync::Arc;
 
-use miden_client::auth::{AuthRpoFalcon512, AuthSecretKey, RPO_FALCON_SCHEME_ID};
+use miden_client::auth::{AuthFalcon512Rpo, AuthSecretKey, RPO_FALCON_SCHEME_ID};
 use miden_client::transaction::{
     ProvenTransaction,
     TransactionExecutorError,
@@ -42,7 +42,7 @@ async fn transaction_creates_two_notes() {
 
     let account = AccountBuilder::new(Default::default())
         .with_component(BasicWallet)
-        .with_auth_component(AuthRpoFalcon512::new(pub_key.to_commitment()))
+        .with_auth_component(AuthFalcon512Rpo::new(pub_key.to_commitment()))
         .with_assets([asset_1, asset_2])
         .build_existing()
         .unwrap();

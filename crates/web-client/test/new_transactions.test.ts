@@ -337,9 +337,7 @@ export const customTransaction = async (
       let noteMetadata = new window.NoteMetadata(
         faucetAccount.id(),
         window.NoteType.Private,
-        window.NoteTag.fromAccountId(walletAccount.id()),
-        window.NoteExecutionHint.none(),
-        undefined
+        window.NoteTag.withAccountTarget(walletAccount.id())
       );
 
       let expectedNoteArgs = noteArgs.map((felt) => felt.asInt());
@@ -358,11 +356,11 @@ export const customTransaction = async (
             # This note script is based off of the P2ID note script because notes currently need to have
             # assets, otherwise it could have been boiled down to the assert.
 
-            use miden::protocol::native_account
+            use miden::protocol::active_account
+            use miden::protocol::account_id
             use miden::protocol::active_note
-            use miden::core::sys
-            use miden::core::mem
             use miden::standards::wallets::basic->basic_wallet
+            use miden::core::mem
             begin
                 # push data from the advice map into the advice stack
                 adv.push_mapval
@@ -397,36 +395,36 @@ export const customTransaction = async (
                 push.${expectedNoteArg2} assert_eqw.err="Second note argument didn't match expected"
                 # => []
 
-                # store the note inputs to memory starting at address 0
-                push.0 exec.active_note::get_inputs
-                # => [num_inputs, inputs_ptr]
+                # store the note storage to memory starting at address 0
+                padw push.0 exec.active_note::get_storage
+                # => [num_storage_items, storage_ptr, EMPTY_WORD]
 
-                # make sure the number of inputs is 2
-                eq.2 assert.err="P2ID script expects exactly 2 note inputs"
-                # => [inputs_ptr]
+                # make sure the number of storage items is 2
+                eq.2 assert.err="P2ID script expects exactly 2 note storage items"
+                # => [storage_ptr, EMPTY_WORD]
 
-                # read the target account id from the note inputs
-                mem_load
-                # => [target_account_id_prefix]
+                # read the target account id from the note storage
+                mem_loadw_be drop drop
+                # => [target_account_id_prefix, target_account_id_suffix]
 
-                exec.native_account::get_id swap drop
-                # => [account_id_prefix, target_account_id_prefix, ...]
+                exec.active_account::get_id
+                # => [account_id_prefix, account_id_suffix, target_account_id_prefix, target_account_id_suffix, ...]
 
                 # ensure account_id = target_account_id, fails otherwise
-                assert_eq.err="P2ID's target account address and transaction address do not match"
-                # => [...]
+                exec.account_id::is_equal assert.err="P2ID's target account address and transaction address do not match"
+                # => []
 
                 exec.basic_wallet::add_assets_to_account
-                # => [...]
+                # => []
             end
         `;
 
       let builder = client.createCodeBuilder();
       let compiledNoteScript = builder.compileNoteScript(noteScript);
-      let noteInputs = new window.NoteInputs(
+      let noteStorage = new window.NoteStorage(
         new window.MidenArrays.FeltArray([
-          walletAccount.id().prefix(),
           walletAccount.id().suffix(),
+          walletAccount.id().prefix(),
         ])
       );
 
@@ -437,7 +435,7 @@ export const customTransaction = async (
       let noteRecipient = new window.NoteRecipient(
         serialNum,
         compiledNoteScript,
-        noteInputs
+        noteStorage
       );
 
       let note = new window.Note(noteAssets, noteMetadata, noteRecipient);
@@ -547,9 +545,7 @@ const customTxWithMultipleNotes = async (
       let noteMetadata = new window.NoteMetadata(
         senderAccountId,
         window.NoteType.Public,
-        window.NoteTag.fromAccountId(targetAccountId),
-        window.NoteExecutionHint.none(),
-        undefined
+        window.NoteTag.withAccountTarget(targetAccountId)
       );
 
       let serialNum1 = new window.Word(
@@ -566,17 +562,17 @@ const customTxWithMultipleNotes = async (
         targetAccount.id().prefix(),
       ]);
 
-      let noteInputs = new window.NoteInputs(inputNotes);
+      let noteStorage = new window.NoteStorage(inputNotes);
 
       let noteRecipient1 = new window.NoteRecipient(
         serialNum1,
         p2idScript,
-        noteInputs
+        noteStorage
       );
       let noteRecipient2 = new window.NoteRecipient(
         isSerialNumSame ? serialNum1 : serialNum2,
         p2idScript,
-        noteInputs
+        noteStorage
       );
 
       let note1 = new window.Note(noteAssets1, noteMetadata, noteRecipient1);
@@ -622,6 +618,8 @@ test.describe("custom transaction tests", () => {
   test("custom transaction with remote prover completes successfully", async ({
     page,
   }) => {
+    // TODO: hotfix CI failure, we should investigate slow prover tests further.
+    test.slow();
     await expect(customTransaction(page, "0", true)).resolves.toBeUndefined();
   });
 });
@@ -1137,7 +1135,7 @@ export const counterAccountComponent = async (
     // Create transaction with network note
     let compiledNoteScript = await builder.compileNoteScript(scriptCode);
 
-    let noteInputs = new window.NoteInputs(
+    let noteStorage = new window.NoteStorage(
       new window.MidenArrays.FeltArray([])
     );
 
@@ -1150,18 +1148,23 @@ export const counterAccountComponent = async (
     let noteRecipient = new window.NoteRecipient(
       serialNum,
       compiledNoteScript,
-      noteInputs
+      noteStorage
     );
 
     let noteAssets = new window.NoteAssets([]);
 
+    // Create network account target attachment so the node knows to consume this note
+    // with the network account (counter account)
+    let networkTargetAttachment = window.NoteAttachment.newNetworkAccountTarget(
+      accountBuilderResult.account.id(),
+      window.NoteExecutionHint.always()
+    );
+
     let noteMetadata = new window.NoteMetadata(
       nativeAccount.id(),
       window.NoteType.Public,
-      window.NoteTag.fromAccountId(accountBuilderResult.account.id()),
-      window.NoteExecutionHint.none(),
-      undefined
-    );
+      window.NoteTag.withAccountTarget(accountBuilderResult.account.id())
+    ).withAttachment(networkTargetAttachment);
 
     let note = new window.Note(noteAssets, noteMetadata, noteRecipient);
 
@@ -1442,12 +1445,12 @@ test.describe("submitNewTransactionWithProver tests", () => {
         const approverCommitments = approverKeys.map((key) =>
           key.publicKey().toCommitment()
         );
-        const multisigConfig = new window.AuthRpoFalcon512MultisigConfig(
+        const multisigConfig = new window.AuthFalcon512RpoMultisigConfig(
           approverCommitments,
           2
         );
         const multisigComponent =
-          window.createAuthRpoFalcon512Multisig(multisigConfig);
+          window.createAuthFalcon512RpoMultisig(multisigConfig);
 
         const accountBuilderResult = new window.AccountBuilder(walletSeed)
           .accountType(window.AccountType.RegularAccountImmutableCode)

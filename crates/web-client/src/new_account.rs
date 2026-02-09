@@ -4,7 +4,7 @@ use miden_client::account::{AccountBuilder, AccountComponent, AccountType};
 use miden_client::asset::TokenSymbol;
 use miden_client::auth::{
     AuthEcdsaK256Keccak,
-    AuthRpoFalcon512,
+    AuthFalcon512Rpo,
     AuthSchemeId as NativeAuthScheme,
     AuthSecretKey,
 };
@@ -42,7 +42,7 @@ impl WebClient {
 
             keystore
                 .expect("KeyStore should be initialized")
-                .add_key(&key_pair)
+                .add_secret_key(&key_pair)
                 .await
                 .map_err(|err| err.to_string())?;
 
@@ -101,10 +101,10 @@ impl WebClient {
 
             let native_scheme: NativeAuthScheme = auth_scheme.try_into()?;
             let (key_pair, auth_component) = match native_scheme {
-                NativeAuthScheme::RpoFalcon512 => {
+                NativeAuthScheme::Falcon512Rpo => {
                     let key_pair = AuthSecretKey::new_falcon512_rpo_with_rng(&mut faucet_rng);
                     let auth_component: AccountComponent =
-                        AuthRpoFalcon512::new(key_pair.public_key().to_commitment()).into();
+                        AuthFalcon512Rpo::new(key_pair.public_key().to_commitment()).into();
                     (key_pair, auth_component)
                 },
                 NativeAuthScheme::EcdsaK256Keccak => {
@@ -146,7 +146,7 @@ impl WebClient {
 
             keystore
                 .expect("KeyStore should be initialized")
-                .add_key(&key_pair)
+                .add_secret_key(&key_pair)
                 .await
                 .map_err(|err| err.to_string())?;
 
@@ -207,7 +207,10 @@ impl WebClient {
         let native_secret_key: AuthSecretKey = secret_key.into();
         let native_account_id = account_id.into();
 
-        keystore.add_key(&native_secret_key).await.map_err(|err| err.to_string())?;
+        keystore
+            .add_secret_key(&native_secret_key)
+            .await
+            .map_err(|err| err.to_string())?;
 
         if let Some(client) = self.get_mut_inner() {
             client
