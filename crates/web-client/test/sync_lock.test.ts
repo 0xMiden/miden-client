@@ -188,7 +188,7 @@ test.describe("Sync Lock Tests", () => {
           window.rpcUrl,
           undefined,
           undefined,
-          "tests" // Same store name as client1
+          window.storeName // Same store name as client1
         );
 
         // Fire concurrent syncs from both clients
@@ -220,13 +220,13 @@ test.describe("Sync Lock Tests", () => {
           window.rpcUrl,
           undefined,
           undefined,
-          "tests"
+          window.storeName
         );
         const client3 = await window.WebClient.createClient(
           window.rpcUrl,
           undefined,
           undefined,
-          "tests"
+          window.storeName
         );
 
         // Fire many concurrent syncs
@@ -257,7 +257,7 @@ test.describe("Sync Lock Tests", () => {
       page,
     }) => {
       const result = await page.evaluate(async () => {
-        const client1 = window.client; // "tests" store
+        const client1 = window.client; // Uses window.storeName
         const client2 = await window.WebClient.createClient(
           window.rpcUrl,
           undefined,

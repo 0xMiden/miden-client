@@ -11,7 +11,7 @@ export async function insertBlockHeader(dbId, blockNum, header, partialBlockchai
         };
         const existingBlockHeader = await db.blockHeaders.get(blockNum);
         if (!existingBlockHeader) {
-            await db.blockHeaders.add(data);
+            await db.blockHeaders.put(data);
         }
         else {
             console.log("Block header already exists, checking for update.");
