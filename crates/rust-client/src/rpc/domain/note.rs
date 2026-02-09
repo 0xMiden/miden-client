@@ -44,7 +44,8 @@ impl TryFrom<proto::note::NoteMetadata> for NoteMetadata {
             .sender
             .ok_or_else(|| proto::note::NoteMetadata::missing_field(stringify!(sender)))?
             .try_into()?;
-        let note_type = NoteType::try_from(u64::from(value.note_type))?;
+        let note_type =
+            NoteType::try_from(u64::try_from(value.note_type).expect("invalid note type"))?;
         let tag = NoteTag::new(value.tag);
 
         // Deserialize attachment if present
@@ -64,7 +65,7 @@ impl From<NoteMetadata> for proto::note::NoteMetadata {
         use miden_tx::utils::Serializable;
         proto::note::NoteMetadata {
             sender: Some(value.sender().into()),
-            note_type: value.note_type() as u32,
+            note_type: value.note_type() as i32,
             tag: value.tag().as_u32(),
             attachment: value.attachment().to_bytes(),
         }

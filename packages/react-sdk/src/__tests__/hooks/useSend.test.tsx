@@ -177,7 +177,7 @@ describe("useSend", () => {
         });
       });
 
-      // Test encrypted
+      // Test public
       act(() => {
         result.current.reset();
       });
@@ -187,7 +187,7 @@ describe("useSend", () => {
           to: "0x2",
           assetId: "0x3",
           amount: 1n,
-          noteType: "encrypted",
+          noteType: "public",
         });
       });
 

@@ -6,9 +6,9 @@ use miden_client::crypto::{FeltRng, MerkleStore, MerkleTree, NodeIndex, Rpo256, 
 use miden_client::note::{
     Note,
     NoteAssets,
-    NoteInputs,
     NoteMetadata,
     NoteRecipient,
+    NoteStorage,
     NoteTag,
     NoteType,
 };
@@ -288,7 +288,7 @@ pub async fn test_onchain_notes_sync_with_tag(client_config: ClientConfig) -> Re
             end
             ";
     let note_script = client_1.code_builder().compile_note_script(note_script)?;
-    let inputs = NoteInputs::new(vec![])?;
+    let inputs = NoteStorage::new(vec![])?;
     let serial_num = client_1.rng().draw_word();
     let note_metadata = NoteMetadata::new(
         basic_account_1.id(),
@@ -372,7 +372,7 @@ fn create_custom_note(
         .context("failed to compile custom note script")?;
 
     let inputs =
-        NoteInputs::new(vec![target_account_id.prefix().as_felt(), target_account_id.suffix()])
+        NoteStorage::new(vec![target_account_id.suffix(), target_account_id.prefix().as_felt()])
             .context("failed to create note inputs")?;
     let serial_num = rng.draw_word();
     let note_metadata = NoteMetadata::new(
