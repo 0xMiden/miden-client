@@ -13,6 +13,33 @@ const TEST_SERVER_PORT = 8080;
 const MIDEN_NODE_PORT = 57291;
 const REMOTE_TX_PROVER_PORT = 50051;
 
+// Check if running against localhost (vs devnet/testnet)
+export function isLocalhost(): boolean {
+  if (process.env.MIDEN_RPC_URL) {
+    return process.env.MIDEN_RPC_URL.includes("localhost");
+  }
+  const network = process.env.TEST_MIDEN_NETWORK?.toLowerCase();
+  return !network || network === "localhost";
+}
+
+// Determine RPC URL from environment or default to localhost
+export function getRpcUrl(): string {
+  if (process.env.MIDEN_RPC_URL) {
+    return process.env.MIDEN_RPC_URL;
+  }
+
+  const network = process.env.TEST_MIDEN_NETWORK?.toLowerCase();
+  switch (network) {
+    case "devnet":
+      return "https://rpc.devnet.miden.io";
+    case "testnet":
+      return "https://rpc.testnet.miden.io";
+    case "localhost":
+    default:
+      return `http://localhost:${MIDEN_NODE_PORT}`;
+  }
+}
+
 export const test = base.extend<{ forEachTest: void }>({
   forEachTest: [
     async ({ page }, use, testInfo) => {
@@ -34,7 +61,7 @@ export const test = base.extend<{ forEachTest: void }>({
       await page.goto("http://localhost:8080");
 
       await page.evaluate(
-        async ({ MIDEN_NODE_PORT, remoteProverPort, storeName }) => {
+        async ({ rpcUrl, remoteProverPort, storeName }) => {
           // Import the sdk classes and attach them
           // to the window object for testing
           const sdkExports = await import("./index.js");
@@ -42,7 +69,6 @@ export const test = base.extend<{ forEachTest: void }>({
             window[key] = value;
           }
 
-          let rpcUrl = `http://localhost:${MIDEN_NODE_PORT}`;
           let proverUrl = remoteProverPort
             ? `http://localhost:${remoteProverPort}`
             : undefined;
@@ -174,7 +200,7 @@ export const test = base.extend<{ forEachTest: void }>({
           };
         },
         {
-          MIDEN_NODE_PORT,
+          rpcUrl: getRpcUrl(),
           remoteProverPort: process.env.REMOTE_PROVER
             ? REMOTE_TX_PROVER_PORT
             : null,
