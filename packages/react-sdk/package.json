@@ -1,6 +1,6 @@
 {
   "name": "@miden-sdk/react",
-  "version": "0.13.1",
+  "version": "0.13.2",
   "description": "React hooks library for Miden Web Client",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
@@ -14,7 +14,8 @@
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "CLAUDE.md"
   ],
   "scripts": {
     "build": "tsup src/index.ts --format cjs,esm --dts --clean",
