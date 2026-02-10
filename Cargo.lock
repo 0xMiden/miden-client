@@ -2655,11 +2655,11 @@ dependencies = [
 
 [[package]]
 name = "miden-client-bench"
-version = "0.13.0"
+version = "0.14.0"
 dependencies = [
  "anyhow",
  "assert_cmd",
- "clap 4.5.54",
+ "clap 4.5.57",
  "comfy-table",
  "hex",
  "indicatif",
