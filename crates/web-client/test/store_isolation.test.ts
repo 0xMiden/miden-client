@@ -52,10 +52,11 @@ test.describe("Store Isolation Tests", () => {
         accounts1Len: accounts1.length,
         accounts2Len: accounts2.length,
         dbNames,
+        storeName: window.storeName,
       };
     });
 
-    expect(result.dbNames).toContain("tests");
+    expect(result.dbNames).toContain(result.storeName);
     expect(result.dbNames).toContain("IsolatedStore1");
 
     expect(result.accounts1Len).toBe(1);
