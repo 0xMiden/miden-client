@@ -961,7 +961,7 @@ export const discardedTransaction = async (
       senderTxResult.executedTransaction().id().toHex()
     );
 
-    await client.forceImportStore(preConsumeStore, "tests");
+    await client.forceImportStore(preConsumeStore, window.storeName);
 
     // Get the account state before the transaction is applied
     const accountStateBeforeTx = (await client.getAccount(
