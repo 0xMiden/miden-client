@@ -37,7 +37,7 @@ use crate::rpc::generated::account::AccountSummary;
 use crate::rpc::generated::note::NoteSyncRecord;
 use crate::rpc::generated::rpc::{BlockRange, SyncStateResponse};
 use crate::rpc::generated::transaction::TransactionSummary;
-use crate::rpc::{AccountStateAt, NodeRpcClient, RpcError};
+use crate::rpc::{AccountStateAt, NodeRpcClient, RpcError, RpcStatusInfo};
 use crate::transaction::ForeignAccount;
 
 pub type MockClient<AUTH> = Client<AUTH>;
@@ -753,6 +753,19 @@ impl NodeRpcClient for MockRpcApi {
 
     async fn get_network_id(&self) -> Result<NetworkId, RpcError> {
         Ok(NetworkId::Testnet)
+    }
+
+    async fn get_rpc_limits(&self) -> crate::rpc::RpcLimits {
+        crate::rpc::RpcLimits::default()
+    }
+
+    async fn get_status_unversioned(&self) -> Result<RpcStatusInfo, RpcError> {
+        Ok(RpcStatusInfo {
+            version: env!("CARGO_PKG_VERSION").into(),
+            genesis_commitment: None,
+            store: None,
+            block_producer: None,
+        })
     }
 }
 

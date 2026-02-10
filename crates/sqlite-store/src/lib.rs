@@ -356,6 +356,16 @@ impl Store for SqliteStore {
             .await
     }
 
+    async fn get_account_code(
+        &self,
+        account_id: AccountId,
+    ) -> Result<Option<AccountCode>, StoreError> {
+        self.interact_with_connection(move |conn| {
+            SqliteStore::get_account_code_by_id(conn, account_id)
+        })
+        .await
+    }
+
     async fn upsert_foreign_account_code(
         &self,
         account_id: AccountId,

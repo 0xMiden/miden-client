@@ -24,7 +24,7 @@ use miden_client::store::{
     StoreError,
 };
 use miden_client::utils::{Deserializable, Serializable};
-use miden_protocol::note::NoteInputs;
+use miden_protocol::note::NoteStorage;
 use rusqlite::types::Value;
 use rusqlite::{Connection, Transaction, params, params_from_iter};
 
@@ -348,7 +348,7 @@ fn parse_input_note(
 
     let serial_number = Word::read_from_bytes(&serial_number)?;
     let script = NoteScript::read_from_bytes(&script)?;
-    let inputs = NoteInputs::read_from_bytes(&inputs)?;
+    let inputs = NoteStorage::read_from_bytes(&inputs)?;
     let recipient = NoteRecipient::new(serial_number, script, inputs);
 
     let details = NoteDetails::new(assets, recipient);
@@ -370,7 +370,7 @@ fn serialize_input_note(note: &InputNoteRecord) -> SerializedInputNoteData {
 
     let serial_number = recipient.serial_num().to_bytes();
     let script = recipient.script().to_bytes();
-    let inputs = recipient.inputs().to_bytes();
+    let inputs = recipient.storage().to_bytes();
 
     let script_root = recipient.script().root().to_hex();
 
