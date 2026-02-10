@@ -31,6 +31,14 @@ export type {
   AccountStorageMode,
 };
 
+// Re-export signer types for external signer providers
+export type {
+  SignCallback,
+  SignerAccountType,
+  SignerAccountConfig,
+  SignerContextValue,
+} from "../context/SignerContext";
+
 export type RpcUrlConfig =
   | string
   | "devnet"
@@ -252,7 +260,7 @@ export interface SendOptions {
   /** Amount to send */
   amount: bigint;
   /** Note type. Default: private */
-  noteType?: "private" | "public" | "encrypted";
+  noteType?: "private" | "public";
   /** Block height after which sender can reclaim note */
   recallHeight?: number;
   /** Block height after which recipient can consume note */
@@ -274,7 +282,7 @@ export interface MultiSendOptions {
   /** Recipient list */
   recipients: MultiSendRecipient[];
   /** Note type. Default: private */
-  noteType?: "private" | "public" | "encrypted";
+  noteType?: "private" | "public";
 }
 
 export interface InternalTransferOptions {
@@ -287,7 +295,7 @@ export interface InternalTransferOptions {
   /** Amount to transfer */
   amount: bigint;
   /** Note type. Default: private */
-  noteType?: "private" | "public" | "encrypted";
+  noteType?: "private" | "public";
 }
 
 export interface InternalTransferChainOptions {
@@ -300,7 +308,7 @@ export interface InternalTransferChainOptions {
   /** Amount to transfer per hop */
   amount: bigint;
   /** Note type. Default: private */
-  noteType?: "private" | "public" | "encrypted";
+  noteType?: "private" | "public";
 }
 
 export interface InternalTransferResult {
@@ -336,7 +344,7 @@ export interface MintOptions {
   /** Amount to mint */
   amount: bigint;
   /** Note type. Default: private */
-  noteType?: "private" | "public" | "encrypted";
+  noteType?: "private" | "public";
 }
 
 // Consume options
@@ -360,9 +368,9 @@ export interface SwapOptions {
   /** Amount being requested */
   requestedAmount: bigint;
   /** Note type for swap note. Default: private */
-  noteType?: "private" | "public" | "encrypted";
+  noteType?: "private" | "public";
   /** Note type for payback note. Default: private */
-  paybackNoteType?: "private" | "public" | "encrypted";
+  paybackNoteType?: "private" | "public";
 }
 
 // Arbitrary transaction options

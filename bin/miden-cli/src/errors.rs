@@ -1,3 +1,4 @@
+// Suppress false positive from miette+thiserror proc-macro interaction.
 #![allow(unused_assignments)]
 
 use std::error::Error;
@@ -36,7 +37,7 @@ pub enum CliError {
     #[error("asset error")]
     #[diagnostic(code(cli::asset_error))]
     Asset(#[source] AssetError),
-    #[error("client error: {error}")]
+    #[error("client error")]
     #[diagnostic(code(cli::client_error))]
     Client {
         #[source]

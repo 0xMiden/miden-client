@@ -23,9 +23,10 @@ testing = ["miden-client/testing"]
 
 [dependencies]
 # Workspace dependencies
-idxdb-store    = { workspace = true }
-miden-client   = { features = ["testing", "tonic"], workspace = true }
-miden-protocol = { workspace = true }
+idxdb-store     = { workspace = true }
+miden-client    = { features = ["testing", "tonic"], workspace = true }
+miden-protocol  = { workspace = true }
+miden-standards = { workspace = true }
 
 # External dependencies
 console_error_panic_hook = { version = "0.1.7" }
