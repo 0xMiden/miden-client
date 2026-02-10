@@ -5,25 +5,40 @@ sidebar_position: 3
 
 # Importing Data with the Miden SDK
 
-This guide demonstrates how to import accounts, notes, and store data using the Miden SDK. We'll cover different ways to import data that was previously exported.
+This guide demonstrates how to import accounts, notes, and store data using the Miden SDK.
 
 ## Importing Accounts
 
-### Importing an Account from an Account File
+### Importing by Account ID
 
-
-To import an account that was previously exported:
+Import a public account by its ID (fetches state from the network):
 
 ```typescript
-import { WebClient } from "@miden-sdk/miden-sdk";
+import { MidenClient } from "@miden-sdk/miden-sdk";
 
 try {
-    // Initialize the web client
-    const webClient = await WebClient.createClient();
+    const client = await MidenClient.create();
 
-    // accountFile should be the result of a previous account export
-    const result = await webClient.importAccountFile(accountFile);
-    console.log("Account import result:", result);
+    const account = await client.accounts.import("0x1234...");
+    console.log("Imported account:", account.id().toString());
+} catch (error) {
+    console.error("Failed to import account:", error.message);
+}
+```
+
+### Importing from an Account File
+
+Import an account that was previously exported:
+
+```typescript
+import { MidenClient } from "@miden-sdk/miden-sdk";
+
+try {
+    const client = await MidenClient.create();
+
+    // accountFile should be the result of a previous client.accounts.export()
+    const account = await client.accounts.import({ file: accountFile });
+    console.log("Imported account:", account.id().toString());
 } catch (error) {
     console.error("Failed to import account:", error.message);
 }
@@ -31,18 +46,20 @@ try {
 
 ### Importing a Public Account from Seed
 
-To import a public account using an initialization seed:
+Import a public account using an initialization seed:
 
 ```typescript
-import { WebClient } from "@miden-sdk/miden-sdk";
+import { MidenClient, AuthScheme } from "@miden-sdk/miden-sdk";
 
 try {
-    // Initialize the web client
-    const webClient = await WebClient.createClient();
+    const client = await MidenClient.create();
 
-    // initSeed should be a Uint8Array containing the initialization seed
-    const account = await webClient.importPublicAccountFromSeed(initSeed, true); // true for mutable account
-    console.log("Imported account ID:", account.id().toString());
+    const account = await client.accounts.import({
+        seed: initSeed,           // Uint8Array
+        mutable: true,            // Whether account code can be updated
+        auth: AuthScheme.Falcon   // Optional auth scheme
+    });
+    console.log("Imported account:", account.id().toString());
 } catch (error) {
     console.error("Failed to import public account:", error.message);
 }
@@ -50,61 +67,46 @@ try {
 
 ## Importing Notes
 
-### Note Import Types
-
-When importing notes, there are three types of note files that can be used:
-
-1. **ID Note File**: Contains only the note ID and metadata. This is the most basic form and is useful when you only need to reference a note by its ID.
-
-2. **Full Note File**: Contains the complete note data including the note ID, metadata, and the actual note content. This is used when you need to fully reconstruct the note.
-
-3. **Partial Note File**: Contains the note ID, metadata, and a partial representation of the note content. This is useful when you need to verify a note's existence without having the full content.
-
-To import a note that was previously exported:
-
 ```typescript
-import { WebClient } from "@miden-sdk/miden-sdk";
+import { MidenClient } from "@miden-sdk/miden-sdk";
 
 try {
-    // Initialize the web client
-    const webClient = await WebClient.createClient();
+    const client = await MidenClient.create();
 
-    // noteFile should be the result of a previous note export
-    const noteId = await webClient.importNoteFile(noteFile);
-    console.log("Imported note ID:", noteId);
+    // noteFile should be the result of a previous client.notes.export()
+    const noteId = await client.notes.import(noteFile);
+    console.log("Imported note:", noteId);
 } catch (error) {
     console.error("Failed to import note:", error.message);
 }
 ```
 
+### Note File Types
+
+There are three types of note files:
+
+1. **ID Note File** — Contains only the note ID and metadata
+2. **Full Note File** — Contains complete note data including content and inclusion proof
+3. **Partial Note File** — Contains the note ID, metadata, and partial content
+
 ## Importing Store Data
 
-To import an entire store (this is a destructive operation that will overwrite the current store):
+To import an entire store snapshot (overwrites current store):
 
 ```typescript
-import { WebClient } from "@miden-sdk/miden-sdk";
+import { MidenClient } from "@miden-sdk/miden-sdk";
 
 try {
-    // Initialize the web client
-    const webClient = await WebClient.createClient();
+    const client = await MidenClient.create();
 
-    // storeDump should be the result of a previous store export
-    const result = await webClient.forceImportStore(storeDump, "NewStoreName");
-    console.log("Store import result:", result);
+    // snapshot should be the result of a previous client.exportStore()
+    await client.importStore(snapshot);
+    console.log("Store imported successfully");
 } catch (error) {
     console.error("Failed to import store:", error.message);
 }
 ```
 
 :::warning
-The `forceImportStore` method is a destructive operation that will completely overwrite the current store. Use with caution and ensure you have a backup if needed.
+`importStore` is a destructive operation that completely overwrites the current store. Ensure you have a backup if needed.
 :::
-
-## Relevant Documentation
-
-For more detailed information about the import functionality, refer to the following API documentation:
-
-- [WebClient](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/WebClient.md) - Main client class for interacting with the Miden network
-- [Account](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/Account.md) - Account class returned by importPublicAccountFromSeed
-
-For a complete list of available classes and utilities, see the [SDK API Reference](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/README.md). 
