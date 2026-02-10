@@ -1,6 +1,13 @@
 //@ts-nocheck
-import { test as base } from "@playwright/test";
+import { test as base, TestInfo } from "@playwright/test";
 import { MockWebClient } from "../js";
+
+// Unique per test run so concurrent suites don't share IndexedDB stores.
+export const RUN_ID = crypto.randomUUID().slice(0, 8);
+
+function generateStoreName(testInfo: TestInfo): string {
+  return `test_${RUN_ID}_${testInfo.testId}`;
+}
 
 const TEST_SERVER_PORT = 8080;
 const MIDEN_NODE_PORT = 57291;
@@ -8,7 +15,8 @@ const REMOTE_TX_PROVER_PORT = 50051;
 
 export const test = base.extend<{ forEachTest: void }>({
   forEachTest: [
-    async ({ page }, use) => {
+    async ({ page }, use, testInfo) => {
+      const storeName = generateStoreName(testInfo);
       page.on("console", (msg) => {
         if (msg.type() === "debug") {
           console.log(`PAGE DEBUG: ${msg.text()}`);
@@ -26,7 +34,7 @@ export const test = base.extend<{ forEachTest: void }>({
       await page.goto("http://localhost:8080");
 
       await page.evaluate(
-        async ({ MIDEN_NODE_PORT, remoteProverPort }) => {
+        async ({ MIDEN_NODE_PORT, remoteProverPort, storeName }) => {
           // Import the sdk classes and attach them
           // to the window object for testing
           const sdkExports = await import("./index.js");
@@ -42,9 +50,10 @@ export const test = base.extend<{ forEachTest: void }>({
             rpcUrl,
             undefined,
             undefined,
-            "tests"
+            storeName
           );
           window.rpcUrl = rpcUrl;
+          window.storeName = storeName;
 
           window.client = client;
 
@@ -138,7 +147,8 @@ export const test = base.extend<{ forEachTest: void }>({
             const client = await WebClient.createClient(
               rpcUrl,
               undefined,
-              initSeed
+              initSeed,
+              window.storeName
             );
             window.client = client;
             await window.client.syncState();
@@ -168,6 +178,7 @@ export const test = base.extend<{ forEachTest: void }>({
           remoteProverPort: process.env.REMOTE_PROVER
             ? REMOTE_TX_PROVER_PORT
             : null,
+          storeName,
         }
       );
       await use();
