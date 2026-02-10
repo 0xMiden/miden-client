@@ -148,8 +148,13 @@ try {
     });
     console.log("Mint-and-consume transaction:", txId.toString());
 } catch (error) {
-    // Error includes a `step` property: "mint", "sync", or "consume"
-    console.error(`Failed at step "${error.step}":`, error.message);
+    // Errors during the multi-step flow include a `step` property: "mint", "sync", or "consume".
+    // Errors before the mint (e.g., invalid inputs) will not have a `step`.
+    if (error.step) {
+        console.error(`Failed at step "${error.step}":`, error.message);
+    } else {
+        console.error("Failed:", error.message);
+    }
 }
 ```
 
