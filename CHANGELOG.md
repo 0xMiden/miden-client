@@ -4,12 +4,12 @@
 
 ### Enhancements
 
+
 * Updated the `GrpcClient` to fetch the RPC limits from the node ([#1724](https://github.com/0xMiden/miden-client/pull/1724)).
 * Added the `@miden-sdk/react` hooks library with a provider, hooks, and an example app for the web client ([#1711](https://github.com/0xMiden/miden-client/pull/1711)).
 * Added typed error parsing for node RPC endpoints, enabling programmatic error handling instead of string parsing ([#1734](https://github.com/0xMiden/miden-client/pull/1734)).
 * Added `--rpc-status` flag to `miden-client info` command to display RPC node status information including node version, genesis commitment, store status, and block producer status; also added `get_status_unversioned` to `NodeRpcClient` trait ([#1742](https://github.com/0xMiden/miden-client/pull/1742)).
-* Added the `@miden-sdk/react` hooks library with a provider, hooks, and an example app for the web client ([#1711](https://github.com/0xMiden/miden-client/pull/1711)).
-* [BREAKING] Added a `AccountReader` accessible through `Client::account_reader` to read account data without needing to load the whole `Account` ([#1713](https://github.com/0xMiden/miden-client/pull/1713), [#1716](https://github.com/0xMiden/miden-client/pull/1716)).
+* Prevent a potential unwrap panic in `insert_storage_map_nodes_for_map` ([#1750](https://github.com/0xMiden/miden-client/pull/1750)).
 
 ### Changes
 
