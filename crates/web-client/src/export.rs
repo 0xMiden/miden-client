@@ -117,7 +117,7 @@ impl WebClient {
             for commitment in commitments {
                 key_pairs.push(
                     keystore
-                        .get_key(commitment)
+                        .get_secret_key(commitment)
                         .await
                         .map_err(|err| {
                             js_error_with_context(err, "failed to get public key for account")

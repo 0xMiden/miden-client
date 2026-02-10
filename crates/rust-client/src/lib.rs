@@ -273,7 +273,7 @@ pub use miden_protocol::{
     Word,
     ZERO,
 };
-pub use miden_remote_prover_client::remote_prover::tx_prover::RemoteTransactionProver;
+pub use miden_remote_prover_client::RemoteTransactionProver;
 pub use miden_tx::ExecutionOptions;
 
 /// Provides test utilities for working with accounts and account IDs

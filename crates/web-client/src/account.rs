@@ -137,7 +137,7 @@ impl WebClient {
         let keystore = self.keystore.clone().expect("Keystore not initialized");
 
         let auth_secret_key = keystore
-            .get_key((*pub_key_commitment.as_native()).into())
+            .get_secret_key((*pub_key_commitment.as_native()).into())
             .await
             .map_err(|err| js_error_with_context(err, "failed to get auth key for account"))?
             .ok_or(JsValue::from_str("Auth not found for account"))?;
