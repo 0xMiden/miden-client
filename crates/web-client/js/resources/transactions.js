@@ -144,7 +144,7 @@ export class TransactionsResource {
     // getConsumableNotes consumes targetId by value.
     const preMintConsumable = await this.#inner.getConsumableNotes(targetId);
     const preExistingNoteIds = new Set(
-      preMintConsumable.map((c) => c.inputNoteRecord().toNote().id().toHex())
+      preMintConsumable.map((c) => c.inputNoteRecord().toNote().id().toString())
     );
 
     // Step 1: Mint
@@ -197,7 +197,7 @@ export class TransactionsResource {
         newNotes = consumable
           .filter(
             (c) =>
-              !preExistingNoteIds.has(c.inputNoteRecord().toNote().id().toHex())
+              !preExistingNoteIds.has(c.inputNoteRecord().toNote().id().toString())
           )
           .map((c) => c.inputNoteRecord().toNote());
 
