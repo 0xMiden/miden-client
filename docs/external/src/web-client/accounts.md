@@ -5,79 +5,101 @@ sidebar_position: 1
 
 # Retrieving Accounts with the Miden SDK
 
-This guide demonstrates how to retrieve and work with existing accounts using the Miden SDK. We'll cover getting a single account by ID, listing all accounts, and accessing account properties. Each example includes detailed annotations to explain the key parameters and returned properties.
+This guide demonstrates how to retrieve and work with existing accounts using the Miden SDK.
 
 ## Retrieving a Single Account
 
-To retrieve a specific account by its ID:
-
 ```typescript
-import { AccountId, WebClient } from "@miden-sdk/miden-sdk";
+import { MidenClient } from "@miden-sdk/miden-sdk";
 
 try {
-  // Initialize the web client
-  const webClient = await WebClient.createClient();
+    const client = await MidenClient.create();
 
-  // Create an AccountId from a hex string
-  const accountId = AccountId.fromHex("0x1234..."); // Replace with actual account ID
+    // Get account by hex string, bech32 string, or AccountId object
+    const account = await client.accounts.get("0x1234...");
 
-  // Get the account
-  const account = await webClient.getAccount(accountId);
+    if (!account) {
+        console.log("Account not found");
+        return;
+    }
 
-  if (!account) {
-    console.log("Account not found");
-    return;
-  }
-
-  // Access account properties
-  console.log(account.id().toString()); // The account's unique identifier
-  console.log(account.nonce().toString()); // Current account nonce
-  console.log(account.commitment().toHex()); // Account commitment hash
-  console.log(account.isPublic()); // Whether the account is public
-  console.log(account.isPrivate()); // Whether the account is private
-  console.log(account.isNetwork()); // Whether the account is network
-  console.log(account.isUpdatable()); // Whether the account code can be updated
-  console.log(account.isFaucet()); // Whether the account is a faucet
-  console.log(account.isRegularAccount()); // Whether it's a regular account
+    console.log(account.id().toString());
+    console.log(account.nonce().toString());
+    console.log(account.isPublic());
+    console.log(account.isFaucet());
 } catch (error) {
-  console.error("Failed to retrieve account:", error.message);
+    console.error("Failed to retrieve account:", error.message);
 }
 ```
 
 ## Listing All Accounts
 
-To retrieve a list of all accounts tracked by the client:
-
 ```typescript
-import { WebClient } from "@miden-sdk/miden-sdk";
+import { MidenClient } from "@miden-sdk/miden-sdk";
 
 try {
-  // Initialize the web client
-  const webClient = await WebClient.createClient();
+    const client = await MidenClient.create();
+    const accounts = await client.accounts.list();
 
-  // Get all account headers
-  const accounts = await webClient.getAccounts();
-
-  // Iterate through accounts
-  for (const account of accounts) {
-    console.log(account.id().toString()); // Account ID
-    console.log(account.nonce().toString()); // Account nonce
-    console.log(account.commitment().toHex()); // Account commitment
-    console.log(account.vaultCommitment().toHex()); // Vault commitment
-    console.log(account.storageCommitment().toHex()); // Storage commitment
-    console.log(account.codeCommitment().toHex()); // Code commitment
-  }
+    for (const header of accounts) {
+        console.log(header.id().toString());
+        console.log(header.nonce().toString());
+    }
 } catch (error) {
-  console.error("Failed to retrieve accounts:", error.message);
+    console.error("Failed to retrieve accounts:", error.message);
 }
 ```
 
-## Relevant Documentation
+## Getting Account Details
 
-For more detailed information about the classes and methods used in these examples, refer to the following API documentation:
+```typescript
+import { MidenClient } from "@miden-sdk/miden-sdk";
 
-- [WebClient](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/WebClient.md) - Main client class for interacting with the Miden network
-- [Account](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/Account.md) - Account class and its properties
-- [AccountId](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/AccountId.md) - Account identifier class and utilities
+try {
+    const client = await MidenClient.create();
 
-For a complete list of available classes and utilities, see the [SDK API Reference](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/README.md).
+    // Returns { account, vault, storage, code, keys } in a single call
+    const details = await client.accounts.getDetails("0x1234...");
+
+    console.log(details.account.id().toString());
+    console.log(details.vault);
+    console.log(details.storage);
+    console.log(details.code);
+    console.log(details.keys);
+} catch (error) {
+    console.error("Failed to get account details:", error.message);
+}
+```
+
+## Checking Account Balance
+
+```typescript
+import { MidenClient } from "@miden-sdk/miden-sdk";
+
+try {
+    const client = await MidenClient.create();
+
+    // Quick balance check (wraps accountReader)
+    const balance = await client.accounts.getBalance("0xACCOUNT...", "0xFAUCET...");
+    console.log(`Balance: ${balance}`);
+} catch (error) {
+    console.error("Failed to get balance:", error.message);
+}
+```
+
+## Address Management
+
+```typescript
+import { MidenClient } from "@miden-sdk/miden-sdk";
+
+try {
+    const client = await MidenClient.create();
+
+    await client.accounts.addAddress("0xACCOUNT...", "mtst1address...");
+    await client.accounts.removeAddress("0xACCOUNT...", "mtst1address...");
+} catch (error) {
+    console.error("Failed to manage address:", error.message);
+}
+```
+
+> **Note:** `get()` returns `null` when an account is not found. All other methods (`getDetails()`, `getBalance()`, `export()`) throw `"Account not found: 0x..."` if the account doesn't exist.
