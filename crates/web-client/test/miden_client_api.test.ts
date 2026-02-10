@@ -130,7 +130,7 @@ test.describe("MidenClient API - Mock Chain", () => {
     const result = await page.evaluate(async () => {
       const client = await window.MidenClient.createMock();
       const wallet = await client.accounts.create();
-      const hexId = wallet.id().toHex();
+      const hexId = wallet.id().toString();
 
       const fetched = await client.accounts.get(hexId);
       return {
