@@ -23,8 +23,8 @@ try {
     // Export with full details including inclusion proof
     const fullExport = await client.notes.export("0xnote...", { format: "full" });
 
-    // Export with partial details (default if format is not specified)
-    const partialExport = await client.notes.export("0xnote...", { format: "details" });
+    // Export with note details including metadata and creation block
+    const detailsExport = await client.notes.export("0xnote...", { format: "details" });
 } catch (error) {
     console.error("Failed to export note:", error.message);
 }

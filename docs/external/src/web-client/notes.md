@@ -116,7 +116,7 @@ try {
     // Export a note - different formats available
     const idExport = await client.notes.export("0xnote...", { format: "id" });
     const fullExport = await client.notes.export("0xnote...", { format: "full" });
-    const partialExport = await client.notes.export("0xnote...", { format: "details" });
+    const detailsExport = await client.notes.export("0xnote...", { format: "details" });
 } catch (error) {
     console.error("Failed to import/export note:", error.message);
 }

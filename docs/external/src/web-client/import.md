@@ -87,7 +87,7 @@ There are three types of note files:
 
 1. **ID Note File** — Contains only the note ID and metadata
 2. **Full Note File** — Contains complete note data including content and inclusion proof
-3. **Partial Note File** — Contains the note ID, metadata, and partial content
+3. **Details Note File** — Contains the note ID, metadata, and note details
 
 ## Importing Store Data
 
