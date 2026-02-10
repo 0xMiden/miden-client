@@ -75,7 +75,9 @@ pub struct StateSync {
     /// Number of blocks after which pending transactions are considered stale and discarded.
     /// If `None`, there is no limit and transactions will be kept indefinitely.
     tx_discard_delta: Option<u32>,
-    /// Whether to sync nullifiers during state sync.
+    /// Whether to check for nullifiers during state sync. When enabled, the client will query the
+    /// nullifiers for unspent notes at each sync step. This allows to detect when tracked notes
+    /// have been consumed externally and discard local transactions that depend on them.
     sync_nullifiers: bool,
 }
 
@@ -87,7 +89,9 @@ impl StateSync {
     /// * `rpc_api` - The RPC client used to communicate with the node.
     /// * `note_screener` - The note screener used to check the relevance of notes.
     /// * `tx_discard_delta` - Number of blocks after which pending transactions are discarded.
-    /// * `sync_nullifiers` - Whether to sync nullifiers during state sync.
+    /// * `sync_nullifiers` - Whether to query the node for new nullifiers after each sync step.
+    ///   This allows the client to detect externally consumed notes and discard local transactions
+    ///   that depend on them.
     pub fn new(
         rpc_api: Arc<dyn NodeRpcClient>,
         note_screener: Arc<dyn OnNoteReceived>,
