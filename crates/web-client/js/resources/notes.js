@@ -46,7 +46,13 @@ export class NotesResource {
   async export(noteId, opts) {
     this.#client.assertNotTerminated();
     const formatMap = { id: "Id", full: "Full", details: "Details" };
-    const format = formatMap[(opts?.format ?? "full").toLowerCase()] ?? "Full";
+    const key = (opts?.format ?? "full").toLowerCase();
+    const format = formatMap[key];
+    if (!format) {
+      throw new Error(
+        `Unknown note export format: "${opts.format}". Expected "id", "full", or "details".`
+      );
+    }
     return await this.#inner.exportNoteFile(noteId, format);
   }
 

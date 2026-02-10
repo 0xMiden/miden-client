@@ -357,6 +357,323 @@ test.describe("MidenClient API - Mock Chain", () => {
     expect(result.message).toContain("terminated");
   });
 
+  test("consumeAll consumes all available notes", async ({ page }) => {
+    const result = await page.evaluate(async () => {
+      const client = await window.MidenClient.createMock();
+      const wallet = await client.accounts.create();
+      const faucet = await client.accounts.create({
+        type: "faucet",
+        symbol: "DAG",
+        decimals: 8,
+        maxSupply: 10_000_000n,
+      });
+
+      // Mint two notes
+      await client.transactions.mint({
+        account: faucet,
+        to: wallet,
+        amount: 100n,
+      });
+      await client.transactions.mint({
+        account: faucet,
+        to: wallet,
+        amount: 200n,
+      });
+      client.proveBlock();
+      await client.sync();
+
+      const result = await client.transactions.consumeAll({
+        account: wallet,
+      });
+      return {
+        consumed: result.consumed,
+        remaining: result.remaining,
+        hasTxId: result.txId != null,
+      };
+    });
+
+    expect(result.consumed).toBe(2);
+    expect(result.remaining).toBe(0);
+    expect(result.hasTxId).toBe(true);
+  });
+
+  test("consumeAll with maxNotes limits consumption", async ({ page }) => {
+    const result = await page.evaluate(async () => {
+      const client = await window.MidenClient.createMock();
+      const wallet = await client.accounts.create();
+      const faucet = await client.accounts.create({
+        type: "faucet",
+        symbol: "DAG",
+        decimals: 8,
+        maxSupply: 10_000_000n,
+      });
+
+      await client.transactions.mint({
+        account: faucet,
+        to: wallet,
+        amount: 100n,
+      });
+      await client.transactions.mint({
+        account: faucet,
+        to: wallet,
+        amount: 200n,
+      });
+      client.proveBlock();
+      await client.sync();
+
+      const result = await client.transactions.consumeAll({
+        account: wallet,
+        maxNotes: 1,
+      });
+      return {
+        consumed: result.consumed,
+        remaining: result.remaining,
+        hasTxId: result.txId != null,
+      };
+    });
+
+    expect(result.consumed).toBe(1);
+    expect(result.remaining).toBe(1);
+    expect(result.hasTxId).toBe(true);
+  });
+
+  test("consumeAll with maxNotes: 0 returns early", async ({ page }) => {
+    const result = await page.evaluate(async () => {
+      const client = await window.MidenClient.createMock();
+      const wallet = await client.accounts.create();
+      const faucet = await client.accounts.create({
+        type: "faucet",
+        symbol: "DAG",
+        decimals: 8,
+        maxSupply: 10_000_000n,
+      });
+
+      await client.transactions.mint({
+        account: faucet,
+        to: wallet,
+        amount: 100n,
+      });
+      client.proveBlock();
+      await client.sync();
+
+      const result = await client.transactions.consumeAll({
+        account: wallet,
+        maxNotes: 0,
+      });
+      return {
+        consumed: result.consumed,
+        remaining: result.remaining,
+        txId: result.txId,
+      };
+    });
+
+    expect(result.consumed).toBe(0);
+    expect(result.remaining).toBe(1);
+    expect(result.txId).toBeNull();
+  });
+
+  test("consumeAll with no consumable notes returns early", async ({
+    page,
+  }) => {
+    const result = await page.evaluate(async () => {
+      const client = await window.MidenClient.createMock();
+      const wallet = await client.accounts.create();
+
+      const result = await client.transactions.consumeAll({
+        account: wallet,
+      });
+      return {
+        consumed: result.consumed,
+        remaining: result.remaining,
+        txId: result.txId,
+      };
+    });
+
+    expect(result.consumed).toBe(0);
+    expect(result.remaining).toBe(0);
+    expect(result.txId).toBeNull();
+  });
+
+  test("accounts.getDetails returns full account info", async ({ page }) => {
+    const result = await page.evaluate(async () => {
+      const client = await window.MidenClient.createMock();
+      const wallet = await client.accounts.create();
+
+      const details = await client.accounts.getDetails(wallet);
+      return {
+        hasAccount: details.account != null,
+        hasVault: details.vault != null,
+        hasStorage: details.storage != null,
+        hasKeys: Array.isArray(details.keys),
+      };
+    });
+
+    expect(result.hasAccount).toBe(true);
+    expect(result.hasVault).toBe(true);
+    expect(result.hasStorage).toBe(true);
+    expect(result.hasKeys).toBe(true);
+  });
+
+  test("notes.listSent returns output notes after mint", async ({ page }) => {
+    const result = await page.evaluate(async () => {
+      const client = await window.MidenClient.createMock();
+      const wallet = await client.accounts.create();
+      const faucet = await client.accounts.create({
+        type: "faucet",
+        symbol: "DAG",
+        decimals: 8,
+        maxSupply: 10_000_000n,
+      });
+
+      await client.transactions.mint({
+        account: faucet,
+        to: wallet,
+        amount: 500n,
+      });
+      client.proveBlock();
+      await client.sync();
+
+      const sent = await client.notes.listSent();
+      return { sentCount: sent.length };
+    });
+
+    expect(result.sentCount).toBeGreaterThanOrEqual(1);
+  });
+
+  test("notes.listAvailable returns consumable notes", async ({ page }) => {
+    const result = await page.evaluate(async () => {
+      const client = await window.MidenClient.createMock();
+      const wallet = await client.accounts.create();
+      const faucet = await client.accounts.create({
+        type: "faucet",
+        symbol: "DAG",
+        decimals: 8,
+        maxSupply: 10_000_000n,
+      });
+
+      await client.transactions.mint({
+        account: faucet,
+        to: wallet,
+        amount: 500n,
+      });
+      client.proveBlock();
+      await client.sync();
+
+      const available = await client.notes.listAvailable({ account: wallet });
+      return { availableCount: available.length };
+    });
+
+    expect(result.availableCount).toBeGreaterThanOrEqual(1);
+  });
+
+  test("terminate prevents resource operations", async ({ page }) => {
+    const result = await page.evaluate(async () => {
+      const client = await window.MidenClient.createMock();
+      client.terminate();
+
+      const errors = [];
+      try {
+        await client.accounts.list();
+      } catch (e) {
+        errors.push("accounts.list: " + e.message);
+      }
+      try {
+        await client.transactions.list();
+      } catch (e) {
+        errors.push("transactions.list: " + e.message);
+      }
+      try {
+        await client.notes.list();
+      } catch (e) {
+        errors.push("notes.list: " + e.message);
+      }
+      return { errors };
+    });
+
+    expect(result.errors).toHaveLength(3);
+    for (const err of result.errors) {
+      expect(err).toContain("terminated");
+    }
+  });
+
+  test("error on invalid note type string", async ({ page }) => {
+    const result = await page.evaluate(async () => {
+      const client = await window.MidenClient.createMock();
+      const wallet = await client.accounts.create();
+      const faucet = await client.accounts.create({
+        type: "faucet",
+        symbol: "DAG",
+        decimals: 8,
+        maxSupply: 10_000_000n,
+      });
+
+      try {
+        await client.transactions.mint({
+          account: faucet,
+          to: wallet,
+          amount: 100n,
+          type: "Private", // wrong case
+        });
+        return { threw: false };
+      } catch (e) {
+        return { threw: true, message: e.message };
+      }
+    });
+
+    expect(result.threw).toBe(true);
+    expect(result.message).toContain("Unknown note type");
+  });
+
+  test("error on invalid storage mode string", async ({ page }) => {
+    const result = await page.evaluate(async () => {
+      const client = await window.MidenClient.createMock();
+
+      try {
+        await client.accounts.create({
+          storage: "encrypted",
+        });
+        return { threw: false };
+      } catch (e) {
+        return { threw: true, message: e.message };
+      }
+    });
+
+    expect(result.threw).toBe(true);
+    expect(result.message).toContain("Unknown storage mode");
+  });
+
+  test("error on null account reference", async ({ page }) => {
+    const result = await page.evaluate(async () => {
+      const client = await window.MidenClient.createMock();
+
+      try {
+        await client.accounts.get(null);
+        return { threw: false };
+      } catch (e) {
+        return { threw: true, message: e.message };
+      }
+    });
+
+    expect(result.threw).toBe(true);
+    expect(result.message).toContain("null or undefined");
+  });
+
+  test("importStore rejects invalid version", async ({ page }) => {
+    const result = await page.evaluate(async () => {
+      const client = await window.MidenClient.createMock();
+
+      try {
+        await client.importStore({ version: 99, data: {} });
+        return { threw: false };
+      } catch (e) {
+        return { threw: true, message: e.message };
+      }
+    });
+
+    expect(result.threw).toBe(true);
+    expect(result.message).toContain("Unsupported store snapshot version");
+  });
+
   test("serializeMockChain and restore", async ({ page }) => {
     const result = await page.evaluate(async () => {
       const client = await window.MidenClient.createMock();

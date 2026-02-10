@@ -84,8 +84,6 @@ export interface ClientOptions {
   storeName?: string;
   /** Sync state on creation (default: false). */
   autoSync?: boolean;
-  /** Structured logging via console.debug (not yet implemented). */
-  debug?: boolean;
   /** External keystore callbacks. */
   keystore?: {
     getKey: GetKeyCallback;
