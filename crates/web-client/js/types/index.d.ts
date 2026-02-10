@@ -438,10 +438,7 @@ export declare class MidenClient {
   /** Creates and initializes a new MidenClient. */
   static create(options?: ClientOptions): Promise<MidenClient>;
   /** Creates a client preconfigured for testnet use. Defaults to autoSync: true. */
-  static createTestnet(options?: {
-    autoSync?: boolean;
-    proverUrl?: string;
-  }): Promise<MidenClient>;
+  static createTestnet(options?: ClientOptions): Promise<MidenClient>;
   /** Creates a mock client for testing. */
   static createMock(options?: MockOptions): Promise<MidenClient>;
 
@@ -475,7 +472,7 @@ export declare class MidenClient {
   serializeMockNoteTransportNode(): Uint8Array;
 
   [Symbol.dispose](): void;
-  [Symbol.asyncDispose](): void;
+  [Symbol.asyncDispose](): Promise<void>;
 }
 
 // ════════════════════════════════════════════════════════════════

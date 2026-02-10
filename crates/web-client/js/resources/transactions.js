@@ -14,22 +14,7 @@ export class TransactionsResource {
   async send(opts) {
     this.#client.assertNotTerminated();
     const wasm = await this.#getWasm();
-
-    const accountId = resolveAccountRef(opts.account, wasm);
-    const targetId = resolveAccountRef(opts.to, wasm);
-    const faucetId = resolveAccountRef(opts.token, wasm);
-    const noteType = resolveNoteType(opts.type, wasm);
-    const amount = BigInt(opts.amount);
-
-    const request = await this.#inner.newSendTransactionRequest(
-      accountId,
-      targetId,
-      faucetId,
-      noteType,
-      amount,
-      opts.reclaimAfter,
-      opts.timelockUntil
-    );
+    const { accountId, request } = await this.#buildSendRequest(opts, wasm);
 
     const txId = await this.#submitOrSubmitWithProver(
       accountId,
@@ -47,19 +32,7 @@ export class TransactionsResource {
   async mint(opts) {
     this.#client.assertNotTerminated();
     const wasm = await this.#getWasm();
-
-    const accountId = resolveAccountRef(opts.account, wasm);
-    const targetId = resolveAccountRef(opts.to, wasm);
-    const noteType = resolveNoteType(opts.type, wasm);
-    const amount = BigInt(opts.amount);
-
-    // WASM signature: newMintTransactionRequest(target, faucet, noteType, amount)
-    const request = await this.#inner.newMintTransactionRequest(
-      targetId,
-      accountId,
-      noteType,
-      amount
-    );
+    const { accountId, request } = await this.#buildMintRequest(opts, wasm);
 
     const txId = await this.#submitOrSubmitWithProver(
       accountId,
@@ -77,16 +50,7 @@ export class TransactionsResource {
   async consume(opts) {
     this.#client.assertNotTerminated();
     const wasm = await this.#getWasm();
-
-    const accountId = resolveAccountRef(opts.account, wasm);
-
-    // Normalize to array
-    const noteInputs = Array.isArray(opts.notes) ? opts.notes : [opts.notes];
-    const notes = await Promise.all(
-      noteInputs.map((input) => this.#resolveNoteInput(input))
-    );
-
-    const request = await this.#inner.newConsumeTransactionRequest(notes);
+    const { accountId, request } = await this.#buildConsumeRequest(opts, wasm);
 
     const txId = await this.#submitOrSubmitWithProver(
       accountId,
@@ -113,9 +77,13 @@ export class TransactionsResource {
     }
 
     const total = consumable.length;
-    const toConsume = opts.maxNotes
-      ? consumable.slice(0, opts.maxNotes)
-      : consumable;
+    const toConsume =
+      opts.maxNotes != null ? consumable.slice(0, opts.maxNotes) : consumable;
+
+    if (toConsume.length === 0) {
+      return { txId: null, consumed: 0, remaining: total };
+    }
+
     const notes = toConsume.map((c) => c.inputNoteRecord().toNote());
 
     const request = await this.#inner.newConsumeTransactionRequest(notes);
@@ -140,22 +108,7 @@ export class TransactionsResource {
   async swap(opts) {
     this.#client.assertNotTerminated();
     const wasm = await this.#getWasm();
-
-    const accountId = resolveAccountRef(opts.account, wasm);
-    const offeredFaucetId = resolveAccountRef(opts.offer.token, wasm);
-    const requestedFaucetId = resolveAccountRef(opts.request.token, wasm);
-    const noteType = resolveNoteType(opts.type, wasm);
-    const paybackNoteType = resolveNoteType(opts.paybackType, wasm);
-
-    const request = await this.#inner.newSwapTransactionRequest(
-      accountId,
-      offeredFaucetId,
-      BigInt(opts.offer.amount),
-      requestedFaucetId,
-      BigInt(opts.request.amount),
-      noteType,
-      paybackNoteType
-    );
+    const { accountId, request } = await this.#buildSwapRequest(opts, wasm);
 
     const txId = await this.#submitOrSubmitWithProver(
       accountId,
@@ -246,59 +199,19 @@ export class TransactionsResource {
 
     switch (opts.operation) {
       case "send": {
-        accountId = resolveAccountRef(opts.account, wasm);
-        const targetId = resolveAccountRef(opts.to, wasm);
-        const faucetId = resolveAccountRef(opts.token, wasm);
-        const noteType = resolveNoteType(opts.type, wasm);
-        request = await this.#inner.newSendTransactionRequest(
-          accountId,
-          targetId,
-          faucetId,
-          noteType,
-          BigInt(opts.amount),
-          opts.reclaimAfter,
-          opts.timelockUntil
-        );
+        ({ accountId, request } = await this.#buildSendRequest(opts, wasm));
         break;
       }
       case "mint": {
-        accountId = resolveAccountRef(opts.account, wasm);
-        const targetId = resolveAccountRef(opts.to, wasm);
-        const noteType = resolveNoteType(opts.type, wasm);
-        request = await this.#inner.newMintTransactionRequest(
-          targetId,
-          accountId,
-          noteType,
-          BigInt(opts.amount)
-        );
+        ({ accountId, request } = await this.#buildMintRequest(opts, wasm));
         break;
       }
       case "consume": {
-        accountId = resolveAccountRef(opts.account, wasm);
-        const noteInputs = Array.isArray(opts.notes)
-          ? opts.notes
-          : [opts.notes];
-        const notes = await Promise.all(
-          noteInputs.map((input) => this.#resolveNoteInput(input))
-        );
-        request = await this.#inner.newConsumeTransactionRequest(notes);
+        ({ accountId, request } = await this.#buildConsumeRequest(opts, wasm));
         break;
       }
       case "swap": {
-        accountId = resolveAccountRef(opts.account, wasm);
-        const offeredFaucetId = resolveAccountRef(opts.offer.token, wasm);
-        const requestedFaucetId = resolveAccountRef(opts.request.token, wasm);
-        const noteType = resolveNoteType(opts.type, wasm);
-        const paybackNoteType = resolveNoteType(opts.paybackType, wasm);
-        request = await this.#inner.newSwapTransactionRequest(
-          accountId,
-          offeredFaucetId,
-          BigInt(opts.offer.amount),
-          requestedFaucetId,
-          BigInt(opts.request.amount),
-          noteType,
-          paybackNoteType
-        );
+        ({ accountId, request } = await this.#buildSwapRequest(opts, wasm));
         break;
       }
       default:
@@ -346,10 +259,7 @@ export class TransactionsResource {
     const interval = opts?.interval ?? 5_000;
     const start = Date.now();
 
-    // Create filter once outside the loop to avoid per-iteration WASM allocations
     const wasm = await this.#getWasm();
-    const txIdObj = wasm.TransactionId.fromHex(txId);
-    const filter = wasm.TransactionFilter.ids([txIdObj]);
 
     while (true) {
       const elapsed = Date.now() - start;
@@ -365,6 +275,10 @@ export class TransactionsResource {
         // Sync may fail transiently; continue polling
       }
 
+      // Recreate filter each iteration — WASM consumes it by value
+      const filter = wasm.TransactionFilter.ids([
+        wasm.TransactionId.fromHex(txId),
+      ]);
       const txs = await this.#inner.getTransactions(filter);
 
       if (txs && txs.length > 0) {
@@ -388,6 +302,72 @@ export class TransactionsResource {
 
       await new Promise((resolve) => setTimeout(resolve, interval));
     }
+  }
+
+  // ── Shared request builders ──
+
+  async #buildSendRequest(opts, wasm) {
+    const accountId = resolveAccountRef(opts.account, wasm);
+    const targetId = resolveAccountRef(opts.to, wasm);
+    const faucetId = resolveAccountRef(opts.token, wasm);
+    const noteType = resolveNoteType(opts.type, wasm);
+    const amount = BigInt(opts.amount);
+
+    const request = await this.#inner.newSendTransactionRequest(
+      accountId,
+      targetId,
+      faucetId,
+      noteType,
+      amount,
+      opts.reclaimAfter,
+      opts.timelockUntil
+    );
+    return { accountId, request };
+  }
+
+  async #buildMintRequest(opts, wasm) {
+    const accountId = resolveAccountRef(opts.account, wasm);
+    const targetId = resolveAccountRef(opts.to, wasm);
+    const noteType = resolveNoteType(opts.type, wasm);
+    const amount = BigInt(opts.amount);
+
+    // WASM signature: newMintTransactionRequest(target, faucet, noteType, amount)
+    const request = await this.#inner.newMintTransactionRequest(
+      targetId,
+      accountId,
+      noteType,
+      amount
+    );
+    return { accountId, request };
+  }
+
+  async #buildConsumeRequest(opts, wasm) {
+    const accountId = resolveAccountRef(opts.account, wasm);
+    const noteInputs = Array.isArray(opts.notes) ? opts.notes : [opts.notes];
+    const notes = await Promise.all(
+      noteInputs.map((input) => this.#resolveNoteInput(input))
+    );
+    const request = await this.#inner.newConsumeTransactionRequest(notes);
+    return { accountId, request };
+  }
+
+  async #buildSwapRequest(opts, wasm) {
+    const accountId = resolveAccountRef(opts.account, wasm);
+    const offeredFaucetId = resolveAccountRef(opts.offer.token, wasm);
+    const requestedFaucetId = resolveAccountRef(opts.request.token, wasm);
+    const noteType = resolveNoteType(opts.type, wasm);
+    const paybackNoteType = resolveNoteType(opts.paybackType, wasm);
+
+    const request = await this.#inner.newSwapTransactionRequest(
+      accountId,
+      offeredFaucetId,
+      BigInt(opts.offer.amount),
+      requestedFaucetId,
+      BigInt(opts.request.amount),
+      noteType,
+      paybackNoteType
+    );
+    return { accountId, request };
   }
 
   async #resolveNoteInput(input) {
