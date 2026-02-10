@@ -1,9 +1,7 @@
 import Dexie from "dexie";
-import * as semver from "semver";
 import { logWebStoreError } from "./utils.js";
 export const CLIENT_VERSION_SETTING_KEY = "clientVersion";
 const textEncoder = new TextEncoder();
-const textDecoder = new TextDecoder();
 // Since we can't have a pointer to a JS Object from rust, we'll
 // use this instead to keep track of open DBs. A client can have
 // a DB for mainnet, devnet, testnet or a custom one, so this should be ok.
@@ -77,6 +75,37 @@ export class MidenDatabase {
     trackedAccounts;
     constructor(network) {
         this.dexie = new Dexie(network);
+        // --- Schema versioning ---
+        //
+        // v1 is the baseline schema. To add a migration:
+        //   1. Add a .version(N+1).stores({...}).upgrade(tx => {...}) block below.
+        //      Only list tables whose indexes changed; Dexie carries forward the rest.
+        //   2. Update TypeScript interfaces and the Table enum if needed.
+        //   3. Add a migration test in schema.test.ts.
+        //   4. Run `yarn build` and `yarn test`.
+        //
+        // The version number is a simple incrementing integer, not the client semver.
+        // Use a comment to note which client version introduced the change.
+        //
+        // Example — adding a `createdAt` field with an index to accounts:
+        //
+        //   // v2: Add createdAt to accounts (client v0.7.0)
+        //   this.dexie.version(2).stores({
+        //       accounts: indexes("&accountCommitment", "id", ..., "createdAt"),
+        //   }).upgrade(tx => {
+        //       return tx.table("accounts").toCollection().modify(account => {
+        //           account.createdAt = 0;
+        //       });
+        //   });
+        //
+        // Tips:
+        //   - Index-only changes: omit .upgrade(). Dexie creates indexes automatically.
+        //   - New table: just include it in .stores(). It starts empty.
+        //   - Remove a table: set it to null, e.g. `oldTable: null`.
+        //   - Never modify a previous version block. Always add a new one.
+        //
+        // Note: The `populate` hook (below the version blocks) only fires on
+        // first database creation, NOT during upgrades.
         this.dexie.version(1).stores({
             [Table.AccountCode]: indexes("root"),
             [Table.AccountStorage]: indexes("[commitment+slotName]", "commitment"),
@@ -132,50 +161,35 @@ export class MidenDatabase {
             return true;
         }
         catch (err) {
-            logWebStoreError(err, "Failed to open database");
-            return false;
+            // Fallback: delete and recreate. This recovers from data-dependent
+            // migration failures and corrupted DB state. It won't help if an
+            // upgrade() callback throws unconditionally (that's a code bug
+            // requiring a new deployment).
+            console.error("Database open/migration failed, attempting reset:", err);
+            try {
+                this.dexie.close();
+                await this.dexie.delete();
+                await this.dexie.open();
+                await this.ensureClientVersion(clientVersion);
+                console.warn("Database was reset due to migration failure.");
+                return true;
+            }
+            catch (resetErr) {
+                // logWebStoreError logs and re-throws, so this effectively
+                // turns a reset failure into a thrown exception.
+                logWebStoreError(resetErr, "Failed to reset database after migration failure");
+                return false; // unreachable; kept for type safety
+            }
         }
     }
     async ensureClientVersion(clientVersion) {
         if (!clientVersion) {
-            console.warn("openDatabase called without a client version; skipping version enforcement.");
+            console.warn("openDatabase called without a client version; skipping version tracking.");
             return;
         }
-        const storedVersion = await this.getStoredClientVersion();
-        if (!storedVersion) {
-            await this.persistClientVersion(clientVersion);
-            return;
-        }
-        if (storedVersion === clientVersion) {
-            return;
-        }
-        const validCurrent = semver.valid(clientVersion);
-        const validStored = semver.valid(storedVersion);
-        if (validCurrent && validStored) {
-            const parsedCurrent = semver.parse(validCurrent);
-            const parsedStored = semver.parse(validStored);
-            const sameMajorMinor = parsedCurrent?.major === parsedStored?.major &&
-                parsedCurrent?.minor === parsedStored?.minor;
-            if (sameMajorMinor || !semver.gt(clientVersion, storedVersion)) {
-                await this.persistClientVersion(clientVersion);
-                return;
-            }
-        }
-        else {
-            console.warn(`Failed to parse semver (${storedVersion} vs ${clientVersion}), forcing store reset.`);
-        }
-        console.warn(`IndexedDB client version mismatch (stored=${storedVersion}, expected=${clientVersion}). Resetting store.`);
-        this.dexie.close();
-        await this.dexie.delete();
-        await this.dexie.open();
+        // Schema migrations are handled by Dexie's version system.
+        // This just records the client version for diagnostics.
         await this.persistClientVersion(clientVersion);
-    }
-    async getStoredClientVersion() {
-        const record = await this.settings.get(CLIENT_VERSION_SETTING_KEY);
-        if (!record) {
-            return null;
-        }
-        return textDecoder.decode(record.value);
     }
     async persistClientVersion(clientVersion) {
         await this.settings.put({
