@@ -40,6 +40,29 @@ export function getRpcUrl(): string {
   }
 }
 
+// Determine remote prover URL from environment or default based on network.
+// Returns undefined if remote proving is not requested (REMOTE_PROVER not set).
+export function getProverUrl(): string | undefined {
+  if (process.env.MIDEN_PROVER_URL) {
+    return process.env.MIDEN_PROVER_URL;
+  }
+
+  if (!process.env.REMOTE_PROVER) {
+    return undefined;
+  }
+
+  const network = process.env.TEST_MIDEN_NETWORK?.toLowerCase();
+  switch (network) {
+    case "devnet":
+      return "https://tx-prover.devnet.miden.io";
+    case "testnet":
+      return "https://tx-prover.testnet.miden.io";
+    case "localhost":
+    default:
+      return `http://localhost:${REMOTE_TX_PROVER_PORT}`;
+  }
+}
+
 export const test = base.extend<{ forEachTest: void }>({
   forEachTest: [
     async ({ page }, use, testInfo) => {
@@ -61,17 +84,13 @@ export const test = base.extend<{ forEachTest: void }>({
       await page.goto("http://localhost:8080");
 
       await page.evaluate(
-        async ({ rpcUrl, remoteProverPort, storeName }) => {
+        async ({ rpcUrl, proverUrl, storeName }) => {
           // Import the sdk classes and attach them
           // to the window object for testing
           const sdkExports = await import("./index.js");
           for (const [key, value] of Object.entries(sdkExports)) {
             window[key] = value;
           }
-
-          let proverUrl = remoteProverPort
-            ? `http://localhost:${remoteProverPort}`
-            : undefined;
           const client = await window.WebClient.createClient(
             rpcUrl,
             undefined,
@@ -201,9 +220,7 @@ export const test = base.extend<{ forEachTest: void }>({
         },
         {
           rpcUrl: getRpcUrl(),
-          remoteProverPort: process.env.REMOTE_PROVER
-            ? REMOTE_TX_PROVER_PORT
-            : null,
+          proverUrl: getProverUrl() ?? null,
           storeName,
         }
       );
