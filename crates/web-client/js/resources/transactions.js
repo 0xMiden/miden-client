@@ -186,21 +186,43 @@ export class TransactionsResource {
       throw err;
     }
 
-    // Step 3: Consume only the newly minted notes
+    // Step 3: Consume only the newly minted notes.
+    // The minted note may not appear in getConsumableNotes immediately after
+    // waitFor returns (the transaction is confirmed but the note may not yet
+    // be indexed locally). Retry with sync up to 5 times before giving up.
     try {
-      // getConsumableNotes consumes AccountId by value — use fresh ID
-      const consumable = await this.#inner.getConsumableNotes(
-        wasm.AccountId.fromHex(targetIdHex)
-      );
-      const newNotes = consumable
-        .filter(
-          (c) =>
-            !preExistingNoteIds.has(c.inputNoteRecord().toNote().id().toHex())
-        )
-        .map((c) => c.inputNoteRecord().toNote());
+      const MAX_CONSUME_ATTEMPTS = 6;
+      const CONSUME_RETRY_INTERVAL = 3_000;
+      let newNotes = [];
+
+      for (let attempt = 0; attempt < MAX_CONSUME_ATTEMPTS; attempt++) {
+        // getConsumableNotes consumes AccountId by value — use fresh ID
+        const consumable = await this.#inner.getConsumableNotes(
+          wasm.AccountId.fromHex(targetIdHex)
+        );
+        newNotes = consumable
+          .filter(
+            (c) =>
+              !preExistingNoteIds.has(c.inputNoteRecord().toNote().id().toHex())
+          )
+          .map((c) => c.inputNoteRecord().toNote());
+
+        if (newNotes.length > 0) break;
+
+        if (attempt < MAX_CONSUME_ATTEMPTS - 1) {
+          await new Promise((r) => setTimeout(r, CONSUME_RETRY_INTERVAL));
+          try {
+            await this.#inner.syncStateWithTimeout(0);
+          } catch {
+            // Sync may fail transiently; continue retrying
+          }
+        }
+      }
 
       if (newNotes.length === 0) {
-        throw new Error("No consumable notes found after mint");
+        throw new Error(
+          "No consumable notes found after mint (retries exhausted)"
+        );
       }
 
       const consumeRequest =
@@ -284,6 +306,18 @@ export class TransactionsResource {
     return await this.#inner.getTransactions(filter);
   }
 
+  /**
+   * Polls for transaction confirmation.
+   *
+   * @param {string} txId - Transaction ID hex string.
+   * @param {WaitOptions} [opts] - Polling options.
+   * @param {number} [opts.timeout=60000] - Timeout in ms. Set to 0 to disable
+   *   the timeout and poll indefinitely until the transaction is committed or
+   *   discarded.
+   * @param {number} [opts.interval=5000] - Polling interval in ms.
+   * @param {function} [opts.onProgress] - Called with the current status on
+   *   each poll iteration ("pending", "submitted", or "committed").
+   */
   async waitFor(txId, opts) {
     this.#client.assertNotTerminated();
     const timeout = opts?.timeout ?? 60_000;

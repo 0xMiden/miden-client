@@ -2,7 +2,7 @@ export class SettingsResource {
   #inner;
   #client;
 
-  constructor(inner, getWasm, client) {
+  constructor(inner, _getWasm, client) {
     this.#inner = inner;
     this.#client = client;
   }

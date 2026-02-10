@@ -674,6 +674,198 @@ test.describe("MidenClient API - Mock Chain", () => {
     expect(result.message).toContain("Unsupported store snapshot version");
   });
 
+  test("accounts.export and import round-trip", async ({ page }) => {
+    const result = await page.evaluate(async () => {
+      const client = await window.MidenClient.createMock();
+      const wallet = await client.accounts.create({ storage: "public" });
+      const walletId = wallet.id().toString();
+
+      const accountFile = await client.accounts.export(wallet);
+
+      // Import into a fresh client
+      const client2 = await window.MidenClient.createMock();
+      const imported = await client2.accounts.import({ file: accountFile });
+
+      return {
+        hasFile: accountFile != null,
+        hasSerialize: typeof accountFile.serialize === "function",
+        originalId: walletId,
+        importedId: imported.id().toString(),
+      };
+    });
+
+    expect(result.hasFile).toBe(true);
+    expect(result.hasSerialize).toBe(true);
+    expect(result.importedId).toBe(result.originalId);
+  });
+
+  test("notes.export and notes.import round-trip", async ({ page }) => {
+    const result = await page.evaluate(async () => {
+      const client = await window.MidenClient.createMock();
+      const wallet = await client.accounts.create();
+      const faucet = await client.accounts.create({
+        type: "faucet",
+        symbol: "DAG",
+        decimals: 8,
+        maxSupply: 10_000_000n,
+      });
+
+      await client.transactions.mint({
+        account: faucet,
+        to: wallet,
+        amount: 500n,
+        type: "public",
+      });
+      client.proveBlock();
+      await client.sync();
+
+      // Get the note
+      const notes = await client.notes.list();
+      const noteId = notes[0].id().toHex();
+
+      // Export it
+      const noteFile = await client.notes.export(noteId, { format: "full" });
+
+      // Import into a fresh client
+      const client2 = await window.MidenClient.createMock();
+      const importedId = await client2.notes.import(noteFile);
+
+      return {
+        originalId: noteId,
+        importedId: importedId.toHex(),
+      };
+    });
+
+    expect(result.importedId).toBeDefined();
+    expect(result.importedId).toBe(result.originalId);
+  });
+
+  test("notes.export with id format", async ({ page }) => {
+    const result = await page.evaluate(async () => {
+      const client = await window.MidenClient.createMock();
+      const wallet = await client.accounts.create();
+      const faucet = await client.accounts.create({
+        type: "faucet",
+        symbol: "DAG",
+        decimals: 8,
+        maxSupply: 10_000_000n,
+      });
+
+      await client.transactions.mint({
+        account: faucet,
+        to: wallet,
+        amount: 500n,
+        type: "public",
+      });
+      client.proveBlock();
+      await client.sync();
+
+      const notes = await client.notes.list();
+      const noteId = notes[0].id().toString();
+
+      const noteFile = await client.notes.export(noteId, { format: "id" });
+      return { hasFile: noteFile != null };
+    });
+
+    expect(result.hasFile).toBe(true);
+  });
+
+  test("transactions.preview returns a TransactionSummary", async ({
+    page,
+  }) => {
+    const result = await page.evaluate(async () => {
+      const client = await window.MidenClient.createMock();
+      const wallet = await client.accounts.create();
+      const faucet = await client.accounts.create({
+        type: "faucet",
+        symbol: "DAG",
+        decimals: 8,
+        maxSupply: 10_000_000n,
+      });
+
+      const faucetId = faucet.id().toString();
+
+      const summary = await client.transactions.preview({
+        operation: "mint",
+        account: faucet,
+        to: wallet,
+        amount: 1000n,
+      });
+
+      return {
+        hasSummary: summary != null,
+        hasAccountId: typeof summary.accountId === "function",
+        accountIdMatches: summary.accountId().toString() === faucetId,
+      };
+    });
+
+    expect(result.hasSummary).toBe(true);
+    expect(result.hasAccountId).toBe(true);
+    expect(result.accountIdMatches).toBe(true);
+  });
+
+  test("standalone createP2IDNote creates a valid note", async ({ page }) => {
+    const result = await page.evaluate(async () => {
+      const client = await window.MidenClient.createMock();
+      const wallet = await client.accounts.create();
+      const faucet = await client.accounts.create({
+        type: "faucet",
+        symbol: "DAG",
+        decimals: 8,
+        maxSupply: 10_000_000n,
+      });
+
+      const note = window.createP2IDNote({
+        from: faucet,
+        to: wallet,
+        assets: { token: faucet, amount: 100n },
+      });
+
+      return {
+        hasNote: note != null,
+        hasId: typeof note.id === "function",
+        hasAssets: typeof note.assets === "function",
+      };
+    });
+
+    expect(result.hasNote).toBe(true);
+    expect(result.hasId).toBe(true);
+    expect(result.hasAssets).toBe(true);
+  });
+
+  test("standalone buildSwapTag returns a number", async ({ page }) => {
+    const result = await page.evaluate(async () => {
+      const client = await window.MidenClient.createMock();
+      const faucetA = await client.accounts.create({
+        type: "faucet",
+        symbol: "AAA",
+        decimals: 8,
+        maxSupply: 10_000_000n,
+      });
+      const faucetB = await client.accounts.create({
+        type: "faucet",
+        symbol: "BBB",
+        decimals: 8,
+        maxSupply: 10_000_000n,
+      });
+
+      const tag = window.buildSwapTag({
+        offer: { token: faucetA, amount: 100n },
+        request: { token: faucetB, amount: 200n },
+      });
+
+      return {
+        tag,
+        isNumber: typeof tag === "number",
+        fitsU32: tag >= 0 && tag <= 0xffffffff,
+      };
+    });
+
+    expect(result.isNumber).toBe(true);
+    expect(result.tag).toBeGreaterThan(0);
+    expect(result.fitsU32).toBe(true);
+  });
+
   test("serializeMockChain and restore", async ({ page }) => {
     const result = await page.evaluate(async () => {
       const client = await window.MidenClient.createMock();
