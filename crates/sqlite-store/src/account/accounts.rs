@@ -32,7 +32,7 @@ use miden_client::store::{
 };
 use miden_client::sync::NoteTagRecord;
 use miden_client::utils::Serializable;
-use miden_client::{AccountError, Word};
+use miden_client::{AccountError, Word, ZERO};
 use miden_protocol::account::{AccountStorageHeader, StorageMapWitness, StorageSlotHeader};
 use miden_protocol::asset::{AssetVaultKey, PartialVault};
 use miden_protocol::crypto::merkle::MerkleError;
@@ -188,7 +188,6 @@ impl SqliteStore {
     /// Retrieves a minimal partial account record with storage and vault witnesses.
     pub(crate) fn get_minimal_partial_account(
         conn: &mut Connection,
-        smt_forest: &Arc<RwLock<AccountSmtForest>>,
         account_id: AccountId,
     ) -> Result<Option<AccountRecord>, StoreError> {
         let Some((header, status)) = Self::get_account_header(conn, account_id)? else {
@@ -208,33 +207,35 @@ impl SqliteStore {
             params![header.storage_commitment().to_hex()],
         )?;
 
-        // Collect all map roots for a single batched query
-        let map_roots: Vec<Value> = storage_values
-            .iter()
-            .filter(|(_, (slot_type, _))| *slot_type == StorageSlotType::Map)
-            .map(|(_, (_, value))| Value::from(value.to_hex()))
-            .collect();
+        // New accounts (nonce == 0) need full storage map entries as advice inputs for
+        // the kernel to validate during account creation. Existing accounts load entries
+        // lazily via `get_storage_map_witness()`.
+        let is_new = header.nonce() == ZERO;
 
-        // Fetch all storage maps in a single query
-        let mut all_storage_maps = if map_roots.is_empty() {
-            BTreeMap::new()
+        let mut all_storage_maps = if is_new {
+            let map_roots: Vec<Value> = storage_values
+                .iter()
+                .filter(|(_, (slot_type, _))| *slot_type == StorageSlotType::Map)
+                .map(|(_, (_, value))| Value::from(value.to_hex()))
+                .collect();
+
+            if map_roots.is_empty() {
+                BTreeMap::new()
+            } else {
+                query_storage_maps(conn, "root IN rarray(?)", [Rc::new(map_roots)])?
+            }
         } else {
-            query_storage_maps(conn, "root IN rarray(?)", [Rc::new(map_roots)])?
+            BTreeMap::new()
         };
 
         for (slot_name, (slot_type, value)) in storage_values {
             storage_header.push(StorageSlotHeader::new(slot_name.clone(), slot_type, value));
             if slot_type == StorageSlotType::Map {
-                let mut partial_storage_map = PartialStorageMap::new(value);
-
-                if let Some(map) = all_storage_maps.remove(&value) {
-                    let smt_forest = smt_forest.read().expect("smt_forest read lock not poisoned");
-                    for (k, _v) in map.entries() {
-                        let witness = smt_forest.get_storage_map_item_witness(value, *k)?;
-                        partial_storage_map.add(witness).map_err(StoreError::MerkleStoreError)?;
-                    }
-                }
-
+                let partial_storage_map = if let Some(map) = all_storage_maps.remove(&value) {
+                    PartialStorageMap::new_full(map)
+                } else {
+                    PartialStorageMap::new(value)
+                };
                 maps.push(partial_storage_map);
             }
         }

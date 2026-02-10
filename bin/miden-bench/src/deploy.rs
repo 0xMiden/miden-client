@@ -34,10 +34,10 @@ use crate::spinner::with_spinner;
 /// Maximum storage entries for a single-transaction deployment.
 /// Proven transactions with more entries exceed the gRPC message size limit (~4MB).
 /// Accounts above this threshold use two-phase deployment (empty maps + expansion).
-const MAX_ENTRIES_SINGLE_DEPLOY: usize = 200;
+const MAX_ENTRIES_SINGLE_DEPLOY: usize = 20;
 
 /// Maximum entries to set per expansion transaction.
-const ENTRIES_PER_EXPANSION_TX: usize = 1000;
+const ENTRIES_PER_EXPANSION_TX: usize = 280;
 
 /// Waits for the chain height to advance, ensuring transaction is in a block
 async fn wait_for_block_advancement(client: &mut Client<FilesystemKeyStore>) -> anyhow::Result<()> {
@@ -252,8 +252,7 @@ async fn expand_storage_maps(
             let tx_result = client.execute_transaction(account_id, tx_request).await?;
             let proven_tx = client.prove_transaction(&tx_result).await?;
             let tx_size = proven_tx.to_bytes().len();
-            let submission_height =
-                client.submit_proven_transaction(proven_tx, &tx_result).await?;
+            let submission_height = client.submit_proven_transaction(proven_tx, &tx_result).await?;
             client.apply_transaction(&tx_result, submission_height).await?;
 
             // Wait for 3 blocks to ensure storage is properly indexed

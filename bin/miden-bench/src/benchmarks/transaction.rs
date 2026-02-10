@@ -143,23 +143,6 @@ pub async fn run_transaction_benchmarks(
 
     // Detect storage slots and build slot info.
     let storage = client.get_account_storage(account_id).await?;
-    for slot in storage.slots() {
-        match slot.content() {
-            StorageSlotContent::Map(map) => {
-                let root = map.root();
-                println!("  Detected map root: {})", root);
-                let entries_count = map.entries().count();
-                println!("  Detected map slot: {} ({} entries)", slot.name(), entries_count);
-                for (key, value) in map.entries() {
-                    println!("    Key: {}, Value: {}", key, value);
-                }
-            },
-            StorageSlotContent::Value(_value) => {
-                println!("value")
-            },
-        }
-    }
-
     let slot_infos: Vec<StorageSlotInfo> = build_slot_infos_from_storage(&storage);
 
     let total_reads: usize = slot_infos.iter().map(StorageSlotInfo::num_reads).sum();
@@ -179,8 +162,7 @@ pub async fn run_transaction_benchmarks(
     let slot_summary = if entries_per_map.windows(2).all(|w| w[0] == w[1]) {
         format!("{num_maps} map ({} entries each)", entries_per_map[0])
     } else {
-        let counts =
-            entries_per_map.iter().map(ToString::to_string).collect::<Vec<_>>().join(", ");
+        let counts = entries_per_map.iter().map(ToString::to_string).collect::<Vec<_>>().join(", ");
         format!("{num_maps} map (entries: [{counts}])")
     };
 
@@ -295,9 +277,7 @@ fn flatten_read_ops(slot_infos: &[StorageSlotInfo]) -> Vec<ReadOp> {
     slot_infos
         .iter()
         .enumerate()
-        .flat_map(|(idx, info)| {
-            info.keys.iter().map(move |k| ReadOp { slot_idx: idx, key: *k })
-        })
+        .flat_map(|(idx, info)| info.keys.iter().map(move |k| ReadOp { slot_idx: idx, key: *k }))
         .collect()
 }
 
@@ -386,10 +366,7 @@ fn build_chunk_tx_request(
 
     let descriptors: Vec<SlotDescriptor> = slot_infos
         .iter()
-        .map(|info| SlotDescriptor {
-            name: info.name.clone(),
-            is_map: true,
-        })
+        .map(|info| SlotDescriptor { name: info.name.clone(), is_map: true })
         .collect();
     let reader_code = generate_reader_component_code(&descriptors);
 

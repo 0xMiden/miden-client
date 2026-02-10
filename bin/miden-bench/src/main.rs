@@ -43,9 +43,7 @@ fn main() {
                 println!("Seed: {seed_hex}");
                 println!();
                 println!("Run benchmarks with:");
-                println!(
-                    "  miden-bench transaction --account-id {account_id} --seed {seed_hex}"
-                );
+                println!("  miden-bench transaction --account-id {account_id} --seed {seed_hex}");
             },
             Err(e) => {
                 eprintln!("Deploy failed: {e:?}");
