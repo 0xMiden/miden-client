@@ -78,6 +78,9 @@ import {
   MidenClient,
   _WebClient,
   _MockWebClient,
+  createP2IDNote,
+  createP2IDENote,
+  buildSwapTag,
 } from "../dist/index";
 
 declare global {
@@ -169,6 +172,9 @@ declare global {
     CodeBuilderMode: typeof CodeBuilderMode;
     createAuthFalcon512RpoMultisig: typeof createAuthFalcon512RpoMultisig;
     MidenClient: typeof MidenClient;
+    createP2IDNote: typeof createP2IDNote;
+    createP2IDENote: typeof createP2IDENote;
+    buildSwapTag: typeof buildSwapTag;
     createClient: () => Promise<void>;
 
     rpcUrl: string;

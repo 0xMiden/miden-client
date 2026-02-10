@@ -263,7 +263,7 @@ export type PreviewOptions =
 export type WaitStatus = "pending" | "submitted" | "committed";
 
 export interface WaitOptions {
-  /** Timeout in ms (default: 60_000). */
+  /** Timeout in ms (default: 60_000). Set to 0 to disable timeout and poll indefinitely. */
   timeout?: number;
   /** Polling interval in ms (default: 5_000). */
   interval?: number;
