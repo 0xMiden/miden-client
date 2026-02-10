@@ -197,7 +197,9 @@ export class TransactionsResource {
         newNotes = consumable
           .filter(
             (c) =>
-              !preExistingNoteIds.has(c.inputNoteRecord().toNote().id().toString())
+              !preExistingNoteIds.has(
+                c.inputNoteRecord().toNote().id().toString()
+              )
           )
           .map((c) => c.inputNoteRecord().toNote());
 
@@ -419,7 +421,10 @@ export class TransactionsResource {
     const offeredFaucetId = resolveAccountRef(opts.offer.token, wasm);
     const requestedFaucetId = resolveAccountRef(opts.request.token, wasm);
     const noteType = resolveNoteType(opts.type, wasm);
-    const paybackNoteType = resolveNoteType(opts.paybackType ?? opts.type, wasm);
+    const paybackNoteType = resolveNoteType(
+      opts.paybackType ?? opts.type,
+      wasm
+    );
 
     const request = await this.#inner.newSwapTransactionRequest(
       accountId,
