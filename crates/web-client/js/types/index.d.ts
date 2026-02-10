@@ -23,6 +23,7 @@ import type {
   ConsumableNoteRecord,
   NoteId,
   NoteFile,
+  NoteTag,
   Note,
   OutputNote,
 } from "./crates/miden_client_web";
@@ -483,8 +484,8 @@ export declare function createP2IDNote(options: NoteOptions): OutputNote;
 /** Creates a P2IDE (Pay-to-ID with Expiration) note. */
 export declare function createP2IDENote(options: P2IDEOptions): OutputNote;
 
-/** Builds a swap tag for note matching. */
-export declare function buildSwapTag(options: BuildSwapTagOptions): number;
+/** Builds a swap tag for note matching. Returns a NoteTag (use `.asU32()` for the numeric value). */
+export declare function buildSwapTag(options: BuildSwapTagOptions): NoteTag;
 
 /** Returns the initialized WASM module. Throws if WASM is unavailable. */
 export declare function getWasmOrThrow(): Promise<typeof WasmExports>;
