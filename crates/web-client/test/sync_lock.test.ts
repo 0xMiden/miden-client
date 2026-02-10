@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { expect } from "@playwright/test";
-import test, { getRpcUrl } from "./playwright.global.setup";
+import test, { getRpcUrl, RUN_ID } from "./playwright.global.setup";
 import { BrowserContext, Page } from "@playwright/test";
 
 test.describe("Sync Lock Tests", () => {
@@ -428,10 +428,11 @@ test.describe("Cross-Tab Sync Lock Tests", () => {
     try {
       // Set up both pages
       const rpcUrl = getRpcUrl();
+      const crossTabStoreName = `CrossTabTestStore_${RUN_ID}`;
       const setupPage = async (page: Page) => {
         await page.goto("http://localhost:8080");
         await page.evaluate(
-          async ({ rpcUrl }) => {
+          async ({ rpcUrl, storeName }) => {
             const sdkExports = await import("./index.js");
             for (const [key, value] of Object.entries(sdkExports)) {
               window[key] = value;
@@ -443,11 +444,11 @@ test.describe("Cross-Tab Sync Lock Tests", () => {
               rpcUrl,
               undefined,
               undefined,
-              "CrossTabTestStore"
+              storeName
             );
             window.client = client;
           },
-          { rpcUrl }
+          { rpcUrl, storeName: crossTabStoreName }
         );
       };
 
@@ -496,10 +497,11 @@ test.describe("Cross-Tab Sync Lock Tests", () => {
 
     try {
       const rpcUrl = getRpcUrl();
+      const rapidStoreName = `RapidCrossTabStore_${RUN_ID}`;
       const setupPage = async (page: Page) => {
         await page.goto("http://localhost:8080");
         await page.evaluate(
-          async ({ rpcUrl }) => {
+          async ({ rpcUrl, storeName }) => {
             const sdkExports = await import("./index.js");
             for (const [key, value] of Object.entries(sdkExports)) {
               window[key] = value;
@@ -510,11 +512,11 @@ test.describe("Cross-Tab Sync Lock Tests", () => {
               rpcUrl,
               undefined,
               undefined,
-              "RapidCrossTabStore"
+              storeName
             );
             window.client = client;
           },
-          { rpcUrl }
+          { rpcUrl, storeName: rapidStoreName }
         );
       };
 
