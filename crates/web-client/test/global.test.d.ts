@@ -75,13 +75,15 @@ import {
   CodeBuilder,
   CodeBuilderMode,
   createAuthFalcon512RpoMultisig,
+  MidenClient,
+  _WebClient,
+  _MockWebClient,
 } from "../dist/index";
-import { MockWebClient, WebClient } from "../js";
 
 declare global {
   interface Window {
-    client: WebClient & WasmWebClient;
-    MockWebClient: typeof MockWebClient;
+    client: _WebClient & WasmWebClient;
+    _MockWebClient: typeof _MockWebClient;
     remoteProverUrl?: string;
     remoteProverInstance: TransactionProver;
     Account: typeof Account;
@@ -159,13 +161,14 @@ declare global {
     TransactionScriptInputPairArray: typeof TransactionScriptInputPairArray;
     TransactionSummary: typeof TransactionSummary;
     RpcClient: typeof RpcClient;
-    WebClient: typeof WebClient;
+    _WebClient: typeof _WebClient;
     Word: typeof Word;
     Address: typeof Address;
     MidenArrays: typeof MidenArrays;
     CodeBuilder: typeof CodeBuilder;
     CodeBuilderMode: typeof CodeBuilderMode;
     createAuthFalcon512RpoMultisig: typeof createAuthFalcon512RpoMultisig;
+    MidenClient: typeof MidenClient;
     createClient: () => Promise<void>;
 
     rpcUrl: string;

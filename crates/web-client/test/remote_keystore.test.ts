@@ -15,7 +15,7 @@ test.describe("remote keystore", () => {
       const signCb = async (_publicKeyCommitment: string, _message: string) => {
         return undefined;
       };
-      const client = await window.WebClient.createClientWithExternalKeystore(
+      const client = await window._WebClient.createClientWithExternalKeystore(
         window.rpcUrl!,
         undefined,
         undefined,
@@ -42,7 +42,7 @@ test.describe("remote keystore", () => {
         publicKeyCommitment = publicKeyCommitmentStr;
         secretKey = secretKeyStr;
       };
-      const client = await window.WebClient.createClientWithExternalKeystore(
+      const client = await window._WebClient.createClientWithExternalKeystore(
         window.rpcUrl!,
         undefined,
         undefined,
@@ -88,7 +88,7 @@ test.describe("remote keystore", () => {
         return undefined;
       };
 
-      const client = await window.WebClient.createClientWithExternalKeystore(
+      const client = await window._WebClient.createClientWithExternalKeystore(
         window.rpcUrl!,
         undefined,
         undefined,
@@ -153,7 +153,7 @@ test.describe("remote keystore", () => {
         return serializedSig;
       };
 
-      const client = await window.WebClient.createClientWithExternalKeystore(
+      const client = await window._WebClient.createClientWithExternalKeystore(
         window.rpcUrl!,
         undefined,
         undefined,

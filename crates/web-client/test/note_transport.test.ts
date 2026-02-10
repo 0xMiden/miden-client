@@ -3,7 +3,7 @@ import { Page, expect } from "@playwright/test";
 
 test("transport basic", async ({ page }) => {
   const result = await page.evaluate(async () => {
-    const client = await window.MockWebClient.createClient();
+    const client = await window._MockWebClient.createClient();
 
     // Create 32-byte seeds
     const senderSeed = new Uint8Array(32).fill(1);
