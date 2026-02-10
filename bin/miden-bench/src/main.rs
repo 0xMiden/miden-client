@@ -118,11 +118,20 @@ struct CliArgs {
     iterations: usize,
 }
 
+fn parse_maps(s: &str) -> Result<usize, String> {
+    let n: usize = s.parse().map_err(|e| format!("{e}"))?;
+    if (1..=100).contains(&n) {
+        Ok(n)
+    } else {
+        Err(format!("storage map count must be between 1 and 100, got {n}"))
+    }
+}
+
 /// Storage configuration options for benchmarks
 #[derive(Args, Clone)]
 struct StorageArgs {
-    /// Number of storage maps in the account
-    #[arg(short, long, default_value = "1")]
+    /// Number of storage maps in the account (1-100)
+    #[arg(short, long, default_value = "1", value_parser = parse_maps)]
     maps: usize,
 
     /// Number of key/value entries per storage map
