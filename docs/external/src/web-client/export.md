@@ -24,7 +24,7 @@ try {
     const fullExport = await client.notes.export("0xnote...", { format: "full" });
 
     // Export with partial details (default if format is not specified)
-    const partialExport = await client.notes.export("0xnote...", { format: "partial" });
+    const partialExport = await client.notes.export("0xnote...", { format: "details" });
 } catch (error) {
     console.error("Failed to export note:", error.message);
 }
@@ -34,7 +34,7 @@ Export formats:
 
 - `"id"` — Exports only the note ID (only works for public notes)
 - `"full"` — Exports the complete note with its inclusion proof (requires the note to have an inclusion proof)
-- `"partial"` — Exports note details including metadata and the creation block number
+- `"details"` — Exports note details including metadata and the creation block number
 
 ## Exporting Accounts
 
