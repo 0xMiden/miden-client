@@ -142,16 +142,10 @@ export class TransactionsResource {
     // Capture existing consumable note IDs before mint to avoid consuming
     // pre-existing notes that don't belong to this operation.
     // getConsumableNotes consumes targetId by value.
-    let preExistingNoteIds;
-    try {
-      const preMintConsumable = await this.#inner.getConsumableNotes(targetId);
-      preExistingNoteIds = new Set(
-        preMintConsumable.map((c) => c.inputNoteRecord().toNote().id().toHex())
-      );
-    } catch {
-      // If we can't query notes (e.g., account not yet synced), assume none exist
-      preExistingNoteIds = new Set();
-    }
+    const preMintConsumable = await this.#inner.getConsumableNotes(targetId);
+    const preExistingNoteIds = new Set(
+      preMintConsumable.map((c) => c.inputNoteRecord().toNote().id().toHex())
+    );
 
     // Step 1: Mint
     // newMintTransactionRequest borrows (&AccountId), but submitNewTransaction
@@ -176,9 +170,9 @@ export class TransactionsResource {
       throw err;
     }
 
-    // Step 2: Wait for mint confirmation
+    // Step 2: Wait for mint confirmation (always required — can't consume before mint confirms)
     try {
-      await this.waitFor(mintTxId.toHex());
+      await this.waitFor(mintTxId.toHex(), { timeout: opts.timeout });
     } catch (original) {
       const err = new Error(original.message);
       err.step = "sync";
@@ -227,11 +221,15 @@ export class TransactionsResource {
 
       const consumeRequest =
         await this.#inner.newConsumeTransactionRequest(newNotes);
-      await this.#submitOrSubmitWithProver(
+      const consumeTxId = await this.#submitOrSubmitWithProver(
         wasm.AccountId.fromHex(targetIdHex),
         consumeRequest,
         opts.prover
       );
+
+      if (opts.waitForConfirmation) {
+        await this.waitFor(consumeTxId.toHex(), { timeout: opts.timeout });
+      }
     } catch (original) {
       if (original.step) throw original;
       const err = new Error(original.message);
@@ -443,9 +441,20 @@ export class TransactionsResource {
       }
       return record.toNote();
     }
+    // InputNoteRecord — unwrap to Note
     if (input && typeof input.toNote === "function") {
       return input.toNote();
     }
+    // NoteId — look up the note by its hex ID
+    if (input && input.constructor?.name === "NoteId") {
+      const hex = input.toString();
+      const record = await this.#inner.getInputNote(hex);
+      if (!record) {
+        throw new Error(`Note not found: ${hex}`);
+      }
+      return record.toNote();
+    }
+    // Assume it's already a Note object
     return input;
   }
 

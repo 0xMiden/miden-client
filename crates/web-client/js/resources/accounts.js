@@ -99,10 +99,9 @@ export class AccountsResource {
     if (input.file) {
       // Import from AccountFile
       await this.#inner.importAccountFile(input.file);
-      // Extract account ID from the AccountFile to return the imported Account
-      const accountData = input.file.account ?? input.file;
-      if (accountData && typeof accountData.id === "function") {
-        return await this.#inner.getAccount(accountData.id());
+      // AccountFile exposes accountId() directly — no need to unwrap .account()
+      if (typeof input.file.accountId === "function") {
+        return await this.#inner.getAccount(input.file.accountId());
       }
       throw new Error(
         "Could not determine account ID from AccountFile. " +

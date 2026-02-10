@@ -50,7 +50,7 @@ try {
         to: recipientWallet,
         token: faucet,
         amount: 100n,
-        noteType: "private",      // "public" or "private" (default: "public")
+        type: "private",           // "public" or "private" (default: "public")
         reclaimAfter: 100,        // Optional: block height for reclaim
         timelockUntil: 90         // Optional: block height for timelock
     });
@@ -72,7 +72,7 @@ try {
         account: faucet,          // The faucet account
         to: wallet,               // Recipient account
         amount: 1000n,            // Amount to mint
-        noteType: "private"       // Optional (default: "public")
+        type: "private"            // Optional (default: "public")
     });
     console.log("Mint transaction:", txId.toString());
 } catch (error) {
@@ -123,7 +123,7 @@ try {
         account: wallet,
         offer: { token: faucetA, amount: 100n },
         request: { token: faucetB, amount: 200n },
-        noteType: "public"
+        type: "public"
     });
     console.log("Swap transaction:", txId.toString());
 } catch (error) {
@@ -142,7 +142,7 @@ try {
     const client = await MidenClient.create();
 
     const txId = await client.transactions.mintAndConsume({
-        account: faucet,
+        faucet: faucet,
         to: wallet,
         amount: 1000n
     });
