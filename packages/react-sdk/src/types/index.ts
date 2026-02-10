@@ -371,6 +371,8 @@ export interface SwapOptions {
   noteType?: "private" | "public" | "encrypted";
   /** Note type for payback note. Default: private */
   paybackNoteType?: "private" | "public" | "encrypted";
+  /** Block height after which sender can reclaim the offered asset (creates SWAPE note). */
+  reclaimHeight?: number;
 }
 
 // Arbitrary transaction options

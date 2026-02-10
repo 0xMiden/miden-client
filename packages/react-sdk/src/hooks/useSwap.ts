@@ -88,14 +88,18 @@ export function useSwap(): UseSwapResult {
 
         setStage("proving");
         const txResult = await runExclusiveSafe(async () => {
-          const txRequest = client.newSwapTransactionRequest(
+          // Cast needed: reclaim_height parameter added in SWAPE support but
+          // WASM type definitions may not yet include it.
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const txRequest = (client as any).newSwapTransactionRequest(
             accountIdObj,
             offeredFaucetIdObj,
             options.offeredAmount,
             requestedFaucetIdObj,
             options.requestedAmount,
             noteType,
-            paybackNoteType
+            paybackNoteType,
+            options.reclaimHeight ?? undefined
           );
 
           const txId = prover
