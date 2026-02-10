@@ -72,7 +72,12 @@ export function resolveNoteType(type, wasm) {
   if (type === "private") {
     return wasm.NoteType.Private;
   }
-  return wasm.NoteType.Public;
+  if (type === "public" || type == null) {
+    return wasm.NoteType.Public;
+  }
+  throw new Error(
+    `Unknown note type: "${type}". Expected "public" or "private".`
+  );
 }
 
 /**
@@ -89,8 +94,13 @@ export function resolveStorageMode(mode, wasm) {
     case "network":
       return wasm.AccountStorageMode.network();
     case "private":
-    default:
+    case undefined:
+    case null:
       return wasm.AccountStorageMode.private();
+    default:
+      throw new Error(
+        `Unknown storage mode: "${mode}". Expected "private", "public", or "network".`
+      );
   }
 }
 
@@ -105,7 +115,12 @@ export function resolveAuthScheme(scheme, wasm) {
   if (scheme === "ecdsa") {
     return wasm.AuthScheme.AuthEcdsaK256Keccak;
   }
-  return wasm.AuthScheme.AuthRpoFalcon512;
+  if (scheme === "falcon" || scheme == null) {
+    return wasm.AuthScheme.AuthRpoFalcon512;
+  }
+  throw new Error(
+    `Unknown auth scheme: "${scheme}". Expected "falcon" or "ecdsa".`
+  );
 }
 
 /**

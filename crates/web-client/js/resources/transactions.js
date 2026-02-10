@@ -69,7 +69,10 @@ export class TransactionsResource {
     this.#client.assertNotTerminated();
     const wasm = await this.#getWasm();
 
+    // getConsumableNotes takes AccountId by value (consumed by WASM).
+    // Save hex so we can reconstruct for submitNewTransaction.
     const accountId = resolveAccountRef(opts.account, wasm);
+    const accountIdHex = accountId.toString();
     const consumable = await this.#inner.getConsumableNotes(accountId);
 
     if (!consumable || consumable.length === 0) {
@@ -89,7 +92,7 @@ export class TransactionsResource {
     const request = await this.#inner.newConsumeTransactionRequest(notes);
 
     const txId = await this.#submitOrSubmitWithProver(
-      accountId,
+      wasm.AccountId.fromHex(accountIdHex),
       request,
       opts.prover
     );
@@ -127,22 +130,42 @@ export class TransactionsResource {
     this.#client.assertNotTerminated();
     const wasm = await this.#getWasm();
 
+    // Save hex strings upfront — getConsumableNotes takes AccountId by value,
+    // which consumes the JS object. We reconstruct from hex when needed.
     const faucetId = resolveAccountRef(opts.faucet, wasm);
     const targetId = resolveAccountRef(opts.to, wasm);
+    const faucetIdHex = faucetId.toString();
+    const targetIdHex = targetId.toString();
     const noteType = resolveNoteType(opts.type, wasm);
     const amount = BigInt(opts.amount);
 
+    // Capture existing consumable note IDs before mint to avoid consuming
+    // pre-existing notes that don't belong to this operation.
+    // getConsumableNotes consumes targetId by value.
+    let preExistingNoteIds;
+    try {
+      const preMintConsumable = await this.#inner.getConsumableNotes(targetId);
+      preExistingNoteIds = new Set(
+        preMintConsumable.map((c) => c.inputNoteRecord().toNote().id().toHex())
+      );
+    } catch {
+      // If we can't query notes (e.g., account not yet synced), assume none exist
+      preExistingNoteIds = new Set();
+    }
+
     // Step 1: Mint
+    // newMintTransactionRequest borrows (&AccountId), but submitNewTransaction
+    // serializes via .toString() through the worker — needs a fresh ID each time.
     let mintTxId;
     try {
       const mintRequest = await this.#inner.newMintTransactionRequest(
-        targetId,
-        faucetId,
+        wasm.AccountId.fromHex(targetIdHex),
+        wasm.AccountId.fromHex(faucetIdHex),
         noteType,
         amount
       );
       mintTxId = await this.#submitOrSubmitWithProver(
-        faucetId,
+        wasm.AccountId.fromHex(faucetIdHex),
         mintRequest,
         opts.prover
       );
@@ -163,19 +186,27 @@ export class TransactionsResource {
       throw err;
     }
 
-    // Step 3: Consume
+    // Step 3: Consume only the newly minted notes
     try {
-      const consumable = await this.#inner.getConsumableNotes(targetId);
-      const notes = consumable.map((c) => c.inputNoteRecord().toNote());
+      // getConsumableNotes consumes AccountId by value — use fresh ID
+      const consumable = await this.#inner.getConsumableNotes(
+        wasm.AccountId.fromHex(targetIdHex)
+      );
+      const newNotes = consumable
+        .filter(
+          (c) =>
+            !preExistingNoteIds.has(c.inputNoteRecord().toNote().id().toHex())
+        )
+        .map((c) => c.inputNoteRecord().toNote());
 
-      if (notes.length === 0) {
+      if (newNotes.length === 0) {
         throw new Error("No consumable notes found after mint");
       }
 
       const consumeRequest =
-        await this.#inner.newConsumeTransactionRequest(notes);
+        await this.#inner.newConsumeTransactionRequest(newNotes);
       await this.#submitOrSubmitWithProver(
-        targetId,
+        wasm.AccountId.fromHex(targetIdHex),
         consumeRequest,
         opts.prover
       );

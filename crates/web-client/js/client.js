@@ -195,6 +195,12 @@ export class MidenClient {
    */
   async importStore(snapshot) {
     this.assertNotTerminated();
+    if (!snapshot || snapshot.version !== 1) {
+      throw new Error(
+        `Unsupported store snapshot version: ${snapshot?.version}. Expected version 1.`
+      );
+    }
+    // Second arg is the store password (empty string = no encryption)
     await this.#inner.forceImportStore(snapshot.data, "");
   }
 
