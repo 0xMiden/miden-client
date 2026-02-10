@@ -75,9 +75,9 @@ pub struct StateSync {
     /// Number of blocks after which pending transactions are considered stale and discarded.
     /// If `None`, there is no limit and transactions will be kept indefinitely.
     tx_discard_delta: Option<u32>,
-    /// Whether to check for nullifiers during state sync. When enabled, the client will query the
-    /// nullifiers for unspent notes at each sync step. This allows to detect when tracked notes
-    /// have been consumed externally and discard local transactions that depend on them.
+    /// Whether to check for nullifiers during state sync. When enabled, the component will query
+    /// the nullifiers for unspent notes at each sync step. This allows to detect when tracked
+    /// notes have been consumed externally and discard local transactions that depend on them.
     sync_nullifiers: bool,
 }
 
@@ -89,21 +89,26 @@ impl StateSync {
     /// * `rpc_api` - The RPC client used to communicate with the node.
     /// * `note_screener` - The note screener used to check the relevance of notes.
     /// * `tx_discard_delta` - Number of blocks after which pending transactions are discarded.
-    /// * `sync_nullifiers` - Whether to query the node for new nullifiers after each sync step.
-    ///   This allows the client to detect externally consumed notes and discard local transactions
-    ///   that depend on them.
     pub fn new(
         rpc_api: Arc<dyn NodeRpcClient>,
         note_screener: Arc<dyn OnNoteReceived>,
         tx_discard_delta: Option<u32>,
-        sync_nullifiers: bool,
     ) -> Self {
         Self {
             rpc_api,
             note_screener,
             tx_discard_delta,
-            sync_nullifiers,
+            sync_nullifiers: true,
         }
+    }
+
+    /// Disables the nullifier sync.
+    ///
+    /// When disabled, the component will not query the node for new nullifiers after each sync
+    /// step. This is useful for clients that don't need to track note consumption, such as
+    /// faucets.
+    pub fn disable_nullifier_sync(&mut self) {
+        self.sync_nullifiers = false;
     }
 
     /// Syncs the state of the client with the chain tip of the node, returning the updates that
