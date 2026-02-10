@@ -97,11 +97,15 @@ export class AccountsResource {
     }
 
     if (input.file) {
-      // Import from AccountFile
+      // Extract accountId before importAccountFile — WASM consumes the
+      // AccountFile by value, invalidating the JS wrapper after the call.
+      const accountId =
+        typeof input.file.accountId === "function"
+          ? input.file.accountId()
+          : null;
       await this.#inner.importAccountFile(input.file);
-      // AccountFile exposes accountId() directly — no need to unwrap .account()
-      if (typeof input.file.accountId === "function") {
-        return await this.#inner.getAccount(input.file.accountId());
+      if (accountId) {
+        return await this.#inner.getAccount(accountId);
       }
       throw new Error(
         "Could not determine account ID from AccountFile. " +

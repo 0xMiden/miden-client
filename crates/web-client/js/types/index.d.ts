@@ -98,10 +98,10 @@ export interface ClientOptions {
 // ════════════════════════════════════════════════════════════════
 
 /**
- * An account reference: hex string, bech32 string, Account object, or AccountId object.
+ * An account reference: hex string, bech32 string, Account, AccountHeader, or AccountId object.
  * All ID fields throughout the SDK accept any of these forms.
  */
-export type AccountRef = string | Account | AccountId;
+export type AccountRef = string | Account | AccountHeader | AccountId;
 
 /** Represents an amount of a specific token (identified by its faucet account). */
 export interface Asset {

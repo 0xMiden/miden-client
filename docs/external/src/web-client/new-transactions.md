@@ -31,7 +31,7 @@ try {
     console.log("Mint transaction:", mintTxId.toString());
 
     // Wait for confirmation
-    await client.transactions.waitFor(mintTxId);
+    await client.transactions.waitFor(mintTxId.toHex());
 } catch (error) {
     console.error("Transaction failed:", error.message);
 }
@@ -203,14 +203,14 @@ try {
     });
 
     // Wait with default settings (60s timeout, 5s interval)
-    await client.transactions.waitFor(txId);
+    await client.transactions.waitFor(txId.toHex());
 
     // Wait with custom options
-    await client.transactions.waitFor(txId, {
+    await client.transactions.waitFor(txId.toHex(), {
         timeout: 120_000,   // 2 minutes
         interval: 3_000,    // Check every 3 seconds
         onProgress: (status) => {
-            console.log(`Block: ${status.blockNum}, committed: ${status.committed}`);
+            console.log(`Status: ${status}`); // "pending", "submitted", or "committed"
         }
     });
 } catch (error) {

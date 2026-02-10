@@ -79,7 +79,7 @@ export function createP2IDENote(opts) {
  * Builds a swap tag for note matching.
  *
  * @param {BuildSwapTagOptions} opts - Swap tag options.
- * @returns {number} The computed swap tag.
+ * @returns {NoteTag} The computed swap tag.
  */
 export function buildSwapTag(opts) {
   const wasm = getWasm();
