@@ -20,6 +20,12 @@ export class TagsResource {
   async list() {
     this.#client.assertNotTerminated();
     const tags = await this.#inner.listTags();
-    return Array.from(tags).map(Number);
+    return Array.from(tags).map((t) => {
+      const n = Number(t);
+      if (Number.isNaN(n)) {
+        throw new Error(`Invalid tag value: ${t}`);
+      }
+      return n;
+    });
   }
 }

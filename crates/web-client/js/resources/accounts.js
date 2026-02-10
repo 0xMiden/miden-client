@@ -99,13 +99,15 @@ export class AccountsResource {
     if (input.file) {
       // Import from AccountFile
       await this.#inner.importAccountFile(input.file);
-      // Extract account ID from the AccountFile to return the Account
-      const account = input.file.account ?? input.file;
-      if (account && typeof account.id === "function") {
-        return await this.#inner.getAccount(account.id());
+      // Extract account ID from the AccountFile to return the imported Account
+      const accountData = input.file.account ?? input.file;
+      if (accountData && typeof accountData.id === "function") {
+        return await this.#inner.getAccount(accountData.id());
       }
-      // Fallback: re-fetch from the file's inner data
-      return account;
+      throw new Error(
+        "Could not determine account ID from AccountFile. " +
+          "Ensure the file contains a valid account."
+      );
     }
 
     if (input.seed) {

@@ -44,6 +44,9 @@ export function resolveAccountRef(ref, wasm) {
  * @returns {Address} The resolved Address.
  */
 export function resolveAddress(ref, wasm) {
+  if (ref == null) {
+    throw new Error("Address reference cannot be null or undefined");
+  }
   if (typeof ref === "string") {
     if (ref.startsWith("0x") || ref.startsWith("0X")) {
       const accountId = wasm.AccountId.fromHex(ref);
