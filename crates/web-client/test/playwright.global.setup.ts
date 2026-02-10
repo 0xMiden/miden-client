@@ -15,8 +15,8 @@ const REMOTE_TX_PROVER_PORT = 50051;
 
 // Check if running against localhost (vs devnet/testnet)
 export function isLocalhost(): boolean {
-  if (process.env.MIDEN_RPC_URL) {
-    return process.env.MIDEN_RPC_URL.includes("localhost");
+  if (process.env.TEST_MIDEN_RPC_URL) {
+    return process.env.TEST_MIDEN_RPC_URL.includes("localhost");
   }
   const network = process.env.TEST_MIDEN_NETWORK?.toLowerCase();
   return !network || network === "localhost";
@@ -24,8 +24,8 @@ export function isLocalhost(): boolean {
 
 // Determine RPC URL from environment or default to localhost
 export function getRpcUrl(): string {
-  if (process.env.MIDEN_RPC_URL) {
-    return process.env.MIDEN_RPC_URL;
+  if (process.env.TEST_MIDEN_RPC_URL) {
+    return process.env.TEST_MIDEN_RPC_URL;
   }
 
   const network = process.env.TEST_MIDEN_NETWORK?.toLowerCase();
@@ -43,8 +43,8 @@ export function getRpcUrl(): string {
 // Determine remote prover URL from environment or default based on network.
 // Returns undefined if remote proving is not requested (REMOTE_PROVER not set).
 export function getProverUrl(): string | undefined {
-  if (process.env.MIDEN_PROVER_URL) {
-    return process.env.MIDEN_PROVER_URL;
+  if (process.env.TEST_MIDEN_PROVER_URL) {
+    return process.env.TEST_MIDEN_PROVER_URL;
   }
 
   if (!process.env.REMOTE_PROVER) {
