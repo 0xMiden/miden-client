@@ -9,22 +9,7 @@ export async function insertBlockHeader(dbId, blockNum, header, partialBlockchai
             partialBlockchainPeaks,
             hasClientNotes: hasClientNotes.toString(),
         };
-        const existingBlockHeader = await db.blockHeaders.get(blockNum);
-        if (!existingBlockHeader) {
-            await db.blockHeaders.put(data);
-        }
-        else {
-            console.log("Block header already exists, checking for update.");
-            if (existingBlockHeader.hasClientNotes === "false" && hasClientNotes) {
-                await db.blockHeaders.update(blockNum, {
-                    hasClientNotes: hasClientNotes.toString(),
-                });
-                console.log("Updated hasClientNotes to true.");
-            }
-            else {
-                console.log("No update needed for hasClientNotes.");
-            }
-        }
+        await db.blockHeaders.put(data);
     }
     catch (err) {
         logWebStoreError(err);
