@@ -2,7 +2,7 @@ import { useCallback, useState } from "react";
 import { useMiden } from "../context/MidenProvider";
 import type {
   TransactionRequest,
-  _WebClient as WebClient,
+  WasmWebClient as WebClient,
   AccountId as AccountIdType,
 } from "@miden-sdk/miden-sdk";
 import type {

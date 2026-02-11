@@ -90,7 +90,7 @@ export const test = base.extend<{ forEachTest: void }>({
           for (const [key, value] of Object.entries(sdkExports)) {
             window[key] = value;
           }
-          const client = await window._WebClient.createClient(
+          const client = await window.WasmWebClient.createClient(
             rpcUrl,
             undefined,
             undefined,
@@ -188,7 +188,7 @@ export const test = base.extend<{ forEachTest: void }>({
           };
 
           window.helpers.refreshClient = async (initSeed) => {
-            const client = await _WebClient.createClient(
+            const client = await WasmWebClient.createClient(
               rpcUrl,
               undefined,
               initSeed,

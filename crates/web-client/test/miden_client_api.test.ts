@@ -276,7 +276,7 @@ test.describe("MidenClient API - Mock Chain", () => {
       });
 
       // Build a custom TransactionRequest using low-level _WebClient
-      const lowLevel = await window._MockWebClient.createClient();
+      const lowLevel = await window.MockWasmWebClient.createClient();
       const mintRequest = lowLevel.newMintTransactionRequest(
         wallet.id(),
         faucet.id(),

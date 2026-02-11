@@ -13,8 +13,8 @@ import { hashSeed } from "./utils.js";
  */
 export class MidenClient {
   // Injected by index.js to resolve circular imports
-  static _WebClient = null;
-  static _MockWebClient = null;
+  static _WasmWebClient = null;
+  static _MockWasmWebClient = null;
   static _getWasmOrThrow = null;
 
   #inner;
@@ -43,7 +43,7 @@ export class MidenClient {
    */
   static async create(options) {
     const getWasm = MidenClient._getWasmOrThrow;
-    const WebClientClass = MidenClient._WebClient;
+    const WebClientClass = MidenClient._WasmWebClient;
 
     if (!WebClientClass || !getWasm) {
       throw new Error(
@@ -113,7 +113,7 @@ export class MidenClient {
    */
   static async createMock(options) {
     const getWasm = MidenClient._getWasmOrThrow;
-    const MockWebClientClass = MidenClient._MockWebClient;
+    const MockWebClientClass = MidenClient._MockWasmWebClient;
 
     if (!MockWebClientClass || !getWasm) {
       throw new Error(

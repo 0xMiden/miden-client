@@ -404,7 +404,7 @@ export const createMockSdkModule = (
 
   return {
     WebClient: WebClientMock,
-    _WebClient: WebClientMock,
+    WasmWebClient: WebClientMock,
     AccountId: MockAccountId,
     Address: {
       fromBech32: vi.fn((bech32: string) => ({

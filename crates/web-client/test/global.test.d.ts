@@ -76,8 +76,8 @@ import {
   CodeBuilderMode,
   createAuthFalcon512RpoMultisig,
   MidenClient,
-  _WebClient,
-  _MockWebClient,
+  WasmWebClient,
+  MockWasmWebClient,
   createP2IDNote,
   createP2IDENote,
   buildSwapTag,
@@ -85,8 +85,8 @@ import {
 
 declare global {
   interface Window {
-    client: _WebClient & WasmWebClient;
-    _MockWebClient: typeof _MockWebClient;
+    client: WasmWebClient & WasmWebClient;
+    MockWasmWebClient: typeof MockWasmWebClient;
     remoteProverUrl?: string;
     remoteProverInstance: TransactionProver;
     Account: typeof Account;
@@ -164,7 +164,7 @@ declare global {
     TransactionScriptInputPairArray: typeof TransactionScriptInputPairArray;
     TransactionSummary: typeof TransactionSummary;
     RpcClient: typeof RpcClient;
-    _WebClient: typeof _WebClient;
+    WasmWebClient: typeof WasmWebClient;
     Word: typeof Word;
     Address: typeof Address;
     MidenArrays: typeof MidenArrays;

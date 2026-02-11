@@ -19,8 +19,8 @@
 
 ## Classes
 
-- [\_MockWebClient](classes/MockWebClient.md)
-- [\_WebClient](classes/WebClient.md)
+- [MockWasmWebClient](classes/MockWasmWebClient.md)
+- [WasmWebClient](classes/WasmWebClient.md)
 - [Account](classes/Account.md)
 - [AccountArray](classes/AccountArray.md)
 - [AccountBuilder](classes/AccountBuilder.md)
@@ -147,7 +147,7 @@
 - [TransactionStatus](classes/TransactionStatus.md)
 - [TransactionStoreUpdate](classes/TransactionStoreUpdate.md)
 - [TransactionSummary](classes/TransactionSummary.md)
-- [WebClient](classes/WebClient-1.md)
+- [WebClient](classes/WebClient.md)
 - [Word](classes/Word.md)
 
 ## Interfaces
