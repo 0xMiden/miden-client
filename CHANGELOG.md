@@ -4,7 +4,7 @@
 
 ### Enhancements
 
-* Added TypeDoc API reference links for web SDK in main README and Docusaurus documentation ([#1356](https://github.com/0xMiden/miden-client/issues/1356)).
+* Added TypeDoc API reference links for web SDK in main README and Docusaurus documentation ([#1625](https://github.com/0xMiden/miden-client/pull/1625)).
 
 ## 0.13.0 (2026-01-28)
 
