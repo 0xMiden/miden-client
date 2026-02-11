@@ -84,6 +84,9 @@ pub struct StateSync {
 impl StateSync {
     /// Creates a new instance of the state sync component.
     ///
+    /// The nullifiers sync is enabled by default. To disable it, see
+    /// [`Self::disable_nullifier_sync`].
+    ///
     /// # Arguments
     ///
     /// * `rpc_api` - The RPC client used to communicate with the node.
@@ -109,6 +112,11 @@ impl StateSync {
     /// faucets.
     pub fn disable_nullifier_sync(&mut self) {
         self.sync_nullifiers = false;
+    }
+
+    /// Enables the nullifier sync.
+    pub fn enable_nullifier_sync(&mut self) {
+        self.sync_nullifiers = true;
     }
 
     /// Syncs the state of the client with the chain tip of the node, returning the updates that
