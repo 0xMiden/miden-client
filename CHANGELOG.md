@@ -4,7 +4,7 @@
 
 ### Enhancements
 
-* Added `miden-client-service` crate that wraps `Client` to provide operation coordination (sync/transaction mutual exclusion), event system for state changes, background sync, and customizable sync behavior via the `Syncer` trait ([#1734](https://github.com/0xMiden/miden-client/pull/1734)).
+* Added `miden-client-service` crate that wraps `Client` to provide operation coordination (sync/transaction mutual exclusion), background sync, and async-friendly client access ([#1734](https://github.com/0xMiden/miden-client/pull/1734)).
 * Updated the `GrpcClient` to fetch the RPC limits from the node ([#1724](https://github.com/0xMiden/miden-client/pull/1724)).
 * Added the `@miden-sdk/react` hooks library with a provider, hooks, and an example app for the web client ([#1711](https://github.com/0xMiden/miden-client/pull/1711)).
 * Added typed error parsing for node RPC endpoints, enabling programmatic error handling instead of string parsing ([#1734](https://github.com/0xMiden/miden-client/pull/1734)).

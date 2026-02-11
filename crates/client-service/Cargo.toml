@@ -1,6 +1,6 @@
 [package]
 authors.workspace      = true
-description            = "Service wrapper for miden-client with operation coordination, events, and background sync"
+description            = "Service wrapper for miden-client with operation coordination and background sync"
 edition.workspace      = true
 keywords               = ["client", "miden", "service"]
 license.workspace      = true
@@ -23,9 +23,7 @@ miden-client = { workspace = true }
 miden-protocol = { workspace = true }
 
 # External dependencies
-async-trait = { workspace = true }
-thiserror   = { workspace = true }
-tracing     = { workspace = true }
+tracing = { workspace = true }
 
 # Optional native dependencies
 tokio = { features = ["rt", "sync", "time"], optional = true, workspace = true }

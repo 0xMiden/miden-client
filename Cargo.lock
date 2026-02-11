@@ -2670,10 +2670,8 @@ dependencies = [
 name = "miden-client-service"
 version = "0.14.0"
 dependencies = [
- "async-trait",
  "miden-client",
  "miden-protocol",
- "thiserror 2.0.18",
  "tokio",
  "tracing",
 ]
