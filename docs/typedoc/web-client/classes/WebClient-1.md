@@ -754,7 +754,7 @@ Retrieves the setting value for `key`, or `None` if it hasn’t been set.
 
 ##### auth\_scheme
 
-`AuthScheme`
+[`AuthScheme`](../enumerations/AuthScheme.md)
 
 #### Returns
 
@@ -868,7 +868,7 @@ Returns all the existing setting keys from the store.
 
 ##### auth\_scheme
 
-`AuthScheme`
+[`AuthScheme`](../enumerations/AuthScheme.md)
 
 #### Returns
 
@@ -1000,7 +1000,7 @@ Returns all the existing setting keys from the store.
 
 ##### auth\_scheme
 
-`AuthScheme`
+[`AuthScheme`](../enumerations/AuthScheme.md)
 
 ##### init\_seed?
 

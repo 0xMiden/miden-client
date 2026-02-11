@@ -62,12 +62,12 @@ export declare const MidenArrays: MidenArrayConstructors;
 // Constants
 // ════════════════════════════════════════════════════════════════
 
-/** Authentication scheme constants. */
-export declare const AuthScheme: {
-  readonly Falcon: "falcon";
-  readonly ECDSA: "ecdsa";
-};
-export type AuthSchemeType = (typeof AuthScheme)[keyof typeof AuthScheme];
+/**
+ * User-facing auth scheme string constants for MidenClient options.
+ * The WASM `AuthScheme` enum (with `AuthRpoFalcon512`, `AuthEcdsaK256Keccak`)
+ * is re-exported separately from the WASM module.
+ */
+export type AuthSchemeType = "falcon" | "ecdsa";
 
 // ════════════════════════════════════════════════════════════════
 // Client options
