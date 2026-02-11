@@ -151,12 +151,12 @@ where
             self.store.get_transactions(TransactionFilter::Uncommitted).await?;
 
         // Build current partial MMR
-        let current_partial_mmr = self.store.get_current_partial_mmr().await?;
+        let mut current_partial_mmr = self.store.get_current_partial_mmr().await?;
 
         // Get the sync update from the network
         let state_sync_update: StateSyncUpdate = state_sync
             .sync_state(
-                current_partial_mmr,
+                &mut current_partial_mmr,
                 accounts,
                 note_tags,
                 unspent_input_notes,

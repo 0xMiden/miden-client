@@ -120,7 +120,7 @@ impl StateSync {
     /// * `unspent_output_notes` - The current state of unspent output notes tracked by the client.
     pub async fn sync_state(
         &self,
-        mut current_partial_mmr: PartialMmr,
+        current_partial_mmr: &mut PartialMmr,
         accounts: Vec<AccountHeader>,
         note_tags: BTreeSet<NoteTag>,
         unspent_input_notes: Vec<InputNoteRecord>,
@@ -210,7 +210,7 @@ impl StateSync {
             let (new_mmr_peaks, new_authentication_nodes) = apply_mmr_changes(
                 &block_header,
                 found_relevant_note,
-                &mut current_partial_mmr,
+                current_partial_mmr,
                 mmr_delta,
             )?;
 
@@ -486,4 +486,79 @@ fn apply_mmr_changes(
         .append(&mut current_partial_mmr.add(new_block.commitment(), new_block_has_relevant_notes));
 
     Ok((new_peaks, new_authentication_nodes))
+}
+
+#[cfg(test)]
+mod tests {
+    use alloc::collections::BTreeSet;
+    use alloc::sync::Arc;
+
+    use async_trait::async_trait;
+    use miden_protocol::crypto::merkle::mmr::{Forest, PartialMmr};
+
+    use super::*;
+    use crate::testing::mock::MockRpcApi;
+
+    /// Mock note screener that discards all notes, for minimal test setup.
+    struct MockScreener;
+
+    #[async_trait(?Send)]
+    impl OnNoteReceived for MockScreener {
+        async fn on_note_received(
+            &self,
+            _committed_note: CommittedNote,
+            _public_note: Option<InputNoteRecord>,
+        ) -> Result<NoteUpdateAction, ClientError> {
+            Ok(NoteUpdateAction::Discard)
+        }
+    }
+
+    #[tokio::test]
+    async fn sync_state_across_multiple_iterations_with_same_mmr() {
+        // Setup: create a mock chain and advance it so there are blocks to sync.
+        let mock_rpc = MockRpcApi::default();
+        mock_rpc.advance_blocks(3);
+        let chain_tip_1 = mock_rpc.get_chain_tip_block_num();
+
+        let state_sync = StateSync::new(Arc::new(mock_rpc.clone()), Arc::new(MockScreener), None);
+
+        // Build the initial PartialMmr from genesis (only 1 leaf).
+        let genesis_peaks = mock_rpc.get_mmr().peaks_at(Forest::new(1)).unwrap();
+        let mut partial_mmr = PartialMmr::from_peaks(genesis_peaks);
+        assert_eq!(partial_mmr.forest().num_leaves(), 1);
+
+        // First sync
+        let update = state_sync
+            .sync_state(&mut partial_mmr, vec![], BTreeSet::new(), vec![], vec![], vec![])
+            .await
+            .unwrap();
+
+        assert_eq!(update.block_num, chain_tip_1);
+        let forest_1 = partial_mmr.forest();
+        // The MMR should contain one leaf per block (genesis + the new blocks).
+        assert_eq!(forest_1.num_leaves(), chain_tip_1.as_u32() as usize + 1);
+
+        // Second sync
+        mock_rpc.advance_blocks(2);
+        let chain_tip_2 = mock_rpc.get_chain_tip_block_num();
+
+        let update = state_sync
+            .sync_state(&mut partial_mmr, vec![], BTreeSet::new(), vec![], vec![], vec![])
+            .await
+            .unwrap();
+
+        assert_eq!(update.block_num, chain_tip_2);
+        let forest_2 = partial_mmr.forest();
+        assert!(forest_2 > forest_1);
+        assert_eq!(forest_2.num_leaves(), chain_tip_2.as_u32() as usize + 1);
+
+        // Third sync (no new blocks)
+        let update = state_sync
+            .sync_state(&mut partial_mmr, vec![], BTreeSet::new(), vec![], vec![], vec![])
+            .await
+            .unwrap();
+
+        assert_eq!(update.block_num, chain_tip_2);
+        assert_eq!(partial_mmr.forest(), forest_2);
+    }
 }
