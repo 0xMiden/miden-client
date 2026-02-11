@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { expect } from "@playwright/test";
-import test from "./playwright.global.setup";
+import test, { getRpcUrl, RUN_ID } from "./playwright.global.setup";
 import { BrowserContext, Page } from "@playwright/test";
 
 test.describe("Sync Lock Tests", () => {
@@ -188,7 +188,7 @@ test.describe("Sync Lock Tests", () => {
           window.rpcUrl,
           undefined,
           undefined,
-          "tests" // Same store name as client1
+          window.storeName // Same store name as client1
         );
 
         // Fire concurrent syncs from both clients
@@ -220,13 +220,13 @@ test.describe("Sync Lock Tests", () => {
           window.rpcUrl,
           undefined,
           undefined,
-          "tests"
+          window.storeName
         );
         const client3 = await window.WebClient.createClient(
           window.rpcUrl,
           undefined,
           undefined,
-          "tests"
+          window.storeName
         );
 
         // Fire many concurrent syncs
@@ -257,7 +257,7 @@ test.describe("Sync Lock Tests", () => {
       page,
     }) => {
       const result = await page.evaluate(async () => {
-        const client1 = window.client; // "tests" store
+        const client1 = window.client; // Uses window.storeName
         const client2 = await window.WebClient.createClient(
           window.rpcUrl,
           undefined,
@@ -427,28 +427,28 @@ test.describe("Cross-Tab Sync Lock Tests", () => {
 
     try {
       // Set up both pages
-      const MIDEN_NODE_PORT = 57291;
+      const rpcUrl = getRpcUrl();
+      const crossTabStoreName = `CrossTabTestStore_${RUN_ID}`;
       const setupPage = async (page: Page) => {
         await page.goto("http://localhost:8080");
         await page.evaluate(
-          async ({ MIDEN_NODE_PORT }) => {
+          async ({ rpcUrl, storeName }) => {
             const sdkExports = await import("./index.js");
             for (const [key, value] of Object.entries(sdkExports)) {
               window[key] = value;
             }
 
-            const rpcUrl = `http://localhost:${MIDEN_NODE_PORT}`;
             window.rpcUrl = rpcUrl;
             // Both pages use the same store name for cross-tab coordination
             const client = await window.WebClient.createClient(
               rpcUrl,
               undefined,
               undefined,
-              "CrossTabTestStore"
+              storeName
             );
             window.client = client;
           },
-          { MIDEN_NODE_PORT }
+          { rpcUrl, storeName: crossTabStoreName }
         );
       };
 
@@ -496,27 +496,27 @@ test.describe("Cross-Tab Sync Lock Tests", () => {
     const page3 = await context.newPage();
 
     try {
-      const MIDEN_NODE_PORT = 57291;
+      const rpcUrl = getRpcUrl();
+      const rapidStoreName = `RapidCrossTabStore_${RUN_ID}`;
       const setupPage = async (page: Page) => {
         await page.goto("http://localhost:8080");
         await page.evaluate(
-          async ({ MIDEN_NODE_PORT }) => {
+          async ({ rpcUrl, storeName }) => {
             const sdkExports = await import("./index.js");
             for (const [key, value] of Object.entries(sdkExports)) {
               window[key] = value;
             }
 
-            const rpcUrl = `http://localhost:${MIDEN_NODE_PORT}`;
             window.rpcUrl = rpcUrl;
             const client = await window.WebClient.createClient(
               rpcUrl,
               undefined,
               undefined,
-              "RapidCrossTabStore"
+              storeName
             );
             window.client = client;
           },
-          { MIDEN_NODE_PORT }
+          { rpcUrl, storeName: rapidStoreName }
         );
       };
 
