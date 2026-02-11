@@ -73,7 +73,7 @@ vi.mock("@miden-sdk/miden-sdk", () => {
 
   return {
     WebClient,
-    _WebClient: WebClient,
+    WasmWebClient: WebClient,
     AccountId: {
       fromHex: vi.fn((hex: string) => createMockAccountId(hex)),
       fromBech32: vi.fn((bech32: string) => createMockAccountId(bech32)),

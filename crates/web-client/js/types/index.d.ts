@@ -3,7 +3,7 @@ export * from "./crates/miden_client_web";
 
 // Import types we need for augmentation
 import type {
-  WebClient as WasmWebClient,
+  WebClient as WasmWebClientBase,
   SyncSummary,
   TransactionProver,
   Account,
@@ -496,13 +496,13 @@ export declare function getWasmOrThrow(): Promise<typeof WasmExports>;
 // ════════════════════════════════════════════════════════════════
 
 /** @internal Low-level WebClient wrapper. Use MidenClient instead. */
-export declare class _WebClient extends WasmWebClient {
+export declare class WasmWebClient extends WasmWebClientBase {
   static createClient(
     rpcUrl?: string,
     noteTransportUrl?: string,
     seed?: Uint8Array,
     storeName?: string
-  ): Promise<_WebClient>;
+  ): Promise<WasmWebClient>;
 
   static createClientWithExternalKeystore(
     rpcUrl?: string,
@@ -512,7 +512,7 @@ export declare class _WebClient extends WasmWebClient {
     getKeyCb?: GetKeyCallback,
     insertKeyCb?: InsertKeyCallback,
     signCb?: SignCallback
-  ): Promise<_WebClient>;
+  ): Promise<WasmWebClient>;
 
   syncState(): Promise<SyncSummary>;
   syncStateWithTimeout(timeoutMs: number): Promise<SyncSummary>;
@@ -520,12 +520,12 @@ export declare class _WebClient extends WasmWebClient {
 }
 
 /** @internal Low-level MockWebClient wrapper. Use MidenClient.createMock() instead. */
-export declare class _MockWebClient extends _WebClient {
+export declare class MockWasmWebClient extends WasmWebClient {
   static createClient(
     serializedMockChain?: Uint8Array,
     serializedMockNoteTransportNode?: Uint8Array,
     seed?: Uint8Array
-  ): Promise<_MockWebClient>;
+  ): Promise<MockWasmWebClient>;
 
   proveBlock(): void;
   serializeMockChain(): Uint8Array;

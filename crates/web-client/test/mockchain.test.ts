@@ -4,7 +4,7 @@ import { Page, expect } from "@playwright/test";
 
 const mockChainTest = async (testingPage: Page) => {
   return await testingPage.evaluate(async () => {
-    const client = await window._MockWebClient.createClient();
+    const client = await window.MockWasmWebClient.createClient();
     await client.syncState();
 
     const account = await client.newWallet(

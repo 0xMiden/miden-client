@@ -18,9 +18,8 @@ export * from "../Cargo.toml";
 export { MidenClient };
 export { createP2IDNote, createP2IDENote, buildSwapTag };
 
-// Internal exports — underscore prefix signals "not public API".
-// Used by integration tests that need direct access to the low-level WebClient proxy.
-export { WebClient as _WebClient, MockWebClient as _MockWebClient };
+// Internal exports — used by integration tests that need direct access to the low-level WebClient proxy.
+export { WebClient as WasmWebClient, MockWebClient as MockWasmWebClient };
 
 // Note: AuthScheme is re-exported from WASM via `export * from "../Cargo.toml"`.
 // User-facing auth scheme strings ("falcon", "ecdsa") are resolved internally
@@ -898,7 +897,7 @@ function copyWebClientStatics(WasmWebClient) {
 }
 
 // Wire MidenClient dependencies (resolves circular import)
-MidenClient._WebClient = WebClient;
-MidenClient._MockWebClient = MockWebClient;
+MidenClient._WasmWebClient = WebClient;
+MidenClient._MockWasmWebClient = MockWebClient;
 MidenClient._getWasmOrThrow = getWasmOrThrow;
 _setStandaloneWebClient(WebClient);
