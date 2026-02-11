@@ -2,6 +2,7 @@
 
 ## 0.13.1 (TBD)
 
+* [FIX][rust] Fixed transport-fetched notes committed before the client's sync height being silently missed; `check_expected_notes` now scans from block 0 instead of `sync_height` (#1523).
 * Added the `@miden-sdk/react` hooks library (see [its own changelog](packages/react-sdk/CHANGELOG.md)) ([#1711](https://github.com/0xMiden/miden-client/pull/1711)).
 * Fixed WASM bindings consuming JS objects: `RpcClient` and `WebClient` methods now take references (`&AccountId`, `&Word`) instead of owned values, so callers can reuse objects after passing them ([#1765](https://github.com/0xMiden/miden-client/pull/1765)).
 
