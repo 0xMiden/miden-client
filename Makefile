@@ -153,6 +153,10 @@ integration-test-web-client-webkit: ## Run integration tests for the web client 
 integration-test-remote-prover-web-client: ## Run integration tests for the web client with remote prover
 	cd ./crates/web-client && yarn run test:remote_prover -- --project=chromium
 
+.PHONY: test-node-web-client
+test-node-web-client: ## Run offline Node.js tests for the web client
+	cd $(WEB_CLIENT_DIR)/test/node && node --test tests.mjs
+
 .PHONY: integration-test-full
 integration-test-full: ## Run the integration test binary with ignored tests included (requires note transport service)
 	TEST_MIDEN_NOTE_TRANSPORT_ENDPOINT=$(NOTE_TRANSPORT_ENDPOINT) TEST_WITH_NOTE_TRANSPORT=1 cargo nextest run --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --release --test=integration
