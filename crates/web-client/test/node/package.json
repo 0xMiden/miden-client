@@ -1,0 +1,14 @@
+{
+  "name": "miden-node-test",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node integration.mjs",
+    "poc": "node poc.mjs"
+  },
+  "dependencies": {
+    "fake-indexeddb": "^6.0.0",
+    "undici": "^7.21.0"
+  }
+}
