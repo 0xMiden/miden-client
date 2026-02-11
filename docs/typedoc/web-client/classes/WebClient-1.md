@@ -2,13 +2,19 @@
 
 ***
 
-[@miden-sdk/miden-sdk](../README.md) / WasmWebClient
+[@miden-sdk/miden-sdk](../README.md) / WebClient
 
-# Interface: WasmWebClient
+# Class: WebClient
 
-## Extended by
+## Constructors
 
-- [`WebClient`](../classes/WebClient.md)
+### Constructor
+
+> **new WebClient**(): `WebClient`
+
+#### Returns
+
+`WebClient`
 
 ## Methods
 
@@ -24,7 +30,7 @@
 
 ### accountReader()
 
-> **accountReader**(`account_id`): [`AccountReader`](../classes/AccountReader.md)
+> **accountReader**(`account_id`): [`AccountReader`](AccountReader.md)
 
 Creates a new `AccountReader` for lazy access to account data.
 
@@ -45,11 +51,11 @@ const balance = await reader.getBalance(faucetId);
 
 ##### account\_id
 
-[`AccountId`](../classes/AccountId.md)
+[`AccountId`](AccountId.md)
 
 #### Returns
 
-[`AccountReader`](../classes/AccountReader.md)
+[`AccountReader`](AccountReader.md)
 
 ***
 
@@ -61,11 +67,11 @@ const balance = await reader.getBalance(faucetId);
 
 ##### account\_id
 
-[`AccountId`](../classes/AccountId.md)
+[`AccountId`](AccountId.md)
 
 ##### secret\_key
 
-[`AuthSecretKey`](../classes/AuthSecretKey.md)
+[`AuthSecretKey`](AuthSecretKey.md)
 
 #### Returns
 
@@ -91,13 +97,13 @@ const balance = await reader.getBalance(faucetId);
 
 ### applyTransaction()
 
-> **applyTransaction**(`transaction_result`, `submission_height`): `Promise`\<[`TransactionStoreUpdate`](../classes/TransactionStoreUpdate.md)\>
+> **applyTransaction**(`transaction_result`, `submission_height`): `Promise`\<[`TransactionStoreUpdate`](TransactionStoreUpdate.md)\>
 
 #### Parameters
 
 ##### transaction\_result
 
-[`TransactionResult`](../classes/TransactionResult.md)
+[`TransactionResult`](TransactionResult.md)
 
 ##### submission\_height
 
@@ -105,7 +111,7 @@ const balance = await reader.getBalance(faucetId);
 
 #### Returns
 
-`Promise`\<[`TransactionStoreUpdate`](../classes/TransactionStoreUpdate.md)\>
+`Promise`\<[`TransactionStoreUpdate`](TransactionStoreUpdate.md)\>
 
 ***
 
@@ -202,11 +208,11 @@ Creates a new `WebClient` instance with external keystore callbacks.
 
 ### createCodeBuilder()
 
-> **createCodeBuilder**(): [`CodeBuilder`](../classes/CodeBuilder.md)
+> **createCodeBuilder**(): [`CodeBuilder`](CodeBuilder.md)
 
 #### Returns
 
-[`CodeBuilder`](../classes/CodeBuilder.md)
+[`CodeBuilder`](CodeBuilder.md)
 
 ***
 
@@ -239,7 +245,7 @@ applications as it uses a mock chain that simulates the behavior of a real node.
 
 ### executeForSummary()
 
-> **executeForSummary**(`account_id`, `transaction_request`): `Promise`\<[`TransactionSummary`](../classes/TransactionSummary.md)\>
+> **executeForSummary**(`account_id`, `transaction_request`): `Promise`\<[`TransactionSummary`](TransactionSummary.md)\>
 
 Executes a transaction and returns the `TransactionSummary`.
 
@@ -255,21 +261,21 @@ request as the salt (or a zero salt if not provided).
 
 ##### account\_id
 
-[`AccountId`](../classes/AccountId.md)
+[`AccountId`](AccountId.md)
 
 ##### transaction\_request
 
-[`TransactionRequest`](../classes/TransactionRequest.md)
+[`TransactionRequest`](TransactionRequest.md)
 
 #### Returns
 
-`Promise`\<[`TransactionSummary`](../classes/TransactionSummary.md)\>
+`Promise`\<[`TransactionSummary`](TransactionSummary.md)\>
 
 ***
 
 ### executeTransaction()
 
-> **executeTransaction**(`account_id`, `transaction_request`): `Promise`\<[`TransactionResult`](../classes/TransactionResult.md)\>
+> **executeTransaction**(`account_id`, `transaction_request`): `Promise`\<[`TransactionResult`](TransactionResult.md)\>
 
 Executes a transaction specified by the request against the specified account but does not
 submit it to the network nor update the local database. The returned [`TransactionResult`]
@@ -283,37 +289,37 @@ the chain tip is performed, and the required block header is retrieved.
 
 ##### account\_id
 
-[`AccountId`](../classes/AccountId.md)
+[`AccountId`](AccountId.md)
 
 ##### transaction\_request
 
-[`TransactionRequest`](../classes/TransactionRequest.md)
+[`TransactionRequest`](TransactionRequest.md)
 
 #### Returns
 
-`Promise`\<[`TransactionResult`](../classes/TransactionResult.md)\>
+`Promise`\<[`TransactionResult`](TransactionResult.md)\>
 
 ***
 
 ### exportAccountFile()
 
-> **exportAccountFile**(`account_id`): `Promise`\<[`AccountFile`](../classes/AccountFile.md)\>
+> **exportAccountFile**(`account_id`): `Promise`\<[`AccountFile`](AccountFile.md)\>
 
 #### Parameters
 
 ##### account\_id
 
-[`AccountId`](../classes/AccountId.md)
+[`AccountId`](AccountId.md)
 
 #### Returns
 
-`Promise`\<[`AccountFile`](../classes/AccountFile.md)\>
+`Promise`\<[`AccountFile`](AccountFile.md)\>
 
 ***
 
 ### exportNoteFile()
 
-> **exportNoteFile**(`note_id`, `export_type`): `Promise`\<[`NoteFile`](../classes/NoteFile.md)\>
+> **exportNoteFile**(`note_id`, `export_type`): `Promise`\<[`NoteFile`](NoteFile.md)\>
 
 #### Parameters
 
@@ -327,7 +333,7 @@ the chain tip is performed, and the required block header is retrieved.
 
 #### Returns
 
-`Promise`\<[`NoteFile`](../classes/NoteFile.md)\>
+`Promise`\<[`NoteFile`](NoteFile.md)\>
 
 ***
 
@@ -407,7 +413,7 @@ Uses an internal pagination mechanism to avoid fetching duplicate notes.
 
 ### getAccount()
 
-> **getAccount**(`account_id`): `Promise`\<[`Account`](../classes/Account.md)\>
+> **getAccount**(`account_id`): `Promise`\<[`Account`](Account.md)\>
 
 Retrieves the full account data for the given account ID, returning `null` if not found.
 
@@ -417,17 +423,17 @@ This method loads the complete account state including vault, storage, and code.
 
 ##### account\_id
 
-[`AccountId`](../classes/AccountId.md)
+[`AccountId`](AccountId.md)
 
 #### Returns
 
-`Promise`\<[`Account`](../classes/Account.md)\>
+`Promise`\<[`Account`](Account.md)\>
 
 ***
 
 ### getAccountAuthByPubKeyCommitment()
 
-> **getAccountAuthByPubKeyCommitment**(`pub_key_commitment`): `Promise`\<[`AuthSecretKey`](../classes/AuthSecretKey.md)\>
+> **getAccountAuthByPubKeyCommitment**(`pub_key_commitment`): `Promise`\<[`AuthSecretKey`](AuthSecretKey.md)\>
 
 Retrieves an authentication secret key from the keystore given a public key commitment.
 
@@ -438,11 +444,11 @@ Returns the associated [`AuthSecretKey`] if found, or an error if not found.
 
 ##### pub\_key\_commitment
 
-[`Word`](../classes/Word.md)
+[`Word`](Word.md)
 
 #### Returns
 
-`Promise`\<[`AuthSecretKey`](../classes/AuthSecretKey.md)\>
+`Promise`\<[`AuthSecretKey`](AuthSecretKey.md)\>
 
 ***
 
@@ -467,7 +473,7 @@ commitment, returning `null` if no account is found.
 
 ### getAccountCode()
 
-> **getAccountCode**(`account_id`): `Promise`\<[`AccountCode`](../classes/AccountCode.md)\>
+> **getAccountCode**(`account_id`): `Promise`\<[`AccountCode`](AccountCode.md)\>
 
 Retrieves the account code for a specific account.
 
@@ -477,27 +483,27 @@ Returns `null` if the account is not found.
 
 ##### account\_id
 
-[`AccountId`](../classes/AccountId.md)
+[`AccountId`](AccountId.md)
 
 #### Returns
 
-`Promise`\<[`AccountCode`](../classes/AccountCode.md)\>
+`Promise`\<[`AccountCode`](AccountCode.md)\>
 
 ***
 
 ### getAccounts()
 
-> **getAccounts**(): `Promise`\<[`AccountHeader`](../classes/AccountHeader.md)[]\>
+> **getAccounts**(): `Promise`\<[`AccountHeader`](AccountHeader.md)[]\>
 
 #### Returns
 
-`Promise`\<[`AccountHeader`](../classes/AccountHeader.md)[]\>
+`Promise`\<[`AccountHeader`](AccountHeader.md)[]\>
 
 ***
 
 ### getAccountStorage()
 
-> **getAccountStorage**(`account_id`): `Promise`\<[`AccountStorage`](../classes/AccountStorage.md)\>
+> **getAccountStorage**(`account_id`): `Promise`\<[`AccountStorage`](AccountStorage.md)\>
 
 Retrieves the storage for a specific account.
 
@@ -507,17 +513,17 @@ To only load a specific slot, use `accountReader` instead.
 
 ##### account\_id
 
-[`AccountId`](../classes/AccountId.md)
+[`AccountId`](AccountId.md)
 
 #### Returns
 
-`Promise`\<[`AccountStorage`](../classes/AccountStorage.md)\>
+`Promise`\<[`AccountStorage`](AccountStorage.md)\>
 
 ***
 
 ### getAccountVault()
 
-> **getAccountVault**(`account_id`): `Promise`\<[`AssetVault`](../classes/AssetVault.md)\>
+> **getAccountVault**(`account_id`): `Promise`\<[`AssetVault`](AssetVault.md)\>
 
 Retrieves the asset vault for a specific account.
 
@@ -527,33 +533,33 @@ To check the balance for a single asset, use `accountReader` instead.
 
 ##### account\_id
 
-[`AccountId`](../classes/AccountId.md)
+[`AccountId`](AccountId.md)
 
 #### Returns
 
-`Promise`\<[`AssetVault`](../classes/AssetVault.md)\>
+`Promise`\<[`AssetVault`](AssetVault.md)\>
 
 ***
 
 ### getConsumableNotes()
 
-> **getConsumableNotes**(`account_id?`): `Promise`\<[`ConsumableNoteRecord`](../classes/ConsumableNoteRecord.md)[]\>
+> **getConsumableNotes**(`account_id?`): `Promise`\<[`ConsumableNoteRecord`](ConsumableNoteRecord.md)[]\>
 
 #### Parameters
 
 ##### account\_id?
 
-[`AccountId`](../classes/AccountId.md)
+[`AccountId`](AccountId.md)
 
 #### Returns
 
-`Promise`\<[`ConsumableNoteRecord`](../classes/ConsumableNoteRecord.md)[]\>
+`Promise`\<[`ConsumableNoteRecord`](ConsumableNoteRecord.md)[]\>
 
 ***
 
 ### getInputNote()
 
-> **getInputNote**(`note_id`): `Promise`\<[`InputNoteRecord`](../classes/InputNoteRecord.md)\>
+> **getInputNote**(`note_id`): `Promise`\<[`InputNoteRecord`](InputNoteRecord.md)\>
 
 #### Parameters
 
@@ -563,29 +569,29 @@ To check the balance for a single asset, use `accountReader` instead.
 
 #### Returns
 
-`Promise`\<[`InputNoteRecord`](../classes/InputNoteRecord.md)\>
+`Promise`\<[`InputNoteRecord`](InputNoteRecord.md)\>
 
 ***
 
 ### getInputNotes()
 
-> **getInputNotes**(`filter`): `Promise`\<[`InputNoteRecord`](../classes/InputNoteRecord.md)[]\>
+> **getInputNotes**(`filter`): `Promise`\<[`InputNoteRecord`](InputNoteRecord.md)[]\>
 
 #### Parameters
 
 ##### filter
 
-[`NoteFilter`](../classes/NoteFilter.md)
+[`NoteFilter`](NoteFilter.md)
 
 #### Returns
 
-`Promise`\<[`InputNoteRecord`](../classes/InputNoteRecord.md)[]\>
+`Promise`\<[`InputNoteRecord`](InputNoteRecord.md)[]\>
 
 ***
 
 ### getOutputNote()
 
-> **getOutputNote**(`note_id`): `Promise`\<[`OutputNoteRecord`](../classes/OutputNoteRecord.md)\>
+> **getOutputNote**(`note_id`): `Promise`\<[`OutputNoteRecord`](OutputNoteRecord.md)\>
 
 #### Parameters
 
@@ -595,29 +601,29 @@ To check the balance for a single asset, use `accountReader` instead.
 
 #### Returns
 
-`Promise`\<[`OutputNoteRecord`](../classes/OutputNoteRecord.md)\>
+`Promise`\<[`OutputNoteRecord`](OutputNoteRecord.md)\>
 
 ***
 
 ### getOutputNotes()
 
-> **getOutputNotes**(`filter`): `Promise`\<[`OutputNoteRecord`](../classes/OutputNoteRecord.md)[]\>
+> **getOutputNotes**(`filter`): `Promise`\<[`OutputNoteRecord`](OutputNoteRecord.md)[]\>
 
 #### Parameters
 
 ##### filter
 
-[`NoteFilter`](../classes/NoteFilter.md)
+[`NoteFilter`](NoteFilter.md)
 
 #### Returns
 
-`Promise`\<[`OutputNoteRecord`](../classes/OutputNoteRecord.md)[]\>
+`Promise`\<[`OutputNoteRecord`](OutputNoteRecord.md)[]\>
 
 ***
 
 ### getPublicKeyCommitmentsOfAccount()
 
-> **getPublicKeyCommitmentsOfAccount**(`account_id`): `Promise`\<[`Word`](../classes/Word.md)[]\>
+> **getPublicKeyCommitmentsOfAccount**(`account_id`): `Promise`\<[`Word`](Word.md)[]\>
 
 Returns all public key commitments associated with the given account ID.
 
@@ -628,11 +634,11 @@ to retrieve the corresponding secret keys from the keystore.
 
 ##### account\_id
 
-[`AccountId`](../classes/AccountId.md)
+[`AccountId`](AccountId.md)
 
 #### Returns
 
-`Promise`\<[`Word`](../classes/Word.md)[]\>
+`Promise`\<[`Word`](Word.md)[]\>
 
 ***
 
@@ -666,17 +672,17 @@ Retrieves the setting value for `key`, or `None` if it hasn’t been set.
 
 ### getTransactions()
 
-> **getTransactions**(`transaction_filter`): `Promise`\<[`TransactionRecord`](../classes/TransactionRecord.md)[]\>
+> **getTransactions**(`transaction_filter`): `Promise`\<[`TransactionRecord`](TransactionRecord.md)[]\>
 
 #### Parameters
 
 ##### transaction\_filter
 
-[`TransactionFilter`](../classes/TransactionFilter.md)
+[`TransactionFilter`](TransactionFilter.md)
 
 #### Returns
 
-`Promise`\<[`TransactionRecord`](../classes/TransactionRecord.md)[]\>
+`Promise`\<[`TransactionRecord`](TransactionRecord.md)[]\>
 
 ***
 
@@ -688,7 +694,7 @@ Retrieves the setting value for `key`, or `None` if it hasn’t been set.
 
 ##### account\_id
 
-[`AccountId`](../classes/AccountId.md)
+[`AccountId`](AccountId.md)
 
 #### Returns
 
@@ -704,7 +710,7 @@ Retrieves the setting value for `key`, or `None` if it hasn’t been set.
 
 ##### account\_file
 
-[`AccountFile`](../classes/AccountFile.md)
+[`AccountFile`](AccountFile.md)
 
 #### Returns
 
@@ -714,23 +720,23 @@ Retrieves the setting value for `key`, or `None` if it hasn’t been set.
 
 ### importNoteFile()
 
-> **importNoteFile**(`note_file`): `Promise`\<[`NoteId`](../classes/NoteId.md)\>
+> **importNoteFile**(`note_file`): `Promise`\<[`NoteId`](NoteId.md)\>
 
 #### Parameters
 
 ##### note\_file
 
-[`NoteFile`](../classes/NoteFile.md)
+[`NoteFile`](NoteFile.md)
 
 #### Returns
 
-`Promise`\<[`NoteId`](../classes/NoteId.md)\>
+`Promise`\<[`NoteId`](NoteId.md)\>
 
 ***
 
 ### importPublicAccountFromSeed()
 
-> **importPublicAccountFromSeed**(`init_seed`, `mutable`, `auth_scheme`): `Promise`\<[`Account`](../classes/Account.md)\>
+> **importPublicAccountFromSeed**(`init_seed`, `mutable`, `auth_scheme`): `Promise`\<[`Account`](Account.md)\>
 
 #### Parameters
 
@@ -744,11 +750,11 @@ Retrieves the setting value for `key`, or `None` if it hasn’t been set.
 
 ##### auth\_scheme
 
-[`AuthScheme`](../enumerations/AuthScheme.md)
+`AuthScheme`
 
 #### Returns
 
-`Promise`\<[`Account`](../classes/Account.md)\>
+`Promise`\<[`Account`](Account.md)\>
 
 ***
 
@@ -760,11 +766,11 @@ Retrieves the setting value for `key`, or `None` if it hasn’t been set.
 
 ##### account\_id
 
-[`AccountId`](../classes/AccountId.md)
+[`AccountId`](AccountId.md)
 
 ##### address
 
-[`Address`](../classes/Address.md)
+[`Address`](Address.md)
 
 #### Returns
 
@@ -802,7 +808,7 @@ Returns all the existing setting keys from the store.
 
 ##### account
 
-[`Account`](../classes/Account.md)
+[`Account`](Account.md)
 
 ##### overwrite
 
@@ -816,29 +822,29 @@ Returns all the existing setting keys from the store.
 
 ### newConsumeTransactionRequest()
 
-> **newConsumeTransactionRequest**(`list_of_notes`): [`TransactionRequest`](../classes/TransactionRequest.md)
+> **newConsumeTransactionRequest**(`list_of_notes`): [`TransactionRequest`](TransactionRequest.md)
 
 #### Parameters
 
 ##### list\_of\_notes
 
-[`Note`](../classes/Note.md)[]
+[`Note`](Note.md)[]
 
 #### Returns
 
-[`TransactionRequest`](../classes/TransactionRequest.md)
+[`TransactionRequest`](TransactionRequest.md)
 
 ***
 
 ### newFaucet()
 
-> **newFaucet**(`storage_mode`, `non_fungible`, `token_symbol`, `decimals`, `max_supply`, `auth_scheme`): `Promise`\<[`Account`](../classes/Account.md)\>
+> **newFaucet**(`storage_mode`, `non_fungible`, `token_symbol`, `decimals`, `max_supply`, `auth_scheme`): `Promise`\<[`Account`](Account.md)\>
 
 #### Parameters
 
 ##### storage\_mode
 
-[`AccountStorageMode`](../classes/AccountStorageMode.md)
+[`AccountStorageMode`](AccountStorageMode.md)
 
 ##### non\_fungible
 
@@ -858,27 +864,27 @@ Returns all the existing setting keys from the store.
 
 ##### auth\_scheme
 
-[`AuthScheme`](../enumerations/AuthScheme.md)
+`AuthScheme`
 
 #### Returns
 
-`Promise`\<[`Account`](../classes/Account.md)\>
+`Promise`\<[`Account`](Account.md)\>
 
 ***
 
 ### newMintTransactionRequest()
 
-> **newMintTransactionRequest**(`target_account_id`, `faucet_id`, `note_type`, `amount`): [`TransactionRequest`](../classes/TransactionRequest.md)
+> **newMintTransactionRequest**(`target_account_id`, `faucet_id`, `note_type`, `amount`): [`TransactionRequest`](TransactionRequest.md)
 
 #### Parameters
 
 ##### target\_account\_id
 
-[`AccountId`](../classes/AccountId.md)
+[`AccountId`](AccountId.md)
 
 ##### faucet\_id
 
-[`AccountId`](../classes/AccountId.md)
+[`AccountId`](AccountId.md)
 
 ##### note\_type
 
@@ -890,27 +896,27 @@ Returns all the existing setting keys from the store.
 
 #### Returns
 
-[`TransactionRequest`](../classes/TransactionRequest.md)
+[`TransactionRequest`](TransactionRequest.md)
 
 ***
 
 ### newSendTransactionRequest()
 
-> **newSendTransactionRequest**(`sender_account_id`, `target_account_id`, `faucet_id`, `note_type`, `amount`, `recall_height?`, `timelock_height?`): [`TransactionRequest`](../classes/TransactionRequest.md)
+> **newSendTransactionRequest**(`sender_account_id`, `target_account_id`, `faucet_id`, `note_type`, `amount`, `recall_height?`, `timelock_height?`): [`TransactionRequest`](TransactionRequest.md)
 
 #### Parameters
 
 ##### sender\_account\_id
 
-[`AccountId`](../classes/AccountId.md)
+[`AccountId`](AccountId.md)
 
 ##### target\_account\_id
 
-[`AccountId`](../classes/AccountId.md)
+[`AccountId`](AccountId.md)
 
 ##### faucet\_id
 
-[`AccountId`](../classes/AccountId.md)
+[`AccountId`](AccountId.md)
 
 ##### note\_type
 
@@ -930,23 +936,23 @@ Returns all the existing setting keys from the store.
 
 #### Returns
 
-[`TransactionRequest`](../classes/TransactionRequest.md)
+[`TransactionRequest`](TransactionRequest.md)
 
 ***
 
 ### newSwapTransactionRequest()
 
-> **newSwapTransactionRequest**(`sender_account_id`, `offered_asset_faucet_id`, `offered_asset_amount`, `requested_asset_faucet_id`, `requested_asset_amount`, `note_type`, `payback_note_type`): [`TransactionRequest`](../classes/TransactionRequest.md)
+> **newSwapTransactionRequest**(`sender_account_id`, `offered_asset_faucet_id`, `offered_asset_amount`, `requested_asset_faucet_id`, `requested_asset_amount`, `note_type`, `payback_note_type`): [`TransactionRequest`](TransactionRequest.md)
 
 #### Parameters
 
 ##### sender\_account\_id
 
-[`AccountId`](../classes/AccountId.md)
+[`AccountId`](AccountId.md)
 
 ##### offered\_asset\_faucet\_id
 
-[`AccountId`](../classes/AccountId.md)
+[`AccountId`](AccountId.md)
 
 ##### offered\_asset\_amount
 
@@ -954,7 +960,7 @@ Returns all the existing setting keys from the store.
 
 ##### requested\_asset\_faucet\_id
 
-[`AccountId`](../classes/AccountId.md)
+[`AccountId`](AccountId.md)
 
 ##### requested\_asset\_amount
 
@@ -970,19 +976,19 @@ Returns all the existing setting keys from the store.
 
 #### Returns
 
-[`TransactionRequest`](../classes/TransactionRequest.md)
+[`TransactionRequest`](TransactionRequest.md)
 
 ***
 
 ### newWallet()
 
-> **newWallet**(`storage_mode`, `mutable`, `auth_scheme`, `init_seed?`): `Promise`\<[`Account`](../classes/Account.md)\>
+> **newWallet**(`storage_mode`, `mutable`, `auth_scheme`, `init_seed?`): `Promise`\<[`Account`](Account.md)\>
 
 #### Parameters
 
 ##### storage\_mode
 
-[`AccountStorageMode`](../classes/AccountStorageMode.md)
+[`AccountStorageMode`](AccountStorageMode.md)
 
 ##### mutable
 
@@ -990,7 +996,7 @@ Returns all the existing setting keys from the store.
 
 ##### auth\_scheme
 
-[`AuthScheme`](../enumerations/AuthScheme.md)
+`AuthScheme`
 
 ##### init\_seed?
 
@@ -998,7 +1004,7 @@ Returns all the existing setting keys from the store.
 
 #### Returns
 
-`Promise`\<[`Account`](../classes/Account.md)\>
+`Promise`\<[`Account`](Account.md)\>
 
 ***
 
@@ -1014,7 +1020,7 @@ Returns all the existing setting keys from the store.
 
 ### proveTransaction()
 
-> **proveTransaction**(`transaction_result`, `prover?`): `Promise`\<[`ProvenTransaction`](../classes/ProvenTransaction.md)\>
+> **proveTransaction**(`transaction_result`, `prover?`): `Promise`\<[`ProvenTransaction`](ProvenTransaction.md)\>
 
 Generates a transaction proof using either the provided prover or the client's default
 prover if none is supplied.
@@ -1023,15 +1029,15 @@ prover if none is supplied.
 
 ##### transaction\_result
 
-[`TransactionResult`](../classes/TransactionResult.md)
+[`TransactionResult`](TransactionResult.md)
 
 ##### prover?
 
-[`TransactionProver`](../classes/TransactionProver.md)
+[`TransactionProver`](TransactionProver.md)
 
 #### Returns
 
-`Promise`\<[`ProvenTransaction`](../classes/ProvenTransaction.md)\>
+`Promise`\<[`ProvenTransaction`](ProvenTransaction.md)\>
 
 ***
 
@@ -1043,11 +1049,11 @@ prover if none is supplied.
 
 ##### account\_id
 
-[`AccountId`](../classes/AccountId.md)
+[`AccountId`](AccountId.md)
 
 ##### address
 
-[`Address`](../classes/Address.md)
+[`Address`](Address.md)
 
 #### Returns
 
@@ -1099,11 +1105,11 @@ Send a private note via the note transport layer
 
 ##### note
 
-[`Note`](../classes/Note.md)
+[`Note`](Note.md)
 
 ##### address
 
-[`Address`](../classes/Address.md)
+[`Address`](Address.md)
 
 #### Returns
 
@@ -1183,7 +1189,7 @@ Sets a setting key-value in the store. It can then be retrieved using `get_setti
 
 ### submitNewTransaction()
 
-> **submitNewTransaction**(`account_id`, `transaction_request`): `Promise`\<[`TransactionId`](../classes/TransactionId.md)\>
+> **submitNewTransaction**(`account_id`, `transaction_request`): `Promise`\<[`TransactionId`](TransactionId.md)\>
 
 Executes a transaction specified by the request against the specified account,
 proves it, submits it to the network, and updates the local database.
@@ -1198,21 +1204,21 @@ the chain tip is performed, and the required block header is retrieved.
 
 ##### account\_id
 
-[`AccountId`](../classes/AccountId.md)
+[`AccountId`](AccountId.md)
 
 ##### transaction\_request
 
-[`TransactionRequest`](../classes/TransactionRequest.md)
+[`TransactionRequest`](TransactionRequest.md)
 
 #### Returns
 
-`Promise`\<[`TransactionId`](../classes/TransactionId.md)\>
+`Promise`\<[`TransactionId`](TransactionId.md)\>
 
 ***
 
 ### submitNewTransactionWithProver()
 
-> **submitNewTransactionWithProver**(`account_id`, `transaction_request`, `prover`): `Promise`\<[`TransactionId`](../classes/TransactionId.md)\>
+> **submitNewTransactionWithProver**(`account_id`, `transaction_request`, `prover`): `Promise`\<[`TransactionId`](TransactionId.md)\>
 
 Executes a transaction specified by the request against the specified account, proves it
 with the user provided prover, submits it to the network, and updates the local database.
@@ -1225,19 +1231,19 @@ chain tip is performed, and the required block header is retrieved.
 
 ##### account\_id
 
-[`AccountId`](../classes/AccountId.md)
+[`AccountId`](AccountId.md)
 
 ##### transaction\_request
 
-[`TransactionRequest`](../classes/TransactionRequest.md)
+[`TransactionRequest`](TransactionRequest.md)
 
 ##### prover
 
-[`TransactionProver`](../classes/TransactionProver.md)
+[`TransactionProver`](TransactionProver.md)
 
 #### Returns
 
-`Promise`\<[`TransactionId`](../classes/TransactionId.md)\>
+`Promise`\<[`TransactionId`](TransactionId.md)\>
 
 ***
 
@@ -1249,11 +1255,11 @@ chain tip is performed, and the required block header is retrieved.
 
 ##### proven\_transaction
 
-[`ProvenTransaction`](../classes/ProvenTransaction.md)
+[`ProvenTransaction`](ProvenTransaction.md)
 
 ##### transaction\_result
 
-[`TransactionResult`](../classes/TransactionResult.md)
+[`TransactionResult`](TransactionResult.md)
 
 #### Returns
 
@@ -1263,7 +1269,7 @@ chain tip is performed, and the required block header is retrieved.
 
 ### syncStateImpl()
 
-> **syncStateImpl**(): `Promise`\<[`SyncSummary`](../classes/SyncSummary.md)\>
+> **syncStateImpl**(): `Promise`\<[`SyncSummary`](SyncSummary.md)\>
 
 Internal implementation of `sync_state`.
 
@@ -1275,7 +1281,7 @@ which provides proper coordination for concurrent calls.
 
 #### Returns
 
-`Promise`\<[`SyncSummary`](../classes/SyncSummary.md)\>
+`Promise`\<[`SyncSummary`](SyncSummary.md)\>
 
 ***
 
@@ -1286,3 +1292,35 @@ which provides proper coordination for concurrent calls.
 #### Returns
 
 `boolean`
+
+***
+
+### buildSwapTag()
+
+> `static` **buildSwapTag**(`note_type`, `offered_asset_faucet_id`, `offered_asset_amount`, `requested_asset_faucet_id`, `requested_asset_amount`): [`NoteTag`](NoteTag.md)
+
+#### Parameters
+
+##### note\_type
+
+[`NoteType`](../enumerations/NoteType.md)
+
+##### offered\_asset\_faucet\_id
+
+[`AccountId`](AccountId.md)
+
+##### offered\_asset\_amount
+
+`bigint`
+
+##### requested\_asset\_faucet\_id
+
+[`AccountId`](AccountId.md)
+
+##### requested\_asset\_amount
+
+`bigint`
+
+#### Returns
+
+[`NoteTag`](NoteTag.md)
