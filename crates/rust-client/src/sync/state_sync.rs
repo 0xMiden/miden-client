@@ -120,7 +120,7 @@ impl StateSync {
     /// * `unspent_output_notes` - The current state of unspent output notes tracked by the client.
     pub async fn sync_state(
         &self,
-        mut current_partial_mmr: PartialMmr,
+        current_partial_mmr: &mut PartialMmr,
         accounts: Vec<AccountHeader>,
         note_tags: BTreeSet<NoteTag>,
         unspent_input_notes: Vec<InputNoteRecord>,
@@ -210,7 +210,7 @@ impl StateSync {
             let (new_mmr_peaks, new_authentication_nodes) = apply_mmr_changes(
                 &block_header,
                 found_relevant_note,
-                &mut current_partial_mmr,
+                current_partial_mmr,
                 mmr_delta,
             )?;
 
