@@ -54,8 +54,9 @@ var Table;
 function indexes(...items) {
     return items.join(",");
 }
-/** V1 baseline schema. Exported for use in migration tests. */
-export const V1_STORES = {
+/** V1 baseline schema. Extracted as a constant because once migrations are enabled, this must
+ *  never be modified — all schema changes should go through new version blocks instead. */
+const V1_STORES = {
     [Table.AccountCode]: indexes("root"),
     [Table.AccountStorage]: indexes("[commitment+slotName]", "commitment"),
     [Table.StorageMapEntries]: indexes("[root+key]", "root"),
@@ -136,6 +137,12 @@ export class MidenDatabase {
         //
         // Note: The `populate` hook (below the version blocks) only fires on
         // first database creation, NOT during upgrades.
+        //
+        // To enable migrations (stop nuking the DB on version change):
+        //   1. Remove the nuke logic in ensureClientVersion (close/delete/open).
+        //      Just persist the new version instead.
+        //   2. Freeze V1_STORES — never modify it again.
+        //   3. Add version(2+) blocks below for all schema changes going forward.
         this.dexie.version(1).stores(V1_STORES);
         this.accountCodes = this.dexie.table(Table.AccountCode);
         this.accountStorages = this.dexie.table(Table.AccountStorage);

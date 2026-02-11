@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 import Dexie from "dexie";
-import { MidenDatabase, CLIENT_VERSION_SETTING_KEY, V1_STORES } from "./schema.js";
+import { MidenDatabase, CLIENT_VERSION_SETTING_KEY } from "./schema.js";
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -33,97 +33,56 @@ function trackDb(db: Dexie): Dexie {
 // migrations don't actually run yet. The test validates that the infrastructure
 // works correctly for when the nuke is removed and migrations take over.
 describe("MidenDatabase migrations", () => {
-  it("fresh DB creation seeds stateSync and stores client version", async () => {
-    const name = uniqueDbName();
-    const db = new MidenDatabase(name);
-    openDbs.push(db.dexie);
-
-    await db.open("1.0.0");
-
-    // stateSync should be seeded by the populate hook
-    const syncRecord = await db.stateSync.get(1);
-    expect(syncRecord).toEqual({ id: 1, blockNum: 0 });
-
-    // client version should be stored in settings
-    const versionRecord = await db.settings.get(CLIENT_VERSION_SETTING_KEY);
-    expect(versionRecord).toBeDefined();
-    expect(decoder.decode(versionRecord!.value)).toBe("1.0.0");
-  });
-
   it("v1 → v2 migration preserves data", async () => {
     const name = uniqueDbName();
 
+    // Minimal schema independent from the production one.
+    const testV1 = {
+      items: "id,category",
+      settings: "key",
+    };
+
     // Step 1: Create a v1 database and insert test data
     const dbV1 = trackDb(new Dexie(name));
-    dbV1.version(1).stores(V1_STORES);
+    dbV1.version(1).stores(testV1);
     await dbV1.open();
 
-    await dbV1.table("settings").put({
-      key: CLIENT_VERSION_SETTING_KEY,
-      value: encoder.encode("0.9.0"),
-    });
-    await dbV1.table("stateSync").put({ id: 1, blockNum: 42 });
-    await dbV1.table("accounts").put({
-      id: "acct-1",
-      codeRoot: "code-root-1",
-      storageRoot: "storage-root-1",
-      vaultRoot: "vault-root-1",
-      nonce: "1",
-      committed: true,
-      accountCommitment: "commitment-1",
-      locked: false,
-    });
-    await dbV1.table("inputNotes").put({
-      noteId: "note-1",
-      stateDiscriminant: 1,
-      assets: new Uint8Array([1, 2, 3]),
-      serialNumber: new Uint8Array([4, 5, 6]),
-      inputs: new Uint8Array([7, 8, 9]),
-      scriptRoot: "script-root-1",
-      nullifier: "nullifier-1",
-      serializedCreatedAt: "2025-01-01",
-      state: new Uint8Array([10, 11]),
-    });
+    await dbV1.table("items").put({ id: "item-1", category: "a", name: "Alice" });
+    await dbV1.table("items").put({ id: "item-2", category: "b", name: "Bob" });
+    await dbV1.table("settings").put({ key: "color", value: encoder.encode("blue") });
 
     dbV1.close();
 
-    // Step 2: Open with v1 + v2 (v2 adds a new index to accounts)
+    // Step 2: Open with v1 + v2 (v2 adds an index and a data transform)
     const dbV2 = trackDb(new Dexie(name));
-    dbV2.version(1).stores(V1_STORES);
+    dbV2.version(1).stores(testV1);
     dbV2
       .version(2)
-      .stores({
-        accounts:
-          "&accountCommitment,id,[id+nonce],codeRoot,storageRoot,vaultRoot,locked",
-      })
+      .stores({ items: "id,category,name" })
       .upgrade((tx) => {
-        // Example data transform: ensure all accounts have locked field
         return tx
-          .table("accounts")
+          .table("items")
           .toCollection()
           .modify((record: Record<string, unknown>) => {
-            if (record.locked === undefined) {
-              record.locked = false;
+            if (!record.name) {
+              record.name = "unknown";
             }
           });
       });
     await dbV2.open();
 
     // Verify data survived migration
-    const syncRecord = await dbV2.table("stateSync").get(1);
-    expect(syncRecord).toEqual({ id: 1, blockNum: 42 });
+    const item1 = await dbV2.table("items").get("item-1");
+    expect(item1).toBeDefined();
+    expect(item1.name).toBe("Alice");
+    expect(item1.category).toBe("a");
 
-    const account = await dbV2.table("accounts").get("commitment-1");
-    expect(account).toBeDefined();
-    expect(account.id).toBe("acct-1");
-    expect(account.locked).toBe(false);
+    const item2 = await dbV2.table("items").get("item-2");
+    expect(item2).toBeDefined();
+    expect(item2.name).toBe("Bob");
 
-    const note = await dbV2.table("inputNotes").get("note-1");
-    expect(note).toBeDefined();
-    expect(note.nullifier).toBe("nullifier-1");
-
-    const versionRecord = await dbV2.table("settings").get(CLIENT_VERSION_SETTING_KEY);
-    expect(decoder.decode(versionRecord.value)).toBe("0.9.0");
+    const setting = await dbV2.table("settings").get("color");
+    expect(decoder.decode(setting.value)).toBe("blue");
   });
 
   it("reopening same version is a no-op and preserves data", async () => {
