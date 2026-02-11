@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node integration.mjs"
+    "test": "node integration.mjs",
+    "test:unit": "node --test tests.mjs"
   }
 }

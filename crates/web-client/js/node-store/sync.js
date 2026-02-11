@@ -10,9 +10,7 @@ export async function getNoteTags(dbId) {
       sourceNoteId:
         record.source_note_id === "" ? undefined : record.source_note_id,
       sourceAccountId:
-        record.source_account_id === ""
-          ? undefined
-          : record.source_account_id,
+        record.source_account_id === "" ? undefined : record.source_account_id,
     }));
   } catch (error) {
     logWebStoreError(error, "Error fetch tag record");
@@ -87,9 +85,7 @@ export async function applyStateSync(dbId, stateUpdate) {
 
   // Prepare all statements
   const stmts = {
-    getSyncHeight: db.prepare(
-      "SELECT blockNum FROM state_sync WHERE id = 1"
-    ),
+    getSyncHeight: db.prepare("SELECT blockNum FROM state_sync WHERE id = 1"),
     updateSyncHeight: db.prepare(
       "UPDATE state_sync SET blockNum = ? WHERE id = 1"
     ),
@@ -144,9 +140,7 @@ export async function applyStateSync(dbId, stateUpdate) {
     upsertNode: db.prepare(
       "INSERT OR REPLACE INTO partial_blockchain_nodes (id, node) VALUES (?, ?)"
     ),
-    deleteTagByNoteId: db.prepare(
-      "DELETE FROM tags WHERE source_note_id = ?"
-    ),
+    deleteTagByNoteId: db.prepare("DELETE FROM tags WHERE source_note_id = ?"),
   };
 
   // Execute everything in one atomic transaction
@@ -253,10 +247,7 @@ export async function applyStateSync(dbId, stateUpdate) {
 
     // 7. Insert/update partial blockchain nodes
     for (let i = 0; i < serializedNodeIds.length; i++) {
-      stmts.upsertNode.run(
-        Number(serializedNodeIds[i]),
-        serializedNodes[i]
-      );
+      stmts.upsertNode.run(Number(serializedNodeIds[i]), serializedNodes[i]);
     }
 
     // 8. Delete committed note tags
@@ -274,9 +265,9 @@ export async function discardTransactions(dbId, transactions) {
     const txs = Array.from(transactions);
     if (txs.length === 0) return;
     const placeholders = txs.map(() => "?").join(",");
-    db.prepare(
-      `DELETE FROM transactions WHERE id IN (${placeholders})`
-    ).run(...txs);
+    db.prepare(`DELETE FROM transactions WHERE id IN (${placeholders})`).run(
+      ...txs
+    );
   } catch (err) {
     logWebStoreError(err, "Failed to discard transactions");
   }

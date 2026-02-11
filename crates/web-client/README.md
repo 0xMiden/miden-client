@@ -89,6 +89,54 @@ yarn test
 
 This runs a suite of integration tests to verify the SDK’s functionality in a web context.
 
+## Node.js Support
+
+The SDK also supports Node.js (20+) via a separate build in `dist-node/`. The npm package includes both browser and Node.js builds — Node.js is selected automatically via [conditional exports](https://nodejs.org/api/packages.html#conditional-exports), so the same import path works in both environments.
+
+### Using the SDK in a Node.js project
+
+```bash
+npm install @miden-sdk/miden-sdk
+```
+
+The Node.js build uses SQLite for persistence (via `better-sqlite3`) instead of IndexedDB. Set the store path before creating a client:
+
+```javascript
+import { resolve } from "node:path";
+import {
+  WebClient,
+  MockWebClient,
+  AccountStorageMode,
+  NoteType,
+} from "@miden-sdk/miden-sdk"; // automatically resolves to the Node.js build
+
+// Point the SDK at a SQLite database file
+globalThis.__MIDEN_STORE_PATH = resolve("./my-miden-store.sqlite");
+
+// For production use with a live node:
+const client = await WebClient.createClient("https://rpc.devnet.miden.io");
+await client.syncState();
+
+const wallet = await client.newWallet(AccountStorageMode.private(), true, 0);
+console.log("Wallet:", wallet.id().toString());
+
+// For offline testing with a mock chain (no RPC needed):
+const mockClient = await MockWebClient.createClient();
+await mockClient.syncState();
+```
+
+### Building the Node.js variant locally
+
+When developing the SDK itself, build the Node.js variant from `crates/web-client/`:
+
+```bash
+yarn build:node
+# or
+node scripts/build-node.mjs
+```
+
+This compiles the Rust crate to WASM and bundles it with a Node.js-compatible entry point using Rollup. The output is written to `dist-node/`.
+
 ### Building the npm package
 
 Follow the steps below to produce the contents that get published to npm (`dist/` plus the license file). All commands are executed from `crates/web-client`.

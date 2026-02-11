@@ -18,12 +18,15 @@
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { existsSync, unlinkSync } from "node:fs";
+import { loadSdk } from "./load-sdk.mjs";
 
 const RPC_URL = process.argv[2] || "https://rpc.devnet.miden.io";
-const distDir = resolve(dirname(fileURLToPath(import.meta.url)), "../../dist-node");
 
 // Set SQLite DB path for node-store (cleaned up at start)
-const SQLITE_PATH = resolve(dirname(fileURLToPath(import.meta.url)), "test-miden-store.sqlite");
+const SQLITE_PATH = resolve(
+  dirname(fileURLToPath(import.meta.url)),
+  "test-miden-store.sqlite"
+);
 if (existsSync(SQLITE_PATH)) unlinkSync(SQLITE_PATH);
 globalThis.__MIDEN_STORE_PATH = SQLITE_PATH;
 
@@ -46,14 +49,23 @@ async function sleep(ms) {
 /**
  * Wait for a transaction to be committed by polling syncState + getTransactions.
  */
-async function waitForTransaction(client, sdk, transactionIdHex, maxWaitMs = 60000) {
+async function waitForTransaction(
+  client,
+  sdk,
+  transactionIdHex,
+  maxWaitMs = 60000
+) {
   const startTime = Date.now();
   while (true) {
     if (Date.now() - startTime > maxWaitMs) {
-      throw new Error(`Timeout waiting for transaction ${transactionIdHex} after ${maxWaitMs}ms`);
+      throw new Error(
+        `Timeout waiting for transaction ${transactionIdHex} after ${maxWaitMs}ms`
+      );
     }
     await client.syncState();
-    const uncommitted = await client.getTransactions(sdk.TransactionFilter.uncommitted());
+    const uncommitted = await client.getTransactions(
+      sdk.TransactionFilter.uncommitted()
+    );
     const uncommittedIds = uncommitted.map((tx) => tx.id().toHex());
     if (!uncommittedIds.includes(transactionIdHex)) {
       return;
@@ -65,7 +77,12 @@ async function waitForTransaction(client, sdk, transactionIdHex, maxWaitMs = 600
 /**
  * Execute, prove, submit, and apply a transaction (mirrors browser helpers.executeAndApplyTransaction).
  */
-async function executeAndApplyTransaction(client, sdk, accountId, transactionRequest) {
+async function executeAndApplyTransaction(
+  client,
+  sdk,
+  accountId,
+  transactionRequest
+) {
   const result = await client.executeTransaction(accountId, transactionRequest);
   const prover = sdk.TransactionProver.newLocalProver();
   const proven = await client.proveTransaction(result, prover);
@@ -84,7 +101,7 @@ async function main() {
 
   // ── 1. Load SDK ─────────────────────────────────────────────────────────
   log("1", "Loading WASM SDK...");
-  const sdk = await import(`${distDir}/node-entry.js`);
+  const sdk = await loadSdk();
   log("1", `SDK loaded (${Object.keys(sdk).length} exports)`);
 
   // ── 2. Create client ────────────────────────────────────────────────────
@@ -101,8 +118,8 @@ async function main() {
   log("4", "Creating wallet...");
   const wallet = await client.newWallet(
     sdk.AccountStorageMode.private(),
-    true,  // mutable
-    0      // AuthScheme: Falcon512
+    true, // mutable
+    0 // AuthScheme: Falcon512
   );
   const walletId = wallet.id();
   log("4", `Wallet created: ${walletId.toString()}`);
@@ -113,11 +130,11 @@ async function main() {
   log("5", "Creating faucet...");
   const faucet = await client.newFaucet(
     sdk.AccountStorageMode.private(),
-    false,            // not non-fungible
-    "NOD",            // token symbol
-    8,                // decimals
+    false, // not non-fungible
+    "NOD", // token symbol
+    8, // decimals
     BigInt(10000000), // max supply
-    0                 // AuthScheme: Falcon512
+    0 // AuthScheme: Falcon512
   );
   const faucetId = faucet.id();
   log("5", `Faucet created: ${faucetId.toString()}`);
@@ -137,14 +154,16 @@ async function main() {
     BigInt(1000)
   );
 
-  const mintUpdate = await executeAndApplyTransaction(client, sdk, faucetId, mintRequest);
+  const mintUpdate = await executeAndApplyTransaction(
+    client,
+    sdk,
+    faucetId,
+    mintRequest
+  );
   const mintTxId = mintUpdate.executedTransaction().id().toHex();
   log("7", `Mint tx submitted: ${mintTxId}`);
 
-  const mintedNote = mintUpdate
-    .executedTransaction()
-    .outputNotes()
-    .notes()[0];
+  const mintedNote = mintUpdate.executedTransaction().outputNotes().notes()[0];
   const mintedNoteId = mintedNote.id().toString();
   log("7", `Minted note: ${mintedNoteId}`);
 
@@ -160,7 +179,12 @@ async function main() {
   const note = inputNoteRecord.toNote();
 
   const consumeRequest = client.newConsumeTransactionRequest([note]);
-  const consumeUpdate = await executeAndApplyTransaction(client, sdk, walletId, consumeRequest);
+  const consumeUpdate = await executeAndApplyTransaction(
+    client,
+    sdk,
+    walletId,
+    consumeRequest
+  );
   const consumeTxId = consumeUpdate.executedTransaction().id().toHex();
   log("9", `Consume tx submitted: ${consumeTxId}`);
 
@@ -195,10 +219,15 @@ async function main() {
     faucetId,
     sdk.NoteType.Public,
     BigInt(100),
-    undefined,  // recallHeight
-    null        // timelockHeight
+    undefined, // recallHeight
+    null // timelockHeight
   );
-  const sendUpdate = await executeAndApplyTransaction(client, sdk, walletId, sendRequest);
+  const sendUpdate = await executeAndApplyTransaction(
+    client,
+    sdk,
+    walletId,
+    sendRequest
+  );
   const sendTxId = sendUpdate.executedTransaction().id().toHex();
   const sentNoteId = sendUpdate
     .executedTransaction()
@@ -220,7 +249,12 @@ async function main() {
   const sentNote = sentNoteRecord.toNote();
 
   const consumeRequest2 = client.newConsumeTransactionRequest([sentNote]);
-  const consumeUpdate2 = await executeAndApplyTransaction(client, sdk, wallet2Id, consumeRequest2);
+  const consumeUpdate2 = await executeAndApplyTransaction(
+    client,
+    sdk,
+    wallet2Id,
+    consumeRequest2
+  );
   const consumeTxId2 = consumeUpdate2.executedTransaction().id().toHex();
   log("15", `Consume tx submitted: ${consumeTxId2}`);
 
@@ -240,8 +274,14 @@ async function main() {
   log("17", `Wallet  balance: ${walletBalance} (expected: 900)`);
   log("17", `Wallet2 balance: ${wallet2Balance} (expected: 100)`);
 
-  assert(walletBalance === BigInt(900), `wallet expected 900, got ${walletBalance}`);
-  assert(wallet2Balance === BigInt(100), `wallet2 expected 100, got ${wallet2Balance}`);
+  assert(
+    walletBalance === BigInt(900),
+    `wallet expected 900, got ${walletBalance}`
+  );
+  assert(
+    wallet2Balance === BigInt(100),
+    `wallet2 expected 100, got ${wallet2Balance}`
+  );
 
   // ── 18. List accounts ───────────────────────────────────────────────────
   log("18", "Listing accounts...");

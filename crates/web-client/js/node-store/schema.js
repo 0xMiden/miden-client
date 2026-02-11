@@ -165,8 +165,7 @@ export function getDatabase(dbId) {
  * Opens a database for the given network and registers it in the registry.
  */
 export async function openDatabase(network, clientVersion) {
-  const dbPath =
-    globalThis.__MIDEN_STORE_PATH || `./${network}.sqlite`;
+  const dbPath = globalThis.__MIDEN_STORE_PATH || `./${network}.sqlite`;
   console.log(
     `Opening database ${network} at ${dbPath} for client version ${clientVersion}...`
   );
@@ -236,8 +235,10 @@ function getStoredClientVersion(db) {
 }
 
 function persistClientVersion(db, clientVersion) {
-  db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)")
-    .run(CLIENT_VERSION_SETTING_KEY, textEncoder.encode(clientVersion));
+  db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)").run(
+    CLIENT_VERSION_SETTING_KEY,
+    textEncoder.encode(clientVersion)
+  );
 }
 
 function resetDatabase(db) {
@@ -254,5 +255,7 @@ function resetDatabase(db) {
   }
   db.exec("PRAGMA foreign_keys = ON");
   // Re-insert default state_sync row
-  db.prepare("INSERT OR IGNORE INTO state_sync (id, blockNum) VALUES (1, 0)").run();
+  db.prepare(
+    "INSERT OR IGNORE INTO state_sync (id, blockNum) VALUES (1, 0)"
+  ).run();
 }

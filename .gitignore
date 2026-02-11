@@ -19,6 +19,9 @@ crates/web-client/**/package-lock.json
 
 # Ignore Store files that may be spawned using `cargo run`
 *.sqlite3
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
 
 # Ignore mdbook build files
 book/

@@ -22,9 +22,7 @@ export async function getTransactions(dbId, filter) {
       if (ids.length > 0) {
         const placeholders = ids.map(() => "?").join(",");
         transactionRecords = db
-          .prepare(
-            `SELECT * FROM transactions WHERE id IN (${placeholders})`
-          )
+          .prepare(`SELECT * FROM transactions WHERE id IN (${placeholders})`)
           .all(...ids);
       }
     } else if (filter.startsWith(EXPIRED_BEFORE_FILTER_PREFIX)) {

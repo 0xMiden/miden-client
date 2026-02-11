@@ -25,7 +25,9 @@ try {
   for (const file of nodeStoreFiles) {
     cpSync(resolve(nodeStoreDir, file), resolve(idxdbJsDir, file));
   }
-  console.log(`   Swapped ${nodeStoreFiles.length} files: ${nodeStoreFiles.join(", ")}`);
+  console.log(
+    `   Swapped ${nodeStoreFiles.length} files: ${nodeStoreFiles.join(", ")}`
+  );
 
   // 3. Remove dist-node if it exists
   const distNodeDir = resolve(webClientDir, "dist-node");

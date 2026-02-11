@@ -31,10 +31,7 @@ export async function insertSetting(dbId, key, value) {
       "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)"
     ).run(key, value);
   } catch (error) {
-    logWebStoreError(
-      error,
-      `Error inserting setting with key: ${key}`
-    );
+    logWebStoreError(error, `Error inserting setting with key: ${key}`);
   }
 }
 

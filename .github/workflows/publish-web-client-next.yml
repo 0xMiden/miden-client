@@ -56,6 +56,7 @@ jobs:
           cd crates/web-client
           yarn install --frozen-lockfile
           yarn build
+          yarn build:node
 
       - name: Publish to npm
         if: steps.check_web_version.outputs.should_publish == 'true'

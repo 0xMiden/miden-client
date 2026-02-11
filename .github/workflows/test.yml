@@ -101,6 +101,28 @@ jobs:
       - name: Build React SDK
         run: cd ./packages/react-sdk && yarn build
 
+  test-node-web-client:
+    name: Test Node.js web client
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@main
+      - name: Install Rust
+        run: |
+          rustup update --no-self-update
+          rustup target add wasm32-unknown-unknown
+      - name: Add Rust Cache
+        uses: Swatinem/rust-cache@v2
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install dependencies
+        run: ./scripts/retry-yarn-install.sh crates/web-client
+      - name: Build Node.js SDK
+        run: cd crates/web-client && node scripts/build-node.mjs
+      - name: Run offline Node.js tests
+        run: make test-node-web-client
+
   integration-tests:
     name: Run integration tests on ubuntu-latest
     runs-on: ubuntu-latest

@@ -88,9 +88,7 @@ export async function getTrackedBlockHeaders(dbId) {
     return rows.map((record) => ({
       blockNum: record.blockNum,
       header: uint8ArrayToBase64(record.header),
-      partialBlockchainPeaks: uint8ArrayToBase64(
-        record.partialBlockchainPeaks
-      ),
+      partialBlockchainPeaks: uint8ArrayToBase64(record.partialBlockchainPeaks),
       hasClientNotes: true,
     }));
   } catch (err) {
@@ -102,7 +100,9 @@ export async function getPartialBlockchainPeaksByBlockNum(dbId, blockNum) {
   try {
     const db = getDatabase(dbId);
     const record = db
-      .prepare("SELECT partialBlockchainPeaks FROM block_headers WHERE blockNum = ?")
+      .prepare(
+        "SELECT partialBlockchainPeaks FROM block_headers WHERE blockNum = ?"
+      )
       .get(blockNum);
 
     if (!record) {
@@ -162,10 +162,7 @@ export async function getPartialBlockchainNodesUpToInOrderIndex(
       .prepare("SELECT * FROM partial_blockchain_nodes WHERE id <= ?")
       .all(maxNumericId);
   } catch (err) {
-    logWebStoreError(
-      err,
-      "Failed to get partial blockchain nodes up to index"
-    );
+    logWebStoreError(err, "Failed to get partial blockchain nodes up to index");
   }
 }
 

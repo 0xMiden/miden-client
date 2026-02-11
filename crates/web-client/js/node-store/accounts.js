@@ -133,10 +133,7 @@ export async function getAccountCode(dbId, codeRoot) {
       code: uint8ArrayToBase64(record.code),
     };
   } catch (error) {
-    logWebStoreError(
-      error,
-      `Error fetching account code for root ${codeRoot}`
-    );
+    logWebStoreError(error, `Error fetching account code for root ${codeRoot}`);
   }
 }
 
@@ -144,7 +141,9 @@ export async function getAccountStorage(dbId, storageCommitment) {
   try {
     const db = getDatabase(dbId);
     const rows = db
-      .prepare("SELECT slotName, slotValue, slotType FROM account_storage WHERE commitment = ?")
+      .prepare(
+        "SELECT slotName, slotValue, slotType FROM account_storage WHERE commitment = ?"
+      )
       .all(storageCommitment);
 
     return rows.map((record) => ({
@@ -201,7 +200,9 @@ export async function getAccountAuthByPubKeyCommitment(
 ) {
   const db = getDatabase(dbId);
   const record = db
-    .prepare("SELECT secretKeyHex FROM account_auth WHERE pubKeyCommitmentHex = ?")
+    .prepare(
+      "SELECT secretKeyHex FROM account_auth WHERE pubKeyCommitmentHex = ?"
+    )
     .get(pubKeyCommitmentHex);
 
   if (!record) {
@@ -320,9 +321,9 @@ export async function upsertAccountRecord(
       commitment,
       accountSeed || null
     );
-    db.prepare(
-      "INSERT OR REPLACE INTO tracked_accounts (id) VALUES (?)"
-    ).run(accountId);
+    db.prepare("INSERT OR REPLACE INTO tracked_accounts (id) VALUES (?)").run(
+      accountId
+    );
   } catch (error) {
     logWebStoreError(error, `Error inserting account: ${accountId}`);
   }

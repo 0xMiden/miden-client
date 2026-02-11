@@ -50,9 +50,7 @@ export async function getInputNotesFromIds(dbId, noteIds) {
     if (ids.length === 0) return [];
     const placeholders = ids.map(() => "?").join(",");
     const rows = db
-      .prepare(
-        `SELECT * FROM input_notes WHERE noteId IN (${placeholders})`
-      )
+      .prepare(`SELECT * FROM input_notes WHERE noteId IN (${placeholders})`)
       .all(...ids);
     return processInputNotes(db, rows);
   } catch (err) {
@@ -67,9 +65,7 @@ export async function getInputNotesFromNullifiers(dbId, nullifiers) {
     if (nulls.length === 0) return [];
     const placeholders = nulls.map(() => "?").join(",");
     const rows = db
-      .prepare(
-        `SELECT * FROM input_notes WHERE nullifier IN (${placeholders})`
-      )
+      .prepare(`SELECT * FROM input_notes WHERE nullifier IN (${placeholders})`)
       .all(...nulls);
     return processInputNotes(db, rows);
   } catch (err) {
@@ -101,9 +97,7 @@ export async function getOutputNotesFromIds(dbId, noteIds) {
     if (ids.length === 0) return [];
     const placeholders = ids.map(() => "?").join(",");
     const rows = db
-      .prepare(
-        `SELECT * FROM output_notes WHERE noteId IN (${placeholders})`
-      )
+      .prepare(`SELECT * FROM output_notes WHERE noteId IN (${placeholders})`)
       .all(...ids);
     return processOutputNotes(rows);
   } catch (err) {
@@ -215,7 +209,9 @@ function processInputNotes(db, notes) {
     let serializedNoteScriptBase64 = undefined;
     if (note.scriptRoot) {
       const scriptRecord = db
-        .prepare("SELECT serializedNoteScript FROM notes_scripts WHERE scriptRoot = ?")
+        .prepare(
+          "SELECT serializedNoteScript FROM notes_scripts WHERE scriptRoot = ?"
+        )
         .get(note.scriptRoot);
       if (scriptRecord && scriptRecord.serializedNoteScript) {
         serializedNoteScriptBase64 = uint8ArrayToBase64(

@@ -10,15 +10,26 @@
   "browser": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./dist/index.js"
+    ".": {
+      "node": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist-node/node-entry.js"
+      },
+      "default": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js"
+      }
+    }
   },
   "files": [
     "dist",
+    "dist-node",
     "../LICENSE.md"
   ],
   "scripts": {
     "build-rust-client-js": "cd ../idxdb-store/src/ && yarn && yarn build",
     "build": "rimraf dist && npm run build-rust-client-js && cross-env RUSTFLAGS=\"--cfg getrandom_backend=\\\"wasm_js\\\"\" rollup -c rollup.config.js && cpr js/types dist && node clean.js",
+    "build:node": "node scripts/build-node.mjs",
     "build-dev": "npm install && MIDEN_WEB_DEV=true npm run build",
     "check:wasm-types": "node ./scripts/check-bindgen-types.js",
     "test": "yarn playwright install --with-deps && yarn playwright test",
