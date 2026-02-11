@@ -7,13 +7,13 @@ use miden_client::note::{
     Note,
     NoteConsumability,
     NoteConsumptionStatus,
-    NoteInputs,
     NoteMetadata,
-    WellKnownNote,
+    NoteStorage,
+    StandardNote,
     get_input_note_with_id_prefix,
 };
 use miden_client::store::{InputNoteRecord, NoteFilter as ClientNoteFilter, OutputNoteRecord};
-use miden_client::{Client, ClientError, IdPrefixFetchError, PrettyPrint};
+use miden_client::{Client, ClientError, IdPrefixFetchError, PrettyPrint, Word};
 
 use crate::errors::CliError;
 use crate::utils::{load_faucet_details_map, parse_account_id};
@@ -193,7 +193,7 @@ async fn show_note<AUTH: TransactionAuthenticator + Sync>(
 
     let CliNoteSummary {
         id,
-        mut script_root,
+        script_root,
         assets_commitment,
         inputs_commitment,
         serial_num,
@@ -205,17 +205,15 @@ async fn show_note<AUTH: TransactionAuthenticator + Sync>(
     } = note_summary(input_note_record.as_ref(), output_note_record.as_ref());
     table.add_row(vec![Cell::new("ID"), Cell::new(id)]);
 
-    match script_root {
-        ref p2id_root if p2id_root == &WellKnownNote::P2ID.script_root().to_string() => {
-            script_root += " (P2ID)";
-        },
-        ref p2ide_root if p2ide_root == &WellKnownNote::P2IDE.script_root().to_string() => {
-            script_root += " (P2IDE)";
-        },
-        ref swap_root if swap_root == &WellKnownNote::SWAP.script_root().to_string() => {
-            script_root += " (SWAP)";
-        },
-        _ => {},
+    // Identify if this is a standard note type by script root
+    let script_root_word = match (&input_note_record, &output_note_record) {
+        (Some(record), _) => Some(record.details().script().root()),
+        (_, Some(record)) => record.recipient().map(|r| r.script().root()),
+        _ => None,
+    };
+
+    if let Some(standard_note_name) = script_root_word.and_then(identify_standard_note) {
+        table.add_row(vec![Cell::new("Standard Note"), Cell::new(standard_note_name)]);
     }
 
     table.add_row(vec![Cell::new("Script Root"), Cell::new(script_root)]);
@@ -233,10 +231,10 @@ async fn show_note<AUTH: TransactionAuthenticator + Sync>(
     let inputs = match (&input_note_record, &output_note_record) {
         (Some(record), _) => {
             let details = record.details();
-            Some(details.inputs().values().to_vec())
+            Some(details.storage().items().to_vec())
         },
         (_, Some(record)) => {
-            record.recipient().map(|recipient| recipient.inputs().values().to_vec())
+            record.recipient().map(|recipient| recipient.storage().items().to_vec())
         },
         (None, None) => {
             panic!("One of the two records should be Some")
@@ -280,7 +278,7 @@ async fn show_note<AUTH: TransactionAuthenticator + Sync>(
     println!("{table}");
 
     if let Some(inputs) = inputs {
-        let inputs = NoteInputs::new(inputs.clone()).map_err(ClientError::NoteError)?;
+        let inputs = NoteStorage::new(inputs.clone()).map_err(ClientError::NoteError)?;
         let mut table = create_dynamic_table(&["Note Inputs"]);
         table
             .load_preset(presets::UTF8_HORIZONTAL_ONLY)
@@ -290,7 +288,7 @@ async fn show_note<AUTH: TransactionAuthenticator + Sync>(
             Cell::new("Value").add_attribute(Attribute::Bold),
         ]);
 
-        inputs.values().iter().enumerate().for_each(|(idx, input)| {
+        inputs.items().iter().enumerate().for_each(|(idx, input)| {
             table.add_row(vec![Cell::new(idx).add_attribute(Attribute::Bold), Cell::new(input)]);
         });
         println!("{table}");
@@ -425,7 +423,6 @@ fn note_record_type(note_record_metadata: Option<&NoteMetadata>) -> String {
     match note_record_metadata {
         Some(metadata) => match metadata.note_type() {
             miden_client::note::NoteType::Private => "Private",
-            miden_client::note::NoteType::Encrypted => "Encrypted",
             miden_client::note::NoteType::Public => "Public",
         },
         None => "-",
@@ -453,7 +450,7 @@ fn note_summary(
             (Some(record), _) => {
                 let details = record.details();
                 (
-                    details.inputs().commitment().to_string(),
+                    details.storage().commitment().to_string(),
                     details.serial_num().to_string(),
                     details.script().root().to_string(),
                 )
@@ -461,7 +458,7 @@ fn note_summary(
             (None, Some(record)) if record.recipient().is_some() => {
                 let recipient = record.recipient().expect("output record should have recipient");
                 (
-                    recipient.inputs().commitment().to_string(),
+                    recipient.storage().commitment().to_string(),
                     recipient.serial_num().to_string(),
                     recipient.script().root().to_string(),
                 )
@@ -502,5 +499,18 @@ fn note_summary(
         tag: note_tag_str,
         sender: note_sender_str,
         exportable: output_note_record.is_some(),
+    }
+}
+
+/// Identifies if a note with the given script root is a standard note type.
+/// Returns the name of the standard note type if found, or `None` if not a standard note.
+fn identify_standard_note(script_root: Word) -> Option<&'static str> {
+    match script_root {
+        sr if sr == StandardNote::P2ID.script_root() => Some("P2ID"),
+        sr if sr == StandardNote::P2IDE.script_root() => Some("P2IDE"),
+        sr if sr == StandardNote::SWAP.script_root() => Some("SWAP"),
+        sr if sr == StandardNote::MINT.script_root() => Some("MINT"),
+        sr if sr == StandardNote::BURN.script_root() => Some("BURN"),
+        _ => None,
     }
 }

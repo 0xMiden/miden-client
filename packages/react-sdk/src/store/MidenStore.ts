@@ -31,7 +31,7 @@ interface MidenStoreState {
   isLoadingNotes: boolean;
 
   // Actions
-  setClient: (client: WebClient) => void;
+  setClient: (client: WebClient | null) => void;
   setInitializing: (isInitializing: boolean) => void;
   setInitError: (error: Error | null) => void;
   setConfig: (config: MidenConfig) => void;
@@ -82,7 +82,7 @@ export const useMidenStore = create<MidenStoreState>()((set) => ({
   setClient: (client) =>
     set({
       client,
-      isReady: true,
+      isReady: client !== null,
       isInitializing: false,
       initError: null,
     }),

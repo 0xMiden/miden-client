@@ -10,14 +10,6 @@ Visibility level for note contents when published to the network.
 
 ## Enumeration Members
 
-### Encrypted
-
-> **Encrypted**: `3`
-
-Notes with this type are shared with the network encrypted.
-
-***
-
 ### Private
 
 > **Private**: `2`
