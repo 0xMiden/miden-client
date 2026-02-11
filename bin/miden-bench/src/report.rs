@@ -56,13 +56,7 @@ pub fn print_results(results: &[BenchmarkResult], title: &str, total_duration: D
 
 fn format_duration(d: Duration) -> String {
     let ms = d.as_secs_f64() * 1000.0;
-    if ms < 1.0 {
-        format!("{:.2}us", d.as_nanos() as f64 / 1000.0)
-    } else if ms < 1000.0 {
-        format!("{ms:.2}ms")
-    } else {
-        format!("{:.2}s", d.as_secs_f64())
-    }
+    format!("{ms:.2}ms")
 }
 
 pub fn format_size(bytes: usize) -> String {

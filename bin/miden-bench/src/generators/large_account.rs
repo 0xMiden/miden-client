@@ -2,21 +2,7 @@
 
 use std::fmt::Write;
 
-use miden_client::assembly::CodeBuilder;
 use miden_protocol::Felt;
-use miden_protocol::account::auth::AuthSecretKey;
-use miden_protocol::account::{
-    Account,
-    AccountBuilder,
-    AccountComponent,
-    AccountStorageMode,
-    AccountType,
-    StorageMap,
-    StorageSlot,
-    StorageSlotName,
-};
-use miden_standards::account::auth::AuthFalcon512Rpo;
-use miden_standards::account::components::basic_wallet_library;
 use rand::Rng;
 use rand_chacha::ChaCha20Rng;
 use rand_chacha::rand_core::SeedableRng;
@@ -33,57 +19,44 @@ pub struct SlotDescriptor {
     pub is_map: bool,
 }
 
-/// Configuration for generating large accounts
+#[cfg(test)]
+use miden_client::assembly::CodeBuilder;
+#[cfg(test)]
+use miden_protocol::account::auth::AuthSecretKey;
+#[cfg(test)]
+use miden_protocol::account::{
+    Account,
+    AccountBuilder,
+    AccountComponent,
+    AccountStorageMode,
+    AccountType,
+    StorageMap,
+    StorageSlot,
+    StorageSlotName,
+};
+#[cfg(test)]
+use miden_standards::account::auth::AuthFalcon512Rpo;
+#[cfg(test)]
+use miden_standards::account::components::basic_wallet_library;
+
+/// Configuration for generating large accounts (used in tests)
+#[cfg(test)]
 #[derive(Clone, Debug)]
-pub struct LargeAccountConfig {
-    /// Number of entries per storage map
-    pub num_storage_map_entries: usize,
-    /// Number of map-type storage slots
-    pub num_map_slots: usize,
-    /// Seed for deterministic generation
-    pub seed: [u8; 32],
+struct LargeAccountConfig {
+    num_storage_map_entries: usize,
+    num_map_slots: usize,
+    seed: [u8; 32],
 }
 
+#[cfg(test)]
 impl LargeAccountConfig {
-    /// Creates a new configuration with the specified number of maps and entries per map
-    pub fn new(maps: usize, entries_per_map: usize) -> Self {
-        let mut rng = rand::rng();
-        let mut seed = [0u8; 32];
-        rng.fill(&mut seed);
-
+    fn with_seed(maps: usize, entries_per_map: usize, seed: [u8; 32]) -> Self {
         Self {
             num_storage_map_entries: entries_per_map,
             num_map_slots: maps,
             seed,
         }
     }
-
-    /// Creates a new configuration with a specific seed (for deterministic generation)
-    #[allow(dead_code)]
-    pub fn with_seed(maps: usize, entries_per_map: usize, seed: [u8; 32]) -> Self {
-        Self {
-            num_storage_map_entries: entries_per_map,
-            num_map_slots: maps,
-            seed,
-        }
-    }
-
-    /// Returns the total number of storage entries
-    pub fn total_entries(&self) -> usize {
-        self.num_map_slots * self.num_storage_map_entries
-    }
-}
-
-/// Generates a deterministic seed from an index
-#[allow(dead_code)]
-pub fn generate_deterministic_seed(index: u32) -> [u8; 32] {
-    let mut seed = [0u8; 32];
-    let bytes = index.to_le_bytes();
-    seed[0..4].copy_from_slice(&bytes);
-    seed[4..8].copy_from_slice(&bytes);
-    seed[8..12].copy_from_slice(&bytes);
-    seed[12..16].copy_from_slice(&bytes);
-    seed
 }
 
 /// Generates MASM code for a storage reader component with procedures for each slot.
@@ -136,10 +109,9 @@ end
     code
 }
 
-/// Creates a large account with the specified configuration
-pub fn create_large_account(
-    config: &LargeAccountConfig,
-) -> anyhow::Result<(Account, AuthSecretKey)> {
+/// Creates a large account with the specified configuration (used in tests)
+#[cfg(test)]
+fn create_large_account(config: &LargeAccountConfig) -> anyhow::Result<(Account, AuthSecretKey)> {
     let sk = AuthSecretKey::new_falcon512_rpo_with_rng(&mut ChaCha20Rng::from_seed(config.seed));
 
     // Create storage map slots
@@ -205,8 +177,9 @@ pub fn slot_rng(seed: u32) -> ChaCha20Rng {
     ChaCha20Rng::from_seed(rng_seed)
 }
 
-/// Creates a storage slot with many map entries
-pub fn create_large_storage_slot(name: &str, num_entries: usize, seed: u32) -> StorageSlot {
+/// Creates a storage slot with many map entries (used in tests)
+#[cfg(test)]
+fn create_large_storage_slot(name: &str, num_entries: usize, seed: u32) -> StorageSlot {
     let mut rng = slot_rng(seed);
 
     let map_entries: Vec<_> = (0..num_entries as u32)

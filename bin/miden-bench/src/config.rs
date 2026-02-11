@@ -9,12 +9,15 @@ pub struct BenchConfig {
     pub network: Endpoint,
     /// Number of benchmark iterations
     pub iterations: usize,
+    /// Optional persistent store directory. When set, deploy saves the store here
+    /// and transaction reuses it instead of creating temporary directories.
+    pub store_path: Option<PathBuf>,
 }
 
 impl BenchConfig {
     /// Creates a new benchmark configuration
-    pub fn new(network: Endpoint, iterations: usize) -> Self {
-        Self { network, iterations }
+    pub fn new(network: Endpoint, iterations: usize, store_path: Option<PathBuf>) -> Self {
+        Self { network, iterations, store_path }
     }
 
     /// Returns a temporary directory for benchmark artifacts

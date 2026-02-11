@@ -30,14 +30,22 @@ fn create_temp_dir(config: &BenchConfig, suffix: &str) -> PathBuf {
     path
 }
 
-// Helper to create a client for benchmarking
+/// Creates a client using either the persistent store directory or a fresh temporary one.
+///
+/// When `config.store_path` is set, the client reuses the existing `SQLite` store and
+/// keystore from that directory (populated by `deploy`). Otherwise a new temp directory
+/// is created per call.
 async fn create_benchmark_client(
     config: &BenchConfig,
     suffix: &str,
 ) -> anyhow::Result<(miden_client::Client<FilesystemKeyStore>, FilesystemKeyStore, PathBuf)> {
-    let temp_dir = create_temp_dir(config, suffix);
-    let store_path = temp_dir.join("store.sqlite3");
-    let keystore_path = temp_dir.join("keystore");
+    let data_dir = if let Some(ref store_path) = config.store_path {
+        store_path.clone()
+    } else {
+        create_temp_dir(config, suffix)
+    };
+    let store_path = data_dir.join("store.sqlite3");
+    let keystore_path = data_dir.join("keystore");
     std::fs::create_dir_all(&keystore_path)?;
 
     let mut rng = rand::rng();
@@ -57,7 +65,7 @@ async fn create_benchmark_client(
         .build()
         .await?;
 
-    Ok((client, keystore, temp_dir))
+    Ok((client, keystore, data_dir))
 }
 
 // DATA MODEL
@@ -137,9 +145,15 @@ pub async fn run_transaction_benchmarks(
     let chain_height = client.get_sync_height().await?;
     println!("Connected successfully. Chain height: {chain_height}");
 
-    // Import the public account from the network
-    println!("Importing account {account_id}...");
-    client.import_account_by_id(account_id).await?;
+    // Import the public account from the network (skip if already present in a persistent store)
+    let has_account =
+        config.store_path.is_some() && client.get_account_storage(account_id).await.is_ok();
+    if has_account {
+        println!("Using account {account_id} from persistent store");
+    } else {
+        println!("Importing account {account_id}...");
+        client.import_account_by_id(account_id).await?;
+    }
 
     // Detect storage slots and build slot info.
     let storage = client.get_account_storage(account_id).await?;
@@ -182,7 +196,9 @@ pub async fn run_transaction_benchmarks(
 
     // Measure proven transaction size upfront (execute + prove one tx)
     if let Some(ref sk) = secret_key {
-        keystore.add_key(sk)?;
+        if config.store_path.is_none() {
+            keystore.add_key(sk)?;
+        }
         let tx_request = build_chunk_tx_request(&client, &chunks[0], &slot_infos)?;
         let tx_result = client.execute_transaction(account_id, tx_request).await?;
         let proven_tx = client.prove_transaction(&tx_result).await?;
@@ -425,6 +441,8 @@ async fn benchmark_tx_execution(
 
     let mut result = BenchmarkResult::new(bench_name("execute", total_reads, num_chunks));
 
+    let use_persistent = config.store_path.is_some();
+
     for i in 0..config.iterations {
         let iter_t = Instant::now();
 
@@ -432,10 +450,12 @@ async fn benchmark_tx_execution(
             create_benchmark_client(config, &format!("tx-exec-iter-{i}")).await?;
         client.sync_state().await?;
 
-        // Import the account and add the signing key (if available)
-        client.import_account_by_id(account_id).await?;
-        if let Some(sk) = secret_key {
-            keystore.add_key(sk)?;
+        // When using a persistent store the account and key are already present
+        if !use_persistent {
+            client.import_account_by_id(account_id).await?;
+            if let Some(sk) = secret_key {
+                keystore.add_key(sk)?;
+            }
         }
 
         let mut total_duration = Duration::ZERO;
@@ -488,6 +508,7 @@ async fn benchmark_tx_proving(
     let num_chunks = chunks.len();
 
     let mut result = BenchmarkResult::new(bench_name("prove", total_reads, num_chunks));
+    let use_persistent = config.store_path.is_some();
 
     for i in 0..config.iterations {
         let iter_t = Instant::now();
@@ -496,9 +517,11 @@ async fn benchmark_tx_proving(
             create_benchmark_client(config, &format!("tx-prove-iter-{i}")).await?;
         client.sync_state().await?;
 
-        // Import the account and add the signing key
-        client.import_account_by_id(account_id).await?;
-        keystore.add_key(secret_key)?;
+        // When using a persistent store the account and key are already present
+        if !use_persistent {
+            client.import_account_by_id(account_id).await?;
+            keystore.add_key(secret_key)?;
+        }
 
         let mut total_duration = Duration::ZERO;
 
@@ -558,6 +581,7 @@ async fn benchmark_tx_full(
     let num_chunks = chunks.len();
 
     let mut result = BenchmarkResult::new(bench_name("full", total_reads, num_chunks));
+    let use_persistent = config.store_path.is_some();
 
     for i in 0..config.iterations {
         let iter_t = Instant::now();
@@ -570,8 +594,10 @@ async fn benchmark_tx_full(
                 create_benchmark_client(config, &format!("tx-full-iter-{i}-chunk-{chunk_idx}"))
                     .await?;
             client.sync_state().await?;
-            client.import_account_by_id(account_id).await?;
-            keystore.add_key(secret_key)?;
+            if !use_persistent {
+                client.import_account_by_id(account_id).await?;
+                keystore.add_key(secret_key)?;
+            }
 
             let tx_request = build_chunk_tx_request(&client, chunk, slot_infos)?;
 
@@ -583,9 +609,11 @@ async fn benchmark_tx_full(
 
             total_duration += duration;
 
-            // Wait for the block to advance before the next chunk so the
-            // node has the updated nonce when we submit the next transaction.
-            if chunk_idx < num_chunks - 1 {
+            // Wait for the block to advance after every submission so the node
+            // has processed the transaction before the next chunk or iteration.
+            // Skip only after the very last submission of the entire benchmark.
+            let is_last = i == config.iterations - 1 && chunk_idx == num_chunks - 1;
+            if !is_last {
                 wait_for_block_advancement(&mut client).await?;
             }
         }

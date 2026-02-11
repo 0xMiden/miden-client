@@ -5,12 +5,6 @@ Benchmarking tool for the Miden client library. This binary measures performance
 ## Installation
 
 ```bash
-cargo install miden-client-bench
-```
-
-### From source
-
-```bash
 # Using make
 make install-bench
 
@@ -24,26 +18,38 @@ After installation, the `miden-bench` binary will be available in your PATH.
 
 ### `deploy`
 
-Deploys a public wallet with configurable storage to the network. This is a prerequisite for running `transaction` benchmarks.
+Deploys a public wallet with empty storage maps to the network. This is the first step in preparing an account for benchmarking. Storage maps are created empty; use `expand` to fill them with entries.
 
 ```bash
-miden-bench --network localhost deploy --maps 2 --entries-per-map 50
+miden-bench --network localhost deploy --maps 2
 ```
 
-The command outputs the account ID and seed, along with a ready-to-copy `transaction` command:
+The command outputs the account ID, seed, and a ready-to-copy `expand` command:
 
 ```
 Account ID: 0xabcdef1234567890...
 Seed: 0123456789abcdef...
 
-Run benchmarks with:
-  miden-bench transaction --account-id 0xabcdef1234567890 --seed 0123456789abcdef... --entries-per-map 50
+Expand storage with:
+  miden-bench expand --account-id 0xabcdef1234567890 --seed 0123456789abcdef... --map-idx 0 --offset 0 --count 100
 ```
 
-**Deployment modes:**
+### `expand`
 
-- **Single transaction** (≤200 total entries): all storage entries are included in the initial account.
-- **Two-phase** (>200 total entries): deploys an account with map entries, then expands storage via batched transactions. Storage map values are random.
+Fills entries into a specific storage map of a deployed account. The account must have been deployed with `deploy` first, which installs the expansion procedures needed to write entries.
+
+```bash
+miden-bench expand --account-id 0x... --seed <hex> --map-idx 0 --offset 0 --count 200
+```
+
+Entries are batched into transactions of up to 280 entries each. Keys and values are generated deterministically from the map index and entry offset, so repeated runs with the same parameters produce the same data.
+
+To fill multiple maps, run `expand` once per map:
+
+```bash
+miden-bench expand --account-id 0x... --seed <hex> --map-idx 0 --offset 0 --count 100
+miden-bench expand --account-id 0x... --seed <hex> --map-idx 1 --offset 0 --count 100
+```
 
 ### `transaction`
 
@@ -53,20 +59,28 @@ Benchmarks transaction operations that read storage from an account (requires a 
 - **prove** - Measures transaction proving time and proof size
 - **full** - Measures full transaction (execute + prove + submit)
 
-The benchmark executes transactions that read all storage map entries from the specified account. Accounts deployed to the network via `deploy` can test `execute`, `prove` and `full`, while other type of accounts may only measure `execute` times.
+The benchmark executes transactions that read all storage map entries from the specified account. Accounts deployed to the network via `deploy` can test `execute`, `prove` and `full`, while other types of accounts may only measure `execute` times.
 
-The number of storage maps is auto-detected from the account. The `--entries-per-map` flag controls how many entries per map are read:
-
-- **Small accounts** (single-tx deployment, ≤200 entries): `--entries-per-map` can be omitted — entries are read directly from the imported account.
-- **Large accounts** (two-phase deployment, >200 entries): `--entries-per-map` is required. The node's import RPC only returns the initial component entries, not entries added by expansion transactions. The `deploy` command prints the correct value in its suggested command.
+The number of storage maps is auto-detected from the account.
 
 ```bash
-# First deploy an account with storage
-miden-bench --network localhost deploy --maps 2 --entries-per-map 50
-# Copy the transaction command from the output
+miden-bench --network localhost transaction --account-id 0x... --seed <hex>
+```
 
-# Then benchmark transactions against it
-miden-bench --network localhost transaction --account-id 0x... --seed <hex> --entries-per-map 50
+## Workflow
+
+The typical workflow is: **deploy** -> **expand** -> **transaction**.
+
+```bash
+# 1. Deploy an account with 2 empty storage maps
+miden-bench --network localhost deploy --maps 2
+
+# 2. Fill each map with entries (copy account-id and seed from deploy output)
+miden-bench expand --account-id 0x... --seed <hex> --map-idx 0 --offset 0 --count 100
+miden-bench expand --account-id 0x... --seed <hex> --map-idx 1 --offset 0 --count 100
+
+# 3. Benchmark transactions against the account
+miden-bench transaction --account-id 0x... --seed <hex>
 ```
 
 ## Global Options
@@ -99,47 +113,55 @@ export MIDEN_NETWORK=devnet
 miden-bench deploy
 ```
 
-### Iterations (`-i, --iterations`)
+### Persistent Store (`--store`)
 
-Number of measured iterations per benchmark. Default: 5.
-
-```bash
-miden-bench --iterations 20 transaction --account-id 0x... --seed <hex>
-```
-
-### Deploy Options
-
-- `-m, --maps <N>` - Number of storage maps in the account (default: 1)
-- `-e, --entries-per-map <N>` - Number of key/value entries per storage map (default: 10)
+Path to a directory for persistent store data. When provided, `deploy` and `expand` save the SQLite store and keystore in this directory (instead of a temporary one), and `transaction` reuses it — skipping the account import from the node on each iteration.
 
 ```bash
-# Deploy account with 3 storage maps, each with 100 entries (300 total)
-miden-bench deploy --maps 3 --entries-per-map 100
+# Deploy with a persistent store
+miden-bench --store ./bench-data deploy --maps 2
+
+# Expand using the same store
+miden-bench --store ./bench-data expand --account-id 0x... --seed <hex> --map-idx 0 --offset 0 --count 100
+
+# Reuse the store for benchmarks (no re-import needed)
+miden-bench --store ./bench-data transaction --account-id 0x... --seed <hex>
 ```
 
-### Transaction Options
+When omitted, temporary directories are used and cleaned up automatically (the default behavior).
+
+### Command Options
+
+#### Deploy
+
+- `-m, --maps <N>` - Number of empty storage maps in the account (1-100, default: 1)
+
+```bash
+# Deploy account with 3 empty storage maps
+miden-bench deploy --maps 3
+```
+
+#### Expand
+
+- `-a, --account-id <ID>` - Public account ID to expand (required, hex format)
+- `-s, --seed <HEX>` - Account seed for signing (required, hex-encoded 32 bytes, output by `deploy`)
+- `-m, --map-idx <N>` - Storage map index to fill (0-based, must be less than the deploy `--maps` count)
+- `-o, --offset <N>` - Starting entry offset (0-based)
+- `-c, --count <N>` - Number of entries to add starting from offset
+
+#### Transaction
 
 - `-a, --account-id <ID>` - Public account ID to benchmark against (required, hex format)
 - `-s, --seed <HEX>` - Account seed for signing (hex-encoded 32 bytes, output by `deploy`). When omitted, only execution is benchmarked (no proving or submission).
-- `-e, --entries-per-map <N>` - Entries per map (required for two-phase deployed accounts, optional for small accounts)
 - `-r, --reads <N>` - Maximum storage reads per transaction. When total entries exceed this limit, reads are split across multiple transactions per benchmark iteration. Each iteration's time is the sum across all transactions. When omitted, all entries are read in a single transaction.
-
-## Examples
-
-### Full workflow: deploy and benchmark
-
-```bash
-# Deploy an account with 2 maps of 100 entries each
-miden-bench --network localhost deploy --maps 2 --entries-per-map 100
-
-# Copy the transaction command from the output and run it
-miden-bench --network localhost transaction --account-id 0x... --seed <hex> --entries-per-map 100
-```
+- `-i, --iterations <N>` - Number of benchmark iterations (default: 5)
 
 ## Metrics
 
-Each benchmark reports:
+Each benchmark reports a table with columns:
 
 - **Mean** - Average duration across all iterations
-- **Min/Max** - Range of observed values
-- **Output Size** - Size in bytes (for proving benchmarks)
+- **Min** - Fastest iteration
+- **Max** - Slowest iteration
+
+Proving benchmarks also display the proof output size alongside the benchmark name.

@@ -57,19 +57,11 @@ fn maps_option() {
     cmd.assert().success();
 }
 
-/// Tests that entries-per-map option is recognized
+/// Tests that maps option works with a specific value
 #[test]
-fn entries_per_map_option() {
+fn maps_option_with_value() {
     let mut cmd = cargo_bin_cmd!("miden-bench");
-    cmd.args(["deploy", "--entries-per-map", "50", "--help"]);
-    cmd.assert().success();
-}
-
-/// Tests that both storage options work together
-#[test]
-fn storage_options_combined() {
-    let mut cmd = cargo_bin_cmd!("miden-bench");
-    cmd.args(["deploy", "--maps", "2", "--entries-per-map", "100", "--help"]);
+    cmd.args(["deploy", "--maps", "5", "--help"]);
     cmd.assert().success();
 }
 
@@ -81,11 +73,11 @@ fn maps_option_invalid() {
     cmd.assert().failure();
 }
 
-/// Tests that iterations option is recognized (global)
+/// Tests that iterations option is recognized (transaction subcommand)
 #[test]
 fn iterations_option() {
     let mut cmd = cargo_bin_cmd!("miden-bench");
-    cmd.args(["--iterations", "5", "deploy", "--help"]);
+    cmd.args(["transaction", "--iterations", "5", "--help"]);
     cmd.assert().success();
 }
 

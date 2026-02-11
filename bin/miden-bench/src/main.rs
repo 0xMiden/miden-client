@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use std::str::FromStr;
 use std::time::Instant;
 
@@ -7,88 +8,106 @@ use miden_client::rpc::Endpoint;
 mod benchmarks;
 mod config;
 mod deploy;
+mod expand;
 mod generators;
 mod metrics;
 mod report;
 mod runner;
-mod spinner;
 
 use config::BenchConfig;
 use metrics::BenchmarkResult;
 use runner::BenchmarkRunner;
 
+const DEFAULT_ITERATION_COUNT: usize = 5;
+
 // MAIN
 // ================================================================================================
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let args = CliArgs::parse();
 
-    let rt = tokio::runtime::Runtime::new().expect("Failed to create tokio runtime");
-
-    // Handle deploy command separately (not a benchmark)
-    if let Command::Deploy(deploy_args) = &args.command {
-        let result = rt.block_on(async {
-            Box::pin(deploy::deploy_account(
+    match args.command {
+        Command::Deploy(deploy_args) => {
+            let result = Box::pin(deploy::deploy_account(
                 &args.network.to_endpoint(),
                 deploy_args.maps,
-                deploy_args.entries_per_map,
+                args.store.as_deref(),
             ))
-            .await
-        });
+            .await;
 
-        match result {
-            Ok((account_id, seed)) => {
-                let seed_hex = hex::encode(seed);
-                println!("Account ID: {account_id}");
-                println!("Seed: {seed_hex}");
-                println!();
-                println!("Run benchmarks with:");
-                println!("  miden-bench transaction --account-id {account_id} --seed {seed_hex}");
-            },
-            Err(e) => {
-                eprintln!("Deploy failed: {e:?}");
-                std::process::exit(1);
-            },
-        }
-        return;
-    }
-
-    let start_time = Instant::now();
-    let results = rt.block_on(async { Box::pin(run_benchmarks(&args)).await });
-
-    let total_duration = start_time.elapsed();
-
-    let title = match &args.command {
-        Command::Transaction(_) => "Transaction Benchmark",
-        Command::Deploy(_) => unreachable!(),
-    };
-
-    match results {
-        Ok(results) => {
-            report::print_results(&results, title, total_duration);
+            match result {
+                Ok((account_id, seed)) => {
+                    let seed_hex = hex::encode(seed);
+                    let store_flag =
+                        args.store.as_ref().map_or(String::new(), |s| format!(" --store {s}"));
+                    println!();
+                    println!("Expand storage with:");
+                    println!(
+                        "  miden-bench{store_flag} expand --account-id {account_id} --seed {seed_hex} --map-idx 0 --offset 0 --count 100"
+                    );
+                },
+                Err(e) => {
+                    panic!("Deploy failed: {e:?}");
+                },
+            }
         },
-        Err(e) => {
-            eprintln!("Benchmark failed: {e:?}");
-            std::process::exit(1);
+        Command::Expand(expand_args) => {
+            let result = Box::pin(expand::expand_storage(
+                &args.network.to_endpoint(),
+                &expand_args.account_id,
+                &expand_args.seed,
+                expand_args.map_idx,
+                expand_args.offset,
+                expand_args.count,
+                args.store.as_deref(),
+            ))
+            .await;
+
+            match result {
+                Ok(()) => {
+                    println!();
+                    println!("Run benchmarks with:");
+                    let store_flag =
+                        args.store.as_ref().map_or(String::new(), |s| format!(" --store {s}"));
+                    println!(
+                        "  miden-bench{store_flag} transaction --account-id {} --seed {} --iterations {DEFAULT_ITERATION_COUNT}",
+                        expand_args.account_id, expand_args.seed
+                    );
+                },
+                Err(e) => {
+                    panic!("Expand failed: {e:?}");
+                },
+            }
+        },
+        Command::Transaction(ref tx_args) => {
+            let start_time = Instant::now();
+            let store_path = args.store.as_ref().map(PathBuf::from);
+            let results = run_benchmarks(tx_args, &args.network, store_path).await;
+            let total_duration = start_time.elapsed();
+
+            match results {
+                Ok(results) => {
+                    report::print_results(&results, "Transaction Benchmark", total_duration);
+                },
+                Err(e) => {
+                    panic!("Benchmark failed: {e:?}");
+                },
+            }
         },
     }
 }
 
-async fn run_benchmarks(args: &CliArgs) -> anyhow::Result<Vec<BenchmarkResult>> {
-    match &args.command {
-        Command::Transaction(tx_args) => {
-            let config = BenchConfig::new(args.network.to_endpoint(), args.iterations);
-            let mut runner = BenchmarkRunner::new(config);
-            let seed = tx_args.seed.as_deref().map(parse_seed_hex).transpose()?;
-            Box::pin(runner.run_transaction_benchmarks(
-                tx_args.account_id.clone(),
-                seed,
-                tx_args.reads,
-            ))
-            .await
-        },
-        Command::Deploy(_) => unreachable!("Deploy is handled separately"),
-    }
+async fn run_benchmarks(
+    tx_args: &TransactionArgs,
+    network: &Network,
+    store_path: Option<PathBuf>,
+) -> anyhow::Result<Vec<BenchmarkResult>> {
+    let config = BenchConfig::new(network.to_endpoint(), tx_args.iterations, store_path);
+    let mut runner = BenchmarkRunner::new(config);
+    let seed = tx_args.seed.as_deref().map(parse_seed_hex).transpose()?;
+    Box::pin(runner.run_transaction_benchmarks(tx_args.account_id.clone(), seed, tx_args.reads))
+        .await
 }
 
 /// Parses a hex-encoded 32-byte seed string into a byte array
@@ -113,9 +132,10 @@ struct CliArgs {
     #[arg(short, long, default_value = "localhost", env = "MIDEN_NETWORK", global = true)]
     network: Network,
 
-    /// Number of benchmark iterations
-    #[arg(short, long, default_value = "5", global = true)]
-    iterations: usize,
+    /// Path to a persistent store directory. When provided, deploy saves the store here
+    /// and transaction reuses it. When omitted, temporary directories are used.
+    #[arg(long, global = true)]
+    store: Option<String>,
 }
 
 fn parse_maps(s: &str) -> Result<usize, String> {
@@ -133,10 +153,6 @@ struct StorageArgs {
     /// Number of storage maps in the account (1-100)
     #[arg(short, long, default_value = "1", value_parser = parse_maps)]
     maps: usize,
-
-    /// Number of key/value entries per storage map
-    #[arg(short, long, default_value = "10")]
-    entries_per_map: usize,
 }
 
 /// Transaction benchmark options
@@ -157,6 +173,34 @@ struct TransactionArgs {
     /// When omitted, all entries are read in a single transaction.
     #[arg(short, long)]
     reads: Option<usize>,
+
+    /// Number of benchmark iterations
+    #[arg(short, long, default_value_t = DEFAULT_ITERATION_COUNT)]
+    iterations: usize,
+}
+
+/// Expand storage: fill entries in a specific map of a deployed account
+#[derive(Args, Clone)]
+struct ExpandArgs {
+    /// Public account ID to expand (hex format)
+    #[arg(short, long)]
+    account_id: String,
+
+    /// Account seed for signing (hex, output by the deploy command)
+    #[arg(short, long)]
+    seed: String,
+
+    /// Storage map index to fill (0-based, matches deploy --maps count)
+    #[arg(short, long)]
+    map_idx: usize,
+
+    /// Starting entry offset (0-based)
+    #[arg(short, long)]
+    offset: usize,
+
+    /// Number of entries to add starting from offset
+    #[arg(short, long)]
+    count: usize,
 }
 
 #[derive(Subcommand, Clone)]
@@ -165,6 +209,8 @@ enum Command {
     Transaction(TransactionArgs),
     /// Deploy a public wallet with configurable storage to the network (requires node)
     Deploy(StorageArgs),
+    /// Expand storage: fill entries in a specific map of a deployed account (requires node)
+    Expand(ExpandArgs),
 }
 
 // NETWORK

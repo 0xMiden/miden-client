@@ -6,6 +6,7 @@ edition.workspace      = true
 keywords               = ["benchmark", "client", "miden", "performance"]
 license.workspace      = true
 name                   = "miden-client-bench"
+publish                = false
 readme                 = "README.md"
 repository.workspace   = true
 rust-version.workspace = true
@@ -29,7 +30,6 @@ anyhow      = { features = ["std"], workspace = true }
 clap        = { features = ["derive", "env"], version = "4.0" }
 comfy-table = { version = "7.1" }
 hex         = { workspace = true }
-indicatif   = { version = "0.17" }
 rand        = { workspace = true }
 rand_chacha = { version = "0.9" }
 tokio       = { workspace = true }
