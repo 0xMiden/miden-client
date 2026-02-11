@@ -20,6 +20,9 @@ use rusqlite::types::Value;
 use rusqlite::{Connection, Transaction, params};
 
 use crate::account::helpers::query_storage_slots;
+
+/// Updated storage slots and `(old_root, new_root)` pairs for each changed storage map.
+pub(crate) type StorageDeltaResult = (BTreeMap<StorageSlotName, StorageSlot>, Vec<(Word, Word)>);
 use crate::smt_forest::AccountSmtForest;
 use crate::sql_error::SqlResultExt;
 use crate::{SqliteStore, insert_sql, subst};
@@ -110,11 +113,13 @@ impl SqliteStore {
     ///
     /// All updated storage map entries are validated against the SMT forest to ensure consistency.
     /// If the computed root doesn't match the expected root, an error is returned.
+    /// Applies storage map deltas to the SMT forest and returns the updated storage slots
+    /// along with `(old_root, new_root)` pairs for each changed map.
     pub(crate) fn apply_account_storage_delta(
         smt_forest: &mut AccountSmtForest,
         mut updated_storage_maps: BTreeMap<StorageSlotName, StorageMap>,
         delta: &AccountDelta,
-    ) -> Result<BTreeMap<StorageSlotName, StorageSlot>, StoreError> {
+    ) -> Result<StorageDeltaResult, StoreError> {
         // Apply storage delta. This map will contain all updated storage slots, both values and
         // maps. It gets initialized with value type updates which contain the new value and
         // don't depend on previous state.
@@ -126,11 +131,13 @@ impl SqliteStore {
             })
             .collect();
 
+        let mut changed_map_roots = Vec::new();
+
         // For storage map deltas, we only updated the keys in the delta, this is why we need the
         // previously retrieved storage maps.
         for (slot_name, map_delta) in delta.storage().maps() {
             let mut map = updated_storage_maps.remove(slot_name).unwrap_or_default();
-            let map_root = map.root();
+            let old_root = map.root();
             let entries: Vec<(Word, Word)> =
                 map_delta.entries().iter().map(|(key, value)| ((*key).into(), *value)).collect();
 
@@ -139,7 +146,7 @@ impl SqliteStore {
             }
 
             let expected_root = map.root();
-            let new_root = smt_forest.update_storage_map_nodes(map_root, entries.into_iter())?;
+            let new_root = smt_forest.update_storage_map_nodes(old_root, entries.into_iter())?;
             if new_root != expected_root {
                 return Err(StoreError::MerkleStoreError(MerkleError::ConflictingRoots {
                     expected_root,
@@ -147,10 +154,12 @@ impl SqliteStore {
                 }));
             }
 
+            changed_map_roots.push((old_root, new_root));
+
             updated_storage_slots
                 .insert(slot_name.clone(), StorageSlot::with_map(slot_name.clone(), map));
         }
 
-        Ok(updated_storage_slots)
+        Ok((updated_storage_slots, changed_map_roots))
     }
 }
