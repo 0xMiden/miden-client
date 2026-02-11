@@ -408,10 +408,7 @@ async fn create_client_account<AUTH: Keystore + Sync + 'static>(
     // Only add the key to the keystore if we generated a default key type (Falcon)
     if let Some(key_pair) = key_pair {
         // Use the Keystore trait method which handles both key storage and account association
-        keystore
-            .add_key(&key_pair, Some(account.id()))
-            .await
-            .map_err(CliError::KeyStore)?;
+        keystore.add_key(&key_pair, account.id()).await.map_err(CliError::KeyStore)?;
         println!("Generated and stored Falcon512 authentication key in keystore.");
     } else {
         println!("Using custom authentication component from package (no key generated).");

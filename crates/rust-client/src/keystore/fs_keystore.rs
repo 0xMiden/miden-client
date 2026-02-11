@@ -7,13 +7,13 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::string::ToString;
-use std::sync::RwLock;
 
 use miden_protocol::Word;
 use miden_protocol::account::AccountId;
 use miden_protocol::account::auth::{AuthSecretKey, PublicKey, PublicKeyCommitment, Signature};
 use miden_tx::AuthenticationError;
 use miden_tx::auth::{SigningInputs, TransactionAuthenticator};
+use miden_tx::utils::sync::RwLock;
 use miden_tx::utils::{Deserializable, Serializable};
 use serde::{Deserialize, Serialize};
 
@@ -47,27 +47,6 @@ impl KeyIndex {
         let pub_key_hex = Word::from(pub_key_commitment).to_hex();
 
         self.mappings.entry(account_id_hex).or_default().insert(pub_key_hex);
-    }
-
-    /// Removes a mapping from account ID to public key commitment.
-    /// Returns true if the mapping existed and was removed.
-    fn remove_mapping(
-        &mut self,
-        account_id: &AccountId,
-        pub_key_commitment: PublicKeyCommitment,
-    ) -> bool {
-        let account_id_hex = account_id.to_hex();
-        let pub_key_hex = Word::from(pub_key_commitment).to_hex();
-
-        if let Some(commitments) = self.mappings.get_mut(&account_id_hex) {
-            let removed = commitments.remove(&pub_key_hex);
-            if commitments.is_empty() {
-                self.mappings.remove(&account_id_hex);
-            }
-            removed
-        } else {
-            false
-        }
     }
 
     /// Removes all mappings for a given public key commitment.
@@ -117,7 +96,7 @@ pub struct FilesystemKeyStore {
 
 impl Clone for FilesystemKeyStore {
     fn clone(&self) -> Self {
-        let index = self.index.read().expect("lock poisoned").clone();
+        let index = self.index.read().clone();
         Self {
             keys_directory: self.keys_directory.clone(),
             index: RwLock::new(index),
@@ -141,9 +120,9 @@ impl FilesystemKeyStore {
         })
     }
 
-    /// Adds a secret key to the keystore without associating it with an account.
+    /// Adds a secret key to the keystore without updating account mappings.
     ///
-    /// This is an internal method. Use [`Keystore::add_key`] with `account_id: None` instead.
+    /// This is an internal method. Use [`Keystore::add_key`] instead.
     fn add_key_without_account(&self, key: &AuthSecretKey) -> Result<(), KeyStoreError> {
         let pub_key_commitment = key.public_key().to_commitment();
         let file_path = key_file_path(&self.keys_directory, pub_key_commitment);
@@ -182,7 +161,7 @@ impl FilesystemKeyStore {
 
     /// Saves the index to disk.
     fn save_index(&self) -> Result<(), KeyStoreError> {
-        let index = self.index.read().expect("lock poisoned");
+        let index = self.index.read();
         save_index(&self.keys_directory, &index)
     }
 }
@@ -224,23 +203,21 @@ impl Keystore for FilesystemKeyStore {
     async fn add_key(
         &self,
         key: &AuthSecretKey,
-        account_id: Option<AccountId>,
+        account_id: AccountId,
     ) -> Result<(), KeyStoreError> {
         let pub_key_commitment = key.public_key().to_commitment();
 
-        // Always write the key file
+        // Write the key file
         self.add_key_without_account(key)?;
 
-        // Conditionally update the index
-        if let Some(account_id) = account_id {
-            {
-                let mut index = self.index.write().expect("lock poisoned");
-                index.add_mapping(&account_id, pub_key_commitment);
-            }
-
-            // Persist the index
-            self.save_index()?;
+        // Update the index
+        {
+            let mut index = self.index.write();
+            index.add_mapping(&account_id, pub_key_commitment);
         }
+
+        // Persist the index
+        self.save_index()?;
 
         Ok(())
     }
@@ -248,7 +225,7 @@ impl Keystore for FilesystemKeyStore {
     async fn remove_key(&self, pub_key: PublicKeyCommitment) -> Result<(), KeyStoreError> {
         // Remove from index first
         {
-            let mut index = self.index.write().expect("lock poisoned");
+            let mut index = self.index.write();
             index.remove_all_mappings_for_key(pub_key);
         }
 
@@ -270,25 +247,8 @@ impl Keystore for FilesystemKeyStore {
         &self,
         account_id: &AccountId,
     ) -> Result<Vec<PublicKeyCommitment>, KeyStoreError> {
-        let index = self.index.read().expect("lock poisoned");
+        let index = self.index.read();
         Ok(index.get_commitments(account_id))
-    }
-
-    async fn disassociate_key_from_account(
-        &self,
-        pub_key: PublicKeyCommitment,
-        account_id: &AccountId,
-    ) -> Result<bool, KeyStoreError> {
-        let removed = {
-            let mut index = self.index.write().expect("lock poisoned");
-            index.remove_mapping(account_id, pub_key)
-        };
-
-        if removed {
-            self.save_index()?;
-        }
-
-        Ok(removed)
     }
 }
 
@@ -344,7 +304,7 @@ fn load_or_create_index(keys_directory: &Path) -> Result<KeyIndex, KeyStoreError
 /// Saves the index to disk atomically (write to temp file, then rename).
 fn save_index(keys_directory: &Path, index: &KeyIndex) -> Result<(), KeyStoreError> {
     let index_path = keys_directory.join(INDEX_FILE_NAME);
-    let temp_path = keys_directory.join(format!("{INDEX_FILE_NAME}.tmp"));
+    let temp_path = std::env::temp_dir().join(INDEX_FILE_NAME);
 
     let contents = serde_json::to_string_pretty(index)
         .map_err(|err| KeyStoreError::StorageError(format!("error serializing index: {err:?}")))?;

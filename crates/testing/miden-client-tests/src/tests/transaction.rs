@@ -48,7 +48,7 @@ async fn transaction_creates_two_notes() {
         .build_existing()
         .unwrap();
 
-    keystore.add_key(&secret_key, None).await.unwrap();
+    keystore.add_key(&secret_key, account.id()).await.unwrap();
 
     client.add_account(&account, false).await.unwrap();
     client.sync_state().await.unwrap();

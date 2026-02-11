@@ -493,7 +493,7 @@ async fn deploy_foreign_account(
     let foreign_account_id = foreign_account.id();
 
     keystore
-        .add_key(&secret_key, None)
+        .add_key(&secret_key, foreign_account_id)
         .await
         .with_context(|| "failed to add key to keystore")?;
     client.add_account(&foreign_account, false).await?;

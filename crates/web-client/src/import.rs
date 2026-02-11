@@ -32,7 +32,7 @@ impl WebClient {
                 .map_err(|err| js_error_with_context(err, "failed to import account"))?;
 
             for key in &auth_secret_keys {
-                keystore.add_key(key, Some(account.id())).await.map_err(|err| err.to_string())?;
+                keystore.add_key(key, account.id()).await.map_err(|err| err.to_string())?;
             }
 
             Ok(JsValue::from_str(&format!("Imported account with ID: {account_id}")))
@@ -63,7 +63,7 @@ impl WebClient {
 
         keystore
             .expect("KeyStore should be initialized")
-            .add_key(&key_pair, Some(native_id))
+            .add_key(&key_pair, native_id)
             .await
             .map_err(|err| err.to_string())?;
 

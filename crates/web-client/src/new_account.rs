@@ -43,7 +43,7 @@ impl WebClient {
 
             keystore
                 .expect("KeyStore should be initialized")
-                .add_key(&key_pair, Some(new_account.id()))
+                .add_key(&key_pair, new_account.id())
                 .await
                 .map_err(|err| err.to_string())?;
 
@@ -121,7 +121,7 @@ impl WebClient {
 
             keystore
                 .expect("KeyStore should be initialized")
-                .add_key(&key_pair, Some(new_account.id()))
+                .add_key(&key_pair, new_account.id())
                 .await
                 .map_err(|err| err.to_string())?;
 
@@ -163,7 +163,7 @@ impl WebClient {
         let native_account_id = account_id.into();
 
         keystore
-            .add_key(&native_secret_key, Some(native_account_id))
+            .add_key(&native_secret_key, native_account_id)
             .await
             .map_err(|err| err.to_string())?;
 

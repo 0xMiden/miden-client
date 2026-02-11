@@ -104,7 +104,7 @@ pub async fn insert_new_wallet_with_seed(
         .build()
         .unwrap();
 
-    keystore.add_key(&key_pair, None).await.unwrap();
+    keystore.add_key(&key_pair, account.id()).await.unwrap();
 
     client.add_account(&account, false).await?;
 
@@ -154,7 +154,7 @@ pub async fn insert_new_fungible_faucet(
         .build()
         .unwrap();
 
-    keystore.add_key(&key_pair, None).await.unwrap();
+    keystore.add_key(&key_pair, account.id()).await.unwrap();
 
     client.add_account(&account, false).await?;
     Ok((account, key_pair))
@@ -564,7 +564,7 @@ pub async fn insert_account_with_custom_component(
         .build()
         .map_err(ClientError::AccountError)?;
 
-    keystore.add_key(&key_pair, None).await.unwrap();
+    keystore.add_key(&key_pair, account.id()).await.unwrap();
     client.add_account(&account, false).await?;
 
     Ok((account, key_pair))

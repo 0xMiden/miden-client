@@ -78,7 +78,7 @@ let new_account = AccountBuilder::new(init_seed) // Seed should be random for ea
     .with_auth_component(AuthRpoFalcon512::new(key_pair.public_key()))
     .with_component(BasicWallet)
     .build()?;
-keystore.add_key(&AuthSecretKey::RpoFalcon512(key_pair)).await?;
+keystore.add_key(&AuthSecretKey::RpoFalcon512(key_pair), new_account.id()).await?;
 client.add_account(&new_account, false).await?;
 ```
 Once an account is created, it is kept locally and its state is automatically tracked by the client.
@@ -96,7 +96,7 @@ let new_account = AccountBuilder::new(init_seed) // Seed should be random for ea
     .with_auth_component(AuthRpoFalcon512::new(key_pair.public_key()))
     .with_component(BasicWallet)
     .build()?;
-keystore.add_key(&AuthSecretKey::RpoFalcon512(key_pair)).await?;
+keystore.add_key(&AuthSecretKey::RpoFalcon512(key_pair), new_account.id()).await?;
 client.add_account(&new_account, false).await?;
 ```
 

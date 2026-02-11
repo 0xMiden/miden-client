@@ -22,15 +22,13 @@ pub enum KeyStoreError {
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 pub trait Keystore: TransactionAuthenticator {
-    /// Adds a secret key to the keystore and optionally associates it with an account.
+    /// Adds a secret key to the keystore and associates it with the given account.
     ///
-    /// If `account_id` is `Some(id)`, the key will be associated with that account.
-    /// If `account_id` is `None`, only the key is stored without creating associations.
     /// A key can be associated with multiple accounts by calling this method multiple times.
     async fn add_key(
         &self,
         key: &AuthSecretKey,
-        account_id: Option<AccountId>,
+        account_id: AccountId,
     ) -> Result<(), KeyStoreError>;
 
     /// Removes a key from the keystore by its public key commitment.
@@ -74,16 +72,6 @@ pub trait Keystore: TransactionAuthenticator {
         }
         Ok(keys)
     }
-
-    /// Removes the association between a key and an account.
-    ///
-    /// The key itself is NOT removed from the keystore.
-    /// Returns `Ok(false)` if the association didn't exist.
-    async fn disassociate_key_from_account(
-        &self,
-        pub_key: PublicKeyCommitment,
-        account_id: &AccountId,
-    ) -> Result<bool, KeyStoreError>;
 }
 
 #[cfg(feature = "std")]

@@ -8,7 +8,6 @@ use idxdb_store::auth::{
     insert_account_auth,
     insert_account_key_mapping,
     remove_account_auth,
-    remove_account_key_mapping,
     remove_all_mappings_for_key,
 };
 use miden_client::account::AccountId;
@@ -90,9 +89,9 @@ impl<R: Rng> WebKeyStore<R> {
         }
     }
 
-    /// Adds a secret key to the keystore without associating it with an account.
+    /// Adds a secret key to the keystore without updating account mappings.
     ///
-    /// This is an internal method. Use [`Keystore::add_key`] with `account_id: None` instead.
+    /// This is an internal method. Use [`Keystore::add_key`] instead.
     async fn add_key_without_account(&self, key: &AuthSecretKey) -> Result<(), KeyStoreError> {
         if let Some(insert_key_cb) = &self.callbacks.as_ref().insert_key {
             let sk = WebAuthSecretKey::from(key.clone());
@@ -192,26 +191,24 @@ impl<R: Rng> Keystore for WebKeyStore<R> {
     async fn add_key(
         &self,
         key: &AuthSecretKey,
-        account_id: Option<AccountId>,
+        account_id: AccountId,
     ) -> Result<(), KeyStoreError> {
         let pub_key_commitment = key.public_key().to_commitment();
 
-        // Always store the key
+        // Store the key
         self.add_key_without_account(key).await?;
 
-        // Conditionally store the mapping
-        if let Some(account_id) = account_id {
-            let account_id_hex = account_id.to_hex();
-            let pub_key_hex = NativeWord::from(pub_key_commitment).to_hex();
+        // Store the mapping
+        let account_id_hex = account_id.to_hex();
+        let pub_key_hex = NativeWord::from(pub_key_commitment).to_hex();
 
-            insert_account_key_mapping(&self.db_id, account_id_hex, pub_key_hex)
-                .await
-                .map_err(|_| {
-                    KeyStoreError::StorageError(
-                        "Failed to insert account key mapping into IndexedDB".to_string(),
-                    )
-                })?;
-        }
+        insert_account_key_mapping(&self.db_id, account_id_hex, pub_key_hex)
+            .await
+            .map_err(|_| {
+                KeyStoreError::StorageError(
+                    "Failed to insert account key mapping into IndexedDB".to_string(),
+                )
+            })?;
 
         Ok(())
     }
@@ -265,24 +262,5 @@ impl<R: Rng> Keystore for WebKeyStore<R> {
             .collect();
 
         Ok(commitments)
-    }
-
-    async fn disassociate_key_from_account(
-        &self,
-        pub_key: PublicKeyCommitment,
-        account_id: &AccountId,
-    ) -> Result<bool, KeyStoreError> {
-        let account_id_hex = account_id.to_hex();
-        let pub_key_hex = NativeWord::from(pub_key).to_hex();
-
-        let removed = remove_account_key_mapping(&self.db_id, account_id_hex, pub_key_hex)
-            .await
-            .map_err(|_| {
-                KeyStoreError::StorageError(
-                    "Failed to remove account key mapping from IndexedDB".to_string(),
-                )
-            })?;
-
-        Ok(removed)
     }
 }

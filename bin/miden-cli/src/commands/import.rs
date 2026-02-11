@@ -77,7 +77,7 @@ async fn import_account<AUTH>(
 
     for key in auth_secret_keys {
         // Use the Keystore trait method which handles both key storage and account association
-        keystore.add_key(&key, Some(account_id)).await.map_err(CliError::KeyStore)?;
+        keystore.add_key(&key, account_id).await.map_err(CliError::KeyStore)?;
     }
 
     client.add_account(&account, overwrite).await?;
