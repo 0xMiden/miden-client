@@ -6,4 +6,8 @@
 
 # Type Alias: AuthSchemeType
 
-> **AuthSchemeType** = *typeof* [`AuthScheme`](../variables/AuthScheme.md)\[keyof *typeof* [`AuthScheme`](../variables/AuthScheme.md)\]
+> **AuthSchemeType** = `"falcon"` \| `"ecdsa"`
+
+User-facing auth scheme string constants for MidenClient options.
+The WASM `AuthScheme` enum (with `AuthRpoFalcon512`, `AuthEcdsaK256Keccak`)
+is re-exported separately from the WASM module.

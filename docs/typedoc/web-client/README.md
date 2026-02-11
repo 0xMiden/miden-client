@@ -8,6 +8,7 @@
 
 - [AccountInterface](enumerations/AccountInterface.md)
 - [AccountType](enumerations/AccountType.md)
+- [AuthScheme](enumerations/AuthScheme.md)
 - [InputNoteState](enumerations/InputNoteState.md)
 - [NetworkType](enumerations/NetworkType.md)
 - [NoteAttachmentKind](enumerations/NoteAttachmentKind.md)
@@ -204,7 +205,6 @@
 
 ## Variables
 
-- [AuthScheme](variables/AuthScheme.md)
 - [MidenArrays](variables/MidenArrays.md)
 
 ## Functions
