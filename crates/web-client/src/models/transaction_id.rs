@@ -20,9 +20,9 @@ pub struct TransactionId(NativeTransactionId);
 
 #[wasm_bindgen]
 impl TransactionId {
-    /// Creates a TransactionId from a hex string.
+    /// Creates a `TransactionId` from a hex string.
     ///
-    /// Fails if the provided string is not a valid hex representation of a TransactionId.
+    /// Fails if the provided string is not a valid hex representation of a `TransactionId`.
     #[wasm_bindgen(js_name = "fromHex")]
     pub fn from_hex(hex: &str) -> Result<TransactionId, JsValue> {
         let native_word = NativeWord::try_from(hex).map_err(|err| {
