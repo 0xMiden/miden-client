@@ -15,22 +15,12 @@
  *   Default RPC: https://rpc.devnet.miden.io
  */
 
-// ─── Setup ──────────────────────────────────────────────────────────────────
-// When using dist-node/, polyfills are built-in — no setup.mjs needed.
-// When using dist/ (browser build), import "./setup.mjs" first.
-const USE_NODE_BUILD = process.env.USE_BROWSER_BUILD !== "true";
-if (!USE_NODE_BUILD) {
-  await import("./setup.mjs");
-}
-
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { existsSync, unlinkSync } from "node:fs";
 
 const RPC_URL = process.argv[2] || "https://rpc.devnet.miden.io";
-const distDir = USE_NODE_BUILD
-  ? resolve(dirname(fileURLToPath(import.meta.url)), "../../dist-node")
-  : resolve(dirname(fileURLToPath(import.meta.url)), "../../dist");
+const distDir = resolve(dirname(fileURLToPath(import.meta.url)), "../../dist-node");
 
 // Set SQLite DB path for node-store (cleaned up at start)
 const SQLITE_PATH = resolve(dirname(fileURLToPath(import.meta.url)), "test-miden-store.sqlite");
@@ -94,8 +84,7 @@ async function main() {
 
   // ── 1. Load SDK ─────────────────────────────────────────────────────────
   log("1", "Loading WASM SDK...");
-  const entryFile = USE_NODE_BUILD ? "node-entry.js" : "index.js";
-  const sdk = await import(`${distDir}/${entryFile}`);
+  const sdk = await import(`${distDir}/node-entry.js`);
   log("1", `SDK loaded (${Object.keys(sdk).length} exports)`);
 
   // ── 2. Create client ────────────────────────────────────────────────────
