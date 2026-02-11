@@ -27,6 +27,7 @@ default = ["std"]
 std = [
   "miden-protocol/std",
   "miden-remote-prover-client/std",
+  "miden-remote-prover-client/tx-prover",
   "miden-tx/concurrent",
   "tonic/tls-native-roots",
   "tonic/tls-ring",

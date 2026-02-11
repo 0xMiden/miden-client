@@ -200,14 +200,12 @@ export function useMultiSend(): UseMultiSendResult {
   };
 }
 
-function getNoteType(type: "private" | "public" | "encrypted"): NoteType {
+function getNoteType(type: "private" | "public"): NoteType {
   switch (type) {
     case "private":
       return NoteType.Private;
     case "public":
       return NoteType.Public;
-    case "encrypted":
-      return NoteType.Encrypted;
     default:
       return NoteType.Private;
   }

@@ -7,6 +7,7 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::string::ToString;
+use std::sync::Arc;
 
 use miden_protocol::Word;
 use miden_protocol::account::AccountId;
@@ -193,8 +194,16 @@ impl TransactionAuthenticator for FilesystemKeyStore {
         Ok(signature)
     }
 
-    async fn get_public_key(&self, _pub_key_commitment: PublicKeyCommitment) -> Option<&PublicKey> {
-        None
+    /// Retrieves a public key for a specific public key commitment.
+    async fn get_public_key(
+        &self,
+        pub_key_commitment: PublicKeyCommitment,
+    ) -> Option<Arc<PublicKey>> {
+        self.get_key(pub_key_commitment)
+            .await
+            .ok()
+            .flatten()
+            .map(|key| Arc::new(key.public_key()))
     }
 }
 
