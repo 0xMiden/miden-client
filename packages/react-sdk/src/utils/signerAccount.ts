@@ -1,4 +1,4 @@
-import type { WebClient } from "@miden-sdk/miden-sdk";
+import type { _WebClient as WebClient } from "@miden-sdk/miden-sdk";
 import type {
   SignerAccountConfig,
   SignerAccountType,

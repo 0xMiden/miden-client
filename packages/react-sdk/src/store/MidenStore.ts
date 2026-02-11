@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type {
-  WebClient,
+  _WebClient as WebClient,
   Account,
   AccountHeader,
   InputNoteRecord,
