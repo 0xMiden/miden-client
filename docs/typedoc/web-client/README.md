@@ -8,7 +8,6 @@
 
 - [AccountInterface](enumerations/AccountInterface.md)
 - [AccountType](enumerations/AccountType.md)
-- [AuthScheme](enumerations/AuthScheme.md)
 - [InputNoteState](enumerations/InputNoteState.md)
 - [NetworkType](enumerations/NetworkType.md)
 - [NoteAttachmentKind](enumerations/NoteAttachmentKind.md)
@@ -19,6 +18,8 @@
 
 ## Classes
 
+- [\_MockWebClient](classes/MockWebClient.md)
+- [\_WebClient](classes/WebClient.md)
 - [Account](classes/Account.md)
 - [AccountArray](classes/AccountArray.md)
 - [AccountBuilder](classes/AccountBuilder.md)
@@ -76,7 +77,7 @@
 - [JsVaultAsset](classes/JsVaultAsset.md)
 - [Library](classes/Library.md)
 - [MerklePath](classes/MerklePath.md)
-- [MockWebClient](classes/MockWebClient.md)
+- [MidenClient](classes/MidenClient.md)
 - [NetworkId](classes/NetworkId.md)
 - [Note](classes/Note.md)
 - [NoteAndArgs](classes/NoteAndArgs.md)
@@ -145,25 +146,71 @@
 - [TransactionStatus](classes/TransactionStatus.md)
 - [TransactionStoreUpdate](classes/TransactionStoreUpdate.md)
 - [TransactionSummary](classes/TransactionSummary.md)
-- [WebClient](classes/WebClient.md)
+- [WebClient](classes/WebClient-1.md)
 - [Word](classes/Word.md)
 
 ## Interfaces
 
-- [WasmWebClient](interfaces/WasmWebClient.md)
+- [AccountDetails](interfaces/AccountDetails.md)
+- [AccountsResource](interfaces/AccountsResource.md)
+- [Asset](interfaces/Asset.md)
+- [BuildSwapTagOptions](interfaces/BuildSwapTagOptions.md)
+- [ClientOptions](interfaces/ClientOptions.md)
+- [ConsumeAllOptions](interfaces/ConsumeAllOptions.md)
+- [ConsumeAllResult](interfaces/ConsumeAllResult.md)
+- [ConsumeOptions](interfaces/ConsumeOptions.md)
+- [ExportAccountOptions](interfaces/ExportAccountOptions.md)
+- [ExportNoteOptions](interfaces/ExportNoteOptions.md)
+- [FaucetOptions](interfaces/FaucetOptions.md)
+- [FetchPrivateNotesOptions](interfaces/FetchPrivateNotesOptions.md)
+- [MintAndConsumeOptions](interfaces/MintAndConsumeOptions.md)
+- [MintOptions](interfaces/MintOptions.md)
+- [MockOptions](interfaces/MockOptions.md)
+- [NoteOptions](interfaces/NoteOptions.md)
+- [NotesResource](interfaces/NotesResource.md)
+- [P2IDEOptions](interfaces/P2IDEOptions.md)
+- [PreviewConsumeOptions](interfaces/PreviewConsumeOptions.md)
+- [PreviewMintOptions](interfaces/PreviewMintOptions.md)
+- [PreviewSendOptions](interfaces/PreviewSendOptions.md)
+- [PreviewSwapOptions](interfaces/PreviewSwapOptions.md)
+- [SendOptions](interfaces/SendOptions.md)
+- [SendPrivateOptions](interfaces/SendPrivateOptions.md)
+- [SettingsResource](interfaces/SettingsResource.md)
+- [StoreSnapshot](interfaces/StoreSnapshot.md)
+- [SwapOptions](interfaces/SwapOptions.md)
+- [TagsResource](interfaces/TagsResource.md)
+- [TransactionOptions](interfaces/TransactionOptions.md)
+- [TransactionsResource](interfaces/TransactionsResource.md)
+- [WaitOptions](interfaces/WaitOptions.md)
+- [WalletOptions](interfaces/WalletOptions.md)
 
 ## Type Aliases
 
+- [AccountRef](type-aliases/AccountRef.md)
 - [AddressInterface](type-aliases/AddressInterface.md)
+- [AuthSchemeType](type-aliases/AuthSchemeType.md)
+- [CreateAccountOptions](type-aliases/CreateAccountOptions.md)
 - [GetKeyCallback](type-aliases/GetKeyCallback.md)
+- [ImportAccountInput](type-aliases/ImportAccountInput.md)
 - [InsertKeyCallback](type-aliases/InsertKeyCallback.md)
+- [NoteInput](type-aliases/NoteInput.md)
+- [NoteQuery](type-aliases/NoteQuery.md)
+- [NoteVisibility](type-aliases/NoteVisibility.md)
+- [PreviewOptions](type-aliases/PreviewOptions.md)
 - [ReadableStreamType](type-aliases/ReadableStreamType.md)
 - [SignCallback](type-aliases/SignCallback.md)
+- [TransactionQuery](type-aliases/TransactionQuery.md)
+- [WaitStatus](type-aliases/WaitStatus.md)
 
 ## Variables
 
+- [AuthScheme](variables/AuthScheme.md)
 - [MidenArrays](variables/MidenArrays.md)
 
 ## Functions
 
+- [buildSwapTag](functions/buildSwapTag.md)
 - [createAuthFalcon512RpoMultisig](functions/createAuthFalcon512RpoMultisig.md)
+- [createP2IDENote](functions/createP2IDENote.md)
+- [createP2IDNote](functions/createP2IDNote.md)
+- [getWasmOrThrow](functions/getWasmOrThrow.md)
