@@ -54,7 +54,7 @@ var Table;
 function indexes(...items) {
     return items.join(",");
 }
-/** V1 baseline schema. Exported for use in migration tests. Never modify this — add a new version instead. */
+/** V1 baseline schema. Exported for use in migration tests. */
 export const V1_STORES = {
     [Table.AccountCode]: indexes("root"),
     [Table.AccountStorage]: indexes("[commitment+slotName]", "commitment"),
@@ -164,9 +164,16 @@ export class MidenDatabase {
     }
     async open(clientVersion) {
         console.log(`Opening database ${this.dexie.name} for client version ${clientVersion}...`);
-        await this.dexie.open();
-        await this.ensureClientVersion(clientVersion);
-        console.log("Database opened successfully");
+        try {
+            await this.dexie.open();
+            await this.ensureClientVersion(clientVersion);
+            console.log("Database opened successfully");
+            return true;
+        }
+        catch (err) {
+            logWebStoreError(err, "Failed to open database");
+            return false;
+        }
     }
     async ensureClientVersion(clientVersion) {
         if (!clientVersion) {

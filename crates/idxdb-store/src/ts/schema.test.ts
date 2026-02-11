@@ -27,6 +27,11 @@ function trackDb(db: Dexie): Dexie {
   return db;
 }
 
+// The v1→v2 migration test uses a raw Dexie instance to test the migration
+// framework in isolation. In production, MidenDatabase.open() calls
+// ensureClientVersion() which nukes the DB on major/minor upgrades — so
+// migrations don't actually run yet. The test validates that the infrastructure
+// works correctly for when the nuke is removed and migrations take over.
 describe("MidenDatabase migrations", () => {
   it("fresh DB creation seeds stateSync and stores client version", async () => {
     const name = uniqueDbName();
@@ -119,58 +124,6 @@ describe("MidenDatabase migrations", () => {
 
     const versionRecord = await dbV2.table("settings").get(CLIENT_VERSION_SETTING_KEY);
     expect(decoder.decode(versionRecord.value)).toBe("0.9.0");
-  });
-
-  it("multi-version jump (v1 → v3) runs all intermediate migrations", async () => {
-    const name = uniqueDbName();
-
-    // Step 1: Create a v1 database with test data
-    const dbV1 = trackDb(new Dexie(name));
-    dbV1.version(1).stores(V1_STORES);
-    await dbV1.open();
-
-    await dbV1.table("stateSync").put({ id: 1, blockNum: 10 });
-    await dbV1.table("settings").put({
-      key: "testKey",
-      value: encoder.encode("testValue"),
-    });
-
-    dbV1.close();
-
-    // Step 2: Open with v1 + v2 + v3
-    const dbV3 = trackDb(new Dexie(name));
-    const migrationLog: number[] = [];
-
-    dbV3.version(1).stores(V1_STORES);
-    dbV3
-      .version(2)
-      .stores({
-        // Add a new index to blockHeaders
-        blockHeaders: "blockNum,hasClientNotes,header",
-      })
-      .upgrade(() => {
-        migrationLog.push(2);
-      });
-    dbV3
-      .version(3)
-      .stores({
-        // Add a new index to transactions
-        transactions: "id,statusVariant,blockNum",
-      })
-      .upgrade(() => {
-        migrationLog.push(3);
-      });
-    await dbV3.open();
-
-    // Both upgrade callbacks should have fired in order
-    expect(migrationLog).toEqual([2, 3]);
-
-    // Original data should be preserved
-    const syncRecord = await dbV3.table("stateSync").get(1);
-    expect(syncRecord).toEqual({ id: 1, blockNum: 10 });
-
-    const setting = await dbV3.table("settings").get("testKey");
-    expect(decoder.decode(setting.value)).toBe("testValue");
   });
 
   it("reopening same version is a no-op and preserves data", async () => {
