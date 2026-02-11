@@ -1,7 +1,9 @@
 import Dexie from "dexie";
+import * as semver from "semver";
 import { logWebStoreError } from "./utils.js";
 export const CLIENT_VERSION_SETTING_KEY = "clientVersion";
 const textEncoder = new TextEncoder();
+const textDecoder = new TextDecoder();
 // Since we can't have a pointer to a JS Object from rust, we'll
 // use this instead to keep track of open DBs. A client can have
 // a DB for mainnet, devnet, testnet or a custom one, so this should be ok.
@@ -99,6 +101,12 @@ export class MidenDatabase {
         this.dexie = new Dexie(network);
         // --- Schema versioning ---
         //
+        // NOTE: The migration system is not currently in use. The Miden network
+        // resets on every upgrade, so the database is nuked whenever the client
+        // version changes (see ensureClientVersion). Once the network stabilizes
+        // and data can be preserved across upgrades, the version-change nuke will
+        // be removed and migrations will take over.
+        //
         // v1 is the baseline schema. To add a migration:
         //   1. Add a .version(N+1).stores({...}).upgrade(tx => {...}) block below.
         //      Only list tables whose indexes changed; Dexie carries forward the rest.
@@ -162,12 +170,44 @@ export class MidenDatabase {
     }
     async ensureClientVersion(clientVersion) {
         if (!clientVersion) {
-            console.warn("openDatabase called without a client version; skipping version tracking.");
+            console.warn("openDatabase called without a client version; skipping version enforcement.");
             return;
         }
-        // Schema migrations are handled by Dexie's version system.
-        // This just records the client version for diagnostics.
+        const storedVersion = await this.getStoredClientVersion();
+        if (!storedVersion) {
+            await this.persistClientVersion(clientVersion);
+            return;
+        }
+        if (storedVersion === clientVersion) {
+            return;
+        }
+        const validCurrent = semver.valid(clientVersion);
+        const validStored = semver.valid(storedVersion);
+        if (validCurrent && validStored) {
+            const parsedCurrent = semver.parse(validCurrent);
+            const parsedStored = semver.parse(validStored);
+            const sameMajorMinor = parsedCurrent?.major === parsedStored?.major &&
+                parsedCurrent?.minor === parsedStored?.minor;
+            if (sameMajorMinor || !semver.gt(clientVersion, storedVersion)) {
+                await this.persistClientVersion(clientVersion);
+                return;
+            }
+        }
+        else {
+            console.warn(`Failed to parse semver (${storedVersion} vs ${clientVersion}), forcing store reset.`);
+        }
+        console.warn(`IndexedDB client version mismatch (stored=${storedVersion}, expected=${clientVersion}). Resetting store.`);
+        this.dexie.close();
+        await this.dexie.delete();
+        await this.dexie.open();
         await this.persistClientVersion(clientVersion);
+    }
+    async getStoredClientVersion() {
+        const record = await this.settings.get(CLIENT_VERSION_SETTING_KEY);
+        if (!record) {
+            return null;
+        }
+        return textDecoder.decode(record.value);
     }
     async persistClientVersion(clientVersion) {
         await this.settings.put({
