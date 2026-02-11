@@ -42,6 +42,7 @@ See the [README](https://github.com/0xMiden/miden-client/blob/main/crates/web-cl
 ## API Reference
 
 For complete API documentation, see the [TypeDoc API Reference](https://github.com/0xMiden/miden-client/blob/main/docs/typedoc/web-client/README.md).
+
 ## Resource Management
 
 The WebClient uses a dedicated [Web Worker](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API) to offload computationally intensive operations like wallet creation, transaction proving, and state synchronization. This keeps the main thread responsive.
