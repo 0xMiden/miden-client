@@ -52,6 +52,28 @@ var Table;
 function indexes(...items) {
     return items.join(",");
 }
+/** V1 baseline schema. Exported for use in migration tests. Never modify this — add a new version instead. */
+export const V1_STORES = {
+    [Table.AccountCode]: indexes("root"),
+    [Table.AccountStorage]: indexes("[commitment+slotName]", "commitment"),
+    [Table.StorageMapEntries]: indexes("[root+key]", "root"),
+    [Table.AccountAssets]: indexes("[root+vaultKey]", "root", "faucetIdPrefix"),
+    [Table.AccountAuth]: indexes("pubKeyCommitmentHex"),
+    [Table.Accounts]: indexes("&accountCommitment", "id", "[id+nonce]", "codeRoot", "storageRoot", "vaultRoot"),
+    [Table.Addresses]: indexes("address", "id"),
+    [Table.Transactions]: indexes("id", "statusVariant"),
+    [Table.TransactionScripts]: indexes("scriptRoot"),
+    [Table.InputNotes]: indexes("noteId", "nullifier", "stateDiscriminant"),
+    [Table.OutputNotes]: indexes("noteId", "recipientDigest", "stateDiscriminant", "nullifier"),
+    [Table.NotesScripts]: indexes("scriptRoot"),
+    [Table.StateSync]: indexes("id"),
+    [Table.BlockHeaders]: indexes("blockNum", "hasClientNotes"),
+    [Table.PartialBlockchainNodes]: indexes("id"),
+    [Table.Tags]: indexes("id++", "tag", "source_note_id", "source_account_id"),
+    [Table.ForeignAccountCode]: indexes("accountId"),
+    [Table.Settings]: indexes("key"),
+    [Table.TrackedAccounts]: indexes("&id"),
+};
 export class MidenDatabase {
     dexie;
     accountCodes;
@@ -106,27 +128,7 @@ export class MidenDatabase {
         //
         // Note: The `populate` hook (below the version blocks) only fires on
         // first database creation, NOT during upgrades.
-        this.dexie.version(1).stores({
-            [Table.AccountCode]: indexes("root"),
-            [Table.AccountStorage]: indexes("[commitment+slotName]", "commitment"),
-            [Table.StorageMapEntries]: indexes("[root+key]", "root"),
-            [Table.AccountAssets]: indexes("[root+vaultKey]", "root", "faucetIdPrefix"),
-            [Table.AccountAuth]: indexes("pubKeyCommitmentHex"),
-            [Table.Accounts]: indexes("&accountCommitment", "id", "[id+nonce]", "codeRoot", "storageRoot", "vaultRoot"),
-            [Table.Addresses]: indexes("address", "id"),
-            [Table.Transactions]: indexes("id", "statusVariant"),
-            [Table.TransactionScripts]: indexes("scriptRoot"),
-            [Table.InputNotes]: indexes("noteId", "nullifier", "stateDiscriminant"),
-            [Table.OutputNotes]: indexes("noteId", "recipientDigest", "stateDiscriminant", "nullifier"),
-            [Table.NotesScripts]: indexes("scriptRoot"),
-            [Table.StateSync]: indexes("id"),
-            [Table.BlockHeaders]: indexes("blockNum", "hasClientNotes"),
-            [Table.PartialBlockchainNodes]: indexes("id"),
-            [Table.Tags]: indexes("id++", "tag", "source_note_id", "source_account_id"),
-            [Table.ForeignAccountCode]: indexes("accountId"),
-            [Table.Settings]: indexes("key"),
-            [Table.TrackedAccounts]: indexes("&id"),
-        });
+        this.dexie.version(1).stores(V1_STORES);
         this.accountCodes = this.dexie.table(Table.AccountCode);
         this.accountStorages = this.dexie.table(Table.AccountStorage);
         this.storageMapEntries = this.dexie.table(Table.StorageMapEntries);
@@ -154,33 +156,9 @@ export class MidenDatabase {
     }
     async open(clientVersion) {
         console.log(`Opening database ${this.dexie.name} for client version ${clientVersion}...`);
-        try {
-            await this.dexie.open();
-            await this.ensureClientVersion(clientVersion);
-            console.log("Database opened successfully");
-            return true;
-        }
-        catch (err) {
-            // Fallback: delete and recreate. This recovers from data-dependent
-            // migration failures and corrupted DB state. It won't help if an
-            // upgrade() callback throws unconditionally (that's a code bug
-            // requiring a new deployment).
-            console.error("Database open/migration failed, attempting reset:", err);
-            try {
-                this.dexie.close();
-                await this.dexie.delete();
-                await this.dexie.open();
-                await this.ensureClientVersion(clientVersion);
-                console.warn("Database was reset due to migration failure.");
-                return true;
-            }
-            catch (resetErr) {
-                // logWebStoreError logs and re-throws, so this effectively
-                // turns a reset failure into a thrown exception.
-                logWebStoreError(resetErr, "Failed to reset database after migration failure");
-                return false; // unreachable; kept for type safety
-            }
-        }
+        await this.dexie.open();
+        await this.ensureClientVersion(clientVersion);
+        console.log("Database opened successfully");
     }
     async ensureClientVersion(clientVersion) {
         if (!clientVersion) {

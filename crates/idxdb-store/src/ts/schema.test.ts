@@ -1,30 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 import Dexie from "dexie";
-import { MidenDatabase, CLIENT_VERSION_SETTING_KEY } from "./schema.js";
-
-// The v1 store definitions, mirroring what MidenDatabase defines in schema.ts.
-// IMPORTANT: If the v1 schema in schema.ts changes, update this copy too.
-const V1_STORES = {
-  accountCode: "root",
-  accountStorage: "[commitment+slotName],commitment",
-  storageMapEntries: "[root+key],root",
-  accountAssets: "[root+vaultKey],root,faucetIdPrefix",
-  accountAuth: "pubKeyCommitmentHex",
-  accounts: "&accountCommitment,id,[id+nonce],codeRoot,storageRoot,vaultRoot",
-  addresses: "address,id",
-  transactions: "id,statusVariant",
-  transactionScripts: "scriptRoot",
-  inputNotes: "noteId,nullifier,stateDiscriminant",
-  outputNotes: "noteId,recipientDigest,stateDiscriminant,nullifier",
-  notesScripts: "scriptRoot",
-  stateSync: "id",
-  blockHeaders: "blockNum,hasClientNotes",
-  partialBlockchainNodes: "id",
-  tags: "id++,tag,source_note_id,source_account_id",
-  foreignAccountCode: "accountId",
-  settings: "key",
-  trackedAccounts: "&id",
-};
+import { MidenDatabase, CLIENT_VERSION_SETTING_KEY, V1_STORES } from "./schema.js";
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -57,8 +33,7 @@ describe("MidenDatabase migrations", () => {
     const db = new MidenDatabase(name);
     openDbs.push(db.dexie);
 
-    const result = await db.open("1.0.0");
-    expect(result).toBe(true);
+    await db.open("1.0.0");
 
     // stateSync should be seeded by the populate hook
     const syncRecord = await db.stateSync.get(1);
@@ -198,46 +173,6 @@ describe("MidenDatabase migrations", () => {
     expect(decoder.decode(setting.value)).toBe("testValue");
   });
 
-  it("migration failure triggers fallback reset", async () => {
-    const name = uniqueDbName();
-
-    // Step 1: Create a v1 database with data
-    const dbV1 = trackDb(new Dexie(name));
-    dbV1.version(1).stores(V1_STORES);
-    await dbV1.open();
-    await dbV1.table("stateSync").put({ id: 1, blockNum: 99 });
-    dbV1.close();
-
-    // Step 2: Open via MidenDatabase. Monkey-patch dexie.open to fail on
-    // the first call (simulating a migration error), then succeed on retry.
-    const midenDb = new MidenDatabase(name);
-    openDbs.push(midenDb.dexie);
-
-    let callCount = 0;
-    const originalOpen = midenDb.dexie.open.bind(midenDb.dexie);
-    midenDb.dexie.open = async () => {
-      callCount++;
-      if (callCount === 1) {
-        throw new Error("Simulated migration failure");
-      }
-      return originalOpen();
-    };
-
-    const result = await midenDb.open("2.0.0");
-    expect(result).toBe(true);
-
-    // open() should have been called twice: first failed, second succeeded
-    expect(callCount).toBe(2);
-
-    // After reset, stateSync should be re-seeded (the old blockNum=99 is gone)
-    const syncRecord = await midenDb.stateSync.get(1);
-    expect(syncRecord).toEqual({ id: 1, blockNum: 0 });
-
-    // Client version should be stored
-    const versionRecord = await midenDb.settings.get(CLIENT_VERSION_SETTING_KEY);
-    expect(decoder.decode(versionRecord!.value)).toBe("2.0.0");
-  });
-
   it("reopening same version is a no-op and preserves data", async () => {
     const name = uniqueDbName();
 
@@ -260,8 +195,7 @@ describe("MidenDatabase migrations", () => {
     // Second open — same version, same schema
     const db2 = new MidenDatabase(name);
     openDbs.push(db2.dexie);
-    const result = await db2.open("1.0.0");
-    expect(result).toBe(true);
+    await db2.open("1.0.0");
 
     // All data should persist
     const syncAfter = await db2.stateSync.get(1);
