@@ -1,5 +1,5 @@
 import type {
-  WebClient,
+  _WebClient as WebClient,
   Account,
   AccountHeader,
   AccountId,

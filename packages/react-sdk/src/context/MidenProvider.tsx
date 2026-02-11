@@ -8,7 +8,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { WebClient } from "@miden-sdk/miden-sdk";
+import { _WebClient as WebClient } from "@miden-sdk/miden-sdk";
 import { useMidenStore } from "../store/MidenStore";
 import type { MidenConfig } from "../types";
 import { DEFAULTS } from "../types";

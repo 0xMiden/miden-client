@@ -3,6 +3,7 @@ export * from "./crates/miden_client_web";
 
 // Import types we need for augmentation
 import type {
+  WebClient as WasmWebClient,
   SyncSummary,
   TransactionProver,
   Account,
@@ -495,7 +496,7 @@ export declare function getWasmOrThrow(): Promise<typeof WasmExports>;
 // ════════════════════════════════════════════════════════════════
 
 /** @internal Low-level WebClient wrapper. Use MidenClient instead. */
-export declare class _WebClient {
+export declare class _WebClient extends WasmWebClient {
   static createClient(
     rpcUrl?: string,
     noteTransportUrl?: string,
@@ -516,7 +517,6 @@ export declare class _WebClient {
   syncState(): Promise<SyncSummary>;
   syncStateWithTimeout(timeoutMs: number): Promise<SyncSummary>;
   terminate(): void;
-  [key: string]: any;
 }
 
 /** @internal Low-level MockWebClient wrapper. Use MidenClient.createMock() instead. */

@@ -6,6 +6,10 @@
 
 # Class: WebClient
 
+## Extended by
+
+- [`_WebClient`](WebClient.md)
+
 ## Constructors
 
 ### Constructor
