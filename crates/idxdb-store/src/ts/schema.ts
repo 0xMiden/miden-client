@@ -242,12 +242,24 @@ const V1_STORES: Record<string, string> = {
   [Table.StorageMapEntries]: indexes("[root+key]", "root"),
   [Table.AccountAssets]: indexes("[root+vaultKey]", "root", "faucetIdPrefix"),
   [Table.AccountAuth]: indexes("pubKeyCommitmentHex"),
-  [Table.Accounts]: indexes("&accountCommitment", "id", "[id+nonce]", "codeRoot", "storageRoot", "vaultRoot"),
+  [Table.Accounts]: indexes(
+    "&accountCommitment",
+    "id",
+    "[id+nonce]",
+    "codeRoot",
+    "storageRoot",
+    "vaultRoot"
+  ),
   [Table.Addresses]: indexes("address", "id"),
   [Table.Transactions]: indexes("id", "statusVariant"),
   [Table.TransactionScripts]: indexes("scriptRoot"),
   [Table.InputNotes]: indexes("noteId", "nullifier", "stateDiscriminant"),
-  [Table.OutputNotes]: indexes("noteId", "recipientDigest", "stateDiscriminant", "nullifier"),
+  [Table.OutputNotes]: indexes(
+    "noteId",
+    "recipientDigest",
+    "stateDiscriminant",
+    "nullifier"
+  ),
   [Table.NotesScripts]: indexes("scriptRoot"),
   [Table.StateSync]: indexes("id"),
   [Table.BlockHeaders]: indexes("blockNum", "hasClientNotes"),

@@ -47,9 +47,13 @@ describe("MidenDatabase migrations", () => {
     dbV1.version(1).stores(testV1);
     await dbV1.open();
 
-    await dbV1.table("items").put({ id: "item-1", category: "a", name: "Alice" });
+    await dbV1
+      .table("items")
+      .put({ id: "item-1", category: "a", name: "Alice" });
     await dbV1.table("items").put({ id: "item-2", category: "b", name: "Bob" });
-    await dbV1.table("settings").put({ key: "color", value: encoder.encode("blue") });
+    await dbV1
+      .table("settings")
+      .put({ key: "color", value: encoder.encode("blue") });
 
     dbV1.close();
 
