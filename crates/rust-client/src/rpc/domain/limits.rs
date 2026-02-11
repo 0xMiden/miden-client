@@ -54,13 +54,12 @@ impl Serializable for RpcLimits {
 }
 
 impl Deserializable for RpcLimits {
-    #[allow(clippy::cast_possible_truncation)]
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         Ok(Self {
-            note_ids_limit: u64::read_from(source)? as usize,
-            nullifiers_limit: u64::read_from(source)? as usize,
-            account_ids_limit: u64::read_from(source)? as usize,
-            note_tags_limit: u64::read_from(source)? as usize,
+            note_ids_limit: usize::read_from(source)?,
+            nullifiers_limit: usize::read_from(source)?,
+            account_ids_limit: usize::read_from(source)?,
+            note_tags_limit: usize::read_from(source)?,
         })
     }
 }
