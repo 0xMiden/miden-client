@@ -81,7 +81,9 @@ use super::Client;
 use crate::Word;
 use crate::auth::AuthSchemeId;
 use crate::errors::ClientError;
+use crate::rpc::RpcError;
 use crate::rpc::domain::account::FetchedAccount;
+use crate::rpc::node::{EndpointError, GetAccountError};
 use crate::store::{AccountStatus, AccountStorageFilter};
 use crate::sync::NoteTagRecord;
 
@@ -227,7 +229,18 @@ impl<AUTH> Client<AUTH> {
     /// - If the account is private.
     /// - There was an error sending the request to the network.
     pub async fn import_account_by_id(&mut self, account_id: AccountId) -> Result<(), ClientError> {
-        let fetched_account = self.rpc_api.get_account_details(account_id).await?;
+        let fetched_account = self
+            .rpc_api
+            .get_account_details(account_id)
+            .await
+            .map_err(|err| match &err {
+                RpcError::RequestError {
+                    endpoint_error:
+                        Some(EndpointError::GetAccount(GetAccountError::AccountNotFound)),
+                    ..
+                } => ClientError::AccountNotFoundOnChain(account_id),
+                _ => ClientError::RpcError(err),
+            })?;
 
         let account = match fetched_account {
             FetchedAccount::Private(..) => {
