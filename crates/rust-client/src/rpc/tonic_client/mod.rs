@@ -97,17 +97,15 @@ impl BlockPagination {
         }
         self.iterations += 1;
 
-        if block_num.as_u32() < self.current_block_from.as_u32() {
+        if block_num < self.current_block_from {
             return Err(RpcError::PaginationError(
                 "invalid pagination: block_num went backwards".to_owned(),
             ));
         }
 
-        let target_block = self
-            .block_to
-            .map_or(chain_tip, |to| BlockNumber::from(to.as_u32().min(chain_tip.as_u32())));
+        let target_block = self.block_to.map_or(chain_tip, |to| to.min(chain_tip));
 
-        if block_num.as_u32() >= target_block.as_u32() {
+        if block_num >= target_block {
             return Ok(PaginationResult::Done { chain_tip, block_num });
         }
 
@@ -854,12 +852,9 @@ impl NodeRpcClient for GrpcClient {
                 }),
                 account_id: Some(account_id.into()),
             };
-            let response = rpc_api
-                .sync_account_storage_maps(request)
-                .await
-                .map_err(|status| {
-                    self.rpc_error_from_status(NodeRpcClientEndpoint::SyncStorageMaps, status)
-                })?;
+            let response = rpc_api.sync_account_storage_maps(request).await.map_err(|status| {
+                self.rpc_error_from_status(NodeRpcClientEndpoint::SyncStorageMaps, status)
+            })?;
             let response = response.into_inner();
             let page = response
                 .pagination_info
@@ -874,7 +869,7 @@ impl NodeRpcClient for GrpcClient {
             updates.extend(batch);
 
             match pagination.advance(page_block_num, page_chain_tip)? {
-                PaginationResult::Continue => continue,
+                PaginationResult::Continue => {},
                 PaginationResult::Done {
                     chain_tip: final_chain_tip,
                     block_num: final_block_num,
@@ -882,11 +877,7 @@ impl NodeRpcClient for GrpcClient {
             }
         };
 
-        Ok(StorageMapInfo {
-            chain_tip,
-            block_number,
-            updates,
-        })
+        Ok(StorageMapInfo { chain_tip, block_number, updates })
     }
 
     async fn sync_account_vault(
@@ -907,12 +898,9 @@ impl NodeRpcClient for GrpcClient {
                 }),
                 account_id: Some(account_id.into()),
             };
-            let response = rpc_api
-                .sync_account_vault(request)
-                .await
-                .map_err(|status| {
-                    self.rpc_error_from_status(NodeRpcClientEndpoint::SyncAccountVault, status)
-                })?;
+            let response = rpc_api.sync_account_vault(request).await.map_err(|status| {
+                self.rpc_error_from_status(NodeRpcClientEndpoint::SyncAccountVault, status)
+            })?;
             let response = response.into_inner();
             let page = response
                 .pagination_info
@@ -927,7 +915,7 @@ impl NodeRpcClient for GrpcClient {
             updates.extend(batch);
 
             match pagination.advance(page_block_num, page_chain_tip)? {
-                PaginationResult::Continue => continue,
+                PaginationResult::Continue => {},
                 PaginationResult::Done {
                     chain_tip: final_chain_tip,
                     block_num: final_block_num,
@@ -935,11 +923,7 @@ impl NodeRpcClient for GrpcClient {
             }
         };
 
-        Ok(AccountVaultInfo {
-            chain_tip,
-            block_number,
-            updates,
-        })
+        Ok(AccountVaultInfo { chain_tip, block_number, updates })
     }
 
     async fn sync_transactions(
@@ -1038,12 +1022,11 @@ impl From<&Status> for GrpcError {
 mod tests {
     use std::boxed::Box;
 
-    use miden_protocol::block::BlockNumber;
     use miden_protocol::Word;
+    use miden_protocol::block::BlockNumber;
 
     use super::{BlockPagination, GrpcClient, PaginationResult};
-    use crate::rpc::RpcError;
-    use crate::rpc::{Endpoint, NodeRpcClient};
+    use crate::rpc::{Endpoint, NodeRpcClient, RpcError};
 
     fn assert_send_sync<T: Send + Sync>() {}
 
