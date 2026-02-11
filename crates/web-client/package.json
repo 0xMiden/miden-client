@@ -49,6 +49,11 @@
   "dependencies": {
     "@rollup/plugin-typescript": "^12.3.0",
     "dexie": "^4.0.1",
-    "glob": "^11.0.0"
+    "glob": "^11.0.0",
+    "semver": "^7.7.4"
+  },
+  "optionalDependencies": {
+    "better-sqlite3": "^12.6.2",
+    "undici": "^7.21.0"
   }
 }
