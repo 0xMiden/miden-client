@@ -3,6 +3,8 @@
 ## 0.13.1 (TBD)
 
 * Added the `@miden-sdk/react` hooks library (see [its own changelog](packages/react-sdk/CHANGELOG.md)) ([#1711](https://github.com/0xMiden/miden-client/pull/1711)).
+* [FEATURE][web] Added Node.js runtime support with SQLite storage adapter (`better-sqlite3`), dedicated Rollup build pipeline (`dist-node/`), and conditional `package.json` exports so `import { WebClient } from "@miden-sdk/miden-sdk"` automatically resolves to the correct build in both browser and Node.js environments.
+* [FEATURE][web] Added offline Node.js test suite (27 tests) covering SDK loading, account creation, mint/consume/send lifecycle, cryptographic primitives, and query APIs, wired into CI and Makefile (`make test-node-web-client`).
 
 ## 0.13.0
 
