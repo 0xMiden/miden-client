@@ -10,6 +10,9 @@ export {
   useMidenClient,
 } from "./context/MidenProvider";
 
+// Signer Context (for external signer providers)
+export { SignerContext, useSigner } from "./context/SignerContext";
+
 // Query Hooks
 export { useAccounts } from "./hooks/useAccounts";
 export { useAccount } from "./hooks/useAccount";
@@ -70,6 +73,11 @@ export type {
   SwapOptions,
   ExecuteTransactionOptions,
   TransactionResult,
+  // Signer types (for external signer providers)
+  SignCallback,
+  SignerAccountType,
+  SignerAccountConfig,
+  SignerContextValue,
 } from "./types";
 
 // Re-export SDK types for convenience

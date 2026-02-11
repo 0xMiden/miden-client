@@ -95,7 +95,7 @@ impl OutputNoteRecord {
         let recipient = self.recipient()?;
         Some(Nullifier::new(
             recipient.script().root(),
-            recipient.inputs().commitment(),
+            recipient.storage().commitment(),
             self.assets.commitment(),
             recipient.serial_num(),
         ))

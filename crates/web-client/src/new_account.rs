@@ -42,7 +42,7 @@ impl WebClient {
 
             keystore
                 .expect("KeyStore should be initialized")
-                .add_key(&key_pair)
+                .add_secret_key(&key_pair)
                 .await
                 .map_err(|err| err.to_string())?;
 
@@ -130,7 +130,7 @@ impl WebClient {
 
             keystore
                 .expect("KeyStore should be initialized")
-                .add_key(&key_pair)
+                .add_secret_key(&key_pair)
                 .await
                 .map_err(|err| err.to_string())?;
 
@@ -181,7 +181,10 @@ impl WebClient {
         let native_secret_key: AuthSecretKey = secret_key.into();
         let native_account_id = account_id.into();
 
-        keystore.add_key(&native_secret_key).await.map_err(|err| err.to_string())?;
+        keystore
+            .add_secret_key(&native_secret_key)
+            .await
+            .map_err(|err| err.to_string())?;
 
         if let Some(client) = self.get_mut_inner() {
             client
