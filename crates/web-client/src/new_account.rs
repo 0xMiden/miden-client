@@ -30,15 +30,15 @@ impl WebClient {
     async fn maybe_sync_before_account_creation(&mut self) {
         let should_sync = match self.get_mut_inner() {
             Some(client) => {
-                client.get_sync_height().await.map_or(false, |h| h == BlockNumber::GENESIS)
+                client.get_sync_height().await.is_ok_and(|h| h == BlockNumber::GENESIS)
             },
             None => false,
         };
 
-        if should_sync {
-            if let Some(client) = self.get_mut_inner() {
-                let _ = client.sync_state().await;
-            }
+        if should_sync
+            && let Some(client) = self.get_mut_inner()
+        {
+            let _ = client.sync_state().await;
         }
     }
 }

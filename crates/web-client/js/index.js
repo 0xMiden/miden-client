@@ -407,30 +407,13 @@ export class WebClient {
   // ----- Explicitly Wrapped Methods (Worker-Forwarded) -----
 
   async newWallet(storageMode, mutable, authSchemeId, seed) {
-    try {
-      if (!this.worker) {
-        const wasmWebClient = await this.getWasmWebClient();
-        return await wasmWebClient.newWallet(
-          storageMode,
-          mutable,
-          authSchemeId,
-          seed
-        );
-      }
-      const wasm = await getWasmOrThrow();
-      const serializedStorageMode = storageMode.asStr();
-      const serializedAccountBytes = await this.callMethodWithWorker(
-        MethodName.NEW_WALLET,
-        serializedStorageMode,
-        mutable,
-        authSchemeId,
-        seed
-      );
-      return wasm.Account.deserialize(new Uint8Array(serializedAccountBytes));
-    } catch (error) {
-      console.error("INDEX.JS: Error in newWallet:", error);
-      throw error;
-    }
+    const wasmWebClient = await this.getWasmWebClient();
+    return await wasmWebClient.newWallet(
+      storageMode,
+      mutable,
+      authSchemeId,
+      seed
+    );
   }
 
   async newFaucet(
@@ -441,36 +424,15 @@ export class WebClient {
     maxSupply,
     authSchemeId
   ) {
-    try {
-      if (!this.worker) {
-        const wasmWebClient = await this.getWasmWebClient();
-        return await wasmWebClient.newFaucet(
-          storageMode,
-          nonFungible,
-          tokenSymbol,
-          decimals,
-          maxSupply,
-          authSchemeId
-        );
-      }
-      const wasm = await getWasmOrThrow();
-      const serializedStorageMode = storageMode.asStr();
-      const serializedMaxSupply = maxSupply.toString();
-      const serializedAccountBytes = await this.callMethodWithWorker(
-        MethodName.NEW_FAUCET,
-        serializedStorageMode,
-        nonFungible,
-        tokenSymbol,
-        decimals,
-        serializedMaxSupply,
-        authSchemeId
-      );
-
-      return wasm.Account.deserialize(new Uint8Array(serializedAccountBytes));
-    } catch (error) {
-      console.error("INDEX.JS: Error in newFaucet:", error);
-      throw error;
-    }
+    const wasmWebClient = await this.getWasmWebClient();
+    return await wasmWebClient.newFaucet(
+      storageMode,
+      nonFungible,
+      tokenSymbol,
+      decimals,
+      maxSupply,
+      authSchemeId
+    );
   }
 
   async submitNewTransaction(accountId, transactionRequest) {
