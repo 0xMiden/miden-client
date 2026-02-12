@@ -591,9 +591,10 @@ async fn account_reader_addresses_access() -> anyhow::Result<()> {
 // STORAGE MODEL BENCHMARK (issue #1768)
 // ================================================================================================
 
-/// Row counts across the new account-related tables.
+/// Row counts across the account-related tables.
 struct StorageMetrics {
-    accounts: usize,
+    latest_account_headers: usize,
+    historical_account_headers: usize,
     latest_account_storage: usize,
     latest_storage_map_entries: usize,
     latest_account_assets: usize,
@@ -606,9 +607,10 @@ impl std::fmt::Display for StorageMetrics {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "accounts={:<3} latest_storage={:<3} latest_map={:<3} latest_assets={:<3} \
-             hist_storage={:<3} hist_map={:<3} hist_assets={:<3}",
-            self.accounts,
+            "latest_headers={:<3} hist_headers={:<3} latest_storage={:<3} latest_map={:<3} \
+             latest_assets={:<3} hist_storage={:<3} hist_map={:<3} hist_assets={:<3}",
+            self.latest_account_headers,
+            self.historical_account_headers,
             self.latest_account_storage,
             self.latest_storage_map_entries,
             self.latest_account_assets,
@@ -627,7 +629,8 @@ async fn get_storage_metrics(store: &SqliteStore) -> StorageMetrics {
                     .into_store_error()
             };
             Ok(StorageMetrics {
-                accounts: count("accounts")?,
+                latest_account_headers: count("latest_account_headers")?,
+                historical_account_headers: count("historical_account_headers")?,
                 latest_account_storage: count("latest_account_storage")?,
                 latest_storage_map_entries: count("latest_storage_map_entries")?,
                 latest_account_assets: count("latest_account_assets")?,
@@ -757,6 +760,11 @@ async fn storage_model_benchmark() -> anyhow::Result<()> {
     let after_updates = get_storage_metrics(&store).await;
     let num_states = (1 + NUM_UPDATES) as usize;
 
+    // Latest account headers: always one row per account
+    assert_eq!(after_updates.latest_account_headers, 1);
+    // Historical account headers: one row per state transition
+    assert_eq!(after_updates.historical_account_headers, num_states);
+
     // Latest tables always hold the full current state
     assert_eq!(after_updates.latest_storage_map_entries, MAP_SIZE as usize);
     // Account has 2 storage slots: the auth key slot + the map slot
@@ -769,7 +777,6 @@ async fn storage_model_benchmark() -> anyhow::Result<()> {
         after_updates.historical_storage_map_entries,
         MAP_SIZE as usize + NUM_UPDATES as usize
     );
-    assert_eq!(after_updates.accounts, num_states);
 
     // ── Phase 2: Correctness (Store trait) ───────────────────────────────
     let changed_key = [Felt::new(1), ZERO, ZERO, ZERO].into();

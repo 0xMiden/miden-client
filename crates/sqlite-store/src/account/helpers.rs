@@ -63,14 +63,32 @@ pub(crate) fn parse_accounts(
     ))
 }
 
-pub(crate) fn query_account_headers(
+pub(crate) fn query_latest_account_headers(
     conn: &Connection,
     where_clause: &str,
     params: impl Params,
 ) -> Result<Vec<(AccountHeader, AccountStatus)>, StoreError> {
-    const SELECT_QUERY: &str = "SELECT id, nonce, vault_root, storage_commitment, code_commitment, account_seed, locked \
-        FROM accounts";
-    let query = format!("{SELECT_QUERY} WHERE {where_clause}");
+    query_account_headers_from_table(conn, "latest_account_headers", where_clause, params)
+}
+
+pub(crate) fn query_historical_account_headers(
+    conn: &Connection,
+    where_clause: &str,
+    params: impl Params,
+) -> Result<Vec<(AccountHeader, AccountStatus)>, StoreError> {
+    query_account_headers_from_table(conn, "historical_account_headers", where_clause, params)
+}
+
+fn query_account_headers_from_table(
+    conn: &Connection,
+    table: &str,
+    where_clause: &str,
+    params: impl Params,
+) -> Result<Vec<(AccountHeader, AccountStatus)>, StoreError> {
+    let query = format!(
+        "SELECT id, nonce, vault_root, storage_commitment, code_commitment, account_seed, locked \
+         FROM {table} WHERE {where_clause}"
+    );
     conn.prepare(&query)
         .into_store_error()?
         .query_map(params, |row| {
