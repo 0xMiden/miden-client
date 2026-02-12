@@ -154,6 +154,7 @@
 - [AddressInterface](type-aliases/AddressInterface.md)
 - [GetKeyCallback](type-aliases/GetKeyCallback.md)
 - [InsertKeyCallback](type-aliases/InsertKeyCallback.md)
+- [LogLevel](type-aliases/LogLevel.md)
 - [ReadableStreamType](type-aliases/ReadableStreamType.md)
 - [SignCallback](type-aliases/SignCallback.md)
 
@@ -164,3 +165,4 @@
 ## Functions
 
 - [createAuthFalcon512RpoMultisig](functions/createAuthFalcon512RpoMultisig.md)
+- [setupLogging](functions/setupLogging.md)
