@@ -75,10 +75,17 @@ pub struct StateSync {
     /// Number of blocks after which pending transactions are considered stale and discarded.
     /// If `None`, there is no limit and transactions will be kept indefinitely.
     tx_discard_delta: Option<u32>,
+    /// Whether to check for nullifiers during state sync. When enabled, the component will query
+    /// the nullifiers for unspent notes at each sync step. This allows to detect when tracked
+    /// notes have been consumed externally and discard local transactions that depend on them.
+    sync_nullifiers: bool,
 }
 
 impl StateSync {
     /// Creates a new instance of the state sync component.
+    ///
+    /// The nullifiers sync is enabled by default. To disable it, see
+    /// [`Self::disable_nullifier_sync`].
     ///
     /// # Arguments
     ///
@@ -90,7 +97,26 @@ impl StateSync {
         note_screener: Arc<dyn OnNoteReceived>,
         tx_discard_delta: Option<u32>,
     ) -> Self {
-        Self { rpc_api, note_screener, tx_discard_delta }
+        Self {
+            rpc_api,
+            note_screener,
+            tx_discard_delta,
+            sync_nullifiers: true,
+        }
+    }
+
+    /// Disables the nullifier sync.
+    ///
+    /// When disabled, the component will not query the node for new nullifiers after each sync
+    /// step. This is useful for clients that don't need to track note consumption, such as
+    /// faucets.
+    pub fn disable_nullifier_sync(&mut self) {
+        self.sync_nullifiers = false;
+    }
+
+    /// Enables the nullifier sync.
+    pub fn enable_nullifier_sync(&mut self) {
+        self.sync_nullifiers = true;
     }
 
     /// Syncs the state of the client with the chain tip of the node, returning the updates that
@@ -224,9 +250,10 @@ impl StateSync {
                 );
             }
         }
-        info!("Syncing nullifiers.");
-
-        self.sync_nullifiers(&mut state_sync_update, block_num).await?;
+        if self.sync_nullifiers {
+            info!("Syncing nullifiers.");
+            self.nullifiers_state_sync(&mut state_sync_update, block_num).await?;
+        }
 
         Ok(state_sync_update)
     }
@@ -398,7 +425,7 @@ impl StateSync {
     /// notes. It then processes the nullifiers to apply the state transitions on the note updates.
     ///
     /// The `state_sync_update` parameter will be updated to track the new discarded transactions.
-    async fn sync_nullifiers(
+    async fn nullifiers_state_sync(
         &self,
         state_sync_update: &mut StateSyncUpdate,
         current_block_num: BlockNumber,
