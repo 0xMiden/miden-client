@@ -103,13 +103,12 @@ impl AccountSmtForest {
         let old_roots = self.pending_old_roots.get_mut(&account_id).and_then(Vec::pop);
 
         // Release the current (staged) roots and restore old ones if available
-        if let Some(old_roots) = old_roots {
-            if let Some(new_roots) = self.account_roots.insert(account_id, old_roots) {
-                let to_pop = decrement_refcounts(&mut self.root_refcounts, &new_roots);
-                self.forest.pop_smts(to_pop);
-            }
-        } else if let Some(new_roots) = self.account_roots.remove(&account_id) {
-            // No old roots to restore — just remove the staged roots entirely
+        let new_roots = match old_roots {
+            Some(old_roots) => self.account_roots.insert(account_id, old_roots),
+            None => self.account_roots.remove(&account_id),
+        };
+
+        if let Some(new_roots) = new_roots {
             let to_pop = decrement_refcounts(&mut self.root_refcounts, &new_roots);
             self.forest.pop_smts(to_pop);
         }
