@@ -291,12 +291,7 @@ export class MidenDatabase {
       [Table.StateSync]: indexes("id"),
       [Table.BlockHeaders]: indexes("blockNum", "hasClientNotes"),
       [Table.PartialBlockchainNodes]: indexes("id"),
-      [Table.Tags]: indexes(
-        "id++",
-        "tag",
-        "source_note_id",
-        "source_account_id"
-      ),
+      [Table.Tags]: indexes("id++", "tag", "sourceNoteId", "sourceAccountId"),
       [Table.ForeignAccountCode]: indexes("accountId"),
       [Table.Settings]: indexes("key"),
       [Table.TrackedAccounts]: indexes("&id"),
