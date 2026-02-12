@@ -806,3 +806,144 @@ async fn storage_model_benchmark() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+// UNDO & COMMITMENT LOOKUP TESTS (issue #1768)
+// ================================================================================================
+
+/// Verifies that `undo_account_state` correctly reverts the latest tables to the previous state.
+/// Exercises `undo_account_state` + `rebuild_latest_for_account`.
+///
+/// The delta includes both storage and vault changes so that the vault root changes between
+/// nonce 0 and nonce 1. This is required because `undo_account_state` pops SMT roots from the
+/// forest, and the vault root must differ to avoid removing the initial state's root.
+#[tokio::test]
+async fn undo_account_state_restores_previous_latest() -> anyhow::Result<()> {
+    let store = create_test_store().await;
+    let map_slot_name = StorageSlotName::new("test::undo::map").expect("valid slot name");
+
+    // Insert account with 5 map entries (nonce 0)
+    let mut account = setup_account_with_map(&store, 5, &map_slot_name).await?;
+    let initial_commitment = account.commitment();
+
+    // Apply a delta (nonce 1) that changes a map entry AND adds a fungible asset.
+    // The vault change ensures the vault root differs between nonce 0 and 1,
+    // which is needed for pop_roots to work correctly.
+    let mut storage_delta = AccountStorageDelta::new();
+    storage_delta.set_map_item(
+        map_slot_name.clone(),
+        [Felt::new(1), ZERO, ZERO, ZERO].into(),
+        [Felt::new(1000), ZERO, ZERO, ZERO].into(),
+    )?;
+    let vault_delta = AccountVaultDelta::from_iters(
+        vec![
+            FungibleAsset::new(AccountId::try_from(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET)?, 100)?
+                .into(),
+        ],
+        [],
+    );
+    let delta = AccountDelta::new(account.id(), storage_delta, vault_delta, ONE)?;
+
+    let prev_header: AccountHeader = (&account).into();
+    account.apply_delta(&delta)?;
+    let final_header: AccountHeader = (&account).into();
+    let post_delta_commitment = account.commitment();
+
+    let smt_forest = store.smt_forest.clone();
+    let account_id = account.id();
+    let delta_clone = delta.clone();
+    store
+        .interact_with_connection(move |conn| {
+            let storage_maps =
+                SqliteStore::get_account_storage_maps_for_delta(conn, account_id, &delta_clone)?;
+            let tx = conn.transaction().into_store_error()?;
+            let mut smt_forest = smt_forest.write().expect("smt_forest write lock not poisoned");
+            SqliteStore::apply_account_delta(
+                &tx,
+                &mut smt_forest,
+                &prev_header,
+                &final_header,
+                BTreeMap::default(),
+                storage_maps,
+                &delta,
+            )?;
+            tx.commit().into_store_error()?;
+            Ok(())
+        })
+        .await?;
+
+    // Pre-undo: 2 historical headers (nonce 0 + nonce 1), 1 latest
+    let m = get_storage_metrics(&store).await;
+    assert_eq!(m.historical_account_headers, 2);
+    assert_eq!(m.latest_account_headers, 1);
+    assert_eq!(m.latest_account_assets, 1);
+
+    // Undo the nonce-1 state
+    let smt_forest = store.smt_forest.clone();
+    store
+        .interact_with_connection(move |conn| {
+            let tx = conn.transaction().into_store_error()?;
+            let mut smt_forest = smt_forest.write().expect("smt_forest write lock not poisoned");
+            SqliteStore::undo_account_state(&tx, &mut smt_forest, &[post_delta_commitment])?;
+            tx.commit().into_store_error()?;
+            Ok(())
+        })
+        .await?;
+
+    // After undo: only nonce-0 state remains in historical, latest rebuilt from it
+    let m = get_storage_metrics(&store).await;
+    assert_eq!(m.historical_account_headers, 1);
+    assert_eq!(m.latest_account_headers, 1);
+    assert_eq!(m.latest_storage_map_entries, 5);
+    assert_eq!(m.historical_storage_map_entries, 5);
+    assert_eq!(m.latest_account_assets, 0, "Vault should be empty after undo to nonce 0");
+
+    // Latest header should reflect nonce 0 with the initial commitment
+    let (header, _status) = store
+        .interact_with_connection(move |conn| SqliteStore::get_account_header(conn, account_id))
+        .await?
+        .expect("account should still exist after undo");
+    assert_eq!(header.nonce().as_int(), 0);
+    assert_eq!(header.commitment(), initial_commitment);
+
+    Ok(())
+}
+
+/// Verifies that `get_account_header_by_commitment` retrieves historical states by commitment.
+#[tokio::test]
+async fn get_account_header_by_commitment_returns_historical() -> anyhow::Result<()> {
+    let store = create_test_store().await;
+    let map_slot_name = StorageSlotName::new("test::commitment::map").expect("valid slot name");
+
+    // Insert account (nonce 0)
+    let mut account = setup_account_with_map(&store, 3, &map_slot_name).await?;
+    let initial_commitment = account.commitment();
+
+    // Apply a delta (nonce 1)
+    apply_single_entry_update(&store, &mut account, &map_slot_name, 1).await?;
+    let post_delta_commitment = account.commitment();
+    assert_ne!(initial_commitment, post_delta_commitment);
+
+    // Look up the initial commitment — should find the nonce-0 state in historical
+    let lookup = initial_commitment;
+    let header = store
+        .interact_with_connection(move |conn| {
+            SqliteStore::get_account_header_by_commitment(conn, lookup)
+        })
+        .await?
+        .expect("Initial commitment should exist in historical");
+    assert_eq!(header.nonce().as_int(), 0);
+    assert_eq!(header.commitment(), initial_commitment);
+
+    // Look up the post-delta commitment — should find the nonce-1 state in historical
+    let lookup = post_delta_commitment;
+    let header = store
+        .interact_with_connection(move |conn| {
+            SqliteStore::get_account_header_by_commitment(conn, lookup)
+        })
+        .await?
+        .expect("Post-delta commitment should exist in historical");
+    assert_eq!(header.nonce().as_int(), 1);
+    assert_eq!(header.commitment(), post_delta_commitment);
+
+    Ok(())
+}
