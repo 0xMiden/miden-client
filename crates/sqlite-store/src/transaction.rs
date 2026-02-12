@@ -1,12 +1,9 @@
 #![allow(clippy::items_after_statements)]
 
-use std::rc::Rc;
-use std::string::{String, ToString};
-use std::sync::{Arc, RwLock};
-use std::vec::Vec;
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
 
 use miden_client::Word;
-use miden_client::note::ToInputNoteCommitments;
 use miden_client::store::{StoreError, TransactionFilter};
 use miden_client::transaction::{
     TransactionDetails,
@@ -14,18 +11,8 @@ use miden_client::transaction::{
     TransactionRecord,
     TransactionScript,
     TransactionStatus,
-    TransactionStoreUpdate,
 };
 use miden_client::utils::{Deserializable as _, Serializable as _};
-use rusqlite::types::Value;
-use rusqlite::{Connection, Transaction, params};
-
-use super::SqliteStore;
-use super::note::apply_note_updates_tx;
-use super::sync::add_note_tag_tx;
-use crate::smt_forest::AccountSmtForest;
-use crate::sql_error::SqlResultExt;
-use crate::{insert_sql, subst};
 
 pub(crate) const UPSERT_TRANSACTION_QUERY: &str = insert_sql!(
     transactions {
@@ -61,158 +48,6 @@ struct SerializedTransactionData {
     status: Vec<u8>,
 }
 
-struct SerializedTransactionParts {
-    /// Transaction ID
-    id: String,
-    /// Transaction script
-    tx_script: Option<Vec<u8>>,
-    /// Transaction details
-    details: Vec<u8>,
-    /// Serialized transaction status
-    status: Vec<u8>,
-}
-
-impl SqliteStore {
-    /// Retrieves tracked transactions, filtered by [`TransactionFilter`].
-    pub fn get_transactions(
-        conn: &mut Connection,
-        filter: &TransactionFilter,
-    ) -> Result<Vec<TransactionRecord>, StoreError> {
-        match filter {
-            TransactionFilter::Ids(ids) => {
-                // Convert transaction IDs to strings for the array parameter
-                let id_strings =
-                    ids.iter().map(|id| Value::Text(id.to_string())).collect::<Vec<_>>();
-
-                // Create a prepared statement and bind the array parameter
-                conn.prepare(filter.to_query().as_ref())
-                    .into_store_error()?
-                    .query_map(params![Rc::new(id_strings)], parse_transaction_columns)
-                    .into_store_error()?
-                    .map(|result| Ok(result.into_store_error()?).and_then(parse_transaction))
-                    .collect::<Result<Vec<TransactionRecord>, _>>()
-            },
-            _ => {
-                // For other filters, no parameters are needed
-                conn.prepare(filter.to_query().as_ref())
-                    .into_store_error()?
-                    .query_map([], parse_transaction_columns)
-                    .into_store_error()?
-                    .map(|result| Ok(result.into_store_error()?).and_then(parse_transaction))
-                    .collect::<Result<Vec<TransactionRecord>, _>>()
-            },
-        }
-    }
-
-    /// Inserts a transaction and updates the current state based on the `tx_result` changes.
-    pub fn apply_transaction(
-        conn: &mut Connection,
-        smt_forest: &Arc<RwLock<AccountSmtForest>>,
-        tx_update: &TransactionStoreUpdate,
-    ) -> Result<(), StoreError> {
-        let executed_transaction = tx_update.executed_transaction();
-
-        let updated_fungible_assets = Self::get_account_fungible_assets_for_delta(
-            conn,
-            &executed_transaction.initial_account().into(),
-            executed_transaction.account_delta(),
-        )?;
-
-        let updated_storage_maps = Self::get_account_storage_maps_for_delta(
-            conn,
-            &executed_transaction.initial_account().into(),
-            executed_transaction.account_delta(),
-        )?;
-
-        let tx = conn.transaction().into_store_error()?;
-
-        // Build transaction record
-        let nullifiers: Vec<Word> = executed_transaction
-            .input_notes()
-            .iter()
-            .map(|x| x.nullifier().as_word())
-            .collect();
-
-        let output_notes = executed_transaction.output_notes();
-
-        let details = TransactionDetails {
-            account_id: executed_transaction.account_id(),
-            init_account_state: executed_transaction.initial_account().commitment(),
-            final_account_state: executed_transaction.final_account().commitment(),
-            input_note_nullifiers: nullifiers,
-            output_notes: output_notes.clone(),
-            block_num: executed_transaction.block_header().block_num(),
-            submission_height: tx_update.submission_height(),
-            expiration_block_num: executed_transaction.expiration_block_num(),
-            creation_timestamp: super::current_timestamp_u64(),
-        };
-
-        let transaction_record = TransactionRecord::new(
-            executed_transaction.id(),
-            details,
-            executed_transaction.tx_args().tx_script().cloned(),
-            TransactionStatus::Pending,
-        );
-
-        // Insert transaction data
-        upsert_transaction_record(&tx, &transaction_record)?;
-
-        // Account Data
-        let mut smt_forest = smt_forest.write().expect("smt_forest write lock not poisoned");
-        Self::apply_account_delta(
-            &tx,
-            &mut smt_forest,
-            &executed_transaction.initial_account().into(),
-            executed_transaction.final_account(),
-            updated_fungible_assets,
-            updated_storage_maps,
-            executed_transaction.account_delta(),
-        )?;
-        drop(smt_forest);
-
-        // Note Updates
-        apply_note_updates_tx(&tx, tx_update.note_updates())?;
-
-        // Note tags
-        for tag_record in tx_update.new_tags() {
-            add_note_tag_tx(&tx, tag_record)?;
-        }
-
-        tx.commit().into_store_error()?;
-
-        Ok(())
-    }
-}
-
-/// Updates the transaction record in the database, inserting it if it doesn't exist.
-pub(crate) fn upsert_transaction_record(
-    tx: &Transaction<'_>,
-    transaction: &TransactionRecord,
-) -> Result<(), StoreError> {
-    let SerializedTransactionData {
-        id,
-        script_root,
-        tx_script,
-        details,
-        block_num,
-        status_variant,
-        status,
-    } = serialize_transaction_data(transaction);
-
-    if let Some(root) = script_root.clone() {
-        tx.execute(INSERT_TRANSACTION_SCRIPT_QUERY, params![root, tx_script])
-            .into_store_error()?;
-    }
-
-    tx.execute(
-        UPSERT_TRANSACTION_QUERY,
-        params![id, details, script_root, block_num, status_variant, status],
-    )
-    .into_store_error()?;
-
-    Ok(())
-}
-
 /// Serializes the transaction record into a format suitable for storage in the database.
 fn serialize_transaction_data(transaction_record: &TransactionRecord) -> SerializedTransactionData {
     let transaction_id: String = transaction_record.id.to_hex();
@@ -231,33 +66,319 @@ fn serialize_transaction_data(transaction_record: &TransactionRecord) -> Seriali
     }
 }
 
-fn parse_transaction_columns(
-    row: &rusqlite::Row<'_>,
-) -> Result<SerializedTransactionParts, rusqlite::Error> {
-    let id: String = row.get(0)?;
-    let tx_script: Option<Vec<u8>> = row.get(1)?;
-    let details: Vec<u8> = row.get(2)?;
-    let status: Vec<u8> = row.get(3)?;
+#[cfg(not(target_arch = "wasm32"))]
+#[allow(dead_code)]
+pub(crate) mod rusqlite_impl {
+    use alloc::string::{String, ToString};
+    use alloc::vec::Vec;
+    use std::rc::Rc;
+    use std::sync::{Arc, RwLock};
 
-    Ok(SerializedTransactionParts { id, tx_script, details, status })
+    use miden_client::Word;
+    use miden_client::note::ToInputNoteCommitments;
+    use miden_client::store::{StoreError, TransactionFilter};
+    use miden_client::transaction::{
+        TransactionDetails,
+        TransactionId,
+        TransactionRecord,
+        TransactionScript,
+        TransactionStatus,
+        TransactionStoreUpdate,
+    };
+    use miden_client::utils::Deserializable as _;
+    use rusqlite::types::Value;
+    use rusqlite::{Connection, Transaction, params};
+
+    use super::{
+        INSERT_TRANSACTION_SCRIPT_QUERY,
+        SerializedTransactionData,
+        UPSERT_TRANSACTION_QUERY,
+        serialize_transaction_data,
+    };
+    use crate::SqliteStore;
+    use crate::note::apply_note_updates_tx;
+    use crate::smt_forest::AccountSmtForest;
+    use crate::sql_error::SqlResultExt;
+    use crate::sync::add_note_tag_tx;
+
+    struct SerializedTransactionParts {
+        /// Transaction ID
+        id: String,
+        /// Transaction script
+        tx_script: Option<Vec<u8>>,
+        /// Transaction details
+        details: Vec<u8>,
+        /// Serialized transaction status
+        status: Vec<u8>,
+    }
+
+    impl SqliteStore {
+        /// Retrieves tracked transactions, filtered by [`TransactionFilter`].
+        pub fn get_transactions(
+            conn: &mut Connection,
+            filter: &TransactionFilter,
+        ) -> Result<Vec<TransactionRecord>, StoreError> {
+            match filter {
+                TransactionFilter::Ids(ids) => {
+                    // Convert transaction IDs to strings for the array parameter
+                    let id_strings =
+                        ids.iter().map(|id| Value::Text(id.to_string())).collect::<Vec<_>>();
+
+                    // Create a prepared statement and bind the array parameter
+                    conn.prepare(filter.to_query().as_ref())
+                        .into_store_error()?
+                        .query_map(params![Rc::new(id_strings)], parse_transaction_columns)
+                        .into_store_error()?
+                        .map(|result| Ok(result.into_store_error()?).and_then(parse_transaction))
+                        .collect::<Result<Vec<TransactionRecord>, _>>()
+                },
+                _ => {
+                    // For other filters, no parameters are needed
+                    conn.prepare(filter.to_query().as_ref())
+                        .into_store_error()?
+                        .query_map([], parse_transaction_columns)
+                        .into_store_error()?
+                        .map(|result| Ok(result.into_store_error()?).and_then(parse_transaction))
+                        .collect::<Result<Vec<TransactionRecord>, _>>()
+                },
+            }
+        }
+
+        /// Inserts a transaction and updates the current state based on the `tx_result` changes.
+        pub fn apply_transaction(
+            conn: &mut Connection,
+            smt_forest: &Arc<RwLock<AccountSmtForest>>,
+            tx_update: &TransactionStoreUpdate,
+        ) -> Result<(), StoreError> {
+            let executed_transaction = tx_update.executed_transaction();
+
+            let updated_fungible_assets = Self::get_account_fungible_assets_for_delta(
+                conn,
+                &executed_transaction.initial_account().into(),
+                executed_transaction.account_delta(),
+            )?;
+
+            let updated_storage_maps = Self::get_account_storage_maps_for_delta(
+                conn,
+                &executed_transaction.initial_account().into(),
+                executed_transaction.account_delta(),
+            )?;
+
+            let tx = conn.transaction().into_store_error()?;
+
+            // Build transaction record
+            let nullifiers: Vec<Word> = executed_transaction
+                .input_notes()
+                .iter()
+                .map(|x| x.nullifier().as_word())
+                .collect();
+
+            let output_notes = executed_transaction.output_notes();
+
+            let details = TransactionDetails {
+                account_id: executed_transaction.account_id(),
+                init_account_state: executed_transaction.initial_account().commitment(),
+                final_account_state: executed_transaction.final_account().commitment(),
+                input_note_nullifiers: nullifiers,
+                output_notes: output_notes.clone(),
+                block_num: executed_transaction.block_header().block_num(),
+                submission_height: tx_update.submission_height(),
+                expiration_block_num: executed_transaction.expiration_block_num(),
+                creation_timestamp: crate::current_timestamp_u64(),
+            };
+
+            let transaction_record = TransactionRecord::new(
+                executed_transaction.id(),
+                details,
+                executed_transaction.tx_args().tx_script().cloned(),
+                TransactionStatus::Pending,
+            );
+
+            // Insert transaction data
+            upsert_transaction_record(&tx, &transaction_record)?;
+
+            // Account Data
+            let mut smt_forest = smt_forest.write().expect("smt_forest write lock not poisoned");
+            Self::apply_account_delta(
+                &tx,
+                &mut smt_forest,
+                &executed_transaction.initial_account().into(),
+                executed_transaction.final_account(),
+                updated_fungible_assets,
+                updated_storage_maps,
+                executed_transaction.account_delta(),
+            )?;
+            drop(smt_forest);
+
+            // Note Updates
+            apply_note_updates_tx(&tx, tx_update.note_updates())?;
+
+            // Note tags
+            for tag_record in tx_update.new_tags() {
+                add_note_tag_tx(&tx, tag_record)?;
+            }
+
+            tx.commit().into_store_error()?;
+
+            Ok(())
+        }
+    }
+
+    /// Updates the transaction record in the database, inserting it if it doesn't exist.
+    pub(crate) fn upsert_transaction_record(
+        tx: &Transaction<'_>,
+        transaction: &TransactionRecord,
+    ) -> Result<(), StoreError> {
+        let SerializedTransactionData {
+            id,
+            script_root,
+            tx_script,
+            details,
+            block_num,
+            status_variant,
+            status,
+        } = serialize_transaction_data(transaction);
+
+        if let Some(root) = script_root.clone() {
+            tx.execute(INSERT_TRANSACTION_SCRIPT_QUERY, params![root, tx_script])
+                .into_store_error()?;
+        }
+
+        tx.execute(
+            UPSERT_TRANSACTION_QUERY,
+            params![id, details, script_root, block_num, status_variant, status],
+        )
+        .into_store_error()?;
+
+        Ok(())
+    }
+
+    fn parse_transaction_columns(
+        row: &rusqlite::Row<'_>,
+    ) -> Result<SerializedTransactionParts, rusqlite::Error> {
+        let id: String = row.get(0)?;
+        let tx_script: Option<Vec<u8>> = row.get(1)?;
+        let details: Vec<u8> = row.get(2)?;
+        let status: Vec<u8> = row.get(3)?;
+
+        Ok(SerializedTransactionParts { id, tx_script, details, status })
+    }
+
+    /// Parse a transaction from the provided parts.
+    fn parse_transaction(
+        serialized_transaction: SerializedTransactionParts,
+    ) -> Result<TransactionRecord, StoreError> {
+        let SerializedTransactionParts { id, tx_script, details, status } = serialized_transaction;
+
+        let id: Word = id.as_str().try_into()?;
+
+        let script: Option<TransactionScript> = tx_script
+            .map(|script| TransactionScript::read_from_bytes(&script))
+            .transpose()?;
+
+        Ok(TransactionRecord {
+            id: TransactionId::from_raw(id),
+            details: TransactionDetails::read_from_bytes(&details)?,
+            script,
+            status: TransactionStatus::read_from_bytes(&status)?,
+        })
+    }
 }
 
-/// Parse a transaction from the provided parts.
-fn parse_transaction(
-    serialized_transaction: SerializedTransactionParts,
-) -> Result<TransactionRecord, StoreError> {
-    let SerializedTransactionParts { id, tx_script, details, status } = serialized_transaction;
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) use rusqlite_impl::upsert_transaction_record;
 
-    let id: Word = id.as_str().try_into()?;
+// SHARED SqlConnection-based functions
+// ================================================================================================
+use crate::sql_types::{SqlConnection, SqlParam, SqlRow};
 
-    let script: Option<TransactionScript> = tx_script
-        .map(|script| TransactionScript::read_from_bytes(&script))
-        .transpose()?;
+const TRANSACTION_BASE_QUERY: &str = "\
+    SELECT tx.id, script.script, tx.details, tx.status \
+    FROM transactions AS tx \
+    LEFT JOIN transaction_scripts AS script ON tx.script_root = script.script_root";
+
+/// Build query and params for [`TransactionFilter`] using standard SQL (no `rarray`).
+fn build_transaction_query(filter: &TransactionFilter) -> (String, Vec<SqlParam>) {
+    use miden_client::transaction::TransactionStatusVariant;
+
+    match filter {
+        TransactionFilter::All => (TRANSACTION_BASE_QUERY.to_string(), vec![]),
+        TransactionFilter::Uncommitted => (
+            format!("{TRANSACTION_BASE_QUERY} WHERE tx.status_variant = ?",),
+            vec![SqlParam::Integer(TransactionStatusVariant::Pending as i64)],
+        ),
+        TransactionFilter::Ids(ids) => {
+            let placeholders: String = ids.iter().map(|_| "?").collect::<Vec<_>>().join(", ");
+            let sql = format!("{TRANSACTION_BASE_QUERY} WHERE tx.id IN ({placeholders})");
+            let params = ids.iter().map(|id| SqlParam::Text(id.to_hex())).collect();
+            (sql, params)
+        },
+        TransactionFilter::ExpiredBefore(block_num) => (
+            format!(
+                "{TRANSACTION_BASE_QUERY} WHERE tx.block_num < ? AND tx.status_variant != ? AND tx.status_variant != ?",
+            ),
+            vec![
+                SqlParam::Integer(i64::from(block_num.as_u32())),
+                SqlParam::Integer(TransactionStatusVariant::Discarded as i64),
+                SqlParam::Integer(TransactionStatusVariant::Committed as i64),
+            ],
+        ),
+    }
+}
+
+/// Retrieve transactions using [`SqlConnection`].
+pub(crate) fn get_transactions_shared(
+    conn: &dyn SqlConnection,
+    filter: &TransactionFilter,
+) -> Result<Vec<TransactionRecord>, StoreError> {
+    let (sql, params) = build_transaction_query(filter);
+    let rows = conn.query_all(&sql, &params)?;
+    rows.into_iter().map(parse_transaction_row).collect()
+}
+
+/// Parse a [`SqlRow`] (columns: id, script, details, status) into a [`TransactionRecord`].
+#[allow(clippy::needless_pass_by_value)]
+fn parse_transaction_row(row: SqlRow) -> Result<TransactionRecord, StoreError> {
+    let id: Word = row.get_text(0)?.try_into()?;
+    let tx_script =
+        row.get_optional_blob(1)?.map(TransactionScript::read_from_bytes).transpose()?;
+    let details = TransactionDetails::read_from_bytes(row.get_blob(2)?)?;
+    let status = TransactionStatus::read_from_bytes(row.get_blob(3)?)?;
 
     Ok(TransactionRecord {
         id: TransactionId::from_raw(id),
-        details: TransactionDetails::read_from_bytes(&details)?,
-        script,
-        status: TransactionStatus::read_from_bytes(&status)?,
+        details,
+        script: tx_script,
+        status,
     })
+}
+
+/// Upsert a transaction record using [`SqlConnection`].
+#[allow(dead_code)]
+pub(crate) fn upsert_transaction_record_shared(
+    conn: &dyn SqlConnection,
+    transaction: &TransactionRecord,
+) -> Result<(), StoreError> {
+    let data = serialize_transaction_data(transaction);
+
+    if let Some(root) = data.script_root.clone() {
+        conn.execute(
+            INSERT_TRANSACTION_SCRIPT_QUERY,
+            &[SqlParam::Blob(root), SqlParam::from(data.tx_script)],
+        )?;
+    }
+
+    conn.execute(
+        UPSERT_TRANSACTION_QUERY,
+        &[
+            SqlParam::Text(data.id),
+            SqlParam::Blob(data.details),
+            SqlParam::from(data.script_root),
+            SqlParam::from(data.block_num),
+            SqlParam::from(data.status_variant),
+            SqlParam::Blob(data.status),
+        ],
+    )?;
+
+    Ok(())
 }

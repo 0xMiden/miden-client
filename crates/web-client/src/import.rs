@@ -122,7 +122,10 @@ impl WebClient {
         store_dump: JsValue,
         _store_name: &str,
     ) -> Result<JsValue, JsValue> {
-        let store = self.store.as_ref().ok_or(JsValue::from_str("Store not initialized"))?;
+        let store = self
+            .idxdb_store
+            .as_ref()
+            .ok_or(JsValue::from_str("Store import is only available with IndexedDB backend"))?;
         store
             .force_import_store(store_dump)
             .await

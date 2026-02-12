@@ -122,6 +122,7 @@ pub(crate) fn query_account_code(
         .transpose()
 }
 
+#[allow(dead_code)]
 pub(crate) fn query_account_addresses(
     conn: &Connection,
     account_id: AccountId,

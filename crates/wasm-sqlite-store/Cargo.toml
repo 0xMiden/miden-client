@@ -1,0 +1,37 @@
+[package]
+authors.workspace      = true
+description            = "SQLite-backed Store implementation for miden-client (WASM)"
+edition.workspace      = true
+license.workspace      = true
+name                   = "miden-wasm-sqlite-store"
+repository.workspace   = true
+rust-version.workspace = true
+version.workspace      = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# Miden dependencies
+miden-client = { workspace = true }
+
+# Workspace dependencies
+async-trait = { workspace = true }
+chrono      = { workspace = true }
+serde       = { features = ["derive"], workspace = true }
+
+# External dependencies
+base64               = { version = "0.22" }
+js-sys               = { version = "0.3" }
+serde-wasm-bindgen   = { version = "0.6" }
+wasm-bindgen         = { features = ["serde-serialize"], version = "0.2" }
+wasm-bindgen-futures = { version = "0.4" }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+web-sys = { features = ["Storage", "Window", "console"], version = "0.3" }
+
+[lints]
+workspace = true
+
+[build-dependencies]
+miette.workspace = true

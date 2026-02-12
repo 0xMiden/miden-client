@@ -19,10 +19,10 @@ use miden_protocol::crypto::merkle::MerkleError;
 use rusqlite::types::Value;
 use rusqlite::{Connection, Transaction, params};
 
+use crate::SqliteStore;
 use crate::account::helpers::query_storage_slots;
 use crate::smt_forest::AccountSmtForest;
 use crate::sql_error::SqlResultExt;
-use crate::{SqliteStore, insert_sql, subst};
 
 impl SqliteStore {
     // READER METHODS

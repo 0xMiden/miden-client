@@ -13,7 +13,7 @@ crate-type = ["lib"]
 
 [dependencies]
 # Miden dependencies
-miden-client   = { features = ["std"], workspace = true }
+miden-client   = { workspace = true }
 miden-protocol = { workspace = true }
 
 # Workspace dependencies
@@ -22,12 +22,20 @@ async-trait = { workspace = true }
 chrono      = { workspace = true }
 thiserror   = { workspace = true }
 
-# External dependencies
+# Native-only dependencies
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 deadpool           = { default-features = false, features = ["managed", "rt_tokio_1"], version = "0.12" }
 deadpool-sync      = { version = "0.1" }
+miden-client       = { features = ["std"], workspace = true }
 rusqlite           = { features = ["array", "bundled", "vtab"], version = "0.36" }
 rusqlite_migration = { version = "2.1" }
 tokio              = { workspace = true }
+
+# WASM-only dependencies
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+js-sys               = { version = "0.3" }
+wasm-bindgen         = { features = ["serde-serialize"], version = "0.2" }
+wasm-bindgen-futures = { version = "0.4" }
 
 [lints]
 workspace = true

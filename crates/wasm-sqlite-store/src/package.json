@@ -1,0 +1,16 @@
+{
+  "name": "wasm_sqlite_store",
+  "version": "1.0.0",
+  "license": "MIT",
+  "dependencies": {
+    "typescript": "^5.9.2",
+    "semver": "^7.6.3"
+  },
+  "scripts": {
+    "build": "yarn tsc --build --force ./tsconfig.json"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/semver": "^7.5.8"
+  }
+}

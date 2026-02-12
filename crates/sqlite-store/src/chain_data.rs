@@ -1,9 +1,9 @@
 #![allow(clippy::items_after_statements)]
 
-use std::collections::{BTreeMap, BTreeSet};
-use std::num::NonZeroUsize;
-use std::rc::Rc;
-use std::vec::Vec;
+use alloc::collections::{BTreeMap, BTreeSet};
+use alloc::string::ToString;
+use alloc::vec::Vec;
+use core::num::NonZeroUsize;
 
 use miden_client::Word;
 use miden_client::block::BlockHeader;
@@ -11,12 +11,6 @@ use miden_client::crypto::{Forest, InOrderIndex, MmrPeaks};
 use miden_client::note::BlockNumber;
 use miden_client::store::{BlockRelevance, PartialBlockchainFilter, StoreError};
 use miden_client::utils::{Deserializable, Serializable};
-use rusqlite::types::Value;
-use rusqlite::{Connection, OptionalExtension, Transaction, params, params_from_iter};
-
-use super::SqliteStore;
-use crate::sql_error::SqlResultExt;
-use crate::{insert_sql, subst};
 
 struct SerializedBlockHeaderData {
     block_num: u32,
@@ -24,254 +18,14 @@ struct SerializedBlockHeaderData {
     partial_blockchain_peaks: Vec<u8>,
     has_client_notes: bool,
 }
-struct SerializedBlockHeaderParts {
-    _block_num: u64,
-    header: Vec<u8>,
-    _partial_blockchain_peaks: Vec<u8>,
-    has_client_notes: bool,
-}
 
 struct SerializedPartialBlockchainNodeData {
     id: i64,
     node: String,
 }
-struct SerializedPartialBlockchainNodeParts {
-    id: u64,
-    node: String,
-}
 
-impl SqliteStore {
-    pub(crate) fn insert_block_header(
-        conn: &mut Connection,
-        block_header: &BlockHeader,
-        partial_blockchain_peaks: &MmrPeaks,
-        has_client_notes: bool,
-    ) -> Result<(), StoreError> {
-        let tx = conn.transaction().into_store_error()?;
-
-        Self::insert_block_header_tx(
-            &tx,
-            block_header,
-            partial_blockchain_peaks,
-            has_client_notes,
-        )?;
-
-        tx.commit().into_store_error()?;
-        Ok(())
-    }
-
-    pub(crate) fn get_block_headers(
-        conn: &mut Connection,
-        block_numbers: &BTreeSet<BlockNumber>,
-    ) -> Result<Vec<(BlockHeader, BlockRelevance)>, StoreError> {
-        let block_number_list = block_numbers
-            .iter()
-            .map(|block_number| Value::Integer(i64::from(block_number.as_u32())))
-            .collect::<Vec<Value>>();
-
-        const QUERY: &str = "SELECT block_num, header, partial_blockchain_peaks, has_client_notes FROM block_headers WHERE block_num IN rarray(?)";
-
-        conn.prepare(QUERY)
-            .into_store_error()?
-            .query_map(params![Rc::new(block_number_list)], parse_block_headers_columns)
-            .into_store_error()?
-            .map(|result| {
-                let serialized_block_header_parts: SerializedBlockHeaderParts =
-                    result.into_store_error()?;
-                parse_block_header(&serialized_block_header_parts)
-            })
-            .collect()
-    }
-
-    pub(crate) fn get_tracked_block_headers(
-        conn: &mut Connection,
-    ) -> Result<Vec<BlockHeader>, StoreError> {
-        const QUERY: &str = "SELECT block_num, header, partial_blockchain_peaks, has_client_notes FROM block_headers WHERE has_client_notes=true";
-        conn.prepare(QUERY)
-            .into_store_error()?
-            .query_map(params![], parse_block_headers_columns)
-            .into_store_error()?
-            .map(|result| {
-                let serialized_block_header_parts: SerializedBlockHeaderParts =
-                    result.into_store_error()?;
-                parse_block_header(&serialized_block_header_parts).map(|(block, _)| block)
-            })
-            .collect()
-    }
-
-    pub(crate) fn get_partial_blockchain_nodes(
-        conn: &mut Connection,
-        filter: &PartialBlockchainFilter,
-    ) -> Result<BTreeMap<InOrderIndex, Word>, StoreError> {
-        match filter {
-            PartialBlockchainFilter::All => query_partial_blockchain_nodes(
-                conn,
-                "SELECT id, node FROM partial_blockchain_nodes",
-                params![],
-            ),
-
-            PartialBlockchainFilter::List(ids) if ids.is_empty() => Ok(BTreeMap::new()),
-            PartialBlockchainFilter::List(ids) => {
-                let id_values = ids
-                    .iter()
-                    .map(|id| Value::Integer(i64::try_from(id.inner()).expect("id is a valid i64")))
-                    .collect::<Vec<_>>();
-
-                query_partial_blockchain_nodes(
-                    conn,
-                    "SELECT id, node FROM partial_blockchain_nodes WHERE id IN rarray(?)",
-                    params_from_iter([Rc::new(id_values)]),
-                )
-            },
-
-            PartialBlockchainFilter::Forest(forest) if forest.is_empty() => Ok(BTreeMap::new()),
-            PartialBlockchainFilter::Forest(forest) => {
-                let max_index = i64::try_from(forest.rightmost_in_order_index().inner())
-                    .expect("id is a valid i64");
-
-                query_partial_blockchain_nodes(
-                    conn,
-                    "SELECT id, node FROM partial_blockchain_nodes WHERE id <= ?",
-                    params![max_index],
-                )
-            },
-        }
-    }
-
-    pub(crate) fn get_partial_blockchain_peaks_by_block_num(
-        conn: &mut Connection,
-        block_num: BlockNumber,
-    ) -> Result<MmrPeaks, StoreError> {
-        const QUERY: &str =
-            "SELECT partial_blockchain_peaks FROM block_headers WHERE block_num = ?";
-
-        let partial_blockchain_peaks: Option<Vec<u8>> = conn
-            .prepare(QUERY)
-            .into_store_error()?
-            .query_row(params![block_num.as_u32()], |row| row.get::<_, Vec<u8>>(0))
-            .optional()
-            .into_store_error()?;
-
-        if let Some(partial_blockchain_peaks) = partial_blockchain_peaks {
-            return parse_partial_blockchain_peaks(block_num.as_u32(), &partial_blockchain_peaks);
-        }
-
-        Ok(MmrPeaks::new(Forest::empty(), vec![])?)
-    }
-
-    pub fn insert_partial_blockchain_nodes(
-        conn: &mut Connection,
-        nodes: &[(InOrderIndex, Word)],
-    ) -> Result<(), StoreError> {
-        let tx = conn.transaction().into_store_error()?;
-
-        Self::insert_partial_blockchain_nodes_tx(&tx, nodes)?;
-        tx.commit().into_store_error()?;
-        Ok(())
-    }
-
-    /// Inserts a list of MMR authentication nodes to the Partial Blockchain nodes table.
-    pub(crate) fn insert_partial_blockchain_nodes_tx(
-        tx: &Transaction<'_>,
-        nodes: &[(InOrderIndex, Word)],
-    ) -> Result<(), StoreError> {
-        for (index, node) in nodes {
-            insert_partial_blockchain_node(tx, *index, *node)?;
-        }
-        Ok(())
-    }
-
-    /// Inserts a block header using a [`rusqlite::Transaction`].
-    ///
-    /// If the block header exists and `has_client_notes` is `true` then the `has_client_notes`
-    /// column is updated to `true` to signify that the block now contains a relevant note.
-    pub(crate) fn insert_block_header_tx(
-        tx: &Transaction<'_>,
-        block_header: &BlockHeader,
-        partial_blockchain_peaks: &MmrPeaks,
-        has_client_notes: bool,
-    ) -> Result<(), StoreError> {
-        let partial_blockchain_peaks = partial_blockchain_peaks.peaks().to_vec();
-        let SerializedBlockHeaderData {
-            block_num,
-            header,
-            partial_blockchain_peaks,
-            has_client_notes,
-        } = serialize_block_header(block_header, &partial_blockchain_peaks, has_client_notes);
-        const QUERY: &str = insert_sql!(
-            block_headers {
-                block_num,
-                header,
-                partial_blockchain_peaks,
-                has_client_notes,
-            } | IGNORE
-        );
-        tx.execute(QUERY, params![block_num, header, partial_blockchain_peaks, has_client_notes])
-            .into_store_error()?;
-
-        set_block_header_has_client_notes(tx, u64::from(block_num), has_client_notes)?;
-        Ok(())
-    }
-
-    /// Removes block headers that do not contain any client notes and aren't the genesis or last
-    /// block.
-    pub fn prune_irrelevant_blocks(conn: &mut Connection) -> Result<(), StoreError> {
-        let tx = conn.transaction().into_store_error()?;
-        let genesis: u32 = BlockNumber::GENESIS.as_u32();
-
-        let sync_block: Option<u32> = tx
-            .query_row("SELECT block_num FROM state_sync LIMIT 1", [], |r| r.get(0))
-            .optional()
-            .into_store_error()?;
-
-        if let Some(sync_height) = sync_block {
-            tx.execute(
-                r"
-            DELETE FROM block_headers
-            WHERE has_client_notes = 0
-              AND block_num > ?1
-              AND block_num < ?2
-            ",
-                rusqlite::params![genesis, sync_height],
-            )
-            .into_store_error()?;
-        }
-
-        tx.commit().into_store_error()
-    }
-}
-
-// HELPERS
+// SHARED HELPERS
 // ================================================================================================
-
-/// Inserts a node represented by its in-order index and the node value.
-fn insert_partial_blockchain_node(
-    tx: &Transaction<'_>,
-    id: InOrderIndex,
-    node: Word,
-) -> Result<(), StoreError> {
-    let SerializedPartialBlockchainNodeData { id, node } =
-        serialize_partial_blockchain_node(id, node);
-    const QUERY: &str = insert_sql!(partial_blockchain_nodes { id, node } | IGNORE);
-    tx.execute(QUERY, params![id, node]).into_store_error()?;
-    Ok(())
-}
-
-fn query_partial_blockchain_nodes<P: rusqlite::Params>(
-    conn: &mut Connection,
-    sql: &str,
-    params: P,
-) -> Result<BTreeMap<InOrderIndex, Word>, StoreError> {
-    let mut stmt = conn.prepare_cached(sql).into_store_error()?;
-
-    stmt.query_map(params, parse_partial_blockchain_nodes_columns)
-        .into_store_error()?
-        .map(|row_res| {
-            let parts: SerializedPartialBlockchainNodeParts = row_res.into_store_error()?;
-            parse_partial_blockchain_nodes(&parts)
-        })
-        .collect()
-}
 
 fn parse_partial_blockchain_peaks(forest: u32, peaks_nodes: &[u8]) -> Result<MmrPeaks, StoreError> {
     let mmr_peaks_nodes = Vec::<Word>::read_from_bytes(peaks_nodes)?;
@@ -300,31 +54,6 @@ fn serialize_block_header(
     }
 }
 
-fn parse_block_headers_columns(
-    row: &rusqlite::Row<'_>,
-) -> Result<SerializedBlockHeaderParts, rusqlite::Error> {
-    let block_num: u32 = row.get(0)?;
-    let header: Vec<u8> = row.get(1)?;
-    let partial_blockchain_peaks: Vec<u8> = row.get(2)?;
-    let has_client_notes: bool = row.get(3)?;
-
-    Ok(SerializedBlockHeaderParts {
-        _block_num: u64::from(block_num),
-        header,
-        _partial_blockchain_peaks: partial_blockchain_peaks,
-        has_client_notes,
-    })
-}
-
-fn parse_block_header(
-    serialized_block_header_parts: &SerializedBlockHeaderParts,
-) -> Result<(BlockHeader, BlockRelevance), StoreError> {
-    Ok((
-        BlockHeader::read_from_bytes(&serialized_block_header_parts.header)?,
-        serialized_block_header_parts.has_client_notes.into(),
-    ))
-}
-
 fn serialize_partial_blockchain_node(
     id: InOrderIndex,
     node: Word,
@@ -334,40 +63,549 @@ fn serialize_partial_blockchain_node(
     SerializedPartialBlockchainNodeData { id, node }
 }
 
-fn parse_partial_blockchain_nodes_columns(
-    row: &rusqlite::Row<'_>,
-) -> Result<SerializedPartialBlockchainNodeParts, rusqlite::Error> {
-    let id: u64 = row.get(0)?;
-    let node = row.get(1)?;
-    Ok(SerializedPartialBlockchainNodeParts { id, node })
+// NATIVE (rusqlite) IMPLEMENTATION
+// ================================================================================================
+
+#[cfg(not(target_arch = "wasm32"))]
+#[allow(dead_code)]
+pub(crate) mod rusqlite_impl {
+    use alloc::collections::{BTreeMap, BTreeSet};
+    use alloc::vec::Vec;
+    use core::num::NonZeroUsize;
+    use std::rc::Rc;
+
+    use miden_client::Word;
+    use miden_client::block::{BlockHeader, BlockNumber};
+    use miden_client::crypto::{InOrderIndex, MmrPeaks};
+    use miden_client::store::{BlockRelevance, PartialBlockchainFilter, StoreError};
+    use miden_client::utils::Deserializable;
+    use rusqlite::types::Value;
+    use rusqlite::{Connection, OptionalExtension, Transaction, params, params_from_iter};
+
+    use super::{
+        Forest,
+        SerializedBlockHeaderData,
+        SerializedPartialBlockchainNodeData,
+        parse_partial_blockchain_peaks,
+        serialize_block_header,
+        serialize_partial_blockchain_node,
+    };
+    use crate::SqliteStore;
+    use crate::sql_error::SqlResultExt;
+
+    struct SerializedBlockHeaderParts {
+        _block_num: u64,
+        header: Vec<u8>,
+        _partial_blockchain_peaks: Vec<u8>,
+        has_client_notes: bool,
+    }
+
+    struct SerializedPartialBlockchainNodeParts {
+        id: u64,
+        node: String,
+    }
+
+    impl SqliteStore {
+        pub(crate) fn insert_block_header(
+            conn: &mut Connection,
+            block_header: &BlockHeader,
+            partial_blockchain_peaks: &MmrPeaks,
+            has_client_notes: bool,
+        ) -> Result<(), StoreError> {
+            let tx = conn.transaction().into_store_error()?;
+
+            Self::insert_block_header_tx(
+                &tx,
+                block_header,
+                partial_blockchain_peaks,
+                has_client_notes,
+            )?;
+
+            tx.commit().into_store_error()?;
+            Ok(())
+        }
+
+        pub(crate) fn get_block_headers(
+            conn: &mut Connection,
+            block_numbers: &BTreeSet<BlockNumber>,
+        ) -> Result<Vec<(BlockHeader, BlockRelevance)>, StoreError> {
+            let block_number_list = block_numbers
+                .iter()
+                .map(|block_number| Value::Integer(i64::from(block_number.as_u32())))
+                .collect::<Vec<Value>>();
+
+            const QUERY: &str = "SELECT block_num, header, partial_blockchain_peaks, has_client_notes FROM block_headers WHERE block_num IN rarray(?)";
+
+            conn.prepare(QUERY)
+                .into_store_error()?
+                .query_map(params![Rc::new(block_number_list)], parse_block_headers_columns)
+                .into_store_error()?
+                .map(|result| {
+                    let serialized_block_header_parts: SerializedBlockHeaderParts =
+                        result.into_store_error()?;
+                    parse_block_header(&serialized_block_header_parts)
+                })
+                .collect()
+        }
+
+        pub(crate) fn get_tracked_block_headers(
+            conn: &mut Connection,
+        ) -> Result<Vec<BlockHeader>, StoreError> {
+            const QUERY: &str = "SELECT block_num, header, partial_blockchain_peaks, has_client_notes FROM block_headers WHERE has_client_notes=true";
+            conn.prepare(QUERY)
+                .into_store_error()?
+                .query_map(params![], parse_block_headers_columns)
+                .into_store_error()?
+                .map(|result| {
+                    let serialized_block_header_parts: SerializedBlockHeaderParts =
+                        result.into_store_error()?;
+                    parse_block_header(&serialized_block_header_parts).map(|(block, _)| block)
+                })
+                .collect()
+        }
+
+        pub(crate) fn get_partial_blockchain_nodes(
+            conn: &mut Connection,
+            filter: &PartialBlockchainFilter,
+        ) -> Result<BTreeMap<InOrderIndex, Word>, StoreError> {
+            match filter {
+                PartialBlockchainFilter::All => query_partial_blockchain_nodes(
+                    conn,
+                    "SELECT id, node FROM partial_blockchain_nodes",
+                    params![],
+                ),
+
+                PartialBlockchainFilter::List(ids) if ids.is_empty() => Ok(BTreeMap::new()),
+                PartialBlockchainFilter::List(ids) => {
+                    let id_values = ids
+                        .iter()
+                        .map(|id| {
+                            Value::Integer(i64::try_from(id.inner()).expect("id is a valid i64"))
+                        })
+                        .collect::<Vec<_>>();
+
+                    query_partial_blockchain_nodes(
+                        conn,
+                        "SELECT id, node FROM partial_blockchain_nodes WHERE id IN rarray(?)",
+                        params_from_iter([Rc::new(id_values)]),
+                    )
+                },
+
+                PartialBlockchainFilter::Forest(forest) if forest.is_empty() => Ok(BTreeMap::new()),
+                PartialBlockchainFilter::Forest(forest) => {
+                    let max_index = i64::try_from(forest.rightmost_in_order_index().inner())
+                        .expect("id is a valid i64");
+
+                    query_partial_blockchain_nodes(
+                        conn,
+                        "SELECT id, node FROM partial_blockchain_nodes WHERE id <= ?",
+                        params![max_index],
+                    )
+                },
+            }
+        }
+
+        pub(crate) fn get_partial_blockchain_peaks_by_block_num(
+            conn: &mut Connection,
+            block_num: BlockNumber,
+        ) -> Result<MmrPeaks, StoreError> {
+            const QUERY: &str =
+                "SELECT partial_blockchain_peaks FROM block_headers WHERE block_num = ?";
+
+            let partial_blockchain_peaks: Option<Vec<u8>> = conn
+                .prepare(QUERY)
+                .into_store_error()?
+                .query_row(params![block_num.as_u32()], |row| row.get::<_, Vec<u8>>(0))
+                .optional()
+                .into_store_error()?;
+
+            if let Some(partial_blockchain_peaks) = partial_blockchain_peaks {
+                return parse_partial_blockchain_peaks(
+                    block_num.as_u32(),
+                    &partial_blockchain_peaks,
+                );
+            }
+
+            Ok(MmrPeaks::new(Forest::empty(), vec![])?)
+        }
+
+        pub fn insert_partial_blockchain_nodes(
+            conn: &mut Connection,
+            nodes: &[(InOrderIndex, Word)],
+        ) -> Result<(), StoreError> {
+            let tx = conn.transaction().into_store_error()?;
+
+            Self::insert_partial_blockchain_nodes_tx(&tx, nodes)?;
+            tx.commit().into_store_error()?;
+            Ok(())
+        }
+
+        /// Inserts a list of MMR authentication nodes to the Partial Blockchain nodes table.
+        pub(crate) fn insert_partial_blockchain_nodes_tx(
+            tx: &Transaction<'_>,
+            nodes: &[(InOrderIndex, Word)],
+        ) -> Result<(), StoreError> {
+            for (index, node) in nodes {
+                insert_partial_blockchain_node(tx, *index, *node)?;
+            }
+            Ok(())
+        }
+
+        /// Inserts a block header using a [`rusqlite::Transaction`].
+        ///
+        /// If the block header exists and `has_client_notes` is `true` then the `has_client_notes`
+        /// column is updated to `true` to signify that the block now contains a relevant note.
+        pub(crate) fn insert_block_header_tx(
+            tx: &Transaction<'_>,
+            block_header: &BlockHeader,
+            partial_blockchain_peaks: &MmrPeaks,
+            has_client_notes: bool,
+        ) -> Result<(), StoreError> {
+            let partial_blockchain_peaks = partial_blockchain_peaks.peaks().to_vec();
+            let SerializedBlockHeaderData {
+                block_num,
+                header,
+                partial_blockchain_peaks,
+                has_client_notes,
+            } = serialize_block_header(block_header, &partial_blockchain_peaks, has_client_notes);
+            const QUERY: &str = insert_sql!(
+                block_headers {
+                    block_num,
+                    header,
+                    partial_blockchain_peaks,
+                    has_client_notes,
+                } | IGNORE
+            );
+            tx.execute(
+                QUERY,
+                params![block_num, header, partial_blockchain_peaks, has_client_notes],
+            )
+            .into_store_error()?;
+
+            set_block_header_has_client_notes(tx, u64::from(block_num), has_client_notes)?;
+            Ok(())
+        }
+
+        /// Removes block headers that do not contain any client notes and aren't the genesis or
+        /// last block.
+        pub fn prune_irrelevant_blocks(conn: &mut Connection) -> Result<(), StoreError> {
+            let tx = conn.transaction().into_store_error()?;
+            let genesis: u32 = BlockNumber::GENESIS.as_u32();
+
+            let sync_block: Option<u32> = tx
+                .query_row("SELECT block_num FROM state_sync LIMIT 1", [], |r| r.get(0))
+                .optional()
+                .into_store_error()?;
+
+            if let Some(sync_height) = sync_block {
+                tx.execute(
+                    r"
+                DELETE FROM block_headers
+                WHERE has_client_notes = 0
+                  AND block_num > ?1
+                  AND block_num < ?2
+                ",
+                    rusqlite::params![genesis, sync_height],
+                )
+                .into_store_error()?;
+            }
+
+            tx.commit().into_store_error()
+        }
+    }
+
+    // HELPERS
+    // --------------------------------------------------------------------------------------------
+
+    /// Inserts a node represented by its in-order index and the node value.
+    fn insert_partial_blockchain_node(
+        tx: &Transaction<'_>,
+        id: InOrderIndex,
+        node: Word,
+    ) -> Result<(), StoreError> {
+        let SerializedPartialBlockchainNodeData { id, node } =
+            serialize_partial_blockchain_node(id, node);
+        const QUERY: &str = insert_sql!(partial_blockchain_nodes { id, node } | IGNORE);
+        tx.execute(QUERY, params![id, node]).into_store_error()?;
+        Ok(())
+    }
+
+    fn query_partial_blockchain_nodes<P: rusqlite::Params>(
+        conn: &mut Connection,
+        sql: &str,
+        params: P,
+    ) -> Result<BTreeMap<InOrderIndex, Word>, StoreError> {
+        let mut stmt = conn.prepare_cached(sql).into_store_error()?;
+
+        stmt.query_map(params, parse_partial_blockchain_nodes_columns)
+            .into_store_error()?
+            .map(|row_res| {
+                let parts: SerializedPartialBlockchainNodeParts = row_res.into_store_error()?;
+                parse_partial_blockchain_nodes(&parts)
+            })
+            .collect()
+    }
+
+    fn parse_block_headers_columns(
+        row: &rusqlite::Row<'_>,
+    ) -> Result<SerializedBlockHeaderParts, rusqlite::Error> {
+        let block_num: u32 = row.get(0)?;
+        let header: Vec<u8> = row.get(1)?;
+        let partial_blockchain_peaks: Vec<u8> = row.get(2)?;
+        let has_client_notes: bool = row.get(3)?;
+
+        Ok(SerializedBlockHeaderParts {
+            _block_num: u64::from(block_num),
+            header,
+            _partial_blockchain_peaks: partial_blockchain_peaks,
+            has_client_notes,
+        })
+    }
+
+    fn parse_block_header(
+        serialized_block_header_parts: &SerializedBlockHeaderParts,
+    ) -> Result<(BlockHeader, BlockRelevance), StoreError> {
+        Ok((
+            BlockHeader::read_from_bytes(&serialized_block_header_parts.header)?,
+            serialized_block_header_parts.has_client_notes.into(),
+        ))
+    }
+
+    fn parse_partial_blockchain_nodes_columns(
+        row: &rusqlite::Row<'_>,
+    ) -> Result<SerializedPartialBlockchainNodeParts, rusqlite::Error> {
+        let id: u64 = row.get(0)?;
+        let node = row.get(1)?;
+        Ok(SerializedPartialBlockchainNodeParts { id, node })
+    }
+
+    fn parse_partial_blockchain_nodes(
+        serialized_partial_blockchain_node_parts: &SerializedPartialBlockchainNodeParts,
+    ) -> Result<(InOrderIndex, Word), StoreError> {
+        let id = InOrderIndex::new(
+            NonZeroUsize::new(
+                usize::try_from(serialized_partial_blockchain_node_parts.id)
+                    .expect("id is u64, should not fail"),
+            )
+            .unwrap(),
+        );
+        let node: Word = Word::try_from(&serialized_partial_blockchain_node_parts.node)?;
+        Ok((id, node))
+    }
+
+    pub(crate) fn set_block_header_has_client_notes(
+        tx: &Transaction<'_>,
+        block_num: u64,
+        has_client_notes: bool,
+    ) -> Result<(), StoreError> {
+        // Only update to change has_client_notes to true if it was false previously
+        const QUERY: &str = "\
+            UPDATE block_headers
+            SET has_client_notes=?
+            WHERE block_num=? AND has_client_notes=FALSE;";
+        tx.execute(QUERY, params![has_client_notes, block_num]).into_store_error()?;
+        Ok(())
+    }
 }
 
-fn parse_partial_blockchain_nodes(
-    serialized_partial_blockchain_node_parts: &SerializedPartialBlockchainNodeParts,
-) -> Result<(InOrderIndex, Word), StoreError> {
-    let id = InOrderIndex::new(
-        NonZeroUsize::new(
-            usize::try_from(serialized_partial_blockchain_node_parts.id)
-                .expect("id is u64, should not fail"),
-        )
-        .unwrap(),
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) use rusqlite_impl::set_block_header_has_client_notes;
+
+// SHARED SqlConnection-based functions
+// ================================================================================================
+use crate::sql_types::{SqlConnection, SqlParam, SqlRow};
+
+/// Insert a block header using [`SqlConnection`].
+pub(crate) fn insert_block_header_shared(
+    conn: &dyn SqlConnection,
+    block_header: &BlockHeader,
+    partial_blockchain_peaks: &MmrPeaks,
+    has_client_notes: bool,
+) -> Result<(), StoreError> {
+    let peaks = partial_blockchain_peaks.peaks().to_vec();
+    let data = serialize_block_header(block_header, &peaks, has_client_notes);
+
+    const QUERY: &str = insert_sql!(
+        block_headers {
+            block_num,
+            header,
+            partial_blockchain_peaks,
+            has_client_notes,
+        } | IGNORE
     );
-    let node: Word = Word::try_from(&serialized_partial_blockchain_node_parts.node)?;
-    Ok((id, node))
+    conn.execute(
+        QUERY,
+        &[
+            SqlParam::from(data.block_num),
+            SqlParam::Blob(data.header),
+            SqlParam::Blob(data.partial_blockchain_peaks),
+            SqlParam::from(data.has_client_notes),
+        ],
+    )?;
+
+    set_block_header_has_client_notes_shared(
+        conn,
+        u64::from(data.block_num),
+        data.has_client_notes,
+    )?;
+    Ok(())
 }
 
-pub(crate) fn set_block_header_has_client_notes(
-    tx: &Transaction<'_>,
+/// Set block header `has_client_notes` flag using [`SqlConnection`].
+pub(crate) fn set_block_header_has_client_notes_shared(
+    conn: &dyn SqlConnection,
     block_num: u64,
     has_client_notes: bool,
 ) -> Result<(), StoreError> {
-    // Only update to change has_client_notes to true if it was false previously
     const QUERY: &str = "\
-        UPDATE block_headers
-        SET has_client_notes=?
+        UPDATE block_headers \
+        SET has_client_notes=? \
         WHERE block_num=? AND has_client_notes=FALSE;";
-    tx.execute(QUERY, params![has_client_notes, block_num]).into_store_error()?;
+    #[allow(clippy::cast_possible_wrap)]
+    conn.execute(QUERY, &[SqlParam::from(has_client_notes), SqlParam::Integer(block_num as i64)])?;
     Ok(())
+}
+
+/// Get block headers by block numbers using [`SqlConnection`] (no `rarray`).
+pub(crate) fn get_block_headers_shared(
+    conn: &dyn SqlConnection,
+    block_numbers: &BTreeSet<BlockNumber>,
+) -> Result<Vec<(BlockHeader, BlockRelevance)>, StoreError> {
+    if block_numbers.is_empty() {
+        return Ok(vec![]);
+    }
+    let placeholders: String = block_numbers.iter().map(|_| "?").collect::<Vec<_>>().join(", ");
+    let sql = format!(
+        "SELECT block_num, header, partial_blockchain_peaks, has_client_notes \
+         FROM block_headers WHERE block_num IN ({placeholders})"
+    );
+    let params: Vec<SqlParam> = block_numbers
+        .iter()
+        .map(|bn| SqlParam::Integer(i64::from(bn.as_u32())))
+        .collect();
+
+    let rows = conn.query_all(&sql, &params)?;
+    rows.into_iter().map(parse_block_header_row).collect()
+}
+
+/// Get tracked (relevant) block headers using [`SqlConnection`].
+pub(crate) fn get_tracked_block_headers_shared(
+    conn: &dyn SqlConnection,
+) -> Result<Vec<BlockHeader>, StoreError> {
+    let rows = conn.query_all(
+        "SELECT block_num, header, partial_blockchain_peaks, has_client_notes \
+         FROM block_headers WHERE has_client_notes=true",
+        &[],
+    )?;
+    rows.into_iter()
+        .map(|row| parse_block_header_row(row).map(|(header, _)| header))
+        .collect()
+}
+
+/// Get partial blockchain nodes using [`SqlConnection`] (no `rarray`).
+pub(crate) fn get_partial_blockchain_nodes_shared(
+    conn: &dyn SqlConnection,
+    filter: &PartialBlockchainFilter,
+) -> Result<BTreeMap<InOrderIndex, Word>, StoreError> {
+    let (sql, params) = match filter {
+        PartialBlockchainFilter::All => {
+            ("SELECT id, node FROM partial_blockchain_nodes".to_string(), vec![])
+        },
+        PartialBlockchainFilter::List(ids) if ids.is_empty() => return Ok(BTreeMap::new()),
+        PartialBlockchainFilter::List(ids) => {
+            let placeholders: String = ids.iter().map(|_| "?").collect::<Vec<_>>().join(", ");
+            let sql = format!(
+                "SELECT id, node FROM partial_blockchain_nodes WHERE id IN ({placeholders})"
+            );
+            let params: Vec<SqlParam> = ids
+                .iter()
+                .map(|id| SqlParam::Integer(i64::try_from(id.inner()).expect("id is a valid i64")))
+                .collect();
+            (sql, params)
+        },
+        PartialBlockchainFilter::Forest(forest) if forest.is_empty() => return Ok(BTreeMap::new()),
+        PartialBlockchainFilter::Forest(forest) => {
+            let max_index = i64::try_from(forest.rightmost_in_order_index().inner())
+                .expect("id is a valid i64");
+            (
+                "SELECT id, node FROM partial_blockchain_nodes WHERE id <= ?".to_string(),
+                vec![SqlParam::Integer(max_index)],
+            )
+        },
+    };
+
+    let rows = conn.query_all(&sql, &params)?;
+    rows.into_iter()
+        .map(|row| {
+            let id = row.get_u64(0)?;
+            let node_hex = row.get_text(1)?;
+            let idx = InOrderIndex::new(
+                NonZeroUsize::new(usize::try_from(id).expect("id should fit in usize")).unwrap(),
+            );
+            let node: Word = Word::try_from(node_hex)?;
+            Ok((idx, node))
+        })
+        .collect()
+}
+
+/// Get partial blockchain peaks for a specific block using [`SqlConnection`].
+pub(crate) fn get_partial_blockchain_peaks_by_block_num_shared(
+    conn: &dyn SqlConnection,
+    block_num: BlockNumber,
+) -> Result<MmrPeaks, StoreError> {
+    let row = conn.query_one(
+        "SELECT partial_blockchain_peaks FROM block_headers WHERE block_num = ?",
+        &[SqlParam::from(block_num.as_u32())],
+    )?;
+
+    match row {
+        Some(row) => {
+            let peaks_bytes = row.get_blob(0)?;
+            parse_partial_blockchain_peaks(block_num.as_u32(), peaks_bytes)
+        },
+        None => Ok(MmrPeaks::new(Forest::empty(), vec![])?),
+    }
+}
+
+/// Insert partial blockchain nodes using [`SqlConnection`].
+pub(crate) fn insert_partial_blockchain_nodes_shared(
+    conn: &dyn SqlConnection,
+    nodes: &[(InOrderIndex, Word)],
+) -> Result<(), StoreError> {
+    const QUERY: &str = insert_sql!(partial_blockchain_nodes { id, node } | IGNORE);
+    for (index, node) in nodes {
+        let data = serialize_partial_blockchain_node(*index, *node);
+        conn.execute(QUERY, &[SqlParam::Integer(data.id), SqlParam::Text(data.node)])?;
+    }
+    Ok(())
+}
+
+/// Prune irrelevant blocks using [`SqlConnection`].
+pub(crate) fn prune_irrelevant_blocks_shared(conn: &dyn SqlConnection) -> Result<(), StoreError> {
+    let genesis = BlockNumber::GENESIS.as_u32();
+
+    let sync_row = conn.query_one("SELECT block_num FROM state_sync LIMIT 1", &[])?;
+
+    if let Some(row) = sync_row {
+        let sync_height = row.get_u32(0)?;
+        conn.execute(
+            "DELETE FROM block_headers \
+             WHERE has_client_notes = 0 \
+             AND block_num > ? \
+             AND block_num < ?",
+            &[SqlParam::from(genesis), SqlParam::from(sync_height)],
+        )?;
+    }
+
+    Ok(())
+}
+
+/// Parse a block header from a [`SqlRow`].
+#[allow(clippy::needless_pass_by_value)]
+fn parse_block_header_row(row: SqlRow) -> Result<(BlockHeader, BlockRelevance), StoreError> {
+    let header = BlockHeader::read_from_bytes(row.get_blob(1)?)?;
+    let has_client_notes = row.get_bool(3)?;
+    Ok((header, has_client_notes.into()))
 }
 
 #[cfg(test)]

@@ -10,9 +10,11 @@ use miden_client::crypto::RpoRandomCoin;
 use miden_client::note_transport::NoteTransportClient;
 use miden_client::note_transport::grpc::GrpcNoteTransportClient;
 use miden_client::rpc::{Endpoint, GrpcClient, NodeRpcClient};
+use miden_client::store::Store;
 use miden_client::testing::mock::MockRpcApi;
 use miden_client::testing::note_transport::MockNoteTransportApi;
 use miden_client::{Client, ClientError, DebugMode, ErrorHint, Felt};
+use miden_client_sqlite_store::SqliteStore;
 use models::code_builder::CodeBuilder;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
@@ -45,7 +47,10 @@ const BASE_STORE_NAME: &str = "MidenClientDB";
 
 #[wasm_bindgen]
 pub struct WebClient {
-    store: Option<Arc<WebStore>>,
+    store: Option<Arc<dyn Store>>,
+    /// Kept separately for IndexedDB-specific operations (export/import store).
+    /// Only set when using the `IndexedDB` backend (`createClient`).
+    idxdb_store: Option<Arc<WebStore>>,
     keystore: Option<WebKeyStore<RpoRandomCoin>>,
     inner: Option<Client<WebKeyStore<RpoRandomCoin>>>,
     mock_rpc_api: Option<Arc<MockRpcApi>>,
@@ -67,6 +72,7 @@ impl WebClient {
         WebClient {
             inner: None,
             store: None,
+            idxdb_store: None,
             keystore: None,
             mock_rpc_api: None,
             mock_note_transport_api: None,
@@ -119,8 +125,69 @@ impl WebClient {
         let store_name =
             store_name.unwrap_or(format!("{}_{}", BASE_STORE_NAME, endpoint.to_network_id()));
 
-        self.setup_client(
+        let web_store = Arc::new(
+            WebStore::new(store_name.clone())
+                .await
+                .map_err(|_| JsValue::from_str("Failed to initialize WebStore"))?,
+        );
+
+        self.idxdb_store = Some(web_store.clone());
+
+        self.setup_client_with_store(
             web_rpc_client,
+            web_store,
+            store_name,
+            note_transport_client,
+            seed,
+            None,
+            None,
+            None,
+        )
+        .await?;
+
+        Ok(JsValue::from_str("Client created successfully"))
+    }
+
+    /// Creates a new `WebClient` instance backed by `SQLite` (via WASM `SQLite` adapter).
+    ///
+    /// This is suitable for Node.js environments where `IndexedDB` is not available.
+    /// The `SQLite` database is accessed through a JavaScript adapter layer.
+    ///
+    /// # Arguments
+    /// * `node_url`: The URL of the node RPC endpoint. If `None`, defaults to the testnet endpoint.
+    /// * `node_note_transport_url`: Optional URL of the note transport service.
+    /// * `seed`: Optional seed for account initialization.
+    /// * `store_name`: Optional name for the database. If `None`, defaults to
+    ///   `MidenClientDB_{network_id}`.
+    #[wasm_bindgen(js_name = "createClientWithSqlite")]
+    pub async fn create_client_with_sqlite(
+        &mut self,
+        node_url: Option<String>,
+        node_note_transport_url: Option<String>,
+        seed: Option<Vec<u8>>,
+        store_name: Option<String>,
+    ) -> Result<JsValue, JsValue> {
+        let endpoint = node_url.map_or(Ok(Endpoint::testnet()), |url| {
+            Endpoint::try_from(url.as_str()).map_err(|_| JsValue::from_str("Invalid node URL"))
+        })?;
+
+        let web_rpc_client = Arc::new(GrpcClient::new(&endpoint, 0));
+
+        let note_transport_client = node_note_transport_url
+            .map(|url| Arc::new(GrpcNoteTransportClient::new(url)) as Arc<dyn NoteTransportClient>);
+
+        let store_name =
+            store_name.unwrap_or(format!("{}_{}", BASE_STORE_NAME, endpoint.to_network_id()));
+
+        let sqlite_store = Arc::new(
+            SqliteStore::new(store_name.clone())
+                .await
+                .map_err(|_| JsValue::from_str("Failed to initialize SqliteStore"))?,
+        );
+
+        self.setup_client_with_store(
+            web_rpc_client,
+            sqlite_store,
             store_name,
             note_transport_client,
             seed,
@@ -168,8 +235,17 @@ impl WebClient {
         let store_name =
             store_name.unwrap_or(format!("{}_{}", BASE_STORE_NAME, endpoint.to_network_id()));
 
-        self.setup_client(
+        let web_store = Arc::new(
+            WebStore::new(store_name.clone())
+                .await
+                .map_err(|_| JsValue::from_str("Failed to initialize WebStore"))?,
+        );
+
+        self.idxdb_store = Some(web_store.clone());
+
+        self.setup_client_with_store(
             web_rpc_client,
+            web_store,
             store_name,
             note_transport_client,
             seed,
@@ -181,9 +257,12 @@ impl WebClient {
 
         Ok(JsValue::from_str("Client created successfully"))
     }
-    async fn setup_client(
+
+    #[allow(clippy::too_many_arguments)]
+    async fn setup_client_with_store(
         &mut self,
         rpc_client: Arc<dyn NodeRpcClient>,
+        store: Arc<dyn Store>,
         store_name: String,
         note_transport_client: Option<Arc<dyn NoteTransportClient>>,
         seed: Option<Vec<u8>>,
@@ -207,19 +286,13 @@ impl WebClient {
 
         let rng = RpoRandomCoin::new(coin_seed.map(Felt::new).into());
 
-        let web_store = Arc::new(
-            WebStore::new(store_name.clone())
-                .await
-                .map_err(|_| JsValue::from_str("Failed to initialize WebStore"))?,
-        );
-
         let keystore =
             WebKeyStore::new_with_callbacks(rng, store_name, get_key_cb, insert_key_cb, sign_cb);
 
         let mut builder = ClientBuilder::new()
             .rpc(rpc_client)
             .rng(Box::new(rng))
-            .store(web_store.clone())
+            .store(store.clone())
             .authenticator(Arc::new(keystore.clone()))
             .in_debug_mode(if self.debug_mode {
                 DebugMode::Enabled
@@ -236,17 +309,14 @@ impl WebClient {
             .await
             .map_err(|err| js_error_with_context(err, "Failed to create client"))?;
 
-        // Ensure genesis block is fetched and stored in IndexedDB.
-        // This is important for web workers that create their own client instances -
-        // they will read the genesis from the shared IndexedDB and automatically
-        // set the genesis commitment on their RPC client.
+        // Ensure genesis block is fetched and stored.
         client
             .ensure_genesis_in_place()
             .await
             .map_err(|err| js_error_with_context(err, "Failed to ensure genesis in place"))?;
 
         self.inner = Some(client);
-        self.store = Some(web_store);
+        self.store = Some(store);
         self.keystore = Some(keystore);
 
         Ok(())

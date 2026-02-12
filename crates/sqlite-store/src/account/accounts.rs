@@ -53,8 +53,9 @@ use crate::account::helpers::{
 use crate::smt_forest::AccountSmtForest;
 use crate::sql_error::SqlResultExt;
 use crate::sync::{add_note_tag_tx, remove_note_tag_tx};
-use crate::{SqliteStore, column_value_as_u64, insert_sql, subst, u64_to_value};
+use crate::{SqliteStore, column_value_as_u64, u64_to_value};
 
+#[allow(dead_code)]
 impl SqliteStore {
     // READER METHODS
     // --------------------------------------------------------------------------------------------

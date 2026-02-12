@@ -2677,6 +2677,7 @@ dependencies = [
  "chrono",
  "deadpool",
  "deadpool-sync",
+ "js-sys",
  "miden-client",
  "miden-protocol",
  "miden-standards",
@@ -2684,6 +2685,8 @@ dependencies = [
  "rusqlite_migration",
  "thiserror 2.0.18",
  "tokio",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
 ]
 
 [[package]]
@@ -2707,6 +2710,7 @@ dependencies = [
  "hex",
  "js-sys",
  "miden-client",
+ "miden-client-sqlite-store",
  "miden-idxdb-store",
  "miden-protocol",
  "rand 0.9.2",
@@ -3384,6 +3388,23 @@ dependencies = [
  "thiserror 2.0.18",
  "tracing",
  "winter-verifier",
+]
+
+[[package]]
+name = "miden-wasm-sqlite-store"
+version = "0.13.0"
+dependencies = [
+ "async-trait",
+ "base64",
+ "chrono",
+ "js-sys",
+ "miden-client",
+ "miette",
+ "serde",
+ "serde-wasm-bindgen",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
 ]
 
 [[package]]

@@ -9,6 +9,8 @@ module.exports = [
       "**/*.d.ts",
       "docs/**/*",
       "crates/idxdb-store/src/**",
+      "crates/wasm-sqlite-store/src/**",
+      "crates/react-sdk/dist/**",
       "packages/react-sdk/**",
     ],
   },

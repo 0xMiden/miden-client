@@ -10,6 +10,7 @@ members = [
   "crates/testing/miden-client-tests",
   "crates/testing/node-builder",
   "crates/testing/prover",
+  "crates/wasm-sqlite-store",
   "crates/web-client",
 ]
 
@@ -32,6 +33,7 @@ opt-level = 1
 idxdb-store               = { default-features = false, package = "miden-idxdb-store", path = "crates/idxdb-store", version = "0.13" }
 miden-client              = { default-features = false, path = "crates/rust-client", version = "0.13" }
 miden-client-sqlite-store = { default-features = false, path = "crates/sqlite-store", version = "0.13" }
+wasm-sqlite-store         = { default-features = false, package = "miden-wasm-sqlite-store", path = "crates/wasm-sqlite-store", version = "0.13" }
 
 # Miden protocol dependencies
 miden-protocol  = { default-features = false, version = "0.13" }

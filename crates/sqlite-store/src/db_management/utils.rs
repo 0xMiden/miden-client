@@ -11,49 +11,6 @@ use rusqlite_migration::{M, Migrations, SchemaVersion};
 use super::errors::SqliteStoreError;
 use crate::sql_error::SqlResultExt;
 
-// MACROS
-// ================================================================================================
-
-/// Auxiliary macro which substitutes `$src` token by `$dst` expression.
-#[macro_export]
-macro_rules! subst {
-    ($src:tt, $dst:expr_2021) => {
-        $dst
-    };
-}
-
-/// Generates a simple insert SQL statement with parameters for the provided table name and fields.
-/// Supports optional conflict resolution (adding "| REPLACE" or "| IGNORE" at the end will generate
-/// "OR REPLACE" and "OR IGNORE", correspondingly).
-///
-/// # Usage:
-///
-/// ```ignore
-/// insert_sql!(users { id, first_name, last_name, age } | REPLACE);
-/// ```
-///
-/// which generates:
-/// ```sql
-/// INSERT OR REPLACE INTO `users` (`id`, `first_name`, `last_name`, `age`) VALUES (?, ?, ?, ?)
-/// ```
-#[macro_export]
-macro_rules! insert_sql {
-    ($table:ident { $first_field:ident $(, $($field:ident),+)? $(,)? } $(| $on_conflict:expr)?) => {
-        concat!(
-            stringify!(INSERT $(OR $on_conflict)? INTO ),
-            "`",
-            stringify!($table),
-            "` (`",
-            stringify!($first_field),
-            $($(concat!("`, `", stringify!($field))),+ ,)?
-            "`) VALUES (",
-            subst!($first_field, "?"),
-            $($(subst!($field, ", ?")),+ ,)?
-            ")"
-        )
-    };
-}
-
 // MIGRATIONS
 // ================================================================================================
 
@@ -143,6 +100,7 @@ pub fn set_migrations_value<T: ToSql>(conn: &Connection, name: &str, value: &T) 
     Ok(())
 }
 
+#[allow(dead_code)]
 pub fn get_setting<T: FromSql>(conn: &mut Connection, name: &str) -> Result<Option<T>, StoreError> {
     conn.transaction()
         .into_store_error()?
@@ -151,6 +109,7 @@ pub fn get_setting<T: FromSql>(conn: &mut Connection, name: &str) -> Result<Opti
         .into_store_error()
 }
 
+#[allow(dead_code)]
 pub fn set_setting<T: ToSql>(conn: &Connection, name: &str, value: &T) -> Result<()> {
     let count =
         conn.execute(insert_sql!(settings { name, value } | REPLACE), params![name, value])?;
@@ -160,6 +119,7 @@ pub fn set_setting<T: ToSql>(conn: &Connection, name: &str, value: &T) -> Result
     Ok(())
 }
 
+#[allow(dead_code)]
 pub fn remove_setting(conn: &Connection, name: &str) -> Result<(), StoreError> {
     let count = conn
         .execute("DELETE FROM settings WHERE name = $1", params![name])
@@ -170,6 +130,7 @@ pub fn remove_setting(conn: &Connection, name: &str) -> Result<(), StoreError> {
     Ok(())
 }
 
+#[allow(dead_code)]
 pub fn list_setting_keys(conn: &Connection) -> Result<Vec<String>, StoreError> {
     let mut stmt = conn.prepare("SELECT name FROM settings").into_store_error()?;
     stmt.query_map([], |row| row.get::<_, String>(0))

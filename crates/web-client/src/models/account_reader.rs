@@ -1,12 +1,12 @@
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
-use idxdb_store::WebStore;
 use miden_client::account::{
     AccountId as NativeAccountId,
     AccountReader as NativeAccountReader,
     StorageSlotName,
 };
+use miden_client::store::Store;
 use wasm_bindgen::prelude::*;
 
 use super::account_header::AccountHeader;
@@ -27,7 +27,7 @@ pub struct AccountReader(NativeAccountReader);
 #[wasm_bindgen]
 impl AccountReader {
     /// Creates a new `AccountReader` for the given account.
-    pub(crate) fn new(store: Arc<WebStore>, account_id: NativeAccountId) -> Self {
+    pub(crate) fn new(store: Arc<dyn Store>, account_id: NativeAccountId) -> Self {
         let inner = NativeAccountReader::new(store, account_id);
         Self(inner)
     }
