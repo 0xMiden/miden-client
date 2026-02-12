@@ -46,9 +46,42 @@ pub mod utils;
 
 mod web_keystore;
 mod web_keystore_callbacks;
+use tracing::Level;
+use tracing_subscriber::layer::SubscriberExt;
 pub use web_keystore::WebKeyStore;
 
 const BASE_STORE_NAME: &str = "MidenClientDB";
+
+/// Initializes the `tracing` subscriber that routes Rust log output to the
+/// browser console via `console.log` / `console.warn` / `console.error`.
+///
+/// `log_level` must be one of `"error"`, `"warn"`, `"info"`, `"debug"`,
+/// `"trace"`, `"off"`, or `"none"` (no logging). Unknown values are treated
+/// as "off".
+///
+/// This is a **per-thread global** — call it once on the main thread and, if
+/// you use a Web Worker, once inside the worker. Subsequent calls on the same
+/// thread are harmless no-ops.
+#[wasm_bindgen(js_name = "setupLogging")]
+pub fn setup_logging(log_level: &str) {
+    let level = match log_level.to_lowercase().as_str() {
+        "error" => Some(Level::ERROR),
+        "warn" => Some(Level::WARN),
+        "info" => Some(Level::INFO),
+        "debug" => Some(Level::DEBUG),
+        "trace" => Some(Level::TRACE),
+        _ => None,
+    };
+
+    if let Some(level) = level {
+        let config = tracing_wasm::WASMLayerConfigBuilder::new().set_max_level(level).build();
+        // `set_as_global_default_with_config` panics on double-init, so replicate
+        // its logic with `set_global_default` which returns a `Result` instead.
+        let _ = tracing::subscriber::set_global_default(
+            tracing_subscriber::registry().with(tracing_wasm::WASMLayer::new(config)),
+        );
+    }
+}
 
 #[wasm_bindgen]
 pub struct WebClient {
