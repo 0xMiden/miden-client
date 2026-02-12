@@ -308,10 +308,7 @@ export async function upsertVaultAssets(dbId, assets) {
                 asset: asset.asset,
             };
         });
-        await db.latestAccountAssets
-            .where("accountId")
-            .equals(accountId)
-            .delete();
+        await db.latestAccountAssets.where("accountId").equals(accountId).delete();
         await db.latestAccountAssets.bulkPut(latestEntries);
         await db.historicalAccountAssets.bulkPut(historicalEntries);
     }

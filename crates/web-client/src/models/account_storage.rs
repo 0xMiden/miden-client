@@ -63,7 +63,9 @@ impl AccountStorage {
         Some(
             map.entries()
                 .map(|(key, value)| JsStorageMapEntry {
-                    root: map.root().to_hex(),
+                    account_id: String::new(),
+                    nonce: String::new(),
+                    slot_name: slot_name.to_string(),
                     key: key.to_hex(),
                     value: value.to_hex(),
                 })
