@@ -2,7 +2,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 
 use miden_client::Word;
-use miden_client::account::{StorageMap, StorageSlot};
+use miden_client::account::{AccountId, StorageMap, StorageSlot};
 use miden_client::asset::Asset;
 use miden_client::utils::Serializable;
 use wasm_bindgen::prelude::*;
@@ -36,13 +36,13 @@ extern "C" {
     pub fn idxdb_get_account_code(db_id: &str, code_root: String) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = getAccountStorage)]
-    pub fn idxdb_get_account_storage(db_id: &str, storage_root: String) -> js_sys::Promise;
+    pub fn idxdb_get_account_storage(db_id: &str, account_id: String) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = getAccountStorageMaps)]
-    pub fn idxdb_get_account_storage_maps(db_id: &str, roots: Vec<String>) -> js_sys::Promise;
+    pub fn idxdb_get_account_storage_maps(db_id: &str, account_id: String) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = getAccountVaultAssets)]
-    pub fn idxdb_get_account_vault_assets(db_id: &str, vault_root: String) -> js_sys::Promise;
+    pub fn idxdb_get_account_vault_assets(db_id: &str, account_id: String) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = getAccountAuthByPubKeyCommitment)]
     pub fn idxdb_get_account_auth_by_pub_key_commitment(
@@ -133,9 +133,12 @@ extern "C" {
 #[wasm_bindgen(getter_with_clone, inspectable)]
 #[derive(Clone)]
 pub struct JsVaultAsset {
-    /// The merkle root of the vault's assets.
-    #[wasm_bindgen(js_name = "root")]
-    pub root: String,
+    /// The account ID this asset belongs to.
+    #[wasm_bindgen(js_name = "accountId")]
+    pub account_id: String,
+    /// The account's nonce when this asset state was recorded.
+    #[wasm_bindgen(js_name = "nonce")]
+    pub nonce: String,
     /// The vault key associated with the asset.
     #[wasm_bindgen(js_name = "vaultKey")]
     pub vault_key: String,
@@ -148,9 +151,10 @@ pub struct JsVaultAsset {
 }
 
 impl JsVaultAsset {
-    pub fn from_asset(asset: &Asset, vault_root: Word) -> Self {
+    pub fn from_asset(asset: &Asset, account_id: &AccountId, nonce: u64) -> Self {
         Self {
-            root: vault_root.to_hex(),
+            account_id: account_id.to_string(),
+            nonce: nonce.to_string(),
             vault_key: Word::from(asset.vault_key()).to_hex(),
             faucet_id_prefix: asset.faucet_id_prefix().to_hex(),
             asset: Word::from(asset).to_hex(),
@@ -165,9 +169,12 @@ impl JsVaultAsset {
 #[wasm_bindgen(getter_with_clone, inspectable)]
 #[derive(Clone)]
 pub struct JsStorageSlot {
-    /// Commitment of the whole account storage
-    #[wasm_bindgen(js_name = "commitment")]
-    pub commitment: String,
+    /// The account ID this slot belongs to.
+    #[wasm_bindgen(js_name = "accountId")]
+    pub account_id: String,
+    /// The account's nonce when this slot state was recorded.
+    #[wasm_bindgen(js_name = "nonce")]
+    pub nonce: String,
     /// The name of the storage slot.
     #[wasm_bindgen(js_name = "slotName")]
     pub slot_name: String,
@@ -180,9 +187,10 @@ pub struct JsStorageSlot {
 }
 
 impl JsStorageSlot {
-    pub fn from_slot(slot: &StorageSlot, storage_commitment: Word) -> Self {
+    pub fn from_slot(slot: &StorageSlot, account_id: &AccountId, nonce: u64) -> Self {
         Self {
-            commitment: storage_commitment.to_hex(),
+            account_id: account_id.to_string(),
+            nonce: nonce.to_string(),
             slot_name: slot.name().to_string(),
             slot_value: slot.value().to_hex(),
             slot_type: slot.slot_type().to_bytes()[0],
@@ -197,9 +205,15 @@ impl JsStorageSlot {
 #[wasm_bindgen(getter_with_clone, inspectable)]
 #[derive(Clone)]
 pub struct JsStorageMapEntry {
-    /// The root of the storage map entry.
-    #[wasm_bindgen(js_name = "root")]
-    pub root: String,
+    /// The account ID this map entry belongs to.
+    #[wasm_bindgen(js_name = "accountId")]
+    pub account_id: String,
+    /// The account's nonce when this entry was recorded.
+    #[wasm_bindgen(js_name = "nonce")]
+    pub nonce: String,
+    /// The slot name of the map this entry belongs to.
+    #[wasm_bindgen(js_name = "slotName")]
+    pub slot_name: String,
     /// The key of the storage map entry.
     #[wasm_bindgen(js_name = "key")]
     pub key: String,
@@ -209,10 +223,14 @@ pub struct JsStorageMapEntry {
 }
 
 impl JsStorageMapEntry {
-    pub fn from_map(map: &StorageMap) -> Vec<Self> {
+    pub fn from_map(map: &StorageMap, account_id: &AccountId, nonce: u64, slot_name: &str) -> Vec<Self> {
+        let account_id_str = account_id.to_string();
+        let nonce_str = nonce.to_string();
         map.entries()
             .map(|(key, value)| Self {
-                root: map.root().to_hex(),
+                account_id: account_id_str.clone(),
+                nonce: nonce_str.clone(),
+                slot_name: slot_name.to_string(),
                 key: key.to_hex(),
                 value: value.to_hex(),
             })

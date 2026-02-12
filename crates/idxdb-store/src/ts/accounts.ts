@@ -1,9 +1,12 @@
 import {
   getDatabase,
   IAccount,
-  IAccountAsset,
-  IAccountStorage,
-  IStorageMapEntry,
+  ILatestAccountStorage,
+  IHistoricalAccountStorage,
+  ILatestStorageMapEntry,
+  IHistoricalStorageMapEntry,
+  ILatestAccountAsset,
+  IHistoricalAccountAsset,
   JsStorageMapEntry,
   JsStorageSlot,
   JsVaultAsset,
@@ -154,15 +157,12 @@ export async function getAccountCode(dbId: string, codeRoot: string) {
   }
 }
 
-export async function getAccountStorage(
-  dbId: string,
-  storageCommitment: string
-) {
+export async function getAccountStorage(dbId: string, accountId: string) {
   try {
     const db = getDatabase(dbId);
-    const allMatchingRecords = await db.accountStorages
-      .where("commitment")
-      .equals(storageCommitment)
+    const allMatchingRecords = await db.latestAccountStorages
+      .where("accountId")
+      .equals(accountId)
       .toArray();
 
     const slots = allMatchingRecords.map((record) => {
@@ -176,34 +176,37 @@ export async function getAccountStorage(
   } catch (error) {
     logWebStoreError(
       error,
-      `Error fetching account storage for commitment ${storageCommitment}`
+      `Error fetching account storage for account ${accountId}`
     );
   }
 }
 
-export async function getAccountStorageMaps(dbId: string, roots: string[]) {
+export async function getAccountStorageMaps(
+  dbId: string,
+  accountId: string
+) {
   try {
     const db = getDatabase(dbId);
-    const allMatchingRecords = await db.storageMapEntries
-      .where("root")
-      .anyOf(roots)
+    const allMatchingRecords = await db.latestStorageMapEntries
+      .where("accountId")
+      .equals(accountId)
       .toArray();
 
     return allMatchingRecords;
   } catch (error) {
     logWebStoreError(
       error,
-      `Error fetching account storage maps for roots ${roots.join(", ")}`
+      `Error fetching account storage maps for account ${accountId}`
     );
   }
 }
 
-export async function getAccountVaultAssets(dbId: string, vaultRoot: string) {
+export async function getAccountVaultAssets(dbId: string, accountId: string) {
   try {
     const db = getDatabase(dbId);
-    const allMatchingRecords = await db.accountAssets
-      .where("root")
-      .equals(vaultRoot)
+    const allMatchingRecords = await db.latestAccountAssets
+      .where("accountId")
+      .equals(accountId)
       .toArray();
 
     const assets = allMatchingRecords.map((record) => {
@@ -216,7 +219,7 @@ export async function getAccountVaultAssets(dbId: string, vaultRoot: string) {
   } catch (error: unknown) {
     logWebStoreError(
       error,
-      `Error fetching account vault for root ${vaultRoot}`
+      `Error fetching account vault for account ${accountId}`
     );
   }
 }
@@ -287,17 +290,35 @@ export async function upsertAccountStorage(
   storageSlots: JsStorageSlot[]
 ) {
   try {
+    if (storageSlots.length === 0) return;
     const db = getDatabase(dbId);
-    let processedSlots = storageSlots.map((slot) => {
+    const accountId = storageSlots[0].accountId;
+
+    const latestEntries = storageSlots.map((slot) => {
       return {
-        commitment: slot.commitment,
+        accountId: slot.accountId,
         slotName: slot.slotName,
         slotValue: slot.slotValue,
         slotType: slot.slotType,
-      } as IAccountStorage;
+      } as ILatestAccountStorage;
     });
 
-    await db.accountStorages.bulkPut(processedSlots);
+    const historicalEntries = storageSlots.map((slot) => {
+      return {
+        accountId: slot.accountId,
+        nonce: slot.nonce,
+        slotName: slot.slotName,
+        slotValue: slot.slotValue,
+        slotType: slot.slotType,
+      } as IHistoricalAccountStorage;
+    });
+
+    await db.latestAccountStorages
+      .where("accountId")
+      .equals(accountId)
+      .delete();
+    await db.latestAccountStorages.bulkPut(latestEntries);
+    await db.historicalAccountStorages.bulkPut(historicalEntries);
   } catch (error) {
     logWebStoreError(error, `Error inserting storage slots`);
   }
@@ -308,16 +329,35 @@ export async function upsertStorageMapEntries(
   entries: JsStorageMapEntry[]
 ) {
   try {
+    if (entries.length === 0) return;
     const db = getDatabase(dbId);
-    let processedEntries = entries.map((entry) => {
+    const accountId = entries[0].accountId;
+
+    const latestEntries = entries.map((entry) => {
       return {
-        root: entry.root,
+        accountId: entry.accountId,
+        slotName: entry.slotName,
         key: entry.key,
         value: entry.value,
-      } as IStorageMapEntry;
+      } as ILatestStorageMapEntry;
     });
 
-    await db.storageMapEntries.bulkPut(processedEntries);
+    const historicalEntries = entries.map((entry) => {
+      return {
+        accountId: entry.accountId,
+        nonce: entry.nonce,
+        slotName: entry.slotName,
+        key: entry.key,
+        value: entry.value,
+      } as IHistoricalStorageMapEntry;
+    });
+
+    await db.latestStorageMapEntries
+      .where("accountId")
+      .equals(accountId)
+      .delete();
+    await db.latestStorageMapEntries.bulkPut(latestEntries);
+    await db.historicalStorageMapEntries.bulkPut(historicalEntries);
   } catch (error) {
     logWebStoreError(error, `Error inserting storage map entries`);
   }
@@ -325,17 +365,35 @@ export async function upsertStorageMapEntries(
 
 export async function upsertVaultAssets(dbId: string, assets: JsVaultAsset[]) {
   try {
+    if (assets.length === 0) return;
     const db = getDatabase(dbId);
-    let processedAssets = assets.map((asset) => {
+    const accountId = assets[0].accountId;
+
+    const latestEntries = assets.map((asset) => {
       return {
-        root: asset.root,
+        accountId: asset.accountId,
         vaultKey: asset.vaultKey,
         faucetIdPrefix: asset.faucetIdPrefix,
         asset: asset.asset,
-      } as IAccountAsset;
+      } as ILatestAccountAsset;
     });
 
-    await db.accountAssets.bulkPut(processedAssets);
+    const historicalEntries = assets.map((asset) => {
+      return {
+        accountId: asset.accountId,
+        nonce: asset.nonce,
+        vaultKey: asset.vaultKey,
+        faucetIdPrefix: asset.faucetIdPrefix,
+        asset: asset.asset,
+      } as IHistoricalAccountAsset;
+    });
+
+    await db.latestAccountAssets
+      .where("accountId")
+      .equals(accountId)
+      .delete();
+    await db.latestAccountAssets.bulkPut(latestEntries);
+    await db.historicalAccountAssets.bulkPut(historicalEntries);
   } catch (error: unknown) {
     logWebStoreError(error, `Error inserting assets`);
   }
@@ -517,29 +575,67 @@ export async function undoAccountStates(
   try {
     const db = getDatabase(dbId);
 
-    // Find affected records to get their account IDs before deleting
+    // Find affected records to get their account IDs and nonces before deleting
     const affectedRecords = await db.historicalAccountHeaders
       .where("accountCommitment")
       .anyOf(accountCommitments)
       .toArray();
 
-    const affectedAccountIds = [...new Set(affectedRecords.map((r) => r.id))];
+    // Collect affected (accountId, nonce) pairs
+    const accountNonces = new Map<string, Set<string>>();
+    for (const record of affectedRecords) {
+      if (!accountNonces.has(record.id)) {
+        accountNonces.set(record.id, new Set());
+      }
+      accountNonces.get(record.id)!.add(record.nonce);
+    }
 
-    // Delete matching records from historical
+    // Delete matching records from historical account headers
     await db.historicalAccountHeaders
       .where("accountCommitment")
       .anyOf(accountCommitments)
       .delete();
 
+    // Delete historical storage/map/assets for affected (accountId, nonce) pairs
+    for (const [accountId, nonces] of accountNonces) {
+      for (const nonce of nonces) {
+        await db.historicalAccountStorages
+          .where("[accountId+nonce]")
+          .equals([accountId, nonce])
+          .delete();
+        await db.historicalStorageMapEntries
+          .where("[accountId+nonce]")
+          .equals([accountId, nonce])
+          .delete();
+        await db.historicalAccountAssets
+          .where("[accountId+nonce]")
+          .equals([accountId, nonce])
+          .delete();
+      }
+    }
+
     // Rebuild latest for each affected account
-    for (const accountId of affectedAccountIds) {
+    for (const accountId of accountNonces.keys()) {
       const remaining = await db.historicalAccountHeaders
         .where("id")
         .equals(accountId)
         .toArray();
 
       if (remaining.length === 0) {
+        // Account completely undone — clear all latest tables
         await db.latestAccountHeaders.where("id").equals(accountId).delete();
+        await db.latestAccountStorages
+          .where("accountId")
+          .equals(accountId)
+          .delete();
+        await db.latestStorageMapEntries
+          .where("accountId")
+          .equals(accountId)
+          .delete();
+        await db.latestAccountAssets
+          .where("accountId")
+          .equals(accountId)
+          .delete();
       } else {
         // Find the record with the highest nonce
         let maxRecord = remaining[0];
@@ -548,7 +644,70 @@ export async function undoAccountStates(
             maxRecord = record;
           }
         }
+        const maxNonce = maxRecord.nonce;
+
+        // Rebuild latest account header
         await db.latestAccountHeaders.put(maxRecord);
+
+        // Rebuild latest storage
+        await db.latestAccountStorages
+          .where("accountId")
+          .equals(accountId)
+          .delete();
+        const histStorage = await db.historicalAccountStorages
+          .where("[accountId+nonce]")
+          .equals([accountId, maxNonce])
+          .toArray();
+        if (histStorage.length > 0) {
+          await db.latestAccountStorages.bulkPut(
+            histStorage.map((s) => ({
+              accountId: s.accountId,
+              slotName: s.slotName,
+              slotValue: s.slotValue,
+              slotType: s.slotType,
+            }))
+          );
+        }
+
+        // Rebuild latest storage map entries
+        await db.latestStorageMapEntries
+          .where("accountId")
+          .equals(accountId)
+          .delete();
+        const histMapEntries = await db.historicalStorageMapEntries
+          .where("[accountId+nonce]")
+          .equals([accountId, maxNonce])
+          .toArray();
+        if (histMapEntries.length > 0) {
+          await db.latestStorageMapEntries.bulkPut(
+            histMapEntries.map((e) => ({
+              accountId: e.accountId,
+              slotName: e.slotName,
+              key: e.key,
+              value: e.value,
+            }))
+          );
+        }
+
+        // Rebuild latest assets
+        await db.latestAccountAssets
+          .where("accountId")
+          .equals(accountId)
+          .delete();
+        const histAssets = await db.historicalAccountAssets
+          .where("[accountId+nonce]")
+          .equals([accountId, maxNonce])
+          .toArray();
+        if (histAssets.length > 0) {
+          await db.latestAccountAssets.bulkPut(
+            histAssets.map((a) => ({
+              accountId: a.accountId,
+              vaultKey: a.vaultKey,
+              faucetIdPrefix: a.faucetIdPrefix,
+              asset: a.asset,
+            }))
+          );
+        }
       }
     }
   } catch (error) {

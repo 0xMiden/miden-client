@@ -42,14 +42,16 @@ pub async fn upsert_account_code(db_id: &str, account_code: &AccountCode) -> Res
 
 pub async fn upsert_account_storage(
     db_id: &str,
+    account_id: &AccountId,
+    nonce: u64,
     account_storage: &AccountStorage,
 ) -> Result<(), JsValue> {
     let mut slots = vec![];
     let mut maps = vec![];
     for slot in account_storage.slots() {
-        slots.push(JsStorageSlot::from_slot(slot, account_storage.to_commitment()));
+        slots.push(JsStorageSlot::from_slot(slot, account_id, nonce));
         if let StorageSlotContent::Map(map) = slot.content() {
-            maps.extend(JsStorageMapEntry::from_map(map));
+            maps.extend(JsStorageMapEntry::from_map(map, account_id, nonce, slot.name().as_str()));
         }
     }
 
@@ -61,11 +63,13 @@ pub async fn upsert_account_storage(
 
 pub async fn upsert_account_asset_vault(
     db_id: &str,
+    account_id: &AccountId,
+    nonce: u64,
     asset_vault: &AssetVault,
 ) -> Result<(), JsValue> {
     let js_assets: Vec<JsVaultAsset> = asset_vault
         .assets()
-        .map(|asset| JsVaultAsset::from_asset(&asset, asset_vault.root()))
+        .map(|asset| JsVaultAsset::from_asset(&asset, account_id, nonce))
         .collect();
 
     let promise = idxdb_upsert_vault_assets(db_id, js_assets);
@@ -165,7 +169,9 @@ pub fn parse_account_address_idxdb_object(
 }
 
 pub async fn update_account(db_id: &str, new_account_state: &Account) -> Result<(), JsValue> {
-    upsert_account_storage(db_id, new_account_state.storage()).await?;
-    upsert_account_asset_vault(db_id, new_account_state.vault()).await?;
+    let account_id = &new_account_state.id();
+    let nonce = new_account_state.nonce().as_int();
+    upsert_account_storage(db_id, account_id, nonce, new_account_state.storage()).await?;
+    upsert_account_asset_vault(db_id, account_id, nonce, new_account_state.vault()).await?;
     upsert_account_record(db_id, new_account_state).await
 }

@@ -32,9 +32,12 @@ export async function openDatabase(network, clientVersion) {
 var Table;
 (function (Table) {
     Table["AccountCode"] = "accountCode";
-    Table["AccountStorage"] = "accountStorage";
-    Table["AccountAssets"] = "accountAssets";
-    Table["StorageMapEntries"] = "storageMapEntries";
+    Table["LatestAccountStorage"] = "latestAccountStorage";
+    Table["HistoricalAccountStorage"] = "historicalAccountStorage";
+    Table["LatestAccountAssets"] = "latestAccountAssets";
+    Table["HistoricalAccountAssets"] = "historicalAccountAssets";
+    Table["LatestStorageMapEntries"] = "latestStorageMapEntries";
+    Table["HistoricalStorageMapEntries"] = "historicalStorageMapEntries";
     Table["AccountAuth"] = "accountAuth";
     Table["LatestAccountHeaders"] = "latestAccountHeaders";
     Table["HistoricalAccountHeaders"] = "historicalAccountHeaders";
@@ -57,9 +60,12 @@ function indexes(...items) {
 export class MidenDatabase {
     dexie;
     accountCodes;
-    accountStorages;
-    storageMapEntries;
-    accountAssets;
+    latestAccountStorages;
+    historicalAccountStorages;
+    latestStorageMapEntries;
+    historicalStorageMapEntries;
+    latestAccountAssets;
+    historicalAccountAssets;
     accountAuths;
     latestAccountHeaders;
     historicalAccountHeaders;
@@ -79,9 +85,12 @@ export class MidenDatabase {
         this.dexie = new Dexie(network);
         this.dexie.version(1).stores({
             [Table.AccountCode]: indexes("root"),
-            [Table.AccountStorage]: indexes("[commitment+slotName]", "commitment"),
-            [Table.StorageMapEntries]: indexes("[root+key]", "root"),
-            [Table.AccountAssets]: indexes("[root+vaultKey]", "root", "faucetIdPrefix"),
+            [Table.LatestAccountStorage]: indexes("[accountId+slotName]", "accountId"),
+            [Table.HistoricalAccountStorage]: indexes("[accountId+nonce+slotName]", "accountId", "[accountId+nonce]"),
+            [Table.LatestStorageMapEntries]: indexes("[accountId+slotName+key]", "accountId", "[accountId+slotName]"),
+            [Table.HistoricalStorageMapEntries]: indexes("[accountId+nonce+slotName+key]", "accountId", "[accountId+nonce]"),
+            [Table.LatestAccountAssets]: indexes("[accountId+vaultKey]", "accountId", "faucetIdPrefix"),
+            [Table.HistoricalAccountAssets]: indexes("[accountId+nonce+vaultKey]", "accountId", "[accountId+nonce]"),
             [Table.AccountAuth]: indexes("pubKeyCommitmentHex"),
             [Table.LatestAccountHeaders]: indexes("&id", "accountCommitment"),
             [Table.HistoricalAccountHeaders]: indexes("&accountCommitment", "id", "[id+nonce]"),
@@ -99,9 +108,12 @@ export class MidenDatabase {
             [Table.Settings]: indexes("key"),
         });
         this.accountCodes = this.dexie.table(Table.AccountCode);
-        this.accountStorages = this.dexie.table(Table.AccountStorage);
-        this.storageMapEntries = this.dexie.table(Table.StorageMapEntries);
-        this.accountAssets = this.dexie.table(Table.AccountAssets);
+        this.latestAccountStorages = this.dexie.table(Table.LatestAccountStorage);
+        this.historicalAccountStorages = this.dexie.table(Table.HistoricalAccountStorage);
+        this.latestStorageMapEntries = this.dexie.table(Table.LatestStorageMapEntries);
+        this.historicalStorageMapEntries = this.dexie.table(Table.HistoricalStorageMapEntries);
+        this.latestAccountAssets = this.dexie.table(Table.LatestAccountAssets);
+        this.historicalAccountAssets = this.dexie.table(Table.HistoricalAccountAssets);
         this.accountAuths = this.dexie.table(Table.AccountAuth);
         this.latestAccountHeaders = this.dexie.table(Table.LatestAccountHeaders);
         this.historicalAccountHeaders = this.dexie.table(Table.HistoricalAccountHeaders);
