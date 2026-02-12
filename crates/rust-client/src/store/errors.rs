@@ -30,23 +30,23 @@ use super::note_record::NoteRecordError;
 #[derive(Debug, Error)]
 #[allow(clippy::large_enum_variant)]
 pub enum StoreError {
-    #[error("asset error")]
+    #[error("asset error: {0}")]
     AssetError(#[from] AssetError),
-    #[error("asset vault error")]
+    #[error("asset vault error: {0}")]
     AssetVaultError(#[from] AssetVaultError),
     #[error("account code data with root {0} not found")]
     AccountCodeDataNotFound(Word),
     #[error("account data wasn't found for account id {0}")]
     AccountDataNotFound(AccountId),
-    #[error("account error")]
+    #[error("account error: {0}")]
     AccountError(#[from] AccountError),
-    #[error("address error")]
+    #[error("address error: {0}")]
     AddressError(#[from] AddressError),
-    #[error("account id error")]
+    #[error("invalid account ID: {0}")]
     AccountIdError(#[from] AccountIdError),
-    #[error("account commitment mismatch for account {0}")]
+    #[error("stored account commitment does not match the expected commitment for account {0}")]
     AccountCommitmentMismatch(AccountId),
-    #[error("public key {0} not found")]
+    #[error("no account found with public key {0}")]
     AccountKeyNotFound(String),
     #[error("account storage data with root {0} not found")]
     AccountStorageRootNotFound(Word),
@@ -56,25 +56,25 @@ pub enum StoreError {
     BlockHeaderNotFound(BlockNumber),
     #[error("partial blockchain node at index {0} not found")]
     PartialBlockchainNodeNotFound(u64),
-    #[error("error deserializing data from the store")]
+    #[error("failed to deserialize data from the store: {0}")]
     DataDeserializationError(#[from] DeserializationError),
     #[error("database-related non-query error: {0}")]
     DatabaseError(String),
-    #[error("error parsing hex")]
+    #[error("failed to parse hex value: {0}")]
     HexParseError(#[from] HexParseError),
-    #[error("failed to convert int")]
+    #[error("integer conversion failed: {0}")]
     InvalidInt(#[from] TryFromIntError),
-    #[error("note record error")]
+    #[error("note record error: {0}")]
     NoteRecordError(#[from] NoteRecordError),
-    #[error("error in merkle store")]
+    #[error("merkle store error: {0}")]
     MerkleStoreError(#[from] MerkleError),
-    #[error("error constructing mmr")]
+    #[error("failed to construct Merkle Mountain Range (MMR): {0}")]
     MmrError(#[from] MmrError),
-    #[error("inclusion proof creation error")]
+    #[error("failed to create note inclusion proof: {0}")]
     NoteInclusionProofError(#[from] NoteError),
     #[error("note tag {0} is already being tracked")]
     NoteTagAlreadyTracked(u64),
-    #[error("note transport cursor not found")]
+    #[error("note transport cursor not found in the store; the sync state may be uninitialized")]
     NoteTransportCursorNotFound,
     #[error("note script with root {0} not found")]
     NoteScriptNotFound(String),
@@ -82,11 +82,11 @@ pub enum StoreError {
     ParsingError(String),
     #[error("failed to retrieve data from the database: {0}")]
     QueryError(String),
-    #[error("error with the SMT proof")]
+    #[error("sparse merkle tree proof error: {0}")]
     SmtProofError(#[from] SmtProofError),
-    #[error("error with a storage map")]
+    #[error("account storage map error: {0}")]
     StorageMapError(#[from] StorageMapError),
-    #[error("error instantiating transaction script")]
+    #[error("failed to instantiate transaction script: {0}")]
     TransactionScriptError(#[from] TransactionScriptError),
     #[error("account vault data for root {0} not found")]
     VaultDataNotFound(Word),

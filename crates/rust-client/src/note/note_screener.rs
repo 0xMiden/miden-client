@@ -185,15 +185,15 @@ where
 /// Error when screening notes to check relevance to a client.
 #[derive(Debug, Error)]
 pub enum NoteScreenerError {
-    #[error("error while processing note inputs")]
+    #[error("failed to process note inputs: {0}")]
     InvalidNoteInputsError(#[from] InvalidNoteInputsError),
-    #[error("account data wasn't found for account id {0}")]
+    #[error("cannot check note relevance: account {0} data not found in the store")]
     AccountDataNotFound(AccountId),
-    #[error("error while fetching data from the store")]
+    #[error("failed to fetch data from the store during note screening: {0}")]
     StoreError(#[from] StoreError),
-    #[error("error while checking note")]
+    #[error("note consumption check failed: {0}")]
     NoteCheckerError(#[from] NoteCheckerError),
-    #[error("error while building transaction request")]
+    #[error("failed to build transaction request during note screening: {0}")]
     TransactionRequestError(#[from] TransactionRequestError),
 }
 
