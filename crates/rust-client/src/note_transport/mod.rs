@@ -9,7 +9,6 @@ use alloc::vec::Vec;
 
 use futures::Stream;
 use miden_protocol::address::Address;
-use miden_protocol::block::BlockNumber;
 use miden_protocol::note::{Note, NoteDetails, NoteFile, NoteHeader, NoteTag};
 use miden_protocol::utils::Serializable;
 use miden_tx::auth::TransactionAuthenticator;
@@ -127,16 +126,14 @@ where
             notes.push(note);
         }
 
-        // Import fetched notes.
-        // Use block 0 so that check_expected_notes() scans the entire chain.
-        // Transport-fetched notes may have been committed before the recipient's
-        // current sync height.
+        let sync_height = self.get_sync_height().await?;
+        // Import fetched notes
         let mut note_requests = Vec::with_capacity(notes.len());
         for note in notes {
             let tag = note.metadata().tag();
             let note_file = NoteFile::NoteDetails {
                 details: note.into(),
-                after_block_num: BlockNumber::from(0u32),
+                after_block_num: sync_height,
                 tag: Some(tag),
             };
             note_requests.push(note_file);
