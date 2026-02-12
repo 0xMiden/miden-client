@@ -36,7 +36,8 @@ var Table;
     Table["AccountAssets"] = "accountAssets";
     Table["StorageMapEntries"] = "storageMapEntries";
     Table["AccountAuth"] = "accountAuth";
-    Table["Accounts"] = "accounts";
+    Table["LatestAccountHeaders"] = "latestAccountHeaders";
+    Table["HistoricalAccountHeaders"] = "historicalAccountHeaders";
     Table["Addresses"] = "addresses";
     Table["Transactions"] = "transactions";
     Table["TransactionScripts"] = "transactionScripts";
@@ -49,7 +50,6 @@ var Table;
     Table["Tags"] = "tags";
     Table["ForeignAccountCode"] = "foreignAccountCode";
     Table["Settings"] = "settings";
-    Table["TrackedAccounts"] = "trackedAccounts";
 })(Table || (Table = {}));
 function indexes(...items) {
     return items.join(",");
@@ -61,7 +61,8 @@ export class MidenDatabase {
     storageMapEntries;
     accountAssets;
     accountAuths;
-    accounts;
+    latestAccountHeaders;
+    historicalAccountHeaders;
     addresses;
     transactions;
     transactionScripts;
@@ -74,7 +75,6 @@ export class MidenDatabase {
     tags;
     foreignAccountCode;
     settings;
-    trackedAccounts;
     constructor(network) {
         this.dexie = new Dexie(network);
         this.dexie.version(1).stores({
@@ -83,7 +83,8 @@ export class MidenDatabase {
             [Table.StorageMapEntries]: indexes("[root+key]", "root"),
             [Table.AccountAssets]: indexes("[root+vaultKey]", "root", "faucetIdPrefix"),
             [Table.AccountAuth]: indexes("pubKeyCommitmentHex"),
-            [Table.Accounts]: indexes("&accountCommitment", "id", "[id+nonce]", "codeRoot", "storageRoot", "vaultRoot"),
+            [Table.LatestAccountHeaders]: indexes("&id", "accountCommitment"),
+            [Table.HistoricalAccountHeaders]: indexes("&accountCommitment", "id", "[id+nonce]"),
             [Table.Addresses]: indexes("address", "id"),
             [Table.Transactions]: indexes("id", "statusVariant"),
             [Table.TransactionScripts]: indexes("scriptRoot"),
@@ -96,14 +97,14 @@ export class MidenDatabase {
             [Table.Tags]: indexes("id++", "tag", "source_note_id", "source_account_id"),
             [Table.ForeignAccountCode]: indexes("accountId"),
             [Table.Settings]: indexes("key"),
-            [Table.TrackedAccounts]: indexes("&id"),
         });
         this.accountCodes = this.dexie.table(Table.AccountCode);
         this.accountStorages = this.dexie.table(Table.AccountStorage);
         this.storageMapEntries = this.dexie.table(Table.StorageMapEntries);
         this.accountAssets = this.dexie.table(Table.AccountAssets);
         this.accountAuths = this.dexie.table(Table.AccountAuth);
-        this.accounts = this.dexie.table(Table.Accounts);
+        this.latestAccountHeaders = this.dexie.table(Table.LatestAccountHeaders);
+        this.historicalAccountHeaders = this.dexie.table(Table.HistoricalAccountHeaders);
         this.addresses = this.dexie.table(Table.Addresses);
         this.transactions = this.dexie.table(Table.Transactions);
         this.transactionScripts = this.dexie.table(Table.TransactionScripts);
@@ -116,7 +117,6 @@ export class MidenDatabase {
         this.tags = this.dexie.table(Table.Tags);
         this.foreignAccountCode = this.dexie.table(Table.ForeignAccountCode);
         this.settings = this.dexie.table(Table.Settings);
-        this.trackedAccounts = this.dexie.table(Table.TrackedAccounts);
         this.dexie.on("populate", () => {
             this.stateSync
                 .put({ id: 1, blockNum: 0 })

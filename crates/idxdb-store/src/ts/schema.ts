@@ -45,7 +45,8 @@ enum Table {
   AccountAssets = "accountAssets",
   StorageMapEntries = "storageMapEntries",
   AccountAuth = "accountAuth",
-  Accounts = "accounts",
+  LatestAccountHeaders = "latestAccountHeaders",
+  HistoricalAccountHeaders = "historicalAccountHeaders",
   Addresses = "addresses",
   Transactions = "transactions",
   TransactionScripts = "transactionScripts",
@@ -58,7 +59,6 @@ enum Table {
   Tags = "tags",
   ForeignAccountCode = "foreignAccountCode",
   Settings = "settings",
-  TrackedAccounts = "trackedAccounts",
 }
 
 export interface IAccountCode {
@@ -184,10 +184,6 @@ export interface ISetting {
   value: Uint8Array;
 }
 
-export interface ITrackedAccount {
-  id: string;
-}
-
 export interface JsVaultAsset {
   root: string;
   vaultKey: string;
@@ -218,7 +214,8 @@ export type MidenDexie = Dexie & {
   accountAssets: Dexie.Table<IAccountAsset, string>;
   storageMapEntries: Dexie.Table<IStorageMapEntry, string>;
   accountAuths: Dexie.Table<IAccountAuth, string>;
-  accounts: Dexie.Table<IAccount, string>;
+  latestAccountHeaders: Dexie.Table<IAccount, string>;
+  historicalAccountHeaders: Dexie.Table<IAccount, string>;
   addresses: Dexie.Table<IAddress, string>;
   transactions: Dexie.Table<ITransaction, string>;
   transactionScripts: Dexie.Table<ITransactionScript, string>;
@@ -231,7 +228,6 @@ export type MidenDexie = Dexie & {
   tags: Dexie.Table<ITag, number>;
   foreignAccountCode: Dexie.Table<IForeignAccountCode, string>;
   settings: Dexie.Table<ISetting, string>;
-  trackedAccounts: Dexie.Table<ITrackedAccount, string>;
 };
 
 export class MidenDatabase {
@@ -241,7 +237,8 @@ export class MidenDatabase {
   storageMapEntries: Dexie.Table<IStorageMapEntry, string>;
   accountAssets: Dexie.Table<IAccountAsset, string>;
   accountAuths: Dexie.Table<IAccountAuth, string>;
-  accounts: Dexie.Table<IAccount, string>;
+  latestAccountHeaders: Dexie.Table<IAccount, string>;
+  historicalAccountHeaders: Dexie.Table<IAccount, string>;
   addresses: Dexie.Table<IAddress, string>;
   transactions: Dexie.Table<ITransaction, string>;
   transactionScripts: Dexie.Table<ITransactionScript, string>;
@@ -254,7 +251,6 @@ export class MidenDatabase {
   tags: Dexie.Table<ITag, number>;
   foreignAccountCode: Dexie.Table<IForeignAccountCode, string>;
   settings: Dexie.Table<ISetting, string>;
-  trackedAccounts: Dexie.Table<ITrackedAccount, string>;
 
   constructor(network: string) {
     this.dexie = new Dexie(network) as MidenDexie;
@@ -269,13 +265,11 @@ export class MidenDatabase {
         "faucetIdPrefix"
       ),
       [Table.AccountAuth]: indexes("pubKeyCommitmentHex"),
-      [Table.Accounts]: indexes(
+      [Table.LatestAccountHeaders]: indexes("&id", "accountCommitment"),
+      [Table.HistoricalAccountHeaders]: indexes(
         "&accountCommitment",
         "id",
-        "[id+nonce]",
-        "codeRoot",
-        "storageRoot",
-        "vaultRoot"
+        "[id+nonce]"
       ),
       [Table.Addresses]: indexes("address", "id"),
       [Table.Transactions]: indexes("id", "statusVariant"),
@@ -299,7 +293,6 @@ export class MidenDatabase {
       ),
       [Table.ForeignAccountCode]: indexes("accountId"),
       [Table.Settings]: indexes("key"),
-      [Table.TrackedAccounts]: indexes("&id"),
     });
 
     this.accountCodes = this.dexie.table<IAccountCode, string>(
@@ -317,7 +310,12 @@ export class MidenDatabase {
     this.accountAuths = this.dexie.table<IAccountAuth, string>(
       Table.AccountAuth
     );
-    this.accounts = this.dexie.table<IAccount, string>(Table.Accounts);
+    this.latestAccountHeaders = this.dexie.table<IAccount, string>(
+      Table.LatestAccountHeaders
+    );
+    this.historicalAccountHeaders = this.dexie.table<IAccount, string>(
+      Table.HistoricalAccountHeaders
+    );
     this.addresses = this.dexie.table<IAddress, string>(Table.Addresses);
     this.transactions = this.dexie.table<ITransaction, string>(
       Table.Transactions
@@ -343,9 +341,6 @@ export class MidenDatabase {
       Table.ForeignAccountCode
     );
     this.settings = this.dexie.table<ISetting, string>(Table.Settings);
-    this.trackedAccounts = this.dexie.table<ITrackedAccount, string>(
-      Table.TrackedAccounts
-    );
 
     this.dexie.on("populate", () => {
       this.stateSync

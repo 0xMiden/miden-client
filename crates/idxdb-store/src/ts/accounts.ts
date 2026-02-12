@@ -3,7 +3,6 @@ import {
   IAccount,
   IAccountAsset,
   IAccountStorage,
-  ITrackedAccount,
   IStorageMapEntry,
   JsStorageMapEntry,
   JsStorageSlot,
@@ -14,8 +13,8 @@ import { logWebStoreError, uint8ArrayToBase64 } from "./utils.js";
 export async function getAccountIds(dbId: string) {
   try {
     const db = getDatabase(dbId);
-    const tracked = await db.trackedAccounts.toArray();
-    return tracked.map((entry) => entry.id);
+    const records = await db.latestAccountHeaders.toArray();
+    return records.map((entry) => entry.id);
   } catch (error) {
     logWebStoreError(error, "Error while fetching account IDs");
   }
@@ -26,43 +25,29 @@ export async function getAccountIds(dbId: string) {
 export async function getAllAccountHeaders(dbId: string) {
   try {
     const db = getDatabase(dbId);
-    const latestRecordsMap: Map<string, IAccount> = new Map();
+    const records = await db.latestAccountHeaders.toArray();
 
-    await db.accounts.each((record) => {
-      const existingRecord = latestRecordsMap.get(record.id);
-      if (
-        !existingRecord ||
-        BigInt(record.nonce) > BigInt(existingRecord.nonce)
-      ) {
-        latestRecordsMap.set(record.id, record);
-      }
-    });
-
-    const latestRecords = Array.from(latestRecordsMap.values());
-
-    const resultObject = await Promise.all(
-      latestRecords.map((record) => {
-        let accountSeedBase64: string | undefined = undefined;
-        if (record.accountSeed) {
-          const seedAsBytes = new Uint8Array(record.accountSeed);
-          if (seedAsBytes.length > 0) {
-            accountSeedBase64 = uint8ArrayToBase64(seedAsBytes);
-          }
+    const resultObject = records.map((record) => {
+      let accountSeedBase64: string | undefined = undefined;
+      if (record.accountSeed) {
+        const seedAsBytes = new Uint8Array(record.accountSeed);
+        if (seedAsBytes.length > 0) {
+          accountSeedBase64 = uint8ArrayToBase64(seedAsBytes);
         }
+      }
 
-        return {
-          id: record.id,
-          nonce: record.nonce,
-          vaultRoot: record.vaultRoot,
-          storageRoot: record.storageRoot || "",
-          codeRoot: record.codeRoot || "",
-          accountSeed: accountSeedBase64,
-          locked: record.locked,
-          committed: record.committed,
-          accountCommitment: record.accountCommitment || "",
-        };
-      })
-    );
+      return {
+        id: record.id,
+        nonce: record.nonce,
+        vaultRoot: record.vaultRoot,
+        storageRoot: record.storageRoot || "",
+        codeRoot: record.codeRoot || "",
+        accountSeed: accountSeedBase64,
+        locked: record.locked,
+        committed: record.committed,
+        accountCommitment: record.accountCommitment || "",
+      };
+    });
 
     return resultObject;
   } catch (error) {
@@ -73,45 +58,32 @@ export async function getAllAccountHeaders(dbId: string) {
 export async function getAccountHeader(dbId: string, accountId: string) {
   try {
     const db = getDatabase(dbId);
-    const allMatchingRecords = await db.accounts
+    const record = await db.latestAccountHeaders
       .where("id")
       .equals(accountId)
-      .toArray();
+      .first();
 
-    if (allMatchingRecords.length === 0) {
+    if (!record) {
       console.log("No account header record found for given ID.");
       return null;
     }
 
-    const sortedRecords = allMatchingRecords.sort((a, b) => {
-      const bigIntA = BigInt(a.nonce);
-      const bigIntB = BigInt(b.nonce);
-      return bigIntA > bigIntB ? -1 : bigIntA < bigIntB ? 1 : 0;
-    });
-
-    const mostRecentRecord: IAccount | undefined = sortedRecords[0];
-
-    if (mostRecentRecord === undefined) {
-      return null;
-    }
-
     let accountSeedBase64: string | undefined = undefined;
-
-    if (mostRecentRecord.accountSeed) {
-      if (mostRecentRecord.accountSeed.length > 0) {
-        accountSeedBase64 = uint8ArrayToBase64(mostRecentRecord.accountSeed);
+    if (record.accountSeed) {
+      if (record.accountSeed.length > 0) {
+        accountSeedBase64 = uint8ArrayToBase64(record.accountSeed);
       }
     }
-    const AccountHeader = {
-      id: mostRecentRecord.id,
-      nonce: mostRecentRecord.nonce,
-      vaultRoot: mostRecentRecord.vaultRoot,
-      storageRoot: mostRecentRecord.storageRoot,
-      codeRoot: mostRecentRecord.codeRoot,
+
+    return {
+      id: record.id,
+      nonce: record.nonce,
+      vaultRoot: record.vaultRoot,
+      storageRoot: record.storageRoot,
+      codeRoot: record.codeRoot,
       accountSeed: accountSeedBase64,
-      locked: mostRecentRecord.locked,
+      locked: record.locked,
     };
-    return AccountHeader;
   } catch (error) {
     logWebStoreError(
       error,
@@ -126,36 +98,29 @@ export async function getAccountHeaderByCommitment(
 ) {
   try {
     const db = getDatabase(dbId);
-    const allMatchingRecords = await db.accounts
+    const record = await db.historicalAccountHeaders
       .where("accountCommitment")
       .equals(accountCommitment)
-      .toArray();
+      .first();
 
-    if (allMatchingRecords.length == 0) {
+    if (!record) {
       return undefined;
     }
 
-    const matchingRecord: IAccount | undefined = allMatchingRecords[0];
-
-    if (matchingRecord === undefined) {
-      console.log("No account header record found for given commitment.");
-      return null;
-    }
-
     let accountSeedBase64: string | undefined = undefined;
-    if (matchingRecord.accountSeed) {
-      accountSeedBase64 = uint8ArrayToBase64(matchingRecord.accountSeed);
+    if (record.accountSeed) {
+      accountSeedBase64 = uint8ArrayToBase64(record.accountSeed);
     }
-    const AccountHeader = {
-      id: matchingRecord.id,
-      nonce: matchingRecord.nonce,
-      vaultRoot: matchingRecord.vaultRoot,
-      storageRoot: matchingRecord.storageRoot,
-      codeRoot: matchingRecord.codeRoot,
+
+    return {
+      id: record.id,
+      nonce: record.nonce,
+      vaultRoot: record.vaultRoot,
+      storageRoot: record.storageRoot,
+      codeRoot: record.codeRoot,
       accountSeed: accountSeedBase64,
-      locked: matchingRecord.locked,
+      locked: record.locked,
     };
-    return AccountHeader;
   } catch (error) {
     logWebStoreError(
       error,
@@ -401,8 +366,8 @@ export async function upsertAccountRecord(
       locked: false,
     };
 
-    await db.accounts.put(data as IAccount);
-    await db.trackedAccounts.put({ id: accountId } as ITrackedAccount);
+    await db.historicalAccountHeaders.put(data as IAccount);
+    await db.latestAccountHeaders.put(data as IAccount);
   } catch (error) {
     logWebStoreError(error, `Error inserting account: ${accountId}`);
   }
@@ -536,7 +501,10 @@ export async function getForeignAccountCode(
 export async function lockAccount(dbId: string, accountId: string) {
   try {
     const db = getDatabase(dbId);
-    await db.accounts.where("id").equals(accountId).modify({ locked: true });
+    await db.latestAccountHeaders
+      .where("id")
+      .equals(accountId)
+      .modify({ locked: true });
   } catch (error) {
     logWebStoreError(error, `Error locking account: ${accountId}`);
   }
@@ -548,10 +516,41 @@ export async function undoAccountStates(
 ) {
   try {
     const db = getDatabase(dbId);
-    await db.accounts
+
+    // Find affected records to get their account IDs before deleting
+    const affectedRecords = await db.historicalAccountHeaders
+      .where("accountCommitment")
+      .anyOf(accountCommitments)
+      .toArray();
+
+    const affectedAccountIds = [...new Set(affectedRecords.map((r) => r.id))];
+
+    // Delete matching records from historical
+    await db.historicalAccountHeaders
       .where("accountCommitment")
       .anyOf(accountCommitments)
       .delete();
+
+    // Rebuild latest for each affected account
+    for (const accountId of affectedAccountIds) {
+      const remaining = await db.historicalAccountHeaders
+        .where("id")
+        .equals(accountId)
+        .toArray();
+
+      if (remaining.length === 0) {
+        await db.latestAccountHeaders.where("id").equals(accountId).delete();
+      } else {
+        // Find the record with the highest nonce
+        let maxRecord = remaining[0];
+        for (const record of remaining) {
+          if (BigInt(record.nonce) > BigInt(maxRecord.nonce)) {
+            maxRecord = record;
+          }
+        }
+        await db.latestAccountHeaders.put(maxRecord);
+      }
+    }
   } catch (error) {
     logWebStoreError(
       error,
