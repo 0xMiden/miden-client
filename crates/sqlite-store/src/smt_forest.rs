@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::HashMap;
 
 use miden_client::account::{AccountId, AccountStorage, StorageMap, StorageSlotContent};
 use miden_client::asset::{Asset, AssetVault, AssetWitness};
@@ -19,11 +19,11 @@ use miden_protocol::crypto::merkle::{EmptySubtreeRoots, MerkleError};
 pub struct AccountSmtForest {
     forest: SmtForest,
     /// Current roots per account (vault root + storage map roots).
-    account_roots: BTreeMap<AccountId, Vec<Word>>,
+    account_roots: HashMap<AccountId, Vec<Word>>,
     /// Stack of old roots saved during staging, awaiting commit or undo.
-    pending_old_roots: BTreeMap<AccountId, Vec<Vec<Word>>>,
+    pending_old_roots: HashMap<AccountId, Vec<Vec<Word>>>,
     /// Reference count for each SMT root across all accounts.
-    root_refcounts: BTreeMap<Word, usize>,
+    root_refcounts: HashMap<Word, usize>,
 }
 
 impl AccountSmtForest {
@@ -95,15 +95,21 @@ impl AccountSmtForest {
     }
 
     /// Discards the most recent staged change: restores old roots and releases new roots.
+    ///
+    /// If there are old roots to restore, the current roots are replaced with them.
+    /// If there are no old roots (i.e., the account was first staged without prior state),
+    /// the current roots are simply removed.
     pub fn discard_roots(&mut self, account_id: AccountId) {
         let old_roots = self.pending_old_roots.get_mut(&account_id).and_then(Vec::pop);
 
-        let Some(old_roots) = old_roots else {
-            return;
-        };
-
-        // Release the current (staged) roots
-        if let Some(new_roots) = self.account_roots.insert(account_id, old_roots) {
+        // Release the current (staged) roots and restore old ones if available
+        if let Some(old_roots) = old_roots {
+            if let Some(new_roots) = self.account_roots.insert(account_id, old_roots) {
+                let to_pop = decrement_refcounts(&mut self.root_refcounts, &new_roots);
+                self.forest.pop_smts(to_pop);
+            }
+        } else if let Some(new_roots) = self.account_roots.remove(&account_id) {
+            // No old roots to restore — just remove the staged roots entirely
             let to_pop = decrement_refcounts(&mut self.root_refcounts, &new_roots);
             self.forest.pop_smts(to_pop);
         }
@@ -117,7 +123,16 @@ impl AccountSmtForest {
     /// Replaces roots atomically: sets new roots and immediately releases old roots.
     ///
     /// Use this when no rollback is needed (e.g., initial insert, network updates).
+    ///
+    /// # Panics
+    ///
+    /// Panics if there are pending staged changes for the account. Use
+    /// [`Self::commit_roots`] or [`Self::discard_roots`] first.
     pub fn replace_roots(&mut self, account_id: AccountId, new_roots: Vec<Word>) {
+        assert!(
+            !self.pending_old_roots.contains_key(&account_id),
+            "cannot replace roots while staged changes are pending for account {account_id}"
+        );
         increment_refcounts(&mut self.root_refcounts, &new_roots);
         if let Some(old_roots) = self.account_roots.insert(account_id, new_roots) {
             let to_pop = decrement_refcounts(&mut self.root_refcounts, &old_roots);
@@ -186,23 +201,26 @@ impl AccountSmtForest {
     }
 
     /// Inserts all storage map SMT nodes to the SMT forest.
-    pub fn insert_storage_map_nodes(&mut self, storage: &AccountStorage) {
+    pub fn insert_storage_map_nodes(&mut self, storage: &AccountStorage) -> Result<(), StoreError> {
         let maps = storage.slots().iter().filter_map(|slot| match slot.content() {
             StorageSlotContent::Map(map) => Some(map),
             StorageSlotContent::Value(_) => None,
         });
 
         for map in maps {
-            self.insert_storage_map_nodes_for_map(map);
+            self.insert_storage_map_nodes_for_map(map)?;
         }
+        Ok(())
     }
 
+    /// Inserts the SMT nodes for an account's vault and storage maps into the
+    /// forest, without tracking roots for the account.
     pub fn insert_account_state(
         &mut self,
         vault: &AssetVault,
         storage: &AccountStorage,
     ) -> Result<(), StoreError> {
-        self.insert_storage_map_nodes(storage);
+        self.insert_storage_map_nodes(storage)?;
         self.insert_asset_nodes(vault)?;
         Ok(())
     }
@@ -221,11 +239,12 @@ impl AccountSmtForest {
         Ok(())
     }
 
-    pub fn insert_storage_map_nodes_for_map(&mut self, map: &StorageMap) {
+    pub fn insert_storage_map_nodes_for_map(&mut self, map: &StorageMap) -> Result<(), StoreError> {
         let empty_root = *EmptySubtreeRoots::entry(SMT_DEPTH, 0);
         let entries: Vec<(Word, Word)> =
             map.entries().map(|(k, v)| (StorageMap::hash_key(*k), *v)).collect();
-        self.forest.batch_insert(empty_root, entries).unwrap(); // TODO: handle unwrap
+        self.forest.batch_insert(empty_root, entries).map_err(StoreError::from)?;
+        Ok(())
     }
 
     // HELPERS
@@ -243,14 +262,14 @@ impl AccountSmtForest {
     }
 }
 
-fn increment_refcounts(refcounts: &mut BTreeMap<Word, usize>, roots: &[Word]) {
+fn increment_refcounts(refcounts: &mut HashMap<Word, usize>, roots: &[Word]) {
     for root in roots {
         *refcounts.entry(*root).or_insert(0) += 1;
     }
 }
 
 /// Decrements refcounts for the given roots, returning those that reached zero.
-fn decrement_refcounts(refcounts: &mut BTreeMap<Word, usize>, roots: &[Word]) -> Vec<Word> {
+fn decrement_refcounts(refcounts: &mut HashMap<Word, usize>, roots: &[Word]) -> Vec<Word> {
     let mut to_pop = Vec::new();
     for root in roots {
         if let Some(count) = refcounts.get_mut(root) {
@@ -287,7 +306,7 @@ mod tests {
     fn insert_map(forest: &mut AccountSmtForest, key: Word, value: Word) -> Word {
         let mut map = StorageMap::new();
         map.insert(key, value).unwrap();
-        forest.insert_storage_map_nodes_for_map(&map);
+        forest.insert_storage_map_nodes_for_map(&map).unwrap();
         map.root()
     }
 

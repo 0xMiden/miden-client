@@ -563,9 +563,11 @@ impl SqliteStore {
         // Build the final roots from the init state's registered roots:
         // - Replace vault root with the final one
         // - Replace changed map roots with their new values
-        // - Unchanged map roots carry continue as they were
-        let mut final_roots =
-            smt_forest.get_roots(&init_account_state.id()).cloned().unwrap_or_default();
+        // - Unchanged map roots continue as they were
+        let mut final_roots = smt_forest
+            .get_roots(&init_account_state.id())
+            .cloned()
+            .ok_or(StoreError::AccountDataNotFound(init_account_state.id()))?;
 
         // First element is always the vault root
         if let Some(vault_root) = final_roots.first_mut() {
