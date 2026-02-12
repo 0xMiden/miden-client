@@ -1,7 +1,6 @@
 use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::string::String;
-use alloc::vec::Vec;
 use std::fs;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::io::Write;
@@ -61,8 +60,47 @@ impl KeyIndex {
         });
     }
 
+    /// Loads the index from disk, or creates a new one if it doesn't exist.
+    fn read_from_file(keys_directory: &Path) -> Result<Self, KeyStoreError> {
+        let index_path = keys_directory.join(INDEX_FILE_NAME);
+
+        if !index_path.exists() {
+            return Ok(Self::new());
+        }
+
+        let contents =
+            fs::read_to_string(&index_path).map_err(keystore_error("error reading index file"))?;
+
+        serde_json::from_str(&contents).map_err(|err| {
+            KeyStoreError::DecodingError(format!("error parsing index file: {err:?}"))
+        })
+    }
+
+    /// Saves the index to disk atomically (write to temp file, then rename).
+    fn write_to_file(&self, keys_directory: &Path) -> Result<(), KeyStoreError> {
+        let index_path = keys_directory.join(INDEX_FILE_NAME);
+        let temp_path = std::env::temp_dir().join(INDEX_FILE_NAME);
+
+        let contents = serde_json::to_string_pretty(self).map_err(|err| {
+            KeyStoreError::StorageError(format!("error serializing index: {err:?}"))
+        })?;
+
+        // Write to temp file
+        let mut file = fs::File::create(&temp_path)
+            .map_err(keystore_error("error creating temp index file"))?;
+        file.write_all(contents.as_bytes())
+            .map_err(keystore_error("error writing temp index file"))?;
+        file.sync_all().map_err(keystore_error("error syncing temp index file"))?;
+
+        // Atomically rename
+        fs::rename(&temp_path, &index_path).map_err(keystore_error("error renaming index file"))
+    }
+
     /// Gets all public key commitments for an account ID.
-    fn get_commitments(&self, account_id: &AccountId) -> Vec<PublicKeyCommitment> {
+    fn get_commitments(
+        &self,
+        account_id: &AccountId,
+    ) -> Result<BTreeSet<PublicKeyCommitment>, KeyStoreError> {
         let account_id_hex = account_id.to_hex();
 
         self.mappings
@@ -75,7 +113,9 @@ impl KeyIndex {
                     })
                     .collect()
             })
-            .unwrap_or_default()
+            .ok_or_else(|| {
+                KeyStoreError::StorageError(format!("account not found {account_id_hex}"))
+            })
     }
 }
 
@@ -113,7 +153,7 @@ impl FilesystemKeyStore {
                 .map_err(keystore_error("error creating keys directory"))?;
         }
 
-        let index = load_or_create_index(&keys_directory)?;
+        let index = KeyIndex::read_from_file(&keys_directory)?;
 
         Ok(FilesystemKeyStore {
             keys_directory,
@@ -128,22 +168,6 @@ impl FilesystemKeyStore {
         let pub_key_commitment = key.public_key().to_commitment();
         let file_path = key_file_path(&self.keys_directory, pub_key_commitment);
         write_secret_key_file(&file_path, key)
-    }
-
-    /// Removes a secret key from the keystore, given the commitment of a public key.
-    ///
-    /// This is a lower-level method that does NOT remove account associations.
-    /// Prefer using [`Keystore::remove_key`] which also removes account associations.
-    pub fn remove_key_without_account(
-        &self,
-        pub_key: PublicKeyCommitment,
-    ) -> Result<(), KeyStoreError> {
-        let file_path = key_file_path(&self.keys_directory, pub_key);
-        if !file_path.exists() {
-            return Ok(());
-        }
-
-        fs::remove_file(file_path).map_err(keystore_error("error removing secret key file"))
     }
 
     /// Retrieves a secret key from the keystore given the commitment of a public key.
@@ -163,7 +187,7 @@ impl FilesystemKeyStore {
     /// Saves the index to disk.
     fn save_index(&self) -> Result<(), KeyStoreError> {
         let index = self.index.read();
-        save_index(&self.keys_directory, &index)
+        index.write_to_file(&self.keys_directory)
     }
 }
 
@@ -242,7 +266,12 @@ impl Keystore for FilesystemKeyStore {
         self.save_index()?;
 
         // Remove the key file
-        self.remove_key_without_account(pub_key)
+        let file_path = key_file_path(&self.keys_directory, pub_key);
+        if file_path.exists() {
+            fs::remove_file(file_path).map_err(keystore_error("error removing secret key file"))?;
+        }
+
+        Ok(())
     }
 
     async fn get_key(
@@ -255,9 +284,9 @@ impl Keystore for FilesystemKeyStore {
     async fn get_account_key_commitments(
         &self,
         account_id: &AccountId,
-    ) -> Result<Vec<PublicKeyCommitment>, KeyStoreError> {
+    ) -> Result<BTreeSet<PublicKeyCommitment>, KeyStoreError> {
         let index = self.index.read();
-        Ok(index.get_commitments(account_id))
+        index.get_commitments(account_id)
     }
 }
 
@@ -293,38 +322,4 @@ fn hash_pub_key(pub_key: Word) -> String {
     let mut hasher = DefaultHasher::new();
     pub_key.hash(&mut hasher);
     hasher.finish().to_string()
-}
-
-/// Loads the index from disk, or creates a new one if it doesn't exist.
-fn load_or_create_index(keys_directory: &Path) -> Result<KeyIndex, KeyStoreError> {
-    let index_path = keys_directory.join(INDEX_FILE_NAME);
-
-    if !index_path.exists() {
-        return Ok(KeyIndex::new());
-    }
-
-    let contents =
-        fs::read_to_string(&index_path).map_err(keystore_error("error reading index file"))?;
-
-    serde_json::from_str(&contents)
-        .map_err(|err| KeyStoreError::DecodingError(format!("error parsing index file: {err:?}")))
-}
-
-/// Saves the index to disk atomically (write to temp file, then rename).
-fn save_index(keys_directory: &Path, index: &KeyIndex) -> Result<(), KeyStoreError> {
-    let index_path = keys_directory.join(INDEX_FILE_NAME);
-    let temp_path = std::env::temp_dir().join(INDEX_FILE_NAME);
-
-    let contents = serde_json::to_string_pretty(index)
-        .map_err(|err| KeyStoreError::StorageError(format!("error serializing index: {err:?}")))?;
-
-    // Write to temp file
-    let mut file =
-        fs::File::create(&temp_path).map_err(keystore_error("error creating temp index file"))?;
-    file.write_all(contents.as_bytes())
-        .map_err(keystore_error("error writing temp index file"))?;
-    file.sync_all().map_err(keystore_error("error syncing temp index file"))?;
-
-    // Atomically rename
-    fs::rename(&temp_path, &index_path).map_err(keystore_error("error renaming index file"))
 }

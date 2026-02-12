@@ -1,4 +1,5 @@
 use alloc::boxed::Box;
+use alloc::collections::BTreeSet;
 use alloc::string::String;
 use alloc::vec::Vec;
 
@@ -46,11 +47,11 @@ pub trait Keystore: TransactionAuthenticator {
 
     /// Returns all public key commitments associated with the given account ID.
     ///
-    /// Returns an empty vector if the account has no associated keys.
+    /// Returns an error if the account is not found.
     async fn get_account_key_commitments(
         &self,
         account_id: &AccountId,
-    ) -> Result<Vec<PublicKeyCommitment>, KeyStoreError>;
+    ) -> Result<BTreeSet<PublicKeyCommitment>, KeyStoreError>;
 
     /// Returns all secret keys associated with the given account ID.
     ///

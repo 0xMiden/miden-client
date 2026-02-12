@@ -1,6 +1,6 @@
+use alloc::collections::BTreeSet;
 use alloc::string::{String, ToString};
 use alloc::sync::Arc;
-use alloc::vec::Vec;
 
 use idxdb_store::auth::{
     get_account_auth_by_pub_key_commitment,
@@ -250,7 +250,7 @@ impl<R: Rng> Keystore for WebKeyStore<R> {
     async fn get_account_key_commitments(
         &self,
         account_id: &AccountId,
-    ) -> Result<Vec<PublicKeyCommitment>, KeyStoreError> {
+    ) -> Result<BTreeSet<PublicKeyCommitment>, KeyStoreError> {
         let account_id_hex = account_id.to_hex();
 
         let commitment_hexes = get_key_commitments_by_account_id(&self.db_id, account_id_hex)
