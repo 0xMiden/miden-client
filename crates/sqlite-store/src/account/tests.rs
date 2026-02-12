@@ -29,7 +29,7 @@ use miden_client::asset::{
 use miden_client::auth::{AuthFalcon512Rpo, PublicKeyCommitment};
 use miden_client::store::Store;
 use miden_client::testing::common::ACCOUNT_ID_REGULAR;
-use miden_client::{EMPTY_WORD, ONE, ZERO};
+use miden_client::{EMPTY_WORD, Felt, ONE, ZERO};
 use miden_protocol::testing::account_id::{
     ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
     ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET,
@@ -234,13 +234,10 @@ async fn apply_account_delta_removals() -> anyhow::Result<()> {
     let smt_forest = store.smt_forest.clone();
     store
         .interact_with_connection(move |conn| {
-            let fungible_assets = SqliteStore::get_account_fungible_assets_for_delta(
-                conn,
-                &(&account).into(),
-                &delta,
-            )?;
+            let fungible_assets =
+                SqliteStore::get_account_fungible_assets_for_delta(conn, account.id(), &delta)?;
             let storage_maps =
-                SqliteStore::get_account_storage_maps_for_delta(conn, &(&account).into(), &delta)?;
+                SqliteStore::get_account_storage_maps_for_delta(conn, account.id(), &delta)?;
             let tx = conn.transaction().into_store_error()?;
             let mut smt_forest = smt_forest.write().expect("smt_forest write lock not poisoned");
 
@@ -587,6 +584,218 @@ async fn account_reader_addresses_access() -> anyhow::Result<()> {
     let addresses = reader.addresses().await?;
     assert_eq!(addresses.len(), 1);
     assert_eq!(addresses[0], default_address);
+
+    Ok(())
+}
+
+// STORAGE MODEL BENCHMARK (issue #1768)
+// ================================================================================================
+
+/// Row counts across the new account-related tables.
+struct StorageMetrics {
+    accounts: usize,
+    latest_account_storage: usize,
+    latest_storage_map_entries: usize,
+    latest_account_assets: usize,
+    historical_account_storage: usize,
+    historical_storage_map_entries: usize,
+    historical_account_assets: usize,
+}
+
+impl std::fmt::Display for StorageMetrics {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "accounts={:<3} latest_storage={:<3} latest_map={:<3} latest_assets={:<3} \
+             hist_storage={:<3} hist_map={:<3} hist_assets={:<3}",
+            self.accounts,
+            self.latest_account_storage,
+            self.latest_storage_map_entries,
+            self.latest_account_assets,
+            self.historical_account_storage,
+            self.historical_storage_map_entries,
+            self.historical_account_assets,
+        )
+    }
+}
+
+async fn get_storage_metrics(store: &SqliteStore) -> StorageMetrics {
+    store
+        .interact_with_connection(|conn| {
+            let count = |table| {
+                conn.query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |r| r.get(0))
+                    .into_store_error()
+            };
+            Ok(StorageMetrics {
+                accounts: count("accounts")?,
+                latest_account_storage: count("latest_account_storage")?,
+                latest_storage_map_entries: count("latest_storage_map_entries")?,
+                latest_account_assets: count("latest_account_assets")?,
+                historical_account_storage: count("historical_account_storage")?,
+                historical_storage_map_entries: count("historical_storage_map_entries")?,
+                historical_account_assets: count("historical_account_assets")?,
+            })
+        })
+        .await
+        .unwrap()
+}
+
+/// Creates an account with a storage map of `map_size` entries, inserts it into the store,
+/// and returns the account. Uses Store::insert_account (public API).
+async fn setup_account_with_map(
+    store: &SqliteStore,
+    map_size: u64,
+    map_slot_name: &StorageSlotName,
+) -> anyhow::Result<Account> {
+    let mut map = StorageMap::new();
+    for i in 1..=map_size {
+        map.insert(
+            [Felt::new(i), ZERO, ZERO, ZERO].into(),
+            [Felt::new(i * 100), ZERO, ZERO, ZERO].into(),
+        )?;
+    }
+
+    let component = AccountComponent::new(
+        basic_wallet_library(),
+        vec![StorageSlot::with_map(map_slot_name.clone(), map)],
+    )?
+    .with_supports_all_types();
+
+    let account = AccountBuilder::new([0; 32])
+        .account_type(AccountType::RegularAccountImmutableCode)
+        .with_auth_component(AuthFalcon512Rpo::new(PublicKeyCommitment::from(EMPTY_WORD)))
+        .with_component(component)
+        .build()?;
+
+    store.insert_account(&account, Address::new(account.id())).await?;
+    Ok(account)
+}
+
+/// Applies a delta that changes a single map entry (key=1) and persists it.
+async fn apply_single_entry_update(
+    store: &SqliteStore,
+    account: &mut Account,
+    map_slot_name: &StorageSlotName,
+    nonce: u64,
+) -> anyhow::Result<()> {
+    let mut storage_delta = AccountStorageDelta::new();
+    storage_delta.set_map_item(
+        map_slot_name.clone(),
+        [Felt::new(1), ZERO, ZERO, ZERO].into(),
+        [Felt::new(nonce * 1000), ZERO, ZERO, ZERO].into(),
+    )?;
+
+    let delta = AccountDelta::new(
+        account.id(),
+        storage_delta,
+        AccountVaultDelta::from_iters([], []),
+        Felt::new(nonce),
+    )?;
+
+    let prev_header: AccountHeader = (&*account).into();
+    account.apply_delta(&delta)?;
+    let final_header: AccountHeader = (&*account).into();
+
+    let smt_forest = store.smt_forest.clone();
+    let delta_clone = delta.clone();
+    let account_id = account.id();
+    store
+        .interact_with_connection(move |conn| {
+            let storage_maps =
+                SqliteStore::get_account_storage_maps_for_delta(conn, account_id, &delta_clone)?;
+            let tx = conn.transaction().into_store_error()?;
+            let mut smt_forest = smt_forest.write().expect("smt_forest write lock not poisoned");
+
+            SqliteStore::apply_account_delta(
+                &tx,
+                &mut smt_forest,
+                &prev_header,
+                &final_header,
+                BTreeMap::default(),
+                storage_maps,
+                &delta,
+            )?;
+
+            tx.commit().into_store_error()?;
+            Ok(())
+        })
+        .await?;
+
+    Ok(())
+}
+
+/// Measures storage row growth and verifies correctness after multiple updates.
+///
+/// After refactor:
+///   50 map entries + 5 updates:
+///     latest_storage_map_entries = 50 (always the full current state)
+///     historical_storage_map_entries = 50 (initial) + 5 (one changed entry per update) = 55
+#[tokio::test]
+async fn storage_model_benchmark() -> anyhow::Result<()> {
+    const MAP_SIZE: u64 = 50;
+    const NUM_UPDATES: u64 = 5;
+
+    let store = create_test_store().await;
+    let map_slot_name = StorageSlotName::new("test::benchmark::map").expect("valid slot name");
+
+    // ── Phase 1: Data growth ─────────────────────────────────────────────
+    let mut account = setup_account_with_map(&store, MAP_SIZE, &map_slot_name).await?;
+    let account_id = account.id();
+
+    eprintln!("\n=== STORAGE MODEL BENCHMARK (issue #1768) ===");
+    eprintln!("Map size: {MAP_SIZE} entries, Updates: {NUM_UPDATES}\n");
+
+    let m = get_storage_metrics(&store).await;
+    eprintln!("After insert:    {m}");
+
+    for i in 1..=NUM_UPDATES {
+        apply_single_entry_update(&store, &mut account, &map_slot_name, i).await?;
+        let m = get_storage_metrics(&store).await;
+        eprintln!("After update {i}:  {m}");
+    }
+
+    let after_updates = get_storage_metrics(&store).await;
+    let num_states = (1 + NUM_UPDATES) as usize;
+
+    // Latest tables always hold the full current state
+    assert_eq!(after_updates.latest_storage_map_entries, MAP_SIZE as usize);
+    // Account has 2 storage slots: the auth key slot + the map slot
+    assert_eq!(after_updates.latest_account_storage, 2);
+
+    // Historical: initial insert writes all N entries at nonce 0,
+    // then each update writes ONLY the changed entry to historical.
+    // Total: N (initial) + M (one changed entry per update) = 50 + 5 = 55.
+    assert_eq!(
+        after_updates.historical_storage_map_entries,
+        MAP_SIZE as usize + NUM_UPDATES as usize
+    );
+    assert_eq!(after_updates.accounts, num_states);
+
+    // ── Phase 2: Correctness (Store trait) ───────────────────────────────
+    let changed_key = [Felt::new(1), ZERO, ZERO, ZERO].into();
+    let (value, _witness) = store
+        .get_account_map_item(account_id, map_slot_name.clone(), changed_key)
+        .await?;
+    let expected_value = [Felt::new(NUM_UPDATES * 1000), ZERO, ZERO, ZERO].into();
+    assert_eq!(value, expected_value, "Changed entry should reflect the last update");
+
+    let unchanged_key = [Felt::new(2), ZERO, ZERO, ZERO].into();
+    let (value, _witness) = store
+        .get_account_map_item(account_id, map_slot_name.clone(), unchanged_key)
+        .await?;
+    let expected_original = [Felt::new(200), ZERO, ZERO, ZERO].into();
+    assert_eq!(value, expected_original, "Unchanged entry should keep its original value");
+
+    // ── Summary ──────────────────────────────────────────────────────────
+    eprintln!("\n=== SUMMARY ===");
+    eprintln!(
+        "Latest storage_map_entries:     {} (always N={MAP_SIZE})",
+        after_updates.latest_storage_map_entries,
+    );
+    eprintln!(
+        "Historical storage_map_entries: {}",
+        after_updates.historical_storage_map_entries,
+    );
 
     Ok(())
 }

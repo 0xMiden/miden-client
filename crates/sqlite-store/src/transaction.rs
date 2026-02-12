@@ -114,13 +114,13 @@ impl SqliteStore {
 
         let updated_fungible_assets = Self::get_account_fungible_assets_for_delta(
             conn,
-            &executed_transaction.initial_account().into(),
+            executed_transaction.account_id(),
             executed_transaction.account_delta(),
         )?;
 
         let updated_storage_maps = Self::get_account_storage_maps_for_delta(
             conn,
-            &executed_transaction.initial_account().into(),
+            executed_transaction.account_id(),
             executed_transaction.account_delta(),
         )?;
 
