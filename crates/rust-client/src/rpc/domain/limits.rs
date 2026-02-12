@@ -46,10 +46,10 @@ impl Default for RpcLimits {
 
 impl Serializable for RpcLimits {
     fn write_into<W: ByteWriter>(&self, target: &mut W) {
-        (self.note_ids_limit as u64).write_into(target);
-        (self.nullifiers_limit as u64).write_into(target);
-        (self.account_ids_limit as u64).write_into(target);
-        (self.note_tags_limit as u64).write_into(target);
+        self.note_ids_limit.write_into(target);
+        self.nullifiers_limit.write_into(target);
+        self.account_ids_limit.write_into(target);
+        self.note_tags_limit.write_into(target);
     }
 }
 
@@ -97,5 +97,25 @@ impl TryFrom<proto::RpcLimits> for RpcLimits {
             note_tags_limit: get_param(&proto, "SyncState", "note_tag")
                 .or_else(|_| get_param(&proto, "SyncNotes", "note_tag"))?,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rpc_limits_serialization_roundtrip() {
+        let original = RpcLimits {
+            note_ids_limit: 100,
+            nullifiers_limit: 1000,
+            account_ids_limit: 1000,
+            note_tags_limit: 1000,
+        };
+
+        let bytes = original.to_bytes();
+        let deserialized = RpcLimits::read_from_bytes(&bytes).expect("deserialization failed");
+
+        assert_eq!(original, deserialized);
     }
 }
