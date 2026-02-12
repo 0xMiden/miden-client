@@ -154,7 +154,7 @@ async fn apply_account_delta_additions() -> anyhow::Result<()> {
                 &account.into(),
                 &final_state,
                 BTreeMap::default(),
-                BTreeMap::default(),
+                &BTreeMap::new(),
                 &delta,
             )?;
 
@@ -236,8 +236,8 @@ async fn apply_account_delta_removals() -> anyhow::Result<()> {
         .interact_with_connection(move |conn| {
             let fungible_assets =
                 SqliteStore::get_account_fungible_assets_for_delta(conn, account.id(), &delta)?;
-            let storage_maps =
-                SqliteStore::get_account_storage_maps_for_delta(conn, account.id(), &delta)?;
+            let old_map_roots =
+                SqliteStore::get_storage_map_roots_for_delta(conn, account.id(), &delta)?;
             let tx = conn.transaction().into_store_error()?;
             let mut smt_forest = smt_forest.write().expect("smt_forest write lock not poisoned");
 
@@ -247,7 +247,7 @@ async fn apply_account_delta_removals() -> anyhow::Result<()> {
                 &account.into(),
                 &final_state,
                 fungible_assets,
-                storage_maps,
+                &old_map_roots,
                 &delta,
             )?;
 
@@ -704,8 +704,8 @@ async fn apply_single_entry_update(
     let account_id = account.id();
     store
         .interact_with_connection(move |conn| {
-            let storage_maps =
-                SqliteStore::get_account_storage_maps_for_delta(conn, account_id, &delta_clone)?;
+            let old_map_roots =
+                SqliteStore::get_storage_map_roots_for_delta(conn, account_id, &delta_clone)?;
             let tx = conn.transaction().into_store_error()?;
             let mut smt_forest = smt_forest.write().expect("smt_forest write lock not poisoned");
 
@@ -715,7 +715,7 @@ async fn apply_single_entry_update(
                 &prev_header,
                 &final_header,
                 BTreeMap::default(),
-                storage_maps,
+                &old_map_roots,
                 &delta,
             )?;
 
@@ -853,8 +853,8 @@ async fn undo_account_state_restores_previous_latest() -> anyhow::Result<()> {
     let delta_clone = delta.clone();
     store
         .interact_with_connection(move |conn| {
-            let storage_maps =
-                SqliteStore::get_account_storage_maps_for_delta(conn, account_id, &delta_clone)?;
+            let old_map_roots =
+                SqliteStore::get_storage_map_roots_for_delta(conn, account_id, &delta_clone)?;
             let tx = conn.transaction().into_store_error()?;
             let mut smt_forest = smt_forest.write().expect("smt_forest write lock not poisoned");
             SqliteStore::apply_account_delta(
@@ -863,7 +863,7 @@ async fn undo_account_state_restores_previous_latest() -> anyhow::Result<()> {
                 &prev_header,
                 &final_header,
                 BTreeMap::default(),
-                storage_maps,
+                &old_map_roots,
                 &delta,
             )?;
             tx.commit().into_store_error()?;

@@ -18,7 +18,6 @@ use miden_client::account::{
     PartialAccount,
     PartialStorage,
     PartialStorageMap,
-    StorageMap,
     StorageSlotName,
     StorageSlotType,
 };
@@ -461,7 +460,7 @@ impl SqliteStore {
         init_account_state: &AccountHeader,
         final_account_state: &AccountHeader,
         updated_fungible_assets: BTreeMap<AccountIdPrefix, FungibleAsset>,
-        updated_storage_maps: BTreeMap<StorageSlotName, StorageMap>,
+        old_map_roots: &BTreeMap<StorageSlotName, Word>,
         delta: &AccountDelta,
     ) -> Result<(), StoreError> {
         let account_id = final_account_state.id();
@@ -480,7 +479,7 @@ impl SqliteStore {
         )?;
 
         let updated_storage_slots =
-            Self::apply_account_storage_delta(smt_forest, updated_storage_maps, delta)?;
+            Self::apply_account_storage_delta(smt_forest, old_map_roots, delta)?;
 
         Self::write_storage_delta(
             tx,
