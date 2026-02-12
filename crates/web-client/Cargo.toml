@@ -13,7 +13,7 @@ rust-version.workspace = true
 version.workspace      = true
 
 [package.metadata.cargo-machete]
-ignored = ["wasm-bindgen-futures"]
+ignored = []
 
 [lib]
 crate-type = ["cdylib"]
@@ -34,14 +34,13 @@ js-sys = { version = "0.3" }
 rand = { workspace = true }
 serde-wasm-bindgen = { version = "0.6" }
 thiserror.workspace = true
-tracing            = { workspace = true }
-tracing-subscriber = { version = "0.3", default-features = false, features = ["registry"] }
-tracing-wasm       = { version = "0.2" }
+tracing = { workspace = true }
+tracing-subscriber = { default-features = false, features = ["registry"], version = "0.3" }
+tracing-wasm = { version = "0.2" }
 wasm-bindgen = { features = [
   "serde-serialize",
 ], version = "=0.2.105" } # Lock version as .106 removed doc generation for structs
 wasm-bindgen-futures = { version = "0.4" }
-web-sys = { features = ["console"], version = "0.3" }
 
 [lints]
 workspace = true
