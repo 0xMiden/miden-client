@@ -301,7 +301,7 @@ mod tests {
         AccountId::try_from(ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET).unwrap()
     }
 
-    /// Creates a StorageMap with a single entry and inserts its nodes into the forest.
+    /// Creates a `StorageMap` with a single entry and inserts its nodes into the forest.
     /// Returns the map's root.
     fn insert_map(forest: &mut AccountSmtForest, key: Word, value: Word) -> Word {
         let mut map = StorageMap::new();
