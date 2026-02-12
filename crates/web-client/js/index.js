@@ -240,11 +240,6 @@ export class WebClient {
     // Lazy initialize the underlying WASM WebClient when first requested.
     this.wasmWebClient = null;
     this.wasmWebClientPromise = null;
-
-    // When true, syncState() is called before account creation methods
-    // (newWallet, newFaucet, newAccount) to advance the sync cursor to the
-    // chain tip and avoid a slow full-chain scan on the next sync.
-    this.syncBeforeNewAccount = true;
   }
 
   // TODO: This will soon conflict with some changes in main.
@@ -409,29 +404,9 @@ export class WebClient {
     });
   }
 
-  async _syncBeforeAccountCreation() {
-    if (this.syncBeforeNewAccount) {
-      try {
-        await this.syncState();
-      } catch (e) {
-        console.warn(
-          "WebClient: pre-account-creation sync failed, proceeding with account creation:",
-          e
-        );
-      }
-    }
-  }
-
   // ----- Explicitly Wrapped Methods (Worker-Forwarded) -----
 
-  async newAccount(account, overwrite) {
-    await this._syncBeforeAccountCreation();
-    const wasmWebClient = await this.getWasmWebClient();
-    return await wasmWebClient.newAccount(account, overwrite);
-  }
-
   async newWallet(storageMode, mutable, authSchemeId, seed) {
-    await this._syncBeforeAccountCreation();
     try {
       if (!this.worker) {
         const wasmWebClient = await this.getWasmWebClient();
@@ -466,7 +441,6 @@ export class WebClient {
     maxSupply,
     authSchemeId
   ) {
-    await this._syncBeforeAccountCreation();
     try {
       if (!this.worker) {
         const wasmWebClient = await this.getWasmWebClient();

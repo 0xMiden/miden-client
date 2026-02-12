@@ -105,20 +105,6 @@ export declare class WebClient extends WasmWebClient {
   syncStateWithTimeout(timeoutMs?: number): Promise<SyncSummary>;
 
   /**
-   * Whether to automatically sync state before creating a new account.
-   *
-   * When true (the default), the client calls syncState() before newWallet(),
-   * newFaucet(), and newAccount() to advance the sync cursor to the chain tip.
-   * This prevents the next syncState() from scanning the entire chain history
-   * for the new account's note tag (which would otherwise take 15-30s).
-   *
-   * Set to false to manage sync timing yourself.
-   *
-   * @default true
-   */
-  syncBeforeNewAccount: boolean;
-
-  /**
    * Terminates the underlying Web Worker used by this WebClient instance.
    *
    * Call this method when you're done using a WebClient to free up browser

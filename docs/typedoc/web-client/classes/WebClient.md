@@ -28,27 +28,6 @@
 
 `WasmWebClient.constructor`
 
-## Properties
-
-### syncBeforeNewAccount
-
-> **syncBeforeNewAccount**: `boolean`
-
-Whether to automatically sync state before creating a new account.
-
-When true (the default), the client calls syncState() before newWallet(),
-newFaucet(), and newAccount() to advance the sync cursor to the chain tip.
-This prevents the next syncState() from scanning the entire chain history
-for the new account's note tag (which would otherwise take 15-30s).
-
-Set to false to manage sync timing yourself.
-
-#### Default
-
-```ts
-true
-```
-
 ## Methods
 
 ### \[dispose\]()

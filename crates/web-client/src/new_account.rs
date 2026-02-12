@@ -8,6 +8,7 @@ use miden_client::auth::{
     AuthSchemeId as NativeAuthScheme,
     AuthSecretKey,
 };
+use miden_client::block::BlockNumber;
 use miden_client::keystore::Keystore;
 use rand::rngs::StdRng;
 use rand::{RngCore, SeedableRng};
@@ -21,6 +22,27 @@ use crate::helpers::generate_wallet;
 use crate::models::account_id::AccountId;
 use crate::{WebClient, js_error_with_context};
 
+impl WebClient {
+    /// Syncs state if the client has never been synced (still at genesis block).
+    ///
+    /// This prevents a slow full-chain scan on the next sync after account creation.
+    /// Errors are intentionally ignored — account creation should proceed regardless.
+    async fn maybe_sync_before_account_creation(&mut self) {
+        let should_sync = match self.get_mut_inner() {
+            Some(client) => {
+                client.get_sync_height().await.map_or(false, |h| h == BlockNumber::GENESIS)
+            },
+            None => false,
+        };
+
+        if should_sync {
+            if let Some(client) = self.get_mut_inner() {
+                let _ = client.sync_state().await;
+            }
+        }
+    }
+}
+
 #[wasm_bindgen]
 impl WebClient {
     #[wasm_bindgen(js_name = "newWallet")]
@@ -31,6 +53,7 @@ impl WebClient {
         auth_scheme: AuthScheme,
         init_seed: Option<Vec<u8>>,
     ) -> Result<Account, JsValue> {
+        self.maybe_sync_before_account_creation().await;
         let keystore = self.keystore.clone();
         if let Some(client) = self.get_mut_inner() {
             let (new_account, key_pair) =
@@ -63,6 +86,7 @@ impl WebClient {
         max_supply: u64,
         auth_scheme: AuthScheme,
     ) -> Result<Account, JsValue> {
+        self.maybe_sync_before_account_creation().await;
         if non_fungible {
             return Err(JsValue::from_str("Non-fungible faucets are not supported yet"));
         }
@@ -139,6 +163,7 @@ impl WebClient {
 
     #[wasm_bindgen(js_name = "newAccount")]
     pub async fn new_account(&mut self, account: &Account, overwrite: bool) -> Result<(), JsValue> {
+        self.maybe_sync_before_account_creation().await;
         if let Some(client) = self.get_mut_inner() {
             let native_account = account.into();
 
