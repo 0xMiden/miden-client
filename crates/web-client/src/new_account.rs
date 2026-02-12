@@ -29,15 +29,11 @@ impl WebClient {
     /// Errors are intentionally ignored — account creation should proceed regardless.
     async fn maybe_sync_before_account_creation(&mut self) {
         let should_sync = match self.get_mut_inner() {
-            Some(client) => {
-                client.get_sync_height().await.is_ok_and(|h| h == BlockNumber::GENESIS)
-            },
+            Some(client) => client.get_sync_height().await.is_ok_and(|h| h == BlockNumber::GENESIS),
             None => false,
         };
 
-        if should_sync
-            && let Some(client) = self.get_mut_inner()
-        {
+        if should_sync && let Some(client) = self.get_mut_inner() {
             let _ = client.sync_state().await;
         }
     }
