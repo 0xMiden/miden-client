@@ -180,7 +180,12 @@ impl JsAccountUpdate {
                 .iter()
                 .filter_map(|slot| {
                     if let StorageSlotContent::Map(map) = slot.content() {
-                        Some(JsStorageMapEntry::from_map(map, &account_id, nonce, slot.name().as_str()))
+                        Some(JsStorageMapEntry::from_map(
+                            map,
+                            &account_id,
+                            nonce,
+                            slot.name().as_str(),
+                        ))
                     } else {
                         None
                     }

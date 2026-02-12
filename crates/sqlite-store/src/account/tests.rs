@@ -35,7 +35,6 @@ use miden_protocol::testing::account_id::{
     ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET,
 };
 use miden_protocol::testing::constants::NON_FUNGIBLE_ASSET_DATA;
-
 use rusqlite::params;
 
 use crate::SqliteStore;
@@ -646,7 +645,7 @@ async fn get_storage_metrics(store: &SqliteStore) -> StorageMetrics {
 }
 
 /// Creates an account with a storage map of `map_size` entries, inserts it into the store,
-/// and returns the account. Uses Store::insert_account (public API).
+/// and returns the account. Uses `Store::insert_account` (public API).
 async fn setup_account_with_map(
     store: &SqliteStore,
     map_size: u64,
@@ -733,8 +732,8 @@ async fn apply_single_entry_update(
 ///
 /// After refactor:
 ///   50 map entries + 5 updates:
-///     latest_storage_map_entries = 50 (always the full current state)
-///     historical_storage_map_entries = 50 (initial) + 5 (one changed entry per update) = 55
+///     `latest_storage_map_entries` = 50 (always the full current state)
+///     `historical_storage_map_entries` = 50 (initial) + 5 (one changed entry per update) = 55
 #[tokio::test]
 async fn storage_model_benchmark() -> anyhow::Result<()> {
     const MAP_SIZE: u64 = 50;
@@ -760,6 +759,7 @@ async fn storage_model_benchmark() -> anyhow::Result<()> {
     }
 
     let after_updates = get_storage_metrics(&store).await;
+    #[allow(clippy::cast_possible_truncation)]
     let num_states = (1 + NUM_UPDATES) as usize;
 
     // Latest account headers: always one row per account
@@ -768,17 +768,16 @@ async fn storage_model_benchmark() -> anyhow::Result<()> {
     assert_eq!(after_updates.historical_account_headers, num_states);
 
     // Latest tables always hold the full current state
-    assert_eq!(after_updates.latest_storage_map_entries, MAP_SIZE as usize);
+    #[allow(clippy::cast_possible_truncation)]
+    let map_size = MAP_SIZE as usize;
+    assert_eq!(after_updates.latest_storage_map_entries, map_size);
     // Account has 2 storage slots: the auth key slot + the map slot
     assert_eq!(after_updates.latest_account_storage, 2);
 
     // Historical: initial insert writes all N entries at nonce 0,
     // then each update writes ONLY the changed entry to historical.
     // Total: N (initial) + M (one changed entry per update) = 50 + 5 = 55.
-    assert_eq!(
-        after_updates.historical_storage_map_entries,
-        MAP_SIZE as usize + NUM_UPDATES as usize
-    );
+    assert_eq!(after_updates.historical_storage_map_entries, map_size + num_states - 1);
 
     // ── Phase 2: Correctness (Store trait) ───────────────────────────────
     let changed_key = [Felt::new(1), ZERO, ZERO, ZERO].into();
@@ -997,7 +996,7 @@ async fn undo_account_state_multiple_accounts_independent() -> anyhow::Result<()
 
     // Insert account A with 3 map entries
     let mut account_a = setup_account_with_map(&store, 3, &map_slot_name_a).await?;
-    let account_a_id = account_a.id();
+    let id_a = account_a.id();
 
     // Insert account B with 3 map entries (different seed to get a different account ID)
     let mut map_b = StorageMap::new();
@@ -1017,7 +1016,7 @@ async fn undo_account_state_multiple_accounts_independent() -> anyhow::Result<()
         .with_auth_component(AuthFalcon512Rpo::new(PublicKeyCommitment::from(EMPTY_WORD)))
         .with_component(component_b)
         .build()?;
-    let account_b_id = account_b.id();
+    let id_b = account_b.id();
     store.insert_account(&account_b, Address::new(account_b.id())).await?;
 
     // Apply a delta to account A (nonce 1) with vault change to ensure different vault root
@@ -1029,8 +1028,7 @@ async fn undo_account_state_multiple_accounts_independent() -> anyhow::Result<()
     )?;
     let vault_delta_a = AccountVaultDelta::from_iters(
         vec![
-            FungibleAsset::new(AccountId::try_from(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET)?, 50)?
-                .into(),
+            FungibleAsset::new(AccountId::try_from(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET)?, 50)?.into(),
         ],
         [],
     );
@@ -1045,7 +1043,7 @@ async fn undo_account_state_multiple_accounts_independent() -> anyhow::Result<()
     store
         .interact_with_connection(move |conn| {
             let old_map_roots =
-                SqliteStore::get_storage_map_roots_for_delta(conn, account_a_id, &delta_a_clone)?;
+                SqliteStore::get_storage_map_roots_for_delta(conn, id_a, &delta_a_clone)?;
             let tx = conn.transaction().into_store_error()?;
             let mut smt_forest = smt_forest.write().expect("smt_forest write lock not poisoned");
             SqliteStore::apply_account_delta(
@@ -1086,14 +1084,14 @@ async fn undo_account_state_multiple_accounts_independent() -> anyhow::Result<()
 
     // Account A should be at nonce 0
     let (header_a, _) = store
-        .interact_with_connection(move |conn| SqliteStore::get_account_header(conn, account_a_id))
+        .interact_with_connection(move |conn| SqliteStore::get_account_header(conn, id_a))
         .await?
         .expect("account A should still exist");
     assert_eq!(header_a.nonce().as_int(), 0);
 
     // Account B should be completely untouched at nonce 0
     let (header_b, _) = store
-        .interact_with_connection(move |conn| SqliteStore::get_account_header(conn, account_b_id))
+        .interact_with_connection(move |conn| SqliteStore::get_account_header(conn, id_b))
         .await?
         .expect("account B should still exist");
     assert_eq!(header_b.nonce().as_int(), 0);
@@ -1179,7 +1177,9 @@ async fn lock_account_only_affects_latest() -> anyhow::Result<()> {
     let historical_locked: Vec<bool> = store
         .interact_with_connection(move |conn| {
             let mut stmt = conn
-                .prepare("SELECT locked FROM historical_account_headers WHERE id = ? ORDER BY nonce")
+                .prepare(
+                    "SELECT locked FROM historical_account_headers WHERE id = ? ORDER BY nonce",
+                )
                 .into_store_error()?;
             let rows = stmt
                 .query_map(params![account_id.to_hex()], |row| row.get(0))

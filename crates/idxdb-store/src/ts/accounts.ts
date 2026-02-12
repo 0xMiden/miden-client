@@ -181,10 +181,7 @@ export async function getAccountStorage(dbId: string, accountId: string) {
   }
 }
 
-export async function getAccountStorageMaps(
-  dbId: string,
-  accountId: string
-) {
+export async function getAccountStorageMaps(dbId: string, accountId: string) {
   try {
     const db = getDatabase(dbId);
     const allMatchingRecords = await db.latestStorageMapEntries
@@ -388,10 +385,7 @@ export async function upsertVaultAssets(dbId: string, assets: JsVaultAsset[]) {
       } as IHistoricalAccountAsset;
     });
 
-    await db.latestAccountAssets
-      .where("accountId")
-      .equals(accountId)
-      .delete();
+    await db.latestAccountAssets.where("accountId").equals(accountId).delete();
     await db.latestAccountAssets.bulkPut(latestEntries);
     await db.historicalAccountAssets.bulkPut(historicalEntries);
   } catch (error: unknown) {

@@ -168,9 +168,7 @@ impl WebStore {
         };
         let account_code = self.get_account_code(account_header.code_commitment()).await?;
 
-        let account_storage = self
-            .get_storage(account_id, AccountStorageFilter::All)
-            .await?;
+        let account_storage = self.get_storage(account_id, AccountStorageFilter::All).await?;
         let assets = self.get_vault_assets(account_id).await?;
         let account_vault = AssetVault::new(&assets)?;
 
@@ -200,9 +198,7 @@ impl WebStore {
         };
         let account_code = self.get_account_code(account_header.code_commitment()).await?;
 
-        let account_storage = self
-            .get_storage(account_id, AccountStorageFilter::All)
-            .await?;
+        let account_storage = self.get_storage(account_id, AccountStorageFilter::All).await?;
         let assets = self.get_vault_assets(account_id).await?;
         let account_vault = AssetVault::new(&assets)?;
 

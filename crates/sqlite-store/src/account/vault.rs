@@ -241,7 +241,12 @@ impl SqliteStore {
             let vault_key_word: Word = (*vault_key).into();
             let faucet_prefix_hex = vault_key.faucet_id_prefix().to_hex();
             tombstone_stmt
-                .execute(params![account_id_hex, nonce_val, vault_key_word.to_hex(), faucet_prefix_hex])
+                .execute(params![
+                    account_id_hex,
+                    nonce_val,
+                    vault_key_word.to_hex(),
+                    faucet_prefix_hex
+                ])
                 .into_store_error()?;
         }
 

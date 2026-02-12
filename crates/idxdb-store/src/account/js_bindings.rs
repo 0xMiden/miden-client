@@ -223,7 +223,12 @@ pub struct JsStorageMapEntry {
 }
 
 impl JsStorageMapEntry {
-    pub fn from_map(map: &StorageMap, account_id: &AccountId, nonce: u64, slot_name: &str) -> Vec<Self> {
+    pub fn from_map(
+        map: &StorageMap,
+        account_id: &AccountId,
+        nonce: u64,
+        slot_name: &str,
+    ) -> Vec<Self> {
         let account_id_str = account_id.to_string();
         let nonce_str = nonce.to_string();
         map.entries()

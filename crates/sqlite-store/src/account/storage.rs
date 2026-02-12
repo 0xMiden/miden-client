@@ -189,8 +189,7 @@ impl SqliteStore {
         const HISTORICAL_MAP_ENTRY_QUERY: &str = insert_sql!(
             historical_storage_map_entries { account_id, nonce, slot_name, key, value } | REPLACE
         );
-        const DELETE_LATEST_MAP_ENTRY: &str =
-            "DELETE FROM latest_storage_map_entries WHERE account_id = ? AND slot_name = ? AND key = ?";
+        const DELETE_LATEST_MAP_ENTRY: &str = "DELETE FROM latest_storage_map_entries WHERE account_id = ? AND slot_name = ? AND key = ?";
 
         let mut latest_slot_stmt = tx.prepare_cached(LATEST_SLOT_QUERY).into_store_error()?;
         let mut hist_slot_stmt = tx.prepare_cached(HISTORICAL_SLOT_QUERY).into_store_error()?;
