@@ -16,7 +16,7 @@ use miden_client::account::{
 };
 use miden_client::assembly::CodeBuilder;
 use miden_client::auth::{AuthFalcon512Rpo, AuthSecretKey};
-use miden_client::keystore::FilesystemKeyStore;
+use miden_client::keystore::{FilesystemKeyStore, Keystore};
 use miden_client::transaction::TransactionRequestBuilder;
 use miden_client::{Client, Serializable};
 use rand::Rng;
@@ -135,7 +135,7 @@ pub async fn deploy_account(
     let keystore_path = store_path.join("keystore");
     let keystore =
         FilesystemKeyStore::new(keystore_path).expect("Failed to create keystore handle");
-    keystore.add_key(&secret_key)?;
+    keystore.add_key(&secret_key, account_id).await?;
     client.add_account(&account, false).await?;
 
     // Deploy the account by submitting an empty transaction
