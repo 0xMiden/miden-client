@@ -40,6 +40,7 @@ use crate::models::account_storage_mode::AccountStorageMode;
 use crate::models::address::Address;
 use crate::models::auth::{AuthScheme, AuthSecretKey as NodeAuthSecretKey};
 use crate::models::input_note_record::InputNoteRecord;
+use crate::models::note::Note;
 use crate::models::note_filter::NoteFilterType;
 use crate::models::note_id::NoteId;
 use crate::models::output_note_record::OutputNoteRecord;
@@ -593,6 +594,32 @@ impl NodeClient {
         })
     }
 
+    /// Returns a single input note by ID, or None if not found.
+    #[napi(js_name = "getInputNote")]
+    pub fn get_input_note(&mut self, note_id: &NoteId) -> Result<Option<InputNoteRecord>> {
+        self.rt.block_on(async {
+            let result = self
+                .inner
+                .get_input_note(note_id.0)
+                .await
+                .map_err(|e| to_napi_err(e, "failed to get input note"))?;
+            Ok(result.map(Into::into))
+        })
+    }
+
+    /// Returns a single output note by ID, or None if not found.
+    #[napi(js_name = "getOutputNote")]
+    pub fn get_output_note(&mut self, note_id: &NoteId) -> Result<Option<OutputNoteRecord>> {
+        self.rt.block_on(async {
+            let result = self
+                .inner
+                .get_output_note(note_id.0)
+                .await
+                .map_err(|e| to_napi_err(e, "failed to get output note"))?;
+            Ok(result.map(Into::into))
+        })
+    }
+
     // TRANSACTION METHODS
     // --------------------------------------------------------------------------------------------
 
@@ -691,6 +718,21 @@ impl NodeClient {
         let tx_request = NativeTransactionRequestBuilder::new()
             .build_swap(&swap_data, native_note_type, native_payback_type, self.inner.rng())
             .map_err(|e| to_napi_err(e, "failed to create swap transaction request"))?;
+
+        let bytes = miden_client::utils::Serializable::to_bytes(&tx_request);
+        Ok(bytes.into())
+    }
+
+    /// Creates a consume transaction request from a list of notes.
+    #[napi(js_name = "newConsumeTransactionRequest")]
+    pub fn new_consume_transaction_request(&mut self, list_of_notes: Vec<&Note>) -> Result<Buffer> {
+        let native_notes: Vec<miden_client::note::Note> =
+            list_of_notes.into_iter().map(|n| n.0.clone()).collect();
+
+        let tx_request =
+            NativeTransactionRequestBuilder::new()
+                .build_consume_notes(native_notes)
+                .map_err(|e| to_napi_err(e, "failed to create consume transaction request"))?;
 
         let bytes = miden_client::utils::Serializable::to_bytes(&tx_request);
         Ok(bytes.into())

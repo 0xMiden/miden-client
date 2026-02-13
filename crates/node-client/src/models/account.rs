@@ -9,6 +9,7 @@ use miden_client::utils::{Deserializable, Serializable};
 use napi::bindgen_prelude::*;
 
 use super::account_id::AccountId;
+use super::asset_vault::AssetVault;
 use super::felt::Felt;
 use super::napi_wrap;
 use super::word::Word;
@@ -33,6 +34,12 @@ impl Account {
     #[napi]
     pub fn nonce(&self) -> Felt {
         self.0.nonce().into()
+    }
+
+    /// Returns the asset vault for this account.
+    #[napi]
+    pub fn vault(&self) -> AssetVault {
+        self.0.vault().into()
     }
 
     /// Returns true if the account is a faucet.

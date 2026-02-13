@@ -1,6 +1,9 @@
+use miden_client::note::Note as NativeNote;
 use miden_client::store::InputNoteRecord as NativeInputNoteRecord;
+use napi::bindgen_prelude::*;
 
 use super::napi_wrap;
+use super::note::Note;
 use super::note_id::NoteId;
 
 napi_wrap!(clone InputNoteRecord wraps NativeInputNoteRecord, one_way);
@@ -41,5 +44,14 @@ impl InputNoteRecord {
     #[napi(js_name = "isProcessing")]
     pub fn is_processing(&self) -> bool {
         self.0.is_processing()
+    }
+
+    /// Converts the record into a Note.
+    #[napi(js_name = "toNote")]
+    pub fn to_note(&self) -> Result<Note> {
+        let note: NativeNote = self.0.clone().try_into().map_err(|err| {
+            napi::Error::from_reason(format!("could not create Note from InputNoteRecord: {err}"))
+        })?;
+        Ok(Note::from(note))
     }
 }
