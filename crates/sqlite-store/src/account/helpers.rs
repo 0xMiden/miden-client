@@ -115,6 +115,8 @@ fn query_account_headers_from_table(
         .collect::<Result<Vec<(AccountHeader, AccountStatus)>, StoreError>>()
 }
 
+// TODO: this function will probably be refactored to receive more complex where clauses and
+// return multiple mast forests
 pub(crate) fn query_account_code(
     conn: &Connection,
     commitment: Word,
