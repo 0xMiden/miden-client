@@ -5,6 +5,7 @@ members = [
   "bin/integration-tests",
   "bin/miden-cli",
   "crates/idxdb-store",
+  "crates/node-client",
   "crates/rust-client",
   "crates/sqlite-store",
   "crates/testing/miden-client-tests",
