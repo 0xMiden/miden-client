@@ -10,11 +10,19 @@ A JavaScript representation of a storage slot in an account.
 
 ## Properties
 
-### commitment
+### accountId
 
-> **commitment**: `string`
+> **accountId**: `string`
 
-Commitment of the whole account storage
+The account ID this slot belongs to.
+
+***
+
+### nonce
+
+> **nonce**: `string`
+
+The account's nonce when this slot state was recorded.
 
 ***
 

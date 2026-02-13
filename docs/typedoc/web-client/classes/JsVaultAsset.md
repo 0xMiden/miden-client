@@ -10,6 +10,14 @@ An object that contains a serialized vault asset
 
 ## Properties
 
+### accountId
+
+> **accountId**: `string`
+
+The account ID this asset belongs to.
+
+***
+
 ### asset
 
 > **asset**: `string`
@@ -26,11 +34,11 @@ Asset's faucet ID prefix.
 
 ***
 
-### root
+### nonce
 
-> **root**: `string`
+> **nonce**: `string`
 
-The merkle root of the vault's assets.
+The account's nonce when this asset state was recorded.
 
 ***
 

@@ -10,6 +10,14 @@ A JavaScript representation of a storage map entry in an account.
 
 ## Properties
 
+### accountId
+
+> **accountId**: `string`
+
+The account ID this map entry belongs to.
+
+***
+
 ### key
 
 > **key**: `string`
@@ -18,11 +26,19 @@ The key of the storage map entry.
 
 ***
 
-### root
+### nonce
 
-> **root**: `string`
+> **nonce**: `string`
 
-The root of the storage map entry.
+The account's nonce when this entry was recorded.
+
+***
+
+### slotName
+
+> **slotName**: `string`
+
+The slot name of the map this entry belongs to.
 
 ***
 
