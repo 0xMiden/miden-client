@@ -12,7 +12,7 @@
 ### Changes
 
 * [BREAKING] Added a `AccountReader` accessible through `Client::account_reader` to read account data without needing to load the whole `Account` ([#1713](https://github.com/0xMiden/miden-client/pull/1713), [#1716](https://github.com/0xMiden/miden-client/pull/1716)).
-* [BREAKING] Added `Keystore` trait that extends `TransactionAuthenticator` to provide a unified interface for key storage, retrieval, and account-key mapping, enabling custom keystore implementations ([#1726](https://github.com/0xMiden/miden-client/pull/1726)).
+* [BREAKING] Added `Keystore` trait that extends `TransactionAuthenticator` to provide a unified interface for key storage, retrieval, and account-key mapping, enabling custom keystore implementations. `Keystore` replaces `TransactionAuthenticator` in `Client` and provides a way to map from account IDs to public keys (registering them separately is not required anymore). ([#1726](https://github.com/0xMiden/miden-client/pull/1726)).
 * Added implementation for the `get_public_key` method on the `FilesystemKeystore` and `WebKeystore` ([#1731](https://github.com/0xMiden/miden-client/pull/1731)).
 
 ## 0.13.1 (TBD)
