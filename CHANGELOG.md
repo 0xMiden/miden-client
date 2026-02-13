@@ -4,8 +4,7 @@
 
 * Added the `@miden-sdk/react` hooks library (see [its own changelog](packages/react-sdk/CHANGELOG.md)) ([#1711](https://github.com/0xMiden/miden-client/pull/1711)).
 * Fixed WASM bindings consuming JS objects: `RpcClient` and `WebClient` methods now take references (`&AccountId`, `&Word`) instead of owned values, so callers can reuse objects after passing them ([#1765](https://github.com/0xMiden/miden-client/pull/1765)).
-* [FEATURE][web] Added Node.js runtime support with SQLite storage adapter (`better-sqlite3`), dedicated Rollup build pipeline (`dist-node/`), and conditional `package.json` exports so `import { WebClient } from "@miden-sdk/miden-sdk"` automatically resolves to the correct build in both browser and Node.js environments.
-* [FEATURE][web] Added offline Node.js test suite (27 tests) covering SDK loading, account creation, mint/consume/send lifecycle, cryptographic primitives, and query APIs, wired into CI and Makefile (`make test-node-web-client`).
+* [FEATURE] Added `@miden-sdk/node-client` — a native Node.js addon (`crates/node-client/`) built with napi-rs that wraps the Rust client and SQLite store directly. Replaces the previous WASM+JS `dist-node/` approach.
 
 ## 0.13.0
 

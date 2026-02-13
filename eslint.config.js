@@ -3,7 +3,6 @@ module.exports = [
     // Ignore patterns
     ignores: [
       "crates/web-client/dist/**/*",
-      "crates/web-client/dist-node/**/*",
       "target/**/*",
       "**/target/**/*",
       "miden-node/**/*",
