@@ -661,10 +661,10 @@ impl SqliteStore {
         let mut vault_roots_to_delete = Vec::new();
         let mut storage_commitments_to_delete = Vec::new();
 
-        for (account_commitment, vault_root, storage_commitment) in &prunable_states {
-            account_commitments_to_delete.push(Value::from(account_commitment.clone()));
-            vault_roots_to_delete.push(Value::from(vault_root.clone()));
-            storage_commitments_to_delete.push(Value::from(storage_commitment.clone()));
+        for (account_commitment, vault_root, storage_commitment) in prunable_states {
+            account_commitments_to_delete.push(Value::from(account_commitment));
+            vault_roots_to_delete.push(Value::from(vault_root));
+            storage_commitments_to_delete.push(Value::from(storage_commitment));
         }
 
         let account_commitments_rc = Rc::new(account_commitments_to_delete);
