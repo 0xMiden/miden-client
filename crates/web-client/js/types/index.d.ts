@@ -137,6 +137,10 @@ export declare class WebClient extends WasmWebClient {
    * Register a listener that fires when another browser tab mutates the same
    * IndexedDB database (cross-tab BroadcastChannel notification, Layer 3).
    *
+   * The WebClient automatically calls `syncState()` on cross-tab changes,
+   * so in-memory state is already refreshed when your callback runs. Use
+   * this for additional work like re-fetching accounts or updating UI.
+   *
    * @param callback - Invoked with a {@link StateChangedEvent} payload.
    * @returns An unsubscribe function — call it to remove the listener.
    */
