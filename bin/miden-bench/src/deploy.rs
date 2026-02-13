@@ -1,6 +1,6 @@
 #![allow(clippy::cast_possible_truncation, clippy::cast_lossless)]
 
-use std::sync::Arc;
+use std::path::Path;
 use std::time::Instant;
 
 use miden_client::account::component::{AccountComponent, basic_wallet_library};
@@ -16,13 +16,9 @@ use miden_client::account::{
 };
 use miden_client::assembly::CodeBuilder;
 use miden_client::auth::{AuthFalcon512Rpo, AuthSecretKey};
-use miden_client::builder::ClientBuilder;
-use miden_client::crypto::RpoRandomCoin;
 use miden_client::keystore::FilesystemKeyStore;
-use miden_client::rpc::{Endpoint, GrpcClient};
 use miden_client::transaction::TransactionRequestBuilder;
-use miden_client::{Client, DebugMode, Felt, Serializable};
-use miden_client_sqlite_store::ClientBuilderSqliteExt;
+use miden_client::{Client, Serializable};
 use rand::Rng;
 use rand_chacha::ChaCha20Rng;
 use rand_chacha::rand_core::SeedableRng;
@@ -113,52 +109,19 @@ fn create_account_with_empty_maps(
 /// Returns the account ID. The signing key and account data are persisted in the
 /// store directory for use by subsequent `expand` and `transaction` commands.
 pub async fn deploy_account(
-    endpoint: &Endpoint,
+    client: &mut Client<FilesystemKeyStore>,
+    store_path: &Path,
     maps: usize,
-    store_path: &str,
 ) -> anyhow::Result<AccountId> {
-    println!("Network: {endpoint}");
     println!("Storage maps: {maps} (empty)");
     println!();
 
     let total_t = Instant::now();
 
-    // Create persistent store directory
-    let data_dir = std::path::PathBuf::from(store_path);
-    std::fs::create_dir_all(&data_dir)?;
-    let sqlite_path = data_dir.join("store.sqlite3");
-    let keystore_path = data_dir.join("keystore");
-    std::fs::create_dir_all(&keystore_path)?;
-
-    println!("Store directory: {}", data_dir.display());
-
     // Generate a random seed for the account
     let mut rng = rand::rng();
     let mut account_seed = [0u8; 32];
     rng.fill(&mut account_seed);
-
-    // Create client
-    let coin_seed: [u64; 4] = rng.random();
-    let rng_coin = RpoRandomCoin::new(coin_seed.map(Felt::new).into());
-
-    let keystore =
-        FilesystemKeyStore::new(keystore_path.clone()).expect("Failed to create keystore");
-
-    let mut client: Client<FilesystemKeyStore> = ClientBuilder::new()
-        .rpc(Arc::new(GrpcClient::new(endpoint, 30_000)))
-        .rng(Box::new(rng_coin))
-        .sqlite_store(sqlite_path)
-        .filesystem_keystore(keystore_path.to_str().expect("keystore path should be valid UTF-8"))?
-        .in_debug_mode(DebugMode::Disabled)
-        .tx_discard_delta(None)
-        .build()
-        .await?;
-
-    // Initial sync
-    println!("Connecting to node at {endpoint}...");
-    client.sync_state().await?;
-    let chain_height = client.get_sync_height().await?;
-    println!("Connected successfully. Chain height: {chain_height}");
 
     // Create account with empty maps
     let t = Instant::now();
@@ -168,7 +131,10 @@ pub async fn deploy_account(
 
     let account_id = account.id();
 
-    // Add key and account to client
+    // Add key to the filesystem keystore and account to the client
+    let keystore_path = store_path.join("keystore");
+    let keystore =
+        FilesystemKeyStore::new(keystore_path).expect("Failed to create keystore handle");
     keystore.add_key(&secret_key)?;
     client.add_account(&account, false).await?;
 
@@ -187,7 +153,7 @@ pub async fn deploy_account(
     let t = Instant::now();
     println!("Waiting for chain block height to advance...");
     for _ in 0..4 {
-        wait_for_block_advancement(&mut client).await?;
+        wait_for_block_advancement(client).await?;
     }
     println!("  Done in {:.2?}", t.elapsed());
 

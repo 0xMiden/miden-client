@@ -13,11 +13,8 @@ mod generators;
 mod masm;
 mod metrics;
 mod report;
-mod runner;
 
 use config::{BenchConfig, DEFAULT_STORE_DIR};
-use metrics::BenchmarkResult;
-use runner::BenchmarkRunner;
 
 const DEFAULT_ITERATION_COUNT: usize = 5;
 
@@ -165,14 +162,28 @@ async fn main() {
         format!(" --store {}", args.store)
     };
 
+    let store_path = PathBuf::from(&args.store);
+    let endpoint = args.network.to_endpoint();
+
+    // Initialize persistent store directory and client
+    std::fs::create_dir_all(&store_path).expect("Failed to create store directory");
+
+    println!("Network: {endpoint}");
+    println!("Store directory: {}", store_path.display());
+
+    let mut client = config::create_client(&endpoint, &store_path)
+        .await
+        .expect("Failed to create client");
+
+    println!("Connecting to node at {endpoint}...");
+    client.sync_state().await.expect("Failed to sync with node");
+    let chain_height = client.get_sync_height().await.expect("Failed to get sync height");
+    println!("Connected successfully. Chain height: {chain_height}");
+
     match args.command {
         Command::Deploy(deploy_args) => {
-            let result = Box::pin(deploy::deploy_account(
-                &args.network.to_endpoint(),
-                deploy_args.maps,
-                &args.store,
-            ))
-            .await;
+            let result =
+                Box::pin(deploy::deploy_account(&mut client, &store_path, deploy_args.maps)).await;
 
             match result {
                 Ok(account_id) => {
@@ -189,12 +200,11 @@ async fn main() {
         },
         Command::Expand(expand_args) => {
             let result = Box::pin(expand::expand_storage(
-                &args.network.to_endpoint(),
+                &mut client,
                 &expand_args.account_id,
                 expand_args.map_idx,
                 expand_args.offset,
                 expand_args.count,
-                &args.store,
             ))
             .await;
 
@@ -214,7 +224,14 @@ async fn main() {
         },
         Command::Transaction(ref tx_args) => {
             let start_time = Instant::now();
-            let results = run_benchmarks(tx_args, &args.network, &args.store).await;
+            let config = BenchConfig::new(endpoint, tx_args.iterations, store_path);
+            let results = Box::pin(benchmarks::transaction::run_transaction_benchmarks(
+                &mut client,
+                &config,
+                tx_args.account_id.clone(),
+                tx_args.reads,
+            ))
+            .await;
             let total_duration = start_time.elapsed();
 
             match results {
@@ -231,18 +248,6 @@ async fn main() {
 
 // HELPERS
 // ================================================================================================
-
-async fn run_benchmarks(
-    tx_args: &TransactionArgs,
-    network: &Network,
-    store: &str,
-) -> anyhow::Result<Vec<BenchmarkResult>> {
-    let store_path = PathBuf::from(store);
-    let config = BenchConfig::new(network.to_endpoint(), tx_args.iterations, store_path);
-    let mut runner = BenchmarkRunner::new(config);
-    Box::pin(runner.run_transaction_benchmarks(tx_args.account_id.clone(), tx_args.reads))
-        .await
-}
 
 fn parse_maps(s: &str) -> Result<usize, String> {
     let n: usize = s.parse().map_err(|e| format!("{e}"))?;

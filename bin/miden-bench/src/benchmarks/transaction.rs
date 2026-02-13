@@ -1,16 +1,11 @@
-use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use miden_client::account::{AccountId, StorageSlotContent};
-use miden_client::builder::ClientBuilder;
-use miden_client::crypto::RpoRandomCoin;
 use miden_client::keystore::FilesystemKeyStore;
-use miden_client::rpc::GrpcClient;
-use miden_client::{Client, DebugMode, Felt, Serializable, Word};
-use miden_client_sqlite_store::ClientBuilderSqliteExt;
-use rand::Rng;
+use miden_client::{Client, Serializable, Word};
 
-use crate::config::BenchConfig;
+use crate::config::{self, BenchConfig};
+use crate::deploy::wait_for_block_advancement;
 use crate::masm::build_chunk_tx_request;
 use crate::metrics::{BenchmarkResult, measure_time_async};
 use crate::report::format_size;
@@ -56,6 +51,7 @@ pub struct ReadOp {
 /// split across multiple transactions per benchmark iteration. Each iteration's reported
 /// time is the sum across all transactions.
 pub async fn run_transaction_benchmarks(
+    client: &mut Client<FilesystemKeyStore>,
     config: &BenchConfig,
     account_id_str: String,
     max_reads_per_tx: Option<usize>,
@@ -64,36 +60,8 @@ pub async fn run_transaction_benchmarks(
 
     // Parse the account ID
     let account_id = AccountId::from_hex(&account_id_str)?;
-
-    // First, try to connect to the node and fetch the account
-    println!("Connecting to node at {}...", config.network);
-
-    let (mut client, _temp_dir) = match create_benchmark_client(config).await {
-        Ok(result) => result,
-        Err(e) => {
-            println!("Failed to connect to node: {e}");
-            println!("Skipping transaction benchmarks (requires a running Miden node).");
-            results
-                .push(BenchmarkResult::new("transaction/connection_failed").with_metadata(
-                    format!("Could not connect to node at {}: {e}", config.network),
-                ));
-            return Ok(results);
-        },
-    };
-
-    // Sync with the network first
-    if let Err(e) = client.sync_state().await {
-        println!("Failed to sync with node: {e}");
-        println!("Skipping transaction benchmarks.");
-        results.push(
-            BenchmarkResult::new("transaction/sync_failed")
-                .with_metadata(format!("Failed to sync: {e}")),
-        );
-        return Ok(results);
-    }
-
-    let chain_height = client.get_sync_height().await?;
-    println!("Connected successfully. Chain height: {chain_height}");
+    println!("Account ID: {account_id}");
+    println!();
 
     // Import the public account from the network (skip if already present in store)
     let has_account = client.get_account_storage(account_id).await.is_ok();
@@ -143,7 +111,7 @@ pub async fn run_transaction_benchmarks(
     // If the signing key is missing from the keystore, proving will fail and we
     // fall back to execution-only benchmarks.
     let can_prove = {
-        let tx_request = build_chunk_tx_request(&client, &chunks[0], &slot_infos)?;
+        let tx_request = build_chunk_tx_request(client, &chunks[0], &slot_infos)?;
         let tx_result = client.execute_transaction(account_id, tx_request).await?;
         if let Ok(proven_tx) = client.prove_transaction(&tx_result).await {
             let tx_size = proven_tx.to_bytes().len();
@@ -164,15 +132,13 @@ pub async fn run_transaction_benchmarks(
 
     // Benchmark 1: Transaction execution time (without proving)
     println!("Benchmarking transaction execution...");
-    let execution_result =
-        benchmark_tx_execution(config, account_id, &chunks, &slot_infos).await?;
+    let execution_result = benchmark_tx_execution(config, account_id, &chunks, &slot_infos).await?;
     results.push(execution_result);
 
     if can_prove {
         // Benchmark 2: Transaction proving time
         println!("Benchmarking transaction proving...");
-        let proving_result =
-            benchmark_tx_proving(config, account_id, &chunks, &slot_infos).await?;
+        let proving_result = benchmark_tx_proving(config, account_id, &chunks, &slot_infos).await?;
         results.push(proving_result);
 
         // Benchmark 3: Full transaction (execute + prove + submit)
@@ -206,7 +172,7 @@ async fn benchmark_tx_execution(
     for i in 0..config.iterations {
         let iter_t = Instant::now();
 
-        let (mut client, _) = create_benchmark_client(config).await?;
+        let mut client = create_iteration_client(config).await?;
         client.sync_state().await?;
 
         let mut total_duration = Duration::ZERO;
@@ -262,7 +228,7 @@ async fn benchmark_tx_proving(
     for i in 0..config.iterations {
         let iter_t = Instant::now();
 
-        let (mut client, _) = create_benchmark_client(config).await?;
+        let mut client = create_iteration_client(config).await?;
         client.sync_state().await?;
 
         let mut total_duration = Duration::ZERO;
@@ -330,7 +296,7 @@ async fn benchmark_tx_full(
         for (chunk_idx, chunk) in chunks.iter().enumerate() {
             // Each chunk submission needs a fresh client with up-to-date state,
             // because the previous submission changes the account nonce on the network.
-            let (mut client, _) = create_benchmark_client(config).await?;
+            let mut client = create_iteration_client(config).await?;
             client.sync_state().await?;
 
             let tx_request = build_chunk_tx_request(&client, chunk, slot_infos)?;
@@ -448,50 +414,15 @@ fn chunk_read_ops(all_ops: &[ReadOp], max_reads: usize) -> Vec<Vec<ReadOp>> {
 // HELPERS
 // ================================================================================================
 
-/// Creates a client using the persistent store directory from the config.
+/// Creates a fresh client for a benchmark iteration.
 ///
-/// The store directory (populated by `deploy`) contains the `SQLite` database and
-/// filesystem keystore. All benchmark iterations reuse the same directory.
-async fn create_benchmark_client(
+/// Each iteration uses a new client to avoid state leaking between measurements.
+/// The client connects to the same persistent store directory (populated by `deploy`),
+/// which contains the `SQLite` database and filesystem keystore.
+async fn create_iteration_client(
     config: &BenchConfig,
-) -> anyhow::Result<(Client<FilesystemKeyStore>, std::path::PathBuf)> {
-    let data_dir = &config.store_path;
-    let store_path = data_dir.join("store.sqlite3");
-    let keystore_path = data_dir.join("keystore");
-    std::fs::create_dir_all(&keystore_path)?;
-
-    let mut rng = rand::rng();
-    let coin_seed: [u64; 4] = rng.random();
-    let rng = RpoRandomCoin::new(coin_seed.map(Felt::new).into());
-
-    let client = ClientBuilder::new()
-        .rpc(Arc::new(GrpcClient::new(&config.network, 30_000)))
-        .rng(Box::new(rng))
-        .sqlite_store(store_path)
-        .filesystem_keystore(keystore_path.to_str().expect("keystore path should be valid UTF-8"))?
-        .in_debug_mode(DebugMode::Disabled)
-        .tx_discard_delta(None)
-        .build()
-        .await?;
-
-    Ok((client, data_dir.clone()))
-}
-
-/// Waits for the chain height to advance by one block.
-async fn wait_for_block_advancement(client: &mut Client<FilesystemKeyStore>) -> anyhow::Result<()> {
-    let initial_height = client.get_sync_height().await?;
-    let target_height = initial_height.as_u32() + 1;
-
-    loop {
-        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-        client.sync_state().await?;
-        let current_height = client.get_sync_height().await?;
-        if current_height.as_u32() >= target_height {
-            break;
-        }
-    }
-
-    Ok(())
+) -> anyhow::Result<Client<FilesystemKeyStore>> {
+    config::create_client(&config.network, &config.store_path).await
 }
 
 /// Formats the benchmark name with optional chunk count.
