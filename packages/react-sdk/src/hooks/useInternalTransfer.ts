@@ -20,7 +20,6 @@ import type {
 } from "../types";
 import { DEFAULTS } from "../types";
 import { parseAccountId } from "../utils/accountParsing";
-import { runExclusiveDirect } from "../utils/runExclusive";
 
 export interface UseInternalTransferResult {
   /** Create a P2ID note and immediately consume it with another account */
@@ -70,8 +69,7 @@ export interface UseInternalTransferResult {
  * ```
  */
 export function useInternalTransfer(): UseInternalTransferResult {
-  const { client, isReady, sync, runExclusive, prover } = useMiden();
-  const runExclusiveSafe = runExclusive ?? runExclusiveDirect;
+  const { client, isReady, sync, prover } = useMiden();
 
   const [result, setResult] = useState<
     InternalTransferResult | InternalTransferResult[] | null
@@ -109,29 +107,25 @@ export function useInternalTransfer(): UseInternalTransferResult {
         .withOwnOutputNotes(new OutputNoteArray([OutputNote.full(note)]))
         .build();
 
-      const createTxId = await runExclusiveSafe(() =>
-        prover
-          ? client.submitNewTransactionWithProver(
-              senderId,
-              createRequest,
-              prover
-            )
-          : client.submitNewTransaction(senderId, createRequest)
-      );
+      const createTxId = prover
+        ? await client.submitNewTransactionWithProver(
+            senderId,
+            createRequest,
+            prover
+          )
+        : await client.submitNewTransaction(senderId, createRequest);
 
       const consumeRequest = new TransactionRequestBuilder()
         .withInputNotes(new NoteAndArgsArray([new NoteAndArgs(note, null)]))
         .build();
 
-      const consumeTxId = await runExclusiveSafe(() =>
-        prover
-          ? client.submitNewTransactionWithProver(
-              receiverId,
-              consumeRequest,
-              prover
-            )
-          : client.submitNewTransaction(receiverId, consumeRequest)
-      );
+      const consumeTxId = prover
+        ? await client.submitNewTransactionWithProver(
+            receiverId,
+            consumeRequest,
+            prover
+          )
+        : await client.submitNewTransaction(receiverId, consumeRequest);
 
       return {
         createTransactionId: createTxId.toString(),
@@ -139,7 +133,7 @@ export function useInternalTransfer(): UseInternalTransferResult {
         noteId,
       };
     },
-    [client, isReady, prover, runExclusiveSafe]
+    [client, isReady, prover]
   );
 
   const transfer = useCallback(

@@ -9,7 +9,6 @@ import type {
 } from "../types";
 import { DEFAULTS } from "../types";
 import { parseAccountId, parseAddress } from "../utils/accountParsing";
-import { runExclusiveDirect } from "../utils/runExclusive";
 
 export interface UseSendResult {
   /** Send tokens from one account to another */
@@ -71,8 +70,7 @@ type ClientWithTransactions = {
  * ```
  */
 export function useSend(): UseSendResult {
-  const { client, isReady, sync, runExclusive, prover } = useMiden();
-  const runExclusiveSafe = runExclusive ?? runExclusiveDirect;
+  const { client, isReady, sync, prover } = useMiden();
 
   const [result, setResult] = useState<TransactionResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -104,36 +102,37 @@ export function useSend(): UseSendResult {
         }
         const assetIdObj = parseAccountId(assetId);
 
-        const txResult = await runExclusiveSafe(async () => {
-          const txRequest = client.newSendTransactionRequest(
-            fromAccountId,
-            toAccountId,
-            assetIdObj,
-            noteType,
-            options.amount,
-            options.recallHeight ?? null,
-            options.timelockHeight ?? null
-          );
+        const txRequest = client.newSendTransactionRequest(
+          fromAccountId,
+          toAccountId,
+          assetIdObj,
+          noteType,
+          options.amount,
+          options.recallHeight ?? null,
+          options.timelockHeight ?? null
+        );
 
-          return await client.executeTransaction(fromAccountId, txRequest);
-        });
+        const txResult = await client.executeTransaction(
+          fromAccountId,
+          txRequest
+        );
 
         setStage("proving");
-        const provenTransaction = await runExclusiveSafe(() =>
-          client.proveTransaction(txResult, prover ?? undefined)
+        const provenTransaction = await client.proveTransaction(
+          txResult,
+          prover ?? undefined
         );
 
         setStage("submitting");
-        const submissionHeight = await runExclusiveSafe(() =>
-          client.submitProvenTransaction(provenTransaction, txResult)
+        const submissionHeight = await client.submitProvenTransaction(
+          provenTransaction,
+          txResult
         );
 
-        await runExclusiveSafe(() =>
-          client.applyTransaction(txResult, submissionHeight)
-        );
+        await client.applyTransaction(txResult, submissionHeight);
 
         const txId = txResult.id();
-        await waitForTransactionCommit(client, runExclusiveSafe, txId);
+        await waitForTransactionCommit(client, txId);
 
         if (noteType === NoteType.Private) {
           const fullNote = extractFullNote(txResult);
@@ -142,9 +141,7 @@ export function useSend(): UseSendResult {
           }
 
           const recipientAddress = parseAddress(options.to, toAccountId);
-          await runExclusiveSafe(() =>
-            client.sendPrivateNote(fullNote, recipientAddress)
-          );
+          await client.sendPrivateNote(fullNote, recipientAddress);
         }
 
         const txSummary = { transactionId: txResult.id().toString() };
@@ -164,7 +161,7 @@ export function useSend(): UseSendResult {
         setIsLoading(false);
       }
     },
-    [client, isReady, prover, runExclusive, sync]
+    [client, isReady, prover, sync]
   );
 
   const reset = useCallback(() => {
@@ -199,7 +196,6 @@ function getNoteType(type: "private" | "public" | "encrypted"): NoteType {
 
 async function waitForTransactionCommit(
   client: ClientWithTransactions,
-  runExclusiveSafe: <T>(fn: () => Promise<T>) => Promise<T>,
   txId: TransactionId,
   maxWaitMs = 10_000,
   delayMs = 1_000
@@ -207,9 +203,9 @@ async function waitForTransactionCommit(
   let waited = 0;
 
   while (waited < maxWaitMs) {
-    await runExclusiveSafe(() => client.syncState());
-    const [record] = await runExclusiveSafe(() =>
-      client.getTransactions(TransactionFilter.ids([txId]))
+    await client.syncState();
+    const [record] = await client.getTransactions(
+      TransactionFilter.ids([txId])
     );
     if (record) {
       const status = record.transactionStatus();

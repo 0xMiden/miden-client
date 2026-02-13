@@ -90,7 +90,9 @@ export function MidenProvider({
     []
   );
 
-  // Sync function
+  // Sync function — the WebClient's Layer 1 (AsyncLock) and Layer 2 (Web
+  // Locks) now handle concurrency internally, so we no longer wrap in
+  // runExclusive here.
   const sync = useCallback(async () => {
     if (!client || !isReady) return;
 
@@ -99,29 +101,27 @@ export function MidenProvider({
 
     setSyncState({ isSyncing: true, error: null });
 
-    await runExclusive(async () => {
-      try {
-        const summary = await client.syncState();
-        const syncHeight = summary.blockNum();
+    try {
+      const summary = await client.syncState();
+      const syncHeight = summary.blockNum();
 
-        setSyncState({
-          syncHeight,
-          isSyncing: false,
-          lastSyncTime: Date.now(),
-          error: null,
-        });
+      setSyncState({
+        syncHeight,
+        isSyncing: false,
+        lastSyncTime: Date.now(),
+        error: null,
+      });
 
-        // Trigger account and note refresh after sync
-        const accounts = await client.getAccounts();
-        useMidenStore.getState().setAccounts(accounts);
-      } catch (error) {
-        setSyncState({
-          isSyncing: false,
-          error: error instanceof Error ? error : new Error(String(error)),
-        });
-      }
-    });
-  }, [client, isReady, runExclusive, setSyncState]);
+      // Trigger account and note refresh after sync
+      const accounts = await client.getAccounts();
+      useMidenStore.getState().setAccounts(accounts);
+    } catch (error) {
+      setSyncState({
+        isSyncing: false,
+        error: error instanceof Error ? error : new Error(String(error)),
+      });
+    }
+  }, [client, isReady, setSyncState]);
 
   // Initialize client
   useEffect(() => {
@@ -278,6 +278,27 @@ export function MidenProvider({
       }
     };
   }, [isReady, client, config.autoSyncInterval, sync]);
+
+  // Cross-tab state change listener (Layer 3).
+  // When another tab mutates the same IndexedDB, refresh our local state.
+  useEffect(() => {
+    if (!isReady || !client) return;
+
+    // The WebClient exposes onStateChanged when BroadcastChannel is available.
+    const unsubscribe = (
+      client as unknown as {
+        onStateChanged?: (
+          cb: (event: { type: string; operation?: string }) => void
+        ) => () => void;
+      }
+    ).onStateChanged?.(() => {
+      sync();
+    });
+
+    return () => {
+      unsubscribe?.();
+    };
+  }, [isReady, client, sync]);
 
   // Render loading state when a custom component is provided.
   if (isInitializing && loadingComponent) {
