@@ -98,7 +98,7 @@ pub struct NewWalletCmd {
 }
 
 impl NewWalletCmd {
-    pub async fn execute<AUTH: TransactionAuthenticator + Sync + 'static>(
+    pub async fn execute<AUTH: TransactionAuthenticator + Send + Sync + 'static>(
         &self,
         mut client: Client<AUTH>,
         keystore: CliKeyStore,
@@ -193,7 +193,7 @@ pub struct NewAccountCmd {
 }
 
 impl NewAccountCmd {
-    pub async fn execute<AUTH: TransactionAuthenticator + Sync + 'static>(
+    pub async fn execute<AUTH: TransactionAuthenticator + Send + Sync + 'static>(
         &self,
         mut client: Client<AUTH>,
         keystore: CliKeyStore,
@@ -345,7 +345,7 @@ fn separate_auth_components(
 /// and build the account.
 ///
 /// If no auth component is detected in the packages, a Falcon-based auth component will be added.
-async fn create_client_account<AUTH: TransactionAuthenticator + Sync + 'static>(
+async fn create_client_account<AUTH: TransactionAuthenticator + Send + Sync + 'static>(
     client: &mut Client<AUTH>,
     keystore: &CliKeyStore,
     account_type: AccountType,
@@ -436,7 +436,7 @@ async fn create_client_account<AUTH: TransactionAuthenticator + Sync + 'static>(
 }
 
 /// Submits a deploy transaction to the node for the specified account.
-async fn deploy_account<AUTH: TransactionAuthenticator + Sync + 'static>(
+async fn deploy_account<AUTH: TransactionAuthenticator + Send + Sync + 'static>(
     client: &mut Client<AUTH>,
     account: &Account,
 ) -> Result<(), CliError> {

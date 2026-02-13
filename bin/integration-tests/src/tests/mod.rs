@@ -1,4 +1,5 @@
 pub mod client;
+pub mod client_service;
 pub mod config;
 pub mod custom_transaction;
 pub mod fpi;

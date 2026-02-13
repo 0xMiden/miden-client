@@ -72,7 +72,7 @@ pub struct NotesCmd {
 }
 
 impl NotesCmd {
-    pub async fn execute<AUTH: TransactionAuthenticator + Sync + 'static>(
+    pub async fn execute<AUTH: TransactionAuthenticator + Send + Sync + 'static>(
         &self,
         mut client: Client<AUTH>,
     ) -> Result<(), CliError> {
@@ -359,7 +359,7 @@ async fn send<AUTH: TransactionAuthenticator + Sync>(
 /// Fetched notes are stored in the store.
 async fn fetch<AUTH>(client: &mut Client<AUTH>) -> Result<(), CliError>
 where
-    AUTH: TransactionAuthenticator + Sync + 'static,
+    AUTH: TransactionAuthenticator + Send + Sync + 'static,
 {
     client.fetch_private_notes().await?;
 
