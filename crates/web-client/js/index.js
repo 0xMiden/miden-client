@@ -100,6 +100,49 @@ const getWasmOrThrow = async () => {
  * Because of this implementation, the only breaking change for end users is in the way the
  * web client is instantiated. Users should now use the WebClient.createClient static call.
  */
+// Synchronous wasm-bindgen methods on WebClient that must NOT be wrapped in
+// _serializeWasmCall. Wrapping these would change their return type from a
+// direct value to a Promise, breaking callers.
+// All other (async) methods are serialized to prevent concurrent RefCell borrows.
+const SYNC_WASM_METHODS = new Set([
+  "accountReader",
+  "createCodeBuilder",
+  "usesMockChain",
+  "setDebugMode",
+  "serializeMockChain",
+  "serializeMockNoteTransportNode",
+  "proveBlock",
+]);
+
+/**
+ * Create a Proxy that forwards missing properties to the underlying WASM
+ * WebClient, serializing async method calls through _serializeWasmCall to
+ * prevent concurrent RefCell borrows in the WASM module.
+ */
+function createSerializingProxy(instance) {
+  return new Proxy(instance, {
+    get(target, prop, receiver) {
+      if (prop in target) {
+        return Reflect.get(target, prop, receiver);
+      }
+      if (target.wasmWebClient && prop in target.wasmWebClient) {
+        const value = target.wasmWebClient[prop];
+        if (typeof value === "function") {
+          if (SYNC_WASM_METHODS.has(prop)) {
+            return value.bind(target.wasmWebClient);
+          }
+          return (...args) =>
+            target._serializeWasmCall(() =>
+              value.apply(target.wasmWebClient, args)
+            );
+        }
+        return value;
+      }
+      return undefined;
+    },
+  });
+}
+
 export class WebClient {
   /**
    * Create a WebClient wrapper.
@@ -240,6 +283,25 @@ export class WebClient {
     // Lazy initialize the underlying WASM WebClient when first requested.
     this.wasmWebClient = null;
     this.wasmWebClientPromise = null;
+
+    // Promise chain to serialize direct WASM calls that require exclusive
+    // (&mut self) access. Without this, concurrent calls on the same client
+    // would panic with "recursive use of an object detected" due to
+    // wasm-bindgen's internal RefCell.
+    this._wasmCallChain = Promise.resolve();
+  }
+
+  /**
+   * Serialize a WASM call that requires exclusive (&mut self) access.
+   * Concurrent calls are queued and executed one at a time.
+   *
+   * @param {() => Promise<any>} fn - The async function to execute.
+   * @returns {Promise<any>} The result of fn.
+   */
+  _serializeWasmCall(fn) {
+    const result = this._wasmCallChain.catch(() => {}).then(fn);
+    this._wasmCallChain = result.catch(() => {});
+    return result;
   }
 
   // TODO: This will soon conflict with some changes in main.
@@ -296,24 +358,7 @@ export class WebClient {
     // Wait for the worker to be ready
     await instance.ready;
 
-    // Return a proxy that forwards missing properties to wasmWebClient.
-    return new Proxy(instance, {
-      get(target, prop, receiver) {
-        // If the property exists on the wrapper, return it.
-        if (prop in target) {
-          return Reflect.get(target, prop, receiver);
-        }
-        // Otherwise, if the wasmWebClient has it, return that.
-        if (target.wasmWebClient && prop in target.wasmWebClient) {
-          const value = target.wasmWebClient[prop];
-          if (typeof value === "function") {
-            return value.bind(target.wasmWebClient);
-          }
-          return value;
-        }
-        return undefined;
-      },
-    });
+    return createSerializingProxy(instance);
   }
 
   /**
@@ -361,24 +406,7 @@ export class WebClient {
     );
 
     await instance.ready;
-    // Return a proxy that forwards missing properties to wasmWebClient.
-    return new Proxy(instance, {
-      get(target, prop, receiver) {
-        // If the property exists on the wrapper, return it.
-        if (prop in target) {
-          return Reflect.get(target, prop, receiver);
-        }
-        // Otherwise, if the wasmWebClient has it, return that.
-        if (target.wasmWebClient && prop in target.wasmWebClient) {
-          const value = target.wasmWebClient[prop];
-          if (typeof value === "function") {
-            return value.bind(target.wasmWebClient);
-          }
-          return value;
-        }
-        return undefined;
-      },
-    });
+    return createSerializingProxy(instance);
   }
 
   /**
@@ -407,13 +435,15 @@ export class WebClient {
   // ----- Explicitly Wrapped Methods (Worker-Forwarded) -----
 
   async newWallet(storageMode, mutable, authSchemeId, seed) {
-    const wasmWebClient = await this.getWasmWebClient();
-    return await wasmWebClient.newWallet(
-      storageMode,
-      mutable,
-      authSchemeId,
-      seed
-    );
+    return this._serializeWasmCall(async () => {
+      const wasmWebClient = await this.getWasmWebClient();
+      return await wasmWebClient.newWallet(
+        storageMode,
+        mutable,
+        authSchemeId,
+        seed
+      );
+    });
   }
 
   async newFaucet(
@@ -424,25 +454,29 @@ export class WebClient {
     maxSupply,
     authSchemeId
   ) {
-    const wasmWebClient = await this.getWasmWebClient();
-    return await wasmWebClient.newFaucet(
-      storageMode,
-      nonFungible,
-      tokenSymbol,
-      decimals,
-      maxSupply,
-      authSchemeId
-    );
+    return this._serializeWasmCall(async () => {
+      const wasmWebClient = await this.getWasmWebClient();
+      return await wasmWebClient.newFaucet(
+        storageMode,
+        nonFungible,
+        tokenSymbol,
+        decimals,
+        maxSupply,
+        authSchemeId
+      );
+    });
   }
 
   async submitNewTransaction(accountId, transactionRequest) {
     try {
       if (!this.worker) {
-        const wasmWebClient = await this.getWasmWebClient();
-        return await wasmWebClient.submitNewTransaction(
-          accountId,
-          transactionRequest
-        );
+        return await this._serializeWasmCall(async () => {
+          const wasmWebClient = await this.getWasmWebClient();
+          return await wasmWebClient.submitNewTransaction(
+            accountId,
+            transactionRequest
+          );
+        });
       }
 
       const wasm = await getWasmOrThrow();
@@ -467,12 +501,14 @@ export class WebClient {
   async submitNewTransactionWithProver(accountId, transactionRequest, prover) {
     try {
       if (!this.worker) {
-        const wasmWebClient = await this.getWasmWebClient();
-        return await wasmWebClient.submitNewTransactionWithProver(
-          accountId,
-          transactionRequest,
-          prover
-        );
+        return await this._serializeWasmCall(async () => {
+          const wasmWebClient = await this.getWasmWebClient();
+          return await wasmWebClient.submitNewTransactionWithProver(
+            accountId,
+            transactionRequest,
+            prover
+          );
+        });
       }
 
       const wasm = await getWasmOrThrow();
@@ -502,11 +538,13 @@ export class WebClient {
   async executeTransaction(accountId, transactionRequest) {
     try {
       if (!this.worker) {
-        const wasmWebClient = await this.getWasmWebClient();
-        return await wasmWebClient.executeTransaction(
-          accountId,
-          transactionRequest
-        );
+        return await this._serializeWasmCall(async () => {
+          const wasmWebClient = await this.getWasmWebClient();
+          return await wasmWebClient.executeTransaction(
+            accountId,
+            transactionRequest
+          );
+        });
       }
 
       const wasm = await getWasmOrThrow();
@@ -529,8 +567,13 @@ export class WebClient {
   async proveTransaction(transactionResult, prover) {
     try {
       if (!this.worker) {
-        const wasmWebClient = await this.getWasmWebClient();
-        return await wasmWebClient.proveTransaction(transactionResult, prover);
+        return await this._serializeWasmCall(async () => {
+          const wasmWebClient = await this.getWasmWebClient();
+          return await wasmWebClient.proveTransaction(
+            transactionResult,
+            prover
+          );
+        });
       }
 
       const wasm = await getWasmOrThrow();
@@ -592,8 +635,10 @@ export class WebClient {
       try {
         let result;
         if (!this.worker) {
-          const wasmWebClient = await this.getWasmWebClient();
-          result = await wasmWebClient.syncStateImpl();
+          result = await this._serializeWasmCall(async () => {
+            const wasmWebClient = await this.getWasmWebClient();
+            return await wasmWebClient.syncStateImpl();
+          });
         } else {
           const wasm = await getWasmOrThrow();
           const serializedSyncSummaryBytes = await this.callMethodWithWorker(
@@ -673,24 +718,7 @@ export class MockWebClient extends WebClient {
     // Wait for the worker to be ready
     await instance.ready;
 
-    // Return a proxy that forwards missing properties to wasmWebClient.
-    return new Proxy(instance, {
-      get(target, prop, receiver) {
-        // If the property exists on the wrapper, return it.
-        if (prop in target) {
-          return Reflect.get(target, prop, receiver);
-        }
-        // Otherwise, if the wasmWebClient has it, return that.
-        if (target.wasmWebClient && prop in target.wasmWebClient) {
-          const value = target.wasmWebClient[prop];
-          if (typeof value === "function") {
-            return value.bind(target.wasmWebClient);
-          }
-          return value;
-        }
-        return undefined;
-      },
-    });
+    return createSerializingProxy(instance);
   }
 
   /**
@@ -724,11 +752,14 @@ export class MockWebClient extends WebClient {
 
       try {
         let result;
-        const wasmWebClient = await this.getWasmWebClient();
 
         if (!this.worker) {
-          result = await wasmWebClient.syncStateImpl();
+          result = await this._serializeWasmCall(async () => {
+            const wasmWebClient = await this.getWasmWebClient();
+            return await wasmWebClient.syncStateImpl();
+          });
         } else {
+          const wasmWebClient = await this.getWasmWebClient();
           let serializedMockChain = wasmWebClient.serializeMockChain().buffer;
           let serializedMockNoteTransportNode =
             wasmWebClient.serializeMockNoteTransportNode().buffer;
