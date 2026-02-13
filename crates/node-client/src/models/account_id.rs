@@ -1,6 +1,5 @@
 use std::str::FromStr;
 
-use miden_client::Felt as NativeFelt;
 use miden_client::account::{AccountId as NativeAccountId, NetworkId as NativeNetworkId};
 use miden_client::address::{
     Address,
@@ -11,49 +10,32 @@ use miden_client::address::{
 use napi::bindgen_prelude::*;
 
 use super::felt::Felt;
-use super::napi_wrap;
+use super::{napi_delegate, napi_wrap};
 
 napi_wrap!(copy AccountId wraps NativeAccountId);
+
+napi_delegate!(impl AccountId {
+    /// Returns true if the ID refers to a faucet.
+    delegate is_faucet -> bool;
+    /// Returns true if the ID refers to a regular account.
+    delegate is_regular_account -> bool;
+    /// Returns true if the account uses public storage.
+    delegate is_public -> bool;
+    /// Returns true if the account uses private storage.
+    delegate is_private -> bool;
+    /// Returns true if the ID is reserved for network accounts.
+    delegate is_network -> bool;
+});
 
 #[napi]
 impl AccountId {
     /// Builds an account ID from its hex string representation.
-    #[napi(js_name = "fromHex")]
+    #[napi]
     pub fn from_hex(hex: String) -> Result<AccountId> {
         let native = NativeAccountId::from_hex(&hex).map_err(|err| {
             napi::Error::from_reason(format!("Failed to parse AccountId from hex: {err}"))
         })?;
         Ok(AccountId(native))
-    }
-
-    /// Returns true if the ID refers to a faucet.
-    #[napi(js_name = "isFaucet")]
-    pub fn is_faucet(&self) -> bool {
-        self.0.is_faucet()
-    }
-
-    /// Returns true if the ID refers to a regular account.
-    #[napi(js_name = "isRegularAccount")]
-    pub fn is_regular_account(&self) -> bool {
-        self.0.is_regular_account()
-    }
-
-    /// Returns true if the account uses public storage.
-    #[napi(js_name = "isPublic")]
-    pub fn is_public(&self) -> bool {
-        self.0.is_public()
-    }
-
-    /// Returns true if the account uses private storage.
-    #[napi(js_name = "isPrivate")]
-    pub fn is_private(&self) -> bool {
-        self.0.is_private()
-    }
-
-    /// Returns true if the ID is reserved for network accounts.
-    #[napi(js_name = "isNetwork")]
-    pub fn is_network(&self) -> bool {
-        self.0.is_network()
     }
 
     /// Returns the canonical hex representation of the account ID.
@@ -65,19 +47,17 @@ impl AccountId {
     /// Returns the prefix field element.
     #[napi]
     pub fn prefix(&self) -> Felt {
-        let native_felt: NativeFelt = self.0.prefix().as_felt();
-        native_felt.into()
+        self.0.prefix().as_felt().into()
     }
 
     /// Returns the suffix field element.
     #[napi]
     pub fn suffix(&self) -> Felt {
-        let native_felt: NativeFelt = self.0.suffix();
-        native_felt.into()
+        self.0.suffix().into()
     }
 
     /// Converts to bech32 representation with a given network.
-    #[napi(js_name = "toBech32")]
+    #[napi]
     pub fn to_bech32(&self, network: String) -> Result<String> {
         let network_id = parse_network_id(&network)?;
         let routing_params = RoutingParameters::new(NativeAccountInterface::BasicWallet);
@@ -89,7 +69,7 @@ impl AccountId {
     }
 
     /// Given a bech32 encoded string, return the matching Account ID for it.
-    #[napi(js_name = "fromBech32")]
+    #[napi]
     pub fn from_bech32(bech32: String) -> Result<AccountId> {
         let (_, address) = Address::decode(&bech32).map_err(|err| {
             napi::Error::from_reason(format!(

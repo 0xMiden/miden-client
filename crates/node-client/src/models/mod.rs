@@ -121,3 +121,72 @@ macro_rules! napi_wrap {
 }
 
 pub(crate) use napi_wrap;
+
+// NAPI DELEGATE MACRO
+// ================================================================================================
+
+/// Generates `#[napi]` delegate methods on a newtype wrapper, eliminating
+/// per-method boilerplate (`#[napi]`, `pub fn`, body).
+///
+/// napi-rs auto-converts snake_case to camelCase, so `is_faucet` becomes `isFaucet` in JS.
+///
+/// # Supported patterns
+///
+/// - `delegate method -> ReturnType;` — calls `self.0.method()` and converts via `.into()`. Works
+///   for any return type (for `bool`/`u32`/etc., `.into()` is a no-op).
+///
+/// - `collect field -> Vec<ReturnType>;` — iterates `self.0.field` and converts each via `.into()`.
+///
+/// Methods needing custom logic, arguments, or non-standard JS names
+/// should be written in a separate `#[napi] impl` block.
+///
+/// # Usage
+///
+/// ```ignore
+/// napi_delegate!(impl Account {
+///     /// Returns the account identifier.
+///     delegate id -> AccountId;
+///     /// Returns true if the account is a faucet.
+///     delegate is_faucet -> bool;
+/// });
+/// ```
+macro_rules! napi_delegate {
+    // Entry: start accumulating methods.
+    (impl $Wrapper:ident { $($body:tt)* }) => {
+        napi_delegate!(@acc $Wrapper [] $($body)*);
+    };
+
+    // Done — emit the impl block with all accumulated methods.
+    (@acc $Wrapper:ident [ $($methods:tt)* ]) => {
+        #[napi]
+        impl $Wrapper { $($methods)* }
+    };
+
+    // delegate: call same-named method on inner, convert via .into().
+    (@acc $Wrapper:ident [ $($methods:tt)* ]
+        $(#[$meta:meta])* delegate $method:ident -> $ret:ty;
+        $($rest:tt)*
+    ) => {
+        napi_delegate!(@acc $Wrapper [
+            $($methods)*
+            $(#[$meta])*
+            #[napi]
+            pub fn $method(&self) -> $ret { self.0.$method().into() }
+        ] $($rest)*);
+    };
+
+    // collect: iterate a field on inner, convert each element via .into().
+    (@acc $Wrapper:ident [ $($methods:tt)* ]
+        $(#[$meta:meta])* collect $field:ident -> $ret:ty;
+        $($rest:tt)*
+    ) => {
+        napi_delegate!(@acc $Wrapper [
+            $($methods)*
+            $(#[$meta])*
+            #[napi]
+            pub fn $field(&self) -> $ret { self.0.$field.iter().map(Into::into).collect() }
+        ] $($rest)*);
+    };
+}
+
+pub(crate) use napi_delegate;

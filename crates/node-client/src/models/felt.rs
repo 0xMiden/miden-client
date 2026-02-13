@@ -13,7 +13,7 @@ impl Felt {
         Ok(Felt(NativeFelt::new(value)))
     }
 
-    #[napi(js_name = "asInt")]
+    #[napi]
     pub fn as_int(&self) -> BigInt {
         BigInt::from(self.0.as_int())
     }

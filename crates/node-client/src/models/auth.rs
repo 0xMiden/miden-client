@@ -44,21 +44,21 @@ napi_wrap!(clone AuthSecretKey wraps NativeAuthSecretKey);
 #[napi]
 impl AuthSecretKey {
     /// Generates a new RPO Falcon 512 key pair, optionally from a seed.
-    #[napi(js_name = "rpoFalconWithRng")]
+    #[napi]
     pub fn rpo_falcon_with_rng(seed: Option<Buffer>) -> Result<AuthSecretKey> {
         let mut rng = try_rng_from_seed(seed)?;
         Ok(NativeAuthSecretKey::new_falcon512_rpo_with_rng(&mut rng).into())
     }
 
     /// Generates a new ECDSA k256 Keccak key pair, optionally from a seed.
-    #[napi(js_name = "ecdsaWithRng")]
+    #[napi]
     pub fn ecdsa_with_rng(seed: Option<Buffer>) -> Result<AuthSecretKey> {
         let mut rng = try_rng_from_seed(seed)?;
         Ok(NativeAuthSecretKey::new_ecdsa_k256_keccak_with_rng(&mut rng).into())
     }
 
     /// Returns the public key commitment as a Word.
-    #[napi(js_name = "getPublicKeyAsWord")]
+    #[napi]
     pub fn get_public_key_as_word(&self) -> Result<Word> {
         let commitment = match &self.0 {
             NativeAuthSecretKey::Falcon512Rpo(key) => key.public_key().to_commitment(),

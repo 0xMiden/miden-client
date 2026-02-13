@@ -8,7 +8,7 @@ napi_wrap!(copy TransactionId wraps NativeTransactionId);
 #[napi]
 impl TransactionId {
     /// Returns the hex representation.
-    #[napi(js_name = "toHex")]
+    #[napi]
     pub fn to_hex(&self) -> String {
         self.0.to_hex()
     }

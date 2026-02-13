@@ -2,19 +2,18 @@ use miden_client::note::Note as NativeNote;
 use miden_client::utils::{Deserializable, Serializable};
 use napi::bindgen_prelude::*;
 
-use super::napi_wrap;
 use super::note_id::NoteId;
+use super::{napi_delegate, napi_wrap};
 
 napi_wrap!(clone Note wraps NativeNote);
 
+napi_delegate!(impl Note {
+    /// Returns the note ID.
+    delegate id -> NoteId;
+});
+
 #[napi]
 impl Note {
-    /// Returns the note ID.
-    #[napi]
-    pub fn id(&self) -> NoteId {
-        self.0.id().into()
-    }
-
     /// Serializes the note into bytes.
     #[napi]
     pub fn serialize(&self) -> Buffer {
