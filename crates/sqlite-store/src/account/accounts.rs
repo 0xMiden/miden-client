@@ -549,18 +549,9 @@ impl SqliteStore {
             delta,
         )?;
 
-        let (updated_storage_slots, changed_map_roots) =
-            Self::apply_account_storage_delta(smt_forest, updated_storage_maps, delta)?;
-
-        Self::insert_storage_slots(
-            tx,
-            final_account_state.storage_commitment(),
-            updated_storage_slots.iter(),
-        )?;
-
         // Build the final roots from the init state's registered roots:
         // - Replace vault root with the final one
-        // - Replace changed map roots with their new values
+        // - Replace changed map roots with their new values (done by apply_account_storage_delta)
         // - Unchanged map roots continue as they were
         let mut final_roots = smt_forest
             .get_roots(&init_account_state.id())
@@ -572,12 +563,18 @@ impl SqliteStore {
             *vault_root = final_account_state.vault_root();
         }
 
-        // Replace changed map roots
-        for (old_root, new_root) in changed_map_roots {
-            if let Some(root) = final_roots.iter_mut().find(|r| **r == old_root) {
-                *root = new_root;
-            }
-        }
+        let updated_storage_slots = Self::apply_account_storage_delta(
+            smt_forest,
+            &mut final_roots,
+            updated_storage_maps,
+            delta,
+        )?;
+
+        Self::insert_storage_slots(
+            tx,
+            final_account_state.storage_commitment(),
+            updated_storage_slots.iter(),
+        )?;
 
         smt_forest.stage_roots(final_account_state.id(), final_roots);
 
