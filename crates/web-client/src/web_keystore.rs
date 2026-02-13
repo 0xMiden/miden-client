@@ -110,36 +110,6 @@ impl<R: Rng> WebKeyStore<R> {
 
         Ok(())
     }
-
-    /// Retrieves a secret key from the keystore given the commitment of a public key.
-    pub async fn get_key_internal(
-        &self,
-        pub_key: PublicKeyCommitment,
-    ) -> Result<Option<AuthSecretKey>, KeyStoreError> {
-        if let Some(get_key_cb) = &self.callbacks.as_ref().get_key {
-            return get_key_cb.get_secret_key(pub_key).await;
-        }
-        let pub_key_commitment = NativeWord::from(pub_key).to_hex();
-        let secret_key_hex =
-            get_account_auth_by_pub_key_commitment(&self.db_id, pub_key_commitment)
-                .await
-                .map_err(|_| {
-                    KeyStoreError::StorageError(
-                        "Failed to get secret key from IndexedDB".to_string(),
-                    )
-                })?;
-
-        let Some(secret_key_hex) = secret_key_hex else {
-            return Ok(None);
-        };
-
-        let secret_key_bytes = hex::decode(secret_key_hex).map_err(|err| {
-            KeyStoreError::DecodingError(format!("error decoding secret key hex: {err:?}"))
-        })?;
-
-        let secret_key = decode_secret_key_from_bytes(&secret_key_bytes)?;
-        Ok(Some(secret_key))
-    }
 }
 
 impl<R: Rng> TransactionAuthenticator for WebKeyStore<R> {
@@ -162,7 +132,7 @@ impl<R: Rng> TransactionAuthenticator for WebKeyStore<R> {
         let message = signing_inputs.to_commitment();
 
         let secret_key = self
-            .get_key_internal(pub_key)
+            .get_key(pub_key)
             .await
             .map_err(|err| AuthenticationError::other(err.to_string()))?;
 
@@ -185,7 +155,7 @@ impl<R: Rng> TransactionAuthenticator for WebKeyStore<R> {
         &self,
         pub_key_commitment: PublicKeyCommitment,
     ) -> Option<Arc<PublicKey>> {
-        self.get_key_internal(pub_key_commitment)
+        self.get_key(pub_key_commitment)
             .await
             .ok()
             .flatten()
@@ -240,11 +210,34 @@ impl<R: Rng> Keystore for WebKeyStore<R> {
         Ok(())
     }
 
+    /// Retrieves a secret key from the keystore given the commitment of a public key.
     async fn get_key(
         &self,
         pub_key: PublicKeyCommitment,
     ) -> Result<Option<AuthSecretKey>, KeyStoreError> {
-        self.get_key_internal(pub_key).await
+        if let Some(get_key_cb) = &self.callbacks.as_ref().get_key {
+            return get_key_cb.get_secret_key(pub_key).await;
+        }
+        let pub_key_commitment = NativeWord::from(pub_key).to_hex();
+        let secret_key_hex =
+            get_account_auth_by_pub_key_commitment(&self.db_id, pub_key_commitment)
+                .await
+                .map_err(|_| {
+                    KeyStoreError::StorageError(
+                        "Failed to get secret key from IndexedDB".to_string(),
+                    )
+                })?;
+
+        let Some(secret_key_hex) = secret_key_hex else {
+            return Ok(None);
+        };
+
+        let secret_key_bytes = hex::decode(secret_key_hex).map_err(|err| {
+            KeyStoreError::DecodingError(format!("error decoding secret key hex: {err:?}"))
+        })?;
+
+        let secret_key = decode_secret_key_from_bytes(&secret_key_bytes)?;
+        Ok(Some(secret_key))
     }
 
     async fn get_account_key_commitments(
