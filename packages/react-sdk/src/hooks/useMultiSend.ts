@@ -19,7 +19,6 @@ import type {
 } from "../types";
 import { DEFAULTS } from "../types";
 import { parseAccountId, parseAddress } from "../utils/accountParsing";
-import { runExclusiveDirect } from "../utils/runExclusive";
 
 export interface UseMultiSendResult {
   /** Create multiple P2ID output notes in one transaction */
@@ -79,8 +78,7 @@ type ClientWithTransactions = {
  * ```
  */
 export function useMultiSend(): UseMultiSendResult {
-  const { client, isReady, sync, runExclusive, prover } = useMiden();
-  const runExclusiveSafe = runExclusive ?? runExclusiveDirect;
+  const { client, isReady, sync, prover } = useMiden();
 
   const [result, setResult] = useState<TransactionResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -130,18 +128,18 @@ export function useMultiSend(): UseMultiSendResult {
           )
           .build();
 
-        const txResult = await runExclusiveSafe(() =>
-          client.executeTransaction(senderId, txRequest)
-        );
+        const txResult = await client.executeTransaction(senderId, txRequest);
 
         setStage("proving");
-        const provenTransaction = await runExclusiveSafe(() =>
-          client.proveTransaction(txResult, prover ?? undefined)
+        const provenTransaction = await client.proveTransaction(
+          txResult,
+          prover ?? undefined
         );
 
         setStage("submitting");
-        const submissionHeight = await runExclusiveSafe(() =>
-          client.submitProvenTransaction(provenTransaction, txResult)
+        const submissionHeight = await client.submitProvenTransaction(
+          provenTransaction,
+          txResult
         );
 
         // Save txId BEFORE applyTransaction, which consumes the WASM pointer
@@ -149,21 +147,16 @@ export function useMultiSend(): UseMultiSendResult {
         const txId = txResult.id();
         const txIdString = txId.toString();
 
-        await runExclusiveSafe(() =>
-          client.applyTransaction(txResult, submissionHeight)
-        );
+        await client.applyTransaction(txResult, submissionHeight);
 
         if (noteType === NoteType.Private) {
           await waitForTransactionCommit(
             client as ClientWithTransactions,
-            runExclusiveSafe,
             txId
           );
 
           for (const output of outputs) {
-            await runExclusiveSafe(() =>
-              client.sendPrivateNote(output.note, output.recipientAddress)
-            );
+            await client.sendPrivateNote(output.note, output.recipientAddress);
           }
         }
 
@@ -184,7 +177,7 @@ export function useMultiSend(): UseMultiSendResult {
         setIsLoading(false);
       }
     },
-    [client, isReady, prover, runExclusive, sync]
+    [client, isReady, prover, sync]
   );
 
   const reset = useCallback(() => {
@@ -219,7 +212,6 @@ function getNoteType(type: "private" | "public" | "encrypted"): NoteType {
 
 async function waitForTransactionCommit(
   client: ClientWithTransactions,
-  runExclusiveSafe: <T>(fn: () => Promise<T>) => Promise<T>,
   txId: TransactionId,
   maxWaitMs = 10_000,
   delayMs = 1_000
@@ -227,9 +219,9 @@ async function waitForTransactionCommit(
   let waited = 0;
 
   while (waited < maxWaitMs) {
-    await runExclusiveSafe(() => client.syncState());
-    const [record] = await runExclusiveSafe(() =>
-      client.getTransactions(TransactionFilter.ids([txId]))
+    await client.syncState();
+    const [record] = await client.getTransactions(
+      TransactionFilter.ids([txId])
     );
     if (record) {
       const status = record.transactionStatus();

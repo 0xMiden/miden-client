@@ -11,7 +11,6 @@ import type {
   ExecuteTransactionOptions,
 } from "../types";
 import { parseAccountId } from "../utils/accountParsing";
-import { runExclusiveDirect } from "../utils/runExclusive";
 
 export interface UseTransactionResult {
   /** Execute a transaction request end-to-end */
@@ -65,8 +64,7 @@ type TransactionRequestFactory = (
  * ```
  */
 export function useTransaction(): UseTransactionResult {
-  const { client, isReady, sync, runExclusive, prover } = useMiden();
-  const runExclusiveSafe = runExclusive ?? runExclusiveDirect;
+  const { client, isReady, sync, prover } = useMiden();
 
   const [result, setResult] = useState<TransactionResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -85,18 +83,16 @@ export function useTransaction(): UseTransactionResult {
 
       try {
         setStage("proving");
-        const txResult = await runExclusiveSafe(async () => {
-          const accountIdObj = resolveAccountId(options.accountId);
-          const txRequest = await resolveRequest(options.request, client);
-          const txId = prover
-            ? await client.submitNewTransactionWithProver(
-                accountIdObj,
-                txRequest,
-                prover
-              )
-            : await client.submitNewTransaction(accountIdObj, txRequest);
-          return { transactionId: txId.toString() };
-        });
+        const accountIdObj = resolveAccountId(options.accountId);
+        const txRequest = await resolveRequest(options.request, client);
+        const txId = prover
+          ? await client.submitNewTransactionWithProver(
+              accountIdObj,
+              txRequest,
+              prover
+            )
+          : await client.submitNewTransaction(accountIdObj, txRequest);
+        const txResult = { transactionId: txId.toString() };
 
         setStage("complete");
         setResult(txResult);
@@ -113,7 +109,7 @@ export function useTransaction(): UseTransactionResult {
         setIsLoading(false);
       }
     },
-    [client, isReady, prover, runExclusive, sync]
+    [client, isReady, prover, sync]
   );
 
   const reset = useCallback(() => {
