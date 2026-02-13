@@ -283,8 +283,10 @@ export function MidenProvider({
   }, [isReady, client, config.autoSyncInterval, sync]);
 
   // Cross-tab state change listener (Layer 3).
-  // When another tab mutates the same IndexedDB, refresh our local state.
-  // Debounced to avoid thundering-herd syncs when rapid writes occur.
+  // The WebClient auto-syncs on cross-tab changes, so the in-memory Rust
+  // state is already fresh. We just need to refresh the Zustand store
+  // (accounts, sync metadata) so the React UI re-renders.
+  // Debounced to avoid thundering-herd refreshes when rapid writes occur.
   useEffect(() => {
     if (!isReady || !client) return;
 
@@ -299,14 +301,22 @@ export function MidenProvider({
       }
     ).onStateChanged?.(() => {
       clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => sync(), 300);
+      timeoutId = setTimeout(async () => {
+        try {
+          const accounts = await client.getAccounts();
+          useMidenStore.getState().setAccounts(accounts);
+          setSyncState({ lastSyncTime: Date.now() });
+        } catch {
+          // Non-fatal — next explicit sync will catch up.
+        }
+      }, 300);
     });
 
     return () => {
       clearTimeout(timeoutId);
       unsubscribe?.();
     };
-  }, [isReady, client, sync]);
+  }, [isReady, client, setSyncState]);
 
   // Render loading state when a custom component is provided.
   if (isInitializing && loadingComponent) {

@@ -257,6 +257,13 @@ export class WebClient {
     this._stateListeners = [];
     if (this._stateChannel) {
       this._stateChannel.onmessage = (event) => {
+        // Auto-sync: refresh in-memory Rust Client state from IndexedDB
+        // when another tab mutates the database. Uses syncState's built-in
+        // coalescing so rapid cross-tab writes don't cause redundant syncs.
+        this.syncState().catch(() => {
+          // Sync failure is non-fatal — the next explicit sync will retry.
+        });
+
         for (const listener of this._stateListeners) {
           try {
             listener(event.data);
@@ -428,7 +435,12 @@ export class WebClient {
 
   /**
    * Register a listener that is called when **another tab** mutates the same
-   * IndexedDB database (Layer 3). Returns an unsubscribe function.
+   * IndexedDB database (Layer 3). The WebClient automatically calls
+   * `syncState()` before invoking listeners, so the in-memory state is
+   * already refreshed when your callback runs. Use this for additional
+   * work like re-fetching accounts or updating UI.
+   *
+   * Returns an unsubscribe function.
    *
    * @param {(event: {type: string, operation?: string, storeName: string}) => void} callback
    * @returns {() => void} Unsubscribe function.
