@@ -1099,10 +1099,10 @@ async fn undo_account_state_multiple_accounts_independent() -> anyhow::Result<()
     Ok(())
 }
 
-/// Verifies that `lock_account_on_unexpected_commitment` only sets `locked = true` in the
-/// latest table and does not affect historical entries.
+/// Verifies that `lock_account_on_unexpected_commitment` sets `locked = true` in both the
+/// latest and historical tables so that the lock survives undo/rebuild.
 #[tokio::test]
-async fn lock_account_only_affects_latest() -> anyhow::Result<()> {
+async fn lock_account_affects_latest_and_historical() -> anyhow::Result<()> {
     let store = create_test_store().await;
     let map_slot_name = StorageSlotName::new("test::lock::map").expect("valid slot name");
 
@@ -1173,7 +1173,7 @@ async fn lock_account_only_affects_latest() -> anyhow::Result<()> {
         .expect("account should exist");
     assert!(status.is_locked(), "Latest header should be locked");
 
-    // Historical entries should NOT be locked
+    // Historical entries should also be locked (so rebuild preserves the lock)
     let historical_locked: Vec<bool> = store
         .interact_with_connection(move |conn| {
             let mut stmt = conn
@@ -1190,8 +1190,8 @@ async fn lock_account_only_affects_latest() -> anyhow::Result<()> {
         })
         .await?;
     assert_eq!(historical_locked.len(), 2, "Should have 2 historical entries");
-    assert!(!historical_locked[0], "Historical nonce-0 should NOT be locked");
-    assert!(!historical_locked[1], "Historical nonce-1 should NOT be locked");
+    assert!(historical_locked[0], "Historical nonce-0 should be locked");
+    assert!(historical_locked[1], "Historical nonce-1 should be locked");
 
     Ok(())
 }

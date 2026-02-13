@@ -55,6 +55,7 @@ CREATE TABLE historical_account_headers (
 
     CONSTRAINT check_seed_nonzero CHECK (NOT (nonce = 0 AND account_seed IS NULL))
 );
+CREATE INDEX idx_historical_account_headers_id_nonce ON historical_account_headers(id, nonce DESC);
 
 -- ── Account storage (latest + historical) ────────────────────────────────
 

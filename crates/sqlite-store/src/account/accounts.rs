@@ -632,15 +632,21 @@ impl SqliteStore {
         // Mismatched digests may be due to stale network data. If the mismatched digest is
         // tracked in the db and corresponds to the mismatched account, it means we
         // got a past update and shouldn't lock the account.
-        const QUERY: &str = "UPDATE latest_account_headers SET locked = true WHERE id = :account_id AND NOT EXISTS (SELECT 1 FROM historical_account_headers WHERE id = :account_id AND account_commitment = :digest)";
-        tx.execute(
-            QUERY,
-            named_params! {
-                ":account_id": account_id.to_hex(),
-                ":digest": mismatched_digest.to_string()
-            },
-        )
-        .into_store_error()?;
+        const LOCK_CONDITION: &str = "WHERE id = :account_id AND NOT EXISTS (SELECT 1 FROM historical_account_headers WHERE id = :account_id AND account_commitment = :digest)";
+        let account_id_hex = account_id.to_hex();
+        let digest_str = mismatched_digest.to_string();
+        let params = named_params! {
+            ":account_id": account_id_hex,
+            ":digest": digest_str
+        };
+
+        let query = format!("UPDATE latest_account_headers SET locked = true {LOCK_CONDITION}");
+        tx.execute(&query, params).into_store_error()?;
+
+        // Also lock historical rows so that rebuild_latest_for_account preserves the lock.
+        let query = format!("UPDATE historical_account_headers SET locked = true {LOCK_CONDITION}");
+        tx.execute(&query, params).into_store_error()?;
+
         Ok(())
     }
 

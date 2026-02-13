@@ -66,17 +66,23 @@ extern "C" {
     #[wasm_bindgen(js_name = upsertAccountStorage)]
     pub fn idxdb_upsert_account_storage(
         db_id: &str,
+        account_id: String,
         storage_slots: Vec<JsStorageSlot>,
     ) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = upsertStorageMapEntries)]
     pub fn idxdb_upsert_storage_map_entries(
         db_id: &str,
+        account_id: String,
         entries: Vec<JsStorageMapEntry>,
     ) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = upsertVaultAssets)]
-    pub fn idxdb_upsert_vault_assets(db_id: &str, assets: Vec<JsVaultAsset>) -> js_sys::Promise;
+    pub fn idxdb_upsert_vault_assets(
+        db_id: &str,
+        account_id: String,
+        assets: Vec<JsVaultAsset>,
+    ) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = upsertAccountRecord)]
     pub fn idxdb_upsert_account_record(

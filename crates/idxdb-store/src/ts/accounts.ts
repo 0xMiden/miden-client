@@ -284,12 +284,17 @@ export async function upsertAccountCode(
 
 export async function upsertAccountStorage(
   dbId: string,
+  accountId: string,
   storageSlots: JsStorageSlot[]
 ) {
   try {
-    if (storageSlots.length === 0) return;
     const db = getDatabase(dbId);
-    const accountId = storageSlots[0].accountId;
+    await db.latestAccountStorages
+      .where("accountId")
+      .equals(accountId)
+      .delete();
+
+    if (storageSlots.length === 0) return;
 
     const latestEntries = storageSlots.map((slot) => {
       return {
@@ -310,10 +315,6 @@ export async function upsertAccountStorage(
       } as IHistoricalAccountStorage;
     });
 
-    await db.latestAccountStorages
-      .where("accountId")
-      .equals(accountId)
-      .delete();
     await db.latestAccountStorages.bulkPut(latestEntries);
     await db.historicalAccountStorages.bulkPut(historicalEntries);
   } catch (error) {
@@ -323,12 +324,17 @@ export async function upsertAccountStorage(
 
 export async function upsertStorageMapEntries(
   dbId: string,
+  accountId: string,
   entries: JsStorageMapEntry[]
 ) {
   try {
-    if (entries.length === 0) return;
     const db = getDatabase(dbId);
-    const accountId = entries[0].accountId;
+    await db.latestStorageMapEntries
+      .where("accountId")
+      .equals(accountId)
+      .delete();
+
+    if (entries.length === 0) return;
 
     const latestEntries = entries.map((entry) => {
       return {
@@ -349,10 +355,6 @@ export async function upsertStorageMapEntries(
       } as IHistoricalStorageMapEntry;
     });
 
-    await db.latestStorageMapEntries
-      .where("accountId")
-      .equals(accountId)
-      .delete();
     await db.latestStorageMapEntries.bulkPut(latestEntries);
     await db.historicalStorageMapEntries.bulkPut(historicalEntries);
   } catch (error) {
@@ -360,11 +362,16 @@ export async function upsertStorageMapEntries(
   }
 }
 
-export async function upsertVaultAssets(dbId: string, assets: JsVaultAsset[]) {
+export async function upsertVaultAssets(
+  dbId: string,
+  accountId: string,
+  assets: JsVaultAsset[]
+) {
   try {
-    if (assets.length === 0) return;
     const db = getDatabase(dbId);
-    const accountId = assets[0].accountId;
+    await db.latestAccountAssets.where("accountId").equals(accountId).delete();
+
+    if (assets.length === 0) return;
 
     const latestEntries = assets.map((asset) => {
       return {
@@ -385,7 +392,6 @@ export async function upsertVaultAssets(dbId: string, assets: JsVaultAsset[]) {
       } as IHistoricalAccountAsset;
     });
 
-    await db.latestAccountAssets.where("accountId").equals(accountId).delete();
     await db.latestAccountAssets.bulkPut(latestEntries);
     await db.historicalAccountAssets.bulkPut(historicalEntries);
   } catch (error: unknown) {
@@ -554,6 +560,11 @@ export async function lockAccount(dbId: string, accountId: string) {
   try {
     const db = getDatabase(dbId);
     await db.latestAccountHeaders
+      .where("id")
+      .equals(accountId)
+      .modify({ locked: true });
+    // Also lock historical rows so that undo/rebuild preserves the lock.
+    await db.historicalAccountHeaders
       .where("id")
       .equals(accountId)
       .modify({ locked: true });

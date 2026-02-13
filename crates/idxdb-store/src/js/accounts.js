@@ -217,12 +217,15 @@ export async function upsertAccountCode(dbId, codeRoot, code) {
         logWebStoreError(error, `Error inserting code with root: ${codeRoot}`);
     }
 }
-export async function upsertAccountStorage(dbId, storageSlots) {
+export async function upsertAccountStorage(dbId, accountId, storageSlots) {
     try {
+        const db = getDatabase(dbId);
+        await db.latestAccountStorages
+            .where("accountId")
+            .equals(accountId)
+            .delete();
         if (storageSlots.length === 0)
             return;
-        const db = getDatabase(dbId);
-        const accountId = storageSlots[0].accountId;
         const latestEntries = storageSlots.map((slot) => {
             return {
                 accountId: slot.accountId,
@@ -240,10 +243,6 @@ export async function upsertAccountStorage(dbId, storageSlots) {
                 slotType: slot.slotType,
             };
         });
-        await db.latestAccountStorages
-            .where("accountId")
-            .equals(accountId)
-            .delete();
         await db.latestAccountStorages.bulkPut(latestEntries);
         await db.historicalAccountStorages.bulkPut(historicalEntries);
     }
@@ -251,12 +250,15 @@ export async function upsertAccountStorage(dbId, storageSlots) {
         logWebStoreError(error, `Error inserting storage slots`);
     }
 }
-export async function upsertStorageMapEntries(dbId, entries) {
+export async function upsertStorageMapEntries(dbId, accountId, entries) {
     try {
+        const db = getDatabase(dbId);
+        await db.latestStorageMapEntries
+            .where("accountId")
+            .equals(accountId)
+            .delete();
         if (entries.length === 0)
             return;
-        const db = getDatabase(dbId);
-        const accountId = entries[0].accountId;
         const latestEntries = entries.map((entry) => {
             return {
                 accountId: entry.accountId,
@@ -274,10 +276,6 @@ export async function upsertStorageMapEntries(dbId, entries) {
                 value: entry.value,
             };
         });
-        await db.latestStorageMapEntries
-            .where("accountId")
-            .equals(accountId)
-            .delete();
         await db.latestStorageMapEntries.bulkPut(latestEntries);
         await db.historicalStorageMapEntries.bulkPut(historicalEntries);
     }
@@ -285,12 +283,12 @@ export async function upsertStorageMapEntries(dbId, entries) {
         logWebStoreError(error, `Error inserting storage map entries`);
     }
 }
-export async function upsertVaultAssets(dbId, assets) {
+export async function upsertVaultAssets(dbId, accountId, assets) {
     try {
+        const db = getDatabase(dbId);
+        await db.latestAccountAssets.where("accountId").equals(accountId).delete();
         if (assets.length === 0)
             return;
-        const db = getDatabase(dbId);
-        const accountId = assets[0].accountId;
         const latestEntries = assets.map((asset) => {
             return {
                 accountId: asset.accountId,
@@ -308,7 +306,6 @@ export async function upsertVaultAssets(dbId, assets) {
                 asset: asset.asset,
             };
         });
-        await db.latestAccountAssets.where("accountId").equals(accountId).delete();
         await db.latestAccountAssets.bulkPut(latestEntries);
         await db.historicalAccountAssets.bulkPut(historicalEntries);
     }
@@ -425,6 +422,11 @@ export async function lockAccount(dbId, accountId) {
     try {
         const db = getDatabase(dbId);
         await db.latestAccountHeaders
+            .where("id")
+            .equals(accountId)
+            .modify({ locked: true });
+        // Also lock historical rows so that undo/rebuild preserves the lock.
+        await db.historicalAccountHeaders
             .where("id")
             .equals(accountId)
             .modify({ locked: true });

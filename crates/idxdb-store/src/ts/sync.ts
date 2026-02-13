@@ -280,9 +280,21 @@ export async function applyStateSync(
       Promise.all(
         accountUpdates.flatMap((accountUpdate) => {
           return [
-            upsertAccountStorage(dbId, accountUpdate.storageSlots),
-            upsertStorageMapEntries(dbId, accountUpdate.storageMapEntries),
-            upsertVaultAssets(dbId, accountUpdate.assets),
+            upsertAccountStorage(
+              dbId,
+              accountUpdate.accountId,
+              accountUpdate.storageSlots
+            ),
+            upsertStorageMapEntries(
+              dbId,
+              accountUpdate.accountId,
+              accountUpdate.storageMapEntries
+            ),
+            upsertVaultAssets(
+              dbId,
+              accountUpdate.accountId,
+              accountUpdate.assets
+            ),
             upsertAccountRecord(
               dbId,
               accountUpdate.accountId,

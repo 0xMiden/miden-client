@@ -55,8 +55,9 @@ pub async fn upsert_account_storage(
         }
     }
 
-    JsFuture::from(idxdb_upsert_account_storage(db_id, slots)).await?;
-    JsFuture::from(idxdb_upsert_storage_map_entries(db_id, maps)).await?;
+    let account_id_str = account_id.to_string();
+    JsFuture::from(idxdb_upsert_account_storage(db_id, account_id_str.clone(), slots)).await?;
+    JsFuture::from(idxdb_upsert_storage_map_entries(db_id, account_id_str, maps)).await?;
 
     Ok(())
 }
@@ -72,7 +73,7 @@ pub async fn upsert_account_asset_vault(
         .map(|asset| JsVaultAsset::from_asset(&asset, account_id, nonce))
         .collect();
 
-    let promise = idxdb_upsert_vault_assets(db_id, js_assets);
+    let promise = idxdb_upsert_vault_assets(db_id, account_id.to_string(), js_assets);
     JsFuture::from(promise).await?;
 
     Ok(())
