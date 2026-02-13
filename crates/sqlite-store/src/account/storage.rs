@@ -22,7 +22,7 @@ use rusqlite::{Connection, Transaction, params};
 use crate::account::helpers::query_storage_slots;
 
 /// Updated storage slots and `(old_root, new_root)` pairs for each changed storage map.
-pub(crate) type StorageDeltaResult = (BTreeMap<StorageSlotName, StorageSlot>, Vec<(Word, Word)>);
+pub(crate) type StorageDeltaResult = (Vec<StorageSlot>, Vec<(Word, Word)>);
 use crate::smt_forest::AccountSmtForest;
 use crate::sql_error::SqlResultExt;
 use crate::{SqliteStore, insert_sql, subst};
@@ -50,8 +50,9 @@ impl SqliteStore {
             params![header.storage_commitment().to_hex(), Rc::new(updated_map_names)],
         )?
         .into_iter()
-        .map(|(slot_name, slot)| {
-            let StorageSlotContent::Map(map) = slot.into_parts().1 else {
+        .map(|slot| {
+            let (slot_name, content) = slot.into_parts();
+            let StorageSlotContent::Map(map) = content else {
                 return Err(StoreError::AccountError(
                     miden_client::AccountError::StorageSlotNotMap(slot_name),
                 ));
@@ -123,12 +124,10 @@ impl SqliteStore {
         // Apply storage delta. This map will contain all updated storage slots, both values and
         // maps. It gets initialized with value type updates which contain the new value and
         // don't depend on previous state.
-        let mut updated_storage_slots: BTreeMap<StorageSlotName, StorageSlot> = delta
+        let mut updated_storage_slots: Vec<StorageSlot> = delta
             .storage()
             .values()
-            .map(|(slot_name, slot)| {
-                (slot_name.clone(), StorageSlot::with_value(slot_name.clone(), *slot))
-            })
+            .map(|(slot_name, slot)| StorageSlot::with_value(slot_name.clone(), *slot))
             .collect();
 
         let mut changed_map_roots = Vec::new();
@@ -156,8 +155,7 @@ impl SqliteStore {
 
             changed_map_roots.push((old_root, new_root));
 
-            updated_storage_slots
-                .insert(slot_name.clone(), StorageSlot::with_map(slot_name.clone(), map));
+            updated_storage_slots.push(StorageSlot::with_map(slot_name.clone(), map));
         }
 
         Ok((updated_storage_slots, changed_map_roots))

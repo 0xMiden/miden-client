@@ -162,9 +162,7 @@ impl SqliteStore {
             conn,
             "commitment = ?",
             params![header.storage_commitment().to_hex()],
-        )?
-        .into_values()
-        .collect();
+        )?;
 
         let storage = AccountStorage::new(slots)?;
 
@@ -329,7 +327,7 @@ impl SqliteStore {
             ),
         };
 
-        let slots = query_storage_slots(conn, where_clause, params)?.into_values().collect();
+        let slots = query_storage_slots(conn, where_clause, params)?;
 
         Ok(AccountStorage::new(slots)?)
     }
@@ -557,7 +555,7 @@ impl SqliteStore {
         Self::insert_storage_slots(
             tx,
             final_account_state.storage_commitment(),
-            updated_storage_slots.values(),
+            updated_storage_slots.iter(),
         )?;
 
         // Build the final roots from the init state's registered roots:
