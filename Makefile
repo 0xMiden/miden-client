@@ -188,6 +188,9 @@ stop-prover: ## Stop prover process
 install: ## Install the CLI binary
 	cargo install --path bin/miden-cli --locked
 
+install-bench: ## Install the benchmark binary
+	cargo install --path bin/miden-bench --locked
+
 install-tests: ## Install the tests binary
 	cargo install --path bin/integration-tests --locked
 
