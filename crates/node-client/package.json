@@ -1,0 +1,36 @@
+{
+  "name": "@miden-sdk/node-client",
+  "version": "0.13.0",
+  "description": "Native Node.js client for interacting with the Miden network",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "napi": {
+    "binaryName": "miden-node-client",
+    "targets": [
+      "aarch64-apple-darwin",
+      "x86_64-apple-darwin",
+      "x86_64-unknown-linux-gnu",
+      "x86_64-unknown-linux-musl",
+      "aarch64-unknown-linux-gnu",
+      "x86_64-pc-windows-msvc"
+    ]
+  },
+  "license": "MIT",
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "*.node"
+  ],
+  "devDependencies": {
+    "@napi-rs/cli": "^3.0.0"
+  },
+  "engines": {
+    "node": ">= 18"
+  },
+  "scripts": {
+    "build": "napi build --release --platform",
+    "build:debug": "napi build --platform",
+    "artifacts": "napi artifacts",
+    "prepublishOnly": "napi prepublish -t npm"
+  }
+}
