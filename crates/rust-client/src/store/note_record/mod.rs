@@ -53,14 +53,11 @@ pub enum NoteRecordError {
     #[error("note record conversion error: {0}")]
     ConversionError(String),
     /// Invalid underlying note object.
-    #[error("note error: {0}")]
+    #[error("note error")]
     NoteError(#[from] NoteError),
     /// Note record isn't consumable.
     #[error("note not consumable: {0}")]
     NoteNotConsumable(String),
-    /// Invalid inclusion proof.
-    #[error("note has an invalid or missing inclusion proof")]
-    InvalidInclusionProof,
     /// Invalid state transition.
     #[error("invalid state transition: {0}")]
     InvalidStateTransition(String),

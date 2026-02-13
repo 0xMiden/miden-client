@@ -70,11 +70,9 @@ pub enum ClientError {
         "address {0} cannot be tracked: its derived note tag {1} is already associated with another tracked address"
     )]
     NoteTagDerivedAddressAlreadyTracked(String, NoteTag),
-    #[error("account error: {0}")]
+    #[error("account error")]
     AccountError(#[from] AccountError),
-    #[error(
-        "account {0} is locked because it has a pending transaction; wait for it to complete or roll it back"
-    )]
+    #[error("account {0} is locked because the local state may be out of date with the network")]
     AccountLocked(AccountId),
     #[error(
         "account import failed: the on-chain account commitment ({0}) does not match the commitment of the account being imported"
@@ -86,65 +84,65 @@ pub enum ClientError {
         "cannot import account: the local account nonce is higher than the imported one, meaning the local state is newer"
     )]
     AccountNonceTooLow,
-    #[error("asset error: {0}")]
+    #[error("asset error")]
     AssetError(#[from] AssetError),
     #[error("account data wasn't found for account id {0}")]
     AccountDataNotFound(AccountId),
-    #[error("failed to construct the partial blockchain: {0}")]
+    #[error("failed to construct the partial blockchain")]
     PartialBlockchainError(#[from] PartialBlockchainError),
-    #[error("failed to deserialize data: {0}")]
+    #[error("failed to deserialize data")]
     DataDeserializationError(#[from] DeserializationError),
     #[error("note with id {0} not found on chain")]
     NoteNotFoundOnChain(NoteId),
-    #[error("failed to parse hex string: {0}")]
+    #[error("failed to parse hex string")]
     HexParseError(#[from] HexParseError),
     #[error(
         "the chain Merkle Mountain Range (MMR) forest value exceeds the supported range (must fit in a u32)"
     )]
     InvalidPartialMmrForest,
     #[error(
-        "cannot track a new account without its seed; the seed is required to derive the account's initial state"
+        "cannot track a new account without its seed; the seed is required to validate the account ID's correctness"
     )]
     AddNewAccountWithoutSeed,
-    #[error("merkle proof error: {0}")]
+    #[error("merkle proof error")]
     MerkleError(#[from] MerkleError),
     #[error(
         "transaction output mismatch: expected output notes with recipient digests {0:?} were not produced by the transaction"
     )]
     MissingOutputRecipients(Vec<Word>),
-    #[error("note error: {0}")]
+    #[error("note error")]
     NoteError(#[from] NoteError),
-    #[error("note consumption check failed: {0}")]
+    #[error("note consumption check failed")]
     NoteCheckerError(#[from] NoteCheckerError),
     #[error("note import error: {0}")]
     NoteImportError(String),
-    #[error("failed to convert note record: {0}")]
+    #[error("failed to convert note record")]
     NoteRecordConversionError(#[from] NoteRecordError),
-    #[error("note transport error: {0}")]
+    #[error("note transport error")]
     NoteTransportError(#[from] NoteTransportError),
     #[error(
         "account {0} has no notes available to consume; sync the client or check that notes targeting this account exist"
     )]
     NoConsumableNoteForAccount(AccountId),
-    #[error("RPC error: {0}")]
+    #[error("RPC error")]
     RpcError(#[from] RpcError),
     #[error(
         "transaction failed a recency check: {0} — the reference block may be too old; try syncing and resubmitting"
     )]
     RecencyConditionError(&'static str),
-    #[error("note relevance check failed: {0}")]
+    #[error("note relevance check failed")]
     NoteScreenerError(#[from] NoteScreenerError),
-    #[error("storage error: {0}")]
+    #[error("storage error")]
     StoreError(#[from] StoreError),
-    #[error("transaction execution failed: {0}")]
+    #[error("transaction execution failed")]
     TransactionExecutorError(#[from] TransactionExecutorError),
     #[error("invalid transaction input: {0}")]
     TransactionInputError(#[source] TransactionInputError),
-    #[error("transaction proving failed: {0}")]
+    #[error("transaction proving failed")]
     TransactionProvingError(#[from] TransactionProverError),
-    #[error("invalid transaction request: {0}")]
+    #[error("invalid transaction request")]
     TransactionRequestError(#[from] TransactionRequestError),
-    #[error("failed to build transaction script from account interface: {0}")]
+    #[error("failed to build transaction script from account interface")]
     AccountInterfaceError(#[from] AccountInterfaceError),
     #[error("transaction script error: {0}")]
     TransactionScriptError(#[source] TransactionScriptError),
@@ -189,9 +187,9 @@ impl From<&ClientError> for Option<ErrorHint> {
             }),
             ClientError::AccountLocked(account_id) => Some(ErrorHint {
                 message: format!(
-                    "Account {account_id} has a transaction currently being processed. \
-                     Wait for it to be committed on chain, then run `sync`. \
-                     If the transaction failed, you may need to discard it."
+                    "Account {account_id} is locked because the client may be missing its latest \
+                     state. This can happen when the account is shared and another client executed \
+                     a transaction. Run `sync` to fetch the latest state from the network."
                 ),
                 docs_url: Some(TROUBLESHOOTING_DOC),
             }),
@@ -307,7 +305,7 @@ fn transaction_executor_hint(err: &TransactionExecutorError) -> Option<ErrorHint
             })
         },
         TransactionExecutorError::TransactionProgramExecutionFailed(_) => Some(ErrorHint {
-            message: "Re-run the transaction with debug mode enabled , capture VM diagnostics, and inspect the source manager output to understand why execution failed.".to_string(),
+            message: "Re-run the transaction with debug mode enabled, capture VM diagnostics, and inspect the source manager output to understand why execution failed.".to_string(),
             docs_url: Some(TROUBLESHOOTING_DOC),
         }),
         _ => None,

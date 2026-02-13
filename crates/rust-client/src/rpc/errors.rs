@@ -69,7 +69,9 @@ impl From<RpcConversionError> for RpcError {
 pub enum RpcConversionError {
     #[error("failed to deserialize: {0}")]
     DeserializationError(#[from] DeserializationError),
-    #[error("invalid field element: value is outside the valid range (0..p)")]
+    #[error(
+        "invalid field element: value is outside the valid range (0..modulus, where modulus = 2^64 - 2^32 + 1)"
+    )]
     NotAValidFelt,
     #[error("invalid note type in node response: {0}")]
     NoteTypeError(#[from] NoteError),

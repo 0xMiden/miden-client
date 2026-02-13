@@ -189,11 +189,11 @@ pub enum NoteScreenerError {
     InvalidNoteInputsError(#[from] InvalidNoteInputsError),
     #[error("cannot check note relevance: account {0} data not found in the store")]
     AccountDataNotFound(AccountId),
-    #[error("failed to fetch data from the store during note screening: {0}")]
+    #[error("failed to fetch data from the store")]
     StoreError(#[from] StoreError),
-    #[error("note consumption check failed: {0}")]
+    #[error("note consumption check failed")]
     NoteCheckerError(#[from] NoteCheckerError),
-    #[error("failed to build transaction request during note screening: {0}")]
+    #[error("failed to build transaction request")]
     TransactionRequestError(#[from] TransactionRequestError),
 }
 
