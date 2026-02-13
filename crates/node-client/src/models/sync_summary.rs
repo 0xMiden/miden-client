@@ -1,11 +1,11 @@
 use miden_client::sync::SyncSummary as NativeSyncSummary;
 
 use super::account_id::AccountId;
+use super::napi_wrap;
 use super::note_id::NoteId;
 use super::transaction_id::TransactionId;
 
-#[napi]
-pub struct SyncSummary(pub(crate) NativeSyncSummary);
+napi_wrap!(owned SyncSummary wraps NativeSyncSummary);
 
 #[napi]
 impl SyncSummary {
@@ -37,11 +37,5 @@ impl SyncSummary {
     #[napi(js_name = "committedTransactions")]
     pub fn committed_transactions(&self) -> Vec<TransactionId> {
         self.0.committed_transactions.iter().map(Into::into).collect()
-    }
-}
-
-impl From<NativeSyncSummary> for SyncSummary {
-    fn from(native: NativeSyncSummary) -> Self {
-        SyncSummary(native)
     }
 }

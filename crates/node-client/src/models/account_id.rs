@@ -11,10 +11,9 @@ use miden_client::address::{
 use napi::bindgen_prelude::*;
 
 use super::felt::Felt;
+use super::napi_wrap;
 
-#[napi]
-#[derive(Clone, Copy)]
-pub struct AccountId(pub(crate) NativeAccountId);
+napi_wrap!(copy AccountId wraps NativeAccountId);
 
 #[napi]
 impl AccountId {
@@ -113,32 +112,5 @@ fn parse_network_id(network: &str) -> Result<NativeNetworkId> {
         "devnet" => Ok(NativeNetworkId::Devnet),
         other => NativeNetworkId::from_str(other)
             .map_err(|err| napi::Error::from_reason(format!("Invalid network id: {err}"))),
-    }
-}
-
-// CONVERSIONS
-// ================================================================================================
-
-impl From<NativeAccountId> for AccountId {
-    fn from(native: NativeAccountId) -> Self {
-        AccountId(native)
-    }
-}
-
-impl From<&NativeAccountId> for AccountId {
-    fn from(native: &NativeAccountId) -> Self {
-        AccountId(*native)
-    }
-}
-
-impl From<AccountId> for NativeAccountId {
-    fn from(id: AccountId) -> Self {
-        id.0
-    }
-}
-
-impl From<&AccountId> for NativeAccountId {
-    fn from(id: &AccountId) -> Self {
-        id.0
     }
 }

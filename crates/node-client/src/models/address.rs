@@ -8,10 +8,9 @@ use miden_client::utils::Deserializable;
 use napi::bindgen_prelude::*;
 
 use super::account_id::AccountId;
+use super::napi_wrap;
 
-#[napi]
-#[derive(Clone)]
-pub struct Address(pub(crate) NativeAddress);
+napi_wrap!(clone Address wraps NativeAddress);
 
 #[napi]
 impl Address {
@@ -60,29 +59,5 @@ impl Address {
             AddressId::AccountId(account_id) => Ok(AccountId(account_id)),
             _ => Err(napi::Error::from_reason("Unsupported Account address type")),
         }
-    }
-}
-
-impl From<NativeAddress> for Address {
-    fn from(native: NativeAddress) -> Self {
-        Address(native)
-    }
-}
-
-impl From<&NativeAddress> for Address {
-    fn from(native: &NativeAddress) -> Self {
-        Address(native.clone())
-    }
-}
-
-impl From<Address> for NativeAddress {
-    fn from(address: Address) -> Self {
-        address.0
-    }
-}
-
-impl From<&Address> for NativeAddress {
-    fn from(address: &Address) -> Self {
-        address.0.clone()
     }
 }

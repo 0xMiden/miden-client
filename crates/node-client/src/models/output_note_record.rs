@@ -1,11 +1,10 @@
 use miden_client::store::OutputNoteRecord as NativeOutputNoteRecord;
 
+use super::napi_wrap;
 use super::note_id::NoteId;
 use super::word::Word;
 
-#[napi]
-#[derive(Clone)]
-pub struct OutputNoteRecord(pub(crate) NativeOutputNoteRecord);
+napi_wrap!(clone OutputNoteRecord wraps NativeOutputNoteRecord, one_way);
 
 #[napi]
 impl OutputNoteRecord {
@@ -43,11 +42,5 @@ impl OutputNoteRecord {
     #[napi(js_name = "isCommitted")]
     pub fn is_committed(&self) -> bool {
         self.0.is_committed()
-    }
-}
-
-impl From<NativeOutputNoteRecord> for OutputNoteRecord {
-    fn from(native: NativeOutputNoteRecord) -> Self {
-        OutputNoteRecord(native)
     }
 }

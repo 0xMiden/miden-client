@@ -10,11 +10,10 @@ use napi::bindgen_prelude::*;
 
 use super::account_id::AccountId;
 use super::felt::Felt;
+use super::napi_wrap;
 use super::word::Word;
 
-#[napi]
-#[derive(Clone)]
-pub struct Account(pub(crate) NativeAccount);
+napi_wrap!(clone Account wraps NativeAccount);
 
 #[napi]
 impl Account {
@@ -102,23 +101,5 @@ impl Account {
             pks.extend(auth.get_public_key_commitments());
         }
         pks.into_iter().map(NativeWord::from).map(Into::into).collect()
-    }
-}
-
-impl From<NativeAccount> for Account {
-    fn from(native: NativeAccount) -> Self {
-        Account(native)
-    }
-}
-
-impl From<&Account> for NativeAccount {
-    fn from(account: &Account) -> Self {
-        account.0.clone()
-    }
-}
-
-impl From<Account> for NativeAccount {
-    fn from(account: Account) -> Self {
-        account.0
     }
 }

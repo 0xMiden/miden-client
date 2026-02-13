@@ -2,11 +2,10 @@ use miden_client::account::AccountHeader as NativeAccountHeader;
 
 use super::account_id::AccountId;
 use super::felt::Felt;
+use super::napi_wrap;
 use super::word::Word;
 
-#[napi]
-#[derive(Clone)]
-pub struct AccountHeader(pub(crate) NativeAccountHeader);
+napi_wrap!(clone AccountHeader wraps NativeAccountHeader, one_way);
 
 #[napi]
 impl AccountHeader {
@@ -44,11 +43,5 @@ impl AccountHeader {
     #[napi(js_name = "codeCommitment")]
     pub fn code_commitment(&self) -> Word {
         self.0.code_commitment().into()
-    }
-}
-
-impl From<NativeAccountHeader> for AccountHeader {
-    fn from(native: NativeAccountHeader) -> Self {
-        AccountHeader(native)
     }
 }

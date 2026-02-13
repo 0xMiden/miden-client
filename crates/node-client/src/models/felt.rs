@@ -1,9 +1,9 @@
 use miden_client::Felt as NativeFelt;
 use napi::bindgen_prelude::*;
 
-#[napi]
-#[derive(Clone, Copy)]
-pub struct Felt(pub(crate) NativeFelt);
+use super::napi_wrap;
+
+napi_wrap!(copy Felt wraps NativeFelt);
 
 #[napi]
 impl Felt {
@@ -21,29 +21,5 @@ impl Felt {
     #[napi(js_name = "toString")]
     pub fn to_str(&self) -> String {
         self.0.to_string()
-    }
-}
-
-impl From<NativeFelt> for Felt {
-    fn from(native: NativeFelt) -> Self {
-        Felt(native)
-    }
-}
-
-impl From<&NativeFelt> for Felt {
-    fn from(native: &NativeFelt) -> Self {
-        Felt(*native)
-    }
-}
-
-impl From<Felt> for NativeFelt {
-    fn from(felt: Felt) -> Self {
-        felt.0
-    }
-}
-
-impl From<&Felt> for NativeFelt {
-    fn from(felt: &Felt) -> Self {
-        felt.0
     }
 }

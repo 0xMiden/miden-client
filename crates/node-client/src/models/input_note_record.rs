@@ -1,10 +1,9 @@
 use miden_client::store::InputNoteRecord as NativeInputNoteRecord;
 
+use super::napi_wrap;
 use super::note_id::NoteId;
 
-#[napi]
-#[derive(Clone)]
-pub struct InputNoteRecord(pub(crate) NativeInputNoteRecord);
+napi_wrap!(clone InputNoteRecord wraps NativeInputNoteRecord, one_way);
 
 #[napi]
 impl InputNoteRecord {
@@ -42,11 +41,5 @@ impl InputNoteRecord {
     #[napi(js_name = "isProcessing")]
     pub fn is_processing(&self) -> bool {
         self.0.is_processing()
-    }
-}
-
-impl From<NativeInputNoteRecord> for InputNoteRecord {
-    fn from(native: NativeInputNoteRecord) -> Self {
-        InputNoteRecord(native)
     }
 }

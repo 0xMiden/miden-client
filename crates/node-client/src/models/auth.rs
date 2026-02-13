@@ -5,6 +5,7 @@ use miden_client::auth::{
 use miden_client::utils::{Deserializable, Serializable};
 use napi::bindgen_prelude::*;
 
+use super::napi_wrap;
 use super::word::Word;
 
 // AUTH SCHEME
@@ -38,9 +39,7 @@ impl From<&AuthScheme> for NativeAuthSchemeId {
 // AUTH SECRET KEY
 // ================================================================================================
 
-#[napi]
-#[derive(Clone)]
-pub struct AuthSecretKey(pub(crate) NativeAuthSecretKey);
+napi_wrap!(clone AuthSecretKey wraps NativeAuthSecretKey);
 
 #[napi]
 impl AuthSecretKey {
@@ -97,23 +96,5 @@ fn try_rng_from_seed(seed: Option<Buffer>) -> Result<rand::rngs::StdRng> {
             Ok(rand::rngs::StdRng::from_seed(seed_array))
         },
         None => Ok(rand::rngs::StdRng::from_os_rng()),
-    }
-}
-
-impl From<NativeAuthSecretKey> for AuthSecretKey {
-    fn from(native: NativeAuthSecretKey) -> Self {
-        AuthSecretKey(native)
-    }
-}
-
-impl From<&AuthSecretKey> for NativeAuthSecretKey {
-    fn from(key: &AuthSecretKey) -> Self {
-        key.0.clone()
-    }
-}
-
-impl From<AuthSecretKey> for NativeAuthSecretKey {
-    fn from(key: AuthSecretKey) -> Self {
-        key.0
     }
 }

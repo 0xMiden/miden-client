@@ -3,10 +3,9 @@ use miden_client::{Felt as NativeFelt, Word as NativeWord};
 use napi::bindgen_prelude::*;
 
 use super::felt::Felt;
+use super::napi_wrap;
 
-#[napi]
-#[derive(Clone)]
-pub struct Word(pub(crate) NativeWord);
+napi_wrap!(copy Word wraps NativeWord);
 
 #[napi]
 impl Word {
@@ -65,29 +64,5 @@ impl Word {
     #[napi(js_name = "toFelts")]
     pub fn to_felts(&self) -> Vec<Felt> {
         self.0.iter().map(|f| Felt::from(*f)).collect()
-    }
-}
-
-impl From<NativeWord> for Word {
-    fn from(native: NativeWord) -> Self {
-        Word(native)
-    }
-}
-
-impl From<&NativeWord> for Word {
-    fn from(native: &NativeWord) -> Self {
-        Word(*native)
-    }
-}
-
-impl From<Word> for NativeWord {
-    fn from(word: Word) -> Self {
-        word.0
-    }
-}
-
-impl From<&Word> for NativeWord {
-    fn from(word: &Word) -> Self {
-        word.0
     }
 }

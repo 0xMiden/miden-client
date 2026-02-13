@@ -1,10 +1,9 @@
 use miden_client::transaction::TransactionId as NativeTransactionId;
 
+use super::napi_wrap;
 use super::word::Word;
 
-#[napi]
-#[derive(Clone)]
-pub struct TransactionId(pub(crate) NativeTransactionId);
+napi_wrap!(copy TransactionId wraps NativeTransactionId);
 
 #[napi]
 impl TransactionId {
@@ -18,23 +17,5 @@ impl TransactionId {
     #[napi]
     pub fn inner(&self) -> Word {
         Word::from(self.0.as_word())
-    }
-}
-
-impl From<NativeTransactionId> for TransactionId {
-    fn from(native: NativeTransactionId) -> Self {
-        TransactionId(native)
-    }
-}
-
-impl From<&NativeTransactionId> for TransactionId {
-    fn from(native: &NativeTransactionId) -> Self {
-        TransactionId(*native)
-    }
-}
-
-impl From<TransactionId> for NativeTransactionId {
-    fn from(id: TransactionId) -> Self {
-        id.0
     }
 }
