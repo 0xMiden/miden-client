@@ -255,22 +255,30 @@ export class WebClient {
       this._stateChannel = null;
     }
     this._stateListeners = [];
+    this._crossTabSyncTimer = null;
     if (this._stateChannel) {
       this._stateChannel.onmessage = (event) => {
-        // Auto-sync: refresh in-memory Rust Client state from IndexedDB
-        // when another tab mutates the database. Uses syncState's built-in
-        // coalescing so rapid cross-tab writes don't cause redundant syncs.
-        this.syncState().catch(() => {
-          // Sync failure is non-fatal — the next explicit sync will retry.
-        });
-
-        for (const listener of this._stateListeners) {
+        // Debounce: rapid cross-tab writes fire many BroadcastChannel
+        // messages. Collapse them into a single sync + listener pass.
+        clearTimeout(this._crossTabSyncTimer);
+        this._crossTabSyncTimer = setTimeout(async () => {
+          // Auto-sync: refresh in-memory Rust Client state from IndexedDB.
           try {
-            listener(event.data);
+            await this.syncState();
           } catch {
-            // Swallow listener errors.
+            // Sync failure is non-fatal — the next explicit sync will retry.
           }
-        }
+
+          // Invoke listeners AFTER syncState resolves so in-memory state
+          // is guaranteed fresh when callbacks run.
+          for (const listener of this._stateListeners) {
+            try {
+              listener(event.data);
+            } catch {
+              // Swallow listener errors.
+            }
+          }
+        }, 100);
       };
     }
 
@@ -408,8 +416,12 @@ export class WebClient {
       }
     });
 
-    // Layer 3: notify other tabs.
-    this._broadcastStateChange(operation);
+    // Layer 3: notify other tabs. Skip for syncState — sync is not a
+    // user-facing mutation, and broadcasting it would cause a ping-pong
+    // loop (Tab A syncs → broadcasts → Tab B auto-syncs → broadcasts → …).
+    if (operation !== "syncState") {
+      this._broadcastStateChange(operation);
+    }
 
     return result;
   }
@@ -913,6 +925,7 @@ export class WebClient {
     if (this.worker) {
       this.worker.terminate();
     }
+    clearTimeout(this._crossTabSyncTimer);
     if (this._stateChannel) {
       try {
         this._stateChannel.close();
