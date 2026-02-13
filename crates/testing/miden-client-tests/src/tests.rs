@@ -2406,12 +2406,12 @@ async fn consume_note_with_custom_script() {
     ";
     let note_script = client.code_builder().compile_note_script(custom_note_script).unwrap();
 
-    let note_inputs = NoteStorage::new(vec![]).unwrap();
+    let note_storage = NoteStorage::new(vec![]).unwrap();
     let serial_num = client.rng().draw_word();
     let note_metadata =
         NoteMetadata::new(sender_id, NoteType::Private, NoteTag::with_account_target(receiver_id));
     let note_assets = NoteAssets::new(vec![]).unwrap();
-    let note_recipient = NoteRecipient::new(serial_num, note_script.clone(), note_inputs);
+    let note_recipient = NoteRecipient::new(serial_num, note_script.clone(), note_storage);
     let custom_note = Note::new(note_assets, note_metadata, note_recipient);
 
     // At this point, the note script should no be stored locally
