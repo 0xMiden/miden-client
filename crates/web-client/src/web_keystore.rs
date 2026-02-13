@@ -2,14 +2,6 @@ use alloc::collections::BTreeSet;
 use alloc::string::{String, ToString};
 use alloc::sync::Arc;
 
-use idxdb_store::auth::{
-    get_account_auth_by_pub_key_commitment,
-    get_key_commitments_by_account_id,
-    insert_account_auth,
-    insert_account_key_mapping,
-    remove_account_auth,
-    remove_all_mappings_for_key,
-};
 use miden_client::account::AccountId;
 use miden_client::auth::{
     AuthSecretKey,
@@ -31,6 +23,14 @@ use crate::web_keystore_callbacks::{
     InsertKeyCallback,
     SignCallback,
     decode_secret_key_from_bytes,
+};
+use crate::web_keystore_db::{
+    get_account_auth_by_pub_key_commitment,
+    get_key_commitments_by_account_id,
+    insert_account_auth,
+    insert_account_key_mapping,
+    remove_account_auth,
+    remove_all_mappings_for_key,
 };
 
 /// A web-based keystore that stores keys in [browser's local storage](https://developer.mozilla.org/en-US/docs/Web/API/Web_Storage_API)

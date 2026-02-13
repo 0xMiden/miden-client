@@ -60,18 +60,22 @@ impl WebClient {
         }
     }
 
-    /// Retrieves the entire underlying web store and returns it as a `JsValue`
+    /// Retrieves the entire underlying store and returns it as a `JsValue`
     ///
-    /// Meant to be used in conjunction with the `force_import_store` method
+    /// Meant to be used in conjunction with the `forceImportStore` method
     #[wasm_bindgen(js_name = "exportStore")]
     pub async fn export_store(&mut self) -> Result<JsValue, JsValue> {
         let store = self.store.as_ref().ok_or(JsValue::from_str("Store not initialized"))?;
-        let export = store
+
+        let bytes = store
             .export_store()
             .await
             .map_err(|err| js_error_with_context(err, "failed to export store"))?;
 
-        Ok(export)
+        let json_string = String::from_utf8(bytes)
+            .map_err(|err| js_error_with_context(err, "failed to decode exported store data"))?;
+
+        Ok(JsValue::from_str(&json_string))
     }
 
     #[wasm_bindgen(js_name = "exportAccountFile")]

@@ -125,6 +125,7 @@
 - [SlotAndKeys](classes/SlotAndKeys.md)
 - [SparseMerklePath](classes/SparseMerklePath.md)
 - [StorageMap](classes/StorageMap.md)
+- [StorageMapEntry](classes/StorageMapEntry.md)
 - [StorageSlot](classes/StorageSlot.md)
 - [StorageSlotArray](classes/StorageSlotArray.md)
 - [SyncSummary](classes/SyncSummary.md)
