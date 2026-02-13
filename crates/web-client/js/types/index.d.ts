@@ -29,6 +29,24 @@ export type SignCallback = (
   signingInputs: Uint8Array
 ) => Promise<Uint8Array> | Uint8Array;
 
+export type LogLevel =
+  | "error"
+  | "warn"
+  | "info"
+  | "debug"
+  | "trace"
+  | "off"
+  | "none";
+
+/**
+ * Initializes the tracing subscriber that routes Rust log output to the
+ * browser console. Call once per thread (main thread / Web Worker).
+ * Subsequent calls on the same thread are harmless no-ops.
+ *
+ * @param logLevel - The maximum log level to display.
+ */
+export declare function setupLogging(logLevel: LogLevel): void;
+
 type MidenArrayConstructors = {
   [K in keyof typeof WasmExports as K extends `${string}Array`
     ? K
@@ -52,7 +70,8 @@ export declare class WebClient extends WasmWebClient {
     rpcUrl?: string,
     noteTransportUrl?: string,
     seed?: Uint8Array,
-    network?: string
+    network?: string,
+    logLevel?: LogLevel
   ): Promise<WebClient>;
 
   /**
@@ -74,7 +93,8 @@ export declare class WebClient extends WasmWebClient {
     storeName?: string,
     getKeyCb?: GetKeyCallback,
     insertKeyCb?: InsertKeyCallback,
-    signCb?: SignCallback
+    signCb?: SignCallback,
+    logLevel?: LogLevel
   ): Promise<WebClient>;
 
   /** Returns the default transaction prover configured on the client. */
@@ -123,7 +143,8 @@ export declare class MockWebClient extends WebClient {
   static createClient(
     serializedMockChain?: ArrayBuffer | Uint8Array,
     serializedMockNoteTransportNode?: ArrayBuffer | Uint8Array,
-    seed?: Uint8Array
+    seed?: Uint8Array,
+    logLevel?: LogLevel
   ): Promise<MockWebClient>;
 
   /** Syncs the mock state and returns the resulting summary. */

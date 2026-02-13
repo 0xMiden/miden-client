@@ -4,6 +4,7 @@
 
 * Added the `@miden-sdk/react` hooks library (see [its own changelog](packages/react-sdk/CHANGELOG.md)) ([#1711](https://github.com/0xMiden/miden-client/pull/1711)).
 * Fixed WASM bindings consuming JS objects: `RpcClient` and `WebClient` methods now take references (`&AccountId`, `&Word`) instead of owned values, so callers can reuse objects after passing them ([#1765](https://github.com/0xMiden/miden-client/pull/1765)).
+* [FEATURE][web] Added `setupLogging(level)` and `logLevel` parameter on `createClient` to route Rust tracing output to the browser console with configurable verbosity ([#1669](https://github.com/0xMiden/miden-client/pull/1669)).
 
 ## 0.13.0
 
