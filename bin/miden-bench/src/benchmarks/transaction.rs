@@ -1,5 +1,3 @@
-use std::fmt::Write;
-use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -8,74 +6,23 @@ use miden_client::builder::ClientBuilder;
 use miden_client::crypto::RpoRandomCoin;
 use miden_client::keystore::FilesystemKeyStore;
 use miden_client::rpc::GrpcClient;
-use miden_client::transaction::TransactionRequestBuilder;
 use miden_client::{Client, DebugMode, Felt, Serializable, Word};
 use miden_client_sqlite_store::ClientBuilderSqliteExt;
-use miden_protocol::account::auth::AuthSecretKey;
 use rand::Rng;
-use rand_chacha::ChaCha20Rng;
-use rand_chacha::rand_core::SeedableRng;
 
 use crate::config::BenchConfig;
-use crate::generators::{SlotDescriptor, generate_reader_component_code};
+use crate::masm::build_chunk_tx_request;
 use crate::metrics::{BenchmarkResult, measure_time_async};
 use crate::report::format_size;
-
-// Helper to create a unique temp directory for each benchmark run
-fn create_temp_dir(config: &BenchConfig, suffix: &str) -> PathBuf {
-    let base = config.temp_dir();
-    let unique_id = uuid::Uuid::new_v4();
-    let path = base.join(format!("miden-bench-{suffix}-{unique_id}"));
-    std::fs::create_dir_all(&path).expect("Failed to create temp directory");
-    path
-}
-
-/// Creates a client using either the persistent store directory or a fresh temporary one.
-///
-/// When `config.store_path` is set, the client reuses the existing `SQLite` store and
-/// keystore from that directory (populated by `deploy`). Otherwise a new temp directory
-/// is created per call.
-async fn create_benchmark_client(
-    config: &BenchConfig,
-    suffix: &str,
-) -> anyhow::Result<(miden_client::Client<FilesystemKeyStore>, FilesystemKeyStore, PathBuf)> {
-    let data_dir = if let Some(ref store_path) = config.store_path {
-        store_path.clone()
-    } else {
-        create_temp_dir(config, suffix)
-    };
-    let store_path = data_dir.join("store.sqlite3");
-    let keystore_path = data_dir.join("keystore");
-    std::fs::create_dir_all(&keystore_path)?;
-
-    let mut rng = rand::rng();
-    let coin_seed: [u64; 4] = rng.random();
-    let rng = RpoRandomCoin::new(coin_seed.map(Felt::new).into());
-
-    let keystore = FilesystemKeyStore::new(keystore_path.clone())
-        .expect("Failed to create filesystem keystore");
-
-    let client = ClientBuilder::new()
-        .rpc(Arc::new(GrpcClient::new(&config.network, 30_000)))
-        .rng(Box::new(rng))
-        .sqlite_store(store_path)
-        .filesystem_keystore(keystore_path.to_str().expect("keystore path should be valid UTF-8"))?
-        .in_debug_mode(DebugMode::Disabled)
-        .tx_discard_delta(None)
-        .build()
-        .await?;
-
-    Ok((client, keystore, data_dir))
-}
 
 // DATA MODEL
 // ================================================================================================
 
 /// Information about a bench map storage slot extracted from the account.
 #[derive(Clone, Debug)]
-struct StorageSlotInfo {
-    name: String,
-    keys: Vec<Word>,
+pub struct StorageSlotInfo {
+    pub name: String,
+    pub keys: Vec<Word>,
 }
 
 impl StorageSlotInfo {
@@ -86,10 +33,10 @@ impl StorageSlotInfo {
 
 /// A single map entry read operation to be performed in a transaction.
 #[derive(Clone, Debug)]
-struct ReadOp {
+pub struct ReadOp {
     /// Index into the `slot_infos` array (matches the reader procedure index).
-    slot_idx: usize,
-    key: Word,
+    pub slot_idx: usize,
+    pub key: Word,
 }
 
 // ORCHESTRATOR
@@ -101,13 +48,16 @@ struct ReadOp {
 /// Each transaction reads storage entries (both value and map slots) from the account's
 /// own storage. Slot types and entries are auto-detected from the imported account storage.
 ///
+/// The signing key is expected to be present in the persistent keystore (written by the
+/// `deploy` command). When the key is available, all benchmarks (execution, proving, full)
+/// are run. Otherwise only execution is benchmarked.
+///
 /// When `max_reads_per_tx` is provided and total reads exceed that limit, reads are
 /// split across multiple transactions per benchmark iteration. Each iteration's reported
 /// time is the sum across all transactions.
 pub async fn run_transaction_benchmarks(
     config: &BenchConfig,
     account_id_str: String,
-    seed: Option<[u8; 32]>,
     max_reads_per_tx: Option<usize>,
 ) -> anyhow::Result<Vec<BenchmarkResult>> {
     let mut results = Vec::new();
@@ -118,7 +68,7 @@ pub async fn run_transaction_benchmarks(
     // First, try to connect to the node and fetch the account
     println!("Connecting to node at {}...", config.network);
 
-    let (mut client, keystore, _temp_dir) = match create_benchmark_client(config, "tx-init").await {
+    let (mut client, _temp_dir) = match create_benchmark_client(config).await {
         Ok(result) => result,
         Err(e) => {
             println!("Failed to connect to node: {e}");
@@ -145,9 +95,8 @@ pub async fn run_transaction_benchmarks(
     let chain_height = client.get_sync_height().await?;
     println!("Connected successfully. Chain height: {chain_height}");
 
-    // Import the public account from the network (skip if already present in a persistent store)
-    let has_account =
-        config.store_path.is_some() && client.get_account_storage(account_id).await.is_ok();
+    // Import the public account from the network (skip if already present in store)
+    let has_account = client.get_account_storage(account_id).await.is_ok();
     if has_account {
         println!("Using account {account_id} from persistent store");
     } else {
@@ -190,48 +139,239 @@ pub async fn run_transaction_benchmarks(
         println!("Slots: {slot_summary}. Total reads: {total_reads}");
     }
 
-    // Regenerate the signing key from the deployment seed (if provided)
-    let secret_key =
-        seed.map(|s| AuthSecretKey::new_falcon512_rpo_with_rng(&mut ChaCha20Rng::from_seed(s)));
-
-    // Measure proven transaction size upfront (execute + prove one tx)
-    if let Some(ref sk) = secret_key {
-        if config.store_path.is_none() {
-            keystore.add_key(sk)?;
-        }
+    // Measure proven transaction size upfront (execute + prove one tx).
+    // If the signing key is missing from the keystore, proving will fail and we
+    // fall back to execution-only benchmarks.
+    let can_prove = {
         let tx_request = build_chunk_tx_request(&client, &chunks[0], &slot_infos)?;
         let tx_result = client.execute_transaction(account_id, tx_request).await?;
-        let proven_tx = client.prove_transaction(&tx_result).await?;
-        let tx_size = proven_tx.to_bytes().len();
-        println!("Proven transaction size: {}", format_size(tx_size));
-    }
+        if let Ok(proven_tx) = client.prove_transaction(&tx_result).await {
+            let tx_size = proven_tx.to_bytes().len();
+            println!("Proven transaction size: {}", format_size(tx_size));
+            true
+        } else {
+            println!(
+                "Signing key not found in keystore. \
+                 Only execution benchmarks will run."
+            );
+            println!(
+                "Hint: run `deploy` first to persist the signing key, or use the same --store path."
+            );
+            false
+        }
+    };
     println!();
 
     // Benchmark 1: Transaction execution time (without proving)
     println!("Benchmarking transaction execution...");
     let execution_result =
-        benchmark_tx_execution(config, account_id, &chunks, &slot_infos, secret_key.as_ref())
-            .await?;
+        benchmark_tx_execution(config, account_id, &chunks, &slot_infos).await?;
     results.push(execution_result);
 
-    // Benchmarks 2 & 3 require the signing key for proving and submission
-    if let Some(ref sk) = secret_key {
+    if can_prove {
         // Benchmark 2: Transaction proving time
         println!("Benchmarking transaction proving...");
         let proving_result =
-            benchmark_tx_proving(config, account_id, &chunks, &slot_infos, sk).await?;
+            benchmark_tx_proving(config, account_id, &chunks, &slot_infos).await?;
         results.push(proving_result);
 
         // Benchmark 3: Full transaction (execute + prove + submit)
         println!("Benchmarking full transaction...");
         let full_result =
-            Box::pin(benchmark_tx_full(config, account_id, &chunks, &slot_infos, sk)).await?;
+            Box::pin(benchmark_tx_full(config, account_id, &chunks, &slot_infos)).await?;
         results.push(full_result);
-    } else {
-        println!("Skipping proving and submission benchmarks (no seed provided).");
     }
 
     Ok(results)
+}
+
+// BENCHMARKS
+// ================================================================================================
+
+/// Benchmarks transaction execution time (reading storage from active account).
+///
+/// When multiple chunks are provided, each iteration executes all chunks sequentially
+/// and reports the total execution time.
+async fn benchmark_tx_execution(
+    config: &BenchConfig,
+    account_id: AccountId,
+    chunks: &[Vec<ReadOp>],
+    slot_infos: &[StorageSlotInfo],
+) -> anyhow::Result<BenchmarkResult> {
+    let total_reads: usize = chunks.iter().map(Vec::len).sum();
+    let num_chunks = chunks.len();
+
+    let mut result = BenchmarkResult::new(bench_name("execute", total_reads, num_chunks));
+
+    for i in 0..config.iterations {
+        let iter_t = Instant::now();
+
+        let (mut client, _) = create_benchmark_client(config).await?;
+        client.sync_state().await?;
+
+        let mut total_duration = Duration::ZERO;
+
+        for chunk in chunks {
+            let tx_request = build_chunk_tx_request(&client, chunk, slot_infos)?;
+
+            let (_, duration) = measure_time_async(|| async {
+                client.execute_transaction(account_id, tx_request).await
+            })
+            .await;
+
+            total_duration += duration;
+        }
+
+        result.add_iteration(total_duration);
+        println!(
+            "  Iteration {}/{}: {:.2?} (total: {:.2?})",
+            i + 1,
+            config.iterations,
+            total_duration,
+            iter_t.elapsed()
+        );
+    }
+
+    result = result.with_metadata(format!(
+        "Transaction execution (no proving), {total_reads} storage reads from active account{}",
+        if num_chunks > 1 {
+            format!(" across {num_chunks} transactions")
+        } else {
+            String::new()
+        }
+    ));
+
+    Ok(result)
+}
+
+/// Benchmarks transaction proving time.
+///
+/// When multiple chunks are provided, each iteration executes and proves all chunks
+/// sequentially, reporting the total proving time (execution time is excluded).
+async fn benchmark_tx_proving(
+    config: &BenchConfig,
+    account_id: AccountId,
+    chunks: &[Vec<ReadOp>],
+    slot_infos: &[StorageSlotInfo],
+) -> anyhow::Result<BenchmarkResult> {
+    let total_reads: usize = chunks.iter().map(Vec::len).sum();
+    let num_chunks = chunks.len();
+
+    let mut result = BenchmarkResult::new(bench_name("prove", total_reads, num_chunks));
+
+    for i in 0..config.iterations {
+        let iter_t = Instant::now();
+
+        let (mut client, _) = create_benchmark_client(config).await?;
+        client.sync_state().await?;
+
+        let mut total_duration = Duration::ZERO;
+
+        for chunk in chunks {
+            let tx_request = build_chunk_tx_request(&client, chunk, slot_infos)?;
+
+            // Execute first (not measured)
+            let tx_result = client.execute_transaction(account_id, tx_request).await?;
+
+            // Measure proving time only
+            let (proven_tx, duration) =
+                measure_time_async(|| async { client.prove_transaction(&tx_result).await }).await;
+
+            total_duration += duration;
+
+            if let Ok(proven) = proven_tx {
+                let proof_bytes = proven.proof().to_bytes();
+                result = result.with_output_size(proof_bytes.len());
+            }
+        }
+
+        result.add_iteration(total_duration);
+        println!(
+            "  Iteration {}/{}: {:.2?} (total: {:.2?})",
+            i + 1,
+            config.iterations,
+            total_duration,
+            iter_t.elapsed()
+        );
+    }
+
+    result = result.with_metadata(format!(
+        "Transaction proving, {total_reads} storage reads from active account{}",
+        if num_chunks > 1 {
+            format!(" across {num_chunks} transactions")
+        } else {
+            String::new()
+        }
+    ));
+
+    Ok(result)
+}
+
+/// Benchmarks full transaction (execute + prove + submit).
+///
+/// When multiple chunks are provided, each iteration submits all chunks sequentially
+/// with block advancement waits between submissions (needed for nonce updates).
+/// Reports the total time including waits.
+async fn benchmark_tx_full(
+    config: &BenchConfig,
+    account_id: AccountId,
+    chunks: &[Vec<ReadOp>],
+    slot_infos: &[StorageSlotInfo],
+) -> anyhow::Result<BenchmarkResult> {
+    let total_reads: usize = chunks.iter().map(Vec::len).sum();
+    let num_chunks = chunks.len();
+
+    let mut result = BenchmarkResult::new(bench_name("full", total_reads, num_chunks));
+
+    for i in 0..config.iterations {
+        let iter_t = Instant::now();
+        let mut total_duration = Duration::ZERO;
+
+        for (chunk_idx, chunk) in chunks.iter().enumerate() {
+            // Each chunk submission needs a fresh client with up-to-date state,
+            // because the previous submission changes the account nonce on the network.
+            let (mut client, _) = create_benchmark_client(config).await?;
+            client.sync_state().await?;
+
+            let tx_request = build_chunk_tx_request(&client, chunk, slot_infos)?;
+
+            // Measure full transaction time (execute + prove + submit)
+            let (_, duration) = measure_time_async(|| async {
+                client.submit_new_transaction(account_id, tx_request).await
+            })
+            .await;
+
+            total_duration += duration;
+
+            // Wait for the block to advance after every submission so the node
+            // has processed the transaction before the next chunk or iteration.
+            // Skip only after the very last submission of the entire benchmark.
+            let is_last = i == config.iterations - 1 && chunk_idx == num_chunks - 1;
+            if !is_last {
+                wait_for_block_advancement(&mut client).await?;
+            }
+        }
+
+        result.add_iteration(total_duration);
+        println!(
+            "  Iteration {}/{}: {:.2?} (total: {:.2?})",
+            i + 1,
+            config.iterations,
+            total_duration,
+            iter_t.elapsed()
+        );
+    }
+
+    result = result.with_metadata(format!(
+        "Full transaction (execute + prove + submit), {total_reads} storage reads{}",
+        if num_chunks > 1 {
+            format!(" across {num_chunks} transactions")
+        } else {
+            String::new()
+        }
+    ));
+
+    Ok(result)
 }
 
 // SLOT DETECTION
@@ -305,96 +445,37 @@ fn chunk_read_ops(all_ops: &[ReadOp], max_reads: usize) -> Vec<Vec<ReadOp>> {
     all_ops.chunks(max_reads).map(<[ReadOp]>::to_vec).collect()
 }
 
-// MASM GENERATION
-// ================================================================================================
-
-/// Maximum read ops per code block to stay within the Miden parser's `u16::MAX` instruction
-/// limit. Map entries generate 6 ops each (push key + call + 4 dropw). Using 7000 as the
-/// conservative limit.
-const MAX_OPS_PER_BLOCK: usize = 7_000;
-
-/// Writes the MASM instructions for a single map entry read (push key, call reader, drop result).
-fn write_read_op_instructions(script: &mut String, op: &ReadOp) {
-    // Push key (4 felts)
-    writeln!(
-        script,
-        "    push.{}.{}.{}.{}",
-        op.key[3].as_int(),
-        op.key[2].as_int(),
-        op.key[1].as_int(),
-        op.key[0].as_int()
-    )
-    .expect("write to string should not fail");
-
-    // Call the account's reader procedure for this storage map slot.
-    // Stack input: [KEY]
-    // Stack output via call frame: [VALUE, pad(12)] = 16 elements
-    writeln!(script, "    call.storage_reader::get_map_item_slot_{}", op.slot_idx)
-        .expect("write to string should not fail");
-
-    // Drop the result (we just want to measure read time)
-    script.push_str("    dropw dropw dropw dropw\n");
-}
-
-/// Generates a MASM script that reads storage entries from the active account.
-///
-/// Uses `call` to invoke account reader procedures rather than directly `exec`-ing
-/// kernel syscalls. The kernel's `authenticate_account_origin` requires the caller
-/// to be an account procedure.
-///
-/// When the total number of read ops exceeds [`MAX_OPS_PER_BLOCK`], the script is
-/// split into `repeat.1 ... end` blocks to stay within the Miden parser's per-block
-/// instruction limit.
-fn generate_storage_read_script(read_ops: &[ReadOp]) -> String {
-    let mut script = String::from(
-        "use bench_reader::storage_reader
-begin
-",
-    );
-
-    if read_ops.len() <= MAX_OPS_PER_BLOCK {
-        for op in read_ops {
-            write_read_op_instructions(&mut script, op);
-        }
-    } else {
-        // Split into repeat.1 blocks to create new block scopes, each with its own
-        // independent instruction limit. repeat.1 compiles to a single pass (no overhead).
-        for chunk in read_ops.chunks(MAX_OPS_PER_BLOCK) {
-            script.push_str("    repeat.1\n");
-            for op in chunk {
-                write_read_op_instructions(&mut script, op);
-            }
-            script.push_str("    end\n");
-        }
-    }
-
-    script.push_str("end\n");
-    script
-}
-
-/// Compiles and builds a transaction request for a chunk of read operations.
-fn build_chunk_tx_request(
-    client: &Client<FilesystemKeyStore>,
-    chunk: &[ReadOp],
-    slot_infos: &[StorageSlotInfo],
-) -> anyhow::Result<miden_client::transaction::TransactionRequest> {
-    let script_code = generate_storage_read_script(chunk);
-
-    let descriptors: Vec<SlotDescriptor> = slot_infos
-        .iter()
-        .map(|info| SlotDescriptor { name: info.name.clone(), is_map: true })
-        .collect();
-    let reader_code = generate_reader_component_code(&descriptors);
-
-    let tx_script = client
-        .code_builder()
-        .with_linked_module("bench_reader::storage_reader", reader_code.as_str())?
-        .compile_tx_script(&script_code)?;
-    Ok(TransactionRequestBuilder::new().custom_script(tx_script).build()?)
-}
-
 // HELPERS
 // ================================================================================================
+
+/// Creates a client using the persistent store directory from the config.
+///
+/// The store directory (populated by `deploy`) contains the `SQLite` database and
+/// filesystem keystore. All benchmark iterations reuse the same directory.
+async fn create_benchmark_client(
+    config: &BenchConfig,
+) -> anyhow::Result<(Client<FilesystemKeyStore>, std::path::PathBuf)> {
+    let data_dir = &config.store_path;
+    let store_path = data_dir.join("store.sqlite3");
+    let keystore_path = data_dir.join("keystore");
+    std::fs::create_dir_all(&keystore_path)?;
+
+    let mut rng = rand::rng();
+    let coin_seed: [u64; 4] = rng.random();
+    let rng = RpoRandomCoin::new(coin_seed.map(Felt::new).into());
+
+    let client = ClientBuilder::new()
+        .rpc(Arc::new(GrpcClient::new(&config.network, 30_000)))
+        .rng(Box::new(rng))
+        .sqlite_store(store_path)
+        .filesystem_keystore(keystore_path.to_str().expect("keystore path should be valid UTF-8"))?
+        .in_debug_mode(DebugMode::Disabled)
+        .tx_discard_delta(None)
+        .build()
+        .await?;
+
+    Ok((client, data_dir.clone()))
+}
 
 /// Waits for the chain height to advance by one block.
 async fn wait_for_block_advancement(client: &mut Client<FilesystemKeyStore>) -> anyhow::Result<()> {
@@ -420,222 +501,4 @@ fn bench_name(phase: &str, total_reads: usize, num_chunks: usize) -> String {
     } else {
         format!("{phase} ({total_reads} storage reads)")
     }
-}
-
-// BENCHMARKS
-// ================================================================================================
-
-/// Benchmarks transaction execution time (reading storage from active account).
-///
-/// When multiple chunks are provided, each iteration executes all chunks sequentially
-/// and reports the total execution time.
-async fn benchmark_tx_execution(
-    config: &BenchConfig,
-    account_id: AccountId,
-    chunks: &[Vec<ReadOp>],
-    slot_infos: &[StorageSlotInfo],
-    secret_key: Option<&AuthSecretKey>,
-) -> anyhow::Result<BenchmarkResult> {
-    let total_reads: usize = chunks.iter().map(Vec::len).sum();
-    let num_chunks = chunks.len();
-
-    let mut result = BenchmarkResult::new(bench_name("execute", total_reads, num_chunks));
-
-    let use_persistent = config.store_path.is_some();
-
-    for i in 0..config.iterations {
-        let iter_t = Instant::now();
-
-        let (mut client, keystore, _) =
-            create_benchmark_client(config, &format!("tx-exec-iter-{i}")).await?;
-        client.sync_state().await?;
-
-        // When using a persistent store the account and key are already present
-        if !use_persistent {
-            client.import_account_by_id(account_id).await?;
-            if let Some(sk) = secret_key {
-                keystore.add_key(sk)?;
-            }
-        }
-
-        let mut total_duration = Duration::ZERO;
-
-        for chunk in chunks {
-            let tx_request = build_chunk_tx_request(&client, chunk, slot_infos)?;
-
-            let (_, duration) = measure_time_async(|| async {
-                client.execute_transaction(account_id, tx_request).await
-            })
-            .await;
-
-            total_duration += duration;
-        }
-
-        result.add_iteration(total_duration);
-        println!(
-            "  Iteration {}/{}: {:.2?} (total: {:.2?})",
-            i + 1,
-            config.iterations,
-            total_duration,
-            iter_t.elapsed()
-        );
-    }
-
-    result = result.with_metadata(format!(
-        "Transaction execution (no proving), {total_reads} storage reads from active account{}",
-        if num_chunks > 1 {
-            format!(" across {num_chunks} transactions")
-        } else {
-            String::new()
-        }
-    ));
-
-    Ok(result)
-}
-
-/// Benchmarks transaction proving time.
-///
-/// When multiple chunks are provided, each iteration executes and proves all chunks
-/// sequentially, reporting the total proving time (execution time is excluded).
-async fn benchmark_tx_proving(
-    config: &BenchConfig,
-    account_id: AccountId,
-    chunks: &[Vec<ReadOp>],
-    slot_infos: &[StorageSlotInfo],
-    secret_key: &AuthSecretKey,
-) -> anyhow::Result<BenchmarkResult> {
-    let total_reads: usize = chunks.iter().map(Vec::len).sum();
-    let num_chunks = chunks.len();
-
-    let mut result = BenchmarkResult::new(bench_name("prove", total_reads, num_chunks));
-    let use_persistent = config.store_path.is_some();
-
-    for i in 0..config.iterations {
-        let iter_t = Instant::now();
-
-        let (mut client, keystore, _) =
-            create_benchmark_client(config, &format!("tx-prove-iter-{i}")).await?;
-        client.sync_state().await?;
-
-        // When using a persistent store the account and key are already present
-        if !use_persistent {
-            client.import_account_by_id(account_id).await?;
-            keystore.add_key(secret_key)?;
-        }
-
-        let mut total_duration = Duration::ZERO;
-
-        for chunk in chunks {
-            let tx_request = build_chunk_tx_request(&client, chunk, slot_infos)?;
-
-            // Execute first (not measured)
-            let tx_result = client.execute_transaction(account_id, tx_request).await?;
-
-            // Measure proving time only
-            let (proven_tx, duration) =
-                measure_time_async(|| async { client.prove_transaction(&tx_result).await }).await;
-
-            total_duration += duration;
-
-            if let Ok(proven) = proven_tx {
-                let proof_bytes = proven.proof().to_bytes();
-                result = result.with_output_size(proof_bytes.len());
-            }
-        }
-
-        result.add_iteration(total_duration);
-        println!(
-            "  Iteration {}/{}: {:.2?} (total: {:.2?})",
-            i + 1,
-            config.iterations,
-            total_duration,
-            iter_t.elapsed()
-        );
-    }
-
-    result = result.with_metadata(format!(
-        "Transaction proving, {total_reads} storage reads from active account{}",
-        if num_chunks > 1 {
-            format!(" across {num_chunks} transactions")
-        } else {
-            String::new()
-        }
-    ));
-
-    Ok(result)
-}
-
-/// Benchmarks full transaction (execute + prove + submit).
-///
-/// When multiple chunks are provided, each iteration submits all chunks sequentially
-/// with block advancement waits between submissions (needed for nonce updates).
-/// Reports the total time including waits.
-async fn benchmark_tx_full(
-    config: &BenchConfig,
-    account_id: AccountId,
-    chunks: &[Vec<ReadOp>],
-    slot_infos: &[StorageSlotInfo],
-    secret_key: &AuthSecretKey,
-) -> anyhow::Result<BenchmarkResult> {
-    let total_reads: usize = chunks.iter().map(Vec::len).sum();
-    let num_chunks = chunks.len();
-
-    let mut result = BenchmarkResult::new(bench_name("full", total_reads, num_chunks));
-    let use_persistent = config.store_path.is_some();
-
-    for i in 0..config.iterations {
-        let iter_t = Instant::now();
-        let mut total_duration = Duration::ZERO;
-
-        for (chunk_idx, chunk) in chunks.iter().enumerate() {
-            // Each chunk submission needs a fresh client with up-to-date state,
-            // because the previous submission changes the account nonce on the network.
-            let (mut client, keystore, _) =
-                create_benchmark_client(config, &format!("tx-full-iter-{i}-chunk-{chunk_idx}"))
-                    .await?;
-            client.sync_state().await?;
-            if !use_persistent {
-                client.import_account_by_id(account_id).await?;
-                keystore.add_key(secret_key)?;
-            }
-
-            let tx_request = build_chunk_tx_request(&client, chunk, slot_infos)?;
-
-            // Measure full transaction time (execute + prove + submit)
-            let (_, duration) = measure_time_async(|| async {
-                client.submit_new_transaction(account_id, tx_request).await
-            })
-            .await;
-
-            total_duration += duration;
-
-            // Wait for the block to advance after every submission so the node
-            // has processed the transaction before the next chunk or iteration.
-            // Skip only after the very last submission of the entire benchmark.
-            let is_last = i == config.iterations - 1 && chunk_idx == num_chunks - 1;
-            if !is_last {
-                wait_for_block_advancement(&mut client).await?;
-            }
-        }
-
-        result.add_iteration(total_duration);
-        println!(
-            "  Iteration {}/{}: {:.2?} (total: {:.2?})",
-            i + 1,
-            config.iterations,
-            total_duration,
-            iter_t.elapsed()
-        );
-    }
-
-    result = result.with_metadata(format!(
-        "Full transaction (execute + prove + submit), {total_reads} storage reads{}",
-        if num_chunks > 1 {
-            format!(" across {num_chunks} transactions")
-        } else {
-            String::new()
-        }
-    ));
-
-    Ok(result)
 }

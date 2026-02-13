@@ -2,7 +2,7 @@
 
 use std::fmt::Write;
 
-use miden_protocol::Felt;
+use miden_client::Felt;
 use rand::Rng;
 use rand_chacha::ChaCha20Rng;
 use rand_chacha::rand_core::SeedableRng;
@@ -20,14 +20,11 @@ pub struct SlotDescriptor {
 }
 
 #[cfg(test)]
-use miden_client::assembly::CodeBuilder;
+use miden_client::account::component::{AccountComponent, basic_wallet_library};
 #[cfg(test)]
-use miden_protocol::account::auth::AuthSecretKey;
-#[cfg(test)]
-use miden_protocol::account::{
+use miden_client::account::{
     Account,
     AccountBuilder,
-    AccountComponent,
     AccountStorageMode,
     AccountType,
     StorageMap,
@@ -35,9 +32,9 @@ use miden_protocol::account::{
     StorageSlotName,
 };
 #[cfg(test)]
-use miden_standards::account::auth::AuthFalcon512Rpo;
+use miden_client::assembly::CodeBuilder;
 #[cfg(test)]
-use miden_standards::account::components::basic_wallet_library;
+use miden_client::auth::{AuthFalcon512Rpo, AuthSecretKey};
 
 /// Configuration for generating large accounts (used in tests)
 #[cfg(test)]
@@ -211,6 +208,6 @@ mod tests {
     #[test]
     fn test_create_large_storage_slot() {
         let slot = create_large_storage_slot("test::slot", 100, 0);
-        assert!(matches!(slot.slot_type(), miden_protocol::account::StorageSlotType::Map));
+        assert!(matches!(slot.slot_type(), miden_client::account::StorageSlotType::Map));
     }
 }

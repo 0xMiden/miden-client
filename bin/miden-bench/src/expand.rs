@@ -1,7 +1,5 @@
 #![allow(clippy::cast_possible_truncation, clippy::cast_lossless)]
 
-use std::fmt::Write;
-use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -13,13 +11,11 @@ use miden_client::rpc::{Endpoint, GrpcClient};
 use miden_client::transaction::TransactionRequestBuilder;
 use miden_client::{Client, DebugMode, Felt, Serializable};
 use miden_client_sqlite_store::ClientBuilderSqliteExt;
-use miden_protocol::account::auth::AuthSecretKey;
 use rand::Rng;
-use rand_chacha::ChaCha20Rng;
-use rand_chacha::rand_core::SeedableRng;
 
-use crate::deploy::{generate_expansion_component_code, wait_for_block_advancement};
+use crate::deploy::wait_for_block_advancement;
 use crate::generators::{random_word, slot_rng};
+use crate::masm::{generate_expansion_component_code, generate_expansion_tx_script};
 use crate::report::format_size;
 
 /// Maximum entries per expansion transaction. Determined empirically to stay
@@ -52,25 +48,6 @@ fn generate_entries(map_idx: usize, offset: usize, count: usize) -> Vec<([Felt; 
         .collect()
 }
 
-/// Generates MASM transaction script code that writes entries into a single storage map slot.
-fn generate_expansion_tx_script(slot_idx: usize, entries: &[([Felt; 4], [Felt; 4])]) -> String {
-    let mut script = String::from("use expander::storage_expander\n\nbegin\n");
-    let procedure_name = format!("set_item_slot_{slot_idx}");
-
-    for (key, value) in entries {
-        write!(
-            script,
-            "    push.{}.{}.{}.{}\n    push.{}.{}.{}.{}\n    call.storage_expander::{procedure_name}\n    dropw dropw dropw dropw\n\n",
-            value[3].as_int(), value[2].as_int(), value[1].as_int(), value[0].as_int(),
-            key[3].as_int(), key[2].as_int(), key[1].as_int(), key[0].as_int(),
-        )
-        .expect("write to string should not fail");
-    }
-
-    script.push_str("end\n");
-    script
-}
-
 /// Detects the number of bench map slots in an imported account by counting
 /// storage slots whose names match `miden::bench::map_slot_*`.
 async fn detect_num_maps(
@@ -86,35 +63,22 @@ async fn detect_num_maps(
     Ok(count)
 }
 
-/// Creates a client and data directory for the expand command.
+/// Creates a client for the expand command using the persistent store directory.
 async fn create_expand_client(
     endpoint: &Endpoint,
-    store_path: Option<&str>,
-) -> anyhow::Result<(Client<FilesystemKeyStore>, FilesystemKeyStore, PathBuf, bool)> {
-    let persistent = store_path.is_some();
-    let data_dir = if let Some(path) = store_path {
-        let p = PathBuf::from(path);
-        std::fs::create_dir_all(&p)?;
-        p
-    } else {
-        let p = std::env::temp_dir().join(format!("miden-bench-expand-{}", uuid::Uuid::new_v4()));
-        std::fs::create_dir_all(&p)?;
-        p
-    };
+    store_path: &str,
+) -> anyhow::Result<(Client<FilesystemKeyStore>, std::path::PathBuf)> {
+    let data_dir = std::path::PathBuf::from(store_path);
+    std::fs::create_dir_all(&data_dir)?;
     let sqlite_path = data_dir.join("store.sqlite3");
     let keystore_path = data_dir.join("keystore");
     std::fs::create_dir_all(&keystore_path)?;
 
-    if persistent {
-        println!("Store directory: {}", data_dir.display());
-    }
+    println!("Store directory: {}", data_dir.display());
 
     let mut rng = rand::rng();
     let coin_seed: [u64; 4] = rng.random();
     let rng_coin = RpoRandomCoin::new(coin_seed.map(Felt::new).into());
-
-    let keystore =
-        FilesystemKeyStore::new(keystore_path.clone()).expect("Failed to create keystore");
 
     let client: Client<FilesystemKeyStore> = ClientBuilder::new()
         .rpc(Arc::new(GrpcClient::new(endpoint, 30_000)))
@@ -126,7 +90,7 @@ async fn create_expand_client(
         .build()
         .await?;
 
-    Ok((client, keystore, data_dir, persistent))
+    Ok((client, data_dir))
 }
 
 /// Submits expansion transactions in batches, waiting for blocks between each batch.
@@ -184,21 +148,18 @@ async fn submit_expansion_batches(
 /// The account must have been deployed via the `deploy` command, which creates
 /// empty storage maps with expansion procedures already installed. This function
 /// submits transactions that call those procedures to insert entries.
+///
+/// The signing key is expected to be present in the persistent keystore
+/// (written by the `deploy` command).
 pub async fn expand_storage(
     endpoint: &Endpoint,
     account_id_str: &str,
-    seed_hex: &str,
     map_idx: usize,
     offset: usize,
     count: usize,
-    store_path: Option<&str>,
+    store_path: &str,
 ) -> anyhow::Result<()> {
     let account_id = AccountId::from_hex(account_id_str)?;
-
-    let seed_bytes = hex::decode(seed_hex).map_err(|e| anyhow::anyhow!("Invalid seed hex: {e}"))?;
-    let seed: [u8; 32] = seed_bytes
-        .try_into()
-        .map_err(|v: Vec<u8>| anyhow::anyhow!("Seed must be 32 bytes, got {}", v.len()))?;
 
     println!("Network: {endpoint}");
     println!(
@@ -209,8 +170,7 @@ pub async fn expand_storage(
 
     let total_t = Instant::now();
 
-    let (mut client, keystore, data_dir, persistent) =
-        create_expand_client(endpoint, store_path).await?;
+    let (mut client, _data_dir) = create_expand_client(endpoint, store_path).await?;
 
     // Sync and import account
     println!("Connecting to node at {endpoint}...");
@@ -218,17 +178,13 @@ pub async fn expand_storage(
     let chain_height = client.get_sync_height().await?;
     println!("Connected successfully. Chain height: {chain_height}");
 
-    let has_account = persistent && client.get_account_storage(account_id).await.is_ok();
+    let has_account = client.get_account_storage(account_id).await.is_ok();
     if has_account {
         println!("Using account {account_id} from persistent store");
     } else {
         println!("Importing account {account_id}...");
         client.import_account_by_id(account_id).await?;
     }
-
-    // Regenerate signing key from deploy seed and add to keystore
-    let secret_key = AuthSecretKey::new_falcon512_rpo_with_rng(&mut ChaCha20Rng::from_seed(seed));
-    keystore.add_key(&secret_key)?;
 
     // Detect number of maps from the imported account
     let num_maps = detect_num_maps(&client, account_id).await?;
@@ -252,10 +208,6 @@ pub async fn expand_storage(
 
     println!();
     println!("Total expand time: {:.2?}", total_t.elapsed());
-
-    if !persistent {
-        let _ = std::fs::remove_dir_all(&data_dir);
-    }
 
     Ok(())
 }

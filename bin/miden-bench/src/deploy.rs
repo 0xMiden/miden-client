@@ -1,11 +1,21 @@
 #![allow(clippy::cast_possible_truncation, clippy::cast_lossless)]
 
-use std::fmt::Write;
 use std::sync::Arc;
 use std::time::Instant;
 
-use miden_client::account::{AccountId, StorageMap, StorageSlot, StorageSlotName};
+use miden_client::account::component::{AccountComponent, basic_wallet_library};
+use miden_client::account::{
+    Account,
+    AccountBuilder,
+    AccountId,
+    AccountStorageMode,
+    AccountType,
+    StorageMap,
+    StorageSlot,
+    StorageSlotName,
+};
 use miden_client::assembly::CodeBuilder;
+use miden_client::auth::{AuthFalcon512Rpo, AuthSecretKey};
 use miden_client::builder::ClientBuilder;
 use miden_client::crypto::RpoRandomCoin;
 use miden_client::keystore::FilesystemKeyStore;
@@ -13,21 +23,12 @@ use miden_client::rpc::{Endpoint, GrpcClient};
 use miden_client::transaction::TransactionRequestBuilder;
 use miden_client::{Client, DebugMode, Felt, Serializable};
 use miden_client_sqlite_store::ClientBuilderSqliteExt;
-use miden_protocol::account::auth::AuthSecretKey;
-use miden_protocol::account::{
-    Account,
-    AccountBuilder,
-    AccountComponent,
-    AccountStorageMode,
-    AccountType,
-};
-use miden_standards::account::auth::AuthFalcon512Rpo;
-use miden_standards::account::components::basic_wallet_library;
 use rand::Rng;
 use rand_chacha::ChaCha20Rng;
 use rand_chacha::rand_core::SeedableRng;
 
 use crate::generators::{SlotDescriptor, generate_reader_component_code};
+use crate::masm::generate_expansion_component_code;
 use crate::report::format_size;
 
 /// Waits for the chain height to advance, ensuring transaction is in a block
@@ -47,38 +48,6 @@ pub(crate) async fn wait_for_block_advancement(
     }
 
     Ok(())
-}
-
-/// Generates MASM code for an account component that can set items in multiple storage maps.
-/// Creates a procedure `set_item_slot_N` for each slot that receives key/value from the stack.
-pub(crate) fn generate_expansion_component_code(num_slots: usize) -> String {
-    let mut code = String::new();
-
-    for i in 0..num_slots {
-        let slot_name = format!("miden::bench::map_slot_{i}");
-        write!(
-            code,
-            r#"const MAP_SLOT_{i} = word("{slot_name}")
-
-# Sets an item in storage slot {i}.
-# Stack input:  [KEY, VALUE, ...]
-# Stack output: [...]
-pub proc set_item_slot_{i}
-    push.MAP_SLOT_{i}[0..2]
-    # Stack: [slot_suffix, slot_prefix, KEY, VALUE, ...]
-
-    exec.::miden::protocol::native_account::set_map_item
-    # Stack: [OLD_VALUE, ...]
-
-    dropw
-end
-
-"#
-        )
-        .expect("writing to String should not fail");
-    }
-
-    code
 }
 
 /// Creates an account with empty storage maps, expansion procedures, and reader procedures.
@@ -141,39 +110,27 @@ fn create_account_with_empty_maps(
 }
 
 /// Creates and deploys a public wallet with empty storage maps to the network.
-/// Returns the account ID and the seed used for key generation (needed for signing transactions).
-///
-/// The deployed account includes expansion and reader procedures so that storage can be
-/// filled later via the `expand` command and read during transaction benchmarks.
+/// Returns the account ID. The signing key and account data are persisted in the
+/// store directory for use by subsequent `expand` and `transaction` commands.
 pub async fn deploy_account(
     endpoint: &Endpoint,
     maps: usize,
-    store_path: Option<&str>,
-) -> anyhow::Result<(AccountId, [u8; 32])> {
+    store_path: &str,
+) -> anyhow::Result<AccountId> {
     println!("Network: {endpoint}");
     println!("Storage maps: {maps} (empty)");
     println!();
 
     let total_t = Instant::now();
 
-    // Create directory for client data (persistent or temporary)
-    let persistent = store_path.is_some();
-    let data_dir = if let Some(path) = store_path {
-        let p = std::path::PathBuf::from(path);
-        std::fs::create_dir_all(&p)?;
-        p
-    } else {
-        let p = std::env::temp_dir().join(format!("miden-bench-deploy-{}", uuid::Uuid::new_v4()));
-        std::fs::create_dir_all(&p)?;
-        p
-    };
+    // Create persistent store directory
+    let data_dir = std::path::PathBuf::from(store_path);
+    std::fs::create_dir_all(&data_dir)?;
     let sqlite_path = data_dir.join("store.sqlite3");
     let keystore_path = data_dir.join("keystore");
     std::fs::create_dir_all(&keystore_path)?;
 
-    if persistent {
-        println!("Store directory: {}", data_dir.display());
-    }
+    println!("Store directory: {}", data_dir.display());
 
     // Generate a random seed for the account
     let mut rng = rand::rng();
@@ -234,17 +191,10 @@ pub async fn deploy_account(
     }
     println!("  Done in {:.2?}", t.elapsed());
 
-    let seed_hex = hex::encode(account_seed);
     println!();
     println!("Total deploy time: {:.2?}", total_t.elapsed());
     println!();
     println!("Account ID: {account_id}");
-    println!("Seed: {seed_hex}");
 
-    // Only cleanup when using a temporary directory
-    if !persistent {
-        let _ = std::fs::remove_dir_all(&data_dir);
-    }
-
-    Ok((account_id, account_seed))
+    Ok(account_id)
 }

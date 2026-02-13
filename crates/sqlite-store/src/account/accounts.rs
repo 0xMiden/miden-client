@@ -32,7 +32,7 @@ use miden_client::store::{
 };
 use miden_client::sync::NoteTagRecord;
 use miden_client::utils::Serializable;
-use miden_client::{AccountError, Word, ZERO};
+use miden_client::{AccountError, Word};
 use miden_protocol::account::{AccountStorageHeader, StorageMapWitness, StorageSlotHeader};
 use miden_protocol::asset::{AssetVaultKey, PartialVault};
 use miden_protocol::crypto::merkle::MerkleError;
@@ -45,7 +45,6 @@ use crate::account::helpers::{
     query_account_addresses,
     query_account_code,
     query_account_headers,
-    query_storage_maps,
     query_storage_slots,
     query_storage_values,
     query_vault_assets,
@@ -207,36 +206,13 @@ impl SqliteStore {
             params![header.storage_commitment().to_hex()],
         )?;
 
-        // New accounts (nonce == 0) need full storage map entries as advice inputs for
-        // the kernel to validate during account creation. Existing accounts load entries
-        // lazily via `get_storage_map_witness()`.
-        let is_new = header.nonce() == ZERO;
-
-        let mut all_storage_maps = if is_new {
-            let map_roots: Vec<Value> = storage_values
-                .iter()
-                .filter(|(_, (slot_type, _))| *slot_type == StorageSlotType::Map)
-                .map(|(_, (_, value))| Value::from(value.to_hex()))
-                .collect();
-
-            if map_roots.is_empty() {
-                BTreeMap::new()
-            } else {
-                query_storage_maps(conn, "root IN rarray(?)", [Rc::new(map_roots)])?
-            }
-        } else {
-            BTreeMap::new()
-        };
-
+        // Storage maps are always minimal here (just roots, no entries).
+        // New accounts that need full storage data are handled by the DataStore layer,
+        // which fetches the full account via `get_account()` when nonce == 0.
         for (slot_name, (slot_type, value)) in storage_values {
             storage_header.push(StorageSlotHeader::new(slot_name.clone(), slot_type, value));
             if slot_type == StorageSlotType::Map {
-                let partial_storage_map = if let Some(map) = all_storage_maps.remove(&value) {
-                    PartialStorageMap::new_full(map)
-                } else {
-                    PartialStorageMap::new(value)
-                };
-                maps.push(partial_storage_map);
+                maps.push(PartialStorageMap::new(value));
             }
         }
         storage_header.sort_by_key(StorageSlotHeader::id);

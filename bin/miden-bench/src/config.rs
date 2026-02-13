@@ -2,6 +2,9 @@ use std::path::PathBuf;
 
 use miden_client::rpc::Endpoint;
 
+/// Default store directory name, created in the current working directory.
+pub const DEFAULT_STORE_DIR: &str = "miden-bench-store";
+
 /// Configuration for benchmark execution
 #[derive(Clone)]
 pub struct BenchConfig {
@@ -9,20 +12,14 @@ pub struct BenchConfig {
     pub network: Endpoint,
     /// Number of benchmark iterations
     pub iterations: usize,
-    /// Optional persistent store directory. When set, deploy saves the store here
-    /// and transaction reuses it instead of creating temporary directories.
-    pub store_path: Option<PathBuf>,
+    /// Persistent store directory. Deploy saves the account and keystore here;
+    /// transaction and expand commands reuse the same directory.
+    pub store_path: PathBuf,
 }
 
 impl BenchConfig {
     /// Creates a new benchmark configuration
-    pub fn new(network: Endpoint, iterations: usize, store_path: Option<PathBuf>) -> Self {
+    pub fn new(network: Endpoint, iterations: usize, store_path: PathBuf) -> Self {
         Self { network, iterations, store_path }
-    }
-
-    /// Returns a temporary directory for benchmark artifacts
-    #[allow(clippy::unused_self)]
-    pub fn temp_dir(&self) -> PathBuf {
-        std::env::temp_dir()
     }
 }

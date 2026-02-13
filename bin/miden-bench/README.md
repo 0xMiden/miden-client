@@ -24,14 +24,13 @@ Deploys a public wallet with empty storage maps to the network. This is the firs
 miden-bench --network localhost deploy --maps 2
 ```
 
-The command outputs the account ID, seed, and a ready-to-copy `expand` command:
+The command outputs the account ID and a ready-to-copy `expand` command:
 
 ```
 Account ID: 0xabcdef1234567890...
-Seed: 0123456789abcdef...
 
 Expand storage with:
-  miden-bench expand --account-id 0xabcdef1234567890 --seed 0123456789abcdef... --map-idx 0 --offset 0 --count 100
+  miden-bench expand --account-id 0xabcdef1234567890 --map-idx 0 --offset 0 --count 100
 ```
 
 ### `expand`
@@ -39,7 +38,7 @@ Expand storage with:
 Fills entries into a specific storage map of a deployed account. The account must have been deployed with `deploy` first, which installs the expansion procedures needed to write entries.
 
 ```bash
-miden-bench expand --account-id 0x... --seed <hex> --map-idx 0 --offset 0 --count 200
+miden-bench expand --account-id 0x... --map-idx 0 --offset 0 --count 200
 ```
 
 Entries are batched into transactions of up to 280 entries each. Keys and values are generated deterministically from the map index and entry offset, so repeated runs with the same parameters produce the same data.
@@ -47,8 +46,8 @@ Entries are batched into transactions of up to 280 entries each. Keys and values
 To fill multiple maps, run `expand` once per map:
 
 ```bash
-miden-bench expand --account-id 0x... --seed <hex> --map-idx 0 --offset 0 --count 100
-miden-bench expand --account-id 0x... --seed <hex> --map-idx 1 --offset 0 --count 100
+miden-bench expand --account-id 0x... --map-idx 0 --offset 0 --count 100
+miden-bench expand --account-id 0x... --map-idx 1 --offset 0 --count 100
 ```
 
 ### `transaction`
@@ -59,28 +58,30 @@ Benchmarks transaction operations that read storage from an account (requires a 
 - **prove** - Measures transaction proving time and proof size
 - **full** - Measures full transaction (execute + prove + submit)
 
-The benchmark executes transactions that read all storage map entries from the specified account. Accounts deployed to the network via `deploy` can test `execute`, `prove` and `full`, while other types of accounts may only measure `execute` times.
+The benchmark executes transactions that read all storage map entries from the specified account. Accounts deployed via `deploy` automatically have the signing key persisted, enabling all three benchmarks (`execute`, `prove`, and `full`). If the signing key is not found (e.g., account was imported from the network without deploying), only `execute` is benchmarked.
 
 The number of storage maps is auto-detected from the account.
 
 ```bash
-miden-bench --network localhost transaction --account-id 0x... --seed <hex>
+miden-bench --network localhost transaction --account-id 0x...
 ```
 
 ## Workflow
 
 The typical workflow is: **deploy** -> **expand** -> **transaction**.
 
+All commands share a persistent store directory (default: `./miden-bench-store`). The `deploy` command saves the account and signing key there, and `expand` and `transaction` reuse them automatically.
+
 ```bash
 # 1. Deploy an account with 2 empty storage maps
 miden-bench --network localhost deploy --maps 2
 
-# 2. Fill each map with entries (copy account-id and seed from deploy output)
-miden-bench expand --account-id 0x... --seed <hex> --map-idx 0 --offset 0 --count 100
-miden-bench expand --account-id 0x... --seed <hex> --map-idx 1 --offset 0 --count 100
+# 2. Fill each map with entries (copy account-id from deploy output)
+miden-bench expand --account-id 0x... --map-idx 0 --offset 0 --count 100
+miden-bench expand --account-id 0x... --map-idx 1 --offset 0 --count 100
 
 # 3. Benchmark transactions against the account
-miden-bench transaction --account-id 0x... --seed <hex>
+miden-bench transaction --account-id 0x...
 ```
 
 ## Global Options
@@ -115,20 +116,16 @@ miden-bench deploy
 
 ### Persistent Store (`--store`)
 
-Path to a directory for persistent store data. When provided, `deploy` and `expand` save the SQLite store and keystore in this directory (instead of a temporary one), and `transaction` reuses it — skipping the account import from the node on each iteration.
+Path to a directory for persistent store data. Default: `./miden-bench-store`.
+
+All commands use this directory for the `SQLite` database and filesystem keystore. The `deploy` command creates and populates it; `expand` and `transaction` reuse it.
 
 ```bash
-# Deploy with a persistent store
-miden-bench --store ./bench-data deploy --maps 2
-
-# Expand using the same store
-miden-bench --store ./bench-data expand --account-id 0x... --seed <hex> --map-idx 0 --offset 0 --count 100
-
-# Reuse the store for benchmarks (no re-import needed)
-miden-bench --store ./bench-data transaction --account-id 0x... --seed <hex>
+# Use a custom store directory
+miden-bench --store ./my-bench-data deploy --maps 2
+miden-bench --store ./my-bench-data expand --account-id 0x... --map-idx 0 --offset 0 --count 100
+miden-bench --store ./my-bench-data transaction --account-id 0x...
 ```
-
-When omitted, temporary directories are used and cleaned up automatically (the default behavior).
 
 ### Command Options
 
@@ -144,7 +141,6 @@ miden-bench deploy --maps 3
 #### Expand
 
 - `-a, --account-id <ID>` - Public account ID to expand (required, hex format)
-- `-s, --seed <HEX>` - Account seed for signing (required, hex-encoded 32 bytes, output by `deploy`)
 - `-m, --map-idx <N>` - Storage map index to fill (0-based, must be less than the deploy `--maps` count)
 - `-o, --offset <N>` - Starting entry offset (0-based)
 - `-c, --count <N>` - Number of entries to add starting from offset
@@ -152,7 +148,6 @@ miden-bench deploy --maps 3
 #### Transaction
 
 - `-a, --account-id <ID>` - Public account ID to benchmark against (required, hex format)
-- `-s, --seed <HEX>` - Account seed for signing (hex-encoded 32 bytes, output by `deploy`). When omitted, only execution is benchmarked (no proving or submission).
 - `-r, --reads <N>` - Maximum storage reads per transaction. When total entries exceed this limit, reads are split across multiple transactions per benchmark iteration. Each iteration's time is the sum across all transactions. When omitted, all entries are read in a single transaction.
 - `-i, --iterations <N>` - Number of benchmark iterations (default: 5)
 

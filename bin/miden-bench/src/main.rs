@@ -10,113 +10,16 @@ mod config;
 mod deploy;
 mod expand;
 mod generators;
+mod masm;
 mod metrics;
 mod report;
 mod runner;
 
-use config::BenchConfig;
+use config::{BenchConfig, DEFAULT_STORE_DIR};
 use metrics::BenchmarkResult;
 use runner::BenchmarkRunner;
 
 const DEFAULT_ITERATION_COUNT: usize = 5;
-
-// MAIN
-// ================================================================================================
-
-#[tokio::main]
-async fn main() {
-    let args = CliArgs::parse();
-
-    match args.command {
-        Command::Deploy(deploy_args) => {
-            let result = Box::pin(deploy::deploy_account(
-                &args.network.to_endpoint(),
-                deploy_args.maps,
-                args.store.as_deref(),
-            ))
-            .await;
-
-            match result {
-                Ok((account_id, seed)) => {
-                    let seed_hex = hex::encode(seed);
-                    let store_flag =
-                        args.store.as_ref().map_or(String::new(), |s| format!(" --store {s}"));
-                    println!();
-                    println!("Expand storage with:");
-                    println!(
-                        "  miden-bench{store_flag} expand --account-id {account_id} --seed {seed_hex} --map-idx 0 --offset 0 --count 100"
-                    );
-                },
-                Err(e) => {
-                    panic!("Deploy failed: {e:?}");
-                },
-            }
-        },
-        Command::Expand(expand_args) => {
-            let result = Box::pin(expand::expand_storage(
-                &args.network.to_endpoint(),
-                &expand_args.account_id,
-                &expand_args.seed,
-                expand_args.map_idx,
-                expand_args.offset,
-                expand_args.count,
-                args.store.as_deref(),
-            ))
-            .await;
-
-            match result {
-                Ok(()) => {
-                    println!();
-                    println!("Run benchmarks with:");
-                    let store_flag =
-                        args.store.as_ref().map_or(String::new(), |s| format!(" --store {s}"));
-                    println!(
-                        "  miden-bench{store_flag} transaction --account-id {} --seed {} --iterations {DEFAULT_ITERATION_COUNT}",
-                        expand_args.account_id, expand_args.seed
-                    );
-                },
-                Err(e) => {
-                    panic!("Expand failed: {e:?}");
-                },
-            }
-        },
-        Command::Transaction(ref tx_args) => {
-            let start_time = Instant::now();
-            let store_path = args.store.as_ref().map(PathBuf::from);
-            let results = run_benchmarks(tx_args, &args.network, store_path).await;
-            let total_duration = start_time.elapsed();
-
-            match results {
-                Ok(results) => {
-                    report::print_results(&results, "Transaction Benchmark", total_duration);
-                },
-                Err(e) => {
-                    panic!("Benchmark failed: {e:?}");
-                },
-            }
-        },
-    }
-}
-
-async fn run_benchmarks(
-    tx_args: &TransactionArgs,
-    network: &Network,
-    store_path: Option<PathBuf>,
-) -> anyhow::Result<Vec<BenchmarkResult>> {
-    let config = BenchConfig::new(network.to_endpoint(), tx_args.iterations, store_path);
-    let mut runner = BenchmarkRunner::new(config);
-    let seed = tx_args.seed.as_deref().map(parse_seed_hex).transpose()?;
-    Box::pin(runner.run_transaction_benchmarks(tx_args.account_id.clone(), seed, tx_args.reads))
-        .await
-}
-
-/// Parses a hex-encoded 32-byte seed string into a byte array
-fn parse_seed_hex(hex_str: &str) -> anyhow::Result<[u8; 32]> {
-    let bytes = hex::decode(hex_str).map_err(|e| anyhow::anyhow!("Invalid seed hex: {e}"))?;
-    bytes
-        .try_into()
-        .map_err(|v: Vec<u8>| anyhow::anyhow!("Seed must be 32 bytes, got {}", v.len()))
-}
 
 // ARGS
 // ================================================================================================
@@ -132,19 +35,20 @@ struct CliArgs {
     #[arg(short, long, default_value = "localhost", env = "MIDEN_NETWORK", global = true)]
     network: Network,
 
-    /// Path to a persistent store directory. When provided, deploy saves the store here
-    /// and transaction reuses it. When omitted, temporary directories are used.
-    #[arg(long, global = true)]
-    store: Option<String>,
+    /// Path to the persistent store directory. All commands share this directory
+    /// for the `SQLite` database and filesystem keystore.
+    #[arg(long, global = true, default_value = DEFAULT_STORE_DIR)]
+    store: String,
 }
 
-fn parse_maps(s: &str) -> Result<usize, String> {
-    let n: usize = s.parse().map_err(|e| format!("{e}"))?;
-    if (1..=100).contains(&n) {
-        Ok(n)
-    } else {
-        Err(format!("storage map count must be between 1 and 100, got {n}"))
-    }
+#[derive(Subcommand, Clone)]
+enum Command {
+    /// Benchmark transaction operations: read all storage entries from account (requires node)
+    Transaction(TransactionArgs),
+    /// Deploy a public wallet with configurable storage to the network (requires node)
+    Deploy(StorageArgs),
+    /// Expand storage: fill entries in a specific map of a deployed account (requires node)
+    Expand(ExpandArgs),
 }
 
 /// Storage configuration options for benchmarks
@@ -161,11 +65,6 @@ struct TransactionArgs {
     /// Public account ID to benchmark (hex format, e.g., 0x...)
     #[arg(short, long)]
     account_id: String,
-
-    /// Account seed for signing (hex, output by the deploy command).
-    /// When omitted, only execution is benchmarked (no proving or submission).
-    #[arg(short, long)]
-    seed: Option<String>,
 
     /// Maximum storage reads per transaction. When total entries exceed this limit,
     /// reads are split across multiple transactions per benchmark iteration.
@@ -186,10 +85,6 @@ struct ExpandArgs {
     #[arg(short, long)]
     account_id: String,
 
-    /// Account seed for signing (hex, output by the deploy command)
-    #[arg(short, long)]
-    seed: String,
-
     /// Storage map index to fill (0-based, matches deploy --maps count)
     #[arg(short, long)]
     map_idx: usize,
@@ -201,16 +96,6 @@ struct ExpandArgs {
     /// Number of entries to add starting from offset
     #[arg(short, long)]
     count: usize,
-}
-
-#[derive(Subcommand, Clone)]
-enum Command {
-    /// Benchmark transaction operations: read all storage entries from account (requires node)
-    Transaction(TransactionArgs),
-    /// Deploy a public wallet with configurable storage to the network (requires node)
-    Deploy(StorageArgs),
-    /// Expand storage: fill entries in a specific map of a deployed account (requires node)
-    Expand(ExpandArgs),
 }
 
 // NETWORK
@@ -265,5 +150,105 @@ impl std::fmt::Display for Network {
             Network::Testnet => write!(f, "testnet"),
             Network::Custom(url) => write!(f, "{url}"),
         }
+    }
+}
+
+// MAIN
+// ================================================================================================
+
+#[tokio::main]
+async fn main() {
+    let args = CliArgs::parse();
+    let store_flag = if args.store == DEFAULT_STORE_DIR {
+        String::new()
+    } else {
+        format!(" --store {}", args.store)
+    };
+
+    match args.command {
+        Command::Deploy(deploy_args) => {
+            let result = Box::pin(deploy::deploy_account(
+                &args.network.to_endpoint(),
+                deploy_args.maps,
+                &args.store,
+            ))
+            .await;
+
+            match result {
+                Ok(account_id) => {
+                    println!();
+                    println!("Expand storage with:");
+                    println!(
+                        "  miden-bench{store_flag} expand --account-id {account_id} --map-idx 0 --offset 0 --count 100"
+                    );
+                },
+                Err(e) => {
+                    panic!("Deploy failed: {e:?}");
+                },
+            }
+        },
+        Command::Expand(expand_args) => {
+            let result = Box::pin(expand::expand_storage(
+                &args.network.to_endpoint(),
+                &expand_args.account_id,
+                expand_args.map_idx,
+                expand_args.offset,
+                expand_args.count,
+                &args.store,
+            ))
+            .await;
+
+            match result {
+                Ok(()) => {
+                    println!();
+                    println!("Run benchmarks with:");
+                    println!(
+                        "  miden-bench{store_flag} transaction --account-id {} --iterations {DEFAULT_ITERATION_COUNT}",
+                        expand_args.account_id
+                    );
+                },
+                Err(e) => {
+                    panic!("Expand failed: {e:?}");
+                },
+            }
+        },
+        Command::Transaction(ref tx_args) => {
+            let start_time = Instant::now();
+            let results = run_benchmarks(tx_args, &args.network, &args.store).await;
+            let total_duration = start_time.elapsed();
+
+            match results {
+                Ok(results) => {
+                    report::print_results(&results, "Transaction Benchmark", total_duration);
+                },
+                Err(e) => {
+                    panic!("Benchmark failed: {e:?}");
+                },
+            }
+        },
+    }
+}
+
+// HELPERS
+// ================================================================================================
+
+async fn run_benchmarks(
+    tx_args: &TransactionArgs,
+    network: &Network,
+    store: &str,
+) -> anyhow::Result<Vec<BenchmarkResult>> {
+    let store_path = PathBuf::from(store);
+    let config = BenchConfig::new(network.to_endpoint(), tx_args.iterations, store_path);
+    let mut runner = BenchmarkRunner::new(config);
+    Box::pin(runner.run_transaction_benchmarks(tx_args.account_id.clone(), tx_args.reads))
+        .await
+}
+
+fn parse_maps(s: &str) -> Result<usize, String> {
+    let n: usize = s.parse().map_err(|e| format!("{e}"))?;
+    if (1..=100).contains(&n) {
+        Ok(n)
+    } else {
+        Err(format!("storage map count must be between 1 and 100, got {n}"))
     }
 }
