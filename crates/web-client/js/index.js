@@ -21,7 +21,10 @@ const WRITE_METHODS = new Set([
   "submitProvenTransaction",
   "applyTransaction",
   "importAccountFile",
+  "importAccountById",
+  "importPublicAccountFromSeed",
   "importNoteFile",
+  "forceImportStore",
   "addTag",
   "removeTag",
   "setSetting",
@@ -29,6 +32,7 @@ const WRITE_METHODS = new Set([
   "insertAccountAddress",
   "removeAccountAddress",
   "sendPrivateNote",
+  // fetch*PrivateNotes fetches from the note transport AND writes to IndexedDB
   "fetchPrivateNotes",
   "fetchAllPrivateNotes",
   "addAccountSecretKeyToWebStore",
@@ -234,8 +238,10 @@ export class WebClient {
     // Layer 1: In-process WASM lock — serializes all main-thread WASM calls.
     this._wasmLock = new AsyncLock();
 
-    // Layer 2: Re-entrancy guard for the cross-tab write lock within the same
-    // tab so that a write method calling another write method doesn't deadlock.
+    // Layer 2: Guard for the cross-tab write lock. When true, the current tab
+    // already holds the Web Lock, so nested or concurrent _withWrite calls in
+    // this tab skip acquiring it again (the outer call's lock already blocks
+    // other tabs). The in-process _wasmLock still serializes WASM access.
     this._writeLockHeld = false;
 
     // Layer 3: BroadcastChannel for cross-tab state-change notifications.
@@ -379,7 +385,8 @@ export class WebClient {
    */
   async _withWrite(operation, fn) {
     if (this._writeLockHeld) {
-      // Re-entrant call within the same write lock — run directly.
+      // This tab already holds the cross-tab Web Lock — skip re-acquiring
+      // it to avoid deadlock. The outer call's lock still blocks other tabs.
       return fn();
     }
 
@@ -776,37 +783,37 @@ export class WebClient {
     });
   }
 
+  // proveTransaction is CPU-heavy but does NOT write to IndexedDB, so it only
+  // needs the in-process WASM lock (Layer 1), not the cross-tab write lock.
   async proveTransaction(transactionResult, prover) {
-    return this._withWrite("proveTransaction", async () => {
-      try {
-        if (!this.worker) {
-          return await this._wasmLock.runExclusive(async () => {
-            const wasmWebClient = await this.getWasmWebClient();
-            return await wasmWebClient.proveTransaction(
-              transactionResult,
-              prover
-            );
-          });
-        }
-
-        const wasm = await getWasmOrThrow();
-        const serializedTransactionResult = transactionResult.serialize();
-        const proverPayload = prover ? prover.serialize() : null;
-
-        const serializedProvenBytes = await this.callMethodWithWorker(
-          MethodName.PROVE_TRANSACTION,
-          serializedTransactionResult,
-          proverPayload
-        );
-
-        return wasm.ProvenTransaction.deserialize(
-          new Uint8Array(serializedProvenBytes)
-        );
-      } catch (error) {
-        console.error("INDEX.JS: Error in proveTransaction:", error);
-        throw error;
+    try {
+      if (!this.worker) {
+        return await this._wasmLock.runExclusive(async () => {
+          const wasmWebClient = await this.getWasmWebClient();
+          return await wasmWebClient.proveTransaction(
+            transactionResult,
+            prover
+          );
+        });
       }
-    });
+
+      const wasm = await getWasmOrThrow();
+      const serializedTransactionResult = transactionResult.serialize();
+      const proverPayload = prover ? prover.serialize() : null;
+
+      const serializedProvenBytes = await this.callMethodWithWorker(
+        MethodName.PROVE_TRANSACTION,
+        serializedTransactionResult,
+        proverPayload
+      );
+
+      return wasm.ProvenTransaction.deserialize(
+        new Uint8Array(serializedProvenBytes)
+      );
+    } catch (error) {
+      console.error("INDEX.JS: Error in proveTransaction:", error);
+      throw error;
+    }
   }
 
   // SYNC
@@ -997,9 +1004,12 @@ export class MockWebClient extends WebClient {
             );
           }
 
-          let serializedMockChain = wasmWebClient.serializeMockChain().buffer;
-          let serializedMockNoteTransportNode =
-            wasmWebClient.serializeMockNoteTransportNode().buffer;
+          const { serializedMockChain, serializedMockNoteTransportNode } =
+            await this._wasmLock.runExclusive(() => ({
+              serializedMockChain: wasmWebClient.serializeMockChain().buffer,
+              serializedMockNoteTransportNode:
+                wasmWebClient.serializeMockNoteTransportNode().buffer,
+            }));
 
           const wasm = await getWasmOrThrow();
 
@@ -1042,9 +1052,12 @@ export class MockWebClient extends WebClient {
         const wasmWebClient = await this.getWasmWebClient();
         const wasm = await getWasmOrThrow();
         const serializedTransactionRequest = transactionRequest.serialize();
-        const serializedMockChain = wasmWebClient.serializeMockChain().buffer;
-        const serializedMockNoteTransportNode =
-          wasmWebClient.serializeMockNoteTransportNode().buffer;
+        const { serializedMockChain, serializedMockNoteTransportNode } =
+          await this._wasmLock.runExclusive(() => ({
+            serializedMockChain: wasmWebClient.serializeMockChain().buffer,
+            serializedMockNoteTransportNode:
+              wasmWebClient.serializeMockNoteTransportNode().buffer,
+          }));
 
         const result = await this.callMethodWithWorker(
           MethodName.SUBMIT_NEW_TRANSACTION_MOCK,
@@ -1101,9 +1114,12 @@ export class MockWebClient extends WebClient {
         const wasm = await getWasmOrThrow();
         const serializedTransactionRequest = transactionRequest.serialize();
         const proverPayload = prover.serialize();
-        const serializedMockChain = wasmWebClient.serializeMockChain().buffer;
-        const serializedMockNoteTransportNode =
-          wasmWebClient.serializeMockNoteTransportNode().buffer;
+        const { serializedMockChain, serializedMockNoteTransportNode } =
+          await this._wasmLock.runExclusive(() => ({
+            serializedMockChain: wasmWebClient.serializeMockChain().buffer,
+            serializedMockNoteTransportNode:
+              wasmWebClient.serializeMockNoteTransportNode().buffer,
+          }));
 
         const result = await this.callMethodWithWorker(
           MethodName.SUBMIT_NEW_TRANSACTION_WITH_PROVER_MOCK,

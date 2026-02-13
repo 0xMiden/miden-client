@@ -84,6 +84,9 @@ export function MidenProvider({
     ]
   );
 
+  // Exposed for advanced consumers who need to serialize custom multi-step
+  // operations against the client. Built-in hooks no longer use this since
+  // the WebClient handles concurrency internally via Layers 1-3.
   const runExclusive = useCallback(
     async <T,>(fn: () => Promise<T>): Promise<T> =>
       clientLockRef.current.runExclusive(fn),
@@ -281,8 +284,11 @@ export function MidenProvider({
 
   // Cross-tab state change listener (Layer 3).
   // When another tab mutates the same IndexedDB, refresh our local state.
+  // Debounced to avoid thundering-herd syncs when rapid writes occur.
   useEffect(() => {
     if (!isReady || !client) return;
+
+    let timeoutId: ReturnType<typeof setTimeout>;
 
     // The WebClient exposes onStateChanged when BroadcastChannel is available.
     const unsubscribe = (
@@ -292,10 +298,12 @@ export function MidenProvider({
         ) => () => void;
       }
     ).onStateChanged?.(() => {
-      sync();
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => sync(), 300);
     });
 
     return () => {
+      clearTimeout(timeoutId);
       unsubscribe?.();
     };
   }, [isReady, client, sync]);
