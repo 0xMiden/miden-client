@@ -399,12 +399,12 @@ async function updateCommittedNoteTags(
     for (let i = 0; i < inputNoteIds.length; i++) {
       const noteId = inputNoteIds[i];
       await (tx as Transaction & { tags: Dexie.Table }).tags
-        .where("source_note_id")
+        .where("sourceNoteId")
         .equals(noteId)
         .delete();
     }
   } catch (error) {
-    logWebStoreError(error, "Failed to pudate committed note tags");
+    logWebStoreError(error, "Failed to update committed note tags");
   }
 }
 
