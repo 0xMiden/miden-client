@@ -1532,7 +1532,7 @@ Terminates the underlying worker.
 
 ### createClient()
 
-> `static` **createClient**(`rpcUrl?`, `noteTransportUrl?`, `seed?`, `network?`): `Promise`\<`WebClient`\>
+> `static` **createClient**(`rpcUrl?`, `noteTransportUrl?`, `seed?`, `network?`, `logLevel?`): `Promise`\<`WebClient`\>
 
 Factory method to create and initialize a new wrapped WebClient.
 
@@ -1562,6 +1562,10 @@ The seed for the account (optional).
 
 Optional name for the store. Setting this allows multiple clients to be used in the same browser.
 
+##### logLevel?
+
+[`LogLevel`](../type-aliases/LogLevel.md)
+
 #### Returns
 
 `Promise`\<`WebClient`\>
@@ -1572,7 +1576,7 @@ A promise that resolves to a fully initialized WebClient.
 
 ### createClientWithExternalKeystore()
 
-> `static` **createClientWithExternalKeystore**(`rpcUrl?`, `noteTransportUrl?`, `seed?`, `storeName?`, `getKeyCb?`, `insertKeyCb?`, `signCb?`): `Promise`\<`WebClient`\>
+> `static` **createClientWithExternalKeystore**(`rpcUrl?`, `noteTransportUrl?`, `seed?`, `storeName?`, `getKeyCb?`, `insertKeyCb?`, `signCb?`, `logLevel?`): `Promise`\<`WebClient`\>
 
 Factory method to create and initialize a new wrapped WebClient with a remote keystore.
 
@@ -1619,6 +1623,10 @@ Callback used to persist secret keys in the external store.
 [`SignCallback`](../type-aliases/SignCallback.md)
 
 Callback used to create signatures for the provided inputs.
+
+##### logLevel?
+
+[`LogLevel`](../type-aliases/LogLevel.md)
 
 #### Returns
 
