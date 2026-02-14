@@ -26,9 +26,9 @@ use miden_client::note::{
     NoteAssets,
     NoteAttachment,
     NoteExecutionHint,
-    NoteInputs,
     NoteMetadata,
     NoteRecipient,
+    NoteStorage,
     NoteTag,
     NoteType,
 };
@@ -160,15 +160,12 @@ pub async fn test_counter_contract_ntx(client_config: ClientConfig) -> Result<()
 
     let network_account = deploy_counter_contract(&mut client, AccountStorageMode::Network).await?;
 
-    let account: Account = client
-        .get_account(network_account.id())
-        .await?
-        .context("failed to find network account after deployment")?
-        .try_into()?;
-    assert_eq!(
-        account.storage().get_item(&COUNTER_SLOT_NAME)?,
-        Word::from([ZERO, ZERO, ZERO, Felt::new(1)])
-    );
+    let counter_value = client
+        .account_reader(network_account.id())
+        .get_storage_item(COUNTER_SLOT_NAME.clone())
+        .await
+        .context("failed to find network account after deployment")?;
+    assert_eq!(counter_value, Word::from([ZERO, ZERO, ZERO, Felt::new(1)]));
 
     let (native_account, ..) =
         insert_new_wallet(&mut client, AccountStorageMode::Public, &keystore, RPO_FALCON_SCHEME_ID)
@@ -244,27 +241,20 @@ pub async fn test_recall_note_before_ntx_consumes_it(client_config: ClientConfig
     wait_for_blocks(&mut client, 2).await;
 
     // The network account should have original value
-    let account: Account = client
-        .get_account(network_account.id())
-        .await?
-        .context("failed to find network account after recall test")?
-        .try_into()?;
-    assert_eq!(
-        account.storage().get_item(&COUNTER_SLOT_NAME)?,
-        Word::from([ZERO, ZERO, ZERO, Felt::new(1)])
-    );
+    let network_counter = client
+        .account_reader(network_account.id())
+        .get_storage_item(COUNTER_SLOT_NAME.clone())
+        .await
+        .context("failed to find network account after recall test")?;
+    assert_eq!(network_counter, Word::from([ZERO, ZERO, ZERO, Felt::new(1)]));
 
     // The native account should have the incremented value
-    let account: Account = client
-        .get_account(native_account.id())
-        .await?
-        .context("failed to find native account after recall test")?
-        .try_into()
-        .unwrap();
-    assert_eq!(
-        account.storage().get_item(&COUNTER_SLOT_NAME)?,
-        Word::from([ZERO, ZERO, ZERO, Felt::new(2)])
-    );
+    let native_counter = client
+        .account_reader(native_account.id())
+        .get_storage_item(COUNTER_SLOT_NAME.clone())
+        .await
+        .context("failed to find native account after recall test")?;
+    assert_eq!(native_counter, Word::from([ZERO, ZERO, ZERO, Felt::new(2)]));
     Ok(())
 }
 
@@ -314,7 +304,7 @@ fn get_network_note<T: Rng>(
             Felt::new(rng.random()),
         ]),
         script,
-        NoteInputs::new(vec![])?,
+        NoteStorage::new(vec![])?,
     );
 
     let network_note = Note::new(NoteAssets::new(vec![])?, metadata, recipient);

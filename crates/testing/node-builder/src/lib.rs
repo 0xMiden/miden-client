@@ -4,7 +4,6 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
 use std::net::SocketAddr;
-use std::num::NonZeroUsize;
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -16,7 +15,7 @@ use miden_node_block_producer::{
     DEFAULT_MAX_TXS_PER_BATCH,
     DEFAULT_MEMPOOL_TX_CAPACITY,
 };
-use miden_node_ntx_builder::NetworkTransactionBuilder;
+use miden_node_ntx_builder::NtxBuilderConfig;
 use miden_node_rpc::Rpc;
 use miden_node_store::{GenesisState, Store};
 use miden_node_utils::crypto::get_rpo_random_coin;
@@ -278,6 +277,7 @@ impl NodeBuilder {
                         rpc_listener,
                         block_producer_listener,
                         ntx_builder_listener,
+                        block_prover_url: None,
                         grpc_timeout: DEFAULT_TIMEOUT_DURATION,
                     }
                     .serve()
@@ -311,7 +311,6 @@ impl NodeBuilder {
                     store_url,
                     grpc_timeout: DEFAULT_TIMEOUT_DURATION,
                     batch_prover_url: None,
-                    block_prover_url: None,
                     validator_url,
                     batch_interval,
                     block_interval,
@@ -348,16 +347,13 @@ impl NodeBuilder {
 
         join_set
             .spawn(async move {
-                NetworkTransactionBuilder::new(
-                    store_url,
-                    block_producer_url,
-                    validator_url,
-                    None,
-                    NonZeroUsize::new(1024).unwrap(),
-                )
-                .run()
-                .await
-                .context("failed while serving ntx builder component")
+                NtxBuilderConfig::new(store_url, block_producer_url, validator_url)
+                    .build()
+                    .await
+                    .context("failed to build ntx builder")?
+                    .run()
+                    .await
+                    .context("failed while serving ntx builder component")
             })
             .id()
     }

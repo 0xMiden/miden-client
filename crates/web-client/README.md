@@ -189,6 +189,14 @@ const accountBalance = updatedAccount
 console.log(accountBalance);
 ```
 
+### Cleanup
+
+When you're finished using a WebClient instance, call `terminate()` to release its Web Worker:
+
+```typescript
+client.terminate();
+```
+
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.

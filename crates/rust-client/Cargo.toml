@@ -27,6 +27,7 @@ default = ["std"]
 std = [
   "miden-protocol/std",
   "miden-remote-prover-client/std",
+  "miden-remote-prover-client/tx-prover",
   "miden-tx/concurrent",
   "tonic/tls-native-roots",
   "tonic/tls-ring",
@@ -75,13 +76,11 @@ prost                            = { default-features = false, features = ["deri
 tonic-prost-build                = { version = "0.14" }
 
 [dev-dependencies]
-miden-client              = { features = ["std", "testing"], path = "." }
-miden-client-sqlite-store = { package = "miden-client-sqlite-store", path = "../sqlite-store" }
-miden-protocol            = { default-features = false, features = ["testing"], workspace = true }
-miden-standards           = { features = ["testing"], workspace = true }
-miden-testing             = { default-features = false, workspace = true }
-tokio                     = { workspace = true }
-web-sys                   = { features = ["console"], version = "0.3" }
+miden-protocol  = { default-features = false, features = ["testing"], workspace = true }
+miden-standards = { features = ["testing"], workspace = true }
+miden-testing   = { default-features = false, workspace = true }
+tokio           = { workspace = true }
+web-sys         = { features = ["console"], version = "0.3" }
 
 [lints]
 workspace = true

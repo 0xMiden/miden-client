@@ -124,7 +124,7 @@ where
 
         let note_screener = NoteScreener::new(self.store.clone(), self.authenticator.clone());
         let state_sync =
-            StateSync::new(self.rpc_api.clone(), Arc::new(note_screener), self.tx_graceful_blocks);
+            StateSync::new(self.rpc_api.clone(), Arc::new(note_screener), self.tx_discard_delta);
 
         // Get current state of the client
         let accounts = self
@@ -151,12 +151,12 @@ where
             self.store.get_transactions(TransactionFilter::Uncommitted).await?;
 
         // Build current partial MMR
-        let current_partial_mmr = self.store.get_current_partial_mmr().await?;
+        let mut current_partial_mmr = self.store.get_current_partial_mmr().await?;
 
         // Get the sync update from the network
         let state_sync_update: StateSyncUpdate = state_sync
             .sync_state(
-                current_partial_mmr,
+                &mut current_partial_mmr,
                 accounts,
                 note_tags,
                 unspent_input_notes,
