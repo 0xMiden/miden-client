@@ -29,9 +29,9 @@ use crate::tests::config::ClientConfig;
 // FPI TESTS
 // ================================================================================================
 
-const MAP_KEY: [Felt; 4] = [Felt::new(15), Felt::new(15), Felt::new(15), Felt::new(15)];
-const MAP_SLOT_NAME: &str = "miden::testing::fpi::map";
-const FPI_STORAGE_VALUE: [Felt; 4] =
+pub(crate) const MAP_KEY: [Felt; 4] = [Felt::new(15), Felt::new(15), Felt::new(15), Felt::new(15)];
+pub(crate) const MAP_SLOT_NAME: &str = "miden::testing::fpi::map";
+pub(crate) const FPI_STORAGE_VALUE: [Felt; 4] =
     [Felt::new(9u64), Felt::new(12u64), Felt::new(18u64), Felt::new(30u64)];
 
 pub async fn test_standard_fpi_public(client_config: ClientConfig) -> Result<()> {
@@ -484,7 +484,7 @@ fn foreign_account_with_code(
 /// A tuple containing:
 /// - `Account` - The deployed foreign account.
 /// - `Word` - The procedure root of the foreign account.
-async fn deploy_foreign_account(
+pub(crate) async fn deploy_foreign_account(
     client: &mut TestClient,
     keystore: &FilesystemKeyStore,
     storage_mode: AccountStorageMode,
