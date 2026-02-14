@@ -48,7 +48,7 @@ use crate::tests::config::ClientConfig;
 // HELPERS
 // ================================================================================================
 
-static COUNTER_SLOT_NAME: LazyLock<StorageSlotName> = LazyLock::new(|| {
+pub(crate) static COUNTER_SLOT_NAME: LazyLock<StorageSlotName> = LazyLock::new(|| {
     StorageSlotName::new("miden::testing::counter_contract::counter").expect("slot name is valid")
 });
 
@@ -94,7 +94,7 @@ const INCR_SCRIPT_CODE: &str = "
 ";
 
 /// Deploys a counter contract as a network account
-async fn deploy_counter_contract(
+pub(crate) async fn deploy_counter_contract(
     client: &mut TestClient,
     storage_mode: AccountStorageMode,
 ) -> Result<Account> {
@@ -287,6 +287,15 @@ fn get_network_note<T: Rng>(
     network_account: AccountId,
     rng: &mut T,
 ) -> Result<Note> {
+    get_network_note_with_script(sender, network_account, INCR_SCRIPT_CODE, rng)
+}
+
+pub(crate) fn get_network_note_with_script<T: Rng>(
+    sender: AccountId,
+    network_account: AccountId,
+    script: &str,
+    rng: &mut T,
+) -> Result<Note> {
     let target = NetworkAccountTarget::new(network_account, NoteExecutionHint::Always)?;
     let attachment: NoteAttachment = target.into();
     let metadata =
@@ -295,7 +304,7 @@ fn get_network_note<T: Rng>(
 
     let script = CodeBuilder::new()
         .with_dynamically_linked_library(counter_contract_library())?
-        .compile_note_script(INCR_SCRIPT_CODE)?;
+        .compile_note_script(script)?;
     let recipient = NoteRecipient::new(
         Word::new([
             Felt::new(rng.random()),

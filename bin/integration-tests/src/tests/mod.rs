@@ -3,6 +3,7 @@ pub mod config;
 pub mod custom_transaction;
 pub mod fpi;
 pub mod network_transaction;
+pub mod network_fpi;
 pub mod onchain;
 pub mod pass_through;
 pub mod swap_transaction;
