@@ -11,6 +11,7 @@
 * Fixed WASM bindings consuming JS objects: `RpcClient` and `WebClient` methods now take references (`&AccountId`, `&Word`) instead of owned values, so callers can reuse objects after passing them ([#1765](https://github.com/0xMiden/miden-client/pull/1765)).
 * Fixed `AccountSmtForest` pruning shared SMT roots between old and new account states, which caused `MerkleError::RootNotInStore` during note screening after `sync_state()` ([#1771](https://github.com/0xMiden/miden-client/pull/1771)).
 * [FEATURE][web] Added `setupLogging(level)` and `logLevel` parameter on `createClient` to route Rust tracing output to the browser console with configurable verbosity ([#1669](https://github.com/0xMiden/miden-client/pull/1669)).
+* [FEATURE][web] Added 3-layer concurrency safety for WASM access: in-tab async lock, cross-tab IndexedDB lock, and auto-sync on cross-tab state changes ([#1784](https://github.com/0xMiden/miden-client/pull/1784)).
 
 ## 0.13.0
 
