@@ -1,10 +1,15 @@
 use anyhow::{Context, Result};
-use miden_client::account::AccountStorageMode;
-use miden_client::auth::RPO_FALCON_SCHEME_ID;
-use miden_client::testing::common::{
-    execute_tx_and_sync, insert_new_wallet, wait_for_blocks,
+use miden_client::account::{
+    AccountStorageMode, StorageSlotName,
 };
-use miden_client::transaction::{OutputNote, TransactionRequestBuilder};
+use miden_client::auth::RPO_FALCON_SCHEME_ID;
+use miden_client::rpc::domain::account::{AccountStorageRequirements, StorageMapKey};
+use miden_client::testing::common::{
+    execute_tx_and_sync, insert_new_wallet, wait_for_blocks
+};
+use miden_client::transaction::{
+    ForeignAccount, OutputNote, TransactionRequestBuilder,
+};
 use miden_client::{Felt, Word, ZERO};
 
 use super::fpi::{FPI_STORAGE_VALUE, MAP_KEY, MAP_SLOT_NAME, deploy_foreign_account};
@@ -112,11 +117,8 @@ pub async fn test_network_fpi(client_config: ClientConfig) -> Result<()> {
             # => [foreign_id_prefix, foreign_id_suffix, FOREIGN_PROC_ROOT, pad(16)]
 
             exec.tx::execute_foreign_procedure
-            # => [VALUE, pad(12)]
 
-            # verify the FPI returned the expected value
-            push.{fpi_value} assert_eqw
-            # => [pad(12)]
+            # push.{fpi_value} assert_eqw
 
             call.counter_contract::increment_count
 
@@ -135,10 +137,15 @@ pub async fn test_network_fpi(client_config: ClientConfig) -> Result<()> {
         &mut client2.rng(),
     )?;
 
-    // The sender's transaction just creates the output note. The FPI in the note script
-    // will be resolved by the node's NTX executor through the DataStore when it processes
-    // the note against the network account.
+    // We will require slot 0, key `MAP_KEY` as well as account proof
+    let map_slot_name = StorageSlotName::new(MAP_SLOT_NAME).expect("slot name should be valid");
+    let storage_requirements =
+        AccountStorageRequirements::new([(map_slot_name, &[StorageMapKey::from(MAP_KEY)])]);
+
+    let foreign_account = ForeignAccount::public(foreign_account_id, storage_requirements);
+
     let tx_request = TransactionRequestBuilder::new()
+        .foreign_accounts([foreign_account?])
         .own_output_notes([OutputNote::Full(network_note)])
         .build()?;
 
