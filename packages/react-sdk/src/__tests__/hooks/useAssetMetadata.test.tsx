@@ -69,9 +69,7 @@ describe("useAssetMetadata", () => {
     const { result } = renderHook(() => useAssetMetadata(["0xfaucet1"]));
 
     await waitFor(() => {
-      expect(result.current.assetMetadata.get("0xfaucet1")?.symbol).toBe(
-        "ETH"
-      );
+      expect(result.current.assetMetadata.get("0xfaucet1")?.symbol).toBe("ETH");
     });
 
     const meta = result.current.assetMetadata.get("0xfaucet1");
@@ -181,12 +179,8 @@ describe("useAssetMetadata", () => {
     });
 
     expect(mockGetAccountDetails).toHaveBeenCalledTimes(2);
-    expect(result.current.assetMetadata.get("0xfaucetA")?.symbol).toBe(
-      "MULTI"
-    );
-    expect(result.current.assetMetadata.get("0xfaucetB")?.symbol).toBe(
-      "MULTI"
-    );
+    expect(result.current.assetMetadata.get("0xfaucetA")?.symbol).toBe("MULTI");
+    expect(result.current.assetMetadata.get("0xfaucetB")?.symbol).toBe("MULTI");
   });
 
   it("should store fallback when BasicFungibleFaucetComponent throws", async () => {
