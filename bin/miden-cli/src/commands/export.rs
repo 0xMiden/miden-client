@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use miden_client::Client;
 use miden_client::account::{Account, AccountFile};
-use miden_client::auth::TransactionAuthenticator;
+use miden_client::keystore::Keystore;
 use miden_client::store::NoteExportType;
 use miden_client::utils::Serializable;
 use tracing::info;
@@ -55,7 +55,7 @@ impl From<&ExportType> for NoteExportType {
 }
 
 impl ExportCmd {
-    pub async fn execute<AUTH: TransactionAuthenticator + Sync>(
+    pub async fn execute<AUTH: Keystore + Sync>(
         &self,
         mut client: Client<AUTH>,
         keystore: FilesystemKeyStore,
@@ -89,17 +89,11 @@ async fn export_account<AUTH>(
         .await?
         .ok_or_else(|| CliError::Export(format!("Account with ID {account_id} not found")))?;
 
-    let commitments = client.get_account_public_key_commitments(&account_id).await?;
+    // Use the Keystore trait method to get all keys for this account
+    let key_pairs = keystore.get_keys_for_account(&account_id).await.map_err(CliError::KeyStore)?;
 
-    let mut key_pairs = vec![];
-
-    for commitment in commitments {
-        key_pairs.push(
-            keystore
-                .get_key(commitment)
-                .map_err(CliError::KeyStore)?
-                .ok_or(CliError::Export("Auth not found for account".to_string()))?,
-        );
+    if key_pairs.is_empty() {
+        return Err(CliError::Export("No keys found for account".to_string()));
     }
 
     let account_data = AccountFile::new(account, key_pairs);
@@ -122,7 +116,7 @@ async fn export_account<AUTH>(
 // EXPORT NOTE
 // ================================================================================================
 
-async fn export_note<AUTH: TransactionAuthenticator + Sync>(
+async fn export_note<AUTH: Keystore + Sync>(
     client: &mut Client<AUTH>,
     note_id: &str,
     filename: Option<PathBuf>,

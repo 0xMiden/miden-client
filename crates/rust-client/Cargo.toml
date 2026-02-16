@@ -54,6 +54,8 @@ hex          = { workspace = true }
 prost        = { default-features = false, features = ["derive"], version = "0.14" }
 prost-types  = { version = "0.14" }
 rand         = { workspace = true }
+serde        = { workspace = true }
+serde_json   = { version = "1.0" }
 thiserror    = { workspace = true }
 tonic        = { default-features = false, features = ["codegen"], version = "0.14" }
 tonic-health = { version = "0.14" }

@@ -8,6 +8,7 @@ use miden_client::auth::{
     AuthSchemeId as NativeAuthScheme,
     AuthSecretKey,
 };
+use miden_client::keystore::Keystore;
 use rand::rngs::StdRng;
 use rand::{RngCore, SeedableRng};
 use wasm_bindgen::prelude::*;
@@ -42,19 +43,9 @@ impl WebClient {
 
             keystore
                 .expect("KeyStore should be initialized")
-                .add_secret_key(&key_pair)
+                .add_key(&key_pair, new_account.id())
                 .await
                 .map_err(|err| err.to_string())?;
-
-            client
-                .register_account_public_key_commitments(
-                    &new_account.id(),
-                    &[key_pair.public_key()],
-                )
-                .await
-                .map_err(|err| {
-                    js_error_with_context(err, "failed to map account to public keys")
-                })?;
 
             Ok(new_account.into())
         } else {
@@ -130,19 +121,9 @@ impl WebClient {
 
             keystore
                 .expect("KeyStore should be initialized")
-                .add_secret_key(&key_pair)
+                .add_key(&key_pair, new_account.id())
                 .await
                 .map_err(|err| err.to_string())?;
-
-            client
-                .register_account_public_key_commitments(
-                    &new_account.id(),
-                    &[key_pair.public_key()],
-                )
-                .await
-                .map_err(|err| {
-                    js_error_with_context(err, "failed to map account to public keys")
-                })?;
 
             match client.add_account(&new_account, false).await {
                 Ok(_) => Ok(new_account.into()),
@@ -182,21 +163,9 @@ impl WebClient {
         let native_account_id = account_id.into();
 
         keystore
-            .add_secret_key(&native_secret_key)
+            .add_key(&native_secret_key, native_account_id)
             .await
             .map_err(|err| err.to_string())?;
-
-        if let Some(client) = self.get_mut_inner() {
-            client
-                .register_account_public_key_commitments(
-                    &native_account_id,
-                    &[native_secret_key.public_key()],
-                )
-                .await
-                .map_err(|err| {
-                    js_error_with_context(err, "failed to map account to public keys")
-                })?;
-        }
 
         Ok(())
     }
