@@ -13,6 +13,30 @@ export * from "../Cargo.toml";
 // ================================================================================================
 
 /**
+ * Set of method names that are synchronous (non-async) on the WASM object
+ * and should NOT be wrapped with the async WASM lock. Wrapping them would
+ * turn their return type from T into Promise<T>, breaking callers that
+ * expect a synchronous return value.
+ *
+ * These methods may still mutate internal client state (e.g. RNG), but they
+ * complete in a single synchronous call without yielding to the event loop.
+ * JavaScript's single-threaded execution guarantees they cannot interleave
+ * with an in-progress async WASM call.
+ *
+ * When updating this set, check the Rust source for any `pub fn` (non-async)
+ * method on `impl WebClient` with #[wasm_bindgen] that is NOT already handled
+ * by an explicit wrapper method on the JS WebClient class.
+ */
+const SYNC_METHODS = new Set([
+  "newMintTransactionRequest",
+  "newSendTransactionRequest",
+  "newConsumeTransactionRequest",
+  "newSwapTransactionRequest",
+  "createCodeBuilder",
+  "buildSwapTag",
+]);
+
+/**
  * Set of method names that mutate state. These are wrapped with the cross-tab
  * write lock (Layer 2) when accessed through the Proxy fallback.
  */
@@ -57,6 +81,12 @@ function createClientProxy(instance) {
       if (target.wasmWebClient && prop in target.wasmWebClient) {
         const value = target.wasmWebClient[prop];
         if (typeof value === "function") {
+          // Synchronous methods: call directly without async wrapping.
+          // These are pure-computation methods whose callers expect a
+          // synchronous return value.
+          if (SYNC_METHODS.has(prop)) {
+            return (...args) => value.apply(target.wasmWebClient, args);
+          }
           // Write methods: cross-tab lock (outer) → WASM lock (inner)
           if (WRITE_METHODS.has(prop)) {
             return (...args) =>
