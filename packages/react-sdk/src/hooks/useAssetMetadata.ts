@@ -9,7 +9,6 @@ import { useMiden } from "../context/MidenProvider";
 import { useAssetMetadataStore, useMidenStore } from "../store/MidenStore";
 import type { AssetMetadata } from "../types";
 import { parseAccountId } from "../utils/accountParsing";
-import { runExclusiveDirect } from "../utils/runExclusive";
 
 const inflight = new Map<string, Promise<void>>();
 const rpcClients = new Map<string, RpcClient>();
@@ -60,8 +59,7 @@ const fetchAssetMetadata = async (
 };
 
 export function useAssetMetadata(assetIds: string[] = []) {
-  const { client, isReady, runExclusive } = useMiden();
-  const runExclusiveSafe = runExclusive ?? runExclusiveDirect;
+  const { client, isReady } = useMiden();
   const assetMetadata = useAssetMetadataStore();
   const setAssetMetadata = useMidenStore((state) => state.setAssetMetadata);
   const rpcUrl = useMidenStore((state) => state.config.rpcUrl);
@@ -81,14 +79,14 @@ export function useAssetMetadata(assetIds: string[] = []) {
         existing?.symbol !== undefined || existing?.decimals !== undefined;
       if (hasMetadata || inflight.has(assetId)) return;
 
-      const promise = runExclusiveSafe(async () => {
+      const promise = (async () => {
         const metadata = await fetchAssetMetadata(
           client as never,
           rpcClient,
           assetId
         );
         setAssetMetadata(assetId, metadata ?? { assetId });
-      }).finally(() => {
+      })().finally(() => {
         inflight.delete(assetId);
       });
 
@@ -99,7 +97,6 @@ export function useAssetMetadata(assetIds: string[] = []) {
     isReady,
     uniqueAssetIds,
     assetMetadata,
-    runExclusiveSafe,
     setAssetMetadata,
     rpcClient,
   ]);

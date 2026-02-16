@@ -84,13 +84,18 @@ export function MidenProvider({
     ]
   );
 
+  // Exposed for advanced consumers who need to serialize custom multi-step
+  // operations against the client. Built-in hooks no longer use this since
+  // the WebClient handles concurrency internally via Layers 1-3.
   const runExclusive = useCallback(
     async <T,>(fn: () => Promise<T>): Promise<T> =>
       clientLockRef.current.runExclusive(fn),
     []
   );
 
-  // Sync function
+  // Sync function — the WebClient's Layer 1 (AsyncLock) and Layer 2 (Web
+  // Locks) now handle concurrency internally, so we no longer wrap in
+  // runExclusive here.
   const sync = useCallback(async () => {
     if (!client || !isReady) return;
 
@@ -99,29 +104,27 @@ export function MidenProvider({
 
     setSyncState({ isSyncing: true, error: null });
 
-    await runExclusive(async () => {
-      try {
-        const summary = await client.syncState();
-        const syncHeight = summary.blockNum();
+    try {
+      const summary = await client.syncState();
+      const syncHeight = summary.blockNum();
 
-        setSyncState({
-          syncHeight,
-          isSyncing: false,
-          lastSyncTime: Date.now(),
-          error: null,
-        });
+      setSyncState({
+        syncHeight,
+        isSyncing: false,
+        lastSyncTime: Date.now(),
+        error: null,
+      });
 
-        // Trigger account and note refresh after sync
-        const accounts = await client.getAccounts();
-        useMidenStore.getState().setAccounts(accounts);
-      } catch (error) {
-        setSyncState({
-          isSyncing: false,
-          error: error instanceof Error ? error : new Error(String(error)),
-        });
-      }
-    });
-  }, [client, isReady, runExclusive, setSyncState]);
+      // Trigger account and note refresh after sync
+      const accounts = await client.getAccounts();
+      useMidenStore.getState().setAccounts(accounts);
+    } catch (error) {
+      setSyncState({
+        isSyncing: false,
+        error: error instanceof Error ? error : new Error(String(error)),
+      });
+    }
+  }, [client, isReady, setSyncState]);
 
   // Initialize client
   useEffect(() => {
@@ -278,6 +281,42 @@ export function MidenProvider({
       }
     };
   }, [isReady, client, config.autoSyncInterval, sync]);
+
+  // Cross-tab state change listener (Layer 3).
+  // The WebClient auto-syncs on cross-tab changes, so the in-memory Rust
+  // state is already fresh. We just need to refresh the Zustand store
+  // (accounts, sync metadata) so the React UI re-renders.
+  // Debounced to avoid thundering-herd refreshes when rapid writes occur.
+  useEffect(() => {
+    if (!isReady || !client) return;
+
+    let timeoutId: ReturnType<typeof setTimeout>;
+
+    // The WebClient exposes onStateChanged when BroadcastChannel is available.
+    const unsubscribe = (
+      client as unknown as {
+        onStateChanged?: (
+          cb: (event: { type: string; operation?: string }) => void
+        ) => () => void;
+      }
+    ).onStateChanged?.(() => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(async () => {
+        try {
+          const accounts = await client.getAccounts();
+          useMidenStore.getState().setAccounts(accounts);
+          setSyncState({ lastSyncTime: Date.now() });
+        } catch {
+          // Non-fatal — next explicit sync will catch up.
+        }
+      }, 300);
+    });
+
+    return () => {
+      clearTimeout(timeoutId);
+      unsubscribe?.();
+    };
+  }, [isReady, client, setSyncState]);
 
   // Render loading state when a custom component is provided.
   if (isInitializing && loadingComponent) {
