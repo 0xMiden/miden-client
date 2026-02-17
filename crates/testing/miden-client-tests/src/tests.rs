@@ -727,7 +727,7 @@ async fn note_without_asset() {
     let serial_num = client.rng().draw_word();
     let recipient = utils::build_p2id_recipient(wallet.id(), serial_num).unwrap();
     let tag = NoteTag::with_account_target(wallet.id());
-    let metadata = NoteMetadata::new(wallet.id(), NoteType::Private, tag);
+    let metadata = NoteMetadata::new(wallet.id(), NoteType::Private).with_tag(tag);
     let vault = NoteAssets::new(vec![]).unwrap();
 
     let note = Note::new(vault.clone(), metadata, recipient.clone());
@@ -744,7 +744,7 @@ async fn note_without_asset() {
     assert!(transaction.is_ok());
 
     // Create the same transaction for the faucet
-    let metadata = NoteMetadata::new(faucet.id(), NoteType::Private, tag);
+    let metadata = NoteMetadata::new(faucet.id(), NoteType::Private).with_tag(tag);
     let note = Note::new(vault, metadata, recipient);
 
     let transaction_request = TransactionRequestBuilder::new()
@@ -2313,7 +2313,7 @@ async fn account_addresses_basic_wallet() {
     // Even when the account has a basic wallet, the address list should not contain it by default
     let routing_params = RoutingParameters::new(AddressInterface::BasicWallet);
     let basic_wallet_address =
-        Address::new(account.id()).with_routing_parameters(routing_params).unwrap();
+        Address::new(account.id()).with_routing_parameters(routing_params);
     assert!(!addresses.contains(&basic_wallet_address));
 }
 
@@ -2332,7 +2332,7 @@ async fn account_addresses_non_basic_wallet() {
 
     let routing_params = RoutingParameters::new(AddressInterface::BasicWallet);
     let basic_wallet_address =
-        Address::new(account.id()).with_routing_parameters(routing_params).unwrap();
+        Address::new(account.id()).with_routing_parameters(routing_params);
     assert!(!addresses.contains(&basic_wallet_address));
 }
 
@@ -2358,7 +2358,7 @@ async fn account_add_address_after_creation() {
     // as it is already present after account creation
     let routing_params = RoutingParameters::new(AddressInterface::BasicWallet);
     let basic_wallet_address =
-        Address::new(account.id()).with_routing_parameters(routing_params).unwrap();
+        Address::new(account.id()).with_routing_parameters(routing_params);
     assert!(client.add_address(basic_wallet_address.clone(), account.id()).await.is_err());
 
     // We can remove the basic wallet address
@@ -2409,7 +2409,7 @@ async fn consume_note_with_custom_script() {
     let note_storage = NoteStorage::new(vec![]).unwrap();
     let serial_num = client.rng().draw_word();
     let note_metadata =
-        NoteMetadata::new(sender_id, NoteType::Private, NoteTag::with_account_target(receiver_id));
+        NoteMetadata::new(sender_id, NoteType::Private).with_tag(NoteTag::with_account_target(receiver_id));
     let note_assets = NoteAssets::new(vec![]).unwrap();
     let note_recipient = NoteRecipient::new(serial_num, note_script.clone(), note_storage);
     let custom_note = Note::new(note_assets, note_metadata, note_recipient);

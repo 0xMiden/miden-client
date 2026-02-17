@@ -22,7 +22,7 @@ use miden_protocol::note::{
 use miden_protocol::transaction::{OutputNote, TransactionScript};
 use miden_protocol::vm::AdviceMap;
 use miden_protocol::{Felt, Word};
-use miden_standards::note::{create_p2id_note, create_p2ide_note, create_swap_note};
+use miden_standards::note::{P2idNote, P2ideNote, SwapNote};
 
 use super::{
     ForeignAccount,
@@ -288,8 +288,8 @@ impl TransactionRequestBuilder {
         note_type: NoteType,
         rng: &mut ClientRng,
     ) -> Result<TransactionRequest, TransactionRequestError> {
-        let created_note = create_p2id_note(
-            asset.faucet_id(),
+        let created_note = P2idNote::create(
+                        asset.faucet_id(),
             target_id,
             vec![asset.into()],
             note_type,
@@ -350,7 +350,7 @@ impl TransactionRequestBuilder {
     ) -> Result<TransactionRequest, TransactionRequestError> {
         // The created note is the one that we need as the output of the tx, the other one is the
         // one that we expect to receive and consume eventually.
-        let (created_note, payback_note_details) = create_swap_note(
+        let (created_note, payback_note_details) = SwapNote::create(
             swap_data.account_id(),
             swap_data.offered_asset(),
             swap_data.requested_asset(),
@@ -524,7 +524,7 @@ impl PaymentNoteDescription {
     ) -> Result<Note, NoteError> {
         if self.reclaim_height.is_none() && self.timelock_height.is_none() {
             // Create a P2ID note
-            create_p2id_note(
+            P2idNote::create(
                 self.sender_account_id,
                 self.target_account_id,
                 self.assets,
@@ -534,7 +534,7 @@ impl PaymentNoteDescription {
             )
         } else {
             // Create a P2IDE note
-            create_p2ide_note(
+            P2ideNote::create(
                 self.sender_account_id,
                 self.target_account_id,
                 self.assets,

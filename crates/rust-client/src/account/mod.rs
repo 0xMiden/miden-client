@@ -106,7 +106,6 @@ pub mod component {
     };
     pub use miden_standards::account::faucets::{
         BasicFungibleFaucet,
-        FungibleFaucetExt,
         NetworkFungibleFaucet,
     };
     pub use miden_standards::account::wallets::BasicWallet;
@@ -202,7 +201,7 @@ impl<AUTH> Client<AUTH> {
                     // the one in the network
                     let network_account_commitment =
                         self.rpc_api.get_account_details(account.id()).await?.commitment();
-                    if network_account_commitment != account.commitment() {
+                    if network_account_commitment != account.to_commitment() {
                         return Err(ClientError::AccountCommitmentMismatch(
                             network_account_commitment,
                         ));

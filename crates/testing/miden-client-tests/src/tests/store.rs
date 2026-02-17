@@ -118,9 +118,9 @@ async fn load_accounts_test() {
     assert_eq!(accounts.len(), 2);
 
     let actual_commitments: BTreeSet<_> =
-        accounts.into_iter().map(|(header, _)| header.commitment()).collect();
+        accounts.into_iter().map(|(header, _)| header.to_commitment()).collect();
     let expected_commitments: BTreeSet<_> =
-        expected_accounts.into_iter().map(|account| account.commitment()).collect();
+        expected_accounts.into_iter().map(|account| account.to_commitment()).collect();
 
     assert_eq!(actual_commitments, expected_commitments);
 }
@@ -144,9 +144,9 @@ async fn load_ecdsa_accounts_test() {
     assert_eq!(accounts.len(), 2);
 
     let actual_commitments: BTreeSet<_> =
-        accounts.into_iter().map(|(header, _)| header.commitment()).collect();
+        accounts.into_iter().map(|(header, _)| header.to_commitment()).collect();
     let expected_commitments: BTreeSet<_> =
-        expected_accounts.into_iter().map(|account| account.commitment()).collect();
+        expected_accounts.into_iter().map(|account| account.to_commitment()).collect();
 
     assert_eq!(actual_commitments, expected_commitments);
 }

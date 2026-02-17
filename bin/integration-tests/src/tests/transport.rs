@@ -161,8 +161,7 @@ async fn run_flow(
 
     // Build recipient address
     let recipient_address = Address::new(recipient_account.id())
-        .with_routing_parameters(RoutingParameters::new(AddressInterface::BasicWallet))
-        .context("failed to build recipient address")?;
+        .with_routing_parameters(RoutingParameters::new(AddressInterface::BasicWallet));
 
     // Ensure recipient has no input notes
     recipient.sync_state().await.context("recipient initial sync")?;

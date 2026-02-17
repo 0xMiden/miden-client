@@ -11,7 +11,7 @@ use std::vec::Vec;
 use anyhow::{Context, Result};
 use miden_protocol::Felt;
 use miden_protocol::account::auth::AuthSecretKey;
-use miden_protocol::account::{Account, AccountId, AccountStorageMode};
+use miden_protocol::account::{Account, AccountComponentMetadata, AccountId, AccountStorageMode};
 use miden_protocol::asset::{FungibleAsset, TokenSymbol};
 use miden_protocol::note::NoteType;
 use miden_protocol::testing::account_id::ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE;
@@ -26,7 +26,7 @@ use crate::account::{AccountBuilder, AccountType, StorageSlot};
 use crate::auth::AuthSchemeId;
 use crate::crypto::FeltRng;
 pub use crate::keystore::{FilesystemKeyStore, Keystore};
-use crate::note::{Note, NoteAttachment, create_p2id_note};
+use crate::note::{Note, NoteAttachment, P2idNote};
 use crate::rpc::RpcError;
 use crate::store::{NoteFilter, TransactionFilter};
 use crate::sync::SyncSummary;
@@ -472,14 +472,7 @@ pub fn mint_multiple_fungible_asset(
         .iter()
         .map(|account_id| {
             OutputNote::Full(
-                create_p2id_note(
-                    asset.faucet_id(),
-                    *account_id,
-                    vec![asset.into()],
-                    note_type,
-                    NoteAttachment::default(),
-                    rng,
-                )
+                P2idNote::create(asset.faucet_id(), *account_id, vec![asset.into()], note_type, NoteAttachment::default(), rng)
                 .unwrap(),
             )
         })
@@ -545,9 +538,8 @@ pub async fn insert_account_with_custom_component(
     let component_code = CodeBuilder::default()
         .compile_component_code("custom::component", custom_code)
         .map_err(|err| ClientError::TransactionRequestError(err.into()))?;
-    let custom_component = AccountComponent::new(component_code, storage_slots)
-        .map_err(ClientError::AccountError)?
-        .with_supports_all_types();
+    let custom_component = AccountComponent::new(component_code, storage_slots, AccountComponentMetadata::new("miden::testing::custom_component").with_supports_all_types())
+        .map_err(ClientError::AccountError)?;
 
     let mut init_seed = [0u8; 32];
     client.rng().fill_bytes(&mut init_seed);

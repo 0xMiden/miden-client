@@ -292,9 +292,7 @@ pub async fn test_onchain_notes_sync_with_tag(client_config: ClientConfig) -> Re
     let serial_num = client_1.rng().draw_word();
     let note_metadata = NoteMetadata::new(
         basic_account_1.id(),
-        NoteType::Public,
-        NoteTag::with_account_target(basic_account_1.id()),
-    );
+        NoteType::Public).with_tag(NoteTag::with_account_target(basic_account_1.id()));
     let note_assets = NoteAssets::new(vec![])?;
     let note_recipient = NoteRecipient::new(serial_num, note_script, inputs);
     let note = Note::new(note_assets, note_metadata, note_recipient);
@@ -377,9 +375,7 @@ fn create_custom_note(
     let serial_num = rng.draw_word();
     let note_metadata = NoteMetadata::new(
         faucet_account_id,
-        NoteType::Private,
-        NoteTag::with_account_target(target_account_id),
-    );
+        NoteType::Private).with_tag(NoteTag::with_account_target(target_account_id));
     let note_assets = NoteAssets::new(vec![
         FungibleAsset::new(faucet_account_id, 10)
             .context("failed to create fungible asset")?

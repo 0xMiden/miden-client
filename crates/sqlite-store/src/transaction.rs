@@ -137,8 +137,8 @@ impl SqliteStore {
 
         let details = TransactionDetails {
             account_id: executed_transaction.account_id(),
-            init_account_state: executed_transaction.initial_account().commitment(),
-            final_account_state: executed_transaction.final_account().commitment(),
+            init_account_state: executed_transaction.initial_account().to_commitment(),
+            final_account_state: executed_transaction.final_account().to_commitment(),
             input_note_nullifiers: nullifiers,
             output_notes: output_notes.clone(),
             block_num: executed_transaction.block_header().block_num(),
