@@ -17,7 +17,7 @@ use super::NodeRpcClientEndpoint;
 
 #[derive(Debug, Error)]
 pub enum RpcError {
-    #[error("accept header validation failed: {0}")]
+    #[error("accept header validation failed")]
     AcceptHeaderError(#[from] AcceptHeaderError),
     #[error(
         "unexpected update received for private account {0}; private account state should not be sent by the node"
@@ -67,19 +67,19 @@ impl From<RpcConversionError> for RpcError {
 
 #[derive(Debug, Error)]
 pub enum RpcConversionError {
-    #[error("failed to deserialize: {0}")]
+    #[error("failed to deserialize")]
     DeserializationError(#[from] DeserializationError),
     #[error(
         "invalid field element: value is outside the valid range (0..modulus, where modulus = 2^64 - 2^32 + 1)"
     )]
     NotAValidFelt,
-    #[error("invalid note type in node response: {0}")]
+    #[error("invalid note type in node response")]
     NoteTypeError(#[from] NoteError),
-    #[error("merkle proof error in node response: {0}")]
+    #[error("merkle proof error in node response")]
     MerkleError(#[from] MerkleError),
     #[error("invalid field in node response: {0}")]
     InvalidField(String),
-    #[error("integer conversion failed in node response: {0}")]
+    #[error("integer conversion failed in node response")]
     InvalidInt(#[from] TryFromIntError),
     #[error("field `{field_name}` expected to be present in protobuf representation of {entity}")]
     MissingFieldInProtobufRepresentation {
