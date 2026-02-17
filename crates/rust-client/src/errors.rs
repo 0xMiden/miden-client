@@ -136,8 +136,8 @@ pub enum ClientError {
     StoreError(#[from] StoreError),
     #[error("transaction execution failed")]
     TransactionExecutorError(#[from] TransactionExecutorError),
-    #[error("invalid transaction input: {0}")]
-    TransactionInputError(#[source] TransactionInputError),
+    #[error("invalid transaction input")]
+TransactionInputError(#[source] TransactionInputError),
     #[error("transaction proving failed")]
     TransactionProvingError(#[from] TransactionProverError),
     #[error("invalid transaction request")]
