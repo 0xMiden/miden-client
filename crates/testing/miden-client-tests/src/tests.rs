@@ -462,6 +462,80 @@ async fn sync_state_mmr() {
     assert_eq!(client.test_store().get_tracked_block_headers().await.unwrap().len(), 2);
 }
 
+/// Tests that MMR authentication nodes are persisted even when `include_block` is false
+/// (i.e., a synced block has no relevant notes and is not the chain tip).
+///
+/// This covers the scenario where a browser extension popup is closed and reopened:
+/// the in-memory `PartialMmr` is lost and must be fully reconstructable from the store.
+/// Without persisting auth nodes for skipped blocks, the store would be missing nodes
+/// needed for Merkle authentication paths, causing transaction execution to fail.
+#[tokio::test]
+async fn sync_persists_auth_nodes_for_skipped_blocks() {
+    use miden_client::async_trait;
+    use miden_client::rpc::domain::note::CommittedNote;
+    use miden_client::store::InputNoteRecord;
+    use miden_client::sync::{NoteUpdateAction, OnNoteReceived, StateSync};
+    use miden_protocol::crypto::merkle::mmr::{Forest, MmrPeaks, PartialMmr};
+
+    // A note screener that discards all notes, forcing `found_relevant_note = false`
+    // for every sync step. This means only the chain tip will have `include_block = true`.
+    struct DiscardAllNotes;
+
+    #[async_trait(?Send)]
+    impl OnNoteReceived for DiscardAllNotes {
+        async fn on_note_received(
+            &self,
+            _committed_note: CommittedNote,
+            _public_note: Option<InputNoteRecord>,
+        ) -> Result<NoteUpdateAction, ClientError> {
+            Ok(NoteUpdateAction::Discard)
+        }
+    }
+
+    // Set up the mock chain (blocks 0-5, notes in blocks 1 and 4)
+    let (_client, rpc_api, _) = Box::pin(create_test_client()).await;
+
+    // Build a PartialMmr starting from an empty forest with the genesis block tracked.
+    // Tracking genesis is critical: it means the MMR must produce authentication nodes
+    // for genesis whenever the tree structure changes (i.e., when new blocks are added).
+    let genesis = rpc_api.get_block_header_by_number(Some(0.into()), false).await.unwrap().0;
+    let mut partial_mmr = PartialMmr::from_peaks(MmrPeaks::new(Forest::empty(), vec![]).unwrap());
+    partial_mmr.add(genesis.commitment(), true); // track genesis
+
+    // Create a StateSync that discards all notes so intermediate blocks are skipped
+    let state_sync = StateSync::new(Arc::new(rpc_api.clone()), Arc::new(DiscardAllNotes), None);
+
+    // Use the note tag from the prebuilt chain (tag 0) so the mock RPC returns
+    // blocks step-by-step (block 1, then block 4, then the chain tip) instead of
+    // jumping directly to the chain tip.
+    let note_tags = BTreeSet::from([NoteTag::new(0)]);
+
+    let state_sync_update = state_sync
+        .sync_state(partial_mmr, vec![], note_tags, vec![], vec![], vec![])
+        .await
+        .unwrap();
+
+    // Only the chain tip block should be stored as a block header.
+    // Blocks 1 and 4 had matching note tags but the screener discarded them,
+    // so `include_block` was false for those steps.
+    assert_eq!(
+        state_sync_update.block_updates.block_headers().len(),
+        1,
+        "expected only the chain tip block header to be stored"
+    );
+    let (tip_header, ..) = &state_sync_update.block_updates.block_headers()[0];
+    assert_eq!(tip_header.block_num(), rpc_api.get_chain_tip_block_num());
+
+    // Authentication nodes must be non-empty: they include nodes produced during
+    // the intermediate sync steps (blocks 1 and 4) via `extend_authentication_nodes`.
+    // These nodes are needed for the tracked genesis leaf's Merkle proof path, which
+    // changes as the tree grows.
+    assert!(
+        !state_sync_update.block_updates.new_authentication_nodes().is_empty(),
+        "expected authentication nodes from intermediate (skipped) blocks to be persisted"
+    );
+}
+
 #[tokio::test]
 async fn sync_state_tags() {
     // generate test client with a random store name
