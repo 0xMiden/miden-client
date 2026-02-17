@@ -1,20 +1,16 @@
 use anyhow::{Context, Result};
-use miden_client::account::{
-    AccountStorageMode, StorageSlotName,
-};
+use miden_client::account::{AccountStorageMode, StorageSlotName};
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
 use miden_client::rpc::domain::account::{AccountStorageRequirements, StorageMapKey};
-use miden_client::testing::common::{
-    execute_tx_and_sync, insert_new_wallet, wait_for_blocks
-};
-use miden_client::transaction::{
-    ForeignAccount, OutputNote, TransactionRequestBuilder,
-};
+use miden_client::testing::common::{execute_tx_and_sync, insert_new_wallet, wait_for_blocks};
+use miden_client::transaction::{ForeignAccount, OutputNote, TransactionRequestBuilder};
 use miden_client::{Felt, Word, ZERO};
 
 use super::fpi::{FPI_STORAGE_VALUE, MAP_KEY, MAP_SLOT_NAME, deploy_foreign_account};
 use super::network_transaction::{
-    COUNTER_SLOT_NAME, deploy_counter_contract, get_network_note_with_script,
+    COUNTER_SLOT_NAME,
+    deploy_counter_contract,
+    get_network_note_with_script,
 };
 use crate::tests::config::ClientConfig;
 

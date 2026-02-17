@@ -69,7 +69,8 @@ pub async fn test_pass_through(client_config: ClientConfig) -> Result<()> {
     )
     .await?;
 
-    let pass_through_account = create_pass_through_account(&mut client).await?;
+    let pass_through_account =
+        create_pass_through_account(&mut client, AccountStorageMode::Private).await?;
 
     // Create client with faucets BTC faucet
     let (btc_faucet_account, ..) = insert_new_fungible_faucet(
@@ -189,8 +190,9 @@ pub async fn test_pass_through(client_config: ClientConfig) -> Result<()> {
 // HELPERS
 // ================================================================================================
 
-async fn create_pass_through_account<AUTH: TransactionAuthenticator>(
+pub(crate) async fn create_pass_through_account<AUTH: TransactionAuthenticator>(
     client: &mut Client<AUTH>,
+    storage_mode: AccountStorageMode,
 ) -> Result<Account> {
     let mut init_seed = [0u8; 32];
     client.rng().fill_bytes(&mut init_seed);
@@ -206,7 +208,7 @@ async fn create_pass_through_account<AUTH: TransactionAuthenticator>(
 
     let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountImmutableCode)
-        .storage_mode(AccountStorageMode::Private)
+        .storage_mode(storage_mode)
         .with_auth_component(auth_component)
         .with_component(BasicWallet)
         .build()
@@ -216,7 +218,7 @@ async fn create_pass_through_account<AUTH: TransactionAuthenticator>(
     Ok(account)
 }
 
-fn get_pass_through_note_script() -> NoteScript {
+pub(crate) fn get_pass_through_note_script() -> NoteScript {
     let note_script_code = include_str!("../asm/PASS_THROUGH.masm");
 
     CodeBuilder::new().compile_note_script(note_script_code).unwrap()
@@ -250,8 +252,7 @@ fn create_pass_through_note(
         NoteTag::with_account_target(target).into(),
     ])?;
 
-    let serial_num = rng.draw_word();
-    let pass_through_recipient = NoteRecipient::new(serial_num, note_script, inputs);
+    let pass_through_recipient = NoteRecipient::new(rng.draw_word(), note_script, inputs);
 
     let metadata =
         NoteMetadata::new(sender, NoteType::Public).with_tag(NoteTag::with_account_target(target));
