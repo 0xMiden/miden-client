@@ -21,6 +21,7 @@ const mockBuilder = {
   accountType: vi.fn().mockReturnThis(),
   storageMode: vi.fn().mockReturnThis(),
   withBasicWalletComponent: vi.fn().mockReturnThis(),
+  withComponent: vi.fn().mockReturnThis(),
   build: vi.fn(() => mockBuildResult),
 };
 
@@ -244,6 +245,40 @@ describe("initializeSignerAccount", () => {
       await initializeSignerAccount(mockClient, config);
 
       expect(mockClient.newAccount).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("custom components", () => {
+    it("should add custom components via withComponent", async () => {
+      const mockComponent1 = { name: "component1" };
+      const mockComponent2 = { name: "component2" };
+      const config = createMockSignerAccountConfig({
+        customComponents: [mockComponent1, mockComponent2] as any,
+      });
+
+      await initializeSignerAccount(mockClient, config);
+
+      expect(mockBuilder.withComponent).toHaveBeenCalledTimes(2);
+      expect(mockBuilder.withComponent).toHaveBeenCalledWith(mockComponent1);
+      expect(mockBuilder.withComponent).toHaveBeenCalledWith(mockComponent2);
+    });
+
+    it("should not call withComponent when no custom components", async () => {
+      const config = createMockSignerAccountConfig();
+
+      await initializeSignerAccount(mockClient, config);
+
+      expect(mockBuilder.withComponent).not.toHaveBeenCalled();
+    });
+
+    it("should not call withComponent when customComponents is empty", async () => {
+      const config = createMockSignerAccountConfig({
+        customComponents: [] as any,
+      });
+
+      await initializeSignerAccount(mockClient, config);
+
+      expect(mockBuilder.withComponent).not.toHaveBeenCalled();
     });
   });
 
