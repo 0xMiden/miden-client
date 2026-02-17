@@ -319,8 +319,8 @@ fn transaction_executor_hint(err: &TransactionExecutorError) -> Option<ErrorHint
 #[derive(Debug, Error)]
 pub enum IdPrefixFetchError {
     /// No matches were found for the ID prefix.
-    #[error("no {0} matched the provided prefix")]
-    NoMatch(String),
+    #[error("no stored notes matched the provided prefix '{0}'")]
+NoMatch(String),
     /// Multiple entities matched with the ID prefix.
     #[error(
         "multiple {0} entries match the provided prefix; provide a longer prefix to narrow it down"
