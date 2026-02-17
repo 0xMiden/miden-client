@@ -136,6 +136,10 @@ jobs:
           rustup update --no-self-update
           rustup target add wasm32-unknown-unknown
 
+      - name: Install binaryen (wasm-opt)
+        run: |
+          sudo apt-get update && sudo apt-get install -y binaryen
+
       - name: Add Rust Cache
         uses: Swatinem/rust-cache@v2
 
