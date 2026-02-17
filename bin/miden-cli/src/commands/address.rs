@@ -154,8 +154,7 @@ async fn add_address<AUTH>(
         None => RoutingParameters::new(interface),
     };
     let address = Address::new(account_id)
-        .with_routing_parameters(routing_params)
-        .map_err(|err| CliError::Address(err, "Failed to set routing params".to_string()))?;
+        .with_routing_parameters(routing_params);
 
     let note_tag = NoteTag::with_account_target(account_id);
     client.add_address(address, account_id).await?;

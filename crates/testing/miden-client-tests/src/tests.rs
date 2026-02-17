@@ -65,18 +65,7 @@ use miden_client::transaction::{
 use miden_client::{ClientError, DebugMode};
 use miden_client_sqlite_store::ClientBuilderSqliteExt;
 use miden_protocol::account::{
-    Account,
-    AccountBuilder,
-    AccountCode,
-    AccountComponent,
-    AccountHeader,
-    AccountId,
-    AccountStorageMode,
-    AccountType,
-    StorageMap,
-    StorageSlot,
-    StorageSlotContent,
-    StorageSlotName,
+    Account, AccountBuilder, AccountCode, AccountComponent, AccountComponentMetadata, AccountHeader, AccountId, AccountStorageMode, AccountType, StorageMap, StorageSlot, StorageSlotContent, StorageSlotName
 };
 use miden_protocol::asset::{Asset, AssetVaultKey, AssetWitness, FungibleAsset, TokenSymbol};
 use miden_protocol::crypto::rand::{FeltRng, RpoRandomCoin};
@@ -106,7 +95,7 @@ use miden_protocol::{EMPTY_WORD, Felt, ONE, Word};
 use miden_standards::account::faucets::BasicFungibleFaucet;
 use miden_standards::account::interface::AccountInterfaceError;
 use miden_standards::account::wallets::BasicWallet;
-use miden_standards::note::{NoteConsumptionStatus, StandardNote, utils};
+use miden_standards::note::{NoteConsumptionStatus, StandardNote, P2idNote};
 use miden_standards::testing::mock_account::MockAccountExt;
 use miden_standards::testing::note::NoteBuilder;
 use miden_testing::{MockChain, MockChainBuilder, TxContextInput};
@@ -725,7 +714,7 @@ async fn note_without_asset() {
 
     // Create note without assets
     let serial_num = client.rng().draw_word();
-    let recipient = utils::build_p2id_recipient(wallet.id(), serial_num).unwrap();
+    let recipient = P2idNote::build_recipient(wallet.id(), serial_num).unwrap();
     let tag = NoteTag::with_account_target(wallet.id());
     let metadata = NoteMetadata::new(wallet.id(), NoteType::Private).with_tag(tag);
     let vault = NoteAssets::new(vec![]).unwrap();
@@ -2086,9 +2075,8 @@ async fn empty_storage_map() {
         .unwrap();
     let map_slot_name = StorageSlotName::new(EMPTY_STORAGE_MAP_SLOT_NAME).unwrap();
     let map_slot = StorageSlot::with_map(map_slot_name, storage_map);
-    let component = AccountComponent::new(component_code, vec![map_slot])
-        .unwrap()
-        .with_supports_all_types();
+    let component = AccountComponent::new(component_code, vec![map_slot], AccountComponentMetadata::new("miden::testing::dummy_component").with_supports_all_types())
+        .unwrap();
 
     let key_pair = AuthSecretKey::new_falcon512_rpo();
     let pub_key = key_pair.public_key();
@@ -2173,9 +2161,8 @@ async fn storage_and_vault_proofs() {
         .unwrap();
     let bump_map_slot_name = StorageSlotName::new(BUMP_MAP_SLOT_NAME).unwrap();
     let bump_map_slot = StorageSlot::with_map(bump_map_slot_name.clone(), storage_map);
-    let bump_item_component = AccountComponent::new(bump_component_code, vec![bump_map_slot])
-        .unwrap()
-        .with_supports_all_types();
+    let bump_item_component = AccountComponent::new(bump_component_code, vec![bump_map_slot], AccountComponentMetadata::new("miden::testing::bump_map_component").with_supports_all_types())
+        .unwrap();
 
     // Build script that bumps the storage map item and adds a new one each time.
     let assembler: Assembler = TransactionKernel::assembler();
@@ -2872,9 +2859,8 @@ async fn storage_and_vault_proofs_ecdsa() {
         .unwrap();
     let bump_map_slot_name = StorageSlotName::new(BUMP_MAP_SLOT_NAME).unwrap();
     let bump_map_slot = StorageSlot::with_map(bump_map_slot_name.clone(), storage_map);
-    let bump_item_component = AccountComponent::new(bump_component_code, vec![bump_map_slot])
-        .unwrap()
-        .with_supports_all_types();
+    let bump_item_component = AccountComponent::new(bump_component_code, vec![bump_map_slot], AccountComponentMetadata::new("miden::testing::bump_map_component").with_supports_all_types())
+        .unwrap();
 
     // Build script that bumps the storage map item and adds a new one each time.
     let assembler: Assembler = TransactionKernel::assembler();

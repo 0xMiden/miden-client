@@ -30,6 +30,7 @@ use miden_client::auth::{AuthFalcon512Rpo, PublicKeyCommitment};
 use miden_client::store::Store;
 use miden_client::testing::common::ACCOUNT_ID_REGULAR;
 use miden_client::{EMPTY_WORD, ONE, ZERO};
+use miden_protocol::account::AccountComponentMetadata;
 use miden_protocol::testing::account_id::{
     ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
     ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET,
@@ -46,7 +47,7 @@ async fn account_code_insertion_no_duplicates() -> anyhow::Result<()> {
     let component_code = CodeBuilder::default()
         .compile_component_code("miden::testing::dummy_component", "pub proc dummy nop end")?;
     let account_component =
-        AccountComponent::new(component_code, vec![])?.with_supports_all_types();
+        AccountComponent::new(component_code, vec![], AccountComponentMetadata::new("miden::testing::dummy_component").with_supports_all_types())?;
     let account_code = AccountCode::from_components(
         &[
             AuthFalcon512Rpo::new(PublicKeyCommitment::from(EMPTY_WORD)).into(),
@@ -101,8 +102,8 @@ async fn apply_account_delta_additions() -> anyhow::Result<()> {
             StorageSlot::with_empty_value(value_slot_name.clone()),
             StorageSlot::with_empty_map(map_slot_name.clone()),
         ],
-    )?
-    .with_supports_all_types();
+        AccountComponentMetadata::new("miden::testing::dummy_component").with_supports_all_types()
+    )?;
 
     // Create and insert an account
     let account = AccountBuilder::new([0; 32])
@@ -192,8 +193,8 @@ async fn apply_account_delta_removals() -> anyhow::Result<()> {
             StorageSlot::with_value(value_slot_name.clone(), [ZERO, ZERO, ZERO, ONE].into()),
             StorageSlot::with_map(map_slot_name.clone(), dummy_map),
         ],
-    )?
-    .with_supports_all_types();
+        AccountComponentMetadata::new("miden::testing::dummy_component").with_supports_all_types()
+    )?;
 
     // Create and insert an account
     let assets: Vec<Asset> = vec![
@@ -293,8 +294,8 @@ async fn get_account_storage_item_success() -> anyhow::Result<()> {
     let dummy_component = AccountComponent::new(
         basic_wallet_library(),
         vec![StorageSlot::with_value(value_slot_name.clone(), test_value.into())],
-    )?
-    .with_supports_all_types();
+        AccountComponentMetadata::new("miden::testing::dummy_component").with_supports_all_types()
+    )?;
 
     let account = AccountBuilder::new([0; 32])
         .account_type(AccountType::RegularAccountImmutableCode)
@@ -323,8 +324,8 @@ async fn get_account_storage_item_not_found() -> anyhow::Result<()> {
     let dummy_component = AccountComponent::new(
         basic_wallet_library(),
         vec![StorageSlot::with_empty_value(value_slot_name)],
-    )?
-    .with_supports_all_types();
+        AccountComponentMetadata::new("miden::testing::dummy_component").with_supports_all_types()
+    )?;
 
     let account = AccountBuilder::new([0; 32])
         .account_type(AccountType::RegularAccountImmutableCode)
@@ -361,8 +362,8 @@ async fn get_account_map_item_success() -> anyhow::Result<()> {
     let dummy_component = AccountComponent::new(
         basic_wallet_library(),
         vec![StorageSlot::with_map(map_slot_name.clone(), storage_map)],
-    )?
-    .with_supports_all_types();
+        AccountComponentMetadata::new("miden::testing::dummy_component").with_supports_all_types()
+    )?;
 
     let account = AccountBuilder::new([0; 32])
         .account_type(AccountType::RegularAccountImmutableCode)
@@ -392,8 +393,8 @@ async fn get_account_map_item_value_slot_error() -> anyhow::Result<()> {
     let dummy_component = AccountComponent::new(
         basic_wallet_library(),
         vec![StorageSlot::with_empty_value(value_slot_name.clone())],
-    )?
-    .with_supports_all_types();
+        AccountComponentMetadata::new("miden::testing::dummy_component").with_supports_all_types()
+    )?;
 
     let account = AccountBuilder::new([0; 32])
         .account_type(AccountType::RegularAccountImmutableCode)
@@ -418,7 +419,7 @@ async fn get_account_code() -> anyhow::Result<()> {
     let store = create_test_store().await;
 
     let dummy_component =
-        AccountComponent::new(basic_wallet_library(), vec![])?.with_supports_all_types();
+        AccountComponent::new(basic_wallet_library(), vec![], AccountComponentMetadata::new("miden::testing::dummy_component").with_supports_all_types())?;
 
     let account = AccountBuilder::new([0; 32])
         .account_type(AccountType::RegularAccountImmutableCode)
@@ -465,7 +466,7 @@ async fn account_reader_nonce_and_status() -> anyhow::Result<()> {
     let store = Arc::new(create_test_store().await);
 
     let dummy_component =
-        AccountComponent::new(basic_wallet_library(), vec![])?.with_supports_all_types();
+        AccountComponent::new(basic_wallet_library(), vec![], AccountComponentMetadata::new("miden::testing::dummy_component").with_supports_all_types())?;
 
     let account = AccountBuilder::new([0; 32])
         .account_type(AccountType::RegularAccountImmutableCode)
@@ -490,7 +491,7 @@ async fn account_reader_nonce_and_status() -> anyhow::Result<()> {
 
     // Test commitment
     let commitment = reader.commitment().await?;
-    assert_eq!(commitment, account.commitment());
+    assert_eq!(commitment, account.to_commitment());
 
     Ok(())
 }
@@ -537,8 +538,8 @@ async fn account_reader_storage_access() -> anyhow::Result<()> {
     let dummy_component = AccountComponent::new(
         basic_wallet_library(),
         vec![StorageSlot::with_value(value_slot_name.clone(), test_value.into())],
-    )?
-    .with_supports_all_types();
+        AccountComponentMetadata::new("miden::testing::dummy_component").with_supports_all_types(),
+    )?;
 
     let account = AccountBuilder::new([0; 32])
         .account_type(AccountType::RegularAccountImmutableCode)
@@ -569,7 +570,7 @@ async fn account_reader_addresses_access() -> anyhow::Result<()> {
     let store = Arc::new(create_test_store().await);
 
     let dummy_component =
-        AccountComponent::new(basic_wallet_library(), vec![])?.with_supports_all_types();
+        AccountComponent::new(basic_wallet_library(), vec![], AccountComponentMetadata::new("miden::testing::dummy_component").with_supports_all_types())?;
 
     let account = AccountBuilder::new([0; 32])
         .account_type(AccountType::RegularAccountImmutableCode)
