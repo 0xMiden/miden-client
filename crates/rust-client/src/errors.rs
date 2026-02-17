@@ -144,8 +144,8 @@ TransactionInputError(#[source] TransactionInputError),
     TransactionRequestError(#[from] TransactionRequestError),
     #[error("failed to build transaction script from account interface")]
     AccountInterfaceError(#[from] AccountInterfaceError),
-    #[error("transaction script error: {0}")]
-    TransactionScriptError(#[source] TransactionScriptError),
+    #[error("transaction script error")]
+TransactionScriptError(#[source] TransactionScriptError),
     #[error("client initialization error: {0}")]
     ClientInitializationError(String),
     #[error("cannot track more note tags: the maximum of {0} tracked tags has been reached")]
