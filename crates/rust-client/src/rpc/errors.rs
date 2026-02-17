@@ -11,6 +11,7 @@ use miden_protocol::utils::DeserializationError;
 use thiserror::Error;
 
 use super::NodeRpcClientEndpoint;
+use crate::errors::ErrorCode;
 
 // RPC ERROR
 // ================================================================================================
@@ -60,6 +61,22 @@ impl From<RpcConversionError> for RpcError {
     }
 }
 
+impl ErrorCode for RpcError {
+    fn error_code(&self) -> &'static str {
+        match self {
+            Self::AcceptHeaderError(_) => "MIDEN-RP-001",
+            Self::AccountUpdateForPrivateAccountReceived(_) => "MIDEN-RP-002",
+            Self::ConnectionError(_) => "MIDEN-RP-003",
+            Self::DeserializationError(_) => "MIDEN-RP-004",
+            Self::ExpectedDataMissing(_) => "MIDEN-RP-005",
+            Self::InvalidResponse(_) => "MIDEN-RP-006",
+            Self::GrpcError { .. } => "MIDEN-RP-007",
+            Self::NoteNotFound(_) => "MIDEN-RP-008",
+            Self::InvalidNodeEndpoint(_) => "MIDEN-RP-009",
+        }
+    }
+}
+
 // RPC CONVERSION ERROR
 // ================================================================================================
 
@@ -82,6 +99,20 @@ pub enum RpcConversionError {
         entity: &'static str,
         field_name: &'static str,
     },
+}
+
+impl ErrorCode for RpcConversionError {
+    fn error_code(&self) -> &'static str {
+        match self {
+            Self::DeserializationError(_) => "MIDEN-RC-001",
+            Self::NotAValidFelt => "MIDEN-RC-002",
+            Self::NoteTypeError(_) => "MIDEN-RC-003",
+            Self::MerkleError(_) => "MIDEN-RC-004",
+            Self::InvalidField(_) => "MIDEN-RC-005",
+            Self::InvalidInt(_) => "MIDEN-RC-006",
+            Self::MissingFieldInProtobufRepresentation { .. } => "MIDEN-RC-007",
+        }
+    }
 }
 
 // GRPC ERROR KIND
@@ -152,6 +183,29 @@ impl GrpcError {
     }
 }
 
+impl ErrorCode for GrpcError {
+    fn error_code(&self) -> &'static str {
+        match self {
+            Self::NotFound => "MIDEN-GR-001",
+            Self::InvalidArgument => "MIDEN-GR-002",
+            Self::PermissionDenied => "MIDEN-GR-003",
+            Self::AlreadyExists => "MIDEN-GR-004",
+            Self::ResourceExhausted => "MIDEN-GR-005",
+            Self::FailedPrecondition => "MIDEN-GR-006",
+            Self::Cancelled => "MIDEN-GR-007",
+            Self::DeadlineExceeded => "MIDEN-GR-008",
+            Self::Unavailable => "MIDEN-GR-009",
+            Self::Internal => "MIDEN-GR-010",
+            Self::Unimplemented => "MIDEN-GR-011",
+            Self::Unauthenticated => "MIDEN-GR-012",
+            Self::Aborted => "MIDEN-GR-013",
+            Self::OutOfRange => "MIDEN-GR-014",
+            Self::DataLoss => "MIDEN-GR-015",
+            Self::Unknown(_) => "MIDEN-GR-016",
+        }
+    }
+}
+
 // ACCEPT HEADER ERROR
 // ================================================================================================
 
@@ -182,5 +236,14 @@ impl AcceptHeaderError {
             return Some(Self::ParsingError(message.to_string()));
         }
         None
+    }
+}
+
+impl ErrorCode for AcceptHeaderError {
+    fn error_code(&self) -> &'static str {
+        match self {
+            Self::NoSupportedMediaRange => "MIDEN-AH-001",
+            Self::ParsingError(_) => "MIDEN-AH-002",
+        }
     }
 }

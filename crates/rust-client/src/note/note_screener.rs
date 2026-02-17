@@ -13,6 +13,7 @@ use miden_tx::{NoteCheckerError, NoteConsumptionChecker, TransactionExecutor};
 use thiserror::Error;
 
 use crate::ClientError;
+use crate::errors::ErrorCode;
 use crate::rpc::domain::note::CommittedNote;
 use crate::store::data_store::ClientDataStore;
 use crate::store::{InputNoteRecord, NoteFilter, Store, StoreError};
@@ -197,6 +198,18 @@ pub enum NoteScreenerError {
     TransactionRequestError(#[from] TransactionRequestError),
 }
 
+impl ErrorCode for NoteScreenerError {
+    fn error_code(&self) -> &'static str {
+        match self {
+            Self::InvalidNoteInputsError(_) => "MIDEN-NS-001",
+            Self::AccountDataNotFound(_) => "MIDEN-NS-002",
+            Self::StoreError(_) => "MIDEN-NS-003",
+            Self::NoteCheckerError(_) => "MIDEN-NS-004",
+            Self::TransactionRequestError(_) => "MIDEN-NS-005",
+        }
+    }
+}
+
 #[derive(Debug, Error)]
 pub enum InvalidNoteInputsError {
     #[error("account error for note with id {0}: {1}")]
@@ -207,4 +220,15 @@ pub enum InvalidNoteInputsError {
     WrongNumInputs(NoteId, usize),
     #[error("note input representing block with value {1} for note with id {0}")]
     BlockNumberError(NoteId, u64),
+}
+
+impl ErrorCode for InvalidNoteInputsError {
+    fn error_code(&self) -> &'static str {
+        match self {
+            Self::AccountError(..) => "MIDEN-NI-001",
+            Self::AssetError(..) => "MIDEN-NI-002",
+            Self::WrongNumInputs(..) => "MIDEN-NI-003",
+            Self::BlockNumberError(..) => "MIDEN-NI-004",
+        }
+    }
 }

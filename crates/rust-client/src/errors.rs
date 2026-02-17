@@ -28,6 +28,19 @@ use crate::rpc::RpcError;
 use crate::store::{NoteRecordError, StoreError};
 use crate::transaction::TransactionRequestError;
 
+// ERROR CODE TRAIT
+// ================================================================================================
+
+/// Provides a stable, machine-readable error code for every error variant.
+///
+/// Codes follow the format `MIDEN-XX-NNN` where `XX` is an enum-specific prefix
+/// and `NNN` is a sequential number. Once assigned, a code is never reused even
+/// if the corresponding variant is removed.
+pub trait ErrorCode {
+    /// Returns the stable error code for this error variant.
+    fn error_code(&self) -> &'static str;
+}
+
 // ACTIONABLE HINTS
 // ================================================================================================
 
@@ -155,6 +168,53 @@ impl From<ClientError> for String {
     }
 }
 
+impl ErrorCode for ClientError {
+    fn error_code(&self) -> &'static str {
+        match self {
+            Self::AddressAlreadyTracked(_) => "MIDEN-CL-001",
+            Self::AccountAlreadyTracked(_) => "MIDEN-CL-002",
+            Self::NoteTagDerivedAddressAlreadyTracked(..) => "MIDEN-CL-003",
+            Self::AccountError(_) => "MIDEN-CL-004",
+            Self::AccountLocked(_) => "MIDEN-CL-005",
+            Self::AccountCommitmentMismatch(_) => "MIDEN-CL-006",
+            Self::AccountIsPrivate(_) => "MIDEN-CL-007",
+            Self::AccountNonceTooLow => "MIDEN-CL-008",
+            Self::AssetError(_) => "MIDEN-CL-009",
+            Self::AccountDataNotFound(_) => "MIDEN-CL-010",
+            Self::PartialBlockchainError(_) => "MIDEN-CL-011",
+            Self::DataDeserializationError(_) => "MIDEN-CL-012",
+            Self::NoteNotFoundOnChain(_) => "MIDEN-CL-013",
+            Self::HexParseError(_) => "MIDEN-CL-014",
+            Self::InvalidPartialMmrForest => "MIDEN-CL-015",
+            Self::AddNewAccountWithoutSeed => "MIDEN-CL-016",
+            Self::MerkleError(_) => "MIDEN-CL-017",
+            Self::MissingOutputRecipients(_) => "MIDEN-CL-018",
+            Self::NoteError(_) => "MIDEN-CL-019",
+            Self::NoteCheckerError(_) => "MIDEN-CL-020",
+            Self::NoteImportError(_) => "MIDEN-CL-021",
+            Self::NoteRecordConversionError(_) => "MIDEN-CL-022",
+            Self::NoteTransportError(_) => "MIDEN-CL-023",
+            Self::NoConsumableNoteForAccount(_) => "MIDEN-CL-024",
+            Self::RpcError(_) => "MIDEN-CL-025",
+            Self::RecencyConditionError(_) => "MIDEN-CL-026",
+            Self::NoteScreenerError(_) => "MIDEN-CL-027",
+            Self::StoreError(_) => "MIDEN-CL-028",
+            Self::TransactionExecutorError(_) => "MIDEN-CL-029",
+            Self::TransactionInputError(_) => "MIDEN-CL-030",
+            Self::TransactionProvingError(_) => "MIDEN-CL-031",
+            Self::TransactionRequestError(_) => "MIDEN-CL-032",
+            Self::AccountInterfaceError(_) => "MIDEN-CL-033",
+            Self::TransactionScriptError(_) => "MIDEN-CL-034",
+            Self::ClientInitializationError(_) => "MIDEN-CL-035",
+            Self::NoteTagsLimitExceeded(_) => "MIDEN-CL-036",
+            Self::AccountsLimitExceeded(_) => "MIDEN-CL-037",
+            Self::UnsupportedAuthSchemeId(_) => "MIDEN-CL-038",
+            Self::AccountRecordNotFull(_) => "MIDEN-CL-039",
+            Self::AccountRecordNotPartial(_) => "MIDEN-CL-040",
+        }
+    }
+}
+
 impl From<&ClientError> for Option<ErrorHint> {
     fn from(err: &ClientError) -> Self {
         match err {
@@ -251,4 +311,250 @@ pub enum IdPrefixFetchError {
     /// Multiple entities matched with the ID prefix.
     #[error("found more than one element for the provided {0} and only one match is expected")]
     MultipleMatches(String),
+}
+
+impl ErrorCode for IdPrefixFetchError {
+    fn error_code(&self) -> &'static str {
+        match self {
+            Self::NoMatch(_) => "MIDEN-IP-001",
+            Self::MultipleMatches(_) => "MIDEN-IP-002",
+        }
+    }
+}
+
+// ERROR CODE TESTS
+// ================================================================================================
+
+#[cfg(test)]
+mod error_code_tests {
+    extern crate std;
+
+    use std::collections::HashSet;
+
+    use super::*;
+
+    /// All known error codes across the crate. When adding a new variant to any
+    /// error enum, add its code here so the uniqueness/format tests catch regressions.
+    fn all_known_codes() -> std::vec::Vec<&'static str> {
+        std::vec![
+            // ClientError (MIDEN-CL-001..040)
+            "MIDEN-CL-001",
+            "MIDEN-CL-002",
+            "MIDEN-CL-003",
+            "MIDEN-CL-004",
+            "MIDEN-CL-005",
+            "MIDEN-CL-006",
+            "MIDEN-CL-007",
+            "MIDEN-CL-008",
+            "MIDEN-CL-009",
+            "MIDEN-CL-010",
+            "MIDEN-CL-011",
+            "MIDEN-CL-012",
+            "MIDEN-CL-013",
+            "MIDEN-CL-014",
+            "MIDEN-CL-015",
+            "MIDEN-CL-016",
+            "MIDEN-CL-017",
+            "MIDEN-CL-018",
+            "MIDEN-CL-019",
+            "MIDEN-CL-020",
+            "MIDEN-CL-021",
+            "MIDEN-CL-022",
+            "MIDEN-CL-023",
+            "MIDEN-CL-024",
+            "MIDEN-CL-025",
+            "MIDEN-CL-026",
+            "MIDEN-CL-027",
+            "MIDEN-CL-028",
+            "MIDEN-CL-029",
+            "MIDEN-CL-030",
+            "MIDEN-CL-031",
+            "MIDEN-CL-032",
+            "MIDEN-CL-033",
+            "MIDEN-CL-034",
+            "MIDEN-CL-035",
+            "MIDEN-CL-036",
+            "MIDEN-CL-037",
+            "MIDEN-CL-038",
+            "MIDEN-CL-039",
+            "MIDEN-CL-040",
+            // IdPrefixFetchError (MIDEN-IP-001..002)
+            "MIDEN-IP-001",
+            "MIDEN-IP-002",
+            // RpcError (MIDEN-RP-001..009)
+            "MIDEN-RP-001",
+            "MIDEN-RP-002",
+            "MIDEN-RP-003",
+            "MIDEN-RP-004",
+            "MIDEN-RP-005",
+            "MIDEN-RP-006",
+            "MIDEN-RP-007",
+            "MIDEN-RP-008",
+            "MIDEN-RP-009",
+            // GrpcError (MIDEN-GR-001..016)
+            "MIDEN-GR-001",
+            "MIDEN-GR-002",
+            "MIDEN-GR-003",
+            "MIDEN-GR-004",
+            "MIDEN-GR-005",
+            "MIDEN-GR-006",
+            "MIDEN-GR-007",
+            "MIDEN-GR-008",
+            "MIDEN-GR-009",
+            "MIDEN-GR-010",
+            "MIDEN-GR-011",
+            "MIDEN-GR-012",
+            "MIDEN-GR-013",
+            "MIDEN-GR-014",
+            "MIDEN-GR-015",
+            "MIDEN-GR-016",
+            // AcceptHeaderError (MIDEN-AH-001..002)
+            "MIDEN-AH-001",
+            "MIDEN-AH-002",
+            // RpcConversionError (MIDEN-RC-001..007)
+            "MIDEN-RC-001",
+            "MIDEN-RC-002",
+            "MIDEN-RC-003",
+            "MIDEN-RC-004",
+            "MIDEN-RC-005",
+            "MIDEN-RC-006",
+            "MIDEN-RC-007",
+            // StoreError (MIDEN-ST-001..031)
+            "MIDEN-ST-001",
+            "MIDEN-ST-002",
+            "MIDEN-ST-003",
+            "MIDEN-ST-004",
+            "MIDEN-ST-005",
+            "MIDEN-ST-006",
+            "MIDEN-ST-007",
+            "MIDEN-ST-008",
+            "MIDEN-ST-009",
+            "MIDEN-ST-010",
+            "MIDEN-ST-011",
+            "MIDEN-ST-012",
+            "MIDEN-ST-013",
+            "MIDEN-ST-014",
+            "MIDEN-ST-015",
+            "MIDEN-ST-016",
+            "MIDEN-ST-017",
+            "MIDEN-ST-018",
+            "MIDEN-ST-019",
+            "MIDEN-ST-020",
+            "MIDEN-ST-021",
+            "MIDEN-ST-022",
+            "MIDEN-ST-023",
+            "MIDEN-ST-024",
+            "MIDEN-ST-025",
+            "MIDEN-ST-026",
+            "MIDEN-ST-027",
+            "MIDEN-ST-028",
+            "MIDEN-ST-029",
+            "MIDEN-ST-030",
+            "MIDEN-ST-031",
+            // NoteRecordError (MIDEN-NR-001..006)
+            "MIDEN-NR-001",
+            "MIDEN-NR-002",
+            "MIDEN-NR-003",
+            "MIDEN-NR-004",
+            "MIDEN-NR-005",
+            "MIDEN-NR-006",
+            // TransactionRequestError (MIDEN-TX-001..023)
+            "MIDEN-TX-001",
+            "MIDEN-TX-002",
+            "MIDEN-TX-003",
+            "MIDEN-TX-004",
+            "MIDEN-TX-005",
+            "MIDEN-TX-006",
+            "MIDEN-TX-007",
+            "MIDEN-TX-008",
+            "MIDEN-TX-009",
+            "MIDEN-TX-010",
+            "MIDEN-TX-011",
+            "MIDEN-TX-012",
+            "MIDEN-TX-013",
+            "MIDEN-TX-014",
+            "MIDEN-TX-015",
+            "MIDEN-TX-016",
+            "MIDEN-TX-017",
+            "MIDEN-TX-018",
+            "MIDEN-TX-019",
+            "MIDEN-TX-020",
+            "MIDEN-TX-021",
+            "MIDEN-TX-022",
+            "MIDEN-TX-023",
+            // NoteTransportError (MIDEN-NT-001..004)
+            "MIDEN-NT-001",
+            "MIDEN-NT-002",
+            "MIDEN-NT-003",
+            "MIDEN-NT-004",
+            // NoteScreenerError (MIDEN-NS-001..005)
+            "MIDEN-NS-001",
+            "MIDEN-NS-002",
+            "MIDEN-NS-003",
+            "MIDEN-NS-004",
+            "MIDEN-NS-005",
+            // InvalidNoteInputsError (MIDEN-NI-001..004)
+            "MIDEN-NI-001",
+            "MIDEN-NI-002",
+            "MIDEN-NI-003",
+            "MIDEN-NI-004",
+            // KeyStoreError (MIDEN-KS-001..002)
+            "MIDEN-KS-001",
+            "MIDEN-KS-002",
+            // TokenParseError (MIDEN-TP-001..004)
+            "MIDEN-TP-001",
+            "MIDEN-TP-002",
+            "MIDEN-TP-003",
+            "MIDEN-TP-004",
+            // AccountProofError (MIDEN-AP-001..003)
+            "MIDEN-AP-001",
+            "MIDEN-AP-002",
+            "MIDEN-AP-003",
+            // SqliteStoreError (MIDEN-SQ-001..004) — defined in sqlite-store crate
+            "MIDEN-SQ-001",
+            "MIDEN-SQ-002",
+            "MIDEN-SQ-003",
+            "MIDEN-SQ-004",
+        ]
+    }
+
+    /// Verifies all error codes match the expected format `MIDEN-XX-NNN`.
+    #[test]
+    fn error_codes_have_correct_format() {
+        let is_valid = |code: &str| -> bool {
+            let parts: std::vec::Vec<&str> = code.split('-').collect();
+            parts.len() == 3
+                && parts[0] == "MIDEN"
+                && parts[1].len() == 2
+                && parts[1].chars().all(|c| c.is_ascii_uppercase())
+                && parts[2].len() == 3
+                && parts[2].chars().all(|c| c.is_ascii_digit())
+        };
+
+        for code in all_known_codes() {
+            assert!(
+                is_valid(code),
+                "Error code '{code}' does not match the expected format MIDEN-XX-NNN"
+            );
+        }
+    }
+
+    /// Verifies that no two error variants share the same error code.
+    #[test]
+    fn error_codes_are_unique() {
+        let mut seen = HashSet::new();
+        for code in all_known_codes() {
+            assert!(seen.insert(code), "Duplicate error code found: {code}");
+        }
+    }
+
+    /// Spot-check a few representative variants to ensure the impl returns
+    /// the expected code. This guards against copy-paste mistakes.
+    #[test]
+    fn spot_check_error_codes() {
+        assert_eq!(ClientError::AccountNonceTooLow.error_code(), "MIDEN-CL-008");
+        assert_eq!(ClientError::InvalidPartialMmrForest.error_code(), "MIDEN-CL-015");
+        assert_eq!(ClientError::NoteImportError(Default::default()).error_code(), "MIDEN-CL-021");
+        assert_eq!(IdPrefixFetchError::NoMatch(Default::default()).error_code(), "MIDEN-IP-001");
+    }
 }

@@ -22,6 +22,7 @@ use miden_tx::DataStoreError;
 use thiserror::Error;
 
 use super::note_record::NoteRecordError;
+use crate::errors::ErrorCode;
 
 // STORE ERROR
 // ================================================================================================
@@ -92,6 +93,44 @@ pub enum StoreError {
     VaultDataNotFound(Word),
     #[error("failed to parse word: {0}")]
     WordError(#[from] WordError),
+}
+
+impl ErrorCode for StoreError {
+    fn error_code(&self) -> &'static str {
+        match self {
+            Self::AssetError(_) => "MIDEN-ST-001",
+            Self::AssetVaultError(_) => "MIDEN-ST-002",
+            Self::AccountCodeDataNotFound(_) => "MIDEN-ST-003",
+            Self::AccountDataNotFound(_) => "MIDEN-ST-004",
+            Self::AccountError(_) => "MIDEN-ST-005",
+            Self::AddressError(_) => "MIDEN-ST-006",
+            Self::AccountIdError(_) => "MIDEN-ST-007",
+            Self::AccountCommitmentMismatch(_) => "MIDEN-ST-008",
+            Self::AccountKeyNotFound(_) => "MIDEN-ST-009",
+            Self::AccountStorageRootNotFound(_) => "MIDEN-ST-010",
+            Self::AccountStorageIndexNotFound(_) => "MIDEN-ST-011",
+            Self::BlockHeaderNotFound(_) => "MIDEN-ST-012",
+            Self::PartialBlockchainNodeNotFound(_) => "MIDEN-ST-013",
+            Self::DataDeserializationError(_) => "MIDEN-ST-014",
+            Self::DatabaseError(_) => "MIDEN-ST-015",
+            Self::HexParseError(_) => "MIDEN-ST-016",
+            Self::InvalidInt(_) => "MIDEN-ST-017",
+            Self::NoteRecordError(_) => "MIDEN-ST-018",
+            Self::MerkleStoreError(_) => "MIDEN-ST-019",
+            Self::MmrError(_) => "MIDEN-ST-020",
+            Self::NoteInclusionProofError(_) => "MIDEN-ST-021",
+            Self::NoteTagAlreadyTracked(_) => "MIDEN-ST-022",
+            Self::NoteTransportCursorNotFound => "MIDEN-ST-023",
+            Self::NoteScriptNotFound(_) => "MIDEN-ST-024",
+            Self::ParsingError(_) => "MIDEN-ST-025",
+            Self::QueryError(_) => "MIDEN-ST-026",
+            Self::SmtProofError(_) => "MIDEN-ST-027",
+            Self::StorageMapError(_) => "MIDEN-ST-028",
+            Self::TransactionScriptError(_) => "MIDEN-ST-029",
+            Self::VaultDataNotFound(_) => "MIDEN-ST-030",
+            Self::WordError(_) => "MIDEN-ST-031",
+        }
+    }
 }
 
 impl From<StoreError> for DataStoreError {

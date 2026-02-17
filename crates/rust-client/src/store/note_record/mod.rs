@@ -23,6 +23,8 @@ use alloc::string::{String, ToString};
 use miden_protocol::errors::NoteError;
 use thiserror::Error;
 
+use crate::errors::ErrorCode;
+
 mod input_note_record;
 mod output_note_record;
 
@@ -67,6 +69,19 @@ pub enum NoteRecordError {
     /// Error generated during a state transition.
     #[error("state transition error: {0}")]
     StateTransitionError(String),
+}
+
+impl ErrorCode for NoteRecordError {
+    fn error_code(&self) -> &'static str {
+        match self {
+            Self::ConversionError(_) => "MIDEN-NR-001",
+            Self::NoteError(_) => "MIDEN-NR-002",
+            Self::NoteNotConsumable(_) => "MIDEN-NR-003",
+            Self::InvalidInclusionProof => "MIDEN-NR-004",
+            Self::InvalidStateTransition(_) => "MIDEN-NR-005",
+            Self::StateTransitionError(_) => "MIDEN-NR-006",
+        }
+    }
 }
 
 impl From<NoteRecordError> for String {

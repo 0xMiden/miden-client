@@ -1,5 +1,6 @@
 use std::string::{String, ToString};
 
+use miden_client::errors::ErrorCode;
 use rusqlite::Error as RusqliteError;
 use rusqlite_migration::Error as MigrationError;
 use thiserror::Error;
@@ -18,6 +19,17 @@ pub enum SqliteStoreError {
     MissingMigrationsTable,
     #[error("Migration hashes mismatch")]
     MigrationHashMismatch,
+}
+
+impl ErrorCode for SqliteStoreError {
+    fn error_code(&self) -> &'static str {
+        match self {
+            Self::DatabaseError(_) => "MIDEN-SQ-001",
+            Self::MigrationError(_) => "MIDEN-SQ-002",
+            Self::MissingMigrationsTable => "MIDEN-SQ-003",
+            Self::MigrationHashMismatch => "MIDEN-SQ-004",
+        }
+    }
 }
 
 impl From<RusqliteError> for SqliteStoreError {

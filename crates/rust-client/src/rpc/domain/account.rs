@@ -26,6 +26,7 @@ use thiserror::Error;
 
 use crate::alloc::borrow::ToOwned;
 use crate::alloc::string::ToString;
+use crate::errors::ErrorCode;
 use crate::rpc::RpcError;
 use crate::rpc::domain::MissingFieldHelper;
 use crate::rpc::errors::RpcConversionError;
@@ -715,4 +716,14 @@ pub enum AccountProofError {
         "the received code commitment doesn't match the received account header's code commitment"
     )]
     InconsistentCodeCommitment,
+}
+
+impl ErrorCode for AccountProofError {
+    fn error_code(&self) -> &'static str {
+        match self {
+            Self::InconsistentAccountCommitment => "MIDEN-AP-001",
+            Self::InconsistentAccountId => "MIDEN-AP-002",
+            Self::InconsistentCodeCommitment => "MIDEN-AP-003",
+        }
+    }
 }

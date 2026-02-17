@@ -19,6 +19,7 @@ pub use miden_tx::utils::{
 };
 
 use crate::alloc::borrow::ToOwned;
+use crate::errors::ErrorCode;
 
 /// Converts an amount in the faucet base units to the token's decimals.
 ///
@@ -54,6 +55,17 @@ pub enum TokenParseError {
     ParseU64(#[source] ParseIntError),
     #[error("Amount has more than {0} decimal places")]
     TooManyDecimals(u8),
+}
+
+impl ErrorCode for TokenParseError {
+    fn error_code(&self) -> &'static str {
+        match self {
+            Self::MaxDecimals(_) => "MIDEN-TP-001",
+            Self::MultipleDecimalPoints => "MIDEN-TP-002",
+            Self::ParseU64(_) => "MIDEN-TP-003",
+            Self::TooManyDecimals(_) => "MIDEN-TP-004",
+        }
+    }
 }
 
 /// Converts a decimal number, represented as a string, into an integer by shifting

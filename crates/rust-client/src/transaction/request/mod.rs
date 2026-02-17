@@ -33,6 +33,7 @@ pub use builder::{PaymentNoteDescription, SwapTransactionData, TransactionReques
 mod foreign;
 pub use foreign::{ForeignAccount, account_proof_into_inputs};
 
+use crate::errors::ErrorCode;
 use crate::store::InputNoteRecord;
 
 // TRANSACTION REQUEST
@@ -471,6 +472,36 @@ pub enum TransactionRequestError {
     AssetVaultError(#[from] AssetVaultError),
     #[error("unsupported authentication scheme ID: {0}")]
     UnsupportedAuthSchemeId(u8),
+}
+
+impl ErrorCode for TransactionRequestError {
+    fn error_code(&self) -> &'static str {
+        match self {
+            Self::AccountInterfaceError(_) => "MIDEN-TX-001",
+            Self::AccountError(_) => "MIDEN-TX-002",
+            Self::DuplicateInputNote(_) => "MIDEN-TX-003",
+            Self::ForeignAccountDataMissing => "MIDEN-TX-004",
+            Self::ForeignAccountStorageSlotInvalidIndex(_) => "MIDEN-TX-005",
+            Self::InvalidForeignAccountId(_) => "MIDEN-TX-006",
+            Self::InputNoteNotAuthenticated(_) => "MIDEN-TX-007",
+            Self::InputNoteAlreadyConsumed(_) => "MIDEN-TX-008",
+            Self::InvalidNoteVariant => "MIDEN-TX-009",
+            Self::InvalidSenderAccount(_) => "MIDEN-TX-010",
+            Self::InvalidTransactionScript(_) => "MIDEN-TX-011",
+            Self::MerkleError(_) => "MIDEN-TX-012",
+            Self::NoInputNotesNorAccountChange => "MIDEN-TX-013",
+            Self::NoteNotFound(_) => "MIDEN-TX-014",
+            Self::NoteCreationError(_) => "MIDEN-TX-015",
+            Self::P2IDNoteWithoutAsset => "MIDEN-TX-016",
+            Self::CodeBuilderError(_) => "MIDEN-TX-017",
+            Self::ScriptTemplateError(_) => "MIDEN-TX-018",
+            Self::StorageSlotNotFound(..) => "MIDEN-TX-019",
+            Self::TransactionInputError(_) => "MIDEN-TX-020",
+            Self::StorageMapError(_) => "MIDEN-TX-021",
+            Self::AssetVaultError(_) => "MIDEN-TX-022",
+            Self::UnsupportedAuthSchemeId(_) => "MIDEN-TX-023",
+        }
+    }
 }
 
 // TESTS

@@ -14,6 +14,7 @@ use miden_client::testing::note_transport::MockNoteTransportApi;
 use miden_client::{
     Client,
     ClientError,
+    ErrorCode,
     ErrorHint,
     ExecutionOptions,
     Felt,
@@ -318,10 +319,15 @@ where
     }
 
     let help = hint_from_error(&err);
+    let code = error_code_from_chain(&err);
     let js_error: JsValue = JsError::new(&error_string).into();
 
     if let Some(help) = help {
         let _ = Reflect::set(&js_error, &JsValue::from_str("help"), &JsValue::from_str(&help));
+    }
+
+    if let Some(code) = code {
+        let _ = Reflect::set(&js_error, &JsValue::from_str("code"), &JsValue::from_str(code));
     }
 
     js_error
@@ -333,4 +339,45 @@ fn hint_from_error(err: &(dyn Error + 'static)) -> Option<String> {
     }
 
     err.source().and_then(hint_from_error)
+}
+
+/// Walks the error source chain and returns the first error code found by
+/// downcasting to known error types that implement [`ErrorCode`].
+fn error_code_from_chain(err: &(dyn Error + 'static)) -> Option<&'static str> {
+    use miden_client::keystore::KeyStoreError;
+    use miden_client::note::NoteScreenerError;
+    use miden_client::note_transport::NoteTransportError;
+    use miden_client::rpc::{AcceptHeaderError, GrpcError, RpcConversionError, RpcError};
+    use miden_client::store::{NoteRecordError, StoreError};
+    use miden_client::transaction::TransactionRequestError;
+
+    macro_rules! try_downcast {
+        ($err:expr, $($ty:ty),+ $(,)?) => {
+            $(
+                if let Some(e) = $err.downcast_ref::<$ty>() {
+                    return Some(e.error_code());
+                }
+            )+
+        };
+    }
+
+    let mut current: Option<&(dyn Error + 'static)> = Some(err);
+    while let Some(e) = current {
+        try_downcast!(
+            e,
+            ClientError,
+            RpcError,
+            GrpcError,
+            AcceptHeaderError,
+            RpcConversionError,
+            StoreError,
+            NoteRecordError,
+            TransactionRequestError,
+            NoteTransportError,
+            NoteScreenerError,
+            KeyStoreError,
+        );
+        current = e.source();
+    }
+    None
 }
