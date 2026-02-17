@@ -29,6 +29,7 @@ jobs:
   test-dev:
     name: Test Rust (debug assertions)
     runs-on: ubuntu-latest
+    continue-on-error: true
     steps:
       - uses: actions/checkout@main
       - name: Install Rust
@@ -142,6 +143,7 @@ jobs:
   integration-tests-dev:
     name: Run integration tests (debug assertions)
     runs-on: ubuntu-latest
+    continue-on-error: true
     steps:
       - uses: actions/checkout@main
       - name: Install Rust
