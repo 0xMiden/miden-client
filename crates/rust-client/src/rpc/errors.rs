@@ -24,7 +24,7 @@ pub enum RpcError {
     )]
     AccountUpdateForPrivateAccountReceived(AccountId),
     #[error("failed to connect to the Miden node")]
-ConnectionError(#[source] Box<dyn Error + Send + Sync + 'static>),
+    ConnectionError(#[source] Box<dyn Error + Send + Sync + 'static>),
     #[error("failed to deserialize response from the Miden node: {0}")]
     DeserializationError(String),
     #[error("Miden node response is missing expected field '{0}'")]

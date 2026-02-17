@@ -137,7 +137,7 @@ pub enum ClientError {
     #[error("transaction execution failed")]
     TransactionExecutorError(#[from] TransactionExecutorError),
     #[error("invalid transaction input")]
-TransactionInputError(#[source] TransactionInputError),
+    TransactionInputError(#[source] TransactionInputError),
     #[error("transaction proving failed")]
     TransactionProvingError(#[from] TransactionProverError),
     #[error("invalid transaction request")]
@@ -145,7 +145,7 @@ TransactionInputError(#[source] TransactionInputError),
     #[error("failed to build transaction script from account interface")]
     AccountInterfaceError(#[from] AccountInterfaceError),
     #[error("transaction script error")]
-TransactionScriptError(#[source] TransactionScriptError),
+    TransactionScriptError(#[source] TransactionScriptError),
     #[error("client initialization error: {0}")]
     ClientInitializationError(String),
     #[error("cannot track more note tags: the maximum of {0} tracked tags has been reached")]
@@ -320,7 +320,7 @@ fn transaction_executor_hint(err: &TransactionExecutorError) -> Option<ErrorHint
 pub enum IdPrefixFetchError {
     /// No matches were found for the ID prefix.
     #[error("no stored notes matched the provided prefix '{0}'")]
-NoMatch(String),
+    NoMatch(String),
     /// Multiple entities matched with the ID prefix.
     #[error(
         "multiple {0} entries match the provided prefix; provide a longer prefix to narrow it down"

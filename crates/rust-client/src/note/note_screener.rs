@@ -186,8 +186,8 @@ where
 #[derive(Debug, Error)]
 pub enum NoteScreenerError {
     #[error("failed to process note inputs")]
-InvalidNoteInputsError(#[from] InvalidNoteInputsError),
-    #[error("cannot check note relevance: account {0} data not found in the store")]
+    InvalidNoteInputsError(#[from] InvalidNoteInputsError),
+    #[error("account {0} data not found in the store")]
     AccountDataNotFound(AccountId),
     #[error("failed to fetch data from the store")]
     StoreError(#[from] StoreError),
