@@ -26,6 +26,19 @@ jobs:
       - name: make - test
         run: make test
 
+  test-dev:
+    name: Test Rust (debug assertions)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@main
+      - name: Install Rust
+        run: rustup update --no-self-update
+      - name: Add Rust Cache
+        uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@nextest
+      - name: make - test-dev
+        run: make test-dev
+
   doc-tests:
     name: doc-tests
     runs-on: ubuntu-latest
@@ -125,6 +138,29 @@ jobs:
         if: always()
         run: |
           make stop-note-transport
+
+  integration-tests-dev:
+    name: Run integration tests (debug assertions)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@main
+      - name: Install Rust
+        run: rustup update --no-self-update
+      - uses: taiki-e/install-action@nextest
+      - name: Add Rust Cache
+        uses: Swatinem/rust-cache@v2
+      - name: Start test node
+        run: make start-node-background
+      - name: Start note transport
+        run: make start-note-transport-background
+      - name: Run integration tests (debug assertions)
+        run: make integration-test-dev
+      - name: Stop test node
+        if: always()
+        run: make stop-node
+      - name: Stop note transport
+        if: always()
+        run: make stop-note-transport
 
   build-web-client-dist-folder:
     name: Build Web Client
