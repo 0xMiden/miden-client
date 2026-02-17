@@ -147,7 +147,7 @@ impl BlockUpdates {
     ///
     /// This is used when a synced block is not stored (no relevant notes and not the chain tip)
     /// but the MMR authentication nodes it produced must still be persisted so that the on-disk
-    /// state stays consistent with the in-memory [`PartialMmr`].
+    /// state stays consistent with the in-memory `PartialMmr`.
     pub fn extend_authentication_nodes(&mut self, nodes: Vec<(InOrderIndex, Word)>) {
         self.new_authentication_nodes.extend(nodes);
     }
