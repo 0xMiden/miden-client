@@ -289,7 +289,7 @@ impl TransactionRequestBuilder {
         rng: &mut ClientRng,
     ) -> Result<TransactionRequest, TransactionRequestError> {
         let created_note = P2idNote::create(
-                        asset.faucet_id(),
+            asset.faucet_id(),
             target_id,
             vec![asset.into()],
             note_type,

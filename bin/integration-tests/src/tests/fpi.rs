@@ -435,10 +435,14 @@ fn foreign_account_with_code(
     let component_code = CodeBuilder::default()
         .compile_component_code("miden::testing::fpi_component", code)
         .context("failed to compile foreign account component code")?;
-    let get_item_component = AccountComponent::new(component_code, vec![map_slot], AccountComponentMetadata::new("miden::testing::fpi_component").with_supports_all_types())
-        .map_err(|err| anyhow::anyhow!(err))
-        .context("failed to create foreign account component")?;
-    
+    let get_item_component = AccountComponent::new(
+        component_code,
+        vec![map_slot],
+        AccountComponentMetadata::new("miden::testing::fpi_component").with_supports_all_types(),
+    )
+    .map_err(|err| anyhow::anyhow!(err))
+    .context("failed to create foreign account component")?;
+
     let (key_pair, auth_component) = match auth_scheme {
         AuthSchemeId::Falcon512Rpo => {
             let key_pair = AuthSecretKey::new_falcon512_rpo();

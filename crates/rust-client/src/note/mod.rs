@@ -100,9 +100,9 @@ pub use miden_protocol::transaction::ToInputNoteCommitments;
 pub use miden_standards::note::{
     NetworkAccountTarget,
     NoteConsumptionStatus,
-    StandardNote,
     NoteExecutionHint,
     P2idNote,
+    StandardNote,
     SwapNote,
 };
 pub use note_screener::{NoteConsumability, NoteScreener, NoteScreenerError};

@@ -124,16 +124,25 @@ async fn get_counter_contract_account(
     let counter_code = CodeBuilder::default()
         .compile_component_code("miden::testing::counter_contract", COUNTER_CONTRACT)
         .context("failed to compile counter contract component code")?;
-    let counter_component = AccountComponent::new(counter_code, vec![counter_slot], AccountComponentMetadata::new("miden::testing::counter_component").with_supports_all_types())
-        .map_err(|err| anyhow::anyhow!(err))
-        .context("failed to create counter contract component")?;
+    let counter_component = AccountComponent::new(
+        counter_code,
+        vec![counter_slot],
+        AccountComponentMetadata::new("miden::testing::counter_component")
+            .with_supports_all_types(),
+    )
+    .map_err(|err| anyhow::anyhow!(err))
+    .context("failed to create counter contract component")?;
 
     let incr_nonce_auth_code = CodeBuilder::default()
         .compile_component_code("miden::testing::incr_nonce_auth", INCR_NONCE_AUTH_CODE)
         .context("failed to compile increment nonce auth component code")?;
-    let incr_nonce_auth = AccountComponent::new(incr_nonce_auth_code, vec![], AccountComponentMetadata::new("miden::testing::incr_nonce_auth").with_supports_all_types())
-        .map_err(|err| anyhow::anyhow!(err))
-        .context("failed to create increment nonce auth component")?;
+    let incr_nonce_auth = AccountComponent::new(
+        incr_nonce_auth_code,
+        vec![],
+        AccountComponentMetadata::new("miden::testing::incr_nonce_auth").with_supports_all_types(),
+    )
+    .map_err(|err| anyhow::anyhow!(err))
+    .context("failed to create increment nonce auth component")?;
 
     let mut init_seed = [0u8; 32];
     client.rng().fill_bytes(&mut init_seed);
@@ -287,9 +296,9 @@ fn get_network_note<T: Rng>(
 ) -> Result<Note> {
     let target = NetworkAccountTarget::new(network_account, NoteExecutionHint::Always)?;
     let attachment: NoteAttachment = target.into();
-    let metadata =
-        NoteMetadata::new(sender, NoteType::Public).with_tag(NoteTag::with_account_target(network_account))
-            .with_attachment(attachment);
+    let metadata = NoteMetadata::new(sender, NoteType::Public)
+        .with_tag(NoteTag::with_account_target(network_account))
+        .with_attachment(attachment);
 
     let script = CodeBuilder::new()
         .with_dynamically_linked_library(counter_contract_library())?

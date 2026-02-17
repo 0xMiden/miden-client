@@ -104,10 +104,7 @@ pub mod component {
         network_fungible_faucet_library,
         no_auth_library,
     };
-    pub use miden_standards::account::faucets::{
-        BasicFungibleFaucet,
-        NetworkFungibleFaucet,
-    };
+    pub use miden_standards::account::faucets::{BasicFungibleFaucet, NetworkFungibleFaucet};
     pub use miden_standards::account::wallets::BasicWallet;
 }
 

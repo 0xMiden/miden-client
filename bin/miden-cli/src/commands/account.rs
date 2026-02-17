@@ -322,8 +322,8 @@ async fn account_bech_32<AUTH>(
         .iter()
         .any(|c| matches!(c, AccountComponentInterface::BasicWallet))
     {
-        address = address
-            .with_routing_parameters(RoutingParameters::new(AddressInterface::BasicWallet));
+        address =
+            address.with_routing_parameters(RoutingParameters::new(AddressInterface::BasicWallet));
     }
 
     let encoded = address.encode(cli_config.rpc.endpoint.0.to_network_id());

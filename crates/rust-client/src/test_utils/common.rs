@@ -472,7 +472,14 @@ pub fn mint_multiple_fungible_asset(
         .iter()
         .map(|account_id| {
             OutputNote::Full(
-                P2idNote::create(asset.faucet_id(), *account_id, vec![asset.into()], note_type, NoteAttachment::default(), rng)
+                P2idNote::create(
+                    asset.faucet_id(),
+                    *account_id,
+                    vec![asset.into()],
+                    note_type,
+                    NoteAttachment::default(),
+                    rng,
+                )
                 .unwrap(),
             )
         })
@@ -538,8 +545,12 @@ pub async fn insert_account_with_custom_component(
     let component_code = CodeBuilder::default()
         .compile_component_code("custom::component", custom_code)
         .map_err(|err| ClientError::TransactionRequestError(err.into()))?;
-    let custom_component = AccountComponent::new(component_code, storage_slots, AccountComponentMetadata::new("miden::testing::custom_component").with_supports_all_types())
-        .map_err(ClientError::AccountError)?;
+    let custom_component = AccountComponent::new(
+        component_code,
+        storage_slots,
+        AccountComponentMetadata::new("miden::testing::custom_component").with_supports_all_types(),
+    )
+    .map_err(ClientError::AccountError)?;
 
     let mut init_seed = [0u8; 32];
     client.rng().fill_bytes(&mut init_seed);

@@ -313,9 +313,9 @@ impl StateSync {
         let mismatched_private_accounts = account_commitment_updates
             .iter()
             .filter(|(account_id, digest)| {
-                private_accounts
-                    .iter()
-                    .any(|account| account.id() == *account_id && &account.to_commitment() != digest)
+                private_accounts.iter().any(|account| {
+                    account.id() == *account_id && &account.to_commitment() != digest
+                })
             })
             .copied()
             .collect::<Vec<_>>();
