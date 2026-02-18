@@ -28,28 +28,28 @@ CREATE TABLE account_code (
 
 -- Latest account header: one row per account (current state).
 CREATE TABLE latest_account_headers (
-    id UNSIGNED BIG INT NOT NULL,
-    account_commitment TEXT NOT NULL UNIQUE,
-    code_commitment TEXT NOT NULL,
-    storage_commitment TEXT NOT NULL,
-    vault_root TEXT NOT NULL,
-    nonce BIGINT NOT NULL,
-    account_seed BLOB NULL,
-    locked BOOLEAN NOT NULL,
+    id UNSIGNED BIG INT NOT NULL,            -- account ID
+    account_commitment TEXT NOT NULL UNIQUE,  -- account state commitment
+    code_commitment TEXT NOT NULL,            -- commitment to the account code
+    storage_commitment TEXT NOT NULL,         -- commitment to the account storage
+    vault_root TEXT NOT NULL,                 -- root of the account vault Merkle tree
+    nonce BIGINT NOT NULL,                   -- account nonce
+    account_seed BLOB NULL,                  -- seed used to generate the ID; NULL for non-new accounts
+    locked BOOLEAN NOT NULL,                 -- whether the account is locked
     PRIMARY KEY (id),
     FOREIGN KEY (code_commitment) REFERENCES account_code(commitment)
 );
 
 -- Historical account headers: all state transitions (one row per nonce).
 CREATE TABLE historical_account_headers (
-    id UNSIGNED BIG INT NOT NULL,
-    account_commitment TEXT NOT NULL UNIQUE,
-    code_commitment TEXT NOT NULL,
-    storage_commitment TEXT NOT NULL,
-    vault_root TEXT NOT NULL,
-    nonce BIGINT NOT NULL,
-    account_seed BLOB NULL,
-    locked BOOLEAN NOT NULL,
+    id UNSIGNED BIG INT NOT NULL,            -- account ID
+    account_commitment TEXT NOT NULL UNIQUE,  -- account state commitment
+    code_commitment TEXT NOT NULL,            -- commitment to the account code
+    storage_commitment TEXT NOT NULL,         -- commitment to the account storage
+    vault_root TEXT NOT NULL,                 -- root of the account vault Merkle tree
+    nonce BIGINT NOT NULL,                   -- account nonce
+    account_seed BLOB NULL,                  -- seed used to generate the ID; NULL for non-new accounts
+    locked BOOLEAN NOT NULL,                 -- whether the account is locked
     PRIMARY KEY (account_commitment),
     FOREIGN KEY (code_commitment) REFERENCES account_code(commitment),
 
@@ -60,57 +60,57 @@ CREATE INDEX idx_historical_account_headers_id_nonce ON historical_account_heade
 -- ── Account storage (latest + historical) ────────────────────────────────
 
 CREATE TABLE latest_account_storage (
-    account_id TEXT NOT NULL,
-    slot_name TEXT NOT NULL,
-    slot_value TEXT NULL,
-    slot_type INTEGER NOT NULL,
+    account_id TEXT NOT NULL,     -- account ID
+    slot_name TEXT NOT NULL,      -- name of the storage slot
+    slot_value TEXT NULL,         -- top-level value of the slot (for maps, contains the root)
+    slot_type INTEGER NOT NULL,   -- type of the slot (0 = Value, 1 = Map)
     PRIMARY KEY (account_id, slot_name)
 ) WITHOUT ROWID;
 
 CREATE TABLE historical_account_storage (
-    account_id TEXT NOT NULL,
-    nonce BIGINT NOT NULL,
-    slot_name TEXT NOT NULL,
-    slot_value TEXT NULL,
-    slot_type INTEGER NOT NULL,
+    account_id TEXT NOT NULL,     -- account ID
+    nonce BIGINT NOT NULL,        -- nonce at which this slot was written
+    slot_name TEXT NOT NULL,      -- name of the storage slot
+    slot_value TEXT NULL,         -- top-level value of the slot (for maps, contains the root)
+    slot_type INTEGER NOT NULL,   -- type of the slot (0 = Value, 1 = Map)
     PRIMARY KEY (account_id, nonce, slot_name)
 ) WITHOUT ROWID;
 
 -- ── Storage map entries (latest + historical) ────────────────────────────
 
 CREATE TABLE latest_storage_map_entries (
-    account_id TEXT NOT NULL,
-    slot_name TEXT NOT NULL,
-    key TEXT NOT NULL,
-    value TEXT NOT NULL,
+    account_id TEXT NOT NULL,   -- account ID
+    slot_name TEXT NOT NULL,    -- name of the storage slot this entry belongs to
+    key TEXT NOT NULL,          -- map entry key
+    value TEXT NOT NULL,        -- map entry value
     PRIMARY KEY (account_id, slot_name, key)
 ) WITHOUT ROWID;
 
 CREATE TABLE historical_storage_map_entries (
-    account_id TEXT NOT NULL,
-    nonce BIGINT NOT NULL,
-    slot_name TEXT NOT NULL,
-    key TEXT NOT NULL,
-    value TEXT NULL,
+    account_id TEXT NOT NULL,   -- account ID
+    nonce BIGINT NOT NULL,      -- nonce at which this entry was written
+    slot_name TEXT NOT NULL,    -- name of the storage slot this entry belongs to
+    key TEXT NOT NULL,          -- map entry key
+    value TEXT NULL,            -- map entry value; NULL marks a removed entry (tombstone)
     PRIMARY KEY (account_id, nonce, slot_name, key)
 ) WITHOUT ROWID;
 
 -- ── Account assets (latest + historical) ─────────────────────────────────
 
 CREATE TABLE latest_account_assets (
-    account_id TEXT NOT NULL,
-    vault_key TEXT NOT NULL,
-    faucet_id_prefix TEXT NOT NULL,
-    asset TEXT NOT NULL,
+    account_id TEXT NOT NULL,        -- account ID
+    vault_key TEXT NOT NULL,         -- asset's vault key
+    faucet_id_prefix TEXT NOT NULL,  -- prefix of the faucet ID, used to filter by faucet
+    asset TEXT NOT NULL,             -- serialized asset value
     PRIMARY KEY (account_id, vault_key)
 ) WITHOUT ROWID;
 
 CREATE TABLE historical_account_assets (
-    account_id TEXT NOT NULL,
-    nonce BIGINT NOT NULL,
-    vault_key TEXT NOT NULL,
-    faucet_id_prefix TEXT NOT NULL,
-    asset TEXT NULL,
+    account_id TEXT NOT NULL,        -- account ID
+    nonce BIGINT NOT NULL,           -- nonce at which this asset was written
+    vault_key TEXT NOT NULL,         -- asset's vault key
+    faucet_id_prefix TEXT NOT NULL,  -- prefix of the faucet ID, used to filter by faucet
+    asset TEXT NULL,                 -- serialized asset value; NULL marks a removed asset (tombstone)
     PRIMARY KEY (account_id, nonce, vault_key)
 ) WITHOUT ROWID;
 
