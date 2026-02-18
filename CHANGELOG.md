@@ -8,6 +8,7 @@
 * Added the `@miden-sdk/react` hooks library with a provider, hooks, and an example app for the web client ([#1711](https://github.com/0xMiden/miden-client/pull/1711)).
 * Added typed error parsing for node RPC endpoints, enabling programmatic error handling instead of string parsing ([#1734](https://github.com/0xMiden/miden-client/pull/1734)).
 * Added `--rpc-status` flag to `miden-client info` command to display RPC node status information including node version, genesis commitment, store status, and block producer status; also added `get_status_unversioned` to `NodeRpcClient` trait ([#1742](https://github.com/0xMiden/miden-client/pull/1742)).
+* Added `getAccountByPublicKey` method to `WebClient` for retrieving accounts by public key ([#1729](https://github.com/0xMiden/miden-client/pull/1729)).
 * Added the `@miden-sdk/react` hooks library with a provider, hooks, and an example app for the web client ([#1711](https://github.com/0xMiden/miden-client/pull/1711)).
 * [BREAKING] Added a `AccountReader` accessible through `Client::account_reader` to read account data without needing to load the whole `Account` ([#1713](https://github.com/0xMiden/miden-client/pull/1713), [#1716](https://github.com/0xMiden/miden-client/pull/1716)).
 
@@ -19,7 +20,6 @@
 ## 0.13.0 (2026-01-28)
 
 
-* Added `getAccountByPublicKey` method to WebClient for retrieving accounts by public key.
 * [BREAKING] Removed `getRpoFalcon512PublicKeyAsWord` and `getEcdsaK256KeccakPublicKeyAsWord` in `AuthSecretKey`
 * Improved auth scheme handling across the Rust and web clients (typed `build_wallet_id`, unified transaction tests, new shared `getPublicKeyAsWord` binding, and refreshed typedoc output) ([#1556](https://github.com/0xMiden/miden-client/pull/1556)).
 * [BREAKING] Typed the `auth_scheme` plumbing across the Rust WebClient ID-building helpers and aligned the WebClient bindings with the native enum to avoid passing raw identifiers ([#1546](https://github.com/0xMiden/miden-client/pull/1546)).
