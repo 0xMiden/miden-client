@@ -100,6 +100,28 @@ const getWasmOrThrow = async () => {
  * Because of this implementation, the only breaking change for end users is in the way the
  * web client is instantiated. Users should now use the WebClient.createClient static call.
  */
+/**
+ * Create a Proxy that forwards missing properties to the underlying WASM
+ * WebClient.
+ */
+function createClientProxy(instance) {
+  return new Proxy(instance, {
+    get(target, prop, receiver) {
+      if (prop in target) {
+        return Reflect.get(target, prop, receiver);
+      }
+      if (target.wasmWebClient && prop in target.wasmWebClient) {
+        const value = target.wasmWebClient[prop];
+        if (typeof value === "function") {
+          return value.bind(target.wasmWebClient);
+        }
+        return value;
+      }
+      return undefined;
+    },
+  });
+}
+
 export class WebClient {
   /**
    * Create a WebClient wrapper.
@@ -240,6 +262,25 @@ export class WebClient {
     // Lazy initialize the underlying WASM WebClient when first requested.
     this.wasmWebClient = null;
     this.wasmWebClientPromise = null;
+
+    // Promise chain to serialize direct WASM calls that require exclusive
+    // (&mut self) access. Without this, concurrent calls on the same client
+    // would panic with "recursive use of an object detected" due to
+    // wasm-bindgen's internal RefCell.
+    this._wasmCallChain = Promise.resolve();
+  }
+
+  /**
+   * Serialize a WASM call that requires exclusive (&mut self) access.
+   * Concurrent calls are queued and executed one at a time.
+   *
+   * @param {() => Promise<any>} fn - The async function to execute.
+   * @returns {Promise<any>} The result of fn.
+   */
+  _serializeWasmCall(fn) {
+    const result = this._wasmCallChain.catch(() => {}).then(fn);
+    this._wasmCallChain = result.catch(() => {});
+    return result;
   }
 
   // TODO: This will soon conflict with some changes in main.
@@ -296,24 +337,7 @@ export class WebClient {
     // Wait for the worker to be ready
     await instance.ready;
 
-    // Return a proxy that forwards missing properties to wasmWebClient.
-    return new Proxy(instance, {
-      get(target, prop, receiver) {
-        // If the property exists on the wrapper, return it.
-        if (prop in target) {
-          return Reflect.get(target, prop, receiver);
-        }
-        // Otherwise, if the wasmWebClient has it, return that.
-        if (target.wasmWebClient && prop in target.wasmWebClient) {
-          const value = target.wasmWebClient[prop];
-          if (typeof value === "function") {
-            return value.bind(target.wasmWebClient);
-          }
-          return value;
-        }
-        return undefined;
-      },
-    });
+    return createClientProxy(instance);
   }
 
   /**
@@ -361,24 +385,7 @@ export class WebClient {
     );
 
     await instance.ready;
-    // Return a proxy that forwards missing properties to wasmWebClient.
-    return new Proxy(instance, {
-      get(target, prop, receiver) {
-        // If the property exists on the wrapper, return it.
-        if (prop in target) {
-          return Reflect.get(target, prop, receiver);
-        }
-        // Otherwise, if the wasmWebClient has it, return that.
-        if (target.wasmWebClient && prop in target.wasmWebClient) {
-          const value = target.wasmWebClient[prop];
-          if (typeof value === "function") {
-            return value.bind(target.wasmWebClient);
-          }
-          return value;
-        }
-        return undefined;
-      },
-    });
+    return createClientProxy(instance);
   }
 
   /**
@@ -407,30 +414,15 @@ export class WebClient {
   // ----- Explicitly Wrapped Methods (Worker-Forwarded) -----
 
   async newWallet(storageMode, mutable, authSchemeId, seed) {
-    try {
-      if (!this.worker) {
-        const wasmWebClient = await this.getWasmWebClient();
-        return await wasmWebClient.newWallet(
-          storageMode,
-          mutable,
-          authSchemeId,
-          seed
-        );
-      }
-      const wasm = await getWasmOrThrow();
-      const serializedStorageMode = storageMode.asStr();
-      const serializedAccountBytes = await this.callMethodWithWorker(
-        MethodName.NEW_WALLET,
-        serializedStorageMode,
+    return this._serializeWasmCall(async () => {
+      const wasmWebClient = await this.getWasmWebClient();
+      return await wasmWebClient.newWallet(
+        storageMode,
         mutable,
         authSchemeId,
         seed
       );
-      return wasm.Account.deserialize(new Uint8Array(serializedAccountBytes));
-    } catch (error) {
-      console.error("INDEX.JS: Error in newWallet:", error);
-      throw error;
-    }
+    });
   }
 
   async newFaucet(
@@ -441,36 +433,17 @@ export class WebClient {
     maxSupply,
     authSchemeId
   ) {
-    try {
-      if (!this.worker) {
-        const wasmWebClient = await this.getWasmWebClient();
-        return await wasmWebClient.newFaucet(
-          storageMode,
-          nonFungible,
-          tokenSymbol,
-          decimals,
-          maxSupply,
-          authSchemeId
-        );
-      }
-      const wasm = await getWasmOrThrow();
-      const serializedStorageMode = storageMode.asStr();
-      const serializedMaxSupply = maxSupply.toString();
-      const serializedAccountBytes = await this.callMethodWithWorker(
-        MethodName.NEW_FAUCET,
-        serializedStorageMode,
+    return this._serializeWasmCall(async () => {
+      const wasmWebClient = await this.getWasmWebClient();
+      return await wasmWebClient.newFaucet(
+        storageMode,
         nonFungible,
         tokenSymbol,
         decimals,
-        serializedMaxSupply,
+        maxSupply,
         authSchemeId
       );
-
-      return wasm.Account.deserialize(new Uint8Array(serializedAccountBytes));
-    } catch (error) {
-      console.error("INDEX.JS: Error in newFaucet:", error);
-      throw error;
-    }
+    });
   }
 
   async submitNewTransaction(accountId, transactionRequest) {
@@ -711,24 +684,7 @@ export class MockWebClient extends WebClient {
     // Wait for the worker to be ready
     await instance.ready;
 
-    // Return a proxy that forwards missing properties to wasmWebClient.
-    return new Proxy(instance, {
-      get(target, prop, receiver) {
-        // If the property exists on the wrapper, return it.
-        if (prop in target) {
-          return Reflect.get(target, prop, receiver);
-        }
-        // Otherwise, if the wasmWebClient has it, return that.
-        if (target.wasmWebClient && prop in target.wasmWebClient) {
-          const value = target.wasmWebClient[prop];
-          if (typeof value === "function") {
-            return value.bind(target.wasmWebClient);
-          }
-          return value;
-        }
-        return undefined;
-      },
-    });
+    return createClientProxy(instance);
   }
 
   /**

@@ -45,6 +45,7 @@ enum Table {
   AccountAssets = "accountAssets",
   StorageMapEntries = "storageMapEntries",
   AccountAuth = "accountAuth",
+  AccountKeyMapping = "accountKeyMapping",
   Accounts = "accounts",
   Addresses = "addresses",
   Transactions = "transactions",
@@ -89,6 +90,11 @@ export interface IAccountAsset {
 export interface IAccountAuth {
   pubKeyCommitmentHex: string;
   secretKeyHex: string;
+}
+
+export interface IAccountKeyMapping {
+  accountIdHex: string;
+  pubKeyCommitmentHex: string;
 }
 
 export interface IAccount {
@@ -218,6 +224,7 @@ export type MidenDexie = Dexie & {
   accountAssets: Dexie.Table<IAccountAsset, string>;
   storageMapEntries: Dexie.Table<IStorageMapEntry, string>;
   accountAuths: Dexie.Table<IAccountAuth, string>;
+  accountKeyMappings: Dexie.Table<IAccountKeyMapping, string>;
   accounts: Dexie.Table<IAccount, string>;
   addresses: Dexie.Table<IAddress, string>;
   transactions: Dexie.Table<ITransaction, string>;
@@ -242,6 +249,11 @@ const V1_STORES: Record<string, string> = {
   [Table.StorageMapEntries]: indexes("[root+key]", "root"),
   [Table.AccountAssets]: indexes("[root+vaultKey]", "root", "faucetIdPrefix"),
   [Table.AccountAuth]: indexes("pubKeyCommitmentHex"),
+  [Table.AccountKeyMapping]: indexes(
+    "[accountIdHex+pubKeyCommitmentHex]",
+    "accountIdHex",
+    "pubKeyCommitmentHex"
+  ),
   [Table.Accounts]: indexes(
     "&accountCommitment",
     "id",
@@ -264,7 +276,7 @@ const V1_STORES: Record<string, string> = {
   [Table.StateSync]: indexes("id"),
   [Table.BlockHeaders]: indexes("blockNum", "hasClientNotes"),
   [Table.PartialBlockchainNodes]: indexes("id"),
-  [Table.Tags]: indexes("id++", "tag", "source_note_id", "source_account_id"),
+  [Table.Tags]: indexes("id++", "tag", "sourceNoteId", "sourceAccountId"),
   [Table.ForeignAccountCode]: indexes("accountId"),
   [Table.Settings]: indexes("key"),
   [Table.TrackedAccounts]: indexes("&id"),
@@ -277,6 +289,7 @@ export class MidenDatabase {
   storageMapEntries: Dexie.Table<IStorageMapEntry, string>;
   accountAssets: Dexie.Table<IAccountAsset, string>;
   accountAuths: Dexie.Table<IAccountAuth, string>;
+  accountKeyMappings: Dexie.Table<IAccountKeyMapping, string>;
   accounts: Dexie.Table<IAccount, string>;
   addresses: Dexie.Table<IAddress, string>;
   transactions: Dexie.Table<ITransaction, string>;
@@ -354,6 +367,9 @@ export class MidenDatabase {
     );
     this.accountAuths = this.dexie.table<IAccountAuth, string>(
       Table.AccountAuth
+    );
+    this.accountKeyMappings = this.dexie.table<IAccountKeyMapping, string>(
+      Table.AccountKeyMapping
     );
     this.accounts = this.dexie.table<IAccount, string>(Table.Accounts);
     this.addresses = this.dexie.table<IAddress, string>(Table.Addresses);
