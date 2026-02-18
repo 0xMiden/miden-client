@@ -1,5 +1,8 @@
 import { createContext, useContext } from "react";
-import type { AccountStorageMode, AccountComponent } from "@miden-sdk/miden-sdk";
+import type {
+  AccountStorageMode,
+  AccountComponent,
+} from "@miden-sdk/miden-sdk";
 
 // SIGNER CONTEXT
 // ================================================================================================

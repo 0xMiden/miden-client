@@ -1,7 +1,10 @@
 # Changelog
 
-## 0.13.1 (TBD)
+## 0.13.3 (TBD)
 
+* [FEATURE][web] Added `customComponents` field to `SignerAccountConfig`, allowing signer providers to attach arbitrary `AccountComponent` instances (e.g. compiled `.masp` packages) to accounts during `initializeSignerAccount`. Components are appended after the default basic wallet component.
+
+## 0.13.1 (2026-02-13)
 * Added unified signer interface (`SignerContext`, `useSigner`) for external keystore providers (Para, Turnkey, MidenFi) with `MidenProvider` integration and comprehensive test coverage ([#1732](https://github.com/0xMiden/miden-client/pull/1732)).
 
 ## 0.13.0
