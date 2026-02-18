@@ -333,11 +333,11 @@ test.describe("account public commitments", () => {
   });
 });
 
-// GET_ACCOUNT_BY_PUBLIC_KEY TESTS
+// GET_ACCOUNT_BY_KEY_COMMITMENT TESTS
 // =======================================================================================================
 
-test.describe("getAccountByPublicKey tests", () => {
-  test("finds wallet by public key after creation", async ({ page }) => {
+test.describe("getAccountByKeyCommitment tests", () => {
+  test("finds wallet by key commitment after creation", async ({ page }) => {
     const result = await page.evaluate(async () => {
       const client = window.client;
 
@@ -350,12 +350,9 @@ test.describe("getAccountByPublicKey tests", () => {
       const commitments = await client.getPublicKeyCommitmentsOfAccount(
         wallet.id()
       );
-      const secretKey = await client.getAccountAuthByPubKeyCommitment(
-        commitments[0]
-      );
-      const publicKey = secretKey.publicKey();
 
-      const foundAccount = await client.getAccountByPublicKey(publicKey);
+      const foundAccount =
+        await client.getAccountByKeyCommitment(commitments[0]);
 
       return {
         createdAccountId: wallet.id().toString(),
@@ -368,14 +365,17 @@ test.describe("getAccountByPublicKey tests", () => {
     expect(result.foundAccountId).toEqual(result.createdAccountId);
   });
 
-  test("returns undefined for non-existent public key", async ({ page }) => {
+  test("returns undefined for non-existent key commitment", async ({
+    page,
+  }) => {
     const result = await page.evaluate(async () => {
       const client = window.client;
 
       const randomSecretKey = window.AuthSecretKey.rpoFalconWithRNG(null);
-      const randomPublicKey = randomSecretKey.publicKey();
+      const randomCommitment = randomSecretKey.publicKey().toCommitment();
 
-      const foundAccount = await client.getAccountByPublicKey(randomPublicKey);
+      const foundAccount =
+        await client.getAccountByKeyCommitment(randomCommitment);
 
       return {
         found: foundAccount !== undefined,
@@ -403,12 +403,9 @@ test.describe("getAccountByPublicKey tests", () => {
       const commitments2 = await client.getPublicKeyCommitmentsOfAccount(
         wallet2.id()
       );
-      const secretKey2 = await client.getAccountAuthByPubKeyCommitment(
-        commitments2[0]
-      );
-      const publicKey2 = secretKey2.publicKey();
 
-      const foundAccount = await client.getAccountByPublicKey(publicKey2);
+      const foundAccount =
+        await client.getAccountByKeyCommitment(commitments2[0]);
 
       return {
         wallet1Id: wallet1.id().toString(),
@@ -437,9 +434,10 @@ test.describe("getAccountByPublicKey tests", () => {
         additionalSecretKey
       );
 
-      const additionalPublicKey = additionalSecretKey.publicKey();
+      const additionalCommitment =
+        additionalSecretKey.publicKey().toCommitment();
       const foundAccount =
-        await client.getAccountByPublicKey(additionalPublicKey);
+        await client.getAccountByKeyCommitment(additionalCommitment);
 
       return {
         walletId: wallet.id().toString(),
@@ -452,7 +450,7 @@ test.describe("getAccountByPublicKey tests", () => {
     expect(result.foundAccountId).toEqual(result.walletId);
   });
 
-  test("finds faucet by public key", async ({ page }) => {
+  test("finds faucet by key commitment", async ({ page }) => {
     const result = await page.evaluate(async () => {
       const client = window.client;
 
@@ -468,12 +466,9 @@ test.describe("getAccountByPublicKey tests", () => {
       const commitments = await client.getPublicKeyCommitmentsOfAccount(
         faucet.id()
       );
-      const secretKey = await client.getAccountAuthByPubKeyCommitment(
-        commitments[0]
-      );
-      const publicKey = secretKey.publicKey();
 
-      const foundAccount = await client.getAccountByPublicKey(publicKey);
+      const foundAccount =
+        await client.getAccountByKeyCommitment(commitments[0]);
 
       return {
         faucetId: faucet.id().toString(),

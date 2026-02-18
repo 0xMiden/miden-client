@@ -446,15 +446,18 @@ Returns the associated [`AuthSecretKey`] if found, or an error if not found.
 
 ***
 
-### getAccountByPublicKey()
+### getAccountByKeyCommitment()
 
-> **getAccountByPublicKey**(`pub_key`): `Promise`\<[`Account`](../classes/Account.md)\>
+> **getAccountByKeyCommitment**(`pub_key_commitment`): `Promise`\<[`Account`](../classes/Account.md)\>
+
+Retrieves the full account data for the account associated with the given public key
+commitment, returning `null` if no account is found.
 
 #### Parameters
 
-##### pub\_key
+##### pub\_key\_commitment
 
-[`PublicKey`](../classes/PublicKey.md)
+[`Word`](../classes/Word.md)
 
 #### Returns
 

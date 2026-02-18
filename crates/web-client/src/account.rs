@@ -1,5 +1,4 @@
 use miden_client::Word as NativeWord;
-use miden_client::auth::PublicKey as NativePublicKey;
 use miden_client::keystore::Keystore;
 use wasm_bindgen::prelude::*;
 
@@ -12,7 +11,6 @@ use crate::models::account_storage::AccountStorage;
 use crate::models::address::Address;
 use crate::models::asset_vault::AssetVault;
 use crate::models::auth_secret_key::AuthSecretKey;
-use crate::models::public_key::PublicKey;
 use crate::models::word::Word;
 use crate::{WebClient, js_error_with_context};
 
@@ -209,25 +207,22 @@ impl WebClient {
         }
     }
 
-    /// Retrieves the full account data for the account associated with the given public key,
-    /// returning `null` if no account is found.
-    #[wasm_bindgen(js_name = "getAccountByPublicKey")]
-    pub async fn get_account_by_public_key(
+    /// Retrieves the full account data for the account associated with the given public key
+    /// commitment, returning `null` if no account is found.
+    #[wasm_bindgen(js_name = "getAccountByKeyCommitment")]
+    pub async fn get_account_by_key_commitment(
         &mut self,
-        pub_key: &PublicKey,
+        pub_key_commitment: &Word,
     ) -> Result<Option<Account>, JsValue> {
         let keystore = self
             .keystore
             .clone()
             .ok_or_else(|| JsValue::from_str("Keystore not initialized"))?;
 
-        let native_pub_key: NativePublicKey = pub_key.into();
-        let commitment = native_pub_key.to_commitment();
-
         let account_id = keystore
-            .get_account_id_by_key_commitment(commitment)
+            .get_account_id_by_key_commitment((*pub_key_commitment.as_native()).into())
             .await
-            .map_err(|err| js_error_with_context(err, "failed to get account by public key"))?;
+            .map_err(|err| js_error_with_context(err, "failed to get account by key commitment"))?;
 
         match account_id {
             Some(id) => self.get_account(&id.into()).await,
