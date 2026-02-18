@@ -950,25 +950,55 @@ function MyFeature() {
 
 ## External Signer Integration
 
-For wallets using external key management (e.g. Para, Turnkey, MidenFi), wrap your app with a signer provider above `MidenProvider`. See `CLAUDE.md` for full signer provider documentation.
+For wallets using external key management (e.g. Para, Turnkey, MidenFi), wrap your app with a signer provider above `MidenProvider`. The signer provider populates a `SignerContext` with a `signCb` and an `accountConfig`; `MidenProvider` picks these up automatically to create the client and initialize the account. See `CLAUDE.md` for full signer provider documentation.
 
 ### Custom Account Components
 
 Signer providers can attach custom `AccountComponent` instances to accounts via the `customComponents` field on `SignerAccountConfig`. This is useful for including application-specific logic compiled from `.masp` packages (e.g. a DEX component or custom smart contract) alongside the default auth and basic wallet components.
 
+When building a custom signer provider, pass `customComponents` through the `SignerContext`:
+
 ```tsx
-import type { SignerAccountConfig } from '@miden-sdk/react';
+import { SignerContext } from '@miden-sdk/react';
 import type { AccountComponent } from '@miden-sdk/miden-sdk';
 
-// Load a compiled .masp component (e.g. from your build pipeline)
-const myDexComponent: AccountComponent = await loadCompiledComponent();
+function MySignerProvider({ children }: { children: React.ReactNode }) {
+  // Load compiled .masp components (e.g. from your build pipeline)
+  const myDexComponent: AccountComponent = useMemo(() => loadCompiledComponent(), []);
 
-const accountConfig: SignerAccountConfig = {
-  publicKeyCommitment: userPublicKeyCommitment,
-  accountType: 'RegularAccountUpdatableCode',
-  storageMode: myStorageMode,
-  customComponents: [myDexComponent],
-};
+  return (
+    <SignerContext.Provider value={{
+      name: 'MySigner',
+      storeName: `mysigner_${userId}`,
+      isConnected: true,
+      accountConfig: {
+        publicKeyCommitment: userPublicKeyCommitment,
+        accountType: 'RegularAccountUpdatableCode',
+        storageMode: myStorageMode,
+        // Custom components are included in the account alongside
+        // the default auth + basic wallet components
+        customComponents: [myDexComponent],
+      },
+      signCb: async (pubKey, signingInputs) => signature,
+      connect: async () => { /* ... */ },
+      disconnect: async () => { /* ... */ },
+    }}>
+      {children}
+    </SignerContext.Provider>
+  );
+}
+
+// MidenProvider automatically uses the accountConfig (including customComponents)
+// when initializing the signer account
+function App() {
+  return (
+    <MySignerProvider>
+      <MidenProvider config={{ rpcUrl: 'testnet' }}>
+        <YourApp />
+      </MidenProvider>
+    </MySignerProvider>
+  );
+}
 ```
 
 Components are appended to the `AccountBuilder` after the default basic wallet component and before `build()` is called, so the account always includes wallet functionality plus any extras you provide. The field is optional — omitting it or passing an empty array preserves the default behavior.
