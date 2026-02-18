@@ -550,7 +550,7 @@ async function rebuildLatestTable(
     .equals([accountId, maxNonce])
     .toArray();
   if (hist.length > 0) {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/no-unsafe-return
     await latestTable.bulkPut(hist.map(({ nonce, ...rest }) => rest));
   }
 }
