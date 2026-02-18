@@ -166,12 +166,7 @@ impl JsAccountUpdate {
         let asset_vault = account.vault();
         Self {
             storage_root: account.storage().to_commitment().to_string(),
-            storage_slots: account
-                .storage()
-                .slots()
-                .iter()
-                .map(|slot| JsStorageSlot::from_slot(slot))
-                .collect(),
+            storage_slots: account.storage().slots().iter().map(JsStorageSlot::from_slot).collect(),
             storage_map_entries: account
                 .storage()
                 .slots()
@@ -186,10 +181,7 @@ impl JsAccountUpdate {
                 .flatten()
                 .collect(),
             asset_vault_root: asset_vault.root().to_string(),
-            assets: asset_vault
-                .assets()
-                .map(|asset| JsVaultAsset::from_asset(&asset))
-                .collect(),
+            assets: asset_vault.assets().map(|asset| JsVaultAsset::from_asset(&asset)).collect(),
             account_id: account.id().to_string(),
             code_root: account.code().commitment().to_string(),
             committed: account.is_public(),
