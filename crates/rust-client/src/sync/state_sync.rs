@@ -228,12 +228,11 @@ impl StateSync {
                     new_authentication_nodes,
                 );
             } else {
-                // Authentication nodes must always be persisted even when the block header
-                // itself is not stored. The in-memory PartialMmr is updated unconditionally
-                // by `apply_mmr_changes`, so the on-disk state must keep up. Otherwise,
-                // closing and reopening the client (e.g. a browser extension popup) loses the
-                // in-memory MMR and subsequent transaction executions fail because the store
-                // is missing nodes needed for Merkle authentication paths.
+                // Even though this block header is not stored, `apply_mmr_changes` may
+                // produce authentication nodes for already-tracked leaves whose Merkle
+                // paths change as the MMR grows. These must be persisted so that the
+                // `PartialMmr` can be correctly reconstructed from the store after a
+                // client restart.
                 state_sync_update
                     .block_updates
                     .extend_authentication_nodes(new_authentication_nodes);
