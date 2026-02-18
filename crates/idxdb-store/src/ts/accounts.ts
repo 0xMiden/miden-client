@@ -676,3 +676,100 @@ export async function pruneOldAccountStates(
     return 0;
   }
 }
+
+export async function removeAccountAuth(
+  dbId: string,
+  pubKeyCommitmentHex: string
+) {
+  try {
+    const db = getDatabase(dbId);
+    await db.accountAuths
+      .where("pubKeyCommitmentHex")
+      .equals(pubKeyCommitmentHex)
+      .delete();
+  } catch (error) {
+    logWebStoreError(
+      error,
+      `Error removing account auth for pubKey: ${pubKeyCommitmentHex}`
+    );
+  }
+}
+
+export async function insertAccountKeyMapping(
+  dbId: string,
+  accountIdHex: string,
+  pubKeyCommitmentHex: string
+) {
+  try {
+    const db = getDatabase(dbId);
+    const data = {
+      accountIdHex,
+      pubKeyCommitmentHex,
+    };
+    await db.accountKeyMappings.put(data);
+  } catch (error) {
+    logWebStoreError(
+      error,
+      `Error inserting account key mapping for account ${accountIdHex} and key ${pubKeyCommitmentHex}`
+    );
+  }
+}
+
+export async function removeAccountKeyMapping(
+  dbId: string,
+  accountIdHex: string,
+  pubKeyCommitmentHex: string
+): Promise<boolean> {
+  try {
+    const db = getDatabase(dbId);
+    const deletedCount = await db.accountKeyMappings
+      .where("[accountIdHex+pubKeyCommitmentHex]")
+      .equals([accountIdHex, pubKeyCommitmentHex])
+      .delete();
+    return deletedCount > 0;
+  } catch (error) {
+    logWebStoreError(
+      error,
+      `Error removing account key mapping for account ${accountIdHex} and key ${pubKeyCommitmentHex}`
+    );
+    return false;
+  }
+}
+
+export async function getKeyCommitmentsByAccountId(
+  dbId: string,
+  accountIdHex: string
+): Promise<string[]> {
+  try {
+    const db = getDatabase(dbId);
+    const mappings = await db.accountKeyMappings
+      .where("accountIdHex")
+      .equals(accountIdHex)
+      .toArray();
+    return mappings.map((mapping) => mapping.pubKeyCommitmentHex);
+  } catch (error) {
+    logWebStoreError(
+      error,
+      `Error getting key commitments for account: ${accountIdHex}`
+    );
+    return [];
+  }
+}
+
+export async function removeAllMappingsForKey(
+  dbId: string,
+  pubKeyCommitmentHex: string
+) {
+  try {
+    const db = getDatabase(dbId);
+    await db.accountKeyMappings
+      .where("pubKeyCommitmentHex")
+      .equals(pubKeyCommitmentHex)
+      .delete();
+  } catch (error) {
+    logWebStoreError(
+      error,
+      `Error removing all mappings for key: ${pubKeyCommitmentHex}`
+    );
+  }
+}
