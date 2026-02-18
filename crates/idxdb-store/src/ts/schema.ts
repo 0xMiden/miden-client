@@ -219,24 +219,18 @@ export interface ISetting {
 }
 
 export interface JsVaultAsset {
-  accountId: string;
-  nonce: string;
   vaultKey: string;
   faucetIdPrefix: string;
   asset: string;
 }
 
 export interface JsStorageSlot {
-  accountId: string;
-  nonce: string;
   slotName: string;
   slotValue: string;
   slotType: number;
 }
 
 export interface JsStorageMapEntry {
-  accountId: string;
-  nonce: string;
   slotName: string;
   key: string;
   value: string;

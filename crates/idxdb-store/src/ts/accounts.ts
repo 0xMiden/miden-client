@@ -285,6 +285,7 @@ export async function upsertAccountCode(
 export async function upsertAccountStorage(
   dbId: string,
   accountId: string,
+  nonce: string,
   storageSlots: JsStorageSlot[]
 ) {
   try {
@@ -298,7 +299,7 @@ export async function upsertAccountStorage(
 
     const latestEntries = storageSlots.map((slot) => {
       return {
-        accountId: slot.accountId,
+        accountId,
         slotName: slot.slotName,
         slotValue: slot.slotValue,
         slotType: slot.slotType,
@@ -307,8 +308,8 @@ export async function upsertAccountStorage(
 
     const historicalEntries = storageSlots.map((slot) => {
       return {
-        accountId: slot.accountId,
-        nonce: slot.nonce,
+        accountId,
+        nonce,
         slotName: slot.slotName,
         slotValue: slot.slotValue,
         slotType: slot.slotType,
@@ -325,6 +326,7 @@ export async function upsertAccountStorage(
 export async function upsertStorageMapEntries(
   dbId: string,
   accountId: string,
+  nonce: string,
   entries: JsStorageMapEntry[]
 ) {
   try {
@@ -338,7 +340,7 @@ export async function upsertStorageMapEntries(
 
     const latestEntries = entries.map((entry) => {
       return {
-        accountId: entry.accountId,
+        accountId,
         slotName: entry.slotName,
         key: entry.key,
         value: entry.value,
@@ -347,8 +349,8 @@ export async function upsertStorageMapEntries(
 
     const historicalEntries = entries.map((entry) => {
       return {
-        accountId: entry.accountId,
-        nonce: entry.nonce,
+        accountId,
+        nonce,
         slotName: entry.slotName,
         key: entry.key,
         value: entry.value,
@@ -365,6 +367,7 @@ export async function upsertStorageMapEntries(
 export async function upsertVaultAssets(
   dbId: string,
   accountId: string,
+  nonce: string,
   assets: JsVaultAsset[]
 ) {
   try {
@@ -375,7 +378,7 @@ export async function upsertVaultAssets(
 
     const latestEntries = assets.map((asset) => {
       return {
-        accountId: asset.accountId,
+        accountId,
         vaultKey: asset.vaultKey,
         faucetIdPrefix: asset.faucetIdPrefix,
         asset: asset.asset,
@@ -384,8 +387,8 @@ export async function upsertVaultAssets(
 
     const historicalEntries = assets.map((asset) => {
       return {
-        accountId: asset.accountId,
-        nonce: asset.nonce,
+        accountId,
+        nonce,
         vaultKey: asset.vaultKey,
         faucetIdPrefix: asset.faucetIdPrefix,
         asset: asset.asset,

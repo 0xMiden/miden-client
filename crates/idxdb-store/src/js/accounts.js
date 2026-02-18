@@ -217,7 +217,7 @@ export async function upsertAccountCode(dbId, codeRoot, code) {
         logWebStoreError(error, `Error inserting code with root: ${codeRoot}`);
     }
 }
-export async function upsertAccountStorage(dbId, accountId, storageSlots) {
+export async function upsertAccountStorage(dbId, accountId, nonce, storageSlots) {
     try {
         const db = getDatabase(dbId);
         await db.latestAccountStorages
@@ -228,7 +228,7 @@ export async function upsertAccountStorage(dbId, accountId, storageSlots) {
             return;
         const latestEntries = storageSlots.map((slot) => {
             return {
-                accountId: slot.accountId,
+                accountId,
                 slotName: slot.slotName,
                 slotValue: slot.slotValue,
                 slotType: slot.slotType,
@@ -236,8 +236,8 @@ export async function upsertAccountStorage(dbId, accountId, storageSlots) {
         });
         const historicalEntries = storageSlots.map((slot) => {
             return {
-                accountId: slot.accountId,
-                nonce: slot.nonce,
+                accountId,
+                nonce,
                 slotName: slot.slotName,
                 slotValue: slot.slotValue,
                 slotType: slot.slotType,
@@ -250,7 +250,7 @@ export async function upsertAccountStorage(dbId, accountId, storageSlots) {
         logWebStoreError(error, `Error inserting storage slots`);
     }
 }
-export async function upsertStorageMapEntries(dbId, accountId, entries) {
+export async function upsertStorageMapEntries(dbId, accountId, nonce, entries) {
     try {
         const db = getDatabase(dbId);
         await db.latestStorageMapEntries
@@ -261,7 +261,7 @@ export async function upsertStorageMapEntries(dbId, accountId, entries) {
             return;
         const latestEntries = entries.map((entry) => {
             return {
-                accountId: entry.accountId,
+                accountId,
                 slotName: entry.slotName,
                 key: entry.key,
                 value: entry.value,
@@ -269,8 +269,8 @@ export async function upsertStorageMapEntries(dbId, accountId, entries) {
         });
         const historicalEntries = entries.map((entry) => {
             return {
-                accountId: entry.accountId,
-                nonce: entry.nonce,
+                accountId,
+                nonce,
                 slotName: entry.slotName,
                 key: entry.key,
                 value: entry.value,
@@ -283,7 +283,7 @@ export async function upsertStorageMapEntries(dbId, accountId, entries) {
         logWebStoreError(error, `Error inserting storage map entries`);
     }
 }
-export async function upsertVaultAssets(dbId, accountId, assets) {
+export async function upsertVaultAssets(dbId, accountId, nonce, assets) {
     try {
         const db = getDatabase(dbId);
         await db.latestAccountAssets.where("accountId").equals(accountId).delete();
@@ -291,7 +291,7 @@ export async function upsertVaultAssets(dbId, accountId, assets) {
             return;
         const latestEntries = assets.map((asset) => {
             return {
-                accountId: asset.accountId,
+                accountId,
                 vaultKey: asset.vaultKey,
                 faucetIdPrefix: asset.faucetIdPrefix,
                 asset: asset.asset,
@@ -299,8 +299,8 @@ export async function upsertVaultAssets(dbId, accountId, assets) {
         });
         const historicalEntries = assets.map((asset) => {
             return {
-                accountId: asset.accountId,
-                nonce: asset.nonce,
+                accountId,
+                nonce,
                 vaultKey: asset.vaultKey,
                 faucetIdPrefix: asset.faucetIdPrefix,
                 asset: asset.asset,

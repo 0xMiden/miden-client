@@ -49,15 +49,23 @@ pub async fn upsert_account_storage(
     let mut slots = vec![];
     let mut maps = vec![];
     for slot in account_storage.slots() {
-        slots.push(JsStorageSlot::from_slot(slot, account_id, nonce));
+        slots.push(JsStorageSlot::from_slot(slot));
         if let StorageSlotContent::Map(map) = slot.content() {
-            maps.extend(JsStorageMapEntry::from_map(map, account_id, nonce, slot.name().as_str()));
+            maps.extend(JsStorageMapEntry::from_map(map, slot.name().as_str()));
         }
     }
 
     let account_id_str = account_id.to_string();
-    JsFuture::from(idxdb_upsert_account_storage(db_id, account_id_str.clone(), slots)).await?;
-    JsFuture::from(idxdb_upsert_storage_map_entries(db_id, account_id_str, maps)).await?;
+    let nonce_str = nonce.to_string();
+    JsFuture::from(idxdb_upsert_account_storage(
+        db_id,
+        account_id_str.clone(),
+        nonce_str.clone(),
+        slots,
+    ))
+    .await?;
+    JsFuture::from(idxdb_upsert_storage_map_entries(db_id, account_id_str, nonce_str, maps))
+        .await?;
 
     Ok(())
 }
@@ -68,12 +76,11 @@ pub async fn upsert_account_asset_vault(
     nonce: u64,
     asset_vault: &AssetVault,
 ) -> Result<(), JsValue> {
-    let js_assets: Vec<JsVaultAsset> = asset_vault
-        .assets()
-        .map(|asset| JsVaultAsset::from_asset(&asset, account_id, nonce))
-        .collect();
+    let js_assets: Vec<JsVaultAsset> =
+        asset_vault.assets().map(|asset| JsVaultAsset::from_asset(&asset)).collect();
 
-    let promise = idxdb_upsert_vault_assets(db_id, account_id.to_string(), js_assets);
+    let promise =
+        idxdb_upsert_vault_assets(db_id, account_id.to_string(), nonce.to_string(), js_assets);
     JsFuture::from(promise).await?;
 
     Ok(())

@@ -283,16 +283,19 @@ export async function applyStateSync(
             upsertAccountStorage(
               dbId,
               accountUpdate.accountId,
+              accountUpdate.nonce,
               accountUpdate.storageSlots
             ),
             upsertStorageMapEntries(
               dbId,
               accountUpdate.accountId,
+              accountUpdate.nonce,
               accountUpdate.storageMapEntries
             ),
             upsertVaultAssets(
               dbId,
               accountUpdate.accountId,
+              accountUpdate.nonce,
               accountUpdate.assets
             ),
             upsertAccountRecord(

@@ -164,15 +164,13 @@ pub struct JsAccountUpdate {
 impl JsAccountUpdate {
     pub fn from_account(account: &Account, account_seed: Option<Word>) -> Self {
         let asset_vault = account.vault();
-        let account_id = account.id();
-        let nonce = account.nonce().as_int();
         Self {
             storage_root: account.storage().to_commitment().to_string(),
             storage_slots: account
                 .storage()
                 .slots()
                 .iter()
-                .map(|slot| JsStorageSlot::from_slot(slot, &account_id, nonce))
+                .map(|slot| JsStorageSlot::from_slot(slot))
                 .collect(),
             storage_map_entries: account
                 .storage()
@@ -180,12 +178,7 @@ impl JsAccountUpdate {
                 .iter()
                 .filter_map(|slot| {
                     if let StorageSlotContent::Map(map) = slot.content() {
-                        Some(JsStorageMapEntry::from_map(
-                            map,
-                            &account_id,
-                            nonce,
-                            slot.name().as_str(),
-                        ))
+                        Some(JsStorageMapEntry::from_map(map, slot.name().as_str()))
                     } else {
                         None
                     }
@@ -195,9 +188,9 @@ impl JsAccountUpdate {
             asset_vault_root: asset_vault.root().to_string(),
             assets: asset_vault
                 .assets()
-                .map(|asset| JsVaultAsset::from_asset(&asset, &account_id, nonce))
+                .map(|asset| JsVaultAsset::from_asset(&asset))
                 .collect(),
-            account_id: account_id.to_string(),
+            account_id: account.id().to_string(),
             code_root: account.code().commitment().to_string(),
             committed: account.is_public(),
             nonce: account.nonce().to_string(),
