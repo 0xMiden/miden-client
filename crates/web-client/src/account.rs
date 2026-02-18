@@ -209,6 +209,8 @@ impl WebClient {
         }
     }
 
+    /// Retrieves the full account data for the account associated with the given public key,
+    /// returning `null` if no account is found.
     #[wasm_bindgen(js_name = "getAccountByPublicKey")]
     pub async fn get_account_by_public_key(
         &mut self,
