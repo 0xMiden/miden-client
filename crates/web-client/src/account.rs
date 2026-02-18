@@ -214,7 +214,10 @@ impl WebClient {
         &mut self,
         pub_key: &PublicKey,
     ) -> Result<Option<Account>, JsValue> {
-        let keystore = self.keystore.clone().expect("Keystore not initialized");
+        let keystore = self
+            .keystore
+            .clone()
+            .ok_or_else(|| JsValue::from_str("Keystore not initialized"))?;
 
         let native_pub_key: NativePublicKey = pub_key.into();
         let commitment = native_pub_key.to_commitment();
