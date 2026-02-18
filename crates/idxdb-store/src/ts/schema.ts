@@ -48,6 +48,7 @@ enum Table {
   LatestStorageMapEntries = "latestStorageMapEntries",
   HistoricalStorageMapEntries = "historicalStorageMapEntries",
   AccountAuth = "accountAuth",
+  AccountKeyMapping = "accountKeyMapping",
   LatestAccountHeaders = "latestAccountHeaders",
   HistoricalAccountHeaders = "historicalAccountHeaders",
   Addresses = "addresses",
@@ -117,6 +118,11 @@ export interface IHistoricalAccountAsset {
 export interface IAccountAuth {
   pubKeyCommitmentHex: string;
   secretKeyHex: string;
+}
+
+export interface IAccountKeyMapping {
+  accountIdHex: string;
+  pubKeyCommitmentHex: string;
 }
 
 export interface IAccount {
@@ -249,6 +255,7 @@ export type MidenDexie = Dexie & {
   latestAccountAssets: Dexie.Table<ILatestAccountAsset, string>;
   historicalAccountAssets: Dexie.Table<IHistoricalAccountAsset, string>;
   accountAuths: Dexie.Table<IAccountAuth, string>;
+  accountKeyMappings: Dexie.Table<IAccountKeyMapping, string>;
   latestAccountHeaders: Dexie.Table<IAccount, string>;
   historicalAccountHeaders: Dexie.Table<IAccount, string>;
   addresses: Dexie.Table<IAddress, string>;
@@ -275,6 +282,7 @@ export class MidenDatabase {
   latestAccountAssets: Dexie.Table<ILatestAccountAsset, string>;
   historicalAccountAssets: Dexie.Table<IHistoricalAccountAsset, string>;
   accountAuths: Dexie.Table<IAccountAuth, string>;
+  accountKeyMappings: Dexie.Table<IAccountKeyMapping, string>;
   latestAccountHeaders: Dexie.Table<IAccount, string>;
   historicalAccountHeaders: Dexie.Table<IAccount, string>;
   addresses: Dexie.Table<IAddress, string>;
@@ -325,6 +333,11 @@ export class MidenDatabase {
         "[accountId+nonce]"
       ),
       [Table.AccountAuth]: indexes("pubKeyCommitmentHex"),
+      [Table.AccountKeyMapping]: indexes(
+        "[accountIdHex+pubKeyCommitmentHex]",
+        "accountIdHex",
+        "pubKeyCommitmentHex"
+      ),
       [Table.LatestAccountHeaders]: indexes("&id", "accountCommitment"),
       [Table.HistoricalAccountHeaders]: indexes(
         "&accountCommitment",
@@ -378,6 +391,9 @@ export class MidenDatabase {
     >(Table.HistoricalAccountAssets);
     this.accountAuths = this.dexie.table<IAccountAuth, string>(
       Table.AccountAuth
+    );
+    this.accountKeyMappings = this.dexie.table<IAccountKeyMapping, string>(
+      Table.AccountKeyMapping
     );
     this.latestAccountHeaders = this.dexie.table<IAccount, string>(
       Table.LatestAccountHeaders

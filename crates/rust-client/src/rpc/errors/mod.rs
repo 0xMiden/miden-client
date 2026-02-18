@@ -50,6 +50,16 @@ pub enum RpcError {
     InvalidNodeEndpoint(String),
 }
 
+impl RpcError {
+    /// Returns the typed endpoint error if this is a request error, or `None` otherwise.
+    pub fn endpoint_error(&self) -> Option<&EndpointError> {
+        match self {
+            Self::RequestError { endpoint_error, .. } => endpoint_error.as_ref(),
+            _ => None,
+        }
+    }
+}
+
 impl From<DeserializationError> for RpcError {
     fn from(err: DeserializationError) -> Self {
         Self::DeserializationError(err.to_string())

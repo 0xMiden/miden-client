@@ -39,6 +39,7 @@ var Table;
     Table["LatestStorageMapEntries"] = "latestStorageMapEntries";
     Table["HistoricalStorageMapEntries"] = "historicalStorageMapEntries";
     Table["AccountAuth"] = "accountAuth";
+    Table["AccountKeyMapping"] = "accountKeyMapping";
     Table["LatestAccountHeaders"] = "latestAccountHeaders";
     Table["HistoricalAccountHeaders"] = "historicalAccountHeaders";
     Table["Addresses"] = "addresses";
@@ -67,6 +68,7 @@ export class MidenDatabase {
     latestAccountAssets;
     historicalAccountAssets;
     accountAuths;
+    accountKeyMappings;
     latestAccountHeaders;
     historicalAccountHeaders;
     addresses;
@@ -92,6 +94,7 @@ export class MidenDatabase {
             [Table.LatestAccountAssets]: indexes("[accountId+vaultKey]", "accountId", "faucetIdPrefix"),
             [Table.HistoricalAccountAssets]: indexes("[accountId+nonce+vaultKey]", "accountId", "[accountId+nonce]"),
             [Table.AccountAuth]: indexes("pubKeyCommitmentHex"),
+            [Table.AccountKeyMapping]: indexes("[accountIdHex+pubKeyCommitmentHex]", "accountIdHex", "pubKeyCommitmentHex"),
             [Table.LatestAccountHeaders]: indexes("&id", "accountCommitment"),
             [Table.HistoricalAccountHeaders]: indexes("&accountCommitment", "id", "[id+nonce]"),
             [Table.Addresses]: indexes("address", "id"),
@@ -115,6 +118,7 @@ export class MidenDatabase {
         this.latestAccountAssets = this.dexie.table(Table.LatestAccountAssets);
         this.historicalAccountAssets = this.dexie.table(Table.HistoricalAccountAssets);
         this.accountAuths = this.dexie.table(Table.AccountAuth);
+        this.accountKeyMappings = this.dexie.table(Table.AccountKeyMapping);
         this.latestAccountHeaders = this.dexie.table(Table.LatestAccountHeaders);
         this.historicalAccountHeaders = this.dexie.table(Table.HistoricalAccountHeaders);
         this.addresses = this.dexie.table(Table.Addresses);

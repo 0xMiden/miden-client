@@ -43,7 +43,6 @@ use crate::account::helpers::{
     query_account_code,
     query_historical_account_headers,
     query_latest_account_headers,
-    query_storage_maps,
     query_storage_slots,
     query_storage_values,
     query_vault_assets,
@@ -134,7 +133,6 @@ impl SqliteStore {
     /// Retrieves a minimal partial account record with storage and vault witnesses.
     pub(crate) fn get_minimal_partial_account(
         conn: &mut Connection,
-        smt_forest: &Arc<RwLock<AccountSmtForest>>,
         account_id: AccountId,
     ) -> Result<Option<AccountRecord>, StoreError> {
         let Some((header, status)) = Self::get_account_header(conn, account_id)? else {
@@ -150,23 +148,13 @@ impl SqliteStore {
 
         let storage_values = query_storage_values(conn, account_id)?;
 
-        // Fetch all storage maps in a single query
-        let mut all_storage_maps = query_storage_maps(conn, account_id)?;
-
+        // Storage maps are always minimal here (just roots, no entries).
+        // New accounts that need full storage data are handled by the DataStore layer,
+        // which fetches the full account via `get_account()` when nonce == 0.
         for (slot_name, (slot_type, value)) in storage_values {
             storage_header.push(StorageSlotHeader::new(slot_name.clone(), slot_type, value));
             if slot_type == StorageSlotType::Map {
-                let mut partial_storage_map = PartialStorageMap::new(value);
-
-                if let Some(map) = all_storage_maps.remove(&slot_name) {
-                    let smt_forest = smt_forest.read().expect("smt_forest read lock not poisoned");
-                    for (k, _v) in map.entries() {
-                        let witness = smt_forest.get_storage_map_item_witness(value, *k)?;
-                        partial_storage_map.add(witness).map_err(StoreError::MerkleStoreError)?;
-                    }
-                }
-
-                maps.push(partial_storage_map);
+                maps.push(PartialStorageMap::new(value));
             }
         }
         storage_header.sort_by_key(StorageSlotHeader::id);
