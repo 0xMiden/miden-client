@@ -950,22 +950,132 @@ function MyFeature() {
 
 ## External Signer Integration
 
-For wallets using external key management (e.g. Para, Turnkey, MidenFi), wrap your app with a signer provider above `MidenProvider`. The signer provider populates a `SignerContext` with a `signCb` and an `accountConfig`; `MidenProvider` picks these up automatically to create the client and initialize the account. See `CLAUDE.md` for full signer provider documentation.
+For wallets using external key management, wrap your app with a signer provider **above** `MidenProvider`. The signer provider populates a `SignerContext` with a `signCb` and an `accountConfig`; `MidenProvider` picks these up automatically to create the client and initialize the account.
+
+### Para (EVM Wallets)
+
+```tsx
+import { ParaSignerProvider } from '@miden-sdk/para';
+
+function App() {
+  return (
+    <ParaSignerProvider apiKey="your-api-key" environment="PRODUCTION">
+      <MidenProvider config={{ rpcUrl: 'testnet' }}>
+        <YourApp />
+      </MidenProvider>
+    </ParaSignerProvider>
+  );
+}
+
+// Access Para-specific data
+const { para, wallet, isConnected } = useParaSigner();
+```
+
+### Turnkey
+
+```tsx
+import { TurnkeySignerProvider } from '@miden-sdk/miden-turnkey-react';
+
+function App() {
+  return (
+    // Config is optional — defaults to https://api.turnkey.com
+    // and reads VITE_TURNKEY_ORG_ID from environment
+    <TurnkeySignerProvider>
+      <MidenProvider config={{ rpcUrl: 'testnet' }}>
+        <YourApp />
+      </MidenProvider>
+    </TurnkeySignerProvider>
+  );
+}
+
+// Or with explicit config:
+<TurnkeySignerProvider config={{
+  apiBaseUrl: 'https://api.turnkey.com',
+  defaultOrganizationId: 'your-org-id',
+}}>
+  ...
+</TurnkeySignerProvider>
+```
+
+Connect via passkey authentication:
+
+```tsx
+import { useSigner } from '@miden-sdk/react';
+import { useTurnkeySigner } from '@miden-sdk/miden-turnkey-react';
+
+const { isConnected, connect, disconnect } = useSigner();
+await connect(); // triggers passkey flow
+
+const { client, account, setAccount } = useTurnkeySigner();
+```
+
+### MidenFi Wallet Adapter
+
+```tsx
+import { MidenFiSignerProvider } from '@miden-sdk/wallet-adapter-react';
+
+function App() {
+  return (
+    <MidenFiSignerProvider network="Testnet">
+      <MidenProvider config={{ rpcUrl: 'testnet' }}>
+        <YourApp />
+      </MidenProvider>
+    </MidenFiSignerProvider>
+  );
+}
+```
+
+### Unified Signer Hook
+
+`useSigner()` works with any signer provider:
+
+```tsx
+import { useSigner } from '@miden-sdk/react';
+
+function ConnectButton() {
+  const signer = useSigner();
+  if (!signer) return null; // local keystore mode
+
+  const { isConnected, connect, disconnect, name } = signer;
+  return isConnected
+    ? <button onClick={disconnect}>Disconnect {name}</button>
+    : <button onClick={connect}>Connect with {name}</button>;
+}
+```
 
 ### Custom Account Components
 
-Signer providers can attach custom `AccountComponent` instances to accounts via the `customComponents` field on `SignerAccountConfig`. This is useful for including application-specific logic compiled from `.masp` packages (e.g. a DEX component or custom smart contract) alongside the default auth and basic wallet components.
+Signer providers can include custom `AccountComponent` instances in the account via the `customComponents` field on `SignerAccountConfig`. This is useful for attaching application-specific logic compiled from `.masp` packages (e.g. a DEX component or custom smart contract) alongside the default auth and basic wallet components.
 
-When building a custom signer provider, pass `customComponents` through the `SignerContext`:
+Pre-built signer providers (Para, Turnkey, MidenFi) accept `customComponents` as a prop and forward it into `accountConfig`:
+
+```tsx
+import { ParaSignerProvider } from '@miden-sdk/para';
+import type { AccountComponent } from '@miden-sdk/miden-sdk';
+
+const dexComponent: AccountComponent = await loadCompiledComponent();
+
+<ParaSignerProvider
+  apiKey="your-api-key"
+  environment="PRODUCTION"
+  customComponents={[dexComponent]}
+>
+  <MidenProvider config={{ rpcUrl: 'testnet' }}>
+    <YourApp />
+  </MidenProvider>
+</ParaSignerProvider>
+```
+
+When building a custom signer provider, pass `customComponents` through the `SignerContext` directly:
 
 ```tsx
 import { SignerContext } from '@miden-sdk/react';
 import type { AccountComponent } from '@miden-sdk/miden-sdk';
 
-function MySignerProvider({ children }: { children: React.ReactNode }) {
-  // Load compiled .masp components (e.g. from your build pipeline)
-  const myDexComponent: AccountComponent = useMemo(() => loadCompiledComponent(), []);
-
+function MySignerProvider({ children, customComponents }: {
+  children: React.ReactNode;
+  customComponents?: AccountComponent[];
+}) {
   return (
     <SignerContext.Provider value={{
       name: 'MySigner',
@@ -975,9 +1085,7 @@ function MySignerProvider({ children }: { children: React.ReactNode }) {
         publicKeyCommitment: userPublicKeyCommitment,
         accountType: 'RegularAccountUpdatableCode',
         storageMode: myStorageMode,
-        // Custom components are included in the account alongside
-        // the default auth + basic wallet components
-        customComponents: [myDexComponent],
+        customComponents,
       },
       signCb: async (pubKey, signingInputs) => signature,
       connect: async () => { /* ... */ },
@@ -985,18 +1093,6 @@ function MySignerProvider({ children }: { children: React.ReactNode }) {
     }}>
       {children}
     </SignerContext.Provider>
-  );
-}
-
-// MidenProvider automatically uses the accountConfig (including customComponents)
-// when initializing the signer account
-function App() {
-  return (
-    <MySignerProvider>
-      <MidenProvider config={{ rpcUrl: 'testnet' }}>
-        <YourApp />
-      </MidenProvider>
-    </MySignerProvider>
   );
 }
 ```
