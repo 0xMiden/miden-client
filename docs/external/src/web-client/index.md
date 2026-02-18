@@ -39,6 +39,10 @@ yarn add @miden-sdk/miden-sdk
 
 See the [README](https://github.com/0xMiden/miden-client/blob/main/crates/web-client/README) for full installation instructions and some usage instructions, including code examples for wallet creation, transaction execution, and syncing state.
 
+## API Reference
+
+For complete API documentation, see the [TypeDoc API Reference](https://github.com/0xMiden/miden-client/blob/main/docs/typedoc/web-client/README.md).
+
 ## Resource Management
 
 The WebClient uses a dedicated [Web Worker](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API) to offload computationally intensive operations like wallet creation, transaction proving, and state synchronization. This keeps the main thread responsive.

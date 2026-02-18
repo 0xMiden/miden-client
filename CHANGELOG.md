@@ -4,6 +4,12 @@
 
 ### Enhancements
 
+* Added TypeDoc API reference links for web SDK in main README and Docusaurus documentation ([#1625](https://github.com/0xMiden/miden-client/pull/1625)).
+
+## 0.13.0 (2026-01-28)
+
+### Enhancements
+
 * Updated the `GrpcClient` to fetch the RPC limits from the node ([#1724](https://github.com/0xMiden/miden-client/pull/1724)).
 * Added typed error parsing for node RPC endpoints, enabling programmatic error handling instead of string parsing ([#1734](https://github.com/0xMiden/miden-client/pull/1734)).
 * Added `--rpc-status` flag to `miden-client info` command to display RPC node status information including node version, genesis commitment, store status, and block producer status; also added `get_status_unversioned` to `NodeRpcClient` trait ([#1742](https://github.com/0xMiden/miden-client/pull/1742)).
