@@ -948,6 +948,31 @@ function MyFeature() {
 }
 ```
 
+## External Signer Integration
+
+For wallets using external key management (e.g. Para, Turnkey, MidenFi), wrap your app with a signer provider above `MidenProvider`. See `CLAUDE.md` for full signer provider documentation.
+
+### Custom Account Components
+
+Signer providers can attach custom `AccountComponent` instances to accounts via the `customComponents` field on `SignerAccountConfig`. This is useful for including application-specific logic compiled from `.masp` packages (e.g. a DEX component or custom smart contract) alongside the default auth and basic wallet components.
+
+```tsx
+import type { SignerAccountConfig } from '@miden-sdk/react';
+import type { AccountComponent } from '@miden-sdk/miden-sdk';
+
+// Load a compiled .masp component (e.g. from your build pipeline)
+const myDexComponent: AccountComponent = await loadCompiledComponent();
+
+const accountConfig: SignerAccountConfig = {
+  publicKeyCommitment: userPublicKeyCommitment,
+  accountType: 'RegularAccountUpdatableCode',
+  storageMode: myStorageMode,
+  customComponents: [myDexComponent],
+};
+```
+
+Components are appended to the `AccountBuilder` after the default basic wallet component and before `build()` is called, so the account always includes wallet functionality plus any extras you provide. The field is optional — omitting it or passing an empty array preserves the default behavior.
+
 ## Default Values
 
 The SDK uses privacy-first defaults:
