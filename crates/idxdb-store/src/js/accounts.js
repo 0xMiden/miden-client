@@ -1,5 +1,8 @@
 import { getDatabase, } from "./schema.js";
 import { logWebStoreError, uint8ArrayToBase64 } from "./utils.js";
+function seedToBase64(seed) {
+    return seed ? uint8ArrayToBase64(seed) : undefined;
+}
 export async function getAccountIds(dbId) {
     try {
         const db = getDatabase(dbId);
@@ -15,26 +18,17 @@ export async function getAllAccountHeaders(dbId) {
     try {
         const db = getDatabase(dbId);
         const records = await db.latestAccountHeaders.toArray();
-        const resultObject = records.map((record) => {
-            let accountSeedBase64 = undefined;
-            if (record.accountSeed) {
-                const seedAsBytes = new Uint8Array(record.accountSeed);
-                if (seedAsBytes.length > 0) {
-                    accountSeedBase64 = uint8ArrayToBase64(seedAsBytes);
-                }
-            }
-            return {
-                id: record.id,
-                nonce: record.nonce,
-                vaultRoot: record.vaultRoot,
-                storageRoot: record.storageRoot || "",
-                codeRoot: record.codeRoot || "",
-                accountSeed: accountSeedBase64,
-                locked: record.locked,
-                committed: record.committed,
-                accountCommitment: record.accountCommitment || "",
-            };
-        });
+        const resultObject = records.map((record) => ({
+            id: record.id,
+            nonce: record.nonce,
+            vaultRoot: record.vaultRoot,
+            storageRoot: record.storageRoot || "",
+            codeRoot: record.codeRoot || "",
+            accountSeed: seedToBase64(record.accountSeed),
+            locked: record.locked,
+            committed: record.committed,
+            accountCommitment: record.accountCommitment || "",
+        }));
         return resultObject;
     }
     catch (error) {
@@ -52,19 +46,13 @@ export async function getAccountHeader(dbId, accountId) {
             console.log("No account header record found for given ID.");
             return null;
         }
-        let accountSeedBase64 = undefined;
-        if (record.accountSeed) {
-            if (record.accountSeed.length > 0) {
-                accountSeedBase64 = uint8ArrayToBase64(record.accountSeed);
-            }
-        }
         return {
             id: record.id,
             nonce: record.nonce,
             vaultRoot: record.vaultRoot,
             storageRoot: record.storageRoot,
             codeRoot: record.codeRoot,
-            accountSeed: accountSeedBase64,
+            accountSeed: seedToBase64(record.accountSeed),
             locked: record.locked,
         };
     }
@@ -82,17 +70,13 @@ export async function getAccountHeaderByCommitment(dbId, accountCommitment) {
         if (!record) {
             return undefined;
         }
-        let accountSeedBase64 = undefined;
-        if (record.accountSeed) {
-            accountSeedBase64 = uint8ArrayToBase64(record.accountSeed);
-        }
         return {
             id: record.id,
             nonce: record.nonce,
             vaultRoot: record.vaultRoot,
             storageRoot: record.storageRoot,
             codeRoot: record.codeRoot,
-            accountSeed: accountSeedBase64,
+            accountSeed: seedToBase64(record.accountSeed),
             locked: record.locked,
         };
     }
