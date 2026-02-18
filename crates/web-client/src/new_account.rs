@@ -8,6 +8,8 @@ use miden_client::auth::{
     AuthSchemeId as NativeAuthScheme,
     AuthSecretKey,
 };
+use miden_client::block::BlockNumber;
+use miden_client::keystore::Keystore;
 use rand::rngs::StdRng;
 use rand::{RngCore, SeedableRng};
 use wasm_bindgen::prelude::*;
@@ -20,6 +22,23 @@ use crate::helpers::generate_wallet;
 use crate::models::account_id::AccountId;
 use crate::{WebClient, js_error_with_context};
 
+impl WebClient {
+    /// Syncs state if the client has never been synced (still at genesis block).
+    ///
+    /// This prevents a slow full-chain scan on the next sync after account creation.
+    /// Errors are intentionally ignored — account creation should proceed regardless.
+    async fn maybe_sync_before_account_creation(&mut self) {
+        let should_sync = match self.get_mut_inner() {
+            Some(client) => client.get_sync_height().await.is_ok_and(|h| h == BlockNumber::GENESIS),
+            None => false,
+        };
+
+        if should_sync && let Some(client) = self.get_mut_inner() {
+            let _ = client.sync_state().await;
+        }
+    }
+}
+
 #[wasm_bindgen]
 impl WebClient {
     #[wasm_bindgen(js_name = "newWallet")]
@@ -30,6 +49,7 @@ impl WebClient {
         auth_scheme: AuthScheme,
         init_seed: Option<Vec<u8>>,
     ) -> Result<Account, JsValue> {
+        self.maybe_sync_before_account_creation().await;
         let keystore = self.keystore.clone();
         if let Some(client) = self.get_mut_inner() {
             let (new_account, key_pair) =
@@ -42,27 +62,9 @@ impl WebClient {
 
             keystore
                 .expect("KeyStore should be initialized")
-                .add_key(&key_pair)
+                .add_key(&key_pair, new_account.id())
                 .await
                 .map_err(|err| err.to_string())?;
-
-            client
-                .register_account_public_key_commitments(
-                    &new_account.id(),
-                    &[key_pair.public_key()],
-                )
-                .await
-                .map_err(|err| {
-                    js_error_with_context(err, "failed to map account to public keys")
-                })?;
-
-            let store = self.store.as_ref().expect("Store should be initialized");
-            store
-                .insert_account_public_key(key_pair.public_key().to_commitment(), new_account.id())
-                .await
-                .map_err(|err| {
-                    js_error_with_context(err, "failed to index account by public key")
-                })?;
 
             Ok(new_account.into())
         } else {
@@ -80,15 +82,12 @@ impl WebClient {
         max_supply: u64,
         auth_scheme: AuthScheme,
     ) -> Result<Account, JsValue> {
+        self.maybe_sync_before_account_creation().await;
         if non_fungible {
             return Err(JsValue::from_str("Non-fungible faucets are not supported yet"));
         }
 
         let keystore = self.keystore.clone();
-        let store = self
-            .store
-            .clone()
-            .ok_or(JsValue::from_str("(newFaucet) store is not initialized"))?;
 
         if let Some(client) = self.get_mut_inner() {
             let mut seed = [0u8; 32];
@@ -143,26 +142,9 @@ impl WebClient {
 
             keystore
                 .expect("KeyStore should be initialized")
-                .add_key(&key_pair)
+                .add_key(&key_pair, new_account.id())
                 .await
                 .map_err(|err| err.to_string())?;
-
-            client
-                .register_account_public_key_commitments(
-                    &new_account.id(),
-                    &[key_pair.public_key()],
-                )
-                .await
-                .map_err(|err| {
-                    js_error_with_context(err, "failed to map account to public keys")
-                })?;
-
-            store
-                .insert_account_public_key(key_pair.public_key().to_commitment(), new_account.id())
-                .await
-                .map_err(|err| {
-                    js_error_with_context(err, "failed to index account by public key")
-                })?;
 
             match client.add_account(&new_account, false).await {
                 Ok(_) => Ok(new_account.into()),
@@ -178,6 +160,7 @@ impl WebClient {
 
     #[wasm_bindgen(js_name = "newAccount")]
     pub async fn new_account(&mut self, account: &Account, overwrite: bool) -> Result<(), JsValue> {
+        self.maybe_sync_before_account_creation().await;
         if let Some(client) = self.get_mut_inner() {
             let native_account = account.into();
 
@@ -201,30 +184,10 @@ impl WebClient {
         let native_secret_key: AuthSecretKey = secret_key.into();
         let native_account_id = account_id.into();
 
-        keystore.add_key(&native_secret_key).await.map_err(|err| err.to_string())?;
-
-        if let Some(client) = self.get_mut_inner() {
-            client
-                .register_account_public_key_commitments(
-                    &native_account_id,
-                    &[native_secret_key.public_key()],
-                )
-                .await
-                .map_err(|err| {
-                    js_error_with_context(err, "failed to map account to public keys")
-                })?;
-
-            let store = self.store.as_ref().expect("Store should be initialized");
-            store
-                .insert_account_public_key(
-                    native_secret_key.public_key().to_commitment(),
-                    native_account_id,
-                )
-                .await
-                .map_err(|err| {
-                    js_error_with_context(err, "failed to index account by public key")
-                })?;
-        }
+        keystore
+            .add_key(&native_secret_key, native_account_id)
+            .await
+            .map_err(|err| err.to_string())?;
 
         Ok(())
     }

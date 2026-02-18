@@ -12,7 +12,7 @@ use anyhow::{Context, Result};
 use miden_protocol::Felt;
 use miden_protocol::account::auth::AuthSecretKey;
 use miden_protocol::account::{Account, AccountId, AccountStorageMode};
-use miden_protocol::asset::{Asset, FungibleAsset, TokenSymbol};
+use miden_protocol::asset::{FungibleAsset, TokenSymbol};
 use miden_protocol::note::NoteType;
 use miden_protocol::testing::account_id::ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE;
 use miden_protocol::transaction::{OutputNote, TransactionId};
@@ -25,7 +25,7 @@ use crate::account::component::{AccountComponent, BasicFungibleFaucet, BasicWall
 use crate::account::{AccountBuilder, AccountType, StorageSlot};
 use crate::auth::AuthSchemeId;
 use crate::crypto::FeltRng;
-pub use crate::keystore::FilesystemKeyStore;
+pub use crate::keystore::{FilesystemKeyStore, Keystore};
 use crate::note::{Note, NoteAttachment, create_p2id_note};
 use crate::rpc::RpcError;
 use crate::store::{NoteFilter, TransactionFilter};
@@ -104,7 +104,7 @@ pub async fn insert_new_wallet_with_seed(
         .build()
         .unwrap();
 
-    keystore.add_key(&key_pair).unwrap();
+    keystore.add_key(&key_pair, account.id()).await.unwrap();
 
     client.add_account(&account, false).await?;
 
@@ -154,7 +154,7 @@ pub async fn insert_new_fungible_faucet(
         .build()
         .unwrap();
 
-    keystore.add_key(&key_pair).unwrap();
+    keystore.add_key(&key_pair, account.id()).await.unwrap();
 
     client.add_account(&account, false).await?;
     Ok((account, key_pair))
@@ -427,21 +427,15 @@ pub async fn consume_notes(
 pub async fn assert_account_has_single_asset(
     client: &TestClient,
     account_id: AccountId,
-    asset_account_id: AccountId,
+    faucet_id: AccountId,
     expected_amount: u64,
 ) {
-    let regular_account: Account =
-        client.get_account(account_id).await.unwrap().unwrap().try_into().unwrap();
-
-    assert_eq!(regular_account.vault().assets().count(), 1);
-    let asset = regular_account.vault().assets().next().unwrap();
-
-    if let Asset::Fungible(fungible_asset) = asset {
-        assert_eq!(fungible_asset.faucet_id(), asset_account_id);
-        assert_eq!(fungible_asset.amount(), expected_amount);
-    } else {
-        panic!("Account has consumed a note and should have a fungible asset");
-    }
+    let balance = client
+        .account_reader(account_id)
+        .get_balance(faucet_id)
+        .await
+        .expect("Account should have the asset");
+    assert_eq!(balance, expected_amount);
 }
 
 /// Tries to consume the note and asserts that the expected error is returned.
@@ -570,7 +564,7 @@ pub async fn insert_account_with_custom_component(
         .build()
         .map_err(ClientError::AccountError)?;
 
-    keystore.add_key(&key_pair).unwrap();
+    keystore.add_key(&key_pair, account.id()).await.unwrap();
     client.add_account(&account, false).await?;
 
     Ok((account, key_pair))

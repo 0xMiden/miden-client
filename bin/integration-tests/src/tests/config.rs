@@ -12,7 +12,7 @@ use miden_client_sqlite_store::ClientBuilderSqliteExt;
 use rand::Rng;
 use uuid::Uuid;
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct ClientConfig {
     pub rpc_endpoint: Endpoint,
     pub rpc_timeout_ms: u64,
@@ -67,15 +67,15 @@ impl ClientConfig {
             format!("failed to create keystore at path: {}", auth_path.to_string_lossy())
         })?;
 
+        let rpc_client = Arc::new(GrpcClient::new(&rpc_endpoint, rpc_timeout));
+
         let builder = ClientBuilder::new()
-            .rpc(Arc::new(GrpcClient::new(&rpc_endpoint, rpc_timeout)))
+            .rpc(rpc_client)
             .rng(Box::new(rng))
             .sqlite_store(store_config)
-            .filesystem_keystore(auth_path.to_str().with_context(|| {
-                format!("failed to convert auth path to string: {}", auth_path.to_string_lossy())
-            })?)
+            .authenticator(Arc::new(keystore.clone()))
             .in_debug_mode(DebugMode::Disabled)
-            .tx_graceful_blocks(None);
+            .tx_discard_delta(None);
 
         Ok((builder, keystore))
     }

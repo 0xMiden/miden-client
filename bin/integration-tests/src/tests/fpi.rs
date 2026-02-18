@@ -18,7 +18,7 @@ use miden_client::auth::{
     AuthSecretKey,
     RPO_FALCON_SCHEME_ID,
 };
-use miden_client::keystore::FilesystemKeyStore;
+use miden_client::keystore::{FilesystemKeyStore, Keystore};
 use miden_client::rpc::domain::account::{AccountStorageRequirements, StorageMapKey};
 use miden_client::testing::common::*;
 use miden_client::transaction::{AdviceInputs, ForeignAccount, TransactionRequestBuilder};
@@ -348,8 +348,7 @@ async fn standard_fpi(
         let foreign_account: Account = client
             .get_account(foreign_account_id)
             .await?
-            .context("failed to find foreign account after deploiyng")?
-            .try_into()?;
+            .context("failed to find foreign account after deploying")?;
 
         let (id, _vault, storage, code, nonce, seed) = foreign_account.into_parts();
         let acc = PartialAccount::new(
@@ -493,7 +492,10 @@ async fn deploy_foreign_account(
         foreign_account_with_code(storage_mode, code, auth_scheme)?;
     let foreign_account_id = foreign_account.id();
 
-    keystore.add_key(&secret_key).with_context(|| "failed to add key to keystore")?;
+    keystore
+        .add_key(&secret_key, foreign_account_id)
+        .await
+        .with_context(|| "failed to add key to keystore")?;
     client.add_account(&foreign_account, false).await?;
 
     println!("Deploying foreign account");
@@ -510,8 +512,7 @@ async fn deploy_foreign_account(
 
     // NOTE: We get the new account state here since the first transaction updates the nonce from
     // to 1
-    let foreign_account: Account =
-        client.get_account(foreign_account_id).await?.unwrap().try_into().unwrap();
+    let foreign_account: Account = client.try_get_account(foreign_account_id).await?;
 
     Ok((foreign_account, proc_root))
 }

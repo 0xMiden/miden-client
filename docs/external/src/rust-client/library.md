@@ -13,41 +13,54 @@ miden-client = { version = "0.11" }
 
 ## Client instantiation
 
-Spin up a client using the following Rust code and supplying a store and RPC endpoint. 
+The recommended way to create a client is using the `ClientBuilder`. For standard networks, use the pre-configured constructors:
 
 ```rust
+use std::sync::Arc;
+use miden_client::builder::ClientBuilder;
 use miden_client_sqlite_store::SqliteStore;
+
+// Create store
 let sqlite_store = SqliteStore::new("path/to/store".try_into()?).await?;
 let store = Arc::new(sqlite_store);
 
-// Generate a random seed for the RpoRandomCoin.
-let mut rng = rand::rng();
-let coin_seed: [u64; 4] = rng.random();
+// Build client for testnet (pre-configured RPC, prover, and note transport)
+let client = ClientBuilder::for_testnet()
+    .store(store)
+    .filesystem_keystore("path/to/keys")?
+    .build()
+    .await?;
+```
 
-// Initialize the random coin using the generated seed.
-let rng = RpoRandomCoin::new(coin_seed.map(Felt::new));
+Other network constructors are available:
+- `ClientBuilder::for_testnet()` - Pre-configured for Miden testnet
+- `ClientBuilder::for_devnet()` - Pre-configured for Miden devnet
+- `ClientBuilder::for_localhost()` - Pre-configured for local development
 
-// Create a keystore to manage cryptographic keys.
-let keystore = FilesystemKeyStore::new(path.into())?;
+For custom configurations, use `ClientBuilder::new()` and configure each component:
 
-// Setup the gRPC endpoint to connect to the local node.
+```rust
+use std::sync::Arc;
+use miden_client::builder::ClientBuilder;
+use miden_client::rpc::{Endpoint, GrpcClient};
+use miden_client_sqlite_store::SqliteStore;
+
+// Create store
+let sqlite_store = SqliteStore::new("path/to/store".try_into()?).await?;
+let store = Arc::new(sqlite_store);
+
+// Setup the gRPC endpoint
 let endpoint = Endpoint::new("https".into(), "localhost".into(), Some(57291));
 
-// Optionally, setup a connection to the note transport network
-let nt_endpoint = "http://localhost:57292".to_string();
-let nt_client = CanonicalNoteTransportClient::connect(nt_endpoint, 10_000).await?;
-
-let client:Client = Client::new(
-    Arc::new(GrpcClient::new(&endpoint, 10_000)),
-    rng,
-    store,
-    Some(Arc::new(keystore)), // Authenticator is optional - use None if no authentication is needed
-    false, // Set to true for debug mode, if needed.
-    None, // Set to Some to enable stale transactions after an amount of blocks.
-    None, // Set to Some to enable recency checks when executing transactions.
-    Some(Arc::new(nt_client)),
-    None, // or Some(Arc::new(prover)) for a custom prover
-);
+let client = ClientBuilder::new()
+    .grpc_client(&endpoint, None)
+    .store(store)
+    .filesystem_keystore("path/to/keys")?
+    // Optional: custom prover via .prover(Arc::new(prover))
+    // Optional: note transport via .note_transport(Arc::new(nt_client))
+    // Optional: debug mode via .in_debug_mode(DebugMode::Enabled)
+    .build()
+    .await?;
 ```
 
 ## Create local account
@@ -65,7 +78,7 @@ let new_account = AccountBuilder::new(init_seed) // Seed should be random for ea
     .with_auth_component(AuthRpoFalcon512::new(key_pair.public_key()))
     .with_component(BasicWallet)
     .build()?;
-keystore.add_key(&AuthSecretKey::RpoFalcon512(key_pair)).await?;
+keystore.add_key(&AuthSecretKey::RpoFalcon512(key_pair), new_account.id()).await?;
 client.add_account(&new_account, false).await?;
 ```
 Once an account is created, it is kept locally and its state is automatically tracked by the client.
@@ -83,7 +96,7 @@ let new_account = AccountBuilder::new(init_seed) // Seed should be random for ea
     .with_auth_component(AuthRpoFalcon512::new(key_pair.public_key()))
     .with_component(BasicWallet)
     .build()?;
-keystore.add_key(&AuthSecretKey::RpoFalcon512(key_pair)).await?;
+keystore.add_key(&AuthSecretKey::RpoFalcon512(key_pair), new_account.id()).await?;
 client.add_account(&new_account, false).await?;
 ```
 

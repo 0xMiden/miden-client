@@ -9,20 +9,22 @@ use assert_cmd::Command;
 use assert_cmd::cargo::cargo_bin_cmd;
 use miden_client::account::{AccountId, AccountStorageMode};
 use miden_client::address::AddressInterface;
-use miden_client::auth::RPO_FALCON_SCHEME_ID;
+use miden_client::auth::{RPO_FALCON_SCHEME_ID, TransactionAuthenticator};
+use miden_client::builder::ClientBuilder;
 use miden_client::crypto::{FeltRng, RpoRandomCoin};
+use miden_client::keystore::Keystore;
 use miden_client::note::{
     Note,
     NoteAssets,
     NoteFile,
     NoteId,
-    NoteInputs,
     NoteMetadata,
     NoteRecipient,
+    NoteStorage,
     NoteTag,
     NoteType,
 };
-use miden_client::rpc::{Endpoint, GrpcClient};
+use miden_client::rpc::Endpoint;
 use miden_client::testing::account_id::ACCOUNT_ID_PRIVATE_SENDER;
 use miden_client::testing::common::{
     ACCOUNT_ID_REGULAR,
@@ -33,15 +35,7 @@ use miden_client::testing::common::{
 };
 use miden_client::transaction::{OutputNote, TransactionRequestBuilder};
 use miden_client::utils::Serializable;
-use miden_client::{
-    self,
-    Client,
-    DebugMode,
-    ExecutionOptions,
-    Felt,
-    MAX_TX_EXECUTION_CYCLES,
-    MIN_TX_EXECUTION_CYCLES,
-};
+use miden_client::{self, Client, DebugMode, Felt};
 use miden_client_cli::MIDEN_DIR;
 use miden_client_sqlite_store::SqliteStore;
 use predicates::str::contains;
@@ -109,8 +103,7 @@ fn init_with_params() {
 #[test]
 #[serial_test::file_serial]
 fn silent_initialization_uses_default_values() {
-    // Clean up any existing global config first
-    cleanup_global_config();
+    let miden_home = set_isolated_miden_home();
 
     let temp_dir = temp_dir().join(format!("cli-test-{}", rand::rng().random::<u64>()));
     std::fs::create_dir_all(&temp_dir).unwrap();
@@ -121,7 +114,7 @@ fn silent_initialization_uses_default_values() {
     account_cmd.current_dir(&temp_dir).assert().success();
 
     // Read and verify the global config file contents
-    let global_config_path = dirs::home_dir().unwrap().join(MIDEN_DIR).join("miden-client.toml");
+    let global_config_path = miden_home.join("miden-client.toml");
     let config_content = std::fs::read_to_string(&global_config_path).unwrap();
 
     // Verify default values are used
@@ -147,9 +140,6 @@ fn silent_initialization_uses_default_values() {
         !local_config_path.exists(),
         "Should not create local config during silent initialization"
     );
-
-    // Clean up
-    cleanup_global_config();
 }
 
 #[test]
@@ -547,7 +537,6 @@ async fn cli_export_import_account() -> Result<()> {
 
     assert!(client_2.get_account(AccountId::from_hex(&faucet_id)?).await.is_ok());
     assert!(client_2.get_account(AccountId::from_hex(&wallet_id)?).await.is_ok());
-
     sync_cli(&temp_dir_2);
 
     let note_id = mint_cli(&temp_dir_2, &wallet_id, &faucet_id);
@@ -560,25 +549,33 @@ async fn cli_export_import_account() -> Result<()> {
 
     // Since importing keys should also store a mapping from
     // the account id to its public key commitments, we should be able
-    // to retrieve them.
-    let faucet_pks = client_2
-        .get_account_public_key_commitments(&AccountId::from_hex(&faucet_id)?)
+    // to retrieve them via the Keystore trait.
+    let faucet_pks = cli_keystore
+        .get_account_key_commitments(&AccountId::from_hex(&faucet_id)?)
         .await?;
 
     for stored_pk_commitment in faucet_pks {
-        let matching_secret_key = cli_keystore.get_key(stored_pk_commitment).unwrap();
+        let matching_secret_key = cli_keystore.get_key_sync(stored_pk_commitment).unwrap();
         assert!(matching_secret_key.is_some());
         assert!(matching_secret_key.unwrap().public_key().to_commitment() == stored_pk_commitment);
+
+        let public_key = cli_keystore.get_public_key(stored_pk_commitment).await;
+        assert!(public_key.is_some());
+        assert!(public_key.unwrap().to_commitment() == stored_pk_commitment);
     }
 
-    let wallet_pks = client_2
-        .get_account_public_key_commitments(&AccountId::from_hex(&wallet_id)?)
+    let wallet_pks = cli_keystore
+        .get_account_key_commitments(&AccountId::from_hex(&wallet_id)?)
         .await?;
 
     for stored_pk_commitment in wallet_pks {
-        let matching_secret_key = cli_keystore.get_key(stored_pk_commitment).unwrap();
+        let matching_secret_key = cli_keystore.get_key_sync(stored_pk_commitment).unwrap();
         assert!(matching_secret_key.is_some());
         assert!(matching_secret_key.unwrap().public_key().to_commitment() == stored_pk_commitment);
+
+        let public_key = cli_keystore.get_public_key(stored_pk_commitment).await;
+        assert!(public_key.is_some());
+        assert!(public_key.unwrap().to_commitment() == stored_pk_commitment);
     }
 
     Ok(())
@@ -698,7 +695,7 @@ async fn debug_mode_outputs_logs() -> Result<()> {
             end
             ";
     let note_script = client.code_builder().compile_note_script(note_script).unwrap();
-    let inputs = NoteInputs::new(vec![]).unwrap();
+    let inputs = NoteStorage::new(vec![]).unwrap();
     let serial_num = client.rng().draw_word();
     let note_metadata = NoteMetadata::new(
         account.id(),
@@ -899,17 +896,13 @@ async fn new_wallet_with_deploy_flag() -> Result<()> {
     // Create a client and retrieve the account to verify the nonce
     let (client, _) = create_rust_client_with_store_path(&store_path, endpoint).await?;
     let account_id = AccountId::from_hex(account_id_str)?;
-    let account = client
-        .get_account(account_id)
-        .await?
-        .expect("Account should exist in the store");
+    let nonce = client.account_reader(account_id).nonce().await?;
 
     // Verify that the nonce is non-zero (account was deployed)
     // By convention, a nonce of 0 indicates an undeployed account
     assert!(
-        account.nonce().as_int() > 0,
-        "Account nonce should be non-zero after deployment, but got: {}",
-        account.nonce()
+        nonce.as_int() > 0,
+        "Account nonce should be non-zero after deployment, but got: {nonce}"
     );
 
     Ok(())
@@ -953,20 +946,18 @@ fn init_cli_with_store_path(store_path: &Path, endpoint: &Endpoint) -> PathBuf {
     temp_dir
 }
 
-/// Helper function to clean up global config for testing
-fn cleanup_global_config() {
-    if let Some(home_dir) = dirs::home_dir() {
-        let global_miden_dir = home_dir.join(MIDEN_DIR);
-        if global_miden_dir.exists() {
-            // Try multiple times in case of file locks
-            for _ in 0..3 {
-                if std::fs::remove_dir_all(&global_miden_dir).is_ok() {
-                    break;
-                }
-                std::thread::sleep(std::time::Duration::from_millis(100));
-            }
-        }
+/// Creates an isolated temporary directory and sets `MIDEN_CLIENT_HOME` to point to it.
+/// This prevents tests from touching the real `~/.miden` directory.
+/// Tests using this MUST use `#[serial_test::file_serial]`.
+fn set_isolated_miden_home() -> PathBuf {
+    let path = temp_dir().join(format!("miden-home-{}", rand::rng().random::<u64>()));
+    std::fs::create_dir_all(&path).unwrap();
+    // SAFETY: Tests using this are serialized via #[serial_test::file_serial]
+    // These don't need to be executed in parallel as they aren't a bottleneck at all.
+    unsafe {
+        env::set_var("MIDEN_CLIENT_HOME", &path);
     }
+    path
 }
 
 // Syncs CLI on directory. It'll try syncing until the command executes successfully. If it never
@@ -1155,26 +1146,16 @@ async fn create_rust_client_with_store_path(
 
     let keystore = FilesystemKeyStore::new(temp_dir())?;
 
-    Ok((
-        TestClient::new(
-            Arc::new(GrpcClient::new(&endpoint, 10_000)),
-            rng,
-            store,
-            Some(std::sync::Arc::new(keystore.clone())),
-            ExecutionOptions::new(
-                Some(MAX_TX_EXECUTION_CYCLES),
-                MIN_TX_EXECUTION_CYCLES,
-                false,
-                true,
-            )?,
-            None,
-            None,
-            None,
-            None,
-        )
-        .await?,
-        keystore,
-    ))
+    let client = ClientBuilder::new()
+        .grpc_client(&endpoint, Some(10_000))
+        .rng(rng)
+        .store(store)
+        .authenticator(Arc::new(keystore.clone()))
+        .in_debug_mode(DebugMode::Enabled)
+        .build()
+        .await?;
+
+    Ok((client, keystore))
 }
 
 /// Executes a command and asserts that it fails but does not panic.
@@ -1373,8 +1354,8 @@ async fn test_from_system_user_config_with_local_config() -> Result<()> {
     // Initialize a local CLI configuration
     let (store_path, temp_dir, _endpoint) = init_cli();
 
-    // Ensure no global config exists to verify local config takes priority
-    cleanup_global_config();
+    // Use isolated global miden directory to ensure no global config interferes
+    let _miden_home = set_isolated_miden_home();
 
     // Change to the temp directory where local .miden config exists
     let original_dir = env::current_dir().unwrap();
@@ -1413,12 +1394,11 @@ async fn test_from_system_user_config_silent_init() -> Result<()> {
     let temp_dir = temp_dir().join(format!("cli-test-silent-init-{}", rand::rng().random::<u64>()));
     std::fs::create_dir_all(&temp_dir)?;
 
-    // Ensure no global config exists
-    cleanup_global_config();
+    // Use isolated global miden directory
+    let miden_home = set_isolated_miden_home();
 
     // Verify no config exists before we start
-    let global_miden_dir = dirs::home_dir().unwrap().join(MIDEN_DIR);
-    let global_config_path = global_miden_dir.join("miden-client.toml");
+    let global_config_path = miden_home.join("miden-client.toml");
     assert!(!global_config_path.exists(), "Global config should not exist before test");
 
     // Change to the temp directory
@@ -1445,10 +1425,6 @@ async fn test_from_system_user_config_silent_init() -> Result<()> {
         "Expected global config to be created at {global_config_path:?} by silent initialization"
     );
 
-    // Clean up temp directory and global config
-    let _ = std::fs::remove_dir_all(&temp_dir);
-    cleanup_global_config();
-
     Ok(())
 }
 
@@ -1456,8 +1432,8 @@ async fn test_from_system_user_config_silent_init() -> Result<()> {
 #[tokio::test]
 #[serial_test::file_serial]
 async fn test_from_system_user_config_local_priority() -> Result<()> {
-    // Clean up any existing global config
-    cleanup_global_config();
+    // Use isolated global miden directory
+    let _miden_home = set_isolated_miden_home();
 
     // Create a global config with testnet endpoint
     let global_store_path = create_test_store_path();
@@ -1488,11 +1464,6 @@ async fn test_from_system_user_config_local_priority() -> Result<()> {
 
     // Create client with local config
     let client = miden_client_cli::CliClient::from_config(config, DebugMode::Disabled).await;
-
-    // Clean up
-    let _ = std::fs::remove_dir_all(&temp_dir_for_global);
-    let _ = std::fs::remove_dir_all(&local_temp_dir);
-    cleanup_global_config();
 
     // Assert client was created with local config
     assert!(client.is_ok(), "Failed to create client with local config: {:?}", client.err());

@@ -29,7 +29,7 @@ jobs:
       - name: Ensure stable toolchain is installed
         run: rustup toolchain install stable --profile minimal
       - name: Install cargo-msrv
-        run: cargo install cargo-msrv
+        run: cargo install cargo-msrv --locked
       - name: Check MSRV for each workspace member
         run: |
           ./scripts/check-msrv.sh

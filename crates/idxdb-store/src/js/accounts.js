@@ -417,51 +417,81 @@ export async function undoAccountStates(dbId, accountCommitments) {
         logWebStoreError(error, `Error undoing account states: ${accountCommitments.join(",")}`);
     }
 }
-export async function insertAccountPublicKey(dbId, pubKeyCommitmentHex, accountId) {
-    return insertAccountPublicKeys(dbId, [pubKeyCommitmentHex], accountId);
-}
-export async function insertAccountPublicKeys(dbId, pubKeyCommitmentHexes, accountId) {
+export async function removeAccountAuth(dbId, pubKeyCommitmentHex) {
     try {
         const db = getDatabase(dbId);
-        const entries = pubKeyCommitmentHexes.map((pubKeyCommitmentHex) => ({
+        await db.accountAuths
+            .where("pubKeyCommitmentHex")
+            .equals(pubKeyCommitmentHex)
+            .delete();
+    }
+    catch (error) {
+        logWebStoreError(error, `Error removing account auth for pubKey: ${pubKeyCommitmentHex}`);
+    }
+}
+export async function insertAccountKeyMapping(dbId, accountIdHex, pubKeyCommitmentHex) {
+    try {
+        const db = getDatabase(dbId);
+        const data = {
+            accountIdHex,
             pubKeyCommitmentHex,
-            accountId,
-        }));
-        await db.accountPublicKeys.bulkPut(entries);
+        };
+        await db.accountKeyMappings.put(data);
     }
     catch (error) {
-        logWebStoreError(error, `Error inserting account public key mappings for account: ${accountId}`);
+        logWebStoreError(error, `Error inserting account key mapping for account ${accountIdHex} and key ${pubKeyCommitmentHex}`);
     }
 }
-export async function getAccountIdByPublicKey(dbId, pubKeyCommitmentHex) {
+export async function removeAccountKeyMapping(dbId, accountIdHex, pubKeyCommitmentHex) {
     try {
         const db = getDatabase(dbId);
-        const record = await db.accountPublicKeys.get(pubKeyCommitmentHex);
-        return record?.accountId ?? null;
+        const deletedCount = await db.accountKeyMappings
+            .where("[accountIdHex+pubKeyCommitmentHex]")
+            .equals([accountIdHex, pubKeyCommitmentHex])
+            .delete();
+        return deletedCount > 0;
     }
     catch (error) {
-        logWebStoreError(error, `Error fetching account by public key: ${pubKeyCommitmentHex}`);
+        logWebStoreError(error, `Error removing account key mapping for account ${accountIdHex} and key ${pubKeyCommitmentHex}`);
+        return false;
     }
 }
-export async function getPublicKeysByAccountId(dbId, accountId) {
+export async function getKeyCommitmentsByAccountId(dbId, accountIdHex) {
     try {
         const db = getDatabase(dbId);
-        const records = await db.accountPublicKeys
-            .where("accountId")
-            .equals(accountId)
+        const mappings = await db.accountKeyMappings
+            .where("accountIdHex")
+            .equals(accountIdHex)
             .toArray();
-        return records.map((r) => r.pubKeyCommitmentHex);
+        return mappings.map((mapping) => mapping.pubKeyCommitmentHex);
     }
     catch (error) {
-        logWebStoreError(error, `Error fetching public keys for account: ${accountId}`);
+        logWebStoreError(error, `Error getting key commitments for account: ${accountIdHex}`);
+        return [];
     }
 }
-export async function removeAccountPublicKey(dbId, pubKeyCommitmentHex) {
+export async function removeAllMappingsForKey(dbId, pubKeyCommitmentHex) {
     try {
         const db = getDatabase(dbId);
-        await db.accountPublicKeys.delete(pubKeyCommitmentHex);
+        await db.accountKeyMappings
+            .where("pubKeyCommitmentHex")
+            .equals(pubKeyCommitmentHex)
+            .delete();
     }
     catch (error) {
-        logWebStoreError(error, `Error removing account public key: ${pubKeyCommitmentHex}`);
+        logWebStoreError(error, `Error removing all mappings for key: ${pubKeyCommitmentHex}`);
+    }
+}
+export async function getAccountIdByKeyCommitment(dbId, pubKeyCommitmentHex) {
+    try {
+        const db = getDatabase(dbId);
+        const mapping = await db.accountKeyMappings
+            .where("pubKeyCommitmentHex")
+            .equals(pubKeyCommitmentHex)
+            .first();
+        return mapping?.accountIdHex ?? null;
+    }
+    catch (error) {
+        logWebStoreError(error, `Error fetching account by public key commitment: ${pubKeyCommitmentHex}`);
     }
 }

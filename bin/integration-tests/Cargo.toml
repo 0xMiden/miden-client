@@ -19,20 +19,22 @@ path = "tests/integration.rs"
 
 [dependencies]
 # Workspace dependencies
-miden-client              = { features = ["std", "testing", "tonic"], path = "../../crates/rust-client" }
-miden-client-sqlite-store = { package = "miden-client-sqlite-store", path = "../../crates/sqlite-store" }
+miden-client              = { features = ["std", "testing", "tonic"], workspace = true }
+miden-client-sqlite-store = { workspace = true }
 
 # External dependencies
-anyhow      = { features = ["std"], workspace = true }
-async-trait = { workspace = true }
-clap        = { features = ["derive", "env"], version = "4.0" }
-num_cpus    = { version = "1.0" }
-rand        = { workspace = true }
-regex       = { version = "1.0" }
-serde       = { features = ["derive"], version = "1.0" }
-tokio       = { workspace = true }
-url         = { version = "2.5.4" }
-uuid        = { version = "1.10" }
+anyhow             = { features = ["std"], workspace = true }
+async-trait        = { workspace = true }
+clap               = { features = ["derive", "env"], version = "4.0" }
+num_cpus           = { version = "1.0" }
+rand               = { workspace = true }
+regex              = { version = "1.0" }
+serde              = { features = ["derive"], version = "1.0" }
+serde_json         = { version = "1.0" }
+tokio              = { workspace = true }
+tracing-subscriber = { features = ["env-filter", "fmt", "json"], version = "0.3" }
+url                = { version = "2.5.4" }
+uuid               = { version = "1.10" }
 
 [package.metadata.cargo-machete]
 ignored = ["url"]

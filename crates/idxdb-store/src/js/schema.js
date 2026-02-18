@@ -36,7 +36,7 @@ var Table;
     Table["AccountAssets"] = "accountAssets";
     Table["StorageMapEntries"] = "storageMapEntries";
     Table["AccountAuth"] = "accountAuth";
-    Table["AccountPublicKeys"] = "accountPublicKeys";
+    Table["AccountKeyMapping"] = "accountKeyMapping";
     Table["Accounts"] = "accounts";
     Table["Addresses"] = "addresses";
     Table["Transactions"] = "transactions";
@@ -62,7 +62,7 @@ export class MidenDatabase {
     storageMapEntries;
     accountAssets;
     accountAuths;
-    accountPublicKeys;
+    accountKeyMappings;
     accounts;
     addresses;
     transactions;
@@ -85,7 +85,7 @@ export class MidenDatabase {
             [Table.StorageMapEntries]: indexes("[root+key]", "root"),
             [Table.AccountAssets]: indexes("[root+vaultKey]", "root", "faucetIdPrefix"),
             [Table.AccountAuth]: indexes("pubKeyCommitmentHex"),
-            [Table.AccountPublicKeys]: indexes("&pubKeyCommitmentHex", "accountId"),
+            [Table.AccountKeyMapping]: indexes("[accountIdHex+pubKeyCommitmentHex]", "accountIdHex", "pubKeyCommitmentHex"),
             [Table.Accounts]: indexes("&accountCommitment", "id", "[id+nonce]", "codeRoot", "storageRoot", "vaultRoot"),
             [Table.Addresses]: indexes("address", "id"),
             [Table.Transactions]: indexes("id", "statusVariant"),
@@ -96,7 +96,7 @@ export class MidenDatabase {
             [Table.StateSync]: indexes("id"),
             [Table.BlockHeaders]: indexes("blockNum", "hasClientNotes"),
             [Table.PartialBlockchainNodes]: indexes("id"),
-            [Table.Tags]: indexes("id++", "tag", "source_note_id", "source_account_id"),
+            [Table.Tags]: indexes("id++", "tag", "sourceNoteId", "sourceAccountId"),
             [Table.ForeignAccountCode]: indexes("accountId"),
             [Table.Settings]: indexes("key"),
             [Table.TrackedAccounts]: indexes("&id"),
@@ -106,7 +106,7 @@ export class MidenDatabase {
         this.storageMapEntries = this.dexie.table(Table.StorageMapEntries);
         this.accountAssets = this.dexie.table(Table.AccountAssets);
         this.accountAuths = this.dexie.table(Table.AccountAuth);
-        this.accountPublicKeys = this.dexie.table(Table.AccountPublicKeys);
+        this.accountKeyMappings = this.dexie.table(Table.AccountKeyMapping);
         this.accounts = this.dexie.table(Table.Accounts);
         this.addresses = this.dexie.table(Table.Addresses);
         this.transactions = this.dexie.table(Table.Transactions);

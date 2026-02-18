@@ -44,16 +44,13 @@ use js_bindings::{
     idxdb_get_account_header,
     idxdb_get_account_header_by_commitment,
     idxdb_get_account_headers,
-    idxdb_get_account_id_by_public_key,
+    idxdb_get_account_id_by_key_commitment,
     idxdb_get_account_ids,
     idxdb_get_account_storage,
     idxdb_get_account_storage_maps,
     idxdb_get_account_vault_assets,
     idxdb_get_foreign_account_code,
-    idxdb_get_public_keys_by_account_id,
-    idxdb_insert_account_public_keys,
     idxdb_lock_account,
-    idxdb_remove_account_public_key,
     idxdb_undo_account_states,
     idxdb_upsert_foreign_account_code,
 };
@@ -188,9 +185,8 @@ impl WebStore {
             status.seed().copied(),
         )?;
 
-        let addresses = self.get_account_addresses(account_id).await?;
         let account_data = AccountRecordData::Full(account);
-        Ok(Some(AccountRecord::new(account_data, status, addresses)))
+        Ok(Some(AccountRecord::new(account_data, status)))
     }
 
     // TODO: current implementation is a copy of `get_account`,
@@ -222,8 +218,7 @@ impl WebStore {
         )?;
 
         let account_data = AccountRecordData::Partial((&account).into());
-        let addresses = self.get_account_addresses(account_id).await?;
-        Ok(Some(AccountRecord::new(account_data, status, addresses)))
+        Ok(Some(AccountRecord::new(account_data, status)))
     }
 
     pub(super) async fn get_account_code(&self, root: Word) -> Result<AccountCode, StoreError> {
@@ -529,65 +524,18 @@ impl WebStore {
         })
     }
 
-    pub async fn insert_account_public_key(
-        &self,
-        pub_key_commitment: PublicKeyCommitment,
-        account_id: AccountId,
-    ) -> Result<(), StoreError> {
-        self.insert_account_public_keys(&[pub_key_commitment], account_id).await
-    }
-
-    pub async fn insert_account_public_keys(
-        &self,
-        pub_key_commitments: &[PublicKeyCommitment],
-        account_id: AccountId,
-    ) -> Result<(), StoreError> {
-        let hexes: Vec<String> =
-            pub_key_commitments.iter().map(|c| Word::from(*c).to_hex()).collect();
-        let promise = idxdb_insert_account_public_keys(self.db_id(), hexes, account_id.to_hex());
-        await_js_value(promise, "failed to insert account public keys").await?;
-        Ok(())
-    }
-
-    pub async fn get_account_id_by_public_key(
+    pub async fn get_account_id_by_pub_key_commitment(
         &self,
         pub_key_commitment: PublicKeyCommitment,
     ) -> Result<Option<AccountId>, StoreError> {
         let word: Word = pub_key_commitment.into();
-        let promise = idxdb_get_account_id_by_public_key(self.db_id(), word.to_hex());
+        let promise = idxdb_get_account_id_by_key_commitment(self.db_id(), word.to_hex());
         let account_id: Option<String> =
-            await_js(promise, "failed to get account id by public key").await?;
+            await_js(promise, "failed to get account id by public key commitment").await?;
 
         match account_id {
             Some(id) => Ok(Some(AccountId::from_hex(&id)?)),
             None => Ok(None),
         }
-    }
-
-    pub async fn get_public_keys_by_account_id(
-        &self,
-        account_id: AccountId,
-    ) -> Result<Vec<PublicKeyCommitment>, StoreError> {
-        let promise = idxdb_get_public_keys_by_account_id(self.db_id(), account_id.to_hex());
-        let commitments: Vec<String> =
-            await_js(promise, "failed to get public keys by account id").await?;
-
-        commitments
-            .into_iter()
-            .map(|hex| {
-                let word = Word::try_from(&hex)?;
-                Ok(PublicKeyCommitment::from(word))
-            })
-            .collect()
-    }
-
-    pub async fn remove_account_public_key(
-        &self,
-        pub_key_commitment: PublicKeyCommitment,
-    ) -> Result<(), StoreError> {
-        let word: Word = pub_key_commitment.into();
-        let promise = idxdb_remove_account_public_key(self.db_id(), word.to_hex());
-        await_js_value(promise, "failed to remove account public key").await?;
-        Ok(())
     }
 }

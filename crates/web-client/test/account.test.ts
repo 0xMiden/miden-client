@@ -1,5 +1,5 @@
 import { Page, expect } from "@playwright/test";
-import test from "./playwright.global.setup";
+import test, { isLocalhost } from "./playwright.global.setup";
 
 // GET_ACCOUNT TESTS
 // =======================================================================================================
@@ -165,6 +165,10 @@ test.describe("get public account with details", () => {
   test("assets and storage with too many assets/entries are retrieved", async ({
     page,
   }) => {
+    test.skip(
+      !isLocalhost(),
+      "This test requires a specific account that only exists in localhost genesis"
+    );
     const [assetCount, balances, mapEntriesCount] = await page.evaluate(
       async () => {
         // This account is inserted into the genesis block when test node is started,

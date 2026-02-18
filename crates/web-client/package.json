@@ -1,6 +1,6 @@
 {
   "name": "@miden-sdk/miden-sdk",
-  "version": "0.13.0-next.4",
+  "version": "0.13.0",
   "description": "Miden Wasm SDK",
   "collaborators": [
     "Miden"
@@ -22,7 +22,11 @@
     "build-dev": "npm install && MIDEN_WEB_DEV=true npm run build",
     "check:wasm-types": "node ./scripts/check-bindgen-types.js",
     "test": "yarn playwright install --with-deps && yarn playwright test",
+    "test:devnet": "cross-env TEST_MIDEN_NETWORK=devnet yarn test",
+    "test:testnet": "cross-env TEST_MIDEN_NETWORK=testnet yarn test",
     "test:remote_prover": "yarn install && yarn playwright install --with-deps && cross-env MIDEN_WEB_DEV=true yarn run build && cross-env REMOTE_PROVER=true yarn playwright test -g 'with remote prover' ",
+    "test:remote_prover:devnet": "cross-env TEST_MIDEN_NETWORK=devnet yarn run test:remote_prover",
+    "test:remote_prover:testnet": "cross-env TEST_MIDEN_NETWORK=testnet yarn run test:remote_prover",
     "test:clean": "yarn install && yarn playwright install --with-deps && MIDEN_WEB_DEV=true yarn run build && yarn playwright test "
   },
   "devDependencies": {

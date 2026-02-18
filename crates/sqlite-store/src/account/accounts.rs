@@ -45,7 +45,6 @@ use crate::account::helpers::{
     query_account_addresses,
     query_account_code,
     query_account_headers,
-    query_storage_maps,
     query_storage_slots,
     query_storage_values,
     query_vault_assets,
@@ -181,15 +180,13 @@ impl SqliteStore {
             status.seed().copied(),
         );
 
-        let addresses = query_account_addresses(conn, header.id())?;
         let account_data = AccountRecordData::Full(account);
-        Ok(Some(AccountRecord::new(account_data, status, addresses)))
+        Ok(Some(AccountRecord::new(account_data, status)))
     }
 
     /// Retrieves a minimal partial account record with storage and vault witnesses.
     pub(crate) fn get_minimal_partial_account(
         conn: &mut Connection,
-        smt_forest: &Arc<RwLock<AccountSmtForest>>,
         account_id: AccountId,
     ) -> Result<Option<AccountRecord>, StoreError> {
         let Some((header, status)) = Self::get_account_header(conn, account_id)? else {
@@ -209,34 +206,13 @@ impl SqliteStore {
             params![header.storage_commitment().to_hex()],
         )?;
 
-        // Collect all map roots for a single batched query
-        let map_roots: Vec<Value> = storage_values
-            .iter()
-            .filter(|(_, (slot_type, _))| *slot_type == StorageSlotType::Map)
-            .map(|(_, (_, value))| Value::from(value.to_hex()))
-            .collect();
-
-        // Fetch all storage maps in a single query
-        let mut all_storage_maps = if map_roots.is_empty() {
-            BTreeMap::new()
-        } else {
-            query_storage_maps(conn, "root IN rarray(?)", [Rc::new(map_roots)])?
-        };
-
+        // Storage maps are always minimal here (just roots, no entries).
+        // New accounts that need full storage data are handled by the DataStore layer,
+        // which fetches the full account via `get_account()` when nonce == 0.
         for (slot_name, (slot_type, value)) in storage_values {
             storage_header.push(StorageSlotHeader::new(slot_name.clone(), slot_type, value));
             if slot_type == StorageSlotType::Map {
-                let mut partial_storage_map = PartialStorageMap::new(value);
-
-                if let Some(map) = all_storage_maps.remove(&value) {
-                    let smt_forest = smt_forest.read().expect("smt_forest read lock not poisoned");
-                    for (k, _v) in map.entries() {
-                        let witness = smt_forest.get_storage_map_item_witness(value, *k)?;
-                        partial_storage_map.add(witness).map_err(StoreError::MerkleStoreError)?;
-                    }
-                }
-
-                maps.push(partial_storage_map);
+                maps.push(PartialStorageMap::new(value));
             }
         }
         storage_header.sort_by_key(StorageSlotHeader::id);
@@ -258,8 +234,7 @@ impl SqliteStore {
             status.seed().copied(),
         )?;
         let account_record_data = AccountRecordData::Partial(partial_account);
-        let addresses = query_account_addresses(conn, header.id())?;
-        Ok(Some(AccountRecord::new(account_record_data, status, addresses)))
+        Ok(Some(AccountRecord::new(account_record_data, status)))
     }
 
     pub fn get_foreign_account_code(
@@ -391,6 +366,24 @@ impl SqliteStore {
         account_id: AccountId,
     ) -> Result<Vec<Address>, StoreError> {
         query_account_addresses(conn, account_id)
+    }
+
+    /// Retrieves the account code for a specific account by ID.
+    pub(crate) fn get_account_code_by_id(
+        conn: &mut Connection,
+        account_id: AccountId,
+    ) -> Result<Option<AccountCode>, StoreError> {
+        let Some((header, _)) = query_account_headers(
+            conn,
+            "id = ? ORDER BY nonce DESC LIMIT 1",
+            params![account_id.to_hex()],
+        )?
+        .into_iter()
+        .next() else {
+            return Ok(None);
+        };
+
+        query_account_code(conn, header.code_commitment())
     }
 
     // MUTATOR/WRITER METHODS
