@@ -1,12 +1,6 @@
 import {
   getDatabase,
   IAccount,
-  ILatestAccountStorage,
-  IHistoricalAccountStorage,
-  ILatestStorageMapEntry,
-  IHistoricalStorageMapEntry,
-  ILatestAccountAsset,
-  IHistoricalAccountAsset,
   JsStorageMapEntry,
   JsStorageSlot,
   JsVaultAsset,
@@ -279,24 +273,17 @@ export async function upsertAccountStorage(
 
     if (storageSlots.length === 0) return;
 
-    const latestEntries = storageSlots.map((slot) => {
-      return {
-        accountId,
-        slotName: slot.slotName,
-        slotValue: slot.slotValue,
-        slotType: slot.slotType,
-      } as ILatestAccountStorage;
-    });
+    const latestEntries = storageSlots.map((slot) => ({
+      accountId,
+      slotName: slot.slotName,
+      slotValue: slot.slotValue,
+      slotType: slot.slotType,
+    }));
 
-    const historicalEntries = storageSlots.map((slot) => {
-      return {
-        accountId,
-        nonce,
-        slotName: slot.slotName,
-        slotValue: slot.slotValue,
-        slotType: slot.slotType,
-      } as IHistoricalAccountStorage;
-    });
+    const historicalEntries = latestEntries.map((entry) => ({
+      ...entry,
+      nonce,
+    }));
 
     await db.latestAccountStorages.bulkPut(latestEntries);
     await db.historicalAccountStorages.bulkPut(historicalEntries);
@@ -320,24 +307,17 @@ export async function upsertStorageMapEntries(
 
     if (entries.length === 0) return;
 
-    const latestEntries = entries.map((entry) => {
-      return {
-        accountId,
-        slotName: entry.slotName,
-        key: entry.key,
-        value: entry.value,
-      } as ILatestStorageMapEntry;
-    });
+    const latestEntries = entries.map((entry) => ({
+      accountId,
+      slotName: entry.slotName,
+      key: entry.key,
+      value: entry.value,
+    }));
 
-    const historicalEntries = entries.map((entry) => {
-      return {
-        accountId,
-        nonce,
-        slotName: entry.slotName,
-        key: entry.key,
-        value: entry.value,
-      } as IHistoricalStorageMapEntry;
-    });
+    const historicalEntries = latestEntries.map((entry) => ({
+      ...entry,
+      nonce,
+    }));
 
     await db.latestStorageMapEntries.bulkPut(latestEntries);
     await db.historicalStorageMapEntries.bulkPut(historicalEntries);
@@ -358,24 +338,17 @@ export async function upsertVaultAssets(
 
     if (assets.length === 0) return;
 
-    const latestEntries = assets.map((asset) => {
-      return {
-        accountId,
-        vaultKey: asset.vaultKey,
-        faucetIdPrefix: asset.faucetIdPrefix,
-        asset: asset.asset,
-      } as ILatestAccountAsset;
-    });
+    const latestEntries = assets.map((asset) => ({
+      accountId,
+      vaultKey: asset.vaultKey,
+      faucetIdPrefix: asset.faucetIdPrefix,
+      asset: asset.asset,
+    }));
 
-    const historicalEntries = assets.map((asset) => {
-      return {
-        accountId,
-        nonce,
-        vaultKey: asset.vaultKey,
-        faucetIdPrefix: asset.faucetIdPrefix,
-        asset: asset.asset,
-      } as IHistoricalAccountAsset;
-    });
+    const historicalEntries = latestEntries.map((entry) => ({
+      ...entry,
+      nonce,
+    }));
 
     await db.latestAccountAssets.bulkPut(latestEntries);
     await db.historicalAccountAssets.bulkPut(historicalEntries);
