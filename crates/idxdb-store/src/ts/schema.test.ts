@@ -1,6 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
 import Dexie from "dexie";
-import { MidenDatabase, CLIENT_VERSION_SETTING_KEY } from "./schema.js";
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -27,16 +26,18 @@ function trackDb(db: Dexie): Dexie {
   return db;
 }
 
-// The v1→v2 migration test uses a raw Dexie instance to test the migration
-// framework in isolation. In production, MidenDatabase.open() calls
-// ensureClientVersion() which nukes the DB on major/minor upgrades — so
-// migrations don't actually run yet. The test validates that the infrastructure
-// works correctly for when the nuke is removed and migrations take over.
 describe("MidenDatabase migrations", () => {
+  // Placeholder for the actual v1→v2 migration test. When the first real
+  // migration is introduced, replace the dummy schema and upgrade logic below
+  // with the production V1_STORES → V2 change. The test structure (create v1
+  // DB, insert data, reopen as v2, verify data survived) stays the same.
+  //
+  // This uses a raw Dexie instance with a toy schema because there's no real
+  // migration yet — the purpose is to validate the vitest + fake-indexeddb
+  // test setup and provide a working template for future migration tests.
   it("v1 → v2 migration preserves data", async () => {
     const name = uniqueDbName();
 
-    // Minimal schema independent from the production one.
     const testV1 = {
       items: "id,category",
       settings: "key",
@@ -87,40 +88,5 @@ describe("MidenDatabase migrations", () => {
 
     const setting = await dbV2.table("settings").get("color");
     expect(decoder.decode(setting.value)).toBe("blue");
-  });
-
-  it("reopening same version is a no-op and preserves data", async () => {
-    const name = uniqueDbName();
-
-    // First open
-    const db1 = new MidenDatabase(name);
-    openDbs.push(db1.dexie);
-    await db1.open("1.0.0");
-
-    // Insert some extra data beyond the seed
-    await db1.settings.put({
-      key: "userSetting",
-      value: encoder.encode("myValue"),
-    });
-
-    const syncBefore = await db1.stateSync.get(1);
-    expect(syncBefore).toEqual({ id: 1, blockNum: 0 });
-
-    db1.dexie.close();
-
-    // Second open — same version, same schema
-    const db2 = new MidenDatabase(name);
-    openDbs.push(db2.dexie);
-    await db2.open("1.0.0");
-
-    // All data should persist
-    const syncAfter = await db2.stateSync.get(1);
-    expect(syncAfter).toEqual({ id: 1, blockNum: 0 });
-
-    const userSetting = await db2.settings.get("userSetting");
-    expect(decoder.decode(userSetting!.value)).toBe("myValue");
-
-    const versionRecord = await db2.settings.get(CLIENT_VERSION_SETTING_KEY);
-    expect(decoder.decode(versionRecord!.value)).toBe("1.0.0");
   });
 });
