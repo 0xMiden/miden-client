@@ -10,6 +10,7 @@
 * Prevent a potential unwrap panic in `insert_storage_map_nodes_for_map` ([#1750](https://github.com/0xMiden/miden-client/pull/1750)).
 * Changed the `StateSync::sync_state()` to take a reference of the MMR ([#1764](https://github.com/0xMiden/miden-client/pull/1764)).
 * [FEATURE][web] WebClient now automatically syncs state before account creation when the client has never been synced, preventing a slow full-chain scan on the next sync (#1704).
+* [FEATURE][web] Added `getAccountProof` method to the web client's `RpcClient`, allowing lightweight retrieval of account header, storage slot values, and code via a single RPC call ([#1794](https://github.com/0xMiden/miden-client/pull/1794)).
 
 ### Changes
 

@@ -123,7 +123,7 @@ impl RpcClient {
     #[wasm_bindgen(js_name = "getAccountDetails")]
     pub async fn get_account_details(
         &self,
-        account_id: AccountId,
+        account_id: &AccountId,
     ) -> Result<FetchedAccount, JsValue> {
         let fetched = self
             .inner
@@ -143,7 +143,7 @@ impl RpcClient {
     /// Useful for reading storage slot values (e.g., faucet metadata) without the overhead of
     /// fetching the complete account with all vault assets and storage map entries.
     #[wasm_bindgen(js_name = "getAccountProof")]
-    pub async fn get_account_proof(&self, account_id: AccountId) -> Result<AccountProof, JsValue> {
+    pub async fn get_account_proof(&self, account_id: &AccountId) -> Result<AccountProof, JsValue> {
         let native_id: miden_client::account::AccountId = account_id.into();
 
         let foreign_account =
