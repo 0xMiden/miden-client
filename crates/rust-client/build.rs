@@ -16,6 +16,11 @@ const NOTE_TRANSPORT_STD_WRAPPER: &str = "note_transport_std.rs";
 const NOTE_TRANSPORT_NOSTD_WRAPPER: &str = "note_transport_nostd.rs";
 
 fn main() -> miette::Result<()> {
+    // Proto definitions come from build-dependency crates. Cargo automatically re-runs this
+    // script when those crates change. This directive opts out of the default behavior of
+    // re-running on every source file change.
+    println!("cargo::rerun-if-changed=build.rs");
+
     let out_dir = PathBuf::from(std::env::var("OUT_DIR").into_diagnostic()?);
 
     compile_tonic_client_proto(&out_dir)?;
