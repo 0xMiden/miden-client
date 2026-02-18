@@ -493,5 +493,6 @@ export async function getAccountIdByKeyCommitment(dbId, pubKeyCommitmentHex) {
     }
     catch (error) {
         logWebStoreError(error, `Error fetching account by public key commitment: ${pubKeyCommitmentHex}`);
+        return null;
     }
 }
