@@ -398,6 +398,26 @@ export async function lockAccount(dbId, accountId) {
         logWebStoreError(error, `Error locking account: ${accountId}`);
     }
 }
+/**
+ * Rebuilds a latest table from historical data at the given nonce.
+ * Clears all latest entries for the account, then copies from historical
+ * with the nonce field stripped (since latest tables don't use nonce).
+ */
+async function rebuildLatestTable(
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+latestTable, 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+historicalTable, accountId, maxNonce) {
+    await latestTable.where("accountId").equals(accountId).delete();
+    const hist = await historicalTable
+        .where("[accountId+nonce]")
+        .equals([accountId, maxNonce])
+        .toArray();
+    if (hist.length > 0) {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        await latestTable.bulkPut(hist.map(({ nonce, ...rest }) => rest));
+    }
+}
 export async function undoAccountStates(dbId, accountCommitments) {
     try {
         const db = getDatabase(dbId);
@@ -466,60 +486,11 @@ export async function undoAccountStates(dbId, accountCommitments) {
                         maxRecord = record;
                     }
                 }
-                const maxNonce = maxRecord.nonce;
-                // Rebuild latest account header
+                // Rebuild latest from historical at max nonce
                 await db.latestAccountHeaders.put(maxRecord);
-                // Rebuild latest storage
-                await db.latestAccountStorages
-                    .where("accountId")
-                    .equals(accountId)
-                    .delete();
-                const histStorage = await db.historicalAccountStorages
-                    .where("[accountId+nonce]")
-                    .equals([accountId, maxNonce])
-                    .toArray();
-                if (histStorage.length > 0) {
-                    await db.latestAccountStorages.bulkPut(histStorage.map((s) => ({
-                        accountId: s.accountId,
-                        slotName: s.slotName,
-                        slotValue: s.slotValue,
-                        slotType: s.slotType,
-                    })));
-                }
-                // Rebuild latest storage map entries
-                await db.latestStorageMapEntries
-                    .where("accountId")
-                    .equals(accountId)
-                    .delete();
-                const histMapEntries = await db.historicalStorageMapEntries
-                    .where("[accountId+nonce]")
-                    .equals([accountId, maxNonce])
-                    .toArray();
-                if (histMapEntries.length > 0) {
-                    await db.latestStorageMapEntries.bulkPut(histMapEntries.map((e) => ({
-                        accountId: e.accountId,
-                        slotName: e.slotName,
-                        key: e.key,
-                        value: e.value,
-                    })));
-                }
-                // Rebuild latest assets
-                await db.latestAccountAssets
-                    .where("accountId")
-                    .equals(accountId)
-                    .delete();
-                const histAssets = await db.historicalAccountAssets
-                    .where("[accountId+nonce]")
-                    .equals([accountId, maxNonce])
-                    .toArray();
-                if (histAssets.length > 0) {
-                    await db.latestAccountAssets.bulkPut(histAssets.map((a) => ({
-                        accountId: a.accountId,
-                        vaultKey: a.vaultKey,
-                        faucetIdPrefix: a.faucetIdPrefix,
-                        asset: a.asset,
-                    })));
-                }
+                await rebuildLatestTable(db.latestAccountStorages, db.historicalAccountStorages, accountId, maxRecord.nonce);
+                await rebuildLatestTable(db.latestStorageMapEntries, db.historicalStorageMapEntries, accountId, maxRecord.nonce);
+                await rebuildLatestTable(db.latestAccountAssets, db.historicalAccountAssets, accountId, maxRecord.nonce);
             }
         }
     }

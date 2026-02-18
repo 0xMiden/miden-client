@@ -60,17 +60,7 @@ impl AccountStorage {
             return None;
         };
 
-        Some(
-            map.entries()
-                .map(|(key, value)| JsStorageMapEntry {
-                    account_id: String::new(),
-                    nonce: String::new(),
-                    slot_name: slot_name.to_string(),
-                    key: key.to_hex(),
-                    value: value.to_hex(),
-                })
-                .collect(),
-        )
+        Some(JsStorageMapEntry::from_map(map, slot_name))
     }
 }
 
