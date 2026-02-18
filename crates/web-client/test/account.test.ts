@@ -351,8 +351,9 @@ test.describe("getAccountByKeyCommitment tests", () => {
         wallet.id()
       );
 
-      const foundAccount =
-        await client.getAccountByKeyCommitment(commitments[0]);
+      const foundAccount = await client.getAccountByKeyCommitment(
+        commitments[0]
+      );
 
       return {
         createdAccountId: wallet.id().toString(),
@@ -404,8 +405,9 @@ test.describe("getAccountByKeyCommitment tests", () => {
         wallet2.id()
       );
 
-      const foundAccount =
-        await client.getAccountByKeyCommitment(commitments2[0]);
+      const foundAccount = await client.getAccountByKeyCommitment(
+        commitments2[0]
+      );
 
       return {
         wallet1Id: wallet1.id().toString(),
@@ -434,8 +436,9 @@ test.describe("getAccountByKeyCommitment tests", () => {
         additionalSecretKey
       );
 
-      const additionalCommitment =
-        additionalSecretKey.publicKey().toCommitment();
+      const additionalCommitment = additionalSecretKey
+        .publicKey()
+        .toCommitment();
       const foundAccount =
         await client.getAccountByKeyCommitment(additionalCommitment);
 
@@ -467,8 +470,9 @@ test.describe("getAccountByKeyCommitment tests", () => {
         faucet.id()
       );
 
-      const foundAccount =
-        await client.getAccountByKeyCommitment(commitments[0]);
+      const foundAccount = await client.getAccountByKeyCommitment(
+        commitments[0]
+      );
 
       return {
         faucetId: faucet.id().toString(),
