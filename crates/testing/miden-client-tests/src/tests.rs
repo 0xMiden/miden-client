@@ -24,7 +24,7 @@ use miden_client::auth::{
     RPO_FALCON_SCHEME_ID,
 };
 use miden_client::builder::ClientBuilder;
-use miden_client::keystore::FilesystemKeyStore;
+use miden_client::keystore::{FilesystemKeyStore, Keystore};
 use miden_client::note::{BlockNumber, NoteId};
 use miden_client::rpc::{NodeRpcClient, RpcLimits};
 use miden_client::store::input_note_states::ConsumedAuthenticatedLocalNoteState;
@@ -2107,7 +2107,7 @@ async fn empty_storage_map() {
 
     let account_id = account.id();
 
-    keystore.add_key(&key_pair).unwrap();
+    keystore.add_key(&key_pair, account_id).await.unwrap();
 
     client.add_account(&account, false).await.unwrap();
 
@@ -2214,7 +2214,7 @@ async fn storage_and_vault_proofs() {
         .build()
         .unwrap();
 
-    keystore.add_key(&key_pair).unwrap();
+    keystore.add_key(&key_pair, account.id()).await.unwrap();
 
     client
         .test_store()
@@ -2406,12 +2406,12 @@ async fn consume_note_with_custom_script() {
     ";
     let note_script = client.code_builder().compile_note_script(custom_note_script).unwrap();
 
-    let note_inputs = NoteStorage::new(vec![]).unwrap();
+    let note_storage = NoteStorage::new(vec![]).unwrap();
     let serial_num = client.rng().draw_word();
     let note_metadata =
         NoteMetadata::new(sender_id, NoteType::Private, NoteTag::with_account_target(receiver_id));
     let note_assets = NoteAssets::new(vec![]).unwrap();
-    let note_recipient = NoteRecipient::new(serial_num, note_script.clone(), note_inputs);
+    let note_recipient = NoteRecipient::new(serial_num, note_script.clone(), note_storage);
     let custom_note = Note::new(note_assets, note_metadata, note_recipient);
 
     // At this point, the note script should no be stored locally
@@ -2753,7 +2753,7 @@ async fn insert_new_wallet(
         .build()
         .unwrap();
 
-    keystore.add_key(&key_pair).unwrap();
+    keystore.add_key(&key_pair, account.id()).await.unwrap();
 
     client.add_account(&account, false).await?;
 
@@ -2779,7 +2779,7 @@ async fn insert_new_ecdsa_wallet(
         .build()
         .unwrap();
 
-    keystore.add_key(&key_pair).unwrap();
+    keystore.add_key(&key_pair, account.id()).await.unwrap();
 
     client.add_account(&account, false).await?;
 
@@ -2810,7 +2810,7 @@ async fn insert_new_fungible_faucet(
         .build()
         .unwrap();
 
-    keystore.add_key(&key_pair).unwrap();
+    keystore.add_key(&key_pair, account.id()).await.unwrap();
 
     client.add_account(&account, false).await?;
     Ok(account)
@@ -2843,7 +2843,7 @@ async fn insert_new_ecdsa_fungible_faucet(
         .build()
         .unwrap();
 
-    keystore.add_key(&key_pair).unwrap();
+    keystore.add_key(&key_pair, account.id()).await.unwrap();
 
     client.add_account(&account, false).await?;
     Ok(account)
@@ -2913,7 +2913,7 @@ async fn storage_and_vault_proofs_ecdsa() {
         .build()
         .unwrap();
 
-    keystore.add_key(&key_pair).unwrap();
+    keystore.add_key(&key_pair, account.id()).await.unwrap();
 
     client.add_account(&account, false).await.unwrap();
 

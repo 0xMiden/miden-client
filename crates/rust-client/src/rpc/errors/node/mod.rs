@@ -1,8 +1,10 @@
+mod account;
 mod block;
 mod note;
 mod sync;
 mod transaction;
 
+pub use account::GetAccountError;
 pub use block::{GetBlockByNumberError, GetBlockHeaderError};
 pub use note::{CheckNullifiersError, GetNoteScriptByRootError, GetNotesByIdError};
 pub use sync::{
@@ -55,6 +57,9 @@ pub enum EndpointError {
     /// Error from the `CheckNullifiers` endpoint
     #[error(transparent)]
     CheckNullifiers(#[from] CheckNullifiersError),
+    /// Error from the `GetAccount` endpoint
+    #[error(transparent)]
+    GetAccount(#[from] GetAccountError),
 }
 
 /// Parses the application-level error code into a typed error for the given endpoint.
@@ -101,10 +106,10 @@ pub fn parse_node_error(
         RpcEndpoint::CheckNullifiers => {
             Some(EndpointError::CheckNullifiers(CheckNullifiersError::from_code(code, message)))
         },
+        RpcEndpoint::GetAccount => {
+            Some(EndpointError::GetAccount(GetAccountError::from_code(code, message)))
+        },
         // These endpoints don't have typed errors from the node
-        RpcEndpoint::GetAccount
-        | RpcEndpoint::SyncState
-        | RpcEndpoint::Status
-        | RpcEndpoint::GetLimits => None,
+        RpcEndpoint::SyncState | RpcEndpoint::Status | RpcEndpoint::GetLimits => None,
     }
 }

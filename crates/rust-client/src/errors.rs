@@ -76,6 +76,8 @@ pub enum ClientError {
     AccountCommitmentMismatch(Word),
     #[error("account with id {0} is private")]
     AccountIsPrivate(AccountId),
+    #[error("account with id {0} not found on the network")]
+    AccountNotFoundOnChain(AccountId),
     #[error("account nonce is too low to import")]
     AccountNonceTooLow,
     #[error("asset error")]

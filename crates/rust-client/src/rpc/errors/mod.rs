@@ -31,6 +31,8 @@ pub enum RpcError {
     DeserializationError(String),
     #[error("rpc api response missing an expected field: {0}")]
     ExpectedDataMissing(String),
+    #[error("rpc pagination error: {0}")]
+    PaginationError(String),
     #[error("rpc api response is invalid: {0}")]
     InvalidResponse(String),
     #[error("grpc request failed for {endpoint}: {error_kind}{}",
@@ -46,6 +48,16 @@ pub enum RpcError {
     NoteNotFound(NoteId),
     #[error("invalid node endpoint: {0}")]
     InvalidNodeEndpoint(String),
+}
+
+impl RpcError {
+    /// Returns the typed endpoint error if this is a request error, or `None` otherwise.
+    pub fn endpoint_error(&self) -> Option<&EndpointError> {
+        match self {
+            Self::RequestError { endpoint_error, .. } => endpoint_error.as_ref(),
+            _ => None,
+        }
+    }
 }
 
 impl From<DeserializationError> for RpcError {
