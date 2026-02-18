@@ -6,17 +6,9 @@
 
 # Class: JsVaultAsset
 
-An object that contains a serialized vault asset
+An object that contains a serialized vault asset.
 
 ## Properties
-
-### accountId
-
-> **accountId**: `string`
-
-The account ID this asset belongs to.
-
-***
 
 ### asset
 
@@ -31,14 +23,6 @@ Word representing the asset.
 > **faucetIdPrefix**: `string`
 
 Asset's faucet ID prefix.
-
-***
-
-### nonce
-
-> **nonce**: `string`
-
-The account's nonce when this asset state was recorded.
 
 ***
 

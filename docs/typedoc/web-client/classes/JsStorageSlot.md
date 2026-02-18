@@ -10,22 +10,6 @@ A JavaScript representation of a storage slot in an account.
 
 ## Properties
 
-### accountId
-
-> **accountId**: `string`
-
-The account ID this slot belongs to.
-
-***
-
-### nonce
-
-> **nonce**: `string`
-
-The account's nonce when this slot state was recorded.
-
-***
-
 ### slotName
 
 > **slotName**: `string`

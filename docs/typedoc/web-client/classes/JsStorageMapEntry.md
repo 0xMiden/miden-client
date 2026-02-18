@@ -10,27 +10,11 @@ A JavaScript representation of a storage map entry in an account.
 
 ## Properties
 
-### accountId
-
-> **accountId**: `string`
-
-The account ID this map entry belongs to.
-
-***
-
 ### key
 
 > **key**: `string`
 
 The key of the storage map entry.
-
-***
-
-### nonce
-
-> **nonce**: `string`
-
-The account's nonce when this entry was recorded.
 
 ***
 
