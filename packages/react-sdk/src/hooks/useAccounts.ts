@@ -3,6 +3,7 @@ import { useMiden } from "../context/MidenProvider";
 import { useMidenStore, useAccountsStore } from "../store/MidenStore";
 import type { AccountHeader } from "@miden-sdk/miden-sdk";
 import type { AccountsResult } from "../types";
+import { isFaucetId } from "../utils/accountParsing";
 import { runExclusiveDirect } from "../utils/runExclusive";
 
 /**
@@ -83,29 +84,3 @@ export function useAccounts(): AccountsResult {
   };
 }
 
-/**
- * Helper to check if an account ID represents a faucet.
- * Faucet IDs have bits 61..=60 == 0b10 (type = Fungible Faucet)
- */
-function isFaucetId(accountId: unknown): boolean {
-  try {
-    // The account ID has a toHex() method, and faucet IDs start with specific prefixes
-    const hex =
-      typeof (accountId as { toHex?: () => string }).toHex === "function"
-        ? (accountId as { toHex: () => string }).toHex()
-        : String(accountId);
-
-    // Parse the first byte to check account type bits
-    // Account type is in bits 61..60 of the u64:
-    // 0b00 = Regular account (off-chain)
-    // 0b01 = Regular account (on-chain)
-    // 0b10 = Fungible faucet
-    // 0b11 = Non-fungible faucet
-    const firstByte = parseInt(hex.slice(0, 2), 16);
-    const accountType = (firstByte >> 4) & 0b11;
-
-    return accountType === 0b10 || accountType === 0b11;
-  } catch {
-    return false;
-  }
-}
