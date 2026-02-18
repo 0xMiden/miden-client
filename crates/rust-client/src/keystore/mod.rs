@@ -53,6 +53,14 @@ pub trait Keystore: TransactionAuthenticator {
         account_id: &AccountId,
     ) -> Result<BTreeSet<PublicKeyCommitment>, KeyStoreError>;
 
+    /// Returns the account ID associated with a given public key commitment.
+    ///
+    /// Returns `Ok(None)` if no account is found for the commitment.
+    async fn get_account_id_by_key_commitment(
+        &self,
+        pub_key_commitment: PublicKeyCommitment,
+    ) -> Result<Option<AccountId>, KeyStoreError>;
+
     /// Returns all secret keys associated with the given account ID.
     ///
     /// This is a convenience method that calls `get_account_key_commitments`

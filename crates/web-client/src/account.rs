@@ -214,14 +214,13 @@ impl WebClient {
         &mut self,
         pub_key: &PublicKey,
     ) -> Result<Option<Account>, JsValue> {
-        let store =
-            self.store.as_ref().ok_or_else(|| JsValue::from_str("Store not initialized"))?;
+        let keystore = self.keystore.clone().expect("Keystore not initialized");
 
         let native_pub_key: NativePublicKey = pub_key.into();
         let commitment = native_pub_key.to_commitment();
 
-        let account_id = store
-            .get_account_id_by_pub_key_commitment(commitment)
+        let account_id = keystore
+            .get_account_id_by_key_commitment(commitment)
             .await
             .map_err(|err| js_error_with_context(err, "failed to get account by public key"))?;
 

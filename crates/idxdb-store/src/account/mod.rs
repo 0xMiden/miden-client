@@ -16,7 +16,6 @@ use miden_client::account::{
     StorageSlotType,
 };
 use miden_client::asset::{Asset, AssetVault};
-use miden_client::auth::PublicKeyCommitment;
 use miden_client::store::{
     AccountRecord,
     AccountRecordData,
@@ -44,7 +43,6 @@ use js_bindings::{
     idxdb_get_account_header,
     idxdb_get_account_header_by_commitment,
     idxdb_get_account_headers,
-    idxdb_get_account_id_by_key_commitment,
     idxdb_get_account_ids,
     idxdb_get_account_storage,
     idxdb_get_account_storage_maps,
@@ -522,20 +520,5 @@ impl WebStore {
         remove_account_address(self.db_id(), address).await.map_err(|js_error| {
             StoreError::DatabaseError(format!("failed to remove account address: {js_error:?}"))
         })
-    }
-
-    pub async fn get_account_id_by_pub_key_commitment(
-        &self,
-        pub_key_commitment: PublicKeyCommitment,
-    ) -> Result<Option<AccountId>, StoreError> {
-        let word: Word = pub_key_commitment.into();
-        let promise = idxdb_get_account_id_by_key_commitment(self.db_id(), word.to_hex());
-        let account_id: Option<String> =
-            await_js(promise, "failed to get account id by public key commitment").await?;
-
-        match account_id {
-            Some(id) => Ok(Some(AccountId::from_hex(&id)?)),
-            None => Ok(None),
-        }
     }
 }
