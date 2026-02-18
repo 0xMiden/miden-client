@@ -1,34 +1,33 @@
 use std::fs;
-use std::io::Write;
+use std::path::{Path, PathBuf};
 
 use miden_node_proto_build::rpc_api_descriptor;
 use miden_note_transport_proto_build::mnt_api_descriptor;
 use miette::IntoDiagnostic;
 
-const STD_PROTO_OUT_DIR: &str = "src/rpc/generated/std";
-const NO_STD_PROTO_OUT_DIR: &str = "src/rpc/generated/nostd";
-const NOTE_TRANSPORT_STD_PROTO_OUT_DIR: &str = "src/note_transport/generated/std";
-const NOTE_TRANSPORT_NO_STD_PROTO_OUT_DIR: &str = "src/note_transport/generated/nostd";
+const RPC_STD_DIR: &str = "rpc/std";
+const RPC_NOSTD_DIR: &str = "rpc/nostd";
+const NOTE_TRANSPORT_STD_DIR: &str = "note_transport/std";
+const NOTE_TRANSPORT_NOSTD_DIR: &str = "note_transport/nostd";
 
-/// Defines whether the build script should generate files in `/src`.
-/// The docs.rs build pipeline has a read-only filesystem, so we have to avoid writing to `src`,
-/// otherwise the docs will fail to build there. Note that writing to `OUT_DIR` is fine.
-const CODEGEN: bool = option_env!("CODEGEN").is_some();
+const RPC_STD_WRAPPER: &str = "rpc_std.rs";
+const RPC_NOSTD_WRAPPER: &str = "rpc_nostd.rs";
+const NOTE_TRANSPORT_STD_WRAPPER: &str = "note_transport_std.rs";
+const NOTE_TRANSPORT_NOSTD_WRAPPER: &str = "note_transport_nostd.rs";
 
 fn main() -> miette::Result<()> {
-    println!("cargo::rerun-if-env-changed=CODEGEN");
-    if !CODEGEN {
-        return Ok(());
-    }
+    let out_dir = PathBuf::from(std::env::var("OUT_DIR").into_diagnostic()?);
 
-    compile_tonic_client_proto()?;
-    compile_tonic_note_transport_proto()?;
-    replace_no_std_types(NO_STD_PROTO_OUT_DIR.to_string() + "/rpc.rs");
-    replace_no_std_types(NO_STD_PROTO_OUT_DIR.to_string() + "/rpc_store.rs");
-    replace_no_std_types(NO_STD_PROTO_OUT_DIR.to_string() + "/block_producer.rs");
-    replace_no_std_types(
-        NOTE_TRANSPORT_NO_STD_PROTO_OUT_DIR.to_string() + "/miden_note_transport.rs",
-    );
+    compile_tonic_client_proto(&out_dir)?;
+    compile_tonic_note_transport_proto(&out_dir)?;
+
+    replace_no_std_types_in_dir(&out_dir.join(RPC_NOSTD_DIR))?;
+    replace_no_std_types_in_dir(&out_dir.join(NOTE_TRANSPORT_NOSTD_DIR))?;
+
+    generate_wrapper(&out_dir, RPC_STD_DIR, RPC_STD_WRAPPER)?;
+    generate_wrapper(&out_dir, RPC_NOSTD_DIR, RPC_NOSTD_WRAPPER)?;
+    generate_wrapper(&out_dir, NOTE_TRANSPORT_STD_DIR, NOTE_TRANSPORT_STD_WRAPPER)?;
+    generate_wrapper(&out_dir, NOTE_TRANSPORT_NOSTD_DIR, NOTE_TRANSPORT_NOSTD_WRAPPER)?;
 
     Ok(())
 }
@@ -37,8 +36,13 @@ fn main() -> miette::Result<()> {
 // ===============================================================================================
 
 /// Generates the Rust protobuf bindings for the Note Transport client.
-fn compile_tonic_note_transport_proto() -> miette::Result<()> {
+fn compile_tonic_note_transport_proto(out_dir: &Path) -> miette::Result<()> {
     let file_descriptors = mnt_api_descriptor();
+
+    let std_out = out_dir.join(NOTE_TRANSPORT_STD_DIR);
+    let nostd_out = out_dir.join(NOTE_TRANSPORT_NOSTD_DIR);
+    fs::create_dir_all(&std_out).into_diagnostic()?;
+    fs::create_dir_all(&nostd_out).into_diagnostic()?;
 
     let mut prost_config = tonic_prost_build::Config::new();
     prost_config.skip_debug(["AccountId", "Digest"]);
@@ -52,13 +56,13 @@ fn compile_tonic_note_transport_proto() -> miette::Result<()> {
     tonic_prost_build::configure()
         .build_transport(false)
         .build_server(false)
-        .out_dir(NOTE_TRANSPORT_NO_STD_PROTO_OUT_DIR)
+        .out_dir(&nostd_out)
         .compile_fds_with_config(file_descriptors.clone(), web_tonic_prost_config)
         .into_diagnostic()?;
 
     tonic_prost_build::configure()
         .build_server(false)
-        .out_dir(NOTE_TRANSPORT_STD_PROTO_OUT_DIR)
+        .out_dir(&std_out)
         .compile_fds_with_config(file_descriptors, prost_config)
         .into_diagnostic()?;
 
@@ -69,8 +73,13 @@ fn compile_tonic_note_transport_proto() -> miette::Result<()> {
 // ===============================================================================================
 
 /// Generates the Rust protobuf bindings for the RPC client.
-fn compile_tonic_client_proto() -> miette::Result<()> {
+fn compile_tonic_client_proto(out_dir: &Path) -> miette::Result<()> {
     let file_descriptors = rpc_api_descriptor();
+
+    let std_out = out_dir.join(RPC_STD_DIR);
+    let nostd_out = out_dir.join(RPC_NOSTD_DIR);
+    fs::create_dir_all(&std_out).into_diagnostic()?;
+    fs::create_dir_all(&nostd_out).into_diagnostic()?;
 
     let mut prost_config = tonic_prost_build::Config::new();
     prost_config.skip_debug(["AccountId", "Digest"]);
@@ -85,28 +94,85 @@ fn compile_tonic_client_proto() -> miette::Result<()> {
     tonic_prost_build::configure()
         .build_transport(false)
         .build_server(false)
-        .out_dir(NO_STD_PROTO_OUT_DIR)
+        .out_dir(&nostd_out)
         .compile_fds_with_config(file_descriptors.clone(), web_tonic_prost_config)
         .into_diagnostic()?;
 
     tonic_prost_build::configure()
         .build_server(false)
-        .out_dir(STD_PROTO_OUT_DIR)
+        .out_dir(&std_out)
         .compile_fds_with_config(file_descriptors, prost_config)
         .into_diagnostic()?;
 
     Ok(())
 }
 
-/// This function replaces all `std::result` with `core::result` in the generated "rpc.rs" file
-/// for the web tonic client. This is needed as `tonic_build` doesn't generate `no_std` compatible
-/// files and we want to build wasm without `std`.
-fn replace_no_std_types(path: String) {
-    let file_str = fs::read_to_string(&path).unwrap();
-    let new_file_str = file_str
-        .replace("std::result", "core::result")
-        .replace("std::marker", "core::marker");
+// WRAPPER GENERATION
+// ===============================================================================================
 
-    let mut f = std::fs::OpenOptions::new().write(true).open(path).unwrap();
-    f.write_all(new_file_str.as_bytes()).unwrap();
+/// Scans `out_dir/subdir/` for generated `.rs` files and produces a single wrapper file at
+/// `out_dir/wrapper_name` that re-exports each file as a module via `include!`.
+///
+/// This is needed because tonic-build generates individual `.rs` files per proto package, but
+/// `pub mod foo;` declarations resolve relative to the including file's location, which doesn't
+/// work when included from `src/` via `include!`. Instead, the wrapper converts each file into:
+///
+/// ```ignore
+/// #[allow(clippy::doc_markdown, ...)]
+/// pub mod foo { include!(concat!(env!("OUT_DIR"), "/subdir/foo.rs")); }
+/// ```
+fn generate_wrapper(out_dir: &Path, subdir: &str, wrapper_name: &str) -> miette::Result<()> {
+    let dir = out_dir.join(subdir);
+
+    // Discover all generated .rs files in the output directory
+    let mut mod_names: Vec<String> = fs::read_dir(&dir)
+        .into_diagnostic()?
+        .filter_map(|entry| {
+            let entry = entry.ok()?;
+            let name = entry.file_name().into_string().ok()?;
+            name.strip_suffix(".rs").map(str::to_owned)
+        })
+        .collect();
+    mod_names.sort();
+
+    let allow_attr = "#[allow(clippy::doc_markdown, clippy::struct_field_names, \
+                      clippy::trivially_copy_pass_by_ref, clippy::large_enum_variant)]";
+
+    let mut wrapper = String::new();
+    for mod_name in &mod_names {
+        wrapper.push_str(allow_attr);
+        wrapper.push_str("\npub mod ");
+        wrapper.push_str(mod_name);
+        wrapper.push_str(" { include!(concat!(env!(\"OUT_DIR\"), \"/");
+        wrapper.push_str(subdir);
+        wrapper.push('/');
+        wrapper.push_str(mod_name);
+        wrapper.push_str(".rs\")); }\n");
+    }
+
+    fs::write(out_dir.join(wrapper_name), wrapper).into_diagnostic()?;
+
+    Ok(())
+}
+
+// NO_STD REPLACEMENTS
+// ===============================================================================================
+
+/// Applies `no_std` type replacements to all `.rs` files in the given directory.
+///
+/// This is needed because `tonic_build` doesn't generate `no_std` compatible files and we want
+/// to build wasm without `std`.
+fn replace_no_std_types_in_dir(dir: &Path) -> miette::Result<()> {
+    for entry in fs::read_dir(dir).into_diagnostic()? {
+        let entry = entry.into_diagnostic()?;
+        let path = entry.path();
+        if path.extension().is_some_and(|ext| ext == "rs") {
+            let content = fs::read_to_string(&path).into_diagnostic()?;
+            let replaced = content
+                .replace("std::result", "core::result")
+                .replace("std::marker", "core::marker");
+            fs::write(&path, replaced).into_diagnostic()?;
+        }
+    }
+    Ok(())
 }
