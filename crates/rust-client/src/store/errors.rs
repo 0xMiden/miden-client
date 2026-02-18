@@ -42,12 +42,10 @@ pub enum StoreError {
     AccountError(#[from] AccountError),
     #[error("address error")]
     AddressError(#[from] AddressError),
-    #[error("account id error")]
+    #[error("invalid account ID")]
     AccountIdError(#[from] AccountIdError),
-    #[error("account commitment mismatch for account {0}")]
+    #[error("stored account commitment does not match the expected commitment for account {0}")]
     AccountCommitmentMismatch(AccountId),
-    #[error("public key {0} not found")]
-    AccountKeyNotFound(String),
     #[error("account storage data with root {0} not found")]
     AccountStorageRootNotFound(Word),
     #[error("account storage data with index {0} not found")]
@@ -56,25 +54,25 @@ pub enum StoreError {
     BlockHeaderNotFound(BlockNumber),
     #[error("partial blockchain node at index {0} not found")]
     PartialBlockchainNodeNotFound(u64),
-    #[error("error deserializing data from the store")]
+    #[error("failed to deserialize data from the store")]
     DataDeserializationError(#[from] DeserializationError),
     #[error("database-related non-query error: {0}")]
     DatabaseError(String),
-    #[error("error parsing hex")]
+    #[error("failed to parse hex value")]
     HexParseError(#[from] HexParseError),
-    #[error("failed to convert int")]
+    #[error("integer conversion failed")]
     InvalidInt(#[from] TryFromIntError),
     #[error("note record error")]
     NoteRecordError(#[from] NoteRecordError),
-    #[error("error in merkle store")]
+    #[error("merkle store error")]
     MerkleStoreError(#[from] MerkleError),
-    #[error("error constructing mmr")]
+    #[error("failed to construct Merkle Mountain Range (MMR)")]
     MmrError(#[from] MmrError),
-    #[error("inclusion proof creation error")]
+    #[error("failed to create note inclusion proof")]
     NoteInclusionProofError(#[from] NoteError),
     #[error("note tag {0} is already being tracked")]
     NoteTagAlreadyTracked(u64),
-    #[error("note transport cursor not found")]
+    #[error("note transport cursor not found in the store; the sync state may be uninitialized")]
     NoteTransportCursorNotFound,
     #[error("note script with root {0} not found")]
     NoteScriptNotFound(String),
@@ -82,15 +80,15 @@ pub enum StoreError {
     ParsingError(String),
     #[error("failed to retrieve data from the database: {0}")]
     QueryError(String),
-    #[error("error with the SMT proof")]
+    #[error("sparse merkle tree proof error")]
     SmtProofError(#[from] SmtProofError),
-    #[error("error with a storage map")]
+    #[error("account storage map error")]
     StorageMapError(#[from] StorageMapError),
-    #[error("error instantiating transaction script")]
+    #[error("failed to instantiate transaction script")]
     TransactionScriptError(#[from] TransactionScriptError),
     #[error("account vault data for root {0} not found")]
     VaultDataNotFound(Word),
-    #[error("failed to parse word: {0}")]
+    #[error("failed to parse word")]
     WordError(#[from] WordError),
 }
 
