@@ -2450,11 +2450,11 @@ async fn add_note_tag_fails_if_note_tag_limit_is_exceeded() {
 
     // add note tags until the limit is exceeded
     for i in 0..note_tags_limit {
-        client.add_note_tag(NoteTag::from(u32::try_from(i).unwrap())).await.unwrap();
+        client.add_note_tag(NoteTag::from(i)).await.unwrap();
     }
 
     // try to add a note tag
-    let tag = NoteTag::from(u32::try_from(note_tags_limit).unwrap());
+    let tag = NoteTag::from(note_tags_limit);
     let result = client.add_note_tag(tag).await;
 
     assert!(matches!(result, Err(ClientError::NoteTagsLimitExceeded(_))));
@@ -2470,7 +2470,7 @@ async fn add_account_fails_if_accounts_limit_is_exceeded() {
         client
             .add_account(
                 &Account::mock(
-                    (i << 8) as u128,
+                    (i << 8).into(),
                     AuthFalcon512Rpo::new(PublicKeyCommitment::from(EMPTY_WORD)),
                 ),
                 false,
@@ -2483,7 +2483,7 @@ async fn add_account_fails_if_accounts_limit_is_exceeded() {
     let result = client
         .add_account(
             &Account::mock(
-                (RpcLimits::default().account_ids_limit << 8) as u128,
+                (RpcLimits::default().account_ids_limit << 8).into(),
                 AuthFalcon512Rpo::new(PublicKeyCommitment::from(EMPTY_WORD)),
             ),
             false,

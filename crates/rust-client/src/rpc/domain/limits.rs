@@ -5,16 +5,18 @@ use core::convert::TryFrom;
 
 use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 
+use crate::alloc::string::ToString;
+use crate::rpc::RpcEndpoint;
 use crate::rpc::errors::RpcConversionError;
 use crate::rpc::generated::rpc as proto;
 
 /// Key used to store RPC limits in the settings table.
 pub(crate) const RPC_LIMITS_STORE_SETTING: &str = "rpc_limits";
 
-const DEFAULT_NOTE_IDS_LIMIT: usize = 100;
-const DEFAULT_NULLIFIERS_LIMIT: usize = 1000;
-const DEFAULT_ACCOUNT_IDS_LIMIT: usize = 1000;
-const DEFAULT_NOTE_TAGS_LIMIT: usize = 1000;
+const DEFAULT_NOTE_IDS_LIMIT: u32 = 100;
+const DEFAULT_NULLIFIERS_LIMIT: u32 = 1000;
+const DEFAULT_ACCOUNT_IDS_LIMIT: u32 = 1000;
+const DEFAULT_NOTE_TAGS_LIMIT: u32 = 1000;
 
 /// Domain type representing RPC endpoint limits.
 ///
@@ -23,14 +25,14 @@ const DEFAULT_NOTE_TAGS_LIMIT: usize = 1000;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RpcLimits {
     /// Maximum number of note IDs that can be sent in a single `GetNotesById` request.
-    pub note_ids_limit: usize,
+    pub note_ids_limit: u32,
     /// Maximum number of nullifier prefixes that can be sent in `CheckNullifiers` or
     /// `SyncNullifiers` requests.
-    pub nullifiers_limit: usize,
+    pub nullifiers_limit: u32,
     /// Maximum number of account IDs that can be sent in a single `SyncState` request.
-    pub account_ids_limit: usize,
+    pub account_ids_limit: u32,
     /// Maximum number of note tags that can be sent in `SyncState` or `SyncNotes` requests.
-    pub note_tags_limit: usize,
+    pub note_tags_limit: u32,
 }
 
 impl Default for RpcLimits {
@@ -56,10 +58,10 @@ impl Serializable for RpcLimits {
 impl Deserializable for RpcLimits {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         Ok(Self {
-            note_ids_limit: usize::read_from(source)?,
-            nullifiers_limit: usize::read_from(source)?,
-            account_ids_limit: usize::read_from(source)?,
-            note_tags_limit: usize::read_from(source)?,
+            note_ids_limit: u32::read_from(source)?,
+            nullifiers_limit: u32::read_from(source)?,
+            account_ids_limit: u32::read_from(source)?,
+            note_tags_limit: u32::read_from(source)?,
         })
     }
 }
@@ -67,10 +69,10 @@ impl Deserializable for RpcLimits {
 /// Extracts a parameter limit from the proto response for a given endpoint and parameter name.
 fn get_param(
     proto: &proto::RpcLimits,
-    endpoint: &str,
+    endpoint: RpcEndpoint,
     param: &'static str,
-) -> Result<usize, RpcConversionError> {
-    let ep = proto.endpoints.get(endpoint).ok_or(
+) -> Result<u32, RpcConversionError> {
+    let ep = proto.endpoints.get(&endpoint.to_string()).ok_or(
         RpcConversionError::MissingFieldInProtobufRepresentation {
             entity: "RpcLimits",
             field_name: param,
@@ -82,7 +84,7 @@ fn get_param(
             field_name: param,
         },
     )?;
-    Ok(*limit as usize)
+    Ok(*limit)
 }
 
 impl TryFrom<proto::RpcLimits> for RpcLimits {
@@ -90,12 +92,12 @@ impl TryFrom<proto::RpcLimits> for RpcLimits {
 
     fn try_from(proto: proto::RpcLimits) -> Result<Self, Self::Error> {
         Ok(Self {
-            note_ids_limit: get_param(&proto, "GetNotesById", "note_id")?,
-            nullifiers_limit: get_param(&proto, "CheckNullifiers", "nullifier")
-                .or_else(|_| get_param(&proto, "SyncNullifiers", "nullifier"))?,
-            account_ids_limit: get_param(&proto, "SyncState", "account_id")?,
-            note_tags_limit: get_param(&proto, "SyncState", "note_tag")
-                .or_else(|_| get_param(&proto, "SyncNotes", "note_tag"))?,
+            note_ids_limit: get_param(&proto, RpcEndpoint::GetNotesById, "note_id")?,
+            nullifiers_limit: get_param(&proto, RpcEndpoint::CheckNullifiers, "nullifier")
+                .or_else(|_| get_param(&proto, RpcEndpoint::SyncNullifiers, "nullifier"))?,
+            account_ids_limit: get_param(&proto, RpcEndpoint::SyncState, "account_id")?,
+            note_tags_limit: get_param(&proto, RpcEndpoint::SyncState, "note_tag")
+                .or_else(|_| get_param(&proto, RpcEndpoint::SyncNotes, "note_tag"))?,
         })
     }
 }
