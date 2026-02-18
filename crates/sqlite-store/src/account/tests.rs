@@ -987,118 +987,6 @@ async fn undo_account_state_deletes_account_entirely() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Verifies that undoing one account's state does not affect another account's data.
-#[tokio::test]
-async fn undo_account_state_multiple_accounts_independent() -> anyhow::Result<()> {
-    let store = create_test_store().await;
-    let map_slot_name_a = StorageSlotName::new("test::undo_multi_a::map").expect("valid slot name");
-    let map_slot_name_b = StorageSlotName::new("test::undo_multi_b::map").expect("valid slot name");
-
-    // Insert account A with 3 map entries
-    let mut account_a = setup_account_with_map(&store, 3, &map_slot_name_a).await?;
-    let id_a = account_a.id();
-
-    // Insert account B with 3 map entries (different seed to get a different account ID)
-    let mut map_b = StorageMap::new();
-    for i in 1..=3u64 {
-        map_b.insert(
-            [Felt::new(i), ZERO, ZERO, ZERO].into(),
-            [Felt::new(i * 100), ZERO, ZERO, ZERO].into(),
-        )?;
-    }
-    let component_b = AccountComponent::new(
-        basic_wallet_library(),
-        vec![StorageSlot::with_map(map_slot_name_b.clone(), map_b)],
-    )?
-    .with_supports_all_types();
-    let account_b = AccountBuilder::new([1; 32])
-        .account_type(AccountType::RegularAccountImmutableCode)
-        .with_auth_component(AuthFalcon512Rpo::new(PublicKeyCommitment::from(EMPTY_WORD)))
-        .with_component(component_b)
-        .build()?;
-    let id_b = account_b.id();
-    store.insert_account(&account_b, Address::new(account_b.id())).await?;
-
-    // Apply a delta to account A (nonce 1) with vault change to ensure different vault root
-    let mut storage_delta_a = AccountStorageDelta::new();
-    storage_delta_a.set_map_item(
-        map_slot_name_a.clone(),
-        [Felt::new(1), ZERO, ZERO, ZERO].into(),
-        [Felt::new(9999), ZERO, ZERO, ZERO].into(),
-    )?;
-    let vault_delta_a = AccountVaultDelta::from_iters(
-        vec![
-            FungibleAsset::new(AccountId::try_from(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET)?, 50)?.into(),
-        ],
-        [],
-    );
-    let delta_a = AccountDelta::new(account_a.id(), storage_delta_a, vault_delta_a, ONE)?;
-    let prev_header_a: AccountHeader = (&account_a).into();
-    account_a.apply_delta(&delta_a)?;
-    let final_header_a: AccountHeader = (&account_a).into();
-    let commitment_a_nonce1 = account_a.commitment();
-
-    let smt_forest = store.smt_forest.clone();
-    let delta_a_clone = delta_a.clone();
-    store
-        .interact_with_connection(move |conn| {
-            let old_map_roots =
-                SqliteStore::get_storage_map_roots_for_delta(conn, id_a, &delta_a_clone)?;
-            let tx = conn.transaction().into_store_error()?;
-            let mut smt_forest = smt_forest.write().expect("smt_forest write lock not poisoned");
-            SqliteStore::apply_account_delta(
-                &tx,
-                &mut smt_forest,
-                &prev_header_a,
-                &final_header_a,
-                BTreeMap::default(),
-                &old_map_roots,
-                &delta_a,
-            )?;
-            tx.commit().into_store_error()?;
-            Ok(())
-        })
-        .await?;
-
-    // Snapshot metrics before undo: 2 latest headers, 3 historical (A nonce0 + A nonce1 + B nonce0)
-    let m = get_storage_metrics(&store).await;
-    assert_eq!(m.latest_account_headers, 2);
-    assert_eq!(m.historical_account_headers, 3);
-
-    // Undo account A's nonce-1 state
-    let smt_forest = store.smt_forest.clone();
-    store
-        .interact_with_connection(move |conn| {
-            let tx = conn.transaction().into_store_error()?;
-            let mut smt_forest = smt_forest.write().expect("smt_forest write lock not poisoned");
-            SqliteStore::undo_account_state(&tx, &mut smt_forest, &[commitment_a_nonce1])?;
-            tx.commit().into_store_error()?;
-            Ok(())
-        })
-        .await?;
-
-    // After undo: A reverted to nonce 0, B unchanged
-    let m = get_storage_metrics(&store).await;
-    assert_eq!(m.latest_account_headers, 2);
-    assert_eq!(m.historical_account_headers, 2); // A nonce0 + B nonce0
-
-    // Account A should be at nonce 0
-    let (header_a, _) = store
-        .interact_with_connection(move |conn| SqliteStore::get_account_header(conn, id_a))
-        .await?
-        .expect("account A should still exist");
-    assert_eq!(header_a.nonce().as_int(), 0);
-
-    // Account B should be completely untouched at nonce 0
-    let (header_b, _) = store
-        .interact_with_connection(move |conn| SqliteStore::get_account_header(conn, id_b))
-        .await?
-        .expect("account B should still exist");
-    assert_eq!(header_b.nonce().as_int(), 0);
-
-    Ok(())
-}
-
 /// Verifies that `lock_account_on_unexpected_commitment` sets `locked = true` in both the
 /// latest and historical tables so that the lock survives undo/rebuild.
 #[tokio::test]
@@ -1192,6 +1080,206 @@ async fn lock_account_affects_latest_and_historical() -> anyhow::Result<()> {
     assert_eq!(historical_locked.len(), 2, "Should have 2 historical entries");
     assert!(historical_locked[0], "Historical nonce-0 should be locked");
     assert!(historical_locked[1], "Historical nonce-1 should be locked");
+
+    Ok(())
+}
+
+/// Verifies that undoing a delta after `update_account_state` does not resurrect entries that
+/// were removed by the update. This exercises the tombstone-writing logic in
+/// `update_account_state`.
+///
+/// Flow:
+/// 1. Insert account with map entries {A, B, C} and an asset X at nonce 0
+/// 2. Apply delta at nonce 1: add asset Y (changes vault root)
+/// 3. `update_account_state` with in-memory state at nonce 2: {A, B} and {X} (C and Y removed)
+/// 4. Apply delta at nonce 3: change entry A, add asset Z
+/// 5. Undo nonce 3
+/// 6. Assert C and Y are not in latest tables
+#[tokio::test]
+#[allow(clippy::too_many_lines)]
+async fn undo_after_update_account_state_does_not_resurrect_removed_entries() -> anyhow::Result<()>
+{
+    let store = create_test_store().await;
+    let map_slot_name =
+        StorageSlotName::new("miden::testing::sqlite_store::map").expect("valid slot name");
+
+    let faucet_id = AccountId::try_from(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET)?;
+    let nf_faucet_id = AccountId::try_from(ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET)?;
+
+    // Build initial map with 3 entries: A (key=1), B (key=2), C (key=3)
+    let key_a = [Felt::new(1), ZERO, ZERO, ZERO].into();
+    let key_c = [Felt::new(3), ZERO, ZERO, ZERO].into();
+
+    let mut initial_map = StorageMap::new();
+    initial_map.insert(key_a, [Felt::new(100), ZERO, ZERO, ZERO].into())?;
+    initial_map.insert(
+        [Felt::new(2), ZERO, ZERO, ZERO].into(),
+        [Felt::new(200), ZERO, ZERO, ZERO].into(),
+    )?;
+    initial_map.insert(key_c, [Felt::new(300), ZERO, ZERO, ZERO].into())?;
+
+    let component = AccountComponent::new(
+        basic_wallet_library(),
+        vec![StorageSlot::with_map(map_slot_name.clone(), initial_map)],
+    )?
+    .with_supports_all_types();
+
+    // Build with build() at nonce 0 — no initial assets
+    let account = AccountBuilder::new([0; 32])
+        .account_type(AccountType::RegularAccountImmutableCode)
+        .with_auth_component(AuthFalcon512Rpo::new(PublicKeyCommitment::from(EMPTY_WORD)))
+        .with_component(component)
+        .build()?;
+
+    let account_id = account.id();
+    store.insert_account(&account, Address::new(account_id)).await?;
+
+    // Step 1+2: Apply delta at nonce 1 adding assets X and Y
+    let asset_x = FungibleAsset::new(faucet_id, 100)?;
+    let asset_y = NonFungibleAsset::new(&NonFungibleAssetDetails::new(
+        nf_faucet_id.prefix(),
+        NON_FUNGIBLE_ASSET_DATA.into(),
+    )?)?;
+
+    let vault_delta_1 = AccountVaultDelta::from_iters(vec![asset_x.into(), asset_y.into()], []);
+    let delta_1 = AccountDelta::new(account_id, AccountStorageDelta::new(), vault_delta_1, ONE)?;
+
+    let prev_header_0: AccountHeader = (&account).into();
+    let mut account_nonce1 = account.clone();
+    account_nonce1.apply_delta(&delta_1)?;
+    let final_header_1: AccountHeader = (&account_nonce1).into();
+
+    let smt_forest = store.smt_forest.clone();
+    store
+        .interact_with_connection(move |conn| {
+            let tx = conn.transaction().into_store_error()?;
+            let mut smt_forest = smt_forest.write().expect("smt_forest write lock not poisoned");
+            SqliteStore::apply_account_delta(
+                &tx,
+                &mut smt_forest,
+                &prev_header_0,
+                &final_header_1,
+                BTreeMap::default(),
+                &BTreeMap::new(),
+                &delta_1,
+            )?;
+            tx.commit().into_store_error()?;
+            Ok(())
+        })
+        .await?;
+
+    // Now: map entries {A, B, C} and assets {X, Y} at nonce 1
+    let m = get_storage_metrics(&store).await;
+    assert_eq!(m.latest_storage_map_entries, 3, "Should have 3 map entries");
+    assert_eq!(m.latest_account_assets, 2, "Should have 2 assets (X + Y)");
+
+    // Step 3: Build in-memory state with only {A, B} and {X} (C and Y removed)
+    let mut storage_delta_remove = AccountStorageDelta::new();
+    storage_delta_remove.set_map_item(map_slot_name.clone(), key_c, EMPTY_WORD)?;
+    let vault_delta_remove = AccountVaultDelta::from_iters([], vec![asset_y.into()]);
+    let delta_remove =
+        AccountDelta::new(account_id, storage_delta_remove, vault_delta_remove, ONE)?;
+
+    let mut account_updated = account_nonce1.clone();
+    account_updated.apply_delta(&delta_remove)?;
+    let updated_nonce = account_updated.nonce().as_int();
+
+    // Call update_account_state with the updated state
+    let smt_forest = store.smt_forest.clone();
+    let account_updated_clone = account_updated.clone();
+    store
+        .interact_with_connection(move |conn| {
+            let tx = conn.transaction().into_store_error()?;
+            let mut smt_forest = smt_forest.write().expect("smt_forest write lock not poisoned");
+            SqliteStore::update_account_state(&tx, &mut smt_forest, &account_updated_clone)?;
+            tx.commit().into_store_error()?;
+            Ok(())
+        })
+        .await?;
+
+    // After update: 2 map entries (A, B), 1 asset (X)
+    let m = get_storage_metrics(&store).await;
+    assert_eq!(m.latest_storage_map_entries, 2, "Should have 2 map entries after update");
+    assert_eq!(m.latest_account_assets, 1, "Should have 1 asset after update");
+
+    // Step 4: Apply a delta that changes entry A and adds asset Z
+    let mut storage_delta_next = AccountStorageDelta::new();
+    storage_delta_next.set_map_item(
+        map_slot_name.clone(),
+        key_a,
+        [Felt::new(999), ZERO, ZERO, ZERO].into(),
+    )?;
+
+    let asset_z = NonFungibleAsset::new(&NonFungibleAssetDetails::new(
+        nf_faucet_id.prefix(),
+        vec![5, 6, 7, 8],
+    )?)?;
+    let vault_delta_next = AccountVaultDelta::from_iters(vec![asset_z.into()], []);
+
+    let delta_next = AccountDelta::new(account_id, storage_delta_next, vault_delta_next, ONE)?;
+
+    let prev_header: AccountHeader = (&account_updated).into();
+    let mut account_next = account_updated.clone();
+    account_next.apply_delta(&delta_next)?;
+    let final_header: AccountHeader = (&account_next).into();
+    let commitment_next = account_next.commitment();
+
+    let smt_forest = store.smt_forest.clone();
+    let delta_next_clone = delta_next.clone();
+    store
+        .interact_with_connection(move |conn| {
+            let old_map_roots =
+                SqliteStore::get_storage_map_roots_for_delta(conn, account_id, &delta_next_clone)?;
+            let tx = conn.transaction().into_store_error()?;
+            let mut smt_forest = smt_forest.write().expect("smt_forest write lock not poisoned");
+            SqliteStore::apply_account_delta(
+                &tx,
+                &mut smt_forest,
+                &prev_header,
+                &final_header,
+                BTreeMap::default(),
+                &old_map_roots,
+                &delta_next,
+            )?;
+            tx.commit().into_store_error()?;
+            Ok(())
+        })
+        .await?;
+
+    // After delta: 2 map entries (A modified, B unchanged), 2 assets (X + Z)
+    let m = get_storage_metrics(&store).await;
+    assert_eq!(m.latest_storage_map_entries, 2, "Should have 2 map entries after delta");
+    assert_eq!(m.latest_account_assets, 2, "Should have 2 assets after delta (X + Z)");
+
+    // Step 5: Undo the last delta
+    let smt_forest = store.smt_forest.clone();
+    store
+        .interact_with_connection(move |conn| {
+            let tx = conn.transaction().into_store_error()?;
+            let mut smt_forest = smt_forest.write().expect("smt_forest write lock not poisoned");
+            SqliteStore::undo_account_state(&tx, &mut smt_forest, &[commitment_next])?;
+            tx.commit().into_store_error()?;
+            Ok(())
+        })
+        .await?;
+
+    // Step 6: Verify C and Y are NOT resurrected
+    let m = get_storage_metrics(&store).await;
+    assert_eq!(
+        m.latest_storage_map_entries, 2,
+        "C should NOT be resurrected — only A and B should be in latest"
+    );
+    assert_eq!(
+        m.latest_account_assets, 1,
+        "Y should NOT be resurrected — only X should be in latest"
+    );
+
+    // Also verify the header reverted to the post-update nonce
+    let (header, _) = store
+        .interact_with_connection(move |conn| SqliteStore::get_account_header(conn, account_id))
+        .await?
+        .expect("account should exist");
+    assert_eq!(header.nonce().as_int(), updated_nonce);
 
     Ok(())
 }

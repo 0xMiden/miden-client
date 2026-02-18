@@ -561,6 +561,8 @@ impl SqliteStore {
     /// - Inserts the new account header
     /// - Deletes all latest entries and replaces them with the new state
     /// - Writes all entries to historical at the new nonce
+    /// - Writes tombstones to historical for entries that existed before but are absent from the
+    ///   new state, so that `rebuild_latest_for_account` won't resurrect them after a later undo
     /// - Updates the SMT forest with the new state
     /// - Pops old SMT roots from the forest to free memory
     pub(crate) fn update_account_state(
@@ -571,11 +573,32 @@ impl SqliteStore {
         let account_id = new_account_state.id();
         let account_id_hex = account_id.to_hex();
         let nonce = new_account_state.nonce().as_int();
+        let nonce_val = u64_to_value(nonce);
 
         // Get old SMT roots before updating so we can prune them after
         let old_roots = Self::get_smt_roots_by_account_id(tx, account_id)?;
 
         smt_forest.insert_account_state(new_account_state.vault(), new_account_state.storage())?;
+
+        // Write tombstones for all current entries before deleting latest.
+        // insert_storage_slots/insert_assets will overwrite entries that still exist
+        // (INSERT OR REPLACE), leaving only genuinely removed entries as tombstones.
+        tx.execute(
+            "INSERT OR REPLACE INTO historical_storage_map_entries \
+             (account_id, nonce, slot_name, key, value) \
+             SELECT account_id, ?, slot_name, key, NULL \
+             FROM latest_storage_map_entries WHERE account_id = ?",
+            params![&nonce_val, &account_id_hex],
+        )
+        .into_store_error()?;
+        tx.execute(
+            "INSERT OR REPLACE INTO historical_account_assets \
+             (account_id, nonce, vault_key, faucet_id_prefix, asset) \
+             SELECT account_id, ?, vault_key, faucet_id_prefix, NULL \
+             FROM latest_account_assets WHERE account_id = ?",
+            params![&nonce_val, &account_id_hex],
+        )
+        .into_store_error()?;
 
         // Delete all latest entries for this account
         tx.execute(
@@ -594,7 +617,8 @@ impl SqliteStore {
         )
         .into_store_error()?;
 
-        // Insert all new entries into latest + historical
+        // Insert all new entries into latest + historical (overwrites tombstones for
+        // entries that still exist)
         Self::insert_storage_slots(
             tx,
             account_id,
@@ -795,12 +819,17 @@ impl SqliteStore {
         // Get vault roots from the accounts being undone
         const VAULT_ROOTS_QUERY: &str = "SELECT vault_root FROM historical_account_headers WHERE account_commitment IN rarray(?1)";
 
-        // Get storage map roots: query latest_account_storage for the account IDs being undone
+        // Get storage map roots from the exact historical states being undone, not from
+        // latest (which may have already been updated). This ensures we pop the correct
+        // intermediate map roots from the SMT forest.
         const MAP_ROOTS_QUERY: &str = "
-            SELECT slot_value FROM latest_account_storage
-            WHERE account_id IN (
-                SELECT id FROM historical_account_headers WHERE account_commitment IN rarray(?1)
-            ) AND slot_type = ?2";
+            SELECT s.slot_value
+            FROM historical_account_storage s
+            INNER JOIN historical_account_headers h
+              ON s.account_id = h.id AND s.nonce = h.nonce
+            WHERE h.account_commitment IN rarray(?1)
+              AND s.slot_type = ?2
+              AND s.slot_value IS NOT NULL";
 
         let map_slot_type = StorageSlotType::Map as u8;
 
