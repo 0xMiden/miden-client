@@ -1,20 +1,16 @@
 use anyhow::{Context, Result};
-use miden_client::account::{
-    AccountStorageMode, StorageSlotName,
-};
+use miden_client::account::{AccountStorageMode, StorageSlotName};
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
 use miden_client::rpc::domain::account::{AccountStorageRequirements, StorageMapKey};
-use miden_client::testing::common::{
-    execute_tx_and_sync, insert_new_wallet, wait_for_blocks
-};
-use miden_client::transaction::{
-    ForeignAccount, OutputNote, TransactionRequestBuilder,
-};
+use miden_client::testing::common::{execute_tx_and_sync, insert_new_wallet, wait_for_blocks};
+use miden_client::transaction::{ForeignAccount, OutputNote, TransactionRequestBuilder};
 use miden_client::{Felt, Word, ZERO};
 
 use super::fpi::{FPI_STORAGE_VALUE, MAP_KEY, MAP_SLOT_NAME, deploy_foreign_account};
 use super::network_transaction::{
-    COUNTER_SLOT_NAME, deploy_counter_contract, get_network_note_with_script,
+    COUNTER_SLOT_NAME,
+    deploy_counter_contract,
+    get_network_note_with_script,
 };
 use crate::tests::config::ClientConfig;
 
@@ -87,13 +83,6 @@ pub async fn test_network_fpi(client_config: ClientConfig) -> Result<()> {
 
     client2.sync_state().await?;
 
-    // let counter_value = client2
-    //     .account_reader(target_network_account.id())
-    //     .get_storage_item(COUNTER_SLOT_NAME.clone())
-    //     .await
-    //     .context("failed to find network account after deployment")?;
-    // assert_eq!(counter_value, Word::from([ZERO, ZERO, ZERO, Felt::new(1)]));
-
     let (sender_account, ..) = insert_new_wallet(
         &mut client2,
         AccountStorageMode::Private,
@@ -153,7 +142,9 @@ pub async fn test_network_fpi(client_config: ClientConfig) -> Result<()> {
 
     wait_for_blocks(&mut client2, 2).await;
 
-    let a = client2
+    // get the updated network account to check that the counter value was updated (meaning that the
+    // note was executed successfully, so the FPI was successful)
+    let updated_network_account = client2
         .test_rpc_api()
         .get_account_details(target_network_account.id())
         .await?
@@ -162,7 +153,7 @@ pub async fn test_network_fpi(client_config: ClientConfig) -> Result<()> {
         .with_context(|| "account details not available")?;
 
     assert_eq!(
-        a.storage().get_item(&COUNTER_SLOT_NAME)?,
+        updated_network_account.storage().get_item(&COUNTER_SLOT_NAME)?,
         Word::from([ZERO, ZERO, ZERO, Felt::new(2)])
     );
 
