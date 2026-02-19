@@ -194,7 +194,7 @@ where
 
     /// Ensures that the RPC limits are set in the RPC client. If not already persisted
     /// in the store, fetches them from the node and stores them.
-    async fn ensure_rpc_limits_in_place(&mut self) -> Result<(), ClientError> {
+    pub async fn ensure_rpc_limits_in_place(&mut self) -> Result<(), ClientError> {
         if self.store.get_rpc_limits().await?.is_some() {
             return Ok(());
         }
