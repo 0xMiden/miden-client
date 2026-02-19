@@ -96,6 +96,22 @@ impl KeyIndex {
         fs::rename(&temp_path, &index_path).map_err(keystore_error("error renaming index file"))
     }
 
+    /// Returns the account ID associated with a given public key commitment hex.
+    ///
+    /// Iterates over all mappings to find which account contains the commitment.
+    /// Returns `None` if no account is found.
+    fn get_account_id(&self, pub_key_commitment: PublicKeyCommitment) -> Option<AccountId> {
+        let pub_key_hex = Word::from(pub_key_commitment).to_hex();
+
+        for (account_id_hex, commitments) in &self.mappings {
+            if commitments.contains(&pub_key_hex) {
+                return AccountId::from_hex(account_id_hex).ok();
+            }
+        }
+
+        None
+    }
+
     /// Gets all public key commitments for an account ID.
     fn get_commitments(
         &self,
@@ -279,6 +295,14 @@ impl Keystore for FilesystemKeyStore {
         pub_key: PublicKeyCommitment,
     ) -> Result<Option<AuthSecretKey>, KeyStoreError> {
         self.get_key_sync(pub_key)
+    }
+
+    async fn get_account_id_by_key_commitment(
+        &self,
+        pub_key_commitment: PublicKeyCommitment,
+    ) -> Result<Option<AccountId>, KeyStoreError> {
+        let index = self.index.read();
+        Ok(index.get_account_id(pub_key_commitment))
     }
 
     async fn get_account_key_commitments(
