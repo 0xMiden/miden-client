@@ -251,6 +251,20 @@ impl Store for SqliteStore {
         self.interact_with_connection(SqliteStore::prune_irrelevant_blocks).await
     }
 
+    async fn prune_old_account_states(&self) -> Result<usize, StoreError> {
+        let smt_forest = self.smt_forest.clone();
+        self.interact_with_connection(move |conn| {
+            // Collect account commitments referenced by pending (uncommitted) transactions.
+            // These states must be preserved for potential rollback; the transactions
+            // themselves are not modified or pruned.
+            let pending_commitments =
+                crate::transaction::get_pending_transaction_account_commitments(conn)?;
+
+            SqliteStore::prune_old_account_states(conn, &smt_forest, &pending_commitments)
+        })
+        .await
+    }
+
     async fn get_block_headers(
         &self,
         block_numbers: &BTreeSet<BlockNumber>,

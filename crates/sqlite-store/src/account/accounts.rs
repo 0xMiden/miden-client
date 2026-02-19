@@ -585,6 +585,144 @@ impl SqliteStore {
         Ok(())
     }
 
+    /// Prunes old committed account states, keeping only the latest state per account.
+    /// States referenced by pending transactions are preserved for rollback support.
+    ///
+    /// Returns the number of pruned account states.
+    pub(crate) fn prune_old_account_states(
+        conn: &mut Connection,
+        smt_forest: &Arc<RwLock<AccountSmtForest>>,
+        pending_account_commitments: &[Word],
+    ) -> Result<usize, StoreError> {
+        let tx = conn.transaction().into_store_error()?;
+
+        // Convert pending commitments to Values for rarray
+        let pending_commitments_params = Rc::new(
+            pending_account_commitments
+                .iter()
+                .map(|h| Value::from(h.to_hex()))
+                .collect::<Vec<_>>(),
+        );
+
+        // Find all non-latest account states that are not in pending transactions.
+        // A state is non-latest if another state exists for the same account ID with a higher
+        // nonce.
+        let prunable_states: Vec<(String, String, String)> = {
+            const FIND_PRUNABLE_QUERY: &str = r"
+                SELECT account_commitment, vault_root, storage_commitment
+                FROM accounts a
+                WHERE EXISTS (
+                    SELECT 1 FROM accounts b
+                    WHERE b.id = a.id AND b.nonce > a.nonce
+                )
+                AND account_commitment NOT IN rarray(?1)
+            ";
+
+            let mut stmt = tx.prepare(FIND_PRUNABLE_QUERY).into_store_error()?;
+            stmt.query_map(params![pending_commitments_params], |row| {
+                Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+            })
+            .into_store_error()?
+            .filter_map(Result::ok)
+            .collect()
+        };
+
+        if prunable_states.is_empty() {
+            return Ok(0);
+        }
+
+        let pruned_count = prunable_states.len();
+
+        // Collect all account commitments and SMT roots we need to clean up
+        let mut account_commitments_to_delete = Vec::new();
+        let mut vault_roots_to_delete = Vec::new();
+        let mut storage_commitments_to_delete = Vec::new();
+
+        for (account_commitment, vault_root, storage_commitment) in prunable_states {
+            account_commitments_to_delete.push(Value::from(account_commitment));
+            vault_roots_to_delete.push(Value::from(vault_root));
+            storage_commitments_to_delete.push(Value::from(storage_commitment));
+        }
+
+        let account_commitments_rc = Rc::new(account_commitments_to_delete);
+        let vault_roots_rc = Rc::new(vault_roots_to_delete);
+        let storage_commitments_rc = Rc::new(storage_commitments_to_delete);
+
+        // Query SMT roots (vault roots + storage map roots) before deletion
+        let map_slot_type = StorageSlotType::Map as u8;
+        let smt_roots: Vec<Word> = {
+            const SMT_ROOTS_QUERY: &str = r"
+                SELECT vault_root FROM accounts WHERE account_commitment IN rarray(?1)
+                UNION ALL
+                SELECT slot_value FROM account_storage
+                WHERE commitment IN rarray(?2) AND slot_type = ?3
+            ";
+
+            let mut stmt = tx.prepare(SMT_ROOTS_QUERY).into_store_error()?;
+            stmt.query_map(
+                params![
+                    account_commitments_rc.clone(),
+                    storage_commitments_rc.clone(),
+                    map_slot_type
+                ],
+                |row| row.get::<_, String>(0),
+            )
+            .into_store_error()?
+            .filter_map(Result::ok)
+            .filter_map(|r| Word::try_from(r.as_str()).ok())
+            .collect()
+        };
+
+        // Delete account states
+        const DELETE_ACCOUNTS_QUERY: &str =
+            "DELETE FROM accounts WHERE account_commitment IN rarray(?)";
+        tx.execute(DELETE_ACCOUNTS_QUERY, params![account_commitments_rc])
+            .into_store_error()?;
+
+        // Delete orphaned account_storage (storage commitments not referenced by any account)
+        const DELETE_ORPHAN_STORAGE_QUERY: &str = r"
+            DELETE FROM account_storage
+            WHERE commitment IN rarray(?1)
+            AND commitment NOT IN (SELECT storage_commitment FROM accounts)
+        ";
+        tx.execute(DELETE_ORPHAN_STORAGE_QUERY, params![storage_commitments_rc.clone()])
+            .into_store_error()?;
+
+        // Delete orphaned storage_map_entries (storage roots not referenced by any account_storage)
+        const DELETE_ORPHAN_MAPS_QUERY: &str = r"
+            DELETE FROM storage_map_entries
+            WHERE root NOT IN (SELECT slot_value FROM account_storage WHERE slot_type = ?)
+        ";
+        tx.execute(DELETE_ORPHAN_MAPS_QUERY, params![map_slot_type])
+            .into_store_error()?;
+
+        // Delete orphaned account_assets (vault roots not referenced by any account)
+        const DELETE_ORPHAN_ASSETS_QUERY: &str = r"
+            DELETE FROM account_assets
+            WHERE root IN rarray(?1)
+            AND root NOT IN (SELECT vault_root FROM accounts)
+        ";
+        tx.execute(DELETE_ORPHAN_ASSETS_QUERY, params![vault_roots_rc])
+            .into_store_error()?;
+
+        // Delete orphaned account_code (code commitments not referenced by accounts or
+        // foreign_account_code)
+        const DELETE_ORPHAN_CODE_QUERY: &str = r"
+            DELETE FROM account_code
+            WHERE commitment NOT IN (SELECT code_commitment FROM accounts)
+            AND commitment NOT IN (SELECT code_commitment FROM foreign_account_code)
+        ";
+        tx.execute(DELETE_ORPHAN_CODE_QUERY, []).into_store_error()?;
+
+        tx.commit().into_store_error()?;
+
+        // Pop SMT roots from the forest to free memory
+        let mut smt_forest = smt_forest.write().expect("smt_forest write lock not poisoned");
+        smt_forest.pop_roots(smt_roots);
+
+        Ok(pruned_count)
+    }
+
     /// Updates the account state in the database to a new complete account state.
     ///
     /// This function replaces the current account state with a completely new one. It:

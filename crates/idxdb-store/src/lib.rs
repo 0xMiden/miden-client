@@ -218,6 +218,21 @@ impl Store for WebStore {
         self.prune_irrelevant_blocks().await
     }
 
+    async fn prune_old_account_states(&self) -> Result<usize, StoreError> {
+        // Collect account commitments referenced by pending (uncommitted) transactions.
+        // These states must be preserved for potential rollback; the transactions
+        // themselves are not modified or pruned.
+        let pending_transactions = self.get_transactions(TransactionFilter::Uncommitted).await?;
+
+        let mut pending_commitments = Vec::new();
+        for tx in pending_transactions {
+            pending_commitments.push(tx.details.init_account_state);
+            pending_commitments.push(tx.details.final_account_state);
+        }
+
+        self.prune_old_account_states(&pending_commitments).await
+    }
+
     // ACCOUNTS
     // --------------------------------------------------------------------------------------------
 

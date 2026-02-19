@@ -8,6 +8,7 @@
 * Added typed error parsing for node RPC endpoints, enabling programmatic error handling instead of string parsing ([#1734](https://github.com/0xMiden/miden-client/pull/1734)).
 * Added `--rpc-status` flag to `miden-client info` command to display RPC node status information including node version, genesis commitment, store status, and block producer status; also added `get_status_unversioned` to `NodeRpcClient` trait ([#1742](https://github.com/0xMiden/miden-client/pull/1742)).
 * Prevent a potential unwrap panic in `insert_storage_map_nodes_for_map` ([#1750](https://github.com/0xMiden/miden-client/pull/1750)).
+* Added `prune_account_history` method to prune old committed account states, keeping only the latest state per account while preserving pending transaction states for rollback support. Also added `pruneAccountHistory` WebClient binding ([#1741](https://github.com/0xMiden/miden-client/pull/1741)).
 * Changed the `StateSync::sync_state()` to take a reference of the MMR ([#1764](https://github.com/0xMiden/miden-client/pull/1764)).
 * Remove unnecessary clones of `NoteInclusionProof` and `NoteMetadata` in note import and sync paths ([#1787](https://github.com/0xMiden/miden-client/pull/1787)).
 * [FEATURE][web] WebClient now automatically syncs state before account creation when the client has never been synced, preventing a slow full-chain scan on the next sync (#1704).

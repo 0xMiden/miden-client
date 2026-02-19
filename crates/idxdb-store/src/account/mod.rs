@@ -49,6 +49,7 @@ use js_bindings::{
     idxdb_get_account_vault_assets,
     idxdb_get_foreign_account_code,
     idxdb_lock_account,
+    idxdb_prune_old_account_states,
     idxdb_undo_account_states,
     idxdb_upsert_foreign_account_code,
 };
@@ -520,5 +521,22 @@ impl WebStore {
         remove_account_address(self.db_id(), address).await.map_err(|js_error| {
             StoreError::DatabaseError(format!("failed to remove account address: {js_error:?}"))
         })
+    }
+
+    /// Prunes old committed account states, keeping only the latest state per account.
+    /// States referenced by pending transactions are preserved for rollback support.
+    ///
+    /// Returns the number of pruned account states.
+    pub(crate) async fn prune_old_account_states(
+        &self,
+        pending_account_commitments: &[Word],
+    ) -> Result<usize, StoreError> {
+        let pending_commitments: Vec<String> =
+            pending_account_commitments.iter().map(ToString::to_string).collect();
+
+        let promise = idxdb_prune_old_account_states(self.db_id(), pending_commitments);
+        let pruned_count: u32 = await_js(promise, "failed to prune old account states").await?;
+
+        Ok(pruned_count as usize)
     }
 }
