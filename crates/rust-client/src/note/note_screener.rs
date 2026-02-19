@@ -6,7 +6,6 @@ use async_trait::async_trait;
 use miden_protocol::account::{Account, AccountCode, AccountId};
 use miden_protocol::block::BlockNumber;
 use miden_protocol::note::Note;
-use miden_standards::code_builder::CodeBuilder;
 use miden_standards::note::{NoteConsumptionStatus, StandardNote};
 use miden_tx::auth::TransactionAuthenticator;
 use miden_tx::{
@@ -30,16 +29,14 @@ use crate::transaction::{AdviceMap, InputNote, TransactionArgs, TransactionReque
 /// relevant.
 pub type NoteConsumability = (AccountId, NoteConsumptionStatus);
 
+/// Returns `true` if the consumption status indicates that the note may be consumable by the
+/// account. A note is considered relevant unless it is permanently unconsumable (either due to
+/// a fundamental incompatibility or unconsumable conditions).
 fn is_relevant(consumption_status: &NoteConsumptionStatus) -> bool {
     !matches!(
         consumption_status,
         NoteConsumptionStatus::NeverConsumable(_) | NoteConsumptionStatus::UnconsumableConditions
     )
-}
-
-fn build_checker_transaction_args() -> Result<TransactionArgs, TransactionRequestError> {
-    let tx_script = CodeBuilder::new().compile_tx_script("begin nop end")?;
-    Ok(TransactionArgs::new(AdviceMap::default()).with_tx_script(tx_script))
 }
 
 /// Provides functionality for testing whether a note is relevant to the client or not.
@@ -81,6 +78,11 @@ where
     }
 
     /// Returns note relevances for a batch of notes, preserving input order.
+    ///
+    /// For each note, returns a list of `(AccountId, NoteConsumptionStatus)` pairs for all
+    /// tracked accounts that could potentially consume it. Notes that are permanently
+    /// unconsumable by an account (i.e., `NeverConsumable` or `UnconsumableConditions`) are
+    /// filtered out from the results.
     pub async fn check_relevance_batch(
         &self,
         notes: &[Note],
@@ -93,7 +95,7 @@ where
         let block_ref = self.store.get_sync_height().await?;
         let standard_notes = notes.iter().map(StandardNote::from_note).collect::<Vec<_>>();
         let mut note_relevances = vec![Vec::new(); notes.len()];
-        let mut tx_args: Option<TransactionArgs> = None;
+        let tx_args = TransactionArgs::new(AdviceMap::default());
 
         let data_store = ClientDataStore::new(self.store.clone());
         let mut transaction_executor = TransactionExecutor::new(&data_store);
@@ -126,21 +128,13 @@ where
             let account_code = self.get_account_code(account_id).await?;
             data_store.mast_store().load_account_code(&account_code);
 
-            let checker_tx_args = if let Some(tx_args) = tx_args.as_ref() {
-                tx_args.clone()
-            } else {
-                let created = build_checker_transaction_args()?;
-                tx_args = Some(created.clone());
-                created
-            };
-
             for note_idx in runtime_note_indices {
                 let consumption_status = consumption_checker
                     .can_consume(
                         account_id,
                         block_ref,
                         InputNote::unauthenticated(notes[note_idx].clone()),
-                        checker_tx_args.clone(),
+                        tx_args.clone(),
                     )
                     .await?;
 
@@ -161,7 +155,7 @@ where
         notes: Vec<Note>,
     ) -> Result<NoteConsumptionInfo, NoteScreenerError> {
         let block_ref = self.store.get_sync_height().await?;
-        let tx_args = build_checker_transaction_args()?;
+        let tx_args = TransactionArgs::new(AdviceMap::default());
         let account_code = self.get_account_code(account_id).await?;
 
         let data_store = ClientDataStore::new(self.store.clone());
@@ -195,7 +189,7 @@ where
             return Ok(consumption_status);
         }
 
-        let tx_args = build_checker_transaction_args()?;
+        let tx_args = TransactionArgs::new(AdviceMap::default());
         self.check_standard_consumability_for_account(
             account.id(),
             account.code(),
