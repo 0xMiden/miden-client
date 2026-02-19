@@ -526,8 +526,8 @@ where
         let note_screener = self.note_screener();
         let output_note_relevances = note_screener.check_relevance_batch(&output_notes).await?;
 
-        for (note, account_relevance) in output_notes.into_iter().zip(output_note_relevances) {
-            if !account_relevance.is_empty() {
+        for note in output_notes {
+            if output_note_relevances.contains_key(&note.id()) {
                 let metadata = note.metadata().clone();
 
                 new_input_notes.push(InputNoteRecord::new(

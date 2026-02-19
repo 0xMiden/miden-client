@@ -1,11 +1,12 @@
 use alloc::boxed::Box;
+use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use async_trait::async_trait;
 use miden_protocol::account::{Account, AccountCode, AccountId};
 use miden_protocol::block::BlockNumber;
-use miden_protocol::note::Note;
+use miden_protocol::note::{Note, NoteId};
 use miden_standards::note::{NoteConsumptionStatus, StandardNote};
 use miden_tx::auth::TransactionAuthenticator;
 use miden_tx::{
@@ -73,28 +74,27 @@ where
         Ok(self
             .check_relevance_batch(core::slice::from_ref(note))
             .await?
-            .pop()
+            .remove(&note.id())
             .unwrap_or_default())
     }
 
-    /// Returns note relevances for a batch of notes, preserving input order.
+    /// Returns note relevances for a batch of notes.
     ///
-    /// For each note, returns a list of `(AccountId, NoteConsumptionStatus)` pairs for all
-    /// tracked accounts that could potentially consume it. Notes that are permanently
-    /// unconsumable by an account (i.e., `NeverConsumable` or `UnconsumableConditions`) are
-    /// filtered out from the results.
+    /// Returns a map from [`NoteId`] to a list of `(AccountId, NoteConsumptionStatus)` pairs
+    /// for all tracked accounts that could potentially consume it. Notes that are permanently
+    /// unconsumable by all accounts are not included in the result.
     pub async fn check_relevance_batch(
         &self,
         notes: &[Note],
-    ) -> Result<Vec<Vec<NoteConsumability>>, NoteScreenerError> {
+    ) -> Result<BTreeMap<NoteId, Vec<NoteConsumability>>, NoteScreenerError> {
         let account_ids = self.store.get_account_ids().await?;
         if notes.is_empty() || account_ids.is_empty() {
-            return Ok(vec![Vec::new(); notes.len()]);
+            return Ok(BTreeMap::new());
         }
 
         let block_ref = self.store.get_sync_height().await?;
         let standard_notes = notes.iter().map(StandardNote::from_note).collect::<Vec<_>>();
-        let mut note_relevances = vec![Vec::new(); notes.len()];
+        let mut note_relevances: BTreeMap<NoteId, Vec<NoteConsumability>> = BTreeMap::new();
         let tx_args = TransactionArgs::new(AdviceMap::default());
 
         let data_store = ClientDataStore::new(self.store.clone());
@@ -113,7 +113,10 @@ where
                         standard_note.is_consumable(note, account_id, block_ref)
                 {
                     if is_relevant(&consumption_status) {
-                        note_relevances[note_idx].push((account_id, consumption_status));
+                        note_relevances
+                            .entry(note.id())
+                            .or_default()
+                            .push((account_id, consumption_status));
                     }
                     continue;
                 }
@@ -129,17 +132,21 @@ where
             data_store.mast_store().load_account_code(&account_code);
 
             for note_idx in runtime_note_indices {
+                let note = &notes[note_idx];
                 let consumption_status = consumption_checker
                     .can_consume(
                         account_id,
                         block_ref,
-                        InputNote::unauthenticated(notes[note_idx].clone()),
+                        InputNote::unauthenticated(note.clone()),
                         tx_args.clone(),
                     )
                     .await?;
 
                 if is_relevant(&consumption_status) {
-                    note_relevances[note_idx].push((account_id, consumption_status));
+                    note_relevances
+                        .entry(note.id())
+                        .or_default()
+                        .push((account_id, consumption_status));
                 }
             }
         }

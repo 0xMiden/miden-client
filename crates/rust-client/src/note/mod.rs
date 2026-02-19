@@ -155,11 +155,15 @@ where
             .collect::<Result<Vec<Note>, _>>()?;
 
         let note_screener = self.note_screener();
-        let note_relevances = note_screener.check_relevance_batch(&notes).await?;
+        let mut note_relevances = note_screener.check_relevance_batch(&notes).await?;
 
         let mut relevant_notes = Vec::new();
-        for (input_note, mut account_relevance) in committed_notes.into_iter().zip(note_relevances)
-        {
+        for input_note in committed_notes {
+            let note_id = input_note.id();
+            let Some(mut account_relevance) = note_relevances.remove(&note_id) else {
+                continue;
+            };
+
             if let Some(account_id) = account_id {
                 account_relevance.retain(|(id, _)| *id == account_id);
             }
