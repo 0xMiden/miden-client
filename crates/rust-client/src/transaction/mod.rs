@@ -79,7 +79,7 @@ use tracing::info;
 
 use super::Client;
 use crate::ClientError;
-use crate::note::{NoteScreener, NoteUpdateTracker};
+use crate::note::NoteUpdateTracker;
 use crate::rpc::AccountStateAt;
 use crate::store::data_store::ClientDataStore;
 use crate::store::input_note_states::ExpectedNoteState;
@@ -521,11 +521,12 @@ where
 
         // New relevant input notes
         let mut new_input_notes = vec![];
-        let note_screener = NoteScreener::new(self.store.clone(), self.authenticator.clone());
+        let output_notes =
+            notes_from_output(executed_tx.output_notes()).cloned().collect::<Vec<_>>();
+        let note_screener = self.note_screener();
+        let output_note_relevances = note_screener.check_relevance_batch(&output_notes).await?;
 
-        for note in notes_from_output(executed_tx.output_notes()) {
-            // TODO: check_relevance() should have the option to take multiple notes
-            let account_relevance = note_screener.check_relevance(note).await?;
+        for (note, account_relevance) in output_notes.into_iter().zip(output_note_relevances) {
             if !account_relevance.is_empty() {
                 let metadata = note.metadata().clone();
 

@@ -3,12 +3,18 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use async_trait::async_trait;
-use miden_protocol::account::{Account, AccountId};
+use miden_protocol::account::{Account, AccountCode, AccountId};
+use miden_protocol::block::BlockNumber;
 use miden_protocol::note::Note;
-use miden_standards::account::interface::{AccountInterface, AccountInterfaceExt};
-use miden_standards::note::NoteConsumptionStatus;
+use miden_standards::code_builder::CodeBuilder;
+use miden_standards::note::{NoteConsumptionStatus, StandardNote};
 use miden_tx::auth::TransactionAuthenticator;
-use miden_tx::{NoteCheckerError, NoteConsumptionChecker, TransactionExecutor};
+use miden_tx::{
+    NoteCheckerError,
+    NoteConsumptionChecker,
+    NoteConsumptionInfo,
+    TransactionExecutor,
+};
 use thiserror::Error;
 
 use crate::ClientError;
@@ -16,13 +22,25 @@ use crate::rpc::domain::note::CommittedNote;
 use crate::store::data_store::ClientDataStore;
 use crate::store::{InputNoteRecord, NoteFilter, Store, StoreError};
 use crate::sync::{NoteUpdateAction, OnNoteReceived};
-use crate::transaction::{InputNote, TransactionRequestBuilder, TransactionRequestError};
+use crate::transaction::{AdviceMap, InputNote, TransactionArgs, TransactionRequestError};
 
 /// Represents the consumability of a note by a specific account.
 ///
 /// The tuple contains the account ID that may consume the note and the moment it will become
 /// relevant.
 pub type NoteConsumability = (AccountId, NoteConsumptionStatus);
+
+fn is_relevant(consumption_status: &NoteConsumptionStatus) -> bool {
+    !matches!(
+        consumption_status,
+        NoteConsumptionStatus::NeverConsumable(_) | NoteConsumptionStatus::UnconsumableConditions
+    )
+}
+
+fn build_checker_transaction_args() -> Result<TransactionArgs, TransactionRequestError> {
+    let tx_script = CodeBuilder::new().compile_tx_script("begin nop end")?;
+    Ok(TransactionArgs::new(AdviceMap::default()).with_tx_script(tx_script))
+}
 
 /// Provides functionality for testing whether a note is relevant to the client or not.
 ///
@@ -55,43 +73,96 @@ where
         &self,
         note: &Note,
     ) -> Result<Vec<NoteConsumability>, NoteScreenerError> {
-        let mut note_relevances = vec![];
-        for id in self.store.get_account_ids().await? {
-            let account_record = self
-                .store
-                .get_account(id)
-                .await?
-                .ok_or(NoteScreenerError::AccountDataNotFound(id))?;
-            let account: Account = account_record
-                .try_into()
-                .map_err(|_| NoteScreenerError::AccountDataNotFound(id))?;
+        Ok(self
+            .check_relevance_batch(core::slice::from_ref(note))
+            .await?
+            .pop()
+            .unwrap_or_default())
+    }
 
-            match self.check_standard_consumability(&account, note).await? {
-                NoteConsumptionStatus::NeverConsumable(_)
-                | NoteConsumptionStatus::UnconsumableConditions => {},
-                relevance => {
-                    note_relevances.push((id, relevance));
-                },
+    /// Returns note relevances for a batch of notes, preserving input order.
+    pub async fn check_relevance_batch(
+        &self,
+        notes: &[Note],
+    ) -> Result<Vec<Vec<NoteConsumability>>, NoteScreenerError> {
+        let account_ids = self.store.get_account_ids().await?;
+        if notes.is_empty() || account_ids.is_empty() {
+            return Ok(vec![Vec::new(); notes.len()]);
+        }
+
+        let block_ref = self.store.get_sync_height().await?;
+        let standard_notes = notes.iter().map(StandardNote::from_note).collect::<Vec<_>>();
+        let mut note_relevances = vec![Vec::new(); notes.len()];
+        let mut tx_args: Option<TransactionArgs> = None;
+
+        let data_store = ClientDataStore::new(self.store.clone());
+        let mut transaction_executor = TransactionExecutor::new(&data_store);
+        if let Some(authenticator) = &self.authenticator {
+            transaction_executor = transaction_executor.with_authenticator(authenticator.as_ref());
+        }
+        let consumption_checker = NoteConsumptionChecker::new(&transaction_executor);
+
+        for account_id in account_ids {
+            let mut runtime_note_indices = Vec::new();
+
+            for (note_idx, note) in notes.iter().enumerate() {
+                if let Some(standard_note) = standard_notes[note_idx].as_ref()
+                    && let Some(consumption_status) =
+                        standard_note.is_consumable(note, account_id, block_ref)
+                {
+                    if is_relevant(&consumption_status) {
+                        note_relevances[note_idx].push((account_id, consumption_status));
+                    }
+                    continue;
+                }
+
+                runtime_note_indices.push(note_idx);
+            }
+
+            if runtime_note_indices.is_empty() {
+                continue;
+            }
+
+            let account_code = self.get_account_code(account_id).await?;
+            data_store.mast_store().load_account_code(&account_code);
+
+            let checker_tx_args = if let Some(tx_args) = tx_args.as_ref() {
+                tx_args.clone()
+            } else {
+                let created = build_checker_transaction_args()?;
+                tx_args = Some(created.clone());
+                created
+            };
+
+            for note_idx in runtime_note_indices {
+                let consumption_status = consumption_checker
+                    .can_consume(
+                        account_id,
+                        block_ref,
+                        InputNote::unauthenticated(notes[note_idx].clone()),
+                        checker_tx_args.clone(),
+                    )
+                    .await?;
+
+                if is_relevant(&consumption_status) {
+                    note_relevances[note_idx].push((account_id, consumption_status));
+                }
             }
         }
 
         Ok(note_relevances)
     }
 
-    /// Tries to execute a standard consume transaction to check if the note is consumable by the
-    /// account.
-    pub async fn check_standard_consumability(
+    /// Runs note consumability checking for many notes at once using
+    /// [`NoteConsumptionChecker::check_notes_consumability`].
+    pub async fn check_notes_consumability(
         &self,
-        account: &Account,
-        note: &Note,
-    ) -> Result<NoteConsumptionStatus, NoteScreenerError> {
-        let transaction_request =
-            TransactionRequestBuilder::new().build_consume_notes(vec![note.clone()])?;
-
-        let tx_script = transaction_request
-            .build_transaction_script(&AccountInterface::from_account(account))?;
-
-        let tx_args = transaction_request.clone().into_transaction_args(tx_script);
+        account_id: AccountId,
+        notes: Vec<Note>,
+    ) -> Result<NoteConsumptionInfo, NoteScreenerError> {
+        let block_ref = self.store.get_sync_height().await?;
+        let tx_args = build_checker_transaction_args()?;
+        let account_code = self.get_account_code(account_id).await?;
 
         let data_store = ClientDataStore::new(self.store.clone());
         let mut transaction_executor = TransactionExecutor::new(&data_store);
@@ -101,17 +172,72 @@ where
 
         let consumption_checker = NoteConsumptionChecker::new(&transaction_executor);
 
-        data_store.mast_store().load_account_code(account.code());
+        data_store.mast_store().load_account_code(&account_code);
+        let note_consumption_info = consumption_checker
+            .check_notes_consumability(account_id, block_ref, notes, tx_args)
+            .await?;
+
+        Ok(note_consumption_info)
+    }
+
+    /// Tries to execute a standard consume transaction to check if the note is consumable by the
+    /// account.
+    pub async fn check_standard_consumability(
+        &self,
+        account: &Account,
+        note: &Note,
+    ) -> Result<NoteConsumptionStatus, NoteScreenerError> {
+        let block_ref = self.store.get_sync_height().await?;
+        if let Some(standard_note) = StandardNote::from_note(note)
+            && let Some(consumption_status) =
+                standard_note.is_consumable(note, account.id(), block_ref)
+        {
+            return Ok(consumption_status);
+        }
+
+        let tx_args = build_checker_transaction_args()?;
+        self.check_standard_consumability_for_account(
+            account.id(),
+            account.code(),
+            note,
+            block_ref,
+            tx_args,
+        )
+        .await
+    }
+
+    async fn check_standard_consumability_for_account(
+        &self,
+        account_id: AccountId,
+        account_code: &AccountCode,
+        note: &Note,
+        block_ref: BlockNumber,
+        tx_args: TransactionArgs,
+    ) -> Result<NoteConsumptionStatus, NoteScreenerError> {
+        let data_store = ClientDataStore::new(self.store.clone());
+        let mut transaction_executor = TransactionExecutor::new(&data_store);
+        if let Some(authenticator) = &self.authenticator {
+            transaction_executor = transaction_executor.with_authenticator(authenticator.as_ref());
+        }
+
+        let consumption_checker = NoteConsumptionChecker::new(&transaction_executor);
+
+        data_store.mast_store().load_account_code(account_code);
         let note_consumption_check = consumption_checker
-            .can_consume(
-                account.id(),
-                self.store.get_sync_height().await?,
-                InputNote::unauthenticated(note.clone()),
-                tx_args,
-            )
+            .can_consume(account_id, block_ref, InputNote::unauthenticated(note.clone()), tx_args)
             .await?;
 
         Ok(note_consumption_check)
+    }
+
+    async fn get_account_code(
+        &self,
+        account_id: AccountId,
+    ) -> Result<AccountCode, NoteScreenerError> {
+        self.store
+            .get_account_code(account_id)
+            .await?
+            .ok_or(NoteScreenerError::AccountDataNotFound(account_id))
     }
 }
 

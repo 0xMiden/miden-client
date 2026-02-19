@@ -378,6 +378,14 @@ where
         assembly::CodeBuilder::with_source_manager(self.source_manager.clone())
     }
 
+    /// Returns an instance of [`note::NoteScreener`] configured for this client.
+    pub fn note_screener(&self) -> note::NoteScreener<AUTH>
+    where
+        AUTH: Sync,
+    {
+        note::NoteScreener::new(self.store.clone(), self.authenticator.clone())
+    }
+
     /// Returns a reference to the client's random number generator. This can be used to generate
     /// randomness for various purposes such as serial numbers, keys, etc.
     pub fn rng(&mut self) -> &mut ClientRng {
