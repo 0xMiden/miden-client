@@ -35,7 +35,7 @@ miden-client-sqlite-store = { default-features = false, path = "crates/sqlite-st
 
 # Miden protocol dependencies
 miden-protocol  = { default-features = false, version = "0.13" }
-miden-swapp     = { git = "https://github.com/inicio-labs/miden-swapp", branch = "swapp-note-script/migration-13" }
+miden-swapp     = { git = "https://github.com/inicio-labs/miden-swapp", tag = "v0.1.0-alpha" }
 miden-standards = { default-features = false, version = "0.13" }
 miden-testing   = { default-features = false, version = "0.13" }
 miden-tx        = { default-features = false, version = "0.13" }
