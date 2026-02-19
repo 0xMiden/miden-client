@@ -88,6 +88,7 @@ impl WebClient {
         }
 
         let keystore = self.keystore.clone();
+
         if let Some(client) = self.get_mut_inner() {
             let mut seed = [0u8; 32];
             client.rng().fill_bytes(&mut seed);

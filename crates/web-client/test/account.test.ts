@@ -332,3 +332,156 @@ test.describe("account public commitments", () => {
     expect(allSksRetrieved).toBe(true);
   });
 });
+
+// GET_ACCOUNT_BY_KEY_COMMITMENT TESTS
+// =======================================================================================================
+
+test.describe("getAccountByKeyCommitment tests", () => {
+  test("finds wallet by key commitment after creation", async ({ page }) => {
+    const result = await page.evaluate(async () => {
+      const client = window.client;
+
+      const wallet = await client.newWallet(
+        window.AccountStorageMode.private(),
+        true,
+        0
+      );
+
+      const commitments = await client.getPublicKeyCommitmentsOfAccount(
+        wallet.id()
+      );
+
+      const foundAccount = await client.getAccountByKeyCommitment(
+        commitments[0]
+      );
+
+      return {
+        createdAccountId: wallet.id().toString(),
+        foundAccountId: foundAccount?.id().toString(),
+        found: foundAccount !== undefined,
+      };
+    });
+
+    expect(result.found).toBe(true);
+    expect(result.foundAccountId).toEqual(result.createdAccountId);
+  });
+
+  test("returns undefined for non-existent key commitment", async ({
+    page,
+  }) => {
+    const result = await page.evaluate(async () => {
+      const client = window.client;
+
+      const randomSecretKey = window.AuthSecretKey.rpoFalconWithRNG(null);
+      const randomCommitment = randomSecretKey.publicKey().toCommitment();
+
+      const foundAccount =
+        await client.getAccountByKeyCommitment(randomCommitment);
+
+      return {
+        found: foundAccount !== undefined,
+      };
+    });
+
+    expect(result.found).toBe(false);
+  });
+
+  test("finds correct account among multiple accounts", async ({ page }) => {
+    const result = await page.evaluate(async () => {
+      const client = window.client;
+
+      const wallet1 = await client.newWallet(
+        window.AccountStorageMode.private(),
+        true,
+        0
+      );
+      const wallet2 = await client.newWallet(
+        window.AccountStorageMode.private(),
+        true,
+        0
+      );
+
+      const commitments2 = await client.getPublicKeyCommitmentsOfAccount(
+        wallet2.id()
+      );
+
+      const foundAccount = await client.getAccountByKeyCommitment(
+        commitments2[0]
+      );
+
+      return {
+        wallet1Id: wallet1.id().toString(),
+        wallet2Id: wallet2.id().toString(),
+        foundAccountId: foundAccount?.id().toString(),
+      };
+    });
+
+    expect(result.foundAccountId).toEqual(result.wallet2Id);
+    expect(result.foundAccountId).not.toEqual(result.wallet1Id);
+  });
+
+  test("finds account by additionally registered key", async ({ page }) => {
+    const result = await page.evaluate(async () => {
+      const client = window.client;
+
+      const wallet = await client.newWallet(
+        window.AccountStorageMode.private(),
+        true,
+        0
+      );
+
+      const additionalSecretKey = window.AuthSecretKey.ecdsaWithRNG(null);
+      await client.addAccountSecretKeyToWebStore(
+        wallet.id(),
+        additionalSecretKey
+      );
+
+      const additionalCommitment = additionalSecretKey
+        .publicKey()
+        .toCommitment();
+      const foundAccount =
+        await client.getAccountByKeyCommitment(additionalCommitment);
+
+      return {
+        walletId: wallet.id().toString(),
+        foundAccountId: foundAccount?.id().toString(),
+        found: foundAccount !== undefined,
+      };
+    });
+
+    expect(result.found).toBe(true);
+    expect(result.foundAccountId).toEqual(result.walletId);
+  });
+
+  test("finds faucet by key commitment", async ({ page }) => {
+    const result = await page.evaluate(async () => {
+      const client = window.client;
+
+      const faucet = await client.newFaucet(
+        window.AccountStorageMode.private(),
+        false,
+        "TST",
+        8,
+        BigInt(10000000),
+        0
+      );
+
+      const commitments = await client.getPublicKeyCommitmentsOfAccount(
+        faucet.id()
+      );
+
+      const foundAccount = await client.getAccountByKeyCommitment(
+        commitments[0]
+      );
+
+      return {
+        faucetId: faucet.id().toString(),
+        foundAccountId: foundAccount?.id().toString(),
+        foundIsFaucet: foundAccount?.isFaucet(),
+      };
+    });
+
+    expect(result.foundAccountId).toEqual(result.faucetId);
+    expect(result.foundIsFaucet).toBe(true);
+  });
+});
