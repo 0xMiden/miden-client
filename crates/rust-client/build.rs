@@ -118,9 +118,7 @@ fn compile_tonic_client_proto(out_dir: &Path) -> miette::Result<()> {
 /// Scans `out_dir/subdir/` for generated `.rs` files and produces a single wrapper file at
 /// `out_dir/wrapper_name` that re-exports each file as a module via `include!`.
 ///
-/// This is needed because tonic-build generates individual `.rs` files per proto package, but
-/// `pub mod foo;` declarations resolve relative to the including file's location, which doesn't
-/// work when included from `src/` via `include!`. Instead, the wrapper converts each file into:
+/// The wrapper converts each file into a module declaration:
 ///
 /// ```ignore
 /// #[allow(clippy::doc_markdown, ...)]
@@ -165,8 +163,8 @@ fn generate_wrapper(out_dir: &Path, subdir: &str, wrapper_name: &str) -> miette:
 
 /// Applies `no_std` type replacements to all `.rs` files in the given directory.
 ///
-/// This is needed because `tonic_build` doesn't generate `no_std` compatible files and we want
-/// to build wasm without `std`.
+/// This is needed because `tonic_build` doesn't generate `no_std` compatible files and we need
+/// to build WASM without `std`.
 fn replace_no_std_types_in_dir(dir: &Path) -> miette::Result<()> {
     for entry in fs::read_dir(dir).into_diagnostic()? {
         let entry = entry.into_diagnostic()?;
