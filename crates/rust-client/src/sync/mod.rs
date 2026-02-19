@@ -121,6 +121,7 @@ where
     /// 8. All updates are applied to the store to be persisted.
     pub async fn sync_state(&mut self) -> Result<SyncSummary, ClientError> {
         _ = self.ensure_genesis_in_place().await?;
+        self.ensure_rpc_limits_in_place().await?;
 
         let note_screener = NoteScreener::new(self.store.clone(), self.authenticator.clone());
         let state_sync =
@@ -189,6 +190,18 @@ where
 
         // Remove irrelevant block headers
         self.store.prune_irrelevant_blocks().await.map_err(ClientError::StoreError)
+    }
+
+    /// Ensures that the RPC limits are set in the RPC client. If not already persisted
+    /// in the store, fetches them from the node and stores them.
+    async fn ensure_rpc_limits_in_place(&mut self) -> Result<(), ClientError> {
+        if self.store.get_rpc_limits().await?.is_some() {
+            return Ok(());
+        }
+
+        let limits = self.rpc_api.get_rpc_limits().await?;
+        self.store.set_rpc_limits(limits).await?;
+        Ok(())
     }
 }
 
