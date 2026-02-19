@@ -755,8 +755,12 @@ impl NodeRpcClient for MockRpcApi {
         Ok(NetworkId::Testnet)
     }
 
-    async fn get_rpc_limits(&self) -> crate::rpc::RpcLimits {
-        crate::rpc::RpcLimits::default()
+    async fn get_rpc_limits(&self) -> Result<crate::rpc::RpcLimits, RpcError> {
+        Ok(crate::rpc::RpcLimits::default())
+    }
+
+    async fn set_rpc_limits(&self, _limits: crate::rpc::RpcLimits) {
+        // No-op for mock client
     }
 
     async fn get_status_unversioned(&self) -> Result<RpcStatusInfo, RpcError> {
