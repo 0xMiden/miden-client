@@ -155,7 +155,7 @@ where
             .collect::<Result<Vec<Note>, _>>()?;
 
         let note_screener = self.note_screener();
-        let mut note_relevances = note_screener.check_relevance_batch(&notes).await?;
+        let mut note_relevances = note_screener.can_consume_batch(&notes).await?;
 
         let mut relevant_notes = Vec::new();
         for input_note in committed_notes {
@@ -188,7 +188,7 @@ where
         note: InputNoteRecord,
     ) -> Result<Vec<NoteConsumability>, ClientError> {
         self.note_screener()
-            .check_relevance(&note.clone().try_into()?)
+            .can_consume(&note.clone().try_into()?)
             .await
             .map_err(Into::into)
     }

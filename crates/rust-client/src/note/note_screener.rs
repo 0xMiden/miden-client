@@ -61,33 +61,27 @@ where
         Self { store, authenticator }
     }
 
-    /// Returns the consumability of the provided note against all accounts tracked by this
-    /// screener. This is a convenience wrapper around [`Self::check_relevance_batch`] for a
-    /// single note.
+    /// Checks whether the provided note could be consumed by any of the accounts tracked by
+    /// this screener. Convenience wrapper around [`Self::can_consume_batch`] for a single note.
     ///
-    /// To check consumability against a specific account, use
-    /// [`Self::check_notes_consumability`] instead.
-    pub async fn check_relevance(
+    /// Returns the [`NoteConsumptionStatus`] for each account that could consume the note.
+    pub async fn can_consume(
         &self,
         note: &Note,
     ) -> Result<Vec<NoteConsumability>, NoteScreenerError> {
         Ok(self
-            .check_relevance_batch(core::slice::from_ref(note))
+            .can_consume_batch(core::slice::from_ref(note))
             .await?
             .remove(&note.id())
             .unwrap_or_default())
     }
 
-    /// Returns the consumability of a batch of notes against all accounts tracked by this
-    /// screener.
+    /// Checks whether the provided notes could be consumed by any of the accounts tracked by
+    /// this screener, by executing a transaction for each note-account pair.
     ///
-    /// Returns a map from [`NoteId`] to a list of `(AccountId, NoteConsumptionStatus)` pairs
-    /// for all tracked accounts that could potentially consume it. Notes that are permanently
-    /// unconsumable by all accounts are not included in the result.
-    ///
-    /// To check consumability against a specific account, use
-    /// [`Self::check_notes_consumability`] instead.
-    pub async fn check_relevance_batch(
+    /// Returns a map from [`NoteId`] to a list of `(AccountId, NoteConsumptionStatus)` pairs.
+    /// Notes that are permanently unconsumable by all accounts are not included in the result.
+    pub async fn can_consume_batch(
         &self,
         notes: &[Note],
     ) -> Result<BTreeMap<NoteId, Vec<NoteConsumability>>, NoteScreenerError> {
@@ -158,12 +152,12 @@ where
         Ok(note_relevances)
     }
 
-    /// Checks the consumability of a batch of notes against a single specific account by
-    /// attempting to execute them in a transaction.
+    /// Checks whether the provided notes could be consumed by a specific account by attempting
+    /// to execute them together in a transaction. Notes that fail are progressively removed
+    /// until a maximal set of successfully consumable notes is found.
     ///
-    /// Unlike [`Self::check_relevance_batch`] which checks against all tracked accounts,
-    /// this method targets a single `account_id` and returns a [`NoteConsumptionInfo`]
-    /// splitting notes into those that were successfully consumed and those that failed.
+    /// Returns a [`NoteConsumptionInfo`] splitting notes into those that succeeded and those
+    /// that failed.
     pub async fn check_notes_consumability(
         &self,
         account_id: AccountId,
@@ -240,7 +234,7 @@ where
 
                 // The note is not being tracked by the client and is public so we can screen it
                 let new_note_relevance = self
-                    .check_relevance(
+                    .can_consume(
                         &public_note
                             .clone()
                             .try_into()

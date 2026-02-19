@@ -524,7 +524,7 @@ where
         let output_notes =
             notes_from_output(executed_tx.output_notes()).cloned().collect::<Vec<_>>();
         let note_screener = self.note_screener();
-        let output_note_relevances = note_screener.check_relevance_batch(&output_notes).await?;
+        let output_note_relevances = note_screener.can_consume_batch(&output_notes).await?;
 
         for note in output_notes {
             if output_note_relevances.contains_key(&note.id()) {
