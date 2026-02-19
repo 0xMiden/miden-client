@@ -61,11 +61,12 @@ where
         Self { store, authenticator }
     }
 
-    /// Returns a vector of tuples describing the relevance of the provided note to the
-    /// accounts monitored by this screener.
+    /// Returns the consumability of the provided note against all accounts tracked by this
+    /// screener. This is a convenience wrapper around [`Self::check_relevance_batch`] for a
+    /// single note.
     ///
-    /// The relevance is determined by [`NoteConsumptionChecker::can_consume`] and is based on
-    /// current conditions (for example, it takes the latest block in the client as reference).
+    /// To check consumability against a specific account, use
+    /// [`Self::check_notes_consumability`] instead.
     pub async fn check_relevance(
         &self,
         note: &Note,
@@ -77,11 +78,15 @@ where
             .unwrap_or_default())
     }
 
-    /// Returns note relevances for a batch of notes.
+    /// Returns the consumability of a batch of notes against all accounts tracked by this
+    /// screener.
     ///
     /// Returns a map from [`NoteId`] to a list of `(AccountId, NoteConsumptionStatus)` pairs
     /// for all tracked accounts that could potentially consume it. Notes that are permanently
     /// unconsumable by all accounts are not included in the result.
+    ///
+    /// To check consumability against a specific account, use
+    /// [`Self::check_notes_consumability`] instead.
     pub async fn check_relevance_batch(
         &self,
         notes: &[Note],
@@ -153,8 +158,12 @@ where
         Ok(note_relevances)
     }
 
-    /// Runs note consumability checking for many notes at once using
-    /// [`NoteConsumptionChecker::check_notes_consumability`].
+    /// Checks the consumability of a batch of notes against a single specific account by
+    /// attempting to execute them in a transaction.
+    ///
+    /// Unlike [`Self::check_relevance_batch`] which checks against all tracked accounts,
+    /// this method targets a single `account_id` and returns a [`NoteConsumptionInfo`]
+    /// splitting notes into those that were successfully consumed and those that failed.
     pub async fn check_notes_consumability(
         &self,
         account_id: AccountId,
