@@ -7,3 +7,4 @@ pub mod onchain;
 pub mod pass_through;
 pub mod swap_transaction;
 pub mod transport;
+pub mod network_fpi;
