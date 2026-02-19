@@ -4,8 +4,7 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use async_trait::async_trait;
-use miden_protocol::account::{Account, AccountCode, AccountId};
-use miden_protocol::block::BlockNumber;
+use miden_protocol::account::{AccountCode, AccountId};
 use miden_protocol::note::{Note, NoteId};
 use miden_standards::note::{NoteConsumptionStatus, StandardNote};
 use miden_tx::auth::TransactionAuthenticator;
@@ -179,56 +178,6 @@ where
             .await?;
 
         Ok(note_consumption_info)
-    }
-
-    /// Tries to execute a standard consume transaction to check if the note is consumable by the
-    /// account.
-    pub async fn check_standard_consumability(
-        &self,
-        account: &Account,
-        note: &Note,
-    ) -> Result<NoteConsumptionStatus, NoteScreenerError> {
-        let block_ref = self.store.get_sync_height().await?;
-        if let Some(standard_note) = StandardNote::from_note(note)
-            && let Some(consumption_status) =
-                standard_note.is_consumable(note, account.id(), block_ref)
-        {
-            return Ok(consumption_status);
-        }
-
-        let tx_args = TransactionArgs::new(AdviceMap::default());
-        self.check_standard_consumability_for_account(
-            account.id(),
-            account.code(),
-            note,
-            block_ref,
-            tx_args,
-        )
-        .await
-    }
-
-    async fn check_standard_consumability_for_account(
-        &self,
-        account_id: AccountId,
-        account_code: &AccountCode,
-        note: &Note,
-        block_ref: BlockNumber,
-        tx_args: TransactionArgs,
-    ) -> Result<NoteConsumptionStatus, NoteScreenerError> {
-        let data_store = ClientDataStore::new(self.store.clone());
-        let mut transaction_executor = TransactionExecutor::new(&data_store);
-        if let Some(authenticator) = &self.authenticator {
-            transaction_executor = transaction_executor.with_authenticator(authenticator.as_ref());
-        }
-
-        let consumption_checker = NoteConsumptionChecker::new(&transaction_executor);
-
-        data_store.mast_store().load_account_code(account_code);
-        let note_consumption_check = consumption_checker
-            .can_consume(account_id, block_ref, InputNote::unauthenticated(note.clone()), tx_args)
-            .await?;
-
-        Ok(note_consumption_check)
     }
 
     async fn get_account_code(
