@@ -109,7 +109,8 @@ impl SqliteStore {
         let assets = query_vault_assets(conn, account_id)?;
         let vault = AssetVault::new(&assets)?;
 
-        let slots = query_storage_slots(conn, account_id)?.into_values().collect();
+        let slots =
+            query_storage_slots(conn, account_id, &AccountStorageFilter::All)?.into_values().collect();
 
         let storage = AccountStorage::new(slots)?;
 
@@ -226,21 +227,8 @@ impl SqliteStore {
         account_id: AccountId,
         filter: &AccountStorageFilter,
     ) -> Result<AccountStorage, StoreError> {
-        let slots = query_storage_slots(conn, account_id)?;
-
-        let filtered_slots: Vec<_> = match filter {
-            AccountStorageFilter::All => slots.into_values().collect(),
-            AccountStorageFilter::Root(root) => {
-                slots.into_values().filter(|s| s.value() == *root).collect()
-            },
-            AccountStorageFilter::SlotName(slot_name) => slots
-                .into_iter()
-                .filter(|(name, _)| name == slot_name)
-                .map(|(_, slot)| slot)
-                .collect(),
-        };
-
-        Ok(AccountStorage::new(filtered_slots)?)
+        let slots = query_storage_slots(conn, account_id, filter)?.into_values().collect();
+        Ok(AccountStorage::new(slots)?)
     }
 
     /// Fetches a specific asset from the account's vault without the need of loading the entire
