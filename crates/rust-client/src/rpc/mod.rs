@@ -423,6 +423,29 @@ pub enum RpcEndpoint {
     GetLimits,
 }
 
+impl RpcEndpoint {
+    /// Returns the endpoint name as used in the RPC service definition.
+    pub fn proto_name(&self) -> &'static str {
+        match self {
+            RpcEndpoint::Status => "Status",
+            RpcEndpoint::CheckNullifiers => "CheckNullifiers",
+            RpcEndpoint::SyncNullifiers => "SyncNullifiers",
+            RpcEndpoint::GetAccount => "GetAccount",
+            RpcEndpoint::GetBlockByNumber => "GetBlockByNumber",
+            RpcEndpoint::GetBlockHeaderByNumber => "GetBlockHeaderByNumber",
+            RpcEndpoint::GetNotesById => "GetNotesById",
+            RpcEndpoint::SyncState => "SyncState",
+            RpcEndpoint::SubmitProvenTx => "SubmitProvenTransaction",
+            RpcEndpoint::SyncNotes => "SyncNotes",
+            RpcEndpoint::GetNoteScriptByRoot => "GetNoteScriptByRoot",
+            RpcEndpoint::SyncStorageMaps => "SyncStorageMaps",
+            RpcEndpoint::SyncAccountVault => "SyncAccountVault",
+            RpcEndpoint::SyncTransactions => "SyncTransactions",
+            RpcEndpoint::GetLimits => "GetLimits",
+        }
+    }
+}
+
 impl fmt::Display for RpcEndpoint {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {

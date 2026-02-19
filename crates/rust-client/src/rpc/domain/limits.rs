@@ -5,7 +5,6 @@ use core::convert::TryFrom;
 
 use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 
-use crate::alloc::string::ToString;
 use crate::rpc::RpcEndpoint;
 use crate::rpc::errors::RpcConversionError;
 use crate::rpc::generated::rpc as proto;
@@ -72,7 +71,7 @@ fn get_param(
     endpoint: RpcEndpoint,
     param: &'static str,
 ) -> Result<u32, RpcConversionError> {
-    let ep = proto.endpoints.get(&endpoint.to_string()).ok_or(
+    let ep = proto.endpoints.get(endpoint.proto_name()).ok_or(
         RpcConversionError::MissingFieldInProtobufRepresentation {
             entity: "RpcLimits",
             field_name: param,
