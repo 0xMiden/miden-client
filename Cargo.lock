@@ -3315,7 +3315,7 @@ dependencies = [
 [[package]]
 name = "miden-swapp"
 version = "0.1.0"
-source = "git+https://github.com/inicio-labs/miden-swapp?branch=swapp-note-script%2Fmigration-13#1316d38509fe2aa097de113f9639b28be35d7b32"
+source = "git+https://github.com/inicio-labs/miden-swapp?tag=v0.1.0-alpha#0c484f2b76105b472c1cb55ccb10906bfdb91e72"
 dependencies = [
  "miden-core",
  "miden-crypto",
