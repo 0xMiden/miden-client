@@ -7,12 +7,7 @@ use miden_client::keystore::Keystore;
 use miden_client::rpc::{GrpcClient, RpcStatusInfo};
 use miden_client::store::NoteFilter;
 
-use super::config::{
-    CLIENT_CONFIG_FILE_NAME,
-    CliConfig,
-    get_global_miden_dir,
-    get_local_miden_dir,
-};
+use super::config::CliConfig;
 use crate::commands::account::DEFAULT_ACCOUNT_ID_KEY;
 use crate::errors::CliError;
 
@@ -24,15 +19,8 @@ pub async fn print_client_info<AUTH: Keystore + Sync + 'static>(
 
     println!("Client version: {}", env!("CARGO_PKG_VERSION"));
 
-    // Show which config directory is active (local takes precedence over global).
-    // One of these branches always matches because `from_system()` above already
-    // succeeded, which guarantees either local or global config is available.
-    if let Some(local_dir) = get_local_miden_dir().ok()
-        && local_dir.join(CLIENT_CONFIG_FILE_NAME).exists()
-    {
-        println!("Config directory: {} (local)", local_dir.display());
-    } else if let Ok(global_dir) = get_global_miden_dir() {
-        println!("Config directory: {} (global)", global_dir.display());
+    if let Some(config_dir) = &config.config_dir {
+        println!("Config directory: {config_dir}");
     }
 
     // Get and display local genesis commitment
