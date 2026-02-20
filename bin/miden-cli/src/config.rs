@@ -44,8 +44,35 @@ pub fn get_local_miden_dir() -> Result<PathBuf, std::io::Error> {
 // CLI CONFIG
 // ================================================================================================
 
+/// Whether the configuration was loaded from the local or global `.miden` directory.
+#[derive(Debug, Clone)]
+pub enum ConfigKind {
+    Local,
+    Global,
+}
+
+/// The `.miden` directory from which the configuration was loaded.
+#[derive(Debug, Clone)]
+pub struct ConfigDir {
+    pub path: PathBuf,
+    pub kind: ConfigKind,
+}
+
+impl std::fmt::Display for ConfigDir {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let label = match self.kind {
+            ConfigKind::Local => "local",
+            ConfigKind::Global => "global",
+        };
+        write!(f, "{} ({})", self.path.display(), label)
+    }
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct CliConfig {
+    /// The directory this configuration was loaded from. Not part of the TOML file.
+    #[serde(skip)]
+    pub config_dir: Option<ConfigDir>,
     /// Describes settings related to the RPC endpoint.
     pub rpc: RpcConfig,
     /// Path to the `SQLite` store file.
@@ -95,6 +122,7 @@ impl Default for CliConfig {
         // Create paths relative to the config file location (which is in .miden directory)
         // These will be resolved relative to the .miden directory when the config is loaded
         Self {
+            config_dir: None,
             rpc: RpcConfig::default(),
             store_filepath: PathBuf::from(STORE_FILENAME),
             secret_keys_directory: PathBuf::from(KEYSTORE_DIRECTORY),
@@ -223,7 +251,12 @@ impl CliConfig {
     /// - Configuration file parsing fails
     pub fn from_local_dir() -> Result<Self, CliError> {
         let local_miden_dir = get_local_miden_dir()?;
-        Self::from_dir(&local_miden_dir)
+        let mut config = Self::from_dir(&local_miden_dir)?;
+        config.config_dir = Some(ConfigDir {
+            path: local_miden_dir,
+            kind: ConfigKind::Local,
+        });
+        Ok(config)
     }
 
     /// Loads configuration from the global `.miden` directory (user's home directory).
@@ -262,7 +295,12 @@ impl CliConfig {
         let global_miden_dir = get_global_miden_dir().map_err(|e| {
             CliError::Config(Box::new(e), "Failed to determine global config directory".to_string())
         })?;
-        Self::from_dir(&global_miden_dir)
+        let mut config = Self::from_dir(&global_miden_dir)?;
+        config.config_dir = Some(ConfigDir {
+            path: global_miden_dir,
+            kind: ConfigKind::Global,
+        });
+        Ok(config)
     }
 
     /// Loads configuration from system directories with priority: local first, then global
