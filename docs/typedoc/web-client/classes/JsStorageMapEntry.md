@@ -18,11 +18,11 @@ The key of the storage map entry.
 
 ***
 
-### root
+### slotName
 
-> **root**: `string`
+> **slotName**: `string`
 
-The root of the storage map entry.
+The slot name of the map this entry belongs to.
 
 ***
 

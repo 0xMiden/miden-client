@@ -6,7 +6,7 @@
 
 # Class: JsVaultAsset
 
-An object that contains a serialized vault asset
+An object that contains a serialized vault asset.
 
 ## Properties
 
@@ -23,14 +23,6 @@ Word representing the asset.
 > **faucetIdPrefix**: `string`
 
 Asset's faucet ID prefix.
-
-***
-
-### root
-
-> **root**: `string`
-
-The merkle root of the vault's assets.
 
 ***
 

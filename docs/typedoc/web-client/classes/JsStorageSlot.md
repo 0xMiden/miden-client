@@ -10,14 +10,6 @@ A JavaScript representation of a storage slot in an account.
 
 ## Properties
 
-### commitment
-
-> **commitment**: `string`
-
-Commitment of the whole account storage
-
-***
-
 ### slotName
 
 > **slotName**: `string`

@@ -106,6 +106,9 @@ impl AccountSmtForest {
 
         let empty_root = *EmptySubtreeRoots::entry(SMT_DEPTH, 0);
         let entries: Vec<(Word, Word)> = smt.entries().map(|(k, v)| (*k, *v)).collect();
+        if entries.is_empty() {
+            return Ok(());
+        }
         let new_root = self.forest.batch_insert(empty_root, entries).map_err(StoreError::from)?;
         debug_assert_eq!(new_root, smt.root());
         Ok(())
@@ -138,13 +141,21 @@ impl AccountSmtForest {
         let empty_root = *EmptySubtreeRoots::entry(SMT_DEPTH, 0);
         let entries: Vec<(Word, Word)> =
             map.entries().map(|(k, v)| (StorageMap::hash_key(*k), *v)).collect();
+        if entries.is_empty() {
+            return Ok(());
+        }
         self.forest.batch_insert(empty_root, entries).map_err(StoreError::from)?;
         Ok(())
     }
 
     /// Removes the specified SMT roots from the forest, releasing memory used by nodes
     /// that are no longer reachable from any remaining root.
+    ///
+    /// Filters out the empty tree root because `SmtForest::pop_smts` has a ref-count
+    /// underflow bug on empty hash nodes (each node has `left == right`, causing
+    /// double-decrement when the parent's rc reaches zero).
     pub fn pop_roots(&mut self, roots: impl IntoIterator<Item = Word>) {
-        self.forest.pop_smts(roots);
+        let empty_tree_root = *EmptySubtreeRoots::entry(SMT_DEPTH, 0);
+        self.forest.pop_smts(roots.into_iter().filter(|r| *r != empty_tree_root));
     }
 }
