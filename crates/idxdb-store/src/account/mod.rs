@@ -215,59 +215,15 @@ impl WebStore {
             self.get_storage_slot_headers(account_header.storage_commitment()).await?;
 
         let mut storage_header_vec = Vec::new();
-
-        // Collect all map roots that need to be fetched
-        let map_roots_to_fetch: Vec<String> = storage_slot_headers
-            .iter()
-            .filter(|(_, slot_type, _)| slot_type == &StorageSlotType::Map)
-            .map(|(_, _, value)| value.to_hex())
-            .collect();
-
-        // Fetch all map entries for the partial account
-        let mut storage_maps_data = BTreeMap::new();
-        if !map_roots_to_fetch.is_empty() {
-            let promise = idxdb_get_account_storage_maps(self.db_id(), map_roots_to_fetch);
-            let account_maps_idxdb: Vec<StorageMapEntryIdxdbObject> =
-                await_js(promise, "failed to fetch account storage maps").await?;
-
-            for entry in account_maps_idxdb {
-                let map = storage_maps_data.entry(entry.root).or_insert_with(StorageMap::new);
-                map.insert(
-                    Word::try_from(entry.key.as_str())?,
-                    Word::try_from(entry.value.as_str())?,
-                )?;
-            }
-        }
-
         let mut maps = Vec::new();
 
+        // Storage maps are always minimal here (just roots, no entries).
+        // New accounts that need full storage data are handled by the DataStore layer,
+        // which fetches the full account via `get_account()` when nonce == 0.
         for (slot_name, slot_type, value) in storage_slot_headers {
             storage_header_vec.push(StorageSlotHeader::new(slot_name, slot_type, value));
             if slot_type == StorageSlotType::Map {
-                let full_map =
-                    storage_maps_data.get(&value.to_hex()).cloned().unwrap_or_else(StorageMap::new);
-
-                // Try to create a partial storage map with witnesses from the SMT forest,
-                // but fall back to a full map without witnesses if the forest doesn't have the root
-                let mut partial_storage_map = PartialStorageMap::new(value);
-                let mut has_witness_error = false;
-                for (k, _v) in full_map.entries() {
-                    let smt_forest = self.smt_forest.read();
-                    if let Ok(witness) = smt_forest.get_storage_map_item_witness(value, *k) {
-                        partial_storage_map.add(witness).map_err(StoreError::MerkleStoreError)?;
-                    } else {
-                        // If we can't get a witness, fall back to creating a full map
-                        has_witness_error = true;
-                        break;
-                    }
-                }
-
-                // If we had errors getting witnesses, use a full map instead
-                if has_witness_error {
-                    partial_storage_map = PartialStorageMap::new_full(full_map);
-                }
-
-                maps.push(partial_storage_map);
+                maps.push(PartialStorageMap::new(value));
             }
         }
 
