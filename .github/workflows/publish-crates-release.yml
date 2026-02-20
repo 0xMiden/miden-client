@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   publish:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       CARGO_TERM_COLOR: always
       # Important: use an absolute path so `cargo publish` verification builds
@@ -17,7 +17,7 @@ jobs:
       CARGO_TARGET_DIR: ${{ github.workspace }}/target
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           # Ensure the release tag refers to the latest commit on main.

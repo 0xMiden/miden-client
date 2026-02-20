@@ -407,6 +407,10 @@ impl MockRpcApi {
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 impl NodeRpcClient for MockRpcApi {
+    fn has_genesis_commitment(&self) -> Option<Word> {
+        None
+    }
+
     async fn set_genesis_commitment(&self, _commitment: Word) -> Result<(), RpcError> {
         // The mock client doesn't use accept headers, so we don't need to do anything here.
         Ok(())
@@ -551,7 +555,7 @@ impl NodeRpcClient for MockRpcApi {
 
     /// Returns the account proof for the specified account. The `known_account_code` parameter
     /// is ignored in the mock implementation and the latest account code is always returned.
-    async fn get_account(
+    async fn get_account_proof(
         &self,
         foreign_account: ForeignAccount,
         account_state: AccountStateAt,
@@ -755,8 +759,16 @@ impl NodeRpcClient for MockRpcApi {
         Ok(NetworkId::Testnet)
     }
 
-    async fn get_rpc_limits(&self) -> crate::rpc::RpcLimits {
-        crate::rpc::RpcLimits::default()
+    async fn get_rpc_limits(&self) -> Result<crate::rpc::RpcLimits, RpcError> {
+        Ok(crate::rpc::RpcLimits::default())
+    }
+
+    fn has_rpc_limits(&self) -> Option<crate::rpc::RpcLimits> {
+        None
+    }
+
+    async fn set_rpc_limits(&self, _limits: crate::rpc::RpcLimits) {
+        // No-op for mock client
     }
 
     async fn get_status_unversioned(&self) -> Result<RpcStatusInfo, RpcError> {

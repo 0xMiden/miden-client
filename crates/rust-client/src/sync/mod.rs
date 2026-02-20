@@ -68,7 +68,6 @@ use miden_tx::auth::TransactionAuthenticator;
 use miden_tx::utils::{Deserializable, DeserializationError, Serializable};
 use tracing::{debug, info};
 
-use crate::note::NoteScreener;
 use crate::store::{NoteFilter, TransactionFilter};
 use crate::{Client, ClientError};
 mod block_header;
@@ -120,9 +119,10 @@ where
     /// 7. The MMR is updated with the new peaks and authentication nodes.
     /// 8. All updates are applied to the store to be persisted.
     pub async fn sync_state(&mut self) -> Result<SyncSummary, ClientError> {
-        _ = self.ensure_genesis_in_place().await?;
+        self.ensure_genesis_in_place().await?;
+        self.ensure_rpc_limits_in_place().await?;
 
-        let note_screener = NoteScreener::new(self.store.clone(), self.authenticator.clone());
+        let note_screener = self.note_screener();
         let state_sync =
             StateSync::new(self.rpc_api.clone(), Arc::new(note_screener), self.tx_discard_delta);
 
@@ -189,6 +189,18 @@ where
 
         // Remove irrelevant block headers
         self.store.prune_irrelevant_blocks().await.map_err(ClientError::StoreError)
+    }
+
+    /// Ensures that the RPC limits are set in the RPC client. If not already cached,
+    /// fetches them from the node and persists them in the store.
+    pub async fn ensure_rpc_limits_in_place(&mut self) -> Result<(), ClientError> {
+        if self.rpc_api.has_rpc_limits().is_some() {
+            return Ok(());
+        }
+
+        let limits = self.rpc_api.get_rpc_limits().await?;
+        self.store.set_rpc_limits(limits).await?;
+        Ok(())
     }
 }
 

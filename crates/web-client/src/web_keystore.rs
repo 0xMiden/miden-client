@@ -4,6 +4,7 @@ use alloc::sync::Arc;
 
 use idxdb_store::auth::{
     get_account_auth_by_pub_key_commitment,
+    get_account_id_by_key_commitment,
     get_key_commitments_by_account_id,
     insert_account_auth,
     insert_account_key_mapping,
@@ -238,6 +239,30 @@ impl<R: Rng> Keystore for WebKeyStore<R> {
 
         let secret_key = decode_secret_key_from_bytes(&secret_key_bytes)?;
         Ok(Some(secret_key))
+    }
+
+    async fn get_account_id_by_key_commitment(
+        &self,
+        pub_key_commitment: PublicKeyCommitment,
+    ) -> Result<Option<AccountId>, KeyStoreError> {
+        let pub_key_hex = NativeWord::from(pub_key_commitment).to_hex();
+
+        let account_id_hex =
+            get_account_id_by_key_commitment(&self.db_id, pub_key_hex).await.map_err(|_| {
+                KeyStoreError::StorageError(
+                    "Failed to get account id by key commitment from IndexedDB".to_string(),
+                )
+            })?;
+
+        match account_id_hex {
+            Some(hex) => {
+                let id = AccountId::from_hex(&hex).map_err(|err| {
+                    KeyStoreError::DecodingError(format!("error decoding account id hex: {err:?}"))
+                })?;
+                Ok(Some(id))
+            },
+            None => Ok(None),
+        }
     }
 
     async fn get_account_key_commitments(
