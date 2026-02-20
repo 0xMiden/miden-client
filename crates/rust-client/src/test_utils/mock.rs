@@ -21,6 +21,7 @@ use crate::rpc::domain::account::{
     AccountProof,
     AccountStorageDetails,
     AccountStorageMapDetails,
+    AccountStorageRequirements,
     AccountUpdateSummary,
     AccountVaultDetails,
     FetchedAccount,
@@ -37,7 +38,6 @@ use crate::rpc::generated::account::AccountSummary;
 use crate::rpc::generated::note::NoteSyncRecord;
 use crate::rpc::generated::rpc::{BlockRange, SyncStateResponse};
 use crate::rpc::generated::transaction::TransactionSummary;
-use crate::rpc::domain::account::AccountStorageRequirements;
 use crate::rpc::{AccountStateAt, NodeRpcClient, RpcError, RpcStatusInfo};
 
 pub type MockClient<AUTH> = Client<AUTH>;
