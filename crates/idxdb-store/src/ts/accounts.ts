@@ -1,9 +1,12 @@
 import {
   getDatabase,
   IAccount,
+  IHistoricalAccountAsset,
+  IHistoricalStorageMapEntry,
   JsStorageMapEntry,
   JsStorageSlot,
   JsVaultAsset,
+  MidenDatabase,
 } from "./schema.js";
 import { logWebStoreError, uint8ArrayToBase64 } from "./utils.js";
 
@@ -300,10 +303,33 @@ export async function upsertStorageMapEntries(
 ) {
   try {
     const db = getDatabase(dbId);
+
+    // Read old latest entries before clearing, to detect removals
+    const oldEntries = await db.latestStorageMapEntries
+      .where("accountId")
+      .equals(accountId)
+      .toArray();
+
     await db.latestStorageMapEntries
       .where("accountId")
       .equals(accountId)
       .delete();
+
+    // Build a set of new keys for fast lookup
+    const newKeySet = new Set(entries.map((e) => `${e.slotName}\0${e.key}`));
+
+    // Write tombstones to historical for entries that existed but are now absent
+    for (const old of oldEntries) {
+      if (!newKeySet.has(`${old.slotName}\0${old.key}`)) {
+        await db.historicalStorageMapEntries.put({
+          accountId,
+          nonce,
+          slotName: old.slotName,
+          key: old.key,
+          value: null,
+        } as IHistoricalStorageMapEntry);
+      }
+    }
 
     if (entries.length === 0) return;
 
@@ -334,7 +360,30 @@ export async function upsertVaultAssets(
 ) {
   try {
     const db = getDatabase(dbId);
+
+    // Read old latest entries before clearing, to detect removals
+    const oldAssets = await db.latestAccountAssets
+      .where("accountId")
+      .equals(accountId)
+      .toArray();
+
     await db.latestAccountAssets.where("accountId").equals(accountId).delete();
+
+    // Build a set of new vault keys for fast lookup
+    const newKeySet = new Set(assets.map((a) => a.vaultKey));
+
+    // Write tombstones to historical for assets that existed but are now absent
+    for (const old of oldAssets) {
+      if (!newKeySet.has(old.vaultKey)) {
+        await db.historicalAccountAssets.put({
+          accountId,
+          nonce,
+          vaultKey: old.vaultKey,
+          faucetIdPrefix: old.faucetIdPrefix,
+          asset: null,
+        } as IHistoricalAccountAsset);
+      }
+    }
 
     if (assets.length === 0) return;
 
@@ -354,6 +403,115 @@ export async function upsertVaultAssets(
     await db.historicalAccountAssets.bulkPut(historicalEntries);
   } catch (error: unknown) {
     logWebStoreError(error, `Error inserting assets`);
+  }
+}
+
+export async function applyStorageDelta(
+  dbId: string,
+  accountId: string,
+  nonce: string,
+  updatedSlots: JsStorageSlot[],
+  changedMapEntries: JsStorageMapEntry[]
+) {
+  try {
+    const db = getDatabase(dbId);
+
+    // Upsert updated slots to both latest and historical
+    for (const slot of updatedSlots) {
+      await db.latestAccountStorages.put({
+        accountId,
+        slotName: slot.slotName,
+        slotValue: slot.slotValue,
+        slotType: slot.slotType,
+      });
+      await db.historicalAccountStorages.put({
+        accountId,
+        nonce,
+        slotName: slot.slotName,
+        slotValue: slot.slotValue,
+        slotType: slot.slotType,
+      });
+    }
+
+    // Process map entries: value="" means removal
+    for (const entry of changedMapEntries) {
+      if (entry.value === "") {
+        // Removal: delete from latest, write tombstone to historical
+        await db.latestStorageMapEntries
+          .where("[accountId+slotName+key]")
+          .equals([accountId, entry.slotName, entry.key])
+          .delete();
+        await db.historicalStorageMapEntries.put({
+          accountId,
+          nonce,
+          slotName: entry.slotName,
+          key: entry.key,
+          value: null,
+        } as IHistoricalStorageMapEntry);
+      } else {
+        // Update: put to both latest and historical
+        await db.latestStorageMapEntries.put({
+          accountId,
+          slotName: entry.slotName,
+          key: entry.key,
+          value: entry.value,
+        });
+        await db.historicalStorageMapEntries.put({
+          accountId,
+          nonce,
+          slotName: entry.slotName,
+          key: entry.key,
+          value: entry.value,
+        });
+      }
+    }
+  } catch (error) {
+    logWebStoreError(error, `Error applying storage delta`);
+  }
+}
+
+export async function applyVaultDelta(
+  dbId: string,
+  accountId: string,
+  nonce: string,
+  changedAssets: JsVaultAsset[]
+) {
+  try {
+    const db = getDatabase(dbId);
+
+    for (const entry of changedAssets) {
+      if (entry.asset === "") {
+        // Removal: delete from latest, write tombstone to historical
+        await db.latestAccountAssets
+          .where("[accountId+vaultKey]")
+          .equals([accountId, entry.vaultKey])
+          .delete();
+        await db.historicalAccountAssets.put({
+          accountId,
+          nonce,
+          vaultKey: entry.vaultKey,
+          faucetIdPrefix: entry.faucetIdPrefix,
+          asset: null,
+        } as IHistoricalAccountAsset);
+      } else {
+        // Update: put to both latest and historical
+        await db.latestAccountAssets.put({
+          accountId,
+          vaultKey: entry.vaultKey,
+          faucetIdPrefix: entry.faucetIdPrefix,
+          asset: entry.asset,
+        });
+        await db.historicalAccountAssets.put({
+          accountId,
+          nonce,
+          vaultKey: entry.vaultKey,
+          faucetIdPrefix: entry.faucetIdPrefix,
+          asset: entry.asset,
+        });
+      }
+    }
+  } catch (error) {
+    logWebStoreError(error, `Error applying vault delta`);
   }
 }
 
@@ -532,26 +690,105 @@ export async function lockAccount(dbId: string, accountId: string) {
 }
 
 /**
- * Rebuilds a latest table from historical data at the given nonce.
- * Clears all latest entries for the account, then copies from historical
- * with the nonce field stripped (since latest tables don't use nonce).
+ * Rebuilds latest storage slots from historical data.
+ * Groups by slotName, takes the entry with MAX(nonce) per slot.
+ * Slots cannot be removed, so no tombstone filtering needed.
  */
-async function rebuildLatestTable(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  latestTable: import("dexie").Table<any, any>,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  historicalTable: import("dexie").Table<any, any>,
-  accountId: string,
-  maxNonce: string
-) {
-  await latestTable.where("accountId").equals(accountId).delete();
-  const hist = await historicalTable
-    .where("[accountId+nonce]")
-    .equals([accountId, maxNonce])
+async function rebuildLatestStorageSlots(db: MidenDatabase, accountId: string) {
+  await db.latestAccountStorages.where("accountId").equals(accountId).delete();
+  const allHist = await db.historicalAccountStorages
+    .where("accountId")
+    .equals(accountId)
     .toArray();
-  if (hist.length > 0) {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/no-unsafe-return
-    await latestTable.bulkPut(hist.map(({ nonce, ...rest }) => rest));
+
+  // Group by slotName, take MAX(nonce) per slot
+  const bySlot = new Map<string, (typeof allHist)[0]>();
+  for (const entry of allHist) {
+    const existing = bySlot.get(entry.slotName);
+    if (!existing || BigInt(entry.nonce) > BigInt(existing.nonce)) {
+      bySlot.set(entry.slotName, entry);
+    }
+  }
+
+  if (bySlot.size > 0) {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const entries = [...bySlot.values()].map(({ nonce, ...rest }) => rest);
+    await db.latestAccountStorages.bulkPut(entries);
+  }
+}
+
+/**
+ * Rebuilds latest storage map entries from historical data.
+ * Groups by (slotName, key), takes the entry with MAX(nonce) per key.
+ * Filters out tombstones (value === null).
+ */
+async function rebuildLatestStorageMapEntries(
+  db: MidenDatabase,
+  accountId: string
+) {
+  await db.latestStorageMapEntries
+    .where("accountId")
+    .equals(accountId)
+    .delete();
+  const allHist = await db.historicalStorageMapEntries
+    .where("accountId")
+    .equals(accountId)
+    .toArray();
+
+  // Group by (slotName, key), take MAX(nonce) per key
+  const byKey = new Map<string, (typeof allHist)[0]>();
+  for (const entry of allHist) {
+    const compositeKey = `${entry.slotName}\0${entry.key}`;
+    const existing = byKey.get(compositeKey);
+    if (!existing || BigInt(entry.nonce) > BigInt(existing.nonce)) {
+      byKey.set(compositeKey, entry);
+    }
+  }
+
+  // Filter out tombstones and strip nonce
+  const entries = [...byKey.values()]
+    .filter((e) => e.value !== null)
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    .map(({ nonce, value, ...rest }) => ({
+      ...rest,
+      value: value as string,
+    }));
+  if (entries.length > 0) {
+    await db.latestStorageMapEntries.bulkPut(entries);
+  }
+}
+
+/**
+ * Rebuilds latest vault assets from historical data.
+ * Groups by vaultKey, takes the entry with MAX(nonce) per key.
+ * Filters out tombstones (asset === null).
+ */
+async function rebuildLatestVaultAssets(db: MidenDatabase, accountId: string) {
+  await db.latestAccountAssets.where("accountId").equals(accountId).delete();
+  const allHist = await db.historicalAccountAssets
+    .where("accountId")
+    .equals(accountId)
+    .toArray();
+
+  // Group by vaultKey, take MAX(nonce) per key
+  const byKey = new Map<string, (typeof allHist)[0]>();
+  for (const entry of allHist) {
+    const existing = byKey.get(entry.vaultKey);
+    if (!existing || BigInt(entry.nonce) > BigInt(existing.nonce)) {
+      byKey.set(entry.vaultKey, entry);
+    }
+  }
+
+  // Filter out tombstones and strip nonce
+  const entries = [...byKey.values()]
+    .filter((e) => e.asset !== null)
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    .map(({ nonce, asset, ...rest }) => ({
+      ...rest,
+      asset: asset as string,
+    }));
+  if (entries.length > 0) {
+    await db.latestAccountAssets.bulkPut(entries);
   }
 }
 
@@ -632,26 +869,11 @@ export async function undoAccountStates(
           }
         }
 
-        // Rebuild latest from historical at max nonce
+        // Rebuild latest from historical using MAX(nonce) per key
         await db.latestAccountHeaders.put(maxRecord);
-        await rebuildLatestTable(
-          db.latestAccountStorages,
-          db.historicalAccountStorages,
-          accountId,
-          maxRecord.nonce
-        );
-        await rebuildLatestTable(
-          db.latestStorageMapEntries,
-          db.historicalStorageMapEntries,
-          accountId,
-          maxRecord.nonce
-        );
-        await rebuildLatestTable(
-          db.latestAccountAssets,
-          db.historicalAccountAssets,
-          accountId,
-          maxRecord.nonce
-        );
+        await rebuildLatestStorageSlots(db, accountId);
+        await rebuildLatestStorageMapEntries(db, accountId);
+        await rebuildLatestVaultAssets(db, accountId);
       }
     }
   } catch (error) {

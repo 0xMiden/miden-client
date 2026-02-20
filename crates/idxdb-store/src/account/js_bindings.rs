@@ -122,6 +122,26 @@ extern "C" {
     pub fn idxdb_get_foreign_account_code(db_id: &str, account_ids: Vec<String>)
     -> js_sys::Promise;
 
+    // DELTA WRITES
+    // --------------------------------------------------------------------------------------------
+
+    #[wasm_bindgen(js_name = applyStorageDelta)]
+    pub fn idxdb_apply_storage_delta(
+        db_id: &str,
+        account_id: String,
+        nonce: String,
+        updated_slots: Vec<JsStorageSlot>,
+        changed_map_entries: Vec<JsStorageMapEntry>,
+    ) -> js_sys::Promise;
+
+    #[wasm_bindgen(js_name = applyVaultDelta)]
+    pub fn idxdb_apply_vault_delta(
+        db_id: &str,
+        account_id: String,
+        nonce: String,
+        changed_assets: Vec<JsVaultAsset>,
+    ) -> js_sys::Promise;
+
     // UPDATES
     // --------------------------------------------------------------------------------------------
 

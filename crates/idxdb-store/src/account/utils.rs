@@ -1,19 +1,21 @@
-use alloc::string::ToString;
+use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
 use miden_client::account::{
     Account,
     AccountCode,
+    AccountDelta,
     AccountHeader,
     AccountId,
     AccountStorage,
     Address,
     StorageSlotContent,
+    StorageSlotType,
 };
-use miden_client::asset::AssetVault;
+use miden_client::asset::{Asset, AssetVault, FungibleAsset};
 use miden_client::store::{AccountStatus, StoreError};
 use miden_client::utils::{Deserializable, Serializable};
-use miden_client::{Felt, Word};
+use miden_client::{EMPTY_WORD, Felt, Word};
 use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::JsFuture;
 
@@ -21,6 +23,8 @@ use super::js_bindings::{
     JsStorageMapEntry,
     JsStorageSlot,
     JsVaultAsset,
+    idxdb_apply_storage_delta,
+    idxdb_apply_vault_delta,
     idxdb_upsert_account_code,
     idxdb_upsert_account_record,
     idxdb_upsert_account_storage,
@@ -174,6 +178,127 @@ pub fn parse_account_address_idxdb_object(
     let address = Address::read_from_bytes(&account_address_idxdb.address)?;
 
     Ok((address, native_account_id))
+}
+
+/// Writes only the changed storage entries (from the delta) to both latest and historical tables.
+/// Value slots are upserted directly. Map entries with `EMPTY_WORD` values are treated as removals
+/// (empty-string sentinel for the JS side).
+pub async fn apply_storage_delta(
+    db_id: &str,
+    account: &Account,
+    delta: &AccountDelta,
+) -> Result<(), JsValue> {
+    let account_id_str = account.id().to_string();
+    let nonce_str = account.nonce().to_string();
+
+    let mut updated_slots = Vec::new();
+    let mut changed_map_entries = Vec::new();
+
+    // Value slots: delta gives (StorageSlotName, Word)
+    for (slot_name, value) in delta.storage().values() {
+        updated_slots.push(JsStorageSlot {
+            slot_name: slot_name.to_string(),
+            slot_value: value.to_hex(),
+            slot_type: StorageSlotType::Value as u8,
+        });
+    }
+
+    // Map slots: delta gives (StorageSlotName, StorageMapDelta)
+    for (slot_name, map_delta) in delta.storage().maps() {
+        // Get the new root value from the final account state for the slot itself
+        if let Some(slot) = account.storage().get(slot_name) {
+            updated_slots.push(JsStorageSlot::from_slot(slot));
+        }
+
+        // Extract changed map entries from the delta
+        for (key, value) in map_delta.entries() {
+            let value_str = if *value == EMPTY_WORD {
+                // Removal sentinel — the JS side interprets "" as "remove from latest,
+                // write null tombstone to historical"
+                String::new()
+            } else {
+                value.to_hex()
+            };
+
+            changed_map_entries.push(JsStorageMapEntry {
+                slot_name: slot_name.to_string(),
+                key: key.inner().to_hex(),
+                value: value_str,
+            });
+        }
+    }
+
+    JsFuture::from(idxdb_apply_storage_delta(
+        db_id,
+        account_id_str,
+        nonce_str,
+        updated_slots,
+        changed_map_entries,
+    ))
+    .await?;
+
+    Ok(())
+}
+
+/// Writes only the changed vault assets (from the delta) to both latest and historical tables.
+/// Assets removed from the vault use an empty-string sentinel for the JS side.
+pub async fn apply_vault_delta(
+    db_id: &str,
+    account: &Account,
+    delta: &AccountDelta,
+) -> Result<(), JsValue> {
+    let account_id_str = account.id().to_string();
+    let nonce_str = account.nonce().to_string();
+
+    let mut changed_assets = Vec::new();
+
+    // Process fungible asset changes
+    for (faucet_id, _amount_delta) in delta.vault().fungible().iter() {
+        let balance = account
+            .vault()
+            .get_balance(*faucet_id)
+            .expect("faucet_id from delta should be valid");
+
+        if balance > 0 {
+            // Asset still exists in the final state — write its current value
+            let asset = FungibleAsset::new(*faucet_id, balance)
+                .expect("balance from vault should be valid");
+            changed_assets.push(JsVaultAsset::from_asset(&Asset::Fungible(asset)));
+        } else {
+            // Asset was removed — construct a removal sentinel
+            // We need vault_key and faucet_id_prefix for the tombstone; create a dummy asset
+            // with amount 1 just to derive these identifiers.
+            let dummy =
+                FungibleAsset::new(*faucet_id, 1).expect("faucet_id from delta should be valid");
+            changed_assets.push(JsVaultAsset {
+                vault_key: Word::from(dummy.vault_key()).to_hex(),
+                faucet_id_prefix: dummy.faucet_id_prefix().to_hex(),
+                asset: String::new(),
+            });
+        }
+    }
+
+    // Process non-fungible asset changes
+    for (nft, action) in delta.vault().non_fungible().iter() {
+        use miden_client::asset::NonFungibleDeltaAction;
+        match action {
+            NonFungibleDeltaAction::Add => {
+                changed_assets.push(JsVaultAsset::from_asset(&Asset::NonFungible(*nft)));
+            },
+            NonFungibleDeltaAction::Remove => {
+                changed_assets.push(JsVaultAsset {
+                    vault_key: Word::from(nft.vault_key()).to_hex(),
+                    faucet_id_prefix: nft.faucet_id_prefix().to_hex(),
+                    asset: String::new(),
+                });
+            },
+        }
+    }
+
+    JsFuture::from(idxdb_apply_vault_delta(db_id, account_id_str, nonce_str, changed_assets))
+        .await?;
+
+    Ok(())
 }
 
 pub async fn update_account(db_id: &str, new_account_state: &Account) -> Result<(), JsValue> {
