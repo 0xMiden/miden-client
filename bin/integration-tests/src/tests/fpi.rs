@@ -91,9 +91,6 @@ pub async fn test_fpi_execute_program(client_config: ClientConfig) -> Result<()>
     let tx_script = client.code_builder().compile_tx_script(&code)?;
     client.sync_state().await?;
 
-    // Wait for a couple of blocks so that the account gets committed
-    wait_for_blocks(&mut client, 2).await;
-
     let map_slot_name = StorageSlotName::new(MAP_SLOT_NAME).expect("slot name should be valid");
     let storage_requirements =
         AccountStorageRequirements::new([(map_slot_name, &[StorageMapKey::from(MAP_KEY)])]);
@@ -220,9 +217,6 @@ pub async fn test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
     let tx_script = client.code_builder().compile_tx_script(&tx_script)?;
     client.sync_state().await?;
 
-    // Wait for a couple of blocks so that the account gets committed
-    wait_for_blocks(&mut client, 2).await;
-
     // Create transaction request with FPI
     let builder = TransactionRequestBuilder::new().custom_script(tx_script);
 
@@ -324,9 +318,6 @@ async fn standard_fpi(
 
     let tx_script = client.code_builder().compile_tx_script(&tx_script)?;
     client.sync_state().await?;
-
-    // Wait for a couple of blocks so that the account gets committed
-    wait_for_blocks(&mut client, 2).await;
 
     // Before the transaction there are no cached foreign accounts
     let foreign_accounts =
