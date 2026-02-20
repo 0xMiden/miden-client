@@ -556,6 +556,29 @@ Returns the associated [`AuthSecretKey`] if found, or an error if not found.
 
 ***
 
+### getAccountByKeyCommitment()
+
+> **getAccountByKeyCommitment**(`pub_key_commitment`): `Promise`\<[`Account`](Account.md)\>
+
+Retrieves the full account data for the account associated with the given public key
+commitment, returning `null` if no account is found.
+
+#### Parameters
+
+##### pub\_key\_commitment
+
+[`Word`](Word.md)
+
+#### Returns
+
+`Promise`\<[`Account`](Account.md)\>
+
+#### Inherited from
+
+[`WebClient`](WebClient.md).[`getAccountByKeyCommitment`](WebClient.md#getaccountbykeycommitment)
+
+***
+
 ### getAccountCode()
 
 > **getAccountCode**(`account_id`): `Promise`\<[`AccountCode`](AccountCode.md)\>

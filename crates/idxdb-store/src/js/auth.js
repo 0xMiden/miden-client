@@ -92,3 +92,17 @@ export async function removeAllMappingsForKey(dbId, pubKeyCommitmentHex) {
         logWebStoreError(error, `Error removing all mappings for key: ${pubKeyCommitmentHex}`);
     }
 }
+export async function getAccountIdByKeyCommitment(dbId, pubKeyCommitmentHex) {
+    try {
+        const db = getDatabase(dbId);
+        const mapping = await db.accountKeyMappings
+            .where("pubKeyCommitmentHex")
+            .equals(pubKeyCommitmentHex)
+            .first();
+        return mapping?.accountIdHex ?? null;
+    }
+    catch (error) {
+        logWebStoreError(error, `Error fetching account by public key commitment: ${pubKeyCommitmentHex}`);
+        return null;
+    }
+}

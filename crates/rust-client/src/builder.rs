@@ -424,6 +424,13 @@ where
             rpc_api.set_genesis_commitment(genesis.commitment()).await?;
         }
 
+        // Set the RPC client with persisted limits if available.
+        if let Some(limits) = store.get_rpc_limits().await? {
+            rpc_api.set_rpc_limits(limits).await;
+        } else if let Ok(limits) = rpc_api.get_rpc_limits().await {
+            store.set_rpc_limits(limits).await?;
+        }
+
         // Initialize note transport: prefer explicit client, fall back to config (tonic only)
         #[cfg(feature = "tonic")]
         if self.note_transport_api.is_none()

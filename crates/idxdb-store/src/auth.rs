@@ -50,4 +50,10 @@ extern "C" {
         db_id: &str,
         pub_key_commitment_hex: String,
     ) -> js_sys::Promise;
+
+    #[wasm_bindgen(js_name = getAccountIdByKeyCommitment)]
+    pub fn idxdb_get_account_id_by_key_commitment(
+        db_id: &str,
+        pub_key_commitment_hex: String,
+    ) -> js_sys::Promise;
 }

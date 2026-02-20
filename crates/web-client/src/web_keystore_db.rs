@@ -4,6 +4,7 @@ use alloc::vec::Vec;
 
 use idxdb_store::auth::{
     idxdb_get_account_auth_by_pub_key_commitment,
+    idxdb_get_account_id_by_key_commitment,
     idxdb_get_key_commitments_by_account_id,
     idxdb_insert_account_auth,
     idxdb_insert_account_key_mapping,
@@ -88,4 +89,13 @@ pub(crate) async fn remove_all_mappings_for_key(
     let promise = idxdb_remove_all_mappings_for_key(db_id, pub_key_commitment_hex);
     JsFuture::from(promise).await?;
     Ok(())
+}
+
+pub(crate) async fn get_account_id_by_key_commitment(
+    db_id: &str,
+    pub_key_commitment_hex: String,
+) -> Result<Option<String>, JsValue> {
+    let promise = idxdb_get_account_id_by_key_commitment(db_id, pub_key_commitment_hex);
+    let js_account_id = JsFuture::from(promise).await?;
+    Ok(js_account_id.as_string())
 }
