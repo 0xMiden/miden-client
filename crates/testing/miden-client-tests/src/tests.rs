@@ -24,7 +24,7 @@ use miden_client::auth::{
     RPO_FALCON_SCHEME_ID,
 };
 use miden_client::builder::ClientBuilder;
-use miden_client::keystore::FilesystemKeyStore;
+use miden_client::keystore::{FilesystemKeyStore, Keystore};
 use miden_client::note::{BlockNumber, NoteId};
 use miden_client::rpc::{NodeRpcClient, RpcLimits};
 use miden_client::store::input_note_states::ConsumedAuthenticatedLocalNoteState;
@@ -2107,7 +2107,7 @@ async fn empty_storage_map() {
 
     let account_id = account.id();
 
-    keystore.add_key(&key_pair).unwrap();
+    keystore.add_key(&key_pair, account_id).await.unwrap();
 
     client.add_account(&account, false).await.unwrap();
 
@@ -2214,7 +2214,7 @@ async fn storage_and_vault_proofs() {
         .build()
         .unwrap();
 
-    keystore.add_key(&key_pair).unwrap();
+    keystore.add_key(&key_pair, account.id()).await.unwrap();
 
     client
         .test_store()
@@ -2450,11 +2450,11 @@ async fn add_note_tag_fails_if_note_tag_limit_is_exceeded() {
 
     // add note tags until the limit is exceeded
     for i in 0..note_tags_limit {
-        client.add_note_tag(NoteTag::from(u32::try_from(i).unwrap())).await.unwrap();
+        client.add_note_tag(NoteTag::from(i)).await.unwrap();
     }
 
     // try to add a note tag
-    let tag = NoteTag::from(u32::try_from(note_tags_limit).unwrap());
+    let tag = NoteTag::from(note_tags_limit);
     let result = client.add_note_tag(tag).await;
 
     assert!(matches!(result, Err(ClientError::NoteTagsLimitExceeded(_))));
@@ -2470,7 +2470,7 @@ async fn add_account_fails_if_accounts_limit_is_exceeded() {
         client
             .add_account(
                 &Account::mock(
-                    (i << 8) as u128,
+                    (i << 8).into(),
                     AuthFalcon512Rpo::new(PublicKeyCommitment::from(EMPTY_WORD)),
                 ),
                 false,
@@ -2483,7 +2483,7 @@ async fn add_account_fails_if_accounts_limit_is_exceeded() {
     let result = client
         .add_account(
             &Account::mock(
-                (RpcLimits::default().account_ids_limit << 8) as u128,
+                (RpcLimits::default().account_ids_limit << 8).into(),
                 AuthFalcon512Rpo::new(PublicKeyCommitment::from(EMPTY_WORD)),
             ),
             false,
@@ -2753,7 +2753,7 @@ async fn insert_new_wallet(
         .build()
         .unwrap();
 
-    keystore.add_key(&key_pair).unwrap();
+    keystore.add_key(&key_pair, account.id()).await.unwrap();
 
     client.add_account(&account, false).await?;
 
@@ -2779,7 +2779,7 @@ async fn insert_new_ecdsa_wallet(
         .build()
         .unwrap();
 
-    keystore.add_key(&key_pair).unwrap();
+    keystore.add_key(&key_pair, account.id()).await.unwrap();
 
     client.add_account(&account, false).await?;
 
@@ -2810,7 +2810,7 @@ async fn insert_new_fungible_faucet(
         .build()
         .unwrap();
 
-    keystore.add_key(&key_pair).unwrap();
+    keystore.add_key(&key_pair, account.id()).await.unwrap();
 
     client.add_account(&account, false).await?;
     Ok(account)
@@ -2843,7 +2843,7 @@ async fn insert_new_ecdsa_fungible_faucet(
         .build()
         .unwrap();
 
-    keystore.add_key(&key_pair).unwrap();
+    keystore.add_key(&key_pair, account.id()).await.unwrap();
 
     client.add_account(&account, false).await?;
     Ok(account)
@@ -2913,7 +2913,7 @@ async fn storage_and_vault_proofs_ecdsa() {
         .build()
         .unwrap();
 
-    keystore.add_key(&key_pair).unwrap();
+    keystore.add_key(&key_pair, account.id()).await.unwrap();
 
     client.add_account(&account, false).await.unwrap();
 

@@ -137,44 +137,6 @@ const callbackProxies = {
 
 // Define a mapping from method names to handler functions.
 const methodHandlers = {
-  [MethodName.NEW_WALLET]: async (args) => {
-    const wasm = await getWasmOrThrow();
-    const [walletStorageModeStr, mutable, authSchemeId, seed] = args;
-    const walletStorageMode =
-      wasm.AccountStorageMode.tryFromStr(walletStorageModeStr);
-    const wallet = await wasmWebClient.newWallet(
-      walletStorageMode,
-      mutable,
-      authSchemeId,
-      seed
-    );
-    const serializedWallet = wallet.serialize();
-    return serializedWallet.buffer;
-  },
-  [MethodName.NEW_FAUCET]: async (args) => {
-    const wasm = await getWasmOrThrow();
-    const [
-      faucetStorageModeStr,
-      nonFungible,
-      tokenSymbol,
-      decimals,
-      maxSupplyStr,
-      authSchemeId,
-    ] = args;
-    const faucetStorageMode =
-      wasm.AccountStorageMode.tryFromStr(faucetStorageModeStr);
-    const maxSupply = BigInt(maxSupplyStr);
-    const faucet = await wasmWebClient.newFaucet(
-      faucetStorageMode,
-      nonFungible,
-      tokenSymbol,
-      decimals,
-      maxSupply,
-      authSchemeId
-    );
-    const serializedFaucet = faucet.serialize();
-    return serializedFaucet.buffer;
-  },
   [MethodName.SYNC_STATE]: async () => {
     // Call the internal WASM method (sync lock is handled at the JS wrapper level)
     const syncSummary = await wasmWebClient.syncStateImpl();

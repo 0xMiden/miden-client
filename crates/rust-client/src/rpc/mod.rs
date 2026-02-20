@@ -67,6 +67,7 @@ mod errors;
 pub use errors::*;
 
 mod endpoint;
+pub(crate) use domain::limits::RPC_LIMITS_STORE_SETTING;
 pub use domain::limits::RpcLimits;
 pub use domain::status::RpcStatusInfo;
 pub use endpoint::Endpoint;
@@ -213,7 +214,7 @@ pub trait NodeRpcClient: Send + Sync {
     /// The `known_account_code` parameter is the known code commitment
     /// to prevent unnecessary data fetching. Returns the block number and the FPI account data. If
     /// the tracked account is not found in the node, the method will return an error.
-    async fn get_account(
+    async fn get_account_proof(
         &self,
         foreign_account: ForeignAccount,
         account_state: AccountStateAt,
@@ -386,9 +387,11 @@ pub trait NodeRpcClient: Send + Sync {
 
     /// Fetches the RPC limits configured on the node.
     ///
-    /// Returns the limits that define the maximum number of items that can be sent in a single
-    /// RPC request. If the request fails for any reason, default values are returned.
-    async fn get_rpc_limits(&self) -> RpcLimits;
+    /// Implementations may cache the result internally to avoid repeated network calls.
+    async fn get_rpc_limits(&self) -> Result<RpcLimits, RpcError>;
+
+    /// Sets the RPC limits internally to be used by the client.
+    async fn set_rpc_limits(&self, limits: RpcLimits);
 
     /// Fetches the RPC status without requiring Accept header validation.
     ///
@@ -402,7 +405,7 @@ pub trait NodeRpcClient: Send + Sync {
 //
 /// RPC methods for the Miden protocol.
 #[derive(Debug, Clone, Copy)]
-pub enum NodeRpcClientEndpoint {
+pub enum RpcEndpoint {
     Status,
     CheckNullifiers,
     SyncNullifiers,
@@ -420,28 +423,51 @@ pub enum NodeRpcClientEndpoint {
     GetLimits,
 }
 
-impl fmt::Display for NodeRpcClientEndpoint {
+impl RpcEndpoint {
+    /// Returns the endpoint name as used in the RPC service definition.
+    pub fn proto_name(&self) -> &'static str {
+        match self {
+            RpcEndpoint::Status => "Status",
+            RpcEndpoint::CheckNullifiers => "CheckNullifiers",
+            RpcEndpoint::SyncNullifiers => "SyncNullifiers",
+            RpcEndpoint::GetAccount => "GetAccount",
+            RpcEndpoint::GetBlockByNumber => "GetBlockByNumber",
+            RpcEndpoint::GetBlockHeaderByNumber => "GetBlockHeaderByNumber",
+            RpcEndpoint::GetNotesById => "GetNotesById",
+            RpcEndpoint::SyncState => "SyncState",
+            RpcEndpoint::SubmitProvenTx => "SubmitProvenTransaction",
+            RpcEndpoint::SyncNotes => "SyncNotes",
+            RpcEndpoint::GetNoteScriptByRoot => "GetNoteScriptByRoot",
+            RpcEndpoint::SyncStorageMaps => "SyncStorageMaps",
+            RpcEndpoint::SyncAccountVault => "SyncAccountVault",
+            RpcEndpoint::SyncTransactions => "SyncTransactions",
+            RpcEndpoint::GetLimits => "GetLimits",
+        }
+    }
+}
+
+impl fmt::Display for RpcEndpoint {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            NodeRpcClientEndpoint::Status => write!(f, "status"),
-            NodeRpcClientEndpoint::CheckNullifiers => write!(f, "check_nullifiers"),
-            NodeRpcClientEndpoint::SyncNullifiers => {
+            RpcEndpoint::Status => write!(f, "status"),
+            RpcEndpoint::CheckNullifiers => write!(f, "check_nullifiers"),
+            RpcEndpoint::SyncNullifiers => {
                 write!(f, "sync_nullifiers")
             },
-            NodeRpcClientEndpoint::GetAccount => write!(f, "get_account"),
-            NodeRpcClientEndpoint::GetBlockByNumber => write!(f, "get_block_by_number"),
-            NodeRpcClientEndpoint::GetBlockHeaderByNumber => {
+            RpcEndpoint::GetAccount => write!(f, "get_account_proof"),
+            RpcEndpoint::GetBlockByNumber => write!(f, "get_block_by_number"),
+            RpcEndpoint::GetBlockHeaderByNumber => {
                 write!(f, "get_block_header_by_number")
             },
-            NodeRpcClientEndpoint::GetNotesById => write!(f, "get_notes_by_id"),
-            NodeRpcClientEndpoint::SyncState => write!(f, "sync_state"),
-            NodeRpcClientEndpoint::SubmitProvenTx => write!(f, "submit_proven_transaction"),
-            NodeRpcClientEndpoint::SyncNotes => write!(f, "sync_notes"),
-            NodeRpcClientEndpoint::GetNoteScriptByRoot => write!(f, "get_note_script_by_root"),
-            NodeRpcClientEndpoint::SyncStorageMaps => write!(f, "sync_storage_maps"),
-            NodeRpcClientEndpoint::SyncAccountVault => write!(f, "sync_account_vault"),
-            NodeRpcClientEndpoint::SyncTransactions => write!(f, "sync_transactions"),
-            NodeRpcClientEndpoint::GetLimits => write!(f, "get_limits"),
+            RpcEndpoint::GetNotesById => write!(f, "get_notes_by_id"),
+            RpcEndpoint::SyncState => write!(f, "sync_state"),
+            RpcEndpoint::SubmitProvenTx => write!(f, "submit_proven_transaction"),
+            RpcEndpoint::SyncNotes => write!(f, "sync_notes"),
+            RpcEndpoint::GetNoteScriptByRoot => write!(f, "get_note_script_by_root"),
+            RpcEndpoint::SyncStorageMaps => write!(f, "sync_storage_maps"),
+            RpcEndpoint::SyncAccountVault => write!(f, "sync_account_vault"),
+            RpcEndpoint::SyncTransactions => write!(f, "sync_transactions"),
+            RpcEndpoint::GetLimits => write!(f, "get_limits"),
         }
     }
 }

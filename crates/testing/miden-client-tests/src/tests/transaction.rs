@@ -2,6 +2,7 @@ use alloc::boxed::Box;
 use alloc::sync::Arc;
 
 use miden_client::auth::{AuthFalcon512Rpo, AuthSecretKey, RPO_FALCON_SCHEME_ID};
+use miden_client::keystore::Keystore;
 use miden_client::transaction::{
     ProvenTransaction,
     TransactionExecutorError,
@@ -47,7 +48,7 @@ async fn transaction_creates_two_notes() {
         .build_existing()
         .unwrap();
 
-    keystore.add_key(&secret_key).unwrap();
+    keystore.add_key(&secret_key, account.id()).await.unwrap();
 
     client.add_account(&account, false).await.unwrap();
     client.sync_state().await.unwrap();

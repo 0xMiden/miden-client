@@ -67,7 +67,6 @@ use miden_tx::auth::TransactionAuthenticator;
 use miden_tx::utils::{Deserializable, DeserializationError, Serializable};
 use tracing::{debug, info};
 
-use crate::note::NoteScreener;
 use crate::store::{NoteFilter, TransactionFilter};
 use crate::{Client, ClientError};
 mod block_header;
@@ -130,7 +129,7 @@ where
         }
 
         // Build sync state components
-        let note_screener = NoteScreener::new(self.store.clone(), self.authenticator.clone());
+        let note_screener = self.note_screener();
         let state_sync =
             StateSync::new(self.rpc_api.clone(), Arc::new(note_screener), self.tx_discard_delta);
         let mut current_partial_mmr = self.store.get_current_partial_mmr().await?;

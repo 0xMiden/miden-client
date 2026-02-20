@@ -1,4 +1,5 @@
 use miden_client::account::{AccountFile as NativeAccountFile, AccountId as NativeAccountId};
+use miden_client::keystore::Keystore;
 use wasm_bindgen::prelude::*;
 
 use crate::helpers::generate_wallet;
@@ -31,19 +32,8 @@ impl WebClient {
                 .map_err(|err| js_error_with_context(err, "failed to import account"))?;
 
             for key in &auth_secret_keys {
-                keystore.add_secret_key(key).await.map_err(|err| err.to_string())?;
+                keystore.add_key(key, account.id()).await.map_err(|err| err.to_string())?;
             }
-
-            let pub_keys: Vec<_> = auth_secret_keys
-                .iter()
-                .map(miden_client::auth::AuthSecretKey::public_key)
-                .collect();
-            client
-                .register_account_public_key_commitments(&account.id(), &pub_keys)
-                .await
-                .map_err(|err| {
-                    js_error_with_context(err, "failed to map account to public keys")
-                })?;
 
             Ok(JsValue::from_str(&format!("Imported account with ID: {account_id}")))
         } else {
@@ -73,14 +63,9 @@ impl WebClient {
 
         keystore
             .expect("KeyStore should be initialized")
-            .add_secret_key(&key_pair)
+            .add_key(&key_pair, native_id)
             .await
             .map_err(|err| err.to_string())?;
-
-        client
-            .register_account_public_key_commitments(&native_id, &[key_pair.public_key()])
-            .await
-            .map_err(|err| js_error_with_context(err, "failed to map account to public keys"))?;
 
         Ok(Account::from(generated_acct))
     }

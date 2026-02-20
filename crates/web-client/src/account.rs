@@ -1,4 +1,5 @@
 use miden_client::Word as NativeWord;
+use miden_client::keystore::Keystore;
 use wasm_bindgen::prelude::*;
 
 use crate::models::account::Account;
@@ -137,7 +138,7 @@ impl WebClient {
         let keystore = self.keystore.clone().expect("Keystore not initialized");
 
         let auth_secret_key = keystore
-            .get_secret_key((*pub_key_commitment.as_native()).into())
+            .get_key((*pub_key_commitment.as_native()).into())
             .await
             .map_err(|err| js_error_with_context(err, "failed to get auth key for account"))?
             .ok_or(JsValue::from_str("Auth not found for account"))?;
@@ -154,26 +155,23 @@ impl WebClient {
         &mut self,
         account_id: &AccountId,
     ) -> Result<Vec<Word>, JsValue> {
-        if let Some(client) = self.get_mut_inner() {
-            Ok(client
-                .get_account_public_key_commitments(account_id.as_native())
-                .await
-                .map_err(|err| {
-                    js_error_with_context(
-                        err,
-                        &format!(
-                            "failed to fetch public key commitments for account: {}",
-                            account_id.as_native()
-                        ),
-                    )
-                })?
-                .into_iter()
-                .map(NativeWord::from)
-                .map(Into::into)
-                .collect())
-        } else {
-            Err(JsValue::from_str("Client not initialized"))
-        }
+        let keystore = self.keystore.clone().expect("Keystore not initialized");
+        Ok(keystore
+            .get_account_key_commitments(account_id.as_native())
+            .await
+            .map_err(|err| {
+                js_error_with_context(
+                    err,
+                    &format!(
+                        "failed to fetch public key commitments for account: {}",
+                        account_id.as_native()
+                    ),
+                )
+            })?
+            .into_iter()
+            .map(NativeWord::from)
+            .map(Into::into)
+            .collect())
     }
 
     #[wasm_bindgen(js_name = "insertAccountAddress")]
@@ -206,6 +204,29 @@ impl WebClient {
             Ok(())
         } else {
             Err(JsValue::from_str("Client not initialized"))
+        }
+    }
+
+    /// Retrieves the full account data for the account associated with the given public key
+    /// commitment, returning `null` if no account is found.
+    #[wasm_bindgen(js_name = "getAccountByKeyCommitment")]
+    pub async fn get_account_by_key_commitment(
+        &mut self,
+        pub_key_commitment: &Word,
+    ) -> Result<Option<Account>, JsValue> {
+        let keystore = self
+            .keystore
+            .clone()
+            .ok_or_else(|| JsValue::from_str("Keystore not initialized"))?;
+
+        let account_id = keystore
+            .get_account_id_by_key_commitment((*pub_key_commitment.as_native()).into())
+            .await
+            .map_err(|err| js_error_with_context(err, "failed to get account by key commitment"))?;
+
+        match account_id {
+            Some(id) => self.get_account(&id.into()).await,
+            None => Ok(None),
         }
     }
 }

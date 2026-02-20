@@ -2,8 +2,8 @@ use std::fs;
 
 use miden_client::Client;
 use miden_client::account::AccountId;
-use miden_client::auth::TransactionAuthenticator;
 use miden_client::block::BlockNumber;
+use miden_client::keystore::Keystore;
 use miden_client::rpc::{GrpcClient, RpcStatusInfo};
 use miden_client::store::NoteFilter;
 
@@ -11,13 +11,17 @@ use super::config::CliConfig;
 use crate::commands::account::DEFAULT_ACCOUNT_ID_KEY;
 use crate::errors::CliError;
 
-pub async fn print_client_info<AUTH: TransactionAuthenticator + Sync + 'static>(
+pub async fn print_client_info<AUTH: Keystore + Sync + 'static>(
     client: &Client<AUTH>,
     show_rpc_status: bool,
 ) -> Result<(), CliError> {
     let config = CliConfig::from_system()?;
 
     println!("Client version: {}", env!("CARGO_PKG_VERSION"));
+
+    if let Some(config_dir) = &config.config_dir {
+        println!("Config directory: {config_dir}");
+    }
 
     // Get and display local genesis commitment
     if let Ok(Some((genesis_header, _))) =
@@ -38,7 +42,7 @@ pub async fn print_client_info<AUTH: TransactionAuthenticator + Sync + 'static>(
 
 // HELPERS
 // ================================================================================================
-async fn print_client_stats<AUTH: TransactionAuthenticator + Sync + 'static>(
+async fn print_client_stats<AUTH: Keystore + Sync + 'static>(
     client: &Client<AUTH>,
 ) -> Result<(), CliError> {
     println!("Block number: {}", client.get_sync_height().await?);

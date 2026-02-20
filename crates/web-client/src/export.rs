@@ -1,5 +1,6 @@
 use miden_client::Word;
 use miden_client::account::AccountFile as NativeAccountFile;
+use miden_client::keystore::Keystore;
 use miden_client::note::NoteId;
 use miden_client::store::NoteExportType;
 use wasm_bindgen::prelude::*;
@@ -99,32 +100,13 @@ impl WebClient {
                     ))
                 })?;
 
-            let mut key_pairs = vec![];
-
-            let commitments = client
-                .get_account_public_key_commitments(account_id.as_native())
-                .await
-                .map_err(|err| {
+            let key_pairs =
+                keystore.get_keys_for_account(account_id.as_native()).await.map_err(|err| {
                     js_error_with_context(
                         err,
-                        &format!(
-                            "failed to get public keys for account: {}",
-                            &account_id.to_string()
-                        ),
+                        &format!("failed to get keys for account: {}", &account_id.to_string()),
                     )
                 })?;
-
-            for commitment in commitments {
-                key_pairs.push(
-                    keystore
-                        .get_secret_key(commitment)
-                        .await
-                        .map_err(|err| {
-                            js_error_with_context(err, "failed to get public key for account")
-                        })?
-                        .ok_or(JsValue::from_str("Auth not found for account"))?,
-                );
-            }
 
             let account_data = NativeAccountFile::new(account, key_pairs);
 

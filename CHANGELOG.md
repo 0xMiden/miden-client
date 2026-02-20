@@ -4,15 +4,22 @@
 
 ### Enhancements
 
-* Updated the `GrpcClient` to fetch the RPC limits from the node ([#1724](https://github.com/0xMiden/miden-client/pull/1724)).
+* Updated the `GrpcClient` to fetch the RPC limits from the node ([#1724](https://github.com/0xMiden/miden-client/pull/1724)) ([#1737](https://github.com/0xMiden/miden-client/pull/1737)).
 * Added typed error parsing for node RPC endpoints, enabling programmatic error handling instead of string parsing ([#1734](https://github.com/0xMiden/miden-client/pull/1734)).
 * Added `--rpc-status` flag to `miden-client info` command to display RPC node status information including node version, genesis commitment, store status, and block producer status; also added `get_status_unversioned` to `NodeRpcClient` trait ([#1742](https://github.com/0xMiden/miden-client/pull/1742)).
 * Prevent a potential unwrap panic in `insert_storage_map_nodes_for_map` ([#1750](https://github.com/0xMiden/miden-client/pull/1750)).
 * Changed the `StateSync::sync_state()` to take a reference of the MMR ([#1764](https://github.com/0xMiden/miden-client/pull/1764)).
+* Remove unnecessary clones of `NoteInclusionProof` and `NoteMetadata` in note import and sync paths ([#1787](https://github.com/0xMiden/miden-client/pull/1787)).
+* [FEATURE][web] WebClient now automatically syncs state before account creation when the client has never been synced, preventing a slow full-chain scan on the next sync (#1704).
+* Added `NoteScreener` constructor via `Client::note_screener()` and improved note consumability checks with batch note screening support ([#1803](https://github.com/0xMiden/miden-client/pull/1803)).
+* [FEATURE][web] Added `getAccountProof` method to the web client's `RpcClient`, allowing lightweight retrieval of account header, storage slot values, and code via a single RPC call ([#1794](https://github.com/0xMiden/miden-client/pull/1794)).
+* Added `getAccountByKeyCommitment` method to `WebClient` for retrieving accounts by public key commitment ([#1729](https://github.com/0xMiden/miden-client/pull/1729)).
 
 ### Changes
 
 * [BREAKING] Added a `AccountReader` accessible through `Client::account_reader` to read account data without needing to load the whole `Account` ([#1713](https://github.com/0xMiden/miden-client/pull/1713), [#1716](https://github.com/0xMiden/miden-client/pull/1716)).
+* [BREAKING] Added `Keystore` trait that extends `TransactionAuthenticator` to provide a unified interface for key storage, retrieval, and account-key mapping, enabling custom keystore implementations. `Keystore` replaces `TransactionAuthenticator` in `Client` and provides a way to map from account IDs to public keys (registering them separately is not required anymore). ([#1726](https://github.com/0xMiden/miden-client/pull/1726)).
+* Refactored integration tests binary with subprocess-per-test execution; added automatic retry of failed tests (`--retry-count`), captured stdout/stderr per test, and tracing support via `RUST_LOG` ([#1743](https://github.com/0xMiden/miden-client/pull/1743)).
 * Added implementation for the `get_public_key` method on the `FilesystemKeystore` and `WebKeystore` ([#1731](https://github.com/0xMiden/miden-client/pull/1731)).
 * [BREAKING] Made the nullifiers sync optional on the `StateSync` component ([#1756](https://github.com/0xMiden/miden-client/pull/1756)).
 * [BREAKING] Added `SyncStateInputs` to bundle the parameters needed to perform the sync state ([#1778](https://github.com/0xMiden/miden-client/pull/1778)).
@@ -56,6 +63,7 @@
 * Updated `SqliteStore`: replaced `MerkleStore` with `SmtForest` and introduced `AccountSmtForest`; simplified queries ([#1526](https://github.com/0xMiden/miden-client/pull/1526), [#1663](https://github.com/0xMiden/miden-client/pull/1663)).
 * Added filter to store query to improve how the MMR is built ([#1681](https://github.com/0xMiden/miden-client/pull/1681)).
 * [BREAKING] Required the client RNG to be `Send + Sync` (via the `ClientFeltRng` marker and `ClientRngBox` alias) so `Client` can be `Send + Sync` ([#1677](https://github.com/0xMiden/miden-client/issues/1677)).
+* [BREAKING] Refactored `FilesystemKeyStore` to implement the new `Keystore` trait, enabling custom keystore implementations ([#1726](https://github.com/0xMiden/miden-client/pull/1726)).
 * Fixed a race condition in `pruneIrrelevantBlocks` that could delete the current block header when multiple tabs share IndexedDB, causing sync to panic ([#1650](https://github.com/0xMiden/miden-client/pull/1650)).
 * Fixed a race condition where concurrent sync operations could cause sync height to go backwards, leading to block header deletion and subsequent panics ([#1650](https://github.com/0xMiden/miden-client/pull/1650)).
 * Changed `get_current_partial_mmr` to return a `StoreError::BlockHeaderNotFound` error instead of panicking when the block header is missing ([#1650](https://github.com/0xMiden/miden-client/pull/1650)).
@@ -64,6 +72,7 @@
 * [BREAKING] Upgraded to protocol 0.13: exposed and aligned note-related structs to WebClient; `NoteTag` and `NoteAttachment` APIs updated renamed `NoteTag.fromAccountId` to `withAccountTarget`, added `withCustomAccountTarget`; added `NoteAttachmentScheme` wrapper and content accessors (`asWord`, `asArray`) to `NoteAttachment`; removed `NoteExecutionMode` ([#1685](https://github.com/0xMiden/miden-client/pull/1685)).
 * Added sync lock to coordinate concurrent `syncState()` calls in the WebClient using the Web Locks API, with coalescing behavior where concurrent callers share results from an in-progress sync ([#1690](https://github.com/0xMiden/miden-client/pull/1690)).
 * [BREAKING] Removed the `payback_note_type` field from the swap command ([#1700](https://github.com/0xMiden/miden-client/pull/1700)).
+* Added `miden-bench` tool to benchmark client operations ([#1721](https://github.com/0xMiden/miden-client/pull/1721)).
 
 ## 0.12.6 (2026-01-08)
 
