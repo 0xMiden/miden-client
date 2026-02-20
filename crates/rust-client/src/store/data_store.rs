@@ -235,10 +235,8 @@ impl DataStore for ClientDataStore {
             .into_values()
             .next();
 
-        let foreign_account = ForeignAccount::Public(
-            foreign_account_id,
-            AccountStorageRequirements::default(),
-        );
+        let foreign_account =
+            ForeignAccount::Public(foreign_account_id, AccountStorageRequirements::default());
 
         let (_, account_proof) = self
             .rpc_api
@@ -249,17 +247,11 @@ impl DataStore for ClientDataStore {
             )
             .await
             .map_err(|err| {
-                DataStoreError::other_with_source(
-                    "failed to fetch foreign account via RPC",
-                    err,
-                )
+                DataStoreError::other_with_source("failed to fetch foreign account via RPC", err)
             })?;
 
         let account_inputs = account_proof_into_inputs(account_proof).map_err(|err| {
-            DataStoreError::other_with_source(
-                "failed to convert account proof to inputs",
-                err,
-            )
+            DataStoreError::other_with_source("failed to convert account proof to inputs", err)
         })?;
 
         // Load the account code into the MAST store so the executor can resolve
@@ -273,7 +265,9 @@ impl DataStore for ClientDataStore {
             .await;
 
         // Cache the result for subsequent calls within the same transaction.
-        self.foreign_account_inputs.write().insert(foreign_account_id, account_inputs.clone());
+        self.foreign_account_inputs
+            .write()
+            .insert(foreign_account_id, account_inputs.clone());
 
         Ok(account_inputs)
     }

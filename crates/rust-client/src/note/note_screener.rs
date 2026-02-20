@@ -67,7 +67,12 @@ where
         authenticator: Option<Arc<AUTH>>,
         rpc_api: Arc<dyn NodeRpcClient>,
     ) -> Self {
-        Self { store, authenticator, tx_args: None, rpc_api }
+        Self {
+            store,
+            authenticator,
+            tx_args: None,
+            rpc_api,
+        }
     }
 
     /// Sets the transaction arguments to use when checking note consumability.
