@@ -21,6 +21,7 @@ use crate::rpc::domain::account::{
     AccountProof,
     AccountStorageDetails,
     AccountStorageMapDetails,
+    AccountStorageRequirements,
     AccountUpdateSummary,
     AccountVaultDetails,
     FetchedAccount,
@@ -38,7 +39,6 @@ use crate::rpc::generated::note::NoteSyncRecord;
 use crate::rpc::generated::rpc::{BlockRange, SyncStateResponse};
 use crate::rpc::generated::transaction::TransactionSummary;
 use crate::rpc::{AccountStateAt, NodeRpcClient, RpcError, RpcStatusInfo};
-use crate::transaction::ForeignAccount;
 
 pub type MockClient<AUTH> = Client<AUTH>;
 
@@ -557,7 +557,8 @@ impl NodeRpcClient for MockRpcApi {
     /// is ignored in the mock implementation and the latest account code is always returned.
     async fn get_account_proof(
         &self,
-        foreign_account: ForeignAccount,
+        account_id: AccountId,
+        account_storage_requirements: AccountStorageRequirements,
         account_state: AccountStateAt,
         _known_account_code: Option<AccountCode>,
     ) -> Result<(BlockNumber, AccountProof), RpcError> {
@@ -568,58 +569,57 @@ impl NodeRpcClient for MockRpcApi {
             AccountStateAt::ChainTip => mock_chain.latest_block_header().block_num(),
         };
 
-        let headers = match &foreign_account {
-            ForeignAccount::Public(account_id, account_storage_requirements) => {
-                let account = mock_chain.committed_account(*account_id).unwrap();
+        let headers = if account_id.is_public() {
+            let account = mock_chain.committed_account(account_id).unwrap();
 
-                let mut map_details = vec![];
-                for slot_name in account_storage_requirements.inner().keys() {
-                    if let Some(StorageSlotContent::Map(storage_map)) =
-                        account.storage().get(slot_name).map(StorageSlot::content)
-                    {
-                        let entries: Vec<StorageMapEntry> = storage_map
-                            .entries()
-                            .map(|(key, value)| StorageMapEntry { key: *key, value: *value })
-                            .collect();
+            let mut map_details = vec![];
+            for slot_name in account_storage_requirements.inner().keys() {
+                if let Some(StorageSlotContent::Map(storage_map)) =
+                    account.storage().get(slot_name).map(StorageSlot::content)
+                {
+                    let entries: Vec<StorageMapEntry> = storage_map
+                        .entries()
+                        .map(|(key, value)| StorageMapEntry { key: *key, value: *value })
+                        .collect();
 
-                        let too_many_entries = entries.len() > 1000;
-                        let account_storage_map_detail = AccountStorageMapDetails {
-                            slot_name: slot_name.clone(),
-                            too_many_entries,
-                            entries: StorageMapEntries::AllEntries(entries),
-                        };
+                    let too_many_entries = entries.len() > 1000;
+                    let account_storage_map_detail = AccountStorageMapDetails {
+                        slot_name: slot_name.clone(),
+                        too_many_entries,
+                        entries: StorageMapEntries::AllEntries(entries),
+                    };
 
-                        map_details.push(account_storage_map_detail);
-                    } else {
-                        panic!("Storage slot {slot_name} is not a map");
-                    }
+                    map_details.push(account_storage_map_detail);
+                } else {
+                    panic!("Storage slot {slot_name} is not a map");
                 }
+            }
 
-                let storage_details = AccountStorageDetails {
-                    header: account.storage().to_header(),
-                    map_details,
-                };
+            let storage_details = AccountStorageDetails {
+                header: account.storage().to_header(),
+                map_details,
+            };
 
-                let mut assets = vec![];
-                for asset in account.vault().assets() {
-                    assets.push(asset);
-                }
-                let vault_details = AccountVaultDetails {
-                    too_many_assets: assets.len() > 1000,
-                    assets,
-                };
+            let mut assets = vec![];
+            for asset in account.vault().assets() {
+                assets.push(asset);
+            }
+            let vault_details = AccountVaultDetails {
+                too_many_assets: assets.len() > 1000,
+                assets,
+            };
 
-                Some(AccountDetails {
-                    header: account.into(),
-                    storage_details,
-                    code: account.code().clone(),
-                    vault_details,
-                })
-            },
-            ForeignAccount::Private(_) => None,
+            Some(AccountDetails {
+                header: account.into(),
+                storage_details,
+                code: account.code().clone(),
+                vault_details,
+            })
+        } else {
+            None
         };
 
-        let witness = mock_chain.account_tree().open(foreign_account.account_id());
+        let witness = mock_chain.account_tree().open(account_id);
 
         let proof = AccountProof::new(witness, headers).unwrap();
 

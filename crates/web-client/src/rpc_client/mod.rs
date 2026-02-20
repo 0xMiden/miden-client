@@ -11,7 +11,6 @@ use miden_client::note::{NoteId as NativeNoteId, Nullifier};
 use miden_client::rpc::domain::account::AccountStorageRequirements as NativeAccountStorageRequirements;
 use miden_client::rpc::domain::note::FetchedNote as NativeFetchedNote;
 use miden_client::rpc::{AccountStateAt, GrpcClient, NodeRpcClient};
-use miden_client::transaction::ForeignAccount as NativeForeignAccount;
 use note::FetchedNote;
 use wasm_bindgen::prelude::*;
 
@@ -134,11 +133,14 @@ impl RpcClient {
         Ok(fetched.into())
     }
 
-    /// Fetches account headers from the node for a public account.
+    /// Fetches an account proof from the node.
     ///
     /// This is a lighter-weight alternative to `getAccountDetails` that makes a single RPC call
-    /// and returns the account header, storage slot values, and account code without
-    /// reconstructing the full account state.
+    /// and returns the account proof and, for public accounts, the account header, storage slot
+    /// values, and account code without reconstructing the full account state.
+    ///
+    /// For private accounts, the proof is returned but account details will not be available
+    /// since they are not stored on-chain.
     ///
     /// Useful for reading storage slot values (e.g., faucet metadata) without the overhead of
     /// fetching the complete account with all vault assets and storage map entries.
@@ -146,13 +148,14 @@ impl RpcClient {
     pub async fn get_account_proof(&self, account_id: &AccountId) -> Result<AccountProof, JsValue> {
         let native_id: miden_client::account::AccountId = account_id.into();
 
-        let foreign_account =
-            NativeForeignAccount::public(native_id, NativeAccountStorageRequirements::default())
-                .map_err(|err| js_error_with_context(err, "failed to create account request"))?;
-
         let (block_num, proof) = self
             .inner
-            .get_account_proof(foreign_account, AccountStateAt::ChainTip, None)
+            .get_account_proof(
+                native_id,
+                NativeAccountStorageRequirements::default(),
+                AccountStateAt::ChainTip,
+                None,
+            )
             .await
             .map_err(|err| js_error_with_context(err, "failed to get account"))?;
 
