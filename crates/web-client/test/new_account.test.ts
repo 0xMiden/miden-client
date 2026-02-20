@@ -233,7 +233,7 @@ test.describe("new_faucet tests", () => {
         0
       )
     ).rejects.toThrow(
-      `token symbol should have length between 1 and 6 characters, but 13 was provided`
+      `token symbol should have length between 1 and 12 characters, but 13 was provided`
     );
   });
 });

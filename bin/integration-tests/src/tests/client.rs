@@ -152,8 +152,9 @@ pub async fn test_multiple_tx_on_same_block(client_config: ClientConfig) -> Resu
     // wait for 1 block
     wait_for_blocks(&mut client, 1).await;
 
-    // wait for 1 block
+    // wait for both transactions to be committed
     wait_for_tx(&mut client, transaction_id_1).await?;
+    wait_for_tx(&mut client, transaction_id_2).await?;
 
     let transactions = client
         .get_transactions(TransactionFilter::All)
@@ -710,20 +711,38 @@ pub async fn test_consume_multiple_expected_notes(client_config: ClientConfig) -
     let faucet_account_id = faucet_account_header.id();
     let to_account_ids = [target_basic_account_1.id(), target_basic_account_2.id()];
 
-    // Mint tokens to the accounts
     let fungible_asset = FungibleAsset::new(faucet_account_id, TRANSFER_AMOUNT).unwrap();
-    let mint_tx_request = mint_multiple_fungible_asset(
-        fungible_asset,
-        &[to_account_ids[0], to_account_ids[0], to_account_ids[1], to_account_ids[1]],
-        NoteType::Private,
-        client.rng(),
-    );
 
-    execute_tx_and_sync(&mut client, faucet_account_id, mint_tx_request.clone()).await?;
+    // TODO: mint tokens in a single transaction once multiple note minting is fixed on protocol
+    // https://github.com/0xMiden/protocol/issues/2519
+    // Mint tokens to the accounts
+    // let mint_tx_request = mint_multiple_fungible_asset(
+    //     fungible_asset,
+    //     &[to_account_ids[0], to_account_ids[0], to_account_ids[1], to_account_ids[1]],
+    //     NoteType::Private,
+    //     client.rng(),
+    // );
+    // execute_tx_and_sync(&mut client, faucet_account_id, mint_tx_request.clone()).await?;
+
+    // Mint tokens individually to work around a protocol bug where minting
+    // multiple notes in a single transaction fails (0xMiden/protocol#2519).
+    let targets = [to_account_ids[0], to_account_ids[0], to_account_ids[1], to_account_ids[1]];
+    let mut all_expected_notes = Vec::new();
+
+    for &target_id in &targets {
+        let tx_request = TransactionRequestBuilder::new()
+            .build_mint_fungible_asset(fungible_asset, target_id, NoteType::Private, client.rng())
+            .unwrap();
+
+        all_expected_notes.extend(tx_request.expected_output_own_notes());
+        execute_tx_and_sync(&mut client, faucet_account_id, tx_request).await?;
+    }
+
     unauth_client.sync_state().await.unwrap();
 
     // Filter notes by ownership
-    let expected_notes = mint_tx_request.expected_output_own_notes().into_iter();
+    // let expected_notes = mint_tx_request.expected_output_own_notes().into_iter();
+    let expected_notes = all_expected_notes.into_iter();
     let client_notes: Vec<_> = client.get_input_notes(NoteFilter::All).await.unwrap();
     let client_notes_ids: Vec<_> = client_notes.iter().map(|note| note.id()).collect();
 

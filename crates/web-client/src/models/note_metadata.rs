@@ -19,7 +19,7 @@ impl NoteMetadata {
     #[wasm_bindgen(constructor)]
     pub fn new(sender: &AccountId, note_type: NoteType, note_tag: &NoteTag) -> NoteMetadata {
         let native_note_metadata =
-            NativeNoteMetadata::new(sender.into(), note_type.into(), note_tag.into());
+            NativeNoteMetadata::new(sender.into(), note_type.into()).with_tag(note_tag.into());
         NoteMetadata(native_note_metadata)
     }
 

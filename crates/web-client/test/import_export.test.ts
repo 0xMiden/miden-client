@@ -38,7 +38,7 @@ const getAccount = async (accountId: string, page: Page) => {
     const account = await client.getAccount(accountId);
     return {
       accountId: account?.id().toString(),
-      accountCommitment: account?.commitment().toHex(),
+      accountCommitment: account?.to_commitment().toHex(),
     };
   }, accountId);
 };

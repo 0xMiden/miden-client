@@ -19,7 +19,7 @@ use miden_node_ntx_builder::NtxBuilderConfig;
 use miden_node_rpc::Rpc;
 use miden_node_store::{GenesisState, Store};
 use miden_node_utils::crypto::get_rpo_random_coin;
-use miden_node_validator::Validator;
+use miden_node_validator::{Validator, ValidatorSigner};
 use miden_protocol::account::auth::AuthSecretKey;
 use miden_protocol::account::{
     Account,
@@ -137,40 +137,41 @@ impl NodeBuilder {
 
         // Bootstrap the store database
         Store::bootstrap(genesis_state, &self.data_directory)
-            .context("failed to bootstrap store")?;
+            .await
+            .with_context(|| "failed to bootstrap store")?;
 
         // Start listening on all gRPC urls so that inter-component connections can be created
         // before each component is fully started up.
         let grpc_rpc = TcpListener::bind(format!("127.0.0.1:{}", self.rpc_port))
             .await
-            .context("failed to bind to RPC gRPC endpoint")?;
+            .with_context(|| "failed to bind to RPC gRPC endpoint")?;
         let store_rpc_listener = TcpListener::bind("127.0.0.1:0")
             .await
-            .context("failed to bind to store RPC gRPC endpoint")?;
+            .with_context(|| "failed to bind to store RPC gRPC endpoint")?;
         let store_ntx_builder_listener = TcpListener::bind("127.0.0.1:0")
             .await
-            .context("failed to bind to store ntx-builder gRPC endpoint")?;
+            .with_context(|| "failed to bind to store ntx-builder gRPC endpoint")?;
         let store_block_producer_listener = TcpListener::bind("127.0.0.1:0")
             .await
-            .context("failed to bind to store block-producer gRPC endpoint")?;
+            .with_context(|| "failed to bind to store block-producer gRPC endpoint")?;
 
         let store_rpc_address = store_rpc_listener
             .local_addr()
-            .context("failed to retrieve the store's RPC gRPC address")?;
+            .with_context(|| "failed to retrieve the store's RPC gRPC address")?;
         let store_block_producer_address = store_block_producer_listener
             .local_addr()
-            .context("failed to retrieve the store's block-producer gRPC address")?;
+            .with_context(|| "failed to retrieve the store's block-producer gRPC address")?;
         let store_ntx_builder_address = store_ntx_builder_listener
             .local_addr()
-            .context("failed to retrieve the store's ntx-builder gRPC address")?;
+            .with_context(|| "failed to retrieve the store's ntx-builder gRPC address")?;
 
         let block_producer_address = available_socket_addr()
             .await
-            .context("failed to bind to block-producer gRPC endpoint")?;
+            .with_context(|| "failed to bind to block-producer gRPC endpoint")?;
 
         let validator_address = available_socket_addr()
             .await
-            .context("failed to bind to validator gRPC endpoint")?;
+            .with_context(|| "failed to bind to validator gRPC endpoint")?;
 
         // Start components
 
@@ -182,12 +183,13 @@ impl NodeBuilder {
             store_ntx_builder_listener,
             store_block_producer_listener,
         )
-        .context("failed to start store")?;
+        .with_context(|| "failed to start store")?;
 
         let ntx_builder_id = Self::start_ntx_builder(
             block_producer_address,
             store_ntx_builder_address,
             validator_address,
+            self.data_directory.join("ntx-builder.sqlite3"),
             &mut join_set,
         );
 
@@ -204,7 +206,8 @@ impl NodeBuilder {
                     Validator {
                         address: validator_address,
                         grpc_timeout: DEFAULT_TIMEOUT_DURATION,
-                        signer: validator_signer,
+                        signer: ValidatorSigner::Local(validator_signer),
+                        data_directory: self.data_directory,
                     }
                     .serve()
                     .await
@@ -337,6 +340,7 @@ impl NodeBuilder {
         block_producer_address: SocketAddr,
         store_address: SocketAddr,
         validator_address: SocketAddr,
+        database_filepath: PathBuf,
         join_set: &mut JoinSet<Result<()>>,
     ) -> Id {
         let store_url =
@@ -354,13 +358,18 @@ impl NodeBuilder {
 
         join_set
             .spawn(async move {
-                NtxBuilderConfig::new(store_url, block_producer_url, validator_url)
-                    .build()
-                    .await
-                    .context("failed to build ntx builder")?
-                    .run()
-                    .await
-                    .context("failed while serving ntx builder component")
+                NtxBuilderConfig::new(
+                    store_url,
+                    block_producer_url,
+                    validator_url,
+                    database_filepath,
+                )
+                .build()
+                .await
+                .context("failed to build ntx builder")?
+                .run()
+                .await
+                .context("failed while serving ntx builder component")
             })
             .id()
     }
@@ -512,10 +521,9 @@ fn create_test_account_with_many_assets(faucets: &[Account]) -> anyhow::Result<A
     let acc_component = AccountComponent::new(
         basic_wallet_library(),
         vec![storage_map],
-        AccountComponentMetadata::new("miden::testing::basic_wallet"),
+        AccountComponentMetadata::new("miden::testing::basic_wallet").with_supports_all_types(),
     )
-    .expect("basic wallet component should satisfy account component requirements")
-    .with_supports_all_types();
+    .expect("basic wallet component should satisfy account component requirements");
 
     let assets = faucets.iter().map(|faucet| {
         Asset::Fungible(

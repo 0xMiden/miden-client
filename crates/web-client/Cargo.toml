@@ -29,17 +29,15 @@ miden-protocol  = { workspace = true }
 miden-standards = { workspace = true }
 
 # External dependencies
-async-trait = { workspace = true }
+async-trait              = { workspace = true }
 console_error_panic_hook = { version = "0.1.7" }
-hex = { version = "0.4" }
-js-sys = { version = "0.3" }
-rand = { workspace = true }
-serde-wasm-bindgen = { version = "0.6" }
-thiserror.workspace = true
-wasm-bindgen = { features = [
-  "serde-serialize",
-], version = "=0.2.105" } # Lock version as .106 removed doc generation for structs
-wasm-bindgen-futures = { version = "0.4" }
+hex                      = { version = "0.4" }
+js-sys                   = { version = "0.3" }
+rand                     = { workspace = true }
+serde-wasm-bindgen       = { version = "0.6" }
+thiserror.workspace      = true
+wasm-bindgen             = { features = ["serde-serialize"], version = "=0.2.108" }
+wasm-bindgen-futures     = { version = "0.4" }
 
 [dev-dependencies]
 web-sys = { features = ["console"], version = "0.3" }

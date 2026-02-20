@@ -899,7 +899,7 @@ export const setupWalletAndFaucet = async (
 
     return {
       accountId: account.id().toString(),
-      accountCommitment: account.commitment().toHex(),
+      accountCommitment: account.to_commitment().toHex(),
       faucetId: faucetAccount.id().toString(),
     };
   });
@@ -912,7 +912,7 @@ export const getAccount = async (testingPage: Page, accountId: string) => {
     const account = await client.getAccount(accountId);
     return {
       id: account?.id().toString(),
-      commitment: account?.commitment().toHex(),
+      commitment: account?.to_commitment().toHex(),
       nonce: account?.nonce().toString(),
       vaultCommitment: account?.vault().root().toHex(),
       storageCommitment: account?.storage().commitment().toHex(),

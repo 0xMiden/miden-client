@@ -49,7 +49,7 @@ use core::fmt;
 use domain::account::{AccountProof, FetchedAccount};
 use domain::note::{FetchedNote, NoteSyncInfo};
 use domain::nullifier::NullifierUpdate;
-use domain::sync::StateSyncInfo;
+use domain::sync::ChainMmrInfo;
 use miden_protocol::Word;
 use miden_protocol::account::{Account, AccountCode, AccountHeader, AccountId};
 use miden_protocol::address::NetworkId;
@@ -149,24 +149,15 @@ pub trait NodeRpcClient: Send + Sync {
     /// verify that each note is part of the block's note tree.
     async fn get_notes_by_id(&self, note_ids: &[NoteId]) -> Result<Vec<FetchedNote>, RpcError>;
 
-    /// Fetches info from the node necessary to perform a state sync using the
-    /// `/SyncState` RPC endpoint.
+    /// Fetches the MMR delta for a given block range using the `/SyncChainMmr` RPC endpoint.
     ///
-    /// - `block_num` is the last block number known by the client. The returned [`StateSyncInfo`]
-    ///   should contain data starting from the next block, until the first block which contains a
-    ///   note of matching the requested tag, or the chain tip if there are no notes.
-    /// - `account_ids` is a list of account IDs and determines the accounts the client is
-    ///   interested in and should receive account updates of.
-    /// - `note_tags` is a list of tags used to filter the notes the client is interested in, which
-    ///   serves as a "note group" filter. Notice that you can't filter by a specific note ID.
-    /// - `nullifiers_tags` similar to `note_tags`, is a list of tags used to filter the nullifiers
-    ///   corresponding to some notes the client is interested in.
-    async fn sync_state(
+    /// - `block_from` is the last block number already present in the caller's MMR.
+    /// - `block_to` is the optional upper bound of the range. If `None`, syncs up to the chain tip.
+    async fn sync_chain_mmr(
         &self,
-        block_num: BlockNumber,
-        account_ids: &[AccountId],
-        note_tags: &BTreeSet<NoteTag>,
-    ) -> Result<StateSyncInfo, RpcError>;
+        block_from: BlockNumber,
+        block_to: Option<BlockNumber>,
+    ) -> Result<ChainMmrInfo, RpcError>;
 
     /// Fetches the current state of an account from the node using the `/GetAccountDetails` RPC
     /// endpoint.
@@ -410,7 +401,7 @@ pub enum NodeRpcClientEndpoint {
     GetBlockByNumber,
     GetBlockHeaderByNumber,
     GetNotesById,
-    SyncState,
+    SyncChainMmr,
     SubmitProvenTx,
     SyncNotes,
     GetNoteScriptByRoot,
@@ -434,7 +425,7 @@ impl fmt::Display for NodeRpcClientEndpoint {
                 write!(f, "get_block_header_by_number")
             },
             NodeRpcClientEndpoint::GetNotesById => write!(f, "get_notes_by_id"),
-            NodeRpcClientEndpoint::SyncState => write!(f, "sync_state"),
+            NodeRpcClientEndpoint::SyncChainMmr => write!(f, "sync_chain_mmr"),
             NodeRpcClientEndpoint::SubmitProvenTx => write!(f, "submit_proven_transaction"),
             NodeRpcClientEndpoint::SyncNotes => write!(f, "sync_notes"),
             NodeRpcClientEndpoint::GetNoteScriptByRoot => write!(f, "get_note_script_by_root"),
