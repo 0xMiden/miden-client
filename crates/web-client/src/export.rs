@@ -67,13 +67,10 @@ impl WebClient {
     pub async fn export_store(&mut self) -> Result<JsValue, JsValue> {
         let store = self.store.as_ref().ok_or(JsValue::from_str("Store not initialized"))?;
 
-        let bytes = store
+        let json_string = store
             .export_store()
             .await
             .map_err(|err| js_error_with_context(err, "failed to export store"))?;
-
-        let json_string = String::from_utf8(bytes)
-            .map_err(|err| js_error_with_context(err, "failed to decode exported store data"))?;
 
         Ok(JsValue::from_str(&json_string))
     }

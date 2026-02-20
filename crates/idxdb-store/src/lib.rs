@@ -361,11 +361,11 @@ impl Store for WebStore {
         self.list_setting_keys().await
     }
 
-    async fn export_store(&self) -> Result<Vec<u8>, StoreError> {
+    async fn export_store(&self) -> Result<String, StoreError> {
         self.export_store().await
     }
 
-    async fn import_store(&self, data: Vec<u8>) -> Result<(), StoreError> {
+    async fn import_store(&self, data: String) -> Result<(), StoreError> {
         self.import_store(data).await
     }
 }

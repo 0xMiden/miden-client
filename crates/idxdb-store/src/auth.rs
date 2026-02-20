@@ -4,7 +4,7 @@ use wasm_bindgen_futures::js_sys;
 // WEB KEYSTORE FFI BINDINGS
 // ================================================================================================
 
-#[wasm_bindgen(module = "/src/js/accounts.js")]
+#[wasm_bindgen(module = "/src/js/auth.js")]
 extern "C" {
     #[wasm_bindgen(js_name = insertAccountAuth)]
     pub fn idxdb_insert_account_auth(

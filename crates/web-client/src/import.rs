@@ -113,7 +113,7 @@ impl WebClient {
             store_dump.as_string().ok_or(JsValue::from_str("Store dump must be a string"))?;
 
         store
-            .import_store(json_string.into_bytes())
+            .import_store(json_string)
             .await
             .map_err(|err| js_error_with_context(err, "failed to import store"))?;
 

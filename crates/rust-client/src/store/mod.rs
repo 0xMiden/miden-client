@@ -552,21 +552,21 @@ pub trait Store: Send + Sync {
     // STORE EXPORT/IMPORT
     // --------------------------------------------------------------------------------------------
 
-    /// Exports the entire store contents as a serialized byte vector.
+    /// Exports the entire store contents as a serialized string.
     ///
     /// The default implementation returns an error indicating the operation is not supported.
     /// Store implementations that support export should override this method.
-    async fn export_store(&self) -> Result<Vec<u8>, StoreError> {
+    async fn export_store(&self) -> Result<String, StoreError> {
         Err(StoreError::DatabaseError(
             "Store export is not supported by this implementation".into(),
         ))
     }
 
-    /// Imports store contents from a serialized byte vector, replacing all existing data.
+    /// Imports store contents from a serialized string, replacing all existing data.
     ///
     /// The default implementation returns an error indicating the operation is not supported.
     /// Store implementations that support import should override this method.
-    async fn import_store(&self, _data: Vec<u8>) -> Result<(), StoreError> {
+    async fn import_store(&self, _data: String) -> Result<(), StoreError> {
         Err(StoreError::DatabaseError(
             "Store import is not supported by this implementation".into(),
         ))
