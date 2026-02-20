@@ -1,14 +1,14 @@
 use miden_client::note::BlockNumber;
 use miden_client::rpc::domain::account::FetchedAccount as NativeFetchedAccount;
-use wasm_bindgen::prelude::*;
 
+use crate::prelude::*;
 use super::account::Account;
 use super::account_id::AccountId;
 use super::word::Word;
 
 /// Account details returned by the node.
+#[bindings]
 #[derive(Clone)]
-#[wasm_bindgen]
 pub struct FetchedAccount {
     account_id: AccountId,
     commitment: Word,
@@ -16,10 +16,9 @@ pub struct FetchedAccount {
     account: Option<Account>,
 }
 
-#[wasm_bindgen]
+#[bindings]
 impl FetchedAccount {
     /// Returns the account ID.
-    #[wasm_bindgen(js_name = "accountId")]
     pub fn account_id(&self) -> AccountId {
         self.account_id
     }
@@ -30,7 +29,7 @@ impl FetchedAccount {
     }
 
     /// Returns the last block height where the account was updated.
-    #[wasm_bindgen(js_name = "lastBlockNum")]
+    #[bindings]
     pub fn last_block_num(&self) -> u32 {
         self.last_block_num.as_u32()
     }
@@ -41,19 +40,16 @@ impl FetchedAccount {
     }
 
     /// Returns true when the account is public.
-    #[wasm_bindgen(js_name = "isPublic")]
     pub fn is_public(&self) -> bool {
         self.account_id.is_public()
     }
 
     /// Returns true when the account is private.
-    #[wasm_bindgen(js_name = "isPrivate")]
     pub fn is_private(&self) -> bool {
         self.account_id.is_private()
     }
 
     /// Returns true when the account is a network account.
-    #[wasm_bindgen(js_name = "isNetwork")]
     pub fn is_network(&self) -> bool {
         self.account_id.is_network()
     }

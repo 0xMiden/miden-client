@@ -1,5 +1,6 @@
 use miden_client::note::PartialNote as NativePartialNote;
-use wasm_bindgen::prelude::*;
+
+use crate::prelude::*;
 
 use super::note_assets::NoteAssets;
 use super::note_id::NoteId;
@@ -14,9 +15,10 @@ use super::word::Word;
 /// to compute note ID and note header, but not sufficient to compute note nullifier, and generally
 /// does not have enough info to execute the note.
 #[derive(Clone)]
-#[wasm_bindgen]
+#[bindings]
 pub struct PartialNote(NativePartialNote);
 
+#[cfg(feature = "wasm")]
 #[wasm_bindgen]
 impl PartialNote {
     // TODO: new
@@ -38,6 +40,32 @@ impl PartialNote {
     }
 
     /// Returns the assets locked in the note.
+    pub fn assets(&self) -> NoteAssets {
+        self.0.assets().into()
+    }
+}
+
+#[cfg(feature = "napi")]
+impl PartialNote {
+    /// Returns the identifier of the partial note.
+    #[bindings(napi)]
+    pub fn id(&self) -> NoteId {
+        self.0.id().into()
+    }
+
+    /// Returns the metadata attached to the note.
+    #[bindings(napi)]
+    pub fn metadata(&self) -> NoteMetadata {
+        self.0.metadata().into()
+    }
+
+    /// Returns the digest of the recipient information.
+    pub fn recipient_digest(&self) -> Word {
+        self.0.recipient_digest().into()
+    }
+
+    /// Returns the assets locked in the note.
+    #[bindings(napi)]
     pub fn assets(&self) -> NoteAssets {
         self.0.assets().into()
     }

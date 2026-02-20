@@ -1,3 +1,6 @@
+use alloc::format;
+use alloc::string::ToString;
+
 use miden_client::auth::{
     AuthSecretKey,
     PublicKeyCommitment,

@@ -1,35 +1,31 @@
 use miden_client::rpc::domain::note::NoteSyncInfo as NativeNoteSyncInfo;
-use wasm_bindgen::prelude::*;
 
 use super::block_header::BlockHeader;
 use super::committed_note::CommittedNote;
 use super::merkle_path::MerklePath;
+use crate::prelude::*;
 
 /// Represents the response data from `syncNotes`.
-#[wasm_bindgen]
+#[bindings]
 pub struct NoteSyncInfo(NativeNoteSyncInfo);
 
-#[wasm_bindgen]
+#[bindings]
 impl NoteSyncInfo {
-    /// Returns the latest block number in the chain.
-    #[wasm_bindgen(js_name = "chainTip")]
+    #[bindings]
     pub fn chain_tip(&self) -> u32 {
         self.0.chain_tip.as_u32()
     }
 
-    /// Returns the block header associated with the matching notes.
-    #[wasm_bindgen(js_name = "blockHeader")]
+    #[bindings]
     pub fn block_header(&self) -> BlockHeader {
         self.0.block_header.clone().into()
     }
 
-    /// Returns the MMR path for the block header.
-    #[wasm_bindgen(js_name = "mmrPath")]
+    #[bindings]
     pub fn mmr_path(&self) -> MerklePath {
         self.0.mmr_path.clone().into()
     }
 
-    /// Returns the committed notes returned by the node.
     pub fn notes(&self) -> Vec<CommittedNote> {
         self.0.notes.iter().map(Into::into).collect()
     }

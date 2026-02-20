@@ -19,26 +19,57 @@ ignored = ["wasm-bindgen-futures"]
 crate-type = ["cdylib"]
 
 [features]
+default = ["wasm"]
 testing = ["miden-client/testing"]
 
+wasm = [
+    "dep:wasm-bindgen",
+    "dep:wasm-bindgen-futures",
+    "dep:js-sys",
+    "dep:serde-wasm-bindgen",
+    "dep:console_error_panic_hook",
+    "dep:idxdb-store",
+    "miden-client/testing",
+    "miden-client/tonic",
+]
+napi = [
+    "dep:napi",
+    "dep:napi-derive",
+    "dep:napi-build",
+    "dep:tokio",
+    "dep:miden-client-sqlite-store",
+    "miden-client/std",
+    "miden-client/tonic",
+]
+
 [dependencies]
-# Workspace dependencies
-idxdb-store     = { workspace = true }
-miden-client    = { features = ["testing", "tonic"], workspace = true }
+# Workspace dependencies (always needed)
+miden-client    = { workspace = true }
 miden-protocol  = { workspace = true }
 miden-standards = { workspace = true }
+miden-bindings-macro = { path = "../bindings-macro" }
 
-# External dependencies
-console_error_panic_hook = { version = "0.1.7" }
-hex = { version = "0.4" }
-js-sys = { version = "0.3" }
-rand = { workspace = true }
-serde-wasm-bindgen = { version = "0.6" }
-thiserror.workspace = true
-wasm-bindgen = { features = [
-  "serde-serialize",
-], version = "=0.2.105" } # Lock version as .106 removed doc generation for structs
-wasm-bindgen-futures = { version = "0.4" }
+# External dependencies (always needed)
+hex       = { version = "0.4" }
+rand      = { workspace = true }
+thiserror = { workspace = true }
+
+# WASM-only (optional)
+idxdb-store              = { workspace = true, optional = true }
+console_error_panic_hook = { version = "0.1.7", optional = true }
+js-sys                   = { version = "0.3", optional = true }
+serde-wasm-bindgen       = { version = "0.6", optional = true }
+wasm-bindgen             = { version = "=0.2.105", features = ["serde-serialize"], optional = true }
+wasm-bindgen-futures     = { version = "0.4", optional = true }
+
+# napi-only (optional)
+napi                      = { version = "2", default-features = false, features = ["async", "napi8", "tokio_rt"], optional = true }
+napi-derive               = { version = "2", optional = true }
+tokio                     = { workspace = true, optional = true }
+miden-client-sqlite-store = { workspace = true, optional = true }
+
+[build-dependencies]
+napi-build = { version = "2", optional = true }
 
 [dev-dependencies]
 web-sys = { features = ["console"], version = "0.3" }

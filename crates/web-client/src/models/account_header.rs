@@ -1,5 +1,5 @@
 use miden_client::account::AccountHeader as NativeAccountHeader;
-use wasm_bindgen::prelude::*;
+use crate::prelude::*;
 
 use super::account_id::AccountId;
 use super::felt::Felt;
@@ -15,10 +15,10 @@ use super::word::Word;
 /// - `storage_commitment`: a commitment to the account's storage (`AccountStorage`).
 /// - `code_commitment`: a commitment to the account's code (`AccountCode`).
 #[derive(Clone)]
-#[wasm_bindgen]
+#[bindings]
 pub struct AccountHeader(NativeAccountHeader);
 
-#[wasm_bindgen]
+#[bindings]
 impl AccountHeader {
     /// Returns the full account commitment.
     pub fn commitment(&self) -> Word {
@@ -36,19 +36,16 @@ impl AccountHeader {
     }
 
     /// Returns the vault commitment.
-    #[wasm_bindgen(js_name = "vaultCommitment")]
     pub fn vault_commitment(&self) -> Word {
         self.0.vault_root().into()
     }
 
     /// Returns the storage commitment.
-    #[wasm_bindgen(js_name = "storageCommitment")]
     pub fn storage_commitment(&self) -> Word {
         self.0.storage_commitment().into()
     }
 
     /// Returns the code commitment.
-    #[wasm_bindgen(js_name = "codeCommitment")]
     pub fn code_commitment(&self) -> Word {
         self.0.code_commitment().into()
     }

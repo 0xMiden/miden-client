@@ -1,37 +1,66 @@
 use miden_client::auth::Signature as NativeSignature;
-use wasm_bindgen::prelude::*;
+
+#[cfg(feature = "napi")]
+use miden_client::{Deserializable, Serializable};
+#[cfg(feature = "napi")]
+use napi::bindgen_prelude::*;
+
+#[cfg(feature = "wasm")]
 use wasm_bindgen_futures::js_sys::Uint8Array;
+
+use crate::prelude::*;
 
 use crate::models::felt::Felt;
 use crate::models::word::Word;
-use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
+use crate::platform::{self, JsResult};
+#[cfg(feature = "wasm")]
+use crate::utils::serialize_to_uint8array;
 
 /// Cryptographic signature produced by supported auth schemes.
-#[wasm_bindgen]
+#[bindings]
 #[derive(Clone)]
 pub struct Signature(NativeSignature);
 
+// Shared methods
+#[bindings]
+impl Signature {
+    /// Converts the signature to the prepared field elements expected by verifying code.
+    #[bindings]
+    pub fn to_prepared_signature(&self, message: &Word) -> Vec<Felt> {
+        self.0
+            .to_prepared_signature(message.clone().into())
+            .into_iter()
+            .map(Into::into)
+            .collect()
+    }
+
+    /// Deserializes a signature from bytes.
+    #[bindings(factory)]
+    pub fn deserialize(bytes: &platform::JsBytes) -> JsResult<Signature> {
+        let native_signature = platform::deserialize_from_bytes::<NativeSignature>(bytes)?;
+        Ok(Signature(native_signature))
+    }
+}
+
+// wasm-specific methods
+#[cfg(feature = "wasm")]
 #[wasm_bindgen]
 impl Signature {
     /// Serializes the signature into bytes.
     pub fn serialize(&self) -> Uint8Array {
         serialize_to_uint8array(&self.0)
     }
+}
 
-    /// Deserializes a signature from bytes.
-    pub fn deserialize(bytes: &Uint8Array) -> Result<Signature, JsValue> {
-        let native_signature = deserialize_from_uint8array::<NativeSignature>(bytes)?;
-        Ok(Signature(native_signature))
-    }
-
-    /// Converts the signature to the prepared field elements expected by verifying code.
-    #[wasm_bindgen(js_name = "toPreparedSignature")]
-    pub fn to_prepared_signature(&self, message: Word) -> Vec<Felt> {
-        self.0
-            .to_prepared_signature(message.into())
-            .into_iter()
-            .map(Into::into)
-            .collect()
+// napi-specific methods
+#[cfg(feature = "napi")]
+#[napi_derive::napi]
+impl Signature {
+    /// Serializes the signature into bytes.
+    #[napi]
+    pub fn serialize(&self) -> Buffer {
+        let bytes = self.0.to_bytes();
+        Buffer::from(bytes)
     }
 }
 

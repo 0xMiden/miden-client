@@ -1,3 +1,5 @@
+use alloc::vec::Vec;
+
 use miden_client::SliceReader;
 use miden_client::utils::{Deserializable, Serializable};
 use wasm_bindgen::prelude::*;

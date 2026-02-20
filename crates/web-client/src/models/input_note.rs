@@ -1,6 +1,7 @@
 use miden_client::note::{Note as NativeNote, NoteInclusionProof as NativeNoteInclusionProof};
 use miden_client::transaction::InputNote as NativeInputNote;
-use wasm_bindgen::prelude::*;
+
+use crate::prelude::*;
 
 use super::note::Note;
 use super::note_id::NoteId;
@@ -9,16 +10,17 @@ use super::note_location::NoteLocation;
 use super::word::Word;
 
 /// Note supplied as an input to a transaction, optionally with authentication data.
+#[bindings]
 #[derive(Clone)]
-#[wasm_bindgen]
 pub struct InputNote(pub(crate) NativeInputNote);
 
-#[wasm_bindgen]
+#[bindings]
 impl InputNote {
     /// Creates an authenticated input note from a note and its inclusion proof.
     ///
     /// An authenticated note has a proof of inclusion in the block's note tree,
     /// which is required for consuming the note in a transaction.
+    #[bindings(factory)]
     pub fn authenticated(note: &Note, inclusion_proof: &NoteInclusionProof) -> InputNote {
         let native_note: NativeNote = note.into();
         let native_proof: NativeNoteInclusionProof = inclusion_proof.clone().into();
@@ -29,6 +31,7 @@ impl InputNote {
     ///
     /// An unauthenticated note can be consumed in a transaction as long as the note exists in the
     /// network as of the transaction batch in which the consume transaction is included.
+    #[bindings(factory)]
     pub fn unauthenticated(note: &Note) -> InputNote {
         InputNote(NativeInputNote::unauthenticated(note.clone().into()))
     }

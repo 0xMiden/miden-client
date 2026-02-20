@@ -1,7 +1,9 @@
 use miden_client::assembly::Library as NativeLibrary;
-use wasm_bindgen::prelude::*;
 
-#[wasm_bindgen]
+use crate::prelude::*;
+
+/// A compiled assembly library that can be linked into scripts or account components.
+#[bindings]
 #[derive(Clone)]
 pub struct Library(NativeLibrary);
 

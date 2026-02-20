@@ -1,6 +1,6 @@
 use miden_client::asset::Asset as NativeAsset;
 use miden_client::note::NoteAssets as NativeNoteAssets;
-use wasm_bindgen::prelude::*;
+use crate::prelude::*;
 
 use super::fungible_asset::FungibleAsset;
 
@@ -12,27 +12,21 @@ use super::fungible_asset::FungibleAsset;
 /// All the assets in a note can be reduced to a single commitment which is computed by sequentially
 /// hashing the assets. Note that the same list of assets can result in two different commitments if
 /// the asset ordering is different.
+#[bindings]
 #[derive(Clone)]
-#[wasm_bindgen]
-pub struct NoteAssets(NativeNoteAssets);
+pub struct NoteAssets(pub(crate) NativeNoteAssets);
 
-#[wasm_bindgen]
+#[bindings]
 impl NoteAssets {
-    /// Creates a new asset list for a note.
-    #[wasm_bindgen(constructor)]
-    pub fn new(assets_array: Option<Vec<FungibleAsset>>) -> NoteAssets {
-        let assets = assets_array.unwrap_or_default();
-        let native_assets: Vec<NativeAsset> = assets.into_iter().map(Into::into).collect();
-        NoteAssets(NativeNoteAssets::new(native_assets).unwrap())
+    #[bindings(constructor)]
+    pub fn new(assets_array: Option<Vec<FungibleAsset>>) -> JsResult<NoteAssets> {
+        let native_assets: Vec<NativeAsset> =
+            assets_array.unwrap_or_default().into_iter().map(Into::into).collect();
+        let native_note_assets = NativeNoteAssets::new(native_assets)
+            .map_err(|e| platform::error_with_context(e, "creating NoteAssets"))?;
+        Ok(NoteAssets(native_note_assets))
     }
 
-    /// Adds a fungible asset to the collection.
-    pub fn push(&mut self, asset: &FungibleAsset) {
-        self.0.add_asset(asset.into()).unwrap();
-    }
-
-    /// Returns all fungible assets contained in the note.
-    #[wasm_bindgen(js_name = "fungibleAssets")]
     pub fn fungible_assets(&self) -> Vec<FungibleAsset> {
         self.0
             .iter()
@@ -44,6 +38,28 @@ impl NoteAssets {
                 }
             })
             .collect()
+    }
+}
+
+// Platform-specific methods that differ between wasm and napi
+#[cfg(feature = "wasm")]
+impl NoteAssets {
+    /// Adds a fungible asset to the collection.
+    pub fn push(&mut self, asset: &FungibleAsset) {
+        self.0.add_asset(asset.into()).unwrap();
+    }
+}
+
+#[cfg(feature = "napi")]
+#[napi_derive::napi]
+impl NoteAssets {
+    /// Adds a fungible asset to the collection.
+    #[napi]
+    pub fn push(&mut self, asset: &FungibleAsset) -> napi::Result<()> {
+        self.0
+            .add_asset(asset.into())
+            .map_err(|e| platform::error_with_context(e, "adding asset"))?;
+        Ok(())
     }
 }
 

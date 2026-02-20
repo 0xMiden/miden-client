@@ -1,8 +1,11 @@
+#[cfg(feature = "napi")]
+use miden_client::Felt as NativeFelt;
 use miden_client::note::NoteStorage as NativeNoteStorage;
-use wasm_bindgen::prelude::*;
 
 use super::felt::Felt;
+#[cfg(feature = "wasm")]
 use crate::models::miden_arrays::FeltArray;
+use crate::prelude::*;
 
 /// A container for note storage items.
 ///
@@ -11,23 +14,40 @@ use crate::models::miden_arrays::FeltArray;
 ///
 /// All storage items associated with a note can be reduced to a single commitment which is
 /// computed as an RPO256 hash over the storage elements.
+#[bindings]
 #[derive(Clone)]
-#[wasm_bindgen]
-pub struct NoteStorage(NativeNoteStorage);
+pub struct NoteStorage(pub(crate) NativeNoteStorage);
 
+#[bindings]
+impl NoteStorage {
+    #[bindings]
+    pub fn items(&self) -> Vec<Felt> {
+        self.0.items().iter().map(Into::into).collect()
+    }
+}
+
+// Platform-specific constructors that differ
+#[cfg(feature = "wasm")]
 #[wasm_bindgen]
 impl NoteStorage {
-    /// Creates note storage from a list of field elements.
     #[wasm_bindgen(constructor)]
     pub fn new(felt_array: &FeltArray) -> NoteStorage {
-        let native_felts = felt_array.into();
+        let wrapper_felts: Vec<Felt> = felt_array.into();
+        let native_felts: Vec<miden_client::Felt> = wrapper_felts.into_iter().map(Into::into).collect();
         let native_note_storage = NativeNoteStorage::new(native_felts).unwrap();
         NoteStorage(native_note_storage)
     }
+}
 
-    /// Returns the raw storage items as an array of field elements.
-    pub fn items(&self) -> Vec<Felt> {
-        self.0.items().iter().map(Into::into).collect()
+#[cfg(feature = "napi")]
+#[napi_derive::napi]
+impl NoteStorage {
+    #[napi(constructor)]
+    pub fn new(felts: Vec<&Felt>) -> JsResult<NoteStorage> {
+        let native_felts: Vec<NativeFelt> = felts.into_iter().map(|f| f.into()).collect();
+        let native_note_storage = NativeNoteStorage::new(native_felts)
+            .map_err(|e| platform::error_with_context(e, "Error creating NoteStorage"))?;
+        Ok(NoteStorage(native_note_storage))
     }
 }
 

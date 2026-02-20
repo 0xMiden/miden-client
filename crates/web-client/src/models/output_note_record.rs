@@ -1,5 +1,6 @@
 use miden_client::store::OutputNoteRecord as NativeOutputNoteRecord;
-use wasm_bindgen::prelude::*;
+
+use crate::prelude::*;
 
 use super::note_assets::NoteAssets;
 use super::note_id::NoteId;
@@ -11,10 +12,10 @@ use super::word::Word;
 
 /// Represents an output note tracked by the client store.
 #[derive(Clone)]
-#[wasm_bindgen]
+#[bindings]
 pub struct OutputNoteRecord(NativeOutputNoteRecord);
 
-#[wasm_bindgen]
+#[bindings]
 impl OutputNoteRecord {
     /// Returns the note ID.
     pub fn id(&self) -> NoteId {
@@ -27,7 +28,7 @@ impl OutputNoteRecord {
     }
 
     /// Returns the recipient digest committed for the note.
-    #[wasm_bindgen(js_name = "recipientDigest")]
+    #[bindings(wasm)]
     pub fn recipient_digest(&self) -> Word {
         self.0.recipient_digest().into()
     }
@@ -43,7 +44,7 @@ impl OutputNoteRecord {
     }
 
     /// Returns the inclusion proof when the note is committed.
-    #[wasm_bindgen(js_name = "inclusionProof")]
+    #[bindings(wasm)]
     pub fn inclusion_proof(&self) -> Option<NoteInclusionProof> {
         self.0.inclusion_proof().map(Into::into)
     }
@@ -54,7 +55,7 @@ impl OutputNoteRecord {
     }
 
     /// Returns the expected block height for the note.
-    #[wasm_bindgen(js_name = "expectedHeight")]
+    #[bindings(wasm)]
     pub fn expected_height(&self) -> u32 {
         self.0.expected_height().as_u32()
     }
@@ -65,13 +66,13 @@ impl OutputNoteRecord {
     }
 
     /// Returns true if the note has been consumed on chain.
-    #[wasm_bindgen(js_name = "isConsumed")]
+    #[bindings(wasm)]
     pub fn is_consumed(&self) -> bool {
         self.0.is_consumed()
     }
 
     /// Returns true if the note is committed on chain.
-    #[wasm_bindgen(js_name = "isCommitted")]
+    #[bindings(wasm)]
     pub fn is_committed(&self) -> bool {
         self.0.is_committed()
     }

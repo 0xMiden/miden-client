@@ -1,14 +1,15 @@
 use miden_client::crypto::MerklePath as NativeMerklePath;
-use wasm_bindgen::prelude::*;
+
+use crate::prelude::*;
 
 use super::word::Word;
 
 /// Represents a Merkle path.
+#[bindings]
 #[derive(Clone)]
-#[wasm_bindgen]
 pub struct MerklePath(NativeMerklePath);
 
-#[wasm_bindgen]
+#[bindings]
 impl MerklePath {
     /// Returns the depth of the path.
     pub fn depth(&self) -> u8 {
@@ -21,14 +22,13 @@ impl MerklePath {
     }
 
     /// Computes the root given a leaf index and value.
-    #[wasm_bindgen(js_name = "computeRoot")]
-    pub fn compute_root(&self, index: u64, node: &Word) -> Word {
-        self.0.compute_root(index, node.clone().into()).unwrap().into()
+    pub fn compute_root(&self, index: i64, node: &Word) -> Word {
+        self.0.compute_root(index as u64, node.clone().into()).unwrap().into()
     }
 
     /// Verifies the path against a root.
-    pub fn verify(&self, index: u64, node: &Word, root: &Word) -> bool {
-        self.0.verify(index, node.clone().into(), &root.clone().into()).is_ok()
+    pub fn verify(&self, index: i64, node: &Word, root: &Word) -> bool {
+        self.0.verify(index as u64, node.clone().into(), &root.clone().into()).is_ok()
     }
 }
 

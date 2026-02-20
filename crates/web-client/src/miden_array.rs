@@ -1,4 +1,5 @@
 use thiserror::Error;
+
 #[derive(Debug, Error)]
 pub enum ArrayError {
     #[error("out of bounds access -- tried to access at index: {index} with length {length}")]
@@ -11,6 +12,9 @@ pub enum ArrayError {
 macro_rules! declare_js_miden_arrays {
     ($(($miden_type_name:path) -> $miden_type_array_name:ident),+ $(,)?) => {
     pub mod miden_arrays {
+        use alloc::format;
+        use alloc::vec;
+        use alloc::vec::Vec;
         use crate::js_error_with_context;
         use wasm_bindgen::prelude::*;
         $(

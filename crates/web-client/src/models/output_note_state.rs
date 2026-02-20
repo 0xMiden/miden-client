@@ -1,8 +1,8 @@
 use miden_client::store::OutputNoteState as NativeOutputNoteState;
-use wasm_bindgen::prelude::*;
 
-#[derive(Clone)]
-#[wasm_bindgen]
+use crate::prelude::*;
+
+#[bindings(wasm(derive(Clone)), napi(string_enum))]
 pub enum OutputNoteState {
     ExpectedPartial,
     ExpectedFull,

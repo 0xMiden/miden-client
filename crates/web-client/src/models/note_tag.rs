@@ -1,6 +1,6 @@
 use miden_client::account::AccountId as NativeAccountId;
 use miden_client::note::NoteTag as NativeNoteTag;
-use wasm_bindgen::prelude::*;
+use crate::prelude::*;
 
 use super::account_id::AccountId;
 
@@ -8,41 +8,36 @@ use super::account_id::AccountId;
 ///
 /// Tags enable quick lookups for notes related to particular use cases, scripts, or account
 /// prefixes.
+#[bindings]
 #[derive(Clone, Copy)]
-#[wasm_bindgen]
 pub struct NoteTag(pub(crate) NativeNoteTag);
 
-#[wasm_bindgen]
+#[bindings]
 impl NoteTag {
-    /// Creates a new `NoteTag` from an arbitrary u32.
-    #[wasm_bindgen(constructor)]
+    #[bindings(constructor)]
     pub fn new(tag: u32) -> NoteTag {
         NoteTag(NativeNoteTag::new(tag))
     }
 
-    /// Constructs a note tag that targets the given account ID.
-    #[wasm_bindgen(js_name = "withAccountTarget")]
+    pub fn as_u32(&self) -> u32 {
+        self.0.as_u32()
+    }
+
+    #[bindings(factory)]
     pub fn with_account_target(account_id: &AccountId) -> NoteTag {
         let native_account_id: NativeAccountId = account_id.into();
         NoteTag(NativeNoteTag::with_account_target(native_account_id))
     }
 
-    /// Constructs a note tag that targets the given account ID with a custom tag length.
-    #[wasm_bindgen(js_name = "withCustomAccountTarget")]
+    #[bindings(factory)]
     pub fn with_custom_account_target(
         account_id: &AccountId,
         tag_len: u8,
-    ) -> Result<NoteTag, JsValue> {
+    ) -> JsResult<NoteTag> {
         let native_account_id: NativeAccountId = account_id.into();
         NativeNoteTag::with_custom_account_target(native_account_id, tag_len)
             .map(NoteTag)
-            .map_err(|err| JsValue::from_str(&err.to_string()))
-    }
-
-    /// Returns the inner u32 value of this tag.
-    #[wasm_bindgen(js_name = "asU32")]
-    pub fn as_u32(&self) -> u32 {
-        self.0.as_u32()
+            .map_err(|err| platform::error_with_context(err, "failed to create note tag with custom account target"))
     }
 }
 

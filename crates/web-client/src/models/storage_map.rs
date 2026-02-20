@@ -1,5 +1,5 @@
 use miden_client::account::StorageMap as NativeStorageMap;
-use wasm_bindgen::prelude::*;
+use crate::prelude::*;
 
 use crate::models::word::Word;
 
@@ -20,14 +20,14 @@ use crate::models::word::Word;
 /// original keys are retained in a separate map. This causes redundancy but allows for
 /// introspection of the map, e.g. by querying the set of stored (original) keys which is useful in
 /// debugging and explorer scenarios.
-#[wasm_bindgen]
+#[bindings]
 #[derive(Clone)]
 pub struct StorageMap(NativeStorageMap);
 
-#[wasm_bindgen]
+#[bindings]
 impl StorageMap {
     /// Creates an empty storage map.
-    #[wasm_bindgen(constructor)]
+    #[bindings(constructor)]
     pub fn new() -> StorageMap {
         StorageMap(NativeStorageMap::new())
     }

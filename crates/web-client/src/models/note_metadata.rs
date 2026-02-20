@@ -1,50 +1,40 @@
 use miden_client::note::NoteMetadata as NativeNoteMetadata;
-use wasm_bindgen::prelude::*;
+use crate::prelude::*;
 
 use super::account_id::AccountId;
 use super::note_attachment::NoteAttachment;
-use super::{NoteTag, NoteType};
+use super::note_tag::NoteTag;
+use super::note_type::NoteType;
 
 /// Metadata associated with a note.
 ///
 /// This metadata includes the sender, note type, tag, and an optional attachment.
 /// Attachments provide additional context about how notes should be processed.
+#[bindings]
 #[derive(Clone)]
-#[wasm_bindgen]
 pub struct NoteMetadata(NativeNoteMetadata);
 
-#[wasm_bindgen]
+#[bindings]
 impl NoteMetadata {
-    /// Creates metadata for a note.
-    #[wasm_bindgen(constructor)]
+    #[bindings(constructor)]
     pub fn new(sender: &AccountId, note_type: NoteType, note_tag: &NoteTag) -> NoteMetadata {
         let native_note_metadata =
             NativeNoteMetadata::new(sender.into(), note_type.into(), note_tag.into());
         NoteMetadata(native_note_metadata)
     }
 
-    /// Returns the account that created the note.
     pub fn sender(&self) -> AccountId {
         self.0.sender().into()
     }
 
-    /// Returns the tag associated with the note.
     pub fn tag(&self) -> NoteTag {
         self.0.tag().into()
     }
 
-    /// Returns whether the note is private, encrypted, or public.
-    #[wasm_bindgen(js_name = "noteType")]
     pub fn note_type(&self) -> NoteType {
         self.0.note_type().into()
     }
 
-    /// Adds an attachment to this metadata and returns the updated metadata.
-    ///
-    /// Attachments provide additional context about how notes should be processed.
-    /// For example, a `NetworkAccountTarget` attachment indicates that the note
-    /// should be consumed by a specific network account.
-    #[wasm_bindgen(js_name = "withAttachment")]
     pub fn with_attachment(&self, attachment: &NoteAttachment) -> NoteMetadata {
         let native_attachment = attachment.into();
         NoteMetadata(self.clone().0.with_attachment(native_attachment))

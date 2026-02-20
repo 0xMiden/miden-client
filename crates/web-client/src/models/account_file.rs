@@ -1,19 +1,28 @@
 use miden_client::account::AccountFile as NativeAccountFile;
-use wasm_bindgen::prelude::*;
+#[cfg(feature = "napi")]
+use miden_client::{Deserializable, Serializable};
+#[cfg(feature = "napi")]
+use napi::bindgen_prelude::*;
+use crate::prelude::*;
+
+#[cfg(feature = "wasm")]
 use wasm_bindgen_futures::js_sys::Uint8Array;
+#[cfg(feature = "wasm")]
+use crate::utils::{serialize_to_uint8array, deserialize_from_uint8array};
 
 use crate::models::account::Account;
 use crate::models::account_id::AccountId;
-use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
+use crate::platform;
+#[cfg(feature = "wasm")]
 
 #[derive(Debug, Clone)]
-#[wasm_bindgen]
+#[bindings]
 pub struct AccountFile(NativeAccountFile);
 
-#[wasm_bindgen]
+// Methods with identical signatures
+#[bindings]
 impl AccountFile {
     /// Returns the account ID.
-    #[wasm_bindgen(js_name = "accountId")]
     pub fn account_id(&self) -> AccountId {
         self.0.account.id().into()
     }
@@ -22,9 +31,13 @@ impl AccountFile {
     pub fn account(&self) -> Account {
         self.0.account.clone().into()
     }
+}
 
+// wasm: usize return, Uint8Array serialize/deserialize
+#[cfg(feature = "wasm")]
+#[wasm_bindgen]
+impl AccountFile {
     /// Returns the number of auth secret keys included.
-    #[wasm_bindgen(js_name = "authSecretKeyCount")]
     pub fn auth_secret_key_count(&self) -> usize {
         self.0.auth_secret_keys.len()
     }
@@ -35,8 +48,35 @@ impl AccountFile {
     }
 
     /// Deserializes a byte array into an `AccountFile`
-    pub fn deserialize(bytes: &Uint8Array) -> Result<AccountFile, JsValue> {
+    pub fn deserialize(bytes: &Uint8Array) -> platform::JsResult<AccountFile> {
         let native_account_file: NativeAccountFile = deserialize_from_uint8array(bytes)?;
+        Ok(Self(native_account_file))
+    }
+}
+
+// napi: i64 return, Buffer serialize/deserialize
+#[cfg(feature = "napi")]
+#[napi_derive::napi]
+impl AccountFile {
+    /// Returns the number of auth secret keys included.
+    pub fn auth_secret_key_count(&self) -> i64 {
+        self.0.auth_secret_keys.len() as i64
+    }
+
+    /// Serializes the `AccountFile` into a byte buffer.
+    #[napi]
+    pub fn serialize(&self) -> Buffer {
+        let bytes = self.0.to_bytes();
+        Buffer::from(bytes)
+    }
+
+    /// Deserializes a byte buffer into an `AccountFile`.
+    #[napi(factory)]
+    pub fn deserialize(bytes: Buffer) -> platform::JsResult<AccountFile> {
+        let native_account_file = NativeAccountFile::read_from_bytes(&bytes)
+            .map_err(|e| {
+                platform::error_with_context(e, "Error deserializing AccountFile")
+            })?;
         Ok(Self(native_account_file))
     }
 }

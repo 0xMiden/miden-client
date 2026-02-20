@@ -1,31 +1,32 @@
 use miden_client::crypto::SparseMerklePath as NativeSparseMerklePath;
-use wasm_bindgen::prelude::*;
+
+use crate::prelude::*;
 
 use super::word::Word;
 
 /// Represents a sparse Merkle path.
+#[bindings]
 #[derive(Clone)]
-#[wasm_bindgen]
 pub struct SparseMerklePath(NativeSparseMerklePath);
 
-#[wasm_bindgen]
+#[bindings]
 impl SparseMerklePath {
-    /// Returns the empty nodes mask used by this path.
-    #[wasm_bindgen(js_name = "emptyNodesMask")]
-    pub fn empty_nodes_mask(&self) -> u64 {
-        let (mask, _siblings) = self.0.clone().into_parts();
-        mask
-    }
-
     /// Returns the sibling nodes that make up the path.
     pub fn nodes(&self) -> Vec<Word> {
         let (_mask, siblings) = self.0.clone().into_parts();
         siblings.into_iter().map(Into::into).collect()
     }
 
+    /// Returns the empty nodes mask used by this path.
+    #[bindings]
+    pub fn empty_nodes_mask(&self) -> i64 {
+        let (mask, _siblings) = self.0.clone().into_parts();
+        mask as i64
+    }
+
     /// Verifies the path against a root.
-    pub fn verify(&self, index: u64, node: &Word, root: &Word) -> bool {
-        self.0.verify(index, node.clone().into(), &root.clone().into()).is_ok()
+    pub fn verify(&self, index: i64, node: &Word, root: &Word) -> bool {
+        self.0.verify(index as u64, node.clone().into(), &root.clone().into()).is_ok()
     }
 }
 

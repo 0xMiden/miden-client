@@ -1,26 +1,24 @@
-use core::convert::TryFrom;
-use core::fmt::Debug;
-
 use miden_client::auth::AuthSchemeId as NativeAuthSchemeId;
-use wasm_bindgen::prelude::*;
 
-/// Authentication schemes supported by the web client.
-#[repr(u8)]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-#[wasm_bindgen]
+use crate::prelude::*;
+
+/// Authentication scheme identifier.
+#[bindings(wasm(derive(Clone, Copy)), napi(string_enum))]
+#[derive(Debug, Eq, PartialEq)]
 pub enum AuthScheme {
-    AuthRpoFalcon512 = 0,
-    AuthEcdsaK256Keccak = 1,
+    AuthRpoFalcon512,
+    AuthEcdsaK256Keccak,
 }
 
-// Compile-time check to ensure both enums stay aligned.
+// Compile-time check to ensure both enums stay aligned (only for wasm where repr(u8) is used).
+#[cfg(feature = "wasm")]
 const _: () = {
     assert!(NativeAuthSchemeId::Falcon512Rpo as u8 == AuthScheme::AuthRpoFalcon512 as u8);
     assert!(NativeAuthSchemeId::EcdsaK256Keccak as u8 == AuthScheme::AuthEcdsaK256Keccak as u8);
 };
 
 impl TryFrom<AuthScheme> for NativeAuthSchemeId {
-    type Error = JsValue;
+    type Error = platform::PlatformError;
 
     fn try_from(value: AuthScheme) -> Result<Self, Self::Error> {
         match value {
@@ -31,17 +29,15 @@ impl TryFrom<AuthScheme> for NativeAuthSchemeId {
 }
 
 impl TryFrom<NativeAuthSchemeId> for AuthScheme {
-    type Error = JsValue;
+    type Error = platform::PlatformError;
 
     fn try_from(value: NativeAuthSchemeId) -> Result<Self, Self::Error> {
         match value {
             NativeAuthSchemeId::Falcon512Rpo => Ok(AuthScheme::AuthRpoFalcon512),
             NativeAuthSchemeId::EcdsaK256Keccak => Ok(AuthScheme::AuthEcdsaK256Keccak),
-            _ => Err(unsupported_scheme_error(value)),
+            _ => Err(platform::error_from_string(&format!(
+                "unsupported auth scheme: {value:?}"
+            ))),
         }
     }
-}
-
-fn unsupported_scheme_error(scheme: impl Debug) -> JsValue {
-    JsValue::from_str(&format!("unsupported auth scheme: {scheme:?}"))
 }

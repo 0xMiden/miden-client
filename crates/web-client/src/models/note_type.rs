@@ -1,17 +1,15 @@
 use miden_client::note::NoteType as NativeNoteType;
-use wasm_bindgen::prelude::*;
+
+use crate::prelude::*;
 
 /// Visibility level for note contents when published to the network.
-// Keep these masks in sync with `miden-protocol/src/note/note_type.rs`
-#[wasm_bindgen]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[repr(u8)]
+#[bindings(wasm(derive(Clone, Copy)), napi(string_enum))]
+#[derive(Debug, PartialEq, Eq)]
 pub enum NoteType {
     /// Notes with this type have only their hash published to the network.
-    Private = 0b10,
-
+    Private,
     /// Notes with this type are fully shared with the network.
-    Public = 0b01,
+    Public,
 }
 
 impl From<NativeNoteType> for NoteType {

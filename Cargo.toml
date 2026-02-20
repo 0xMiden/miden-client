@@ -4,6 +4,7 @@ resolver = "2"
 members = [
   "bin/integration-tests",
   "bin/miden-cli",
+  "crates/bindings-macro",
   "crates/idxdb-store",
   "crates/rust-client",
   "crates/sqlite-store",

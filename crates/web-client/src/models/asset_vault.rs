@@ -1,5 +1,5 @@
 use miden_client::asset::AssetVault as NativeAssetVault;
-use wasm_bindgen::prelude::*;
+use crate::prelude::*;
 
 use super::account_id::AccountId;
 use super::fungible_asset::FungibleAsset;
@@ -16,25 +16,21 @@ use super::word::Word;
 ///   value of the node.
 ///
 /// An asset vault can be reduced to a single hash which is the root of the Sparse Merkle Tree.
+#[bindings]
 #[derive(Clone)]
-#[wasm_bindgen]
 pub struct AssetVault(NativeAssetVault);
 
-#[wasm_bindgen]
+// Methods with identical signatures
+#[bindings]
 impl AssetVault {
     /// Returns the root commitment of the asset vault tree.
+    #[bindings(getter)]
     pub fn root(&self) -> Word {
         self.0.root().into()
     }
 
-    /// Returns the balance for the given fungible faucet, or zero if absent.
-    #[wasm_bindgen(js_name = "getBalance")]
-    pub fn get_balance(&self, faucet_id: &AccountId) -> u64 {
-        self.0.get_balance(faucet_id.into()).unwrap()
-    }
-
     /// Returns the fungible assets contained in this vault.
-    #[wasm_bindgen(js_name = "fungibleAssets")]
+    #[bindings(getter)]
     pub fn fungible_assets(&self) -> Vec<FungibleAsset> {
         self.0
             .assets()
@@ -46,6 +42,28 @@ impl AssetVault {
                 }
             })
             .collect()
+    }
+}
+
+// wasm: get_balance returns u64
+#[cfg(feature = "wasm")]
+#[wasm_bindgen]
+impl AssetVault {
+    /// Returns the balance for the given fungible faucet, or zero if absent.
+    
+    pub fn get_balance(&self, faucet_id: &AccountId) -> u64 {
+        self.0.get_balance(faucet_id.into()).unwrap()
+    }
+}
+
+// napi: get_balance returns i64
+#[cfg(feature = "napi")]
+#[napi_derive::napi]
+impl AssetVault {
+    /// Returns the balance for the given fungible faucet, or zero if absent.
+    pub fn get_balance(&self, faucet_id: &AccountId) -> i64 {
+        // napi doesn't support u64 natively; cast to i64
+        self.0.get_balance(faucet_id.into()).unwrap() as i64
     }
 }
 

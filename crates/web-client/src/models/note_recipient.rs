@@ -4,12 +4,11 @@ use miden_client::note::{
     NoteScript as NativeNoteScript,
     NoteStorage as NativeNoteStorage,
 };
-use wasm_bindgen::prelude::*;
 
 use super::note_script::NoteScript;
 use super::note_storage::NoteStorage;
 use super::word::Word;
-use crate::models::miden_arrays::NoteRecipientArray as RecipientArray;
+use crate::prelude::*;
 
 /// Value that describes under which condition a note can be consumed.
 ///
@@ -20,14 +19,13 @@ use crate::models::miden_arrays::NoteRecipientArray as RecipientArray;
 ///
 /// Recipient is computed as a nested hash of the serial number, the script root, and the storage
 /// commitment, ensuring the recipient digest binds all three pieces of data together.
+#[bindings]
 #[derive(Clone)]
-#[wasm_bindgen]
-pub struct NoteRecipient(NativeNoteRecipient);
+pub struct NoteRecipient(pub(crate) NativeNoteRecipient);
 
-#[wasm_bindgen]
+#[bindings]
 impl NoteRecipient {
-    /// Creates a note recipient from its serial number, script, and storage.
-    #[wasm_bindgen(constructor)]
+    #[bindings(constructor)]
     pub fn new(
         serial_num: &Word,
         note_script: &NoteScript,
@@ -42,23 +40,18 @@ impl NoteRecipient {
         NoteRecipient(native_note_recipient)
     }
 
-    /// Returns the digest of the recipient data (used in the note commitment).
     pub fn digest(&self) -> Word {
         self.0.digest().into()
     }
 
-    /// Returns the serial number that prevents double spends.
-    #[wasm_bindgen(js_name = "serialNum")]
     pub fn serial_num(&self) -> Word {
         self.0.serial_num().into()
     }
 
-    /// Returns the script that controls consumption.
     pub fn script(&self) -> NoteScript {
         self.0.script().into()
     }
 
-    /// Returns the storage provided to the script.
     pub fn storage(&self) -> NoteStorage {
         self.0.storage().into()
     }
@@ -91,8 +84,13 @@ impl From<&NoteRecipient> for NativeNoteRecipient {
     }
 }
 
-impl From<&RecipientArray> for Vec<NativeNoteRecipient> {
-    fn from(recipient_array: &RecipientArray) -> Self {
-        recipient_array.__inner.iter().map(NativeNoteRecipient::from).collect()
+#[cfg(feature = "wasm")]
+const _: () = {
+    use crate::models::miden_arrays::NoteRecipientArray as RecipientArray;
+
+    impl From<&RecipientArray> for alloc::vec::Vec<NativeNoteRecipient> {
+        fn from(recipient_array: &RecipientArray) -> Self {
+            recipient_array.__inner.iter().map(NativeNoteRecipient::from).collect()
+        }
     }
-}
+};

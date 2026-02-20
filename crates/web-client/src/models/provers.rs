@@ -7,21 +7,22 @@ use miden_client::transaction::{
     ProvingOptions,
     TransactionProver as TransactionProverTrait,
 };
-use wasm_bindgen::prelude::*;
+
+use crate::prelude::*;
 
 /// Wrapper over local or remote transaction proving backends.
-#[wasm_bindgen]
 #[derive(Clone)]
+#[bindings]
 pub struct TransactionProver {
     prover: Arc<dyn TransactionProverTrait + Send + Sync>,
     endpoint: Option<String>,
     timeout: Option<Duration>,
 }
 
-#[wasm_bindgen]
+#[bindings]
 impl TransactionProver {
     /// Creates a prover that uses the local proving backend.
-    #[wasm_bindgen(js_name = "newLocalProver")]
+    #[bindings(factory)]
     pub fn new_local_prover() -> TransactionProver {
         let local_prover = LocalTransactionProver::new(ProvingOptions::default());
         TransactionProver {
@@ -36,12 +37,12 @@ impl TransactionProver {
     /// Arguments:
     /// - `endpoint`: The URL of the remote prover.
     /// - `timeout_ms`: The timeout in milliseconds for the remote prover.
-    #[wasm_bindgen(js_name = "newRemoteProver")]
-    pub fn new_remote_prover(endpoint: &str, timeout_ms: Option<u64>) -> TransactionProver {
-        let mut remote_prover = RemoteTransactionProver::new(endpoint);
+    #[bindings(factory)]
+    pub fn new_remote_prover(endpoint: String, timeout_ms: Option<i64>) -> TransactionProver {
+        let mut remote_prover = RemoteTransactionProver::new(&endpoint);
 
         let timeout = if let Some(timeout) = timeout_ms {
-            let timeout = Duration::from_millis(timeout);
+            let timeout = Duration::from_millis(timeout as u64);
             remote_prover = remote_prover.with_timeout(timeout);
             Some(timeout)
         } else {
@@ -50,7 +51,7 @@ impl TransactionProver {
 
         TransactionProver {
             prover: Arc::new(remote_prover),
-            endpoint: Some(endpoint.to_string()),
+            endpoint: Some(endpoint),
             timeout,
         }
     }
@@ -63,7 +64,7 @@ impl TransactionProver {
     /// - `"remote|{endpoint}|{timeout_ms}"` for remote prover with timeout
     ///
     /// Uses `|` as delimiter since it's not a valid URL character.
-    pub fn serialize(&self) -> String {
+    pub fn serialize_config(&self) -> String {
         match (&self.endpoint, &self.timeout) {
             (Some(ep), Some(timeout)) => {
                 let timeout_ms = u64::try_from(timeout.as_millis())
@@ -77,18 +78,19 @@ impl TransactionProver {
 
     /// Reconstructs a prover from its serialized descriptor.
     ///
-    /// Parses the format produced by `serialize()`:
+    /// Parses the format produced by `serializeConfig()`:
     /// - `"local"` for local prover
     /// - `"remote|{endpoint}"` for remote prover without timeout
     /// - `"remote|{endpoint}|{timeout_ms}"` for remote prover with timeout
-    pub fn deserialize(payload: &str) -> Result<TransactionProver, JsValue> {
+    #[bindings(factory)]
+    pub fn deserialize_config(payload: String) -> JsResult<TransactionProver> {
         if payload == "local" {
             return Ok(TransactionProver::new_local_prover());
         }
 
         if let Some(rest) = payload.strip_prefix("remote|") {
             if rest.is_empty() {
-                return Err(JsValue::from_str("Remote prover requires an endpoint"));
+                return Err(platform::error_from_string("Remote prover requires an endpoint"));
             }
 
             // Split on last `|` to extract optional timeout
@@ -98,15 +100,18 @@ impl TransactionProver {
 
                 // Check if the suffix is a valid integer (timeout)
                 if let Ok(timeout_ms) = timeout_str.parse::<u64>() {
-                    return Ok(TransactionProver::new_remote_prover(endpoint, Some(timeout_ms)));
+                    return Ok(TransactionProver::new_remote_prover(
+                        endpoint.to_string(),
+                        Some(timeout_ms as i64),
+                    ));
                 }
             }
 
             // No valid timeout found, entire rest is the endpoint
-            return Ok(TransactionProver::new_remote_prover(rest, None));
+            return Ok(TransactionProver::new_remote_prover(rest.to_string(), None));
         }
 
-        Err(JsValue::from_str(&format!("Invalid prover payload: {payload}")))
+        Err(platform::error_from_string(&format!("Invalid prover payload: {payload}")))
     }
 
     /// Returns the endpoint if this is a remote prover.

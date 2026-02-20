@@ -1,6 +1,8 @@
 use miden_client::transaction::TransactionScript as NativeTransactionScript;
-use wasm_bindgen::prelude::*;
 
+use crate::prelude::*;
+
+#[cfg(feature = "wasm")]
 use crate::models::package::Package;
 use crate::models::word::Word;
 
@@ -12,19 +14,23 @@ use crate::models::word::Word;
 /// - A set of transaction script inputs defined by a map of key-value inputs that are loaded into
 ///   the advice inputs' map such that the transaction script can access them.
 #[derive(Clone)]
-#[wasm_bindgen]
+#[bindings]
 pub struct TransactionScript(NativeTransactionScript);
 
-#[wasm_bindgen]
+#[bindings]
 impl TransactionScript {
     /// Returns the MAST root commitment of the transaction script.
     pub fn root(&self) -> Word {
         self.0.root().into()
     }
+}
 
+#[cfg(feature = "wasm")]
+#[wasm_bindgen]
+impl TransactionScript {
     /// Creates a `NoteScript` from the given `Package`.
     /// Throws if the package is invalid.
-    #[wasm_bindgen(js_name = "fromPackage")]
+    
     pub fn from_package(package: &Package) -> Result<TransactionScript, JsValue> {
         let program = package.as_program()?;
         let native_transaction_script = NativeTransactionScript::new(program.into());

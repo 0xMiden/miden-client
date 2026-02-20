@@ -1,4 +1,4 @@
-use alloc::str::FromStr;
+use core::str::FromStr;
 
 use miden_client::Felt as NativeFelt;
 use miden_client::account::{AccountId as NativeAccountId, NetworkId as NativeNetworkId};
@@ -9,34 +9,35 @@ use miden_client::address::{
     CustomNetworkId,
     RoutingParameters,
 };
-use wasm_bindgen::prelude::*;
 
+use crate::prelude::*;
 use super::felt::Felt;
-use crate::js_error_with_context;
 
 /// Uniquely identifies a specific account.
 ///
 /// A Miden account ID is a 120-bit value derived from the commitments to account code and storage,
 /// and a random user-provided seed.
-#[wasm_bindgen]
+#[bindings]
 #[derive(Clone, Copy, Debug)]
-pub struct AccountId(NativeAccountId);
+pub struct AccountId(pub(crate) NativeAccountId);
 
 /// The type of a Miden network.
-#[wasm_bindgen]
+#[derive(Default)]
+#[bindings(napi(string_enum))]
 pub enum NetworkType {
     /// Main network prefix (`mm`).
-    Mainnet = 0,
+    #[default]
+    Mainnet,
     /// Public test network prefix (`mtst`).
-    Testnet = 1,
+    Testnet,
     /// Developer network prefix (`mdev`).
-    Devnet = 2,
+    Devnet,
     /// Custom network prefix.
-    Custom = 3,
+    Custom,
 }
 
 /// The identifier of a Miden network.
-#[wasm_bindgen]
+#[bindings]
 pub struct NetworkId {
     // Specific type of the network ID.
     network_type: NetworkType,
@@ -44,8 +45,9 @@ pub struct NetworkId {
     custom: Option<CustomNetworkId>,
 }
 
-#[wasm_bindgen]
+#[bindings]
 impl NetworkId {
+    #[bindings(napi(factory))]
     pub fn mainnet() -> NetworkId {
         NetworkId {
             network_type: NetworkType::Mainnet,
@@ -53,6 +55,7 @@ impl NetworkId {
         }
     }
 
+    #[bindings(napi(factory))]
     pub fn testnet() -> NetworkId {
         NetworkId {
             network_type: NetworkType::Testnet,
@@ -60,6 +63,7 @@ impl NetworkId {
         }
     }
 
+    #[bindings(napi(factory))]
     pub fn devnet() -> NetworkId {
         NetworkId {
             network_type: NetworkType::Devnet,
@@ -70,9 +74,10 @@ impl NetworkId {
     /// Builds a custom network ID from a provided custom prefix.
     ///
     /// Returns an error if the prefix is invalid.
-    pub fn custom(custom_prefix: &str) -> Result<NetworkId, JsValue> {
-        let custom = CustomNetworkId::from_str(custom_prefix)
-            .map_err(|err| js_error_with_context(err, "Error building custom id prefix"))?;
+    #[bindings(napi(factory))]
+    pub fn custom(custom_prefix: String) -> JsResult<NetworkId> {
+        let custom = CustomNetworkId::from_str(&custom_prefix)
+            .map_err(|err| platform::error_with_context(err, "Error building custom id prefix"))?;
 
         Ok(NetworkId {
             network_type: NetworkType::Custom,
@@ -81,90 +86,45 @@ impl NetworkId {
     }
 }
 
-#[wasm_bindgen]
-#[repr(u8)]
+/// Account interface type.
+#[bindings(napi(string_enum))]
 pub enum AccountInterface {
     /// Basic wallet address interface.
-    BasicWallet = 0,
+    BasicWallet,
 }
 
-#[wasm_bindgen]
+#[bindings]
 impl AccountId {
-    /// Builds an account ID from its hex string representation.
-    #[wasm_bindgen(js_name = "fromHex")]
-    pub fn from_hex(hex: &str) -> AccountId {
-        let native_account_id = NativeAccountId::from_hex(hex).unwrap();
-        AccountId(native_account_id)
-    }
-
     /// Returns true if the ID refers to a faucet.
-    #[wasm_bindgen(js_name = "isFaucet")]
     pub fn is_faucet(&self) -> bool {
         self.0.is_faucet()
     }
 
     /// Returns true if the ID refers to a regular account.
-    #[wasm_bindgen(js_name = "isRegularAccount")]
     pub fn is_regular_account(&self) -> bool {
         self.0.is_regular_account()
     }
 
     /// Returns true if the account uses public storage.
-    #[wasm_bindgen(js_name = "isPublic")]
     pub fn is_public(&self) -> bool {
         self.0.is_public()
     }
 
     /// Returns true if the account uses private storage.
-    #[wasm_bindgen(js_name = "isPrivate")]
     pub fn is_private(&self) -> bool {
         self.0.is_private()
     }
 
     /// Returns true if the ID is reserved for network accounts.
-    #[wasm_bindgen(js_name = "isNetwork")]
     pub fn is_network(&self) -> bool {
         self.0.is_network()
     }
 
     /// Returns the canonical hex representation of the account ID.
-    #[wasm_bindgen(js_name = "toString")]
+    #[bindings(napi(js_name = "toString"))]
     #[allow(clippy::inherent_to_string)]
-    pub fn to_string(&self) -> String {
+    pub fn to_string_js(&self) -> String {
         self.0.to_string()
-    }
-
-    /// Will turn the Account ID into its bech32 string representation.
-    #[wasm_bindgen(js_name = "toBech32")]
-    pub fn to_bech32(
-        &self,
-        network_id: NetworkId,
-        account_interface: AccountInterface,
-    ) -> Result<String, JsValue> {
-        let network_id: NativeNetworkId = network_id.into();
-
-        let routing_params = RoutingParameters::new(account_interface.into());
-        let address = Address::new(self.0)
-            .with_routing_parameters(routing_params)
-            .map_err(|err| js_error_with_context(err, "failed to set routing parameters"))?;
-        Ok(address.encode(network_id))
-    }
-
-    /// Given a bech32 encoded string, return the matching Account ID for it.
-    #[wasm_bindgen(js_name = "fromBech32")]
-    pub fn from_bech32(bech_32_encoded_id: &str) -> Result<AccountId, JsValue> {
-        // Since a bech32 encodes an account id + a routing parameter,
-        // we can use Address::decode to fetch the account id.
-        // Reference: https://github.com/0xMiden/miden-base/blob/150a8066c5a4b4011c4f3e55f9435921ad3835f3/docs/src/account/address.md#structure
-        let (_, address) = Address::decode(bech_32_encoded_id).map_err(|err| {
-            js_error_with_context(err, "could not interpret input as a bech32-encoded account id")
-        })?;
-        match address.id() {
-            AddressId::AccountId(account_id) => Ok(account_id.into()),
-            _unsupported => {
-                Err(JsValue::from_str("bech32 string decoded into an unsupported address kind"))
-            },
-        }
     }
 
     /// Returns the prefix field element storing metadata about version, type, and storage mode.
@@ -178,7 +138,76 @@ impl AccountId {
         let native_felt: NativeFelt = self.0.suffix();
         native_felt.into()
     }
+}
 
+#[bindings]
+impl AccountId {
+    /// Builds an account ID from its hex string representation.
+    #[bindings(napi(factory))]
+    pub fn from_hex(hex: String) -> JsResult<AccountId> {
+        let native_account_id = NativeAccountId::from_hex(&hex)
+            .map_err(|e| platform::error_from_string(&format!("Invalid account ID hex: {e}")))?;
+        Ok(AccountId(native_account_id))
+    }
+
+    /// Given a bech32 encoded string, return the matching Account ID for it.
+    #[bindings(napi(factory))]
+    pub fn from_bech32(bech_32_encoded_id: String) -> JsResult<AccountId> {
+        let (_, address) = Address::decode(&bech_32_encoded_id).map_err(|err| {
+            platform::error_with_context(
+                err,
+                "could not interpret input as a bech32-encoded account id",
+            )
+        })?;
+        match address.id() {
+            AddressId::AccountId(account_id) => Ok(account_id.into()),
+            _unsupported => Err(platform::error_from_string(
+                "bech32 string decoded into an unsupported address kind",
+            )),
+        }
+    }
+}
+
+// to_bech32 must stay separate: wasm takes NetworkId by value, napi by reference
+#[cfg(feature = "wasm")]
+#[bindings(wasm)]
+impl AccountId {
+    /// Will turn the Account ID into its bech32 string representation.
+    #[bindings(wasm(js_name = "toBech32"))]
+    pub fn to_bech32(
+        &self,
+        network_id: NetworkId,
+        account_interface: AccountInterface,
+    ) -> JsResult<String> {
+        let network_id: NativeNetworkId = network_id.into();
+
+        let routing_params = RoutingParameters::new(account_interface.into());
+        let address = Address::new(self.0)
+            .with_routing_parameters(routing_params)
+            .map_err(|err| platform::error_with_context(err, "failed to set routing parameters"))?;
+        Ok(address.encode(network_id))
+    }
+}
+
+#[cfg(feature = "napi")]
+#[bindings(napi)]
+impl AccountId {
+    /// Will turn the Account ID into its bech32 string representation.
+    pub fn to_bech32(
+        &self,
+        network_id: &NetworkId,
+        account_interface: AccountInterface,
+    ) -> JsResult<String> {
+        let native_network_id: NativeNetworkId = network_id.into();
+        let routing_params = RoutingParameters::new(account_interface.into());
+        let address = Address::new(self.0)
+            .with_routing_parameters(routing_params)
+            .map_err(|err| platform::error_with_context(err, "failed to set routing parameters"))?;
+        Ok(address.encode(native_network_id))
+    }
+}
+
+impl AccountId {
     pub(crate) fn as_native(&self) -> &NativeAccountId {
         &self.0
     }
@@ -211,6 +240,8 @@ impl From<&AccountId> for NativeAccountId {
     }
 }
 
+// wasm takes NetworkId by value
+#[cfg(feature = "wasm")]
 impl From<NetworkId> for NativeNetworkId {
     fn from(value: NetworkId) -> Self {
         match value.network_type {
@@ -220,6 +251,26 @@ impl From<NetworkId> for NativeNetworkId {
             NetworkType::Custom => {
                 let custom_prefix =
                     value.custom.expect("custom network id constructor implies existing prefix");
+                NativeNetworkId::from_str(custom_prefix.as_str())
+                    .expect("custom network id constructor implies valid prefix")
+            },
+        }
+    }
+}
+
+// napi takes NetworkId by reference
+#[cfg(feature = "napi")]
+impl From<&NetworkId> for NativeNetworkId {
+    fn from(value: &NetworkId) -> Self {
+        match value.network_type {
+            NetworkType::Mainnet => NativeNetworkId::Mainnet,
+            NetworkType::Testnet => NativeNetworkId::Testnet,
+            NetworkType::Devnet => NativeNetworkId::Devnet,
+            NetworkType::Custom => {
+                let custom_prefix = value
+                    .custom
+                    .as_ref()
+                    .expect("custom network id constructor implies existing prefix");
                 NativeNetworkId::from_str(custom_prefix.as_str())
                     .expect("custom network id constructor implies valid prefix")
             },

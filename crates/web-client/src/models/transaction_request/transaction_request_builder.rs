@@ -13,9 +13,10 @@ use miden_client::transaction::{
     TransactionScript as NativeTransactionScript,
 };
 use miden_client::vm::AdviceMap as NativeAdviceMap;
-use wasm_bindgen::prelude::*;
+use crate::prelude::*;
 
 use crate::models::advice_map::AdviceMap;
+#[cfg(feature = "wasm")]
 use crate::models::miden_arrays::{
     ForeignAccountArray,
     NoteAndArgsArray,
@@ -23,6 +24,16 @@ use crate::models::miden_arrays::{
     NoteRecipientArray,
     OutputNoteArray,
 };
+#[cfg(feature = "napi")]
+use crate::models::foreign_account::ForeignAccount;
+#[cfg(feature = "napi")]
+use crate::models::note_recipient::NoteRecipient;
+#[cfg(feature = "napi")]
+use crate::models::output_note::OutputNote;
+#[cfg(feature = "napi")]
+use crate::models::transaction_request::note_and_args::NoteAndArgs;
+#[cfg(feature = "napi")]
+use crate::models::transaction_request::note_details_and_tag::NoteDetailsAndTag;
 use crate::models::transaction_request::TransactionRequest;
 use crate::models::transaction_script::TransactionScript;
 use crate::models::word::Word;
@@ -31,114 +42,171 @@ use crate::models::word::Word;
 ///
 /// Use this builder to construct a `TransactionRequest` by adding input notes, specifying
 /// scripts, and setting other transaction parameters.
+#[bindings]
 #[derive(Clone)]
-#[wasm_bindgen]
-pub struct TransactionRequestBuilder(NativeTransactionRequestBuilder);
+pub struct TransactionRequestBuilder(Option<NativeTransactionRequestBuilder>);
 
-#[wasm_bindgen]
+impl TransactionRequestBuilder {
+    fn take_inner(&mut self) -> NativeTransactionRequestBuilder {
+        self.0
+            .take()
+            .expect("TransactionRequestBuilder has already been consumed by build()")
+    }
+}
+
+// Shared methods (same signatures on both platforms)
+#[bindings]
 impl TransactionRequestBuilder {
     /// Creates a new empty transaction request builder.
-    #[wasm_bindgen(constructor)]
+    #[bindings(constructor)]
     pub fn new() -> TransactionRequestBuilder {
-        let native_transaction_request = NativeTransactionRequestBuilder::new();
-        TransactionRequestBuilder(native_transaction_request)
-    }
-
-    /// Adds input notes with optional arguments.
-    #[wasm_bindgen(js_name = "withInputNotes")]
-    pub fn with_input_notes(mut self, notes: &NoteAndArgsArray) -> Self {
-        let native_note_and_note_args: Vec<(NativeNote, Option<NativeNoteArgs>)> = notes.into();
-        self.0 = self.0.input_notes(native_note_and_note_args);
-        self
-    }
-
-    /// Adds notes created by the sender that should be emitted by the transaction.
-    #[wasm_bindgen(js_name = "withOwnOutputNotes")]
-    pub fn with_own_output_notes(mut self, notes: &OutputNoteArray) -> Self {
-        let native_output_notes: Vec<NativeOutputNote> = notes.into();
-        self.0 = self.0.own_output_notes(native_output_notes);
-        self
+        TransactionRequestBuilder(Some(NativeTransactionRequestBuilder::new()))
     }
 
     /// Attaches a custom transaction script.
-    #[wasm_bindgen(js_name = "withCustomScript")]
-    pub fn with_custom_script(mut self, script: &TransactionScript) -> Self {
+    pub fn with_custom_script(&mut self, script: &TransactionScript) {
         let native_script: NativeTransactionScript = script.into();
-        self.0 = self.0.custom_script(native_script);
-        self
+        let inner = self.take_inner();
+        self.0 = Some(inner.custom_script(native_script));
+    }
+
+    /// Merges an advice map to be available during script execution.
+    pub fn extend_advice_map(&mut self, advice_map: &AdviceMap) {
+        let native_advice_map: NativeAdviceMap = advice_map.into();
+        let inner = self.take_inner();
+        self.0 = Some(inner.extend_advice_map(native_advice_map));
+    }
+
+    /// Adds a transaction script argument.
+    pub fn with_script_arg(&mut self, script_arg: &Word) {
+        let native_word: NativeWord = script_arg.into();
+        let inner = self.take_inner();
+        self.0 = Some(inner.script_arg(native_word));
+    }
+
+    /// Adds an authentication argument.
+    pub fn with_auth_arg(&mut self, auth_arg: &Word) {
+        let native_word: NativeWord = auth_arg.into();
+        let inner = self.take_inner();
+        self.0 = Some(inner.auth_arg(native_word));
+    }
+
+    /// Finalizes the builder into a `TransactionRequest`.
+    pub fn build(&mut self) -> TransactionRequest {
+        let inner = self.take_inner();
+        TransactionRequest::from(inner.build().unwrap())
+    }
+}
+
+// wasm-specific methods (uses wasm array types)
+#[cfg(feature = "wasm")]
+#[wasm_bindgen]
+impl TransactionRequestBuilder {
+    /// Adds input notes with optional arguments.
+    pub fn with_input_notes(&mut self, notes: &NoteAndArgsArray) {
+        let wrapper_notes: Vec<crate::models::transaction_request::note_and_args::NoteAndArgs> = notes.into();
+        let native_note_and_note_args: Vec<(NativeNote, Option<NativeNoteArgs>)> =
+            wrapper_notes.into_iter().map(Into::into).collect();
+        let inner = self.take_inner();
+        self.0 = Some(inner.input_notes(native_note_and_note_args));
+    }
+
+    /// Adds notes created by the sender that should be emitted by the transaction.
+    pub fn with_own_output_notes(&mut self, notes: &OutputNoteArray) {
+        let wrapper_notes: Vec<crate::models::output_note::OutputNote> = notes.into();
+        let native_output_notes: Vec<NativeOutputNote> =
+            wrapper_notes.into_iter().map(Into::into).collect();
+        let inner = self.take_inner();
+        self.0 = Some(inner.own_output_notes(native_output_notes));
     }
 
     /// Declares expected output recipients (used for verification).
     #[wasm_bindgen(js_name = "withExpectedOutputRecipients")]
-    pub fn with_expected_output_notes(mut self, recipients: &NoteRecipientArray) -> Self {
+    pub fn with_expected_output_notes(&mut self, recipients: &NoteRecipientArray) {
         let native_recipients: Vec<NativeNoteRecipient> = recipients.into();
-        self.0 = self.0.expected_output_recipients(native_recipients);
-        self
+        let inner = self.take_inner();
+        self.0 = Some(inner.expected_output_recipients(native_recipients));
     }
 
     /// Declares notes expected to be created in follow-up executions.
-    #[wasm_bindgen(js_name = "withExpectedFutureNotes")]
-    pub fn with_expected_future_notes(
-        mut self,
-        note_details_and_tag: &NoteDetailsAndTagArray,
-    ) -> Self {
-        let native_note_details_and_tag: Vec<(NativeNoteDetails, NativeNoteTag)> =
+    pub fn with_expected_future_notes(&mut self, note_details_and_tag: &NoteDetailsAndTagArray) {
+        let wrapper_notes: Vec<crate::models::transaction_request::note_details_and_tag::NoteDetailsAndTag> =
             note_details_and_tag.into();
-        self.0 = self.0.expected_future_notes(native_note_details_and_tag);
-        self
-    }
-
-    /// Merges an advice map to be available during script execution.
-    #[wasm_bindgen(js_name = "extendAdviceMap")]
-    pub fn extend_advice_map(mut self, advice_map: &AdviceMap) -> Self {
-        let native_advice_map: NativeAdviceMap = advice_map.into();
-        self.0 = self.0.extend_advice_map(native_advice_map);
-        self
+        let native_note_details_and_tag: Vec<(NativeNoteDetails, NativeNoteTag)> =
+            wrapper_notes.into_iter().map(Into::into).collect();
+        let inner = self.take_inner();
+        self.0 = Some(inner.expected_future_notes(native_note_details_and_tag));
     }
 
     /// Registers foreign accounts referenced by the transaction.
-    #[wasm_bindgen(js_name = "withForeignAccounts")]
-    pub fn with_foreign_accounts(mut self, foreign_accounts: &ForeignAccountArray) -> Self {
+    pub fn with_foreign_accounts(&mut self, foreign_accounts: &ForeignAccountArray) {
         let native_foreign_accounts: Vec<NativeForeignAccount> =
             foreign_accounts.__inner.iter().map(|account| account.clone().into()).collect();
-        self.0 = self.0.foreign_accounts(native_foreign_accounts);
-        self
+        let inner = self.take_inner();
+        self.0 = Some(inner.foreign_accounts(native_foreign_accounts));
+    }
+}
+
+// napi-specific methods (uses Vec<&T> parameter types)
+#[cfg(feature = "napi")]
+#[napi_derive::napi]
+impl TransactionRequestBuilder {
+    /// Adds input notes with optional arguments.
+    pub fn with_input_notes(&mut self, notes: Vec<&NoteAndArgs>) {
+        let native_note_and_note_args: Vec<(NativeNote, Option<NativeNoteArgs>)> =
+            notes.into_iter().map(Into::into).collect();
+        let inner = self.take_inner();
+        self.0 = Some(inner.input_notes(native_note_and_note_args));
     }
 
-    /// Adds a transaction script argument.
-    #[wasm_bindgen(js_name = "withScriptArg")]
-    pub fn with_script_arg(mut self, script_arg: &Word) -> Self {
-        let native_word: NativeWord = script_arg.into();
-        self.0 = self.0.script_arg(native_word);
-        self
+    /// Adds notes created by the sender that should be emitted by the transaction.
+    pub fn with_own_output_notes(&mut self, notes: Vec<&OutputNote>) {
+        let native_output_notes: Vec<NativeOutputNote> =
+            notes.into_iter().map(|n| n.note().clone()).collect();
+        let inner = self.take_inner();
+        self.0 = Some(inner.own_output_notes(native_output_notes));
     }
 
-    /// Adds an authentication argument.
-    #[wasm_bindgen(js_name = "withAuthArg")]
-    pub fn with_auth_arg(mut self, auth_arg: &Word) -> Self {
-        let native_word: NativeWord = auth_arg.into();
-        self.0 = self.0.auth_arg(native_word);
-        self
+    /// Declares expected output recipients (used for verification).
+    #[napi(js_name = "withExpectedOutputRecipients")]
+    pub fn with_expected_output_notes(&mut self, recipients: Vec<&NoteRecipient>) {
+        let native_recipients: Vec<NativeNoteRecipient> =
+            recipients.into_iter().map(Into::into).collect();
+        let inner = self.take_inner();
+        self.0 = Some(inner.expected_output_recipients(native_recipients));
     }
 
-    /// Finalizes the builder into a `TransactionRequest`.
-    pub fn build(self) -> TransactionRequest {
-        TransactionRequest(self.0.build().unwrap())
+    /// Declares notes expected to be created in follow-up executions.
+    pub fn with_expected_future_notes(&mut self, note_details_and_tag: Vec<&NoteDetailsAndTag>) {
+        let native_note_details_and_tag: Vec<(NativeNoteDetails, NativeNoteTag)> =
+            note_details_and_tag.into_iter().map(Into::into).collect();
+        let inner = self.take_inner();
+        self.0 = Some(inner.expected_future_notes(native_note_details_and_tag));
+    }
+
+    /// Registers foreign accounts referenced by the transaction.
+    pub fn with_foreign_accounts(&mut self, foreign_accounts: Vec<&ForeignAccount>) {
+        let native_foreign_accounts: Vec<NativeForeignAccount> =
+            foreign_accounts.into_iter().map(|a| a.into()).collect();
+        let inner = self.take_inner();
+        self.0 = Some(inner.foreign_accounts(native_foreign_accounts));
     }
 }
 
 // CONVERSIONS
 // ================================================================================================
 
+#[cfg(feature = "wasm")]
 impl From<TransactionRequestBuilder> for NativeTransactionRequestBuilder {
-    fn from(transaction_request: TransactionRequestBuilder) -> Self {
-        transaction_request.0
+    fn from(mut transaction_request: TransactionRequestBuilder) -> Self {
+        transaction_request.take_inner()
     }
 }
 
+#[cfg(feature = "wasm")]
 impl From<&TransactionRequestBuilder> for NativeTransactionRequestBuilder {
     fn from(transaction_request: &TransactionRequestBuilder) -> Self {
-        transaction_request.0.clone()
+        transaction_request.0.clone().expect("TransactionRequestBuilder has been consumed")
     }
 }
 

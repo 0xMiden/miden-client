@@ -1,48 +1,63 @@
 use miden_client::auth::{PublicKey as NativePublicKey, Signature as NativeSignature};
-use miden_client::{Deserializable, Word as NativeWord};
-use wasm_bindgen::prelude::*;
+#[cfg(feature = "napi")]
+use miden_client::Serializable;
+use miden_client::Word as NativeWord;
+#[cfg(feature = "napi")]
+use napi::bindgen_prelude::*;
+#[cfg(feature = "wasm")]
 use wasm_bindgen_futures::js_sys::Uint8Array;
 
-use crate::js_error_with_context;
+use crate::prelude::*;
+
 use crate::models::signature::Signature;
 use crate::models::signing_inputs::SigningInputs;
 use crate::models::word::Word;
+use crate::platform::{self, JsResult};
+#[cfg(feature = "wasm")]
 use crate::utils::serialize_to_uint8array;
 
-#[wasm_bindgen]
+// serialize differs in return types (Uint8Array vs Buffer) so it needs separate impl blocks.
+// deserialize and recover_from are now unified in the shared block using platform::JsBytes.
+
+#[bindings]
 #[derive(Clone)]
 pub struct PublicKey(pub(crate) NativePublicKey);
 
-#[wasm_bindgen]
+// Shared methods with identical implementations across both platforms.
+#[bindings]
 impl PublicKey {
-    /// Serializes the public key into bytes.
-    pub fn serialize(&self) -> Uint8Array {
-        serialize_to_uint8array(&self.0)
-    }
-
-    /// Deserializes a public key from bytes.
-    pub fn deserialize(bytes: &Uint8Array) -> Result<PublicKey, JsValue> {
-        let native_public_key = NativePublicKey::read_from_bytes(&bytes.to_vec())
-            .map_err(|e| js_error_with_context(e, "Failed to deserialize public key"))?;
-        Ok(PublicKey(native_public_key))
-    }
-
     /// Verifies a blind message word against the signature.
     pub fn verify(&self, message: &Word, signature: &Signature) -> bool {
         self.verify_data(&SigningInputs::new_blind(message), signature)
     }
 
     /// Returns the commitment corresponding to this public key.
-    #[wasm_bindgen(js_name = "toCommitment")]
+    #[bindings]
     pub fn to_commitment(&self) -> Word {
         let commitment = self.0.to_commitment();
         let native_word: NativeWord = commitment.into();
         native_word.into()
     }
 
+    /// Verifies a signature over arbitrary signing inputs.
+    #[bindings]
+    pub fn verify_data(&self, signing_inputs: &SigningInputs, signature: &Signature) -> bool {
+        let native_public_key: NativePublicKey = self.into();
+        let message = signing_inputs.to_commitment().into();
+        let native_signature: NativeSignature = signature.clone().into();
+        native_public_key.verify(message, native_signature)
+    }
+
+    /// Deserializes a public key from bytes.
+    #[bindings(factory)]
+    pub fn deserialize(bytes: &platform::JsBytes) -> JsResult<PublicKey> {
+        let native_public_key = platform::deserialize_from_bytes(bytes)?;
+        Ok(PublicKey(native_public_key))
+    }
+
     /// Recovers a public key from a signature (only supported for `RpoFalcon512`).
-    #[wasm_bindgen(js_name = "recoverFrom")]
-    pub fn recover_from(message: &Word, signature: &Signature) -> Result<PublicKey, JsValue> {
+    #[bindings(js_name = "recoverFrom", factory)]
+    pub fn recover_from(message: &Word, signature: &Signature) -> JsResult<PublicKey> {
         let native_message: NativeWord = message.into();
         let native_signature: NativeSignature = signature.into();
 
@@ -54,19 +69,30 @@ impl PublicKey {
                 );
                 Ok(NativePublicKey::Falcon512Rpo(public_key).into())
             },
-            NativeSignature::EcdsaK256Keccak(_) => Err(JsValue::from_str(
+            NativeSignature::EcdsaK256Keccak(_) => Err(platform::error_from_string(
                 "Recovering a public key from an EcdsaK256Keccak signature is not supported yet",
             )),
         }
     }
+}
 
-    /// Verifies a signature over arbitrary signing inputs.
-    #[wasm_bindgen(js_name = "verifyData")]
-    pub fn verify_data(&self, signing_inputs: &SigningInputs, signature: &Signature) -> bool {
-        let native_public_key: NativePublicKey = self.into();
-        let message = signing_inputs.to_commitment().into();
-        let native_signature: NativeSignature = signature.clone().into();
-        native_public_key.verify(message, native_signature)
+#[cfg(feature = "wasm")]
+#[wasm_bindgen]
+impl PublicKey {
+    /// Serializes the public key into bytes.
+    pub fn serialize(&self) -> Uint8Array {
+        serialize_to_uint8array(&self.0)
+    }
+}
+
+#[cfg(feature = "napi")]
+#[napi_derive::napi]
+impl PublicKey {
+    /// Serializes the public key into bytes.
+    #[napi]
+    pub fn serialize(&self) -> Buffer {
+        let bytes = self.0.to_bytes();
+        Buffer::from(bytes)
     }
 }
 

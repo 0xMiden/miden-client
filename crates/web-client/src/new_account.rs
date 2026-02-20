@@ -3,81 +3,115 @@ use miden_client::account::component::BasicFungibleFaucet;
 use miden_client::account::{AccountBuilder, AccountComponent, AccountType};
 use miden_client::asset::TokenSymbol;
 use miden_client::auth::{
-    AuthEcdsaK256Keccak,
-    AuthFalcon512Rpo,
-    AuthSchemeId as NativeAuthScheme,
-    AuthSecretKey,
+    AuthEcdsaK256Keccak, AuthFalcon512Rpo, AuthSchemeId as NativeAuthScheme, AuthSecretKey,
 };
 use rand::rngs::StdRng;
 use rand::{RngCore, SeedableRng};
-use wasm_bindgen::prelude::*;
 
+use crate::prelude::*;
 use super::models::account::Account;
 use super::models::account_storage_mode::AccountStorageMode;
 use super::models::auth::AuthScheme;
-use super::models::auth_secret_key::AuthSecretKey as WebAuthSecretKey;
 use crate::helpers::generate_wallet;
 use crate::models::account_id::AccountId;
-use crate::{WebClient, js_error_with_context};
+use crate::models::auth_secret_key::AuthSecretKey as BindingsAuthSecretKey;
+use crate::WebClient;
 
-#[wasm_bindgen]
+// Shared methods
+#[bindings]
 impl WebClient {
-    #[wasm_bindgen(js_name = "newWallet")]
+    #[bindings(js_name = "newAccount")]
+    pub async fn new_account(&self, account: &Account, overwrite: bool) -> platform::JsResult<()> {
+        let mut guard = lock_client!(self);
+        let client = guard
+            .as_mut()
+            .ok_or_else(|| platform::error_from_string("Client not initialized"))?;
+
+        let native_account = account.into();
+
+        client
+            .add_account(&native_account, overwrite)
+            .await
+            .map_err(|err| platform::error_with_context(err, "failed to insert new account"))?;
+        Ok(())
+    }
+
+    #[bindings(js_name = "newWallet")]
     pub async fn new_wallet(
-        &mut self,
+        &self,
         storage_mode: &AccountStorageMode,
         mutable: bool,
         auth_scheme: AuthScheme,
         init_seed: Option<Vec<u8>>,
-    ) -> Result<Account, JsValue> {
-        let keystore = self.keystore.clone();
-        if let Some(client) = self.get_mut_inner() {
-            let (new_account, key_pair) =
-                generate_wallet(storage_mode, mutable, init_seed, auth_scheme).await?;
+    ) -> platform::JsResult<Account> {
+        let (new_account, key_pair) =
+            generate_wallet(storage_mode, mutable, init_seed, auth_scheme)?;
 
-            client
-                .add_account(&new_account, false)
-                .await
-                .map_err(|err| js_error_with_context(err, "failed to insert new wallet"))?;
-
+        // Add key to keystore
+        {
+            let keystore = lock_keystore!(self)?;
+            #[cfg(feature = "wasm")]
             keystore
-                .expect("KeyStore should be initialized")
                 .add_secret_key(&key_pair)
                 .await
-                .map_err(|err| err.to_string())?;
-
-            client
-                .register_account_public_key_commitments(
-                    &new_account.id(),
-                    &[key_pair.public_key()],
-                )
-                .await
                 .map_err(|err| {
-                    js_error_with_context(err, "failed to map account to public keys")
+                    platform::error_with_context(err, "failed to add secret key to keystore")
                 })?;
-
-            Ok(new_account.into())
-        } else {
-            Err(JsValue::from_str("Client not initialized"))
+            #[cfg(feature = "napi")]
+            keystore
+                .add_key(&key_pair)
+                .map_err(|err| {
+                    platform::error_with_context(err, "failed to add key to keystore")
+                })?;
         }
+
+        // Add account and register public keys
+        let mut guard = lock_client!(self);
+        let client = guard
+            .as_mut()
+            .ok_or_else(|| platform::error_from_string("Client not initialized"))?;
+
+        client
+            .add_account(&new_account, false)
+            .await
+            .map_err(|err| platform::error_with_context(err, "failed to insert new wallet"))?;
+
+        client
+            .register_account_public_key_commitments(
+                &new_account.id(),
+                &[key_pair.public_key()],
+            )
+            .await
+            .map_err(|err| {
+                platform::error_with_context(err, "failed to map account to public keys")
+            })?;
+
+        Ok(new_account.into())
     }
 
-    #[wasm_bindgen(js_name = "newFaucet")]
+    #[bindings(js_name = "newFaucet")]
     pub async fn new_faucet(
-        &mut self,
+        &self,
         storage_mode: &AccountStorageMode,
         non_fungible: bool,
-        token_symbol: &str,
+        token_symbol: String,
         decimals: u8,
-        max_supply: u64,
+        max_supply: i64,
         auth_scheme: AuthScheme,
-    ) -> Result<Account, JsValue> {
+    ) -> platform::JsResult<Account> {
         if non_fungible {
-            return Err(JsValue::from_str("Non-fungible faucets are not supported yet"));
+            return Err(platform::error_from_string(
+                "Non-fungible faucets are not supported yet",
+            ));
         }
 
-        let keystore = self.keystore.clone();
-        if let Some(client) = self.get_mut_inner() {
+        // Build the faucet account (needs client rng)
+        let (new_account, key_pair) = {
+            let mut guard = lock_client!(self);
+            let client = guard
+                .as_mut()
+                .ok_or_else(|| platform::error_from_string("Client not initialized"))?;
+
             let mut seed = [0u8; 32];
             client.rng().fill_bytes(&mut seed);
             // TODO: we need a way to pass the client's rng instead of having to use an stdrng
@@ -99,94 +133,106 @@ impl WebClient {
                 },
                 _ => {
                     let message = format!("unsupported auth scheme: {native_scheme:?}");
-                    return Err(JsValue::from_str(&message));
+                    return Err(platform::error_from_string(&message));
                 },
             };
 
-            let symbol =
-                TokenSymbol::new(token_symbol).map_err(|e| JsValue::from_str(&e.to_string()))?;
-            let max_supply = Felt::try_from(max_supply.to_le_bytes().as_slice())
+            let max_supply_u64 = max_supply as u64;
+            let symbol = TokenSymbol::new(&token_symbol)
+                .map_err(|e| platform::error_with_context(e, "failed to create token symbol"))?;
+            let max_supply_felt = Felt::try_from(max_supply_u64.to_le_bytes().as_slice())
                 .expect("u64 can be safely converted to a field element");
 
             let mut init_seed = [0u8; 32];
             faucet_rng.fill_bytes(&mut init_seed);
 
-            let new_account = match AccountBuilder::new(init_seed)
+            let new_account = AccountBuilder::new(init_seed)
                 .account_type(AccountType::FungibleFaucet)
                 .storage_mode(storage_mode.into())
                 .with_auth_component(auth_component)
                 .with_component(
-                    BasicFungibleFaucet::new(symbol, decimals, max_supply)
-                        .map_err(|err| js_error_with_context(err, "failed to create new faucet"))?,
+                    BasicFungibleFaucet::new(symbol, decimals, max_supply_felt)
+                        .map_err(|err| {
+                            platform::error_with_context(err, "failed to create new faucet")
+                        })?,
                 )
                 .build()
-            {
-                Ok(result) => result,
-                Err(err) => {
-                    let error_message = format!("Failed to create new faucet: {err:?}");
-                    return Err(JsValue::from_str(&error_message));
-                },
-            };
-
-            keystore
-                .expect("KeyStore should be initialized")
-                .add_secret_key(&key_pair)
-                .await
-                .map_err(|err| err.to_string())?;
-
-            client
-                .register_account_public_key_commitments(
-                    &new_account.id(),
-                    &[key_pair.public_key()],
-                )
-                .await
                 .map_err(|err| {
-                    js_error_with_context(err, "failed to map account to public keys")
+                    let error_message = format!("Failed to create new faucet: {err:?}");
+                    platform::error_from_string(&error_message)
                 })?;
 
-            match client.add_account(&new_account, false).await {
-                Ok(_) => Ok(new_account.into()),
-                Err(err) => {
-                    let error_message = format!("Failed to insert new faucet: {err:?}");
-                    Err(JsValue::from_str(&error_message))
-                },
-            }
-        } else {
-            Err(JsValue::from_str("Client not initialized"))
-        }
-    }
+            (new_account, key_pair)
+        }; // Drop client guard
 
-    #[wasm_bindgen(js_name = "newAccount")]
-    pub async fn new_account(&mut self, account: &Account, overwrite: bool) -> Result<(), JsValue> {
-        if let Some(client) = self.get_mut_inner() {
-            let native_account = account.into();
-
-            client
-                .add_account(&native_account, overwrite)
+        // Add key to keystore
+        {
+            let keystore = lock_keystore!(self)?;
+            #[cfg(feature = "wasm")]
+            keystore
+                .add_secret_key(&key_pair)
                 .await
-                .map_err(|err| js_error_with_context(err, "failed to insert new account"))?;
-            Ok(())
-        } else {
-            Err(JsValue::from_str("Client not initialized"))
+                .map_err(|err| {
+                    platform::error_with_context(err, "failed to add secret key to keystore")
+                })?;
+            #[cfg(feature = "napi")]
+            keystore
+                .add_key(&key_pair)
+                .map_err(|err| {
+                    platform::error_with_context(err, "failed to add key to keystore")
+                })?;
         }
-    }
 
+        // Re-lock client for account operations
+        let mut guard = lock_client!(self);
+        let client = guard
+            .as_mut()
+            .ok_or_else(|| platform::error_from_string("Client not initialized"))?;
+
+        client
+            .register_account_public_key_commitments(
+                &new_account.id(),
+                &[key_pair.public_key()],
+            )
+            .await
+            .map_err(|err| {
+                platform::error_with_context(err, "failed to map account to public keys")
+            })?;
+
+        client
+            .add_account(&new_account, false)
+            .await
+            .map(|_| new_account.into())
+            .map_err(|err| {
+                let error_message = format!("Failed to insert new faucet: {err:?}");
+                platform::error_from_string(&error_message)
+            })
+    }
+}
+
+// wasm-only: add_account_secret_key_to_web_store (different method name + async keystore)
+#[cfg(feature = "wasm")]
+#[wasm_bindgen]
+impl WebClient {
     #[wasm_bindgen(js_name = "addAccountSecretKeyToWebStore")]
     pub async fn add_account_secret_key_to_web_store(
-        &mut self,
+        &self,
         account_id: &AccountId,
-        secret_key: &WebAuthSecretKey,
-    ) -> Result<(), JsValue> {
-        let keystore = self.keystore.as_ref().expect("KeyStore should be initialized");
+        secret_key: &BindingsAuthSecretKey,
+    ) -> platform::JsResult<()> {
+        let keystore = lock_keystore!(self)?;
         let native_secret_key: AuthSecretKey = secret_key.into();
         let native_account_id = account_id.into();
 
         keystore
             .add_secret_key(&native_secret_key)
             .await
-            .map_err(|err| err.to_string())?;
+            .map_err(|err| {
+                platform::error_with_context(err, "failed to add secret key to keystore")
+            })?;
 
-        if let Some(client) = self.get_mut_inner() {
+        let mut guard = lock_client!(self);
+        if let Some(client) = guard.as_mut() {
             client
                 .register_account_public_key_commitments(
                     &native_account_id,
@@ -194,9 +240,45 @@ impl WebClient {
                 )
                 .await
                 .map_err(|err| {
-                    js_error_with_context(err, "failed to map account to public keys")
+                    platform::error_with_context(err, "failed to map account to public keys")
                 })?;
         }
+
+        Ok(())
+    }
+}
+
+// napi-only: add_secret_key (different method name + sync keystore)
+#[cfg(feature = "napi")]
+#[napi_derive::napi]
+impl WebClient {
+    pub async fn add_secret_key(
+        &self,
+        account_id: &AccountId,
+        secret_key: &BindingsAuthSecretKey,
+    ) -> platform::JsResult<()> {
+        let keystore = lock_keystore!(self)?;
+        let native_secret_key: AuthSecretKey = secret_key.into();
+        let native_account_id = account_id.into();
+
+        keystore
+            .add_key(&native_secret_key)
+            .map_err(|err| platform::error_with_context(err, "failed to add key to keystore"))?;
+
+        let mut guard = lock_client!(self);
+        let client = guard
+            .as_mut()
+            .ok_or_else(|| platform::error_from_string("Client not initialized"))?;
+
+        client
+            .register_account_public_key_commitments(
+                &native_account_id,
+                &[native_secret_key.public_key()],
+            )
+            .await
+            .map_err(|err| {
+                platform::error_with_context(err, "failed to map account to public keys")
+            })?;
 
         Ok(())
     }

@@ -1,17 +1,18 @@
 use miden_client::note::NoteAttachmentKind as NativeNoteAttachmentKind;
-use wasm_bindgen::prelude::*;
+
+use crate::prelude::*;
 
 /// Defines the payload shape of a note attachment.
-#[wasm_bindgen]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[repr(u8)]
+#[bindings(wasm(derive(Clone, Copy)), napi(string_enum))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NoteAttachmentKind {
-    None = 0,
-    Word = 1,
-    Array = 2,
+    None,
+    Word,
+    Array,
 }
 
 // Compile-time check to keep enum values aligned.
+#[cfg(feature = "wasm")]
 const _: () = {
     assert!(NativeNoteAttachmentKind::None as u8 == NoteAttachmentKind::None as u8);
     assert!(NativeNoteAttachmentKind::Word as u8 == NoteAttachmentKind::Word as u8);

@@ -1,4 +1,6 @@
+use alloc::borrow::ToOwned;
 use alloc::sync::Arc;
+use alloc::vec::Vec;
 
 use miden_client::testing::MockChain;
 use miden_client::testing::mock::MockRpcApi;

@@ -1,5 +1,5 @@
 use miden_client::transaction::TransactionId as NativeTransactionId;
-use wasm_bindgen::prelude::*;
+use crate::prelude::*;
 
 use super::felt::Felt;
 use super::word::Word;
@@ -12,26 +12,25 @@ use super::word::Word;
 /// This achieves the following properties:
 /// - Transactions are identical if and only if they have the same ID.
 /// - Computing transaction ID can be done solely from public transaction data.
+#[bindings]
 #[derive(Clone)]
-#[wasm_bindgen]
 pub struct TransactionId(NativeTransactionId);
 
-#[wasm_bindgen]
+#[bindings]
 impl TransactionId {
     /// Returns the transaction ID as field elements.
-    #[wasm_bindgen(js_name = "asElements")]
+    #[bindings]
     pub fn as_elements(&self) -> Vec<Felt> {
         self.0.as_elements().iter().map(Into::into).collect()
     }
 
     /// Returns the transaction ID as raw bytes.
-    #[wasm_bindgen(js_name = "asBytes")]
+    #[bindings]
     pub fn as_bytes(&self) -> Vec<u8> {
         self.0.as_bytes().to_vec()
     }
 
     /// Returns the hexadecimal encoding of the transaction ID.
-    #[wasm_bindgen(js_name = "toHex")]
     pub fn to_hex(&self) -> String {
         self.0.to_hex()
     }

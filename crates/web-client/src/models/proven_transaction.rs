@@ -1,30 +1,25 @@
 use miden_client::account::AccountId as NativeAccountId;
 use miden_client::transaction::ProvenTransaction as NativeProvenTransaction;
-use wasm_bindgen::prelude::*;
-use wasm_bindgen_futures::js_sys::Uint8Array;
 
 use crate::models::account_id::AccountId;
 use crate::models::output_notes::OutputNotes;
 use crate::models::transaction_id::TransactionId;
 use crate::models::word::Word;
-use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
+use crate::platform::{self, JsBytes, JsResult};
+use crate::prelude::*;
 
 /// Result of executing and proving a transaction. Contains all the data required to verify that a
 /// transaction was executed correctly.
 #[derive(Clone)]
-#[wasm_bindgen]
+#[bindings]
 pub struct ProvenTransaction(NativeProvenTransaction);
 
-#[wasm_bindgen]
+// Shared methods (identical signatures)
+#[bindings]
 impl ProvenTransaction {
     /// Serializes the proven transaction into bytes.
-    pub fn serialize(&self) -> Uint8Array {
-        serialize_to_uint8array(&self.0)
-    }
-
-    /// Deserializes a proven transaction from bytes.
-    pub fn deserialize(bytes: &Uint8Array) -> Result<ProvenTransaction, JsValue> {
-        deserialize_from_uint8array::<NativeProvenTransaction>(bytes).map(ProvenTransaction)
+    pub fn serialize(&self) -> JsBytes {
+        platform::serialize_to_bytes(&self.0)
     }
 
     /// Returns the transaction ID.
@@ -33,40 +28,58 @@ impl ProvenTransaction {
     }
 
     /// Returns the account ID the transaction was executed against.
-    #[wasm_bindgen(js_name = "accountId")]
+    #[bindings(wasm)]
     pub fn account_id(&self) -> AccountId {
         let account_id: NativeAccountId = self.0.account_id();
         account_id.into()
     }
 
     /// Returns the reference block number used during execution.
-    #[wasm_bindgen(js_name = "refBlockNumber")]
+    #[bindings(wasm(js_name = "refBlockNumber"))]
     pub fn ref_block_number(&self) -> u32 {
         self.0.ref_block_num().as_u32()
     }
 
     /// Returns the block number at which the transaction expires.
-    #[wasm_bindgen(js_name = "expirationBlockNumber")]
+    #[bindings(wasm(js_name = "expirationBlockNumber"))]
     pub fn expiration_block_number(&self) -> u32 {
         self.0.expiration_block_num().as_u32()
     }
 
-    /// Returns notes created by this transaction.
-    #[wasm_bindgen(js_name = "outputNotes")]
-    pub fn output_notes(&self) -> OutputNotes {
-        self.0.output_notes().into()
-    }
-
     /// Returns the commitment of the reference block.
-    #[wasm_bindgen(js_name = "refBlockCommitment")]
+    #[bindings(wasm(js_name = "refBlockCommitment"))]
     pub fn ref_block_commitment(&self) -> Word {
         self.0.ref_block_commitment().into()
     }
 
     /// Returns the nullifiers of the consumed input notes.
-    #[wasm_bindgen(js_name = "nullifiers")]
     pub fn nullifiers(&self) -> Vec<Word> {
         self.0.nullifiers().map(|nullifier| Word::from(nullifier.as_word())).collect()
+    }
+
+    /// Returns notes created by this transaction.
+    #[bindings(wasm)]
+    pub fn output_notes(&self) -> OutputNotes {
+        self.0.output_notes().into()
+    }
+}
+
+// wasm-specific: deserialize (takes &JsBytes)
+#[cfg(feature = "wasm")]
+impl ProvenTransaction {
+    /// Deserializes a proven transaction from bytes.
+    pub fn deserialize(bytes: &JsBytes) -> JsResult<ProvenTransaction> {
+        platform::deserialize_from_bytes::<NativeProvenTransaction>(bytes).map(ProvenTransaction)
+    }
+}
+
+// napi-specific: deserialize (takes owned JsBytes, needs #[napi(factory)])
+#[cfg(feature = "napi")]
+impl ProvenTransaction {
+    /// Deserializes a proven transaction from bytes.
+    #[bindings(napi(factory))]
+    pub fn deserialize(bytes: JsBytes) -> JsResult<ProvenTransaction> {
+        platform::deserialize_from_bytes::<NativeProvenTransaction>(&bytes).map(ProvenTransaction)
     }
 }
 

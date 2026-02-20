@@ -8,33 +8,31 @@ use miden_client::auth::{
 };
 use rand::rngs::StdRng;
 use rand::{RngCore, SeedableRng};
-use wasm_bindgen::JsValue;
 
-use crate::js_error_with_context;
+use crate::prelude::*;
 use crate::models::account_storage_mode::AccountStorageMode;
 use crate::models::auth::AuthScheme;
 
 // HELPERS
 // ================================================================================================
-// These methods should not be exposed to the wasm interface
+// These methods should not be exposed to the JS interface
 
-/// Serves as a way to manage the logic of seed generation.
+/// Generates a new wallet with the specified parameters.
 ///
 /// # Errors:
 /// - If rust client calls fail
 /// - If the seed is passed in and is not exactly 32 bytes
-pub(crate) async fn generate_wallet(
+pub(crate) fn generate_wallet(
     storage_mode: &AccountStorageMode,
     mutable: bool,
     seed: Option<Vec<u8>>,
     auth_scheme: AuthScheme,
-) -> Result<(Account, AuthSecretKey), JsValue> {
+) -> JsResult<(Account, AuthSecretKey)> {
     let mut rng = match seed {
         Some(seed_bytes) => {
-            // Attempt to convert the seed slice into a 32-byte array.
             let seed_array: [u8; 32] = seed_bytes
                 .try_into()
-                .map_err(|_| JsValue::from_str("Seed must be exactly 32 bytes"))?;
+                .map_err(|_| platform::error_from_string("Seed must be exactly 32 bytes"))?;
             StdRng::from_seed(seed_array)
         },
         None => StdRng::from_os_rng(),
@@ -56,7 +54,7 @@ pub(crate) async fn generate_wallet(
         },
         _ => {
             let message = format!("unsupported auth scheme: {native_scheme:?}");
-            return Err(JsValue::from_str(&message));
+            return Err(platform::error_from_string(&message));
         },
     };
 
@@ -74,7 +72,7 @@ pub(crate) async fn generate_wallet(
         .with_auth_component(auth_component)
         .with_component(BasicWallet)
         .build()
-        .map_err(|err| js_error_with_context(err, "failed to create new wallet"))?;
+        .map_err(|err| platform::error_with_context(err, "failed to create new wallet"))?;
 
     let _account_seed =
         new_account.seed().expect("newly built wallet should always contain a seed");

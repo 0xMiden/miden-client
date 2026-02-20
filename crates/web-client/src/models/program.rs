@@ -1,8 +1,10 @@
 use miden_client::vm::Program as NativeProgram;
-use wasm_bindgen::prelude::*;
 
-#[wasm_bindgen]
+use crate::prelude::*;
+
+/// A compiled VM program.
 #[derive(Clone)]
+#[bindings]
 pub struct Program(NativeProgram);
 
 // CONVERSIONS

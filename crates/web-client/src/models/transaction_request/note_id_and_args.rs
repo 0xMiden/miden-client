@@ -1,25 +1,24 @@
 use miden_client::note::NoteId as NativeNoteId;
 use miden_client::transaction::NoteArgs as NativeNoteArgs;
-use wasm_bindgen::prelude::*;
+use crate::prelude::*;
 
-use crate::models::miden_arrays::NoteIdAndArgsArray;
 use crate::models::note_id::NoteId;
 use crate::models::transaction_request::note_and_args::NoteArgs;
 
 /// Note ID paired with optional arguments for inclusion in a transaction request.
+#[bindings]
 #[derive(Clone)]
-#[wasm_bindgen]
 pub struct NoteIdAndArgs {
     note_id: NoteId,
     args: Option<NoteArgs>,
 }
 
-#[wasm_bindgen]
+#[bindings]
 impl NoteIdAndArgs {
     /// Creates a new NoteId/args pair.
-    #[wasm_bindgen(constructor)]
-    pub fn new(note_id: NoteId, args: Option<NoteArgs>) -> NoteIdAndArgs {
-        NoteIdAndArgs { note_id, args }
+    #[bindings(constructor)]
+    pub fn new(note_id: &NoteId, args: Option<NoteArgs>) -> NoteIdAndArgs {
+        NoteIdAndArgs { note_id: *note_id, args }
     }
 }
 
@@ -40,14 +39,3 @@ impl From<&NoteIdAndArgs> for (NativeNoteId, Option<NativeNoteArgs>) {
     }
 }
 
-impl From<NoteIdAndArgsArray> for Vec<(NativeNoteId, Option<NativeNoteArgs>)> {
-    fn from(note_id_and_args_array: NoteIdAndArgsArray) -> Self {
-        note_id_and_args_array.__inner.into_iter().map(Into::into).collect()
-    }
-}
-
-impl From<&NoteIdAndArgsArray> for Vec<(NativeNoteId, Option<NativeNoteArgs>)> {
-    fn from(note_id_and_args_array: &NoteIdAndArgsArray) -> Self {
-        note_id_and_args_array.__inner.iter().map(Into::into).collect()
-    }
-}

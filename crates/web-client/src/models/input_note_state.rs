@@ -1,8 +1,9 @@
 use miden_client::store::InputNoteState as NativeNoteState;
-use wasm_bindgen::prelude::*;
 
+use crate::prelude::*;
+
+#[bindings]
 #[derive(Clone)]
-#[wasm_bindgen]
 pub enum InputNoteState {
     Expected,
     Unverified,

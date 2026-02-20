@@ -6,14 +6,15 @@ use miden_client::note::{
 };
 use miden_client::{Felt as NativeFelt, Word as NativeWord};
 use miden_protocol::note::NoteAttachmentContent;
-use wasm_bindgen::prelude::*;
 
 use super::account_id::AccountId;
 use super::felt::Felt;
 use super::note_attachment_kind::NoteAttachmentKind;
 use super::note_execution_hint::NoteExecutionHint;
 use super::word::Word;
+#[cfg(feature = "wasm")]
 use crate::models::miden_arrays::FeltArray;
+use crate::prelude::*;
 
 // NOTE ATTACHMENT SCHEME
 // ================================================================================================
@@ -22,31 +23,27 @@ use crate::models::miden_arrays::FeltArray;
 ///
 /// Value `0` is reserved to signal that the scheme is none or absent. Whenever the kind of
 /// attachment is not standardized or interoperability is unimportant, this none value can be used.
+#[bindings]
 #[derive(Clone, Copy)]
-#[wasm_bindgen]
 pub struct NoteAttachmentScheme(NativeNoteAttachmentScheme);
 
-#[wasm_bindgen]
+#[bindings]
 impl NoteAttachmentScheme {
-    /// Creates a new `NoteAttachmentScheme` from a u32.
-    #[wasm_bindgen(constructor)]
+    #[bindings(constructor)]
     pub fn new(scheme: u32) -> NoteAttachmentScheme {
         NoteAttachmentScheme(NativeNoteAttachmentScheme::new(scheme))
     }
 
-    /// Returns the `NoteAttachmentScheme` that signals the absence of an attachment scheme.
-    pub fn none() -> NoteAttachmentScheme {
+    #[bindings(factory, js_name = "none")]
+    pub fn none_scheme() -> NoteAttachmentScheme {
         NoteAttachmentScheme(NativeNoteAttachmentScheme::none())
     }
 
-    /// Returns true if the attachment scheme is the reserved value that signals an absent scheme.
-    #[wasm_bindgen(js_name = "isNone")]
+    #[bindings]
     pub fn is_none(&self) -> bool {
         self.0.is_none()
     }
 
-    /// Returns the note attachment scheme as a u32.
-    #[wasm_bindgen(js_name = "asU32")]
     pub fn as_u32(&self) -> u32 {
         self.0.as_u32()
     }
@@ -72,51 +69,25 @@ impl From<&NoteAttachmentScheme> for NativeNoteAttachmentScheme {
 /// Note attachments provide additional context about how notes should be processed.
 /// For example, a network account target attachment indicates that the note should
 /// be consumed by a specific network account.
+#[bindings]
 #[derive(Clone, Default)]
-#[wasm_bindgen]
-pub struct NoteAttachment(NativeNoteAttachment);
+pub struct NoteAttachment(pub(crate) NativeNoteAttachment);
 
-#[wasm_bindgen]
+#[bindings]
 impl NoteAttachment {
-    /// Creates a default (empty) note attachment.
-    #[wasm_bindgen(constructor)]
+    #[bindings(constructor)]
     pub fn new() -> NoteAttachment {
         NoteAttachment(NativeNoteAttachment::default())
     }
 
-    /// Creates a new note attachment with Word content from the provided word.
-    #[wasm_bindgen(js_name = "newWord")]
-    pub fn new_word(scheme: &NoteAttachmentScheme, word: &Word) -> NoteAttachment {
-        let native_word: NativeWord = word.into();
-        NoteAttachment(NativeNoteAttachment::new_word(scheme.into(), native_word))
-    }
-
-    /// Creates a new note attachment with Array content from the provided elements.
-    #[wasm_bindgen(js_name = "newArray")]
-    pub fn new_array(
-        scheme: &NoteAttachmentScheme,
-        elements: &FeltArray,
-    ) -> Result<NoteAttachment, JsValue> {
-        let native_elements: Vec<NativeFelt> = elements.into();
-        NativeNoteAttachment::new_array(scheme.into(), native_elements)
-            .map(NoteAttachment)
-            .map_err(|e| JsValue::from_str(&e.to_string()))
-    }
-
-    /// Returns the attachment scheme.
-    #[wasm_bindgen(js_name = "attachmentScheme")]
     pub fn attachment_scheme(&self) -> NoteAttachmentScheme {
         self.0.attachment_scheme().into()
     }
 
-    /// Returns the attachment kind.
-    #[wasm_bindgen(js_name = "attachmentKind")]
     pub fn attachment_kind(&self) -> NoteAttachmentKind {
         self.0.attachment_kind().into()
     }
 
-    /// Returns the content as a Word if the attachment kind is Word, otherwise None.
-    #[wasm_bindgen(js_name = "asWord")]
     pub fn as_word(&self) -> Option<Word> {
         match self.0.content() {
             NoteAttachmentContent::Word(word) => Some((*word).into()),
@@ -124,8 +95,44 @@ impl NoteAttachment {
         }
     }
 
+    #[bindings(factory)]
+    pub fn new_word(scheme: &NoteAttachmentScheme, word: &Word) -> NoteAttachment {
+        let native_word: NativeWord = word.into();
+        NoteAttachment(NativeNoteAttachment::new_word(scheme.into(), native_word))
+    }
+
+    #[bindings]
+    pub fn new_network_account_target(
+        target_id: &AccountId,
+        exec_hint: &NoteExecutionHint,
+    ) -> JsResult<NoteAttachment> {
+        let native_account_id: NativeAccountId = target_id.into();
+        let native_target = NativeNetworkAccountTarget::new(native_account_id, exec_hint.into())
+            .map_err(|err| platform::error_with_context(err, "failed to create network account target"))?;
+        let native_attachment: NativeNoteAttachment = native_target.into();
+        Ok(NoteAttachment(native_attachment))
+    }
+}
+
+// Platform-specific methods
+#[cfg(feature = "wasm")]
+#[wasm_bindgen]
+impl NoteAttachment {
+    /// Creates a new note attachment with Array content from the provided elements.
+    
+    pub fn new_array(
+        scheme: &NoteAttachmentScheme,
+        elements: &FeltArray,
+    ) -> JsResult<NoteAttachment> {
+        let wrapper_elements: Vec<Felt> = elements.into();
+        let native_elements: Vec<NativeFelt> = wrapper_elements.into_iter().map(Into::into).collect();
+        NativeNoteAttachment::new_array(scheme.into(), native_elements)
+            .map(NoteAttachment)
+            .map_err(|err| platform::error_with_context(err, "failed to create note attachment array"))
+    }
+
     /// Returns the content as an array of Felts if the attachment kind is Array, otherwise None.
-    #[wasm_bindgen(js_name = "asArray")]
+    
     pub fn as_array(&self) -> Option<FeltArray> {
         match self.0.content() {
             NoteAttachmentContent::Array(array) => {
@@ -135,29 +142,32 @@ impl NoteAttachment {
             _ => None,
         }
     }
+}
 
-    /// Creates a new note attachment for a network account target.
-    ///
-    /// This attachment indicates that the note should be consumed by a specific network account.
-    /// Network accounts are accounts whose storage mode is `Network`, meaning the network (nodes)
-    /// can execute transactions on behalf of the account.
-    ///
-    /// # Arguments
-    /// * `target_id` - The ID of the network account that should consume the note
-    /// * `exec_hint` - A hint about when the note can be executed
-    ///
-    /// # Errors
-    /// Returns an error if the target account is not a network account.
-    #[wasm_bindgen(js_name = "newNetworkAccountTarget")]
-    pub fn new_network_account_target(
-        target_id: &AccountId,
-        exec_hint: &NoteExecutionHint,
-    ) -> Result<NoteAttachment, JsValue> {
-        let native_account_id: NativeAccountId = target_id.into();
-        let native_target = NativeNetworkAccountTarget::new(native_account_id, exec_hint.into())
-            .map_err(|e| JsValue::from_str(&e.to_string()))?;
-        let native_attachment: NativeNoteAttachment = native_target.into();
-        Ok(NoteAttachment(native_attachment))
+#[cfg(feature = "napi")]
+#[napi_derive::napi]
+impl NoteAttachment {
+    /// Creates a new note attachment with Array content from the provided elements.
+    #[napi(factory)]
+    pub fn new_array(
+        scheme: &NoteAttachmentScheme,
+        elements: Vec<&Felt>,
+    ) -> JsResult<NoteAttachment> {
+        let native_elements: Vec<NativeFelt> = elements.into_iter().map(|f| f.into()).collect();
+        NativeNoteAttachment::new_array(scheme.into(), native_elements)
+            .map(NoteAttachment)
+            .map_err(|err| platform::error_with_context(err, "failed to create note attachment array"))
+    }
+
+    /// Returns the content as an array of Felts if the attachment kind is Array, otherwise None.
+    pub fn as_array(&self) -> Option<Vec<Felt>> {
+        match self.0.content() {
+            NoteAttachmentContent::Array(array) => {
+                let felts: Vec<Felt> = array.as_slice().iter().map(|f| (*f).into()).collect();
+                Some(felts)
+            },
+            _ => None,
+        }
     }
 }
 

@@ -1,31 +1,30 @@
 use miden_client::Felt as NativeFelt;
-use wasm_bindgen::prelude::*;
 
-use crate::models::miden_arrays::FeltArray;
+use crate::prelude::*;
 
 /// Field element wrapper exposed to JavaScript.
+#[bindings]
 #[derive(Clone, Copy)]
-#[wasm_bindgen]
-pub struct Felt(NativeFelt);
+pub struct Felt(#[cfg_attr(feature = "napi", allow(dead_code))] pub(crate) NativeFelt);
 
-#[wasm_bindgen]
+// All methods unified with i64 signatures
+#[bindings]
 impl Felt {
-    /// Creates a new field element from a u64 value.
-    #[wasm_bindgen(constructor)]
-    pub fn new(value: u64) -> Felt {
-        Felt(NativeFelt::new(value))
+    /// Creates a new field element from a value.
+    #[bindings(constructor)]
+    pub fn new(value: i64) -> Felt {
+        Felt(NativeFelt::new(value as u64))
     }
 
     /// Returns the integer representation of the field element.
-    #[wasm_bindgen(js_name = "asInt")]
-    pub fn as_int(&self) -> u64 {
-        self.0.as_int()
+    pub fn as_int(&self) -> i64 {
+        self.0.as_int() as i64
     }
 
     /// Returns the string representation of the field element.
-    #[wasm_bindgen(js_name = "toString")]
+    #[bindings(js_name = "toString")]
     #[allow(clippy::inherent_to_string)]
-    pub fn to_string(&self) -> String {
+    pub fn to_string_js(&self) -> String {
         self.0.to_string()
     }
 }
@@ -57,11 +56,3 @@ impl From<&Felt> for NativeFelt {
     }
 }
 
-// CONVERSIONS
-// ================================================================================================
-
-impl From<&FeltArray> for Vec<NativeFelt> {
-    fn from(felt_array: &FeltArray) -> Self {
-        felt_array.__inner.iter().map(Into::into).collect()
-    }
-}
