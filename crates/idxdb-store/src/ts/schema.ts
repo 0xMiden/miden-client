@@ -97,7 +97,7 @@ export interface IHistoricalStorageMapEntry {
   nonce: string;
   slotName: string;
   key: string;
-  value: string;
+  value: string | null;
 }
 
 export interface ILatestAccountAsset {
@@ -112,7 +112,7 @@ export interface IHistoricalAccountAsset {
   nonce: string;
   vaultKey: string;
   faucetIdPrefix: string;
-  asset: string;
+  asset: string | null;
 }
 
 export interface IAccountAuth {
