@@ -7,8 +7,7 @@ help: ## Show description of all commands
 # --- Variables -----------------------------------------------------------------------------------
 
 # Enable file generation in the `src` directory.
-# This is used in the build script of the client to generate the node RPC-related code, from the
-# protobuf files.
+# This is used in the build script of the idxdb-store to build TypeScript artifacts via yarn.
 CODEGEN=CODEGEN=1
 
 FEATURES_CLIENT=--features "std"
@@ -197,7 +196,7 @@ install-tests: ## Install the tests binary
 # --- Building ------------------------------------------------------------------------------------
 
 build: ## Build the CLI binary, client library and tests binary in release mode
-	CODEGEN=1 cargo build --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --release
+	cargo build --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --release
 	cargo build --package testing-remote-prover --release --locked
 	cargo build --package miden-client-integration-tests --release --locked
 
