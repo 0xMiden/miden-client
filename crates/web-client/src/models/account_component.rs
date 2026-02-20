@@ -1,5 +1,8 @@
 use miden_client::Word as NativeWord;
-use miden_client::account::component::AccountComponent as NativeAccountComponent;
+use miden_client::account::component::{
+    AccountComponent as NativeAccountComponent,
+    AccountComponentMetadata,
+};
 use miden_client::account::{
     AccountComponentCode as NativeAccountComponentCode,
     StorageSlot as NativeStorageSlot,
@@ -72,16 +75,25 @@ impl AccountComponent {
 
         let native_account_code: NativeAccountComponentCode = account_code.into();
 
-        NativeAccountComponent::new(native_account_code, native_slots)
-            .map(AccountComponent)
-            .map_err(|e| js_error_with_context(e, "Failed to compile account component"))
+        NativeAccountComponent::new(
+            native_account_code,
+            native_slots,
+            AccountComponentMetadata::new("custom"),
+        )
+        .map(AccountComponent)
+        .map_err(|e| js_error_with_context(e, "Failed to compile account component"))
     }
 
     /// Marks the component as supporting all account types.
     #[wasm_bindgen(js_name = "withSupportsAllTypes")]
-    pub fn with_supports_all_types(mut self) -> Self {
-        self.0 = self.0.with_supports_all_types();
-        self
+    pub fn with_supports_all_types(self) -> Self {
+        let metadata = self.0.metadata().clone().with_supports_all_types();
+        let code = self.0.component_code().clone();
+        let slots = self.0.storage_slots().to_vec();
+        AccountComponent(
+            NativeAccountComponent::new(code, slots, metadata)
+                .expect("reconstructing component with updated metadata should not fail"),
+        )
     }
 
     /// Returns the hex-encoded MAST root for a procedure by name.
@@ -187,11 +199,13 @@ impl AccountComponent {
             .map(|storage_slot| storage_slot.clone().into())
             .collect();
 
-        NativeAccountComponent::new(native_library, native_slots)
-            .map(AccountComponent)
-            .map_err(|e| {
-                js_error_with_context(e, "Failed to create account component from package")
-            })
+        NativeAccountComponent::new(
+            native_library,
+            native_slots,
+            AccountComponentMetadata::new("custom"),
+        )
+        .map(AccountComponent)
+        .map_err(|e| js_error_with_context(e, "Failed to create account component from package"))
     }
 
     /// Creates an account component from a compiled library and storage slots.
@@ -204,11 +218,13 @@ impl AccountComponent {
         let native_slots: Vec<NativeStorageSlot> =
             storage_slots.into_iter().map(Into::into).collect();
 
-        NativeAccountComponent::new(native_library, native_slots)
-            .map(AccountComponent)
-            .map_err(|e| {
-                js_error_with_context(e, "Failed to create account component from library")
-            })
+        NativeAccountComponent::new(
+            native_library,
+            native_slots,
+            AccountComponentMetadata::new("custom"),
+        )
+        .map(AccountComponent)
+        .map_err(|e| js_error_with_context(e, "Failed to create account component from library"))
     }
 }
 

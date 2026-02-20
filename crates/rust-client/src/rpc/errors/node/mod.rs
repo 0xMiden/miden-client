@@ -110,7 +110,7 @@ pub fn parse_node_error(
             Some(EndpointError::GetAccount(GetAccountError::from_code(code, message)))
         },
         // These endpoints don't have typed errors from the node
-        NodeRpcClientEndpoint::SyncState
+        NodeRpcClientEndpoint::SyncChainMmr
         | NodeRpcClientEndpoint::Status
         | NodeRpcClientEndpoint::GetLimits => None,
     }

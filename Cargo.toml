@@ -41,16 +41,18 @@ miden-testing   = { branch = "next", default-features = false, git = "https://gi
 miden-tx        = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base" }
 
 # Miden node dependencies
-miden-node-block-producer = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
-miden-node-ntx-builder = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
-miden-node-proto-build = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-node" }
-miden-node-rpc = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
-miden-node-store = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
-miden-node-utils = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
-miden-node-validator = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
+miden-node-block-producer = { branch = "mmagician-base-update", git = "https://github.com/0xMiden/miden-node" }
+miden-node-ntx-builder = { branch = "mmagician-base-update", git = "https://github.com/0xMiden/miden-node" }
+miden-node-proto-build = { branch = "mmagician-base-update", default-features = false, git = "https://github.com/0xMiden/miden-node" }
+miden-node-rpc = { branch = "mmagician-base-update", git = "https://github.com/0xMiden/miden-node" }
+miden-node-store = { branch = "mmagician-base-update", git = "https://github.com/0xMiden/miden-node" }
+miden-node-utils = { branch = "mmagician-base-update", git = "https://github.com/0xMiden/miden-node" }
+miden-node-validator = { branch = "mmagician-base-update", git = "https://github.com/0xMiden/miden-node" }
 miden-note-transport-proto-build = { default-features = false, version = "0.2" }
-miden-remote-prover = { branch = "next", features = ["concurrent"], git = "https://github.com/0xMiden/miden-node" }
-miden-remote-prover-client = { branch = "next", default-features = false, features = [
+miden-remote-prover = { branch = "mmagician-base-update", features = [
+  "concurrent",
+], git = "https://github.com/0xMiden/miden-node" }
+miden-remote-prover-client = { branch = "mmagician-base-update", default-features = false, features = [
   "tx-prover",
 ], git = "https://github.com/0xMiden/miden-node" }
 
@@ -78,3 +80,14 @@ module_name_repetitions     = "allow" # Many triggers, and is a stylistic choice
 must_use_candidate          = "allow" # This marks many fn's which isn't helpful.
 should_panic_without_expect = "allow" # We don't care about the specific panic message.
 # End of pedantic lints.
+
+[patch."https://github.com/0xMiden/miden-node"]
+miden-node-block-producer = { path = "../miden-node/crates/block-producer" }
+miden-node-ntx-builder = { path = "../miden-node/crates/ntx-builder" }
+miden-node-proto-build = { path = "../miden-node/proto" }
+miden-node-rpc = { path = "../miden-node/crates/rpc" }
+miden-node-store = { path = "../miden-node/crates/store" }
+miden-node-utils = { path = "../miden-node/crates/utils" }
+miden-node-validator = { path = "../miden-node/crates/validator" }
+miden-remote-prover = { path = "../miden-node/bin/remote-prover" }
+miden-remote-prover-client = { path = "../miden-node/crates/remote-prover-client" }

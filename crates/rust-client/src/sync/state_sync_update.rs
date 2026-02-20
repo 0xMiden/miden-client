@@ -195,13 +195,32 @@ impl TransactionUpdateTracker {
 
     /// Applies the necessary state transitions to the [`TransactionUpdateTracker`] when a
     /// transaction is included in a block.
+    ///
+    /// First attempts to match by transaction ID. If no match is found, falls back to matching
+    /// by account ID and initial state commitment. The fallback is needed because the
+    /// `SyncTransactionsResponse` proto only provides nullifiers (not full input note commitments
+    /// with optional headers for unauthenticated notes), so the recomputed transaction ID may
+    /// differ from the locally computed one for transactions with unauthenticated input notes.
     pub fn apply_transaction_inclusion(
         &mut self,
         transaction_inclusion: &TransactionInclusion,
         timestamp: u64,
     ) {
+        // Try matching by transaction ID first (fast path).
         if let Some(transaction) = self.transactions.get_mut(&transaction_inclusion.transaction_id)
         {
+            transaction.commit_transaction(transaction_inclusion.block_num, timestamp);
+            return;
+        }
+
+        // Fall back to matching by account ID + initial state commitment.
+        // This handles the case where the transaction ID recomputed from the proto differs
+        // from the local ID (e.g. transactions with unauthenticated input notes).
+        if let Some(transaction) = self.transactions.values_mut().find(|tx| {
+            tx.details.account_id == transaction_inclusion.account_id
+                && tx.details.init_account_state
+                    == transaction_inclusion.initial_state_commitment
+        }) {
             transaction.commit_transaction(transaction_inclusion.block_num, timestamp);
         }
     }
