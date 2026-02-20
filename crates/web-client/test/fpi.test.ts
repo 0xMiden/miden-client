@@ -1,7 +1,7 @@
 import { Page, expect } from "@playwright/test";
 import test from "./playwright.global.setup";
 
-export const testStandardFpi = async (page: Page): Promise<string> => {
+export const testStandardFpi = async (page: Page): Promise<void> => {
   return await page.evaluate(async () => {
     const client = window.client;
     await client.syncState();
@@ -137,45 +137,11 @@ export const testStandardFpi = async (page: Page): Promise<string> => {
       newAccount.id(),
       txRequest2
     );
-
-    return foreignAccountId.toString();
   });
 };
 
 test.describe("fpi test", () => {
-  test("runs the standard fpi test successfully and verifies account proof", async ({
-    page,
-  }) => {
-    const foreignAccountId = await testStandardFpi(page);
-
-    // Test RpcClient.getAccountProof on the deployed public account
-    const proofResult = await page.evaluate(
-      async (_foreignAccountId: string) => {
-        const endpoint = new window.Endpoint(window.rpcUrl);
-        const rpcClient = new window.RpcClient(endpoint);
-
-        const accountId = window.AccountId.fromHex(_foreignAccountId);
-        const accountProof = await rpcClient.getAccountProof(accountId);
-
-        return {
-          accountId: accountProof.accountId().toString(),
-          blockNum: accountProof.blockNum(),
-          accountCommitment: accountProof.accountCommitment().toHex(),
-          hasAccountHeader: !!accountProof.accountHeader(),
-          hasAccountCode: !!accountProof.accountCode(),
-          numStorageSlots: accountProof.numStorageSlots(),
-          nonce: accountProof.accountHeader()?.nonce().toString(),
-        };
-      },
-      foreignAccountId
-    );
-
-    expect(proofResult.accountId).toEqual(foreignAccountId);
-    expect(proofResult.blockNum).toBeGreaterThan(0);
-    expect(proofResult.accountCommitment).toMatch(/^0x[0-9a-fA-F]+$/);
-    expect(proofResult.hasAccountHeader).toBe(true);
-    expect(proofResult.hasAccountCode).toBe(true);
-    expect(proofResult.numStorageSlots).toBeGreaterThan(0);
-    expect(proofResult.nonce).toBeDefined();
+  test("runs the standard fpi test successfully", async ({ page }) => {
+    await expect(testStandardFpi(page)).resolves.toBeUndefined();
   });
 });

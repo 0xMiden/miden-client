@@ -5,59 +5,52 @@ on:
   push:
     branches: [main, next]
   pull_request:
-
-concurrency:
-  group: "${{ github.workflow }} @ ${{ github.event.pull_request.head.label || github.head_ref || github.ref }}"
-  cancel-in-progress: true
-
-env:
-  CARGO_PROFILE_DEV_DEBUG: 0
-  RUST_CACHE_KEY: rust-cache-2026.02.18
+    types: [opened, repoened, synchronize]
 
 jobs:
   unused_deps:
     name: check for unused dependencies
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@main
       - name: machete
         uses: bnjbvr/cargo-machete@main
-
+        
   typos:
     name: spellcheck
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
       - uses: taiki-e/install-action@v2
         with:
-          tool: typos@1.42.0
+          tool: typos
       - run: make typos-check
 
   toml:
     name: toml formatting
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
       - uses: taiki-e/install-action@v2
         with:
-          tool: taplo-cli@0.10.0
+          tool: taplo-cli
       - run: make toml-check
-
+      
   eslint:
     name: "Typescript eslint checks"
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
       - run: make rust-client-ts-lint
 
   react-sdk-lint:
     name: "React SDK lint and typecheck"
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     needs: [wasm-bindgen-types]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
       - name: Fetch web client dist
         uses: actions/download-artifact@v4
         with:
@@ -78,56 +71,44 @@ jobs:
 
   clippy:
     name: Clippy
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@main
       - name: Install Rust with clippy
         run: |
-          rustup update --no-self-update
+          rustup update --no-self-update 
           rustup component add clippy
       - name: Add Rust Cache
         uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: rust-build
-          prefix-key: ${{ env.RUST_CACHE_KEY }}
-          save-if: ${{ github.ref == 'refs/heads/next' }}
       - name: make - clippy
         run: make clippy
 
   clippy-wasm:
     name: Clippy WASM
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@main
       - name: Install Rust with clippy
         run: |
-          rustup update --no-self-update
+          rustup update --no-self-update 
           rustup target add wasm32-unknown-unknown
           rustup component add clippy
       - name: Add Rust Cache
         uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: rust-build-wasm
-          prefix-key: ${{ env.RUST_CACHE_KEY }}
-          save-if: ${{ github.ref == 'refs/heads/next' }}
       - name: make - clippy-wasm
         run: make clippy-wasm
 
   format:
     name: format check
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@main
       - name: Install Rust with rustfmt
         run: |
           rustup update --no-self-update nightly
           rustup +nightly component add rustfmt
       - name: Add Rust Cache
         uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: rust-build
-          prefix-key: ${{ env.RUST_CACHE_KEY }}
-          save-if: ${{ github.ref == 'refs/heads/next' }}
       - name: Install prettier
         run: yarn install
       - name: make - format-check
@@ -135,9 +116,9 @@ jobs:
 
   wasm-bindgen-types:
     name: wasm bindgen types
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -152,10 +133,6 @@ jobs:
           rustup target add wasm32-unknown-unknown
       - name: Add Rust Cache
         uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: rust-build-wasm
-          prefix-key: ${{ env.RUST_CACHE_KEY }}
-          save-if: ${{ github.ref == 'refs/heads/next' }}
       - name: Install dependencies
         working-directory: crates/web-client
         run: yarn install --frozen-lockfile
@@ -173,16 +150,12 @@ jobs:
 
   rustdocs:
     name: build rust documentation
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@main
       - name: Install Rust
         run: rustup update --no-self-update
       - name: Add Rust Cache
         uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: rust-build
-          prefix-key: ${{ env.RUST_CACHE_KEY }}
-          save-if: ${{ github.ref == 'refs/heads/next' }}
       - name: make - doc
         run: make doc

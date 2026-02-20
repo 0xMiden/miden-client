@@ -10,6 +10,7 @@ use miden_client::store::{InputNoteState, NoteFilter};
 use miden_client::testing::common::*;
 use miden_client::transaction::{InputNote, PaymentNoteDescription, TransactionRequestBuilder};
 use rand::RngCore;
+use tracing::info;
 
 use crate::tests::config::ClientConfig;
 
@@ -201,7 +202,7 @@ pub async fn test_onchain_accounts(client_config: ClientConfig) -> Result<()> {
     client_2.add_account(&faucet_account_header, false).await?;
 
     // First Mint necessary token
-    println!("First client consuming note");
+    info!(account_id = %target_account_id, faucet_id = %faucet_account_id, "First client minting note");
     client_1.sync_state().await?;
     let (tx_id, note) =
         mint_note(&mut client_1, target_account_id, faucet_account_id, NoteType::Private).await;
@@ -225,7 +226,7 @@ pub async fn test_onchain_accounts(client_config: ClientConfig) -> Result<()> {
     assert_eq!(client_1_faucet.commitment(), client_2_faucet.commitment());
 
     // Now use the faucet in the second client to mint to its own account
-    println!("Second client consuming note");
+    info!(account_id = %second_client_target_account_id, faucet_id = %faucet_account_id, "Second client minting note");
     let (tx_id, second_client_note) = mint_note(
         &mut client_2,
         second_client_target_account_id,
@@ -239,7 +240,7 @@ pub async fn test_onchain_accounts(client_config: ClientConfig) -> Result<()> {
     // between clients
     client_1.sync_state().await?;
 
-    println!("About to consume");
+    info!(account_id = %target_account_id, "Consuming note on first client");
     let tx_id = consume_notes(&mut client_1, target_account_id, &[note]).await;
     wait_for_tx(&mut client_1, tx_id).await?;
     assert_account_has_single_asset(&client_1, target_account_id, faucet_account_id, MINT_AMOUNT)
@@ -288,7 +289,7 @@ pub async fn test_onchain_accounts(client_config: ClientConfig) -> Result<()> {
 
     let asset = FungibleAsset::new(faucet_account_id, TRANSFER_AMOUNT)?;
 
-    println!("Running P2ID tx...");
+    info!(from = %from_account_id, to = %to_account_id, amount = TRANSFER_AMOUNT, "Running P2ID transaction");
     let tx_request = TransactionRequestBuilder::new().build_pay_to_id(
         PaymentNoteDescription::new(vec![Asset::Fungible(asset)], from_account_id, to_account_id),
         NoteType::Public,
@@ -297,7 +298,7 @@ pub async fn test_onchain_accounts(client_config: ClientConfig) -> Result<()> {
     execute_tx_and_sync(&mut client_1, from_account_id, tx_request).await?;
 
     // sync on second client until we receive the note
-    println!("Syncing on second client...");
+    info!("Syncing state on second client");
     client_2.sync_state().await?;
     let notes = client_2.get_input_notes(NoteFilter::Committed).await?;
 
@@ -305,13 +306,13 @@ pub async fn test_onchain_accounts(client_config: ClientConfig) -> Result<()> {
     client_1.import_notes(&[NoteFile::NoteId(notes[0].id())]).await?;
 
     // Consume the note
-    println!("Consuming note on second client...");
+    info!(note_id = %notes[0].id(), account_id = %to_account_id, "Consuming note on second client");
     let tx_request = TransactionRequestBuilder::new()
         .build_consume_notes(vec![notes[0].clone().try_into().unwrap()])?;
     execute_tx_and_sync(&mut client_2, to_account_id, tx_request).await?;
 
     // sync on first client
-    println!("Syncing on first client...");
+    info!("Syncing state on first client");
     client_1.sync_state().await?;
 
     // Check that the client doesn't know who consumed the note
@@ -403,7 +404,7 @@ pub async fn test_import_account_by_id(client_config: ClientConfig) -> Result<()
     assert_eq!(imported_commitment, original_commitment);
 
     // Now use the wallet in the second client to consume the generated note
-    println!("Second client consuming note");
+    info!(account_id = %target_account_id, "Second client consuming note");
     client_2.sync_state().await?;
     let tx_id = consume_notes(&mut client_2, target_account_id, &[note]).await;
     wait_for_tx(&mut client_2, tx_id).await?;

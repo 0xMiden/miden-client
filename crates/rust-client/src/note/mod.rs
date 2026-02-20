@@ -107,7 +107,6 @@ pub use miden_standards::note::{
     create_p2ide_note,
     create_swap_note,
 };
-pub use miden_tx::{FailedNote, NoteConsumptionInfo};
 pub use note_screener::{NoteConsumability, NoteScreener, NoteScreenerError};
 pub use note_update_tracker::{
     InputNoteUpdate,
@@ -148,21 +147,13 @@ where
         account_id: Option<AccountId>,
     ) -> Result<Vec<(InputNoteRecord, Vec<NoteConsumability>)>, ClientError> {
         let committed_notes = self.store.get_input_notes(NoteFilter::Committed).await?;
-        let notes = committed_notes
-            .iter()
-            .cloned()
-            .map(TryInto::try_into)
-            .collect::<Result<Vec<Note>, _>>()?;
 
-        let note_screener = self.note_screener();
-        let mut note_relevances = note_screener.can_consume_batch(&notes).await?;
+        let note_screener = NoteScreener::new(self.store.clone(), self.authenticator.clone());
 
         let mut relevant_notes = Vec::new();
         for input_note in committed_notes {
-            let note_id = input_note.id();
-            let Some(mut account_relevance) = note_relevances.remove(&note_id) else {
-                continue;
-            };
+            let mut account_relevance =
+                note_screener.check_relevance(&input_note.clone().try_into()?).await?;
 
             if let Some(account_id) = account_id {
                 account_relevance.retain(|(id, _)| *id == account_id);
@@ -187,8 +178,9 @@ where
         &self,
         note: InputNoteRecord,
     ) -> Result<Vec<NoteConsumability>, ClientError> {
-        self.note_screener()
-            .can_consume(&note.clone().try_into()?)
+        let note_screener = NoteScreener::new(self.store.clone(), self.authenticator.clone());
+        note_screener
+            .check_relevance(&note.clone().try_into()?)
             .await
             .map_err(Into::into)
     }
