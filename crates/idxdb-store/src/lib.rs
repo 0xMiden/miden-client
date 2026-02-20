@@ -360,6 +360,14 @@ impl Store for WebStore {
     async fn list_setting_keys(&self) -> Result<Vec<String>, StoreError> {
         self.list_setting_keys().await
     }
+
+    async fn export_store(&self) -> Result<String, StoreError> {
+        self.export_store().await
+    }
+
+    async fn import_store(&self, data: String) -> Result<(), StoreError> {
+        self.import_store(data).await
+    }
 }
 
 // UTILS

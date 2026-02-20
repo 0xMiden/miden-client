@@ -10,6 +10,7 @@ use miden_client::crypto::RpoRandomCoin;
 use miden_client::note_transport::NoteTransportClient;
 use miden_client::note_transport::grpc::GrpcNoteTransportClient;
 use miden_client::rpc::{Endpoint, GrpcClient, NodeRpcClient};
+use miden_client::store::Store;
 use miden_client::testing::mock::MockRpcApi;
 use miden_client::testing::note_transport::MockNoteTransportApi;
 use miden_client::{Client, ClientError, DebugMode, ErrorHint, Felt};
@@ -39,13 +40,14 @@ pub mod utils;
 
 mod web_keystore;
 mod web_keystore_callbacks;
+mod web_keystore_db;
 pub use web_keystore::WebKeyStore;
 
 const BASE_STORE_NAME: &str = "MidenClientDB";
 
 #[wasm_bindgen]
 pub struct WebClient {
-    store: Option<Arc<WebStore>>,
+    store: Option<Arc<dyn Store>>,
     keystore: Option<WebKeyStore<RpoRandomCoin>>,
     inner: Option<Client<WebKeyStore<RpoRandomCoin>>>,
     mock_rpc_api: Option<Arc<MockRpcApi>>,
@@ -246,7 +248,7 @@ impl WebClient {
             .map_err(|err| js_error_with_context(err, "Failed to ensure genesis in place"))?;
 
         self.inner = Some(client);
-        self.store = Some(web_store);
+        self.store = Some(web_store.clone());
         self.keystore = Some(keystore);
 
         Ok(())

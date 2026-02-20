@@ -335,9 +335,9 @@ the chain tip is performed, and the required block header is retrieved.
 
 > **exportStore**(): `Promise`\<`any`\>
 
-Retrieves the entire underlying web store and returns it as a `JsValue`
+Retrieves the entire underlying store and returns it as a `JsValue`
 
-Meant to be used in conjunction with the `force_import_store` method
+Meant to be used in conjunction with the `forceImportStore` method
 
 #### Returns
 
