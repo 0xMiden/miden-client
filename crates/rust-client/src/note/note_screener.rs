@@ -51,6 +51,8 @@ pub struct NoteScreener<AUTH> {
     store: Arc<dyn Store>,
     /// A reference to the transaction authenticator
     authenticator: Option<Arc<AUTH>>,
+    /// Optional transaction arguments to use when checking consumability.
+    tx_args: Option<TransactionArgs>,
 }
 
 impl<AUTH> NoteScreener<AUTH>
@@ -58,7 +60,21 @@ where
     AUTH: TransactionAuthenticator + Sync,
 {
     pub fn new(store: Arc<dyn Store>, authenticator: Option<Arc<AUTH>>) -> Self {
-        Self { store, authenticator }
+        Self { store, authenticator, tx_args: None }
+    }
+
+    /// Sets the transaction arguments to use when checking note consumability.
+    /// If not set, a default `TransactionArgs` with an empty advice map is used.
+    #[must_use]
+    pub fn with_transaction_args(mut self, tx_args: TransactionArgs) -> Self {
+        self.tx_args = Some(tx_args);
+        self
+    }
+
+    fn tx_args(&self) -> TransactionArgs {
+        self.tx_args
+            .clone()
+            .unwrap_or_else(|| TransactionArgs::new(AdviceMap::default()))
     }
 
     /// Checks whether the provided note could be consumed by any of the accounts tracked by
@@ -91,9 +107,9 @@ where
         }
 
         let block_ref = self.store.get_sync_height().await?;
-        let standard_notes = notes.iter().map(StandardNote::from_note).collect::<Vec<_>>();
+        let standard_notes: Vec<_> = notes.iter().map(StandardNote::from_note).collect();
         let mut note_relevances: BTreeMap<NoteId, Vec<NoteConsumability>> = BTreeMap::new();
-        let tx_args = TransactionArgs::new(AdviceMap::default());
+        let tx_args = self.tx_args();
 
         let data_store = ClientDataStore::new(self.store.clone());
         let mut transaction_executor = TransactionExecutor::new(&data_store);
@@ -105,8 +121,8 @@ where
         for account_id in account_ids {
             let mut runtime_note_indices = Vec::new();
 
-            for (note_idx, note) in notes.iter().enumerate() {
-                if let Some(standard_note) = standard_notes[note_idx].as_ref()
+            for (note_idx, (note, standard_note)) in notes.iter().zip(&standard_notes).enumerate() {
+                if let Some(standard_note) = standard_note.as_ref()
                     && let Some(consumption_status) =
                         standard_note.is_consumable(note, account_id, block_ref)
                 {
@@ -164,7 +180,7 @@ where
         notes: Vec<Note>,
     ) -> Result<NoteConsumptionInfo, NoteScreenerError> {
         let block_ref = self.store.get_sync_height().await?;
-        let tx_args = TransactionArgs::new(AdviceMap::default());
+        let tx_args = self.tx_args();
         let account_code = self.get_account_code(account_id).await?;
 
         let data_store = ClientDataStore::new(self.store.clone());
