@@ -35,8 +35,8 @@ use crate::transaction::TransactionRecord;
 /// - Track uncommitted transactions so they can be marked as committed when the node confirms them,
 ///   or discarded when they become stale.
 ///
-/// Use [`Client::build_sync_input()`](`crate::Client::build_sync_input()`) to build a default input from the client state, or
-/// construct this struct manually for custom sync scenarios.
+/// Use [`Client::build_sync_input()`](`crate::Client::build_sync_input()`) to build a default input
+/// from the client state, or construct this struct manually for custom sync scenarios.
 pub struct StateSyncInput {
     /// Account headers to request commitment updates for.
     pub accounts: Vec<AccountHeader>,
@@ -146,9 +146,9 @@ impl StateSync {
     /// Syncs the state of the client with the chain tip of the node, returning the updates that
     /// should be applied to the store.
     ///
-    /// Use [`Client::build_sync_input()`](`crate::Client::build_sync_input()`) to build the default input, or assemble it
-    /// manually for custom sync. The `current_partial_mmr` is taken by mutable reference so
-    /// callers can keep it in memory across syncs.
+    /// Use [`Client::build_sync_input()`](`crate::Client::build_sync_input()`) to build the default
+    /// input, or assemble it manually for custom sync. The `current_partial_mmr` is taken by
+    /// mutable reference so callers can keep it in memory across syncs.
     ///
     /// During the sync process, the following steps are performed:
     /// 1. A request is sent to the node to get the state updates. This request includes tracked
