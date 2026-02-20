@@ -407,6 +407,10 @@ impl MockRpcApi {
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 impl NodeRpcClient for MockRpcApi {
+    fn has_genesis_commitment(&self) -> Option<Word> {
+        None
+    }
+
     async fn set_genesis_commitment(&self, _commitment: Word) -> Result<(), RpcError> {
         // The mock client doesn't use accept headers, so we don't need to do anything here.
         Ok(())
@@ -760,7 +764,7 @@ impl NodeRpcClient for MockRpcApi {
     }
 
     fn has_rpc_limits(&self) -> Option<crate::rpc::RpcLimits> {
-        Some(crate::rpc::RpcLimits::default())
+        None
     }
 
     async fn set_rpc_limits(&self, _limits: crate::rpc::RpcLimits) {

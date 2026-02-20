@@ -113,6 +113,9 @@ pub trait NodeRpcClient: Send + Sync {
     /// this method does nothing.
     async fn set_genesis_commitment(&self, commitment: Word) -> Result<(), RpcError>;
 
+    /// Returns the genesis commitment if it has been set, without fetching from the node.
+    fn has_genesis_commitment(&self) -> Option<Word>;
+
     /// Given a Proven Transaction, send it to the node for it to be included in a future block
     /// using the `/SubmitProvenTransaction` RPC endpoint.
     async fn submit_proven_transaction(

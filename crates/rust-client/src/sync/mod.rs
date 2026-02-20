@@ -81,7 +81,10 @@ pub use state_sync::{NoteUpdateAction, OnNoteReceived, StateSync};
 
 mod state_sync_update;
 pub use state_sync_update::{
-    AccountUpdates, BlockUpdates, StateSyncUpdate, TransactionUpdateTracker,
+    AccountUpdates,
+    BlockUpdates,
+    StateSyncUpdate,
+    TransactionUpdateTracker,
 };
 
 /// Client synchronization methods.
@@ -117,7 +120,7 @@ where
     /// 7. The MMR is updated with the new peaks and authentication nodes.
     /// 8. All updates are applied to the store to be persisted.
     pub async fn sync_state(&mut self) -> Result<SyncSummary, ClientError> {
-        _ = self.ensure_genesis_in_place().await?;
+        self.ensure_genesis_in_place().await?;
         self.ensure_rpc_limits_in_place().await?;
 
         let note_screener = NoteScreener::new(self.store.clone(), self.authenticator.clone());
