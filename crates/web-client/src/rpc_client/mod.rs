@@ -11,7 +11,6 @@ use miden_client::note::{NoteId as NativeNoteId, Nullifier};
 use miden_client::rpc::domain::account::AccountStorageRequirements as NativeAccountStorageRequirements;
 use miden_client::rpc::domain::note::FetchedNote as NativeFetchedNote;
 use miden_client::rpc::{AccountStateAt, GrpcClient, NodeRpcClient};
-use miden_client::transaction::ForeignAccount as NativeForeignAccount;
 use note::FetchedNote;
 use wasm_bindgen::prelude::*;
 
@@ -149,15 +148,14 @@ impl RpcClient {
     pub async fn get_account_proof(&self, account_id: &AccountId) -> Result<AccountProof, JsValue> {
         let native_id: miden_client::account::AccountId = account_id.into();
 
-        // Construct the foreign account directly to allow both public and private account IDs.
-        // The RPC layer handles both cases: for public accounts it requests full details,
-        // for private accounts it only returns the proof.
-        let foreign_account =
-            NativeForeignAccount::Public(native_id, NativeAccountStorageRequirements::default());
-
         let (block_num, proof) = self
             .inner
-            .get_account_proof(foreign_account, AccountStateAt::ChainTip, None)
+            .get_account_proof(
+                native_id,
+                NativeAccountStorageRequirements::default(),
+                AccountStateAt::ChainTip,
+                None,
+            )
             .await
             .map_err(|err| js_error_with_context(err, "failed to get account"))?;
 
