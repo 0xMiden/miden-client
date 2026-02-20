@@ -551,7 +551,7 @@ impl NodeRpcClient for MockRpcApi {
 
     /// Returns the account proof for the specified account. The `known_account_code` parameter
     /// is ignored in the mock implementation and the latest account code is always returned.
-    async fn get_account(
+    async fn get_account_proof(
         &self,
         foreign_account: ForeignAccount,
         account_state: AccountStateAt,

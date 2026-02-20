@@ -214,7 +214,7 @@ pub trait NodeRpcClient: Send + Sync {
     /// The `known_account_code` parameter is the known code commitment
     /// to prevent unnecessary data fetching. Returns the block number and the FPI account data. If
     /// the tracked account is not found in the node, the method will return an error.
-    async fn get_account(
+    async fn get_account_proof(
         &self,
         foreign_account: ForeignAccount,
         account_state: AccountStateAt,
@@ -454,7 +454,7 @@ impl fmt::Display for RpcEndpoint {
             RpcEndpoint::SyncNullifiers => {
                 write!(f, "sync_nullifiers")
             },
-            RpcEndpoint::GetAccount => write!(f, "get_account"),
+            RpcEndpoint::GetAccount => write!(f, "get_account_proof"),
             RpcEndpoint::GetBlockByNumber => write!(f, "get_block_by_number"),
             RpcEndpoint::GetBlockHeaderByNumber => {
                 write!(f, "get_block_header_by_number")
