@@ -583,7 +583,7 @@ impl NodeRpcClient for GrpcClient {
     /// - There was an error sending the request to the node.
     /// - The answer had a `None` for one of the expected fields.
     /// - There is an error during storage deserialization.
-    async fn get_account(
+    async fn get_account_proof(
         &self,
         foreign_account: ForeignAccount,
         account_state: AccountStateAt,
