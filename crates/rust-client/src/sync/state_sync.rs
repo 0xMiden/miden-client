@@ -19,59 +19,35 @@ use crate::rpc::NodeRpcClient;
 use crate::rpc::domain::note::CommittedNote;
 use crate::rpc::domain::sync::StateSyncInfo;
 use crate::rpc::domain::transaction::TransactionInclusion;
-use crate::store::{
-    InputNoteRecord,
-    NoteFilter,
-    OutputNoteRecord,
-    Store,
-    StoreError,
-    TransactionFilter,
-};
+use crate::store::{InputNoteRecord, OutputNoteRecord, StoreError};
 use crate::transaction::TransactionRecord;
 
 // SYNC REQUEST
 // ================================================================================================
 
 /// Bundles the client state needed to perform a sync operation.
+///
+/// The sync process uses these inputs to:
+/// - Request account commitment updates from the node for the provided accounts.
+/// - Filter which note inclusions the node returns based on the provided note tags.
+/// - Follow the lifecycle of every tracked note (input and output), transitioning them from pending
+///   to committed to consumed as the network state advances.
+/// - Track uncommitted transactions so they can be marked as committed when the node confirms them,
+///   or discarded when they become stale.
+///
+/// Use [`Client::build_sync_input()`] to build a default input from the client state, or
+/// construct this struct manually for custom sync scenarios.
 pub struct StateSyncInput {
-    /// All headers of tracked accounts.
+    /// Account headers to request commitment updates for.
     pub accounts: Vec<AccountHeader>,
-    /// Note tags to include in the sync state request.
+    /// Note tags that the node uses to filter which note inclusions to return.
     pub note_tags: BTreeSet<NoteTag>,
-    /// Current state of unspent input notes tracked by the client.
-    pub unspent_input_notes: Vec<InputNoteRecord>,
-    /// Current state of unspent output notes tracked by the client.
-    pub unspent_output_notes: Vec<OutputNoteRecord>,
-    /// Uncommitted transactions tracked by the client.
+    /// Input notes whose lifecycle should be followed during sync.
+    pub input_notes: Vec<InputNoteRecord>,
+    /// Output notes whose lifecycle should be followed during sync.
+    pub output_notes: Vec<OutputNoteRecord>,
+    /// Transactions to track for commitment or discard during sync.
     pub uncommitted_transactions: Vec<TransactionRecord>,
-}
-
-impl StateSyncInput {
-    /// Reads client state from a [`Store`] and assembles a [`StateSyncInput`].
-    pub async fn from_store(store: &Arc<dyn Store>) -> Result<Self, ClientError> {
-        let accounts = store
-            .get_account_headers()
-            .await?
-            .into_iter()
-            .map(|(acc_header, _)| acc_header)
-            .collect();
-
-        let note_tags: BTreeSet<NoteTag> = store.get_unique_note_tags().await?;
-
-        let unspent_input_notes = store.get_input_notes(NoteFilter::Unspent).await?;
-        let unspent_output_notes = store.get_output_notes(NoteFilter::Unspent).await?;
-
-        let uncommitted_transactions =
-            store.get_transactions(TransactionFilter::Uncommitted).await?;
-
-        Ok(Self {
-            accounts,
-            note_tags,
-            unspent_input_notes,
-            unspent_output_notes,
-            uncommitted_transactions,
-        })
-    }
 }
 
 // SYNC CALLBACKS
@@ -170,7 +146,7 @@ impl StateSync {
     /// Syncs the state of the client with the chain tip of the node, returning the updates that
     /// should be applied to the store.
     ///
-    /// Use [`StateSyncInput::from_store()`] to build the input from a store, or assemble it
+    /// Use [`Client::build_sync_input()`] to build the default input, or assemble it
     /// manually for custom sync. The `current_partial_mmr` is taken by mutable reference so
     /// callers can keep it in memory across syncs.
     ///
@@ -197,8 +173,8 @@ impl StateSync {
         let StateSyncInput {
             accounts,
             note_tags,
-            unspent_input_notes,
-            unspent_output_notes,
+            input_notes,
+            output_notes,
             uncommitted_transactions,
         } = input;
         let block_num = u32::try_from(
@@ -209,7 +185,7 @@ impl StateSync {
 
         let mut state_sync_update = StateSyncUpdate {
             block_num,
-            note_updates: NoteUpdateTracker::new(unspent_input_notes, unspent_output_notes),
+            note_updates: NoteUpdateTracker::new(input_notes, output_notes),
             transaction_updates: TransactionUpdateTracker::new(uncommitted_transactions),
             ..Default::default()
         };
@@ -592,8 +568,8 @@ mod tests {
         StateSyncInput {
             accounts: vec![],
             note_tags: BTreeSet::new(),
-            unspent_input_notes: vec![],
-            unspent_output_notes: vec![],
+            input_notes: vec![],
+            output_notes: vec![],
             uncommitted_transactions: vec![],
         }
     }

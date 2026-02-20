@@ -68,6 +68,7 @@ use miden_tx::utils::{Deserializable, DeserializationError, Serializable};
 use tracing::{debug, info};
 
 use crate::note::NoteScreener;
+use crate::store::{NoteFilter, TransactionFilter};
 use crate::{Client, ClientError};
 mod block_header;
 
@@ -133,7 +134,7 @@ where
         let state_sync =
             StateSync::new(self.rpc_api.clone(), Arc::new(note_screener), self.tx_discard_delta);
         let mut current_partial_mmr = self.store.get_current_partial_mmr().await?;
-        let input = StateSyncInput::from_store(&self.store).await?;
+        let input = self.build_sync_input().await?;
 
         // Get the sync update from the network
         let state_sync_update = state_sync.sync_state(&mut current_partial_mmr, input).await?;
@@ -152,6 +153,36 @@ where
         self.store.prune_irrelevant_blocks().await?;
 
         Ok(sync_summary)
+    }
+
+    /// Builds a default [`StateSyncInput`] from the current client state.
+    ///
+    /// This includes all tracked account headers, all unique note tags, all unspent input and
+    /// output notes, and all uncommitted transactions.
+    pub async fn build_sync_input(&self) -> Result<StateSyncInput, ClientError> {
+        let accounts = self
+            .store
+            .get_account_headers()
+            .await?
+            .into_iter()
+            .map(|(acc_header, _)| acc_header)
+            .collect();
+
+        let note_tags = self.store.get_unique_note_tags().await?;
+
+        let input_notes = self.store.get_input_notes(NoteFilter::Unspent).await?;
+        let output_notes = self.store.get_output_notes(NoteFilter::Unspent).await?;
+
+        let uncommitted_transactions =
+            self.store.get_transactions(TransactionFilter::Uncommitted).await?;
+
+        Ok(StateSyncInput {
+            accounts,
+            note_tags,
+            input_notes,
+            output_notes,
+            uncommitted_transactions,
+        })
     }
 
     /// Applies the state sync update to the store and prunes the irrelevant block headers.
