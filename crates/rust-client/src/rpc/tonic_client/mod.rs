@@ -967,6 +967,10 @@ impl NodeRpcClient for GrpcClient {
         Ok(limits)
     }
 
+    fn has_rpc_limits(&self) -> Option<RpcLimits> {
+        *self.limits.read()
+    }
+
     async fn set_rpc_limits(&self, limits: RpcLimits) {
         self.limits.write().replace(limits);
     }

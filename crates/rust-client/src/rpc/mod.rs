@@ -390,6 +390,9 @@ pub trait NodeRpcClient: Send + Sync {
     /// Implementations may cache the result internally to avoid repeated network calls.
     async fn get_rpc_limits(&self) -> Result<RpcLimits, RpcError>;
 
+    /// Returns the RPC limits if they have been set, without fetching from the node.
+    fn has_rpc_limits(&self) -> Option<RpcLimits>;
+
     /// Sets the RPC limits internally to be used by the client.
     async fn set_rpc_limits(&self, limits: RpcLimits);
 

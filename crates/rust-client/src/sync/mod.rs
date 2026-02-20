@@ -81,10 +81,7 @@ pub use state_sync::{NoteUpdateAction, OnNoteReceived, StateSync};
 
 mod state_sync_update;
 pub use state_sync_update::{
-    AccountUpdates,
-    BlockUpdates,
-    StateSyncUpdate,
-    TransactionUpdateTracker,
+    AccountUpdates, BlockUpdates, StateSyncUpdate, TransactionUpdateTracker,
 };
 
 /// Client synchronization methods.
@@ -192,10 +189,10 @@ where
         self.store.prune_irrelevant_blocks().await.map_err(ClientError::StoreError)
     }
 
-    /// Ensures that the RPC limits are set in the RPC client. If not already persisted
-    /// in the store, fetches them from the node and stores them.
+    /// Ensures that the RPC limits are set in the RPC client. If not already cached,
+    /// fetches them from the node and persists them in the store.
     pub async fn ensure_rpc_limits_in_place(&mut self) -> Result<(), ClientError> {
-        if self.store.get_rpc_limits().await?.is_some() {
+        if self.rpc_api.has_rpc_limits().is_some() {
             return Ok(());
         }
 

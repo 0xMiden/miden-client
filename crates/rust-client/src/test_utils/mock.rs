@@ -759,6 +759,10 @@ impl NodeRpcClient for MockRpcApi {
         Ok(crate::rpc::RpcLimits::default())
     }
 
+    fn has_rpc_limits(&self) -> Option<crate::rpc::RpcLimits> {
+        Some(crate::rpc::RpcLimits::default())
+    }
+
     async fn set_rpc_limits(&self, _limits: crate::rpc::RpcLimits) {
         // No-op for mock client
     }
