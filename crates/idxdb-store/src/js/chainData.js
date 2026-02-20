@@ -115,7 +115,9 @@ export async function getPartialBlockchainNodes(dbId, ids) {
         const db = getDatabase(dbId);
         const numericIds = ids.map((id) => Number(id));
         const results = await db.partialBlockchainNodes.bulkGet(numericIds);
-        return results;
+        // bulkGet returns undefined for missing keys — filter them out so the
+        // Rust deserializer does not choke on undefined values.
+        return results.filter((r) => r !== undefined);
     }
     catch (err) {
         logWebStoreError(err, "Failed to get partial blockchain nodes");
