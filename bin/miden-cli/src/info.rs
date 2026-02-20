@@ -19,6 +19,10 @@ pub async fn print_client_info<AUTH: Keystore + Sync + 'static>(
 
     println!("Client version: {}", env!("CARGO_PKG_VERSION"));
 
+    if let Some(config_dir) = &config.config_dir {
+        println!("Config directory: {config_dir}");
+    }
+
     // Get and display local genesis commitment
     if let Ok(Some((genesis_header, _))) =
         client.get_block_header_by_num(BlockNumber::GENESIS).await
