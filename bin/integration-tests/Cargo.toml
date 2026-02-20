@@ -32,6 +32,7 @@ regex              = { version = "1.0" }
 serde              = { features = ["derive"], version = "1.0" }
 serde_json         = { version = "1.0" }
 tokio              = { workspace = true }
+tracing            = { workspace = true }
 tracing-subscriber = { features = ["env-filter", "fmt", "json"], version = "0.3" }
 url                = { version = "2.5.4" }
 uuid               = { version = "1.10" }

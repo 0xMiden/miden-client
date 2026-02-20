@@ -3,7 +3,6 @@ use std::env::temp_dir;
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::PathBuf;
-use std::println;
 use std::string::ToString;
 use std::time::{Duration, Instant};
 use std::vec::Vec;
@@ -19,6 +18,7 @@ use miden_protocol::transaction::{OutputNote, TransactionId};
 use miden_standards::account::auth::{AuthEcdsaK256Keccak, AuthFalcon512Rpo};
 use miden_standards::code_builder::CodeBuilder;
 use rand::RngCore;
+use tracing::{debug, info};
 use uuid::Uuid;
 
 use crate::account::component::{AccountComponent, BasicFungibleFaucet, BasicWallet};
@@ -108,6 +108,8 @@ pub async fn insert_new_wallet_with_seed(
 
     client.add_account(&account, false).await?;
 
+    info!(account_id = %account.id(), ?storage_mode, "Inserted new wallet");
+
     Ok((account, key_pair))
 }
 
@@ -157,6 +159,9 @@ pub async fn insert_new_fungible_faucet(
     keystore.add_key(&key_pair, account.id()).await.unwrap();
 
     client.add_account(&account, false).await?;
+
+    info!(account_id = %account.id(), ?storage_mode, "Inserted new fungible faucet");
+
     Ok((account, key_pair))
 }
 
@@ -167,7 +172,7 @@ pub async fn execute_failing_tx(
     tx_request: TransactionRequest,
     expected_error: ClientError,
 ) {
-    println!("Executing transaction...");
+    info!(account_id = %account_id, "Executing transaction (expecting failure)");
     // We compare string since we can't compare the error directly
     assert_eq!(
         Box::pin(client.submit_new_transaction(account_id, tx_request))
@@ -185,6 +190,7 @@ pub async fn execute_tx_and_sync(
     tx_request: TransactionRequest,
 ) -> Result<()> {
     let transaction_id = Box::pin(client.submit_new_transaction(account_id, tx_request)).await?;
+    info!(tx_id = %transaction_id, account_id = %account_id, "Transaction submitted, waiting for commit");
     wait_for_tx(client, transaction_id).await?;
     Ok(())
 }
@@ -193,7 +199,7 @@ pub async fn execute_tx_and_sync(
 pub async fn wait_for_tx(client: &mut TestClient, transaction_id: TransactionId) -> Result<()> {
     // wait until tx is committed
     let now = Instant::now();
-    println!("Syncing State...");
+    debug!(tx_id = %transaction_id, "Waiting for transaction to be committed");
     loop {
         client
             .sync_state()
@@ -210,7 +216,7 @@ pub async fn wait_for_tx(client: &mut TestClient, transaction_id: TransactionId)
 
         match tracked_transaction.status {
             TransactionStatus::Committed { block_number, .. } => {
-                println!("tx committed in {block_number}");
+                info!(tx_id = %transaction_id, %block_number, "Transaction committed");
                 break;
             },
             TransactionStatus::Pending => {
@@ -248,10 +254,10 @@ pub async fn wait_for_tx(client: &mut TestClient, transaction_id: TransactionId)
 pub async fn wait_for_blocks(client: &mut TestClient, amount_of_blocks: u32) -> SyncSummary {
     let current_block = client.get_sync_height().await.unwrap();
     let final_block = current_block + amount_of_blocks;
-    println!("Syncing until block {final_block}...",);
+    debug!(current_block = %current_block, target_block = %final_block, "Waiting for blocks");
     loop {
         let summary = client.sync_state().await.unwrap();
-        println!("Synced to block {} (syncing until {})...", summary.block_num, final_block);
+        debug!(sync_height = %summary.block_num, target_block = %final_block, "Synced");
 
         if summary.block_num >= final_block {
             return summary;
@@ -266,14 +272,14 @@ pub async fn wait_for_blocks(client: &mut TestClient, amount_of_blocks: u32) -> 
 pub async fn wait_for_blocks_no_sync(client: &mut TestClient, amount_of_blocks: u32) {
     let current_block = client.get_sync_height().await.unwrap();
     let final_block = current_block + amount_of_blocks;
-    println!("Waiting until block {final_block}...",);
+    debug!(current_block = %current_block, target_block = %final_block, "Waiting for blocks (no sync)");
     loop {
         let (latest_block, _) =
             client.test_rpc_api().get_block_header_by_number(None, false).await.unwrap();
-        println!(
-            "Waited up to block {} (waiting until {})...",
-            latest_block.block_num(),
-            final_block
+        debug!(
+            chain_tip = %latest_block.block_num(),
+            target_block = %final_block,
+            "Waiting for blocks (no sync)"
         );
 
         if latest_block.block_num() >= final_block {
@@ -293,8 +299,8 @@ pub async fn wait_for_blocks_no_sync(client: &mut TestClient, amount_of_blocks: 
 pub async fn wait_for_node(client: &mut TestClient) {
     const NODE_TIME_BETWEEN_ATTEMPTS: u64 = 2;
     const NUMBER_OF_NODE_ATTEMPTS: u64 = 60;
-    println!(
-        "Waiting for Node to be up. Checking every {NODE_TIME_BETWEEN_ATTEMPTS}s for {NUMBER_OF_NODE_ATTEMPTS} tries..."
+    info!(
+        "Waiting for node to be up (checking every {NODE_TIME_BETWEEN_ATTEMPTS}s, max {NUMBER_OF_NODE_ATTEMPTS} tries)"
     );
     for _try_number in 0..NUMBER_OF_NODE_ATTEMPTS {
         match client.sync_state().await {
@@ -357,11 +363,14 @@ pub async fn setup_two_wallets_and_faucet(
             .await
             .with_context(|| "failed to insert second basic wallet account")?;
 
-    println!("Syncing State...");
+    info!(
+        faucet_id = %faucet_account.id(),
+        wallet_1_id = %first_basic_account.id(),
+        wallet_2_id = %second_basic_account.id(),
+        "Setup complete, syncing state"
+    );
     client.sync_state().await.with_context(|| "failed to sync client state")?;
 
-    // Get Faucet and regular accounts
-    println!("Fetching Accounts...");
     Ok((first_basic_account, second_basic_account, faucet_account))
 }
 
@@ -395,7 +404,7 @@ pub async fn mint_note(
 ) -> (TransactionId, Note) {
     // Create a Mint Tx for MINT_AMOUNT units of our fungible asset
     let fungible_asset = FungibleAsset::new(faucet_account_id, MINT_AMOUNT).unwrap();
-    println!("Minting Asset");
+    info!(faucet_id = %faucet_account_id, target_id = %basic_account_id, amount = MINT_AMOUNT, "Minting asset");
     let tx_request = TransactionRequestBuilder::new()
         .build_mint_fungible_asset(fungible_asset, basic_account_id, note_type, client.rng())
         .unwrap();
@@ -404,9 +413,9 @@ pub async fn mint_note(
             .await
             .unwrap();
 
-    // Check that note is committed and return it
-    println!("Fetching Committed Notes...");
-    (tx_id, tx_request.expected_output_own_notes().pop().unwrap())
+    let note = tx_request.expected_output_own_notes().pop().unwrap();
+    info!(tx_id = %tx_id, note_id = %note.id(), "Mint transaction submitted");
+    (tx_id, note)
 }
 
 /// Executes a transaction that consumes the provided notes and returns the transaction ID.
@@ -416,11 +425,14 @@ pub async fn consume_notes(
     account_id: AccountId,
     input_notes: &[Note],
 ) -> TransactionId {
-    println!("Consuming Note...");
+    let note_ids: Vec<_> = input_notes.iter().map(|n| n.id().to_string()).collect();
+    info!(account_id = %account_id, note_ids = %note_ids.join(", "), "Consuming notes");
     let tx_request = TransactionRequestBuilder::new()
         .build_consume_notes(input_notes.to_vec())
         .unwrap();
-    Box::pin(client.submit_new_transaction(account_id, tx_request)).await.unwrap()
+    let tx_id = Box::pin(client.submit_new_transaction(account_id, tx_request)).await.unwrap();
+    info!(tx_id = %tx_id, "Consume transaction submitted");
+    tx_id
 }
 
 /// Asserts that the account has a single asset with the expected amount.
@@ -445,7 +457,7 @@ pub async fn assert_note_cannot_be_consumed_twice(
     note_to_consume: Note,
 ) {
     // Check that we can't consume the P2ID note again
-    println!("Consuming Note...");
+    info!(note_id = %note_to_consume.id(), account_id = %consuming_account_id, "Attempting double-consume (expecting failure)");
 
     // Double-spend error expected to be received since we are consuming the same note
     let tx_request = TransactionRequestBuilder::new()
@@ -516,6 +528,12 @@ pub async fn mint_and_consume(
     faucet_account_id: AccountId,
     note_type: NoteType,
 ) -> TransactionId {
+    info!(
+        faucet_id = %faucet_account_id,
+        target_id = %basic_account_id,
+        amount = MINT_AMOUNT,
+        "Minting and consuming asset"
+    );
     let tx_request = TransactionRequestBuilder::new()
         .build_mint_fungible_asset(
             FungibleAsset::new(faucet_account_id, MINT_AMOUNT).unwrap(),
@@ -525,13 +543,15 @@ pub async fn mint_and_consume(
         )
         .unwrap();
 
-    Box::pin(execute_tx_and_consume_output_notes(
+    let tx_id = Box::pin(execute_tx_and_consume_output_notes(
         tx_request,
         client,
         faucet_account_id,
         basic_account_id,
     ))
-    .await
+    .await;
+    info!(tx_id = %tx_id, "Mint-and-consume transaction submitted");
+    tx_id
 }
 
 /// Creates and inserts an account with custom code as a component into the client.

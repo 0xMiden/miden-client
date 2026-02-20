@@ -9,10 +9,10 @@ on:
 
 jobs:
   changelog:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@main
         with:
           fetch-depth: 0
       - name: Check for changes in changelog

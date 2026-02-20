@@ -113,9 +113,6 @@ pub trait NodeRpcClient: Send + Sync {
     /// this method does nothing.
     async fn set_genesis_commitment(&self, commitment: Word) -> Result<(), RpcError>;
 
-    /// Returns the genesis commitment if it has been set, without fetching from the node.
-    fn has_genesis_commitment(&self) -> Option<Word>;
-
     /// Given a Proven Transaction, send it to the node for it to be included in a future block
     /// using the `/SubmitProvenTransaction` RPC endpoint.
     async fn submit_proven_transaction(
@@ -217,7 +214,7 @@ pub trait NodeRpcClient: Send + Sync {
     /// The `known_account_code` parameter is the known code commitment
     /// to prevent unnecessary data fetching. Returns the block number and the FPI account data. If
     /// the tracked account is not found in the node, the method will return an error.
-    async fn get_account_proof(
+    async fn get_account(
         &self,
         foreign_account: ForeignAccount,
         account_state: AccountStateAt,
@@ -393,9 +390,6 @@ pub trait NodeRpcClient: Send + Sync {
     /// Implementations may cache the result internally to avoid repeated network calls.
     async fn get_rpc_limits(&self) -> Result<RpcLimits, RpcError>;
 
-    /// Returns the RPC limits if they have been set, without fetching from the node.
-    fn has_rpc_limits(&self) -> Option<RpcLimits>;
-
     /// Sets the RPC limits internally to be used by the client.
     async fn set_rpc_limits(&self, limits: RpcLimits);
 
@@ -460,7 +454,7 @@ impl fmt::Display for RpcEndpoint {
             RpcEndpoint::SyncNullifiers => {
                 write!(f, "sync_nullifiers")
             },
-            RpcEndpoint::GetAccount => write!(f, "get_account_proof"),
+            RpcEndpoint::GetAccount => write!(f, "get_account"),
             RpcEndpoint::GetBlockByNumber => write!(f, "get_block_by_number"),
             RpcEndpoint::GetBlockHeaderByNumber => {
                 write!(f, "get_block_header_by_number")
