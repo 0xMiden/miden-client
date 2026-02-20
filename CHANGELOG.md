@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.13.2 (TBD)
+
+* [FIX][web] Added missing `attachment()` getter to `NoteMetadata` WASM binding ([#1810](https://github.com/0xMiden/miden-client/pull/1810)).
+
 ## 0.13.1 (2026-02-13)
 
 * Added the `@miden-sdk/react` hooks library (see [its own changelog](packages/react-sdk/CHANGELOG.md)) ([#1711](https://github.com/0xMiden/miden-client/pull/1711)).
