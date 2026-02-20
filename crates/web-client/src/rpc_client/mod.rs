@@ -152,7 +152,7 @@ impl RpcClient {
 
         let (block_num, proof) = self
             .inner
-            .get_account(foreign_account, AccountStateAt::ChainTip, None)
+            .get_account_proof(foreign_account, AccountStateAt::ChainTip, None)
             .await
             .map_err(|err| js_error_with_context(err, "failed to get account"))?;
 

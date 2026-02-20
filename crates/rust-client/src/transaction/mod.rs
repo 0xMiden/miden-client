@@ -694,7 +694,7 @@ where
 
             let (_, account_proof) = self
                 .rpc_api
-                .get_account(
+                .get_account_proof(
                     foreign_account.clone(),
                     AccountStateAt::Block(block_num),
                     known_account_code,
