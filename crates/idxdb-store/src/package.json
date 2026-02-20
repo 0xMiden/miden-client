@@ -10,13 +10,16 @@
   "scripts": {
     "build": "yarn tsc --build --force ./tsconfig.json",
     "build:bundler": "yarn tsc --build --force ./tsconfig.bundler.json",
-    "lint": "yarn build && yarn eslint --config ./ts/eslint.config.mjs ./ts"
+    "lint": "yarn build && yarn eslint --config ./ts/eslint.config.mjs ./ts",
+    "test": "vitest run"
   },
   "devDependencies": {
     "@eslint/js": "^9.33.0",
     "@typescript-eslint/eslint-plugin": "^8.39.1",
     "eslint": "^9.33.0",
+    "@types/semver": "^7.5.8",
     "typescript-eslint": "^8.39.1",
-    "@types/semver": "^7.5.8"
+    "vitest": "^3.0.0",
+    "fake-indexeddb": "^6.0.0"
   }
 }

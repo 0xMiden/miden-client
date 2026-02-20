@@ -76,6 +76,8 @@ pub enum ClientError {
     AccountCommitmentMismatch(Word),
     #[error("account with id {0} is private")]
     AccountIsPrivate(AccountId),
+    #[error("account with id {0} not found on the network")]
+    AccountNotFoundOnChain(AccountId),
     #[error("account nonce is too low to import")]
     AccountNonceTooLow,
     #[error("asset error")]
@@ -135,9 +137,9 @@ pub enum ClientError {
     #[error("client initialization error: {0}")]
     ClientInitializationError(String),
     #[error("note tags limit exceeded (max {0})")]
-    NoteTagsLimitExceeded(usize),
+    NoteTagsLimitExceeded(u32),
     #[error("accounts limit exceeded (max {0})")]
-    AccountsLimitExceeded(usize),
+    AccountsLimitExceeded(u32),
     #[error("unsupported authentication scheme ID: {0}")]
     UnsupportedAuthSchemeId(u8),
     #[error("account error is not full: {0}")]

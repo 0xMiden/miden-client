@@ -11,7 +11,10 @@ use miden_protocol::note::NoteId;
 use miden_protocol::utils::DeserializationError;
 use thiserror::Error;
 
-use super::NodeRpcClientEndpoint;
+use super::RpcEndpoint;
+
+pub mod node;
+pub use node::EndpointError;
 
 // RPC ERROR
 // ================================================================================================
@@ -28,12 +31,16 @@ pub enum RpcError {
     DeserializationError(String),
     #[error("rpc api response missing an expected field: {0}")]
     ExpectedDataMissing(String),
+    #[error("rpc pagination error: {0}")]
+    PaginationError(String),
     #[error("rpc api response is invalid: {0}")]
     InvalidResponse(String),
-    #[error("grpc request failed for {endpoint}: {error_kind}")]
-    GrpcError {
-        endpoint: NodeRpcClientEndpoint,
+    #[error("grpc request failed for {endpoint}: {error_kind}{}",
+        endpoint_error.as_ref().map_or(String::new(), |e| format!(" ({e})")))]
+    RequestError {
+        endpoint: RpcEndpoint,
         error_kind: GrpcError,
+        endpoint_error: Option<EndpointError>,
         #[source]
         source: Option<Box<dyn Error + Send + Sync + 'static>>,
     },
@@ -41,6 +48,16 @@ pub enum RpcError {
     NoteNotFound(NoteId),
     #[error("invalid node endpoint: {0}")]
     InvalidNodeEndpoint(String),
+}
+
+impl RpcError {
+    /// Returns the typed endpoint error if this is a request error, or `None` otherwise.
+    pub fn endpoint_error(&self) -> Option<&EndpointError> {
+        match self {
+            Self::RequestError { endpoint_error, .. } => endpoint_error.as_ref(),
+            _ => None,
+        }
+    }
 }
 
 impl From<DeserializationError> for RpcError {
@@ -156,8 +173,8 @@ impl GrpcError {
 // ACCEPT HEADER ERROR
 // ================================================================================================
 
-// TODO: Once the node returns structure error information, replace this with a more structure
-// approach. See miden-client/#1129 for more information.
+// TODO: Accept header errors are still parsed from message strings, which is fragile.
+// Ideally the node would return structured error codes for these too. See #1129.
 
 /// Errors that can occur during accept header validation.
 #[derive(Debug, Error)]

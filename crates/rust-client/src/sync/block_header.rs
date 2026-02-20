@@ -8,38 +8,39 @@ use miden_protocol::crypto::merkle::mmr::{Forest, InOrderIndex, MmrPeaks, Partia
 use tracing::warn;
 
 use crate::rpc::NodeRpcClient;
-use crate::store::StoreError;
+use crate::store::{BlockRelevance, StoreError};
 use crate::{Client, ClientError};
 
 /// Network information management methods.
 impl<AUTH> Client<AUTH> {
-    /// Attempts to retrieve the genesis block from the store. If not found,
-    /// it requests it from the node and store it.
-    pub async fn ensure_genesis_in_place(&mut self) -> Result<BlockHeader, ClientError> {
-        let genesis = if let Some((block, _)) = self.store.get_block_header_by_num(0.into()).await?
-        {
-            block
-        } else {
-            let genesis = self.retrieve_and_store_genesis().await?;
-            self.rpc_api.set_genesis_commitment(genesis.commitment()).await?;
-            genesis
-        };
-
-        Ok(genesis)
+    /// Retrieves a block header by its block number from the store.
+    ///
+    /// Returns `None` if the block header is not found in the store.
+    pub async fn get_block_header_by_num(
+        &self,
+        block_num: BlockNumber,
+    ) -> Result<Option<(BlockHeader, BlockRelevance)>, ClientError> {
+        self.store.get_block_header_by_num(block_num).await.map_err(Into::into)
     }
 
-    /// Calls `get_block_header_by_number` requesting the genesis block and storing it
-    /// in the local database.
-    async fn retrieve_and_store_genesis(&mut self) -> Result<BlockHeader, ClientError> {
-        let (genesis_block, _) = self
+    /// Ensures that the genesis block is available. If the genesis commitment is already
+    /// cached in the RPC client, returns early. Otherwise, fetches the genesis block from
+    /// the node, stores it, and sets the commitment in the RPC client.
+    pub async fn ensure_genesis_in_place(&mut self) -> Result<(), ClientError> {
+        if self.rpc_api.has_genesis_commitment().is_some() {
+            return Ok(());
+        }
+
+        let (genesis, _) = self
             .rpc_api
             .get_block_header_by_number(Some(BlockNumber::GENESIS), false)
             .await?;
 
         let blank_mmr_peaks = MmrPeaks::new(Forest::empty(), vec![])
             .expect("Blank MmrPeaks should not fail to instantiate");
-        self.store.insert_block_header(&genesis_block, blank_mmr_peaks, false).await?;
-        Ok(genesis_block)
+        self.store.insert_block_header(&genesis, blank_mmr_peaks, false).await?;
+        self.rpc_api.set_genesis_commitment(genesis.commitment()).await?;
+        Ok(())
     }
 
     /// Fetches from the store the current view of the chain's [`PartialMmr`].

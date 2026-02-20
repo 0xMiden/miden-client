@@ -5,6 +5,7 @@ import {
   useRef,
   useCallback,
   useMemo,
+  useState,
   type ReactNode,
 } from "react";
 import { WebClient } from "@miden-sdk/miden-sdk";
@@ -14,6 +15,8 @@ import { DEFAULTS } from "../types";
 import { AsyncLock } from "../utils/asyncLock";
 import { resolveRpcUrl } from "../utils/network";
 import { resolveTransactionProver } from "../utils/prover";
+import { useSigner } from "./SignerContext";
+import { initializeSignerAccount } from "../utils/signerAccount";
 
 interface MidenContextValue {
   client: WebClient | null;
@@ -23,6 +26,8 @@ interface MidenContextValue {
   sync: () => Promise<void>;
   runExclusive: <T>(fn: () => Promise<T>) => Promise<T>;
   prover: ReturnType<typeof resolveTransactionProver>;
+  /** Account ID from signer (only set when using external signer) */
+  signerAccountId: string | null;
 }
 
 const MidenContext = createContext<MidenContextValue | null>(null);
@@ -57,6 +62,10 @@ export function MidenProvider({
   const syncIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isInitializedRef = useRef(false);
   const clientLockRef = useRef(new AsyncLock());
+
+  // Detect signer from context (null if no signer provider above)
+  const signerContext = useSigner();
+  const [signerAccountId, setSignerAccountId] = useState<string | null>(null);
 
   const resolvedConfig = useMemo(
     () => ({
@@ -116,41 +125,130 @@ export function MidenProvider({
 
   // Initialize client
   useEffect(() => {
-    if (isInitializedRef.current) return;
-    isInitializedRef.current = true;
+    // For signer mode, we need to re-initialize when connection state changes
+    // For local keystore mode, we only initialize once
+    if (!signerContext && isInitializedRef.current) return;
 
-    const initClient = async () => {
-      setInitializing(true);
-      setConfig(resolvedConfig);
-
-      try {
-        const seed = resolvedConfig.seed as Parameters<
-          typeof WebClient.createClient
-        >[2];
-        const webClient = await WebClient.createClient(
-          resolvedConfig.rpcUrl,
-          resolvedConfig.noteTransportUrl,
-          seed
-        );
-
-        setClient(webClient);
-
-        // Initial sync
-        try {
-          const summary = await runExclusive(() => webClient.syncState());
-          setSyncState({
-            syncHeight: summary.blockNum(),
-            lastSyncTime: Date.now(),
-          });
-        } catch {
-          // Initial sync failure is non-fatal
-        }
-      } catch (error) {
-        setInitError(error instanceof Error ? error : new Error(String(error)));
+    // If signer provider exists but not connected, wait for user to connect
+    if (signerContext && !signerContext.isConnected) {
+      // Reset state when signer disconnects
+      // Read client from store directly (not closure) since client is not in deps
+      if (useMidenStore.getState().client) {
+        useMidenStore.getState().reset();
+        setClient(null);
+        setSignerAccountId(null);
       }
+      return;
+    }
+
+    // Mark as initialized for local keystore mode
+    if (!signerContext) {
+      isInitializedRef.current = true;
+    }
+
+    let cancelled = false;
+
+    // Wrap the entire init in runExclusive so that if the effect re-triggers
+    // while a previous init is still running, the new init waits for the old
+    // one to finish.  This prevents concurrent WASM access (which crashes
+    // with "recursive use of an object detected").
+    const initClient = async () => {
+      await runExclusive(async () => {
+        // Re-check cancelled after potentially waiting for the lock
+        if (cancelled) return;
+
+        setInitializing(true);
+        setConfig(resolvedConfig);
+
+        try {
+          let webClient: WebClient;
+          let didSignerInit = false;
+
+          if (signerContext && signerContext.isConnected) {
+            // External keystore mode - signer provider is present and connected
+            const storeName = `MidenClientDB_${signerContext.storeName}`;
+
+            webClient = await WebClient.createClientWithExternalKeystore(
+              resolvedConfig.rpcUrl,
+              resolvedConfig.noteTransportUrl,
+              resolvedConfig.seed,
+              storeName,
+              undefined, // getKeyCb - not needed for public accounts
+              undefined, // insertKeyCb - not needed for public accounts
+              signerContext.signCb
+            );
+
+            if (cancelled) return;
+
+            // Initialize account from signer config
+            // (this already syncs the client internally)
+            const accountId = await initializeSignerAccount(
+              webClient,
+              signerContext.accountConfig
+            );
+            if (cancelled) return;
+            setSignerAccountId(accountId);
+            didSignerInit = true;
+          } else {
+            // No signer provider - standard local keystore (existing behavior)
+            const seed = resolvedConfig.seed as Parameters<
+              typeof WebClient.createClient
+            >[2];
+            webClient = await WebClient.createClient(
+              resolvedConfig.rpcUrl,
+              resolvedConfig.noteTransportUrl,
+              seed
+            );
+            if (cancelled) return;
+          }
+
+          // Initial sync BEFORE setClient — setClient atomically sets isReady=true
+          // which triggers auto-sync and consumer hooks. Doing sync first avoids
+          // concurrent WASM access between init sync and auto-sync.
+          // Skip for signer mode: initializeSignerAccount already synced.
+          if (!didSignerInit) {
+            try {
+              const summary = await webClient.syncState();
+              if (cancelled) return;
+              setSyncState({
+                syncHeight: summary.blockNum(),
+                lastSyncTime: Date.now(),
+              });
+            } catch {
+              // Initial sync failure is non-fatal
+            }
+          }
+
+          // Load accounts before making client ready
+          if (!cancelled) {
+            try {
+              const accounts = await webClient.getAccounts();
+              if (cancelled) return;
+              useMidenStore.getState().setAccounts(accounts);
+            } catch {
+              // Non-fatal
+            }
+          }
+
+          // Set client LAST — this atomically sets isReady=true and
+          // isInitializing=false, which enables auto-sync and consumer hooks.
+          if (!cancelled) {
+            setClient(webClient);
+          }
+        } catch (error) {
+          if (!cancelled) {
+            setInitError(
+              error instanceof Error ? error : new Error(String(error))
+            );
+          }
+        }
+      });
     };
 
     initClient();
+    return () => {
+      cancelled = true;
+    };
   }, [
     runExclusive,
     resolvedConfig,
@@ -159,6 +257,7 @@ export function MidenProvider({
     setInitError,
     setInitializing,
     setSyncState,
+    signerContext,
   ]);
 
   // Auto-sync interval
@@ -201,6 +300,7 @@ export function MidenProvider({
     sync,
     runExclusive,
     prover: defaultProver,
+    signerAccountId,
   };
 
   return (
