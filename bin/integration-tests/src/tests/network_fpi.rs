@@ -131,8 +131,6 @@ pub async fn test_network_fpi(client_config: ClientConfig) -> Result<()> {
 
     execute_tx_and_sync(&mut client2, sender_account.id(), tx_request).await?;
 
-    wait_for_blocks(&mut client2, 2).await;
-
     // get the updated network account to check that the counter value was updated (meaning that the
     // note was executed successfully, so the FPI was successful)
     let updated_network_account = client2
