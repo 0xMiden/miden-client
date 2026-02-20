@@ -329,7 +329,7 @@ async fn token_symbol_mapping() -> Result<()> {
     ]);
 
     let output = mint_cmd.current_dir(&temp_dir).output().unwrap();
-    assert!(output.status.success());
+    assert!(output.status.success(), "token_symbol mint failed.\nstdout: {}\nstderr: {}", String::from_utf8_lossy(&output.stdout), String::from_utf8_lossy(&output.stderr));
 
     let note_id = String::from_utf8(output.stdout)
         .unwrap()
@@ -990,6 +990,7 @@ fn sync_cli(cli_path: &Path) -> u64 {
 /// successfully given account using the CLI given by `cli_path`.
 fn mint_cli(cli_path: &Path, target_account_id: &str, faucet_id: &str) -> String {
     let mut mint_cmd = cargo_bin_cmd!("miden-client");
+    mint_cmd.env("MIDEN_DEBUG", "true");
     mint_cmd.args([
         "mint",
         "--target",
@@ -1002,7 +1003,7 @@ fn mint_cli(cli_path: &Path, target_account_id: &str, faucet_id: &str) -> String
     ]);
 
     let output = mint_cmd.current_dir(cli_path).output().unwrap();
-    assert!(output.status.success());
+    assert!(output.status.success(), "mint_cli failed.\nstdout: {}\nstderr: {}", String::from_utf8_lossy(&output.stdout), String::from_utf8_lossy(&output.stderr));
 
     String::from_utf8(output.stdout)
         .unwrap()

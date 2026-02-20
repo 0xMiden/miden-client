@@ -30,8 +30,9 @@ use super::generated::rpc::account_request::AccountDetailRequest;
 use super::generated::rpc::AccountRequest;
 use super::{
     Endpoint, FetchedAccount, NodeRpcClient, NodeRpcClientEndpoint, NoteSyncInfo, RpcError,
-    RpcStatusInfo, StateSyncInfo,
+    RpcStatusInfo,
 };
+use crate::rpc::domain::sync::ChainMmrInfo;
 use crate::rpc::domain::account_vault::{AccountVaultInfo, AccountVaultUpdate};
 use crate::rpc::domain::storage_map::{StorageMapInfo, StorageMapUpdate};
 use crate::rpc::domain::transaction::TransactionsInfo;
@@ -492,29 +493,24 @@ impl NodeRpcClient for GrpcClient {
         Ok(notes)
     }
 
-    /// Sends a sync state request to the Miden node, validates and converts the response
-    /// into a [`StateSyncInfo`] struct.
-    async fn sync_state(
+    async fn sync_chain_mmr(
         &self,
-        block_num: BlockNumber,
-        account_ids: &[AccountId],
-        note_tags: &BTreeSet<NoteTag>,
-    ) -> Result<StateSyncInfo, RpcError> {
-        let account_ids = account_ids.iter().map(|acc| (*acc).into()).collect();
+        block_from: BlockNumber,
+        block_to: Option<BlockNumber>,
+    ) -> Result<ChainMmrInfo, RpcError> {
+        let block_range = Some(BlockRange {
+            block_from: block_from.as_u32(),
+            block_to: block_to.map(|b| b.as_u32()),
+        });
 
-        let note_tags = note_tags.iter().map(|&note_tag| note_tag.into()).collect();
-
-        let request = proto::rpc::SyncStateRequest {
-            block_num: block_num.as_u32(),
-            account_ids,
-            note_tags,
-        };
+        let request = proto::rpc::SyncChainMmrRequest { block_range };
 
         let mut rpc_api = self.ensure_connected().await?;
 
-        let response = rpc_api.sync_state(request).await.map_err(|status| {
-            self.rpc_error_from_status(NodeRpcClientEndpoint::SyncState, status)
+        let response = rpc_api.sync_chain_mmr(request).await.map_err(|status| {
+            self.rpc_error_from_status(NodeRpcClientEndpoint::SyncChainMmr, status)
         })?;
+
         response.into_inner().try_into()
     }
 
