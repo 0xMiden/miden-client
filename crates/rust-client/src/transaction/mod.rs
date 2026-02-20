@@ -108,7 +108,6 @@ mod store_update;
 pub use store_update::TransactionStoreUpdate;
 
 mod request;
-use request::account_proof_into_inputs;
 pub use request::{
     ForeignAccount,
     NoteArgs,
@@ -118,6 +117,7 @@ pub use request::{
     TransactionRequestBuilder,
     TransactionRequestError,
     TransactionScriptTemplate,
+    account_proof_into_inputs,
 };
 
 mod result;
@@ -290,7 +290,8 @@ where
 
         let ignore_invalid_notes = transaction_request.ignore_invalid_input_notes();
 
-        let data_store = ClientDataStore::new(self.store.clone());
+        let data_store =
+            ClientDataStore::new(self.store.clone(), self.rpc_api.clone());
         data_store.register_foreign_account_inputs(foreign_account_inputs.iter().cloned());
         for fpi_account in &foreign_account_inputs {
             data_store.mast_store().load_account_code(fpi_account.code());
@@ -471,7 +472,8 @@ where
 
         let account: Account = account_record.try_into()?;
 
-        let data_store = ClientDataStore::new(self.store.clone());
+        let data_store =
+            ClientDataStore::new(self.store.clone(), self.rpc_api.clone());
 
         data_store.register_foreign_account_inputs(foreign_account_inputs.iter().cloned());
 
@@ -622,7 +624,8 @@ where
         tx_args: TransactionArgs,
     ) -> Result<InputNotes<InputNote>, ClientError> {
         loop {
-            let data_store = ClientDataStore::new(self.store.clone());
+            let data_store =
+                ClientDataStore::new(self.store.clone(), self.rpc_api.clone());
 
             data_store.mast_store().load_account_code(account.code());
             let execution = NoteConsumptionChecker::new(&self.build_executor(&data_store)?)

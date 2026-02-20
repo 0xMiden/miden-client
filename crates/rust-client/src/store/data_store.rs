@@ -21,7 +21,10 @@ use miden_protocol::{MastForest, Word, ZERO};
 use miden_tx::{DataStore, DataStoreError, MastForestStore, TransactionMastStore};
 
 use super::{AccountStorageFilter, PartialBlockchainFilter, Store};
+use crate::rpc::domain::account::AccountStorageRequirements;
+use crate::rpc::{AccountStateAt, NodeRpcClient};
 use crate::store::StoreError;
+use crate::transaction::{ForeignAccount, account_proof_into_inputs};
 use crate::utils::RwLock;
 
 // DATA STORE
@@ -35,14 +38,17 @@ pub struct ClientDataStore {
     transaction_mast_store: Arc<TransactionMastStore>,
     /// Cache of foreign account inputs that should be returned to the executor on demand.
     foreign_account_inputs: RwLock<BTreeMap<AccountId, AccountInputs>>,
+    /// RPC client used to lazy-load foreign account data on cache miss.
+    rpc_api: Arc<dyn NodeRpcClient>,
 }
 
 impl ClientDataStore {
-    pub fn new(store: alloc::sync::Arc<dyn Store>) -> Self {
+    pub fn new(store: alloc::sync::Arc<dyn Store>, rpc_api: Arc<dyn NodeRpcClient>) -> Self {
         Self {
             store,
             transaction_mast_store: Arc::new(TransactionMastStore::new()),
             foreign_account_inputs: RwLock::new(BTreeMap::new()),
+            rpc_api,
         }
     }
 
@@ -202,16 +208,74 @@ impl DataStore for ClientDataStore {
     async fn get_foreign_account_inputs(
         &self,
         foreign_account_id: AccountId,
-        _ref_block: BlockNumber,
+        ref_block: BlockNumber,
     ) -> Result<AccountInputs, DataStoreError> {
-        let cache = self.foreign_account_inputs.read();
+        // Fast path: check the cache first (drop the read guard before any async work).
+        {
+            let cache = self.foreign_account_inputs.read();
+            if let Some(inputs) = cache.get(&foreign_account_id).cloned() {
+                return Ok(inputs);
+            }
+        }
 
-        let inputs = cache
-            .get(&foreign_account_id)
-            .cloned()
-            .ok_or(DataStoreError::AccountNotFound(foreign_account_id))?;
+        // Cache miss — try lazy loading via RPC for public accounts.
+        if !foreign_account_id.is_public() {
+            return Err(DataStoreError::AccountNotFound(foreign_account_id));
+        }
 
-        Ok(inputs)
+        // Check whether we already have the code cached in the store to avoid
+        // re-fetching it from the network.
+        let known_account_code = self
+            .store
+            .get_foreign_account_code(alloc::vec![foreign_account_id])
+            .await
+            .map_err(|err| {
+                DataStoreError::other_with_source("failed to query foreign account code cache", err)
+            })?
+            .into_values()
+            .next();
+
+        let foreign_account = ForeignAccount::Public(
+            foreign_account_id,
+            AccountStorageRequirements::default(),
+        );
+
+        let (_, account_proof) = self
+            .rpc_api
+            .get_account_proof(
+                foreign_account,
+                AccountStateAt::Block(ref_block),
+                known_account_code,
+            )
+            .await
+            .map_err(|err| {
+                DataStoreError::other_with_source(
+                    "failed to fetch foreign account via RPC",
+                    err,
+                )
+            })?;
+
+        let account_inputs = account_proof_into_inputs(account_proof).map_err(|err| {
+            DataStoreError::other_with_source(
+                "failed to convert account proof to inputs",
+                err,
+            )
+        })?;
+
+        // Load the account code into the MAST store so the executor can resolve
+        // procedure hashes during execution.
+        self.transaction_mast_store.load_account_code(account_inputs.code());
+
+        // Persist the fetched code for future transactions.
+        let _ = self
+            .store
+            .upsert_foreign_account_code(foreign_account_id, account_inputs.code().clone())
+            .await;
+
+        // Cache the result for subsequent calls within the same transaction.
+        self.foreign_account_inputs.write().insert(foreign_account_id, account_inputs.clone());
+
+        Ok(account_inputs)
     }
 
     fn get_note_script(
