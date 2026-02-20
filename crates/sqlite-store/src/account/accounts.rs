@@ -684,7 +684,7 @@ impl SqliteStore {
                 VAULT_QUERY,
                 params![
                     final_account_header.vault_root().to_hex(),
-                    init_account_header.commitment().to_hex()
+                    init_account_header.to_commitment().to_hex()
                 ],
             )
             .into_store_error()?;
@@ -711,7 +711,7 @@ impl SqliteStore {
                 STORAGE_QUERY,
                 params![
                     final_account_header.storage_commitment().to_hex(),
-                    init_account_header.commitment().to_hex()
+                    init_account_header.to_commitment().to_hex()
                 ],
             )
             .into_store_error()?;
@@ -808,7 +808,7 @@ impl SqliteStore {
         let storage_commitment = account.storage_commitment().to_string();
         let vault_root = account.vault_root().to_string();
         let nonce = u64_to_value(account.nonce().as_int());
-        let commitment = account.commitment().to_string();
+        let commitment = account.to_commitment().to_string();
 
         let account_seed = account_seed.map(|seed| seed.to_bytes());
 

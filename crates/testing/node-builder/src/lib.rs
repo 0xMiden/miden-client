@@ -21,7 +21,14 @@ use miden_node_store::{GenesisState, Store};
 use miden_node_utils::crypto::get_rpo_random_coin;
 use miden_node_validator::Validator;
 use miden_protocol::account::auth::AuthSecretKey;
-use miden_protocol::account::{Account, AccountBuilder, AccountComponent, AccountFile, StorageMap};
+use miden_protocol::account::{
+    Account,
+    AccountBuilder,
+    AccountComponent,
+    AccountComponentMetadata,
+    AccountFile,
+    StorageMap,
+};
 use miden_protocol::asset::{Asset, FungibleAsset, TokenSymbol};
 use miden_protocol::block::FeeParameters;
 use miden_protocol::crypto::dsa::ecdsa_k256_keccak;
@@ -502,9 +509,13 @@ fn create_test_account_with_many_assets(faucets: &[Account]) -> anyhow::Result<A
         AuthSecretKey::new_falcon512_rpo_with_rng(&mut ChaCha20Rng::from_seed(TEST_ACCOUNT_SEED));
 
     let storage_map = create_large_storage_map();
-    let acc_component = AccountComponent::new(basic_wallet_library(), vec![storage_map])
-        .expect("basic wallet component should satisfy account component requirements")
-        .with_supports_all_types();
+    let acc_component = AccountComponent::new(
+        basic_wallet_library(),
+        vec![storage_map],
+        AccountComponentMetadata::new("miden::testing::basic_wallet"),
+    )
+    .expect("basic wallet component should satisfy account component requirements")
+    .with_supports_all_types();
 
     let assets = faucets.iter().map(|faucet| {
         Asset::Fungible(

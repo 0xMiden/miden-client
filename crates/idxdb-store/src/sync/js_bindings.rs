@@ -199,7 +199,7 @@ impl JsAccountUpdate {
             code_root: account.code().commitment().to_string(),
             committed: account.is_public(),
             nonce: account.nonce().to_string(),
-            account_commitment: account.commitment().to_string(),
+            account_commitment: account.to_commitment().to_string(),
             account_seed: account_seed.map(|seed| seed.to_bytes()),
         }
     }

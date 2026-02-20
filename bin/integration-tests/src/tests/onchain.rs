@@ -222,7 +222,7 @@ pub async fn test_onchain_accounts(client_config: ClientConfig) -> Result<()> {
         .await
         .context("failed to find faucet account in client 2 after sync")?;
 
-    assert_eq!(client_1_faucet.commitment(), client_2_faucet.commitment());
+    assert_eq!(client_1_faucet.to_commitment(), client_2_faucet.to_commitment());
 
     // Now use the faucet in the second client to mint to its own account
     println!("Second client consuming note");
@@ -268,7 +268,7 @@ pub async fn test_onchain_accounts(client_config: ClientConfig) -> Result<()> {
             .await
             .context("failed to find faucet account in client 2 after consume transactions")?;
 
-    assert_eq!(client_1_faucet.commitment(), client_2_faucet.commitment());
+    assert_eq!(client_1_faucet.to_commitment(), client_2_faucet.to_commitment());
 
     // Now we'll try to do a p2id transfer from an account of one client to the other one
     let from_account_id = target_account_id;

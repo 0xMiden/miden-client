@@ -82,7 +82,7 @@ pub async fn upsert_account_record(db_id: &str, account: &Account) -> Result<(),
     let committed = account.is_public();
     let nonce = account.nonce().to_string();
     let account_seed = account.seed().map(|seed| seed.to_bytes());
-    let commitment = account.commitment().to_string();
+    let commitment = account.to_commitment().to_string();
 
     let promise = idxdb_upsert_account_record(
         db_id,
