@@ -980,3 +980,23 @@ export async function removeAllMappingsForKey(
     );
   }
 }
+
+export async function getAccountIdByKeyCommitment(
+  dbId: string,
+  pubKeyCommitmentHex: string
+): Promise<string | null> {
+  try {
+    const db = getDatabase(dbId);
+    const mapping = await db.accountKeyMappings
+      .where("pubKeyCommitmentHex")
+      .equals(pubKeyCommitmentHex)
+      .first();
+    return mapping?.accountIdHex ?? null;
+  } catch (error) {
+    logWebStoreError(
+      error,
+      `Error fetching account by public key commitment: ${pubKeyCommitmentHex}`
+    );
+    return null;
+  }
+}
