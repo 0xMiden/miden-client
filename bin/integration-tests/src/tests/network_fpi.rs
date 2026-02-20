@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use miden_client::account::AccountStorageMode;
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
-use miden_client::testing::common::{execute_tx_and_sync, insert_new_wallet};
+use miden_client::testing::common::{execute_tx_and_sync, insert_new_wallet, wait_for_blocks};
 use miden_client::transaction::{OutputNote, TransactionRequestBuilder};
 use miden_client::{Felt, Word, ZERO};
 
@@ -130,6 +130,8 @@ pub async fn test_network_fpi(client_config: ClientConfig) -> Result<()> {
         .build()?;
 
     execute_tx_and_sync(&mut client2, sender_account.id(), tx_request).await?;
+
+    wait_for_blocks(&mut client2, 2).await;
 
     // get the updated network account to check that the counter value was updated (meaning that the
     // note was executed successfully, so the FPI was successful)

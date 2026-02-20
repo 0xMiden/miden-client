@@ -228,6 +228,9 @@ pub async fn test_import_expected_notes(client_config: ClientConfig) -> Result<(
     );
     execute_tx_and_sync(&mut client_1, faucet_account.id(), tx_request).await?;
 
+    // Use client 1 to wait until a couple of blocks have passed
+    wait_for_blocks(&mut client_1, 3).await;
+
     let new_sync_data = client_2.sync_state().await.unwrap();
 
     client_2.add_note_tag(note.metadata().unwrap().tag()).await.unwrap();
