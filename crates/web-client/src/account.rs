@@ -206,4 +206,27 @@ impl WebClient {
             Err(JsValue::from_str("Client not initialized"))
         }
     }
+
+    /// Retrieves the full account data for the account associated with the given public key
+    /// commitment, returning `null` if no account is found.
+    #[wasm_bindgen(js_name = "getAccountByKeyCommitment")]
+    pub async fn get_account_by_key_commitment(
+        &mut self,
+        pub_key_commitment: &Word,
+    ) -> Result<Option<Account>, JsValue> {
+        let keystore = self
+            .keystore
+            .clone()
+            .ok_or_else(|| JsValue::from_str("Keystore not initialized"))?;
+
+        let account_id = keystore
+            .get_account_id_by_key_commitment((*pub_key_commitment.as_native()).into())
+            .await
+            .map_err(|err| js_error_with_context(err, "failed to get account by key commitment"))?;
+
+        match account_id {
+            Some(id) => self.get_account(&id.into()).await,
+            None => Ok(None),
+        }
+    }
 }
