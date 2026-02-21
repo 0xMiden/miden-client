@@ -5,93 +5,69 @@ sidebar_position: 2
 
 # Creating Accounts with the Miden SDK
 
-This guide demonstrates how to create and work with different types of accounts using the Miden SDK. We'll cover initializing the client, creating regular wallet accounts, and setting up faucet accounts. Each example includes detailed annotations to explain the key parameters and returned properties.
+This guide demonstrates how to create and work with different types of accounts using the Miden SDK.
 
 ## Creating a Regular Wallet Account
 
-Here's how to create a new wallet account with various configuration options:
-
 ```typescript
-import { AccountStorageMode, WebClient } from "@miden-sdk/miden-sdk";
+import { MidenClient, AuthScheme } from "@miden-sdk/miden-sdk";
 
 try {
-    // Initialize the web client
-    const webClient = await WebClient.createClient();
+    const client = await MidenClient.create();
 
-    // Set up account parameters
-    const accountStorageMode = AccountStorageMode.private(); // Can be private() or public()
-    const mutable = true; // Whether the account code can be updated later
-    const authSchemeId = 0; // Authentication scheme can be either 0 (Rpo Falcon 512) or 1 (ECDSA K256 Keccak)
+    // Default wallet (private storage, mutable, Falcon auth)
+    const wallet = await client.accounts.create();
 
-    // Create new wallet account
-    const account = await webClient.newWallet(accountStorageMode, mutable, authSchemeId);
+    // Wallet with custom options
+    const wallet2 = await client.accounts.create({
+        storage: "public",       // "private" or "public"
+        mutable: false,          // Whether account code can be updated
+        auth: AuthScheme.ECDSA,  // "falcon" or "ecdsa"
+        seed: "my-seed"          // Optional deterministic seed (auto-hashed)
+    });
 
     // Access account properties
-    console.log(account.id().toString());      // The account's unique identifier (hex string)
-    console.log(account.nonce().toString());   // Current account nonce (starts at 0)
-    console.log(account.isPublic());           // Whether the account is public
-    console.log(account.isPrivate());          // Whether the account is private
-    console.log(account.isNetwork());          // Whether the account is network
-    console.log(account.isUpdatable());        // Whether the account code can be updated (true if mutable)
-    console.log(account.isFaucet());           // Whether the account is a faucet (false for regular wallets)
-    console.log(account.isRegularAccount());   // Whether it's a regular account (true for wallets)
+    console.log(wallet.id().toString());      // Unique identifier (hex)
+    console.log(wallet.nonce().toString());   // Current nonce (starts at 0)
+    console.log(wallet.isPublic());           // false
+    console.log(wallet.isPrivate());          // true
+    console.log(wallet.isFaucet());           // false
+    console.log(wallet.isRegularAccount());   // true
 } catch (error) {
-    console.error("Failed to create and store new wallet account:", error.message);
+    console.error("Failed to create wallet:", error.message);
 }
 ```
 
 ## Creating a Faucet Account
 
-For creating a token faucet, use the following approach:
-
 ```typescript
-import { AccountStorageMode, WebClient } from "@miden-sdk/miden-sdk";
+import { MidenClient, AuthScheme } from "@miden-sdk/miden-sdk";
 
 try {
-    // Initialize the web client
-    const webClient = await WebClient.createClient();
+    const client = await MidenClient.create();
 
-    // Set up faucet parameters
-    const faucetStorageMode = AccountStorageMode.public(); // Faucets are typically public
-    const nonFungible = false;                             // Whether this is a non-fungible faucet
-    const tokenSymbol = "TEST";                            // The token symbol (e.g., "TEST", "BTC", etc.)
-    const decimals = 8;                                    // Number of decimal places for the token
-    const maxSupply = BigInt(10000000);                    // Maximum supply of tokens that can be minted
-    const authSchemeId = 0;                                // RPO Falcon 512 Auth Scheme by Default
+    // Create faucet — only required fields
+    const faucet = await client.accounts.create({
+        type: "faucet",
+        symbol: "TEST",
+        decimals: 8,
+        maxSupply: 10_000_000n   // Accepts number or bigint
+    });
 
-    // Create new faucet account
-    const faucet = await webClient.newFaucet(
-        faucetStorageMode,
-        nonFungible,
-        tokenSymbol,
-        decimals,
-        maxSupply,
-        authSchemeId,
-    );
+    // With custom options
+    const faucet2 = await client.accounts.create({
+        type: "faucet",
+        symbol: "DAG",
+        decimals: 8,
+        maxSupply: 10_000_000n,
+        storage: "public",
+        auth: AuthScheme.Falcon
+    });
 
-    // Access faucet properties
-    console.log(faucet.id().toString());     // The faucet's unique identifier
-    console.log(faucet.nonce().toString());  // Current faucet nonce (starts at 0)
-    console.log(faucet.isPublic());          // Whether the faucet is public (typically true)
-    console.log(faucet.isPrivate());         // Whether the faucet is private
-    console.log(faucet.isNetwork());         // Whether the faucet is network
-    console.log(faucet.isUpdatable());       // Whether the faucet code can be updated (always false)
-    console.log(faucet.isFaucet());          // Whether the account is a faucet (true)
-    console.log(faucet.isRegularAccount());  // Whether it's a regular account (false for faucets)
+    console.log(faucet.id().toString());
+    console.log(faucet.isFaucet());          // true
+    console.log(faucet.isRegularAccount());  // false
 } catch (error) {
-    console.error("Failed to create and store new faucet account:", error.message);
+    console.error("Failed to create faucet:", error.message);
 }
 ```
-
-## Relevant Documentation
-
-For more detailed information about the classes and methods used in these examples, refer to the following API documentation:
-
-- [WebClient](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/WebClient.md) - Main client class for interacting with the Miden network
-- [Account](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/Account.md) - Account class and its properties
-- [AccountStorageMode](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/AccountStorageMode.md) - Storage mode options and methods
-- [AccountId](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/AccountId.md) - Account identifier class and utilities
-- [AccountCode](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/AccountCode.md) - Account code management
-- [AccountStorage](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/AccountStorage.md) - Account storage operations
-
-For a complete list of available classes and utilities, see the [SDK API Reference](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/README.md).

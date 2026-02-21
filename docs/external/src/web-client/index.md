@@ -41,20 +41,28 @@ See the [README](https://github.com/0xMiden/miden-client/blob/main/crates/web-cl
 
 ## Resource Management
 
-The WebClient uses a dedicated [Web Worker](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API) to offload computationally intensive operations like wallet creation, transaction proving, and state synchronization. This keeps the main thread responsive.
+The MidenClient uses a dedicated [Web Worker](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API) to offload computationally intensive operations like wallet creation, transaction proving, and state synchronization. This keeps the main thread responsive.
 
-When building applications that create multiple WebClient instances (e.g., multi-wallet apps or when switching between networks), it's important to properly clean up instances you no longer need:
+When building applications that create multiple MidenClient instances (e.g., multi-wallet apps or when switching between networks), it's important to properly clean up instances you no longer need:
 
 ```typescript
+import { MidenClient } from "@miden-sdk/miden-sdk";
+
 // Create client
-const client = await WebClient.createClient(rpcUrl);
+const client = await MidenClient.create({ rpcUrl });
 
 // ... use the client ...
 
 // Clean up when done to free the worker thread
 client.terminate();
+
+// Or use explicit resource management (TC39 proposal):
+{
+  using client = await MidenClient.create();
+  // ... client.terminate() called automatically at end of scope
+}
 ```
 
-Each active WebClient holds a Web Worker thread. Calling `terminate()` releases this resource. Failure to terminate unused clients may lead to memory leaks in long-running applications.
+Each active MidenClient holds a Web Worker thread. Calling `terminate()` releases this resource. Failure to terminate unused clients may lead to memory leaks in long-running applications.
 
-**Note:** After calling `terminate()`, the WebClient instance should not be used for further operations.
+**Note:** After calling `terminate()`, all subsequent method calls will throw `Error("Client terminated")`.

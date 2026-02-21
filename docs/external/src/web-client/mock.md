@@ -1,100 +1,110 @@
 ---
-title: Working with the mocked web client
+title: Working with the mock client
 draft: true
 sidebar_position: 12
 ---
 
-# Working with the mocked web client
+# Working with the Mock Client
 
-The mock web client is useful for testing and development purposes, as it simulates interactions with the Miden blockchain without requiring a live network connection. This allows you to experiment with account creation, transaction execution, and note management in a controlled, faster environment.
+The mock client is useful for testing and development, as it simulates interactions with the Miden blockchain without requiring a live network connection.
 
-The mock web client mimics the normal `WebClient` interface to allow for seamless integration with existing code. The only difference is the addition of a `proveBlock` function. The simulated environment will not create blocks automatically, so `proveBlock` needs to be called manually each time a new block should be created.
+The mock client provides the same resource-based API as the real client (`client.accounts.*`, `client.transactions.*`, etc.) plus mock-specific methods like `proveBlock()`. The simulated environment does not create blocks automatically, so `proveBlock()` must be called manually.
 
-The mock client also includes a simulated note transport layer, allowing you to test note transport features such as `sendPrivateNote()` and `fetchPrivateNotes()` without requiring a live note transport node.
+## Basic Usage
 
 ```typescript
-import { MockWebClient } from "@miden-sdk/miden-sdk";
+import { MidenClient } from "@miden-sdk/miden-sdk";
 
 try {
-  // Initialize the mock web client
-  const mockWebClient = await MockWebClient.createClient();
+    // Create a mock client
+    const client = await MidenClient.createMock();
 
-  const mintTransactionId = await mockWebClient.submitNewTransaction(
-    faucetAccount.id(),
-    mintTransactionRequest
-  );
+    // Create accounts (same API as the real client)
+    const wallet = await client.accounts.create();
+    const faucet = await client.accounts.create({
+        type: "faucet",
+        symbol: "TEST",
+        decimals: 8,
+        maxSupply: 10_000_000n
+    });
 
-  console.log("Mint transaction submitted:", mintTransactionId.toString());
+    // Advance the mock chain
+    client.proveBlock();
+    await client.sync();
 
-  // Advance the mock chain and refresh local state
-  await mockWebClient.proveBlock();
-  await mockWebClient.syncState();
+    // Mint tokens
+    await client.transactions.mint({
+        account: faucet,
+        to: wallet,
+        amount: 1000n
+    });
 
-  const consumableNotes = await mockWebClient.getConsumableNotes(
-    userAccount.id()
-  );
-  const noteIdToConsume = consumableNotes[0]
-    .inputNoteRecord()
-    .id()
-    .toString();
-  const inputNoteRecord = await client.getInputNote(noteIdToConsume);
-  if (!inputNoteRecord) {
-    throw new Error(`Note with ID ${noteIdToConsume} not found`);
-  }
-  const noteToConsume = inputNoteRecord.toNote();
-  const consumeRequest = mockWebClient.newConsumeTransactionRequest([
-    noteToConsume,
-  ]);
+    // Advance and sync again
+    client.proveBlock();
+    await client.sync();
 
-  const consumeTransactionId = await mockWebClient.submitNewTransaction(
-    userAccount.id(),
-    consumeRequest
-  );
+    // Consume all available notes
+    const result = await client.transactions.consumeAll({ account: wallet });
+    console.log(`Consumed ${result.consumed} notes`);
 
-  await mockWebClient.proveBlock();
-  await mockWebClient.syncState();
+    // Advance and sync to confirm
+    client.proveBlock();
+    await client.sync();
+
+    // Check balance
+    const balance = await client.accounts.getBalance(wallet, faucet);
+    console.log(`Balance: ${balance}`);
 } catch (error) {
-  console.error(
-    "An error occurred while using the mock web client:",
-    error.message
-  );
+    console.error("Error:", error.message);
 }
+```
+
+## Mock-Only Methods
+
+- `client.proveBlock()` — Advances the mock chain by one block
+- `client.usesMockChain()` — Returns `true` for mock clients
+- `client.serializeMockChain()` — Serializes mock chain state for snapshot/restore
+- `client.serializeMockNoteTransportNode()` — Serializes mock note transport state
+
+## Restoring from Snapshot
+
+```typescript
+import { MidenClient } from "@miden-sdk/miden-sdk";
+
+// Create and use a mock client
+const client = await MidenClient.createMock();
+// ... do some operations ...
+
+// Snapshot the state
+const chainState = client.serializeMockChain();
+const transportState = client.serializeMockNoteTransportNode();
+
+// Restore in a new client
+const restored = await MidenClient.createMock({
+    serializedMockChain: chainState,
+    serializedNoteTransport: transportState
+});
 ```
 
 ## Working with Note Transport
 
-The mock client includes a built-in note transport layer.
+The mock client includes a built-in note transport layer for testing private note delivery:
 
 ```typescript
-import { MockWebClient, NoteFilter, NoteFilterTypes } from "@miden-sdk/miden-sdk";
+import { MidenClient } from "@miden-sdk/miden-sdk";
 
-try {
-  // Initialize the mock web client
-  const mockWebClient = await MockWebClient.createClient();
+const client = await MidenClient.createMock();
 
-  // Send a private note (example with placeholders)
-  const note = /* create your note */;
-  const recipientAddress = /* create recipient address */;
+// Send a private note
+await client.notes.sendPrivate({
+    noteId: "0xnote...",
+    to: "mtst1recipient..."
+});
 
-  await mockWebClient.sendPrivateNote(note, recipientAddress);
+// Fetch private notes
+await client.notes.fetch();
 
-  // Fetch private notes
-  await mockWebClient.fetchPrivateNotes();
-
-  // Retrieve the fetched notes
-  const filter = new NoteFilter(NoteFilterTypes.All);
-  const notes = await mockWebClient.getInputNotes(filter);
-
-  console.log(`Fetched ${notes.length} private notes`);
-} catch (error) {
-  console.error("Error:", error.message);
-}
+// List received notes
+const notes = await client.notes.list();
+console.log(`Received ${notes.length} notes`);
 ```
-
-## Relevant Documentation
-
-For more detailed information about the classes and methods used in these examples, refer to the following API documentation:
-
-- [WebClient](../api/classes/WebClient) - Main client class for interacting with the Miden network.
-
-For a complete list of available classes and utilities, see the [SDK API Reference](../api/index).

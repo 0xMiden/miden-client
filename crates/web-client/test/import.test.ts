@@ -42,7 +42,7 @@ const importWalletFromSeed = async (
 const createFreshClient = async (page: Page) => {
   await page.evaluate(async () => {
     const freshStoreName = `test_fresh_${crypto.randomUUID().slice(0, 8)}`;
-    const client = await window.WebClient.createClient(
+    const client = await window.WasmWebClient.createClient(
       window.rpcUrl,
       undefined,
       undefined,

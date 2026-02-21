@@ -46,7 +46,7 @@ Sets the account type (regular, faucet, etc.).
 
 ##### account\_type
 
-[`AccountType`](../enumerations/AccountType.md)
+`AccountType`
 
 #### Returns
 

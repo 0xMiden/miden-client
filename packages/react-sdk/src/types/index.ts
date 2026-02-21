@@ -1,5 +1,5 @@
 import type {
-  WebClient,
+  WasmWebClient as WebClient,
   Account,
   AccountHeader,
   AccountId,

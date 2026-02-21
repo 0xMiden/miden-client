@@ -1,6 +1,5 @@
 //@ts-nocheck
 import { test as base, TestInfo } from "@playwright/test";
-import { MockWebClient } from "../js";
 
 // Unique per test run so concurrent suites don't share IndexedDB stores.
 export const RUN_ID = crypto.randomUUID().slice(0, 8);
@@ -91,7 +90,7 @@ export const test = base.extend<{ forEachTest: void }>({
           for (const [key, value] of Object.entries(sdkExports)) {
             window[key] = value;
           }
-          const client = await window.WebClient.createClient(
+          const client = await window.WasmWebClient.createClient(
             rpcUrl,
             undefined,
             undefined,
@@ -189,7 +188,7 @@ export const test = base.extend<{ forEachTest: void }>({
           };
 
           window.helpers.refreshClient = async (initSeed) => {
-            const client = await WebClient.createClient(
+            const client = await WasmWebClient.createClient(
               rpcUrl,
               undefined,
               initSeed,

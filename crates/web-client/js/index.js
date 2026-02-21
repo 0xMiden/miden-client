@@ -5,7 +5,40 @@ import {
   releaseSyncLock,
   releaseSyncLockWithError,
 } from "./syncLock.js";
+import { MidenClient } from "./client.js";
+import {
+  createP2IDNote,
+  createP2IDENote,
+  buildSwapTag,
+  _setWasm as _setStandaloneWasm,
+  _setWebClient as _setStandaloneWebClient,
+} from "./standalone.js";
 export * from "../Cargo.toml";
+
+// Extend the WASM AccountType with user-friendly string aliases for the simplified API.
+// The original WASM numeric variants (FungibleFaucet, RegularAccountImmutableCode, etc.)
+// are preserved for low-level AccountBuilder usage.
+export const AccountType = Object.freeze({
+  // Simplified API aliases (string values used by MidenClient.accounts.create/import)
+  MutableWallet: "MutableWallet",
+  ImmutableWallet: "ImmutableWallet",
+  FungibleFaucet: "FungibleFaucet",
+  // Original WASM enum variants (numeric values used by AccountBuilder.accountType())
+  NonFungibleFaucet: 1,
+  RegularAccountImmutableCode: 2,
+  RegularAccountUpdatableCode: 3,
+});
+
+export { MidenClient };
+export { createP2IDNote, createP2IDENote, buildSwapTag };
+
+// Internal exports — used by integration tests that need direct access to the low-level WebClient proxy.
+export { WebClient as WasmWebClient, MockWebClient as MockWasmWebClient };
+
+// Note: AuthScheme is re-exported from WASM via `export * from "../Cargo.toml"`.
+// User-facing auth scheme strings ("falcon", "ecdsa") are resolved internally
+// by resolveAuthScheme() in utils.js. The AuthSchemeId type constant is declared
+// in js/types/index.d.ts for type-safe usage.
 
 const buildTypedArraysExport = (exportObject) => {
   return Object.entries(exportObject).reduce(
@@ -59,6 +92,8 @@ const ensureWasm = async () => {
           copyWebClientStatics(module.WebClient);
           webClientStaticsCopied = true;
         }
+        // Set WASM module for standalone utilities
+        _setStandaloneWasm(module);
       }
       return module;
     });
@@ -66,7 +101,7 @@ const ensureWasm = async () => {
   return wasmLoadPromise;
 };
 
-const getWasmOrThrow = async () => {
+export const getWasmOrThrow = async () => {
   const module = await ensureWasm();
   if (!module) {
     throw new Error(
@@ -122,7 +157,7 @@ function createClientProxy(instance) {
   });
 }
 
-export class WebClient {
+class WebClient {
   /**
    * Create a WebClient wrapper.
    *
@@ -645,7 +680,7 @@ export class WebClient {
   }
 }
 
-export class MockWebClient extends WebClient {
+class MockWebClient extends WebClient {
   constructor(seed) {
     super(null, null, seed, "mock");
   }
@@ -874,3 +909,9 @@ function copyWebClientStatics(WasmWebClient) {
     }
   });
 }
+
+// Wire MidenClient dependencies (resolves circular import)
+MidenClient._WasmWebClient = WebClient;
+MidenClient._MockWasmWebClient = MockWebClient;
+MidenClient._getWasmOrThrow = getWasmOrThrow;
+_setStandaloneWebClient(WebClient);

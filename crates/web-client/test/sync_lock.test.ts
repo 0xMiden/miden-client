@@ -184,7 +184,7 @@ test.describe("Sync Lock Tests", () => {
       const result = await page.evaluate(async () => {
         // Create two clients pointing to the same store
         const client1 = window.client;
-        const client2 = await window.WebClient.createClient(
+        const client2 = await window.WasmWebClient.createClient(
           window.rpcUrl,
           undefined,
           undefined,
@@ -216,13 +216,13 @@ test.describe("Sync Lock Tests", () => {
     }) => {
       const result = await page.evaluate(async () => {
         const client1 = window.client;
-        const client2 = await window.WebClient.createClient(
+        const client2 = await window.WasmWebClient.createClient(
           window.rpcUrl,
           undefined,
           undefined,
           window.storeName
         );
-        const client3 = await window.WebClient.createClient(
+        const client3 = await window.WasmWebClient.createClient(
           window.rpcUrl,
           undefined,
           undefined,
@@ -258,13 +258,13 @@ test.describe("Sync Lock Tests", () => {
     }) => {
       const result = await page.evaluate(async () => {
         const client1 = window.client; // Uses window.storeName
-        const client2 = await window.WebClient.createClient(
+        const client2 = await window.WasmWebClient.createClient(
           window.rpcUrl,
           undefined,
           undefined,
           "SyncLockTestStore1"
         );
-        const client3 = await window.WebClient.createClient(
+        const client3 = await window.WasmWebClient.createClient(
           window.rpcUrl,
           undefined,
           undefined,
@@ -440,7 +440,7 @@ test.describe("Cross-Tab Sync Lock Tests", () => {
 
             window.rpcUrl = rpcUrl;
             // Both pages use the same store name for cross-tab coordination
-            const client = await window.WebClient.createClient(
+            const client = await window.WasmWebClient.createClient(
               rpcUrl,
               undefined,
               undefined,
@@ -508,7 +508,7 @@ test.describe("Cross-Tab Sync Lock Tests", () => {
             }
 
             window.rpcUrl = rpcUrl;
-            const client = await window.WebClient.createClient(
+            const client = await window.WasmWebClient.createClient(
               rpcUrl,
               undefined,
               undefined,

@@ -2,27 +2,31 @@
 
 ***
 
-[@miden-sdk/miden-sdk](../README.md) / MockWebClient
+[@miden-sdk/miden-sdk](../README.md) / MockWasmWebClient
 
-# Class: MockWebClient
+# Class: MockWasmWebClient
+
+**`Internal`**
+
+Low-level MockWebClient wrapper. Use MidenClient.createMock() instead.
 
 ## Extends
 
-- [`WebClient`](WebClient.md)
+- [`WasmWebClient`](WasmWebClient.md)
 
 ## Constructors
 
 ### Constructor
 
-> **new MockWebClient**(): `MockWebClient`
+> **new MockWasmWebClient**(): `MockWasmWebClient`
 
 #### Returns
 
-`MockWebClient`
+`MockWasmWebClient`
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`constructor`](WebClient.md#constructor)
+[`WasmWebClient`](WasmWebClient.md).[`constructor`](WasmWebClient.md#constructor)
 
 ## Methods
 
@@ -36,7 +40,7 @@
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`[dispose]`](WebClient.md#dispose)
+[`WasmWebClient`](WasmWebClient.md).[`[dispose]`](WasmWebClient.md#dispose)
 
 ***
 
@@ -71,7 +75,7 @@ const balance = await reader.getBalance(faucetId);
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`accountReader`](WebClient.md#accountreader)
+[`WasmWebClient`](WasmWebClient.md).[`accountReader`](WasmWebClient.md#accountreader)
 
 ***
 
@@ -95,7 +99,7 @@ const balance = await reader.getBalance(faucetId);
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`addAccountSecretKeyToWebStore`](WebClient.md#addaccountsecretkeytowebstore)
+[`WasmWebClient`](WasmWebClient.md).[`addAccountSecretKeyToWebStore`](WasmWebClient.md#addaccountsecretkeytowebstore)
 
 ***
 
@@ -115,7 +119,7 @@ const balance = await reader.getBalance(faucetId);
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`addTag`](WebClient.md#addtag)
+[`WasmWebClient`](WasmWebClient.md).[`addTag`](WasmWebClient.md#addtag)
 
 ***
 
@@ -139,7 +143,7 @@ const balance = await reader.getBalance(faucetId);
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`applyTransaction`](WebClient.md#applytransaction)
+[`WasmWebClient`](WasmWebClient.md).[`applyTransaction`](WasmWebClient.md#applytransaction)
 
 ***
 
@@ -181,7 +185,7 @@ Creates a new `WebClient` instance with the specified configuration.
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`createClient`](WebClient.md#createclient)
+[`WasmWebClient`](WasmWebClient.md).[`createClient`](WasmWebClient.md#createclient)
 
 ***
 
@@ -238,7 +242,7 @@ Creates a new `WebClient` instance with external keystore callbacks.
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`createClientWithExternalKeystore`](WebClient.md#createclientwithexternalkeystore)
+[`WasmWebClient`](WasmWebClient.md).[`createClientWithExternalKeystore`](WasmWebClient.md#createclientwithexternalkeystore)
 
 ***
 
@@ -252,7 +256,7 @@ Creates a new `WebClient` instance with external keystore callbacks.
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`createCodeBuilder`](WebClient.md#createcodebuilder)
+[`WasmWebClient`](WasmWebClient.md).[`createCodeBuilder`](WasmWebClient.md#createcodebuilder)
 
 ***
 
@@ -283,23 +287,7 @@ applications as it uses a mock chain that simulates the behavior of a real node.
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`createMockClient`](WebClient.md#createmockclient)
-
-***
-
-### defaultTransactionProver()
-
-> **defaultTransactionProver**(): [`TransactionProver`](TransactionProver.md)
-
-Returns the default transaction prover configured on the client.
-
-#### Returns
-
-[`TransactionProver`](TransactionProver.md)
-
-#### Inherited from
-
-[`WebClient`](WebClient.md).[`defaultTransactionProver`](WebClient.md#defaulttransactionprover)
+[`WasmWebClient`](WasmWebClient.md).[`createMockClient`](WasmWebClient.md#createmockclient)
 
 ***
 
@@ -333,7 +321,7 @@ request as the salt (or a zero salt if not provided).
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`executeForSummary`](WebClient.md#executeforsummary)
+[`WasmWebClient`](WasmWebClient.md).[`executeForSummary`](WasmWebClient.md#executeforsummary)
 
 ***
 
@@ -365,7 +353,7 @@ the chain tip is performed, and the required block header is retrieved.
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`executeTransaction`](WebClient.md#executetransaction)
+[`WasmWebClient`](WasmWebClient.md).[`executeTransaction`](WasmWebClient.md#executetransaction)
 
 ***
 
@@ -385,13 +373,13 @@ the chain tip is performed, and the required block header is retrieved.
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`exportAccountFile`](WebClient.md#exportaccountfile)
+[`WasmWebClient`](WasmWebClient.md).[`exportAccountFile`](WasmWebClient.md#exportaccountfile)
 
 ***
 
 ### exportNoteFile()
 
-> **exportNoteFile**(`note_id`, `export_type`): `Promise`\<[`NoteFile`](NoteFile.md)\>
+> **exportNoteFile**(`note_id`, `export_format`): `Promise`\<[`NoteFile`](NoteFile.md)\>
 
 #### Parameters
 
@@ -399,9 +387,9 @@ the chain tip is performed, and the required block header is retrieved.
 
 `string`
 
-##### export\_type
+##### export\_format
 
-`string`
+[`NoteExportFormat`](../enumerations/NoteExportFormat.md)
 
 #### Returns
 
@@ -409,7 +397,7 @@ the chain tip is performed, and the required block header is retrieved.
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`exportNoteFile`](WebClient.md#exportnotefile)
+[`WasmWebClient`](WasmWebClient.md).[`exportNoteFile`](WasmWebClient.md#exportnotefile)
 
 ***
 
@@ -427,7 +415,7 @@ Meant to be used in conjunction with the `force_import_store` method
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`exportStore`](WebClient.md#exportstore)
+[`WasmWebClient`](WasmWebClient.md).[`exportStore`](WasmWebClient.md#exportstore)
 
 ***
 
@@ -447,7 +435,7 @@ fetching mechanism.
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`fetchAllPrivateNotes`](WebClient.md#fetchallprivatenotes)
+[`WasmWebClient`](WasmWebClient.md).[`fetchAllPrivateNotes`](WasmWebClient.md#fetchallprivatenotes)
 
 ***
 
@@ -465,7 +453,7 @@ Uses an internal pagination mechanism to avoid fetching duplicate notes.
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`fetchPrivateNotes`](WebClient.md#fetchprivatenotes)
+[`WasmWebClient`](WasmWebClient.md).[`fetchPrivateNotes`](WasmWebClient.md#fetchprivatenotes)
 
 ***
 
@@ -489,7 +477,7 @@ Uses an internal pagination mechanism to avoid fetching duplicate notes.
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`forceImportStore`](WebClient.md#forceimportstore)
+[`WasmWebClient`](WasmWebClient.md).[`forceImportStore`](WasmWebClient.md#forceimportstore)
 
 ***
 
@@ -503,7 +491,7 @@ Uses an internal pagination mechanism to avoid fetching duplicate notes.
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`free`](WebClient.md#free)
+[`WasmWebClient`](WasmWebClient.md).[`free`](WasmWebClient.md#free)
 
 ***
 
@@ -527,7 +515,7 @@ This method loads the complete account state including vault, storage, and code.
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`getAccount`](WebClient.md#getaccount)
+[`WasmWebClient`](WasmWebClient.md).[`getAccount`](WasmWebClient.md#getaccount)
 
 ***
 
@@ -552,7 +540,7 @@ Returns the associated [`AuthSecretKey`] if found, or an error if not found.
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`getAccountAuthByPubKeyCommitment`](WebClient.md#getaccountauthbypubkeycommitment)
+[`WasmWebClient`](WasmWebClient.md).[`getAccountAuthByPubKeyCommitment`](WasmWebClient.md#getaccountauthbypubkeycommitment)
 
 ***
 
@@ -575,7 +563,7 @@ commitment, returning `null` if no account is found.
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`getAccountByKeyCommitment`](WebClient.md#getaccountbykeycommitment)
+[`WasmWebClient`](WasmWebClient.md).[`getAccountByKeyCommitment`](WasmWebClient.md#getaccountbykeycommitment)
 
 ***
 
@@ -599,7 +587,7 @@ Returns `null` if the account is not found.
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`getAccountCode`](WebClient.md#getaccountcode)
+[`WasmWebClient`](WasmWebClient.md).[`getAccountCode`](WasmWebClient.md#getaccountcode)
 
 ***
 
@@ -613,7 +601,7 @@ Returns `null` if the account is not found.
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`getAccounts`](WebClient.md#getaccounts)
+[`WasmWebClient`](WasmWebClient.md).[`getAccounts`](WasmWebClient.md#getaccounts)
 
 ***
 
@@ -637,7 +625,7 @@ To only load a specific slot, use `accountReader` instead.
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`getAccountStorage`](WebClient.md#getaccountstorage)
+[`WasmWebClient`](WasmWebClient.md).[`getAccountStorage`](WasmWebClient.md#getaccountstorage)
 
 ***
 
@@ -661,7 +649,7 @@ To check the balance for a single asset, use `accountReader` instead.
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`getAccountVault`](WebClient.md#getaccountvault)
+[`WasmWebClient`](WasmWebClient.md).[`getAccountVault`](WasmWebClient.md#getaccountvault)
 
 ***
 
@@ -681,7 +669,7 @@ To check the balance for a single asset, use `accountReader` instead.
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`getConsumableNotes`](WebClient.md#getconsumablenotes)
+[`WasmWebClient`](WasmWebClient.md).[`getConsumableNotes`](WasmWebClient.md#getconsumablenotes)
 
 ***
 
@@ -701,7 +689,7 @@ To check the balance for a single asset, use `accountReader` instead.
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`getInputNote`](WebClient.md#getinputnote)
+[`WasmWebClient`](WasmWebClient.md).[`getInputNote`](WasmWebClient.md#getinputnote)
 
 ***
 
@@ -721,7 +709,7 @@ To check the balance for a single asset, use `accountReader` instead.
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`getInputNotes`](WebClient.md#getinputnotes)
+[`WasmWebClient`](WasmWebClient.md).[`getInputNotes`](WasmWebClient.md#getinputnotes)
 
 ***
 
@@ -741,7 +729,7 @@ To check the balance for a single asset, use `accountReader` instead.
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`getOutputNote`](WebClient.md#getoutputnote)
+[`WasmWebClient`](WasmWebClient.md).[`getOutputNote`](WasmWebClient.md#getoutputnote)
 
 ***
 
@@ -761,7 +749,7 @@ To check the balance for a single asset, use `accountReader` instead.
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`getOutputNotes`](WebClient.md#getoutputnotes)
+[`WasmWebClient`](WasmWebClient.md).[`getOutputNotes`](WasmWebClient.md#getoutputnotes)
 
 ***
 
@@ -786,7 +774,7 @@ to retrieve the corresponding secret keys from the keystore.
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`getPublicKeyCommitmentsOfAccount`](WebClient.md#getpublickeycommitmentsofaccount)
+[`WasmWebClient`](WasmWebClient.md).[`getPublicKeyCommitmentsOfAccount`](WasmWebClient.md#getpublickeycommitmentsofaccount)
 
 ***
 
@@ -808,7 +796,7 @@ Retrieves the setting value for `key`, or `None` if it hasn’t been set.
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`getSetting`](WebClient.md#getsetting)
+[`WasmWebClient`](WasmWebClient.md).[`getSetting`](WasmWebClient.md#getsetting)
 
 ***
 
@@ -822,7 +810,7 @@ Retrieves the setting value for `key`, or `None` if it hasn’t been set.
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`getSyncHeight`](WebClient.md#getsyncheight)
+[`WasmWebClient`](WasmWebClient.md).[`getSyncHeight`](WasmWebClient.md#getsyncheight)
 
 ***
 
@@ -842,7 +830,7 @@ Retrieves the setting value for `key`, or `None` if it hasn’t been set.
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`getTransactions`](WebClient.md#gettransactions)
+[`WasmWebClient`](WasmWebClient.md).[`getTransactions`](WasmWebClient.md#gettransactions)
 
 ***
 
@@ -862,7 +850,7 @@ Retrieves the setting value for `key`, or `None` if it hasn’t been set.
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`importAccountById`](WebClient.md#importaccountbyid)
+[`WasmWebClient`](WasmWebClient.md).[`importAccountById`](WasmWebClient.md#importaccountbyid)
 
 ***
 
@@ -882,7 +870,7 @@ Retrieves the setting value for `key`, or `None` if it hasn’t been set.
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`importAccountFile`](WebClient.md#importaccountfile)
+[`WasmWebClient`](WasmWebClient.md).[`importAccountFile`](WasmWebClient.md#importaccountfile)
 
 ***
 
@@ -902,7 +890,7 @@ Retrieves the setting value for `key`, or `None` if it hasn’t been set.
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`importNoteFile`](WebClient.md#importnotefile)
+[`WasmWebClient`](WasmWebClient.md).[`importNoteFile`](WasmWebClient.md#importnotefile)
 
 ***
 
@@ -930,7 +918,7 @@ Retrieves the setting value for `key`, or `None` if it hasn’t been set.
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`importPublicAccountFromSeed`](WebClient.md#importpublicaccountfromseed)
+[`WasmWebClient`](WasmWebClient.md).[`importPublicAccountFromSeed`](WasmWebClient.md#importpublicaccountfromseed)
 
 ***
 
@@ -954,7 +942,7 @@ Retrieves the setting value for `key`, or `None` if it hasn’t been set.
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`insertAccountAddress`](WebClient.md#insertaccountaddress)
+[`WasmWebClient`](WasmWebClient.md).[`insertAccountAddress`](WasmWebClient.md#insertaccountaddress)
 
 ***
 
@@ -970,7 +958,7 @@ Returns all the existing setting keys from the store.
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`listSettingKeys`](WebClient.md#listsettingkeys)
+[`WasmWebClient`](WasmWebClient.md).[`listSettingKeys`](WasmWebClient.md#listsettingkeys)
 
 ***
 
@@ -984,7 +972,7 @@ Returns all the existing setting keys from the store.
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`listTags`](WebClient.md#listtags)
+[`WasmWebClient`](WasmWebClient.md).[`listTags`](WasmWebClient.md#listtags)
 
 ***
 
@@ -1008,7 +996,7 @@ Returns all the existing setting keys from the store.
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`newAccount`](WebClient.md#newaccount)
+[`WasmWebClient`](WasmWebClient.md).[`newAccount`](WasmWebClient.md#newaccount)
 
 ***
 
@@ -1028,7 +1016,7 @@ Returns all the existing setting keys from the store.
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`newConsumeTransactionRequest`](WebClient.md#newconsumetransactionrequest)
+[`WasmWebClient`](WasmWebClient.md).[`newConsumeTransactionRequest`](WasmWebClient.md#newconsumetransactionrequest)
 
 ***
 
@@ -1068,7 +1056,7 @@ Returns all the existing setting keys from the store.
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`newFaucet`](WebClient.md#newfaucet)
+[`WasmWebClient`](WasmWebClient.md).[`newFaucet`](WasmWebClient.md#newfaucet)
 
 ***
 
@@ -1100,7 +1088,7 @@ Returns all the existing setting keys from the store.
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`newMintTransactionRequest`](WebClient.md#newminttransactionrequest)
+[`WasmWebClient`](WasmWebClient.md).[`newMintTransactionRequest`](WasmWebClient.md#newminttransactionrequest)
 
 ***
 
@@ -1144,7 +1132,7 @@ Returns all the existing setting keys from the store.
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`newSendTransactionRequest`](WebClient.md#newsendtransactionrequest)
+[`WasmWebClient`](WasmWebClient.md).[`newSendTransactionRequest`](WasmWebClient.md#newsendtransactionrequest)
 
 ***
 
@@ -1188,7 +1176,7 @@ Returns all the existing setting keys from the store.
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`newSwapTransactionRequest`](WebClient.md#newswaptransactionrequest)
+[`WasmWebClient`](WasmWebClient.md).[`newSwapTransactionRequest`](WasmWebClient.md#newswaptransactionrequest)
 
 ***
 
@@ -1220,7 +1208,7 @@ Returns all the existing setting keys from the store.
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`newWallet`](WebClient.md#newwallet)
+[`WasmWebClient`](WasmWebClient.md).[`newWallet`](WasmWebClient.md#newwallet)
 
 ***
 
@@ -1232,9 +1220,9 @@ Returns all the existing setting keys from the store.
 
 `void`
 
-#### Inherited from
+#### Overrides
 
-[`WebClient`](WebClient.md).[`proveBlock`](WebClient.md#proveblock)
+[`WasmWebClient`](WasmWebClient.md).[`proveBlock`](WasmWebClient.md#proveblock)
 
 ***
 
@@ -1261,7 +1249,7 @@ prover if none is supplied.
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`proveTransaction`](WebClient.md#provetransaction)
+[`WasmWebClient`](WasmWebClient.md).[`proveTransaction`](WasmWebClient.md#provetransaction)
 
 ***
 
@@ -1285,7 +1273,7 @@ prover if none is supplied.
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`removeAccountAddress`](WebClient.md#removeaccountaddress)
+[`WasmWebClient`](WasmWebClient.md).[`removeAccountAddress`](WasmWebClient.md#removeaccountaddress)
 
 ***
 
@@ -1307,7 +1295,7 @@ Deletes a setting key-value from the store.
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`removeSetting`](WebClient.md#removesetting)
+[`WasmWebClient`](WasmWebClient.md).[`removeSetting`](WasmWebClient.md#removesetting)
 
 ***
 
@@ -1327,7 +1315,7 @@ Deletes a setting key-value from the store.
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`removeTag`](WebClient.md#removetag)
+[`WasmWebClient`](WasmWebClient.md).[`removeTag`](WasmWebClient.md#removetag)
 
 ***
 
@@ -1353,7 +1341,7 @@ Send a private note via the note transport layer
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`sendPrivateNote`](WebClient.md#sendprivatenote)
+[`WasmWebClient`](WasmWebClient.md).[`sendPrivateNote`](WasmWebClient.md#sendprivatenote)
 
 ***
 
@@ -1367,9 +1355,9 @@ Returns the inner serialized mock chain if it exists.
 
 `Uint8Array`
 
-#### Inherited from
+#### Overrides
 
-[`WebClient`](WebClient.md).[`serializeMockChain`](WebClient.md#serializemockchain)
+[`WasmWebClient`](WasmWebClient.md).[`serializeMockChain`](WasmWebClient.md#serializemockchain)
 
 ***
 
@@ -1383,9 +1371,9 @@ Returns the inner serialized mock note transport node if it exists.
 
 `Uint8Array`
 
-#### Inherited from
+#### Overrides
 
-[`WebClient`](WebClient.md).[`serializeMockNoteTransportNode`](WebClient.md#serializemocknotetransportnode)
+[`WasmWebClient`](WasmWebClient.md).[`serializeMockNoteTransportNode`](WasmWebClient.md#serializemocknotetransportnode)
 
 ***
 
@@ -1413,7 +1401,7 @@ Must be called before `createClient`.
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`setDebugMode`](WebClient.md#setdebugmode)
+[`WasmWebClient`](WasmWebClient.md).[`setDebugMode`](WasmWebClient.md#setdebugmode)
 
 ***
 
@@ -1439,7 +1427,7 @@ Sets a setting key-value in the store. It can then be retrieved using `get_setti
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`setSetting`](WebClient.md#setsetting)
+[`WasmWebClient`](WasmWebClient.md).[`setSetting`](WasmWebClient.md#setsetting)
 
 ***
 
@@ -1472,7 +1460,7 @@ the chain tip is performed, and the required block header is retrieved.
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`submitNewTransaction`](WebClient.md#submitnewtransaction)
+[`WasmWebClient`](WasmWebClient.md).[`submitNewTransaction`](WasmWebClient.md#submitnewtransaction)
 
 ***
 
@@ -1507,7 +1495,7 @@ chain tip is performed, and the required block header is retrieved.
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`submitNewTransactionWithProver`](WebClient.md#submitnewtransactionwithprover)
+[`WasmWebClient`](WasmWebClient.md).[`submitNewTransactionWithProver`](WasmWebClient.md#submitnewtransactionwithprover)
 
 ***
 
@@ -1531,7 +1519,7 @@ chain tip is performed, and the required block header is retrieved.
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`submitProvenTransaction`](WebClient.md#submitproventransaction)
+[`WasmWebClient`](WasmWebClient.md).[`submitProvenTransaction`](WasmWebClient.md#submitproventransaction)
 
 ***
 
@@ -1539,15 +1527,13 @@ chain tip is performed, and the required block header is retrieved.
 
 > **syncState**(): `Promise`\<[`SyncSummary`](SyncSummary.md)\>
 
-Syncs the mock state and returns the resulting summary.
-
 #### Returns
 
 `Promise`\<[`SyncSummary`](SyncSummary.md)\>
 
-#### Overrides
+#### Inherited from
 
-[`WebClient`](WebClient.md).[`syncState`](WebClient.md#syncstate)
+[`WasmWebClient`](WasmWebClient.md).[`syncState`](WasmWebClient.md#syncstate)
 
 ***
 
@@ -1569,33 +1555,27 @@ which provides proper coordination for concurrent calls.
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`syncStateImpl`](WebClient.md#syncstateimpl)
+[`WasmWebClient`](WasmWebClient.md).[`syncStateImpl`](WasmWebClient.md#syncstateimpl)
 
 ***
 
 ### syncStateWithTimeout()
 
-> **syncStateWithTimeout**(`timeoutMs?`): `Promise`\<[`SyncSummary`](SyncSummary.md)\>
-
-Syncs the client state with the Miden node with an optional timeout.
+> **syncStateWithTimeout**(`timeoutMs`): `Promise`\<[`SyncSummary`](SyncSummary.md)\>
 
 #### Parameters
 
-##### timeoutMs?
+##### timeoutMs
 
 `number`
-
-Optional timeout in milliseconds. If 0 or not provided, waits indefinitely.
 
 #### Returns
 
 `Promise`\<[`SyncSummary`](SyncSummary.md)\>
 
-A promise that resolves to a SyncSummary with the sync results.
+#### Inherited from
 
-#### Overrides
-
-[`WebClient`](WebClient.md).[`syncStateWithTimeout`](WebClient.md#syncstatewithtimeout)
+[`WasmWebClient`](WasmWebClient.md).[`syncStateWithTimeout`](WasmWebClient.md#syncstatewithtimeout)
 
 ***
 
@@ -1603,34 +1583,13 @@ A promise that resolves to a SyncSummary with the sync results.
 
 > **terminate**(): `void`
 
-Terminates the underlying Web Worker used by this WebClient instance.
-
-Call this method when you're done using a WebClient to free up browser
-resources.
-
-After calling terminate(), the WebClient instance should not be used for
-any further operations that require the worker.
-
 #### Returns
 
 `void`
 
-#### Example
-
-```typescript
-// Create a client
-const client = await WebClient.createClient(rpcUrl);
-
-// Use the client...
-await client.syncState();
-
-// Clean up when done
-client.terminate();
-```
-
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`terminate`](WebClient.md#terminate)
+[`WasmWebClient`](WasmWebClient.md).[`terminate`](WasmWebClient.md#terminate)
 
 ***
 
@@ -1644,7 +1603,7 @@ client.terminate();
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`usesMockChain`](WebClient.md#usesmockchain)
+[`WasmWebClient`](WasmWebClient.md).[`usesMockChain`](WasmWebClient.md#usesmockchain)
 
 ***
 
@@ -1680,53 +1639,41 @@ client.terminate();
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`buildSwapTag`](WebClient.md#buildswaptag)
+[`WasmWebClient`](WasmWebClient.md).[`buildSwapTag`](WasmWebClient.md#buildswaptag)
 
 ***
 
 ### createClient()
 
-> `static` **createClient**(`serializedMockChain?`, `serializedMockNoteTransportNode?`, `seed?`): `Promise`\<`MockWebClient`\>
-
-Factory method to create and initialize a new wrapped MockWebClient.
+> `static` **createClient**(`serializedMockChain?`, `serializedMockNoteTransportNode?`, `seed?`): `Promise`\<`MockWasmWebClient`\>
 
 #### Parameters
 
 ##### serializedMockChain?
 
-Serialized mock chain (optional).
-
-`Uint8Array` | `ArrayBuffer`
+`Uint8Array`
 
 ##### serializedMockNoteTransportNode?
 
-Serialized mock note transport node (optional).
-
-`Uint8Array` | `ArrayBuffer`
+`Uint8Array`
 
 ##### seed?
 
 `Uint8Array`
 
-Seed for account initialization (optional).
-
 #### Returns
 
-`Promise`\<`MockWebClient`\>
-
-A promise that resolves to a fully initialized MockWebClient.
+`Promise`\<`MockWasmWebClient`\>
 
 #### Overrides
 
-[`WebClient`](WebClient.md).[`createClient`](WebClient.md#createclient-2)
+[`WasmWebClient`](WasmWebClient.md).[`createClient`](WasmWebClient.md#createclient-2)
 
 ***
 
 ### createClientWithExternalKeystore()
 
-> `static` **createClientWithExternalKeystore**(`rpcUrl?`, `noteTransportUrl?`, `seed?`, `storeName?`, `getKeyCb?`, `insertKeyCb?`, `signCb?`): `Promise`\<[`WebClient`](WebClient.md)\>
-
-Factory method to create and initialize a new wrapped WebClient with a remote keystore.
+> `static` **createClientWithExternalKeystore**(`rpcUrl?`, `noteTransportUrl?`, `seed?`, `storeName?`, `getKeyCb?`, `insertKeyCb?`, `signCb?`): `Promise`\<[`WasmWebClient`](WasmWebClient.md)\>
 
 #### Parameters
 
@@ -1734,50 +1681,34 @@ Factory method to create and initialize a new wrapped WebClient with a remote ke
 
 `string`
 
-The RPC URL (optional).
-
 ##### noteTransportUrl?
 
 `string`
-
-The note transport URL (optional).
 
 ##### seed?
 
 `Uint8Array`
 
-The seed for the account (optional).
-
 ##### storeName?
 
 `string`
-
-Optional name for the store. Setting this allows multiple clients to be used in the same browser.
 
 ##### getKeyCb?
 
 [`GetKeyCallback`](../type-aliases/GetKeyCallback.md)
 
-Callback used to retrieve secret keys for a given public key.
-
 ##### insertKeyCb?
 
 [`InsertKeyCallback`](../type-aliases/InsertKeyCallback.md)
-
-Callback used to persist secret keys in the external store.
 
 ##### signCb?
 
 [`SignCallback`](../type-aliases/SignCallback.md)
 
-Callback used to create signatures for the provided inputs.
-
 #### Returns
 
-`Promise`\<[`WebClient`](WebClient.md)\>
-
-A promise that resolves to a fully initialized WebClient.
+`Promise`\<[`WasmWebClient`](WasmWebClient.md)\>
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`createClientWithExternalKeystore`](WebClient.md#createclientwithexternalkeystore-2)
+[`WasmWebClient`](WasmWebClient.md).[`createClientWithExternalKeystore`](WasmWebClient.md#createclientwithexternalkeystore-2)
