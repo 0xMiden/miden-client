@@ -12,7 +12,7 @@
 
 ## Extended by
 
-- [`MockWebClient`](MockWebClient.md)
+- [`MockWasmWebClient`](MockWasmWebClient.md)
 
 ## Constructors
 

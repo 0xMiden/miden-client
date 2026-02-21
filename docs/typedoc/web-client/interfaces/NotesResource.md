@@ -28,9 +28,9 @@
 
 ***
 
-### fetch()
+### fetchPrivate()
 
-> **fetch**(`options?`): `Promise`\<`void`\>
+> **fetchPrivate**(`options?`): `Promise`\<`void`\>
 
 #### Parameters
 

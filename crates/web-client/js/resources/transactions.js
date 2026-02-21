@@ -311,9 +311,10 @@ export class TransactionsResource {
    *
    * @param {string} txId - Transaction ID hex string.
    * @param {WaitOptions} [opts] - Polling options.
-   * @param {number} [opts.timeout=60000] - Timeout in ms. Set to 0 to disable
-   *   the timeout and poll indefinitely until the transaction is committed or
-   *   discarded.
+   * @param {number} [opts.timeout=60000] - Wall-clock polling timeout in
+   *   milliseconds. This is NOT a block height — it controls how long the
+   *   client waits before giving up. Set to 0 to disable the timeout and poll
+   *   indefinitely until the transaction is committed or discarded.
    * @param {number} [opts.interval=5000] - Polling interval in ms.
    * @param {function} [opts.onProgress] - Called with the current status on
    *   each poll iteration ("pending", "submitted", or "committed").

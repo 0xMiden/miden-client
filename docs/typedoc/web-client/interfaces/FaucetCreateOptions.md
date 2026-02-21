@@ -2,11 +2,17 @@
 
 ***
 
-[@miden-sdk/miden-sdk](../README.md) / FaucetOptions
+[@miden-sdk/miden-sdk](../README.md) / FaucetCreateOptions
 
-# Interface: FaucetOptions
+# Interface: FaucetCreateOptions
 
 ## Properties
+
+### accountType
+
+> **accountType**: `"FungibleFaucet"`
+
+***
 
 ### auth?
 
@@ -35,9 +41,3 @@
 ### symbol
 
 > **symbol**: `string`
-
-***
-
-### type
-
-> **type**: `"faucet"`

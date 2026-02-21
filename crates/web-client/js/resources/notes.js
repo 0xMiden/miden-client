@@ -45,18 +45,12 @@ export class NotesResource {
 
   async export(noteId, opts) {
     this.#client.assertNotTerminated();
-    const formatMap = { id: "Id", full: "Full", details: "Details" };
-    const key = (opts?.format ?? "full").toLowerCase();
-    const format = formatMap[key];
-    if (!format) {
-      throw new Error(
-        `Unknown note export format: "${opts.format}". Expected "id", "full", or "details".`
-      );
-    }
+    const wasm = await this.#getWasm();
+    const format = opts?.format ?? wasm.NoteExportFormat.Full;
     return await this.#inner.exportNoteFile(noteId, format);
   }
 
-  async fetch(opts) {
+  async fetchPrivate(opts) {
     this.#client.assertNotTerminated();
     if (opts?.mode === "all") {
       await this.#inner.fetchAllPrivateNotes();

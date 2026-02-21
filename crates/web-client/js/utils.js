@@ -124,6 +124,26 @@ export function resolveAuthScheme(scheme, wasm) {
 }
 
 /**
+ * Resolves a simplified AccountType string to a boolean `mutable` flag
+ * for the underlying WASM `newWallet()` / `importPublicAccountFromSeed()` calls.
+ *
+ * @param {string | undefined} accountType - "MutableWallet", "ImmutableWallet", or undefined.
+ *   Defaults to mutable wallet when undefined.
+ * @returns {boolean} Whether the account code is mutable.
+ */
+export function resolveAccountMutability(accountType) {
+  if (accountType == null || accountType === "MutableWallet") {
+    return true;
+  }
+  if (accountType === "ImmutableWallet") {
+    return false;
+  }
+  throw new Error(
+    `Unknown wallet account type: "${accountType}". Expected "MutableWallet" or "ImmutableWallet".`
+  );
+}
+
+/**
  * Hashes a seed value. Strings are hashed via SHA-256 to produce a 32-byte Uint8Array.
  * Uint8Array values are passed through unchanged.
  *
