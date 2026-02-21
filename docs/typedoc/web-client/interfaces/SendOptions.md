@@ -40,11 +40,15 @@ Override default prover.
 
 > `optional` **reclaimAfter**: `number`
 
+Block height after which the sender can reclaim the note. This is a block number, not wall-clock time.
+
 ***
 
 ### timelockUntil?
 
 > `optional` **timelockUntil**: `number`
+
+Block height until which the note is timelocked. This is a block number, not wall-clock time.
 
 ***
 
@@ -52,7 +56,9 @@ Override default prover.
 
 > `optional` **timeout**: `number`
 
-Timeout in ms (default: 60_000).
+Wall-clock polling timeout in milliseconds for waitFor() (default: 60_000).
+This is NOT a block height. For block-height-based parameters, see
+`reclaimAfter` and `timelockUntil` on SendOptions.
 
 #### Inherited from
 

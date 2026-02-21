@@ -71,6 +71,13 @@ export declare const MidenArrays: MidenArrayConstructors;
 export type AuthSchemeType = "falcon" | "ecdsa";
 
 /**
+ * Union of all values in the AccountType const.
+ * Includes string aliases ("MutableWallet", etc.) for the simplified API
+ * and numeric variants (1, 2, 3) matching the original WASM enum.
+ */
+export type AccountType = (typeof AccountType)[keyof typeof AccountType];
+
+/**
  * User-friendly account type constants for the simplified API.
  * Replaces the WASM `AccountType` enum (which has internal names like
  * `RegularAccountUpdatableCode`) with readable string constants.
