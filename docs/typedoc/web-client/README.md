@@ -7,11 +7,11 @@
 ## Enumerations
 
 - [AccountInterface](enumerations/AccountInterface.md)
-- [AccountType](enumerations/AccountType.md)
 - [AuthScheme](enumerations/AuthScheme.md)
 - [InputNoteState](enumerations/InputNoteState.md)
 - [NetworkType](enumerations/NetworkType.md)
 - [NoteAttachmentKind](enumerations/NoteAttachmentKind.md)
+- [NoteExportFormat](enumerations/NoteExportFormat.md)
 - [NoteFilterTypes](enumerations/NoteFilterTypes.md)
 - [NoteType](enumerations/NoteType.md)
 - [OutputNoteState](enumerations/OutputNoteState.md)
@@ -146,6 +146,7 @@
 - [TransactionStatus](classes/TransactionStatus.md)
 - [TransactionStoreUpdate](classes/TransactionStoreUpdate.md)
 - [TransactionSummary](classes/TransactionSummary.md)
+- [WasmWebClient](classes/WasmWebClient.md)
 - [WebClient](classes/WebClient.md)
 - [Word](classes/Word.md)
 
@@ -187,6 +188,8 @@
 ## Type Aliases
 
 - [AccountRef](type-aliases/AccountRef.md)
+- [AccountType](type-aliases/AccountType.md)
+- [AccountTypeValue](type-aliases/AccountTypeValue.md)
 - [AddressInterface](type-aliases/AddressInterface.md)
 - [AuthSchemeType](type-aliases/AuthSchemeType.md)
 - [CreateAccountOptions](type-aliases/CreateAccountOptions.md)
@@ -204,6 +207,7 @@
 
 ## Variables
 
+- [AccountType](variables/AccountType.md)
 - [MidenArrays](variables/MidenArrays.md)
 
 ## Functions

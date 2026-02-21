@@ -45,7 +45,9 @@ Override default prover.
 
 > `optional` **timeout**: `number`
 
-Timeout in ms (default: 60_000).
+Wall-clock polling timeout in milliseconds for waitFor() (default: 60_000).
+This is NOT a block height. For block-height-based parameters, see
+`reclaimAfter` and `timelockUntil` on SendOptions.
 
 #### Inherited from
 

@@ -36,4 +36,4 @@ Polling interval in ms (default: 5_000).
 
 > `optional` **timeout**: `number`
 
-Timeout in ms (default: 60_000). Set to 0 to disable timeout and poll indefinitely.
+Wall-clock polling timeout in ms (default: 60_000). Set to 0 to disable timeout and poll indefinitely.

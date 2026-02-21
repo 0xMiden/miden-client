@@ -10,4 +10,6 @@
 
 ### format?
 
-> `optional` **format**: `"id"` \| `"full"` \| `"details"`
+> `optional` **format**: [`NoteExportFormat`](../enumerations/NoteExportFormat.md)
+
+Export format. Defaults to NoteExportFormat.Full. Use the NoteExportFormat enum.
