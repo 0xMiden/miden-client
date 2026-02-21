@@ -146,7 +146,6 @@
 - [TransactionStatus](classes/TransactionStatus.md)
 - [TransactionStoreUpdate](classes/TransactionStoreUpdate.md)
 - [TransactionSummary](classes/TransactionSummary.md)
-- [WasmWebClient](classes/WasmWebClient.md)
 - [WebClient](classes/WebClient.md)
 - [Word](classes/Word.md)
 
@@ -162,7 +161,7 @@
 - [ConsumeOptions](interfaces/ConsumeOptions.md)
 - [ExportAccountOptions](interfaces/ExportAccountOptions.md)
 - [ExportNoteOptions](interfaces/ExportNoteOptions.md)
-- [FaucetOptions](interfaces/FaucetOptions.md)
+- [FaucetCreateOptions](interfaces/FaucetCreateOptions.md)
 - [FetchPrivateNotesOptions](interfaces/FetchPrivateNotesOptions.md)
 - [MintAndConsumeOptions](interfaces/MintAndConsumeOptions.md)
 - [MintOptions](interfaces/MintOptions.md)
@@ -183,7 +182,7 @@
 - [TransactionOptions](interfaces/TransactionOptions.md)
 - [TransactionsResource](interfaces/TransactionsResource.md)
 - [WaitOptions](interfaces/WaitOptions.md)
-- [WalletOptions](interfaces/WalletOptions.md)
+- [WalletCreateOptions](interfaces/WalletCreateOptions.md)
 
 ## Type Aliases
 

@@ -31,6 +31,7 @@ import {
   NoteAssets,
   NoteConsumability,
   NoteExecutionHint,
+  NoteExportFormat,
   NoteFilter,
   NoteFile,
   NoteFilterTypes,
@@ -94,8 +95,6 @@ declare global {
     AccountBuilder: typeof AccountBuilder;
     AccountComponent: typeof AccountComponent;
     AccountDelta: typeof AccountDelta;
-    AccountStorageDelta: typeof AccountStorageDelta;
-    AccountVaultDelta: typeof AccountVaultDelta;
     AccountHeader: typeof AccountHeader;
     AccountId: typeof AccountId;
     AccountInterface: typeof AccountInterface;
@@ -126,6 +125,7 @@ declare global {
     NoteAssets: typeof NoteAssets;
     NoteConsumability: typeof NoteConsumability;
     NoteExecutionHint: typeof NoteExecutionHint;
+    NoteExportFormat: typeof NoteExportFormat;
     NoteFilter: typeof NoteFilter;
     NoteFile: typeof NoteFile;
     NoteFilterTypes: typeof NoteFilterTypes;
@@ -166,7 +166,6 @@ declare global {
     RpcClient: typeof RpcClient;
     WasmWebClient: typeof WasmWebClient;
     Word: typeof Word;
-    Address: typeof Address;
     MidenArrays: typeof MidenArrays;
     CodeBuilder: typeof CodeBuilder;
     CodeBuilderMode: typeof CodeBuilderMode;

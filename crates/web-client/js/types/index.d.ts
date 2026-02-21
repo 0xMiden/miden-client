@@ -27,6 +27,7 @@ import type {
   NoteTag,
   Note,
   OutputNote,
+  NoteExportFormat,
 } from "./crates/miden_client_web";
 
 // Import the full namespace for the MidenArrayConstructors type
@@ -68,6 +69,26 @@ export declare const MidenArrays: MidenArrayConstructors;
  * is re-exported separately from the WASM module.
  */
 export type AuthSchemeType = "falcon" | "ecdsa";
+
+/**
+ * User-friendly account type constants for the simplified API.
+ * Replaces the WASM `AccountType` enum (which has internal names like
+ * `RegularAccountUpdatableCode`) with readable string constants.
+ */
+export declare const AccountType: {
+  readonly MutableWallet: "MutableWallet";
+  readonly ImmutableWallet: "ImmutableWallet";
+  readonly FungibleFaucet: "FungibleFaucet";
+  readonly NonFungibleFaucet: 1;
+  readonly RegularAccountImmutableCode: 2;
+  readonly RegularAccountUpdatableCode: 3;
+};
+
+/** Union of valid AccountType string values. */
+export type AccountTypeValue =
+  | "MutableWallet"
+  | "ImmutableWallet"
+  | "FungibleFaucet";
 
 // ════════════════════════════════════════════════════════════════
 // Client options
@@ -123,19 +144,19 @@ export type NoteInput = string | NoteId | Note | InputNoteRecord;
 // Account types
 // ════════════════════════════════════════════════════════════════
 
-/** Create a wallet (default) or faucet. Discriminated by `type` field. */
-export type CreateAccountOptions = WalletOptions | FaucetOptions;
+/** Create a wallet (default) or faucet. Discriminated by `accountType` field. */
+export type CreateAccountOptions = WalletCreateOptions | FaucetCreateOptions;
 
-export interface WalletOptions {
-  type?: "wallet";
+export interface WalletCreateOptions {
+  /** Account type. Defaults to "MutableWallet". Use AccountType enum. */
+  accountType?: "MutableWallet" | "ImmutableWallet";
   storage?: "private" | "public";
-  mutable?: boolean;
   auth?: AuthSchemeType;
   seed?: string | Uint8Array;
 }
 
-export interface FaucetOptions {
-  type: "faucet";
+export interface FaucetCreateOptions {
+  accountType: "FungibleFaucet";
   symbol: string;
   decimals: number;
   maxSupply: number | bigint;
@@ -155,7 +176,12 @@ export interface AccountDetails {
 export type ImportAccountInput =
   | string
   | { file: AccountFile }
-  | { seed: Uint8Array; mutable?: boolean; auth?: AuthSchemeType };
+  | {
+      seed: Uint8Array;
+      /** Account type. Defaults to "MutableWallet". Use AccountType enum. */
+      accountType?: "MutableWallet" | "ImmutableWallet";
+      auth?: AuthSchemeType;
+    };
 
 /** Options for accounts.export(). Exists for forward-compatible extensibility. */
 export interface ExportAccountOptions {}
@@ -166,7 +192,11 @@ export interface ExportAccountOptions {}
 
 export interface TransactionOptions {
   waitForConfirmation?: boolean;
-  /** Timeout in ms (default: 60_000). */
+  /**
+   * Wall-clock polling timeout in milliseconds for waitFor() (default: 60_000).
+   * This is NOT a block height. For block-height-based parameters, see
+   * `reclaimAfter` and `timelockUntil` on SendOptions.
+   */
   timeout?: number;
   /** Override default prover. */
   prover?: TransactionProver;
@@ -178,7 +208,9 @@ export interface SendOptions extends TransactionOptions {
   token: AccountRef;
   amount: number | bigint;
   type?: NoteVisibility;
+  /** Block height after which the sender can reclaim the note. This is a block number, not wall-clock time. */
   reclaimAfter?: number;
+  /** Block height until which the note is timelocked. This is a block number, not wall-clock time. */
   timelockUntil?: number;
 }
 
@@ -265,7 +297,7 @@ export type PreviewOptions =
 export type WaitStatus = "pending" | "submitted" | "committed";
 
 export interface WaitOptions {
-  /** Timeout in ms (default: 60_000). Set to 0 to disable timeout and poll indefinitely. */
+  /** Wall-clock polling timeout in ms (default: 60_000). Set to 0 to disable timeout and poll indefinitely. */
   timeout?: number;
   /** Polling interval in ms (default: 5_000). */
   interval?: number;
@@ -319,7 +351,8 @@ export interface P2IDEOptions extends NoteOptions {
 }
 
 export interface ExportNoteOptions {
-  format?: "id" | "full" | "details";
+  /** Export format. Defaults to NoteExportFormat.Full. Use the NoteExportFormat enum. */
+  format?: NoteExportFormat;
 }
 
 export interface FetchPrivateNotesOptions {
@@ -413,7 +446,7 @@ export interface NotesResource {
   import(noteFile: NoteFile): Promise<NoteId>;
   export(noteId: string, options?: ExportNoteOptions): Promise<NoteFile>;
 
-  fetch(options?: FetchPrivateNotesOptions): Promise<void>;
+  fetchPrivate(options?: FetchPrivateNotesOptions): Promise<void>;
   sendPrivate(options: SendPrivateOptions): Promise<void>;
 }
 

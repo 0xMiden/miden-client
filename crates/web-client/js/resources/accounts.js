@@ -2,6 +2,7 @@ import {
   resolveAccountRef,
   resolveStorageMode,
   resolveAuthScheme,
+  resolveAccountMutability,
   hashSeed,
 } from "../utils.js";
 
@@ -20,7 +21,7 @@ export class AccountsResource {
     this.#client.assertNotTerminated();
     const wasm = await this.#getWasm();
 
-    if (opts?.type === "faucet") {
+    if (opts?.accountType === "FungibleFaucet") {
       const storageMode = resolveStorageMode(opts.storage ?? "public", wasm);
       const authScheme = resolveAuthScheme(opts.auth, wasm);
       return await this.#inner.newFaucet(
@@ -33,16 +34,12 @@ export class AccountsResource {
       );
     }
 
-    // Default: wallet
+    // Default: wallet (mutable or immutable based on accountType)
+    const mutable = resolveAccountMutability(opts?.accountType);
     const storageMode = resolveStorageMode(opts?.storage ?? "private", wasm);
     const authScheme = resolveAuthScheme(opts?.auth, wasm);
     const seed = opts?.seed ? await hashSeed(opts.seed) : undefined;
-    return await this.#inner.newWallet(
-      storageMode,
-      opts?.mutable ?? true,
-      authScheme,
-      seed
-    );
+    return await this.#inner.newWallet(storageMode, mutable, authScheme, seed);
   }
 
   async get(ref) {
@@ -116,9 +113,10 @@ export class AccountsResource {
     if (input.seed) {
       // Import public account from seed
       const authScheme = resolveAuthScheme(input.auth, wasm);
+      const mutable = resolveAccountMutability(input.accountType);
       return await this.#inner.importPublicAccountFromSeed(
         input.seed,
-        input.mutable ?? true,
+        mutable,
         authScheme
       );
     }
