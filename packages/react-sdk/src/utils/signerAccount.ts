@@ -69,8 +69,7 @@ export async function initializeSignerAccount(
   const seed = config.accountSeed ?? crypto.getRandomValues(new Uint8Array(32));
   const accountType = await getAccountType(config.accountType);
 
-  const builder = new AccountBuilder(seed);
-  const buildResult = builder
+  let builder = new AccountBuilder(seed)
     .withAuthComponent(
       AccountComponent.createAuthComponentFromCommitment(
         commitmentWord,
@@ -79,8 +78,16 @@ export async function initializeSignerAccount(
     )
     .accountType(accountType)
     .storageMode(config.storageMode)
-    .withBasicWalletComponent()
-    .build();
+    .withBasicWalletComponent();
+
+  // Add any custom components (e.g. from compiled .masp packages)
+  if (config.customComponents?.length) {
+    for (const component of config.customComponents) {
+      builder = builder.withComponent(component);
+    }
+  }
+
+  const buildResult = builder.build();
 
   const account = buildResult.account;
   const accountId = account.id();
