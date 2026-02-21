@@ -6,7 +6,8 @@
 
 # Type Alias: AccountType
 
-> **AccountType** = `AccountType`
+> **AccountType** = *typeof* [`AccountType`](../variables/AccountType.md)\[keyof *typeof* [`AccountType`](../variables/AccountType.md)\]
 
-Re-export the WASM AccountType enum as a type so it remains available
-in the type namespace (the const below only occupies the value namespace).
+Union of all values in the AccountType const.
+Includes string aliases ("MutableWallet", etc.) for the simplified API
+and numeric variants (1, 2, 3) matching the original WASM enum.
