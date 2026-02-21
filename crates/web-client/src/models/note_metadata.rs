@@ -39,6 +39,11 @@ impl NoteMetadata {
         self.0.note_type().into()
     }
 
+    /// Returns the attachment of the note.
+    pub fn attachment(&self) -> NoteAttachment {
+        self.0.attachment().into()
+    }
+
     /// Adds an attachment to this metadata and returns the updated metadata.
     ///
     /// Attachments provide additional context about how notes should be processed.
