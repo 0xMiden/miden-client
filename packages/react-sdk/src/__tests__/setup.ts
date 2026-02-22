@@ -162,13 +162,14 @@ vi.mock("@miden-sdk/miden-sdk", () => {
         return Array.from(this.values);
       }
     },
-    NoteAttachment: Object.assign(
-      class NoteAttachment {},
-      {
-        newWord: vi.fn((_scheme: unknown, _word: unknown) => new (class NoteAttachment {})()),
-        newArray: vi.fn((_scheme: unknown, _words: unknown[]) => new (class NoteAttachment {})()),
-      }
-    ),
+    NoteAttachment: Object.assign(class NoteAttachment {}, {
+      newWord: vi.fn(
+        (_scheme: unknown, _word: unknown) => new (class NoteAttachment {})()
+      ),
+      newArray: vi.fn(
+        (_scheme: unknown, _words: unknown[]) => new (class NoteAttachment {})()
+      ),
+    }),
     OutputNoteArray: class OutputNoteArray {
       notes: unknown[];
       constructor(notes: unknown[]) {

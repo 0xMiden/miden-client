@@ -108,7 +108,9 @@ export function createNoteAttachment(
     words.push(new Word(BigUint64Array.from(bigints.slice(i, i + 4))));
   }
   // Runtime WASM bindings accept Word[] but TS declarations may expect FeltArray
-  const newArray = (NoteAttachment as unknown as Record<string, unknown>)["newArray"];
+  const newArray = (NoteAttachment as unknown as Record<string, unknown>)[
+    "newArray"
+  ];
   if (typeof newArray !== "function") {
     throw new Error(
       "NoteAttachment.newArray is not available. Ensure @miden-sdk/miden-sdk >= 0.13.1."

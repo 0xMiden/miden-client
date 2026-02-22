@@ -103,7 +103,11 @@ describe("createMidenStorage", () => {
 describe("migrateStorage", () => {
   // Mock indexedDB for clearMidenStorage
   const mockDeleteDatabase = vi.fn().mockImplementation(() => {
-    const req = { onsuccess: null as any, onerror: null as any, onblocked: null as any };
+    const req = {
+      onsuccess: null as any,
+      onerror: null as any,
+      onblocked: null as any,
+    };
     setTimeout(() => req.onsuccess?.(), 0);
     return req;
   });
@@ -183,17 +187,23 @@ describe("migrateStorage", () => {
 describe("clearMidenStorage", () => {
   it("should delete miden-related databases", async () => {
     const deleteDb = vi.fn().mockImplementation(() => {
-      const req = { onsuccess: null as any, onerror: null as any, onblocked: null as any };
+      const req = {
+        onsuccess: null as any,
+        onerror: null as any,
+        onblocked: null as any,
+      };
       setTimeout(() => req.onsuccess?.(), 0);
       return req;
     });
 
     vi.stubGlobal("indexedDB", {
-      databases: vi.fn().mockResolvedValue([
-        { name: "miden-client-db" },
-        { name: "other-db" },
-        { name: "MidenStore" },
-      ]),
+      databases: vi
+        .fn()
+        .mockResolvedValue([
+          { name: "miden-client-db" },
+          { name: "other-db" },
+          { name: "MidenStore" },
+        ]),
       deleteDatabase: deleteDb,
     });
 

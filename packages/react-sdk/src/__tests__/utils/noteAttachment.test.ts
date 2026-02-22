@@ -3,10 +3,7 @@ import {
   readNoteAttachment,
   createNoteAttachment,
 } from "../../utils/noteAttachment";
-import {
-  NoteAttachmentKind,
-  NoteAttachment,
-} from "@miden-sdk/miden-sdk";
+import { NoteAttachmentKind, NoteAttachment } from "@miden-sdk/miden-sdk";
 
 describe("readNoteAttachment", () => {
   it("should return null when note has no metadata", () => {

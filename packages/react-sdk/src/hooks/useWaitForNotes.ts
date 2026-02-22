@@ -35,7 +35,9 @@ export function useWaitForNotes(): UseWaitForNotesResult {
       let waited = 0;
 
       while (waited < timeoutMs) {
-        await runExclusiveSafe(() => (client as unknown as ClientWithNotes).syncState());
+        await runExclusiveSafe(() =>
+          (client as unknown as ClientWithNotes).syncState()
+        );
         const notes = await runExclusiveSafe(() =>
           (client as unknown as ClientWithNotes).getConsumableNotes(accountId)
         );

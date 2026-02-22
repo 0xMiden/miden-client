@@ -274,7 +274,9 @@ describe("useSessionAccount", () => {
   describe("error handling", () => {
     it("should set error when wallet creation fails", async () => {
       const mockClient = createMockWebClient({
-        newWallet: vi.fn().mockRejectedValue(new Error("Wallet creation failed")),
+        newWallet: vi
+          .fn()
+          .mockRejectedValue(new Error("Wallet creation failed")),
       });
 
       mockUseMiden.mockReturnValue({

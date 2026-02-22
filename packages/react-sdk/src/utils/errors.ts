@@ -10,7 +10,10 @@ export class MidenError extends Error {
   readonly code: MidenErrorCode;
   declare readonly cause?: unknown;
 
-  constructor(message: string, options?: { cause?: unknown; code?: MidenErrorCode }) {
+  constructor(
+    message: string,
+    options?: { cause?: unknown; code?: MidenErrorCode }
+  ) {
     super(message);
     this.name = "MidenError";
     this.code = options?.code ?? "UNKNOWN";
@@ -28,7 +31,8 @@ interface ErrorPattern {
 
 const ERROR_PATTERNS: ErrorPattern[] = [
   {
-    test: (msg) => msg.includes("_assertClass") || msg.includes("expected instance of"),
+    test: (msg) =>
+      msg.includes("_assertClass") || msg.includes("expected instance of"),
     code: "WASM_CLASS_MISMATCH",
     message:
       "WASM class identity mismatch. This usually means multiple copies of @miden-sdk/miden-sdk " +
@@ -47,14 +51,16 @@ const ERROR_PATTERNS: ErrorPattern[] = [
   },
   {
     test: (msg) =>
-      msg.includes("not initialized") || msg.includes("Cannot read properties of null"),
+      msg.includes("not initialized") ||
+      msg.includes("Cannot read properties of null"),
     code: "WASM_NOT_INITIALIZED",
     message:
       "Miden client is not initialized. Ensure you are inside a <MidenProvider> and the client is ready " +
       "before calling SDK methods.",
   },
   {
-    test: (msg) => msg.includes("state commitment mismatch") || msg.includes("stale state"),
+    test: (msg) =>
+      msg.includes("state commitment mismatch") || msg.includes("stale state"),
     code: "WASM_SYNC_REQUIRED",
     message:
       "Account state is stale. Call sync() before executing transactions, or ensure no concurrent " +

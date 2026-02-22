@@ -80,31 +80,33 @@ export function useMultiSend(): UseMultiSendResult {
         const senderId = parseAccountId(options.from);
         const assetId = parseAccountId(options.assetId);
 
-        const outputs = options.recipients.map(({ to, amount, attachment, noteType: recipientNoteType }) => {
-          const receiverId = parseAccountId(to);
-          const assets = new NoteAssets([new FungibleAsset(assetId, amount)]);
-          const resolvedNoteType = recipientNoteType
-            ? getNoteType(recipientNoteType)
-            : noteType;
-          const noteAttachment =
-            attachment !== undefined && attachment !== null
-              ? createNoteAttachment(attachment)
-              : new NoteAttachment();
-          const note = Note.createP2IDNote(
-            senderId,
-            receiverId,
-            assets,
-            resolvedNoteType,
-            noteAttachment
-          );
-          const recipientAddress = parseAddress(to, receiverId);
-          return {
-            outputNote: OutputNote.full(note),
-            note,
-            recipientAddress,
-            noteType: resolvedNoteType,
-          };
-        });
+        const outputs = options.recipients.map(
+          ({ to, amount, attachment, noteType: recipientNoteType }) => {
+            const receiverId = parseAccountId(to);
+            const assets = new NoteAssets([new FungibleAsset(assetId, amount)]);
+            const resolvedNoteType = recipientNoteType
+              ? getNoteType(recipientNoteType)
+              : noteType;
+            const noteAttachment =
+              attachment !== undefined && attachment !== null
+                ? createNoteAttachment(attachment)
+                : new NoteAttachment();
+            const note = Note.createP2IDNote(
+              senderId,
+              receiverId,
+              assets,
+              resolvedNoteType,
+              noteAttachment
+            );
+            const recipientAddress = parseAddress(to, receiverId);
+            return {
+              outputNote: OutputNote.full(note),
+              note,
+              recipientAddress,
+              noteType: resolvedNoteType,
+            };
+          }
+        );
 
         const txRequest = new TransactionRequestBuilder()
           .withOwnOutputNotes(
@@ -135,9 +137,7 @@ export function useMultiSend(): UseMultiSendResult {
         );
 
         // Send private notes after commit
-        const hasPrivate = outputs.some(
-          (o) => o.noteType === NoteType.Private
-        );
+        const hasPrivate = outputs.some((o) => o.noteType === NoteType.Private);
         if (hasPrivate) {
           await waitForTransactionCommit(
             client as unknown as ClientWithTransactions,
@@ -202,4 +202,3 @@ function getNoteType(type: "private" | "public"): NoteType {
       return NoteType.Private;
   }
 }
-

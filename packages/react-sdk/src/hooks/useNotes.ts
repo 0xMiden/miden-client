@@ -22,9 +22,7 @@ export function useNotes(options?: NotesFilter): NotesResult {
   const consumableNotes = useConsumableNotesStore();
   const isLoadingNotes = useMidenStore((state) => state.isLoadingNotes);
   const setLoadingNotes = useMidenStore((state) => state.setLoadingNotes);
-  const setNotesIfChanged = useMidenStore(
-    (state) => state.setNotesIfChanged
-  );
+  const setNotesIfChanged = useMidenStore((state) => state.setNotesIfChanged);
   const setConsumableNotesIfChanged = useMidenStore(
     (state) => state.setConsumableNotesIfChanged
   );
@@ -164,4 +162,3 @@ export function useNotes(options?: NotesFilter): NotesResult {
     refetch,
   };
 }
-

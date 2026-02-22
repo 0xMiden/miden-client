@@ -97,10 +97,8 @@ export function useSessionAccount(
         const storageMode = getStorageMode(
           walletOptions?.storageMode ?? "public"
         );
-        const mutable =
-          walletOptions?.mutable ?? DEFAULTS.WALLET_MUTABLE;
-        const authScheme =
-          walletOptions?.authScheme ?? DEFAULTS.AUTH_SCHEME;
+        const mutable = walletOptions?.mutable ?? DEFAULTS.WALLET_MUTABLE;
+        const authScheme = walletOptions?.authScheme ?? DEFAULTS.AUTH_SCHEME;
 
         const wallet = await runExclusiveSafe(async () => {
           const w = await client.newWallet(storageMode, mutable, authScheme);
@@ -196,9 +194,14 @@ function getStorageMode(
 
 type WaitAndConsumeClient = {
   syncState: () => Promise<unknown>;
-  getConsumableNotes: (accountId?: unknown) => Promise<Array<{ inputNoteRecord: () => { toNote: () => unknown } }>>;
+  getConsumableNotes: (
+    accountId?: unknown
+  ) => Promise<Array<{ inputNoteRecord: () => { toNote: () => unknown } }>>;
   newConsumeTransactionRequest: (notes: unknown[]) => unknown;
-  submitNewTransaction: (accountId: unknown, request: unknown) => Promise<unknown>;
+  submitNewTransaction: (
+    accountId: unknown,
+    request: unknown
+  ) => Promise<unknown>;
 };
 
 async function waitAndConsume(

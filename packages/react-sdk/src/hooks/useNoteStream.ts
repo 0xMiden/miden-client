@@ -55,9 +55,7 @@ export function useNoteStream(
   const allNotes = useNotesStore();
   const noteFirstSeen = useNoteFirstSeenStore();
   const { lastSyncTime } = useSyncStateStore();
-  const setNotesIfChanged = useMidenStore(
-    (state) => state.setNotesIfChanged
-  );
+  const setNotesIfChanged = useMidenStore((state) => state.setNotesIfChanged);
   const setLoadingNotes = useMidenStore((state) => state.setLoadingNotes);
 
   const [isLoading, setIsLoading] = useState(false);
@@ -97,7 +95,14 @@ export function useNoteStream(
       setIsLoading(false);
       setLoadingNotes(false);
     }
-  }, [client, isReady, runExclusiveSafe, status, setNotesIfChanged, setLoadingNotes]);
+  }, [
+    client,
+    isReady,
+    runExclusiveSafe,
+    status,
+    setNotesIfChanged,
+    setLoadingNotes,
+  ]);
 
   // Fetch on mount and after each sync
   useEffect(() => {
@@ -149,10 +154,19 @@ export function useNoteStream(
     result.sort((a, b) => a.firstSeenAt - b.firstSeenAt);
 
     return result;
-  }, [allNotes, noteFirstSeen, excludeIdSet, sender, since, amountFilter, handledVersion]);
+  }, [
+    allNotes,
+    noteFirstSeen,
+    excludeIdSet,
+    sender,
+    since,
+    amountFilter,
+    handledVersion,
+  ]);
 
   const latest = useMemo(
-    () => (streamedNotes.length > 0 ? streamedNotes[streamedNotes.length - 1] : null),
+    () =>
+      streamedNotes.length > 0 ? streamedNotes[streamedNotes.length - 1] : null,
     [streamedNotes]
   );
 
@@ -239,4 +253,3 @@ function buildStreamedNote(
     return null;
   }
 }
-

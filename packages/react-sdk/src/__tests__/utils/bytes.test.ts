@@ -20,7 +20,9 @@ describe("bytesToBigInt", () => {
   });
 
   it("should handle max u64", () => {
-    const bytes = new Uint8Array([0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);
+    const bytes = new Uint8Array([
+      0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+    ]);
     expect(bytesToBigInt(bytes)).toBe(2n ** 64n - 1n);
   });
 

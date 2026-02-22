@@ -120,9 +120,7 @@ describe("useNoteStream", () => {
 
       useMidenStore.getState().setNotes(notes as any);
 
-      const { result } = renderHook(() =>
-        useNoteStream({ sender: "0xalice" })
-      );
+      const { result } = renderHook(() => useNoteStream({ sender: "0xalice" }));
 
       await waitFor(() => {
         expect(result.current.notes.length).toBe(2);
@@ -230,9 +228,7 @@ describe("useNoteStream", () => {
 
       useMidenStore.getState().setNotes(notes as any);
 
-      const { result } = renderHook(() =>
-        useNoteStream({ sender: null })
-      );
+      const { result } = renderHook(() => useNoteStream({ sender: null }));
 
       // sender: null means "no sender filter" — returns all notes
       await waitFor(() => {

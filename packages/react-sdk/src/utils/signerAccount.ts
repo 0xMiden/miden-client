@@ -10,9 +10,7 @@ import type {
 /**
  * Maps SignerAccountType string to SDK AccountType enum value.
  */
-async function getAccountType(
-  accountType: SignerAccountType
-) {
+async function getAccountType(accountType: SignerAccountType) {
   const { AccountType } = await import("@miden-sdk/miden-sdk");
 
   switch (accountType) {
