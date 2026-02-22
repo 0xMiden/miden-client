@@ -33,6 +33,38 @@ type TransactionRequestFactory = (
   client: WebClient
 ) => TransactionRequest | Promise<TransactionRequest>;
 
+/**
+ * Hook to execute arbitrary transaction requests.
+ *
+ * @example
+ * ```tsx
+ * function CustomTransactionButton({ accountId }: { accountId: string }) {
+ *   const { execute, isLoading, stage } = useTransaction();
+ *
+ *   const handleClick = async () => {
+ *     await execute({
+ *       accountId,
+ *       request: (client) =>
+ *         client.newSwapTransactionRequest(
+ *           AccountId.fromHex(accountId),
+ *           AccountId.fromHex("0x..."),
+ *           10n,
+ *           AccountId.fromHex("0x..."),
+ *           5n,
+ *           NoteType.Private,
+ *           NoteType.Private
+ *         ),
+ *     });
+ *   };
+ *
+ *   return (
+ *     <button onClick={handleClick} disabled={isLoading}>
+ *       {isLoading ? stage : "Run Transaction"}
+ *     </button>
+ *   );
+ * }
+ * ```
+ */
 export function useTransaction(): UseTransactionResult {
   const { client, isReady, sync, runExclusive, prover } = useMiden();
   const runExclusiveSafe = runExclusive ?? runExclusiveDirect;

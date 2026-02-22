@@ -38,6 +38,34 @@ export interface UseMultiSendResult {
   reset: () => void;
 }
 
+/**
+ * Hook to create a multi-send transaction (multiple P2ID notes).
+ *
+ * @example
+ * ```tsx
+ * function MultiSendButton() {
+ *   const { sendMany, isLoading, stage } = useMultiSend();
+ *
+ *   const handleSend = async () => {
+ *     await sendMany({
+ *       from: "mtst1...",
+ *       assetId: "0x...",
+ *       recipients: [
+ *         { to: "mtst1...", amount: 100n },
+ *         { to: "0x...", amount: 250n },
+ *       ],
+ *       noteType: "public",
+ *     });
+ *   };
+ *
+ *   return (
+ *     <button onClick={handleSend} disabled={isLoading}>
+ *       {isLoading ? stage : "Multi-send"}
+ *     </button>
+ *   );
+ * }
+ * ```
+ */
 export function useMultiSend(): UseMultiSendResult {
   const { client, isReady, sync, runExclusive, prover } = useMiden();
   const runExclusiveSafe = runExclusive ?? runExclusiveDirect;

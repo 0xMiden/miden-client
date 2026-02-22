@@ -38,6 +38,36 @@ export interface UseSendResult {
   reset: () => void;
 }
 
+/**
+ * Hook to send tokens between accounts.
+ *
+ * @example
+ * ```tsx
+ * function SendButton({ from, to, assetId }: Props) {
+ *   const { send, isLoading, stage, error } = useSend();
+ *
+ *   const handleSend = async () => {
+ *     try {
+ *       const result = await send({
+ *         from,
+ *         to,
+ *         assetId,
+ *         amount: 100n,
+ *       });
+ *       console.log('Transaction ID:', result.transactionId);
+ *     } catch (err) {
+ *       console.error('Send failed:', err);
+ *     }
+ *   };
+ *
+ *   return (
+ *     <button onClick={handleSend} disabled={isLoading}>
+ *       {isLoading ? stage : 'Send'}
+ *     </button>
+ *   );
+ * }
+ * ```
+ */
 export function useSend(): UseSendResult {
   const { client, isReady, sync, runExclusive, prover } = useMiden();
   const runExclusiveSafe = runExclusive ?? runExclusiveDirect;

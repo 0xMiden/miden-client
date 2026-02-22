@@ -15,6 +15,40 @@ import { parseAccountId } from "../utils/accountParsing";
 import { accountIdsEqual } from "../utils/accountId";
 import { getNoteFilterType } from "../utils/noteFilters";
 
+/**
+ * Hook to list notes.
+ *
+ * @param options - Optional filter options
+ *
+ * @example
+ * ```tsx
+ * function NotesList() {
+ *   const { notes, consumableNotes, isLoading, refetch } = useNotes();
+ *
+ *   if (isLoading) return <div>Loading...</div>;
+ *
+ *   return (
+ *     <div>
+ *       <h2>All Notes ({notes.length})</h2>
+ *       {notes.map(n => (
+ *         <div key={n.id().toString()}>
+ *           Note: {n.id().toString()} - {n.isConsumed() ? 'Consumed' : 'Pending'}
+ *         </div>
+ *       ))}
+ *
+ *       <h2>Consumable Notes ({consumableNotes.length})</h2>
+ *       {consumableNotes.map(n => (
+ *         <div key={n.inputNoteRecord().id().toString()}>
+ *           {n.inputNoteRecord().id().toString()}
+ *         </div>
+ *       ))}
+ *
+ *       <button onClick={refetch}>Refresh</button>
+ *     </div>
+ *   );
+ * }
+ * ```
+ */
 export function useNotes(options?: NotesFilter): NotesResult {
   const { client, isReady, runExclusive } = useMiden();
   const runExclusiveSafe = runExclusive ?? runExclusiveDirect;
