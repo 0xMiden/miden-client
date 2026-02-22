@@ -6,47 +6,15 @@ import {
   useConsumableNotesStore,
   useSyncStateStore,
 } from "../store/MidenStore";
-import { NoteFilter, NoteFilterTypes } from "@miden-sdk/miden-sdk";
+import { NoteFilter } from "@miden-sdk/miden-sdk";
 import type { NotesFilter, NotesResult, NoteSummary } from "../types";
 import { runExclusiveDirect } from "../utils/runExclusive";
 import { getNoteSummary } from "../utils/notes";
 import { useAssetMetadata } from "./useAssetMetadata";
 import { parseAccountId } from "../utils/accountParsing";
+import { accountIdsEqual } from "../utils/accountId";
+import { getNoteFilterType } from "../utils/noteFilters";
 
-/**
- * Hook to list notes.
- *
- * @param options - Optional filter options
- *
- * @example
- * ```tsx
- * function NotesList() {
- *   const { notes, consumableNotes, isLoading, refetch } = useNotes();
- *
- *   if (isLoading) return <div>Loading...</div>;
- *
- *   return (
- *     <div>
- *       <h2>All Notes ({notes.length})</h2>
- *       {notes.map(n => (
- *         <div key={n.id().toString()}>
- *           Note: {n.id().toString()} - {n.isConsumed() ? 'Consumed' : 'Pending'}
- *         </div>
- *       ))}
- *
- *       <h2>Consumable Notes ({consumableNotes.length})</h2>
- *       {consumableNotes.map(n => (
- *         <div key={n.inputNoteRecord().id().toString()}>
- *           {n.inputNoteRecord().id().toString()}
- *         </div>
- *       ))}
- *
- *       <button onClick={refetch}>Refresh</button>
- *     </div>
- *   );
- * }
- * ```
- */
 export function useNotes(options?: NotesFilter): NotesResult {
   const { client, isReady, runExclusive } = useMiden();
   const runExclusiveSafe = runExclusive ?? runExclusiveDirect;
@@ -54,8 +22,12 @@ export function useNotes(options?: NotesFilter): NotesResult {
   const consumableNotes = useConsumableNotesStore();
   const isLoadingNotes = useMidenStore((state) => state.isLoadingNotes);
   const setLoadingNotes = useMidenStore((state) => state.setLoadingNotes);
-  const setNotes = useMidenStore((state) => state.setNotes);
-  const setConsumableNotes = useMidenStore((state) => state.setConsumableNotes);
+  const setNotesIfChanged = useMidenStore(
+    (state) => state.setNotesIfChanged
+  );
+  const setConsumableNotesIfChanged = useMidenStore(
+    (state) => state.setConsumableNotesIfChanged
+  );
   const { lastSyncTime } = useSyncStateStore();
 
   const [error, setError] = useState<Error | null>(null);
@@ -89,8 +61,9 @@ export function useNotes(options?: NotesFilter): NotesResult {
         }
       );
 
-      setNotes(fetchedNotes);
-      setConsumableNotes(fetchedConsumable);
+      // Smart refetch: only update store if note IDs changed (prevents unnecessary re-renders)
+      setNotesIfChanged(fetchedNotes);
+      setConsumableNotesIfChanged(fetchedConsumable);
     } catch (err) {
       setError(err instanceof Error ? err : new Error(String(err)));
     } finally {
@@ -103,8 +76,8 @@ export function useNotes(options?: NotesFilter): NotesResult {
     options?.status,
     options?.accountId,
     setLoadingNotes,
-    setNotes,
-    setConsumableNotes,
+    setNotesIfChanged,
+    setConsumableNotesIfChanged,
   ]);
 
   // Initial fetch
@@ -140,21 +113,46 @@ export function useNotes(options?: NotesFilter): NotesResult {
     [assetMetadata]
   );
 
-  const noteSummaries = useMemo(
-    () =>
-      notes
-        .map((note) => getNoteSummary(note, getMetadata))
-        .filter(Boolean) as NoteSummary[],
-    [notes, getMetadata]
-  );
+  // Build summaries with optional sender and excludeIds filters
+  const noteSummaries = useMemo(() => {
+    let summaries = notes
+      .map((note) => getNoteSummary(note, getMetadata))
+      .filter(Boolean) as NoteSummary[];
 
-  const consumableNoteSummaries = useMemo(
-    () =>
-      consumableNotes
-        .map((note) => getNoteSummary(note, getMetadata))
-        .filter(Boolean) as NoteSummary[],
-    [consumableNotes, getMetadata]
-  );
+    if (options?.sender) {
+      const senderFilter = options.sender;
+      summaries = summaries.filter(
+        (s) => s.sender && accountIdsEqual(s.sender, senderFilter)
+      );
+    }
+
+    if (options?.excludeIds && options.excludeIds.length > 0) {
+      const excludeSet = new Set(options.excludeIds);
+      summaries = summaries.filter((s) => !excludeSet.has(s.id));
+    }
+
+    return summaries;
+  }, [notes, getMetadata, options?.sender, options?.excludeIds]);
+
+  const consumableNoteSummaries = useMemo(() => {
+    let summaries = consumableNotes
+      .map((note) => getNoteSummary(note, getMetadata))
+      .filter(Boolean) as NoteSummary[];
+
+    if (options?.sender) {
+      const senderFilter = options.sender;
+      summaries = summaries.filter(
+        (s) => s.sender && accountIdsEqual(s.sender, senderFilter)
+      );
+    }
+
+    if (options?.excludeIds && options.excludeIds.length > 0) {
+      const excludeSet = new Set(options.excludeIds);
+      summaries = summaries.filter((s) => !excludeSet.has(s.id));
+    }
+
+    return summaries;
+  }, [consumableNotes, getMetadata, options?.sender, options?.excludeIds]);
 
   return {
     notes,
@@ -167,18 +165,3 @@ export function useNotes(options?: NotesFilter): NotesResult {
   };
 }
 
-function getNoteFilterType(status?: NotesFilter["status"]): NoteFilterTypes {
-  switch (status) {
-    case "consumed":
-      return NoteFilterTypes.Consumed;
-    case "committed":
-      return NoteFilterTypes.Committed;
-    case "expected":
-      return NoteFilterTypes.Expected;
-    case "processing":
-      return NoteFilterTypes.Processing;
-    case "all":
-    default:
-      return NoteFilterTypes.All;
-  }
-}
