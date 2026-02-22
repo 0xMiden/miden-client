@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type {
-  WebClient,
+  WasmWebClient as WebClient,
   Account,
   AccountHeader,
   InputNoteRecord,
@@ -26,6 +26,9 @@ interface MidenStoreState {
   consumableNotes: ConsumableNoteRecord[];
   assetMetadata: Map<string, AssetMetadata>;
 
+  // Temporal note tracking — records when each note ID was first observed
+  noteFirstSeen: Map<string, number>;
+
   // Loading states
   isLoadingAccounts: boolean;
   isLoadingNotes: boolean;
@@ -41,7 +44,9 @@ interface MidenStoreState {
   setAccounts: (accounts: AccountHeader[]) => void;
   setAccountDetails: (accountId: string, account: Account) => void;
   setNotes: (notes: InputNoteRecord[]) => void;
+  setNotesIfChanged: (notes: InputNoteRecord[]) => void;
   setConsumableNotes: (notes: ConsumableNoteRecord[]) => void;
+  setConsumableNotesIfChanged: (notes: ConsumableNoteRecord[]) => void;
   setAssetMetadata: (assetId: string, metadata: AssetMetadata) => void;
 
   setLoadingAccounts: (isLoading: boolean) => void;
@@ -71,6 +76,7 @@ const initialState = {
   notes: [],
   consumableNotes: [],
   assetMetadata: new Map<string, AssetMetadata>(),
+  noteFirstSeen: new Map<string, number>(),
 
   isLoadingAccounts: false,
   isLoadingNotes: false,
@@ -112,9 +118,85 @@ export const useMidenStore = create<MidenStoreState>()((set) => ({
       return { accountDetails: newMap };
     }),
 
-  setNotes: (notes) => set({ notes }),
+  setNotes: (notes) =>
+    set((state) => {
+      const now = Date.now();
+      const newFirstSeen = new Map(state.noteFirstSeen);
+      for (const note of notes) {
+        try {
+          const id = note.id().toString();
+          if (!newFirstSeen.has(id)) {
+            newFirstSeen.set(id, now);
+          }
+        } catch {
+          // Skip if id() fails
+        }
+      }
+      return { notes, noteFirstSeen: newFirstSeen };
+    }),
+
+  setNotesIfChanged: (notes) =>
+    set((state) => {
+      const prevIds = new Set(
+        state.notes.map((n) => {
+          try {
+            return n.id().toString();
+          } catch {
+            return "";
+          }
+        })
+      );
+      const newIds = new Set(
+        notes.map((n) => {
+          try {
+            return n.id().toString();
+          } catch {
+            return "";
+          }
+        })
+      );
+      if (
+        prevIds.size === newIds.size &&
+        [...prevIds].every((id) => newIds.has(id))
+      ) {
+        return {};
+      }
+      const now = Date.now();
+      const newFirstSeen = new Map(state.noteFirstSeen);
+      for (const note of notes) {
+        try {
+          const id = note.id().toString();
+          if (!newFirstSeen.has(id)) {
+            newFirstSeen.set(id, now);
+          }
+        } catch {
+          // Skip
+        }
+      }
+      return { notes, noteFirstSeen: newFirstSeen };
+    }),
 
   setConsumableNotes: (consumableNotes) => set({ consumableNotes }),
+
+  setConsumableNotesIfChanged: (consumableNotes) =>
+    set((state) => {
+      const getId = (n: ConsumableNoteRecord) => {
+        try {
+          return n.inputNoteRecord().id().toString();
+        } catch {
+          return "";
+        }
+      };
+      const prevIds = new Set(state.consumableNotes.map(getId));
+      const newIds = new Set(consumableNotes.map(getId));
+      if (
+        prevIds.size === newIds.size &&
+        [...prevIds].every((id) => newIds.has(id))
+      ) {
+        return {};
+      }
+      return { consumableNotes };
+    }),
 
   setAssetMetadata: (assetId, metadata) =>
     set((state) => {
@@ -144,3 +226,5 @@ export const useConsumableNotesStore = () =>
   useMidenStore((state) => state.consumableNotes);
 export const useAssetMetadataStore = () =>
   useMidenStore((state) => state.assetMetadata);
+export const useNoteFirstSeenStore = () =>
+  useMidenStore((state) => state.noteFirstSeen);
