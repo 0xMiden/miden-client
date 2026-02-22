@@ -155,6 +155,12 @@ export function useNotes(options?: NotesFilter): NotesResult {
     }
   }, [options?.sender]);
 
+  // Serialize excludeIds to a stable string key so array literals don't defeat memoization
+  const excludeIdsKey = useMemo(() => {
+    if (!options?.excludeIds || options.excludeIds.length === 0) return "";
+    return [...options.excludeIds].sort().join("\0");
+  }, [options?.excludeIds]);
+
   // Helper: normalize a sender string with a cache to avoid repeated WASM allocations.
   // normalizeAccountId calls parseAccountId (WASM) + toBech32 per invocation.
   const filterBySender = useCallback(
@@ -187,19 +193,13 @@ export function useNotes(options?: NotesFilter): NotesResult {
       summaries = filterBySender(summaries, normalizedSender);
     }
 
-    if (options?.excludeIds && options.excludeIds.length > 0) {
-      const excludeSet = new Set(options.excludeIds);
+    if (excludeIdsKey) {
+      const excludeSet = new Set(excludeIdsKey.split("\0"));
       summaries = summaries.filter((s) => !excludeSet.has(s.id));
     }
 
     return summaries;
-  }, [
-    notes,
-    getMetadata,
-    normalizedSender,
-    options?.excludeIds,
-    filterBySender,
-  ]);
+  }, [notes, getMetadata, normalizedSender, excludeIdsKey, filterBySender]);
 
   const consumableNoteSummaries = useMemo(() => {
     let summaries = consumableNotes
@@ -210,8 +210,8 @@ export function useNotes(options?: NotesFilter): NotesResult {
       summaries = filterBySender(summaries, normalizedSender);
     }
 
-    if (options?.excludeIds && options.excludeIds.length > 0) {
-      const excludeSet = new Set(options.excludeIds);
+    if (excludeIdsKey) {
+      const excludeSet = new Set(excludeIdsKey.split("\0"));
       summaries = summaries.filter((s) => !excludeSet.has(s.id));
     }
 
@@ -220,7 +220,7 @@ export function useNotes(options?: NotesFilter): NotesResult {
     consumableNotes,
     getMetadata,
     normalizedSender,
-    options?.excludeIds,
+    excludeIdsKey,
     filterBySender,
   ]);
 

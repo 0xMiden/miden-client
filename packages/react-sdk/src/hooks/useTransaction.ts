@@ -99,13 +99,16 @@ export function useTransaction(): UseTransactionResult {
           await sync();
         }
 
-        // Resolve account ID and request — this is the async work that makes
-        // "executing" stage observable before transitioning to "proving"
-        const accountIdObj = resolveAccountId(options.accountId);
+        // Resolve request outside runExclusiveSafe so the "executing" stage
+        // is observable before transitioning to "proving"
         const txRequest = await resolveRequest(options.request, client);
 
         setStage("proving");
         const txResult = await runExclusiveSafe(async () => {
+          // Create fresh AccountId inside the closure — WASM objects created
+          // outside may become stale if another runExclusiveSafe call runs
+          // between creation and consumption.
+          const accountIdObj = resolveAccountId(options.accountId);
           const txId = prover
             ? await client.submitNewTransactionWithProver(
                 accountIdObj,

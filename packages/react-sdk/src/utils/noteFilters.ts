@@ -1,4 +1,8 @@
-import { NoteFilterTypes, TransactionFilter } from "@miden-sdk/miden-sdk";
+import {
+  NoteFilterTypes,
+  NoteType,
+  TransactionFilter,
+} from "@miden-sdk/miden-sdk";
 
 /**
  * Map a status string to the corresponding NoteFilterTypes enum value.
@@ -19,6 +23,21 @@ export function getNoteFilterType(
     case "all":
     default:
       return NoteFilterTypes.All;
+  }
+}
+
+/**
+ * Map a note type string to the corresponding NoteType enum value.
+ * Shared across hooks that create transactions (useSend, useMultiSend, etc.).
+ */
+export function getNoteType(type: "private" | "public"): NoteType {
+  switch (type) {
+    case "private":
+      return NoteType.Private;
+    case "public":
+      return NoteType.Public;
+    default:
+      return NoteType.Private;
   }
 }
 

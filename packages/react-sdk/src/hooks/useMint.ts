@@ -1,6 +1,5 @@
 import { useCallback, useState } from "react";
 import { useMiden } from "../context/MidenProvider";
-import { NoteType } from "@miden-sdk/miden-sdk";
 import type {
   MintOptions,
   TransactionStage,
@@ -9,6 +8,7 @@ import type {
 import { DEFAULTS } from "../types";
 import { parseAccountId } from "../utils/accountParsing";
 import { runExclusiveDirect } from "../utils/runExclusive";
+import { getNoteType } from "../utils/noteFilters";
 
 export interface UseMintResult {
   /** Mint tokens from a faucet to a target account */
@@ -133,15 +133,4 @@ export function useMint(): UseMintResult {
     error,
     reset,
   };
-}
-
-function getNoteType(type: "private" | "public"): NoteType {
-  switch (type) {
-    case "private":
-      return NoteType.Private;
-    case "public":
-      return NoteType.Public;
-    default:
-      return NoteType.Private;
-  }
 }

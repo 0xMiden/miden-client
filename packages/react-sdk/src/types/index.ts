@@ -468,6 +468,8 @@ export interface UseSessionAccountOptions {
   };
   /** Polling interval for funding note detection (ms). Default: 3000 */
   pollIntervalMs?: number;
+  /** Maximum time to wait for funding note (ms). Default: 60000 */
+  maxWaitMs?: number;
   /** localStorage key prefix for persistence. Default: "miden-session" */
   storagePrefix?: string;
 }

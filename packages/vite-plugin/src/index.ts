@@ -1,5 +1,6 @@
 import type { Plugin } from "vite";
 import path from "path";
+import { createRequire } from "node:module";
 
 export interface MidenVitePluginOptions {
   /** Packages to deduplicate. Default: ["@miden-sdk/miden-sdk"] */
@@ -29,10 +30,17 @@ export function midenVitePlugin(options?: MidenVitePluginOptions): Plugin {
 
       // Use array form for resolve.alias so Vite appends rather than replaces
       // any existing aliases the user may have configured.
-      const alias = wasmPackages.map((pkg) => ({
-        find: pkg,
-        replacement: path.resolve(root, "node_modules", pkg),
-      }));
+      // Use require.resolve for portable resolution in pnpm/Yarn PnP setups.
+      const esmRequire = createRequire(`file://${root}/`);
+      const alias = wasmPackages.map((pkg) => {
+        let replacement: string;
+        try {
+          replacement = path.dirname(esmRequire.resolve(`${pkg}/package.json`));
+        } catch {
+          replacement = path.resolve(root, "node_modules", pkg);
+        }
+        return { find: pkg, replacement };
+      });
 
       const serverConfig: Record<string, unknown> = {};
       const previewConfig: Record<string, unknown> = {};

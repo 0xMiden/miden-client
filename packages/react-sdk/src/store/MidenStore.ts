@@ -121,13 +121,10 @@ export const useMidenStore = create<MidenStoreState>()((set) => ({
   setNotes: (notes) =>
     set((state) => {
       const now = Date.now();
-      const currentIds = new Set<string>();
       const newFirstSeen = new Map<string, number>();
       for (const note of notes) {
         try {
           const id = note.id().toString();
-          currentIds.add(id);
-          // Preserve existing timestamp or record new one
           newFirstSeen.set(id, state.noteFirstSeen.get(id) ?? now);
         } catch {
           // Skip if id() fails
@@ -138,24 +135,23 @@ export const useMidenStore = create<MidenStoreState>()((set) => ({
 
   setNotesIfChanged: (notes) =>
     set((state) => {
-      const prevIds = new Set(
-        state.notes.map((n) => {
-          try {
-            return n.id().toString();
-          } catch {
-            return "";
-          }
-        })
-      );
-      const newIds = new Set(
-        notes.map((n) => {
-          try {
-            return n.id().toString();
-          } catch {
-            return "";
-          }
-        })
-      );
+      const safeId = (n: InputNoteRecord): string | null => {
+        try {
+          return n.id().toString();
+        } catch {
+          return null;
+        }
+      };
+      const prevIds = new Set<string>();
+      for (const n of state.notes) {
+        const id = safeId(n);
+        if (id) prevIds.add(id);
+      }
+      const newIds = new Set<string>();
+      for (const n of notes) {
+        const id = safeId(n);
+        if (id) newIds.add(id);
+      }
       if (
         prevIds.size === newIds.size &&
         [...prevIds].every((id) => newIds.has(id))
@@ -180,15 +176,23 @@ export const useMidenStore = create<MidenStoreState>()((set) => ({
 
   setConsumableNotesIfChanged: (consumableNotes) =>
     set((state) => {
-      const getId = (n: ConsumableNoteRecord) => {
+      const safeId = (n: ConsumableNoteRecord): string | null => {
         try {
           return n.inputNoteRecord().id().toString();
         } catch {
-          return "";
+          return null;
         }
       };
-      const prevIds = new Set(state.consumableNotes.map(getId));
-      const newIds = new Set(consumableNotes.map(getId));
+      const prevIds = new Set<string>();
+      for (const n of state.consumableNotes) {
+        const id = safeId(n);
+        if (id) prevIds.add(id);
+      }
+      const newIds = new Set<string>();
+      for (const n of consumableNotes) {
+        const id = safeId(n);
+        if (id) newIds.add(id);
+      }
       if (
         prevIds.size === newIds.size &&
         [...prevIds].every((id) => newIds.has(id))

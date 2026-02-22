@@ -57,6 +57,7 @@ export function useSessionAccount(
 
   const storagePrefix = options.storagePrefix ?? "miden-session";
   const pollIntervalMs = options.pollIntervalMs ?? 3000;
+  const maxWaitMs = options.maxWaitMs ?? 60_000;
 
   // Destructure walletOptions primitives so useCallback deps are stable
   const storageMode = options.walletOptions?.storageMode ?? "public";
@@ -146,6 +147,7 @@ export function useSessionAccount(
         runExclusiveSafe,
         walletId,
         pollIntervalMs,
+        maxWaitMs,
         cancelledRef
       );
 
@@ -177,6 +179,7 @@ export function useSessionAccount(
     authScheme,
     storagePrefix,
     pollIntervalMs,
+    maxWaitMs,
     setAccounts,
   ]);
 
@@ -230,9 +233,9 @@ async function waitAndConsume(
   runExclusiveSafe: <T>(fn: () => Promise<T>) => Promise<T>,
   walletId: string,
   pollIntervalMs: number,
+  maxWaitMs: number,
   cancelledRef: { current: boolean }
 ) {
-  const maxWaitMs = 60_000; // 1 minute timeout
   const deadline = Date.now() + maxWaitMs;
 
   while (Date.now() < deadline) {

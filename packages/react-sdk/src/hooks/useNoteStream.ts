@@ -72,17 +72,18 @@ export function useNoteStream(
   const amountFilterRef = useRef(options.amountFilter);
   amountFilterRef.current = options.amountFilter;
 
-  // Serialize excludeIds to a stable key so array literals don't defeat memoization
+  // Serialize excludeIds to a stable key so array literals don't defeat memoization.
+  // Uses \0 separator (note IDs are hex strings that never contain null bytes).
   const excludeIdsKey = useMemo(() => {
     if (!options.excludeIds) return "";
     if (options.excludeIds instanceof Set)
-      return Array.from(options.excludeIds).sort().join(",");
-    return [...options.excludeIds].sort().join(",");
+      return Array.from(options.excludeIds).sort().join("\0");
+    return [...options.excludeIds].sort().join("\0");
   }, [options.excludeIds]);
 
   const excludeIdSet = useMemo(() => {
     if (!excludeIdsKey) return null;
-    return new Set(excludeIdsKey.split(","));
+    return new Set(excludeIdsKey.split("\0"));
   }, [excludeIdsKey]);
 
   // Fetch notes from client

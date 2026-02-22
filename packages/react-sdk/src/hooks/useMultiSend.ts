@@ -20,7 +20,7 @@ import { parseAccountId, parseAddress } from "../utils/accountParsing";
 import { runExclusiveDirect } from "../utils/runExclusive";
 import { createNoteAttachment } from "../utils/noteAttachment";
 import { MidenError } from "../utils/errors";
-import { waitForTransactionCommit } from "../utils/noteFilters";
+import { getNoteType, waitForTransactionCommit } from "../utils/noteFilters";
 import type { ClientWithTransactions } from "../utils/noteFilters";
 
 export interface UseMultiSendResult {
@@ -223,15 +223,4 @@ export function useMultiSend(): UseMultiSendResult {
     error,
     reset,
   };
-}
-
-function getNoteType(type: "private" | "public"): NoteType {
-  switch (type) {
-    case "private":
-      return NoteType.Private;
-    case "public":
-      return NoteType.Public;
-    default:
-      return NoteType.Private;
-  }
 }
