@@ -57,7 +57,16 @@ export function useSessionAccount(
 
   const storagePrefix = options.storagePrefix ?? "miden-session";
   const pollIntervalMs = options.pollIntervalMs ?? 3000;
-  const { fund, walletOptions } = options;
+
+  // Destructure walletOptions primitives so useCallback deps are stable
+  const storageMode = options.walletOptions?.storageMode ?? "public";
+  const mutable = options.walletOptions?.mutable ?? DEFAULTS.WALLET_MUTABLE;
+  const authScheme = options.walletOptions?.authScheme ?? DEFAULTS.AUTH_SCHEME;
+
+  // Store fund in a ref so the callback identity doesn't change when the
+  // caller passes an inline function (the common case).
+  const fundRef = useRef(options.fund);
+  fundRef.current = options.fund;
 
   // Restore persisted session on mount
   useEffect(() => {
@@ -103,14 +112,14 @@ export function useSessionAccount(
       if (!walletId) {
         setStep("creating");
 
-        const storageMode = getStorageMode(
-          walletOptions?.storageMode ?? "public"
-        );
-        const mutable = walletOptions?.mutable ?? DEFAULTS.WALLET_MUTABLE;
-        const authScheme = walletOptions?.authScheme ?? DEFAULTS.AUTH_SCHEME;
+        const resolvedStorageMode = getStorageMode(storageMode);
 
         const wallet = await runExclusiveSafe(async () => {
-          const w = await client.newWallet(storageMode, mutable, authScheme);
+          const w = await client.newWallet(
+            resolvedStorageMode,
+            mutable,
+            authScheme
+          );
           ensureAccountBech32(w);
           const accounts = await client.getAccounts();
           setAccounts(accounts);
@@ -126,7 +135,7 @@ export function useSessionAccount(
 
       // Step 2: Fund the session wallet
       setStep("funding");
-      await fund(walletId);
+      await fundRef.current(walletId);
 
       if (cancelledRef.current) return;
 
@@ -163,8 +172,9 @@ export function useSessionAccount(
     sync,
     runExclusiveSafe,
     sessionAccountId,
-    fund,
-    walletOptions,
+    storageMode,
+    mutable,
+    authScheme,
     storagePrefix,
     pollIntervalMs,
     setAccounts,
@@ -172,6 +182,7 @@ export function useSessionAccount(
 
   const reset = useCallback(() => {
     cancelledRef.current = true;
+    isBusyRef.current = false;
     setSessionAccountId(null);
     setStep("idle");
     setError(null);

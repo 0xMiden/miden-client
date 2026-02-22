@@ -26,10 +26,13 @@ export function midenVitePlugin(options?: MidenVitePluginOptions): Plugin {
 
     config(userConfig, env) {
       const root = userConfig.root ?? process.cwd();
-      const alias: Record<string, string> = {};
-      for (const pkg of wasmPackages) {
-        alias[pkg] = path.resolve(root, "node_modules", pkg);
-      }
+
+      // Use array form for resolve.alias so Vite appends rather than replaces
+      // any existing aliases the user may have configured.
+      const alias = wasmPackages.map((pkg) => ({
+        find: pkg,
+        replacement: path.resolve(root, "node_modules", pkg),
+      }));
 
       const serverConfig: Record<string, unknown> = {};
       const previewConfig: Record<string, unknown> = {};

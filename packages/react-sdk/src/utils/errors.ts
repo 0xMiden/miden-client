@@ -71,7 +71,7 @@ const ERROR_PATTERNS: ErrorPattern[] = [
 export function wrapWasmError(e: unknown): Error {
   if (e instanceof MidenError) return e;
 
-  const msg = String(e);
+  const msg = e instanceof Error ? e.message : String(e);
   for (const pattern of ERROR_PATTERNS) {
     if (pattern.test(msg)) {
       return new MidenError(pattern.message, { cause: e, code: pattern.code });

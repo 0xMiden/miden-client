@@ -60,7 +60,12 @@ export async function clearMidenStorage(): Promise<void> {
             const req = indexedDB.deleteDatabase(db.name);
             req.onsuccess = () => resolve();
             req.onerror = () => reject(req.error);
-            req.onblocked = () => resolve();
+            req.onblocked = () => {
+              console.warn(
+                `IndexedDB "${db.name}" delete was blocked — close other tabs using this database.`
+              );
+              resolve();
+            };
           })
       )
     );
@@ -89,8 +94,8 @@ export function createMidenStorage(prefix: string) {
     set<T>(key: string, value: T): void {
       try {
         localStorage.setItem(fullKey(key), JSON.stringify(value));
-      } catch {
-        // localStorage may be full or unavailable
+      } catch (e) {
+        console.warn(`Failed to write localStorage key "${fullKey(key)}":`, e);
       }
     },
 

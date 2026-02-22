@@ -155,6 +155,28 @@ export function useNotes(options?: NotesFilter): NotesResult {
     }
   }, [options?.sender]);
 
+  // Helper: normalize a sender string with a cache to avoid repeated WASM allocations.
+  // normalizeAccountId calls parseAccountId (WASM) + toBech32 per invocation.
+  const filterBySender = useCallback(
+    (summaries: NoteSummary[], target: string): NoteSummary[] => {
+      const cache = new Map<string, string>();
+      return summaries.filter((s) => {
+        if (!s.sender) return false;
+        let normalized = cache.get(s.sender);
+        if (normalized === undefined) {
+          try {
+            normalized = normalizeAccountId(s.sender);
+          } catch {
+            normalized = s.sender;
+          }
+          cache.set(s.sender, normalized);
+        }
+        return normalized === target;
+      });
+    },
+    []
+  );
+
   // Build summaries with optional sender and excludeIds filters
   const noteSummaries = useMemo(() => {
     let summaries = notes
@@ -162,9 +184,7 @@ export function useNotes(options?: NotesFilter): NotesResult {
       .filter(Boolean) as NoteSummary[];
 
     if (normalizedSender) {
-      summaries = summaries.filter(
-        (s) => s.sender && normalizeAccountId(s.sender) === normalizedSender
-      );
+      summaries = filterBySender(summaries, normalizedSender);
     }
 
     if (options?.excludeIds && options.excludeIds.length > 0) {
@@ -173,7 +193,13 @@ export function useNotes(options?: NotesFilter): NotesResult {
     }
 
     return summaries;
-  }, [notes, getMetadata, normalizedSender, options?.excludeIds]);
+  }, [
+    notes,
+    getMetadata,
+    normalizedSender,
+    options?.excludeIds,
+    filterBySender,
+  ]);
 
   const consumableNoteSummaries = useMemo(() => {
     let summaries = consumableNotes
@@ -181,9 +207,7 @@ export function useNotes(options?: NotesFilter): NotesResult {
       .filter(Boolean) as NoteSummary[];
 
     if (normalizedSender) {
-      summaries = summaries.filter(
-        (s) => s.sender && normalizeAccountId(s.sender) === normalizedSender
-      );
+      summaries = filterBySender(summaries, normalizedSender);
     }
 
     if (options?.excludeIds && options.excludeIds.length > 0) {
@@ -192,7 +216,13 @@ export function useNotes(options?: NotesFilter): NotesResult {
     }
 
     return summaries;
-  }, [consumableNotes, getMetadata, normalizedSender, options?.excludeIds]);
+  }, [
+    consumableNotes,
+    getMetadata,
+    normalizedSender,
+    options?.excludeIds,
+    filterBySender,
+  ]);
 
   return {
     notes,

@@ -66,13 +66,24 @@ export function useNoteStream(
   const status = options.status ?? "committed";
   const sender = options.sender ?? null;
   const since = options.since;
-  const amountFilter = options.amountFilter;
+
+  // Store amountFilter in a ref so the streamedNotes useMemo doesn't depend
+  // on the function reference (callers typically pass inline lambdas).
+  const amountFilterRef = useRef(options.amountFilter);
+  amountFilterRef.current = options.amountFilter;
+
+  // Serialize excludeIds to a stable key so array literals don't defeat memoization
+  const excludeIdsKey = useMemo(() => {
+    if (!options.excludeIds) return "";
+    if (options.excludeIds instanceof Set)
+      return Array.from(options.excludeIds).sort().join(",");
+    return [...options.excludeIds].sort().join(",");
+  }, [options.excludeIds]);
 
   const excludeIdSet = useMemo(() => {
-    if (!options.excludeIds) return null;
-    if (options.excludeIds instanceof Set) return options.excludeIds;
-    return new Set(options.excludeIds);
-  }, [options.excludeIds]);
+    if (!excludeIdsKey) return null;
+    return new Set(excludeIdsKey.split(","));
+  }, [excludeIdsKey]);
 
   // Fetch notes from client
   const refetch = useCallback(async () => {
@@ -135,8 +146,9 @@ export function useNoteStream(
       // Filter: since timestamp
       if (since !== undefined && note.firstSeenAt < since) continue;
 
-      // Filter: amount
-      if (amountFilter && !amountFilter(note.amount)) continue;
+      // Filter: amount (read from ref to avoid unstable function dep)
+      if (amountFilterRef.current && !amountFilterRef.current(note.amount))
+        continue;
 
       result.push(note);
     }
@@ -145,15 +157,7 @@ export function useNoteStream(
     result.sort((a, b) => a.firstSeenAt - b.firstSeenAt);
 
     return result;
-  }, [
-    allNotes,
-    noteFirstSeen,
-    excludeIdSet,
-    sender,
-    since,
-    amountFilter,
-    handledVersion,
-  ]);
+  }, [allNotes, noteFirstSeen, excludeIdSet, sender, since, handledVersion]);
 
   const latest = useMemo(
     () =>
