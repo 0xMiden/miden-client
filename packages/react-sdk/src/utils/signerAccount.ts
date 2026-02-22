@@ -1,4 +1,4 @@
-import type { WebClient } from "@miden-sdk/miden-sdk";
+import type { WasmWebClient as WebClient } from "@miden-sdk/miden-sdk";
 import type {
   SignerAccountConfig,
   SignerAccountType,
@@ -12,7 +12,7 @@ import type {
  */
 async function getAccountType(
   accountType: SignerAccountType
-): Promise<import("@miden-sdk/miden-sdk").AccountType> {
+) {
   const { AccountType } = await import("@miden-sdk/miden-sdk");
 
   switch (accountType) {
@@ -76,7 +76,8 @@ export async function initializeSignerAccount(
         1 // ECDSA auth scheme (K256/Keccak)
       )
     )
-    .accountType(accountType)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- SDK type mismatch between JS wrapper AccountType and WASM enum AccountType
+    .accountType(accountType as any)
     .storageMode(config.storageMode)
     .withBasicWalletComponent();
 

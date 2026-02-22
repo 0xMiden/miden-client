@@ -47,11 +47,11 @@ export function useWaitForCommit(): UseWaitForCommitResult {
 
       while (waited < timeoutMs) {
         await runExclusiveSafe(() =>
-          (client as ClientWithTransactions).syncState()
+          (client as unknown as ClientWithTransactions).syncState()
         );
 
         const records = await runExclusiveSafe(() =>
-          (client as ClientWithTransactions).getTransactions(
+          (client as unknown as ClientWithTransactions).getTransactions(
             typeof txId === "string"
               ? TransactionFilter.all()
               : TransactionFilter.ids([txId])
