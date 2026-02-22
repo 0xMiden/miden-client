@@ -1,8 +1,8 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useMiden } from "../context/MidenProvider";
 import type {
   TransactionRequest,
-  WebClient,
+  WasmWebClient as WebClient,
   AccountId as AccountIdType,
 } from "@miden-sdk/miden-sdk";
 import type {
@@ -12,6 +12,7 @@ import type {
 } from "../types";
 import { parseAccountId } from "../utils/accountParsing";
 import { runExclusiveDirect } from "../utils/runExclusive";
+import { MidenError } from "../utils/errors";
 
 export interface UseTransactionResult {
   /** Execute a transaction request end-to-end */
@@ -32,41 +33,10 @@ type TransactionRequestFactory = (
   client: WebClient
 ) => TransactionRequest | Promise<TransactionRequest>;
 
-/**
- * Hook to execute arbitrary transaction requests.
- *
- * @example
- * ```tsx
- * function CustomTransactionButton({ accountId }: { accountId: string }) {
- *   const { execute, isLoading, stage } = useTransaction();
- *
- *   const handleClick = async () => {
- *     await execute({
- *       accountId,
- *       request: (client) =>
- *         client.newSwapTransactionRequest(
- *           AccountId.fromHex(accountId),
- *           AccountId.fromHex("0x..."),
- *           10n,
- *           AccountId.fromHex("0x..."),
- *           5n,
- *           NoteType.Private,
- *           NoteType.Private
- *         ),
- *     });
- *   };
- *
- *   return (
- *     <button onClick={handleClick} disabled={isLoading}>
- *       {isLoading ? stage : "Run Transaction"}
- *     </button>
- *   );
- * }
- * ```
- */
 export function useTransaction(): UseTransactionResult {
   const { client, isReady, sync, runExclusive, prover } = useMiden();
   const runExclusiveSafe = runExclusive ?? runExclusiveDirect;
+  const isBusyRef = useRef(false);
 
   const [result, setResult] = useState<TransactionResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -79,15 +49,31 @@ export function useTransaction(): UseTransactionResult {
         throw new Error("Miden client is not ready");
       }
 
+      if (isBusyRef.current) {
+        throw new MidenError(
+          "A transaction is already in progress. Await the previous transaction before starting another.",
+          { code: "SEND_BUSY" }
+        );
+      }
+
+      isBusyRef.current = true;
       setIsLoading(true);
       setStage("executing");
       setError(null);
 
       try {
+        // Auto-sync before transaction unless opted out
+        if (!options.skipSync) {
+          await sync();
+        }
+
+        // Resolve account ID and request — this is the async work that makes
+        // "executing" stage observable before transitioning to "proving"
+        const accountIdObj = resolveAccountId(options.accountId);
+        const txRequest = await resolveRequest(options.request, client);
+
         setStage("proving");
         const txResult = await runExclusiveSafe(async () => {
-          const accountIdObj = resolveAccountId(options.accountId);
-          const txRequest = await resolveRequest(options.request, client);
           const txId = prover
             ? await client.submitNewTransactionWithProver(
                 accountIdObj,
@@ -111,6 +97,7 @@ export function useTransaction(): UseTransactionResult {
         throw error;
       } finally {
         setIsLoading(false);
+        isBusyRef.current = false;
       }
     },
     [client, isReady, prover, runExclusive, sync]
