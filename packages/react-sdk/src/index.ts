@@ -120,11 +120,7 @@ export {
   createNoteAttachment,
 } from "./utils/noteAttachment";
 export type { NoteAttachmentData } from "./utils/noteAttachment";
-export {
-  bytesToBigInt,
-  bigIntToBytes,
-  concatBytes,
-} from "./utils/bytes";
+export { bytesToBigInt, bigIntToBytes, concatBytes } from "./utils/bytes";
 export { MidenError, wrapWasmError } from "./utils/errors";
 export type { MidenErrorCode } from "./utils/errors";
 export { waitForWalletDetection } from "./utils/walletDetection";

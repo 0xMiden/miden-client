@@ -19,7 +19,7 @@ export interface WalletAdapterLike {
  */
 export async function waitForWalletDetection(
   adapter: WalletAdapterLike,
-  timeoutMs = 5000,
+  timeoutMs = 5000
 ): Promise<void> {
   if (adapter.readyState === "Installed") return;
 
@@ -41,8 +41,8 @@ export async function waitForWalletDetection(
       reject(
         new Error(
           `Wallet extension not detected within ${timeoutMs}ms. ` +
-            "Is the browser extension installed and enabled?",
-        ),
+            "Is the browser extension installed and enabled?"
+        )
       );
     }, timeoutMs);
 

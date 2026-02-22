@@ -5,7 +5,7 @@ import {
 } from "../../utils/walletDetection";
 
 function createMockAdapter(
-  initialState: string = "NotDetected",
+  initialState: string = "NotDetected"
 ): WalletAdapterLike & { emit: (state: string) => void } {
   const listeners = new Set<(state: string) => void>();
   return {
@@ -65,7 +65,7 @@ describe("waitForWalletDetection", () => {
 
     await expect(promise).rejects.toThrow("not detected within 5000ms");
     await expect(promise).rejects.toThrow(
-      "Is the browser extension installed and enabled?",
+      "Is the browser extension installed and enabled?"
     );
   });
 
@@ -86,7 +86,10 @@ describe("waitForWalletDetection", () => {
     adapter.emit("Installed");
     await promise;
 
-    expect(offSpy).toHaveBeenCalledWith("readyStateChange", expect.any(Function));
+    expect(offSpy).toHaveBeenCalledWith(
+      "readyStateChange",
+      expect.any(Function)
+    );
   });
 
   it("should clean up listener on timeout", async () => {
@@ -97,7 +100,10 @@ describe("waitForWalletDetection", () => {
     vi.advanceTimersByTime(5000);
 
     await expect(promise).rejects.toThrow();
-    expect(offSpy).toHaveBeenCalledWith("readyStateChange", expect.any(Function));
+    expect(offSpy).toHaveBeenCalledWith(
+      "readyStateChange",
+      expect.any(Function)
+    );
   });
 
   it("should handle race condition where readyState changes before listener is registered", async () => {
