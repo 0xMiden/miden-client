@@ -75,6 +75,10 @@ export async function waitForTransactionCommit(
 
   while (Date.now() < deadline) {
     await runExclusiveSafe(() => client.syncState());
+    // TODO: Use TransactionFilter.ids([txId]) once TransactionId.fromHex()
+    // is available in the SDK. Currently we fetch all transactions and scan
+    // linearly because creating a TransactionId WASM object from a hex string
+    // is not supported. This is O(n) per poll iteration.
     const records = await runExclusiveSafe(() =>
       client.getTransactions(TransactionFilter.all())
     );

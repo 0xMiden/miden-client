@@ -4,6 +4,7 @@ export type MidenErrorCode =
   | "WASM_NOT_INITIALIZED"
   | "WASM_SYNC_REQUIRED"
   | "SEND_BUSY"
+  | "OPERATION_BUSY"
   | "UNKNOWN";
 
 export class MidenError extends Error {

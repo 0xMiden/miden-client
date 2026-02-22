@@ -107,7 +107,9 @@ export function createNoteAttachment(
   for (let i = 0; i < bigints.length; i += 4) {
     words.push(new Word(BigUint64Array.from(bigints.slice(i, i + 4))));
   }
-  // Runtime WASM bindings accept Word[] but TS declarations may expect FeltArray
+  // NoteAttachment.newArray exists in the WASM bindings but is not yet
+  // exposed in the TS declarations (added in SDK ≥0.13.1). Access via
+  // bracket notation with a runtime guard until upstream types are updated.
   const newArray = (NoteAttachment as unknown as Record<string, unknown>)[
     "newArray"
   ];

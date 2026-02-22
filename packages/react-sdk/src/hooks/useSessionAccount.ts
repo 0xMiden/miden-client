@@ -98,7 +98,7 @@ export function useSessionAccount(
     if (isBusyRef.current) {
       throw new MidenError(
         "Session account initialization is already in progress.",
-        { code: "SEND_BUSY" }
+        { code: "OPERATION_BUSY" }
       );
     }
 
@@ -247,21 +247,20 @@ async function waitAndConsume(
 
     if (cancelledRef.current) return;
 
-    const accountIdObj = parseAccountId(walletId);
-    const consumable = await runExclusiveSafe(() =>
-      client.getConsumableNotes(accountIdObj)
-    );
+    // Fetch and consume in a single exclusive block to avoid WASM pointer
+    // staleness between separate runExclusiveSafe calls.
+    const consumed = await runExclusiveSafe(async () => {
+      const accountIdObj = parseAccountId(walletId);
+      const consumable = await client.getConsumableNotes(accountIdObj);
+      if (consumable.length === 0) return false;
+      const notes = consumable.map((c) => c.inputNoteRecord().toNote());
+      const txRequest = client.newConsumeTransactionRequest(notes);
+      const freshAccountId = parseAccountId(walletId);
+      await client.submitNewTransaction(freshAccountId, txRequest);
+      return true;
+    });
 
-    if (consumable.length > 0) {
-      // Consume the notes — all WASM operations inside runExclusiveSafe
-      await runExclusiveSafe(async () => {
-        const notes = consumable.map((c) => c.inputNoteRecord().toNote());
-        const txRequest = client.newConsumeTransactionRequest(notes);
-        const freshAccountId = parseAccountId(walletId);
-        await client.submitNewTransaction(freshAccountId, txRequest);
-      });
-      return;
-    }
+    if (consumed) return;
 
     await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
   }

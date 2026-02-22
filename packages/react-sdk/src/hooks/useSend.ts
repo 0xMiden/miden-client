@@ -128,9 +128,6 @@ export function useSend(): UseSendResult {
           throw new Error("Amount is required (provide amount or sendAll)");
         }
 
-        // Convert string IDs to AccountId objects
-        const fromAccountId = parseAccountId(options.from);
-        const toAccountId = parseAccountId(options.to);
         const assetId =
           options.assetId ??
           (options as { faucetId?: string }).faucetId ??
@@ -138,7 +135,6 @@ export function useSend(): UseSendResult {
         if (!assetId) {
           throw new Error("Asset ID is required");
         }
-        const assetIdObj = parseAccountId(assetId);
 
         // Build transaction — use attachment path if attachment provided
         const hasAttachment =
@@ -154,6 +150,13 @@ export function useSend(): UseSendResult {
         }
 
         const txResult = await runExclusiveSafe(async () => {
+          // Create all WASM AccountId objects inside runExclusiveSafe to
+          // avoid stale pointers if another exclusive operation runs between
+          // creation and consumption.
+          const fromAccountId = parseAccountId(options.from);
+          const toAccountId = parseAccountId(options.to);
+          const assetIdObj = parseAccountId(assetId);
+
           let txRequest;
 
           if (hasAttachment) {
@@ -184,7 +187,7 @@ export function useSend(): UseSendResult {
             );
           }
 
-          // Fresh AccountId — the original may have been consumed by
+          // Fresh AccountId — the originals may have been consumed by
           // createP2IDNote or newSendTransactionRequest above.
           const execAccountId = parseAccountId(options.from);
           return await client.executeTransaction(execAccountId, txRequest);
