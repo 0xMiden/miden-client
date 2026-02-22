@@ -17,6 +17,7 @@ export { SignerContext, useSigner } from "./context/SignerContext";
 export { useAccounts } from "./hooks/useAccounts";
 export { useAccount } from "./hooks/useAccount";
 export { useNotes } from "./hooks/useNotes";
+export { useNoteStream } from "./hooks/useNoteStream";
 export { useTransactionHistory } from "./hooks/useTransactionHistory";
 export { useSyncState } from "./hooks/useSyncState";
 export { useAssetMetadata } from "./hooks/useAssetMetadata";
@@ -34,6 +35,7 @@ export { useMint } from "./hooks/useMint";
 export { useConsume } from "./hooks/useConsume";
 export { useSwap } from "./hooks/useSwap";
 export { useTransaction } from "./hooks/useTransaction";
+export { useSessionAccount } from "./hooks/useSessionAccount";
 
 // Types
 export type {
@@ -73,6 +75,14 @@ export type {
   SwapOptions,
   ExecuteTransactionOptions,
   TransactionResult,
+  // Note stream types
+  StreamedNote,
+  UseNoteStreamOptions,
+  UseNoteStreamReturn,
+  // Session account types
+  UseSessionAccountOptions,
+  UseSessionAccountReturn,
+  SessionAccountStep,
   // Signer types (for external signer providers)
   SignCallback,
   SignerAccountType,
@@ -104,6 +114,25 @@ export { DEFAULTS } from "./types";
 export { toBech32AccountId } from "./utils/accountBech32";
 export { formatAssetAmount, parseAssetAmount } from "./utils/amounts";
 export { getNoteSummary, formatNoteSummary } from "./utils/notes";
+export { normalizeAccountId, accountIdsEqual } from "./utils/accountId";
+export {
+  readNoteAttachment,
+  createNoteAttachment,
+} from "./utils/noteAttachment";
+export type { NoteAttachmentData } from "./utils/noteAttachment";
+export {
+  bytesToBigInt,
+  bigIntToBytes,
+  concatBytes,
+} from "./utils/bytes";
+export { MidenError, wrapWasmError } from "./utils/errors";
+export type { MidenErrorCode } from "./utils/errors";
+export {
+  migrateStorage,
+  clearMidenStorage,
+  createMidenStorage,
+} from "./utils/storage";
+export type { MigrateStorageOptions } from "./utils/storage";
 
 // Hook result types
 export type { UseCreateWalletResult } from "./hooks/useCreateWallet";
