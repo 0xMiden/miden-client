@@ -121,13 +121,14 @@ export const useMidenStore = create<MidenStoreState>()((set) => ({
   setNotes: (notes) =>
     set((state) => {
       const now = Date.now();
-      const newFirstSeen = new Map(state.noteFirstSeen);
+      const currentIds = new Set<string>();
+      const newFirstSeen = new Map<string, number>();
       for (const note of notes) {
         try {
           const id = note.id().toString();
-          if (!newFirstSeen.has(id)) {
-            newFirstSeen.set(id, now);
-          }
+          currentIds.add(id);
+          // Preserve existing timestamp or record new one
+          newFirstSeen.set(id, state.noteFirstSeen.get(id) ?? now);
         } catch {
           // Skip if id() fails
         }
@@ -162,13 +163,12 @@ export const useMidenStore = create<MidenStoreState>()((set) => ({
         return {};
       }
       const now = Date.now();
-      const newFirstSeen = new Map(state.noteFirstSeen);
+      const newFirstSeen = new Map<string, number>();
       for (const note of notes) {
         try {
           const id = note.id().toString();
-          if (!newFirstSeen.has(id)) {
-            newFirstSeen.set(id, now);
-          }
+          // Preserve existing timestamp or record new one
+          newFirstSeen.set(id, state.noteFirstSeen.get(id) ?? now);
         } catch {
           // Skip
         }

@@ -61,13 +61,21 @@ export function useSessionAccount(
 
   // Restore persisted session on mount
   useEffect(() => {
-    const stored = localStorage.getItem(`${storagePrefix}:accountId`);
-    const storedReady = localStorage.getItem(`${storagePrefix}:ready`);
-    if (stored) {
-      setSessionAccountId(stored);
-      if (storedReady === "true") {
-        setStep("ready");
+    try {
+      const stored = localStorage.getItem(`${storagePrefix}:accountId`);
+      const storedReady = localStorage.getItem(`${storagePrefix}:ready`);
+      if (stored && stored.length > 0) {
+        // Validate the stored ID is parseable before restoring
+        parseAccountId(stored);
+        setSessionAccountId(stored);
+        if (storedReady === "true") {
+          setStep("ready");
+        }
       }
+    } catch {
+      // Stored data is invalid — clear it and start fresh
+      localStorage.removeItem(`${storagePrefix}:accountId`);
+      localStorage.removeItem(`${storagePrefix}:ready`);
     }
   }, [storagePrefix]);
 
@@ -212,9 +220,9 @@ async function waitAndConsume(
   cancelledRef: { current: boolean }
 ) {
   const maxWaitMs = 60_000; // 1 minute timeout
-  let waited = 0;
+  const deadline = Date.now() + maxWaitMs;
 
-  while (waited < maxWaitMs) {
+  while (Date.now() < deadline) {
     if (cancelledRef.current) return;
 
     await runExclusiveSafe(() =>
@@ -240,7 +248,6 @@ async function waitAndConsume(
     }
 
     await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
-    waited += pollIntervalMs;
   }
 
   throw new Error("Timeout waiting for session wallet funding");

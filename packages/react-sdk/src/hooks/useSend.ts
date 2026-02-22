@@ -217,7 +217,10 @@ export function useSend(): UseSendResult {
             txIdForWait
           );
 
-          const recipientAddress = parseAddress(options.to, toAccountId);
+          // Create a fresh AccountId — the original toAccountId may have been
+          // consumed by Note.createP2IDNote or newSendTransactionRequest.
+          const recipientAccountId = parseAccountId(options.to);
+          const recipientAddress = parseAddress(options.to, recipientAccountId);
           await runExclusiveSafe(() =>
             client.sendPrivateNote(fullNote!, recipientAddress)
           );

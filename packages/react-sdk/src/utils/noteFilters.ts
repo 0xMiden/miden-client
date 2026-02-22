@@ -48,9 +48,9 @@ export async function waitForTransactionCommit(
   maxWaitMs = 10_000,
   delayMs = 1_000
 ) {
-  let waited = 0;
+  const deadline = Date.now() + maxWaitMs;
 
-  while (waited < maxWaitMs) {
+  while (Date.now() < deadline) {
     await runExclusiveSafe(() => client.syncState());
     const [record] = await runExclusiveSafe(() =>
       client.getTransactions(TransactionFilter.ids([txId]))
@@ -65,7 +65,6 @@ export async function waitForTransactionCommit(
       }
     }
     await new Promise((resolve) => setTimeout(resolve, delayMs));
-    waited += delayMs;
   }
 
   throw new Error("Timeout waiting for transaction commit");

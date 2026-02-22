@@ -120,4 +120,18 @@ describe("waitForWalletDetection", () => {
 
     await waitForWalletDetection(adapter);
   });
+
+  it("should reject immediately when timeoutMs is 0 and not installed", async () => {
+    const adapter = createMockAdapter("NotDetected");
+    const promise = waitForWalletDetection(adapter, 0);
+
+    vi.advanceTimersByTime(0);
+
+    await expect(promise).rejects.toThrow("not detected within 0ms");
+  });
+
+  it("should resolve immediately when timeoutMs is 0 and already installed", async () => {
+    const adapter = createMockAdapter("Installed");
+    await waitForWalletDetection(adapter, 0);
+  });
 });

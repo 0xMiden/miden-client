@@ -1,5 +1,6 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { normalizeAccountId, accountIdsEqual } from "../../utils/accountId";
+import { AccountId } from "@miden-sdk/miden-sdk";
 
 // The global mock in setup.ts mocks @miden-sdk/miden-sdk.
 // parseAccountId (used by accountIdsEqual) calls AccountId.fromHex / fromBech32,
@@ -51,5 +52,20 @@ describe("accountIdsEqual", () => {
     // and toString returns the original hex
     const same = "0x1234567890abcdef";
     expect(accountIdsEqual(same, same)).toBe(true);
+  });
+
+  it("should free WASM objects after comparison", () => {
+    vi.mocked(AccountId.fromHex).mockClear();
+
+    accountIdsEqual("0xaaa", "0xbbb");
+
+    // Verify fromHex was called (creates WASM objects)
+    expect(vi.mocked(AccountId.fromHex)).toHaveBeenCalledTimes(2);
+
+    // Verify the mock objects' free() was called
+    const calls = vi.mocked(AccountId.fromHex).mock.results;
+    for (const call of calls) {
+      expect(call.value.free).toHaveBeenCalled();
+    }
   });
 });

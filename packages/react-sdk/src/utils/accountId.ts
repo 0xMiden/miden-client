@@ -14,11 +14,17 @@ export function normalizeAccountId(id: string): string {
  * Parses both to AccountId objects and compares their hex representations.
  */
 export function accountIdsEqual(a: string, b: string): boolean {
+  let idA: ReturnType<typeof parseAccountId> | undefined;
+  let idB: ReturnType<typeof parseAccountId> | undefined;
   try {
-    const idA = parseAccountId(a);
-    const idB = parseAccountId(b);
+    idA = parseAccountId(a);
+    idB = parseAccountId(b);
     return idA.toString() === idB.toString();
   } catch {
     return a === b;
+  } finally {
+    // Free WASM objects to prevent memory leaks
+    (idA as { free?: () => void })?.free?.();
+    (idB as { free?: () => void })?.free?.();
   }
 }

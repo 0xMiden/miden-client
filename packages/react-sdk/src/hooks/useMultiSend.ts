@@ -105,13 +105,16 @@ export function useMultiSend(): UseMultiSendResult {
         }
 
         const noteType = getNoteType(options.noteType ?? DEFAULTS.NOTE_TYPE);
-        const senderId = parseAccountId(options.from);
-        const assetId = parseAccountId(options.assetId);
 
         const outputs = options.recipients.map(
           ({ to, amount, attachment, noteType: recipientNoteType }) => {
+            // Create fresh WASM objects per iteration to avoid use-after-consume
+            const iterSenderId = parseAccountId(options.from);
+            const iterAssetId = parseAccountId(options.assetId);
             const receiverId = parseAccountId(to);
-            const assets = new NoteAssets([new FungibleAsset(assetId, amount)]);
+            const assets = new NoteAssets([
+              new FungibleAsset(iterAssetId, amount),
+            ]);
             const resolvedNoteType = recipientNoteType
               ? getNoteType(recipientNoteType)
               : noteType;
@@ -120,7 +123,7 @@ export function useMultiSend(): UseMultiSendResult {
                 ? createNoteAttachment(attachment)
                 : new NoteAttachment();
             const note = Note.createP2IDNote(
-              senderId,
+              iterSenderId,
               receiverId,
               assets,
               resolvedNoteType,
@@ -142,8 +145,9 @@ export function useMultiSend(): UseMultiSendResult {
           )
           .build();
 
+        const txSenderId = parseAccountId(options.from);
         const txResult = await runExclusiveSafe(() =>
-          client.executeTransaction(senderId, txRequest)
+          client.executeTransaction(txSenderId, txRequest)
         );
 
         setStage("proving");

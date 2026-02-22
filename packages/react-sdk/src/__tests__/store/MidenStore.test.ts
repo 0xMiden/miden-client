@@ -351,6 +351,36 @@ describe("MidenStore", () => {
     it("should be empty in initial state", () => {
       expect(useMidenStore.getState().noteFirstSeen.size).toBe(0);
     });
+
+    it("should prune stale entries when notes are removed via setNotes", () => {
+      const note1 = createMockInputNoteRecord("0xnote1");
+      const note2 = createMockInputNoteRecord("0xnote2");
+
+      useMidenStore.getState().setNotes([note1, note2] as any);
+      expect(useMidenStore.getState().noteFirstSeen.size).toBe(2);
+
+      // Remove note2 from the list
+      useMidenStore.getState().setNotes([note1] as any);
+      const firstSeen = useMidenStore.getState().noteFirstSeen;
+      expect(firstSeen.size).toBe(1);
+      expect(firstSeen.has("0xnote1")).toBe(true);
+      expect(firstSeen.has("0xnote2")).toBe(false);
+    });
+
+    it("should prune stale entries when notes are removed via setNotesIfChanged", () => {
+      const note1 = createMockInputNoteRecord("0xnote1");
+      const note2 = createMockInputNoteRecord("0xnote2");
+
+      useMidenStore.getState().setNotes([note1, note2] as any);
+      expect(useMidenStore.getState().noteFirstSeen.size).toBe(2);
+
+      // Remove note2
+      useMidenStore.getState().setNotesIfChanged([note1] as any);
+      const firstSeen = useMidenStore.getState().noteFirstSeen;
+      expect(firstSeen.size).toBe(1);
+      expect(firstSeen.has("0xnote1")).toBe(true);
+      expect(firstSeen.has("0xnote2")).toBe(false);
+    });
   });
 
   describe("setNotesIfChanged", () => {
