@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useMiden } from "../context/MidenProvider";
 import {
   FungibleAsset,
@@ -8,10 +8,8 @@ import {
   NoteType,
   OutputNote,
   OutputNoteArray,
-  TransactionFilter,
   TransactionRequestBuilder,
 } from "@miden-sdk/miden-sdk";
-import type { TransactionId } from "@miden-sdk/miden-sdk";
 import type {
   MultiSendOptions,
   TransactionStage,
@@ -20,6 +18,10 @@ import type {
 import { DEFAULTS } from "../types";
 import { parseAccountId, parseAddress } from "../utils/accountParsing";
 import { runExclusiveDirect } from "../utils/runExclusive";
+import { createNoteAttachment } from "../utils/noteAttachment";
+import { MidenError } from "../utils/errors";
+import { waitForTransactionCommit } from "../utils/noteFilters";
+import type { ClientWithTransactions } from "../utils/noteFilters";
 
 export interface UseMultiSendResult {
   /** Create multiple P2ID output notes in one transaction */
@@ -36,51 +38,10 @@ export interface UseMultiSendResult {
   reset: () => void;
 }
 
-type ClientWithTransactions = {
-  syncState: () => Promise<unknown>;
-  getTransactions: (filter: TransactionFilter) => Promise<
-    Array<{
-      id: () => { toHex: () => string };
-      transactionStatus: () => {
-        isPending: () => boolean;
-        isCommitted: () => boolean;
-        isDiscarded: () => boolean;
-      };
-    }>
-  >;
-};
-
-/**
- * Hook to create a multi-send transaction (multiple P2ID notes).
- *
- * @example
- * ```tsx
- * function MultiSendButton() {
- *   const { sendMany, isLoading, stage } = useMultiSend();
- *
- *   const handleSend = async () => {
- *     await sendMany({
- *       from: "mtst1...",
- *       assetId: "0x...",
- *       recipients: [
- *         { to: "mtst1...", amount: 100n },
- *         { to: "0x...", amount: 250n },
- *       ],
- *       noteType: "public",
- *     });
- *   };
- *
- *   return (
- *     <button onClick={handleSend} disabled={isLoading}>
- *       {isLoading ? stage : "Multi-send"}
- *     </button>
- *   );
- * }
- * ```
- */
 export function useMultiSend(): UseMultiSendResult {
   const { client, isReady, sync, runExclusive, prover } = useMiden();
   const runExclusiveSafe = runExclusive ?? runExclusiveDirect;
+  const isBusyRef = useRef(false);
 
   const [result, setResult] = useState<TransactionResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -97,30 +58,51 @@ export function useMultiSend(): UseMultiSendResult {
         throw new Error("No recipients provided");
       }
 
+      if (isBusyRef.current) {
+        throw new MidenError(
+          "A send is already in progress. Await the previous send before starting another.",
+          { code: "SEND_BUSY" }
+        );
+      }
+
+      isBusyRef.current = true;
       setIsLoading(true);
       setStage("executing");
       setError(null);
 
       try {
+        // Auto-sync before send unless opted out
+        if (!options.skipSync) {
+          await sync();
+        }
+
         const noteType = getNoteType(options.noteType ?? DEFAULTS.NOTE_TYPE);
         const senderId = parseAccountId(options.from);
         const assetId = parseAccountId(options.assetId);
 
-        const outputs = options.recipients.map(({ to, amount }) => {
+        const outputs = options.recipients.map(({ to, amount, attachment, noteType: recipientNoteType }) => {
           const receiverId = parseAccountId(to);
           const assets = new NoteAssets([new FungibleAsset(assetId, amount)]);
+          const resolvedNoteType = recipientNoteType
+            ? getNoteType(recipientNoteType)
+            : noteType;
+          const noteAttachment =
+            attachment !== undefined && attachment !== null
+              ? createNoteAttachment(attachment)
+              : new NoteAttachment();
           const note = Note.createP2IDNote(
             senderId,
             receiverId,
             assets,
-            noteType,
-            new NoteAttachment()
+            resolvedNoteType,
+            noteAttachment
           );
           const recipientAddress = parseAddress(to, receiverId);
           return {
             outputNote: OutputNote.full(note),
             note,
             recipientAddress,
+            noteType: resolvedNoteType,
           };
         });
 
@@ -145,7 +127,6 @@ export function useMultiSend(): UseMultiSendResult {
         );
 
         // Save txId BEFORE applyTransaction, which consumes the WASM pointer
-        // inside txResult.
         const txId = txResult.id();
         const txIdString = txId.toString();
 
@@ -153,17 +134,23 @@ export function useMultiSend(): UseMultiSendResult {
           client.applyTransaction(txResult, submissionHeight)
         );
 
-        if (noteType === NoteType.Private) {
+        // Send private notes after commit
+        const hasPrivate = outputs.some(
+          (o) => o.noteType === NoteType.Private
+        );
+        if (hasPrivate) {
           await waitForTransactionCommit(
-            client as ClientWithTransactions,
+            client as unknown as ClientWithTransactions,
             runExclusiveSafe,
             txId
           );
 
           for (const output of outputs) {
-            await runExclusiveSafe(() =>
-              client.sendPrivateNote(output.note, output.recipientAddress)
-            );
+            if (output.noteType === NoteType.Private) {
+              await runExclusiveSafe(() =>
+                client.sendPrivateNote(output.note, output.recipientAddress)
+              );
+            }
           }
         }
 
@@ -182,6 +169,7 @@ export function useMultiSend(): UseMultiSendResult {
         throw error;
       } finally {
         setIsLoading(false);
+        isBusyRef.current = false;
       }
     },
     [client, isReady, prover, runExclusive, sync]
@@ -204,45 +192,14 @@ export function useMultiSend(): UseMultiSendResult {
   };
 }
 
-function getNoteType(type: "private" | "public" | "encrypted"): NoteType {
+function getNoteType(type: "private" | "public"): NoteType {
   switch (type) {
     case "private":
       return NoteType.Private;
     case "public":
       return NoteType.Public;
-    case "encrypted":
-      return NoteType.Encrypted;
     default:
       return NoteType.Private;
   }
 }
 
-async function waitForTransactionCommit(
-  client: ClientWithTransactions,
-  runExclusiveSafe: <T>(fn: () => Promise<T>) => Promise<T>,
-  txId: TransactionId,
-  maxWaitMs = 10_000,
-  delayMs = 1_000
-) {
-  let waited = 0;
-
-  while (waited < maxWaitMs) {
-    await runExclusiveSafe(() => client.syncState());
-    const [record] = await runExclusiveSafe(() =>
-      client.getTransactions(TransactionFilter.ids([txId]))
-    );
-    if (record) {
-      const status = record.transactionStatus();
-      if (status.isCommitted()) {
-        return;
-      }
-      if (status.isDiscarded()) {
-        throw new Error("Transaction was discarded before commit");
-      }
-    }
-    await new Promise((resolve) => setTimeout(resolve, delayMs));
-    waited += delayMs;
-  }
-
-  throw new Error("Timeout waiting for transaction commit");
-}
