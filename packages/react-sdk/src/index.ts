@@ -127,6 +127,8 @@ export {
 } from "./utils/bytes";
 export { MidenError, wrapWasmError } from "./utils/errors";
 export type { MidenErrorCode } from "./utils/errors";
+export { waitForWalletDetection } from "./utils/walletDetection";
+export type { WalletAdapterLike } from "./utils/walletDetection";
 export {
   migrateStorage,
   clearMidenStorage,

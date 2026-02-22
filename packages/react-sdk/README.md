@@ -1060,6 +1060,27 @@ store.remove('lastOpponent');
 store.clear(); // Clears only keys under 'myapp:' prefix
 ```
 
+### Wallet Detection
+
+Wait for a browser extension wallet to be detected before connecting:
+
+```typescript
+import { waitForWalletDetection } from '@miden-sdk/react';
+
+const adapter = wallets[0].adapter;
+
+// Default 5s timeout
+await waitForWalletDetection(adapter);
+
+// Custom timeout
+await waitForWalletDetection(adapter, 10000);
+
+// Returns immediately if already installed, otherwise
+// listens for readyStateChange events with a timeout.
+```
+
+This replaces the common 30-line polling+timeout pattern needed when the wallet extension loads slowly. The adapter is duck-typed — any object with `readyState`, `on("readyStateChange", ...)`, and `off("readyStateChange", ...)` will work.
+
 ### Error Handling Utilities
 
 WASM errors are cryptic. The SDK wraps common patterns with actionable messages:
