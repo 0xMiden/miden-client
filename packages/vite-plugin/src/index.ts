@@ -30,7 +30,7 @@ export function midenVitePlugin(options?: MidenVitePluginOptions): Plugin {
 
       // Use array form for resolve.alias so Vite appends rather than replaces
       // any existing aliases the user may have configured.
-      // Use require.resolve for portable resolution in pnpm/Yarn PnP setups.
+      // Use require.resolve for portable resolution in pnpm/Yarn Plug'n'Play setups.
       const esmRequire = createRequire(`file://${root}/`);
       const alias = wasmPackages.map((pkg) => {
         let replacement: string;
