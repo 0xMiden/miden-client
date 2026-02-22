@@ -177,7 +177,7 @@ describe("useSend", () => {
         });
       });
 
-      // Test encrypted
+      // Test public
       act(() => {
         result.current.reset();
       });
@@ -187,7 +187,7 @@ describe("useSend", () => {
           to: "0x2",
           assetId: "0x3",
           amount: 1n,
-          noteType: "encrypted",
+          noteType: "public",
         });
       });
 
@@ -430,6 +430,208 @@ describe("useSend", () => {
       });
 
       expect(result.current.isLoading).toBe(false);
+    });
+  });
+
+  describe("concurrency guard", () => {
+    it("should reject concurrent sends with SEND_BUSY", async () => {
+      let resolveExecute: () => void;
+      const executePromise = new Promise((resolve) => {
+        resolveExecute = () => resolve(createMockTransactionResult());
+      });
+
+      const mockClient = createMockWebClient({
+        newSendTransactionRequest: vi
+          .fn()
+          .mockReturnValue(createMockTransactionRequest()),
+        executeTransaction: vi.fn().mockReturnValue(executePromise),
+        proveTransaction: vi.fn().mockResolvedValue({}),
+        submitProvenTransaction: vi.fn().mockResolvedValue(100),
+        applyTransaction: vi.fn().mockResolvedValue({}),
+        sendPrivateNote: vi.fn().mockResolvedValue(undefined),
+      });
+
+      mockUseMiden.mockReturnValue({
+        client: mockClient,
+        isReady: true,
+        sync: vi.fn().mockResolvedValue(undefined),
+      });
+
+      const { result } = renderHook(() => useSend());
+
+      // Start first send
+      let firstSend: Promise<any>;
+      act(() => {
+        firstSend = result.current.send({
+          from: "0x1",
+          to: "0x2",
+          assetId: "0x3",
+          amount: 1n,
+        });
+      });
+
+      // Try second send while first is in progress
+      await expect(
+        result.current.send({
+          from: "0x1",
+          to: "0x2",
+          assetId: "0x3",
+          amount: 1n,
+        })
+      ).rejects.toThrow("A send is already in progress");
+
+      // Resolve first send
+      await act(async () => {
+        resolveExecute!();
+        await firstSend;
+      });
+    });
+  });
+
+  describe("auto-sync", () => {
+    it("should call sync before send by default", async () => {
+      const mockSync = vi.fn().mockResolvedValue(undefined);
+      const mockTxResult = createMockTransactionResult();
+      const mockClient = createMockWebClient({
+        newSendTransactionRequest: vi
+          .fn()
+          .mockReturnValue(createMockTransactionRequest()),
+        executeTransaction: vi.fn().mockResolvedValue(mockTxResult),
+        proveTransaction: vi.fn().mockResolvedValue({}),
+        submitProvenTransaction: vi.fn().mockResolvedValue(100),
+        applyTransaction: vi.fn().mockResolvedValue({}),
+        sendPrivateNote: vi.fn().mockResolvedValue(undefined),
+      });
+
+      mockUseMiden.mockReturnValue({
+        client: mockClient,
+        isReady: true,
+        sync: mockSync,
+      });
+
+      const { result } = renderHook(() => useSend());
+
+      await act(async () => {
+        await result.current.send({
+          from: "0x1",
+          to: "0x2",
+          assetId: "0x3",
+          amount: 1n,
+        });
+      });
+
+      // sync called before send + after send = at least 2 calls
+      expect(mockSync).toHaveBeenCalled();
+    });
+
+    it("should skip sync when skipSync is true", async () => {
+      const mockSync = vi.fn().mockResolvedValue(undefined);
+      const mockTxResult = createMockTransactionResult();
+      const mockClient = createMockWebClient({
+        newSendTransactionRequest: vi
+          .fn()
+          .mockReturnValue(createMockTransactionRequest()),
+        executeTransaction: vi.fn().mockResolvedValue(mockTxResult),
+        proveTransaction: vi.fn().mockResolvedValue({}),
+        submitProvenTransaction: vi.fn().mockResolvedValue(100),
+        applyTransaction: vi.fn().mockResolvedValue({}),
+        sendPrivateNote: vi.fn().mockResolvedValue(undefined),
+      });
+
+      mockUseMiden.mockReturnValue({
+        client: mockClient,
+        isReady: true,
+        sync: mockSync,
+      });
+
+      const { result } = renderHook(() => useSend());
+
+      await act(async () => {
+        await result.current.send({
+          from: "0x1",
+          to: "0x2",
+          assetId: "0x3",
+          amount: 1n,
+          skipSync: true,
+        });
+      });
+
+      // sync should only be called once (the post-send sync), not before
+      expect(mockSync).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("sendAll", () => {
+    it("should query account balance when sendAll is true", async () => {
+      const mockAccount = {
+        vault: vi.fn(() => ({
+          getBalance: vi.fn(() => 500n),
+        })),
+      };
+
+      const mockTxResult = createMockTransactionResult();
+      const mockClient = createMockWebClient({
+        getAccount: vi.fn().mockResolvedValue(mockAccount),
+        newSendTransactionRequest: vi
+          .fn()
+          .mockReturnValue(createMockTransactionRequest()),
+        executeTransaction: vi.fn().mockResolvedValue(mockTxResult),
+        proveTransaction: vi.fn().mockResolvedValue({}),
+        submitProvenTransaction: vi.fn().mockResolvedValue(100),
+        applyTransaction: vi.fn().mockResolvedValue({}),
+        sendPrivateNote: vi.fn().mockResolvedValue(undefined),
+      });
+
+      mockUseMiden.mockReturnValue({
+        client: mockClient,
+        isReady: true,
+        sync: vi.fn().mockResolvedValue(undefined),
+      });
+
+      const { result } = renderHook(() => useSend());
+
+      await act(async () => {
+        await result.current.send({
+          from: "0x1",
+          to: "0x2",
+          assetId: "0x3",
+          sendAll: true,
+        });
+      });
+
+      expect(mockClient.getAccount).toHaveBeenCalled();
+      expect(result.current.stage).toBe("complete");
+    });
+
+    it("should throw when sendAll balance is zero", async () => {
+      const mockAccount = {
+        vault: vi.fn(() => ({
+          getBalance: vi.fn(() => 0n),
+        })),
+      };
+
+      const mockClient = createMockWebClient({
+        getAccount: vi.fn().mockResolvedValue(mockAccount),
+      });
+
+      mockUseMiden.mockReturnValue({
+        client: mockClient,
+        isReady: true,
+        sync: vi.fn().mockResolvedValue(undefined),
+      });
+
+      const { result } = renderHook(() => useSend());
+
+      await act(async () => {
+        await expect(
+          result.current.send({
+            from: "0x1",
+            to: "0x2",
+            assetId: "0x3",
+            sendAll: true,
+          })
+        ).rejects.toThrow("zero balance");
+      });
     });
   });
 });

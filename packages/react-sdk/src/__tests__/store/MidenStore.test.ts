@@ -318,4 +318,99 @@ describe("MidenStore", () => {
       expect(useMidenStore.getState().sync.syncHeight).toBe(3);
     });
   });
+
+  describe("noteFirstSeen tracking", () => {
+    it("should record firstSeen timestamp when setNotes is called", () => {
+      const note1 = createMockInputNoteRecord("0xnote1");
+      const note2 = createMockInputNoteRecord("0xnote2");
+
+      const before = Date.now();
+      useMidenStore.getState().setNotes([note1, note2] as any);
+      const after = Date.now();
+
+      const firstSeen = useMidenStore.getState().noteFirstSeen;
+      expect(firstSeen.has("0xnote1")).toBe(true);
+      expect(firstSeen.has("0xnote2")).toBe(true);
+      expect(firstSeen.get("0xnote1")!).toBeGreaterThanOrEqual(before);
+      expect(firstSeen.get("0xnote1")!).toBeLessThanOrEqual(after);
+    });
+
+    it("should not overwrite existing firstSeen timestamps", () => {
+      const note = createMockInputNoteRecord("0xnote1");
+
+      useMidenStore.getState().setNotes([note] as any);
+      const first = useMidenStore.getState().noteFirstSeen.get("0xnote1")!;
+
+      // Wait a tick and set again
+      useMidenStore.getState().setNotes([note] as any);
+      const second = useMidenStore.getState().noteFirstSeen.get("0xnote1")!;
+
+      expect(second).toBe(first); // Should be the same timestamp
+    });
+
+    it("should be empty in initial state", () => {
+      expect(useMidenStore.getState().noteFirstSeen.size).toBe(0);
+    });
+  });
+
+  describe("setNotesIfChanged", () => {
+    it("should update notes when IDs change", () => {
+      const note1 = createMockInputNoteRecord("0xnote1");
+      const note2 = createMockInputNoteRecord("0xnote2");
+
+      useMidenStore.getState().setNotes([note1] as any);
+      useMidenStore.getState().setNotesIfChanged([note1, note2] as any);
+
+      expect(useMidenStore.getState().notes.length).toBe(2);
+    });
+
+    it("should skip update when note IDs are the same", () => {
+      const note1 = createMockInputNoteRecord("0xnote1");
+      const note2 = createMockInputNoteRecord("0xnote2");
+
+      useMidenStore.getState().setNotes([note1, note2] as any);
+      const firstRef = useMidenStore.getState().notes;
+
+      // Same IDs, possibly different objects
+      const note1b = createMockInputNoteRecord("0xnote1");
+      const note2b = createMockInputNoteRecord("0xnote2");
+      useMidenStore.getState().setNotesIfChanged([note1b, note2b] as any);
+
+      // Should be the same reference (no update triggered)
+      expect(useMidenStore.getState().notes).toBe(firstRef);
+    });
+
+    it("should track firstSeen for new notes", () => {
+      const note1 = createMockInputNoteRecord("0xnote1");
+      useMidenStore.getState().setNotes([note1] as any);
+
+      const note2 = createMockInputNoteRecord("0xnote2");
+      useMidenStore.getState().setNotesIfChanged([note1, note2] as any);
+
+      expect(useMidenStore.getState().noteFirstSeen.has("0xnote2")).toBe(true);
+    });
+  });
+
+  describe("setConsumableNotesIfChanged", () => {
+    it("should update consumable notes when IDs change", () => {
+      const cn1 = createMockConsumableNoteRecord("0xcn1");
+      const cn2 = createMockConsumableNoteRecord("0xcn2");
+
+      useMidenStore.getState().setConsumableNotes([cn1] as any);
+      useMidenStore.getState().setConsumableNotesIfChanged([cn1, cn2] as any);
+
+      expect(useMidenStore.getState().consumableNotes.length).toBe(2);
+    });
+
+    it("should skip update when consumable note IDs are the same", () => {
+      const cn1 = createMockConsumableNoteRecord("0xcn1");
+      useMidenStore.getState().setConsumableNotes([cn1] as any);
+      const firstRef = useMidenStore.getState().consumableNotes;
+
+      const cn1b = createMockConsumableNoteRecord("0xcn1");
+      useMidenStore.getState().setConsumableNotesIfChanged([cn1b] as any);
+
+      expect(useMidenStore.getState().consumableNotes).toBe(firstRef);
+    });
+  });
 });
