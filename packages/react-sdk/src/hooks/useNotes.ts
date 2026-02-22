@@ -12,7 +12,7 @@ import { runExclusiveDirect } from "../utils/runExclusive";
 import { getNoteSummary } from "../utils/notes";
 import { useAssetMetadata } from "./useAssetMetadata";
 import { parseAccountId } from "../utils/accountParsing";
-import { accountIdsEqual } from "../utils/accountId";
+import { normalizeAccountId } from "../utils/accountId";
 import { getNoteFilterType } from "../utils/noteFilters";
 
 /**
@@ -145,16 +145,25 @@ export function useNotes(options?: NotesFilter): NotesResult {
     [assetMetadata]
   );
 
+  // Normalize sender once outside the loop to avoid per-note WASM allocations
+  const normalizedSender = useMemo(() => {
+    if (!options?.sender) return null;
+    try {
+      return normalizeAccountId(options.sender);
+    } catch {
+      return options.sender;
+    }
+  }, [options?.sender]);
+
   // Build summaries with optional sender and excludeIds filters
   const noteSummaries = useMemo(() => {
     let summaries = notes
       .map((note) => getNoteSummary(note, getMetadata))
       .filter(Boolean) as NoteSummary[];
 
-    if (options?.sender) {
-      const senderFilter = options.sender;
+    if (normalizedSender) {
       summaries = summaries.filter(
-        (s) => s.sender && accountIdsEqual(s.sender, senderFilter)
+        (s) => s.sender && normalizeAccountId(s.sender) === normalizedSender
       );
     }
 
@@ -164,17 +173,16 @@ export function useNotes(options?: NotesFilter): NotesResult {
     }
 
     return summaries;
-  }, [notes, getMetadata, options?.sender, options?.excludeIds]);
+  }, [notes, getMetadata, normalizedSender, options?.excludeIds]);
 
   const consumableNoteSummaries = useMemo(() => {
     let summaries = consumableNotes
       .map((note) => getNoteSummary(note, getMetadata))
       .filter(Boolean) as NoteSummary[];
 
-    if (options?.sender) {
-      const senderFilter = options.sender;
+    if (normalizedSender) {
       summaries = summaries.filter(
-        (s) => s.sender && accountIdsEqual(s.sender, senderFilter)
+        (s) => s.sender && normalizeAccountId(s.sender) === normalizedSender
       );
     }
 
@@ -184,7 +192,7 @@ export function useNotes(options?: NotesFilter): NotesResult {
     }
 
     return summaries;
-  }, [consumableNotes, getMetadata, options?.sender, options?.excludeIds]);
+  }, [consumableNotes, getMetadata, normalizedSender, options?.excludeIds]);
 
   return {
     notes,

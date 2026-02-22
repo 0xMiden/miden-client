@@ -184,7 +184,10 @@ export function useSend(): UseSendResult {
             );
           }
 
-          return await client.executeTransaction(fromAccountId, txRequest);
+          // Fresh AccountId — the original may have been consumed by
+          // createP2IDNote or newSendTransactionRequest above.
+          const execAccountId = parseAccountId(options.from);
+          return await client.executeTransaction(execAccountId, txRequest);
         });
 
         setStage("proving");

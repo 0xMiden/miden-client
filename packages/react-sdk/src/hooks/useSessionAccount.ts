@@ -66,7 +66,8 @@ export function useSessionAccount(
       const storedReady = localStorage.getItem(`${storagePrefix}:ready`);
       if (stored && stored.length > 0) {
         // Validate the stored ID is parseable before restoring
-        parseAccountId(stored);
+        const validationId = parseAccountId(stored);
+        (validationId as { free?: () => void })?.free?.();
         setSessionAccountId(stored);
         if (storedReady === "true") {
           setStep("ready");
@@ -151,6 +152,7 @@ export function useSessionAccount(
         const error = err instanceof Error ? err : new Error(String(err));
         setError(error);
         setStep("idle");
+        throw error;
       }
     } finally {
       isBusyRef.current = false;
