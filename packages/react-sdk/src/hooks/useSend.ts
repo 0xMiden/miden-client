@@ -9,7 +9,6 @@ import {
   OutputNoteArray,
   TransactionRequestBuilder,
 } from "@miden-sdk/miden-sdk";
-import type { TransactionId } from "@miden-sdk/miden-sdk";
 import type {
   SendOptions,
   TransactionStage,
@@ -145,6 +144,15 @@ export function useSend(): UseSendResult {
         const hasAttachment =
           options.attachment !== undefined && options.attachment !== null;
 
+        if (
+          hasAttachment &&
+          (options.recallHeight != null || options.timelockHeight != null)
+        ) {
+          throw new Error(
+            "recallHeight and timelockHeight are not supported when attachment is provided"
+          );
+        }
+
         const txResult = await runExclusiveSafe(async () => {
           let txRequest;
 
@@ -189,17 +197,16 @@ export function useSend(): UseSendResult {
           client.submitProvenTransaction(provenTransaction, txResult)
         );
 
-        // Save txIdString BEFORE applyTransaction, which consumes the WASM
+        // Save txId hex BEFORE applyTransaction, which consumes the WASM
         // pointer inside txResult (and any child objects like TransactionId).
+        const txIdHex = txResult.id().toHex();
         const txIdString = txResult.id().toString();
 
-        // For private notes we need to wait for commit before sending the
-        // note via the transport.
+        // For private notes, extract the full note BEFORE applyTransaction
+        // consumes the WASM pointers.
         let fullNote: Note | null = null;
-        let txIdForWait: TransactionId | undefined;
         if (noteType === NoteType.Private) {
           fullNote = extractFullNote(txResult);
-          txIdForWait = txResult.id();
         }
 
         await runExclusiveSafe(() =>
@@ -207,14 +214,14 @@ export function useSend(): UseSendResult {
         );
 
         if (noteType === NoteType.Private) {
-          if (!fullNote || !txIdForWait) {
+          if (!fullNote) {
             throw new Error("Missing full note for private send");
           }
 
           await waitForTransactionCommit(
             client as unknown as ClientWithTransactions,
             runExclusiveSafe,
-            txIdForWait
+            txIdHex
           );
 
           // Create a fresh AccountId — the original toAccountId may have been

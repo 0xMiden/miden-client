@@ -35,6 +35,8 @@ describe("waitForTransactionCommit", () => {
   // Uses real timers with very short delays to avoid fake-timer / Date.now()
   // interaction issues that cause unhandled rejection warnings.
 
+  const TX_HEX = "0xtx123";
+
   const createMockClient = (
     statusSequence: Array<"pending" | "committed" | "discarded"> = ["committed"]
   ) => {
@@ -46,7 +48,7 @@ describe("waitForTransactionCommit", () => {
         callIndex++;
         return Promise.resolve([
           {
-            id: vi.fn(() => ({ toHex: vi.fn(() => "0xtx") })),
+            id: vi.fn(() => ({ toHex: vi.fn(() => TX_HEX) })),
             transactionStatus: vi.fn(() => ({
               isPending: vi.fn(() => status === "pending"),
               isCommitted: vi.fn(() => status === "committed"),
@@ -60,15 +62,13 @@ describe("waitForTransactionCommit", () => {
 
   const mockRunExclusive = async <T>(fn: () => Promise<T>): Promise<T> => fn();
 
-  const mockTxId = { toString: () => "0xtx123" } as never;
-
   it("should resolve when transaction is committed on first check", async () => {
     const client = createMockClient(["committed"]);
 
     await waitForTransactionCommit(
       client as never,
       mockRunExclusive,
-      mockTxId,
+      TX_HEX,
       5000,
       10
     );
@@ -83,7 +83,7 @@ describe("waitForTransactionCommit", () => {
     await waitForTransactionCommit(
       client as never,
       mockRunExclusive,
-      mockTxId,
+      TX_HEX,
       5000,
       10
     );
@@ -99,7 +99,7 @@ describe("waitForTransactionCommit", () => {
       waitForTransactionCommit(
         client as never,
         mockRunExclusive,
-        mockTxId,
+        TX_HEX,
         5000,
         10
       )
@@ -107,7 +107,6 @@ describe("waitForTransactionCommit", () => {
   });
 
   it("should throw on timeout", async () => {
-    // Always returns pending — will eventually timeout
     const client = createMockClient([
       "pending",
       "pending",
@@ -125,15 +124,29 @@ describe("waitForTransactionCommit", () => {
       waitForTransactionCommit(
         client as never,
         mockRunExclusive,
-        mockTxId,
-        100, // 100ms timeout
-        10 // 10ms delay
+        TX_HEX,
+        100,
+        10
       )
     ).rejects.toThrow("Timeout waiting for transaction commit");
   });
 
+  it("should match transaction by hex regardless of case/prefix", async () => {
+    const client = createMockClient(["committed"]);
+
+    // Pass uppercase hex without 0x prefix — should still match "0xtx123"
+    await waitForTransactionCommit(
+      client as never,
+      mockRunExclusive,
+      "TX123",
+      5000,
+      10
+    );
+
+    expect(client.getTransactions).toHaveBeenCalledTimes(1);
+  });
+
   it("should use wall-clock time including async operation duration", async () => {
-    // syncState takes 30ms each call (simulated via real delay)
     const client = {
       syncState: vi
         .fn()
@@ -142,7 +155,7 @@ describe("waitForTransactionCommit", () => {
         ),
       getTransactions: vi.fn().mockResolvedValue([
         {
-          id: vi.fn(() => ({ toHex: vi.fn(() => "0xtx") })),
+          id: vi.fn(() => ({ toHex: vi.fn(() => TX_HEX) })),
           transactionStatus: vi.fn(() => ({
             isPending: vi.fn(() => true),
             isCommitted: vi.fn(() => false),
@@ -156,9 +169,9 @@ describe("waitForTransactionCommit", () => {
       waitForTransactionCommit(
         client as never,
         mockRunExclusive,
-        mockTxId,
-        150, // 150ms total timeout
-        10 // 10ms delay between polls
+        TX_HEX,
+        150,
+        10
       )
     ).rejects.toThrow("Timeout waiting for transaction commit");
 

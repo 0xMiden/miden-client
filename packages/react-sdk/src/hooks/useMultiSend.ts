@@ -160,9 +160,10 @@ export function useMultiSend(): UseMultiSendResult {
           client.submitProvenTransaction(provenTransaction, txResult)
         );
 
-        // Save txId BEFORE applyTransaction, which consumes the WASM pointer
-        const txId = txResult.id();
-        const txIdString = txId.toString();
+        // Save txId hex/string BEFORE applyTransaction, which consumes the
+        // WASM pointer inside txResult (and any child objects).
+        const txIdHex = txResult.id().toHex();
+        const txIdString = txResult.id().toString();
 
         await runExclusiveSafe(() =>
           client.applyTransaction(txResult, submissionHeight)
@@ -174,7 +175,7 @@ export function useMultiSend(): UseMultiSendResult {
           await waitForTransactionCommit(
             client as unknown as ClientWithTransactions,
             runExclusiveSafe,
-            txId
+            txIdHex
           );
 
           for (const output of outputs) {

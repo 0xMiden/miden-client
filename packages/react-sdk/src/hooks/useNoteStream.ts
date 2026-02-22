@@ -56,7 +56,6 @@ export function useNoteStream(
   const noteFirstSeen = useNoteFirstSeenStore();
   const { lastSyncTime } = useSyncStateStore();
   const setNotesIfChanged = useMidenStore((state) => state.setNotesIfChanged);
-  const setLoadingNotes = useMidenStore((state) => state.setLoadingNotes);
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
@@ -93,16 +92,8 @@ export function useNoteStream(
       setError(err instanceof Error ? err : new Error(String(err)));
     } finally {
       setIsLoading(false);
-      setLoadingNotes(false);
     }
-  }, [
-    client,
-    isReady,
-    runExclusiveSafe,
-    status,
-    setNotesIfChanged,
-    setLoadingNotes,
-  ]);
+  }, [client, isReady, runExclusiveSafe, status, setNotesIfChanged]);
 
   // Fetch on mount and after each sync
   useEffect(() => {

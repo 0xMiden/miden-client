@@ -1,5 +1,4 @@
 import { NoteFilterTypes, TransactionFilter } from "@miden-sdk/miden-sdk";
-import type { TransactionId } from "@miden-sdk/miden-sdk";
 
 /**
  * Map a status string to the corresponding NoteFilterTypes enum value.
@@ -40,20 +39,28 @@ type ClientWithTransactions = {
 /**
  * Poll until a transaction is committed or discarded.
  * Shared between useSend and useMultiSend.
+ *
+ * Accepts a hex string rather than a TransactionId WASM object because
+ * applyTransaction may invalidate all child WASM pointers (including
+ * TransactionId). Using a plain string avoids use-after-free.
  */
 export async function waitForTransactionCommit(
   client: ClientWithTransactions,
   runExclusiveSafe: <T>(fn: () => Promise<T>) => Promise<T>,
-  txId: TransactionId,
+  txIdHex: string,
   maxWaitMs = 10_000,
   delayMs = 1_000
 ) {
   const deadline = Date.now() + maxWaitMs;
+  const targetHex = normalizeHex(txIdHex);
 
   while (Date.now() < deadline) {
     await runExclusiveSafe(() => client.syncState());
-    const [record] = await runExclusiveSafe(() =>
-      client.getTransactions(TransactionFilter.ids([txId]))
+    const records = await runExclusiveSafe(() =>
+      client.getTransactions(TransactionFilter.all())
+    );
+    const record = records.find(
+      (r) => normalizeHex(r.id().toHex()) === targetHex
     );
     if (record) {
       const status = record.transactionStatus();
@@ -68,6 +75,15 @@ export async function waitForTransactionCommit(
   }
 
   throw new Error("Timeout waiting for transaction commit");
+}
+
+function normalizeHex(value: string): string {
+  const trimmed = value.trim();
+  const normalized =
+    trimmed.startsWith("0x") || trimmed.startsWith("0X")
+      ? trimmed
+      : `0x${trimmed}`;
+  return normalized.toLowerCase();
 }
 
 export type { ClientWithTransactions };
