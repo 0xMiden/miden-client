@@ -13,7 +13,6 @@ BRANCH=${TRANSPORT_BRANCH:-main}
 
 TRANSPORT_DIR=${TRANSPORT_DIR:-.tmp/miden-note-transport}
 REPO_URL=${REPO_URL:-https://github.com/0xMiden/miden-note-transport}
-RUN_CMD=${TRANSPORT_RUN_CMD:-cargo run --release --locked}
 
 # Shared target directory (important for CI speed: ends up under repo `target/` which is cached)
 TRANSPORT_CARGO_TARGET_DIR=${TRANSPORT_CARGO_TARGET_DIR:-"$REPO_ROOT/target/note-transport"}
@@ -34,12 +33,15 @@ else
 fi
 
 BINARY_PATH="$TRANSPORT_CARGO_TARGET_DIR/release/miden-note-transport"
+BUILD_HASH_FILE="$TRANSPORT_CARGO_TARGET_DIR/.build-hash"
+CURRENT_HASH=$(git -C "$TRANSPORT_DIR" rev-parse HEAD)
 
-if [ -x "$BINARY_PATH" ]; then
-  echo "Note transport binary found, skipping build"
+if [ -x "$BINARY_PATH" ] && [ -f "$BUILD_HASH_FILE" ] && [ "$(cat "$BUILD_HASH_FILE")" = "$CURRENT_HASH" ]; then
+  echo "Note transport binary found (built from $CURRENT_HASH), skipping build"
 else
-  echo "Building note transport service..."
+  echo "Building note transport service (commit $CURRENT_HASH)..."
   ( cd "$TRANSPORT_DIR" && CARGO_TARGET_DIR="$TRANSPORT_CARGO_TARGET_DIR" cargo build --release --locked )
+  echo "$CURRENT_HASH" > "$BUILD_HASH_FILE"
 fi
 
 echo "Starting note transport service in background..."
