@@ -6,10 +6,6 @@ help: ## Show description of all commands
 
 # --- Variables -----------------------------------------------------------------------------------
 
-# Enable file generation in the `src` directory.
-# This is used in the build script of the idxdb-store to build TypeScript artifacts via yarn.
-CODEGEN=CODEGEN=1
-
 FEATURES_CLIENT=--features "std"
 WARNINGS=RUSTDOCFLAGS="-D warnings"
 
