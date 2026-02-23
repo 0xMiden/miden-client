@@ -21,6 +21,7 @@ const mockBuilder = {
   accountType: vi.fn().mockReturnThis(),
   storageMode: vi.fn().mockReturnThis(),
   withBasicWalletComponent: vi.fn().mockReturnThis(),
+  withComponent: vi.fn().mockReturnThis(),
   build: vi.fn(() => mockBuildResult),
 };
 
@@ -244,6 +245,116 @@ describe("initializeSignerAccount", () => {
       await initializeSignerAccount(mockClient, config);
 
       expect(mockClient.newAccount).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("custom components", () => {
+    it("should add custom components via withComponent", async () => {
+      const mockComponent1 = { name: "component1", getProcedures: vi.fn() };
+      const mockComponent2 = { name: "component2", getProcedures: vi.fn() };
+      const config = createMockSignerAccountConfig({
+        customComponents: [mockComponent1, mockComponent2] as any,
+      });
+
+      await initializeSignerAccount(mockClient, config);
+
+      expect(mockBuilder.withComponent).toHaveBeenCalledTimes(2);
+      expect(mockBuilder.withComponent).toHaveBeenCalledWith(mockComponent1);
+      expect(mockBuilder.withComponent).toHaveBeenCalledWith(mockComponent2);
+    });
+
+    it("should add a single custom component", async () => {
+      const mockComponent = { name: "solo-component", getProcedures: vi.fn() };
+      const config = createMockSignerAccountConfig({
+        customComponents: [mockComponent] as any,
+      });
+
+      await initializeSignerAccount(mockClient, config);
+
+      expect(mockBuilder.withComponent).toHaveBeenCalledTimes(1);
+      expect(mockBuilder.withComponent).toHaveBeenCalledWith(mockComponent);
+    });
+
+    it("should not call withComponent when no custom components", async () => {
+      const config = createMockSignerAccountConfig();
+
+      await initializeSignerAccount(mockClient, config);
+
+      expect(mockBuilder.withComponent).not.toHaveBeenCalled();
+    });
+
+    it("should not call withComponent when customComponents is empty", async () => {
+      const config = createMockSignerAccountConfig({
+        customComponents: [] as any,
+      });
+
+      await initializeSignerAccount(mockClient, config);
+
+      expect(mockBuilder.withComponent).not.toHaveBeenCalled();
+    });
+
+    it("should not call withComponent when customComponents is undefined", async () => {
+      const config = createMockSignerAccountConfig({
+        customComponents: undefined,
+      });
+
+      await initializeSignerAccount(mockClient, config);
+
+      expect(mockBuilder.withComponent).not.toHaveBeenCalled();
+    });
+
+    it("should reject invalid custom components", async () => {
+      const config = createMockSignerAccountConfig({
+        customComponents: [{ notAComponent: true }] as any,
+      });
+
+      await expect(initializeSignerAccount(mockClient, config)).rejects.toThrow(
+        "Each entry in customComponents must be an AccountComponent instance"
+      );
+    });
+
+    it("should add custom components after withBasicWalletComponent", async () => {
+      const mockComponent = { name: "custom", getProcedures: vi.fn() };
+      const config = createMockSignerAccountConfig({
+        customComponents: [mockComponent] as any,
+      });
+
+      await initializeSignerAccount(mockClient, config);
+
+      const walletOrder =
+        mockBuilder.withBasicWalletComponent.mock.invocationCallOrder[0];
+      const componentOrder =
+        mockBuilder.withComponent.mock.invocationCallOrder[0];
+      expect(walletOrder).toBeLessThan(componentOrder);
+    });
+
+    it("should call build after adding custom components", async () => {
+      const mockComponent = { name: "custom", getProcedures: vi.fn() };
+      const config = createMockSignerAccountConfig({
+        customComponents: [mockComponent] as any,
+      });
+
+      await initializeSignerAccount(mockClient, config);
+
+      const componentOrder =
+        mockBuilder.withComponent.mock.invocationCallOrder[0];
+      const buildOrder = mockBuilder.build.mock.invocationCallOrder[0];
+      expect(componentOrder).toBeLessThan(buildOrder);
+    });
+
+    it("should still build and create account with custom components", async () => {
+      mockClient.getAccount.mockRejectedValue(new Error("Not found"));
+      const mockComponent = { name: "custom", getProcedures: vi.fn() };
+      const config = createMockSignerAccountConfig({
+        storageMode: { toString: () => "private" } as any,
+        customComponents: [mockComponent] as any,
+      });
+
+      const result = await initializeSignerAccount(mockClient, config);
+
+      expect(mockBuilder.build).toHaveBeenCalled();
+      expect(mockClient.newAccount).toHaveBeenCalledWith(mockAccount, false);
+      expect(result).toBe("0xaccount123");
     });
   });
 
