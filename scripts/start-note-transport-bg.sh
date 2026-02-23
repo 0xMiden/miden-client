@@ -33,11 +33,17 @@ else
   git -C "$TRANSPORT_DIR" reset --hard "origin/$BRANCH"
 fi
 
-echo "Building note transport service..."
-( cd "$TRANSPORT_DIR" && CARGO_TARGET_DIR="$TRANSPORT_CARGO_TARGET_DIR" cargo build --release --locked )
+BINARY_PATH="$TRANSPORT_CARGO_TARGET_DIR/release/miden-note-transport"
+
+if [ -x "$BINARY_PATH" ]; then
+  echo "Note transport binary found, skipping build"
+else
+  echo "Building note transport service..."
+  ( cd "$TRANSPORT_DIR" && CARGO_TARGET_DIR="$TRANSPORT_CARGO_TARGET_DIR" cargo build --release --locked )
+fi
 
 echo "Starting note transport service in background..."
-( cd "$TRANSPORT_DIR" && RUST_LOG=info CARGO_TARGET_DIR="$TRANSPORT_CARGO_TARGET_DIR" $RUN_CMD ) & echo $! > "$PID_FILE"
+RUST_LOG=info "$BINARY_PATH" & echo $! > "$PID_FILE"
 
 sleep 4
 

@@ -34,7 +34,7 @@ jobs:
       - name: Add Rust Cache
         uses: Swatinem/rust-cache@v2
         with:
-          shared-key: rust-build
+          shared-key: rust-release
           prefix-key: ${{ env.RUST_CACHE_KEY }}
           save-if: ${{ github.ref == 'refs/heads/next' }}
       - uses: taiki-e/install-action@v2
@@ -50,7 +50,7 @@ jobs:
       - uses: actions/checkout@v6
       - uses: Swatinem/rust-cache@v2
         with:
-          shared-key: rust-build
+          shared-key: rust-debug
           prefix-key: ${{ env.RUST_CACHE_KEY }}
           save-if: ${{ github.ref == 'refs/heads/next' }}
       - name: Install rust
@@ -73,6 +73,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
+          cache: yarn
+          cache-dependency-path: packages/react-sdk/yarn.lock
       - name: Install dependencies
         run: ./scripts/retry-yarn-install.sh packages/react-sdk
       - name: Run unit tests
@@ -93,6 +95,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
+          cache: yarn
+          cache-dependency-path: packages/react-sdk/yarn.lock
       - name: Install dependencies
         run: ./scripts/retry-yarn-install.sh packages/react-sdk
       - name: Install Playwright browsers
@@ -115,6 +119,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
+          cache: yarn
+          cache-dependency-path: packages/react-sdk/yarn.lock
       - name: Install dependencies
         run: ./scripts/retry-yarn-install.sh packages/react-sdk
       - name: Build React SDK
@@ -133,9 +139,19 @@ jobs:
       - name: Add Rust Cache
         uses: Swatinem/rust-cache@v2
         with:
-          shared-key: rust-integration-tests
+          shared-key: rust-release
           prefix-key: ${{ env.RUST_CACHE_KEY }}
           save-if: ${{ github.ref == 'refs/heads/next' }}
+      - name: Restore node-builder binary
+        uses: actions/cache@v4
+        with:
+          path: target/release/node-builder
+          key: ${{ runner.os }}-node-builder-${{ hashFiles('Cargo.lock') }}
+      - name: Restore note-transport binary
+        uses: actions/cache@v4
+        with:
+          path: target/note-transport/release/miden-note-transport
+          key: ${{ runner.os }}-note-transport-${{ hashFiles('Cargo.lock') }}
       - name: Start test node
         run: make start-node-background
       - name: Start note transport
@@ -164,7 +180,7 @@ jobs:
       - name: Add Rust Cache
         uses: Swatinem/rust-cache@v2
         with:
-          shared-key: rust-build-wasm
+          shared-key: rust-wasm
           prefix-key: ${{ env.RUST_CACHE_KEY }}
           save-if: ${{ github.ref == 'refs/heads/next' }}
 
@@ -172,6 +188,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
+          cache: yarn
+          cache-dependency-path: crates/web-client/yarn.lock
 
       - name: Install dependencies
         run: ./scripts/retry-yarn-install.sh crates/web-client
@@ -240,12 +258,11 @@ jobs:
           node-version: "20"
       - name: Configure setuid sandbox
         run: . ./scripts/configure-sandbox.sh
-      - name: Add Rust Cache
-        uses: Swatinem/rust-cache@v2
+      - name: Restore node-builder binary
+        uses: actions/cache@v4
         with:
-          shared-key: rust-integration-tests
-          prefix-key: ${{ env.RUST_CACHE_KEY }}
-          save-if: ${{ github.ref == 'refs/heads/next' }}
+          path: target/release/node-builder
+          key: ${{ runner.os }}-node-builder-${{ hashFiles('Cargo.lock') }}
       - name: Start test node
         run: make start-node-background
       - name: Run web client tests
@@ -283,9 +300,14 @@ jobs:
       - name: Add Rust Cache
         uses: Swatinem/rust-cache@v2
         with:
-          shared-key: rust-integration-tests
+          shared-key: rust-release
           prefix-key: ${{ env.RUST_CACHE_KEY }}
           save-if: ${{ github.ref == 'refs/heads/next' }}
+      - name: Restore node-builder binary
+        uses: actions/cache@v4
+        with:
+          path: target/release/node-builder
+          key: ${{ runner.os }}-node-builder-${{ hashFiles('Cargo.lock') }}
       - name: Start test node
         run: make start-node-background
       - name: Start prover

@@ -34,7 +34,7 @@ jobs:
       - name: Add Rust Cache
         uses: Swatinem/rust-cache@v2
         with:
-          shared-key: rust-build
+          shared-key: rust-release
           prefix-key: ${{ env.RUST_CACHE_KEY }}
           save-if: ${{ github.ref == 'refs/heads/next' }}
       - name: make - build
@@ -51,7 +51,7 @@ jobs:
       - name: Add Rust Cache
         uses: Swatinem/rust-cache@v2
         with:
-          shared-key: rust-build-wasm
+          shared-key: rust-wasm
           prefix-key: ${{ env.RUST_CACHE_KEY }}
           save-if: ${{ github.ref == 'refs/heads/next' }}
       - name: make - build-wasm

@@ -88,7 +88,7 @@ jobs:
       - name: Add Rust Cache
         uses: Swatinem/rust-cache@v2
         with:
-          shared-key: rust-build
+          shared-key: rust-debug
           prefix-key: ${{ env.RUST_CACHE_KEY }}
           save-if: ${{ github.ref == 'refs/heads/next' }}
       - name: make - clippy
@@ -107,7 +107,7 @@ jobs:
       - name: Add Rust Cache
         uses: Swatinem/rust-cache@v2
         with:
-          shared-key: rust-build-wasm
+          shared-key: rust-wasm
           prefix-key: ${{ env.RUST_CACHE_KEY }}
           save-if: ${{ github.ref == 'refs/heads/next' }}
       - name: make - clippy-wasm
@@ -122,12 +122,12 @@ jobs:
         run: |
           rustup update --no-self-update nightly
           rustup +nightly component add rustfmt
-      - name: Add Rust Cache
-        uses: Swatinem/rust-cache@v2
+      - name: Install Node.js
+        uses: actions/setup-node@v4
         with:
-          shared-key: rust-build
-          prefix-key: ${{ env.RUST_CACHE_KEY }}
-          save-if: ${{ github.ref == 'refs/heads/next' }}
+          node-version: "20"
+          cache: yarn
+          cache-dependency-path: yarn.lock
       - name: Install prettier
         run: yarn install
       - name: make - format-check
@@ -153,7 +153,7 @@ jobs:
       - name: Add Rust Cache
         uses: Swatinem/rust-cache@v2
         with:
-          shared-key: rust-build-wasm
+          shared-key: rust-wasm
           prefix-key: ${{ env.RUST_CACHE_KEY }}
           save-if: ${{ github.ref == 'refs/heads/next' }}
       - name: Install dependencies
@@ -181,7 +181,7 @@ jobs:
       - name: Add Rust Cache
         uses: Swatinem/rust-cache@v2
         with:
-          shared-key: rust-build
+          shared-key: rust-release
           prefix-key: ${{ env.RUST_CACHE_KEY }}
           save-if: ${{ github.ref == 'refs/heads/next' }}
       - name: make - doc
