@@ -274,18 +274,29 @@ impl DataStore for ClientDataStore {
         script_root: Word,
     ) -> impl FutureMaybeSend<Result<Option<NoteScript>, DataStoreError>> {
         let store = self.store.clone();
+        let rpc_api = self.rpc_api.clone();
 
         async move {
+            // Fast path: check the local store first.
             if let Ok(note_script) = store.get_note_script(script_root).await {
-                Ok(Some(note_script))
-            } else {
-                // If no matching note found, return an error
-                // TODO: refactor to make RPC call to `GetNoteScriptByRoot` in case notes are not
-                // found https://github.com/0xMiden/miden-client/issues/1410
-                Err(DataStoreError::other(
-                    format!("Note script with root {script_root} not found",),
-                ))
+                return Ok(Some(note_script));
             }
+
+            // Store miss, fetch from the network via RPC.
+            let note_script =
+                rpc_api.get_note_script_by_root(script_root).await.map_err(|err| {
+                    DataStoreError::other_with_source("failed to fetch note script via RPC", err)
+                })?;
+
+            // Persist for future lookups.
+            if let Err(err) = store.upsert_note_scripts(&[note_script.clone()]).await {
+                tracing::warn!(
+                    %err,
+                    "Failed to persist fetched note script to store"
+                );
+            }
+
+            Ok(Some(note_script))
         }
     }
 }
