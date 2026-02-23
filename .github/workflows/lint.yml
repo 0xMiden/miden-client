@@ -90,7 +90,7 @@ jobs:
         with:
           shared-key: rust-debug
           prefix-key: ${{ env.RUST_CACHE_KEY }}
-          save-if: ${{ github.ref == 'refs/heads/next' }}
+          # save-if: ${{ github.ref == 'refs/heads/next' }}  # TODO: uncomment after testing
       - name: make - clippy
         run: make clippy
 
@@ -109,7 +109,7 @@ jobs:
         with:
           shared-key: rust-wasm
           prefix-key: ${{ env.RUST_CACHE_KEY }}
-          save-if: ${{ github.ref == 'refs/heads/next' }}
+          # save-if: ${{ github.ref == 'refs/heads/next' }}  # TODO: uncomment after testing
       - name: make - clippy-wasm
         run: make clippy-wasm
 
@@ -155,7 +155,7 @@ jobs:
         with:
           shared-key: rust-wasm
           prefix-key: ${{ env.RUST_CACHE_KEY }}
-          save-if: ${{ github.ref == 'refs/heads/next' }}
+          # save-if: ${{ github.ref == 'refs/heads/next' }}  # TODO: uncomment after testing
       - name: Install dependencies
         working-directory: crates/web-client
         run: yarn install --frozen-lockfile
@@ -183,6 +183,6 @@ jobs:
         with:
           shared-key: rust-release
           prefix-key: ${{ env.RUST_CACHE_KEY }}
-          save-if: ${{ github.ref == 'refs/heads/next' }}
+          # save-if: ${{ github.ref == 'refs/heads/next' }}  # TODO: uncomment after testing
       - name: make - doc
         run: make doc
