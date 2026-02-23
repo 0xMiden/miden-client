@@ -85,7 +85,7 @@ export async function initializeSignerAccount(
     for (const component of config.customComponents) {
       if (
         component == null ||
-        typeof (component as AccountComponent).getProcedures !== "function"
+        typeof (component as any).getProcedures !== "function"
       ) {
         throw new Error(
           "Each entry in customComponents must be an AccountComponent instance created via " +
