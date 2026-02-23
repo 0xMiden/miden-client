@@ -109,8 +109,9 @@ impl SqliteStore {
         let assets = query_vault_assets(conn, account_id)?;
         let vault = AssetVault::new(&assets)?;
 
-        let slots =
-            query_storage_slots(conn, account_id, &AccountStorageFilter::All)?.into_values().collect();
+        let slots = query_storage_slots(conn, account_id, &AccountStorageFilter::All)?
+            .into_values()
+            .collect();
 
         let storage = AccountStorage::new(slots)?;
 
