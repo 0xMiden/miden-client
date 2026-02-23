@@ -250,8 +250,8 @@ describe("initializeSignerAccount", () => {
 
   describe("custom components", () => {
     it("should add custom components via withComponent", async () => {
-      const mockComponent1 = { name: "component1" };
-      const mockComponent2 = { name: "component2" };
+      const mockComponent1 = { name: "component1", getProcedures: vi.fn() };
+      const mockComponent2 = { name: "component2", getProcedures: vi.fn() };
       const config = createMockSignerAccountConfig({
         customComponents: [mockComponent1, mockComponent2] as any,
       });
@@ -264,7 +264,7 @@ describe("initializeSignerAccount", () => {
     });
 
     it("should add a single custom component", async () => {
-      const mockComponent = { name: "solo-component" };
+      const mockComponent = { name: "solo-component", getProcedures: vi.fn() };
       const config = createMockSignerAccountConfig({
         customComponents: [mockComponent] as any,
       });
@@ -303,8 +303,18 @@ describe("initializeSignerAccount", () => {
       expect(mockBuilder.withComponent).not.toHaveBeenCalled();
     });
 
+    it("should reject invalid custom components", async () => {
+      const config = createMockSignerAccountConfig({
+        customComponents: [{ notAComponent: true }] as any,
+      });
+
+      await expect(initializeSignerAccount(mockClient, config)).rejects.toThrow(
+        "Each entry in customComponents must be an AccountComponent instance"
+      );
+    });
+
     it("should add custom components after withBasicWalletComponent", async () => {
-      const mockComponent = { name: "custom" };
+      const mockComponent = { name: "custom", getProcedures: vi.fn() };
       const config = createMockSignerAccountConfig({
         customComponents: [mockComponent] as any,
       });
@@ -319,7 +329,7 @@ describe("initializeSignerAccount", () => {
     });
 
     it("should call build after adding custom components", async () => {
-      const mockComponent = { name: "custom" };
+      const mockComponent = { name: "custom", getProcedures: vi.fn() };
       const config = createMockSignerAccountConfig({
         customComponents: [mockComponent] as any,
       });
@@ -334,7 +344,7 @@ describe("initializeSignerAccount", () => {
 
     it("should still build and create account with custom components", async () => {
       mockClient.getAccount.mockRejectedValue(new Error("Not found"));
-      const mockComponent = { name: "custom" };
+      const mockComponent = { name: "custom", getProcedures: vi.fn() };
       const config = createMockSignerAccountConfig({
         storageMode: { toString: () => "private" } as any,
         customComponents: [mockComponent] as any,

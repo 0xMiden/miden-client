@@ -83,6 +83,15 @@ export async function initializeSignerAccount(
   // Add any custom components (e.g. from compiled .masp packages)
   if (config.customComponents?.length) {
     for (const component of config.customComponents) {
+      if (
+        component == null ||
+        typeof (component as AccountComponent).getProcedures !== "function"
+      ) {
+        throw new Error(
+          "Each entry in customComponents must be an AccountComponent instance created via " +
+            "AccountComponent.compile(), AccountComponent.fromPackage(), or AccountComponent.fromLibrary()."
+        );
+      }
       builder = builder.withComponent(component);
     }
   }
