@@ -1,6 +1,7 @@
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
+use miden_client::Word;
 use miden_client::account::AccountId;
 use miden_client::asset::AssetVault;
 use miden_client::note::{BlockNumber, NoteId, NoteTag};
@@ -183,15 +184,8 @@ impl WebStore {
             .map(|tx_record| tx_record.details.final_account_state)
             .collect::<Vec<_>>();
 
-        // Remove the account states that are originated from the discarded transactions
-        self.undo_account_states(&account_states_to_rollback).await?;
-
-        // Update SMT forest for account rollbacks
-        {
-            // Use a separate scope to prevent holding the `MutexGuard` across an await point
-            let mut smt_forest = self.smt_forest.write();
-            smt_forest.pop_roots(account_states_to_rollback.clone());
-        }
+        // Remove the account states and pop the corresponding SMT roots from the forest
+        self.rollback_account_states(&account_states_to_rollback).await?;
 
         let transaction_updates: Vec<_> = transaction_updates
             .committed_transactions()
@@ -228,6 +222,29 @@ impl WebStore {
         };
         let promise = idxdb_apply_state_sync(self.db_id(), state_update);
         await_js_value(promise, "failed to apply state sync").await?;
+
+        Ok(())
+    }
+
+    /// Rolls back account states by removing them from the DB and popping their SMT roots
+    /// (vault roots + storage map roots) from the forest.
+    async fn rollback_account_states(
+        &self,
+        account_commitments: &[Word],
+    ) -> Result<(), StoreError> {
+        // Collect the actual SMT roots before deletion so we pop the correct entries
+        let mut smt_roots_to_pop = Vec::new();
+        for commitment in account_commitments {
+            if let Some(header) = self.get_account_header_by_commitment(*commitment).await? {
+                let roots = self.get_smt_roots_for_account_header(&header).await?;
+                smt_roots_to_pop.extend(roots);
+            }
+        }
+
+        self.undo_account_states(account_commitments).await?;
+
+        let mut smt_forest = self.smt_forest.write();
+        smt_forest.pop_roots(smt_roots_to_pop);
 
         Ok(())
     }

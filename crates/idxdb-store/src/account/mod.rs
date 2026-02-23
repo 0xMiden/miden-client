@@ -29,6 +29,7 @@ use miden_client::asset::{
     StorageSlotContent,
     StorageSlotHeader,
 };
+use miden_client::crypto::MerkleError;
 use miden_client::store::{
     AccountRecord,
     AccountRecordData,
@@ -481,7 +482,7 @@ impl WebStore {
     ///
     /// This is used to identify which roots should be popped from the SMT forest when
     /// an account is updated, to prevent memory leaks.
-    async fn get_smt_roots_for_account_header(
+    pub(crate) async fn get_smt_roots_for_account_header(
         &self,
         header: &AccountHeader,
     ) -> Result<Vec<Word>, StoreError> {
@@ -544,7 +545,7 @@ impl WebStore {
 
         match smt_forest.get_asset_and_witness(account_header.vault_root(), vault_key_word) {
             Ok(result) => Ok(Some(result)),
-            Err(StoreError::MerkleStoreError(_)) => Ok(None),
+            Err(StoreError::MerkleStoreError(MerkleError::UntrackedKey(_))) => Ok(None),
             Err(e) => Err(e),
         }
     }
