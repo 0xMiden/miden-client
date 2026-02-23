@@ -65,8 +65,8 @@ use models::{
 
 pub(crate) mod utils;
 use utils::{
+    apply_full_account_state,
     parse_account_record_idxdb_object,
-    update_account,
     upsert_account_asset_vault,
     upsert_account_code,
     upsert_account_record,
@@ -384,7 +384,7 @@ impl WebStore {
             return Err(StoreError::AccountDataNotFound(new_account_state.id()));
         }
 
-        update_account(self.db_id(), new_account_state)
+        apply_full_account_state(self.db_id(), new_account_state)
             .await
             .map_err(|_| StoreError::DatabaseError("failed to update account".to_string()))
     }

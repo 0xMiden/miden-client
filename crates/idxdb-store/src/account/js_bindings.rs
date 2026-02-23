@@ -122,24 +122,39 @@ extern "C" {
     pub fn idxdb_get_foreign_account_code(db_id: &str, account_ids: Vec<String>)
     -> js_sys::Promise;
 
-    // DELTA WRITES
+    // TRANSACTIONAL WRITES
     // --------------------------------------------------------------------------------------------
 
-    #[wasm_bindgen(js_name = applyStorageDelta)]
-    pub fn idxdb_apply_storage_delta(
+    #[wasm_bindgen(js_name = applyTransactionDelta)]
+    pub fn idxdb_apply_transaction_delta(
         db_id: &str,
         account_id: String,
         nonce: String,
         updated_slots: Vec<JsStorageSlot>,
         changed_map_entries: Vec<JsStorageMapEntry>,
+        changed_assets: Vec<JsVaultAsset>,
+        code_root: String,
+        storage_root: String,
+        vault_root: String,
+        committed: bool,
+        commitment: String,
+        account_seed: Option<Vec<u8>>,
     ) -> js_sys::Promise;
 
-    #[wasm_bindgen(js_name = applyVaultDelta)]
-    pub fn idxdb_apply_vault_delta(
+    #[wasm_bindgen(js_name = applyFullAccountState)]
+    pub fn idxdb_apply_full_account_state(
         db_id: &str,
         account_id: String,
         nonce: String,
-        changed_assets: Vec<JsVaultAsset>,
+        storage_slots: Vec<JsStorageSlot>,
+        storage_map_entries: Vec<JsStorageMapEntry>,
+        assets: Vec<JsVaultAsset>,
+        code_root: String,
+        storage_root: String,
+        vault_root: String,
+        committed: bool,
+        commitment: String,
+        account_seed: Option<Vec<u8>>,
     ) -> js_sys::Promise;
 
     // UPDATES

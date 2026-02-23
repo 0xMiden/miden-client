@@ -15,12 +15,7 @@ use miden_client::transaction::{
 use miden_client::utils::Deserializable;
 
 use super::WebStore;
-use super::account::utils::{
-    apply_storage_delta,
-    apply_vault_delta,
-    update_account,
-    upsert_account_record,
-};
+use super::account::utils::{apply_full_account_state, apply_transaction_delta};
 use super::note::utils::apply_note_updates_tx;
 use crate::promise::await_js;
 
@@ -113,20 +108,14 @@ impl WebStore {
             account =
                 delta.try_into().expect("casting account from full state delta should not fail");
             // Full-state path: writes all entries and tombstones for removed ones
-            update_account(self.db_id(), &account).await.map_err(|err| {
-                StoreError::DatabaseError(format!("failed to update account: {err:?}"))
+            apply_full_account_state(self.db_id(), &account).await.map_err(|err| {
+                StoreError::DatabaseError(format!("failed to apply full account state: {err:?}"))
             })?;
         } else {
             account.apply_delta(delta)?;
-            // Delta path: write only changed entries
-            apply_storage_delta(self.db_id(), &account, delta).await.map_err(|err| {
-                StoreError::DatabaseError(format!("failed to apply storage delta: {err:?}"))
-            })?;
-            apply_vault_delta(self.db_id(), &account, delta).await.map_err(|err| {
-                StoreError::DatabaseError(format!("failed to apply vault delta: {err:?}"))
-            })?;
-            upsert_account_record(self.db_id(), &account).await.map_err(|err| {
-                StoreError::DatabaseError(format!("failed to upsert account record: {err:?}"))
+            // Delta path: write only changed entries (single Dexie transaction)
+            apply_transaction_delta(self.db_id(), &account, delta).await.map_err(|err| {
+                StoreError::DatabaseError(format!("failed to apply transaction delta: {err:?}"))
             })?;
         }
 

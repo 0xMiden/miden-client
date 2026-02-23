@@ -23,8 +23,8 @@ use super::js_bindings::{
     JsStorageMapEntry,
     JsStorageSlot,
     JsVaultAsset,
-    idxdb_apply_storage_delta,
-    idxdb_apply_vault_delta,
+    idxdb_apply_full_account_state,
+    idxdb_apply_transaction_delta,
     idxdb_upsert_account_code,
     idxdb_upsert_account_record,
     idxdb_upsert_account_storage,
@@ -180,10 +180,9 @@ pub fn parse_account_address_idxdb_object(
     Ok((address, native_account_id))
 }
 
-/// Writes only the changed storage entries (from the delta) to both latest and historical tables.
-/// Value slots are upserted directly. Map entries with `EMPTY_WORD` values are treated as removals
-/// (empty-string sentinel for the JS side).
-pub async fn apply_storage_delta(
+/// Applies a transaction's account delta atomically in a single Dexie transaction.
+/// Combines storage delta + vault delta + account record upsert.
+pub async fn apply_transaction_delta(
     db_id: &str,
     account: &Account,
     delta: &AccountDelta,
@@ -228,31 +227,9 @@ pub async fn apply_storage_delta(
         }
     }
 
-    JsFuture::from(idxdb_apply_storage_delta(
-        db_id,
-        account_id_str,
-        nonce_str,
-        updated_slots,
-        changed_map_entries,
-    ))
-    .await?;
-
-    Ok(())
-}
-
-/// Writes only the changed vault assets (from the delta) to both latest and historical tables.
-/// Assets removed from the vault use an empty-string sentinel for the JS side.
-pub async fn apply_vault_delta(
-    db_id: &str,
-    account: &Account,
-    delta: &AccountDelta,
-) -> Result<(), JsValue> {
-    let account_id_str = account.id().to_string();
-    let nonce_str = account.nonce().to_string();
-
+    // Build vault delta
     let mut changed_assets = Vec::new();
 
-    // Process fungible asset changes
     for (faucet_id, _amount_delta) in delta.vault().fungible().iter() {
         let balance = account
             .vault()
@@ -260,14 +237,10 @@ pub async fn apply_vault_delta(
             .expect("faucet_id from delta should be valid");
 
         if balance > 0 {
-            // Asset still exists in the final state — write its current value
             let asset = FungibleAsset::new(*faucet_id, balance)
                 .expect("balance from vault should be valid");
             changed_assets.push(JsVaultAsset::from_asset(&Asset::Fungible(asset)));
         } else {
-            // Asset was removed — construct a removal sentinel
-            // We need vault_key and faucet_id_prefix for the tombstone; create a dummy asset
-            // with amount 1 just to derive these identifiers.
             let dummy =
                 FungibleAsset::new(*faucet_id, 1).expect("faucet_id from delta should be valid");
             changed_assets.push(JsVaultAsset {
@@ -278,7 +251,6 @@ pub async fn apply_vault_delta(
         }
     }
 
-    // Process non-fungible asset changes
     for (nft, action) in delta.vault().non_fungible().iter() {
         use miden_client::asset::NonFungibleDeltaAction;
         match action {
@@ -295,16 +267,76 @@ pub async fn apply_vault_delta(
         }
     }
 
-    JsFuture::from(idxdb_apply_vault_delta(db_id, account_id_str, nonce_str, changed_assets))
-        .await?;
+    // Account record fields
+    let code_root = account.code().commitment().to_string();
+    let storage_root = account.storage().to_commitment().to_string();
+    let vault_root = account.vault().root().to_string();
+    let committed = account.is_public();
+    let commitment = account.commitment().to_string();
+    let account_seed = account.seed().map(|seed| seed.to_bytes());
+
+    JsFuture::from(idxdb_apply_transaction_delta(
+        db_id,
+        account_id_str,
+        nonce_str,
+        updated_slots,
+        changed_map_entries,
+        changed_assets,
+        code_root,
+        storage_root,
+        vault_root,
+        committed,
+        commitment,
+        account_seed,
+    ))
+    .await?;
 
     Ok(())
 }
 
-pub async fn update_account(db_id: &str, new_account_state: &Account) -> Result<(), JsValue> {
-    let account_id = &new_account_state.id();
-    let nonce = new_account_state.nonce().as_int();
-    upsert_account_storage(db_id, account_id, nonce, new_account_state.storage()).await?;
-    upsert_account_asset_vault(db_id, account_id, nonce, new_account_state.vault()).await?;
-    upsert_account_record(db_id, new_account_state).await
+/// Writes the full account state atomically in a single Dexie transaction.
+/// Combines storage upsert + map entries upsert + vault assets upsert + account record upsert.
+pub async fn apply_full_account_state(db_id: &str, account: &Account) -> Result<(), JsValue> {
+    let account_id_str = account.id().to_string();
+    let nonce_str = account.nonce().to_string();
+
+    // Build storage slots and map entries
+    let mut slots = vec![];
+    let mut maps = vec![];
+    for slot in account.storage().slots() {
+        slots.push(JsStorageSlot::from_slot(slot));
+        if let StorageSlotContent::Map(map) = slot.content() {
+            maps.extend(JsStorageMapEntry::from_map(map, slot.name().as_str()));
+        }
+    }
+
+    // Build vault assets
+    let js_assets: Vec<JsVaultAsset> =
+        account.vault().assets().map(|asset| JsVaultAsset::from_asset(&asset)).collect();
+
+    // Account record fields
+    let code_root = account.code().commitment().to_string();
+    let storage_root = account.storage().to_commitment().to_string();
+    let vault_root = account.vault().root().to_string();
+    let committed = account.is_public();
+    let commitment = account.commitment().to_string();
+    let account_seed = account.seed().map(|seed| seed.to_bytes());
+
+    JsFuture::from(idxdb_apply_full_account_state(
+        db_id,
+        account_id_str,
+        nonce_str,
+        slots,
+        maps,
+        js_assets,
+        code_root,
+        storage_root,
+        vault_root,
+        committed,
+        commitment,
+        account_seed,
+    ))
+    .await?;
+
+    Ok(())
 }
