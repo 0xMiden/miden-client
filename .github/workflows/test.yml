@@ -73,8 +73,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-          cache: yarn
-          cache-dependency-path: packages/react-sdk/yarn.lock
       - name: Install dependencies
         run: ./scripts/retry-yarn-install.sh packages/react-sdk
       - name: Run unit tests
@@ -95,8 +93,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-          cache: yarn
-          cache-dependency-path: packages/react-sdk/yarn.lock
       - name: Install dependencies
         run: ./scripts/retry-yarn-install.sh packages/react-sdk
       - name: Install Playwright browsers
@@ -119,8 +115,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-          cache: yarn
-          cache-dependency-path: packages/react-sdk/yarn.lock
       - name: Install dependencies
         run: ./scripts/retry-yarn-install.sh packages/react-sdk
       - name: Build React SDK
@@ -188,8 +182,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-          cache: yarn
-          cache-dependency-path: crates/web-client/yarn.lock
 
       - name: Install dependencies
         run: ./scripts/retry-yarn-install.sh crates/web-client

@@ -122,12 +122,6 @@ jobs:
         run: |
           rustup update --no-self-update nightly
           rustup +nightly component add rustfmt
-      - name: Install Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: yarn
-          cache-dependency-path: yarn.lock
       - name: Install prettier
         run: yarn install
       - name: make - format-check
@@ -142,10 +136,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: yarn
-          cache-dependency-path: |
-            crates/web-client/yarn.lock
-            crates/idxdb-store/src/yarn.lock
       - name: Install Rust with wasm target
         run: |
           rustup update --no-self-update
