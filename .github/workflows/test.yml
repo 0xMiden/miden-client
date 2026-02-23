@@ -139,7 +139,7 @@ jobs:
       - name: Restore node-builder binary
         uses: actions/cache@v4
         with:
-          path: target/release/node-builder
+          path: target/release/testing-node-builder
           key: ${{ runner.os }}-node-builder-${{ hashFiles('Cargo.lock') }}
       - name: Restore note-transport binary
         uses: actions/cache@v4
@@ -257,7 +257,7 @@ jobs:
       - name: Restore node-builder binary
         uses: actions/cache@v4
         with:
-          path: target/release/node-builder
+          path: target/release/testing-node-builder
           key: ${{ runner.os }}-node-builder-${{ hashFiles('Cargo.lock') }}
       - name: Start test node
         run: make start-node-background
@@ -302,7 +302,7 @@ jobs:
       - name: Restore node-builder binary
         uses: actions/cache@v4
         with:
-          path: target/release/node-builder
+          path: target/release/testing-node-builder
           key: ${{ runner.os }}-node-builder-${{ hashFiles('Cargo.lock') }}
       - name: Start test node
         run: make start-node-background

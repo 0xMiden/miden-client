@@ -3,16 +3,17 @@
 # Starts the binary in the background and checks that it has not exited
 
 if [ -z "$1" ]; then
-    echo "Usage: $0 <package-name>"
+    echo "Usage: $0 <package-name> [binary-name]"
     exit 1
 fi;
 
 PACKAGE_NAME="$1"
+BINARY_NAME="${2:-$PACKAGE_NAME}"
 
 # Resolve the workspace target directory (handles being called from subcrates)
 TARGET_DIR=$(cargo metadata --format-version 1 --no-deps 2>/dev/null | grep -o '"target_directory":"[^"]*"' | head -1 | cut -d'"' -f4)
 TARGET_DIR="${TARGET_DIR:-target}"
-BINARY_PATH="$TARGET_DIR/release/$PACKAGE_NAME"
+BINARY_PATH="$TARGET_DIR/release/$BINARY_NAME"
 
 if [ -x "$BINARY_PATH" ]; then
     echo "$PACKAGE_NAME binary found, skipping build"
