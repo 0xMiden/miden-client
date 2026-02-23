@@ -186,6 +186,8 @@ pub async fn test_counter_contract_ntx(client_config: ClientConfig) -> Result<()
 
     execute_tx_and_sync(&mut client, native_account.id(), tx_request).await?;
 
+    wait_for_blocks(&mut client, 2).await;
+
     let a = client
         .test_rpc_api()
         .get_account_details(network_account.id())
