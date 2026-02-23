@@ -11,8 +11,8 @@
 * Changed the `StateSync::sync_state()` to take a reference of the MMR ([#1764](https://github.com/0xMiden/miden-client/pull/1764)).
 * Remove unnecessary clones of `NoteInclusionProof` and `NoteMetadata` in note import and sync paths ([#1787](https://github.com/0xMiden/miden-client/pull/1787)).
 * [FEATURE][web] WebClient now automatically syncs state before account creation when the client has never been synced, preventing a slow full-chain scan on the next sync (#1704).
-* Added `NoteScreener` constructor via `Client::note_screener()` and improved note consumability checks with batch note screening support ([#1803](https://github.com/0xMiden/miden-client/pull/1803)).
-* [FEATURE][web] Added `getAccountProof` method to the web client's `RpcClient`, allowing lightweight retrieval of account header, storage slot values, and code via a single RPC call ([#1794](https://github.com/0xMiden/miden-client/pull/1794)).
+* Added `NoteScreener` constructor via `Client::note_screener()` and improved note consumability checks with batch note screening support ([#1803](https://github.com/0xMiden/miden-client/pull/1803), [#1814](https://github.com/0xMiden/miden-client/pull/1814)).
+* [FEATURE][web] Added `getAccountProof` method to the web client's `RpcClient`, allowing lightweight retrieval of account header, storage slot values, and code via a single RPC call ([#1794](https://github.com/0xMiden/miden-client/pull/1794), [#1814](https://github.com/0xMiden/miden-client/pull/1814)).
 * Added `getAccountByKeyCommitment` method to `WebClient` for retrieving accounts by public key commitment ([#1729](https://github.com/0xMiden/miden-client/pull/1729)).
 
 ### Changes
@@ -22,6 +22,7 @@
 * Refactored integration tests binary with subprocess-per-test execution; added automatic retry of failed tests (`--retry-count`), captured stdout/stderr per test, and tracing support via `RUST_LOG` ([#1743](https://github.com/0xMiden/miden-client/pull/1743)).
 * Added implementation for the `get_public_key` method on the `FilesystemKeystore` and `WebKeystore` ([#1731](https://github.com/0xMiden/miden-client/pull/1731)).
 * [BREAKING] Made the nullifiers sync optional on the `StateSync` component ([#1756](https://github.com/0xMiden/miden-client/pull/1756)).
+* [BREAKING] Changed `NodeRpcClient::get_account_proof` to take `AccountId` and `AccountStorageRequirements` separately instead of `ForeignAccount`, decoupling the RPC trait from the transaction-specific type ([#1814](https://github.com/0xMiden/miden-client/pull/1814)).
 
 ## 0.13.1 (TBD)
 
