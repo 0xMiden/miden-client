@@ -4,11 +4,7 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use miden_protocol::account::{
-    Account,
-    AccountId,
-    PartialAccount,
-    StorageSlot,
-    StorageSlotContent,
+    Account, AccountId, PartialAccount, StorageSlot, StorageSlotContent,
 };
 use miden_protocol::asset::{AssetVaultKey, AssetWitness};
 use miden_protocol::block::{BlockHeader, BlockNumber};
@@ -21,10 +17,10 @@ use miden_protocol::{MastForest, Word, ZERO};
 use miden_tx::{DataStore, DataStoreError, MastForestStore, TransactionMastStore};
 
 use super::{AccountStorageFilter, PartialBlockchainFilter, Store};
+use crate::rpc::NodeRpcClient;
 use crate::rpc::domain::account::AccountStorageRequirements;
-use crate::rpc::{AccountStateAt, NodeRpcClient};
 use crate::store::StoreError;
-use crate::transaction::{ForeignAccount, account_proof_into_inputs};
+use crate::transaction::{ForeignAccount, fetch_public_account_inputs};
 use crate::utils::RwLock;
 
 // DATA STORE
@@ -205,6 +201,10 @@ impl DataStore for ClientDataStore {
         }
     }
 
+    /// Returns the [`AccountInputs`] for the given foreign account.
+    ///
+    /// Inputs can be cached if they have been pre-registered via [`register_foreign_account_inputs`](ClientDataStore::register_foreign_account_inputs), or
+    /// lazy-fetched from the node (public accounts only).
     async fn get_foreign_account_inputs(
         &self,
         foreign_account_id: AccountId,
@@ -218,40 +218,23 @@ impl DataStore for ClientDataStore {
             }
         }
 
-        // Cache miss — try lazy loading via RPC for public accounts.
+        // Cache miss, try lazy loading via RPC for public accounts.
         if !foreign_account_id.is_public() {
             return Err(DataStoreError::AccountNotFound(foreign_account_id));
         }
 
-        // Check whether we already have the code cached in the store to avoid
-        // re-fetching it from the network.
-        let known_account_code = self
-            .store
-            .get_foreign_account_code(alloc::vec![foreign_account_id])
-            .await
-            .map_err(|err| {
-                DataStoreError::other_with_source("failed to query foreign account code cache", err)
-            })?
-            .into_values()
-            .next();
-
         let foreign_account =
             ForeignAccount::Public(foreign_account_id, AccountStorageRequirements::default());
 
-        let (_, account_proof) = self
-            .rpc_api
-            .get_account_proof(
-                foreign_account,
-                AccountStateAt::Block(ref_block),
-                known_account_code,
-            )
-            .await
-            .map_err(|err| {
-                DataStoreError::other_with_source("failed to fetch foreign account via RPC", err)
-            })?;
-
-        let account_inputs = account_proof_into_inputs(account_proof).map_err(|err| {
-            DataStoreError::other_with_source("failed to convert account proof to inputs", err)
+        let account_inputs = fetch_public_account_inputs(
+            self.store.as_ref(),
+            self.rpc_api.as_ref(),
+            foreign_account,
+            ref_block,
+        )
+        .await
+        .map_err(|err| {
+            DataStoreError::other_with_source("failed to lazy-load foreign account", err)
         })?;
 
         // Load the account code into the MAST store so the executor can resolve
@@ -262,7 +245,14 @@ impl DataStore for ClientDataStore {
         let _ = self
             .store
             .upsert_foreign_account_code(foreign_account_id, account_inputs.code().clone())
-            .await;
+            .await
+            .inspect_err(|err| {
+                tracing::warn!(
+                    account_id = %foreign_account_id,
+                    %err,
+                    "Failed to persist foreign account code to store"
+                );
+            });
 
         // Cache the result for subsequent calls within the same transaction.
         self.foreign_account_inputs

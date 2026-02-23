@@ -26,7 +26,7 @@ use crate::note::NoteScreenerError;
 use crate::note_transport::NoteTransportError;
 use crate::rpc::RpcError;
 use crate::store::{NoteRecordError, StoreError};
-use crate::transaction::TransactionRequestError;
+use crate::transaction::{FetchForeignAccountError, TransactionRequestError};
 
 // ACTIONABLE HINTS
 // ================================================================================================
@@ -154,6 +154,16 @@ pub enum ClientError {
 impl From<ClientError> for String {
     fn from(err: ClientError) -> String {
         err.to_string()
+    }
+}
+
+impl From<FetchForeignAccountError> for ClientError {
+    fn from(err: FetchForeignAccountError) -> Self {
+        match err {
+            FetchForeignAccountError::StoreQuery(e) => ClientError::StoreError(e),
+            FetchForeignAccountError::RpcFetch(e) => ClientError::RpcError(e),
+            FetchForeignAccountError::Conversion(e) => ClientError::TransactionRequestError(e),
+        }
     }
 }
 

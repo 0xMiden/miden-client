@@ -4,23 +4,20 @@ use alloc::vec::Vec;
 use core::cmp::Ordering;
 
 use miden_protocol::account::{
-    AccountId,
-    PartialAccount,
-    PartialStorage,
-    PartialStorageMap,
-    StorageMap,
+    AccountId, PartialAccount, PartialStorage, PartialStorageMap, StorageMap,
 };
 use miden_protocol::asset::{AssetVault, PartialVault};
+use miden_protocol::block::BlockNumber;
 use miden_protocol::transaction::AccountInputs;
 use miden_tx::utils::{Deserializable, DeserializationError, Serializable};
+use thiserror::Error;
 
 use super::TransactionRequestError;
 use crate::rpc::domain::account::{
-    AccountDetails,
-    AccountProof,
-    AccountStorageRequirements,
-    StorageMapEntries,
+    AccountDetails, AccountProof, AccountStorageRequirements, StorageMapEntries,
 };
+use crate::rpc::{AccountStateAt, NodeRpcClient, RpcError};
+use crate::store::{Store, StoreError};
 
 // FOREIGN ACCOUNT
 // ================================================================================================
@@ -129,6 +126,48 @@ impl Deserializable for ForeignAccount {
             _ => Err(DeserializationError::InvalidValue("Invalid account type".to_string())),
         }
     }
+}
+
+// FETCH FOREIGN ACCOUNT
+// ================================================================================================
+
+/// Errors that can occur when fetching a public foreign account's inputs via RPC.
+#[derive(Debug, Error)]
+pub(crate) enum FetchForeignAccountError {
+    #[error("failed to query foreign account code cache")]
+    StoreQuery(#[source] StoreError),
+    #[error("failed to fetch foreign account proof via RPC")]
+    RpcFetch(#[source] RpcError),
+    #[error("failed to convert account proof to inputs")]
+    Conversion(#[source] TransactionRequestError),
+}
+
+/// Fetches [`AccountInputs`] for a public foreign account by querying the store's code cache
+/// and then the network via RPC.
+pub(crate) async fn fetch_public_account_inputs(
+    store: &dyn Store,
+    rpc_api: &dyn NodeRpcClient,
+    foreign_account: ForeignAccount,
+    block_num: BlockNumber,
+) -> Result<AccountInputs, FetchForeignAccountError> {
+    let account_id = foreign_account.account_id();
+
+    // Check whether we already have the code cached in the store.
+    let known_account_code = store
+        .get_foreign_account_code(alloc::vec![account_id])
+        .await
+        .map_err(FetchForeignAccountError::StoreQuery)?
+        .into_values()
+        .next();
+
+    // Fetch the account proof from the network.
+    let (_, account_proof) = rpc_api
+        .get_account_proof(foreign_account, AccountStateAt::Block(block_num), known_account_code)
+        .await
+        .map_err(FetchForeignAccountError::RpcFetch)?;
+
+    // Convert the proof into account inputs.
+    account_proof_into_inputs(account_proof).map_err(FetchForeignAccountError::Conversion)
 }
 
 /// Converts an [`AccountProof`] to [`AccountInputs`].

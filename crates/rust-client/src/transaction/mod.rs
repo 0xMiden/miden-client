@@ -84,11 +84,7 @@ use crate::rpc::AccountStateAt;
 use crate::store::data_store::ClientDataStore;
 use crate::store::input_note_states::ExpectedNoteState;
 use crate::store::{
-    InputNoteRecord,
-    InputNoteState,
-    NoteFilter,
-    OutputNoteRecord,
-    TransactionFilter,
+    InputNoteRecord, InputNoteState, NoteFilter, OutputNoteRecord, TransactionFilter,
 };
 use crate::sync::NoteTagRecord;
 
@@ -97,10 +93,7 @@ pub use prover::TransactionProver;
 
 mod record;
 pub use record::{
-    DiscardCause,
-    TransactionDetails,
-    TransactionRecord,
-    TransactionStatus,
+    DiscardCause, TransactionDetails, TransactionRecord, TransactionStatus,
     TransactionStatusVariant,
 };
 
@@ -108,15 +101,10 @@ mod store_update;
 pub use store_update::TransactionStoreUpdate;
 
 mod request;
+pub(crate) use request::{FetchForeignAccountError, fetch_public_account_inputs};
 pub use request::{
-    ForeignAccount,
-    NoteArgs,
-    PaymentNoteDescription,
-    SwapTransactionData,
-    TransactionRequest,
-    TransactionRequestBuilder,
-    TransactionRequestError,
-    TransactionScriptTemplate,
+    ForeignAccount, NoteArgs, PaymentNoteDescription, SwapTransactionData, TransactionRequest,
+    TransactionRequestBuilder, TransactionRequestError, TransactionScriptTemplate,
     account_proof_into_inputs,
 };
 
@@ -124,27 +112,15 @@ mod result;
 // RE-EXPORTS
 // ================================================================================================
 pub use miden_protocol::transaction::{
-    ExecutedTransaction,
-    InputNote,
-    InputNotes,
-    OutputNote,
-    OutputNotes,
-    ProvenTransaction,
-    TransactionArgs,
-    TransactionId,
-    TransactionInputs,
-    TransactionKernel,
-    TransactionScript,
+    ExecutedTransaction, InputNote, InputNotes, OutputNote, OutputNotes, ProvenTransaction,
+    TransactionArgs, TransactionId, TransactionInputs, TransactionKernel, TransactionScript,
     TransactionSummary,
 };
 pub use miden_protocol::vm::{AdviceInputs, AdviceMap};
 pub use miden_standards::account::interface::{AccountComponentInterface, AccountInterface};
 pub use miden_tx::auth::TransactionAuthenticator;
 pub use miden_tx::{
-    DataStoreError,
-    LocalTransactionProver,
-    ProvingOptions,
-    TransactionExecutorError,
+    DataStoreError, LocalTransactionProver, ProvingOptions, TransactionExecutorError,
     TransactionProverError,
 };
 pub use result::TransactionResult;
@@ -686,41 +662,47 @@ where
 
         for foreign_account in foreign_accounts {
             let account_id = foreign_account.account_id();
-            let known_account_code = self
-                .store
-                .get_foreign_account_code(vec![account_id])
-                .await?
-                .pop_first()
-                .map(|(_, code)| code);
-
-            let (_, account_proof) = self
-                .rpc_api
-                .get_account_proof(
-                    foreign_account.clone(),
-                    AccountStateAt::Block(block_num),
-                    known_account_code,
+            let foreign_account_inputs = if account_id.is_public() {
+                let inputs = fetch_public_account_inputs(
+                    self.store.as_ref(),
+                    self.rpc_api.as_ref(),
+                    foreign_account,
+                    block_num,
                 )
                 .await?;
-            let foreign_account_inputs = match foreign_account {
-                ForeignAccount::Public(account_id, ..) => {
-                    let foreign_account_inputs: AccountInputs =
-                        account_proof_into_inputs(account_proof)?;
 
-                    // Update our foreign account code cache
-                    self.store
-                        .upsert_foreign_account_code(
-                            account_id,
-                            foreign_account_inputs.code().clone(),
-                        )
-                        .await?;
+                // Persist the code to the local cache.
+                self.store
+                    .upsert_foreign_account_code(account_id, inputs.code().clone())
+                    .await?;
 
-                    foreign_account_inputs
-                },
-                ForeignAccount::Private(partial_account) => {
-                    let (witness, _) = account_proof.into_parts();
+                inputs
+            } else {
+                let partial_account = match &foreign_account {
+                    ForeignAccount::Private(pa) => pa.clone(),
+                    ForeignAccount::Public(..) => {
+                        unreachable!("private account expected for non-public ID")
+                    },
+                };
 
-                    AccountInputs::new(partial_account.clone(), witness)
-                },
+                let known_account_code = self
+                    .store
+                    .get_foreign_account_code(vec![account_id])
+                    .await?
+                    .pop_first()
+                    .map(|(_, code)| code);
+
+                let (_, account_proof) = self
+                    .rpc_api
+                    .get_account_proof(
+                        foreign_account,
+                        AccountStateAt::Block(block_num),
+                        known_account_code,
+                    )
+                    .await?;
+
+                let (witness, _) = account_proof.into_parts();
+                AccountInputs::new(partial_account, witness)
             };
 
             return_foreign_account_inputs.push(foreign_account_inputs);

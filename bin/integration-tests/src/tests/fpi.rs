@@ -258,6 +258,115 @@ pub async fn test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
     Ok(())
 }
 
+/// Tests that foreign accounts are lazily loaded via RPC when not specified upfront
+/// in the `TransactionRequestBuilder`.
+pub async fn test_lazy_fpi_loading(client_config: ClientConfig) -> Result<()> {
+    let (mut client, keystore) = client_config.clone().into_client().await?;
+    wait_for_node(&mut client).await;
+
+    // Create a simple foreign account with a constant-returning procedure.
+    // We use a constant instead of a storage map read because lazy loading fetches with
+    // empty AccountStorageRequirements, so map entries aren't included in the response.
+    let constant_value: [Felt; 4] = [Felt::new(9), Felt::new(12), Felt::new(18), Felt::new(30)];
+
+    let component_code = CodeBuilder::default()
+        .compile_component_code(
+            "miden::testing::fpi_lazy_component",
+            format!(
+                "pub proc get_constant\n    dropw\n    push.{}\nend",
+                Word::from(constant_value)
+            ),
+        )
+        .context("failed to compile lazy FPI component code")?;
+
+    let fpi_component = AccountComponent::new(component_code, vec![])
+        .map_err(|err| anyhow::anyhow!(err))
+        .context("failed to create lazy FPI component")?
+        .with_supports_all_types();
+
+    let proc_root = fpi_component
+        .mast_forest()
+        .procedure_digests()
+        .next()
+        .context("failed to get procedure root from lazy FPI component")?;
+
+    let key_pair = AuthSecretKey::new_falcon512_rpo();
+    let auth_component: AccountComponent =
+        AuthFalcon512Rpo::new(key_pair.public_key().to_commitment()).into();
+
+    let foreign_account = AccountBuilder::new(Default::default())
+        .with_component(fpi_component)
+        .with_auth_component(auth_component)
+        .storage_mode(AccountStorageMode::Public)
+        .build()
+        .context("failed to build lazy FPI foreign account")?;
+
+    let foreign_account_id = foreign_account.id();
+
+    keystore.add_key(&key_pair, foreign_account_id).await?;
+    client.add_account(&foreign_account, false).await?;
+
+    // Deploy the foreign account.
+    let tx_id = client
+        .submit_new_transaction(foreign_account_id, TransactionRequestBuilder::new().build()?)
+        .await?;
+    wait_for_tx(&mut client, tx_id).await?;
+
+    // Build FPI transaction script.
+    let tx_script = format!(
+        "
+        use miden::protocol::tx
+        begin
+            push.{proc_root}
+            push.{account_id_suffix} push.{account_id_prefix}
+            exec.tx::execute_foreign_procedure
+            push.{fpi_value} assert_eqw
+        end
+        ",
+        account_id_prefix = foreign_account_id.prefix().as_u64(),
+        account_id_suffix = foreign_account_id.suffix(),
+        fpi_value = Word::from(constant_value),
+    );
+
+    let tx_script = client.code_builder().compile_tx_script(&tx_script)?;
+    client.sync_state().await?;
+
+    // Wait for blocks so the account is committed on-chain.
+    wait_for_blocks(&mut client, 2).await;
+
+    // Create a new client with a fresh MAST store to ensure no cached data.
+    let (mut client2, keystore2) =
+        ClientConfig::new(client_config.rpc_endpoint, client_config.rpc_timeout_ms)
+            .into_client()
+            .await?;
+    client2.sync_state().await?;
+
+    let (native_account, ..) = insert_new_wallet(
+        &mut client2,
+        AccountStorageMode::Public,
+        &keystore2,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
+
+    wait_for_blocks_no_sync(&mut client2, 2).await;
+
+    // Before the transaction there are no cached foreign accounts.
+    let cached = client2.test_store().get_foreign_account_code(vec![foreign_account_id]).await?;
+    assert!(cached.is_empty());
+
+    // Build request WITHOUT specifying foreign accounts — lazy loading should handle it.
+    let tx_request = TransactionRequestBuilder::new().custom_script(tx_script).build()?;
+
+    let _ = client2.submit_new_transaction(native_account.id(), tx_request).await?;
+
+    // After the transaction the foreign account code should be cached.
+    let cached = client2.test_store().get_foreign_account_code(vec![foreign_account_id]).await?;
+    assert_eq!(cached.len(), 1);
+
+    Ok(())
+}
+
 // HELPERS
 // ================================================================================================
 
