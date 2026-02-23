@@ -133,7 +133,7 @@ jobs:
       - name: Add Rust Cache
         uses: Swatinem/rust-cache@v2
         with:
-          shared-key: rust-build
+          shared-key: rust-integration-tests
           prefix-key: ${{ env.RUST_CACHE_KEY }}
           save-if: ${{ github.ref == 'refs/heads/next' }}
       - name: Start test node
@@ -243,7 +243,7 @@ jobs:
       - name: Add Rust Cache
         uses: Swatinem/rust-cache@v2
         with:
-          shared-key: rust-build
+          shared-key: rust-integration-tests
           prefix-key: ${{ env.RUST_CACHE_KEY }}
           save-if: ${{ github.ref == 'refs/heads/next' }}
       - name: Start test node
@@ -283,7 +283,7 @@ jobs:
       - name: Add Rust Cache
         uses: Swatinem/rust-cache@v2
         with:
-          shared-key: rust-build
+          shared-key: rust-integration-tests
           prefix-key: ${{ env.RUST_CACHE_KEY }}
           save-if: ${{ github.ref == 'refs/heads/next' }}
       - name: Start test node
