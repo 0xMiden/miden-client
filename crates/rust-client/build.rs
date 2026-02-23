@@ -19,6 +19,7 @@ fn main() -> miette::Result<()> {
     // Proto definitions come from build-dependency crates. Cargo automatically re-runs this
     // script when those crates change. This directive opts out of the default behavior of
     // re-running on every source file change.
+    // https://doc.rust-lang.org/cargo/reference/build-scripts.html#rerun-if-changed
     println!("cargo::rerun-if-changed=build.rs");
 
     let out_dir = PathBuf::from(std::env::var("OUT_DIR").into_diagnostic()?);
@@ -143,14 +144,11 @@ fn generate_wrapper(out_dir: &Path, subdir: &str, wrapper_name: &str) -> miette:
 
     let mut wrapper = String::new();
     for mod_name in &mod_names {
-        wrapper.push_str(allow_attr);
-        wrapper.push_str("\npub mod ");
-        wrapper.push_str(mod_name);
-        wrapper.push_str(" { include!(concat!(env!(\"OUT_DIR\"), \"/");
-        wrapper.push_str(subdir);
-        wrapper.push('/');
-        wrapper.push_str(mod_name);
-        wrapper.push_str(".rs\")); }\n");
+        let mod_declaration = format!(
+            "{allow_attr}\n\
+             pub mod {mod_name} {{ include!(concat!(env!(\"OUT_DIR\"), \"/{subdir}/{mod_name}.rs\")); }}\n"
+        );
+        wrapper.push_str(&mod_declaration);
     }
 
     fs::write(out_dir.join(wrapper_name), wrapper).into_diagnostic()?;
