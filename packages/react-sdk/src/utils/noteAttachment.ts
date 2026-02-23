@@ -28,7 +28,7 @@ export function readNoteAttachment(
   note: InputNoteRecord
 ): NoteAttachmentData | null {
   try {
-    const metadata = note.metadata?.() as NoteMetadataRuntime | null;
+    const metadata = note.metadata?.() as unknown as NoteMetadataRuntime | null;
     if (!metadata) return null;
 
     const attachment = metadata.attachment?.();

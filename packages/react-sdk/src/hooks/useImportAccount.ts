@@ -6,7 +6,7 @@ import type {
   Account,
   AccountId as AccountIdType,
   AccountFile as AccountFileType,
-  WasmWebClient as WebClient,
+  WebClient,
 } from "@miden-sdk/miden-sdk";
 import type { ImportAccountOptions } from "../types";
 import { DEFAULTS } from "../types";

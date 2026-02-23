@@ -1,4 +1,4 @@
-import type { WasmWebClient as WebClient } from "@miden-sdk/miden-sdk";
+import type { WebClient } from "@miden-sdk/miden-sdk";
 import type {
   SignerAccountConfig,
   SignerAccountType,
