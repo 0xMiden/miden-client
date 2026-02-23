@@ -31,7 +31,6 @@ mod builder;
 pub use builder::{PaymentNoteDescription, SwapTransactionData, TransactionRequestBuilder};
 
 mod foreign;
-pub(crate) use foreign::{FetchForeignAccountError, fetch_public_account_inputs};
 pub use foreign::{ForeignAccount, account_proof_into_inputs};
 
 use crate::store::InputNoteRecord;

@@ -4,7 +4,11 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use miden_protocol::account::{
-    Account, AccountId, PartialAccount, StorageSlot, StorageSlotContent,
+    Account,
+    AccountId,
+    PartialAccount,
+    StorageSlot,
+    StorageSlotContent,
 };
 use miden_protocol::asset::{AssetVaultKey, AssetWitness};
 use miden_protocol::block::{BlockHeader, BlockNumber};
@@ -203,8 +207,11 @@ impl DataStore for ClientDataStore {
 
     /// Returns the [`AccountInputs`] for the given foreign account.
     ///
-    /// Inputs can be cached if they have been pre-registered via [`register_foreign_account_inputs`](ClientDataStore::register_foreign_account_inputs), or
-    /// lazy-fetched from the node (public accounts only).
+    /// Inputs can be cached if they have been pre-registered via
+    /// [`register_foreign_account_inputs`](ClientDataStore::register_foreign_account_inputs),
+    /// or lazy-fetched from the node for public accounts. The RPC only returns full account
+    /// details for public accounts, so private accounts that are not pre-registered will
+    /// return [`DataStoreError::AccountNotFound`].
     async fn get_foreign_account_inputs(
         &self,
         foreign_account_id: AccountId,
@@ -218,7 +225,7 @@ impl DataStore for ClientDataStore {
             }
         }
 
-        // Cache miss, try lazy loading via RPC for public accounts.
+        // Cache miss, lazy loading is only possible for public accounts.
         if !foreign_account_id.is_public() {
             return Err(DataStoreError::AccountNotFound(foreign_account_id));
         }

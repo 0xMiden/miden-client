@@ -80,11 +80,16 @@ use tracing::info;
 use super::Client;
 use crate::ClientError;
 use crate::note::NoteUpdateTracker;
-use crate::rpc::AccountStateAt;
+use crate::rpc::{AccountStateAt, NodeRpcClient};
 use crate::store::data_store::ClientDataStore;
 use crate::store::input_note_states::ExpectedNoteState;
 use crate::store::{
-    InputNoteRecord, InputNoteState, NoteFilter, OutputNoteRecord, TransactionFilter,
+    InputNoteRecord,
+    InputNoteState,
+    NoteFilter,
+    OutputNoteRecord,
+    Store,
+    TransactionFilter,
 };
 use crate::sync::NoteTagRecord;
 
@@ -93,7 +98,10 @@ pub use prover::TransactionProver;
 
 mod record;
 pub use record::{
-    DiscardCause, TransactionDetails, TransactionRecord, TransactionStatus,
+    DiscardCause,
+    TransactionDetails,
+    TransactionRecord,
+    TransactionStatus,
     TransactionStatusVariant,
 };
 
@@ -101,10 +109,15 @@ mod store_update;
 pub use store_update::TransactionStoreUpdate;
 
 mod request;
-pub(crate) use request::{FetchForeignAccountError, fetch_public_account_inputs};
 pub use request::{
-    ForeignAccount, NoteArgs, PaymentNoteDescription, SwapTransactionData, TransactionRequest,
-    TransactionRequestBuilder, TransactionRequestError, TransactionScriptTemplate,
+    ForeignAccount,
+    NoteArgs,
+    PaymentNoteDescription,
+    SwapTransactionData,
+    TransactionRequest,
+    TransactionRequestBuilder,
+    TransactionRequestError,
+    TransactionScriptTemplate,
     account_proof_into_inputs,
 };
 
@@ -112,15 +125,27 @@ mod result;
 // RE-EXPORTS
 // ================================================================================================
 pub use miden_protocol::transaction::{
-    ExecutedTransaction, InputNote, InputNotes, OutputNote, OutputNotes, ProvenTransaction,
-    TransactionArgs, TransactionId, TransactionInputs, TransactionKernel, TransactionScript,
+    ExecutedTransaction,
+    InputNote,
+    InputNotes,
+    OutputNote,
+    OutputNotes,
+    ProvenTransaction,
+    TransactionArgs,
+    TransactionId,
+    TransactionInputs,
+    TransactionKernel,
+    TransactionScript,
     TransactionSummary,
 };
 pub use miden_protocol::vm::{AdviceInputs, AdviceMap};
 pub use miden_standards::account::interface::{AccountComponentInterface, AccountInterface};
 pub use miden_tx::auth::TransactionAuthenticator;
 pub use miden_tx::{
-    DataStoreError, LocalTransactionProver, ProvingOptions, TransactionExecutorError,
+    DataStoreError,
+    LocalTransactionProver,
+    ProvingOptions,
+    TransactionExecutorError,
     TransactionProverError,
 };
 pub use result::TransactionResult;
@@ -856,4 +881,30 @@ fn validate_executed_transaction(
     }
 
     Ok(())
+}
+
+/// Fetches [`AccountInputs`] for a public foreign account by querying the store's code cache
+/// and then the network via RPC.
+///
+/// This helper does **not** persist the fetched code (callers handle caching differently)
+/// and does **not** load MAST forests (callers manage that based on their context).
+pub(crate) async fn fetch_public_account_inputs(
+    store: &dyn Store,
+    rpc_api: &dyn NodeRpcClient,
+    foreign_account: ForeignAccount,
+    block_num: BlockNumber,
+) -> Result<AccountInputs, ClientError> {
+    let account_id = foreign_account.account_id();
+
+    // Check whether we already have the code cached in the store.
+    let known_account_code =
+        store.get_foreign_account_code(vec![account_id]).await?.into_values().next();
+
+    // Fetch the account proof from the network.
+    let (_, account_proof) = rpc_api
+        .get_account_proof(foreign_account, AccountStateAt::Block(block_num), known_account_code)
+        .await?;
+
+    // Convert the proof into account inputs.
+    Ok(account_proof_into_inputs(account_proof)?)
 }
