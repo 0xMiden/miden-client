@@ -34,6 +34,11 @@ const SYNC_METHODS = new Set([
   "newSwapTransactionRequest",
   "createCodeBuilder",
   "buildSwapTag",
+  "setDebugMode",
+  "usesMockChain",
+  "serializeMockChain",
+  "serializeMockNoteTransportNode",
+  "proveBlock",
 ]);
 
 /**
