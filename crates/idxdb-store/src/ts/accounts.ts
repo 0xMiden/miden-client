@@ -542,20 +542,35 @@ export async function applyTransactionDelta(
 
 export async function applyFullAccountState(
   dbId: string,
-  accountId: string,
-  nonce: string,
-  storageSlots: JsStorageSlot[],
-  storageMapEntries: JsStorageMapEntry[],
-  assets: JsVaultAsset[],
-  codeRoot: string,
-  storageRoot: string,
-  vaultRoot: string,
-  committed: boolean,
-  commitment: string,
-  accountSeed: Uint8Array | undefined
+  accountState: {
+    accountId: string;
+    nonce: string;
+    storageSlots: JsStorageSlot[];
+    storageMapEntries: JsStorageMapEntry[];
+    assets: JsVaultAsset[];
+    codeRoot: string;
+    storageRoot: string;
+    vaultRoot: string;
+    committed: boolean;
+    accountCommitment: string;
+    accountSeed: Uint8Array | undefined;
+  }
 ) {
   try {
     const db = getDatabase(dbId);
+    const {
+      accountId,
+      nonce,
+      storageSlots,
+      storageMapEntries,
+      assets,
+      codeRoot,
+      storageRoot,
+      vaultRoot,
+      committed,
+      accountCommitment,
+      accountSeed,
+    } = accountState;
 
     await db.dexie.transaction(
       "rw",
@@ -590,7 +605,7 @@ export async function applyFullAccountState(
           nonce,
           committed,
           accountSeed,
-          accountCommitment: commitment,
+          accountCommitment,
           locked: false,
         };
         await db.historicalAccountHeaders.put(data as IAccount);

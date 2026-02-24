@@ -33,6 +33,7 @@ use super::js_bindings::{
 };
 use crate::account::js_bindings::idxdb_insert_account_address;
 use crate::account::models::{AccountRecordIdxdbObject, AddressIdxdbObject};
+use crate::sync::JsAccountUpdate;
 
 pub async fn upsert_account_code(db_id: &str, account_code: &AccountCode) -> Result<(), JsValue> {
     let root = account_code.commitment().to_string();
@@ -297,46 +298,9 @@ pub async fn apply_transaction_delta(
 /// Writes the full account state atomically in a single Dexie transaction.
 /// Combines storage upsert + map entries upsert + vault assets upsert + account record upsert.
 pub async fn apply_full_account_state(db_id: &str, account: &Account) -> Result<(), JsValue> {
-    let account_id_str = account.id().to_string();
-    let nonce_str = account.nonce().to_string();
+    let account_state = JsAccountUpdate::from_account(account, account.seed());
 
-    // Build storage slots and map entries
-    let mut slots = vec![];
-    let mut maps = vec![];
-    for slot in account.storage().slots() {
-        slots.push(JsStorageSlot::from_slot(slot));
-        if let StorageSlotContent::Map(map) = slot.content() {
-            maps.extend(JsStorageMapEntry::from_map(map, slot.name().as_str()));
-        }
-    }
-
-    // Build vault assets
-    let js_assets: Vec<JsVaultAsset> =
-        account.vault().assets().map(|asset| JsVaultAsset::from_asset(&asset)).collect();
-
-    // Account record fields
-    let code_root = account.code().commitment().to_string();
-    let storage_root = account.storage().to_commitment().to_string();
-    let vault_root = account.vault().root().to_string();
-    let committed = account.is_public();
-    let commitment = account.commitment().to_string();
-    let account_seed = account.seed().map(|seed| seed.to_bytes());
-
-    JsFuture::from(idxdb_apply_full_account_state(
-        db_id,
-        account_id_str,
-        nonce_str,
-        slots,
-        maps,
-        js_assets,
-        code_root,
-        storage_root,
-        vault_root,
-        committed,
-        commitment,
-        account_seed,
-    ))
-    .await?;
+    JsFuture::from(idxdb_apply_full_account_state(db_id, account_state)).await?;
 
     Ok(())
 }

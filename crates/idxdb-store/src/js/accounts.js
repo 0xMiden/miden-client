@@ -429,9 +429,10 @@ export async function applyTransactionDelta(dbId, accountId, nonce, updatedSlots
         logWebStoreError(error, `Error applying transaction delta`);
     }
 }
-export async function applyFullAccountState(dbId, accountId, nonce, storageSlots, storageMapEntries, assets, codeRoot, storageRoot, vaultRoot, committed, commitment, accountSeed) {
+export async function applyFullAccountState(dbId, accountState) {
     try {
         const db = getDatabase(dbId);
+        const { accountId, nonce, storageSlots, storageMapEntries, assets, codeRoot, storageRoot, vaultRoot, committed, accountCommitment, accountSeed, } = accountState;
         await db.dexie.transaction("rw", [
             db.latestAccountStorages,
             db.historicalAccountStorages,
@@ -456,7 +457,7 @@ export async function applyFullAccountState(dbId, accountId, nonce, storageSlots
                 nonce,
                 committed,
                 accountSeed,
-                accountCommitment: commitment,
+                accountCommitment,
                 locked: false,
             };
             await db.historicalAccountHeaders.put(data);

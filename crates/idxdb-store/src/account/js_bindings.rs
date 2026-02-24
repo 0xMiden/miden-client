@@ -8,6 +8,8 @@ use miden_client::utils::Serializable;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys;
 
+use crate::sync::JsAccountUpdate;
+
 // INDEXED DB BINDINGS
 // ================================================================================================
 
@@ -144,17 +146,7 @@ extern "C" {
     #[wasm_bindgen(js_name = applyFullAccountState)]
     pub fn idxdb_apply_full_account_state(
         db_id: &str,
-        account_id: String,
-        nonce: String,
-        storage_slots: Vec<JsStorageSlot>,
-        storage_map_entries: Vec<JsStorageMapEntry>,
-        assets: Vec<JsVaultAsset>,
-        code_root: String,
-        storage_root: String,
-        vault_root: String,
-        committed: bool,
-        commitment: String,
-        account_seed: Option<Vec<u8>>,
+        account_state: JsAccountUpdate,
     ) -> js_sys::Promise;
 
     // UPDATES

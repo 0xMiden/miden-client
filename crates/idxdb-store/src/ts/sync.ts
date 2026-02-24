@@ -146,7 +146,7 @@ interface JsAccountUpdate {
   storageRoot: string;
   storageSlots: JsStorageSlot[];
   storageMapEntries: JsStorageMapEntry[];
-  assetVaultRoot: string;
+  vaultRoot: string;
   assets: JsVaultAsset[];
   accountId: string;
   codeRoot: string;
@@ -303,7 +303,7 @@ export async function applyStateSync(
               accountUpdate.accountId,
               accountUpdate.codeRoot,
               accountUpdate.storageRoot,
-              accountUpdate.assetVaultRoot,
+              accountUpdate.vaultRoot,
               accountUpdate.nonce,
               accountUpdate.committed,
               accountUpdate.accountCommitment,

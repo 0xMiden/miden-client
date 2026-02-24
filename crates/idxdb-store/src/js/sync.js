@@ -116,7 +116,7 @@ export async function applyStateSync(dbId, stateUpdate) {
                     upsertAccountStorage(dbId, accountUpdate.accountId, accountUpdate.nonce, accountUpdate.storageSlots),
                     upsertStorageMapEntries(dbId, accountUpdate.accountId, accountUpdate.nonce, accountUpdate.storageMapEntries),
                     upsertVaultAssets(dbId, accountUpdate.accountId, accountUpdate.nonce, accountUpdate.assets),
-                    upsertAccountRecord(dbId, accountUpdate.accountId, accountUpdate.codeRoot, accountUpdate.storageRoot, accountUpdate.assetVaultRoot, accountUpdate.nonce, accountUpdate.committed, accountUpdate.accountCommitment, accountUpdate.accountSeed),
+                    upsertAccountRecord(dbId, accountUpdate.accountId, accountUpdate.codeRoot, accountUpdate.storageRoot, accountUpdate.vaultRoot, accountUpdate.nonce, accountUpdate.committed, accountUpdate.accountCommitment, accountUpdate.accountSeed),
                 ];
             })),
             updateSyncHeight(tx, blockNum),
