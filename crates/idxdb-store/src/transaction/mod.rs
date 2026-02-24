@@ -119,6 +119,12 @@ impl WebStore {
             })?;
         }
 
+        // Update SMT forest with the new account state
+        {
+            let mut smt_forest = self.smt_forest.write().expect("smt_forest write lock");
+            smt_forest.insert_account_state(account.vault(), account.storage())?;
+        }
+
         // Updates for notes
         apply_note_updates_tx(self.db_id(), tx_update.note_updates()).await?;
 

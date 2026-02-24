@@ -212,6 +212,14 @@ impl WebStore {
         let promise = idxdb_apply_state_sync(self.db_id(), state_update);
         await_js_value(promise, "failed to apply state sync").await?;
 
+        // Update SMT forest with updated public account states
+        {
+            let mut smt_forest = self.smt_forest.write().expect("smt_forest write lock");
+            for account in account_updates.updated_public_accounts() {
+                smt_forest.insert_account_state(account.vault(), account.storage())?;
+            }
+        }
+
         Ok(())
     }
 }

@@ -368,6 +368,10 @@ impl WebStore {
                 ))
             })?;
 
+        // Update SMT forest with the new account's vault and storage map nodes
+        let mut smt_forest = self.smt_forest.write().expect("smt_forest write lock");
+        smt_forest.insert_account_state(account.vault(), account.storage())?;
+
         Ok(())
     }
 
@@ -386,7 +390,13 @@ impl WebStore {
 
         apply_full_account_state(self.db_id(), new_account_state)
             .await
-            .map_err(|_| StoreError::DatabaseError("failed to update account".to_string()))
+            .map_err(|_| StoreError::DatabaseError("failed to update account".to_string()))?;
+
+        // Update SMT forest with the new account state
+        let mut smt_forest = self.smt_forest.write().expect("smt_forest write lock");
+        smt_forest.insert_account_state(new_account_state.vault(), new_account_state.storage())?;
+
+        Ok(())
     }
 
     pub(crate) async fn get_account_vault(
