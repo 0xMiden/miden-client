@@ -77,7 +77,6 @@
 - [Library](classes/Library.md)
 - [MerklePath](classes/MerklePath.md)
 - [MidenClient](classes/MidenClient.md)
-- [MockWasmWebClient](classes/MockWasmWebClient.md)
 - [NetworkId](classes/NetworkId.md)
 - [Note](classes/Note.md)
 - [NoteAndArgs](classes/NoteAndArgs.md)
@@ -146,7 +145,6 @@
 - [TransactionStatus](classes/TransactionStatus.md)
 - [TransactionStoreUpdate](classes/TransactionStoreUpdate.md)
 - [TransactionSummary](classes/TransactionSummary.md)
-- [WasmWebClient](classes/WasmWebClient.md)
 - [WebClient](classes/WebClient.md)
 - [Word](classes/Word.md)
 
