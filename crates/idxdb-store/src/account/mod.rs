@@ -335,6 +335,31 @@ impl WebStore {
         Ok(assets)
     }
 
+    /// Returns a map from slot name to map root for all Map-type storage slots.
+    /// Only loads slot metadata — does NOT load map entries.
+    pub(crate) async fn get_storage_map_roots(
+        &self,
+        account_id: AccountId,
+    ) -> Result<BTreeMap<StorageSlotName, Word>, StoreError> {
+        let promise = idxdb_get_account_storage(self.db_id(), account_id.to_string());
+        let slots: Vec<AccountStorageIdxdbObject> =
+            await_js(promise, "failed to fetch account storage").await?;
+
+        slots
+            .into_iter()
+            .filter(|s| {
+                StorageSlotType::try_from(s.slot_type).ok() == Some(StorageSlotType::Map)
+            })
+            .map(|s| {
+                let name = StorageSlotName::new(s.slot_name).map_err(|err| {
+                    StoreError::DatabaseError(format!("invalid storage slot name: {err}"))
+                })?;
+                let root = Word::try_from(s.slot_value.as_str())?;
+                Ok((name, root))
+            })
+            .collect()
+    }
+
     pub(crate) async fn insert_account(
         &self,
         account: &Account,

@@ -2,7 +2,7 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
 use miden_client::Word;
-use miden_client::account::{Account, StorageSlotContent};
+use miden_client::account::Account;
 use miden_client::store::{StoreError, TransactionFilter};
 use miden_client::transaction::{
     TransactionDetails,
@@ -15,7 +15,9 @@ use miden_client::transaction::{
 use miden_client::utils::Deserializable;
 
 use super::WebStore;
-use super::account::utils::{apply_full_account_state, apply_transaction_delta};
+use super::account::utils::{
+    apply_full_account_state, apply_transaction_delta, compute_storage_delta, compute_vault_delta,
+};
 use super::note::utils::apply_note_updates_tx;
 use crate::promise::await_js;
 
@@ -87,56 +89,91 @@ impl WebStore {
         &self,
         tx_update: TransactionStoreUpdate,
     ) -> Result<(), StoreError> {
+        let executed_tx = tx_update.executed_transaction();
+
         // Transaction Data
-        insert_proven_transaction_data(
-            self.db_id(),
-            tx_update.executed_transaction(),
-            tx_update.submission_height(),
-        )
-        .await?;
+        insert_proven_transaction_data(self.db_id(), executed_tx, tx_update.submission_height())
+            .await?;
 
-        // Account Data
-        let delta = tx_update.executed_transaction().account_delta();
-        let mut account: Account = self
-            .get_account(delta.id())
-            .await?
-            .ok_or(StoreError::AccountDataNotFound(delta.id()))?
-            .try_into()
-            .map_err(|_| StoreError::AccountDataNotFound(delta.id()))?;
-
-        // Capture old SMT roots before mutating the account
-        let old_vault_root = account.vault().root();
-        let old_map_roots: Vec<Word> = account
-            .storage()
-            .slots()
-            .iter()
-            .filter_map(|slot| match slot.content() {
-                StorageSlotContent::Map(map) => Some(map.root()),
-                StorageSlotContent::Value(_) => None,
-            })
-            .collect();
+        let delta = executed_tx.account_delta();
+        let account_id = executed_tx.account_id();
 
         if delta.is_full_state() {
-            account =
+            // Full-state path: the delta contains the complete account state.
+            let old_roots =
+                self.collect_account_smt_roots(core::iter::once(account_id)).await?;
+
+            let account: Account =
                 delta.try_into().expect("casting account from full state delta should not fail");
-            // Full-state path: writes all entries and tombstones for removed ones
             apply_full_account_state(self.db_id(), &account).await.map_err(|err| {
                 StoreError::DatabaseError(format!("failed to apply full account state: {err:?}"))
             })?;
-        } else {
-            account.apply_delta(delta)?;
-            // Delta path: write only changed entries (single Dexie transaction)
-            apply_transaction_delta(self.db_id(), &account, delta).await.map_err(|err| {
-                StoreError::DatabaseError(format!("failed to apply transaction delta: {err:?}"))
-            })?;
-        }
 
-        // Update SMT forest: insert new state and release old roots
-        {
+            // Update SMT forest: insert new state and release old roots
             let mut smt_forest = self.smt_forest.write().expect("smt_forest write lock");
             smt_forest.insert_account_state(account.vault(), account.storage())?;
-            smt_forest
-                .pop_roots(old_map_roots.into_iter().chain(core::iter::once(old_vault_root)));
+            smt_forest.pop_roots(old_roots);
+        } else {
+            // Delta path: load only targeted data, avoid loading full Account.
+            let (header, status) = self
+                .get_account_header(account_id)
+                .await?
+                .ok_or(StoreError::AccountDataNotFound(account_id))?;
+            let old_vault_root = header.vault_root();
+            let seed = status.seed().copied();
+
+            let old_vault_assets = self.get_vault_assets(account_id).await?;
+            let old_map_roots = self.get_storage_map_roots(account_id).await?;
+
+            let final_header = executed_tx.final_account();
+
+            // Compute storage and vault changes using SMT forest
+            let updated_storage_slots;
+            let updated_assets;
+            let removed_vault_keys;
+            {
+                let mut smt_forest =
+                    self.smt_forest.write().expect("smt_forest write lock");
+
+                // Storage: compute new map roots via SMT forest
+                updated_storage_slots =
+                    compute_storage_delta(&mut smt_forest, &old_map_roots, delta)?;
+
+                // Vault: compute new asset values and update SMT forest
+                let (assets, removed_keys) =
+                    compute_vault_delta(&old_vault_assets, delta)?;
+                let _new_vault_root = smt_forest.update_asset_nodes(
+                    old_vault_root,
+                    assets.iter().copied(),
+                    removed_keys.iter().copied(),
+                )?;
+                updated_assets = assets;
+                removed_vault_keys = removed_keys;
+
+                // Release old SMT trees
+                smt_forest.pop_roots(
+                    old_map_roots
+                        .values()
+                        .copied()
+                        .chain(core::iter::once(old_vault_root)),
+                );
+            }
+
+            // Write to DB atomically
+            apply_transaction_delta(
+                self.db_id(),
+                account_id,
+                final_header,
+                seed,
+                &updated_storage_slots,
+                &updated_assets,
+                &removed_vault_keys,
+                delta,
+            )
+            .await
+            .map_err(|err| {
+                StoreError::DatabaseError(format!("failed to apply transaction delta: {err:?}"))
+            })?;
         }
 
         // Updates for notes

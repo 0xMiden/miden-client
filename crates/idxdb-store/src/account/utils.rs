@@ -1,3 +1,4 @@
+use alloc::collections::BTreeMap;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
@@ -7,13 +8,18 @@ use miden_client::account::{
     AccountDelta,
     AccountHeader,
     AccountId,
+    AccountIdPrefix,
     AccountStorage,
     Address,
+    StorageMap,
     StorageSlotContent,
+    StorageSlotName,
     StorageSlotType,
 };
-use miden_client::asset::{Asset, AssetVault, FungibleAsset};
-use miden_client::store::{AccountStatus, StoreError};
+use miden_client::asset::{
+    Asset, AssetVault, AssetVaultKey, FungibleAsset, NonFungibleDeltaAction,
+};
+use miden_client::store::{AccountSmtForest, AccountStatus, StoreError};
 use miden_client::utils::{Deserializable, Serializable};
 use miden_client::{EMPTY_WORD, Felt, Word};
 use wasm_bindgen::JsValue;
@@ -181,36 +187,123 @@ pub fn parse_account_address_idxdb_object(
     Ok((address, native_account_id))
 }
 
+/// Computes new storage slot values from the delta, using the SMT forest for map root computation.
+///
+/// Value-type slots take their new value directly from the delta.
+/// Map-type slots use the old root + delta entries to compute a new root via the SMT forest.
+pub fn compute_storage_delta(
+    smt_forest: &mut AccountSmtForest,
+    old_map_roots: &BTreeMap<StorageSlotName, Word>,
+    delta: &AccountDelta,
+) -> Result<BTreeMap<StorageSlotName, (Word, StorageSlotType)>, StoreError> {
+    let mut updated_slots: BTreeMap<StorageSlotName, (Word, StorageSlotType)> = delta
+        .storage()
+        .values()
+        .map(|(slot_name, value)| (slot_name.clone(), (*value, StorageSlotType::Value)))
+        .collect();
+
+    let default_map_root = StorageMap::default().root();
+
+    for (slot_name, map_delta) in delta.storage().maps() {
+        let old_root = old_map_roots.get(slot_name).copied().unwrap_or(default_map_root);
+        let entries: Vec<(Word, Word)> =
+            map_delta.entries().iter().map(|(key, value)| ((*key).into(), *value)).collect();
+
+        let new_root = smt_forest.update_storage_map_nodes(old_root, entries.into_iter())?;
+        updated_slots.insert(slot_name.clone(), (new_root, StorageSlotType::Map));
+    }
+
+    Ok(updated_slots)
+}
+
+/// Computes the new vault state from old assets and the vault delta.
+///
+/// Returns (`updated_assets`, `removed_vault_keys`) where:
+/// - `updated_assets` contains assets with their new values (for DB insertion and SMT update)
+/// - `removed_vault_keys` contains vault keys for assets removed from the vault
+pub fn compute_vault_delta(
+    old_vault_assets: &[Asset],
+    delta: &AccountDelta,
+) -> Result<(Vec<Asset>, Vec<AssetVaultKey>), StoreError> {
+    let mut updated_assets = Vec::new();
+    let mut removed_vault_keys = Vec::new();
+
+    // Build lookup map from faucet ID prefix to FungibleAsset
+    let mut fungible_map: BTreeMap<AccountIdPrefix, FungibleAsset> = old_vault_assets
+        .iter()
+        .filter_map(|asset| match asset {
+            Asset::Fungible(fa) => Some((fa.faucet_id_prefix(), *fa)),
+            Asset::NonFungible(_) => None,
+        })
+        .collect();
+
+    // Process fungible deltas
+    for (faucet_id, delta_amount) in delta.vault().fungible().iter() {
+        let delta_asset = FungibleAsset::new(*faucet_id, delta_amount.unsigned_abs())?;
+
+        let asset = match fungible_map.remove(&faucet_id.prefix()) {
+            Some(existing) => {
+                if *delta_amount >= 0 {
+                    existing.add(delta_asset)?
+                } else {
+                    existing.sub(delta_asset)?
+                }
+            },
+            None => delta_asset,
+        };
+
+        if asset.amount() > 0 {
+            updated_assets.push(Asset::Fungible(asset));
+        } else {
+            removed_vault_keys.push(asset.vault_key());
+        }
+    }
+
+    // Process non-fungible deltas
+    for (nft, action) in delta.vault().non_fungible().iter() {
+        match action {
+            NonFungibleDeltaAction::Add => {
+                updated_assets.push(Asset::NonFungible(*nft));
+            },
+            NonFungibleDeltaAction::Remove => {
+                removed_vault_keys.push(nft.vault_key());
+            },
+        }
+    }
+
+    Ok((updated_assets, removed_vault_keys))
+}
+
 /// Applies a transaction's account delta atomically in a single Dexie transaction.
-/// Combines storage delta + vault delta + account record upsert.
+///
+/// Takes pre-computed values (storage roots from SMT forest, vault changes) instead of
+/// the full Account object. This avoids loading account code and full storage map entries.
 pub async fn apply_transaction_delta(
     db_id: &str,
-    account: &Account,
+    account_id: AccountId,
+    final_header: &AccountHeader,
+    account_seed: Option<Word>,
+    updated_storage_slots: &BTreeMap<StorageSlotName, (Word, StorageSlotType)>,
+    updated_assets: &[Asset],
+    removed_vault_keys: &[AssetVaultKey],
     delta: &AccountDelta,
 ) -> Result<(), JsValue> {
-    let account_id_str = account.id().to_string();
-    let nonce_str = account.nonce().to_string();
+    let account_id_str = account_id.to_string();
+    let nonce_str = final_header.nonce().to_string();
 
-    let mut updated_slots = Vec::new();
-    let mut changed_map_entries = Vec::new();
-
-    // Value slots: delta gives (StorageSlotName, Word)
-    for (slot_name, value) in delta.storage().values() {
-        updated_slots.push(JsStorageSlot {
+    // Build updated slot JS objects from pre-computed storage roots
+    let mut js_slots = Vec::new();
+    for (slot_name, (value, slot_type)) in updated_storage_slots {
+        js_slots.push(JsStorageSlot {
             slot_name: slot_name.to_string(),
             slot_value: value.to_hex(),
-            slot_type: StorageSlotType::Value as u8,
+            slot_type: *slot_type as u8,
         });
     }
 
-    // Map slots: delta gives (StorageSlotName, StorageMapDelta)
+    // Build changed map entries from delta
+    let mut changed_map_entries = Vec::new();
     for (slot_name, map_delta) in delta.storage().maps() {
-        // Get the new root value from the final account state for the slot itself
-        if let Some(slot) = account.storage().get(slot_name) {
-            updated_slots.push(JsStorageSlot::from_slot(slot));
-        }
-
-        // Extract changed map entries from the delta
         for (key, value) in map_delta.entries() {
             let value_str = if *value == EMPTY_WORD {
                 // Removal sentinel — the JS side interprets "" as "remove from latest,
@@ -228,59 +321,31 @@ pub async fn apply_transaction_delta(
         }
     }
 
-    // Build vault delta
-    let mut changed_assets = Vec::new();
+    // Build changed assets: updated assets + removal markers
+    let mut changed_assets: Vec<JsVaultAsset> =
+        updated_assets.iter().map(JsVaultAsset::from_asset).collect();
 
-    for (faucet_id, _amount_delta) in delta.vault().fungible().iter() {
-        let balance = account
-            .vault()
-            .get_balance(*faucet_id)
-            .expect("faucet_id from delta should be valid");
-
-        if balance > 0 {
-            let asset = FungibleAsset::new(*faucet_id, balance)
-                .expect("balance from vault should be valid");
-            changed_assets.push(JsVaultAsset::from_asset(&Asset::Fungible(asset)));
-        } else {
-            let dummy =
-                FungibleAsset::new(*faucet_id, 1).expect("faucet_id from delta should be valid");
-            changed_assets.push(JsVaultAsset {
-                vault_key: Word::from(dummy.vault_key()).to_hex(),
-                faucet_id_prefix: dummy.faucet_id_prefix().to_hex(),
-                asset: String::new(),
-            });
-        }
+    for vault_key in removed_vault_keys {
+        changed_assets.push(JsVaultAsset {
+            vault_key: Word::from(*vault_key).to_hex(),
+            faucet_id_prefix: vault_key.faucet_id_prefix().to_hex(),
+            asset: String::new(),
+        });
     }
 
-    for (nft, action) in delta.vault().non_fungible().iter() {
-        use miden_client::asset::NonFungibleDeltaAction;
-        match action {
-            NonFungibleDeltaAction::Add => {
-                changed_assets.push(JsVaultAsset::from_asset(&Asset::NonFungible(*nft)));
-            },
-            NonFungibleDeltaAction::Remove => {
-                changed_assets.push(JsVaultAsset {
-                    vault_key: Word::from(nft.vault_key()).to_hex(),
-                    faucet_id_prefix: nft.faucet_id_prefix().to_hex(),
-                    asset: String::new(),
-                });
-            },
-        }
-    }
-
-    // Account record fields
-    let code_root = account.code().commitment().to_string();
-    let storage_root = account.storage().to_commitment().to_string();
-    let vault_root = account.vault().root().to_string();
-    let committed = account.is_public();
-    let commitment = account.commitment().to_string();
-    let account_seed = account.seed().map(|seed| seed.to_bytes());
+    // Account record fields from final header
+    let code_root = final_header.code_commitment().to_string();
+    let storage_root = final_header.storage_commitment().to_string();
+    let vault_root = final_header.vault_root().to_string();
+    let committed = account_id.is_public();
+    let commitment = final_header.commitment().to_string();
+    let account_seed_bytes = account_seed.map(|seed| seed.to_bytes());
 
     JsFuture::from(idxdb_apply_transaction_delta(
         db_id,
         account_id_str,
         nonce_str,
-        updated_slots,
+        js_slots,
         changed_map_entries,
         changed_assets,
         code_root,
@@ -288,7 +353,7 @@ pub async fn apply_transaction_delta(
         vault_root,
         committed,
         commitment,
-        account_seed,
+        account_seed_bytes,
     ))
     .await?;
 
