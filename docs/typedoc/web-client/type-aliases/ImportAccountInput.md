@@ -6,7 +6,7 @@
 
 # Type Alias: ImportAccountInput
 
-> **ImportAccountInput** = `string` \| \{ `file`: [`AccountFile`](../classes/AccountFile.md); \} \| \{ `type?`: `"MutableWallet"` \| `"ImmutableWallet"`; `auth?`: [`AuthSchemeType`](AuthSchemeType.md); `seed`: `Uint8Array`; \}
+> **ImportAccountInput** = `string` \| \{ `file`: [`AccountFile`](../classes/AccountFile.md); \} \| \{ `auth?`: [`AuthSchemeType`](AuthSchemeType.md); `seed`: `Uint8Array`; `type?`: `"MutableWallet"` \| `"ImmutableWallet"`; \}
 
 Discriminated union for account import.
 
@@ -20,13 +20,7 @@ Discriminated union for account import.
 
 > **file**: [`AccountFile`](../classes/AccountFile.md)
 
-\{ `type?`: `"MutableWallet"` \| `"ImmutableWallet"`; `auth?`: [`AuthSchemeType`](AuthSchemeType.md); `seed`: `Uint8Array`; \}
-
-### type?
-
-> `optional` **type**: `"MutableWallet"` \| `"ImmutableWallet"`
-
-Account type. Defaults to "MutableWallet". Use AccountType enum.
+\{ `auth?`: [`AuthSchemeType`](AuthSchemeType.md); `seed`: `Uint8Array`; `type?`: `"MutableWallet"` \| `"ImmutableWallet"`; \}
 
 ### auth?
 
@@ -35,3 +29,9 @@ Account type. Defaults to "MutableWallet". Use AccountType enum.
 ### seed
 
 > **seed**: `Uint8Array`
+
+### type?
+
+> `optional` **type**: `"MutableWallet"` \| `"ImmutableWallet"`
+
+Account type. Defaults to "MutableWallet". Use AccountType enum.

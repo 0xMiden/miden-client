@@ -8,14 +8,6 @@
 
 ## Properties
 
-### type?
-
-> `optional` **type**: `"MutableWallet"` \| `"ImmutableWallet"`
-
-Account type. Defaults to "MutableWallet". Use AccountType enum.
-
-***
-
 ### auth?
 
 > `optional` **auth**: [`AuthSchemeType`](../type-aliases/AuthSchemeType.md)
@@ -31,3 +23,11 @@ Account type. Defaults to "MutableWallet". Use AccountType enum.
 ### storage?
 
 > `optional` **storage**: `"private"` \| `"public"`
+
+***
+
+### type?
+
+> `optional` **type**: `"MutableWallet"` \| `"ImmutableWallet"`
+
+Account type. Defaults to "MutableWallet". Use AccountType enum.

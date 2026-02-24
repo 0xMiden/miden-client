@@ -24,15 +24,15 @@ Creates a new note from the provided assets, metadata, and recipient.
 
 ##### note\_assets
 
-[`NoteAssets`](NoteAssets.md)
+`NoteAssets`
 
 ##### note\_metadata
 
-[`NoteMetadata`](NoteMetadata.md)
+`NoteMetadata`
 
 ##### note\_recipient
 
-[`NoteRecipient`](NoteRecipient.md)
+`NoteRecipient`
 
 #### Returns
 
@@ -52,13 +52,13 @@ Creates a new note from the provided assets, metadata, and recipient.
 
 ### assets()
 
-> **assets**(): [`NoteAssets`](NoteAssets.md)
+> **assets**(): `NoteAssets`
 
 Returns the assets locked inside the note.
 
 #### Returns
 
-[`NoteAssets`](NoteAssets.md)
+`NoteAssets`
 
 ***
 
@@ -98,13 +98,13 @@ Returns the unique identifier of the note.
 
 ### metadata()
 
-> **metadata**(): [`NoteMetadata`](NoteMetadata.md)
+> **metadata**(): `NoteMetadata`
 
 Returns the public metadata associated with the note.
 
 #### Returns
 
-[`NoteMetadata`](NoteMetadata.md)
+`NoteMetadata`
 
 ***
 
@@ -122,25 +122,25 @@ Returns the note nullifier as a word.
 
 ### recipient()
 
-> **recipient**(): [`NoteRecipient`](NoteRecipient.md)
+> **recipient**(): `NoteRecipient`
 
 Returns the recipient who can consume this note.
 
 #### Returns
 
-[`NoteRecipient`](NoteRecipient.md)
+`NoteRecipient`
 
 ***
 
 ### script()
 
-> **script**(): [`NoteScript`](NoteScript.md)
+> **script**(): `NoteScript`
 
 Returns the script that guards the note.
 
 #### Returns
 
-[`NoteScript`](NoteScript.md)
+`NoteScript`
 
 ***
 
@@ -174,7 +174,7 @@ Builds a P2IDE note that can be reclaimed or timelocked based on block heights.
 
 ##### assets
 
-[`NoteAssets`](NoteAssets.md)
+`NoteAssets`
 
 ##### reclaim\_height
 
@@ -186,11 +186,11 @@ Builds a P2IDE note that can be reclaimed or timelocked based on block heights.
 
 ##### note\_type
 
-[`NoteType`](../enumerations/NoteType.md)
+`NoteType`
 
 ##### attachment
 
-[`NoteAttachment`](NoteAttachment.md)
+`NoteAttachment`
 
 #### Returns
 
@@ -216,15 +216,15 @@ Builds a standard P2ID note that targets the specified account.
 
 ##### assets
 
-[`NoteAssets`](NoteAssets.md)
+`NoteAssets`
 
 ##### note\_type
 
-[`NoteType`](../enumerations/NoteType.md)
+`NoteType`
 
 ##### attachment
 
-[`NoteAttachment`](NoteAttachment.md)
+`NoteAttachment`
 
 #### Returns
 

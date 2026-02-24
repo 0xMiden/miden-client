@@ -8,12 +8,6 @@
 
 ## Properties
 
-### type
-
-> **type**: `"FungibleFaucet"`
-
-***
-
 ### auth?
 
 > `optional` **auth**: [`AuthSchemeType`](../type-aliases/AuthSchemeType.md)
@@ -41,3 +35,9 @@
 ### symbol
 
 > **symbol**: `string`
+
+***
+
+### type
+
+> **type**: `"FungibleFaucet"`

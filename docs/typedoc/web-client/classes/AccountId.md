@@ -127,11 +127,11 @@ Will turn the Account ID into its bech32 string representation.
 
 ##### network\_id
 
-[`NetworkId`](NetworkId.md)
+`NetworkId`
 
 ##### account\_interface
 
-[`BasicWallet`](../enumerations/AccountInterface.md#basicwallet)
+`AccountInterface`
 
 #### Returns
 
