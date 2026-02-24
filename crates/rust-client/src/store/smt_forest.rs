@@ -1,12 +1,13 @@
-use miden_client::account::{AccountStorage, StorageMap, StorageSlotContent};
-use miden_client::asset::{Asset, AssetVault, AssetWitness};
-use miden_client::crypto::SMT_DEPTH;
-use miden_client::store::StoreError;
-use miden_client::{EMPTY_WORD, Word};
-use miden_protocol::account::StorageMapWitness;
-use miden_protocol::asset::AssetVaultKey;
-use miden_protocol::crypto::merkle::smt::{Smt, SmtForest};
+use alloc::vec::Vec;
+
+use miden_protocol::Word;
+use miden_protocol::account::{AccountStorage, StorageMap, StorageSlotContent, StorageMapWitness};
+use miden_protocol::asset::{Asset, AssetVault, AssetVaultKey, AssetWitness};
+use miden_protocol::crypto::merkle::smt::{Smt, SmtForest, SMT_DEPTH};
 use miden_protocol::crypto::merkle::{EmptySubtreeRoots, MerkleError};
+use miden_protocol::EMPTY_WORD;
+
+use super::StoreError;
 
 /// Thin wrapper around `SmtForest` for account vault/storage proofs and updates.
 #[derive(Debug, Default, Clone, Eq, PartialEq)]
@@ -127,6 +128,7 @@ impl AccountSmtForest {
         Ok(())
     }
 
+    /// Inserts an account's complete state (both vault and storage) into the SMT forest.
     pub fn insert_account_state(
         &mut self,
         vault: &AssetVault,
@@ -137,6 +139,7 @@ impl AccountSmtForest {
         Ok(())
     }
 
+    /// Inserts storage map SMT nodes for a specific storage map.
     pub fn insert_storage_map_nodes_for_map(&mut self, map: &StorageMap) -> Result<(), StoreError> {
         let empty_root = *EmptySubtreeRoots::entry(SMT_DEPTH, 0);
         let entries: Vec<(Word, Word)> =
