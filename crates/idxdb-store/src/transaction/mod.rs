@@ -2,7 +2,7 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
 use miden_client::Word;
-use miden_client::account::Account;
+use miden_client::account::{Account, StorageSlotContent};
 use miden_client::store::{StoreError, TransactionFilter};
 use miden_client::transaction::{
     TransactionDetails,
@@ -104,6 +104,18 @@ impl WebStore {
             .try_into()
             .map_err(|_| StoreError::AccountDataNotFound(delta.id()))?;
 
+        // Capture old SMT roots before mutating the account
+        let old_vault_root = account.vault().root();
+        let old_map_roots: Vec<Word> = account
+            .storage()
+            .slots()
+            .iter()
+            .filter_map(|slot| match slot.content() {
+                StorageSlotContent::Map(map) => Some(map.root()),
+                StorageSlotContent::Value(_) => None,
+            })
+            .collect();
+
         if delta.is_full_state() {
             account =
                 delta.try_into().expect("casting account from full state delta should not fail");
@@ -119,10 +131,12 @@ impl WebStore {
             })?;
         }
 
-        // Update SMT forest with the new account state
+        // Update SMT forest: insert new state and release old roots
         {
             let mut smt_forest = self.smt_forest.write().expect("smt_forest write lock");
             smt_forest.insert_account_state(account.vault(), account.storage())?;
+            smt_forest
+                .pop_roots(old_map_roots.into_iter().chain(core::iter::once(old_vault_root)));
         }
 
         // Updates for notes

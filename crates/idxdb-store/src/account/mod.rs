@@ -12,6 +12,7 @@ use miden_client::account::{
     Address,
     StorageMap,
     StorageSlot,
+    StorageSlotContent,
     StorageSlotName,
     StorageSlotType,
 };
@@ -379,22 +380,36 @@ impl WebStore {
         &self,
         new_account_state: &Account,
     ) -> Result<(), StoreError> {
-        let account_id_str = new_account_state.id().to_string();
+        let account_id = new_account_state.id();
+        let account_id_str = account_id.to_string();
         let promise = idxdb_get_account_header(self.db_id(), account_id_str);
         let account_header_idxdb: Option<AccountRecordIdxdbObject> =
             await_js(promise, "failed to fetch account header").await?;
 
-        if account_header_idxdb.is_none() {
-            return Err(StoreError::AccountDataNotFound(new_account_state.id()));
-        }
+        let account_header_idxdb = account_header_idxdb
+            .ok_or(StoreError::AccountDataNotFound(account_id))?;
+
+        // Get old SMT roots before updating so we can pop them after
+        let (old_header, _) = parse_account_record_idxdb_object(account_header_idxdb)?;
+        let old_vault_root = old_header.vault_root();
+        let old_storage = self.get_storage(account_id, AccountStorageFilter::All).await?;
+        let old_map_roots: Vec<Word> = old_storage
+            .slots()
+            .iter()
+            .filter_map(|slot| match slot.content() {
+                StorageSlotContent::Map(map) => Some(map.root()),
+                StorageSlotContent::Value(_) => None,
+            })
+            .collect();
 
         apply_full_account_state(self.db_id(), new_account_state)
             .await
             .map_err(|_| StoreError::DatabaseError("failed to update account".to_string()))?;
 
-        // Update SMT forest with the new account state
+        // Update SMT forest: insert new state and release old roots
         let mut smt_forest = self.smt_forest.write().expect("smt_forest write lock");
         smt_forest.insert_account_state(new_account_state.vault(), new_account_state.storage())?;
+        smt_forest.pop_roots(old_map_roots.into_iter().chain(core::iter::once(old_vault_root)));
 
         Ok(())
     }
@@ -520,5 +535,26 @@ impl WebStore {
         remove_account_address(self.db_id(), address).await.map_err(|js_error| {
             StoreError::DatabaseError(format!("failed to remove account address: {js_error:?}"))
         })
+    }
+
+    /// Collects vault and storage map SMT roots for the given account IDs.
+    pub(crate) async fn collect_account_smt_roots(
+        &self,
+        account_ids: impl Iterator<Item = AccountId>,
+    ) -> Result<Vec<Word>, StoreError> {
+        let mut roots = Vec::new();
+        for account_id in account_ids {
+            if let Some((header, _)) = self.get_account_header(account_id).await? {
+                roots.push(header.vault_root());
+                let storage =
+                    self.get_storage(account_id, AccountStorageFilter::All).await?;
+                for slot in storage.slots() {
+                    if let StorageSlotContent::Map(map) = slot.content() {
+                        roots.push(map.root());
+                    }
+                }
+            }
+        }
+        Ok(roots)
     }
 }

@@ -1,7 +1,7 @@
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
-use miden_client::account::AccountId;
+use miden_client::account::{Account, AccountId};
 use miden_client::note::{BlockNumber, NoteId, NoteTag};
 use miden_client::store::StoreError;
 use miden_client::sync::{NoteTagRecord, NoteTagSource, StateSyncUpdate};
@@ -191,6 +191,11 @@ impl WebStore {
             .map(serialize_transaction_record)
             .collect();
 
+        // Collect old SMT roots for updated public accounts so we can pop them after
+        let old_roots_to_pop = self.collect_account_smt_roots(
+            account_updates.updated_public_accounts().iter().map(Account::id),
+        ).await?;
+
         let state_update = JsStateSyncUpdate {
             block_num: block_num.as_u32(),
             flattened_new_block_headers: flatten_nested_u8_vec(block_headers_as_bytes),
@@ -212,12 +217,13 @@ impl WebStore {
         let promise = idxdb_apply_state_sync(self.db_id(), state_update);
         await_js_value(promise, "failed to apply state sync").await?;
 
-        // Update SMT forest with updated public account states
+        // Update SMT forest: insert new states and release old roots
         {
             let mut smt_forest = self.smt_forest.write().expect("smt_forest write lock");
             for account in account_updates.updated_public_accounts() {
                 smt_forest.insert_account_state(account.vault(), account.storage())?;
             }
+            smt_forest.pop_roots(old_roots_to_pop);
         }
 
         Ok(())
