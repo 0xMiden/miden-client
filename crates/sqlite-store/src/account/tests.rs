@@ -589,7 +589,7 @@ async fn account_reader_addresses_access() -> anyhow::Result<()> {
     Ok(())
 }
 
-// STORAGE MODEL BENCHMARK (issue #1768)
+// TEST HELPERS
 // ================================================================================================
 
 /// Row counts across the account-related tables.
