@@ -12,19 +12,19 @@ This guide demonstrates how to export accounts, notes, and store data using the 
 Export a note with different levels of detail:
 
 ```typescript
-import { MidenClient } from "@miden-sdk/miden-sdk";
+import { MidenClient, NoteExportFormat } from "@miden-sdk/miden-sdk";
 
 try {
     const client = await MidenClient.create();
 
     // Export with just the note ID
-    const idExport = await client.notes.export("0xnote...", { format: "id" });
+    const idExport = await client.notes.export("0xnote...", { format: NoteExportFormat.Id });
 
     // Export with full details including inclusion proof
-    const fullExport = await client.notes.export("0xnote...", { format: "full" });
+    const fullExport = await client.notes.export("0xnote...", { format: NoteExportFormat.Full });
 
     // Export with note details including metadata and creation block
-    const detailsExport = await client.notes.export("0xnote...", { format: "details" });
+    const detailsExport = await client.notes.export("0xnote...", { format: NoteExportFormat.Details });
 } catch (error) {
     console.error("Failed to export note:", error.message);
 }
@@ -32,9 +32,9 @@ try {
 
 Export formats:
 
-- `"id"` — Exports only the note ID (only works for public notes)
-- `"full"` — Exports the complete note with its inclusion proof (requires the note to have an inclusion proof)
-- `"details"` — Exports note details including metadata and the creation block number
+- `NoteExportFormat.Id` — Exports only the note ID (only works for public notes)
+- `NoteExportFormat.Full` — Exports the complete note with its inclusion proof (requires the note to have an inclusion proof)
+- `NoteExportFormat.Details` — Exports note details including metadata and the creation block number
 
 ## Exporting Accounts
 

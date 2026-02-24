@@ -104,7 +104,7 @@ try {
 ## Importing and Exporting Notes
 
 ```typescript
-import { MidenClient } from "@miden-sdk/miden-sdk";
+import { MidenClient, NoteExportFormat } from "@miden-sdk/miden-sdk";
 
 try {
     const client = await MidenClient.create();
@@ -114,18 +114,18 @@ try {
     console.log("Imported note:", noteId);
 
     // Export a note - different formats available
-    const idExport = await client.notes.export("0xnote...", { format: "id" });
-    const fullExport = await client.notes.export("0xnote...", { format: "full" });
-    const detailsExport = await client.notes.export("0xnote...", { format: "details" });
+    const idExport = await client.notes.export("0xnote...", { format: NoteExportFormat.Id });
+    const fullExport = await client.notes.export("0xnote...", { format: NoteExportFormat.Full });
+    const detailsExport = await client.notes.export("0xnote...", { format: NoteExportFormat.Details });
 } catch (error) {
     console.error("Failed to import/export note:", error.message);
 }
 ```
 
 Export formats:
-- `"id"` — Exports only the note ID (only works for public notes)
-- `"full"` — Exports the complete note with its inclusion proof
-- `"details"` — Exports note details including metadata and creation block
+- `NoteExportFormat.Id` — Exports only the note ID (only works for public notes)
+- `NoteExportFormat.Full` — Exports the complete note with its inclusion proof
+- `NoteExportFormat.Details` — Exports note details including metadata and creation block
 
 ## Available Note Filter Statuses
 
