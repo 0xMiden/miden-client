@@ -24,7 +24,7 @@ use super::{AccountStorageFilter, PartialBlockchainFilter, Store};
 use crate::rpc::NodeRpcClient;
 use crate::rpc::domain::account::AccountStorageRequirements;
 use crate::store::StoreError;
-use crate::transaction::{ForeignAccount, fetch_public_account_inputs};
+use crate::transaction::fetch_public_account_inputs;
 use crate::utils::RwLock;
 
 // DATA STORE
@@ -230,13 +230,11 @@ impl DataStore for ClientDataStore {
             return Err(DataStoreError::AccountNotFound(foreign_account_id));
         }
 
-        let foreign_account =
-            ForeignAccount::Public(foreign_account_id, AccountStorageRequirements::default());
-
         let account_inputs = fetch_public_account_inputs(
             self.store.as_ref(),
             self.rpc_api.as_ref(),
-            foreign_account,
+            foreign_account_id,
+            AccountStorageRequirements::default(),
             ref_block,
         )
         .await

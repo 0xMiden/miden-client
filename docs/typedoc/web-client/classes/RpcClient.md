@@ -72,11 +72,14 @@ Fetches account details for a specific account ID.
 
 > **getAccountProof**(`account_id`): `Promise`\<[`AccountProof`](AccountProof.md)\>
 
-Fetches account headers from the node for a public account.
+Fetches an account proof from the node.
 
 This is a lighter-weight alternative to `getAccountDetails` that makes a single RPC call
-and returns the account header, storage slot values, and account code without
-reconstructing the full account state.
+and returns the account proof and, for public accounts, the account header, storage slot
+values, and account code without reconstructing the full account state.
+
+For private accounts, the proof is returned but account details will not be available
+since they are not stored on-chain.
 
 Useful for reading storage slot values (e.g., faucet metadata) without the overhead of
 fetching the complete account with all vault assets and storage map entries.

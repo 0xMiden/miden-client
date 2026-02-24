@@ -6,7 +6,7 @@ use alloc::vec::Vec;
 use async_trait::async_trait;
 use miden_protocol::account::{AccountCode, AccountId};
 use miden_protocol::note::{Note, NoteId};
-use miden_standards::note::{NoteConsumptionStatus, StandardNote};
+use miden_standards::note::NoteConsumptionStatus;
 use miden_tx::auth::TransactionAuthenticator;
 use miden_tx::{
     NoteCheckerError,
@@ -119,8 +119,7 @@ where
         }
 
         let block_ref = self.store.get_sync_height().await?;
-        let standard_notes: Vec<_> = notes.iter().map(StandardNote::from_note).collect();
-        let mut note_relevances: BTreeMap<NoteId, Vec<NoteConsumability>> = BTreeMap::new();
+        let mut relevant_notes: BTreeMap<NoteId, Vec<NoteConsumability>> = BTreeMap::new();
         let tx_args = self.tx_args();
 
         let data_store = ClientDataStore::new(self.store.clone(), self.rpc_api.clone());
@@ -131,34 +130,10 @@ where
         let consumption_checker = NoteConsumptionChecker::new(&transaction_executor);
 
         for account_id in account_ids {
-            let mut runtime_note_indices = Vec::new();
-
-            for (note_idx, (note, standard_note)) in notes.iter().zip(&standard_notes).enumerate() {
-                if let Some(standard_note) = standard_note.as_ref()
-                    && let Some(consumption_status) =
-                        standard_note.is_consumable(note, account_id, block_ref)
-                {
-                    if is_relevant(&consumption_status) {
-                        note_relevances
-                            .entry(note.id())
-                            .or_default()
-                            .push((account_id, consumption_status));
-                    }
-                    continue;
-                }
-
-                runtime_note_indices.push(note_idx);
-            }
-
-            if runtime_note_indices.is_empty() {
-                continue;
-            }
-
             let account_code = self.get_account_code(account_id).await?;
             data_store.mast_store().load_account_code(&account_code);
 
-            for note_idx in runtime_note_indices {
-                let note = &notes[note_idx];
+            for note in notes {
                 let consumption_status = consumption_checker
                     .can_consume(
                         account_id,
@@ -169,7 +144,7 @@ where
                     .await?;
 
                 if is_relevant(&consumption_status) {
-                    note_relevances
+                    relevant_notes
                         .entry(note.id())
                         .or_default()
                         .push((account_id, consumption_status));
@@ -177,7 +152,7 @@ where
             }
         }
 
-        Ok(note_relevances)
+        Ok(relevant_notes)
     }
 
     /// Checks whether the provided notes could be consumed by a specific account by attempting
