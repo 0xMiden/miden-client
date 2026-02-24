@@ -289,17 +289,16 @@ jobs:
 
       - name: Configure setuid sandbox
         run: . ./scripts/configure-sandbox.sh
-      - name: Add Rust Cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: rust-release
-          prefix-key: ${{ env.RUST_CACHE_KEY }}
-          save-if: ${{ github.ref == 'refs/heads/next' }}
       - name: Restore node-builder binary
         uses: actions/cache@v4
         with:
           path: target/release/testing-node-builder
           key: ${{ runner.os }}-node-builder-${{ hashFiles('Cargo.lock') }}
+      - name: Restore prover binary
+        uses: actions/cache@v4
+        with:
+          path: target/release/testing-remote-prover
+          key: ${{ runner.os }}-prover-${{ hashFiles('Cargo.lock') }}
       - name: Start test node
         run: make start-node-background
       - name: Start prover
