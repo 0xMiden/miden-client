@@ -29,16 +29,16 @@ export const AccountType = Object.freeze({
   RegularAccountUpdatableCode: 3,
 });
 
+export const AuthScheme = Object.freeze({
+  Falcon: "falcon",
+  ECDSA: "ecdsa",
+});
+
 export { MidenClient };
 export { createP2IDNote, createP2IDENote, buildSwapTag };
 
 // Internal exports — used by integration tests that need direct access to the low-level WebClient proxy.
 export { WebClient as WasmWebClient, MockWebClient as MockWasmWebClient };
-
-// Note: AuthScheme is re-exported from WASM via `export * from "../Cargo.toml"`.
-// User-facing auth scheme strings ("falcon", "ecdsa") are resolved internally
-// by resolveAuthScheme() in utils.js. The AuthSchemeId type constant is declared
-// in js/types/index.d.ts for type-safe usage.
 
 const buildTypedArraysExport = (exportObject) => {
   return Object.entries(exportObject).reduce(
