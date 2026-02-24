@@ -72,22 +72,6 @@
 
 ***
 
-### mintAndConsume()
-
-> **mintAndConsume**(`options`): `Promise`\<[`TransactionId`](../classes/TransactionId.md)\>
-
-#### Parameters
-
-##### options
-
-[`MintAndConsumeOptions`](MintAndConsumeOptions.md)
-
-#### Returns
-
-`Promise`\<[`TransactionId`](../classes/TransactionId.md)\>
-
-***
-
 ### preview()
 
 > **preview**(`options`): `Promise`\<[`TransactionSummary`](../classes/TransactionSummary.md)\>

@@ -13,7 +13,6 @@
 - [`ConsumeOptions`](ConsumeOptions.md)
 - [`ConsumeAllOptions`](ConsumeAllOptions.md)
 - [`SwapOptions`](SwapOptions.md)
-- [`MintAndConsumeOptions`](MintAndConsumeOptions.md)
 
 ## Properties
 

@@ -164,7 +164,6 @@
 - [ExportNoteOptions](interfaces/ExportNoteOptions.md)
 - [FaucetCreateOptions](interfaces/FaucetCreateOptions.md)
 - [FetchPrivateNotesOptions](interfaces/FetchPrivateNotesOptions.md)
-- [MintAndConsumeOptions](interfaces/MintAndConsumeOptions.md)
 - [MintOptions](interfaces/MintOptions.md)
 - [MockOptions](interfaces/MockOptions.md)
 - [NoteOptions](interfaces/NoteOptions.md)
