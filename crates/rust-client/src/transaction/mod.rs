@@ -84,12 +84,7 @@ use crate::rpc::{AccountStateAt, NodeRpcClient};
 use crate::store::data_store::ClientDataStore;
 use crate::store::input_note_states::ExpectedNoteState;
 use crate::store::{
-    InputNoteRecord,
-    InputNoteState,
-    NoteFilter,
-    OutputNoteRecord,
-    Store,
-    TransactionFilter,
+    InputNoteRecord, InputNoteState, NoteFilter, OutputNoteRecord, Store, TransactionFilter,
 };
 use crate::sync::NoteTagRecord;
 
@@ -98,10 +93,7 @@ pub use prover::TransactionProver;
 
 mod record;
 pub use record::{
-    DiscardCause,
-    TransactionDetails,
-    TransactionRecord,
-    TransactionStatus,
+    DiscardCause, TransactionDetails, TransactionRecord, TransactionStatus,
     TransactionStatusVariant,
 };
 
@@ -110,14 +102,8 @@ pub use store_update::TransactionStoreUpdate;
 
 mod request;
 pub use request::{
-    ForeignAccount,
-    NoteArgs,
-    PaymentNoteDescription,
-    SwapTransactionData,
-    TransactionRequest,
-    TransactionRequestBuilder,
-    TransactionRequestError,
-    TransactionScriptTemplate,
+    ForeignAccount, NoteArgs, PaymentNoteDescription, SwapTransactionData, TransactionRequest,
+    TransactionRequestBuilder, TransactionRequestError, TransactionScriptTemplate,
     account_proof_into_inputs,
 };
 
@@ -125,27 +111,15 @@ mod result;
 // RE-EXPORTS
 // ================================================================================================
 pub use miden_protocol::transaction::{
-    ExecutedTransaction,
-    InputNote,
-    InputNotes,
-    OutputNote,
-    OutputNotes,
-    ProvenTransaction,
-    TransactionArgs,
-    TransactionId,
-    TransactionInputs,
-    TransactionKernel,
-    TransactionScript,
+    ExecutedTransaction, InputNote, InputNotes, OutputNote, OutputNotes, ProvenTransaction,
+    TransactionArgs, TransactionId, TransactionInputs, TransactionKernel, TransactionScript,
     TransactionSummary,
 };
 pub use miden_protocol::vm::{AdviceInputs, AdviceMap};
 pub use miden_standards::account::interface::{AccountComponentInterface, AccountInterface};
 pub use miden_tx::auth::TransactionAuthenticator;
 pub use miden_tx::{
-    DataStoreError,
-    LocalTransactionProver,
-    ProvingOptions,
-    TransactionExecutorError,
+    DataStoreError, LocalTransactionProver, ProvingOptions, TransactionExecutorError,
     TransactionProverError,
 };
 pub use result::TransactionResult;
@@ -530,14 +504,15 @@ where
         for note in output_notes {
             if output_note_relevances.contains_key(&note.id()) {
                 let metadata = note.metadata().clone();
+                let tag = metadata.tag();
 
                 new_input_notes.push(InputNoteRecord::new(
                     note.into(),
                     current_timestamp,
                     ExpectedNoteState {
-                        metadata: Some(metadata.clone()),
+                        metadata: Some(metadata),
                         after_block_num: submission_height,
-                        tag: Some(metadata.tag()),
+                        tag: Some(tag),
                     }
                     .into(),
                 ));

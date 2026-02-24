@@ -604,7 +604,7 @@ impl NodeRpcClient for GrpcClient {
         let account_id = foreign_account.account_id();
         let storage_requirements = foreign_account.storage_slot_requirements();
 
-        let storage_maps: Vec<StorageMapDetailRequest> = storage_requirements.clone().into();
+        let storage_maps: Vec<StorageMapDetailRequest> = storage_requirements.into();
 
         // Only request details for public accounts; include known code commitment for this
         // account when available
@@ -946,9 +946,8 @@ impl NodeRpcClient for GrpcClient {
     }
 
     async fn get_network_id(&self) -> Result<NetworkId, RpcError> {
-        let endpoint_str: &str = &self.endpoint.clone();
         let endpoint: Endpoint =
-            Endpoint::try_from(endpoint_str).map_err(RpcError::InvalidNodeEndpoint)?;
+            Endpoint::try_from(self.endpoint.as_str()).map_err(RpcError::InvalidNodeEndpoint)?;
         Ok(endpoint.to_network_id())
     }
 
