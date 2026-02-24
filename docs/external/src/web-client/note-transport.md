@@ -36,11 +36,11 @@ try {
     const client = await MidenClient.create();
 
     // Fetch private notes using pagination (default)
-    await client.notes.fetch();
+    await client.notes.fetchPrivate();
 
     // Or fetch all private notes at once
     // (reserve for special cases like initial setup)
-    await client.notes.fetch({ mode: "all" });
+    await client.notes.fetchPrivate({ mode: "all" });
 
     // List the fetched notes
     const notes = await client.notes.list();
