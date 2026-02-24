@@ -8,4 +8,4 @@
 
 > **CreateAccountOptions** = [`WalletCreateOptions`](../interfaces/WalletCreateOptions.md) \| [`FaucetCreateOptions`](../interfaces/FaucetCreateOptions.md)
 
-Create a wallet (default) or faucet. Discriminated by `accountType` field.
+Create a wallet (default) or faucet. Discriminated by `type` field.

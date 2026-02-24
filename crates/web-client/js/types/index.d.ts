@@ -64,11 +64,18 @@ export declare const MidenArrays: MidenArrayConstructors;
 // ════════════════════════════════════════════════════════════════
 
 /**
- * User-facing auth scheme string constants for MidenClient options.
- * The WASM `AuthScheme` enum (with `AuthRpoFalcon512`, `AuthEcdsaK256Keccak`)
- * is re-exported separately from the WASM module.
+ * User-friendly auth scheme constants for MidenClient options.
+ * Use `AuthScheme.Falcon` or `AuthScheme.ECDSA` instead of raw strings.
  */
-export type AuthSchemeType = "falcon" | "ecdsa";
+export declare const AuthScheme: {
+  readonly Falcon: "falcon";
+  readonly ECDSA: "ecdsa";
+};
+
+/**
+ * Union of all values in the AuthScheme const.
+ */
+export type AuthSchemeType = (typeof AuthScheme)[keyof typeof AuthScheme];
 
 /**
  * Union of all values in the AccountType const.
@@ -151,19 +158,19 @@ export type NoteInput = string | NoteId | Note | InputNoteRecord;
 // Account types
 // ════════════════════════════════════════════════════════════════
 
-/** Create a wallet (default) or faucet. Discriminated by `accountType` field. */
+/** Create a wallet (default) or faucet. Discriminated by `type` field. */
 export type CreateAccountOptions = WalletCreateOptions | FaucetCreateOptions;
 
 export interface WalletCreateOptions {
   /** Account type. Defaults to "MutableWallet". Use AccountType enum. */
-  accountType?: "MutableWallet" | "ImmutableWallet";
+  type?: "MutableWallet" | "ImmutableWallet";
   storage?: "private" | "public";
   auth?: AuthSchemeType;
   seed?: string | Uint8Array;
 }
 
 export interface FaucetCreateOptions {
-  accountType: "FungibleFaucet";
+  type: "FungibleFaucet";
   symbol: string;
   decimals: number;
   maxSupply: number | bigint;
@@ -186,7 +193,7 @@ export type ImportAccountInput =
   | {
       seed: Uint8Array;
       /** Account type. Defaults to "MutableWallet". Use AccountType enum. */
-      accountType?: "MutableWallet" | "ImmutableWallet";
+      type?: "MutableWallet" | "ImmutableWallet";
       auth?: AuthSchemeType;
     };
 
@@ -245,19 +252,6 @@ export interface SwapOptions extends TransactionOptions {
   request: Asset;
   type?: NoteVisibility;
   paybackType?: NoteVisibility;
-}
-
-/**
- * Exception to the `account` field pattern: this composed operation executes
- * under TWO accounts (faucet mints, `to` consumes).
- */
-export interface MintAndConsumeOptions extends TransactionOptions {
-  /** The faucet account that executes the mint. */
-  faucet: AccountRef;
-  /** The account that receives the minted note AND consumes it. */
-  to: AccountRef;
-  amount: number | bigint;
-  type?: NoteVisibility;
 }
 
 export interface PreviewSendOptions {
@@ -420,8 +414,6 @@ export interface TransactionsResource {
   consume(options: ConsumeOptions): Promise<TransactionId>;
   swap(options: SwapOptions): Promise<TransactionId>;
   consumeAll(options: ConsumeAllOptions): Promise<ConsumeAllResult>;
-
-  mintAndConsume(options: MintAndConsumeOptions): Promise<TransactionId>;
 
   preview(options: PreviewOptions): Promise<TransactionSummary>;
 

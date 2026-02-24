@@ -10,7 +10,7 @@ This guide demonstrates how to create and work with different types of accounts 
 ## Creating a Regular Wallet Account
 
 ```typescript
-import { MidenClient, AuthScheme } from "@miden-sdk/miden-sdk";
+import { MidenClient, AccountType, AuthScheme } from "@miden-sdk/miden-sdk";
 
 try {
     const client = await MidenClient.create();
@@ -20,10 +20,10 @@ try {
 
     // Wallet with custom options
     const wallet2 = await client.accounts.create({
-        storage: "public",       // "private" or "public"
-        mutable: false,          // Whether account code can be updated
-        auth: AuthScheme.ECDSA,  // "falcon" or "ecdsa"
-        seed: "my-seed"          // Optional deterministic seed (auto-hashed)
+        storage: "public",                          // "private" or "public"
+        type: AccountType.ImmutableWallet,            // AccountType.MutableWallet (default) or AccountType.ImmutableWallet
+        auth: AuthScheme.ECDSA,                     // AuthScheme.Falcon (default) or AuthScheme.ECDSA
+        seed: "my-seed"                             // Optional deterministic seed (auto-hashed)
     });
 
     // Access account properties
@@ -41,14 +41,14 @@ try {
 ## Creating a Faucet Account
 
 ```typescript
-import { MidenClient, AuthScheme } from "@miden-sdk/miden-sdk";
+import { MidenClient, AccountType, AuthScheme } from "@miden-sdk/miden-sdk";
 
 try {
     const client = await MidenClient.create();
 
     // Create faucet — only required fields
     const faucet = await client.accounts.create({
-        type: "faucet",
+        type: AccountType.FungibleFaucet,
         symbol: "TEST",
         decimals: 8,
         maxSupply: 10_000_000n   // Accepts number or bigint
@@ -56,7 +56,7 @@ try {
 
     // With custom options
     const faucet2 = await client.accounts.create({
-        type: "faucet",
+        type: AccountType.FungibleFaucet,
         symbol: "DAG",
         decimals: 8,
         maxSupply: 10_000_000n,

@@ -15,7 +15,7 @@ test.describe("MidenClient API - Mock Chain", () => {
 
       const wallet = await client.accounts.create();
       const faucet = await client.accounts.create({
-        accountType: window.AccountType.FungibleFaucet,
+        type: window.AccountType.FungibleFaucet,
         symbol: "DAG",
         decimals: 8,
         maxSupply: 10_000_000n,
@@ -95,7 +95,7 @@ test.describe("MidenClient API - Mock Chain", () => {
       const client = await window.MidenClient.createMock();
 
       const faucet = await client.accounts.create({
-        accountType: window.AccountType.FungibleFaucet,
+        type: window.AccountType.FungibleFaucet,
         symbol: "TST",
         decimals: 6,
         maxSupply: 1_000_000n,
@@ -163,7 +163,7 @@ test.describe("MidenClient API - Mock Chain", () => {
       const client = await window.MidenClient.createMock();
       const wallet = await client.accounts.create();
       const faucet = await client.accounts.create({
-        accountType: window.AccountType.FungibleFaucet,
+        type: window.AccountType.FungibleFaucet,
         symbol: "DAG",
         decimals: 8,
         maxSupply: 10_000_000n,
@@ -187,7 +187,7 @@ test.describe("MidenClient API - Mock Chain", () => {
       const client = await window.MidenClient.createMock();
       const wallet = await client.accounts.create();
       const faucet = await client.accounts.create({
-        accountType: window.AccountType.FungibleFaucet,
+        type: window.AccountType.FungibleFaucet,
         symbol: "DAG",
         decimals: 8,
         maxSupply: 10_000_000n,
@@ -228,7 +228,7 @@ test.describe("MidenClient API - Mock Chain", () => {
       const client = await window.MidenClient.createMock();
       const wallet = await client.accounts.create();
       const faucet = await client.accounts.create({
-        accountType: window.AccountType.FungibleFaucet,
+        type: window.AccountType.FungibleFaucet,
         symbol: "DAG",
         decimals: 8,
         maxSupply: 10_000_000n,
@@ -269,7 +269,7 @@ test.describe("MidenClient API - Mock Chain", () => {
       const client = await window.MidenClient.createMock();
       const wallet = await client.accounts.create();
       const faucet = await client.accounts.create({
-        accountType: window.AccountType.FungibleFaucet,
+        type: window.AccountType.FungibleFaucet,
         symbol: "DAG",
         decimals: 8,
         maxSupply: 10_000_000n,
@@ -362,7 +362,7 @@ test.describe("MidenClient API - Mock Chain", () => {
       const client = await window.MidenClient.createMock();
       const wallet = await client.accounts.create();
       const faucet = await client.accounts.create({
-        accountType: window.AccountType.FungibleFaucet,
+        type: window.AccountType.FungibleFaucet,
         symbol: "DAG",
         decimals: 8,
         maxSupply: 10_000_000n,
@@ -402,7 +402,7 @@ test.describe("MidenClient API - Mock Chain", () => {
       const client = await window.MidenClient.createMock();
       const wallet = await client.accounts.create();
       const faucet = await client.accounts.create({
-        accountType: window.AccountType.FungibleFaucet,
+        type: window.AccountType.FungibleFaucet,
         symbol: "DAG",
         decimals: 8,
         maxSupply: 10_000_000n,
@@ -442,7 +442,7 @@ test.describe("MidenClient API - Mock Chain", () => {
       const client = await window.MidenClient.createMock();
       const wallet = await client.accounts.create();
       const faucet = await client.accounts.create({
-        accountType: window.AccountType.FungibleFaucet,
+        type: window.AccountType.FungibleFaucet,
         symbol: "DAG",
         decimals: 8,
         maxSupply: 10_000_000n,
@@ -519,7 +519,7 @@ test.describe("MidenClient API - Mock Chain", () => {
       const client = await window.MidenClient.createMock();
       const wallet = await client.accounts.create();
       const faucet = await client.accounts.create({
-        accountType: window.AccountType.FungibleFaucet,
+        type: window.AccountType.FungibleFaucet,
         symbol: "DAG",
         decimals: 8,
         maxSupply: 10_000_000n,
@@ -545,7 +545,7 @@ test.describe("MidenClient API - Mock Chain", () => {
       const client = await window.MidenClient.createMock();
       const wallet = await client.accounts.create();
       const faucet = await client.accounts.create({
-        accountType: window.AccountType.FungibleFaucet,
+        type: window.AccountType.FungibleFaucet,
         symbol: "DAG",
         decimals: 8,
         maxSupply: 10_000_000n,
@@ -601,7 +601,7 @@ test.describe("MidenClient API - Mock Chain", () => {
       const client = await window.MidenClient.createMock();
       const wallet = await client.accounts.create();
       const faucet = await client.accounts.create({
-        accountType: window.AccountType.FungibleFaucet,
+        type: window.AccountType.FungibleFaucet,
         symbol: "DAG",
         decimals: 8,
         maxSupply: 10_000_000n,
@@ -700,7 +700,7 @@ test.describe("MidenClient API - Mock Chain", () => {
       const client = await window.MidenClient.createMock();
       const wallet = await client.accounts.create();
       const faucet = await client.accounts.create({
-        accountType: window.AccountType.FungibleFaucet,
+        type: window.AccountType.FungibleFaucet,
         symbol: "DAG",
         decimals: 8,
         maxSupply: 10_000_000n,
@@ -742,7 +742,7 @@ test.describe("MidenClient API - Mock Chain", () => {
       const client = await window.MidenClient.createMock();
       const wallet = await client.accounts.create();
       const faucet = await client.accounts.create({
-        accountType: window.AccountType.FungibleFaucet,
+        type: window.AccountType.FungibleFaucet,
         symbol: "DAG",
         decimals: 8,
         maxSupply: 10_000_000n,
@@ -776,7 +776,7 @@ test.describe("MidenClient API - Mock Chain", () => {
       const client = await window.MidenClient.createMock();
       const wallet = await client.accounts.create();
       const faucet = await client.accounts.create({
-        accountType: window.AccountType.FungibleFaucet,
+        type: window.AccountType.FungibleFaucet,
         symbol: "DAG",
         decimals: 8,
         maxSupply: 10_000_000n,
@@ -808,7 +808,7 @@ test.describe("MidenClient API - Mock Chain", () => {
       const client = await window.MidenClient.createMock();
       const wallet = await client.accounts.create();
       const faucet = await client.accounts.create({
-        accountType: window.AccountType.FungibleFaucet,
+        type: window.AccountType.FungibleFaucet,
         symbol: "DAG",
         decimals: 8,
         maxSupply: 10_000_000n,
@@ -836,13 +836,13 @@ test.describe("MidenClient API - Mock Chain", () => {
     const result = await page.evaluate(async () => {
       const client = await window.MidenClient.createMock();
       const faucetA = await client.accounts.create({
-        accountType: window.AccountType.FungibleFaucet,
+        type: window.AccountType.FungibleFaucet,
         symbol: "AAA",
         decimals: 8,
         maxSupply: 10_000_000n,
       });
       const faucetB = await client.accounts.create({
-        accountType: window.AccountType.FungibleFaucet,
+        type: window.AccountType.FungibleFaucet,
         symbol: "BBB",
         decimals: 8,
         maxSupply: 10_000_000n,
@@ -875,7 +875,7 @@ test.describe("MidenClient API - Mock Chain", () => {
 
       const wallet = await client.accounts.create();
       const faucet = await client.accounts.create({
-        accountType: window.AccountType.FungibleFaucet,
+        type: window.AccountType.FungibleFaucet,
         symbol: "DAG",
         decimals: 8,
         maxSupply: 10_000_000n,
@@ -944,7 +944,7 @@ test.describe("MidenClient API - Integration", () => {
 
       const wallet = await client.accounts.create();
       const faucet = await client.accounts.create({
-        accountType: window.AccountType.FungibleFaucet,
+        type: window.AccountType.FungibleFaucet,
         symbol: "DAG",
         decimals: 8,
         maxSupply: 10_000_000n,
@@ -978,7 +978,7 @@ test.describe("MidenClient API - Integration", () => {
 
       const wallet = await client.accounts.create();
       const faucet = await client.accounts.create({
-        accountType: window.AccountType.FungibleFaucet,
+        type: window.AccountType.FungibleFaucet,
         symbol: "DAG",
         decimals: 8,
         maxSupply: 10_000_000n,
@@ -1044,7 +1044,7 @@ test.describe("MidenClient API - Integration", () => {
 
       const wallet = await client.accounts.create();
       const faucet = await client.accounts.create({
-        accountType: window.AccountType.FungibleFaucet,
+        type: window.AccountType.FungibleFaucet,
         symbol: "DAG",
         decimals: 8,
         maxSupply: 10_000_000n,
@@ -1092,7 +1092,7 @@ test.describe("MidenClient API - Integration", () => {
 
       const wallet = await client.accounts.create();
       const faucet = await client.accounts.create({
-        accountType: window.AccountType.FungibleFaucet,
+        type: window.AccountType.FungibleFaucet,
         symbol: "DAG",
         decimals: 8,
         maxSupply: 10_000_000n,

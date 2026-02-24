@@ -135,7 +135,7 @@ The following are just a few simple examples to get started. For more details, s
 ### Quick Start
 
 ```typescript
-import { MidenClient, AuthScheme } from "@miden-sdk/miden-sdk";
+import { MidenClient, AccountType } from "@miden-sdk/miden-sdk";
 
 // 1. Create client (defaults to testnet)
 const client = await MidenClient.create();
@@ -143,13 +143,17 @@ const client = await MidenClient.create();
 // 2. Create a wallet and a token (faucet account)
 const wallet = await client.accounts.create();
 const dagToken = await client.accounts.create({
-  type: "faucet", symbol: "DAG", decimals: 8, maxSupply: 10_000_000n
+  type: AccountType.FungibleFaucet, symbol: "DAG", decimals: 8, maxSupply: 10_000_000n
 });
 
-// 3. Mint tokens to the wallet (mint + sync + consume in one call)
-await client.transactions.mintAndConsume({ faucet: dagToken, to: wallet, amount: 1000n });
+// 3. Mint tokens
+const mintTxId = await client.transactions.mint({ account: dagToken, to: wallet, amount: 1000n });
+await client.transactions.waitFor(mintTxId.toHex());
 
-// 4. Send tokens to another address
+// 4. Consume the minted note
+await client.transactions.consumeAll({ account: wallet });
+
+// 5. Send tokens to another address
 await client.transactions.send({
   account: wallet,
   to: "0xBOB",
@@ -157,18 +161,18 @@ await client.transactions.send({
   amount: 100n
 });
 
-// 5. Check balance
+// 6. Check balance
 const balance = await client.accounts.getBalance(wallet, dagToken);
 console.log(`Balance: ${balance}`); // 900n
 
-// 6. Cleanup
+// 7. Cleanup
 client.terminate();
 ```
 
 ### Create a New Wallet
 
 ```typescript
-import { MidenClient, AuthScheme } from "@miden-sdk/miden-sdk";
+import { MidenClient, AccountType, AuthScheme } from "@miden-sdk/miden-sdk";
 
 const client = await MidenClient.create();
 
@@ -178,7 +182,7 @@ const wallet = await client.accounts.create();
 // Wallet with options
 const wallet2 = await client.accounts.create({
   storage: "public",
-  mutable: false,
+  type: AccountType.ImmutableWallet,
   auth: AuthScheme.ECDSA,
   seed: "deterministic"
 });
@@ -193,7 +197,7 @@ console.log(wallet.isFaucet()); // false
 
 ```typescript
 const faucet = await client.accounts.create({
-  type: "faucet",
+  type: AccountType.FungibleFaucet,
   symbol: "DAG",
   decimals: 8,
   maxSupply: 10_000_000n

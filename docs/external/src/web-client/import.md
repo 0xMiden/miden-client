@@ -49,21 +49,25 @@ try {
 Import a public account using an initialization seed:
 
 ```typescript
-import { MidenClient, AuthScheme } from "@miden-sdk/miden-sdk";
+import { MidenClient, AccountType, AuthScheme } from "@miden-sdk/miden-sdk";
 
 try {
     const client = await MidenClient.create();
 
     const account = await client.accounts.import({
-        seed: initSeed,           // Uint8Array
-        mutable: true,            // Whether account code can be updated
-        auth: AuthScheme.Falcon   // Optional auth scheme
+        seed: initSeed,                           // Uint8Array
+        type: AccountType.MutableWallet,            // AccountType.MutableWallet (default) or AccountType.ImmutableWallet
+        auth: AuthScheme.Falcon                   // Optional auth scheme
     });
     console.log("Imported account:", account.id().toString());
 } catch (error) {
     console.error("Failed to import public account:", error.message);
 }
 ```
+
+:::warning
+Import-by-seed only works for public accounts. The account must have been originally created with `storage: "public"`.
+:::
 
 ## Importing Notes
 

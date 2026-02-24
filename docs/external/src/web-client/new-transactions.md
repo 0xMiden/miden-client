@@ -12,13 +12,13 @@ This guide demonstrates how to create and submit different types of transactions
 The simplified API handles the full transaction lifecycle automatically (execute, prove, submit). Each transaction method returns a transaction ID.
 
 ```typescript
-import { MidenClient } from "@miden-sdk/miden-sdk";
+import { MidenClient, AccountType } from "@miden-sdk/miden-sdk";
 
 try {
     const client = await MidenClient.create();
 
     const faucet = await client.accounts.create({
-        type: "faucet", symbol: "TEST", decimals: 8, maxSupply: 10_000_000n
+        type: AccountType.FungibleFaucet, symbol: "TEST", decimals: 8, maxSupply: 10_000_000n
     });
     const wallet = await client.accounts.create();
 
@@ -128,33 +128,6 @@ try {
     console.log("Swap transaction:", txId.toString());
 } catch (error) {
     console.error("Swap failed:", error.message);
-}
-```
-
-## Mint and Consume (Combined)
-
-A convenience method that mints, waits for confirmation, then consumes in one call:
-
-```typescript
-import { MidenClient } from "@miden-sdk/miden-sdk";
-
-try {
-    const client = await MidenClient.create();
-
-    const txId = await client.transactions.mintAndConsume({
-        faucet: faucet,
-        to: wallet,
-        amount: 1000n
-    });
-    console.log("Mint-and-consume transaction:", txId.toString());
-} catch (error) {
-    // Errors during the multi-step flow include a `step` property: "mint", "sync", or "consume".
-    // Errors before the mint (e.g., invalid inputs) will not have a `step`.
-    if (error.step) {
-        console.error(`Failed at step "${error.step}":`, error.message);
-    } else {
-        console.error("Failed:", error.message);
-    }
 }
 ```
 

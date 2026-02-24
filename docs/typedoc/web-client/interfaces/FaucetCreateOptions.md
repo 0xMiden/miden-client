@@ -8,9 +8,9 @@
 
 ## Properties
 
-### accountType
+### type
 
-> **accountType**: `"FungibleFaucet"`
+> **type**: `"FungibleFaucet"`
 
 ***
 

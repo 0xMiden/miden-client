@@ -8,9 +8,9 @@
 
 ## Properties
 
-### accountType?
+### type?
 
-> `optional` **accountType**: `"MutableWallet"` \| `"ImmutableWallet"`
+> `optional` **type**: `"MutableWallet"` \| `"ImmutableWallet"`
 
 Account type. Defaults to "MutableWallet". Use AccountType enum.
 

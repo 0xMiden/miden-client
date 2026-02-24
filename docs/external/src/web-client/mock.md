@@ -13,7 +13,7 @@ The mock client provides the same resource-based API as the real client (`client
 ## Basic Usage
 
 ```typescript
-import { MidenClient } from "@miden-sdk/miden-sdk";
+import { MidenClient, AccountType } from "@miden-sdk/miden-sdk";
 
 try {
     // Create a mock client
@@ -22,7 +22,7 @@ try {
     // Create accounts (same API as the real client)
     const wallet = await client.accounts.create();
     const faucet = await client.accounts.create({
-        type: "faucet",
+        type: AccountType.FungibleFaucet,
         symbol: "TEST",
         decimals: 8,
         maxSupply: 10_000_000n
@@ -102,7 +102,7 @@ await client.notes.sendPrivate({
 });
 
 // Fetch private notes
-await client.notes.fetch();
+await client.notes.fetchPrivate();
 
 // List received notes
 const notes = await client.notes.list();
