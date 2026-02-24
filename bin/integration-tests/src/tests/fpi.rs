@@ -273,7 +273,7 @@ pub async fn test_lazy_fpi_loading(client_config: ClientConfig) -> Result<()> {
         .compile_component_code(
             "miden::testing::fpi_lazy_component",
             format!(
-                "pub proc get_constant\n    dropw\n    push.{}\nend",
+                "pub proc get_constant\n    push.{}\n    swapw dropw\nend",
                 Word::from(constant_value)
             ),
         )
