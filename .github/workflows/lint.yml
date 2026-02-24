@@ -171,7 +171,7 @@ jobs:
       - name: Add Rust Cache
         uses: Swatinem/rust-cache@v2
         with:
-          shared-key: rust-release
+          shared-key: rust-nightly-release
           prefix-key: ${{ env.RUST_CACHE_KEY }}
           # save-if: ${{ github.ref == 'refs/heads/next' }}  # TODO: uncomment after testing
       - name: make - doc
