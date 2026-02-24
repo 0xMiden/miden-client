@@ -15,27 +15,15 @@ import {
 } from "./standalone.js";
 export * from "../Cargo.toml";
 
-// Extend the WASM AccountType with user-friendly string aliases for the simplified API.
-// The original WASM numeric variants (FungibleFaucet, RegularAccountImmutableCode, etc.)
-// are preserved for low-level AccountBuilder usage.
 export const AccountType = Object.freeze({
-  // Simplified API aliases (string values used by MidenClient.accounts.create/import)
   MutableWallet: "MutableWallet",
   ImmutableWallet: "ImmutableWallet",
   FungibleFaucet: "FungibleFaucet",
-  // Original WASM enum variants (numeric values used by AccountBuilder.accountType())
-  NonFungibleFaucet: 1,
-  RegularAccountImmutableCode: 2,
-  RegularAccountUpdatableCode: 3,
 });
 
 export const AuthScheme = Object.freeze({
-  // Simplified API aliases (string values used by MidenClient.accounts.create/import)
   Falcon: "falcon",
   ECDSA: "ecdsa",
-  // Original WASM enum variants (numeric values used by AccountComponent.createAuthComponentFromCommitment)
-  AuthRpoFalcon512: 0,
-  AuthEcdsaK256Keccak: 1,
 });
 
 export { MidenClient };

@@ -66,8 +66,6 @@ export declare const MidenArrays: MidenArrayConstructors;
 export declare const AuthScheme: {
   readonly Falcon: "falcon";
   readonly ECDSA: "ecdsa";
-  readonly AuthRpoFalcon512: 0;
-  readonly AuthEcdsaK256Keccak: 1;
 };
 
 /**
@@ -77,8 +75,6 @@ export type AuthSchemeType = (typeof AuthScheme)[keyof typeof AuthScheme];
 
 /**
  * Union of all values in the AccountType const.
- * Includes string aliases ("MutableWallet", etc.) for the simplified API
- * and numeric variants (1, 2, 3) matching the original WASM enum.
  */
 export type AccountType = (typeof AccountType)[keyof typeof AccountType];
 
@@ -91,9 +87,6 @@ export declare const AccountType: {
   readonly MutableWallet: "MutableWallet";
   readonly ImmutableWallet: "ImmutableWallet";
   readonly FungibleFaucet: "FungibleFaucet";
-  readonly NonFungibleFaucet: 1;
-  readonly RegularAccountImmutableCode: 2;
-  readonly RegularAccountUpdatableCode: 3;
 };
 
 /** Union of valid AccountType string values. */

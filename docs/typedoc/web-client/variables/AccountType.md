@@ -25,15 +25,3 @@ Replaces the WASM `AccountType` enum (which has internal names like
 ### MutableWallet
 
 > `readonly` **MutableWallet**: `"MutableWallet"`
-
-### NonFungibleFaucet
-
-> `readonly` **NonFungibleFaucet**: `1`
-
-### RegularAccountImmutableCode
-
-> `readonly` **RegularAccountImmutableCode**: `2`
-
-### RegularAccountUpdatableCode
-
-> `readonly` **RegularAccountUpdatableCode**: `3`
