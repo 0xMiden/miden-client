@@ -136,6 +136,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: yarn
+          cache-dependency-path: |
+            crates/web-client/yarn.lock
+            crates/idxdb-store/src/yarn.lock
       - name: Install Rust with wasm target
         run: |
           rustup update --no-self-update
