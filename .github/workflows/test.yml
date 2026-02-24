@@ -36,7 +36,7 @@ jobs:
         with:
           shared-key: rust-release
           prefix-key: ${{ env.RUST_CACHE_KEY }}
-          # save-if: ${{ github.ref == 'refs/heads/next' }}  # TODO: uncomment after testing
+          save-if: ${{ github.ref == 'refs/heads/next' }}
       - uses: taiki-e/install-action@v2
         with:
           tool: nextest@0.9.122
@@ -52,7 +52,7 @@ jobs:
         with:
           shared-key: rust-debug
           prefix-key: ${{ env.RUST_CACHE_KEY }}
-          # save-if: ${{ github.ref == 'refs/heads/next' }}  # TODO: uncomment after testing
+          save-if: ${{ github.ref == 'refs/heads/next' }}
       - name: Install rust
         run: rustup update --no-self-update
       - name: Run doc-tests
@@ -135,7 +135,7 @@ jobs:
         with:
           shared-key: rust-release
           prefix-key: ${{ env.RUST_CACHE_KEY }}
-          # save-if: ${{ github.ref == 'refs/heads/next' }}  # TODO: uncomment after testing
+          save-if: ${{ github.ref == 'refs/heads/next' }}
       - name: Restore node-builder binary
         uses: actions/cache@v4
         with:
@@ -180,7 +180,7 @@ jobs:
         with:
           shared-key: rust-wasm
           prefix-key: ${{ env.RUST_CACHE_KEY }}
-          # save-if: ${{ github.ref == 'refs/heads/next' }}  # TODO: uncomment after testing
+          save-if: ${{ github.ref == 'refs/heads/next' }}
 
       - name: Install Node.js
         uses: actions/setup-node@v4
@@ -298,7 +298,7 @@ jobs:
         with:
           shared-key: rust-release
           prefix-key: ${{ env.RUST_CACHE_KEY }}
-          # save-if: ${{ github.ref == 'refs/heads/next' }}  # TODO: uncomment after testing
+          save-if: ${{ github.ref == 'refs/heads/next' }}
       - name: Restore node-builder binary
         uses: actions/cache@v4
         with:
