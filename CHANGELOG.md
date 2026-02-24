@@ -20,6 +20,7 @@
 * [BREAKING] Added a `AccountReader` accessible through `Client::account_reader` to read account data without needing to load the whole `Account` ([#1713](https://github.com/0xMiden/miden-client/pull/1713), [#1716](https://github.com/0xMiden/miden-client/pull/1716)).
 * [BREAKING] Added `Keystore` trait that extends `TransactionAuthenticator` to provide a unified interface for key storage, retrieval, and account-key mapping, enabling custom keystore implementations. `Keystore` replaces `TransactionAuthenticator` in `Client` and provides a way to map from account IDs to public keys (registering them separately is not required anymore). ([#1726](https://github.com/0xMiden/miden-client/pull/1726)).
 * Refactored integration tests binary with subprocess-per-test execution; added automatic retry of failed tests (`--retry-count`), captured stdout/stderr per test, and tracing support via `RUST_LOG` ([#1743](https://github.com/0xMiden/miden-client/pull/1743)).
+* Improved integration test logging with a `--verbose` flag for info-level tracing, routed tracing output to stderr to avoid corrupting subprocess JSON, and added `tracing::info!` instrumentation to test helpers ([#1816](https://github.com/0xMiden/miden-client/pull/1816)).
 * Added implementation for the `get_public_key` method on the `FilesystemKeystore` and `WebKeystore` ([#1731](https://github.com/0xMiden/miden-client/pull/1731)).
 * [BREAKING] Made the nullifiers sync optional on the `StateSync` component ([#1756](https://github.com/0xMiden/miden-client/pull/1756)).
 
