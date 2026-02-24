@@ -17,7 +17,8 @@ all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [package.metadata.cargo-machete]
-ignored = ["getrandom"]
+# "prost-types" and "tonic-prost" are ignored because they are needed by the generated proto bindings.
+ignored = ["getrandom", "prost-types", "tonic-prost"]
 
 [lib]
 crate-type = ["lib"]
