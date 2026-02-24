@@ -30,8 +30,12 @@ export const AccountType = Object.freeze({
 });
 
 export const AuthScheme = Object.freeze({
+  // Simplified API aliases (string values used by MidenClient.accounts.create/import)
   Falcon: "falcon",
   ECDSA: "ecdsa",
+  // Original WASM enum variants (numeric values used by AccountComponent.createAuthComponentFromCommitment)
+  AuthRpoFalcon512: 0,
+  AuthEcdsaK256Keccak: 1,
 });
 
 export { MidenClient };

@@ -66,6 +66,8 @@ export declare const MidenArrays: MidenArrayConstructors;
 export declare const AuthScheme: {
   readonly Falcon: "falcon";
   readonly ECDSA: "ecdsa";
+  readonly AuthRpoFalcon512: 0;
+  readonly AuthEcdsaK256Keccak: 1;
 };
 
 /**
