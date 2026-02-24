@@ -46,6 +46,10 @@ try {
 
 ### Importing a Public Account from Seed
 
+:::warning[Public accounts only]
+Import-by-seed **only works for public accounts** — those originally created with `storage: "public"`. Private account state is not available on-chain, so it cannot be reconstructed from a seed alone. To transfer a private account between clients, use the [account file export/import](#importing-from-an-account-file) workflow instead.
+:::
+
 Import a public account using an initialization seed:
 
 ```typescript
@@ -64,10 +68,6 @@ try {
     console.error("Failed to import public account:", error.message);
 }
 ```
-
-:::warning
-Import-by-seed only works for public accounts. The account must have been originally created with `storage: "public"`.
-:::
 
 ## Importing Notes
 
