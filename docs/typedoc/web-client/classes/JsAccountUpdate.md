@@ -34,14 +34,6 @@ The account's asset vault.
 
 ***
 
-### assetVaultRoot
-
-> **assetVaultRoot**: `string`
-
-The merkle root of the account's asset vault.
-
-***
-
 ### codeRoot
 
 > **codeRoot**: `string`
@@ -87,6 +79,14 @@ The merkle root of the account's storage trie.
 > **storageSlots**: [`JsStorageSlot`](JsStorageSlot.md)[]
 
 Serialized storage slot data for this account.
+
+***
+
+### vaultRoot
+
+> **vaultRoot**: `string`
+
+The merkle root of the account's asset vault.
 
 ## Accessors
 
