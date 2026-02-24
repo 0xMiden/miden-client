@@ -289,7 +289,7 @@ impl DataStore for ClientDataStore {
                 })?;
 
             // Persist for future lookups.
-            if let Err(err) = store.upsert_note_scripts(&[note_script.clone()]).await {
+            if let Err(err) = store.upsert_note_scripts(core::slice::from_ref(&note_script)).await {
                 tracing::warn!(
                     %err,
                     "Failed to persist fetched note script to store"
