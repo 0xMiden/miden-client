@@ -687,6 +687,7 @@ where
 
         for foreign_account in foreign_accounts {
             let account_id = foreign_account.account_id();
+            let storage_requirements = foreign_account.storage_slot_requirements();
             let known_account_code = self
                 .store
                 .get_foreign_account_code(vec![account_id])
@@ -697,7 +698,8 @@ where
             let (_, account_proof) = self
                 .rpc_api
                 .get_account_proof(
-                    foreign_account.clone(),
+                    account_id,
+                    storage_requirements,
                     AccountStateAt::Block(block_num),
                     known_account_code,
                 )
