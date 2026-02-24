@@ -32,7 +32,7 @@ else
   git -C "$TRANSPORT_DIR" reset --hard "origin/$BRANCH"
 fi
 
-BINARY_PATH="$TRANSPORT_CARGO_TARGET_DIR/release/miden-note-transport"
+BINARY_PATH="$TRANSPORT_CARGO_TARGET_DIR/release/miden-note-transport-node-bin"
 BUILD_HASH_FILE="$TRANSPORT_CARGO_TARGET_DIR/.build-hash"
 CURRENT_HASH=$(git -C "$TRANSPORT_DIR" rev-parse HEAD)
 
