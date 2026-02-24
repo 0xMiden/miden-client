@@ -117,7 +117,7 @@ start-node: ## Start the testing node server
 
 .PHONY: start-node-background
 start-node-background: ## Start the testing node server in background
-	./scripts/start-binary-bg.sh node-builder testing-node-builder
+	./scripts/start-binary-bg.sh testing-node-builder
 
 .PHONY: stop-node
 stop-node: ## Stop the testing node server
