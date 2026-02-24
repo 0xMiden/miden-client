@@ -33,15 +33,12 @@ else
 fi
 
 BINARY_PATH="$TRANSPORT_CARGO_TARGET_DIR/release/miden-note-transport-node-bin"
-BUILD_HASH_FILE="$TRANSPORT_CARGO_TARGET_DIR/.build-hash"
-CURRENT_HASH=$(git -C "$TRANSPORT_DIR" rev-parse HEAD)
 
-if [ -x "$BINARY_PATH" ] && [ -f "$BUILD_HASH_FILE" ] && [ "$(cat "$BUILD_HASH_FILE")" = "$CURRENT_HASH" ]; then
-  echo "Note transport binary found (built from $CURRENT_HASH), skipping build"
+if [ -x "$BINARY_PATH" ]; then
+  echo "Note transport binary found, skipping build"
 else
-  echo "Building note transport service (commit $CURRENT_HASH)..."
+  echo "Building note transport service..."
   ( cd "$TRANSPORT_DIR" && CARGO_TARGET_DIR="$TRANSPORT_CARGO_TARGET_DIR" cargo build --release --locked )
-  echo "$CURRENT_HASH" > "$BUILD_HASH_FILE"
 fi
 
 echo "Starting note transport service in background..."

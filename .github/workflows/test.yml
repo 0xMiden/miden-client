@@ -144,12 +144,8 @@ jobs:
       - name: Restore note-transport binary
         uses: actions/cache@v4
         with:
-          path: |
-            target/note-transport/release/miden-note-transport-node-bin
-            target/note-transport/.build-hash
+          path: target/note-transport/release/miden-note-transport-node-bin
           key: ${{ runner.os }}-note-transport-${{ hashFiles('Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-note-transport-
       - name: Start test node
         run: make start-node-background
       - name: Start note transport
