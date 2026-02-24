@@ -29,6 +29,7 @@ use miden_client::crypto::{InOrderIndex, MmrPeaks};
 use miden_client::note::{BlockNumber, NoteScript, Nullifier};
 use miden_client::store::{
     AccountRecord,
+    AccountSmtForest,
     AccountStatus,
     AccountStorageFilter,
     BlockRelevance,
@@ -44,6 +45,8 @@ use miden_client::sync::{NoteTagRecord, StateSyncUpdate};
 use miden_client::transaction::{TransactionRecord, TransactionStoreUpdate};
 use serde::de::Error;
 use serde::{Deserialize, Deserializer};
+use std::sync::{Arc, RwLock};
+
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::{JsFuture, js_sys};
 
@@ -82,19 +85,43 @@ extern "C" {
 /// which would prevent the struct from being Send + Sync.
 pub struct WebStore {
     database_id: String,
+    pub(crate) smt_forest: Arc<RwLock<AccountSmtForest>>,
 }
 
 impl WebStore {
     pub async fn new(database_name: String) -> Result<WebStore, JsValue> {
         let promise = open_database(database_name.as_str(), CLIENT_VERSION);
         let _db_id = JsFuture::from(promise).await?;
-        Ok(WebStore { database_id: database_name })
+
+        let store = WebStore {
+            database_id: database_name,
+            smt_forest: Arc::new(RwLock::new(AccountSmtForest::new())),
+        };
+
+        // Initialize SMT forest with all existing accounts
+        for id in store.get_account_ids().await.map_err(js_error)? {
+            let vault = store.get_account_vault(id).await.map_err(js_error)?;
+            let storage = store
+                .get_account_storage(id, AccountStorageFilter::All)
+                .await
+                .map_err(js_error)?;
+
+            let mut smt_forest = store.smt_forest.write().expect("smt_forest write lock");
+            smt_forest.insert_account_state(&vault, &storage).map_err(js_error)?;
+        }
+
+        Ok(store)
     }
 
     /// Returns the database ID as a string slice for passing to JS functions.
     pub(crate) fn db_id(&self) -> &str {
         self.database_id.as_str()
     }
+}
+
+/// Converts a displayable error into a `JsValue` for WASM interop.
+fn js_error(e: impl core::fmt::Display) -> JsValue {
+    JsValue::from_str(&e.to_string())
 }
 
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
