@@ -17,11 +17,19 @@
 
 ### Changes
 
+* [BREAKING][arch][web] Replaced the `WebClient` class with a new `MidenClient` resource-based API as the primary web SDK entry point. `WebClient` is still available as `WasmWebClient` for low-level access but is no longer part of the public API. All documentation has been updated to use `MidenClient`. Migration: replace `WebClient.createClient(rpcUrl, noteTransportUrl, seed, storeName)` with `MidenClient.create({ rpcUrl, noteTransportUrl, seed, storeName })`, and replace direct method calls (e.g. `client.newWallet(...)`, `client.submitNewTransaction(...)`, `client.getAccounts()`) with resource methods (e.g. `client.accounts.create()`, `client.transactions.send(...)`, `client.accounts.list()`). ([#1762](https://github.com/0xMiden/miden-client/pull/1762))
+* [BREAKING][type][web] `AccountId.fromHex()` now returns `Result` (throws on invalid hex) instead of silently panicking via `unwrap()`. ([#1762](https://github.com/0xMiden/miden-client/pull/1762))
 * [BREAKING] Added a `AccountReader` accessible through `Client::account_reader` to read account data without needing to load the whole `Account` ([#1713](https://github.com/0xMiden/miden-client/pull/1713), [#1716](https://github.com/0xMiden/miden-client/pull/1716)).
 * [BREAKING] Added `Keystore` trait that extends `TransactionAuthenticator` to provide a unified interface for key storage, retrieval, and account-key mapping, enabling custom keystore implementations. `Keystore` replaces `TransactionAuthenticator` in `Client` and provides a way to map from account IDs to public keys (registering them separately is not required anymore). ([#1726](https://github.com/0xMiden/miden-client/pull/1726)).
 * Refactored integration tests binary with subprocess-per-test execution; added automatic retry of failed tests (`--retry-count`), captured stdout/stderr per test, and tracing support via `RUST_LOG` ([#1743](https://github.com/0xMiden/miden-client/pull/1743)).
 * Added implementation for the `get_public_key` method on the `FilesystemKeystore` and `WebKeystore` ([#1731](https://github.com/0xMiden/miden-client/pull/1731)).
 * [BREAKING] Made the nullifiers sync optional on the `StateSync` component ([#1756](https://github.com/0xMiden/miden-client/pull/1756)).
+
+### Features
+
+* [FEATURE][web] New `MidenClient` class with resource-based API (`client.accounts`, `client.transactions`, `client.notes`, `client.tags`, `client.settings`). Provides high-level transaction helpers (`send`, `mint`, `consume`, `swap`, `consumeAll`), transaction dry-runs via `preview()`, confirmation polling via `waitFor()`, and flexible account/note references that accept hex strings, bech32 strings, or WASM objects interchangeably (`AccountRef`, `NoteInput` types). Factory methods: `MidenClient.create()`, `MidenClient.createTestnet()`, `MidenClient.createMock()`. ([#1762](https://github.com/0xMiden/miden-client/pull/1762))
+* [FEATURE][web] Added `TransactionId.fromHex()` static constructor for creating transaction IDs from hex strings. ([#1762](https://github.com/0xMiden/miden-client/pull/1762))
+* [FEATURE][web] Added standalone tree-shakeable note utilities (`createP2IDNote`, `createP2IDENote`, `buildSwapTag`) usable without a client instance. ([#1762](https://github.com/0xMiden/miden-client/pull/1762))
 
 ## 0.13.1 (TBD)
 
