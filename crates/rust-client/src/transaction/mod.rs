@@ -529,14 +529,15 @@ where
         for note in output_notes {
             if output_note_relevances.contains_key(&note.id()) {
                 let metadata = note.metadata().clone();
+                let tag = metadata.tag();
 
                 new_input_notes.push(InputNoteRecord::new(
                     note.into(),
                     current_timestamp,
                     ExpectedNoteState {
-                        metadata: Some(metadata.clone()),
+                        metadata: Some(metadata),
                         after_block_num: submission_height,
-                        tag: Some(metadata.tag()),
+                        tag: Some(tag),
                     }
                     .into(),
                 ));
@@ -721,7 +722,7 @@ where
                 ForeignAccount::Private(partial_account) => {
                     let (witness, _) = account_proof.into_parts();
 
-                    AccountInputs::new(partial_account.clone(), witness)
+                    AccountInputs::new(partial_account, witness)
                 },
             };
 

@@ -943,9 +943,8 @@ impl NodeRpcClient for GrpcClient {
     }
 
     async fn get_network_id(&self) -> Result<NetworkId, RpcError> {
-        let endpoint_str: &str = &self.endpoint.clone();
         let endpoint: Endpoint =
-            Endpoint::try_from(endpoint_str).map_err(RpcError::InvalidNodeEndpoint)?;
+            Endpoint::try_from(self.endpoint.as_str()).map_err(RpcError::InvalidNodeEndpoint)?;
         Ok(endpoint.to_network_id())
     }
 
