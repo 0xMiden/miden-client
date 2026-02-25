@@ -504,7 +504,19 @@ impl WebStore {
         let account_commitments =
             account_states.iter().map(ToString::to_string).collect::<Vec<_>>();
         let promise = idxdb_undo_account_states(self.db_id(), account_commitments);
-        await_js_value(promise, "failed to undo account states").await?;
+        let smt_root_strings: Vec<String> =
+            await_js(promise, "failed to undo account states").await?;
+
+        // Pop undone SMT roots from the forest to release memory
+        let smt_roots: Vec<Word> = smt_root_strings
+            .iter()
+            .filter_map(|s| Word::try_from(s.as_str()).ok())
+            .collect();
+
+        if !smt_roots.is_empty() {
+            let mut smt_forest = self.smt_forest.write().expect("smt_forest write lock");
+            smt_forest.pop_roots(smt_roots);
+        }
 
         Ok(())
     }
