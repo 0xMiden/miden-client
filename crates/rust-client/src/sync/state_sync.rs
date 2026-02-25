@@ -564,7 +564,7 @@ mod tests {
         }
     }
 
-    fn empty_input() -> StateSyncInput {
+    fn empty() -> StateSyncInput {
         StateSyncInput {
             accounts: vec![],
             note_tags: BTreeSet::new(),
@@ -589,7 +589,7 @@ mod tests {
         assert_eq!(partial_mmr.forest().num_leaves(), 1);
 
         // First sync
-        let update = state_sync.sync_state(&mut partial_mmr, empty_input()).await.unwrap();
+        let update = state_sync.sync_state(&mut partial_mmr, empty()).await.unwrap();
 
         assert_eq!(update.block_num, chain_tip_1);
         let forest_1 = partial_mmr.forest();
@@ -600,7 +600,7 @@ mod tests {
         mock_rpc.advance_blocks(2);
         let chain_tip_2 = mock_rpc.get_chain_tip_block_num();
 
-        let update = state_sync.sync_state(&mut partial_mmr, empty_input()).await.unwrap();
+        let update = state_sync.sync_state(&mut partial_mmr, empty()).await.unwrap();
 
         assert_eq!(update.block_num, chain_tip_2);
         let forest_2 = partial_mmr.forest();
@@ -608,7 +608,7 @@ mod tests {
         assert_eq!(forest_2.num_leaves(), chain_tip_2.as_u32() as usize + 1);
 
         // Third sync (no new blocks)
-        let update = state_sync.sync_state(&mut partial_mmr, empty_input()).await.unwrap();
+        let update = state_sync.sync_state(&mut partial_mmr, empty()).await.unwrap();
 
         assert_eq!(update.block_num, chain_tip_2);
         assert_eq!(partial_mmr.forest(), forest_2);
