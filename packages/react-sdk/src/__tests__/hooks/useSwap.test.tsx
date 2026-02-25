@@ -133,7 +133,7 @@ describe("useSwap", () => {
           requestedFaucetId: "0xfaucetB",
           requestedAmount: 100n,
           noteType: "public",
-          paybackNoteType: "encrypted",
+          paybackNoteType: "public",
         });
       });
 
@@ -170,7 +170,7 @@ describe("useSwap", () => {
         });
       });
 
-      // Public / Encrypted
+      // Public / Public
       act(() => {
         result.current.reset();
       });
@@ -182,7 +182,7 @@ describe("useSwap", () => {
           requestedFaucetId: "0xB",
           requestedAmount: 1n,
           noteType: "public",
-          paybackNoteType: "encrypted",
+          paybackNoteType: "public",
         });
       });
 

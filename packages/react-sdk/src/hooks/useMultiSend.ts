@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useMiden } from "../context/MidenProvider";
 import {
   FungibleAsset,
@@ -8,10 +8,8 @@ import {
   NoteType,
   OutputNote,
   OutputNoteArray,
-  TransactionFilter,
   TransactionRequestBuilder,
 } from "@miden-sdk/miden-sdk";
-import type { TransactionId } from "@miden-sdk/miden-sdk";
 import type {
   MultiSendOptions,
   TransactionStage,
@@ -19,6 +17,10 @@ import type {
 } from "../types";
 import { DEFAULTS } from "../types";
 import { parseAccountId, parseAddress } from "../utils/accountParsing";
+import { createNoteAttachment } from "../utils/noteAttachment";
+import { MidenError } from "../utils/errors";
+import { getNoteType, waitForTransactionCommit } from "../utils/noteFilters";
+import type { ClientWithTransactions } from "../utils/noteFilters";
 
 export interface UseMultiSendResult {
   /** Create multiple P2ID output notes in one transaction */
@@ -34,20 +36,6 @@ export interface UseMultiSendResult {
   /** Reset the hook state */
   reset: () => void;
 }
-
-type ClientWithTransactions = {
-  syncState: () => Promise<unknown>;
-  getTransactions: (filter: TransactionFilter) => Promise<
-    Array<{
-      id: () => { toHex: () => string };
-      transactionStatus: () => {
-        isPending: () => boolean;
-        isCommitted: () => boolean;
-        isDiscarded: () => boolean;
-      };
-    }>
-  >;
-};
 
 /**
  * Hook to create a multi-send transaction (multiple P2ID notes).
@@ -79,6 +67,7 @@ type ClientWithTransactions = {
  */
 export function useMultiSend(): UseMultiSendResult {
   const { client, isReady, sync, prover } = useMiden();
+  const isBusyRef = useRef(false);
 
   const [result, setResult] = useState<TransactionResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -95,32 +84,58 @@ export function useMultiSend(): UseMultiSendResult {
         throw new Error("No recipients provided");
       }
 
+      if (isBusyRef.current) {
+        throw new MidenError(
+          "A send is already in progress. Await the previous send before starting another.",
+          { code: "SEND_BUSY" }
+        );
+      }
+
+      isBusyRef.current = true;
       setIsLoading(true);
       setStage("executing");
       setError(null);
 
       try {
-        const noteType = getNoteType(options.noteType ?? DEFAULTS.NOTE_TYPE);
-        const senderId = parseAccountId(options.from);
-        const assetId = parseAccountId(options.assetId);
+        // Auto-sync before send unless opted out
+        if (!options.skipSync) {
+          await sync();
+        }
 
-        const outputs = options.recipients.map(({ to, amount }) => {
-          const receiverId = parseAccountId(to);
-          const assets = new NoteAssets([new FungibleAsset(assetId, amount)]);
-          const note = Note.createP2IDNote(
-            senderId,
-            receiverId,
-            assets,
-            noteType,
-            new NoteAttachment()
-          );
-          const recipientAddress = parseAddress(to, receiverId);
-          return {
-            outputNote: OutputNote.full(note),
-            note,
-            recipientAddress,
-          };
-        });
+        const noteType = getNoteType(options.noteType ?? DEFAULTS.NOTE_TYPE);
+
+        const outputs = options.recipients.map(
+          ({ to, amount, attachment, noteType: recipientNoteType }) => {
+            // Create fresh WASM objects per iteration to avoid use-after-consume
+            const iterSenderId = parseAccountId(options.from);
+            const iterAssetId = parseAccountId(options.assetId);
+            const receiverId = parseAccountId(to);
+            const assets = new NoteAssets([
+              new FungibleAsset(iterAssetId, amount),
+            ]);
+            const resolvedNoteType = recipientNoteType
+              ? getNoteType(recipientNoteType)
+              : noteType;
+            const noteAttachment =
+              attachment !== undefined && attachment !== null
+                ? createNoteAttachment(attachment)
+                : new NoteAttachment();
+            const note = Note.createP2IDNote(
+              iterSenderId,
+              receiverId,
+              assets,
+              resolvedNoteType,
+              noteAttachment
+            );
+            const recipientAddress = parseAddress(to, receiverId);
+            return {
+              outputNote: OutputNote.full(note),
+              note,
+              recipientAddress,
+              noteType: resolvedNoteType,
+            };
+          }
+        );
 
         const txRequest = new TransactionRequestBuilder()
           .withOwnOutputNotes(
@@ -128,7 +143,11 @@ export function useMultiSend(): UseMultiSendResult {
           )
           .build();
 
-        const txResult = await client.executeTransaction(senderId, txRequest);
+        const txSenderId = parseAccountId(options.from);
+        const txResult = await client.executeTransaction(
+          txSenderId,
+          txRequest
+        );
 
         setStage("proving");
         const provenTransaction = await client.proveTransaction(
@@ -142,21 +161,28 @@ export function useMultiSend(): UseMultiSendResult {
           txResult
         );
 
-        // Save txId BEFORE applyTransaction, which consumes the WASM pointer
-        // inside txResult.
-        const txId = txResult.id();
-        const txIdString = txId.toString();
+        // Save txId hex/string BEFORE applyTransaction, which consumes the
+        // WASM pointer inside txResult (and any child objects).
+        const txIdHex = txResult.id().toHex();
+        const txIdString = txResult.id().toString();
 
         await client.applyTransaction(txResult, submissionHeight);
 
-        if (noteType === NoteType.Private) {
+        // Send private notes after commit
+        const hasPrivate = outputs.some((o) => o.noteType === NoteType.Private);
+        if (hasPrivate) {
           await waitForTransactionCommit(
-            client as ClientWithTransactions,
-            txId
+            client as unknown as ClientWithTransactions,
+            txIdHex
           );
 
           for (const output of outputs) {
-            await client.sendPrivateNote(output.note, output.recipientAddress);
+            if (output.noteType === NoteType.Private) {
+              await client.sendPrivateNote(
+                output.note,
+                output.recipientAddress
+              );
+            }
           }
         }
 
@@ -175,6 +201,7 @@ export function useMultiSend(): UseMultiSendResult {
         throw error;
       } finally {
         setIsLoading(false);
+        isBusyRef.current = false;
       }
     },
     [client, isReady, prover, sync]
@@ -195,46 +222,4 @@ export function useMultiSend(): UseMultiSendResult {
     error,
     reset,
   };
-}
-
-function getNoteType(type: "private" | "public" | "encrypted"): NoteType {
-  switch (type) {
-    case "private":
-      return NoteType.Private;
-    case "public":
-      return NoteType.Public;
-    case "encrypted":
-      return NoteType.Encrypted;
-    default:
-      return NoteType.Private;
-  }
-}
-
-async function waitForTransactionCommit(
-  client: ClientWithTransactions,
-  txId: TransactionId,
-  maxWaitMs = 10_000,
-  delayMs = 1_000
-) {
-  let waited = 0;
-
-  while (waited < maxWaitMs) {
-    await client.syncState();
-    const [record] = await client.getTransactions(
-      TransactionFilter.ids([txId])
-    );
-    if (record) {
-      const status = record.transactionStatus();
-      if (status.isCommitted()) {
-        return;
-      }
-      if (status.isDiscarded()) {
-        throw new Error("Transaction was discarded before commit");
-      }
-    }
-    await new Promise((resolve) => setTimeout(resolve, delayMs));
-    waited += delayMs;
-  }
-
-  throw new Error("Timeout waiting for transaction commit");
 }

@@ -151,6 +151,10 @@ export interface AssetBalance {
 export interface NotesFilter {
   status?: "all" | "consumed" | "committed" | "expected" | "processing";
   accountId?: string;
+  /** Only notes from this sender (any format, normalized internally) */
+  sender?: string;
+  /** Exclude these note IDs */
+  excludeIds?: string[];
 }
 
 export interface NotesResult {
@@ -257,14 +261,20 @@ export interface SendOptions {
   to: string;
   /** Asset ID to send (token id) */
   assetId: string;
-  /** Amount to send */
-  amount: bigint;
+  /** Amount to send (ignored when sendAll is true) */
+  amount?: bigint;
   /** Note type. Default: private */
-  noteType?: "private" | "public" | "encrypted";
+  noteType?: "private" | "public";
   /** Block height after which sender can reclaim note */
   recallHeight?: number;
   /** Block height after which recipient can consume note */
   timelockHeight?: number;
+  /** Arbitrary data payload attached to the note */
+  attachment?: bigint[] | Uint8Array | number[];
+  /** Skip auto-sync before send. Default: false */
+  skipSync?: boolean;
+  /** Send the full balance of this asset. When true, amount is ignored. */
+  sendAll?: boolean;
 }
 
 export interface MultiSendRecipient {
@@ -272,6 +282,10 @@ export interface MultiSendRecipient {
   to: string;
   /** Amount to send */
   amount: bigint;
+  /** Per-recipient note type override */
+  noteType?: "private" | "public";
+  /** Per-recipient attachment */
+  attachment?: bigint[] | Uint8Array | number[];
 }
 
 export interface MultiSendOptions {
@@ -281,8 +295,10 @@ export interface MultiSendOptions {
   assetId: string;
   /** Recipient list */
   recipients: MultiSendRecipient[];
-  /** Note type. Default: private */
-  noteType?: "private" | "public" | "encrypted";
+  /** Default note type for all recipients. Default: private */
+  noteType?: "private" | "public";
+  /** Skip auto-sync before send. Default: false */
+  skipSync?: boolean;
 }
 
 export interface InternalTransferOptions {
@@ -295,7 +311,7 @@ export interface InternalTransferOptions {
   /** Amount to transfer */
   amount: bigint;
   /** Note type. Default: private */
-  noteType?: "private" | "public" | "encrypted";
+  noteType?: "private" | "public";
 }
 
 export interface InternalTransferChainOptions {
@@ -308,7 +324,7 @@ export interface InternalTransferChainOptions {
   /** Amount to transfer per hop */
   amount: bigint;
   /** Note type. Default: private */
-  noteType?: "private" | "public" | "encrypted";
+  noteType?: "private" | "public";
 }
 
 export interface InternalTransferResult {
@@ -344,7 +360,7 @@ export interface MintOptions {
   /** Amount to mint */
   amount: bigint;
   /** Note type. Default: private */
-  noteType?: "private" | "public" | "encrypted";
+  noteType?: "private" | "public";
 }
 
 // Consume options
@@ -368,9 +384,9 @@ export interface SwapOptions {
   /** Amount being requested */
   requestedAmount: bigint;
   /** Note type for swap note. Default: private */
-  noteType?: "private" | "public" | "encrypted";
+  noteType?: "private" | "public";
   /** Note type for payback note. Default: private */
-  paybackNoteType?: "private" | "public" | "encrypted";
+  paybackNoteType?: "private" | "public";
 }
 
 // Arbitrary transaction options
@@ -381,11 +397,103 @@ export interface ExecuteTransactionOptions {
   request:
     | TransactionRequest
     | ((client: WebClient) => TransactionRequest | Promise<TransactionRequest>);
+  /** Skip auto-sync before transaction. Default: false */
+  skipSync?: boolean;
 }
 
 // Transaction result
 export interface TransactionResult {
   transactionId: string;
+}
+
+// --- useNoteStream types ---
+
+export interface StreamedNote {
+  /** Note ID (hex string) */
+  id: string;
+  /** Sender account ID (bech32 if available) */
+  sender: string;
+  /** First fungible asset amount (convenience; 0n if no fungible assets) */
+  amount: bigint;
+  /** All assets on the note */
+  assets: NoteAsset[];
+  /** The underlying InputNoteRecord for escape-hatch access */
+  record: InputNoteRecord;
+  /** Timestamp (ms) when this note was first observed by the SDK */
+  firstSeenAt: number;
+  /** Pre-decoded attachment values, or null if no attachment */
+  attachment: bigint[] | null;
+}
+
+export interface UseNoteStreamOptions {
+  /** Note status filter. Default: "committed" */
+  status?: "all" | "consumed" | "committed" | "expected" | "processing";
+  /** Only notes from this sender (any format, normalized internally) */
+  sender?: string | null;
+  /** Only notes first seen after this timestamp */
+  since?: number;
+  /** Exclude these note IDs (for cross-phase stale filtering) */
+  excludeIds?: Set<string> | string[];
+  /** Filter by primary asset amount */
+  amountFilter?: (amount: bigint) => boolean;
+}
+
+export interface UseNoteStreamReturn {
+  /** Notes matching all filter criteria */
+  notes: StreamedNote[];
+  /** Most recent note (convenience) */
+  latest: StreamedNote | null;
+  /** Mark a note as handled (excluded from future renders) */
+  markHandled: (noteId: string) => void;
+  /** Mark all current notes as handled */
+  markAllHandled: () => void;
+  /** Snapshot current state for passing to next phase */
+  snapshot: () => { ids: Set<string>; timestamp: number };
+  isLoading: boolean;
+  error: Error | null;
+}
+
+// --- useSessionAccount types ---
+
+export interface UseSessionAccountOptions {
+  /** Callback to fund the session wallet. Receives the session wallet ID. */
+  fund: (sessionAccountId: string) => Promise<void>;
+  /** Asset ID of the funding token (reserved for future filtering of consumable notes) */
+  assetId?: string;
+  /** Wallet creation options */
+  walletOptions?: {
+    storageMode?: "private" | "public";
+    mutable?: boolean;
+    authScheme?: 0 | 1;
+  };
+  /** Polling interval for funding note detection (ms). Default: 3000 */
+  pollIntervalMs?: number;
+  /** Maximum time to wait for funding note (ms). Default: 60000 */
+  maxWaitMs?: number;
+  /** localStorage key prefix for persistence. Default: "miden-session" */
+  storagePrefix?: string;
+}
+
+export type SessionAccountStep =
+  | "idle"
+  | "creating"
+  | "funding"
+  | "consuming"
+  | "ready";
+
+export interface UseSessionAccountReturn {
+  /** Start the create->fund->consume flow */
+  initialize: () => Promise<void>;
+  /** Session wallet ID (bech32), or null if not yet created */
+  sessionAccountId: string | null;
+  /** Whether the session wallet is funded and ready */
+  isReady: boolean;
+  /** Current step */
+  step: SessionAccountStep;
+  /** Error from any step */
+  error: Error | null;
+  /** Clear all session data and reset */
+  reset: () => void;
 }
 
 // Default values

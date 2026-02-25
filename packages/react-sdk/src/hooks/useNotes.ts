@@ -6,11 +6,13 @@ import {
   useConsumableNotesStore,
   useSyncStateStore,
 } from "../store/MidenStore";
-import { NoteFilter, NoteFilterTypes } from "@miden-sdk/miden-sdk";
+import { NoteFilter } from "@miden-sdk/miden-sdk";
 import type { NotesFilter, NotesResult, NoteSummary } from "../types";
 import { getNoteSummary } from "../utils/notes";
 import { useAssetMetadata } from "./useAssetMetadata";
 import { parseAccountId } from "../utils/accountParsing";
+import { normalizeAccountId } from "../utils/accountId";
+import { getNoteFilterType } from "../utils/noteFilters";
 
 /**
  * Hook to list notes.
@@ -52,8 +54,10 @@ export function useNotes(options?: NotesFilter): NotesResult {
   const consumableNotes = useConsumableNotesStore();
   const isLoadingNotes = useMidenStore((state) => state.isLoadingNotes);
   const setLoadingNotes = useMidenStore((state) => state.setLoadingNotes);
-  const setNotes = useMidenStore((state) => state.setNotes);
-  const setConsumableNotes = useMidenStore((state) => state.setConsumableNotes);
+  const setNotesIfChanged = useMidenStore((state) => state.setNotesIfChanged);
+  const setConsumableNotesIfChanged = useMidenStore(
+    (state) => state.setConsumableNotesIfChanged
+  );
   const { lastSyncTime } = useSyncStateStore();
 
   const [error, setError] = useState<Error | null>(null);
@@ -78,8 +82,9 @@ export function useNotes(options?: NotesFilter): NotesResult {
         fetchedConsumable = await client.getConsumableNotes();
       }
 
-      setNotes(fetchedNotes);
-      setConsumableNotes(fetchedConsumable);
+      // Smart refetch: only update store if note IDs changed (prevents unnecessary re-renders)
+      setNotesIfChanged(fetchedNotes);
+      setConsumableNotesIfChanged(fetchedConsumable);
     } catch (err) {
       setError(err instanceof Error ? err : new Error(String(err)));
     } finally {
@@ -91,8 +96,8 @@ export function useNotes(options?: NotesFilter): NotesResult {
     options?.status,
     options?.accountId,
     setLoadingNotes,
-    setNotes,
-    setConsumableNotes,
+    setNotesIfChanged,
+    setConsumableNotesIfChanged,
   ]);
 
   // Initial fetch
@@ -128,21 +133,84 @@ export function useNotes(options?: NotesFilter): NotesResult {
     [assetMetadata]
   );
 
-  const noteSummaries = useMemo(
-    () =>
-      notes
-        .map((note) => getNoteSummary(note, getMetadata))
-        .filter(Boolean) as NoteSummary[],
-    [notes, getMetadata]
+  // Normalize sender once outside the loop to avoid per-note WASM allocations
+  const normalizedSender = useMemo(() => {
+    if (!options?.sender) return null;
+    try {
+      return normalizeAccountId(options.sender);
+    } catch {
+      return options.sender;
+    }
+  }, [options?.sender]);
+
+  // Serialize excludeIds to a stable string key so array literals don't defeat memoization
+  const excludeIdsKey = useMemo(() => {
+    if (!options?.excludeIds || options.excludeIds.length === 0) return "";
+    return [...options.excludeIds].sort().join("\0");
+  }, [options?.excludeIds]);
+
+  // Helper: normalize a sender string with a cache to avoid repeated WASM allocations.
+  // normalizeAccountId calls parseAccountId (WASM) + toBech32 per invocation.
+  const filterBySender = useCallback(
+    (summaries: NoteSummary[], target: string): NoteSummary[] => {
+      const cache = new Map<string, string>();
+      return summaries.filter((s) => {
+        if (!s.sender) return false;
+        let normalized = cache.get(s.sender);
+        if (normalized === undefined) {
+          try {
+            normalized = normalizeAccountId(s.sender);
+          } catch {
+            normalized = s.sender;
+          }
+          cache.set(s.sender, normalized);
+        }
+        return normalized === target;
+      });
+    },
+    []
   );
 
-  const consumableNoteSummaries = useMemo(
-    () =>
-      consumableNotes
-        .map((note) => getNoteSummary(note, getMetadata))
-        .filter(Boolean) as NoteSummary[],
-    [consumableNotes, getMetadata]
-  );
+  // Build summaries with optional sender and excludeIds filters
+  const noteSummaries = useMemo(() => {
+    let summaries = notes
+      .map((note) => getNoteSummary(note, getMetadata))
+      .filter(Boolean) as NoteSummary[];
+
+    if (normalizedSender) {
+      summaries = filterBySender(summaries, normalizedSender);
+    }
+
+    if (excludeIdsKey) {
+      const excludeSet = new Set(excludeIdsKey.split("\0"));
+      summaries = summaries.filter((s) => !excludeSet.has(s.id));
+    }
+
+    return summaries;
+  }, [notes, getMetadata, normalizedSender, excludeIdsKey, filterBySender]);
+
+  const consumableNoteSummaries = useMemo(() => {
+    let summaries = consumableNotes
+      .map((note) => getNoteSummary(note, getMetadata))
+      .filter(Boolean) as NoteSummary[];
+
+    if (normalizedSender) {
+      summaries = filterBySender(summaries, normalizedSender);
+    }
+
+    if (excludeIdsKey) {
+      const excludeSet = new Set(excludeIdsKey.split("\0"));
+      summaries = summaries.filter((s) => !excludeSet.has(s.id));
+    }
+
+    return summaries;
+  }, [
+    consumableNotes,
+    getMetadata,
+    normalizedSender,
+    excludeIdsKey,
+    filterBySender,
+  ]);
 
   return {
     notes,
@@ -153,20 +221,4 @@ export function useNotes(options?: NotesFilter): NotesResult {
     error,
     refetch,
   };
-}
-
-function getNoteFilterType(status?: NotesFilter["status"]): NoteFilterTypes {
-  switch (status) {
-    case "consumed":
-      return NoteFilterTypes.Consumed;
-    case "committed":
-      return NoteFilterTypes.Committed;
-    case "expected":
-      return NoteFilterTypes.Expected;
-    case "processing":
-      return NoteFilterTypes.Processing;
-    case "all":
-    default:
-      return NoteFilterTypes.All;
-  }
 }

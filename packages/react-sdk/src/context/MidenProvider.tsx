@@ -231,8 +231,6 @@ export function MidenProvider({
           // Set client LAST — this atomically sets isReady=true and
           // isInitializing=false, which enables auto-sync and consumer hooks.
           if (!cancelled) {
-            // Mark as initialized only after success so that StrictMode
-            // double-effect re-runs don't skip a cancelled first attempt.
             if (!signerContext) {
               isInitializedRef.current = true;
             }
@@ -251,6 +249,10 @@ export function MidenProvider({
     initClient();
     return () => {
       cancelled = true;
+      // Reset so StrictMode mount-2 can re-init if needed.
+      // The cancelled flag prevents mount-1 from setting state after cleanup,
+      // and runExclusive queuing ensures mount-2 waits for any in-progress init.
+      isInitializedRef.current = false;
     };
   }, [
     runExclusive,

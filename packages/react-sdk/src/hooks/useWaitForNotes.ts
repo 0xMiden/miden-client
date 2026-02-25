@@ -33,10 +33,10 @@ export function useWaitForNotes(): UseWaitForNotesResult {
       let waited = 0;
 
       while (waited < timeoutMs) {
-        await (client as ClientWithNotes).syncState();
-        const notes = await (client as ClientWithNotes).getConsumableNotes(
-          accountId
-        );
+        await (client as unknown as ClientWithNotes).syncState();
+        const notes = await (
+          client as unknown as ClientWithNotes
+        ).getConsumableNotes(accountId);
         if (notes.length >= minCount) {
           return notes;
         }
