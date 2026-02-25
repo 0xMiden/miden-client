@@ -219,29 +219,108 @@ try {
 }
 ```
 
-## Custom Transactions
+## Custom Script Transactions
 
-For advanced use cases, build a `TransactionRequest` manually and submit it:
+Use `transactions.execute()` to run a custom MASM transaction script against an account. Compile the script first with [`client.compile.txScript()`](./compile.md).
 
 ```typescript
-import {
-    MidenClient,
-    TransactionRequestBuilder,
-    TransactionScript,
-    TransactionProver
-} from "@miden-sdk/miden-sdk";
+import { MidenClient, AccountType, AuthSecretKey, StorageSlot } from "@miden-sdk/miden-sdk";
 
 try {
     const client = await MidenClient.create();
 
-    // Build a custom transaction request
+    // Compile the script (and any libraries it depends on)
+    const script = await client.compile.txScript({
+        code: `
+            use external_contract::counter_contract
+            begin
+                call.counter_contract::increment_count
+            end
+        `,
+        libraries: [
+            { namespace: "external_contract::counter_contract", code: counterContractCode }
+        ]
+    });
+
+    // Execute the script against the contract account
+    const txId = await client.transactions.execute({
+        account: contractAccount.id(),
+        script
+    });
+
+    console.log("Transaction ID:", txId.toHex());
+} catch (error) {
+    console.error("Custom transaction failed:", error.message);
+}
+```
+
+### Foreign Procedure Invocation (FPI)
+
+Pass `foreignAccounts` to allow the transaction to read state from other contracts:
+
+```typescript
+try {
+    const client = await MidenClient.create();
+
+    // Get the procedure hash of the foreign contract's function
+    const counterComponent = await client.compile.component({
+        code: counterContractCode,
+        slots: [StorageSlot.emptyValue("miden::tutorials::counter")]
+    });
+    const getCountHash = counterComponent.getProcedureHash("get_count");
+
+    // Compile the FPI script
+    const script = await client.compile.txScript({
+        code: `
+            use external_contract::count_reader_contract
+            use miden::core::sys
+            begin
+                push.${getCountHash}
+                push.${counterAccount.id().suffix()}
+                push.${counterAccount.id().prefix()}
+                call.count_reader_contract::copy_count
+                exec.sys::truncate_stack
+            end
+        `,
+        libraries: [
+            // "dynamic" linking (default) — foreign contract code lives on-chain
+            { namespace: "external_contract::count_reader_contract", code: countReaderCode }
+        ]
+    });
+
+    const txId = await client.transactions.execute({
+        account: countReaderAccount.id(),
+        script,
+        foreignAccounts: [
+            // Bare AccountRef — client fetches storage requirements automatically
+            counterAccount.id(),
+            // Or with explicit storage requirements:
+            // { id: counterAccount.id(), storage: requirements }
+        ]
+    });
+
+    console.log("FPI transaction:", txId.toHex());
+} catch (error) {
+    console.error("FPI transaction failed:", error.message);
+}
+```
+
+### Advanced: Manual Transaction Request
+
+For full control over note inputs/outputs, build a `TransactionRequest` manually and call `submit()`:
+
+```typescript
+import { MidenClient, TransactionRequestBuilder } from "@miden-sdk/miden-sdk";
+
+try {
+    const client = await MidenClient.create();
+
     const request = new TransactionRequestBuilder()
         .withCustomScript(transactionScript)
         .withOwnOutputNotes(outputNotes)
         .withExpectedOutputNotes(expectedNotes)
         .build();
 
-    // Submit the custom request
     const txId = await client.transactions.submit(wallet, request);
     console.log("Custom transaction:", txId.toString());
 } catch (error) {
