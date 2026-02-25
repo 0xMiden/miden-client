@@ -109,7 +109,7 @@ jobs:
         with:
           shared-key: rust-wasm
           prefix-key: ${{ env.RUST_CACHE_KEY }}
-          save-if: ${{ github.ref == 'refs/heads/next' }}
+          save-if: false
       - name: make - clippy-wasm
         run: make clippy-wasm
 
@@ -149,7 +149,7 @@ jobs:
         with:
           shared-key: rust-wasm
           prefix-key: ${{ env.RUST_CACHE_KEY }}
-          save-if: ${{ github.ref == 'refs/heads/next' }}
+          save-if: false
       - name: Install dependencies
         working-directory: crates/web-client
         run: yarn install --frozen-lockfile

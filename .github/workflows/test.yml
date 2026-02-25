@@ -36,7 +36,7 @@ jobs:
         with:
           shared-key: rust-release
           prefix-key: ${{ env.RUST_CACHE_KEY }}
-          save-if: ${{ github.ref == 'refs/heads/next' }}
+          save-if: false
       - uses: taiki-e/install-action@v2
         with:
           tool: nextest@0.9.122
@@ -52,7 +52,7 @@ jobs:
         with:
           shared-key: rust-debug
           prefix-key: ${{ env.RUST_CACHE_KEY }}
-          save-if: ${{ github.ref == 'refs/heads/next' }}
+          save-if: false
       - name: Install rust
         run: rustup update --no-self-update
       - name: Run doc-tests
@@ -120,9 +120,46 @@ jobs:
       - name: Build React SDK
         run: cd ./packages/react-sdk && yarn build
 
+  build-node-builder:
+    name: Build node-builder
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install Rust
+        run: rustup update --no-self-update
+      - name: Restore node-builder binary
+        id: cache-node-builder
+        uses: actions/cache@v4
+        with:
+          path: target/release/testing-node-builder
+          key: ${{ runner.os }}-node-builder-${{ hashFiles('Cargo.lock') }}
+      - name: Build node-builder
+        if: steps.cache-node-builder.outputs.cache-hit != 'true'
+        run: cargo build --release --package node-builder --locked
+
+  build-note-transport:
+    name: Build note-transport
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install Rust
+        run: rustup update --no-self-update
+      - name: Restore note-transport binary
+        id: cache-note-transport
+        uses: actions/cache@v4
+        with:
+          path: target/note-transport/release/miden-note-transport-node-bin
+          key: ${{ runner.os }}-note-transport-${{ hashFiles('Cargo.lock') }}
+      - name: Build note-transport
+        if: steps.cache-note-transport.outputs.cache-hit != 'true'
+        run: |
+          git clone --depth=1 -b main https://github.com/0xMiden/miden-note-transport .tmp/miden-note-transport
+          cd .tmp/miden-note-transport && CARGO_TARGET_DIR="$GITHUB_WORKSPACE/target/note-transport" cargo build --release --locked
+
   integration-tests:
     name: Run integration tests
     runs-on: ubuntu-24.04
+    needs: [build-node-builder, build-note-transport]
     steps:
       - uses: actions/checkout@v6
       - name: Install Rust
@@ -135,14 +172,14 @@ jobs:
         with:
           shared-key: rust-release
           prefix-key: ${{ env.RUST_CACHE_KEY }}
-          save-if: ${{ github.ref == 'refs/heads/next' }}
+          save-if: false
       - name: Restore node-builder binary
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: target/release/testing-node-builder
           key: ${{ runner.os }}-node-builder-${{ hashFiles('Cargo.lock') }}
       - name: Restore note-transport binary
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: target/note-transport/release/miden-note-transport-node-bin
           key: ${{ runner.os }}-note-transport-${{ hashFiles('Cargo.lock') }}
@@ -176,7 +213,7 @@ jobs:
         with:
           shared-key: rust-wasm
           prefix-key: ${{ env.RUST_CACHE_KEY }}
-          save-if: ${{ github.ref == 'refs/heads/next' }}
+          save-if: false
 
       - name: Install Node.js
         uses: actions/setup-node@v4
@@ -201,7 +238,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: ./crates/web-client/dist
-          key: ${{ runner.os }}-dist-${{ hashFiles('**/yarn.lock', './crates/web-client/src/**/*.ts', './crates/web-client/pkg/**/*.wasm') }}
+          key: ${{ runner.os }}-dist-${{ hashFiles('**/yarn.lock', './crates/web-client/src/**/*.ts', './crates/web-client/src/**/*.rs', 'Cargo.lock') }}
           restore-keys: ${{ runner.os }}-dist-
 
       - name: Build project
@@ -226,7 +263,7 @@ jobs:
   integration-tests-web-client:
     name: Run integration tests for web client
     runs-on: ubuntu-24.04
-    needs: [ build-web-client-dist-folder ]
+    needs: [build-web-client-dist-folder, build-node-builder]
     strategy:
       matrix:
         shard_index: [1, 2, 3, 4, 5, 6]
@@ -251,7 +288,7 @@ jobs:
       - name: Configure setuid sandbox
         run: . ./scripts/configure-sandbox.sh
       - name: Restore node-builder binary
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: target/release/testing-node-builder
           key: ${{ runner.os }}-node-builder-${{ hashFiles('Cargo.lock') }}
@@ -269,7 +306,7 @@ jobs:
   integration-tests-remote-prover-web-client:
     name: Run integration tests for remote prover
     runs-on: ubuntu-24.04
-    needs: [ build-web-client-dist-folder ]
+    needs: [build-web-client-dist-folder, build-node-builder]
     steps:
       - uses: actions/checkout@v6
       - name: Install Rust
@@ -290,15 +327,19 @@ jobs:
       - name: Configure setuid sandbox
         run: . ./scripts/configure-sandbox.sh
       - name: Restore node-builder binary
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: target/release/testing-node-builder
           key: ${{ runner.os }}-node-builder-${{ hashFiles('Cargo.lock') }}
       - name: Restore prover binary
+        id: cache-prover
         uses: actions/cache@v4
         with:
           path: target/release/testing-remote-prover
           key: ${{ runner.os }}-prover-${{ hashFiles('Cargo.lock') }}
+      - name: Build prover
+        if: steps.cache-prover.outputs.cache-hit != 'true'
+        run: cargo build --release --package testing-remote-prover --locked
       - name: Start test node
         run: make start-node-background
       - name: Start prover
