@@ -47,8 +47,6 @@ const SYNC_METHODS = new Set([
  */
 const WRITE_METHODS = new Set([
   "newAccount",
-  "submitProvenTransaction",
-  "applyTransaction",
   "importAccountFile",
   "importAccountById",
   "importPublicAccountFromSeed",
@@ -66,6 +64,37 @@ const WRITE_METHODS = new Set([
   "fetchAllPrivateNotes",
   "addAccountSecretKeyToWebStore",
   "executeForSummary",
+]);
+
+/**
+ * Set of method names that are read-only (no state mutation). These are
+ * wrapped with the in-process WASM lock only (Layer 1).
+ *
+ * This set exists purely for the CI lint check (`check-method-classification`)
+ * which ensures every WASM export is explicitly classified — preventing new
+ * write methods from silently defaulting to read-only.
+ *
+ * The Proxy behaviour is unchanged: methods not in SYNC_METHODS or
+ * WRITE_METHODS already get WASM-lock-only wrapping.
+ */
+const READ_METHODS = new Set([
+  "getAccounts",
+  "getAccount",
+  "getAccountAuthByPubKeyCommitment",
+  "getPublicKeyCommitmentsOfAccount",
+  "getInputNotes",
+  "getInputNote",
+  "getOutputNotes",
+  "getOutputNote",
+  "getConsumableNotes",
+  "getTransactions",
+  "getSyncHeight",
+  "exportNoteFile",
+  "exportStore",
+  "exportAccountFile",
+  "listTags",
+  "getSetting",
+  "listSettingKeys",
 ]);
 
 /**
@@ -290,30 +319,26 @@ export class WebClient {
       this._stateChannel = null;
     }
     this._stateListeners = [];
-    this._crossTabSyncTimer = null;
     if (this._stateChannel) {
-      this._stateChannel.onmessage = (event) => {
-        // Debounce: rapid cross-tab writes fire many BroadcastChannel
-        // messages. Collapse them into a single sync + listener pass.
-        clearTimeout(this._crossTabSyncTimer);
-        this._crossTabSyncTimer = setTimeout(async () => {
-          // Auto-sync: refresh in-memory Rust Client state from IndexedDB.
-          try {
-            await this.syncState();
-          } catch {
-            // Sync failure is non-fatal — the next explicit sync will retry.
-          }
+      this._stateChannel.onmessage = async (event) => {
+        // Auto-sync: refresh in-memory Rust Client state from IndexedDB.
+        // Sync coalescing (in syncLock.js) ensures concurrent syncs share the
+        // same result, so rapid messages are handled without debouncing.
+        try {
+          await this.syncState();
+        } catch {
+          // Sync failure is non-fatal — the next explicit sync will retry.
+        }
 
-          // Invoke listeners AFTER syncState resolves so in-memory state
-          // is guaranteed fresh when callbacks run.
-          for (const listener of this._stateListeners) {
-            try {
-              listener(event.data);
-            } catch {
-              // Swallow listener errors.
-            }
+        // Invoke listeners AFTER syncState resolves so in-memory state
+        // is guaranteed fresh when callbacks run.
+        for (const listener of this._stateListeners) {
+          try {
+            listener(event.data);
+          } catch {
+            // Swallow listener errors.
           }
-        }, 100);
+        }
       };
     }
 
@@ -875,6 +900,59 @@ export class WebClient {
     }
   }
 
+  // submitProvenTransaction and applyTransaction sync state before the write
+  // to catch cross-tab writes that occurred between execute and submit.
+  // This ensures the local IndexedDB view is fresh before submission.
+
+  async submitProvenTransaction(provenTransaction, transactionResult) {
+    return this._withWrite("submitProvenTransaction", async () => {
+      // Sync state to catch cross-tab writes that occurred since execute.
+      // We call syncStateImpl directly (bypassing the sync lock) because we
+      // already hold the write lock — calling syncState() would attempt to
+      // acquire sync lock → write lock, which is the reverse of the normal
+      // sync lock → write lock order and could deadlock across tabs.
+      try {
+        await this._wasmLock.runExclusive(async () => {
+          const wasmWebClient = await this.getWasmWebClient();
+          await wasmWebClient.syncStateImpl();
+        });
+      } catch {
+        // Sync failure is non-fatal — proceed with submission.
+        // The node will reject truly invalid transactions.
+      }
+
+      return await this._wasmLock.runExclusive(async () => {
+        const wasmWebClient = await this.getWasmWebClient();
+        return await wasmWebClient.submitProvenTransaction(
+          provenTransaction,
+          transactionResult
+        );
+      });
+    });
+  }
+
+  async applyTransaction(provenTransaction, transactionResult) {
+    return this._withWrite("applyTransaction", async () => {
+      // Sync state to catch cross-tab writes (same rationale as above).
+      try {
+        await this._wasmLock.runExclusive(async () => {
+          const wasmWebClient = await this.getWasmWebClient();
+          await wasmWebClient.syncStateImpl();
+        });
+      } catch {
+        // Sync failure is non-fatal.
+      }
+
+      return await this._wasmLock.runExclusive(async () => {
+        const wasmWebClient = await this.getWasmWebClient();
+        return await wasmWebClient.applyTransaction(
+          provenTransaction,
+          transactionResult
+        );
+      });
+    });
+  }
+
   // SYNC
   // ================================================================================================
 
@@ -960,7 +1038,6 @@ export class WebClient {
     if (this.worker) {
       this.worker.terminate();
     }
-    clearTimeout(this._crossTabSyncTimer);
     if (this._stateChannel) {
       try {
         this._stateChannel.close();

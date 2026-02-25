@@ -286,11 +286,9 @@ export function MidenProvider({
   // The WebClient auto-syncs on cross-tab changes, so the in-memory Rust
   // state is already fresh. We just need to refresh the Zustand store
   // (accounts, sync metadata) so the React UI re-renders.
-  // Debounced to avoid thundering-herd refreshes when rapid writes occur.
+  // Sync coalescing in the WebClient handles rapid messages without debouncing.
   useEffect(() => {
     if (!isReady || !client) return;
-
-    let timeoutId: ReturnType<typeof setTimeout>;
 
     // The WebClient exposes onStateChanged when BroadcastChannel is available.
     const unsubscribe = (
@@ -299,21 +297,17 @@ export function MidenProvider({
           cb: (event: { type: string; operation?: string }) => void
         ) => () => void;
       }
-    ).onStateChanged?.(() => {
-      clearTimeout(timeoutId);
-      timeoutId = setTimeout(async () => {
-        try {
-          const accounts = await client.getAccounts();
-          useMidenStore.getState().setAccounts(accounts);
-          setSyncState({ lastSyncTime: Date.now() });
-        } catch {
-          // Non-fatal — next explicit sync will catch up.
-        }
-      }, 300);
+    ).onStateChanged?.(async () => {
+      try {
+        const accounts = await client.getAccounts();
+        useMidenStore.getState().setAccounts(accounts);
+        setSyncState({ lastSyncTime: Date.now() });
+      } catch {
+        // Non-fatal — next explicit sync will catch up.
+      }
     });
 
     return () => {
-      clearTimeout(timeoutId);
       unsubscribe?.();
     };
   }, [isReady, client, setSyncState]);
