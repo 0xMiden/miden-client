@@ -147,17 +147,25 @@ impl WebStore {
                     assets.iter().copied(),
                     removed_keys.iter().copied(),
                 )?;
-                debug_assert_eq!(
-                    new_vault_root,
-                    final_header.vault_root(),
-                    "computed vault root does not match final account header"
-                );
+                if new_vault_root != final_header.vault_root() {
+                    return Err(StoreError::DatabaseError(format!(
+                        "computed vault root {} does not match final account header {}",
+                        new_vault_root.to_hex(),
+                        final_header.vault_root().to_hex(),
+                    )));
+                }
                 updated_assets = assets;
                 removed_vault_keys = removed_keys;
 
                 // Don't pop old roots here — matching SqliteStore's behavior.
                 // Old roots stay in the forest so undo can restore pre-transaction
                 // state. They get released during sync (full-state path) or undo.
+                //
+                // Note: the forest is mutated above (update_storage_map_nodes,
+                // update_asset_nodes) before the async DB write below. If the DB
+                // write fails, the forest will have extra nodes for the new roots.
+                // This is a memory issue, not a correctness issue — old roots are
+                // still valid and match the DB state.
             }
 
             // Write to DB atomically
