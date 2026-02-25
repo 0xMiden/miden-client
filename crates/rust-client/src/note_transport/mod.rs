@@ -4,9 +4,9 @@ pub mod generated;
 pub mod grpc;
 
 use alloc::boxed::Box;
+use alloc::collections::BTreeSet;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
-use std::collections::BTreeSet;
 
 use futures::Stream;
 use miden_protocol::address::Address;
