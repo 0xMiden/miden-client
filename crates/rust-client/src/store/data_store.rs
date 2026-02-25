@@ -7,6 +7,8 @@ use miden_protocol::account::{
     Account,
     AccountId,
     PartialAccount,
+    PartialStorageMap,
+    StorageMap,
     StorageSlot,
     StorageSlotContent,
 };
@@ -21,7 +23,7 @@ use miden_protocol::{MastForest, Word, ZERO};
 use miden_tx::{DataStore, DataStoreError, MastForestStore, TransactionMastStore};
 
 use super::{AccountStorageFilter, PartialBlockchainFilter, Store};
-use crate::rpc::domain::account::AccountStorageRequirements;
+use crate::rpc::domain::account::{AccountStorageRequirements, StorageMapEntries};
 use crate::rpc::{AccountStateAt, NodeRpcClient};
 use crate::store::StoreError;
 use crate::transaction::account_proof_into_inputs;
@@ -181,32 +183,140 @@ impl DataStore for ClientDataStore {
         Ok(asset_witnesses)
     }
 
+    /// Returns the [`StorageMapWitness`](miden_protocol::account::StorageMapWitness) for the given
+    /// account, map root, and map key.
+    ///
+    /// Resolution order:
+    /// 1. Local store (works for native accounts and pre-registered foreign accounts).
+    /// 2. Lazy-load via RPC for foreign accounts whose inputs were cached by
+    ///    [`get_foreign_account_inputs`](DataStore::get_foreign_account_inputs). The slot name is
+    ///    resolved from the cached [`AccountStorageHeader`](miden_protocol::account::AccountStorageHeader)
+    ///    and a second RPC call fetches the storage map entries.
+    #[allow(clippy::too_many_lines)]
     async fn get_storage_map_witness(
         &self,
         account_id: AccountId,
         map_root: Word,
         map_key: Word,
     ) -> Result<miden_protocol::account::StorageMapWitness, DataStoreError> {
-        let account_storage = self
+        // Try the local store first (works for native and pre-registered foreign accounts).
+        if let Ok(account_storage) = self
             .store
             .get_account_storage(account_id, AccountStorageFilter::Root(map_root))
-            .await?;
+            .await
+        {
+            match account_storage.slots().first().map(StorageSlot::content) {
+                Some(StorageSlotContent::Map(map)) => return Ok(map.open(&map_key)),
+                Some(StorageSlotContent::Value(value)) => {
+                    return Err(DataStoreError::Other {
+                        error_msg: format!(
+                            "found StorageSlotContent::Value with {value} as its value."
+                        )
+                        .into(),
+                        source: None,
+                    });
+                },
+                _ => {},
+            }
+        }
 
-        match account_storage.slots().first().map(StorageSlot::content) {
-            Some(StorageSlotContent::Map(map)) => {
-                let witness = map.open(&map_key);
-                Ok(witness)
+        // Local store miss — try lazy-loading the storage map for foreign accounts.
+        // Extract the slot name and known code from the cache (drop the lock before async
+        // work).
+        let (slot_name, known_code) = {
+            let cache = self.foreign_account_inputs.read();
+            let inputs = cache.get(&account_id).ok_or_else(|| DataStoreError::Other {
+                error_msg: format!(
+                    "did not find map with {map_root} as a root for {account_id}"
+                )
+                .into(),
+                source: None,
+            })?;
+
+            let storage_header = inputs.storage().header();
+            let slot_name = storage_header
+                .slots()
+                .find(|slot| slot.slot_type().is_map() && slot.value() == map_root)
+                .map(|slot| slot.name().clone())
+                .ok_or_else(|| DataStoreError::Other {
+                    error_msg: format!(
+                        "did not find map slot with root {map_root} for foreign account \
+                         {account_id}"
+                    )
+                    .into(),
+                    source: None,
+                })?;
+
+            (slot_name, inputs.code().clone())
+        };
+
+        // Fetch the storage map entries from the node.
+        let storage_requirements = AccountStorageRequirements::new([(slot_name, &[map_key])]);
+        let (_, account_proof) = self
+            .rpc_api
+            .get_account_proof(
+                account_id,
+                storage_requirements,
+                AccountStateAt::ChainTip,
+                Some(known_code),
+            )
+            .await
+            .map_err(|err| {
+                DataStoreError::other_with_source(
+                    "failed to fetch storage map via RPC",
+                    err,
+                )
+            })?;
+
+        // Extract the storage map from the proof response.
+        let (_, account_details) = account_proof.into_parts();
+        let details = account_details.ok_or_else(|| DataStoreError::Other {
+            error_msg: format!(
+                "RPC returned no account details for public account {account_id}"
+            )
+            .into(),
+            source: None,
+        })?;
+
+        let map_detail = details
+            .storage_details
+            .map_details
+            .into_iter()
+            .next()
+            .ok_or_else(|| DataStoreError::Other {
+                error_msg: format!(
+                    "RPC returned no storage map details for account {account_id}"
+                )
+                .into(),
+                source: None,
+            })?;
+
+        match map_detail.entries {
+            StorageMapEntries::AllEntries(entries) => {
+                let storage_entries_iter = entries.iter().map(|e| (e.key, e.value));
+                let map = StorageMap::with_entries(storage_entries_iter).map_err(|err| {
+                    DataStoreError::other_with_source(
+                        "failed to build storage map from entries",
+                        err,
+                    )
+                })?;
+                Ok(map.open(&map_key))
             },
-            Some(StorageSlotContent::Value(value)) => Err(DataStoreError::Other {
-                error_msg: format!("found StorageSlotContent::Value with {value} as its value.")
-                    .into(),
-                source: None,
-            }),
-            _ => Err(DataStoreError::Other {
-                error_msg: format!("did not find map with {map_root} as a root for {account_id}")
-                    .into(),
-                source: None,
-            }),
+            StorageMapEntries::EntriesWithProofs(witnesses) => {
+                let partial_map =
+                    PartialStorageMap::with_witnesses(witnesses).map_err(|err| {
+                        DataStoreError::other_with_source(
+                            "failed to build partial storage map from witnesses",
+                            err,
+                        )
+                    })?;
+                partial_map.open(&map_key).map_err(|err| {
+                    DataStoreError::other_with_source(
+                        "failed to open storage map witness",
+                        err,
+                    )
+                })
+            },
         }
     }
 

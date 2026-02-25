@@ -367,13 +367,12 @@ pub async fn test_lazy_fpi_loading(client_config: ClientConfig) -> Result<()> {
     Ok(())
 }
 
-/// Tests that lazy loading a public foreign account that reads from a storage map fails
-/// because the map entries are not included in the response when no
-/// `AccountStorageRequirements` are specified.
+/// Tests that lazy loading a public foreign account that reads from a storage map works
+/// even when no `AccountStorageRequirements` are specified upfront.
 ///
-/// This documents the current limitation: lazy loading uses empty storage requirements,
-/// so foreign procedures that access storage maps require the account to be declared
-/// upfront via `TransactionRequestBuilder::foreign_accounts()`.
+/// The executor first lazy-loads the foreign account (with empty storage requirements),
+/// then when the procedure reads from the storage map, `get_storage_map_witness` detects
+/// the cache miss and makes a second RPC call to fetch the storage map entries.
 pub async fn test_lazy_fpi_loading_with_storage_map(client_config: ClientConfig) -> Result<()> {
     let (mut client, keystore) = client_config.clone().into_client().await?;
     wait_for_node(&mut client).await;
@@ -437,16 +436,11 @@ pub async fn test_lazy_fpi_loading_with_storage_map(client_config: ClientConfig)
 
     wait_for_blocks_no_sync(&mut client2, 2).await;
 
-    // Build request WITHOUT specifying the foreign account — lazy loading will use empty
-    // storage requirements, so the storage map entries won't be in the proof.
+    // Build request WITHOUT specifying the foreign account — lazy loading should handle
+    // both the account inputs and the storage map entries via separate RPC calls.
     let tx_request = TransactionRequestBuilder::new().custom_script(tx_script).build()?;
 
-    let result = client2.submit_new_transaction(native_account.id(), tx_request).await;
-
-    assert!(
-        result.is_err(),
-        "transaction should fail because lazy loading does not fetch storage map entries"
-    );
+    let _ = client2.submit_new_transaction(native_account.id(), tx_request).await?;
 
     Ok(())
 }
