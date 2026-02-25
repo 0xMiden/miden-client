@@ -90,7 +90,8 @@ jobs:
         with:
           shared-key: rust-debug
           prefix-key: ${{ env.RUST_CACHE_KEY }}
-          save-if: ${{ github.ref == 'refs/heads/next' }}
+          # TODO: restore to save-if: ${{ github.ref == 'refs/heads/next' }} before merging
+          save-if: true
       - name: make - clippy
         run: make clippy
 
@@ -177,6 +178,7 @@ jobs:
         with:
           shared-key: rust-nightly-release # TODO: remove once https://github.com/rust-lang/rust/pull/150055 gets stabilized.
           prefix-key: ${{ env.RUST_CACHE_KEY }}
-          save-if: ${{ github.ref == 'refs/heads/next' }}
+          # TODO: restore to save-if: ${{ github.ref == 'refs/heads/next' }} before merging
+          save-if: true
       - name: make - doc
         run: make doc
