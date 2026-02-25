@@ -276,6 +276,12 @@ jobs:
         run: |
           rustup update --no-self-update
           rustup target add wasm32-unknown-unknown
+      - name: Add Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: rust-wasm
+          prefix-key: ${{ env.RUST_CACHE_KEY }}
+          save-if: false
 
       - name: Fetch dist folder
         uses: actions/download-artifact@v4
@@ -318,6 +324,12 @@ jobs:
         run: |
           rustup update --no-self-update
           rustup target add wasm32-unknown-unknown
+      - name: Add Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: rust-wasm
+          prefix-key: ${{ env.RUST_CACHE_KEY }}
+          save-if: false
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
