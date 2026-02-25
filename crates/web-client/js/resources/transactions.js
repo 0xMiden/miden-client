@@ -157,6 +157,48 @@ export class TransactionsResource {
     return await this.#inner.executeForSummary(accountId, request);
   }
 
+  async execute(opts) {
+    this.#client.assertNotTerminated();
+    const wasm = await this.#getWasm();
+    const accountId = resolveAccountRef(opts.account, wasm);
+
+    let builder = new wasm.TransactionRequestBuilder().withCustomScript(
+      opts.script
+    );
+
+    if (opts.foreignAccounts?.length) {
+      const accounts = opts.foreignAccounts.map((fa) => {
+        const isWrapper =
+          fa !== null &&
+          typeof fa === "object" &&
+          "id" in fa &&
+          typeof fa.id !== "function";
+        const id = resolveAccountRef(isWrapper ? fa.id : fa, wasm);
+        const storage =
+          isWrapper && fa.storage
+            ? fa.storage
+            : new wasm.AccountStorageRequirements();
+        return wasm.ForeignAccount.public(id, storage);
+      });
+      builder = builder.withForeignAccounts(
+        new wasm.ForeignAccountArray(accounts)
+      );
+    }
+
+    const request = builder.build();
+    const txId = await this.#submitOrSubmitWithProver(
+      accountId,
+      request,
+      opts.prover
+    );
+
+    if (opts.waitForConfirmation) {
+      await this.waitFor(txId.toHex(), { timeout: opts.timeout });
+    }
+
+    return txId;
+  }
+
   async submit(account, request, opts) {
     this.#client.assertNotTerminated();
     const wasm = await this.#getWasm();
