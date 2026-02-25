@@ -19,6 +19,8 @@ export const AccountType = Object.freeze({
   MutableWallet: "MutableWallet",
   ImmutableWallet: "ImmutableWallet",
   FungibleFaucet: "FungibleFaucet",
+  ImmutableContract: "ImmutableContract",
+  MutableContract: "MutableContract",
 });
 
 export const AuthScheme = Object.freeze({
@@ -469,6 +471,23 @@ class WebClient {
         decimals,
         maxSupply,
         authSchemeId
+      );
+    });
+  }
+
+  async newAccount(account, overwrite) {
+    return this._serializeWasmCall(async () => {
+      const wasmWebClient = await this.getWasmWebClient();
+      return await wasmWebClient.newAccount(account, overwrite);
+    });
+  }
+
+  async addAccountSecretKeyToWebStore(accountId, secretKey) {
+    return this._serializeWasmCall(async () => {
+      const wasmWebClient = await this.getWasmWebClient();
+      return await wasmWebClient.addAccountSecretKeyToWebStore(
+        accountId,
+        secretKey
       );
     });
   }
