@@ -12,7 +12,6 @@ use miden_client::account::{
     Address,
     StorageMap,
     StorageSlot,
-    StorageSlotContent,
     StorageSlotName,
     StorageSlotType,
 };
@@ -417,15 +416,7 @@ impl WebStore {
         // Get old SMT roots before updating so we can pop them after
         let (old_header, _) = parse_account_record_idxdb_object(account_header_idxdb)?;
         let old_vault_root = old_header.vault_root();
-        let old_storage = self.get_storage(account_id, AccountStorageFilter::All).await?;
-        let old_map_roots: Vec<Word> = old_storage
-            .slots()
-            .iter()
-            .filter_map(|slot| match slot.content() {
-                StorageSlotContent::Map(map) => Some(map.root()),
-                StorageSlotContent::Value(_) => None,
-            })
-            .collect();
+        let old_map_roots = self.get_storage_map_roots(account_id).await?;
 
         apply_full_account_state(self.db_id(), new_account_state)
             .await
@@ -434,7 +425,8 @@ impl WebStore {
         // Update SMT forest: insert new state and release old roots
         let mut smt_forest = self.smt_forest.write().expect("smt_forest write lock");
         smt_forest.insert_account_state(new_account_state.vault(), new_account_state.storage())?;
-        smt_forest.pop_roots(old_map_roots.into_iter().chain(core::iter::once(old_vault_root)));
+        smt_forest
+            .pop_roots(old_map_roots.into_values().chain(core::iter::once(old_vault_root)));
 
         Ok(())
     }
@@ -571,13 +563,8 @@ impl WebStore {
         for account_id in account_ids {
             if let Some((header, _)) = self.get_account_header(account_id).await? {
                 roots.push(header.vault_root());
-                let storage =
-                    self.get_storage(account_id, AccountStorageFilter::All).await?;
-                for slot in storage.slots() {
-                    if let StorageSlotContent::Map(map) = slot.content() {
-                        roots.push(map.root());
-                    }
-                }
+                let map_roots = self.get_storage_map_roots(account_id).await?;
+                roots.extend(map_roots.into_values());
             }
         }
         Ok(roots)

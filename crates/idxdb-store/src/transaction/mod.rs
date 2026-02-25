@@ -142,21 +142,22 @@ impl WebStore {
                 // Vault: compute new asset values and update SMT forest
                 let (assets, removed_keys) =
                     compute_vault_delta(&old_vault_assets, delta)?;
-                let _new_vault_root = smt_forest.update_asset_nodes(
+                let new_vault_root = smt_forest.update_asset_nodes(
                     old_vault_root,
                     assets.iter().copied(),
                     removed_keys.iter().copied(),
                 )?;
+                debug_assert_eq!(
+                    new_vault_root,
+                    final_header.vault_root(),
+                    "computed vault root does not match final account header"
+                );
                 updated_assets = assets;
                 removed_vault_keys = removed_keys;
 
-                // Release old SMT trees
-                smt_forest.pop_roots(
-                    old_map_roots
-                        .values()
-                        .copied()
-                        .chain(core::iter::once(old_vault_root)),
-                );
+                // Don't pop old roots here — matching SqliteStore's behavior.
+                // Old roots stay in the forest so undo can restore pre-transaction
+                // state. They get released during sync (full-state path) or undo.
             }
 
             // Write to DB atomically
