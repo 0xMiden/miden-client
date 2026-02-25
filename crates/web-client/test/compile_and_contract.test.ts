@@ -213,7 +213,10 @@ test.describe("compile.txScript()", () => {
             end
           `,
           libraries: [
-            { namespace: "external_contract::counter_contract", code: counterCode },
+            {
+              namespace: "external_contract::counter_contract",
+              code: counterCode,
+            },
           ],
         });
 
@@ -481,7 +484,9 @@ test.describe("transactions.execute()", () => {
     expect(result.txHex.length).toBeGreaterThan(0);
   });
 
-  test("execute() increments storage slot on the contract", async ({ page }) => {
+  test("execute() increments storage slot on the contract", async ({
+    page,
+  }) => {
     const result = await page.evaluate(
       async ({ code, slotName }) => {
         const client = await window.MidenClient.createMock();
@@ -530,14 +535,7 @@ test.describe("transactions.execute()", () => {
         // The counter word is stored little-endian; extract the value from the last 8 hex chars
         const countHex = countWord?.toHex() ?? "";
         const countValue = Number(
-          BigInt(
-            "0x" +
-              countHex
-                .slice(-16)
-                .match(/../g)
-                .reverse()
-                .join("")
-          )
+          BigInt("0x" + countHex.slice(-16).match(/../g).reverse().join(""))
         );
 
         return { countValue };

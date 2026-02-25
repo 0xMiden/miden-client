@@ -20,7 +20,10 @@ export class CompilerResource {
     const wasm = await this.#getWasm();
     const builder = this.#inner.createCodeBuilder();
     const compiled = builder.compileAccountComponentCode(code);
-    return wasm.AccountComponent.compile(compiled, slots).withSupportsAllTypes();
+    return wasm.AccountComponent.compile(
+      compiled,
+      slots
+    ).withSupportsAllTypes();
   }
 
   /**
