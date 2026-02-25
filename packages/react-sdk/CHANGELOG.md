@@ -2,9 +2,8 @@
 
 ## 0.13.3 (TBD)
 
-* [FEATURE][web] Added `customComponents` field to `SignerAccountConfig`, allowing signer providers to attach arbitrary `AccountComponent` instances (e.g. compiled `.masp` packages) to accounts during `initializeSignerAccount`. Components are appended after the default basic wallet component.
-
 ### Features
+* [FEATURE][web] Added `customComponents` field to `SignerAccountConfig`, allowing signer providers to attach arbitrary `AccountComponent` instances (e.g. compiled `.masp` packages) to accounts during `initializeSignerAccount`. Components are appended after the default basic wallet component.
 * [FEATURE][web] Added `MidenError` class and `wrapWasmError()` utility that intercepts cryptic WASM errors and replaces them with actionable messages including fix suggestions ([#1818](https://github.com/0xMiden/miden-client/pull/1818)).
 * [FEATURE][web] Added `readNoteAttachment()` and `createNoteAttachment()` utilities for encoding/decoding arbitrary `bigint[]` payloads on notes, with automatic Word vs Array detection and 4-element boundary padding ([#1818](https://github.com/0xMiden/miden-client/pull/1818)).
 * [FEATURE][web] Added `normalizeAccountId()` and `accountIdsEqual()` utilities for format-agnostic account ID comparison across hex and bech32 ([#1818](https://github.com/0xMiden/miden-client/pull/1818)).
@@ -23,6 +22,7 @@
 ### Fixes
 * [FIX][web] Fixed React StrictMode double-initialization in `MidenProvider` by adding `initializingRef` guard to prevent concurrent WASM client init ([#1818](https://github.com/0xMiden/miden-client/pull/1818)).
 * [FIX][web] Standardized all hooks to privacy-first defaults (`NoteType.Private`) and ensured all mutation paths go through `runExclusive` for WASM concurrency safety ([#1818](https://github.com/0xMiden/miden-client/pull/1818)).
+* [FIX][web] Removed incorrect `AccountId` single-use reference from `WASM_POINTER_CONSUMED` error message — `AccountId` APIs take references and are not typically consumed ([#1818](https://github.com/0xMiden/miden-client/pull/1818)).
 
 ## 0.13.2 (2026-02-10)
 
