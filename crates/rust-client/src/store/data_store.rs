@@ -190,8 +190,9 @@ impl DataStore for ClientDataStore {
     /// 1. Local store (works for native accounts and pre-registered foreign accounts).
     /// 2. Lazy-load via RPC for foreign accounts whose inputs were cached by
     ///    [`get_foreign_account_inputs`](DataStore::get_foreign_account_inputs). The slot name is
-    ///    resolved from the cached [`AccountStorageHeader`](miden_protocol::account::AccountStorageHeader)
-    ///    and a second RPC call fetches the storage map entries.
+    ///    resolved from the cached
+    ///    [`AccountStorageHeader`](miden_protocol::account::AccountStorageHeader) and a second RPC
+    ///    call fetches the storage map entries.
     #[allow(clippy::too_many_lines)]
     async fn get_storage_map_witness(
         &self,
@@ -226,10 +227,8 @@ impl DataStore for ClientDataStore {
         let (slot_name, known_code) = {
             let cache = self.foreign_account_inputs.read();
             let inputs = cache.get(&account_id).ok_or_else(|| DataStoreError::Other {
-                error_msg: format!(
-                    "did not find map with {map_root} as a root for {account_id}"
-                )
-                .into(),
+                error_msg: format!("did not find map with {map_root} as a root for {account_id}")
+                    .into(),
                 source: None,
             })?;
 
@@ -262,33 +261,26 @@ impl DataStore for ClientDataStore {
             )
             .await
             .map_err(|err| {
-                DataStoreError::other_with_source(
-                    "failed to fetch storage map via RPC",
-                    err,
-                )
+                DataStoreError::other_with_source("failed to fetch storage map via RPC", err)
             })?;
 
         // Extract the storage map from the proof response.
         let (_, account_details) = account_proof.into_parts();
         let details = account_details.ok_or_else(|| DataStoreError::Other {
-            error_msg: format!(
-                "RPC returned no account details for public account {account_id}"
-            )
-            .into(),
+            error_msg: format!("RPC returned no account details for public account {account_id}")
+                .into(),
             source: None,
         })?;
 
-        let map_detail = details
-            .storage_details
-            .map_details
-            .into_iter()
-            .next()
-            .ok_or_else(|| DataStoreError::Other {
-                error_msg: format!(
-                    "RPC returned no storage map details for account {account_id}"
-                )
-                .into(),
-                source: None,
+        let map_detail =
+            details.storage_details.map_details.into_iter().next().ok_or_else(|| {
+                DataStoreError::Other {
+                    error_msg: format!(
+                        "RPC returned no storage map details for account {account_id}"
+                    )
+                    .into(),
+                    source: None,
+                }
             })?;
 
         match map_detail.entries {
@@ -303,18 +295,14 @@ impl DataStore for ClientDataStore {
                 Ok(map.open(&map_key))
             },
             StorageMapEntries::EntriesWithProofs(witnesses) => {
-                let partial_map =
-                    PartialStorageMap::with_witnesses(witnesses).map_err(|err| {
-                        DataStoreError::other_with_source(
-                            "failed to build partial storage map from witnesses",
-                            err,
-                        )
-                    })?;
-                partial_map.open(&map_key).map_err(|err| {
+                let partial_map = PartialStorageMap::with_witnesses(witnesses).map_err(|err| {
                     DataStoreError::other_with_source(
-                        "failed to open storage map witness",
+                        "failed to build partial storage map from witnesses",
                         err,
                     )
+                })?;
+                partial_map.open(&map_key).map_err(|err| {
+                    DataStoreError::other_with_source("failed to open storage map witness", err)
                 })
             },
         }
