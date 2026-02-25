@@ -17,6 +17,7 @@
 
 ### Changes
 
+* Included Partial states in `NoteFilter::Unspent` for output notes ([#1817](https://github.com/0xMiden/miden-client/pull/1817))
 * [BREAKING][arch][web] Replaced the `WebClient` class with a new `MidenClient` resource-based API as the primary web SDK entry point. `WebClient` is still available as `WasmWebClient` for low-level access but is no longer part of the public API. All documentation has been updated to use `MidenClient`. Migration: replace `WebClient.createClient(rpcUrl, noteTransportUrl, seed, storeName)` with `MidenClient.create({ rpcUrl, noteTransportUrl, seed, storeName })`, and replace direct method calls (e.g. `client.newWallet(...)`, `client.submitNewTransaction(...)`, `client.getAccounts()`) with resource methods (e.g. `client.accounts.create()`, `client.transactions.send(...)`, `client.accounts.list()`). ([#1762](https://github.com/0xMiden/miden-client/pull/1762))
 * [BREAKING][type][web] `AccountId.fromHex()` now returns `Result` (throws on invalid hex) instead of silently panicking via `unwrap()`. ([#1762](https://github.com/0xMiden/miden-client/pull/1762))
 * [BREAKING] Added a `AccountReader` accessible through `Client::account_reader` to read account data without needing to load the whole `Account` ([#1713](https://github.com/0xMiden/miden-client/pull/1713), [#1716](https://github.com/0xMiden/miden-client/pull/1716)).
