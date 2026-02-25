@@ -24,6 +24,11 @@ import type {
   Note,
   OutputNote,
   NoteExportFormat,
+  StorageSlot,
+  AccountComponent,
+  AuthSecretKey,
+  AccountStorageRequirements,
+  TransactionScript,
 } from "./crates/miden_client_web";
 
 // Import the full namespace for the MidenArrayConstructors type
@@ -87,13 +92,17 @@ export declare const AccountType: {
   readonly MutableWallet: "MutableWallet";
   readonly ImmutableWallet: "ImmutableWallet";
   readonly FungibleFaucet: "FungibleFaucet";
+  readonly ImmutableContract: "ImmutableContract";
+  readonly MutableContract: "MutableContract";
 };
 
 /** Union of valid AccountType string values. */
 export type AccountTypeValue =
   | "MutableWallet"
   | "ImmutableWallet"
-  | "FungibleFaucet";
+  | "FungibleFaucet"
+  | "ImmutableContract"
+  | "MutableContract";
 
 // ════════════════════════════════════════════════════════════════
 // Client options
@@ -149,8 +158,34 @@ export type NoteInput = string | NoteId | Note | InputNoteRecord;
 // Account types
 // ════════════════════════════════════════════════════════════════
 
-/** Create a wallet (default) or faucet. Discriminated by `type` field. */
-export type CreateAccountOptions = WalletCreateOptions | FaucetCreateOptions;
+/**
+ * Options for creating a custom contract account.
+ *
+ * Unlike wallets/faucets, `auth` must be a raw `AuthSecretKey` WASM object —
+ * the caller must retain it for signing. Construct via `AuthSecretKey.rpoFalconWithRNG(seed)`.
+ * Storage defaults to `"public"` (unlike wallets which default to `"private"`).
+ */
+export interface ContractCreateOptions {
+  type: "ImmutableContract" | "MutableContract";
+  /** Defaults to "public" (differs from wallet default of "private"). */
+  storage?: "private" | "public";
+  /** Required — used to derive a deterministic account ID. */
+  seed: Uint8Array;
+  /**
+   * Required raw WASM AuthSecretKey. Use `AuthSecretKey.rpoFalconWithRNG(seed)`.
+   * Must be a concrete object (not a string) because the caller needs to retain
+   * the key for transaction signing.
+   */
+  auth: AuthSecretKey;
+  /** Additional compiled account components from `compile.component()`. */
+  components?: AccountComponent[];
+}
+
+/** Create a wallet (default), faucet, or custom contract. Discriminated by `type` field. */
+export type CreateAccountOptions =
+  | WalletCreateOptions
+  | FaucetCreateOptions
+  | ContractCreateOptions;
 
 export interface WalletCreateOptions {
   /** Account type. Defaults to "MutableWallet". Use AccountType enum. */
@@ -180,12 +215,12 @@ export interface AccountDetails {
 /**
  * Discriminated union for account import.
  *
- * - `string` — Import a public account by its hex or bech32 ID (fetches state from the network).
+ * - `AccountRef` (string, AccountId, Account, AccountHeader) — Import a public account by ID (fetches state from the network).
  * - `{ file: AccountFile }` — Import from a previously exported account file (works for both public and private accounts).
  * - `{ seed, type?, auth? }` — Reconstruct a **public** account from its init seed. **Does not work for private accounts** — use the account file workflow instead.
  */
 export type ImportAccountInput =
-  | string
+  | AccountRef
   | { file: AccountFile }
   | {
       seed: Uint8Array;
@@ -302,6 +337,14 @@ export interface WaitOptions {
   onProgress?: (status: WaitStatus) => void;
 }
 
+export interface ExecuteOptions extends TransactionOptions {
+  account: AccountRef;
+  script: TransactionScript;
+  foreignAccounts?: Array<
+    AccountRef | { id: AccountRef; storage?: AccountStorageRequirements }
+  >;
+}
+
 /** Result of consumeAll — includes count of remaining notes for pagination. */
 export interface ConsumeAllResult {
   txId: TransactionId | null;
@@ -385,12 +428,42 @@ export interface BuildSwapTagOptions {
 }
 
 // ════════════════════════════════════════════════════════════════
+// Compiler types
+// ════════════════════════════════════════════════════════════════
+
+export interface CompileComponentOptions {
+  code: string;
+  slots: StorageSlot[];
+}
+
+export interface CompileTxScriptLibrary {
+  namespace: string;
+  code: string;
+  /**
+   * "static"  — copies library into the script (for off-chain libraries).
+   * "dynamic" — links without copying (for on-chain FPI libraries). Default.
+   */
+  linking?: "static" | "dynamic";
+}
+
+export interface CompileTxScriptOptions {
+  code: string;
+  libraries?: CompileTxScriptLibrary[];
+}
+
+// ════════════════════════════════════════════════════════════════
 // Resource interfaces
 // ════════════════════════════════════════════════════════════════
+
+export interface CompilerResource {
+  component(opts: CompileComponentOptions): Promise<AccountComponent>;
+  txScript(opts: CompileTxScriptOptions): Promise<TransactionScript>;
+}
 
 export interface AccountsResource {
   create(options?: CreateAccountOptions): Promise<Account>;
   get(accountId: AccountRef): Promise<Account | null>;
+  getOrImport(accountId: AccountRef): Promise<Account>;
   list(): Promise<AccountHeader[]>;
   getDetails(accountId: AccountRef): Promise<AccountDetails>;
   getBalance(accountId: AccountRef, tokenId: AccountRef): Promise<bigint>;
@@ -411,6 +484,7 @@ export interface TransactionsResource {
   consume(options: ConsumeOptions): Promise<TransactionId>;
   swap(options: SwapOptions): Promise<TransactionId>;
   consumeAll(options: ConsumeAllOptions): Promise<ConsumeAllResult>;
+  execute(options: ExecuteOptions): Promise<TransactionId>;
 
   preview(options: PreviewOptions): Promise<TransactionSummary>;
 
@@ -476,6 +550,7 @@ export declare class MidenClient {
   readonly notes: NotesResource;
   readonly tags: TagsResource;
   readonly settings: SettingsResource;
+  readonly compile: CompilerResource;
 
   /** Syncs the client state with the Miden node. */
   sync(options?: { timeout?: number }): Promise<SyncSummary>;
