@@ -41,6 +41,11 @@
 * [FEATURE][web] Added `TransactionId.fromHex()` static constructor for creating transaction IDs from hex strings. ([#1762](https://github.com/0xMiden/miden-client/pull/1762))
 * [FEATURE][web] Added standalone tree-shakeable note utilities (`createP2IDNote`, `createP2IDENote`, `buildSwapTag`) usable without a client instance. ([#1762](https://github.com/0xMiden/miden-client/pull/1762))
 * [FEATURE][web] SDK ergonomics: `accounts.getOrImport(ref)` convenience method, `accounts.import()` accepts full `AccountRef`, `transactions.send()` return type changed to `SendResult` with optional `returnNote`, notes API simplified (`listAvailable` returns `InputNoteRecord[]`, `consume` accepts `Note` objects), `MidenClient.create()` accepts rpcUrl/proverUrl shorthands.
+* [FEATURE][web] `accounts.create()` now supports `ImmutableContract` and `MutableContract` account types for custom contract deployment. Accepts `seed` (deterministic ID), raw `AuthSecretKey`, and an optional `components` array of compiled `AccountComponent` objects. ([#1828](https://github.com/0xMiden/miden-client/pull/1828))
+* [FEATURE][web] New `client.compile` resource with `compile.component({ code, slots })` and `compile.txScript({ code, libraries })` for compiling MASM code without a `WasmWebClient` reference. Each call creates a fresh `CodeBuilder` to prevent library accumulation across compilations; inline libraries accept a `linking` field (`"dynamic"` for FPI, `"static"` for off-chain libraries). ([#1828](https://github.com/0xMiden/miden-client/pull/1828))
+* [FEATURE][web] New `transactions.execute({ account, script, foreignAccounts? })` for executing custom transaction scripts. `foreignAccounts` accepts bare `AccountRef` values or `{ id, storage? }` objects for cross-contract (FPI) calls. ([#1828](https://github.com/0xMiden/miden-client/pull/1828))
+* [FEATURE][web] `accounts.getOrImport(ref)` convenience method — returns the locally known account or imports it from the network if absent. ([#1828](https://github.com/0xMiden/miden-client/pull/1828))
+* [FEATURE][web] `accounts.import()` now accepts full `AccountRef` (string, `AccountId`, `Account`, or `AccountHeader`) for public account import by ID, in addition to `{ file }` and `{ seed }` forms. ([#1828](https://github.com/0xMiden/miden-client/pull/1828))
 
 ### Fixes
 
