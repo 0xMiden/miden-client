@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.13.3 (TBD)
+## 0.13.3 (2026-02-25)
 
 ### Features
 * [FEATURE][web] Added `customComponents` field to `SignerAccountConfig`, allowing signer providers to attach arbitrary `AccountComponent` instances (e.g. compiled `.masp` packages) to accounts during `initializeSignerAccount`. Components are appended after the default basic wallet component.
