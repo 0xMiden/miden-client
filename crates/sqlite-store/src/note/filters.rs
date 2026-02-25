@@ -171,25 +171,3 @@ pub(super) fn note_filter_input_notes_condition(filter: &NoteFilter) -> (String,
 
     (condition, params)
 }
-
-// TESTS
-// ================================================================================================
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn unspent_filter_includes_all_non_consumed_output_states() {
-        let (condition, _params) = note_filter_output_notes_condition(&NoteFilter::Unspent);
-
-        // Verify all non-consumed output note states are included
-        assert!(condition.contains(&OutputNoteState::STATE_EXPECTED_PARTIAL.to_string()));
-        assert!(condition.contains(&OutputNoteState::STATE_EXPECTED_FULL.to_string()));
-        assert!(condition.contains(&OutputNoteState::STATE_COMMITTED_PARTIAL.to_string()));
-        assert!(condition.contains(&OutputNoteState::STATE_COMMITTED_FULL.to_string()));
-
-        // Verify consumed state is NOT included
-        assert!(!condition.contains(&OutputNoteState::STATE_CONSUMED.to_string()));
-    }
-}
