@@ -12,7 +12,6 @@ concurrency:
 
 env:
   CARGO_PROFILE_DEV_DEBUG: 0
-  RUST_CACHE_KEY: rust-cache-2026.02.18
 
 jobs:
   unused_deps:
@@ -85,12 +84,6 @@ jobs:
         run: |
           rustup update --no-self-update
           rustup component add clippy
-      - name: Add Rust Cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: rust-debug
-          prefix-key: ${{ env.RUST_CACHE_KEY }}
-          save-if: ${{ github.ref == 'refs/heads/next' }}
       - name: make - clippy
         run: make clippy
 
@@ -104,12 +97,6 @@ jobs:
           rustup update --no-self-update
           rustup target add wasm32-unknown-unknown
           rustup component add clippy
-      - name: Add Rust Cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: rust-wasm
-          prefix-key: ${{ env.RUST_CACHE_KEY }}
-          save-if: false
       - name: make - clippy-wasm
         run: make clippy-wasm
 
@@ -144,12 +131,6 @@ jobs:
         run: |
           rustup update --no-self-update
           rustup target add wasm32-unknown-unknown
-      - name: Add Rust Cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: rust-wasm
-          prefix-key: ${{ env.RUST_CACHE_KEY }}
-          save-if: false
       - name: Install dependencies
         working-directory: crates/web-client
         run: yarn install --frozen-lockfile
@@ -172,11 +153,5 @@ jobs:
       - uses: actions/checkout@v6
       - name: Install Rust
         run: rustup update --no-self-update
-      - name: Add Rust Cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: rust-nightly-release # TODO: remove once https://github.com/rust-lang/rust/pull/150055 gets stabilized.
-          prefix-key: ${{ env.RUST_CACHE_KEY }}
-          save-if: ${{ github.ref == 'refs/heads/next' }}
       - name: make - doc
         run: make doc
