@@ -144,10 +144,7 @@ export function useMultiSend(): UseMultiSendResult {
           .build();
 
         const txSenderId = parseAccountId(options.from);
-        const txResult = await client.executeTransaction(
-          txSenderId,
-          txRequest
-        );
+        const txResult = await client.executeTransaction(txSenderId, txRequest);
 
         setStage("proving");
         const provenTransaction = await client.proveTransaction(
