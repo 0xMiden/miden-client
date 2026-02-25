@@ -18,7 +18,9 @@ use miden_protocol::errors::{
     TransactionInputError,
     TransactionScriptError,
 };
-use miden_protocol::note::{Note, NoteDetails, NoteId, NoteRecipient, NoteTag, PartialNote};
+use miden_protocol::note::{
+    Note, NoteDetails, NoteId, NoteRecipient, NoteScript, NoteTag, PartialNote,
+};
 use miden_protocol::transaction::{InputNote, InputNotes, TransactionArgs, TransactionScript};
 use miden_protocol::vm::AdviceMap;
 use miden_standards::account::interface::{AccountInterface, AccountInterfaceError};
@@ -101,6 +103,9 @@ pub struct TransactionRequest {
     /// Optional [`Word`] that will be pushed to the stack for the authentication procedure
     /// during transaction execution.
     auth_arg: Option<Word>,
+    /// Note scripts that the node's NTX builder will need in its registry to successfully
+    /// execute network transactions that consume the notes created by this transaction.
+    expected_ntx_scripts: Vec<NoteScript>,
 }
 
 impl TransactionRequest {
@@ -203,6 +208,16 @@ impl TransactionRequest {
     /// Returns the auth argument for the transaction request.
     pub fn auth_arg(&self) -> &Option<Word> {
         &self.auth_arg
+    }
+
+    /// Returns the expected NTX scripts that the node's NTX builder will need in its registry.
+    pub fn expected_ntx_scripts(&self) -> &[NoteScript] {
+        &self.expected_ntx_scripts
+    }
+
+    /// Takes the expected NTX scripts out of the request, replacing with an empty vec.
+    pub(crate) fn take_expected_ntx_scripts(&mut self) -> Vec<NoteScript> {
+        core::mem::take(&mut self.expected_ntx_scripts)
     }
 
     /// Builds the [`InputNotes`] needed for the transaction execution.
@@ -335,6 +350,7 @@ impl Serializable for TransactionRequest {
         target.write_u8(u8::from(self.ignore_invalid_input_notes));
         self.script_arg.write_into(target);
         self.auth_arg.write_into(target);
+        self.expected_ntx_scripts.write_into(target);
     }
 }
 
@@ -370,6 +386,7 @@ impl Deserializable for TransactionRequest {
         let ignore_invalid_input_notes = source.read_u8()? == 1;
         let script_arg = Option::<Word>::read_from(source)?;
         let auth_arg = Option::<Word>::read_from(source)?;
+        let expected_ntx_scripts = Vec::<NoteScript>::read_from(source).unwrap_or_default();
 
         Ok(TransactionRequest {
             input_notes,
@@ -384,6 +401,7 @@ impl Deserializable for TransactionRequest {
             ignore_invalid_input_notes,
             script_arg,
             auth_arg,
+            expected_ntx_scripts,
         })
     }
 }
@@ -584,6 +602,7 @@ mod tests {
             ])
             .script_arg(rng.draw_word())
             .auth_arg(rng.draw_word())
+            .expected_ntx_scripts(vec![notes.first().unwrap().recipient().script().clone()])
             .build()
             .unwrap();
 

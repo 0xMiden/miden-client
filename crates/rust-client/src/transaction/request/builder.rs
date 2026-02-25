@@ -15,6 +15,7 @@ use miden_protocol::note::{
     NoteDetails,
     NoteId,
     NoteRecipient,
+    NoteScript,
     NoteTag,
     NoteType,
     PartialNote,
@@ -83,6 +84,12 @@ pub struct TransactionRequestBuilder {
     /// Optional [`Word`] that will be pushed to the stack for the authentication procedure
     /// during transaction execution.
     auth_arg: Option<Word>,
+    /// Note scripts that the node's NTX builder will need in its registry to successfully
+    /// execute network transactions that consume the notes created by this transaction.
+    ///
+    /// Before executing the main transaction, the client will check each script against the
+    /// node and automatically create registration transactions for any missing scripts.
+    expected_ntx_scripts: Vec<NoteScript>,
 }
 
 impl TransactionRequestBuilder {
@@ -105,6 +112,7 @@ impl TransactionRequestBuilder {
             ignore_invalid_input_notes: false,
             script_arg: None,
             auth_arg: None,
+            expected_ntx_scripts: vec![],
         }
     }
 
@@ -253,6 +261,16 @@ impl TransactionRequestBuilder {
     #[must_use]
     pub fn auth_arg(mut self, auth_arg: Word) -> Self {
         self.auth_arg = Some(auth_arg);
+        self
+    }
+
+    /// Specifies note scripts that the node's NTX builder will need in its registry.
+    ///
+    /// Before executing the main transaction, the client will check each script against the
+    /// node and automatically create registration transactions for any missing scripts.
+    #[must_use]
+    pub fn expected_ntx_scripts(mut self, scripts: Vec<NoteScript>) -> Self {
+        self.expected_ntx_scripts = scripts;
         self
     }
 
@@ -429,6 +447,7 @@ impl TransactionRequestBuilder {
             ignore_invalid_input_notes: self.ignore_invalid_input_notes,
             script_arg: self.script_arg,
             auth_arg: self.auth_arg,
+            expected_ntx_scripts: self.expected_ntx_scripts,
         })
     }
 }
