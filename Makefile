@@ -30,8 +30,8 @@ clippy: ## Run Clippy with configs. We need two separate commands because the `t
 
 .PHONY: clippy-wasm
 clippy-wasm: rust-client-ts-build ## Run Clippy for the wasm packages (web client and idxdb store)
-	cargo clippy --package miden-client-web --target wasm32-unknown-unknown --release --all-targets -- -D warnings
-	cargo clippy --package miden-idxdb-store --target wasm32-unknown-unknown --release --all-targets -- -D warnings
+	cargo clippy --package miden-client-web --target wasm32-unknown-unknown --all-targets -- -D warnings
+	cargo clippy --package miden-idxdb-store --target wasm32-unknown-unknown --all-targets -- -D warnings
 
 .PHONY: fix
 fix: ## Run Fix with configs, building tests with proper features to avoid type split.
@@ -202,8 +202,8 @@ build: ## Build the CLI binary, client library and tests binary in release mode
 	cargo build --package miden-client-integration-tests --release --locked
 
 build-wasm: rust-client-ts-build ## Build the wasm packages (web client and idxdb store)
-	CODEGEN=1 cargo build --package miden-client-web --target wasm32-unknown-unknown --release --locked
-	cargo build --package miden-idxdb-store --target wasm32-unknown-unknown --release --locked
+	CODEGEN=1 cargo build --package miden-client-web --target wasm32-unknown-unknown --locked
+	cargo build --package miden-idxdb-store --target wasm32-unknown-unknown --locked
 
 .PHONY: rust-client-ts-build
 rust-client-ts-build:
