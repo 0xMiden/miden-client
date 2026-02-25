@@ -209,7 +209,7 @@ jobs:
         with:
           shared-key: rust-wasm
           prefix-key: ${{ env.RUST_CACHE_KEY }}
-          save-if: true # TODO: change back to ${{ github.ref == 'refs/heads/next' }}
+          save-if: ${{ github.ref == 'refs/heads/next' }}
 
       - name: Install Node.js
         uses: actions/setup-node@v4
