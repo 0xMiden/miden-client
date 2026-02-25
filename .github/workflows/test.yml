@@ -25,7 +25,7 @@ env:
 
 jobs:
   test:
-    name: Test Rust
+    name: Unit tests
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
@@ -44,7 +44,7 @@ jobs:
         run: make test
 
   doc-tests:
-    name: doc-tests
+    name: Documentation tests
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
@@ -59,7 +59,7 @@ jobs:
         run: make test-docs
 
   test-react-sdk:
-    name: Test React SDK
+    name: React SDK tests
     runs-on: ubuntu-24.04
     needs: [build-web-client-dist-folder]
     steps:
@@ -157,7 +157,7 @@ jobs:
           cd .tmp/miden-note-transport && CARGO_TARGET_DIR="$GITHUB_WORKSPACE/target/note-transport" cargo build --release --locked
 
   integration-tests:
-    name: Run integration tests
+    name: Integration tests
     runs-on: ubuntu-24.04
     needs: [build-node-builder, build-note-transport]
     steps:
@@ -261,7 +261,7 @@ jobs:
           path: ./crates/web-client/dist
 
   integration-tests-web-client:
-    name: Run integration tests for web client
+    name: Integration tests for web client
     runs-on: ubuntu-24.04
     needs: [build-web-client-dist-folder, build-node-builder]
     strategy:
@@ -304,7 +304,7 @@ jobs:
         run: make stop-node
 
   integration-tests-remote-prover-web-client:
-    name: Run integration tests for remote prover
+    name: Integration tests for remote prover
     runs-on: ubuntu-24.04
     needs: [build-web-client-dist-folder, build-node-builder]
     steps:

@@ -16,7 +16,7 @@ env:
 
 jobs:
   unused_deps:
-    name: check for unused dependencies
+    name: Check for unused dependencies
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
@@ -24,7 +24,7 @@ jobs:
         uses: bnjbvr/cargo-machete@main
 
   typos:
-    name: spellcheck
+    name: Spellcheck
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -35,7 +35,7 @@ jobs:
       - run: make typos-check
 
   toml:
-    name: toml formatting
+    name: Toml formatting
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -46,14 +46,14 @@ jobs:
       - run: make toml-check
 
   eslint:
-    name: "Typescript eslint checks"
+    name: Typescript eslint checks
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
       - run: make rust-client-ts-lint
 
   react-sdk-lint:
-    name: "React SDK lint and typecheck"
+    name: React SDK lint and typecheck
     runs-on: ubuntu-24.04
     needs: [wasm-bindgen-types]
     steps:
@@ -114,7 +114,7 @@ jobs:
         run: make clippy-wasm
 
   format:
-    name: format check
+    name: Format check
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
@@ -128,7 +128,7 @@ jobs:
         run: make format-check
 
   wasm-bindgen-types:
-    name: wasm bindgen types
+    name: Wasm bindgen types
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
@@ -166,7 +166,7 @@ jobs:
           path: ./crates/web-client/dist
 
   rustdocs:
-    name: build rust documentation
+    name: Build rust documentation
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6

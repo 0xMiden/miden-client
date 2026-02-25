@@ -40,7 +40,7 @@ jobs:
       - name: make - build
         run: make build
   build-wasm:
-    name: Build Client for wasm
+    name: Build Client for Wasm
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6

@@ -14,7 +14,7 @@ permissions:
 jobs:
   # Run tests on the beta channel to provide feedback for Rust team.
   beta-test:
-    name: test on beta channel
+    name: Test on beta channel
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -32,7 +32,7 @@ jobs:
   # Check that our MSRV complies with our specified rust version.
   # Each workspace package is verified independently via a matrix for clear per-package errors.
   workspace-packages:
-    name: list packages
+    name: List packages
     runs-on: ubuntu-24.04
     outputs:
       packages: ${{ steps.package-matrix.outputs.packages }}
