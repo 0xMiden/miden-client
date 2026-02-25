@@ -62,9 +62,9 @@ impl ClientDataStore {
     /// [`get_foreign_account_inputs`](DataStore::get_foreign_account_inputs).
     ///
     /// This is used for accounts declared upfront in the transaction request. Public accounts
-    /// **not** registered here will be lazy-loaded from the network at execution time with
-    /// empty storage requirements (no map entries). Private accounts must always be
-    /// pre-registered.
+    /// **not** registered here will be lazy-loaded from the network at execution time; any
+    /// storage map accesses will trigger additional RPC calls. Private accounts must always
+    /// be pre-registered.
     pub fn register_foreign_account_inputs(
         &self,
         foreign_accounts: impl IntoIterator<Item = AccountInputs>,
@@ -187,7 +187,7 @@ impl DataStore for ClientDataStore {
     /// account, map root, and map key.
     ///
     /// Resolution order:
-    /// 1. Local store (works for native accounts and pre-registered foreign accounts).
+    /// 1. Local store (works for local accounts and pre-registered foreign accounts).
     /// 2. Lazy-load via RPC for foreign accounts whose inputs were cached by
     ///    [`get_foreign_account_inputs`](DataStore::get_foreign_account_inputs). The slot name is
     ///    resolved from the cached
@@ -200,7 +200,7 @@ impl DataStore for ClientDataStore {
         map_root: Word,
         map_key: Word,
     ) -> Result<miden_protocol::account::StorageMapWitness, DataStoreError> {
-        // Try the local store first (works for native and pre-registered foreign accounts).
+        // Try the local store first.
         if let Ok(account_storage) = self
             .store
             .get_account_storage(account_id, AccountStorageFilter::Root(map_root))
@@ -221,7 +221,7 @@ impl DataStore for ClientDataStore {
             }
         }
 
-        // Local store miss — try lazy-loading the storage map for foreign accounts.
+        // Local store miss. Try lazy-loading the storage map for foreign accounts.
         // Extract the slot name and known code from the cache (drop the lock before async
         // work).
         let (slot_name, known_code) = {

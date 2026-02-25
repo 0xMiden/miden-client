@@ -31,8 +31,9 @@ use crate::rpc::domain::account::{
 pub enum ForeignAccount {
     /// Public account whose state and code will be retrieved from the network at execution time.
     /// Declaring it upfront lets you specify [`AccountStorageRequirements`] so the correct
-    /// storage map entries are fetched. If not declared, the account is lazily loaded with
-    /// empty storage requirements (no map entries).
+    /// storage map entries are fetched in a single RPC call. If not declared, the account is
+    /// lazily loaded with empty storage requirements, and any storage map accesses will trigger
+    /// additional RPC calls during execution.
     Public(AccountId, AccountStorageRequirements),
     /// Private account that requires a [`PartialAccount`] to be provided by the caller. An
     /// account witness will be retrieved from the network at execution time so that it can be

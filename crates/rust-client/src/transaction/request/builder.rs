@@ -162,12 +162,11 @@ impl TransactionRequestBuilder {
     /// - **Private accounts**: the node retrieves a proof of the account's existence and injects
     ///   that as advice inputs.
     ///
-    /// **Public** accounts that do not access storage maps can be omitted — undeclared public
-    /// accounts are lazily loaded via RPC when the executor encounters them at runtime (with
-    /// empty storage requirements). However, if the foreign procedure reads from a storage map,
-    /// you **must** declare the account here with the appropriate
+    /// **Public** accounts can be omitted: undeclared public accounts are lazily loaded via RPC
+    /// when the executor encounters them at runtime. Declaring them upfront with the appropriate
     /// [`AccountStorageRequirements`](crate::rpc::domain::account::AccountStorageRequirements)
-    /// so the needed map entries are included in the proof; otherwise the transaction will fail.
+    /// is an optimization, it fetches all needed storage map entries in a single RPC call
+    /// instead of triggering additional calls during execution.
     ///
     /// **Private** accounts must always be declared here because their partial state cannot be
     /// obtained from the network.
