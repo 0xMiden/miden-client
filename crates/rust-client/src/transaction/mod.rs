@@ -878,4 +878,3 @@ fn validate_executed_transaction(
 
     Ok(())
 }
-

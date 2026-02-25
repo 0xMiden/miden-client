@@ -21,8 +21,8 @@ use miden_protocol::{MastForest, Word, ZERO};
 use miden_tx::{DataStore, DataStoreError, MastForestStore, TransactionMastStore};
 
 use super::{AccountStorageFilter, PartialBlockchainFilter, Store};
-use crate::rpc::{AccountStateAt, NodeRpcClient};
 use crate::rpc::domain::account::AccountStorageRequirements;
+use crate::rpc::{AccountStateAt, NodeRpcClient};
 use crate::store::StoreError;
 use crate::transaction::account_proof_into_inputs;
 use crate::utils::RwLock;
@@ -56,8 +56,13 @@ impl ClientDataStore {
         self.transaction_mast_store.clone()
     }
 
-    /// Stores the provided foreign account inputs so they can be served to the executor upon
-    /// request.
+    /// Pre-registers foreign account inputs so they are served to the executor on demand via
+    /// [`get_foreign_account_inputs`](DataStore::get_foreign_account_inputs).
+    ///
+    /// This is used for accounts declared upfront in the transaction request. Public accounts
+    /// **not** registered here will be lazy-loaded from the network at execution time with
+    /// empty storage requirements (no map entries). Private accounts must always be
+    /// pre-registered.
     pub fn register_foreign_account_inputs(
         &self,
         foreign_accounts: impl IntoIterator<Item = AccountInputs>,

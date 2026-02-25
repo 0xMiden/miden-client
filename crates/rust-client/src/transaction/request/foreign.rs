@@ -29,13 +29,14 @@ use crate::rpc::domain::account::{
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[allow(clippy::large_enum_variant)]
 pub enum ForeignAccount {
-    /// Public account data will be retrieved from the network at execution time, based on the
-    /// account ID. The second element of the tuple indicates which storage slot indices
-    /// and map keys are desired to be retrieved.
+    /// Public account whose state and code will be retrieved from the network at execution time.
+    /// Declaring it upfront lets you specify [`AccountStorageRequirements`] so the correct
+    /// storage map entries are fetched. If not declared, the account is lazily loaded with
+    /// empty storage requirements (no map entries).
     Public(AccountId, AccountStorageRequirements),
-    /// Private account data requires [`PartialAccount`] to be passed. An account witness
-    /// will be retrieved from the network at execution time so that it can be used as inputs to
-    /// the transaction kernel.
+    /// Private account that requires a [`PartialAccount`] to be provided by the caller. An
+    /// account witness will be retrieved from the network at execution time so that it can be
+    /// used as inputs to the transaction kernel.
     Private(PartialAccount),
 }
 
