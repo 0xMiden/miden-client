@@ -940,16 +940,6 @@ export class WebClient {
 
   async applyTransaction(provenTransaction, transactionResult) {
     return this._withWrite("applyTransaction", async () => {
-      // Sync state to catch cross-tab writes (same rationale as above).
-      try {
-        await this._wasmLock.runExclusive(async () => {
-          const wasmWebClient = await this.getWasmWebClient();
-          await wasmWebClient.syncStateImpl();
-        });
-      } catch {
-        // Sync failure is non-fatal.
-      }
-
       return await this._wasmLock.runExclusive(async () => {
         const wasmWebClient = await this.getWasmWebClient();
         return await wasmWebClient.applyTransaction(
