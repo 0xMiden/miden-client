@@ -40,6 +40,22 @@
 
 ***
 
+### execute()
+
+> **execute**(`options`): `Promise`\<[`TransactionId`](../classes/TransactionId.md)\>
+
+#### Parameters
+
+##### options
+
+[`ExecuteOptions`](ExecuteOptions.md)
+
+#### Returns
+
+`Promise`\<[`TransactionId`](../classes/TransactionId.md)\>
+
+***
+
 ### list()
 
 > **list**(`query?`): `Promise`\<[`TransactionRecord`](../classes/TransactionRecord.md)[]\>

@@ -13,6 +13,7 @@
 - [`ConsumeOptions`](ConsumeOptions.md)
 - [`ConsumeAllOptions`](ConsumeAllOptions.md)
 - [`SwapOptions`](SwapOptions.md)
+- [`ExecuteOptions`](ExecuteOptions.md)
 
 ## Properties
 

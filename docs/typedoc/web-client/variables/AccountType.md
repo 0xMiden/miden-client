@@ -18,9 +18,17 @@ Replaces the WASM `AccountType` enum (which has internal names like
 
 > `readonly` **FungibleFaucet**: `"FungibleFaucet"`
 
+### ImmutableContract
+
+> `readonly` **ImmutableContract**: `"ImmutableContract"`
+
 ### ImmutableWallet
 
 > `readonly` **ImmutableWallet**: `"ImmutableWallet"`
+
+### MutableContract
+
+> `readonly` **MutableContract**: `"MutableContract"`
 
 ### MutableWallet
 
