@@ -5,12 +5,8 @@ use miden_client::assembly::CodeBuilder;
 use miden_client::auth::{AuthFalcon512Rpo, AuthSecretKey, RPO_FALCON_SCHEME_ID};
 use miden_client::keystore::Keystore;
 use miden_client::transaction::{
-    ProvenTransaction,
-    TransactionExecutorError,
-    TransactionInputs,
-    TransactionProver,
-    TransactionProverError,
-    TransactionRequestBuilder,
+    ProvenTransaction, TransactionExecutorError, TransactionInputs, TransactionProver,
+    TransactionProverError, TransactionRequestBuilder,
 };
 use miden_client::{ClientError, async_trait};
 use miden_protocol::account::{AccountBuilder, AccountComponent, AccountStorageMode};
@@ -18,8 +14,7 @@ use miden_protocol::assembly::diagnostics::miette::GraphicalReportHandler;
 use miden_protocol::asset::{Asset, FungibleAsset};
 use miden_protocol::note::NoteType;
 use miden_protocol::testing::account_id::{
-    ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
-    ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
+    ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET, ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
     ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
 };
 use miden_protocol::{Felt, Word};
@@ -199,24 +194,15 @@ async fn lazy_foreign_account_loading() {
     let (mut client, rpc_api, keystore) = Box::pin(create_test_client()).await;
 
     // Setup: Create and deploy a public foreign account
-
-    // Use a constant-returning procedure to avoid storage map limitations with lazy loading
-    // (lazy fetches use empty AccountStorageRequirements, so map entries aren't included).
-    let constant_value: [Felt; 4] = [Felt::new(9), Felt::new(12), Felt::new(18), Felt::new(30)];
-
+    let constant_value: Word = [Felt::new(9), Felt::new(12), Felt::new(18), Felt::new(30)].into();
     let component_code = CodeBuilder::default()
         .compile_component_code(
             "miden::testing::fpi_lazy_component",
-            format!(
-                "pub proc get_constant\n    push.{}\n    swapw dropw\nend",
-                Word::from(constant_value)
-            ),
+            format!("pub proc get_constant\n    push.{constant_value}\n    swapw dropw\nend"),
         )
         .unwrap();
-
     let fpi_component =
         AccountComponent::new(component_code, vec![]).unwrap().with_supports_all_types();
-
     let proc_root = fpi_component.mast_forest().procedure_digests().next().unwrap();
 
     let secret_key = AuthSecretKey::new_falcon512_rpo();
@@ -226,7 +212,6 @@ async fn lazy_foreign_account_loading() {
         .storage_mode(AccountStorageMode::Public)
         .build()
         .unwrap();
-
     let foreign_account_id = foreign_account.id();
 
     keystore.add_key(&secret_key, foreign_account_id).await.unwrap();
@@ -263,22 +248,22 @@ async fn lazy_foreign_account_loading() {
     );
 
     // Build a transaction script that calls the foreign procedure via FPI.
-    let tx_script_code = format!(
-        "
-        use miden::protocol::tx
-        begin
-            push.{proc_root}
-            push.{account_id_suffix} push.{account_id_prefix}
-            exec.tx::execute_foreign_procedure
-            push.{fpi_value} assert_eqw
-        end
-        ",
-        account_id_prefix = foreign_account_id.prefix().as_u64(),
-        account_id_suffix = foreign_account_id.suffix(),
-        fpi_value = Word::from(constant_value),
-    );
-
-    let tx_script = client.code_builder().compile_tx_script(&tx_script_code).unwrap();
+    let tx_script = client
+        .code_builder()
+        .compile_tx_script(&format!(
+            "
+            use miden::protocol::tx
+            begin
+                push.{proc_root}
+                push.{suffix} push.{prefix}
+                exec.tx::execute_foreign_procedure
+                push.{constant_value} assert_eqw
+            end
+            ",
+            prefix = foreign_account_id.prefix().as_u64(),
+            suffix = foreign_account_id.suffix(),
+        ))
+        .unwrap();
 
     // Build request WITHOUT specifying foreign accounts, lazy loading should handle it.
     let tx_request = TransactionRequestBuilder::new().custom_script(tx_script).build().unwrap();
