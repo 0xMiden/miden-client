@@ -6,6 +6,7 @@ pub mod grpc;
 use alloc::boxed::Box;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
+use std::collections::BTreeSet;
 
 use futures::Stream;
 use miden_protocol::address::Address;
@@ -103,20 +104,16 @@ where
     ///
     /// Pagination is employed, where only notes after the provided cursor are requested.
     /// Downloaded notes are imported.
-    pub(crate) async fn fetch_transport_notes<I>(
+    pub(crate) async fn fetch_transport_notes(
         &mut self,
         cursor: NoteTransportCursor,
-        tags: I,
-    ) -> Result<(), ClientError>
-    where
-        I: IntoIterator<Item = NoteTag>,
-    {
+        tags: BTreeSet<NoteTag>,
+    ) -> Result<(), ClientError> {
         let mut notes = Vec::new();
         // Fetch notes
-        let (note_infos, rcursor) = self
-            .get_note_transport_api()?
-            .fetch_notes(&tags.into_iter().collect::<Vec<_>>(), cursor)
-            .await?;
+        let tags = tags.into_iter().collect::<Vec<_>>();
+        let (note_infos, rcursor) =
+            self.get_note_transport_api()?.fetch_notes(&tags, cursor).await?;
         for note_info in &note_infos {
             // e2ee impl hint:
             // for key in self.store.decryption_keys() try

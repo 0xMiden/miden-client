@@ -120,12 +120,13 @@ where
     pub async fn sync_state(&mut self) -> Result<SyncSummary, ClientError> {
         _ = self.ensure_genesis_in_place().await?;
 
+        let input = self.build_sync_input().await?;
+
         // Note Transport update
         // TODO We can run both sync_state, fetch_transport_notes futures in parallel
         if self.is_note_transport_enabled() {
             let cursor = self.store.get_note_transport_cursor().await?;
-            let note_tags = self.store.get_unique_note_tags().await?;
-            self.fetch_transport_notes(cursor, note_tags).await?;
+            self.fetch_transport_notes(cursor, input.note_tags.clone()).await?;
         }
 
         // Build sync state components
@@ -133,7 +134,6 @@ where
         let state_sync =
             StateSync::new(self.rpc_api.clone(), Arc::new(note_screener), self.tx_discard_delta);
         let mut current_partial_mmr = self.store.get_current_partial_mmr().await?;
-        let input = self.build_sync_input().await?;
 
         // Get the sync update from the network
         let state_sync_update = state_sync.sync_state(&mut current_partial_mmr, input).await?;
