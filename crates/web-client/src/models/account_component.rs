@@ -99,10 +99,7 @@ impl AccountComponent {
                 let path_str = export_path.as_ref().as_str();
                 path_str == procedure_name
                     || export_path.as_ref().to_relative().as_str() == procedure_name
-                    || path_str
-                        .rsplit_once("::")
-                        .map(|(_, local)| local == procedure_name)
-                        .unwrap_or(false)
+                    || path_str.rsplit_once("::").is_some_and(|(_, local)| local == procedure_name)
             })
             .ok_or_else(|| {
                 JsValue::from_str(&format!(
