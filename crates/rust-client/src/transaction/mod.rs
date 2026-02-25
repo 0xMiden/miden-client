@@ -80,8 +80,7 @@ use tracing::info;
 use super::Client;
 use crate::ClientError;
 use crate::note::NoteUpdateTracker;
-use crate::rpc::domain::account::AccountStorageRequirements;
-use crate::rpc::{AccountStateAt, NodeRpcClient};
+use crate::rpc::AccountStateAt;
 use crate::store::data_store::ClientDataStore;
 use crate::store::input_note_states::ExpectedNoteState;
 use crate::store::{
@@ -89,7 +88,6 @@ use crate::store::{
     InputNoteState,
     NoteFilter,
     OutputNoteRecord,
-    Store,
     TransactionFilter,
 };
 use crate::sync::NoteTagRecord;
@@ -689,42 +687,40 @@ where
 
         for foreign_account in foreign_accounts {
             let account_id = foreign_account.account_id();
+            let storage_requirements = foreign_account.storage_slot_requirements();
+            let known_account_code = self
+                .store
+                .get_foreign_account_code(vec![account_id])
+                .await?
+                .pop_first()
+                .map(|(_, code)| code);
+
+            let (_, account_proof) = self
+                .rpc_api
+                .get_account_proof(
+                    account_id,
+                    storage_requirements,
+                    AccountStateAt::Block(block_num),
+                    known_account_code,
+                )
+                .await?;
+
             let foreign_account_inputs = match foreign_account {
-                ForeignAccount::Public(account_id, storage_requirements) => {
-                    let inputs = fetch_public_account_inputs(
-                        self.store.as_ref(),
-                        self.rpc_api.as_ref(),
-                        account_id,
-                        storage_requirements,
-                        block_num,
-                    )
-                    .await?;
+                ForeignAccount::Public(account_id, ..) => {
+                    let foreign_account_inputs: AccountInputs =
+                        account_proof_into_inputs(account_proof)?;
 
-                    // Persist the code to the local cache.
+                    // Update our foreign account code cache
                     self.store
-                        .upsert_foreign_account_code(account_id, inputs.code().clone())
-                        .await?;
-
-                    inputs
-                },
-                ForeignAccount::Private(partial_account) => {
-                    let known_account_code = self
-                        .store
-                        .get_foreign_account_code(vec![account_id])
-                        .await?
-                        .pop_first()
-                        .map(|(_, code)| code);
-
-                    let (_, account_proof) = self
-                        .rpc_api
-                        .get_account_proof(
+                        .upsert_foreign_account_code(
                             account_id,
-                            AccountStorageRequirements::default(),
-                            AccountStateAt::Block(block_num),
-                            known_account_code,
+                            foreign_account_inputs.code().clone(),
                         )
                         .await?;
 
+                    foreign_account_inputs
+                },
+                ForeignAccount::Private(partial_account) => {
                     let (witness, _) = account_proof.into_parts();
                     AccountInputs::new(partial_account, witness)
                 },
@@ -883,32 +879,3 @@ fn validate_executed_transaction(
     Ok(())
 }
 
-/// Fetches [`AccountInputs`] for a public foreign account by querying the store's code cache
-/// and then the network via RPC.
-///
-/// This helper does **not** persist the fetched code (callers handle caching differently)
-/// and does **not** load MAST forests (callers manage that based on their context).
-pub(crate) async fn fetch_public_account_inputs(
-    store: &dyn Store,
-    rpc_api: &dyn NodeRpcClient,
-    account_id: AccountId,
-    storage_requirements: AccountStorageRequirements,
-    block_num: BlockNumber,
-) -> Result<AccountInputs, ClientError> {
-    // Check whether we already have the code cached in the store.
-    let known_account_code =
-        store.get_foreign_account_code(vec![account_id]).await?.into_values().next();
-
-    // Fetch the account proof from the network.
-    let (_, account_proof) = rpc_api
-        .get_account_proof(
-            account_id,
-            storage_requirements,
-            AccountStateAt::Block(block_num),
-            known_account_code,
-        )
-        .await?;
-
-    // Convert the proof into account inputs.
-    Ok(account_proof_into_inputs(account_proof)?)
-}

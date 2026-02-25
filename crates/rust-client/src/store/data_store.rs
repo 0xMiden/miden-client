@@ -21,10 +21,10 @@ use miden_protocol::{MastForest, Word, ZERO};
 use miden_tx::{DataStore, DataStoreError, MastForestStore, TransactionMastStore};
 
 use super::{AccountStorageFilter, PartialBlockchainFilter, Store};
-use crate::rpc::NodeRpcClient;
+use crate::rpc::{AccountStateAt, NodeRpcClient};
 use crate::rpc::domain::account::AccountStorageRequirements;
 use crate::store::StoreError;
-use crate::transaction::fetch_public_account_inputs;
+use crate::transaction::account_proof_into_inputs;
 use crate::utils::RwLock;
 
 // DATA STORE
@@ -230,16 +230,34 @@ impl DataStore for ClientDataStore {
             return Err(DataStoreError::AccountNotFound(foreign_account_id));
         }
 
-        let account_inputs = fetch_public_account_inputs(
-            self.store.as_ref(),
-            self.rpc_api.as_ref(),
-            foreign_account_id,
-            AccountStorageRequirements::default(),
-            ref_block,
-        )
-        .await
-        .map_err(|err| {
-            DataStoreError::other_with_source("failed to lazy-load foreign account", err)
+        let known_account_code = self
+            .store
+            .get_foreign_account_code(vec![foreign_account_id])
+            .await
+            .map_err(|err| {
+                DataStoreError::other_with_source("failed to query foreign account code cache", err)
+            })?
+            .into_values()
+            .next();
+
+        let (_, account_proof) = self
+            .rpc_api
+            .get_account_proof(
+                foreign_account_id,
+                AccountStorageRequirements::default(),
+                AccountStateAt::Block(ref_block),
+                known_account_code,
+            )
+            .await
+            .map_err(|err| {
+                DataStoreError::other_with_source(
+                    "failed to fetch foreign account proof via RPC",
+                    err,
+                )
+            })?;
+
+        let account_inputs = account_proof_into_inputs(account_proof).map_err(|err| {
+            DataStoreError::other_with_source("failed to convert account proof to inputs", err)
         })?;
 
         // Load the account code into the MAST store so the executor can resolve
