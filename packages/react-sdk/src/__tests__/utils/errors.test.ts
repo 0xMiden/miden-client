@@ -47,6 +47,7 @@ describe("wrapWasmError", () => {
     const wrapped = wrapWasmError(new Error("null pointer passed to Rust"));
     expect((wrapped as MidenError).code).toBe("WASM_POINTER_CONSUMED");
     expect(wrapped.message).toContain("WASM object was already consumed");
+    expect(wrapped.message).not.toContain("AccountId");
   });
 
   it("should detect 'already been freed' as WASM_POINTER_CONSUMED", () => {

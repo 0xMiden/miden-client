@@ -47,8 +47,8 @@ const ERROR_PATTERNS: ErrorPattern[] = [
       msg.includes("dereferencing a null"),
     code: "WASM_POINTER_CONSUMED",
     message:
-      "WASM object was already consumed. AccountId and other WASM objects can only be used once. " +
-      "Create a fresh object for each call using AccountId.fromBech32() or parseAccountId().",
+      "WASM object was already consumed. Some WASM-bound objects can only be passed once — " +
+      "if you need to reuse a value, create a fresh instance before each call.",
   },
   {
     test: (msg) =>
