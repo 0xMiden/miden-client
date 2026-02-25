@@ -279,7 +279,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: web-client-artifacts
-          path: ./crates/web-client
+          path: ./crates/web-client/dist
 
       - name: Install Node.js
         uses: actions/setup-node@v4
@@ -322,7 +322,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: web-client-artifacts
-          path: ./crates/web-client
+          path: ./crates/web-client/dist
 
       - name: Configure setuid sandbox
         run: . ./scripts/configure-sandbox.sh
