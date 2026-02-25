@@ -62,20 +62,16 @@
 //! For more detailed information about each function and error type, refer to the specific API
 //! documentation.
 
+use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, BTreeSet};
-use alloc::string::ToString;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use miden_protocol::account::{Account, AccountId};
-use miden_protocol::crypto::rand::FeltRng;
 use miden_protocol::asset::NonFungibleAsset;
 use miden_protocol::block::BlockNumber;
 use miden_protocol::errors::AssetError;
-use miden_protocol::note::{
-    Note, NoteAssets, NoteDetails, NoteId, NoteMetadata, NoteRecipient, NoteScript, NoteStorage,
-    NoteTag, NoteType,
-};
+use miden_protocol::note::{Note, NoteDetails, NoteId, NoteRecipient, NoteScript, NoteTag};
 use miden_protocol::transaction::AccountInputs;
 use miden_protocol::{Felt, Word};
 use miden_standards::account::interface::AccountInterfaceExt;
@@ -205,14 +201,19 @@ where
     pub async fn submit_new_transaction_with_prover(
         &mut self,
         account_id: AccountId,
-        mut transaction_request: TransactionRequest,
+        transaction_request: TransactionRequest,
         tx_prover: Arc<dyn TransactionProver>,
     ) -> Result<TransactionId, ClientError> {
         // Pre-flight: register any missing NTX scripts before the main transaction.
-        let ntx_scripts = transaction_request.take_expected_ntx_scripts();
-        if !ntx_scripts.is_empty() {
-            self.ensure_ntx_scripts_registered(account_id, &ntx_scripts, tx_prover.clone())
-                .await?;
+        // Boxed to avoid inflating this future's size (the registration path contains its
+        // own full execute → prove → submit pipeline).
+        if !transaction_request.expected_ntx_scripts().is_empty() {
+            Box::pin(self.ensure_ntx_scripts_registered(
+                account_id,
+                transaction_request.expected_ntx_scripts(),
+                tx_prover.clone(),
+            ))
+            .await?;
         }
 
         let tx_result = self.execute_transaction(account_id, transaction_request).await?;
@@ -629,62 +630,46 @@ where
     /// scripts. For any script that is missing, creates and submits a registration transaction
     /// that produces a public note carrying that script.
     ///
-    /// `account_id` is the account that will execute the registration transactions.
+    /// `account_id` is the account that will execute the registration transaction.
     async fn ensure_ntx_scripts_registered(
         &mut self,
         account_id: AccountId,
         scripts: &[NoteScript],
         tx_prover: Arc<dyn TransactionProver>,
     ) -> Result<(), ClientError> {
+        let mut missing_scripts = Vec::new();
+
         for script in scripts {
             let script_root = script.root();
 
             // Check if the node already has this script registered.
-            let is_registered = match self.rpc_api.get_note_script_by_root(script_root).await {
-                Ok(_) => true,
-                Err(RpcError::RequestError { error_kind: GrpcError::NotFound, .. }) => false,
+            match self.rpc_api.get_note_script_by_root(script_root).await {
+                Ok(_) => {},
+                Err(RpcError::RequestError { error_kind: GrpcError::NotFound, .. }) => {
+                    missing_scripts.push(script.clone());
+                },
                 Err(other) => {
                     return Err(ClientError::NtxScriptRegistrationFailed(format!(
                         "failed to check script with root {script_root:?}: {other}"
                     )));
                 },
-            };
-
-            if is_registered {
-                info!("NTX script with root {:?} already registered on node", script_root);
-                continue;
             }
-
-            info!("Registering NTX script with root {:?} on node", script_root);
-
-            // Create a minimal public note whose only purpose is to register the script.
-            let serial_num = self.rng.draw_word();
-            let note_storage = NoteStorage::new(vec![])
-                .map_err(|e| ClientError::NtxScriptRegistrationFailed(e.to_string()))?;
-            let recipient = NoteRecipient::new(serial_num, script.clone(), note_storage);
-            let note_assets = NoteAssets::new(vec![])
-                .map_err(|e| ClientError::NtxScriptRegistrationFailed(e.to_string()))?;
-            let metadata = NoteMetadata::new(
-                account_id,
-                NoteType::Public,
-                NoteTag::with_account_target(account_id),
-            );
-            let registration_note = Note::new(note_assets, metadata, recipient);
-
-            // Build and submit a registration transaction.
-            let registration_request = TransactionRequestBuilder::new()
-                .own_output_notes(vec![OutputNote::Full(registration_note)])
-                .build()?;
-
-            let tx_result =
-                self.execute_transaction(account_id, registration_request).await?;
-            let proven = self.prove_transaction_with(&tx_result, tx_prover.clone()).await?;
-            let submission_height =
-                self.submit_proven_transaction(proven, &tx_result).await?;
-            self.apply_transaction(&tx_result, submission_height).await?;
-
-            info!("NTX script registration transaction submitted successfully");
         }
+
+        if missing_scripts.is_empty() {
+            return Ok(());
+        }
+
+        let registration_request = TransactionRequestBuilder::new().build_register_note_scripts(
+            account_id,
+            missing_scripts,
+            self.rng(),
+        )?;
+
+        let tx_result = self.execute_transaction(account_id, registration_request).await?;
+        let proven = self.prove_transaction_with(&tx_result, tx_prover).await?;
+        let submission_height = self.submit_proven_transaction(proven, &tx_result).await?;
+        self.apply_transaction(&tx_result, submission_height).await?;
 
         Ok(())
     }

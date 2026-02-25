@@ -19,7 +19,13 @@ use miden_protocol::errors::{
     TransactionScriptError,
 };
 use miden_protocol::note::{
-    Note, NoteDetails, NoteId, NoteRecipient, NoteScript, NoteTag, PartialNote,
+    Note,
+    NoteDetails,
+    NoteId,
+    NoteRecipient,
+    NoteScript,
+    NoteTag,
+    PartialNote,
 };
 use miden_protocol::transaction::{InputNote, InputNotes, TransactionArgs, TransactionScript};
 use miden_protocol::vm::AdviceMap;
@@ -103,8 +109,9 @@ pub struct TransactionRequest {
     /// Optional [`Word`] that will be pushed to the stack for the authentication procedure
     /// during transaction execution.
     auth_arg: Option<Word>,
-    /// Note scripts that the node's NTX builder will need in its registry to successfully
-    /// execute network transactions that consume the notes created by this transaction.
+    /// Note scripts that the node's NTX builder will need in its script registry.
+    ///
+    /// See [`TransactionRequestBuilder::expected_ntx_scripts`] for details.
     expected_ntx_scripts: Vec<NoteScript>,
 }
 
@@ -213,11 +220,6 @@ impl TransactionRequest {
     /// Returns the expected NTX scripts that the node's NTX builder will need in its registry.
     pub fn expected_ntx_scripts(&self) -> &[NoteScript] {
         &self.expected_ntx_scripts
-    }
-
-    /// Takes the expected NTX scripts out of the request, replacing with an empty vec.
-    pub(crate) fn take_expected_ntx_scripts(&mut self) -> Vec<NoteScript> {
-        core::mem::take(&mut self.expected_ntx_scripts)
     }
 
     /// Builds the [`InputNotes`] needed for the transaction execution.
