@@ -175,7 +175,7 @@ jobs:
       - name: Add Rust Cache
         uses: Swatinem/rust-cache@v2
         with:
-          shared-key: rust-nightly-release
+          shared-key: rust-nightly-release # TODO: remove once https://github.com/rust-lang/rust/pull/150055 gets stabilized.
           prefix-key: ${{ env.RUST_CACHE_KEY }}
           save-if: ${{ github.ref == 'refs/heads/next' }}
       - name: make - doc
