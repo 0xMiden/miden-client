@@ -36,8 +36,7 @@ jobs:
         with:
           shared-key: rust-release
           prefix-key: ${{ env.RUST_CACHE_KEY }}
-          # TODO: restore to save-if: ${{ github.ref == 'refs/heads/next' }} before merging
-          save-if: true
+          save-if: ${{ github.ref == 'refs/heads/next' }}
       - name: make - build
         run: make build
   build-wasm:
@@ -54,7 +53,6 @@ jobs:
         with:
           shared-key: rust-wasm
           prefix-key: ${{ env.RUST_CACHE_KEY }}
-          # TODO: restore to save-if: ${{ github.ref == 'refs/heads/next' }} before merging
-          save-if: true
+          save-if: ${{ github.ref == 'refs/heads/next' }}
       - name: make - build-wasm
         run: make build-wasm
