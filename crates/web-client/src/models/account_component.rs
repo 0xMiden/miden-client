@@ -92,9 +92,17 @@ impl AccountComponent {
         let get_proc_export = library
             .exports()
             .find(|export| {
-                export.as_procedure().is_some()
-                    && (export.path().as_ref().as_str() == procedure_name
-                        || export.path().as_ref().to_relative().as_str() == procedure_name)
+                if export.as_procedure().is_none() {
+                    return false;
+                }
+                let export_path = export.path();
+                let path_str = export_path.as_ref().as_str();
+                path_str == procedure_name
+                    || export_path.as_ref().to_relative().as_str() == procedure_name
+                    || path_str
+                        .rsplit_once("::")
+                        .map(|(_, local)| local == procedure_name)
+                        .unwrap_or(false)
             })
             .ok_or_else(|| {
                 JsValue::from_str(&format!(
