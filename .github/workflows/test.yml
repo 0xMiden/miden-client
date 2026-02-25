@@ -184,19 +184,23 @@ jobs:
           path: target/note-transport/release/miden-note-transport-node-bin
           key: ${{ runner.os }}-note-transport-${{ hashFiles('Cargo.lock') }}
       - name: Start test node
-        run: make start-node-background
+        run: |
+          RUST_LOG=none target/release/testing-node-builder &
+          sleep 4
+          pgrep -f testing-node-builder || (echo "Failed to start node" && exit 1)
       - name: Start note transport
-        run: make start-note-transport-background
+        run: |
+          RUST_LOG=none target/note-transport/release/miden-note-transport-node-bin &
+          sleep 4
+          pgrep -f miden-note-transport-node-bin || (echo "Failed to start note transport" && exit 1)
       - name: Run integration tests
         run: make integration-test-full
       - name: Stop test node
         if: always()
-        run: |
-          make stop-node
+        run: make stop-node
       - name: Stop note transport
         if: always()
-        run: |
-          make stop-note-transport
+        run: make stop-note-transport
 
   build-web-client-dist-folder:
     name: Build Web Client
@@ -293,7 +297,10 @@ jobs:
           path: target/release/testing-node-builder
           key: ${{ runner.os }}-node-builder-${{ hashFiles('Cargo.lock') }}
       - name: Start test node
-        run: make start-node-background
+        run: |
+          RUST_LOG=none target/release/testing-node-builder &
+          sleep 4
+          pgrep -f testing-node-builder || (echo "Failed to start node" && exit 1)
       - name: Run web client tests
         run: |
           make integration-test-web-client
@@ -341,9 +348,15 @@ jobs:
         if: steps.cache-prover.outputs.cache-hit != 'true'
         run: cargo build --release --package testing-remote-prover --locked
       - name: Start test node
-        run: make start-node-background
+        run: |
+          RUST_LOG=none target/release/testing-node-builder &
+          sleep 4
+          pgrep -f testing-node-builder || (echo "Failed to start node" && exit 1)
       - name: Start prover
-        run: make start-prover-background
+        run: |
+          RUST_LOG=none target/release/testing-remote-prover &
+          sleep 4
+          pgrep -f testing-remote-prover || (echo "Failed to start prover" && exit 1)
       - name: Run remote prover tests
         run: make integration-test-remote-prover-web-client
       - name: Stop test node
