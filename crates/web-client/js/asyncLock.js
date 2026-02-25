@@ -17,7 +17,10 @@ export class AsyncLock {
    * @returns {Promise<T>}
    */
   runExclusive(fn) {
-    const run = this._pending.then(fn, fn);
+    const run = this._pending.then(
+      () => fn(),
+      () => fn()
+    );
     // Swallow the result/error so the chain itself never rejects
     this._pending = run.then(
       () => undefined,

@@ -291,13 +291,7 @@ export function MidenProvider({
     if (!isReady || !client) return;
 
     // The WebClient exposes onStateChanged when BroadcastChannel is available.
-    const unsubscribe = (
-      client as unknown as {
-        onStateChanged?: (
-          cb: (event: { type: string; operation?: string }) => void
-        ) => () => void;
-      }
-    ).onStateChanged?.(async () => {
+    const unsubscribe = client.onStateChanged?.(async () => {
       try {
         const accounts = await client.getAccounts();
         useMidenStore.getState().setAccounts(accounts);

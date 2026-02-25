@@ -98,6 +98,14 @@ const READ_METHODS = new Set([
 ]);
 
 /**
+ * Module-level map tracking whether the current tab already holds the
+ * cross-tab Web Lock for a given store name. Keyed by storeName so that
+ * two WebClient instances targeting the same store correctly detect
+ * re-entrancy and skip re-acquiring the lock (which would deadlock).
+ */
+const _writeLockHeldByStore = new Map();
+
+/**
  * Create the Proxy that wraps a WebClient instance. The proxy:
  * - Returns properties from the wrapper (instance) first.
  * - Falls back to the underlying WASM WebClient, wrapping function calls
@@ -302,12 +310,6 @@ export class WebClient {
     // Layer 1: In-process WASM lock — serializes all main-thread WASM calls.
     this._wasmLock = new AsyncLock();
 
-    // Layer 2: Guard for the cross-tab write lock. When true, the current tab
-    // already holds the Web Lock, so nested or concurrent _withWrite calls in
-    // this tab skip acquiring it again (the outer call's lock already blocks
-    // other tabs). The in-process _wasmLock still serializes WASM access.
-    this._writeLockHeld = false;
-
     // Layer 3: BroadcastChannel for cross-tab state-change notifications.
     const channelName = `miden-state-${storeName || "default"}`;
     try {
@@ -321,6 +323,9 @@ export class WebClient {
     this._stateListeners = [];
     if (this._stateChannel) {
       this._stateChannel.onmessage = async (event) => {
+        // Ignore cross-tab messages until the client is fully initialized.
+        if (!this.wasmWebClient) return;
+
         // Auto-sync: refresh in-memory Rust Client state from IndexedDB.
         // Sync coalescing (in syncLock.js) ensures concurrent syncs share the
         // same result, so rapid messages are handled without debouncing.
@@ -459,20 +464,22 @@ export class WebClient {
    * @template T
    */
   async _withWrite(operation, fn) {
-    if (this._writeLockHeld) {
-      // This tab already holds the cross-tab Web Lock — skip re-acquiring
-      // it to avoid deadlock. The outer call's lock still blocks other tabs.
+    const storeName = this.storeName || "default";
+
+    if (_writeLockHeldByStore.get(storeName)) {
+      // This tab already holds the cross-tab Web Lock for this store —
+      // skip re-acquiring it to avoid deadlock. The outer call's lock
+      // still blocks other tabs. Works correctly even when two WebClient
+      // instances target the same store within the same tab.
       return fn();
     }
 
-    const storeName = this.storeName || "default";
-
     const result = await withWriteLock(storeName, async () => {
-      this._writeLockHeld = true;
+      _writeLockHeldByStore.set(storeName, true);
       try {
         return await fn();
       } finally {
-        this._writeLockHeld = false;
+        _writeLockHeldByStore.set(storeName, false);
       }
     });
 
@@ -1133,20 +1140,22 @@ export class MockWebClient extends WebClient {
 
       try {
         const result = await this._withWrite("syncState", async () => {
-          const wasmWebClient = await this.getWasmWebClient();
-
           if (!this.worker) {
-            return await this._wasmLock.runExclusive(() =>
-              wasmWebClient.syncStateImpl()
-            );
+            return await this._wasmLock.runExclusive(async () => {
+              const wasmWebClient = await this.getWasmWebClient();
+              return wasmWebClient.syncStateImpl();
+            });
           }
 
           const { serializedMockChain, serializedMockNoteTransportNode } =
-            await this._wasmLock.runExclusive(() => ({
-              serializedMockChain: wasmWebClient.serializeMockChain().buffer,
-              serializedMockNoteTransportNode:
-                wasmWebClient.serializeMockNoteTransportNode().buffer,
-            }));
+            await this._wasmLock.runExclusive(async () => {
+              const wasmWebClient = await this.getWasmWebClient();
+              return {
+                serializedMockChain: wasmWebClient.serializeMockChain().buffer,
+                serializedMockNoteTransportNode:
+                  wasmWebClient.serializeMockNoteTransportNode().buffer,
+              };
+            });
 
           const wasm = await getWasmOrThrow();
 
@@ -1186,15 +1195,17 @@ export class MockWebClient extends WebClient {
           });
         }
 
-        const wasmWebClient = await this.getWasmWebClient();
         const wasm = await getWasmOrThrow();
         const serializedTransactionRequest = transactionRequest.serialize();
         const { serializedMockChain, serializedMockNoteTransportNode } =
-          await this._wasmLock.runExclusive(() => ({
-            serializedMockChain: wasmWebClient.serializeMockChain().buffer,
-            serializedMockNoteTransportNode:
-              wasmWebClient.serializeMockNoteTransportNode().buffer,
-          }));
+          await this._wasmLock.runExclusive(async () => {
+            const wasmWebClient = await this.getWasmWebClient();
+            return {
+              serializedMockChain: wasmWebClient.serializeMockChain().buffer,
+              serializedMockNoteTransportNode:
+                wasmWebClient.serializeMockNoteTransportNode().buffer,
+            };
+          });
 
         const result = await this.callMethodWithWorker(
           MethodName.SUBMIT_NEW_TRANSACTION_MOCK,
@@ -1247,16 +1258,18 @@ export class MockWebClient extends WebClient {
           });
         }
 
-        const wasmWebClient = await this.getWasmWebClient();
         const wasm = await getWasmOrThrow();
         const serializedTransactionRequest = transactionRequest.serialize();
         const proverPayload = prover.serialize();
         const { serializedMockChain, serializedMockNoteTransportNode } =
-          await this._wasmLock.runExclusive(() => ({
-            serializedMockChain: wasmWebClient.serializeMockChain().buffer,
-            serializedMockNoteTransportNode:
-              wasmWebClient.serializeMockNoteTransportNode().buffer,
-          }));
+          await this._wasmLock.runExclusive(async () => {
+            const wasmWebClient = await this.getWasmWebClient();
+            return {
+              serializedMockChain: wasmWebClient.serializeMockChain().buffer,
+              serializedMockNoteTransportNode:
+                wasmWebClient.serializeMockNoteTransportNode().buffer,
+            };
+          });
 
         const result = await this.callMethodWithWorker(
           MethodName.SUBMIT_NEW_TRANSACTION_WITH_PROVER_MOCK,
