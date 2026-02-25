@@ -5,8 +5,12 @@ use miden_client::assembly::CodeBuilder;
 use miden_client::auth::{AuthFalcon512Rpo, AuthSecretKey, RPO_FALCON_SCHEME_ID};
 use miden_client::keystore::Keystore;
 use miden_client::transaction::{
-    ProvenTransaction, TransactionExecutorError, TransactionInputs, TransactionProver,
-    TransactionProverError, TransactionRequestBuilder,
+    ProvenTransaction,
+    TransactionExecutorError,
+    TransactionInputs,
+    TransactionProver,
+    TransactionProverError,
+    TransactionRequestBuilder,
 };
 use miden_client::{ClientError, async_trait};
 use miden_protocol::account::{AccountBuilder, AccountComponent, AccountStorageMode};
@@ -14,7 +18,8 @@ use miden_protocol::assembly::diagnostics::miette::GraphicalReportHandler;
 use miden_protocol::asset::{Asset, FungibleAsset};
 use miden_protocol::note::NoteType;
 use miden_protocol::testing::account_id::{
-    ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET, ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
+    ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
+    ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
     ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
 };
 use miden_protocol::{Felt, Word};
@@ -250,7 +255,7 @@ async fn lazy_foreign_account_loading() {
     // Build a transaction script that calls the foreign procedure via FPI.
     let tx_script = client
         .code_builder()
-        .compile_tx_script(&format!(
+        .compile_tx_script(format!(
             "
             use miden::protocol::tx
             begin

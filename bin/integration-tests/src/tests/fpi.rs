@@ -1,12 +1,22 @@
 use anyhow::{Context, Result};
 use miden_client::account::component::AccountComponent;
 use miden_client::account::{
-    Account, AccountBuilder, AccountStorageMode, PartialAccount, PartialStorage, StorageMap,
-    StorageSlot, StorageSlotName,
+    Account,
+    AccountBuilder,
+    AccountStorageMode,
+    PartialAccount,
+    PartialStorage,
+    StorageMap,
+    StorageSlot,
+    StorageSlotName,
 };
 use miden_client::assembly::CodeBuilder;
 use miden_client::auth::{
-    AuthEcdsaK256Keccak, AuthFalcon512Rpo, AuthSchemeId, AuthSecretKey, RPO_FALCON_SCHEME_ID,
+    AuthEcdsaK256Keccak,
+    AuthFalcon512Rpo,
+    AuthSchemeId,
+    AuthSecretKey,
+    RPO_FALCON_SCHEME_ID,
 };
 use miden_client::keystore::{FilesystemKeyStore, Keystore};
 use miden_client::rpc::domain::account::{AccountStorageRequirements, StorageMapKey};
