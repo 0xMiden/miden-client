@@ -322,7 +322,6 @@ export interface MultiSendOptions {
   skipSync?: boolean;
 }
 
-
 export interface WaitForCommitOptions {
   /** Timeout in milliseconds. Default: 10000 */
   timeoutMs?: number;
