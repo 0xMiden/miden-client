@@ -196,7 +196,7 @@ export type NoteInput = string | NoteId | Note | InputNoteRecord;
 export interface ContractCreateOptions {
   type: "ImmutableContract" | "MutableContract";
   /** Defaults to "public" (differs from wallet default of "private"). */
-  storage?: "private" | "public" | "network";
+  storage?: StorageMode;
   /** Required — used to derive a deterministic account ID. */
   seed: Uint8Array;
   /**
@@ -218,7 +218,7 @@ export type CreateAccountOptions =
 export interface WalletCreateOptions {
   /** Account type. Defaults to "MutableWallet". Use AccountType enum. */
   type?: "MutableWallet" | "ImmutableWallet";
-  storage?: "private" | "public";
+  storage?: StorageMode;
   auth?: AuthSchemeType;
   seed?: string | Uint8Array;
 }
@@ -228,7 +228,7 @@ export interface FaucetCreateOptions {
   symbol: string;
   decimals: number;
   maxSupply: number | bigint;
-  storage?: "private" | "public";
+  storage?: StorageMode;
   auth?: AuthSchemeType;
 }
 
