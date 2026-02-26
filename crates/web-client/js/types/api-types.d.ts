@@ -276,16 +276,34 @@ export interface TransactionOptions {
   prover?: TransactionProver;
 }
 
-export interface SendOptions extends TransactionOptions {
+export interface SendOptionsAuthenticated extends TransactionOptions {
   account: AccountRef;
   to: AccountRef;
   token: AccountRef;
   amount: number | bigint;
   type?: NoteVisibility;
+  authenticated?: true;
   /** Block height after which the sender can reclaim the note. This is a block number, not wall-clock time. */
   reclaimAfter?: number;
   /** Block height until which the note is timelocked. This is a block number, not wall-clock time. */
   timelockUntil?: number;
+}
+
+export interface SendOptionsUnauthenticated extends TransactionOptions {
+  account: AccountRef;
+  to: AccountRef;
+  token: AccountRef;
+  amount: number | bigint;
+  type?: NoteVisibility;
+  authenticated: false;
+}
+
+/** @deprecated Use SendOptionsAuthenticated or SendOptionsUnauthenticated instead */
+export type SendOptions = SendOptionsAuthenticated | SendOptionsUnauthenticated;
+
+export interface SendResult {
+  txId: TransactionId;
+  note: Note | null;
 }
 
 export interface MintOptions extends TransactionOptions {
@@ -510,7 +528,9 @@ export interface AccountsResource {
 }
 
 export interface TransactionsResource {
-  send(options: SendOptions): Promise<TransactionId>;
+  send(options: SendOptionsAuthenticated): Promise<{ txId: TransactionId; note: null }>;
+  send(options: SendOptionsUnauthenticated): Promise<{ txId: TransactionId; note: Note }>;
+  send(options: SendOptions): Promise<SendResult>;
   mint(options: MintOptions): Promise<TransactionId>;
   consume(options: ConsumeOptions): Promise<TransactionId>;
   swap(options: SwapOptions): Promise<TransactionId>;

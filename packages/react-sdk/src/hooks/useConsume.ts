@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import { useMiden } from "../context/MidenProvider";
 import { NoteFilter, NoteFilterTypes, NoteId } from "@miden-sdk/miden-sdk";
+import type { Note } from "@miden-sdk/miden-sdk";
 import type {
   ConsumeOptions,
   TransactionStage,
@@ -81,19 +82,40 @@ export function useConsume(): UseConsumeResult {
 
         setStage("proving");
         const txResult = await runExclusiveSafe(async () => {
-          const noteIds = options.noteIds.map((noteId) =>
-            typeof noteId === "string" ? NoteId.fromHex(noteId) : noteId
-          );
-          const filter = new NoteFilter(NoteFilterTypes.List, noteIds);
-          const noteRecords = await client.getInputNotes(filter);
-          const notes = noteRecords.map((record) => record.toNote());
+          // Separate Note objects (for unauthenticated consumption) from ID-based lookups
+          const directNotes: Note[] = [];
+          const noteIdInputs: NoteId[] = [];
+
+          for (const item of options.noteIds) {
+            // Note objects have an .id() method; NoteId objects do not
+            if (
+              item !== null &&
+              typeof item === "object" &&
+              typeof (item as { id?: unknown }).id === "function"
+            ) {
+              directNotes.push(item as Note);
+            } else {
+              noteIdInputs.push(
+                typeof item === "string" ? NoteId.fromHex(item) : (item as NoteId)
+              );
+            }
+          }
+
+          let storeLookupNotes: Note[] = [];
+          if (noteIdInputs.length > 0) {
+            const filter = new NoteFilter(NoteFilterTypes.List, noteIdInputs);
+            const noteRecords = await client.getInputNotes(filter);
+            storeLookupNotes = noteRecords.map((record) => record.toNote());
+
+            if (storeLookupNotes.length !== noteIdInputs.length) {
+              throw new Error("Some notes could not be found for provided IDs");
+            }
+          }
+
+          const notes = [...storeLookupNotes, ...directNotes];
 
           if (notes.length === 0) {
             throw new Error("No notes found for provided IDs");
-          }
-
-          if (notes.length !== options.noteIds.length) {
-            throw new Error("Some notes could not be found for provided IDs");
           }
 
           const txRequest = client.newConsumeTransactionRequest(notes);

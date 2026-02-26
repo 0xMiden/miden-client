@@ -18,8 +18,43 @@ export class TransactionsResource {
   async send(opts) {
     this.#client.assertNotTerminated();
     const wasm = await this.#getWasm();
-    const { accountId, request } = await this.#buildSendRequest(opts, wasm);
 
+    if (opts.authenticated === false) {
+      // Unauthenticated P2ID path — create note in JS, return Note object
+      if (opts.reclaimAfter != null || opts.timelockUntil != null) {
+        throw new Error(
+          "reclaimAfter and timelockUntil are not supported for unauthenticated sends"
+        );
+      }
+
+      const senderId = resolveAccountRef(opts.account, wasm);
+      const receiverId = resolveAccountRef(opts.to, wasm);
+      const faucetId = resolveAccountRef(opts.token, wasm);
+      const noteType = resolveNoteType(opts.type, wasm);
+
+      const note = wasm.Note.createP2IDNote(
+        senderId,
+        receiverId,
+        new wasm.NoteAssets([new wasm.FungibleAsset(faucetId, BigInt(opts.amount))]),
+        noteType,
+        new wasm.NoteAttachment()
+      );
+
+      const request = new wasm.TransactionRequestBuilder()
+        .withOwnOutputNotes(new wasm.OutputNoteArray([wasm.OutputNote.full(note)]))
+        .build();
+
+      const txId = await this.#submitOrSubmitWithProver(senderId, request, opts.prover);
+
+      if (opts.waitForConfirmation) {
+        await this.waitFor(txId.toHex(), { timeout: opts.timeout });
+      }
+
+      return { txId, note };
+    }
+
+    // Authenticated path (default) — existing P2ID with optional reclaim/timelock
+    const { accountId, request } = await this.#buildSendRequest(opts, wasm);
     const txId = await this.#submitOrSubmitWithProver(
       accountId,
       request,
@@ -30,7 +65,7 @@ export class TransactionsResource {
       await this.waitFor(txId.toHex(), { timeout: opts.timeout });
     }
 
-    return txId;
+    return { txId, note: null };
   }
 
   async mint(opts) {
@@ -344,6 +379,50 @@ export class TransactionsResource {
   async #buildConsumeRequest(opts, wasm) {
     const accountId = resolveAccountRef(opts.account, wasm);
     const noteInputs = Array.isArray(opts.notes) ? opts.notes : [opts.notes];
+
+    // Detect direct Note objects (unauthenticated consumption path).
+    // Note objects have .id() but not .toNote(); NoteId has neither .id() nor .toNote().
+    const hasDirectNotes = noteInputs.some(
+      (input) =>
+        input !== null &&
+        typeof input === "object" &&
+        typeof input.id === "function" &&
+        typeof input.toNote !== "function"
+    );
+
+    if (hasDirectNotes) {
+      // Resolve all inputs to Note objects, then use NoteAndArgs builder path
+      // (the only WASM path that accepts unauthenticated notes not in the store).
+      const resolvedNotes = await Promise.all(
+        noteInputs.map(async (input) => {
+          // Already a Note object
+          if (
+            input !== null &&
+            typeof input === "object" &&
+            typeof input.id === "function" &&
+            typeof input.toNote !== "function"
+          ) {
+            return input;
+          }
+          // InputNoteRecord
+          if (input && typeof input.toNote === "function") {
+            return input.toNote();
+          }
+          // String or NoteId — fetch from store
+          return await this.#resolveNoteInput(input);
+        })
+      );
+
+      const noteAndArgsArr = resolvedNotes.map(
+        (note) => new wasm.NoteAndArgs(note, null)
+      );
+      const request = new wasm.TransactionRequestBuilder()
+        .withInputNotes(new wasm.NoteAndArgsArray(noteAndArgsArr))
+        .build();
+      return { accountId, request };
+    }
+
+    // Standard path: all inputs are IDs or records — look up from store.
     const notes = await Promise.all(
       noteInputs.map((input) => this.#resolveNoteInput(input))
     );

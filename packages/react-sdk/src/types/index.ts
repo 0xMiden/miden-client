@@ -13,6 +13,7 @@ import type {
   TransactionRequest,
   NoteType,
   NoteId,
+  Note,
   AccountStorageMode,
   NoteVisibility,
   StorageMode,
@@ -33,6 +34,7 @@ export type {
   TransactionRequest,
   NoteType,
   NoteId,
+  Note,
   AccountStorageMode,
   NoteVisibility,
   StorageMode,
@@ -274,6 +276,14 @@ export interface SendOptions {
   recallHeight?: number;
   /** Block height after which recipient can consume note */
   timelockHeight?: number;
+  /** false = unauthenticated P2ID (returns Note object). Default: true (authenticated) */
+  authenticated?: boolean;
+}
+
+// Send result — txId always set; note is non-null only for unauthenticated sends
+export interface SendResult {
+  txId: string;
+  note: Note | null;
 }
 
 export interface MultiSendRecipient {
@@ -294,37 +304,6 @@ export interface MultiSendOptions {
   noteType?: NoteVisibility;
 }
 
-export interface InternalTransferOptions {
-  /** Sender account ID */
-  from: AccountRef;
-  /** Recipient account ID */
-  to: AccountRef;
-  /** Asset ID to send (token id) */
-  assetId: AccountRef;
-  /** Amount to transfer */
-  amount: bigint;
-  /** Note type. Default: private */
-  noteType?: NoteVisibility;
-}
-
-export interface InternalTransferChainOptions {
-  /** Initial sender account ID */
-  from: AccountRef;
-  /** Ordered list of recipient account IDs */
-  recipients: AccountRef[];
-  /** Asset ID to send (token id) */
-  assetId: AccountRef;
-  /** Amount to transfer per hop */
-  amount: bigint;
-  /** Note type. Default: private */
-  noteType?: NoteVisibility;
-}
-
-export interface InternalTransferResult {
-  createTransactionId: string;
-  consumeTransactionId: string;
-  noteId: string;
-}
 
 export interface WaitForCommitOptions {
   /** Timeout in milliseconds. Default: 10000 */
@@ -360,8 +339,8 @@ export interface MintOptions {
 export interface ConsumeOptions {
   /** Account ID that will consume the notes */
   accountId: AccountRef;
-  /** List of note IDs to consume */
-  noteIds: (string | NoteId)[];
+  /** List of note IDs or Note objects to consume. Pass Note objects directly for unauthenticated consumption. */
+  noteIds: (string | NoteId | Note)[];
 }
 
 // Swap options

@@ -27,7 +27,6 @@ export { useCreateFaucet } from "./hooks/useCreateFaucet";
 export { useImportAccount } from "./hooks/useImportAccount";
 export { useSend } from "./hooks/useSend";
 export { useMultiSend } from "./hooks/useMultiSend";
-export { useInternalTransfer } from "./hooks/useInternalTransfer";
 export { useWaitForCommit } from "./hooks/useWaitForCommit";
 export { useWaitForNotes } from "./hooks/useWaitForNotes";
 export { useMint } from "./hooks/useMint";
@@ -61,11 +60,9 @@ export type {
   CreateFaucetOptions,
   ImportAccountOptions,
   SendOptions,
+  SendResult,
   MultiSendRecipient,
   MultiSendOptions,
-  InternalTransferOptions,
-  InternalTransferChainOptions,
-  InternalTransferResult,
   WaitForCommitOptions,
   WaitForNotesOptions,
   MintOptions,
@@ -95,6 +92,7 @@ export type {
   TransactionRecord,
   TransactionRequest,
   NoteType,
+  Note,
   AccountStorageMode,
 } from "./types";
 
@@ -112,7 +110,6 @@ export type { UseCreateFaucetResult } from "./hooks/useCreateFaucet";
 export type { UseImportAccountResult } from "./hooks/useImportAccount";
 export type { UseSendResult } from "./hooks/useSend";
 export type { UseMultiSendResult } from "./hooks/useMultiSend";
-export type { UseInternalTransferResult } from "./hooks/useInternalTransfer";
 export type { UseWaitForCommitResult } from "./hooks/useWaitForCommit";
 export type { UseWaitForNotesResult } from "./hooks/useWaitForNotes";
 export type { UseMintResult } from "./hooks/useMint";
