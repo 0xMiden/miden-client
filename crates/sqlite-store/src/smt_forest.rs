@@ -152,7 +152,7 @@ impl AccountSmtForest {
     /// that are no longer reachable from any remaining root.
     ///
     /// Filters out the empty tree root because it should never be popped: the empty
-    /// hash nodes are pre-populated infrastructure in the SmtStore, and popping the
+    /// hash nodes are pre-populated infrastructure in the `SmtStore`, and popping the
     /// empty root would walk and destroy them, corrupting the store for all future
     /// operations.
     // TODO: fix this in miden-crypto's `batch_insert` so it never registers the empty
