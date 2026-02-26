@@ -11,6 +11,7 @@ import type {
   TransactionRecord,
   TransactionRequest,
   NoteType,
+  NoteId,
   AccountStorageMode,
   NoteVisibility,
   StorageMode,
@@ -30,6 +31,7 @@ export type {
   TransactionRecord,
   TransactionRequest,
   NoteType,
+  NoteId,
   AccountStorageMode,
   NoteVisibility,
   StorageMode,
@@ -356,7 +358,7 @@ export interface ConsumeOptions {
   /** Account ID that will consume the notes */
   accountId: string;
   /** List of note IDs to consume */
-  noteIds: string[];
+  noteIds: (string | NoteId)[];
 }
 
 // Swap options

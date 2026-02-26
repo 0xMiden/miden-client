@@ -1,4 +1,4 @@
-import { resolveAccountRef, resolveNoteType } from "../utils.js";
+import { resolveAccountRef, resolveNoteType, resolveTransactionIdHex } from "../utils.js";
 
 export class TransactionsResource {
   #inner;
@@ -220,7 +220,7 @@ export class TransactionsResource {
     } else if (query.status === "uncommitted") {
       filter = wasm.TransactionFilter.uncommitted();
     } else if (query.ids) {
-      const txIds = query.ids.map((id) => wasm.TransactionId.fromHex(id));
+      const txIds = query.ids.map((id) => wasm.TransactionId.fromHex(resolveTransactionIdHex(id)));
       filter = wasm.TransactionFilter.ids(txIds);
     } else if (query.expiredBefore !== undefined) {
       filter = wasm.TransactionFilter.expiredBefore(query.expiredBefore);
@@ -234,7 +234,7 @@ export class TransactionsResource {
   /**
    * Polls for transaction confirmation.
    *
-   * @param {string} txId - Transaction ID hex string.
+   * @param {string | TransactionId} txId - Transaction ID hex string or TransactionId object.
    * @param {WaitOptions} [opts] - Polling options.
    * @param {number} [opts.timeout=60000] - Wall-clock polling timeout in
    *   milliseconds. This is NOT a block height — it controls how long the
@@ -246,6 +246,7 @@ export class TransactionsResource {
    */
   async waitFor(txId, opts) {
     this.#client.assertNotTerminated();
+    const hex = resolveTransactionIdHex(txId);
     const timeout = opts?.timeout ?? 60_000;
     const interval = opts?.interval ?? 5_000;
     const start = Date.now();
@@ -268,7 +269,7 @@ export class TransactionsResource {
 
       // Recreate filter each iteration — WASM consumes it by value
       const filter = wasm.TransactionFilter.ids([
-        wasm.TransactionId.fromHex(txId),
+        wasm.TransactionId.fromHex(hex),
       ]);
       const txs = await this.#inner.getTransactions(filter);
 
@@ -282,7 +283,7 @@ export class TransactionsResource {
             return;
           }
           if (status.isDiscarded()) {
-            throw new Error(`Transaction rejected: ${txId}`);
+            throw new Error(`Transaction rejected: ${hex}`);
           }
         }
 

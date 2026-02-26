@@ -82,7 +82,7 @@ export function useConsume(): UseConsumeResult {
         setStage("proving");
         const txResult = await runExclusiveSafe(async () => {
           const noteIds = options.noteIds.map((noteId) =>
-            NoteId.fromHex(noteId)
+            typeof noteId === "string" ? NoteId.fromHex(noteId) : noteId
           );
           const filter = new NoteFilter(NoteFilterTypes.List, noteIds);
           const noteRecords = await client.getInputNotes(filter);

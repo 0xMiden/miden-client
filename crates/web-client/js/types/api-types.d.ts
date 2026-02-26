@@ -385,7 +385,7 @@ export interface ConsumeAllResult {
  */
 export type TransactionQuery =
   | { status: "uncommitted" }
-  | { ids: string[] }
+  | { ids: (string | TransactionId)[] }
   | { expiredBefore: number };
 
 // ════════════════════════════════════════════════════════════════
@@ -402,7 +402,7 @@ export type NoteQuery =
         | "processing"
         | "unverified";
     }
-  | { ids: string[] };
+  | { ids: (string | NoteId)[] };
 
 /** Options for standalone note creation utilities. */
 export interface NoteOptions {
@@ -428,7 +428,7 @@ export interface FetchPrivateNotesOptions {
 }
 
 export interface SendPrivateOptions {
-  noteId: string;
+  noteId: NoteInput;
   to: AccountRef;
 }
 
@@ -527,12 +527,12 @@ export interface TransactionsResource {
 
   list(query?: TransactionQuery): Promise<TransactionRecord[]>;
 
-  waitFor(txId: string, options?: WaitOptions): Promise<void>;
+  waitFor(txId: string | TransactionId, options?: WaitOptions): Promise<void>;
 }
 
 export interface NotesResource {
   list(query?: NoteQuery): Promise<InputNoteRecord[]>;
-  get(noteId: string): Promise<InputNoteRecord | null>;
+  get(noteId: NoteInput): Promise<InputNoteRecord | null>;
 
   listSent(query?: NoteQuery): Promise<OutputNoteRecord[]>;
 
@@ -541,7 +541,7 @@ export interface NotesResource {
   }): Promise<ConsumableNoteRecord[]>;
 
   import(noteFile: NoteFile): Promise<NoteId>;
-  export(noteId: string, options?: ExportNoteOptions): Promise<NoteFile>;
+  export(noteId: NoteInput, options?: ExportNoteOptions): Promise<NoteFile>;
 
   fetchPrivate(options?: FetchPrivateNotesOptions): Promise<void>;
   sendPrivate(options: SendPrivateOptions): Promise<void>;
