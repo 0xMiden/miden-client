@@ -5,99 +5,147 @@ use std::rc::Rc;
 use std::string::ToString;
 use std::vec::Vec;
 
-use miden_client::Word;
 use miden_client::account::{
     AccountDelta,
-    AccountHeader,
+    AccountId,
     StorageMap,
     StorageSlot,
     StorageSlotContent,
     StorageSlotName,
+    StorageSlotType,
 };
 use miden_client::store::StoreError;
-use miden_protocol::crypto::merkle::MerkleError;
+use miden_client::{EMPTY_WORD, Word};
 use rusqlite::types::Value;
-use rusqlite::{Connection, Transaction, params};
+use rusqlite::{Transaction, params};
 
-use crate::account::helpers::query_storage_slots;
 use crate::smt_forest::AccountSmtForest;
 use crate::sql_error::SqlResultExt;
-use crate::{SqliteStore, insert_sql, subst};
+use crate::{SqliteStore, insert_sql, subst, u64_to_value};
 
 impl SqliteStore {
     // READER METHODS
     // --------------------------------------------------------------------------------------------
 
-    /// Fetches the relevant storage maps inside the account's storage that will be updated by the
-    /// account delta.
-    pub(crate) fn get_account_storage_maps_for_delta(
-        conn: &Connection,
-        header: &AccountHeader,
+    /// Fetches the current root values for storage maps that will be updated by the account delta.
+    ///
+    /// Only queries the slot values (roots) from the latest storage table, avoiding the need to
+    /// load full storage map entries into memory. The `AccountSmtForest` handles the actual
+    /// Merkle tree operations.
+    pub(crate) fn get_storage_map_roots_for_delta(
+        conn: &rusqlite::Connection,
+        account_id: AccountId,
         delta: &AccountDelta,
-    ) -> Result<BTreeMap<StorageSlotName, StorageMap>, StoreError> {
-        let updated_map_names = delta
+    ) -> Result<BTreeMap<StorageSlotName, Word>, StoreError> {
+        let map_slot_names: Vec<Value> = delta
             .storage()
             .maps()
             .map(|(slot_name, _)| Value::Text(slot_name.to_string()))
-            .collect::<Vec<Value>>();
+            .collect();
 
-        query_storage_slots(
-            conn,
-            "commitment = ? AND slot_name IN rarray(?)",
-            params![header.storage_commitment().to_hex(), Rc::new(updated_map_names)],
-        )?
-        .into_iter()
-        .map(|(slot_name, slot)| {
-            let StorageSlotContent::Map(map) = slot.into_parts().1 else {
-                return Err(StoreError::AccountError(
-                    miden_client::AccountError::StorageSlotNotMap(slot_name),
-                ));
-            };
+        if map_slot_names.is_empty() {
+            return Ok(BTreeMap::new());
+        }
 
-            Ok((slot_name, map))
-        })
-        .collect()
+        const QUERY: &str = "SELECT slot_name, slot_value FROM latest_account_storage \
+                             WHERE account_id = ? AND slot_name IN rarray(?)";
+
+        conn.prepare(QUERY)
+            .into_store_error()?
+            .query_map(params![account_id.to_hex(), Rc::new(map_slot_names)], |row| {
+                let name: String = row.get(0)?;
+                let value: String = row.get(1)?;
+                Ok((name, value))
+            })
+            .into_store_error()?
+            .map(|result| {
+                let (name, value) = result.into_store_error()?;
+                let slot_name = StorageSlotName::new(name)
+                    .map_err(|err| StoreError::ParsingError(err.to_string()))?;
+                Ok((slot_name, Word::try_from(value)?))
+            })
+            .collect()
     }
 
     // MUTATOR/WRITER METHODS
     // --------------------------------------------------------------------------------------------
 
-    /// Inserts storage slots into the database for a given storage commitment.
+    /// Inserts storage slots into both latest and historical tables for a given
+    /// (`account_id`, `nonce`).
     pub(crate) fn insert_storage_slots<'a>(
         tx: &Transaction<'_>,
-        commitment: Word,
+        account_id: AccountId,
+        nonce: u64,
         account_storage: impl Iterator<Item = &'a StorageSlot>,
     ) -> Result<(), StoreError> {
-        const SLOT_QUERY: &str = insert_sql!(
-            account_storage {
-                commitment,
+        const LATEST_SLOT_QUERY: &str = insert_sql!(
+            latest_account_storage {
+                account_id,
                 slot_name,
                 slot_value,
                 slot_type
             } | REPLACE
         );
-        const MAP_ENTRY_QUERY: &str =
-            insert_sql!(storage_map_entries { root, key, value } | REPLACE);
+        const HISTORICAL_SLOT_QUERY: &str = insert_sql!(
+            historical_account_storage {
+                account_id,
+                nonce,
+                slot_name,
+                slot_value,
+                slot_type
+            } | REPLACE
+        );
+        const LATEST_MAP_ENTRY_QUERY: &str =
+            insert_sql!(latest_storage_map_entries { account_id, slot_name, key, value } | REPLACE);
+        const HISTORICAL_MAP_ENTRY_QUERY: &str = insert_sql!(
+            historical_storage_map_entries { account_id, nonce, slot_name, key, value } | REPLACE
+        );
 
-        let mut slot_stmt = tx.prepare_cached(SLOT_QUERY).into_store_error()?;
-        let mut map_entry_stmt = tx.prepare_cached(MAP_ENTRY_QUERY).into_store_error()?;
-        let commitment_hex = commitment.to_hex();
+        let mut latest_slot_stmt = tx.prepare_cached(LATEST_SLOT_QUERY).into_store_error()?;
+        let mut hist_slot_stmt = tx.prepare_cached(HISTORICAL_SLOT_QUERY).into_store_error()?;
+        let mut latest_map_stmt = tx.prepare_cached(LATEST_MAP_ENTRY_QUERY).into_store_error()?;
+        let mut hist_map_stmt = tx.prepare_cached(HISTORICAL_MAP_ENTRY_QUERY).into_store_error()?;
+        let account_id_hex = account_id.to_hex();
+        let nonce_val = u64_to_value(nonce);
 
         for slot in account_storage {
-            slot_stmt
+            let slot_name_str = slot.name().to_string();
+            let slot_value_hex = slot.value().to_hex();
+            let slot_type_val = slot.slot_type() as u8;
+
+            latest_slot_stmt
+                .execute(params![&account_id_hex, &slot_name_str, &slot_value_hex, slot_type_val])
+                .into_store_error()?;
+
+            hist_slot_stmt
                 .execute(params![
-                    &commitment_hex,
-                    slot.name().to_string(),
-                    slot.value().to_hex(),
-                    slot.slot_type() as u8
+                    &account_id_hex,
+                    &nonce_val,
+                    &slot_name_str,
+                    &slot_value_hex,
+                    slot_type_val,
                 ])
                 .into_store_error()?;
 
             if let StorageSlotContent::Map(map) = slot.content() {
-                let root_hex = map.root().to_hex();
                 for (key, value) in map.entries() {
-                    map_entry_stmt
-                        .execute(params![&root_hex, key.to_hex(), value.to_hex()])
+                    latest_map_stmt
+                        .execute(params![
+                            &account_id_hex,
+                            &slot_name_str,
+                            key.to_hex(),
+                            value.to_hex(),
+                        ])
+                        .into_store_error()?;
+
+                    hist_map_stmt
+                        .execute(params![
+                            &account_id_hex,
+                            &nonce_val,
+                            &slot_name_str,
+                            key.to_hex(),
+                            value.to_hex(),
+                        ])
                         .into_store_error()?;
                 }
             }
@@ -106,51 +154,160 @@ impl SqliteStore {
         Ok(())
     }
 
-    /// Applies storage delta changes to the account state, updating storage slots and maps.
+    /// Writes only the changed storage slots to historical and updates latest via INSERT OR
+    /// REPLACE.
     ///
-    /// All updated storage map entries are validated against the SMT forest to ensure consistency.
-    /// If the computed root doesn't match the expected root, an error is returned.
-    pub(crate) fn apply_account_storage_delta(
-        smt_forest: &mut AccountSmtForest,
-        mut updated_storage_maps: BTreeMap<StorageSlotName, StorageMap>,
+    /// For both latest and historical tables: writes slot values and only the delta's changed
+    /// map entries. Removed map entries (`EMPTY_WORD`) are deleted from latest and stored as NULL
+    /// in historical.
+    pub(crate) fn write_storage_delta(
+        tx: &Transaction<'_>,
+        account_id: AccountId,
+        nonce: u64,
+        updated_slots: &BTreeMap<StorageSlotName, (Word, StorageSlotType)>,
         delta: &AccountDelta,
-    ) -> Result<BTreeMap<StorageSlotName, StorageSlot>, StoreError> {
-        // Apply storage delta. This map will contain all updated storage slots, both values and
-        // maps. It gets initialized with value type updates which contain the new value and
-        // don't depend on previous state.
-        let mut updated_storage_slots: BTreeMap<StorageSlotName, StorageSlot> = delta
+    ) -> Result<(), StoreError> {
+        const LATEST_SLOT_QUERY: &str = insert_sql!(
+            latest_account_storage {
+                account_id,
+                slot_name,
+                slot_value,
+                slot_type
+            } | REPLACE
+        );
+        const HISTORICAL_SLOT_QUERY: &str = insert_sql!(
+            historical_account_storage {
+                account_id,
+                nonce,
+                slot_name,
+                slot_value,
+                slot_type
+            } | REPLACE
+        );
+        const LATEST_MAP_ENTRY_QUERY: &str =
+            insert_sql!(latest_storage_map_entries { account_id, slot_name, key, value } | REPLACE);
+        const HISTORICAL_MAP_ENTRY_QUERY: &str = insert_sql!(
+            historical_storage_map_entries { account_id, nonce, slot_name, key, value } | REPLACE
+        );
+        const DELETE_LATEST_MAP_ENTRY: &str = "DELETE FROM latest_storage_map_entries WHERE account_id = ? AND slot_name = ? AND key = ?";
+
+        let mut latest_slot_stmt = tx.prepare_cached(LATEST_SLOT_QUERY).into_store_error()?;
+        let mut hist_slot_stmt = tx.prepare_cached(HISTORICAL_SLOT_QUERY).into_store_error()?;
+        let mut latest_map_stmt = tx.prepare_cached(LATEST_MAP_ENTRY_QUERY).into_store_error()?;
+        let mut hist_map_stmt = tx.prepare_cached(HISTORICAL_MAP_ENTRY_QUERY).into_store_error()?;
+        let account_id_hex = account_id.to_hex();
+        let nonce_val = u64_to_value(nonce);
+
+        // Collect the delta's changed map entries for efficient lookup
+        let delta_map_entries: BTreeMap<&StorageSlotName, Vec<(Word, Word)>> = delta
             .storage()
-            .values()
-            .map(|(slot_name, slot)| {
-                (slot_name.clone(), StorageSlot::with_value(slot_name.clone(), *slot))
+            .maps()
+            .map(|(slot_name, map_delta)| {
+                let entries: Vec<(Word, Word)> = map_delta
+                    .entries()
+                    .iter()
+                    .map(|(key, value)| ((*key).into(), *value))
+                    .collect();
+                (slot_name, entries)
             })
             .collect();
 
-        // For storage map deltas, we only updated the keys in the delta, this is why we need the
-        // previously retrieved storage maps.
+        for (slot_name, (value, slot_type)) in updated_slots {
+            let slot_name_str = slot_name.to_string();
+            let slot_value_hex = value.to_hex();
+            let slot_type_val = *slot_type as u8;
+
+            // Update latest slot
+            latest_slot_stmt
+                .execute(params![&account_id_hex, &slot_name_str, &slot_value_hex, slot_type_val])
+                .into_store_error()?;
+
+            // Write slot to historical
+            hist_slot_stmt
+                .execute(params![
+                    &account_id_hex,
+                    &nonce_val,
+                    &slot_name_str,
+                    &slot_value_hex,
+                    slot_type_val,
+                ])
+                .into_store_error()?;
+
+            if let Some(changed_entries) = delta_map_entries.get(slot_name) {
+                for (key, value) in changed_entries {
+                    // Latest: write only the delta entries (REPLACE for updates, DELETE
+                    // for removals)
+                    if *value == EMPTY_WORD {
+                        tx.execute(
+                            DELETE_LATEST_MAP_ENTRY,
+                            params![&account_id_hex, &slot_name_str, key.to_hex()],
+                        )
+                        .into_store_error()?;
+                    } else {
+                        latest_map_stmt
+                            .execute(params![
+                                &account_id_hex,
+                                &slot_name_str,
+                                key.to_hex(),
+                                value.to_hex(),
+                            ])
+                            .into_store_error()?;
+                    }
+
+                    // Historical: write ONLY the delta's changed entries.
+                    // Use NULL as tombstone for removed entries (EMPTY_WORD) so that
+                    // rebuild_latest_for_account can filter them out, matching the
+                    // behavior of StorageMap::entries() which excludes zero-valued
+                    // entries.
+                    let value_param: Option<String> = if *value == EMPTY_WORD {
+                        None
+                    } else {
+                        Some(value.to_hex())
+                    };
+                    hist_map_stmt
+                        .execute(params![
+                            &account_id_hex,
+                            &nonce_val,
+                            &slot_name_str,
+                            key.to_hex(),
+                            value_param,
+                        ])
+                        .into_store_error()?;
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Applies storage delta changes to the account state, computing new roots via the SMT forest.
+    ///
+    /// Value-type slot updates are taken directly from the delta. For map-type slots, the old
+    /// root is used to update the SMT forest with the delta entries, producing the new root.
+    /// Full storage maps are never loaded into memory — the `AccountSmtForest` handles all
+    /// Merkle tree operations.
+    pub(crate) fn apply_account_storage_delta(
+        smt_forest: &mut AccountSmtForest,
+        old_map_roots: &BTreeMap<StorageSlotName, Word>,
+        delta: &AccountDelta,
+    ) -> Result<BTreeMap<StorageSlotName, (Word, StorageSlotType)>, StoreError> {
+        let mut updated_slots: BTreeMap<StorageSlotName, (Word, StorageSlotType)> = delta
+            .storage()
+            .values()
+            .map(|(slot_name, value)| (slot_name.clone(), (*value, StorageSlotType::Value)))
+            .collect();
+
+        let default_map_root = StorageMap::default().root();
+
         for (slot_name, map_delta) in delta.storage().maps() {
-            let mut map = updated_storage_maps.remove(slot_name).unwrap_or_default();
-            let map_root = map.root();
+            let old_root = old_map_roots.get(slot_name).copied().unwrap_or(default_map_root);
             let entries: Vec<(Word, Word)> =
                 map_delta.entries().iter().map(|(key, value)| ((*key).into(), *value)).collect();
 
-            for (key, value) in &entries {
-                map.insert(*key, *value)?;
-            }
-
-            let expected_root = map.root();
-            let new_root = smt_forest.update_storage_map_nodes(map_root, entries.into_iter())?;
-            if new_root != expected_root {
-                return Err(StoreError::MerkleStoreError(MerkleError::ConflictingRoots {
-                    expected_root,
-                    actual_root: new_root,
-                }));
-            }
-
-            updated_storage_slots
-                .insert(slot_name.clone(), StorageSlot::with_map(slot_name.clone(), map));
+            let new_root = smt_forest.update_storage_map_nodes(old_root, entries.into_iter())?;
+            updated_slots.insert(slot_name.clone(), (new_root, StorageSlotType::Map));
         }
 
-        Ok(updated_storage_slots)
+        Ok(updated_slots)
     }
 }

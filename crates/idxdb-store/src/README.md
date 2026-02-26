@@ -14,16 +14,3 @@ files under `src/js`. This is because to use extern functions, we still need to 
 To unify and make this setup straightforward, the top-most makefile from this project has a
 useful target: `make rust-client-ts-build`, which takes the .ts files and compiles them down to .js files.
 
-## Testing
-
-Tests use [vitest](https://vitest.dev/) with [fake-indexeddb](https://github.com/dumbmatter/fakeIndexedDB) to run IndexedDB operations in Node.js.
-
-```bash
-yarn test    # run tests
-yarn build   # compile TS → JS
-yarn lint    # build + eslint
-```
-
-## IndexedDB schema migrations
-
-The schema is defined in `ts/schema.ts` using [Dexie.js](https://dexie.org/) version blocks. See the comment above `version(1)` in the `MidenDatabase` constructor for how to add migrations. Migration tests go in `ts/schema.test.ts`.

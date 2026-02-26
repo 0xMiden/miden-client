@@ -24,66 +24,107 @@ CREATE TABLE account_code (
     PRIMARY KEY (commitment)
 );
 
--- Create account_storage table
-CREATE TABLE account_storage (
-    commitment TEXT NOT NULL,               -- commitment to the account storage
-    slot_name TEXT NOT NULL,                -- name of the storage slot
-    slot_value TEXT NULL,                   -- top-level value of the slot (e.g., if the slot is a map it contains the root)
-    slot_type INTEGER NOT NULL,             -- type of the slot (0 = Value, 1 = Map)
-    PRIMARY KEY (commitment, slot_name)
-) WITHOUT ROWID;
+-- ── Account headers ──────────────────────────────────────────────────────
 
-CREATE INDEX idx_account_storage_commitment ON account_storage(commitment);
-
--- Create storage_map_entries table
-CREATE TABLE storage_map_entries (
-    root TEXT NOT NULL,     -- root of the storage map
-    key TEXT NOT NULL,      -- key of the storage map entry
-    value TEXT NOT NULL,    -- value of the storage map entry
-    PRIMARY KEY (root, key)
-) WITHOUT ROWID;
-
-CREATE INDEX idx_storage_map_entries_root ON storage_map_entries(root);
-
--- Create account_assets table
-CREATE TABLE account_assets (
-    root TEXT NOT NULL,                             -- root of the account_vault Merkle tree
-    vault_key TEXT NOT NULL,                        -- asset's vault key
-    faucet_id_prefix TEXT NOT NULL,                 -- prefix of the faucet ID, used to identify the faucet
-    asset TEXT NULL,                                -- value that represents the asset in the vault
-    PRIMARY KEY (root, vault_key)
-) WITHOUT ROWID;
-
-CREATE INDEX idx_account_assets_root ON account_assets(root);
-CREATE INDEX idx_account_assets_root_faucet_prefix ON account_assets(root, faucet_id_prefix);
-
--- Create foreign_account_code table
-CREATE TABLE foreign_account_code(
-    account_id TEXT NOT NULL,              -- ID of the account
-    code_commitment TEXT NOT NULL,         -- Commitment to the account_code
-    PRIMARY KEY (account_id),
+-- Latest account header: one row per account (current state).
+CREATE TABLE latest_account_headers (
+    id UNSIGNED BIG INT NOT NULL,            -- account ID
+    account_commitment TEXT NOT NULL UNIQUE,  -- account state commitment
+    code_commitment TEXT NOT NULL,            -- commitment to the account code
+    storage_commitment TEXT NOT NULL,         -- commitment to the account storage
+    vault_root TEXT NOT NULL,                 -- root of the account vault Merkle tree
+    nonce BIGINT NOT NULL,                   -- account nonce
+    account_seed BLOB NULL,                  -- seed used to generate the ID; NULL for non-new accounts
+    locked BOOLEAN NOT NULL,                 -- whether the account is locked
+    PRIMARY KEY (id),
     FOREIGN KEY (code_commitment) REFERENCES account_code(commitment)
 );
 
--- Create accounts table
-CREATE TABLE accounts (
-    id UNSIGNED BIG INT NOT NULL,               -- Account ID.
-    account_commitment TEXT NOT NULL UNIQUE,    -- Account state commitment
-    code_commitment TEXT NOT NULL,              -- Commitment to the account code
-    storage_commitment TEXT NOT NULL,           -- Commitment to the account storage
-    vault_root TEXT NOT NULL,                   -- Root of the account_vault Merkle tree.
-    nonce BIGINT NOT NULL,                      -- Account nonce.
-    account_seed BLOB NULL,                     -- Account seed used to generate the ID. Expected to be NULL for non-new accounts
-    locked BOOLEAN NOT NULL,                    -- True if the account is locked, false if not.
+-- Historical account headers: all state transitions (one row per nonce).
+CREATE TABLE historical_account_headers (
+    id UNSIGNED BIG INT NOT NULL,            -- account ID
+    account_commitment TEXT NOT NULL UNIQUE,  -- account state commitment
+    code_commitment TEXT NOT NULL,            -- commitment to the account code
+    storage_commitment TEXT NOT NULL,         -- commitment to the account storage
+    vault_root TEXT NOT NULL,                 -- root of the account vault Merkle tree
+    nonce BIGINT NOT NULL,                   -- account nonce
+    account_seed BLOB NULL,                  -- seed used to generate the ID; NULL for non-new accounts
+    locked BOOLEAN NOT NULL,                 -- whether the account is locked
     PRIMARY KEY (account_commitment),
     FOREIGN KEY (code_commitment) REFERENCES account_code(commitment),
 
     CONSTRAINT check_seed_nonzero CHECK (NOT (nonce = 0 AND account_seed IS NULL))
 );
-CREATE INDEX idx_accounts_id_nonce ON accounts(id, nonce DESC);
-CREATE INDEX idx_accounts_id ON accounts(id);
+CREATE INDEX idx_historical_account_headers_id_nonce ON historical_account_headers(id, nonce DESC);
 
--- Create transactions table
+-- ── Account storage (latest + historical) ────────────────────────────────
+
+CREATE TABLE latest_account_storage (
+    account_id TEXT NOT NULL,     -- account ID
+    slot_name TEXT NOT NULL,      -- name of the storage slot
+    slot_value TEXT NULL,         -- top-level value of the slot (for maps, contains the root)
+    slot_type INTEGER NOT NULL,   -- type of the slot (0 = Value, 1 = Map)
+    PRIMARY KEY (account_id, slot_name)
+) WITHOUT ROWID;
+
+CREATE TABLE historical_account_storage (
+    account_id TEXT NOT NULL,     -- account ID
+    nonce BIGINT NOT NULL,        -- nonce at which this slot was written
+    slot_name TEXT NOT NULL,      -- name of the storage slot
+    slot_value TEXT NULL,         -- top-level value of the slot (for maps, contains the root)
+    slot_type INTEGER NOT NULL,   -- type of the slot (0 = Value, 1 = Map)
+    PRIMARY KEY (account_id, nonce, slot_name)
+) WITHOUT ROWID;
+
+-- ── Storage map entries (latest + historical) ────────────────────────────
+
+CREATE TABLE latest_storage_map_entries (
+    account_id TEXT NOT NULL,   -- account ID
+    slot_name TEXT NOT NULL,    -- name of the storage slot this entry belongs to
+    key TEXT NOT NULL,          -- map entry key
+    value TEXT NOT NULL,        -- map entry value
+    PRIMARY KEY (account_id, slot_name, key)
+) WITHOUT ROWID;
+
+CREATE TABLE historical_storage_map_entries (
+    account_id TEXT NOT NULL,   -- account ID
+    nonce BIGINT NOT NULL,      -- nonce at which this entry was written
+    slot_name TEXT NOT NULL,    -- name of the storage slot this entry belongs to
+    key TEXT NOT NULL,          -- map entry key
+    value TEXT NULL,            -- map entry value; NULL marks a removed entry (tombstone)
+    PRIMARY KEY (account_id, nonce, slot_name, key)
+) WITHOUT ROWID;
+
+-- ── Account assets (latest + historical) ─────────────────────────────────
+
+CREATE TABLE latest_account_assets (
+    account_id TEXT NOT NULL,        -- account ID
+    vault_key TEXT NOT NULL,         -- asset's vault key
+    faucet_id_prefix TEXT NOT NULL,  -- prefix of the faucet ID, used to filter by faucet
+    asset TEXT NOT NULL,             -- serialized asset value
+    PRIMARY KEY (account_id, vault_key)
+) WITHOUT ROWID;
+
+CREATE TABLE historical_account_assets (
+    account_id TEXT NOT NULL,        -- account ID
+    nonce BIGINT NOT NULL,           -- nonce at which this asset was written
+    vault_key TEXT NOT NULL,         -- asset's vault key
+    faucet_id_prefix TEXT NOT NULL,  -- prefix of the faucet ID, used to filter by faucet
+    asset TEXT NULL,                 -- serialized asset value; NULL marks a removed asset (tombstone)
+    PRIMARY KEY (account_id, nonce, vault_key)
+) WITHOUT ROWID;
+
+-- ── Foreign account code ─────────────────────────────────────────────────
+
+CREATE TABLE foreign_account_code(
+    account_id TEXT NOT NULL,
+    code_commitment TEXT NOT NULL,
+    PRIMARY KEY (account_id),
+    FOREIGN KEY (code_commitment) REFERENCES account_code(commitment)
+);
+
+-- ── Transactions ─────────────────────────────────────────────────────────
+
 CREATE TABLE transactions (
     id TEXT NOT NULL,                                -- Transaction ID (commitment of various components)
     details BLOB NOT NULL,                           -- Serialized transaction details
@@ -104,7 +145,8 @@ CREATE TABLE transaction_scripts (
     PRIMARY KEY (script_root)
 ) WITHOUT ROWID;
 
--- Create input notes table
+-- ── Notes ────────────────────────────────────────────────────────────────
+
 CREATE TABLE input_notes (
     note_id TEXT NOT NULL,                                  -- the note id
     assets BLOB NOT NULL,                                   -- the serialized list of assets
@@ -122,7 +164,6 @@ CREATE TABLE input_notes (
 CREATE INDEX idx_input_notes_state ON input_notes(state_discriminant);
 CREATE INDEX idx_input_notes_nullifier ON input_notes(nullifier);
 
--- Create output notes table
 CREATE TABLE output_notes (
     note_id TEXT NOT NULL,                                  -- the note id
     recipient_digest TEXT NOT NULL,                                -- the note recipient
@@ -140,7 +181,6 @@ CREATE TABLE output_notes (
 CREATE INDEX idx_output_notes_state ON output_notes(state_discriminant);
 CREATE INDEX idx_output_notes_nullifier ON output_notes(nullifier);
 
--- Create note's scripts table, used for both input and output notes
 CREATE TABLE notes_scripts (
     script_root TEXT NOT NULL,                       -- Note script root
     serialized_note_script BLOB,                     -- NoteScript, serialized
@@ -148,13 +188,13 @@ CREATE TABLE notes_scripts (
     PRIMARY KEY (script_root)
 );
 
--- Create state sync table
+-- ── State sync & tags ────────────────────────────────────────────────────
+
 CREATE TABLE state_sync (
     block_num UNSIGNED BIG INT NOT NULL,    -- the block number of the most recent state sync
     PRIMARY KEY (block_num)
 );
 
--- Create tags table
 CREATE TABLE tags (
     tag BLOB NOT NULL,     -- the serialized tag
     source BLOB NOT NULL   -- the serialized tag source
@@ -167,7 +207,8 @@ WHERE (
     SELECT COUNT(*) FROM state_sync
 ) = 0;
 
--- Create block headers table
+-- ── Block headers & partial blockchain ───────────────────────────────────
+
 CREATE TABLE block_headers (
     block_num UNSIGNED BIG INT NOT NULL,  -- block number
     header BLOB NOT NULL,                 -- serialized block header
@@ -177,14 +218,14 @@ CREATE TABLE block_headers (
 );
 CREATE INDEX IF NOT EXISTS idx_block_headers_has_notes ON block_headers(block_num) WHERE has_client_notes = 1;
 
--- Create partial blockchain nodes
 CREATE TABLE partial_blockchain_nodes (
     id UNSIGNED BIG INT NOT NULL,   -- in-order index of the internal MMR node
     node BLOB NOT NULL,             -- internal node value (commitment)
     PRIMARY KEY (id)
 ) WITHOUT ROWID;
 
--- Create addresses table
+-- ── Addresses ────────────────────────────────────────────────────────────
+
 CREATE TABLE addresses (
     address BLOB NOT NULL,          -- the address
     account_id UNSIGNED BIG INT NOT NULL,   -- associated Account ID.
@@ -193,10 +234,3 @@ CREATE TABLE addresses (
 ) WITHOUT ROWID;
 
 CREATE INDEX idx_addresses_account_id ON addresses(account_id);
-
--- Create tracked_accounts table to easily read account IDs
--- TODO: this should maybe use the settings table in the future?
-
-CREATE TABLE tracked_accounts (
-    id TEXT NOT NULL PRIMARY KEY
-);
