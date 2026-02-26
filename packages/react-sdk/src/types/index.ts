@@ -52,6 +52,7 @@ export type {
   SignerContextValue,
 } from "../context/SignerContext";
 
+
 export type RpcUrlConfig =
   | string
   | "devnet"
@@ -324,11 +325,11 @@ export interface MultiSendOptions {
 
 export interface InternalTransferOptions {
   /** Sender account ID */
-  from: string;
+  from: AccountRef;
   /** Recipient account ID */
-  to: string;
+  to: AccountRef;
   /** Asset ID to send (token id) */
-  assetId: string;
+  assetId: AccountRef;
   /** Amount to transfer */
   amount: bigint;
   /** Note type. Default: private */
@@ -337,11 +338,11 @@ export interface InternalTransferOptions {
 
 export interface InternalTransferChainOptions {
   /** Initial sender account ID */
-  from: string;
+  from: AccountRef;
   /** Ordered list of recipient account IDs */
-  recipients: string[];
+  recipients: AccountRef[];
   /** Asset ID to send (token id) */
-  assetId: string;
+  assetId: AccountRef;
   /** Amount to transfer per hop */
   amount: bigint;
   /** Note type. Default: private */
