@@ -803,11 +803,11 @@ mod tests {
     #[test]
     fn debug_shows_encryption_status() {
         let (ks, _dir) = temp_keystore();
-        let debug_plain = format!("{:?}", ks);
+        let debug_plain = format!("{ks:?}");
         assert!(debug_plain.contains("encrypted: false"));
 
         let ks = ks.with_encryption(PasswordEncryptor::new("pw"));
-        let debug_enc = format!("{:?}", ks);
+        let debug_enc = format!("{ks:?}");
         assert!(debug_enc.contains("encrypted: true"));
     }
 }
