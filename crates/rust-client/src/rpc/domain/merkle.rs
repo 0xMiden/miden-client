@@ -93,7 +93,9 @@ impl TryFrom<proto::primitives::MmrDelta> for MmrDelta {
             value.data.into_iter().map(Word::try_from).collect();
 
         Ok(MmrDelta {
-            forest: Forest::new(usize::try_from(value.forest).expect("u64 should fit in usize")),
+            forest: Forest::new(usize::try_from(value.forest).map_err(|_| {
+                RpcConversionError::InvalidField("MmrDelta forest value exceeds usize".into())
+            })?),
             data: data?,
         })
     }

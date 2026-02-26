@@ -10,6 +10,7 @@ use miden_protocol::transaction::TransactionId;
 use super::note::CommittedNote;
 use super::transaction::TransactionInclusion;
 use crate::rpc::domain::MissingFieldHelper;
+use crate::rpc::errors::RpcConversionError;
 use crate::rpc::{RpcError, generated as proto};
 
 // STATE SYNC INFO
@@ -94,7 +95,11 @@ impl TryFrom<proto::rpc::SyncStateResponse> for StateSyncInfo {
 
             let committed_note = super::note::CommittedNote::new(
                 note_id,
-                u16::try_from(note.note_index_in_block).expect("note index out of range"),
+                u16::try_from(note.note_index_in_block).map_err(|_| {
+                    RpcConversionError::InvalidField(
+                        "note_index_in_block value out of u16 range".into(),
+                    )
+                })?,
                 inclusion_path,
                 metadata,
             );

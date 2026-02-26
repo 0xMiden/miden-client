@@ -192,12 +192,18 @@ impl FilesystemKeyStore {
         pub_key: PublicKeyCommitment,
     ) -> Result<Option<AuthSecretKey>, KeyStoreError> {
         let file_path = key_file_path(&self.keys_directory, pub_key);
-        if !file_path.exists() {
-            return Ok(None);
+        match fs::read(&file_path) {
+            Ok(bytes) => {
+                let key = AuthSecretKey::read_from_bytes(&bytes).map_err(|err| {
+                    KeyStoreError::DecodingError(format!(
+                        "error reading secret key from file: {err:?}"
+                    ))
+                })?;
+                Ok(Some(key))
+            },
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+            Err(e) => Err(keystore_error("error reading secret key file")(e)),
         }
-
-        let secret_key = read_secret_key_file(&file_path)?;
-        Ok(Some(secret_key))
     }
 
     /// Saves the index to disk.
@@ -283,8 +289,10 @@ impl Keystore for FilesystemKeyStore {
 
         // Remove the key file
         let file_path = key_file_path(&self.keys_directory, pub_key);
-        if file_path.exists() {
-            fs::remove_file(file_path).map_err(keystore_error("error removing secret key file"))?;
+        match fs::remove_file(file_path) {
+            Ok(()) => {},
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {},
+            Err(e) => return Err(keystore_error("error removing secret key file")(e)),
         }
 
         Ok(())
@@ -323,15 +331,24 @@ fn key_file_path(keys_directory: &Path, pub_key: PublicKeyCommitment) -> PathBuf
     keys_directory.join(filename)
 }
 
-/// Reads a file into an [`AuthSecretKey`]
-fn read_secret_key_file(file_path: &Path) -> Result<AuthSecretKey, KeyStoreError> {
-    let bytes = fs::read(file_path).map_err(keystore_error("error reading secret key file"))?;
-    AuthSecretKey::read_from_bytes(bytes.as_slice()).map_err(|err| {
-        KeyStoreError::DecodingError(format!("error reading secret key from file: {err:?}"))
-    })
+/// Writes an [`AuthSecretKey`] into a file with restrictive permissions (0600 on Unix).
+#[cfg(unix)]
+fn write_secret_key_file(file_path: &Path, key: &AuthSecretKey) -> Result<(), KeyStoreError> {
+    use std::io::Write;
+    use std::os::unix::fs::OpenOptionsExt;
+    let mut file = fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .mode(0o600)
+        .open(file_path)
+        .map_err(keystore_error("error writing secret key file"))?;
+    file.write_all(&key.to_bytes())
+        .map_err(keystore_error("error writing secret key file"))
 }
 
-/// Write an [`AuthSecretKey`] into a file
+/// Writes an [`AuthSecretKey`] into a file.
+#[cfg(not(unix))]
 fn write_secret_key_file(file_path: &Path, key: &AuthSecretKey) -> Result<(), KeyStoreError> {
     fs::write(file_path, key.to_bytes()).map_err(keystore_error("error writing secret key file"))
 }
