@@ -73,6 +73,7 @@ export type {
   SwapOptions,
   ExecuteTransactionOptions,
   TransactionResult,
+  AccountRef,
   // Signer types (for external signer providers)
   SignCallback,
   SignerAccountType,

@@ -1,3 +1,4 @@
+import type { AccountRef } from "../utils/accountParsing";
 import type {
   WasmWebClient as WebClient,
   Account,
@@ -37,6 +38,8 @@ export type {
   StorageMode,
 };
 
+export type { AccountRef } from "../utils/accountParsing";
+
 // Re-export signer types for external signer providers
 export type {
   SignCallback,
@@ -44,6 +47,7 @@ export type {
   SignerAccountConfig,
   SignerContextValue,
 } from "../context/SignerContext";
+
 
 export type RpcUrlConfig =
   | string
@@ -156,7 +160,7 @@ export interface AssetBalance {
 // Notes types
 export interface NotesFilter {
   status?: "all" | "consumed" | "committed" | "expected" | "processing";
-  accountId?: string;
+  accountId?: AccountRef;
 }
 
 export interface NotesResult {
@@ -246,7 +250,7 @@ export type ImportAccountOptions =
     }
   | {
       type: "id";
-      accountId: string | AccountId;
+      accountId: AccountRef;
     }
   | {
       type: "seed";
@@ -258,11 +262,11 @@ export type ImportAccountOptions =
 // Send options
 export interface SendOptions {
   /** Sender account ID */
-  from: string;
+  from: AccountRef;
   /** Recipient account ID */
-  to: string;
+  to: AccountRef;
   /** Asset ID to send (token id) */
-  assetId: string;
+  assetId: AccountRef;
   /** Amount to send */
   amount: bigint;
   /** Note type. Default: private */
@@ -275,16 +279,16 @@ export interface SendOptions {
 
 export interface MultiSendRecipient {
   /** Recipient account ID */
-  to: string;
+  to: AccountRef;
   /** Amount to send */
   amount: bigint;
 }
 
 export interface MultiSendOptions {
   /** Sender account ID */
-  from: string;
+  from: AccountRef;
   /** Asset ID to send (token id) */
-  assetId: string;
+  assetId: AccountRef;
   /** Recipient list */
   recipients: MultiSendRecipient[];
   /** Note type. Default: private */
@@ -293,11 +297,11 @@ export interface MultiSendOptions {
 
 export interface InternalTransferOptions {
   /** Sender account ID */
-  from: string;
+  from: AccountRef;
   /** Recipient account ID */
-  to: string;
+  to: AccountRef;
   /** Asset ID to send (token id) */
-  assetId: string;
+  assetId: AccountRef;
   /** Amount to transfer */
   amount: bigint;
   /** Note type. Default: private */
@@ -306,11 +310,11 @@ export interface InternalTransferOptions {
 
 export interface InternalTransferChainOptions {
   /** Initial sender account ID */
-  from: string;
+  from: AccountRef;
   /** Ordered list of recipient account IDs */
-  recipients: string[];
+  recipients: AccountRef[];
   /** Asset ID to send (token id) */
-  assetId: string;
+  assetId: AccountRef;
   /** Amount to transfer per hop */
   amount: bigint;
   /** Note type. Default: private */
@@ -332,7 +336,7 @@ export interface WaitForCommitOptions {
 
 export interface WaitForNotesOptions {
   /** Account ID to check for consumable notes */
-  accountId: string;
+  accountId: AccountRef;
   /** Minimum number of notes to wait for. Default: 1 */
   minCount?: number;
   /** Timeout in milliseconds. Default: 10000 */
@@ -356,7 +360,7 @@ export interface MintOptions {
 // Consume options
 export interface ConsumeOptions {
   /** Account ID that will consume the notes */
-  accountId: string;
+  accountId: AccountRef;
   /** List of note IDs to consume */
   noteIds: (string | NoteId)[];
 }
@@ -364,13 +368,13 @@ export interface ConsumeOptions {
 // Swap options
 export interface SwapOptions {
   /** Account initiating the swap */
-  accountId: string;
+  accountId: AccountRef;
   /** Faucet ID of the offered asset */
-  offeredFaucetId: string;
+  offeredFaucetId: AccountRef;
   /** Amount being offered */
   offeredAmount: bigint;
   /** Faucet ID of the requested asset */
-  requestedFaucetId: string;
+  requestedFaucetId: AccountRef;
   /** Amount being requested */
   requestedAmount: bigint;
   /** Note type for swap note. Default: private */
@@ -382,7 +386,7 @@ export interface SwapOptions {
 // Arbitrary transaction options
 export interface ExecuteTransactionOptions {
   /** Account ID the transaction applies to */
-  accountId: string | AccountId;
+  accountId: AccountRef;
   /** Transaction request or builder */
   request:
     | TransactionRequest
