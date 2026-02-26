@@ -155,8 +155,7 @@ impl AccountSmtForest {
     /// hash nodes are pre-populated infrastructure in the `SmtStore`, and popping the
     /// empty root would walk and destroy them, corrupting the store for all future
     /// operations.
-    // TODO: fix this in miden-crypto's `batch_insert` so it never registers the empty
-    // root, then remove this filter.
+    // TODO(#1834): remove this filter once the miden-crypto fix lands.
     pub fn pop_roots(&mut self, roots: impl IntoIterator<Item = Word>) {
         let empty_tree_root = *EmptySubtreeRoots::entry(SMT_DEPTH, 0);
         self.forest.pop_smts(roots.into_iter().filter(|r| *r != empty_tree_root));
