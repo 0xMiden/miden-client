@@ -63,6 +63,72 @@ let client = ClientBuilder::new()
     .await?;
 ```
 
+## Keystore encryption
+
+By default, secret keys are stored as plaintext files on disk. You can enable password-based encryption so that keys are encrypted at rest using Argon2id (key derivation) and ChaCha20-Poly1305 (authenticated encryption).
+
+> **Note:** Keystore encryption is available for native (CLI/desktop) builds only. It requires the `std` feature and applies to `FilesystemKeyStore`. In WASM/web environments, the `WebKeyStore` stores keys in IndexedDB, which is sandboxed by the browser's same-origin policy. Web applications that need additional encryption can provide custom key management callbacks via the `WebKeyStore` JS callback system.
+
+### Using the builder
+
+The `ClientBuilder` provides a convenience method that creates an encrypted keystore in a single call:
+
+```rust
+use miden_client::builder::ClientBuilder;
+use miden_client::keystore::PasswordEncryptor;
+
+let client = ClientBuilder::for_testnet()
+    .store(store)
+    .filesystem_keystore_encrypted(
+        "path/to/keys",
+        PasswordEncryptor::new("my-strong-password"),
+    )?
+    .build()
+    .await?;
+```
+
+### Using the keystore directly
+
+You can also enable encryption on an existing `FilesystemKeyStore` via the builder pattern:
+
+```rust
+use miden_client::keystore::{FilesystemKeyStore, PasswordEncryptor};
+
+let keystore = FilesystemKeyStore::new("path/to/keys".into())?
+    .with_encryption(PasswordEncryptor::new("my-strong-password"));
+```
+
+When encryption is enabled:
+- New keys are encrypted on write.
+- Existing plaintext key files are still readable (backward compatible).
+- Reading an encrypted file with the wrong password returns an error.
+
+### Migrating existing keys
+
+To encrypt all existing plaintext key files in-place, call `migrate_to_encrypted()`:
+
+```rust
+let migrated = keystore.migrate_to_encrypted()?;
+println!("Migrated {migrated} key files to encrypted format");
+```
+
+Already-encrypted files are skipped, so migration is safe to call multiple times.
+
+### Custom encryptors
+
+The `KeyEncryptor` trait is object-safe and can be implemented to support alternative encryption backends (e.g., hardware security modules):
+
+```rust
+use miden_client::keystore::KeyEncryptor;
+
+struct MyHsmEncryptor { /* ... */ }
+
+impl KeyEncryptor for MyHsmEncryptor {
+    fn encrypt(&self, plaintext: &[u8]) -> Result<Vec<u8>, KeyStoreError> { /* ... */ }
+    fn decrypt(&self, ciphertext: &[u8]) -> Result<Vec<u8>, KeyStoreError> { /* ... */ }
+}
+```
+
 ## Create local account
 
 With the Miden client, you can create and track any number of public and local accounts. For local accounts, the state is tracked locally, and the rollup only keeps commitments to the data, which in turn guarantees privacy.
