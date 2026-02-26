@@ -17,7 +17,6 @@ import type {
 } from "../types";
 import { DEFAULTS } from "../types";
 import { parseAccountId, parseAddress } from "../utils/accountParsing";
-import { runExclusiveDirect } from "../utils/runExclusive";
 import { createNoteAttachment } from "../utils/noteAttachment";
 import { MidenError } from "../utils/errors";
 import { getNoteType, waitForTransactionCommit } from "../utils/noteFilters";
@@ -67,8 +66,7 @@ export interface UseMultiSendResult {
  * ```
  */
 export function useMultiSend(): UseMultiSendResult {
-  const { client, isReady, sync, runExclusive, prover } = useMiden();
-  const runExclusiveSafe = runExclusive ?? runExclusiveDirect;
+  const { client, isReady, sync, prover } = useMiden();
   const isBusyRef = useRef(false);
 
   const [result, setResult] = useState<TransactionResult | null>(null);
@@ -146,18 +144,18 @@ export function useMultiSend(): UseMultiSendResult {
           .build();
 
         const txSenderId = parseAccountId(options.from);
-        const txResult = await runExclusiveSafe(() =>
-          client.executeTransaction(txSenderId, txRequest)
-        );
+        const txResult = await client.executeTransaction(txSenderId, txRequest);
 
         setStage("proving");
-        const provenTransaction = await runExclusiveSafe(() =>
-          client.proveTransaction(txResult, prover ?? undefined)
+        const provenTransaction = await client.proveTransaction(
+          txResult,
+          prover ?? undefined
         );
 
         setStage("submitting");
-        const submissionHeight = await runExclusiveSafe(() =>
-          client.submitProvenTransaction(provenTransaction, txResult)
+        const submissionHeight = await client.submitProvenTransaction(
+          provenTransaction,
+          txResult
         );
 
         // Save txId hex/string BEFORE applyTransaction, which consumes the
@@ -165,23 +163,21 @@ export function useMultiSend(): UseMultiSendResult {
         const txIdHex = txResult.id().toHex();
         const txIdString = txResult.id().toString();
 
-        await runExclusiveSafe(() =>
-          client.applyTransaction(txResult, submissionHeight)
-        );
+        await client.applyTransaction(txResult, submissionHeight);
 
         // Send private notes after commit
         const hasPrivate = outputs.some((o) => o.noteType === NoteType.Private);
         if (hasPrivate) {
           await waitForTransactionCommit(
             client as unknown as ClientWithTransactions,
-            runExclusiveSafe,
             txIdHex
           );
 
           for (const output of outputs) {
             if (output.noteType === NoteType.Private) {
-              await runExclusiveSafe(() =>
-                client.sendPrivateNote(output.note, output.recipientAddress)
+              await client.sendPrivateNote(
+                output.note,
+                output.recipientAddress
               );
             }
           }
@@ -205,7 +201,7 @@ export function useMultiSend(): UseMultiSendResult {
         isBusyRef.current = false;
       }
     },
-    [client, isReady, prover, runExclusive, sync]
+    [client, isReady, prover, sync]
   );
 
   const reset = useCallback(() => {
