@@ -90,7 +90,8 @@ export declare const NoteVisibility: {
 /**
  * Union of all values in the NoteVisibility const.
  */
-export type NoteVisibility = (typeof NoteVisibility)[keyof typeof NoteVisibility];
+export type NoteVisibility =
+  (typeof NoteVisibility)[keyof typeof NoteVisibility];
 
 /**
  * User-friendly storage mode constants for MidenClient options.

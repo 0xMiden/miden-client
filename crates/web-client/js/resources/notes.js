@@ -1,4 +1,8 @@
-import { resolveAccountRef, resolveAddress, resolveNoteIdHex } from "../utils.js";
+import {
+  resolveAccountRef,
+  resolveAddress,
+  resolveNoteIdHex,
+} from "../utils.js";
 
 export class NotesResource {
   #inner;
@@ -79,7 +83,9 @@ function buildNoteFilter(query, wasm) {
   }
 
   if (query.ids) {
-    const noteIds = query.ids.map((id) => wasm.NoteId.fromHex(resolveNoteIdHex(id)));
+    const noteIds = query.ids.map((id) =>
+      wasm.NoteId.fromHex(resolveNoteIdHex(id))
+    );
     return new wasm.NoteFilter(wasm.NoteFilterTypes.List, noteIds);
   }
 

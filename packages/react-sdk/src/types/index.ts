@@ -48,7 +48,6 @@ export type {
   SignerContextValue,
 } from "../context/SignerContext";
 
-
 export type RpcUrlConfig =
   | string
   | "devnet"

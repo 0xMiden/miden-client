@@ -1,4 +1,8 @@
-import { resolveAccountRef, resolveNoteType, resolveTransactionIdHex } from "../utils.js";
+import {
+  resolveAccountRef,
+  resolveNoteType,
+  resolveTransactionIdHex,
+} from "../utils.js";
 
 export class TransactionsResource {
   #inner;
@@ -220,7 +224,9 @@ export class TransactionsResource {
     } else if (query.status === "uncommitted") {
       filter = wasm.TransactionFilter.uncommitted();
     } else if (query.ids) {
-      const txIds = query.ids.map((id) => wasm.TransactionId.fromHex(resolveTransactionIdHex(id)));
+      const txIds = query.ids.map((id) =>
+        wasm.TransactionId.fromHex(resolveTransactionIdHex(id))
+      );
       filter = wasm.TransactionFilter.ids(txIds);
     } else if (query.expiredBefore !== undefined) {
       filter = wasm.TransactionFilter.expiredBefore(query.expiredBefore);
