@@ -16,7 +16,7 @@
 
 ##### noteId
 
-`string`
+[`NoteInput`](../type-aliases/NoteInput.md)
 
 ##### options?
 
@@ -52,7 +52,7 @@
 
 ##### noteId
 
-`string`
+[`NoteInput`](../type-aliases/NoteInput.md)
 
 #### Returns
 

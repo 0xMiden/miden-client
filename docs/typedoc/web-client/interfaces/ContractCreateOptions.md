@@ -42,7 +42,7 @@ Required — used to derive a deterministic account ID.
 
 ### storage?
 
-> `optional` **storage**: `"private"` \| `"public"`
+> `optional` **storage**: `"public"` \| `"private"`
 
 Defaults to "public" (differs from wallet default of "private").
 

@@ -171,7 +171,7 @@ Note: WASM requires accountId separately, so `account` is the first argument.
 
 ##### txId
 
-`string`
+`string` | [`TransactionId`](../classes/TransactionId.md)
 
 ##### options?
 

@@ -91,6 +91,7 @@
 - [NoteVisibility](type-aliases/NoteVisibility.md)
 - [PreviewOptions](type-aliases/PreviewOptions.md)
 - [SignCallback](type-aliases/SignCallback.md)
+- [StorageMode](type-aliases/StorageMode.md)
 - [TransactionQuery](type-aliases/TransactionQuery.md)
 - [WaitStatus](type-aliases/WaitStatus.md)
 
@@ -99,6 +100,8 @@
 - [AccountType](variables/AccountType.md)
 - [AuthScheme](variables/AuthScheme.md)
 - [MidenArrays](variables/MidenArrays.md)
+- [NoteVisibility](variables/NoteVisibility.md)
+- [StorageMode](variables/StorageMode.md)
 
 ## Functions
 
