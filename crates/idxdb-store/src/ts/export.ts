@@ -3,6 +3,7 @@
 /* eslint-disable  @typescript-eslint/no-unsafe-return */
 /* eslint-disable  @typescript-eslint/no-unsafe-assignment */
 import { getDatabase } from "./schema.js";
+import { decryptSecretKey } from "./crypto.js";
 import { uint8ArrayToBase64 } from "./utils.js";
 type TransformableInput =
   | { type: "Uint8Array"; value: Uint8Array }
@@ -62,7 +63,37 @@ export async function exportStore(dbId: string) {
   const dbJson: Record<string, any> = {};
 
   for (const table of db.dexie.tables) {
-    const records = await table.toArray();
+    let records = await table.toArray();
+
+    // Decrypt auth records to plaintext for export so they survive the
+    // export/import cycle (the non-extractable CryptoKey cannot be serialized).
+    if (table.name === "accountAuth") {
+      records = await Promise.all(
+        records.map(async (record: any) => {
+          if (record.encryptedSecretKey && record.iv) {
+            try {
+              const secretKeyHex = await decryptSecretKey(
+                dbId,
+                record.encryptedSecretKey,
+                record.iv
+              );
+              return {
+                pubKeyCommitmentHex: record.pubKeyCommitmentHex,
+                secretKeyHex,
+              };
+            } catch {
+              console.warn(
+                `Failed to decrypt auth for export: ${record.pubKeyCommitmentHex}. ` +
+                  `Including raw encrypted record — it may not be usable after import.`
+              );
+              return record;
+            }
+          }
+          return record;
+        })
+      );
+    }
+
     dbJson[table.name] = await Promise.all(records.map(transformForExport));
   }
 

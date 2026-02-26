@@ -89,7 +89,10 @@ export interface IAccountAsset {
 
 export interface IAccountAuth {
   pubKeyCommitmentHex: string;
-  secretKeyHex: string;
+  /** @deprecated Legacy plaintext field — kept for backward compatibility during migration. */
+  secretKeyHex?: string;
+  encryptedSecretKey?: Uint8Array;
+  iv?: Uint8Array;
 }
 
 export interface IAccountKeyMapping {
