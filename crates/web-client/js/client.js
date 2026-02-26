@@ -78,10 +78,7 @@ export class MidenClient {
     let defaultProver = null;
     if (options?.proverUrl) {
       const wasm = await getWasm();
-      defaultProver = wasm.TransactionProver.newRemoteProver(
-        options.proverUrl,
-        undefined
-      );
+      defaultProver = resolveProver(options.proverUrl, wasm);
     }
 
     const client = new MidenClient(inner, getWasm, defaultProver);
@@ -248,4 +245,25 @@ export class MidenClient {
       throw new Error(`${method}() is only available on mock clients`);
     }
   }
+}
+
+const PROVER_URLS = {
+  devnet: "https://tx-prover.devnet.miden.io",
+  testnet: "https://tx-prover.testnet.miden.io",
+};
+
+/**
+ * Resolves a proverUrl shorthand or raw URL into a TransactionProver.
+ *
+ * @param {string} proverUrl - "local", "devnet", "testnet", or a raw URL.
+ * @param {object} wasm - Loaded WASM module.
+ * @returns {object} A TransactionProver instance.
+ */
+function resolveProver(proverUrl, wasm) {
+  const normalized = proverUrl.trim().toLowerCase();
+  if (normalized === "local") {
+    return wasm.TransactionProver.newLocalProver();
+  }
+  const remoteUrl = PROVER_URLS[normalized] ?? proverUrl;
+  return wasm.TransactionProver.newRemoteProver(remoteUrl, undefined);
 }

@@ -143,8 +143,14 @@ export interface ClientOptions {
   rpcUrl?: string;
   /** Note transport URL (optional). */
   noteTransportUrl?: string;
-  /** Auto-creates a remote prover from this URL. */
-  proverUrl?: string;
+  /**
+   * Prover to use for transactions. Accepts shorthands or a raw URL:
+   * - `"local"` — local (in-browser) prover
+   * - `"devnet"` — Miden devnet remote prover
+   * - `"testnet"` — Miden testnet remote prover
+   * - any other string — treated as a raw remote prover URL
+   */
+  proverUrl?: "local" | "devnet" | "testnet" | (string & {});
   /** Hashed to 32 bytes via SHA-256. */
   seed?: string | Uint8Array;
   /** Store isolation key. */
