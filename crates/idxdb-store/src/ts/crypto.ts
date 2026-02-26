@@ -30,11 +30,13 @@ async function getOrCreateEncryptionKey(dbId: string): Promise<CryptoKey> {
   // CryptoKey objects are structured-cloneable and can be stored directly in IDB.
   // ISetting.value is typed as Uint8Array, so we use the raw Dexie table API
   // to store the opaque CryptoKey directly.
-  const stored = await db.dexie.table("settings").get("encryptionKey");
+  const stored: { key: string; value: unknown } | undefined = await db.dexie
+    .table("settings")
+    .get("encryptionKey");
   let key: CryptoKey;
 
   if (stored && stored.value instanceof CryptoKey) {
-    key = stored.value as unknown as CryptoKey;
+    key = stored.value;
   } else {
     // extractable: false — key cannot be exported, only used for encrypt/decrypt
     key = await crypto.subtle.generateKey(
