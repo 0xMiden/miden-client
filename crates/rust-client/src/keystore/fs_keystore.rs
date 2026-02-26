@@ -454,7 +454,10 @@ fn key_file_path(keys_directory: &Path, pub_key: PublicKeyCommitment) -> PathBuf
 /// and then renaming. This ensures a crash mid-write cannot leave a corrupted file.
 fn atomic_write(file_path: &Path, data: &[u8]) -> Result<(), KeyStoreError> {
     let temp_path = file_path.with_extension("tmp");
-    fs::write(&temp_path, data).map_err(keystore_error("error writing temp key file"))?;
+    let mut file =
+        fs::File::create(&temp_path).map_err(keystore_error("error creating temp key file"))?;
+    file.write_all(data).map_err(keystore_error("error writing temp key file"))?;
+    file.sync_all().map_err(keystore_error("error syncing temp key file"))?;
     fs::rename(&temp_path, file_path).map_err(keystore_error("error renaming temp key file"))
 }
 
