@@ -20,6 +20,14 @@ pub struct AccountAuthIdxdbObject {
     pub secret_key: String,
 }
 
+// Register crypto.js with wasm-bindgen so it is included in the snippets bundle.
+// accounts.js and export.js import from ./crypto.js for secret key encryption.
+#[wasm_bindgen(module = "/src/js/crypto.js")]
+extern "C" {
+    #[wasm_bindgen(js_name = encryptSecretKey)]
+    fn _crypto_encrypt(db_id: &str, plaintext: &str) -> js_sys::Promise;
+}
+
 #[wasm_bindgen(module = "/src/js/accounts.js")]
 extern "C" {
     #[wasm_bindgen(js_name = insertAccountAuth)]
