@@ -525,4 +525,32 @@ impl ClientBuilder<FilesystemKeyStore> {
             .map_err(|e| ClientError::ClientInitializationError(e.to_string()))?;
         Ok(self.authenticator(Arc::new(keystore)))
     }
+
+    /// Creates a [`FilesystemKeyStore`] with encryption enabled and sets it as the authenticator.
+    ///
+    /// This is a convenience method that combines [`filesystem_keystore`](Self::filesystem_keystore)
+    /// with [`FilesystemKeyStore::with_encryption`].
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// use miden_client::keystore::PasswordEncryptor;
+    ///
+    /// let client = ClientBuilder::new()
+    ///     .rpc(rpc_client)
+    ///     .store(store)
+    ///     .filesystem_keystore_encrypted("path/to/keys", PasswordEncryptor::new("password"))?
+    ///     .build()
+    ///     .await?;
+    /// ```
+    pub fn filesystem_keystore_encrypted(
+        self,
+        keystore_path: impl Into<std::path::PathBuf>,
+        encryptor: impl crate::keystore::KeyEncryptor + 'static,
+    ) -> Result<Self, ClientError> {
+        let keystore = FilesystemKeyStore::new(keystore_path.into())
+            .map_err(|e| ClientError::ClientInitializationError(e.to_string()))?
+            .with_encryption(encryptor);
+        Ok(self.authenticator(Arc::new(keystore)))
+    }
 }
