@@ -13,7 +13,14 @@ use miden_client::transaction::{
     TransactionRequestBuilder,
 };
 use miden_client::{ClientError, async_trait};
-use miden_protocol::account::{AccountBuilder, AccountComponent, AccountStorageMode};
+use miden_protocol::account::{
+    AccountBuilder,
+    AccountComponent,
+    AccountStorageMode,
+    StorageMap,
+    StorageSlot,
+    StorageSlotName,
+};
 use miden_protocol::assembly::diagnostics::miette::GraphicalReportHandler;
 use miden_protocol::asset::{Asset, FungibleAsset};
 use miden_protocol::note::NoteType;
@@ -189,25 +196,37 @@ async fn prover_fallback_pattern_allows_retry_with_different_prover() {
 
 /// Tests that the `ClientDataStore` lazy-loads foreign account inputs via RPC when the foreign
 /// account is not specified in the `TransactionRequestBuilder`.
-///
-/// This verifies:
-/// 1. A cache miss in `get_foreign_account_inputs` triggers an RPC fetch for public accounts.
-/// 2. The fetched account code is persisted in the store for future transactions.
-/// 3. The transaction succeeds even though the foreign account was not pre-specified.
 #[tokio::test]
 async fn lazy_foreign_account_loading() {
     let (mut client, rpc_api, keystore) = Box::pin(create_test_client()).await;
 
-    // Setup: Create and deploy a public foreign account
-    let constant_value: Word = [Felt::new(9), Felt::new(12), Felt::new(18), Felt::new(30)].into();
+    // Setup: Create and deploy a public foreign account with a storage map.
+    let map_key: Word = [Felt::new(15), Felt::new(15), Felt::new(15), Felt::new(15)].into();
+    let map_value: Word = [Felt::new(9), Felt::new(12), Felt::new(18), Felt::new(30)].into();
+    let map_slot_name = StorageSlotName::new("miden::testing::fpi::map").unwrap();
+
+    let mut storage_map = StorageMap::new();
+    storage_map.insert(map_key, map_value).unwrap();
+    let map_slot = StorageSlot::with_map(map_slot_name, storage_map);
+
     let component_code = CodeBuilder::default()
         .compile_component_code(
             "miden::testing::fpi_lazy_component",
-            format!("pub proc get_constant\n    push.{constant_value}\n    swapw dropw\nend"),
+            format!(
+                r#"
+                const STORAGE_MAP_SLOT = word("miden::testing::fpi::map")
+                pub proc get_map_item
+                    push.{map_key}
+                    push.STORAGE_MAP_SLOT[0..2]
+                    exec.::miden::protocol::active_account::get_map_item
+                    swapw dropw
+                end"#
+            ),
         )
         .unwrap();
-    let fpi_component =
-        AccountComponent::new(component_code, vec![]).unwrap().with_supports_all_types();
+    let fpi_component = AccountComponent::new(component_code, vec![map_slot])
+        .unwrap()
+        .with_supports_all_types();
     let proc_root = fpi_component.mast_forest().procedure_digests().next().unwrap();
 
     let secret_key = AuthSecretKey::new_falcon512_rpo();
@@ -232,14 +251,12 @@ async fn lazy_foreign_account_loading() {
     rpc_api.prove_block();
     client.sync_state().await.unwrap();
 
-    // Setup: Create a native wallet to execute the FPI transaction
+    // Setup: Create a local wallet to execute the FPI transaction.
+    let local_wallet = super::insert_new_wallet(&mut client, AccountStorageMode::Public, &keystore)
+        .await
+        .unwrap();
 
-    let native_wallet =
-        super::insert_new_wallet(&mut client, AccountStorageMode::Public, &keystore)
-            .await
-            .unwrap();
-
-    // Execute FPI transaction WITHOUT specifying foreign account
+    // Execute FPI transaction WITHOUT specifying foreign account.
 
     // Verify no foreign account code is cached before the transaction.
     let cached = client
@@ -253,6 +270,7 @@ async fn lazy_foreign_account_loading() {
     );
 
     // Build a transaction script that calls the foreign procedure via FPI.
+    // The procedure reads from the storage map, triggering lazy loading of map entries.
     let tx_script = client
         .code_builder()
         .compile_tx_script(format!(
@@ -262,7 +280,7 @@ async fn lazy_foreign_account_loading() {
                 push.{proc_root}
                 push.{suffix} push.{prefix}
                 exec.tx::execute_foreign_procedure
-                push.{constant_value} assert_eqw
+                push.{map_value} assert_eqw
             end
             ",
             prefix = foreign_account_id.prefix().as_u64(),
@@ -274,8 +292,9 @@ async fn lazy_foreign_account_loading() {
     let tx_request = TransactionRequestBuilder::new().custom_script(tx_script).build().unwrap();
 
     // Execute the transaction. This should succeed because the data store will
-    // lazy-load the foreign account via RPC when the executor requests it.
-    Box::pin(client.submit_new_transaction(native_wallet.id(), tx_request))
+    // lazy-load the foreign account via RPC, and then lazy-load the storage map
+    // entries when the procedure reads from the map.
+    Box::pin(client.submit_new_transaction(local_wallet.id(), tx_request))
         .await
         .unwrap();
 
