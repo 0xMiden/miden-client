@@ -45,7 +45,7 @@ impl AuthSecretKey {
     }
 
     fn public_key_commitment(&self) -> NativeWord {
-        self.0.public_key().to_commitment()
+        self.0.public_key().to_commitment().into()
     }
 
     #[wasm_bindgen(js_name = "publicKey")]
