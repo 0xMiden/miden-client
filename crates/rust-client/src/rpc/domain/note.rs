@@ -155,7 +155,9 @@ impl TryFrom<proto::rpc::SyncNotesResponse> for NoteSyncInfo {
 
             let committed_note = CommittedNote::new(
                 note_id,
-                u16::try_from(note.note_index_in_block).expect("note index out of range"),
+                u16::try_from(note.note_index_in_block).map_err(|_| {
+                    RpcConversionError::InvalidField("note_index_in_block value out of u16 range".into())
+                })?,
                 inclusion_path,
                 metadata,
             );
