@@ -459,3 +459,339 @@ fn hash_pub_key(pub_key: Word) -> String {
     hasher.finish().to_string()
 }
 
+// TESTS
+// ================================================================================================
+
+#[cfg(test)]
+mod tests {
+    use miden_protocol::account::{AccountId, AccountIdVersion, AccountStorageMode, AccountType};
+    use miden_protocol::account::auth::AuthSecretKey;
+
+    use super::*;
+    use crate::keystore::PasswordEncryptor;
+    use crate::keystore::encryption::is_encrypted;
+
+    /// Helper: creates a temporary directory and returns a `FilesystemKeyStore` rooted there.
+    fn temp_keystore() -> (FilesystemKeyStore, tempfile::TempDir) {
+        let dir = tempfile::tempdir().expect("failed to create temp dir");
+        let ks =
+            FilesystemKeyStore::new(dir.path().to_path_buf()).expect("failed to create keystore");
+        (ks, dir)
+    }
+
+    /// Helper: creates a test `AccountId` from the given seed byte.
+    fn test_account_id(seed: u8) -> AccountId {
+        AccountId::dummy(
+            [seed; 15],
+            AccountIdVersion::Version0,
+            AccountType::RegularAccountImmutableCode,
+            AccountStorageMode::Private,
+        )
+    }
+
+    // PLAINTEXT (BASELINE) TESTS
+    // --------------------------------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn plaintext_add_and_get_key() {
+        let (ks, _dir) = temp_keystore();
+        let secret_key = AuthSecretKey::new_falcon512_rpo();
+        let commitment = secret_key.public_key().to_commitment();
+        let account_id = test_account_id(0);
+
+        ks.add_key(&secret_key, account_id).await.unwrap();
+
+        let retrieved = ks.get_key(commitment).await.unwrap();
+        assert!(retrieved.is_some());
+        assert_eq!(retrieved.unwrap().to_bytes(), secret_key.to_bytes());
+    }
+
+    #[tokio::test]
+    async fn plaintext_key_file_is_not_encrypted() {
+        let (ks, _dir) = temp_keystore();
+        let secret_key = AuthSecretKey::new_falcon512_rpo();
+        let commitment = secret_key.public_key().to_commitment();
+        let account_id = test_account_id(0);
+
+        ks.add_key(&secret_key, account_id).await.unwrap();
+
+        let file_path = key_file_path(&ks.keys_directory, commitment);
+        let bytes = fs::read(&file_path).unwrap();
+        assert!(!is_encrypted(&bytes), "plaintext keystore should not produce encrypted files");
+    }
+
+    // ENCRYPTED KEYSTORE TESTS
+    // --------------------------------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn encrypted_add_and_get_key() {
+        let (ks, _dir) = temp_keystore();
+        let ks = ks.with_encryption(PasswordEncryptor::new("test-password"));
+
+        let secret_key = AuthSecretKey::new_falcon512_rpo();
+        let commitment = secret_key.public_key().to_commitment();
+        let account_id = test_account_id(0);
+
+        ks.add_key(&secret_key, account_id).await.unwrap();
+
+        let retrieved = ks.get_key(commitment).await.unwrap();
+        assert!(retrieved.is_some());
+        assert_eq!(retrieved.unwrap().to_bytes(), secret_key.to_bytes());
+    }
+
+    #[tokio::test]
+    async fn encrypted_key_file_has_magic_header() {
+        let (ks, _dir) = temp_keystore();
+        let ks = ks.with_encryption(PasswordEncryptor::new("my-password"));
+
+        let secret_key = AuthSecretKey::new_falcon512_rpo();
+        let commitment = secret_key.public_key().to_commitment();
+        let account_id = test_account_id(0);
+
+        ks.add_key(&secret_key, account_id).await.unwrap();
+
+        let file_path = key_file_path(&ks.keys_directory, commitment);
+        let bytes = fs::read(&file_path).unwrap();
+        assert!(is_encrypted(&bytes), "encrypted keystore should produce files with MENC header");
+    }
+
+    #[tokio::test]
+    async fn encrypted_keystore_wrong_password_fails() {
+        let (ks, dir) = temp_keystore();
+        let ks = ks.with_encryption(PasswordEncryptor::new("correct-password"));
+
+        let secret_key = AuthSecretKey::new_falcon512_rpo();
+        let commitment = secret_key.public_key().to_commitment();
+        let account_id = test_account_id(0);
+
+        ks.add_key(&secret_key, account_id).await.unwrap();
+
+        // Open a new keystore on the same directory with a wrong password
+        let ks_wrong = FilesystemKeyStore::new(dir.path().to_path_buf())
+            .unwrap()
+            .with_encryption(PasswordEncryptor::new("wrong-password"));
+
+        let result = ks_wrong.get_key(commitment).await;
+        assert!(result.is_err(), "reading with wrong password should fail");
+    }
+
+    // BACKWARD COMPATIBILITY TESTS
+    // --------------------------------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn encrypted_keystore_reads_plaintext_files() {
+        let (ks_plain, dir) = temp_keystore();
+        let secret_key = AuthSecretKey::new_falcon512_rpo();
+        let commitment = secret_key.public_key().to_commitment();
+        let account_id = test_account_id(0);
+
+        // Write as plaintext
+        ks_plain.add_key(&secret_key, account_id).await.unwrap();
+
+        // Open the same directory with encryption enabled
+        let ks_enc = FilesystemKeyStore::new(dir.path().to_path_buf())
+            .unwrap()
+            .with_encryption(PasswordEncryptor::new("some-password"));
+
+        // Should be able to read the plaintext file
+        let retrieved = ks_enc.get_key(commitment).await.unwrap();
+        assert!(retrieved.is_some(), "encrypted keystore should read plaintext key files");
+        assert_eq!(retrieved.unwrap().to_bytes(), secret_key.to_bytes());
+    }
+
+    #[tokio::test]
+    async fn plaintext_keystore_errors_on_encrypted_files() {
+        let (ks_enc, dir) = temp_keystore();
+        let ks_enc = ks_enc.with_encryption(PasswordEncryptor::new("password"));
+
+        let secret_key = AuthSecretKey::new_falcon512_rpo();
+        let commitment = secret_key.public_key().to_commitment();
+        let account_id = test_account_id(0);
+
+        // Write as encrypted
+        ks_enc.add_key(&secret_key, account_id).await.unwrap();
+
+        // Open the same directory without encryption
+        let ks_plain = FilesystemKeyStore::new(dir.path().to_path_buf()).unwrap();
+
+        let result = ks_plain.get_key(commitment).await;
+        assert!(result.is_err(), "plaintext keystore should error on encrypted files");
+
+        // Verify the error message mentions encryption
+        let err_msg = format!("{}", result.unwrap_err());
+        assert!(
+            err_msg.contains("encrypted") || err_msg.contains("encryptor"),
+            "error should mention encryption: {err_msg}"
+        );
+    }
+
+    // MIGRATION TESTS
+    // --------------------------------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn migrate_to_encrypted_converts_plaintext_files() {
+        let (ks, _dir) = temp_keystore();
+        let secret_key = AuthSecretKey::new_falcon512_rpo();
+        let commitment = secret_key.public_key().to_commitment();
+        let account_id = test_account_id(0);
+
+        // Write as plaintext
+        ks.add_key(&secret_key, account_id).await.unwrap();
+
+        // Verify it's plaintext
+        let file_path = key_file_path(&ks.keys_directory, commitment);
+        assert!(!is_encrypted(&fs::read(&file_path).unwrap()));
+
+        // Enable encryption and migrate
+        let ks = ks.with_encryption(PasswordEncryptor::new("migration-password"));
+        let migrated = ks.migrate_to_encrypted().unwrap();
+        assert_eq!(migrated, 1, "should have migrated 1 file");
+
+        // Verify the file is now encrypted
+        assert!(is_encrypted(&fs::read(&file_path).unwrap()));
+
+        // Verify we can still read the key
+        let retrieved = ks.get_key(commitment).await.unwrap();
+        assert!(retrieved.is_some());
+        assert_eq!(retrieved.unwrap().to_bytes(), secret_key.to_bytes());
+    }
+
+    #[tokio::test]
+    async fn migrate_skips_already_encrypted_files() {
+        let (ks, _dir) = temp_keystore();
+        let ks = ks.with_encryption(PasswordEncryptor::new("password"));
+
+        let secret_key = AuthSecretKey::new_falcon512_rpo();
+        let account_id = test_account_id(0);
+
+        // Write as encrypted
+        ks.add_key(&secret_key, account_id).await.unwrap();
+
+        // Migrate should skip already-encrypted files
+        let migrated = ks.migrate_to_encrypted().unwrap();
+        assert_eq!(migrated, 0, "should not re-encrypt already encrypted files");
+    }
+
+    #[tokio::test]
+    async fn migrate_without_encryptor_errors() {
+        let (ks, _dir) = temp_keystore();
+
+        let result = ks.migrate_to_encrypted();
+        assert!(result.is_err(), "migration without encryptor should fail");
+    }
+
+    #[tokio::test]
+    async fn migrate_deduplicates_shared_keys() {
+        let (ks, dir) = temp_keystore();
+        let secret_key = AuthSecretKey::new_falcon512_rpo();
+        let commitment = secret_key.public_key().to_commitment();
+
+        // Associate the same key with two different accounts.
+        let account_id_1 = test_account_id(0);
+        let account_id_2 = test_account_id(1);
+
+        ks.add_key(&secret_key, account_id_1).await.unwrap();
+        // add_key writes the key file again but that's fine — same file path
+        ks.add_key(&secret_key, account_id_2).await.unwrap();
+
+        // Enable encryption and migrate
+        let ks = FilesystemKeyStore::new(dir.path().to_path_buf())
+            .unwrap()
+            .with_encryption(PasswordEncryptor::new("password"));
+        let migrated = ks.migrate_to_encrypted().unwrap();
+        assert_eq!(migrated, 1, "same key file shared by two accounts should only be migrated once");
+
+        // Verify the key is readable
+        let retrieved = ks.get_key(commitment).await.unwrap();
+        assert!(retrieved.is_some());
+        assert_eq!(retrieved.unwrap().to_bytes(), secret_key.to_bytes());
+    }
+
+    // MULTIPLE KEYS
+    // --------------------------------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn encrypted_keystore_handles_multiple_keys() {
+        let (ks, _dir) = temp_keystore();
+        let ks = ks.with_encryption(PasswordEncryptor::new("password"));
+
+        let key1 = AuthSecretKey::new_falcon512_rpo();
+        let key2 = AuthSecretKey::new_falcon512_rpo();
+        let commitment1 = key1.public_key().to_commitment();
+        let commitment2 = key2.public_key().to_commitment();
+
+        let account_id = test_account_id(0);
+
+        ks.add_key(&key1, account_id).await.unwrap();
+        ks.add_key(&key2, account_id).await.unwrap();
+
+        let retrieved1 = ks.get_key(commitment1).await.unwrap().unwrap();
+        let retrieved2 = ks.get_key(commitment2).await.unwrap().unwrap();
+
+        assert_eq!(retrieved1.to_bytes(), key1.to_bytes());
+        assert_eq!(retrieved2.to_bytes(), key2.to_bytes());
+    }
+
+    // REMOVE KEY
+    // --------------------------------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn encrypted_remove_key_deletes_file() {
+        let (ks, _dir) = temp_keystore();
+        let ks = ks.with_encryption(PasswordEncryptor::new("password"));
+
+        let secret_key = AuthSecretKey::new_falcon512_rpo();
+        let commitment = secret_key.public_key().to_commitment();
+        let account_id = test_account_id(0);
+
+        ks.add_key(&secret_key, account_id).await.unwrap();
+
+        // Key should exist
+        assert!(ks.get_key(commitment).await.unwrap().is_some());
+
+        // Remove it
+        ks.remove_key(commitment).await.unwrap();
+
+        // Key should no longer exist
+        assert!(ks.get_key(commitment).await.unwrap().is_none());
+
+        // File should be gone
+        let file_path = key_file_path(&ks.keys_directory, commitment);
+        assert!(!file_path.exists());
+    }
+
+    // CLONE PRESERVES ENCRYPTION
+    // --------------------------------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn cloned_keystore_preserves_encryption() {
+        let (ks, _dir) = temp_keystore();
+        let ks = ks.with_encryption(PasswordEncryptor::new("password"));
+
+        let secret_key = AuthSecretKey::new_falcon512_rpo();
+        let commitment = secret_key.public_key().to_commitment();
+        let account_id = test_account_id(0);
+
+        ks.add_key(&secret_key, account_id).await.unwrap();
+
+        // Clone and verify it can decrypt
+        let ks_clone = ks.clone();
+        let retrieved = ks_clone.get_key(commitment).await.unwrap();
+        assert!(retrieved.is_some());
+        assert_eq!(retrieved.unwrap().to_bytes(), secret_key.to_bytes());
+    }
+
+    // DEBUG IMPL
+    // --------------------------------------------------------------------------------------------
+
+    #[test]
+    fn debug_shows_encryption_status() {
+        let (ks, _dir) = temp_keystore();
+        let debug_plain = format!("{:?}", ks);
+        assert!(debug_plain.contains("encrypted: false"));
+
+        let ks = ks.with_encryption(PasswordEncryptor::new("pw"));
+        let debug_enc = format!("{:?}", ks);
+        assert!(debug_enc.contains("encrypted: true"));
+    }
+}
