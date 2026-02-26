@@ -674,6 +674,8 @@ async fn debug_mode_outputs_logs() -> Result<()> {
     // We use the [`Client`] to create a custom note that will print the stack state and consume it
     // using the CLI to check the stdout.
     const NOTE_FILENAME: &str = "test_note.mno";
+    // SAFETY: This test is the only one modifying MIDEN_DEBUG, and integration tests
+    // run as separate processes, so there is no concurrent env access.
     unsafe {
         env::set_var("MIDEN_DEBUG", "true");
     }
@@ -753,6 +755,8 @@ async fn debug_mode_outputs_logs() -> Result<()> {
         .success()
         .stdout(contains("Stack state"));
 
+    // SAFETY: This test is the only one modifying MIDEN_DEBUG, and integration tests
+    // run as separate processes, so there is no concurrent env access.
     unsafe {
         env::remove_var("MIDEN_DEBUG");
     }
