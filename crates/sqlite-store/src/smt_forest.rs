@@ -162,3 +162,42 @@ impl AccountSmtForest {
         self.forest.pop_smts(roots.into_iter().filter(|r| *r != empty_tree_root));
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use miden_client::{EMPTY_WORD, Felt, ONE};
+
+    use super::*;
+
+    /// Inserting an EMPTY_WORD value into an empty tree via the public API is a
+    /// no-op for the tree (the root stays the empty root), but miden-crypto's
+    /// `batch_insert` registers that root in `self.roots`. Popping it would walk
+    /// and destroy the pre-populated empty hash nodes, corrupting the store.
+    ///
+    /// The `pop_roots` filter prevents this. To verify, comment out the filter
+    /// in `pop_roots` (use `self.forest.pop_smts(roots)` directly) and this
+    /// test will panic with "attempt to subtract with overflow".
+    #[test]
+    fn insert_empty_value_then_pop_roots() {
+        let mut forest = AccountSmtForest::new();
+        let empty_root = *EmptySubtreeRoots::entry(SMT_DEPTH, 0);
+        let key = Word::from([ONE; 4]);
+
+        // Insert EMPTY_WORD via the public API — a no-op for the tree, but
+        // batch_insert registers the empty root in self.roots
+        let root = forest
+            .update_storage_map_nodes(empty_root, vec![(key, EMPTY_WORD)].into_iter())
+            .unwrap();
+        assert_eq!(root, empty_root);
+
+        // With the filter in pop_roots, the empty root is skipped — no corruption
+        forest.pop_roots([root]);
+
+        // Forest still works
+        let value = Word::from([Felt::new(42); 4]);
+        let new_root = forest
+            .update_storage_map_nodes(empty_root, vec![(key, value)].into_iter())
+            .unwrap();
+        assert_ne!(new_root, empty_root);
+    }
+}
