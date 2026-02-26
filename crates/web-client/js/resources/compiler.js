@@ -34,6 +34,7 @@ export class CompilerResource {
    */
   async txScript({ code, libraries = [] }) {
     this.#client.assertNotTerminated();
+    // Ensure WASM is initialized (result unused — only #inner needs it)
     await this.#getWasm();
     const builder = this.#inner.createCodeBuilder();
     for (const lib of libraries) {

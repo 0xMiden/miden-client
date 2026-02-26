@@ -42,7 +42,7 @@ Required — used to derive a deterministic account ID.
 
 ### storage?
 
-> `optional` **storage**: `"public"` \| `"private"`
+> `optional` **storage**: [`StorageMode`](../type-aliases/StorageMode.md)
 
 Defaults to "public" (differs from wallet default of "private").
 
