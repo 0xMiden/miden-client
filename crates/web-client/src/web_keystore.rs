@@ -114,12 +114,12 @@ impl<R: Rng> WebKeyStore<R> {
                 .await
                 .map_err(|err| {
                     KeyStoreError::StorageError(format!(
-                        "failed to get item from IndexedDB: {err:?}"
+                        "failed to get item from IndexedDB: {err}"
                     ))
                 })?;
 
         let secret_key_bytes = hex::decode(secret_key_hex).map_err(|err| {
-            KeyStoreError::DecodingError(format!("error decoding secret key hex: {err:?}"))
+            KeyStoreError::DecodingError(format!("error decoding secret key hex: {err}"))
         })?;
 
         let secret_key = decode_secret_key_from_bytes(&secret_key_bytes)?;
