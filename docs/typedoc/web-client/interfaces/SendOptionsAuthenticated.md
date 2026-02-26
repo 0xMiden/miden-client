@@ -2,9 +2,9 @@
 
 ***
 
-[@miden-sdk/miden-sdk](../README.md) / SendOptions
+[@miden-sdk/miden-sdk](../README.md) / SendOptionsAuthenticated
 
-# Interface: SendOptions
+# Interface: SendOptionsAuthenticated
 
 ## Extends
 
@@ -21,6 +21,12 @@
 ### amount
 
 > **amount**: `number` \| `bigint`
+
+***
+
+### authenticated?
+
+> `optional` **authenticated**: `true`
 
 ***
 

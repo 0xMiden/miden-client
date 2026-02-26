@@ -106,17 +106,47 @@
 
 ### send()
 
-> **send**(`options`): `Promise`\<[`TransactionId`](../classes/TransactionId.md)\>
+#### Call Signature
 
-#### Parameters
+> **send**(`options`): `Promise`\<\{ `note`: `null`; `txId`: [`TransactionId`](../classes/TransactionId.md); \}\>
 
-##### options
+##### Parameters
 
-[`SendOptions`](SendOptions.md)
+###### options
 
-#### Returns
+[`SendOptionsAuthenticated`](SendOptionsAuthenticated.md)
 
-`Promise`\<[`TransactionId`](../classes/TransactionId.md)\>
+##### Returns
+
+`Promise`\<\{ `note`: `null`; `txId`: [`TransactionId`](../classes/TransactionId.md); \}\>
+
+#### Call Signature
+
+> **send**(`options`): `Promise`\<\{ `note`: [`Note`](../classes/Note.md); `txId`: [`TransactionId`](../classes/TransactionId.md); \}\>
+
+##### Parameters
+
+###### options
+
+[`SendOptionsUnauthenticated`](SendOptionsUnauthenticated.md)
+
+##### Returns
+
+`Promise`\<\{ `note`: [`Note`](../classes/Note.md); `txId`: [`TransactionId`](../classes/TransactionId.md); \}\>
+
+#### Call Signature
+
+> **send**(`options`): `Promise`\<[`SendResult`](SendResult.md)\>
+
+##### Parameters
+
+###### options
+
+[`SendOptions`](../type-aliases/SendOptions.md)
+
+##### Returns
+
+`Promise`\<[`SendResult`](SendResult.md)\>
 
 ***
 
