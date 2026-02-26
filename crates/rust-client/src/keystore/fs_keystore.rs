@@ -325,27 +325,10 @@ impl Keystore for FilesystemKeyStore {
 // HELPERS
 // ================================================================================================
 
-/// Returns the file path that belongs to the public key commitment.
-///
-/// Uses the hex representation of the public key as the filename. Falls back to legacy
-/// `DefaultHasher`-based filenames and migrates them automatically.
+/// Returns the file path that belongs to the public key commitment
 fn key_file_path(keys_directory: &Path, pub_key: PublicKeyCommitment) -> PathBuf {
-    let new_filename = Word::from(pub_key).to_hex();
-    let new_path = keys_directory.join(&new_filename);
-    if new_path.exists() {
-        return new_path;
-    }
-    // Legacy fallback: try old DefaultHasher-based filename
-    let legacy_filename = legacy_hash_pub_key(pub_key.into());
-    let legacy_path = keys_directory.join(&legacy_filename);
-    if legacy_path.exists() {
-        // Migrate: rename to new convention; fall back to legacy path if rename fails
-        if fs::rename(&legacy_path, &new_path).is_ok() {
-            return new_path;
-        }
-        return legacy_path;
-    }
-    new_path // default to new path for new keys
+    let filename = hash_pub_key(pub_key.into());
+    keys_directory.join(filename)
 }
 
 /// Writes an [`AuthSecretKey`] into a file with restrictive permissions (0600 on Unix).
@@ -374,10 +357,8 @@ fn keystore_error(context: &str) -> impl FnOnce(std::io::Error) -> KeyStoreError
     move |err| KeyStoreError::StorageError(format!("{context}: {err}"))
 }
 
-/// Legacy hash function for backward compatibility with existing key files.
-/// Uses `DefaultHasher` which was the original filename derivation method.
-/// This can be removed in a future release once all key files have been migrated.
-fn legacy_hash_pub_key(pub_key: Word) -> String {
+/// Hashes a public key to a string representation.
+fn hash_pub_key(pub_key: Word) -> String {
     let pub_key = pub_key.to_hex();
     let mut hasher = DefaultHasher::new();
     pub_key.hash(&mut hasher);

@@ -1,5 +1,4 @@
 import { getDatabase, } from "./schema.js";
-import { encryptSecretKey, decryptSecretKey } from "./crypto.js";
 import { logWebStoreError, uint8ArrayToBase64 } from "./utils.js";
 export async function getAccountIds(dbId) {
     try {
@@ -200,42 +199,17 @@ export async function getAccountVaultAssets(dbId, vaultRoot) {
 }
 export async function getAccountAuthByPubKeyCommitment(dbId, pubKeyCommitmentHex) {
     const db = getDatabase(dbId);
-    const accountAuth = await db.accountAuths
+    const accountSecretKey = await db.accountAuths
         .where("pubKeyCommitmentHex")
         .equals(pubKeyCommitmentHex)
         .first();
-    if (!accountAuth) {
+    if (!accountSecretKey) {
         throw new Error("Account auth not found in cache.");
     }
-    let secretKeyHex;
-    if (accountAuth.encryptedSecretKey && accountAuth.iv) {
-        // Decrypt the encrypted secret key
-        try {
-            secretKeyHex = await decryptSecretKey(dbId, accountAuth.encryptedSecretKey, accountAuth.iv);
-        }
-        catch {
-            // Decryption failed — the encryption key was likely lost (e.g. after a
-            // store export/import cycle). The CryptoKey is non-exportable and does
-            // not survive serialization.
-            throw new Error("Failed to decrypt account auth secret key. " +
-                "The encryption key may have been lost after a store export/import. " +
-                "The account must be re-imported from an account file.");
-        }
-    }
-    else if (accountAuth.secretKeyHex) {
-        // Legacy fallback: plaintext secret key — migrate to encrypted in place
-        secretKeyHex = accountAuth.secretKeyHex;
-        const { encrypted, iv } = await encryptSecretKey(dbId, secretKeyHex);
-        await db.accountAuths.put({
-            pubKeyCommitmentHex,
-            encryptedSecretKey: encrypted,
-            iv,
-        });
-    }
-    else {
-        throw new Error("Account auth record has no secret key data.");
-    }
-    return { secretKey: secretKeyHex };
+    const data = {
+        secretKey: accountSecretKey.secretKeyHex,
+    };
+    return data;
 }
 export async function getAccountAddresses(dbId, accountId) {
     try {
@@ -341,11 +315,9 @@ export async function upsertAccountRecord(dbId, accountId, codeRoot, storageRoot
 export async function insertAccountAuth(dbId, pubKeyCommitmentHex, secretKey) {
     try {
         const db = getDatabase(dbId);
-        const { encrypted, iv } = await encryptSecretKey(dbId, secretKey);
         const data = {
             pubKeyCommitmentHex,
-            encryptedSecretKey: encrypted,
-            iv,
+            secretKeyHex: secretKey,
         };
         await db.accountAuths.add(data);
     }

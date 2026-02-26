@@ -277,10 +277,7 @@ fn parse_partial_blockchain_peaks(forest: u32, peaks_nodes: &[u8]) -> Result<Mmr
     let mmr_peaks_nodes = Vec::<Word>::read_from_bytes(peaks_nodes)?;
 
     MmrPeaks::new(
-        Forest::new(
-            usize::try_from(forest)
-                .map_err(|_| StoreError::ParsingError("forest value exceeds usize".to_string()))?,
-        ),
+        Forest::new(usize::try_from(forest).expect("u64 should fit in usize")),
         mmr_peaks_nodes,
     )
     .map_err(StoreError::MmrError)

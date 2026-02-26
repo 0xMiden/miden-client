@@ -55,8 +55,7 @@ pub(crate) fn parse_accounts(
 
     Ok((
         AccountHeader::new(
-            AccountId::from_hex(&id)
-                .map_err(|e| StoreError::ParsingError(format!("invalid stored AccountID: {e}")))?,
+            AccountId::from_hex(&id).expect("Conversion from stored AccountID should not panic"),
             miden_client::Felt::new(nonce),
             Word::try_from(&vault_root)?,
             Word::try_from(&storage_commitment)?,
@@ -66,10 +65,6 @@ pub(crate) fn parse_accounts(
     ))
 }
 
-/// # Security
-/// The `where_clause` parameter is interpolated directly into the SQL query.
-/// Callers MUST only pass compile-time constant strings or parameterized expressions.
-/// Never pass user-controlled input as the `where_clause`.
 pub(crate) fn query_account_headers(
     conn: &Connection,
     where_clause: &str,
@@ -148,10 +143,6 @@ pub(crate) fn query_account_addresses(
         .collect::<Result<Vec<Address>, StoreError>>()
 }
 
-/// # Security
-/// The `where_clause` parameter is interpolated directly into the SQL query.
-/// Callers MUST only pass compile-time constant strings or parameterized expressions.
-/// Never pass user-controlled input as the `where_clause`.
 pub(crate) fn query_vault_assets(
     conn: &Connection,
     where_clause: &str,
@@ -175,10 +166,6 @@ pub(crate) fn query_vault_assets(
         .collect::<Result<Vec<Asset>, StoreError>>()
 }
 
-/// # Security
-/// The `where_clause` parameter is interpolated directly into the SQL query.
-/// Callers MUST only pass compile-time constant strings or parameterized expressions.
-/// Never pass user-controlled input as the `where_clause`.
 pub(crate) fn query_storage_slots(
     conn: &Connection,
     where_clause: &str,
@@ -229,10 +216,6 @@ pub(crate) fn query_storage_slots(
         .collect())
 }
 
-/// # Security
-/// The `where_clause` parameter is interpolated directly into the SQL query.
-/// Callers MUST only pass compile-time constant strings or parameterized expressions.
-/// Never pass user-controlled input as the `where_clause`.
 pub(crate) fn query_storage_maps(
     conn: &Connection,
     where_clause: &str,
@@ -267,10 +250,6 @@ pub(crate) fn query_storage_maps(
     Ok(maps)
 }
 
-/// # Security
-/// The `where_clause` parameter is interpolated directly into the SQL query.
-/// Callers MUST only pass compile-time constant strings or parameterized expressions.
-/// Never pass user-controlled input as the `where_clause`.
 pub(crate) fn query_storage_values(
     conn: &Connection,
     where_clause: &str,

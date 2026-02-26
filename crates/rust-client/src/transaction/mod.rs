@@ -75,7 +75,7 @@ use miden_protocol::transaction::AccountInputs;
 use miden_protocol::{Felt, Word};
 use miden_standards::account::interface::AccountInterfaceExt;
 use miden_tx::{DataStore, NoteConsumptionChecker, TransactionExecutor};
-use tracing::{info, warn};
+use tracing::info;
 
 use super::Client;
 use crate::ClientError;
@@ -841,14 +841,7 @@ fn validate_basic_account_request(
 pub fn notes_from_output(output_notes: &OutputNotes) -> impl Iterator<Item = &Note> {
     output_notes.iter().filter_map(|n| match n {
         OutputNote::Full(n) => Some(n),
-        OutputNote::Header(_) => {
-            warn!("Skipping non-Full output note (variant: Header)");
-            None
-        },
-        OutputNote::Partial(_) => {
-            warn!("Skipping non-Full output note (variant: Partial)");
-            None
-        },
+        OutputNote::Header(_) | OutputNote::Partial(_) => None,
     })
 }
 

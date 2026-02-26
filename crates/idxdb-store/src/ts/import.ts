@@ -25,23 +25,13 @@ async function recursivelyTransformForImport(
     case "Object":
       return Object.fromEntries(
         await Promise.all(
-          Object.entries(obj.value).map(async ([key, value]) => {
-            // Convert plain number arrays back to Uint8Array for known binary fields
-            if (
-              (key === "encryptedSecretKey" || key === "iv") &&
-              Array.isArray(value) &&
-              value.every((v) => typeof v === "number")
-            ) {
-              return [key, new Uint8Array(value)];
-            }
-            return [
-              key,
-              await recursivelyTransformForImport({
-                type: getImportType(value),
-                value,
-              }),
-            ];
-          })
+          Object.entries(obj.value).map(async ([key, value]) => [
+            key,
+            await recursivelyTransformForImport({
+              type: getImportType(value),
+              value,
+            }),
+          ])
         )
       );
     case "Primitive":
