@@ -222,23 +222,27 @@ impl FilesystemKeyStore {
             KeyStoreError::StorageError("no encryptor configured for migration".into())
         })?;
 
-        let index = self.index.read();
-        let mut migrated = 0usize;
-
-        // Collect unique file paths from the index to avoid processing duplicates
-        let mut seen_paths = BTreeSet::new();
-        for commitments in index.mappings.values() {
-            for hex in commitments {
-                if let Ok(word) = Word::try_from(hex.as_str()) {
-                    let commitment = PublicKeyCommitment::from(word);
-                    let file_path = key_file_path(&self.keys_directory, commitment);
-                    if file_path.exists() {
-                        seen_paths.insert(file_path);
+        // Collect unique file paths under the lock, then drop it before doing expensive I/O.
+        // Each Argon2id derivation takes ~100ms, so we don't want to hold the lock during
+        // encryption.
+        let seen_paths = {
+            let index = self.index.read();
+            let mut paths = BTreeSet::new();
+            for commitments in index.mappings.values() {
+                for hex in commitments {
+                    if let Ok(word) = Word::try_from(hex.as_str()) {
+                        let commitment = PublicKeyCommitment::from(word);
+                        let file_path = key_file_path(&self.keys_directory, commitment);
+                        if file_path.exists() {
+                            paths.insert(file_path);
+                        }
                     }
                 }
             }
-        }
+            paths
+        };
 
+        let mut migrated = 0usize;
         for file_path in seen_paths {
             let bytes =
                 fs::read(&file_path).map_err(keystore_error("error reading key file for migration"))?;
