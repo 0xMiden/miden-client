@@ -8,7 +8,7 @@ use comfy_table::{Attribute, Cell, ContentArrangement, Table, presets};
 use errors::CliError;
 use miden_client::account::AccountHeader;
 use miden_client::builder::ClientBuilder;
-use miden_client::keystore::{FilesystemKeyStore, Keystore};
+use miden_client::keystore::{FilesystemKeyStore, Keystore, PasswordEncryptor};
 use miden_client::note_transport::grpc::GrpcNoteTransportClient;
 use miden_client::store::{NoteFilter as ClientNoteFilter, OutputNoteRecord};
 use miden_client_sqlite_store::ClientBuilderSqliteExt;
@@ -131,9 +131,9 @@ impl CliClient {
         config: CliConfig,
         debug_mode: miden_client::DebugMode,
     ) -> Result<Self, CliError> {
-        // Create keystore
+        // Create keystore (with optional encryption from MIDEN_KEYSTORE_PASSWORD)
         let keystore =
-            CliKeyStore::new(config.secret_keys_directory.clone()).map_err(CliError::KeyStore)?;
+            create_keystore(config.secret_keys_directory.clone()).map_err(CliError::KeyStore)?;
 
         // Build client with the provided configuration
         let mut builder = ClientBuilder::new()
@@ -316,6 +316,27 @@ pub fn client_binary_name() -> OsString {
 /// stale and discarded.
 const TX_DISCARD_DELTA: u32 = 20;
 
+/// Creates a [`CliKeyStore`] with optional password-based encryption.
+///
+/// If the `MIDEN_KEYSTORE_PASSWORD` environment variable is set to a non-empty value, the
+/// keystore will encrypt secret keys at rest using that password. Otherwise, keys are stored
+/// as plaintext (existing behavior).
+fn create_keystore(
+    keys_directory: std::path::PathBuf,
+) -> Result<CliKeyStore, miden_client::keystore::KeyStoreError> {
+    let keystore = CliKeyStore::new(keys_directory)?;
+    match std::env::var("MIDEN_KEYSTORE_PASSWORD") {
+        Ok(password) if !password.is_empty() => {
+            Ok(keystore.with_encryption(PasswordEncryptor::new(password)))
+        },
+        Ok(_) | Err(std::env::VarError::NotPresent) => Ok(keystore),
+        Err(std::env::VarError::NotUnicode(_)) => {
+            tracing::warn!("MIDEN_KEYSTORE_PASSWORD contains invalid Unicode, ignoring");
+            Ok(keystore)
+        },
+    }
+}
+
 /// Root CLI struct.
 #[derive(Parser, Debug)]
 #[command(
@@ -433,9 +454,9 @@ impl Cli {
         // Load configuration
         let cli_config = CliConfig::from_system()?;
 
-        // Create keystore for commands that need it
-        let keystore = CliKeyStore::new(cli_config.secret_keys_directory.clone())
-            .map_err(CliError::KeyStore)?;
+        // Create keystore for commands that need it (with optional encryption)
+        let keystore =
+            create_keystore(cli_config.secret_keys_directory.clone()).map_err(CliError::KeyStore)?;
 
         // Create the client
         let cli_client = CliClient::from_config(cli_config, in_debug_mode).await?;
