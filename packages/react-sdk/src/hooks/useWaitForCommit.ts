@@ -42,16 +42,15 @@ export function useWaitForCommit(): UseWaitForCommitResult {
       const targetHex = normalizeHex(
         typeof txId === "string" ? txId : txId.toHex()
       );
+      const deadline = Date.now() + timeoutMs;
 
-      let waited = 0;
-
-      while (waited < timeoutMs) {
+      while (Date.now() < deadline) {
         await runExclusiveSafe(() =>
-          (client as ClientWithTransactions).syncState()
+          (client as unknown as ClientWithTransactions).syncState()
         );
 
         const records = await runExclusiveSafe(() =>
-          (client as ClientWithTransactions).getTransactions(
+          (client as unknown as ClientWithTransactions).getTransactions(
             typeof txId === "string"
               ? TransactionFilter.all()
               : TransactionFilter.ids([txId])
@@ -73,7 +72,6 @@ export function useWaitForCommit(): UseWaitForCommitResult {
         }
 
         await new Promise((resolve) => setTimeout(resolve, intervalMs));
-        waited += intervalMs;
       }
 
       throw new Error("Timeout waiting for transaction commit");

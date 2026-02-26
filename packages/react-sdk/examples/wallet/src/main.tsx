@@ -8,8 +8,8 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <MidenProvider
       config={{
-        rpcUrl: "devnet",
-        prover: "devnet",
+        rpcUrl: "testnet",
+        prover: "testnet",
       }}
     >
       <App />

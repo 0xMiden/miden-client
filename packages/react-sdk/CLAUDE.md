@@ -332,6 +332,34 @@ import { SignerContext } from "@miden-sdk/react";
 </SignerContext.Provider>
 ```
 
+### Custom Account Components
+
+Signer providers can attach custom `AccountComponent` instances to accounts
+via the `customComponents` field on `SignerAccountConfig`. This is useful for
+including application-specific logic compiled from `.masp` packages (e.g. a
+DEX component or custom smart contract) alongside the default auth and basic
+wallet components.
+
+```tsx
+import { SignerContext, type SignerAccountConfig } from "@miden-sdk/react";
+import { AccountComponent } from "@miden-sdk/miden-sdk";
+
+// Load a compiled .masp component (e.g. from your build pipeline)
+const myDexComponent: AccountComponent = await loadCompiledComponent();
+
+const accountConfig: SignerAccountConfig = {
+  publicKeyCommitment: userPublicKeyCommitment,
+  accountType: "RegularAccountUpdatableCode",
+  storageMode: myStorageMode,
+  customComponents: [myDexComponent],
+};
+```
+
+Components are appended to the `AccountBuilder` after the default basic wallet
+component and before `build()` is called, so the account always includes wallet
+functionality plus any extras you provide. The field is optional — omitting it
+or passing an empty array preserves the default behavior.
+
 ## Account ID Formats
 
 Both formats work interchangeably in all hooks:

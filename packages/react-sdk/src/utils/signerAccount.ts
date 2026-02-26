@@ -69,19 +69,35 @@ export async function initializeSignerAccount(
   const seed = config.accountSeed ?? crypto.getRandomValues(new Uint8Array(32));
   const accountType = getAccountType(config.accountType);
 
-  const builder = new AccountBuilder(seed);
-  const buildResult = builder
+  let builder = new AccountBuilder(seed)
     .withAuthComponent(
       AccountComponent.createAuthComponentFromCommitment(
         commitmentWord,
         1 // ECDSA auth scheme (K256/Keccak)
       )
     )
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- SDK type mismatch between JS wrapper AccountType and WASM enum AccountType
     .accountType(accountType as any)
     .storageMode(config.storageMode)
-    .withBasicWalletComponent()
-    .build();
+    .withBasicWalletComponent();
+
+  // Add any custom components (e.g. from compiled .masp packages)
+  if (config.customComponents?.length) {
+    for (const component of config.customComponents) {
+      if (
+        component == null ||
+        typeof (component as any).getProcedures !== "function"
+      ) {
+        throw new Error(
+          "Each entry in customComponents must be an AccountComponent instance created via " +
+            "AccountComponent.compile(), AccountComponent.fromPackage(), or AccountComponent.fromLibrary()."
+        );
+      }
+      builder = builder.withComponent(component);
+    }
+  }
+
+  const buildResult = builder.build();
 
   const account = buildResult.account;
   const accountId = account.id();

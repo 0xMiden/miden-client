@@ -170,6 +170,9 @@ class WebClient {
    *   serialized public key, and `signingInputs` is a `Uint8Array` produced by
    *   `SigningInputs.serialize()`. Must return a `Uint8Array` containing the serialized
    *   signature, either directly or wrapped in a `Promise`.
+   * @param {string | undefined} [logLevel] - Optional log verbosity level
+   *   ("error", "warn", "info", "debug", "trace", "off", or "none").
+   *   When set, Rust tracing output is routed to the browser console.
    */
   constructor(
     rpcUrl,
@@ -178,7 +181,8 @@ class WebClient {
     storeName,
     getKeyCb,
     insertKeyCb,
-    signCb
+    signCb,
+    logLevel
   ) {
     this.rpcUrl = rpcUrl;
     this.noteTransportUrl = noteTransportUrl;
@@ -187,6 +191,7 @@ class WebClient {
     this.getKeyCb = getKeyCb;
     this.insertKeyCb = insertKeyCb;
     this.signCb = signCb;
+    this.logLevel = logLevel;
 
     // Check if Web Workers are available.
     if (typeof Worker !== "undefined") {
@@ -324,6 +329,7 @@ class WebClient {
         !!this.getKeyCb,
         !!this.insertKeyCb,
         !!this.signCb,
+        this.logLevel,
       ],
     });
   }
@@ -351,11 +357,27 @@ class WebClient {
    * @param {string} noteTransportUrl - The note transport URL (optional).
    * @param {string} seed - The seed for the account.
    * @param {string | undefined} network - Optional name for the store. Setting this allows multiple clients to be used in the same browser.
+   * @param {string | undefined} logLevel - Optional log verbosity level ("error", "warn", "info", "debug", "trace", "off", or "none").
    * @returns {Promise<WebClient>} The fully initialized WebClient.
    */
-  static async createClient(rpcUrl, noteTransportUrl, seed, network) {
+  static async createClient(rpcUrl, noteTransportUrl, seed, network, logLevel) {
     // Construct the instance (synchronously).
-    const instance = new WebClient(rpcUrl, noteTransportUrl, seed, network);
+    const instance = new WebClient(
+      rpcUrl,
+      noteTransportUrl,
+      seed,
+      network,
+      undefined,
+      undefined,
+      undefined,
+      logLevel
+    );
+
+    // Set up logging on the main thread before creating the client.
+    if (logLevel) {
+      const wasm = await getWasmOrThrow();
+      wasm.setupLogging(logLevel);
+    }
 
     // Wait for the underlying wasmWebClient to be initialized.
     const wasmWebClient = await instance.getWasmWebClient();
@@ -378,6 +400,7 @@ class WebClient {
    * @param {Function | undefined} getKeyCb - The get key callback.
    * @param {Function | undefined} insertKeyCb - The insert key callback.
    * @param {Function | undefined} signCb - The sign callback.
+   * @param {string | undefined} logLevel - Optional log verbosity level ("error", "warn", "info", "debug", "trace", "off", or "none").
    * @returns {Promise<WebClient>} The fully initialized WebClient.
    */
   static async createClientWithExternalKeystore(
@@ -387,7 +410,8 @@ class WebClient {
     storeName,
     getKeyCb,
     insertKeyCb,
-    signCb
+    signCb,
+    logLevel
   ) {
     // Construct the instance (synchronously).
     const instance = new WebClient(
@@ -397,8 +421,16 @@ class WebClient {
       storeName,
       getKeyCb,
       insertKeyCb,
-      signCb
+      signCb,
+      logLevel
     );
+
+    // Set up logging on the main thread before creating the client.
+    if (logLevel) {
+      const wasm = await getWasmOrThrow();
+      wasm.setupLogging(logLevel);
+    }
+
     // Wait for the underlying wasmWebClient to be initialized.
     const wasmWebClient = await instance.getWasmWebClient();
     await wasmWebClient.createClientWithExternalKeystore(
@@ -673,14 +705,14 @@ class WebClient {
 }
 
 class MockWebClient extends WebClient {
-  constructor(seed) {
-    super(null, null, seed, "mock");
+  constructor(seed, logLevel) {
+    super(null, null, seed, "mock", undefined, undefined, undefined, logLevel);
   }
 
   initializeWorker() {
     this.worker.postMessage({
       action: WorkerAction.INIT_MOCK,
-      args: [this.seed],
+      args: [this.seed, this.logLevel],
     });
   }
 
@@ -695,10 +727,17 @@ class MockWebClient extends WebClient {
   static async createClient(
     serializedMockChain,
     serializedMockNoteTransportNode,
-    seed
+    seed,
+    logLevel
   ) {
     // Construct the instance (synchronously).
-    const instance = new MockWebClient(seed);
+    const instance = new MockWebClient(seed, logLevel);
+
+    // Set up logging on the main thread before creating the client.
+    if (logLevel) {
+      const wasm = await getWasmOrThrow();
+      wasm.setupLogging(logLevel);
+    }
 
     // Wait for the underlying wasmWebClient to be initialized.
     const wasmWebClient = await instance.getWasmWebClient();

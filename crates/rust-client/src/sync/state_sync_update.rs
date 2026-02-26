@@ -143,6 +143,15 @@ impl BlockUpdates {
         &self.block_headers
     }
 
+    /// Adds authentication nodes without an associated block header.
+    ///
+    /// This is used when a synced block is not stored (no relevant notes and not the chain tip)
+    /// but the MMR authentication nodes it produced must still be persisted so that the on-disk
+    /// state stays consistent with the in-memory `PartialMmr`.
+    pub fn extend_authentication_nodes(&mut self, nodes: Vec<(InOrderIndex, Word)>) {
+        self.new_authentication_nodes.extend(nodes);
+    }
+
     /// Returns the new authentication nodes that are meant to be stored in order to authenticate
     /// block headers.
     pub fn new_authentication_nodes(&self) -> &[(InOrderIndex, Word)] {

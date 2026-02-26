@@ -79,6 +79,7 @@
 - [GetKeyCallback](type-aliases/GetKeyCallback.md)
 - [ImportAccountInput](type-aliases/ImportAccountInput.md)
 - [InsertKeyCallback](type-aliases/InsertKeyCallback.md)
+- [LogLevel](type-aliases/LogLevel.md)
 - [MidenArrayConstructors](type-aliases/MidenArrayConstructors.md)
 - [NoteInput](type-aliases/NoteInput.md)
 - [NoteQuery](type-aliases/NoteQuery.md)
@@ -100,3 +101,4 @@
 - [createP2IDENote](functions/createP2IDENote.md)
 - [createP2IDNote](functions/createP2IDNote.md)
 - [getWasmOrThrow](functions/getWasmOrThrow.md)
+- [setupLogging](functions/setupLogging.md)

@@ -230,6 +230,7 @@ check-tools: ## Checks if development tools are installed
 	@command -v cargo nextest >/dev/null 2>&1 && echo "[OK] cargo-nextest is installed" || echo "[MISSING] cargo-nextest(make install-tools)"
 	@command -v taplo         >/dev/null 2>&1 && echo "[OK] taplo is installed"         || echo "[MISSING] taplo        (make install-tools)"
 	@command -v yarn          >/dev/null 2>&1 && echo "[OK] yarn is installed"          || echo "[MISSING] yarn         (make install-tools)"
+	@command -v wasm-opt      >/dev/null 2>&1 && echo "[OK] wasm-opt is installed"      || echo "[MISSING] wasm-opt     (brew install binaryen / apt-get install binaryen)"
 
 .PHONY: install-tools
 install-tools: ## Installs Rust + Node tools required by the Makefile
@@ -245,6 +246,15 @@ install-tools: ## Installs Rust + Node tools required by the Makefile
 	cargo install typos-cli --locked
 	cargo install cargo-nextest --locked
 	cargo install taplo-cli --locked
+	# Binaryen (wasm-opt) – needed by web-client build
+	@command -v wasm-opt >/dev/null 2>&1 && echo "wasm-opt already installed" || { \
+		echo "Installing binaryen (wasm-opt)..."; \
+		if [ "$$(uname)" = "Darwin" ]; then \
+			brew install binaryen; \
+		else \
+			sudo apt-get update && sudo apt-get install -y binaryen; \
+		fi; \
+	}
 	# Web-related
 	command -v yarn >/dev/null 2>&1 || npm install -g yarn
 	yarn --cwd $(WEB_CLIENT_DIR) --silent  # installs prettier, eslint, typedoc, etc.

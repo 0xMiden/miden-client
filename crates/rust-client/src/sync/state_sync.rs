@@ -272,6 +272,15 @@ impl StateSync {
                     new_mmr_peaks,
                     new_authentication_nodes,
                 );
+            } else {
+                // Even though this block header is not stored, `apply_mmr_changes` may
+                // produce authentication nodes for already-tracked leaves whose Merkle
+                // paths change as the MMR grows. These must be persisted so that the
+                // `PartialMmr` can be correctly reconstructed from the store after a
+                // client restart.
+                state_sync_update
+                    .block_updates
+                    .extend_authentication_nodes(new_authentication_nodes);
             }
         }
         if self.sync_nullifiers {
