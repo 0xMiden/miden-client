@@ -163,7 +163,7 @@ impl std::fmt::Debug for FilesystemKeyStore {
         f.debug_struct("FilesystemKeyStore")
             .field("keys_directory", &self.keys_directory)
             .field("encrypted", &self.encryptor.is_some())
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 
@@ -326,7 +326,7 @@ impl FilesystemKeyStore {
         let data = if let Some(encryptor) = &self.encryptor {
             encryptor.encrypt(&plaintext)?
         } else {
-            plaintext.to_vec()
+            plaintext.clone()
         };
 
         atomic_write(file_path, &data)
