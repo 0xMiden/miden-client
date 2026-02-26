@@ -84,6 +84,11 @@ pub trait Keystore: TransactionAuthenticator {
 }
 
 #[cfg(feature = "std")]
+mod encryption;
+#[cfg(feature = "std")]
+pub use encryption::{KeyEncryptor, PasswordEncryptor};
+
+#[cfg(feature = "std")]
 mod fs_keystore;
 #[cfg(feature = "std")]
 pub use fs_keystore::FilesystemKeyStore;
