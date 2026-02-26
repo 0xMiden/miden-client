@@ -106,8 +106,11 @@ impl WebStore {
             .map_err(|_| StoreError::AccountDataNotFound(delta.id()))?;
 
         if delta.is_full_state() {
-            account =
-                delta.try_into().expect("casting account from full state delta should not fail");
+            account = delta.try_into().map_err(|_| {
+                StoreError::ParsingError(
+                    "failed to cast account from full state delta".to_string(),
+                )
+            })?;
         } else {
             account.apply_delta(delta)?;
         }
