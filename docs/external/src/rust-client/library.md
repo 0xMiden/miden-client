@@ -67,6 +67,8 @@ let client = ClientBuilder::new()
 
 By default, secret keys are stored as plaintext files on disk. You can enable password-based encryption so that keys are encrypted at rest using Argon2id (key derivation) and ChaCha20-Poly1305 (authenticated encryption).
 
+> **Note:** Keystore encryption is available for native (CLI/desktop) builds only. It requires the `std` feature and applies to `FilesystemKeyStore`. In WASM/web environments, the `WebKeyStore` stores keys in IndexedDB, which is sandboxed by the browser's same-origin policy. Web applications that need additional encryption can provide custom key management callbacks via the `WebKeyStore` JS callback system.
+
 ### Using the builder
 
 The `ClientBuilder` provides a convenience method that creates an encrypted keystore in a single call:
