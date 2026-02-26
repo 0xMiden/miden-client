@@ -337,9 +337,9 @@ impl StateSync {
         let mismatched_private_accounts = account_commitment_updates
             .iter()
             .filter(|(account_id, digest)| {
-                private_accounts
-                    .iter()
-                    .any(|account| account.id() == *account_id && &account.commitment() != digest)
+                private_accounts.iter().any(|account| {
+                    account.id() == *account_id && &account.to_commitment() != digest
+                })
             })
             .copied()
             .collect::<Vec<_>>();
@@ -363,7 +363,7 @@ impl StateSync {
             // check if this updated account state is tracked by the client
             if let Some(account) = current_public_accounts
                 .iter()
-                .find(|acc| *id == acc.id() && *commitment != acc.commitment())
+                .find(|acc| *id == acc.id() && *commitment != acc.to_commitment())
             {
                 mismatched_public_accounts.push(*account);
             }

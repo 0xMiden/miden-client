@@ -525,7 +525,7 @@ impl AccountProof {
             ..
         }) = &account_details
         {
-            if account_header.commitment() != account_witness.state_commitment() {
+            if account_header.to_commitment() != account_witness.state_commitment() {
                 return Err(AccountProofError::InconsistentAccountCommitment);
             }
             if account_header.id() != account_witness.id() {

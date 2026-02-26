@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use miden_client::account::component::AccountComponent;
+use miden_client::account::component::{AccountComponent, AccountComponentMetadata};
 use miden_client::account::{
     Account,
     AccountBuilder,
@@ -436,10 +436,13 @@ fn foreign_account_with_code(
     let component_code = CodeBuilder::default()
         .compile_component_code("miden::testing::fpi_component", code)
         .context("failed to compile foreign account component code")?;
-    let get_item_component = AccountComponent::new(component_code, vec![map_slot])
-        .map_err(|err| anyhow::anyhow!(err))
-        .context("failed to create foreign account component")?
-        .with_supports_all_types();
+    let get_item_component = AccountComponent::new(
+        component_code,
+        vec![map_slot],
+        AccountComponentMetadata::new("miden::testing::fpi_component").with_supports_all_types(),
+    )
+    .map_err(|err| anyhow::anyhow!(err))
+    .context("failed to create foreign account component")?;
 
     let (key_pair, auth_component) = match auth_scheme {
         AuthSchemeId::Falcon512Rpo => {
