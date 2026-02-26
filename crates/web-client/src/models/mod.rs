@@ -74,6 +74,7 @@ pub mod note_attachment;
 pub mod note_attachment_kind;
 pub mod note_details;
 pub mod note_execution_hint;
+pub mod note_export_format;
 pub mod note_file;
 pub mod note_filter;
 pub mod note_header;
