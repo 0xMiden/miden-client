@@ -25,7 +25,7 @@ pub struct AccountStorageIdxdbObject {
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct StorageMapEntryIdxdbObject {
-    pub root: String,
+    pub slot_name: String,
     pub key: String,
     pub value: String,
 }

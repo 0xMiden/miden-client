@@ -8,6 +8,8 @@ use miden_client::utils::Serializable;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys;
 
+use crate::sync::JsAccountUpdate;
+
 // INDEXED DB BINDINGS
 // ================================================================================================
 
@@ -36,13 +38,13 @@ extern "C" {
     pub fn idxdb_get_account_code(db_id: &str, code_root: String) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = getAccountStorage)]
-    pub fn idxdb_get_account_storage(db_id: &str, storage_root: String) -> js_sys::Promise;
+    pub fn idxdb_get_account_storage(db_id: &str, account_id: String) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = getAccountStorageMaps)]
-    pub fn idxdb_get_account_storage_maps(db_id: &str, roots: Vec<String>) -> js_sys::Promise;
+    pub fn idxdb_get_account_storage_maps(db_id: &str, account_id: String) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = getAccountVaultAssets)]
-    pub fn idxdb_get_account_vault_assets(db_id: &str, vault_root: String) -> js_sys::Promise;
+    pub fn idxdb_get_account_vault_assets(db_id: &str, account_id: String) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = getAccountAuthByPubKeyCommitment)]
     pub fn idxdb_get_account_auth_by_pub_key_commitment(
@@ -66,17 +68,26 @@ extern "C" {
     #[wasm_bindgen(js_name = upsertAccountStorage)]
     pub fn idxdb_upsert_account_storage(
         db_id: &str,
+        account_id: String,
+        nonce: String,
         storage_slots: Vec<JsStorageSlot>,
     ) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = upsertStorageMapEntries)]
     pub fn idxdb_upsert_storage_map_entries(
         db_id: &str,
+        account_id: String,
+        nonce: String,
         entries: Vec<JsStorageMapEntry>,
     ) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = upsertVaultAssets)]
-    pub fn idxdb_upsert_vault_assets(db_id: &str, assets: Vec<JsVaultAsset>) -> js_sys::Promise;
+    pub fn idxdb_upsert_vault_assets(
+        db_id: &str,
+        account_id: String,
+        nonce: String,
+        assets: Vec<JsVaultAsset>,
+    ) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = upsertAccountRecord)]
     pub fn idxdb_upsert_account_record(
@@ -113,6 +124,31 @@ extern "C" {
     pub fn idxdb_get_foreign_account_code(db_id: &str, account_ids: Vec<String>)
     -> js_sys::Promise;
 
+    // TRANSACTIONAL WRITES
+    // --------------------------------------------------------------------------------------------
+
+    #[wasm_bindgen(js_name = applyTransactionDelta)]
+    pub fn idxdb_apply_transaction_delta(
+        db_id: &str,
+        account_id: String,
+        nonce: String,
+        updated_slots: Vec<JsStorageSlot>,
+        changed_map_entries: Vec<JsStorageMapEntry>,
+        changed_assets: Vec<JsVaultAsset>,
+        code_root: String,
+        storage_root: String,
+        vault_root: String,
+        committed: bool,
+        commitment: String,
+        account_seed: Option<Vec<u8>>,
+    ) -> js_sys::Promise;
+
+    #[wasm_bindgen(js_name = applyFullAccountState)]
+    pub fn idxdb_apply_full_account_state(
+        db_id: &str,
+        account_state: JsAccountUpdate,
+    ) -> js_sys::Promise;
+
     // UPDATES
     // --------------------------------------------------------------------------------------------
 
@@ -129,13 +165,10 @@ extern "C" {
 // VAULT ASSET
 // ================================================================================================
 
-/// An object that contains a serialized vault asset
+/// An object that contains a serialized vault asset.
 #[wasm_bindgen(getter_with_clone, inspectable)]
 #[derive(Clone)]
 pub struct JsVaultAsset {
-    /// The merkle root of the vault's assets.
-    #[wasm_bindgen(js_name = "root")]
-    pub root: String,
     /// The vault key associated with the asset.
     #[wasm_bindgen(js_name = "vaultKey")]
     pub vault_key: String,
@@ -148,9 +181,8 @@ pub struct JsVaultAsset {
 }
 
 impl JsVaultAsset {
-    pub fn from_asset(asset: &Asset, vault_root: Word) -> Self {
+    pub fn from_asset(asset: &Asset) -> Self {
         Self {
-            root: vault_root.to_hex(),
             vault_key: Word::from(asset.vault_key()).to_hex(),
             faucet_id_prefix: asset.faucet_id_prefix().to_hex(),
             asset: Word::from(asset).to_hex(),
@@ -165,9 +197,6 @@ impl JsVaultAsset {
 #[wasm_bindgen(getter_with_clone, inspectable)]
 #[derive(Clone)]
 pub struct JsStorageSlot {
-    /// Commitment of the whole account storage
-    #[wasm_bindgen(js_name = "commitment")]
-    pub commitment: String,
     /// The name of the storage slot.
     #[wasm_bindgen(js_name = "slotName")]
     pub slot_name: String,
@@ -180,9 +209,8 @@ pub struct JsStorageSlot {
 }
 
 impl JsStorageSlot {
-    pub fn from_slot(slot: &StorageSlot, storage_commitment: Word) -> Self {
+    pub fn from_slot(slot: &StorageSlot) -> Self {
         Self {
-            commitment: storage_commitment.to_hex(),
             slot_name: slot.name().to_string(),
             slot_value: slot.value().to_hex(),
             slot_type: slot.slot_type().to_bytes()[0],
@@ -197,9 +225,9 @@ impl JsStorageSlot {
 #[wasm_bindgen(getter_with_clone, inspectable)]
 #[derive(Clone)]
 pub struct JsStorageMapEntry {
-    /// The root of the storage map entry.
-    #[wasm_bindgen(js_name = "root")]
-    pub root: String,
+    /// The slot name of the map this entry belongs to.
+    #[wasm_bindgen(js_name = "slotName")]
+    pub slot_name: String,
     /// The key of the storage map entry.
     #[wasm_bindgen(js_name = "key")]
     pub key: String,
@@ -209,10 +237,10 @@ pub struct JsStorageMapEntry {
 }
 
 impl JsStorageMapEntry {
-    pub fn from_map(map: &StorageMap) -> Vec<Self> {
+    pub fn from_map(map: &StorageMap, slot_name: &str) -> Vec<Self> {
         map.entries()
             .map(|(key, value)| Self {
-                root: map.root().to_hex(),
+                slot_name: slot_name.to_string(),
                 key: key.to_hex(),
                 value: value.to_hex(),
             })
