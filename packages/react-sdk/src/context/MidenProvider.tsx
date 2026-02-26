@@ -189,6 +189,32 @@ export function MidenProvider({
             if (cancelled) return;
             setSignerAccountId(accountId);
             didSignerInit = true;
+          } else if (resolvedConfig.passkeyEncryption) {
+            // Passkey encryption mode — local keystore with encrypted keys
+            const { createPasskeyKeystore } = await import(
+              "@miden-sdk/miden-sdk"
+            );
+            const passkeyOpts =
+              typeof resolvedConfig.passkeyEncryption === "object"
+                ? resolvedConfig.passkeyEncryption
+                : {};
+            const storeName = resolvedConfig.storeName || "default";
+            const keystore = await createPasskeyKeystore(
+              storeName,
+              passkeyOpts
+            );
+            if (cancelled) return;
+
+            webClient = await WebClient.createClientWithExternalKeystore(
+              resolvedConfig.rpcUrl,
+              resolvedConfig.noteTransportUrl,
+              resolvedConfig.seed,
+              storeName,
+              keystore.getKey,
+              keystore.insertKey,
+              undefined // sign — Rust signs locally using getKey
+            );
+            if (cancelled) return;
           } else {
             // No signer provider - standard local keystore (existing behavior)
             const seed = resolvedConfig.seed as Parameters<
