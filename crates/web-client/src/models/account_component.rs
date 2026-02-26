@@ -85,6 +85,10 @@ impl AccountComponent {
     }
 
     /// Returns the hex-encoded MAST root for a procedure by name.
+    ///
+    /// Matches by full path, relative path, or local name (after the last `::`).
+    /// When matching by local name, if multiple procedures share the same local
+    /// name across modules, the first match is returned.
     #[wasm_bindgen(js_name = "getProcedureHash")]
     pub fn get_procedure_hash(&self, procedure_name: &str) -> Result<String, JsValue> {
         let library = self.0.component_code().as_library();

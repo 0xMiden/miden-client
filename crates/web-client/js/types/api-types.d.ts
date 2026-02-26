@@ -196,7 +196,7 @@ export type NoteInput = string | NoteId | Note | InputNoteRecord;
 export interface ContractCreateOptions {
   type: "ImmutableContract" | "MutableContract";
   /** Defaults to "public" (differs from wallet default of "private"). */
-  storage?: "private" | "public";
+  storage?: "private" | "public" | "network";
   /** Required — used to derive a deterministic account ID. */
   seed: Uint8Array;
   /**

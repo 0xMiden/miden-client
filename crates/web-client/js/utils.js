@@ -160,8 +160,13 @@ export function resolveNoteIdHex(input) {
   if (typeof input === "string") {
     return input;
   }
-  // NoteId WASM object — toString() returns hex
-  if (input.constructor?.name === "NoteId") {
+  // NoteId WASM object — has toString() but not id() (unlike InputNoteRecord/Note).
+  // Check for constructor.fromHex to distinguish from plain objects (which also inherit toString).
+  if (
+    typeof input.toString === "function" &&
+    typeof input.id !== "function" &&
+    input.constructor?.fromHex !== undefined
+  ) {
     return input.toString();
   }
   // InputNoteRecord, Note, or other object with id() returning NoteId

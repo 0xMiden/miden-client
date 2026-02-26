@@ -50,6 +50,11 @@ export class AccountsResource {
   }
 
   async #createContract(opts, wasm) {
+    if (!opts.seed)
+      throw new Error("Contract creation requires a 'seed' (Uint8Array)");
+    if (!opts.auth)
+      throw new Error("Contract creation requires an 'auth' (AuthSecretKey)");
+
     const mutable = opts.type === "MutableContract";
     const accountTypeEnum = mutable
       ? wasm.AccountType.RegularAccountUpdatableCode
@@ -69,13 +74,23 @@ export class AccountsResource {
 
     const built = builder.build();
     const account = built.account;
+    const accountId = account.id();
 
-    await this.#inner.addAccountSecretKeyToWebStore(account.id(), opts.auth);
-    await this.#inner.newAccount(account, false);
-    return await this.#inner.getAccount(account.id());
+    await this.#inner.addAccountSecretKeyToWebStore(accountId, opts.auth);
+    try {
+      await this.#inner.newAccount(account, false);
+    } catch (err) {
+      throw new Error(
+        `Contract account creation failed after storing secret key for ${accountId.toString()}. ` +
+          `The secret key was stored but the account was not. ` +
+          `Original error: ${err?.message ?? err}`
+      );
+    }
+    return await this.#inner.getAccount(accountId);
   }
 
   async getOrImport(ref) {
+    this.#client.assertNotTerminated();
     return (await this.get(ref)) ?? (await this.import(ref));
   }
 
@@ -122,6 +137,15 @@ export class AccountsResource {
   async import(input) {
     this.#client.assertNotTerminated();
     const wasm = await this.#getWasm();
+
+    // Early exit for string, Account, and AccountHeader types before property
+    // checks, preventing misrouting if a WASM object ever gains a .file or .seed
+    // property. Bare AccountId (no .id() method) falls through to the fallback.
+    if (typeof input === "string" || typeof input.id === "function") {
+      const id = resolveAccountRef(input, wasm);
+      await this.#inner.importAccountById(id);
+      return await this.#inner.getAccount(id);
+    }
 
     if (input.file) {
       // Extract accountId before importAccountFile — WASM consumes the

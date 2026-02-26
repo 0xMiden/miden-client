@@ -172,6 +172,8 @@ export class TransactionsResource {
 
     if (opts.foreignAccounts?.length) {
       const accounts = opts.foreignAccounts.map((fa) => {
+        // Distinguish { id: AccountRef, storage? } wrapper objects from WASM types
+        // (Account/AccountHeader expose .id() as a method, wrappers have .id as a property)
         const isWrapper =
           fa !== null &&
           typeof fa === "object" &&
@@ -383,8 +385,15 @@ export class TransactionsResource {
     if (input && typeof input.toNote === "function") {
       return input.toNote();
     }
-    // NoteId — look up the note by its hex ID
-    if (input && input.constructor?.name === "NoteId") {
+    // NoteId — has toString() but not toNote() or id() (unlike InputNoteRecord/Note).
+    // Check for constructor.fromHex to distinguish from plain objects.
+    if (
+      input &&
+      typeof input.toString === "function" &&
+      typeof input.toNote !== "function" &&
+      typeof input.id !== "function" &&
+      input.constructor?.fromHex !== undefined
+    ) {
       const hex = input.toString();
       const record = await this.#inner.getInputNote(hex);
       if (!record) {
