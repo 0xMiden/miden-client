@@ -72,9 +72,9 @@ test.describe("compile.component()", () => {
 
     expect(result.hasGetCount).toBe(true);
     expect(result.hasIncrement).toBe(true);
-    // A Word rendered as hex is 64 hex chars (32 bytes)
-    expect(result.getCountHashLen).toBe(64);
-    expect(result.incrementHashLen).toBe(64);
+    // A Word rendered as hex is 66 hex chars (32 bytes + "0x" prefix)
+    expect(result.getCountHashLen).toBe(66);
+    expect(result.incrementHashLen).toBe(66);
   });
 
   test("withSupportsAllTypes() is applied — component works in a contract", async ({
