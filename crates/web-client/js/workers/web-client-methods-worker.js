@@ -461,7 +461,8 @@ self.onmessage = (event) => {
     pendingCallbacks.has(event.data.callbackRequestId)
   ) {
     const { callbackRequestId, callbackResult, callbackError } = event.data;
-    const { resolve, reject, timeoutId } = pendingCallbacks.get(callbackRequestId);
+    const { resolve, reject, timeoutId } =
+      pendingCallbacks.get(callbackRequestId);
     clearTimeout(timeoutId);
     pendingCallbacks.delete(callbackRequestId);
     if (!callbackError) {
