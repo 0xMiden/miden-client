@@ -81,11 +81,7 @@ impl AuthSecretKey {
     pub fn get_rpo_falcon_512_secret_key_as_felts(&self) -> Result<Vec<Felt>, JsValue> {
         let secret_key_as_bytes = match &self.0 {
             NativeAuthSecretKey::Falcon512Rpo(key) => key.to_bytes(),
-            _ => {
-                return Err(JsValue::from_str(
-                    "Key is not an RPO Falcon 512 key",
-                ))
-            },
+            _ => return Err(JsValue::from_str("Key is not an RPO Falcon 512 key")),
         };
 
         let secret_key_as_native_felts = secret_key_as_bytes
@@ -101,11 +97,7 @@ impl AuthSecretKey {
     pub fn get_ecdsa_k256_keccak_secret_key_as_felts(&self) -> Result<Vec<Felt>, JsValue> {
         let secret_key_as_bytes = match &self.0 {
             NativeAuthSecretKey::EcdsaK256Keccak(key) => key.to_bytes(),
-            _ => {
-                return Err(JsValue::from_str(
-                    "Key is not an ECDSA K256 Keccak key",
-                ))
-            },
+            _ => return Err(JsValue::from_str("Key is not an ECDSA K256 Keccak key")),
         };
 
         let secret_key_as_native_felts = secret_key_as_bytes

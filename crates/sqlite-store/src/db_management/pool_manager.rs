@@ -47,10 +47,7 @@ impl SqlitePoolManager {
                 if path.exists()
                     && let Err(e) = std::fs::set_permissions(&path, perms.clone())
                 {
-                    eprintln!(
-                        "Warning: failed to set permissions on {}: {e}",
-                        path.display()
-                    );
+                    eprintln!("Warning: failed to set permissions on {}: {e}", path.display());
                 }
             }
         }

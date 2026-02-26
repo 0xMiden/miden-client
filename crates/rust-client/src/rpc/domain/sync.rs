@@ -96,7 +96,9 @@ impl TryFrom<proto::rpc::SyncStateResponse> for StateSyncInfo {
             let committed_note = super::note::CommittedNote::new(
                 note_id,
                 u16::try_from(note.note_index_in_block).map_err(|_| {
-                    RpcConversionError::InvalidField("note_index_in_block value out of u16 range".into())
+                    RpcConversionError::InvalidField(
+                        "note_index_in_block value out of u16 range".into(),
+                    )
                 })?,
                 inclusion_path,
                 metadata,

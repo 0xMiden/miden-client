@@ -22,10 +22,7 @@ fn validate_file_path(path: &Path) -> Result<PathBuf, CliError> {
     // so we canonicalize the parent (if present) to give a useful error message.
     let resolved = if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
         let canonical_parent = parent.canonicalize().map_err(|_| {
-            CliError::Export(format!(
-                "Parent directory does not exist: {}",
-                parent.display()
-            ))
+            CliError::Export(format!("Parent directory does not exist: {}", parent.display()))
         })?;
         canonical_parent.join(path.file_name().unwrap_or_default())
     } else {

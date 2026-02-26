@@ -55,9 +55,8 @@ pub(crate) fn parse_accounts(
 
     Ok((
         AccountHeader::new(
-            AccountId::from_hex(&id).map_err(|e| {
-                StoreError::ParsingError(format!("invalid stored AccountID: {e}"))
-            })?,
+            AccountId::from_hex(&id)
+                .map_err(|e| StoreError::ParsingError(format!("invalid stored AccountID: {e}")))?,
             miden_client::Felt::new(nonce),
             Word::try_from(&vault_root)?,
             Word::try_from(&storage_commitment)?,
