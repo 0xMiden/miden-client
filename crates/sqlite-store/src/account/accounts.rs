@@ -471,6 +471,21 @@ impl SqliteStore {
         tx.commit().into_store_error()
     }
 
+    /// Upserts the foreign account code within an existing transaction.
+    pub(crate) fn upsert_foreign_account_code_tx(
+        tx: &Transaction<'_>,
+        account_id: AccountId,
+        code: &AccountCode,
+    ) -> Result<(), StoreError> {
+        const QUERY: &str =
+            insert_sql!(foreign_account_code { account_id, code_commitment } | REPLACE);
+
+        tx.execute(QUERY, params![account_id.to_hex(), code.commitment().to_string()])
+            .into_store_error()?;
+
+        Ok(())
+    }
+
     pub(crate) fn insert_address(
         tx: &Transaction<'_>,
         address: &Address,

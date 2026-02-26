@@ -45,6 +45,7 @@ use miden_client::store::{
     Store,
     StoreError,
     TransactionFilter,
+    WatchedAccountRecord,
 };
 use miden_client::sync::{NoteTagRecord, StateSyncUpdate};
 use miden_client::transaction::{TransactionRecord, TransactionStoreUpdate};
@@ -493,6 +494,38 @@ impl Store for SqliteStore {
     ) -> Result<Option<AccountRecord>, StoreError> {
         self.interact_with_connection(move |conn| {
             SqliteStore::get_minimal_partial_account(conn, account_id)
+        })
+        .await
+    }
+
+    async fn get_watched_accounts(&self) -> Result<Vec<WatchedAccountRecord>, StoreError> {
+        self.interact_with_connection(SqliteStore::get_watched_accounts).await
+    }
+
+    async fn get_watched_account(
+        &self,
+        account_id: AccountId,
+    ) -> Result<Option<WatchedAccountRecord>, StoreError> {
+        self.interact_with_connection(move |conn| {
+            SqliteStore::get_watched_account(conn, account_id)
+        })
+        .await
+    }
+
+    async fn upsert_watched_account(
+        &self,
+        record: &WatchedAccountRecord,
+    ) -> Result<(), StoreError> {
+        let record = record.clone();
+        self.interact_with_connection(move |conn| {
+            SqliteStore::upsert_watched_account(conn, &record)
+        })
+        .await
+    }
+
+    async fn remove_watched_account(&self, account_id: AccountId) -> Result<(), StoreError> {
+        self.interact_with_connection(move |conn| {
+            SqliteStore::remove_watched_account(conn, account_id)
         })
         .await
     }

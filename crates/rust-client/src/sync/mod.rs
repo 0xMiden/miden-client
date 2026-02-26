@@ -158,7 +158,7 @@ where
     /// Builds a default [`StateSyncInput`] from the current client state.
     ///
     /// This includes all tracked account headers, all unique note tags, all unspent input and
-    /// output notes, and all uncommitted transactions.
+    /// output notes, all uncommitted transactions, and all watched accounts.
     pub async fn build_sync_input(&self) -> Result<StateSyncInput, ClientError> {
         let accounts = self
             .store
@@ -167,6 +167,8 @@ where
             .into_iter()
             .map(|(acc_header, _)| acc_header)
             .collect();
+
+        let watched_accounts = self.store.get_watched_accounts().await?;
 
         let note_tags = self.store.get_unique_note_tags().await?;
 
@@ -178,6 +180,7 @@ where
 
         Ok(StateSyncInput {
             accounts,
+            watched_accounts,
             note_tags,
             input_notes,
             output_notes,
@@ -230,6 +233,8 @@ pub struct SyncSummary {
     pub locked_accounts: Vec<AccountId>,
     /// IDs of committed transactions.
     pub committed_transactions: Vec<TransactionId>,
+    /// IDs of watched accounts that have been updated.
+    pub updated_watched_accounts: Vec<AccountId>,
 }
 
 impl SyncSummary {
@@ -241,6 +246,7 @@ impl SyncSummary {
         updated_accounts: Vec<AccountId>,
         locked_accounts: Vec<AccountId>,
         committed_transactions: Vec<TransactionId>,
+        updated_watched_accounts: Vec<AccountId>,
     ) -> Self {
         Self {
             block_num,
@@ -250,6 +256,7 @@ impl SyncSummary {
             updated_accounts,
             locked_accounts,
             committed_transactions,
+            updated_watched_accounts,
         }
     }
 
@@ -262,6 +269,7 @@ impl SyncSummary {
             updated_accounts: vec![],
             locked_accounts: vec![],
             committed_transactions: vec![],
+            updated_watched_accounts: vec![],
         }
     }
 
@@ -272,6 +280,7 @@ impl SyncSummary {
             && self.updated_accounts.is_empty()
             && self.locked_accounts.is_empty()
             && self.committed_transactions.is_empty()
+            && self.updated_watched_accounts.is_empty()
     }
 
     pub fn combine_with(&mut self, mut other: Self) {
@@ -282,6 +291,7 @@ impl SyncSummary {
         self.updated_accounts.append(&mut other.updated_accounts);
         self.locked_accounts.append(&mut other.locked_accounts);
         self.committed_transactions.append(&mut other.committed_transactions);
+        self.updated_watched_accounts.append(&mut other.updated_watched_accounts);
     }
 }
 
@@ -294,6 +304,7 @@ impl Serializable for SyncSummary {
         self.updated_accounts.write_into(target);
         self.locked_accounts.write_into(target);
         self.committed_transactions.write_into(target);
+        self.updated_watched_accounts.write_into(target);
     }
 }
 
@@ -308,6 +319,7 @@ impl Deserializable for SyncSummary {
         let updated_accounts = Vec::<AccountId>::read_from(source)?;
         let locked_accounts = Vec::<AccountId>::read_from(source)?;
         let committed_transactions = Vec::<TransactionId>::read_from(source)?;
+        let updated_watched_accounts = Vec::<AccountId>::read_from(source)?;
 
         Ok(Self {
             block_num,
@@ -317,6 +329,7 @@ impl Deserializable for SyncSummary {
             updated_accounts,
             locked_accounts,
             committed_transactions,
+            updated_watched_accounts,
         })
     }
 }

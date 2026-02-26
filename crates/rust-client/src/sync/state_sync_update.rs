@@ -12,6 +12,7 @@ use super::SyncSummary;
 use crate::account::Account;
 use crate::note::{NoteUpdateTracker, NoteUpdateType};
 use crate::rpc::domain::transaction::TransactionInclusion;
+use crate::store::WatchedAccountRecord;
 use crate::transaction::{DiscardCause, TransactionRecord, TransactionStatus};
 
 // STATE SYNC UPDATE
@@ -92,6 +93,12 @@ impl From<&StateSyncUpdate> for SyncSummary {
                 .map(|(id, _)| *id)
                 .collect(),
             value.transaction_updates.committed_transactions().map(|t| t.id).collect(),
+            value
+                .account_updates
+                .updated_watched_accounts()
+                .iter()
+                .map(|r| r.account_id)
+                .collect(),
         )
     }
 }
@@ -286,6 +293,7 @@ impl TransactionUpdateTracker {
 
 /// Contains account changes to apply to the store after a sync request.
 #[derive(Debug, Clone, Default)]
+#[allow(clippy::struct_field_names)]
 pub struct AccountUpdates {
     /// Updated public accounts.
     updated_public_accounts: Vec<Account>,
@@ -296,6 +304,8 @@ pub struct AccountUpdates {
     /// hasn't been committed). If this is not the case, the account may be locked until the state
     /// is restored manually.
     mismatched_private_accounts: Vec<(AccountId, Word)>,
+    /// Watched (foreign) accounts whose state was updated on the network.
+    pub(crate) updated_watched_accounts: Vec<WatchedAccountRecord>,
 }
 
 impl AccountUpdates {
@@ -307,6 +317,7 @@ impl AccountUpdates {
         Self {
             updated_public_accounts,
             mismatched_private_accounts,
+            updated_watched_accounts: vec![],
         }
     }
 
@@ -320,8 +331,14 @@ impl AccountUpdates {
         &self.mismatched_private_accounts
     }
 
+    /// Returns the updated watched accounts.
+    pub fn updated_watched_accounts(&self) -> &[WatchedAccountRecord] {
+        &self.updated_watched_accounts
+    }
+
     pub fn extend(&mut self, other: AccountUpdates) {
         self.updated_public_accounts.extend(other.updated_public_accounts);
         self.mismatched_private_accounts.extend(other.mismatched_private_accounts);
+        self.updated_watched_accounts.extend(other.updated_watched_accounts);
     }
 }

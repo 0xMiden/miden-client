@@ -78,9 +78,10 @@ use miden_standards::account::wallets::BasicWallet;
 use super::Client;
 use crate::auth::AuthSchemeId;
 use crate::errors::ClientError;
-use crate::rpc::domain::account::FetchedAccount;
+use crate::rpc::domain::account::{AccountStorageRequirements, FetchedAccount};
 use crate::rpc::node::{EndpointError, GetAccountError};
-use crate::store::{AccountStatus, AccountStorageFilter};
+use crate::rpc::AccountStateAt;
+use crate::store::{AccountStatus, AccountStorageFilter, WatchedAccountRecord};
 use crate::sync::NoteTagRecord;
 
 pub mod component {
@@ -294,6 +295,79 @@ impl<AUTH> Client<AUTH> {
     ) -> Result<(), ClientError> {
         self.store.remove_address(address, account_id).await?;
         Ok(())
+    }
+
+    // WATCHED ACCOUNTS
+    // --------------------------------------------------------------------------------------------
+
+    /// Watches a public account, fetching its current state from the network.
+    ///
+    /// Watched accounts are synced during `sync_state()` — when the node reports a commitment
+    /// change, the client fetches the updated state.
+    ///
+    /// # Errors
+    ///
+    /// - If the account is private.
+    /// - If the account is already owned (tracked) by the client.
+    /// - If the account is not found on the network.
+    pub async fn watch_account(&mut self, account_id: AccountId) -> Result<(), ClientError> {
+        if account_id.is_private() {
+            return Err(ClientError::AccountIsPrivate(account_id));
+        }
+
+        // Verify the account is not already owned
+        if self.store.get_account_header(account_id).await?.is_some() {
+            return Err(ClientError::AccountAlreadyTracked(account_id));
+        }
+
+        // Fetch the current state from the network
+        let (_block_num, proof) = self
+            .rpc_api
+            .get_account_proof(
+                account_id,
+                AccountStorageRequirements::default(),
+                AccountStateAt::ChainTip,
+                None,
+            )
+            .await?;
+
+        let details = proof
+            .into_parts()
+            .1
+            .ok_or(ClientError::AccountNotFoundOnChain(account_id))?;
+
+        let sync_height = self.store.get_sync_height().await?;
+
+        let record = WatchedAccountRecord {
+            account_id,
+            header: details.header,
+            code: details.code.clone(),
+            storage_header: details.storage_details.header,
+            last_synced_block: sync_height,
+        };
+
+        self.store.upsert_watched_account(&record).await?;
+
+        // Also cache the code for lazy FPI
+        let _ = self
+            .store
+            .upsert_foreign_account_code(account_id, details.code)
+            .await;
+
+        Ok(())
+    }
+
+    /// Stops watching a previously watched account.
+    pub async fn unwatch_account(&mut self, account_id: AccountId) -> Result<(), ClientError> {
+        self.store.remove_watched_account(account_id).await?;
+        Ok(())
+    }
+
+    /// Returns all watched account records.
+    pub async fn get_watched_accounts(
+        &self,
+    ) -> Result<Vec<WatchedAccountRecord>, ClientError> {
+        self.store.get_watched_accounts().await.map_err(ClientError::StoreError)
     }
 
     // ACCOUNT DATA RETRIEVAL

@@ -64,7 +64,9 @@ mod errors;
 pub use errors::*;
 
 mod account;
-pub use account::{AccountRecord, AccountRecordData, AccountStatus, AccountUpdates};
+pub use account::{
+    AccountRecord, AccountRecordData, AccountStatus, AccountUpdates, WatchedAccountRecord,
+};
 mod note_record;
 pub use note_record::{
     InputNoteRecord,
@@ -567,6 +569,27 @@ pub trait Store: Send + Sync {
         &self,
         account_id: AccountId,
     ) -> Result<Option<AccountRecord>, StoreError>;
+
+    // WATCHED ACCOUNTS
+    // --------------------------------------------------------------------------------------------
+
+    /// Returns all watched (foreign) account records.
+    async fn get_watched_accounts(&self) -> Result<Vec<WatchedAccountRecord>, StoreError>;
+
+    /// Returns a watched account by ID, or `None` if not watched.
+    async fn get_watched_account(
+        &self,
+        account_id: AccountId,
+    ) -> Result<Option<WatchedAccountRecord>, StoreError>;
+
+    /// Inserts or updates a watched account record.
+    async fn upsert_watched_account(
+        &self,
+        record: &WatchedAccountRecord,
+    ) -> Result<(), StoreError>;
+
+    /// Removes a watched account.
+    async fn remove_watched_account(&self, account_id: AccountId) -> Result<(), StoreError>;
 }
 
 // PARTIAL BLOCKCHAIN NODE FILTER

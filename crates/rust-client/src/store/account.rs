@@ -3,7 +3,10 @@
 use alloc::vec::Vec;
 use core::fmt::Display;
 
-use miden_protocol::account::{Account, AccountId, PartialAccount};
+use miden_protocol::account::{
+    Account, AccountCode, AccountHeader, AccountId, AccountStorageHeader, PartialAccount,
+};
+use miden_protocol::block::BlockNumber;
 use miden_protocol::{Felt, Word};
 
 use crate::ClientError;
@@ -170,4 +173,25 @@ impl AccountUpdates {
     pub fn mismatched_private_accounts(&self) -> &[(AccountId, Word)] {
         &self.mismatched_private_accounts
     }
+}
+
+// WATCHED ACCOUNT RECORD
+// ================================================================================================
+
+/// A public account the client watches but does not own.
+///
+/// Watched accounts participate in `sync_state()` — the node reports their commitment changes —
+/// and their state is fetched via `get_account_proof` when a change is detected.
+#[derive(Debug, Clone)]
+pub struct WatchedAccountRecord {
+    /// Account ID (must be a public account).
+    pub account_id: AccountId,
+    /// Last known account header from the network.
+    pub header: AccountHeader,
+    /// Account code.
+    pub code: AccountCode,
+    /// Storage header (slot metadata and top-level values/roots).
+    pub storage_header: AccountStorageHeader,
+    /// Block number up to which this account has been synced.
+    pub last_synced_block: BlockNumber,
 }

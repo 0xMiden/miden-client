@@ -12,6 +12,7 @@ use miden_client::utils::{Deserializable, Serializable};
 use rusqlite::{Connection, Transaction, params};
 
 use super::SqliteStore;
+use crate::account::watched::upsert_watched_account_tx;
 use crate::note::apply_note_updates_tx;
 use crate::smt_forest::AccountSmtForest;
 use crate::sql_error::SqlResultExt;
@@ -180,6 +181,14 @@ impl SqliteStore {
 
         for (account_id, digest) in account_updates.mismatched_private_accounts() {
             Self::lock_account_on_unexpected_commitment(&tx, account_id, digest)?;
+        }
+
+        // Update watched accounts
+        for record in account_updates.updated_watched_accounts() {
+            upsert_watched_account_tx(&tx, record)?;
+            // Also update foreign_account_code cache
+            Self::insert_account_code(&tx, &record.code)?;
+            Self::upsert_foreign_account_code_tx(&tx, record.account_id, &record.code)?;
         }
 
         // Commit the updates
