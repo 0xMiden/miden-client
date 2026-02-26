@@ -55,6 +55,20 @@ export function midenVitePlugin(options?: MidenVitePluginOptions): Plugin {
       }
 
       if (rpcProxyTarget !== false && env.command === "serve") {
+        // Validate proxy target is a valid URL
+        let targetUrl: URL;
+        try {
+          targetUrl = new URL(
+            typeof rpcProxyTarget === "string" ? rpcProxyTarget : ""
+          );
+        } catch {
+          throw new Error(`Invalid rpcProxyTarget URL: ${rpcProxyTarget}`);
+        }
+        if (targetUrl.protocol !== "https:") {
+          console.warn(
+            `[miden-vite-plugin] Warning: rpcProxyTarget uses ${targetUrl.protocol} instead of https:`
+          );
+        }
         serverConfig.proxy = {
           [rpcProxyPath]: {
             target: rpcProxyTarget,
