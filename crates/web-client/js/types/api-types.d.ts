@@ -24,6 +24,11 @@ import type {
   Note,
   OutputNote,
   NoteExportFormat,
+  StorageSlot,
+  AccountComponent,
+  AuthSecretKey,
+  AccountStorageRequirements,
+  TransactionScript,
 } from "./crates/miden_client_web";
 
 // Import the full namespace for the MidenArrayConstructors type
@@ -74,6 +79,36 @@ export declare const AuthScheme: {
 export type AuthSchemeType = (typeof AuthScheme)[keyof typeof AuthScheme];
 
 /**
+ * User-friendly note visibility constants for MidenClient options.
+ * Use `NoteVisibility.Public` or `NoteVisibility.Private` instead of raw strings.
+ */
+export declare const NoteVisibility: {
+  readonly Public: "public";
+  readonly Private: "private";
+};
+
+/**
+ * Union of all values in the NoteVisibility const.
+ */
+export type NoteVisibility =
+  (typeof NoteVisibility)[keyof typeof NoteVisibility];
+
+/**
+ * User-friendly storage mode constants for MidenClient options.
+ * Use `StorageMode.Public`, `StorageMode.Private`, or `StorageMode.Network` instead of raw strings.
+ */
+export declare const StorageMode: {
+  readonly Public: "public";
+  readonly Private: "private";
+  readonly Network: "network";
+};
+
+/**
+ * Union of all values in the StorageMode const.
+ */
+export type StorageMode = (typeof StorageMode)[keyof typeof StorageMode];
+
+/**
  * Union of all values in the AccountType const.
  */
 export type AccountType = (typeof AccountType)[keyof typeof AccountType];
@@ -87,25 +122,42 @@ export declare const AccountType: {
   readonly MutableWallet: "MutableWallet";
   readonly ImmutableWallet: "ImmutableWallet";
   readonly FungibleFaucet: "FungibleFaucet";
+  readonly ImmutableContract: "ImmutableContract";
+  readonly MutableContract: "MutableContract";
 };
 
 /** Union of valid AccountType string values. */
 export type AccountTypeValue =
   | "MutableWallet"
   | "ImmutableWallet"
-  | "FungibleFaucet";
+  | "FungibleFaucet"
+  | "ImmutableContract"
+  | "MutableContract";
 
 // ════════════════════════════════════════════════════════════════
 // Client options
 // ════════════════════════════════════════════════════════════════
 
 export interface ClientOptions {
-  /** RPC endpoint URL. Defaults to testnet RPC. */
-  rpcUrl?: string;
+  /**
+   * RPC endpoint. Accepts shorthands or a raw URL:
+   * - `"testnet"` — Miden testnet RPC (`https://rpc.testnet.miden.io`)
+   * - `"devnet"` — Miden devnet RPC (`https://rpc.devnet.miden.io`)
+   * - `"localhost"` / `"local"` — local node (`http://localhost:57291`)
+   * - any other string — treated as a raw RPC endpoint URL
+   * Defaults to the SDK testnet RPC if omitted.
+   */
+  rpcUrl?: "testnet" | "devnet" | "localhost" | "local" | (string & {});
   /** Note transport URL (optional). */
   noteTransportUrl?: string;
-  /** Auto-creates a remote prover from this URL. */
-  proverUrl?: string;
+  /**
+   * Prover to use for transactions. Accepts shorthands or a raw URL:
+   * - `"local"` — local (in-browser) prover
+   * - `"devnet"` — Miden devnet remote prover
+   * - `"testnet"` — Miden testnet remote prover
+   * - any other string — treated as a raw remote prover URL
+   */
+  proverUrl?: "local" | "devnet" | "testnet" | (string & {});
   /** Hashed to 32 bytes via SHA-256. */
   seed?: string | Uint8Array;
   /** Store isolation key. */
@@ -138,8 +190,6 @@ export interface Asset {
   amount: number | bigint;
 }
 
-export type NoteVisibility = "public" | "private";
-
 /**
  * A note reference: hex note ID string, NoteId object, InputNoteRecord, or Note object.
  */
@@ -149,13 +199,39 @@ export type NoteInput = string | NoteId | Note | InputNoteRecord;
 // Account types
 // ════════════════════════════════════════════════════════════════
 
-/** Create a wallet (default) or faucet. Discriminated by `type` field. */
-export type CreateAccountOptions = WalletCreateOptions | FaucetCreateOptions;
+/**
+ * Options for creating a custom contract account.
+ *
+ * Unlike wallets/faucets, `auth` must be a raw `AuthSecretKey` WASM object —
+ * the caller must retain it for signing. Construct via `AuthSecretKey.rpoFalconWithRNG(seed)`.
+ * Storage defaults to `"public"` (unlike wallets which default to `"private"`).
+ */
+export interface ContractCreateOptions {
+  type: "ImmutableContract" | "MutableContract";
+  /** Defaults to "public" (differs from wallet default of "private"). */
+  storage?: StorageMode;
+  /** Required — used to derive a deterministic account ID. */
+  seed: Uint8Array;
+  /**
+   * Required raw WASM AuthSecretKey. Use `AuthSecretKey.rpoFalconWithRNG(seed)`.
+   * Must be a concrete object (not a string) because the caller needs to retain
+   * the key for transaction signing.
+   */
+  auth: AuthSecretKey;
+  /** Additional compiled account components from `compile.component()`. */
+  components?: AccountComponent[];
+}
+
+/** Create a wallet (default), faucet, or custom contract. Discriminated by `type` field. */
+export type CreateAccountOptions =
+  | WalletCreateOptions
+  | FaucetCreateOptions
+  | ContractCreateOptions;
 
 export interface WalletCreateOptions {
   /** Account type. Defaults to "MutableWallet". Use AccountType enum. */
   type?: "MutableWallet" | "ImmutableWallet";
-  storage?: "private" | "public";
+  storage?: StorageMode;
   auth?: AuthSchemeType;
   seed?: string | Uint8Array;
 }
@@ -165,7 +241,7 @@ export interface FaucetCreateOptions {
   symbol: string;
   decimals: number;
   maxSupply: number | bigint;
-  storage?: "private" | "public";
+  storage?: StorageMode;
   auth?: AuthSchemeType;
 }
 
@@ -180,12 +256,12 @@ export interface AccountDetails {
 /**
  * Discriminated union for account import.
  *
- * - `string` — Import a public account by its hex or bech32 ID (fetches state from the network).
+ * - `AccountRef` (string, AccountId, Account, AccountHeader) — Import a public account by ID (fetches state from the network).
  * - `{ file: AccountFile }` — Import from a previously exported account file (works for both public and private accounts).
  * - `{ seed, type?, auth? }` — Reconstruct a **public** account from its init seed. **Does not work for private accounts** — use the account file workflow instead.
  */
 export type ImportAccountInput =
-  | string
+  | AccountRef
   | { file: AccountFile }
   | {
       seed: Uint8Array;
@@ -213,23 +289,44 @@ export interface TransactionOptions {
   prover?: TransactionProver;
 }
 
-export interface SendOptions extends TransactionOptions {
+export interface SendOptionsAuthenticated extends TransactionOptions {
   account: AccountRef;
   to: AccountRef;
   token: AccountRef;
   amount: number | bigint;
   type?: NoteVisibility;
+  authenticated?: true;
   /** Block height after which the sender can reclaim the note. This is a block number, not wall-clock time. */
   reclaimAfter?: number;
   /** Block height until which the note is timelocked. This is a block number, not wall-clock time. */
   timelockUntil?: number;
 }
 
+export interface SendOptionsUnauthenticated extends TransactionOptions {
+  account: AccountRef;
+  to: AccountRef;
+  token: AccountRef;
+  amount: number | bigint;
+  type?: NoteVisibility;
+  authenticated: false;
+}
+
+/** @deprecated Use SendOptionsAuthenticated or SendOptionsUnauthenticated instead */
+export type SendOptions = SendOptionsAuthenticated | SendOptionsUnauthenticated;
+
+export interface SendResult {
+  txId: TransactionId;
+  note: Note | null;
+}
+
 export interface MintOptions extends TransactionOptions {
   /** Faucet (executing account). */
   account: AccountRef;
+  /** Recipient account. */
   to: AccountRef;
+  /** Amount to mint. */
   amount: number | bigint;
+  /** Note visibility. Defaults to "public". */
   type?: NoteVisibility;
 }
 
@@ -302,6 +399,14 @@ export interface WaitOptions {
   onProgress?: (status: WaitStatus) => void;
 }
 
+export interface ExecuteOptions extends TransactionOptions {
+  account: AccountRef;
+  script: TransactionScript;
+  foreignAccounts?: Array<
+    AccountRef | { id: AccountRef; storage?: AccountStorageRequirements }
+  >;
+}
+
 /** Result of consumeAll — includes count of remaining notes for pagination. */
 export interface ConsumeAllResult {
   txId: TransactionId | null;
@@ -315,7 +420,7 @@ export interface ConsumeAllResult {
  */
 export type TransactionQuery =
   | { status: "uncommitted" }
-  | { ids: string[] }
+  | { ids: (string | TransactionId)[] }
   | { expiredBefore: number };
 
 // ════════════════════════════════════════════════════════════════
@@ -332,7 +437,7 @@ export type NoteQuery =
         | "processing"
         | "unverified";
     }
-  | { ids: string[] };
+  | { ids: (string | NoteId)[] };
 
 /** Options for standalone note creation utilities. */
 export interface NoteOptions {
@@ -358,7 +463,7 @@ export interface FetchPrivateNotesOptions {
 }
 
 export interface SendPrivateOptions {
-  noteId: string;
+  noteId: NoteInput;
   to: AccountRef;
 }
 
@@ -385,12 +490,42 @@ export interface BuildSwapTagOptions {
 }
 
 // ════════════════════════════════════════════════════════════════
+// Compiler types
+// ════════════════════════════════════════════════════════════════
+
+export interface CompileComponentOptions {
+  code: string;
+  slots: StorageSlot[];
+}
+
+export interface CompileTxScriptLibrary {
+  namespace: string;
+  code: string;
+  /**
+   * "static"  — copies library into the script (for off-chain libraries).
+   * "dynamic" — links without copying (for on-chain FPI libraries). Default.
+   */
+  linking?: "static" | "dynamic";
+}
+
+export interface CompileTxScriptOptions {
+  code: string;
+  libraries?: CompileTxScriptLibrary[];
+}
+
+// ════════════════════════════════════════════════════════════════
 // Resource interfaces
 // ════════════════════════════════════════════════════════════════
+
+export interface CompilerResource {
+  component(opts: CompileComponentOptions): Promise<AccountComponent>;
+  txScript(opts: CompileTxScriptOptions): Promise<TransactionScript>;
+}
 
 export interface AccountsResource {
   create(options?: CreateAccountOptions): Promise<Account>;
   get(accountId: AccountRef): Promise<Account | null>;
+  getOrImport(accountId: AccountRef): Promise<Account>;
   list(): Promise<AccountHeader[]>;
   getDetails(accountId: AccountRef): Promise<AccountDetails>;
   getBalance(accountId: AccountRef, tokenId: AccountRef): Promise<bigint>;
@@ -406,11 +541,18 @@ export interface AccountsResource {
 }
 
 export interface TransactionsResource {
-  send(options: SendOptions): Promise<TransactionId>;
+  send(
+    options: SendOptionsAuthenticated
+  ): Promise<{ txId: TransactionId; note: null }>;
+  send(
+    options: SendOptionsUnauthenticated
+  ): Promise<{ txId: TransactionId; note: Note }>;
+  send(options: SendOptions): Promise<SendResult>;
   mint(options: MintOptions): Promise<TransactionId>;
   consume(options: ConsumeOptions): Promise<TransactionId>;
   swap(options: SwapOptions): Promise<TransactionId>;
   consumeAll(options: ConsumeAllOptions): Promise<ConsumeAllResult>;
+  execute(options: ExecuteOptions): Promise<TransactionId>;
 
   preview(options: PreviewOptions): Promise<TransactionSummary>;
 
@@ -426,12 +568,12 @@ export interface TransactionsResource {
 
   list(query?: TransactionQuery): Promise<TransactionRecord[]>;
 
-  waitFor(txId: string, options?: WaitOptions): Promise<void>;
+  waitFor(txId: string | TransactionId, options?: WaitOptions): Promise<void>;
 }
 
 export interface NotesResource {
   list(query?: NoteQuery): Promise<InputNoteRecord[]>;
-  get(noteId: string): Promise<InputNoteRecord | null>;
+  get(noteId: NoteInput): Promise<InputNoteRecord | null>;
 
   listSent(query?: NoteQuery): Promise<OutputNoteRecord[]>;
 
@@ -440,7 +582,7 @@ export interface NotesResource {
   }): Promise<ConsumableNoteRecord[]>;
 
   import(noteFile: NoteFile): Promise<NoteId>;
-  export(noteId: string, options?: ExportNoteOptions): Promise<NoteFile>;
+  export(noteId: NoteInput, options?: ExportNoteOptions): Promise<NoteFile>;
 
   fetchPrivate(options?: FetchPrivateNotesOptions): Promise<void>;
   sendPrivate(options: SendPrivateOptions): Promise<void>;
@@ -476,6 +618,7 @@ export declare class MidenClient {
   readonly notes: NotesResource;
   readonly tags: TagsResource;
   readonly settings: SettingsResource;
+  readonly compile: CompilerResource;
 
   /** Syncs the client state with the Miden node. */
   sync(options?: { timeout?: number }): Promise<SyncSummary>;

@@ -34,12 +34,64 @@ export class AccountsResource {
       );
     }
 
+    if (
+      opts?.type === "ImmutableContract" ||
+      opts?.type === "MutableContract"
+    ) {
+      return await this.#createContract(opts, wasm);
+    }
+
     // Default: wallet (mutable or immutable based on type)
     const mutable = resolveAccountMutability(opts?.type);
     const storageMode = resolveStorageMode(opts?.storage ?? "private", wasm);
     const authScheme = resolveAuthScheme(opts?.auth, wasm);
     const seed = opts?.seed ? await hashSeed(opts.seed) : undefined;
     return await this.#inner.newWallet(storageMode, mutable, authScheme, seed);
+  }
+
+  async #createContract(opts, wasm) {
+    if (!opts.seed)
+      throw new Error("Contract creation requires a 'seed' (Uint8Array)");
+    if (!opts.auth)
+      throw new Error("Contract creation requires an 'auth' (AuthSecretKey)");
+
+    const mutable = opts.type === "MutableContract";
+    const accountTypeEnum = mutable
+      ? wasm.AccountType.RegularAccountUpdatableCode
+      : wasm.AccountType.RegularAccountImmutableCode;
+    const storageMode = resolveStorageMode(opts.storage ?? "public", wasm);
+    const authComponent =
+      wasm.AccountComponent.createAuthComponentFromSecretKey(opts.auth);
+
+    let builder = new wasm.AccountBuilder(opts.seed)
+      .accountType(accountTypeEnum)
+      .storageMode(storageMode)
+      .withAuthComponent(authComponent);
+
+    for (const component of opts.components ?? []) {
+      builder = builder.withComponent(component);
+    }
+
+    const built = builder.build();
+    const account = built.account;
+    const accountId = account.id();
+
+    await this.#inner.addAccountSecretKeyToWebStore(accountId, opts.auth);
+    try {
+      await this.#inner.newAccount(account, false);
+    } catch (err) {
+      throw new Error(
+        `Contract account creation failed after storing secret key for ${accountId.toString()}. ` +
+          `The secret key was stored but the account was not. ` +
+          `Original error: ${err?.message ?? err}`
+      );
+    }
+    return await this.#inner.getAccount(accountId);
+  }
+
+  async getOrImport(ref) {
+    this.#client.assertNotTerminated();
+    return (await this.get(ref)) ?? (await this.import(ref));
   }
 
   async get(ref) {
@@ -86,8 +138,10 @@ export class AccountsResource {
     this.#client.assertNotTerminated();
     const wasm = await this.#getWasm();
 
-    if (typeof input === "string") {
-      // Import by ID (hex or bech32 string)
+    // Early exit for string, Account, and AccountHeader types before property
+    // checks, preventing misrouting if a WASM object ever gains a .file or .seed
+    // property. Bare AccountId (no .id() method) falls through to the fallback.
+    if (typeof input === "string" || typeof input.id === "function") {
       const id = resolveAccountRef(input, wasm);
       await this.#inner.importAccountById(id);
       return await this.#inner.getAccount(id);
@@ -121,9 +175,10 @@ export class AccountsResource {
       );
     }
 
-    throw new Error(
-      "Invalid import input: expected a string, { file }, or { seed }"
-    );
+    // Fallback: treat as AccountRef (string, AccountId, Account, AccountHeader)
+    const id = resolveAccountRef(input, wasm);
+    await this.#inner.importAccountById(id);
+    return await this.#inner.getAccount(id);
   }
 
   async export(ref) {

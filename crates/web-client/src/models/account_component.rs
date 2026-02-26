@@ -85,6 +85,10 @@ impl AccountComponent {
     }
 
     /// Returns the hex-encoded MAST root for a procedure by name.
+    ///
+    /// Matches by full path, relative path, or local name (after the last `::`).
+    /// When matching by local name, if multiple procedures share the same local
+    /// name across modules, the first match is returned.
     #[wasm_bindgen(js_name = "getProcedureHash")]
     pub fn get_procedure_hash(&self, procedure_name: &str) -> Result<String, JsValue> {
         let library = self.0.component_code().as_library();
@@ -92,9 +96,14 @@ impl AccountComponent {
         let get_proc_export = library
             .exports()
             .find(|export| {
-                export.as_procedure().is_some()
-                    && (export.path().as_ref().as_str() == procedure_name
-                        || export.path().as_ref().to_relative().as_str() == procedure_name)
+                if export.as_procedure().is_none() {
+                    return false;
+                }
+                let export_path = export.path();
+                let path_str = export_path.as_ref().as_str();
+                path_str == procedure_name
+                    || export_path.as_ref().to_relative().as_str() == procedure_name
+                    || path_str.rsplit_once("::").is_some_and(|(_, local)| local == procedure_name)
             })
             .ok_or_else(|| {
                 JsValue::from_str(&format!(

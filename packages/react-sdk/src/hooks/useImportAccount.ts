@@ -10,7 +10,7 @@ import type {
 } from "@miden-sdk/miden-sdk";
 import type { ImportAccountOptions } from "../types";
 import { DEFAULTS } from "../types";
-import { parseAccountId } from "../utils/accountParsing";
+import { parseAccountId, type AccountRef } from "../utils/accountParsing";
 import { runExclusiveDirect } from "../utils/runExclusive";
 import { ensureAccountBech32 } from "../utils/accountBech32";
 
@@ -197,7 +197,7 @@ export function useImportAccount(): UseImportAccountResult {
   };
 }
 
-function resolveAccountId(accountId: string | AccountIdType): AccountIdType {
+function resolveAccountId(accountId: AccountRef): AccountIdType {
   return parseAccountId(accountId);
 }
 

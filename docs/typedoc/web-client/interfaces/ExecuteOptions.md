@@ -2,9 +2,9 @@
 
 ***
 
-[@miden-sdk/miden-sdk](../README.md) / SendOptions
+[@miden-sdk/miden-sdk](../README.md) / ExecuteOptions
 
-# Interface: SendOptions
+# Interface: ExecuteOptions
 
 ## Extends
 
@@ -18,9 +18,9 @@
 
 ***
 
-### amount
+### foreignAccounts?
 
-> **amount**: `number` \| `bigint`
+> `optional` **foreignAccounts**: ([`AccountRef`](../type-aliases/AccountRef.md) \| \{ `id`: [`AccountRef`](../type-aliases/AccountRef.md); `storage?`: `AccountStorageRequirements`; \})[]
 
 ***
 
@@ -36,19 +36,9 @@ Override default prover.
 
 ***
 
-### reclaimAfter?
+### script
 
-> `optional` **reclaimAfter**: `number`
-
-Block height after which the sender can reclaim the note. This is a block number, not wall-clock time.
-
-***
-
-### timelockUntil?
-
-> `optional` **timelockUntil**: `number`
-
-Block height until which the note is timelocked. This is a block number, not wall-clock time.
+> **script**: `TransactionScript`
 
 ***
 
@@ -63,24 +53,6 @@ This is NOT a block height. For block-height-based parameters, see
 #### Inherited from
 
 [`TransactionOptions`](TransactionOptions.md).[`timeout`](TransactionOptions.md#timeout)
-
-***
-
-### to
-
-> **to**: [`AccountRef`](../type-aliases/AccountRef.md)
-
-***
-
-### token
-
-> **token**: [`AccountRef`](../type-aliases/AccountRef.md)
-
-***
-
-### type?
-
-> `optional` **type**: [`NoteVisibility`](../type-aliases/NoteVisibility.md)
 
 ***
 

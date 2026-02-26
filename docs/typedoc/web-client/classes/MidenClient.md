@@ -24,6 +24,12 @@
 
 ***
 
+### compile
+
+> `readonly` **compile**: [`CompilerResource`](../interfaces/CompilerResource.md)
+
+***
+
 ### defaultProver
 
 > `readonly` **defaultProver**: [`TransactionProver`](TransactionProver.md)

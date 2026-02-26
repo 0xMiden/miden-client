@@ -2,9 +2,9 @@
 
 ***
 
-[@miden-sdk/miden-sdk](../README.md) / MintOptions
+[@miden-sdk/miden-sdk](../README.md) / SendOptionsAuthenticated
 
-# Interface: MintOptions
+# Interface: SendOptionsAuthenticated
 
 ## Extends
 
@@ -16,15 +16,17 @@
 
 > **account**: [`AccountRef`](../type-aliases/AccountRef.md)
 
-Faucet (executing account).
-
 ***
 
 ### amount
 
 > **amount**: `number` \| `bigint`
 
-Amount to mint.
+***
+
+### authenticated?
+
+> `optional` **authenticated**: `true`
 
 ***
 
@@ -37,6 +39,22 @@ Override default prover.
 #### Inherited from
 
 [`TransactionOptions`](TransactionOptions.md).[`prover`](TransactionOptions.md#prover)
+
+***
+
+### reclaimAfter?
+
+> `optional` **reclaimAfter**: `number`
+
+Block height after which the sender can reclaim the note. This is a block number, not wall-clock time.
+
+***
+
+### timelockUntil?
+
+> `optional` **timelockUntil**: `number`
+
+Block height until which the note is timelocked. This is a block number, not wall-clock time.
 
 ***
 
@@ -58,15 +76,17 @@ This is NOT a block height. For block-height-based parameters, see
 
 > **to**: [`AccountRef`](../type-aliases/AccountRef.md)
 
-Recipient account.
+***
+
+### token
+
+> **token**: [`AccountRef`](../type-aliases/AccountRef.md)
 
 ***
 
 ### type?
 
 > `optional` **type**: [`NoteVisibility`](../type-aliases/NoteVisibility.md)
-
-Note visibility. Defaults to "public".
 
 ***
 

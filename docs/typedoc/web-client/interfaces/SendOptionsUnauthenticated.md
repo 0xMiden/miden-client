@@ -2,9 +2,9 @@
 
 ***
 
-[@miden-sdk/miden-sdk](../README.md) / MintOptions
+[@miden-sdk/miden-sdk](../README.md) / SendOptionsUnauthenticated
 
-# Interface: MintOptions
+# Interface: SendOptionsUnauthenticated
 
 ## Extends
 
@@ -16,15 +16,17 @@
 
 > **account**: [`AccountRef`](../type-aliases/AccountRef.md)
 
-Faucet (executing account).
-
 ***
 
 ### amount
 
 > **amount**: `number` \| `bigint`
 
-Amount to mint.
+***
+
+### authenticated
+
+> **authenticated**: `false`
 
 ***
 
@@ -58,15 +60,17 @@ This is NOT a block height. For block-height-based parameters, see
 
 > **to**: [`AccountRef`](../type-aliases/AccountRef.md)
 
-Recipient account.
+***
+
+### token
+
+> **token**: [`AccountRef`](../type-aliases/AccountRef.md)
 
 ***
 
 ### type?
 
 > `optional` **type**: [`NoteVisibility`](../type-aliases/NoteVisibility.md)
-
-Note visibility. Defaults to "public".
 
 ***
 
