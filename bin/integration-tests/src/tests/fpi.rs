@@ -23,6 +23,7 @@ use miden_client::rpc::domain::account::{AccountStorageRequirements, StorageMapK
 use miden_client::testing::common::*;
 use miden_client::transaction::{AdviceInputs, ForeignAccount, TransactionRequestBuilder};
 use miden_client::{Felt, Word};
+use tracing::info;
 
 use crate::tests::config::ClientConfig;
 
@@ -191,7 +192,7 @@ pub async fn test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
     .await?;
     let outer_foreign_account_id = outer_foreign_account.id();
 
-    println!("Calling FPI function inside a FPI function with new account");
+    info!(inner_id = %inner_foreign_account_id, outer_id = %outer_foreign_account_id, "Executing nested FPI call");
 
     let tx_script = format!(
         "
@@ -445,7 +446,7 @@ async fn standard_fpi(
 
     let foreign_account_id = foreign_account.id();
 
-    println!("Calling FPI functions with new account");
+    info!(foreign_id = %foreign_account_id, "Executing FPI call");
 
     let tx_script = format!(
         "
@@ -640,7 +641,7 @@ async fn deploy_foreign_account(
         .with_context(|| "failed to add key to keystore")?;
     client.add_account(&foreign_account, false).await?;
 
-    println!("Deploying foreign account");
+    info!(account_id = %foreign_account_id, ?storage_mode, "Deploying foreign account");
 
     let tx_id = client
         .submit_new_transaction(

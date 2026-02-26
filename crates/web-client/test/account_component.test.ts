@@ -1,9 +1,10 @@
 import test from "./playwright.global.setup";
 import { expect } from "@playwright/test";
 
+// WASM AuthScheme enum: 0 = AuthRpoFalcon512 (Falcon), 1 = AuthEcdsaK256Keccak (ECDSA)
 const SCHEMES = [
-  ["rpoFalconWithRNG", "AuthRpoFalcon512"],
-  ["ecdsaWithRNG", "AuthEcdsaK256Keccak"],
+  ["rpoFalconWithRNG", 0],
+  ["ecdsaWithRNG", 1],
 ] as const;
 
 const proceduresFromComponent = (component: any) =>
@@ -13,12 +14,12 @@ const proceduresFromComponent = (component: any) =>
     .sort();
 
 test.describe("account component auth constructors", () => {
-  SCHEMES.forEach(([secretKeyFn, authSchemeKey]) => {
-    test(`createAuthComponentFromCommitment matches secret-key variant (${authSchemeKey})`, async ({
+  SCHEMES.forEach(([secretKeyFn, authSchemeValue]) => {
+    test(`createAuthComponentFromCommitment matches secret-key variant (${authSchemeValue})`, async ({
       page,
     }) => {
       const digestsMatch = await page.evaluate(
-        ({ _secretKeyFn, _authSchemeKey }) => {
+        ({ _secretKeyFn, _authSchemeValue }) => {
           const secretKey = window.AuthSecretKey[_secretKeyFn]();
           const commitment = secretKey.publicKey().toCommitment();
 
@@ -27,7 +28,7 @@ test.describe("account component auth constructors", () => {
           const fromCommitment =
             window.AccountComponent.createAuthComponentFromCommitment(
               commitment,
-              window.AuthScheme[_authSchemeKey]
+              _authSchemeValue
             );
 
           const toHexList = (component: any) =>
@@ -41,7 +42,7 @@ test.describe("account component auth constructors", () => {
             JSON.stringify(toHexList(fromCommitment))
           );
         },
-        { _secretKeyFn: secretKeyFn, _authSchemeKey: authSchemeKey }
+        { _secretKeyFn: secretKeyFn, _authSchemeValue: authSchemeValue }
       );
 
       expect(digestsMatch).toBe(true);
