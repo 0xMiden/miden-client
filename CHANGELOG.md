@@ -1,7 +1,8 @@
 # Changelog
 
-## 0.13.2 (TBD)
+## 0.13.2 (2026-02-26)
 
+* Updated to `miden-crypto` v0.19.5 ([#1813](https://github.com/0xMiden/miden-client/pull/1813)).
 * [FIX][web] Fixed transaction execution failures after reopening a browser extension by always persisting MMR authentication nodes during sync, even for blocks with no relevant notes. Previously, closing and reopening the extension lost in-memory MMR state and the store was missing nodes needed for Merkle authentication paths. Also surfaces a distinct `PartialBlockchainNodeNotFound` error instead of a confusing deserialization crash when nodes are missing ([#1789](https://github.com/0xMiden/miden-client/pull/1789)).
 
 ## 0.13.1 (2026-02-13)
