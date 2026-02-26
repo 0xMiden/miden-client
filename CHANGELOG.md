@@ -38,14 +38,7 @@
 
 ### Fixes
 
-* [FIX][rust] Filesystem keystore now writes secret key files with restrictive 0600 permissions on Unix instead of world-readable 0644 ([#1833](https://github.com/0xMiden/miden-client/pull/1833)).
-* [FIX][web] Replaced `todo!()` panics in `AuthSecretKey` WASM bindings with proper error returns ([#1833](https://github.com/0xMiden/miden-client/pull/1833)).
-* [FIX][rust] Replaced `todo!()` in `notes_from_output` with safe `filter_map` ([#1833](https://github.com/0xMiden/miden-client/pull/1833)).
-* [FIX][rust] Eliminated TOCTOU race conditions in filesystem keystore `get_key` and `remove_key` ([#1833](https://github.com/0xMiden/miden-client/pull/1833)).
-* [FIX][web] Added 30-second timeout for pending worker callback requests to prevent unbounded accumulation ([#1833](https://github.com/0xMiden/miden-client/pull/1833)).
 * [FIX][rust] Replaced `.expect()` panics on RPC response data with proper error propagation ([#1833](https://github.com/0xMiden/miden-client/pull/1833)).
-* [FIX][store] SQLite database file permissions now set to 0600 on Unix after connection open ([#1833](https://github.com/0xMiden/miden-client/pull/1833)).
-* [FIX][all] Updated vulnerable dependencies: `keccak` 0.1.6, `time` 0.3.47, `rollup` 4.59.0, `basic-ftp` 5.2.0, `tar` 7.5.9, `qs` 6.15.0, `minimatch` 10.2.4, `@isaacs/brace-expansion` 5.0.1, `esbuild` 0.27.3 ([#1833](https://github.com/0xMiden/miden-client/pull/1833)).
 
 ## 0.13.1 (TBD)
 
