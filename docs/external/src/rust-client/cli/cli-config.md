@@ -182,6 +182,17 @@ miden-client init --block-delta 256
 
 - `MIDEN_DEBUG`: When set to `true`, enables debug mode on the transaction executor and the script compiler. For any script that has been compiled and executed in this mode, debug logs will be output in order to facilitate MASM debugging ([these instructions](https://0xMiden.github.io/miden-vm/user_docs/assembly/debugging.html) can be used to do so). This variable can be overridden by the `--debug` CLI flag.
 
+- `MIDEN_KEYSTORE_PASSWORD`: When set to a non-empty value, enables password-based encryption for secret keys at rest. Keys are encrypted using Argon2id (key derivation) and ChaCha20-Poly1305 (authenticated encryption). For example:
+
+  ```sh
+  export MIDEN_KEYSTORE_PASSWORD="my-strong-password"
+  miden-client account new-wallet --storage-mode private
+  ```
+
+  When enabled, newly created key files are encrypted on disk. Existing plaintext key files are still readable (backward compatible), so encryption can be enabled on an existing keystore without migration. To encrypt all existing plaintext key files, use the `migrate_to_encrypted()` method from the Rust API.
+
+  If the variable is unset or empty, keys are stored as plaintext (the default behavior).
+
 ### Note Transport
 
 A `note-transport` section is used to configure the connection to the Miden Note Transport node used in the exchange of private notes. It contains the following fields:
