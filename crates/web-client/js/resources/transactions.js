@@ -35,16 +35,24 @@ export class TransactionsResource {
       const note = wasm.Note.createP2IDNote(
         senderId,
         receiverId,
-        new wasm.NoteAssets([new wasm.FungibleAsset(faucetId, BigInt(opts.amount))]),
+        new wasm.NoteAssets([
+          new wasm.FungibleAsset(faucetId, BigInt(opts.amount)),
+        ]),
         noteType,
         new wasm.NoteAttachment()
       );
 
       const request = new wasm.TransactionRequestBuilder()
-        .withOwnOutputNotes(new wasm.OutputNoteArray([wasm.OutputNote.full(note)]))
+        .withOwnOutputNotes(
+          new wasm.OutputNoteArray([wasm.OutputNote.full(note)])
+        )
         .build();
 
-      const txId = await this.#submitOrSubmitWithProver(senderId, request, opts.prover);
+      const txId = await this.#submitOrSubmitWithProver(
+        senderId,
+        request,
+        opts.prover
+      );
 
       if (opts.waitForConfirmation) {
         await this.waitFor(txId.toHex(), { timeout: opts.timeout });

@@ -528,8 +528,12 @@ export interface AccountsResource {
 }
 
 export interface TransactionsResource {
-  send(options: SendOptionsAuthenticated): Promise<{ txId: TransactionId; note: null }>;
-  send(options: SendOptionsUnauthenticated): Promise<{ txId: TransactionId; note: Note }>;
+  send(
+    options: SendOptionsAuthenticated
+  ): Promise<{ txId: TransactionId; note: null }>;
+  send(
+    options: SendOptionsUnauthenticated
+  ): Promise<{ txId: TransactionId; note: Note }>;
   send(options: SendOptions): Promise<SendResult>;
   mint(options: MintOptions): Promise<TransactionId>;
   consume(options: ConsumeOptions): Promise<TransactionId>;

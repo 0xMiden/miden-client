@@ -12,11 +12,7 @@ import {
   TransactionRequestBuilder,
 } from "@miden-sdk/miden-sdk";
 import type { TransactionId } from "@miden-sdk/miden-sdk";
-import type {
-  SendOptions,
-  SendResult,
-  TransactionStage,
-} from "../types";
+import type { SendOptions, SendResult, TransactionStage } from "../types";
 import { DEFAULTS } from "../types";
 import { parseAccountId, parseAddress } from "../utils/accountParsing";
 import { runExclusiveDirect } from "../utils/runExclusive";

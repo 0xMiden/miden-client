@@ -96,7 +96,9 @@ export function useConsume(): UseConsumeResult {
               directNotes.push(item as Note);
             } else {
               noteIdInputs.push(
-                typeof item === "string" ? NoteId.fromHex(item) : (item as NoteId)
+                typeof item === "string"
+                  ? NoteId.fromHex(item)
+                  : (item as NoteId)
               );
             }
           }

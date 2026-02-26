@@ -304,7 +304,6 @@ export interface MultiSendOptions {
   noteType?: NoteVisibility;
 }
 
-
 export interface WaitForCommitOptions {
   /** Timeout in milliseconds. Default: 10000 */
   timeoutMs?: number;
