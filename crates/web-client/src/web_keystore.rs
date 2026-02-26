@@ -43,7 +43,9 @@ struct JsCallbacks {
 
 // Since Function is not Send/Sync, we need to explicitly mark our struct as Send + Sync
 // This is safe in WASM because it's single-threaded
+#[cfg(target_arch = "wasm32")]
 unsafe impl Send for JsCallbacks {}
+#[cfg(target_arch = "wasm32")]
 unsafe impl Sync for JsCallbacks {}
 
 impl<R: Rng> WebKeyStore<R> {
