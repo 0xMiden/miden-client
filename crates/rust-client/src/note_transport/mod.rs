@@ -4,7 +4,6 @@ pub mod generated;
 pub mod grpc;
 
 use alloc::boxed::Box;
-use alloc::collections::BTreeSet;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
@@ -104,16 +103,20 @@ where
     ///
     /// Pagination is employed, where only notes after the provided cursor are requested.
     /// Downloaded notes are imported.
-    pub(crate) async fn fetch_transport_notes(
+    pub(crate) async fn fetch_transport_notes<I>(
         &mut self,
         cursor: NoteTransportCursor,
-        tags: BTreeSet<NoteTag>,
-    ) -> Result<(), ClientError> {
+        tags: I,
+    ) -> Result<(), ClientError>
+    where
+        I: IntoIterator<Item = NoteTag>,
+    {
         let mut notes = Vec::new();
         // Fetch notes
-        let tags = tags.into_iter().collect::<Vec<_>>();
-        let (note_infos, rcursor) =
-            self.get_note_transport_api()?.fetch_notes(&tags, cursor).await?;
+        let (note_infos, rcursor) = self
+            .get_note_transport_api()?
+            .fetch_notes(&tags.into_iter().collect::<Vec<_>>(), cursor)
+            .await?;
         for note_info in &note_infos {
             // e2ee impl hint:
             // for key in self.store.decryption_keys() try
