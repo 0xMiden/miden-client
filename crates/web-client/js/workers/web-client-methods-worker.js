@@ -96,7 +96,7 @@ let pendingCallbacks = new Map();
 const callbackProxies = {
   getKey: async (pubKey) => {
     return new Promise((resolve, reject) => {
-      const requestId = `${CallbackType.GET_KEY}-${Date.now()}-${Math.random()}`;
+      const requestId = `${CallbackType.GET_KEY}-${crypto.randomUUID()}`;
       pendingCallbacks.set(requestId, { resolve, reject });
 
       self.postMessage({
@@ -109,7 +109,7 @@ const callbackProxies = {
   },
   insertKey: async (pubKey, secretKey) => {
     return new Promise((resolve, reject) => {
-      const requestId = `${CallbackType.INSERT_KEY}-${Date.now()}-${Math.random()}`;
+      const requestId = `${CallbackType.INSERT_KEY}-${crypto.randomUUID()}`;
       pendingCallbacks.set(requestId, { resolve, reject });
 
       self.postMessage({
@@ -122,7 +122,7 @@ const callbackProxies = {
   },
   sign: async (pubKey, signingInputs) => {
     return new Promise((resolve, reject) => {
-      const requestId = `${CallbackType.SIGN}-${Date.now()}-${Math.random()}`;
+      const requestId = `${CallbackType.SIGN}-${crypto.randomUUID()}`;
       pendingCallbacks.set(requestId, { resolve, reject });
 
       self.postMessage({
