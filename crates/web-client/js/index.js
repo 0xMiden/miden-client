@@ -424,7 +424,7 @@ class WebClient {
   async callMethodWithWorker(methodName, ...args) {
     await this.ready;
     // Create a unique request ID.
-    const requestId = `${methodName}-${Date.now()}-${Math.random()}`;
+    const requestId = `${methodName}-${crypto.randomUUID()}`;
     return new Promise((resolve, reject) => {
       // Save the resolve and reject callbacks in the pendingRequests map.
       this.pendingRequests.set(requestId, { resolve, reject });
