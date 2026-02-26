@@ -196,7 +196,7 @@ impl FilesystemKeyStore {
             Ok(bytes) => {
                 let key = AuthSecretKey::read_from_bytes(&bytes).map_err(|err| {
                     KeyStoreError::DecodingError(format!(
-                        "error reading secret key from file: {err:?}"
+                        "error reading secret key from file: {err}"
                     ))
                 })?;
                 Ok(Some(key))
@@ -371,7 +371,7 @@ fn write_secret_key_file(file_path: &Path, key: &AuthSecretKey) -> Result<(), Ke
 }
 
 fn keystore_error(context: &str) -> impl FnOnce(std::io::Error) -> KeyStoreError {
-    move |err| KeyStoreError::StorageError(format!("{context}: {err:?}"))
+    move |err| KeyStoreError::StorageError(format!("{context}: {err}"))
 }
 
 /// Legacy hash function for backward compatibility with existing key files.
