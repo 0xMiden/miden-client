@@ -291,8 +291,11 @@ export interface SendOptions extends TransactionOptions {
 export interface MintOptions extends TransactionOptions {
   /** Faucet (executing account). */
   account: AccountRef;
+  /** Recipient account. */
   to: AccountRef;
+  /** Amount to mint. */
   amount: number | bigint;
+  /** Note visibility. Defaults to "public". */
   type?: NoteVisibility;
 }
 
