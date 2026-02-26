@@ -455,8 +455,8 @@ impl Cli {
         let cli_config = CliConfig::from_system()?;
 
         // Create keystore for commands that need it (with optional encryption)
-        let keystore =
-            create_keystore(cli_config.secret_keys_directory.clone()).map_err(CliError::KeyStore)?;
+        let keystore = create_keystore(cli_config.secret_keys_directory.clone())
+            .map_err(CliError::KeyStore)?;
 
         // Create the client
         let cli_client = CliClient::from_config(cli_config, in_debug_mode).await?;

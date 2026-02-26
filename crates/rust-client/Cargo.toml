@@ -51,24 +51,24 @@ miden-tx                   = { workspace = true }
 
 # External dependencies
 anyhow           = { workspace = true }
-argon2           = { version = "0.5", optional = true }
-chacha20poly1305 = { version = "0.10", default-features = false, features = ["std"], optional = true }
-async-trait  = { workspace = true }
-chrono       = { optional = false, version = "0.4" }
-futures      = { version = "0.3" }
-hex          = { workspace = true }
-prost        = { default-features = false, features = ["derive"], version = "0.14" }
-prost-types  = { version = "0.14" }
-rand         = { workspace = true }
-serde        = { workspace = true }
-serde_json   = { version = "1.0" }
-thiserror    = { workspace = true }
-tonic        = { default-features = false, features = ["codegen"], version = "0.14" }
-tonic-health = { version = "0.14" }
-tonic-prost  = { version = "0.14" }
-tracing      = { workspace = true }
-uuid         = { features = ["js", "serde", "v4"], optional = true, version = "1.10" }
-zeroize      = { version = "1.8", optional = true }
+argon2           = { optional = true, version = "0.5" }
+async-trait      = { workspace = true }
+chacha20poly1305 = { default-features = false, features = ["std"], optional = true, version = "0.10" }
+chrono           = { optional = false, version = "0.4" }
+futures          = { version = "0.3" }
+hex              = { workspace = true }
+prost            = { default-features = false, features = ["derive"], version = "0.14" }
+prost-types      = { version = "0.14" }
+rand             = { workspace = true }
+serde            = { workspace = true }
+serde_json       = { version = "1.0" }
+thiserror        = { workspace = true }
+tonic            = { default-features = false, features = ["codegen"], version = "0.14" }
+tonic-health     = { version = "0.14" }
+tonic-prost      = { version = "0.14" }
+tracing          = { workspace = true }
+uuid             = { features = ["js", "serde", "v4"], optional = true, version = "1.10" }
+zeroize          = { optional = true, version = "1.8" }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom             = { features = ["wasm_js"], version = "0.3" }

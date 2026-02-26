@@ -1,8 +1,8 @@
 use alloc::vec::Vec;
 
 use argon2::Argon2;
-use chacha20poly1305::aead::{Aead, KeyInit};
 use chacha20poly1305::ChaCha20Poly1305;
+use chacha20poly1305::aead::{Aead, KeyInit};
 use zeroize::Zeroizing;
 
 use super::KeyStoreError;
@@ -90,15 +90,13 @@ impl PasswordEncryptor {
             argon2::Algorithm::Argon2id,
             argon2::Version::V0x13,
             argon2::Params::new(ARGON2_M_COST, ARGON2_T_COST, ARGON2_P_COST, Some(KEY_LEN))
-                .map_err(|e| {
-                    KeyStoreError::StorageError(format!("argon2 params error: {e}"))
-                })?,
+                .map_err(|e| KeyStoreError::StorageError(format!("argon2 params error: {e}")))?,
         );
 
         let mut key = Zeroizing::new([0u8; KEY_LEN]);
-        argon2.hash_password_into(self.password.as_slice(), salt, &mut *key).map_err(|e| {
-            KeyStoreError::StorageError(format!("key derivation error: {e}"))
-        })?;
+        argon2
+            .hash_password_into(self.password.as_slice(), salt, &mut *key)
+            .map_err(|e| KeyStoreError::StorageError(format!("key derivation error: {e}")))?;
 
         Ok(key)
     }
@@ -117,9 +115,9 @@ impl KeyEncryptor for PasswordEncryptor {
             .map_err(|e| KeyStoreError::StorageError(format!("cipher init error: {e}")))?;
 
         // Encrypt
-        let ciphertext = cipher.encrypt(&nonce, plaintext).map_err(|e| {
-            KeyStoreError::StorageError(format!("encryption error: {e}"))
-        })?;
+        let ciphertext = cipher
+            .encrypt(&nonce, plaintext)
+            .map_err(|e| KeyStoreError::StorageError(format!("encryption error: {e}")))?;
 
         // Assemble: magic + version + salt + nonce + ciphertext
         let mut output = Vec::with_capacity(HEADER_LEN + ciphertext.len());
@@ -134,24 +132,20 @@ impl KeyEncryptor for PasswordEncryptor {
 
     fn decrypt(&self, data: &[u8]) -> Result<Vec<u8>, KeyStoreError> {
         if data.len() < HEADER_LEN {
-            return Err(KeyStoreError::DecodingError(
-                "encrypted file too short".into(),
-            ));
+            return Err(KeyStoreError::DecodingError("encrypted file too short".into()));
         }
 
         // Validate magic
         if &data[..4] != ENCRYPTED_MAGIC {
-            return Err(KeyStoreError::DecodingError(
-                "invalid encrypted file magic".into(),
-            ));
+            return Err(KeyStoreError::DecodingError("invalid encrypted file magic".into()));
         }
 
         // Validate version
         let version = data[4];
         if version != ENCRYPTED_VERSION {
-            return Err(KeyStoreError::DecodingError(
-                format!("unsupported encrypted file version: {version}"),
-            ));
+            return Err(KeyStoreError::DecodingError(format!(
+                "unsupported encrypted file version: {version}"
+            )));
         }
 
         // Extract salt, nonce, ciphertext
@@ -265,7 +259,7 @@ mod tests {
         assert!(!is_encrypted(&[0x00, 0x01, 0x02, 0x03]));
         assert!(!is_encrypted(&[0x01, 0x00, 0x00, 0x00]));
         assert!(!is_encrypted(&[]));
-        assert!(!is_encrypted(&[0x4D])); // just 'M'
+        assert!(!is_encrypted(&[0x4d])); // just 'M'
     }
 
     #[test]

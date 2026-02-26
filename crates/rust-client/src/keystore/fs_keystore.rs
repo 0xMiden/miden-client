@@ -244,8 +244,8 @@ impl FilesystemKeyStore {
 
         let mut migrated = 0usize;
         for file_path in seen_paths {
-            let bytes =
-                fs::read(&file_path).map_err(keystore_error("error reading key file for migration"))?;
+            let bytes = fs::read(&file_path)
+                .map_err(keystore_error("error reading key file for migration"))?;
 
             // Skip files that are already encrypted
             if is_encrypted(&bytes) {
@@ -295,8 +295,7 @@ impl FilesystemKeyStore {
     /// encryptor. If the file is plaintext, it is deserialized directly. Attempting to read an
     /// encrypted file without a configured encryptor returns an error.
     fn read_secret_key_file(&self, file_path: &Path) -> Result<AuthSecretKey, KeyStoreError> {
-        let bytes =
-            fs::read(file_path).map_err(keystore_error("error reading secret key file"))?;
+        let bytes = fs::read(file_path).map_err(keystore_error("error reading secret key file"))?;
 
         let key_bytes = if is_encrypted(&bytes) {
             let encryptor = self.encryptor.as_ref().ok_or_else(|| {
@@ -478,8 +477,8 @@ fn hash_pub_key(pub_key: Word) -> String {
 
 #[cfg(test)]
 mod tests {
-    use miden_protocol::account::{AccountId, AccountIdVersion, AccountStorageMode, AccountType};
     use miden_protocol::account::auth::AuthSecretKey;
+    use miden_protocol::account::{AccountId, AccountIdVersion, AccountStorageMode, AccountType};
 
     use super::*;
     use crate::keystore::PasswordEncryptor;
@@ -713,7 +712,10 @@ mod tests {
             .unwrap()
             .with_encryption(PasswordEncryptor::new("password"));
         let migrated = ks.migrate_to_encrypted().unwrap();
-        assert_eq!(migrated, 1, "same key file shared by two accounts should only be migrated once");
+        assert_eq!(
+            migrated, 1,
+            "same key file shared by two accounts should only be migrated once"
+        );
 
         // Verify the key is readable
         let retrieved = ks.get_key(commitment).await.unwrap();

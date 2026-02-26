@@ -528,7 +528,8 @@ impl ClientBuilder<FilesystemKeyStore> {
 
     /// Creates a [`FilesystemKeyStore`] with encryption enabled and sets it as the authenticator.
     ///
-    /// This is a convenience method that combines [`filesystem_keystore`](Self::filesystem_keystore)
+    /// This is a convenience method that combines
+    /// [`filesystem_keystore`](Self::filesystem_keystore)
     /// with [`FilesystemKeyStore::with_encryption`].
     ///
     /// # Example
