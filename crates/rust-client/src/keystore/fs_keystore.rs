@@ -113,7 +113,24 @@ fn read_secret_key_file(file_path: &Path) -> Result<AuthSecretKey, KeyStoreError
     })
 }
 
-/// Write an [`AuthSecretKey`] into a file
+/// Writes an [`AuthSecretKey`] into a file with restrictive permissions (0600 on Unix).
+#[cfg(unix)]
+fn write_secret_key_file(file_path: &Path, key: &AuthSecretKey) -> Result<(), KeyStoreError> {
+    use std::io::Write;
+    use std::os::unix::fs::OpenOptionsExt;
+    let mut file = fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .mode(0o600)
+        .open(file_path)
+        .map_err(keystore_error("error writing secret key file"))?;
+    file.write_all(&key.to_bytes())
+        .map_err(keystore_error("error writing secret key file"))
+}
+
+/// Writes an [`AuthSecretKey`] into a file.
+#[cfg(not(unix))]
 fn write_secret_key_file(file_path: &Path, key: &AuthSecretKey) -> Result<(), KeyStoreError> {
     fs::write(file_path, key.to_bytes()).map_err(keystore_error("error writing secret key file"))
 }
