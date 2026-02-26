@@ -253,8 +253,7 @@ impl FilesystemKeyStore {
             }
 
             let encrypted = encryptor.encrypt(&bytes)?;
-            fs::write(&file_path, encrypted)
-                .map_err(keystore_error("error writing encrypted key file"))?;
+            atomic_write(&file_path, &encrypted)?;
             migrated += 1;
         }
 
@@ -331,7 +330,7 @@ impl FilesystemKeyStore {
             plaintext.to_vec()
         };
 
-        fs::write(file_path, data).map_err(keystore_error("error writing secret key file"))
+        atomic_write(file_path, &data)
     }
 }
 
@@ -449,6 +448,14 @@ impl Keystore for FilesystemKeyStore {
 fn key_file_path(keys_directory: &Path, pub_key: PublicKeyCommitment) -> PathBuf {
     let filename = hash_pub_key(pub_key.into());
     keys_directory.join(filename)
+}
+
+/// Writes `data` to `file_path` atomically by writing to a temporary file in the same directory
+/// and then renaming. This ensures a crash mid-write cannot leave a corrupted file.
+fn atomic_write(file_path: &Path, data: &[u8]) -> Result<(), KeyStoreError> {
+    let temp_path = file_path.with_extension("tmp");
+    fs::write(&temp_path, data).map_err(keystore_error("error writing temp key file"))?;
+    fs::rename(&temp_path, file_path).map_err(keystore_error("error renaming temp key file"))
 }
 
 fn keystore_error(context: &str) -> impl FnOnce(std::io::Error) -> KeyStoreError {
