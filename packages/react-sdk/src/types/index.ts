@@ -322,37 +322,6 @@ export interface MultiSendOptions {
   skipSync?: boolean;
 }
 
-export interface InternalTransferOptions {
-  /** Sender account ID */
-  from: AccountRef;
-  /** Recipient account ID */
-  to: AccountRef;
-  /** Asset ID to send (token id) */
-  assetId: AccountRef;
-  /** Amount to transfer */
-  amount: bigint;
-  /** Note type. Default: private */
-  noteType?: NoteVisibility;
-}
-
-export interface InternalTransferChainOptions {
-  /** Initial sender account ID */
-  from: AccountRef;
-  /** Ordered list of recipient account IDs */
-  recipients: AccountRef[];
-  /** Asset ID to send (token id) */
-  assetId: AccountRef;
-  /** Amount to transfer per hop */
-  amount: bigint;
-  /** Note type. Default: private */
-  noteType?: NoteVisibility;
-}
-
-export interface InternalTransferResult {
-  createTransactionId: string;
-  consumeTransactionId: string;
-  noteId: string;
-}
 
 export interface WaitForCommitOptions {
   /** Timeout in milliseconds. Default: 10000 */
