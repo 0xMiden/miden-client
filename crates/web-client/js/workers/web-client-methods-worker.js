@@ -92,12 +92,21 @@ let processing = false; // Flag to ensure one message is processed at a time.
 // Track pending callback requests
 let pendingCallbacks = new Map();
 
+// Timeout for pending callbacks (30 seconds)
+const CALLBACK_TIMEOUT_MS = 30000;
+
 // Define proxy functions for callbacks that communicate with main thread
 const callbackProxies = {
   getKey: async (pubKey) => {
     return new Promise((resolve, reject) => {
       const requestId = `${CallbackType.GET_KEY}-${crypto.randomUUID()}`;
-      pendingCallbacks.set(requestId, { resolve, reject });
+      const timeoutId = setTimeout(() => {
+        if (pendingCallbacks.has(requestId)) {
+          pendingCallbacks.delete(requestId);
+          reject(new Error(`Callback ${requestId} timed out`));
+        }
+      }, CALLBACK_TIMEOUT_MS);
+      pendingCallbacks.set(requestId, { resolve, reject, timeoutId });
 
       self.postMessage({
         action: WorkerAction.EXECUTE_CALLBACK,
@@ -110,7 +119,13 @@ const callbackProxies = {
   insertKey: async (pubKey, secretKey) => {
     return new Promise((resolve, reject) => {
       const requestId = `${CallbackType.INSERT_KEY}-${crypto.randomUUID()}`;
-      pendingCallbacks.set(requestId, { resolve, reject });
+      const timeoutId = setTimeout(() => {
+        if (pendingCallbacks.has(requestId)) {
+          pendingCallbacks.delete(requestId);
+          reject(new Error(`Callback ${requestId} timed out`));
+        }
+      }, CALLBACK_TIMEOUT_MS);
+      pendingCallbacks.set(requestId, { resolve, reject, timeoutId });
 
       self.postMessage({
         action: WorkerAction.EXECUTE_CALLBACK,
@@ -123,7 +138,13 @@ const callbackProxies = {
   sign: async (pubKey, signingInputs) => {
     return new Promise((resolve, reject) => {
       const requestId = `${CallbackType.SIGN}-${crypto.randomUUID()}`;
-      pendingCallbacks.set(requestId, { resolve, reject });
+      const timeoutId = setTimeout(() => {
+        if (pendingCallbacks.has(requestId)) {
+          pendingCallbacks.delete(requestId);
+          reject(new Error(`Callback ${requestId} timed out`));
+        }
+      }, CALLBACK_TIMEOUT_MS);
+      pendingCallbacks.set(requestId, { resolve, reject, timeoutId });
 
       self.postMessage({
         action: WorkerAction.EXECUTE_CALLBACK,
@@ -489,7 +510,8 @@ self.onmessage = (event) => {
     pendingCallbacks.has(event.data.callbackRequestId)
   ) {
     const { callbackRequestId, callbackResult, callbackError } = event.data;
-    const { resolve, reject } = pendingCallbacks.get(callbackRequestId);
+    const { resolve, reject, timeoutId } = pendingCallbacks.get(callbackRequestId);
+    clearTimeout(timeoutId);
     pendingCallbacks.delete(callbackRequestId);
     if (!callbackError) {
       resolve(callbackResult);
