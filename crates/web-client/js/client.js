@@ -55,10 +55,12 @@ export class MidenClient {
 
     const seed = options?.seed ? await hashSeed(options.seed) : undefined;
 
+    const rpcUrl = resolveRpcUrl(options?.rpcUrl);
+
     let inner;
     if (options?.keystore) {
       inner = await WebClientClass.createClientWithExternalKeystore(
-        options?.rpcUrl,
+        rpcUrl,
         options?.noteTransportUrl,
         seed,
         options?.storeName,
@@ -68,7 +70,7 @@ export class MidenClient {
       );
     } else {
       inner = await WebClientClass.createClient(
-        options?.rpcUrl,
+        rpcUrl,
         options?.noteTransportUrl,
         seed,
         options?.storeName
@@ -245,6 +247,24 @@ export class MidenClient {
       throw new Error(`${method}() is only available on mock clients`);
     }
   }
+}
+
+const RPC_URLS = {
+  testnet: "https://rpc.testnet.miden.io",
+  devnet: "https://rpc.devnet.miden.io",
+  localhost: "http://localhost:57291",
+  local: "http://localhost:57291",
+};
+
+/**
+ * Resolves an rpcUrl shorthand or raw URL into a concrete endpoint string.
+ *
+ * @param {string | undefined} rpcUrl - "testnet", "devnet", "localhost", "local", or a raw URL.
+ * @returns {string | undefined} A fully qualified URL, or undefined to use the SDK default.
+ */
+function resolveRpcUrl(rpcUrl) {
+  if (!rpcUrl) return undefined;
+  return RPC_URLS[rpcUrl.trim().toLowerCase()] ?? rpcUrl;
 }
 
 const PROVER_URLS = {

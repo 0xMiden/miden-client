@@ -139,8 +139,15 @@ export type AccountTypeValue =
 // ════════════════════════════════════════════════════════════════
 
 export interface ClientOptions {
-  /** RPC endpoint URL. Defaults to testnet RPC. */
-  rpcUrl?: string;
+  /**
+   * RPC endpoint. Accepts shorthands or a raw URL:
+   * - `"testnet"` — Miden testnet RPC (`https://rpc.testnet.miden.io`)
+   * - `"devnet"` — Miden devnet RPC (`https://rpc.devnet.miden.io`)
+   * - `"localhost"` / `"local"` — local node (`http://localhost:57291`)
+   * - any other string — treated as a raw RPC endpoint URL
+   * Defaults to the SDK testnet RPC if omitted.
+   */
+  rpcUrl?: "testnet" | "devnet" | "localhost" | "local" | (string & {});
   /** Note transport URL (optional). */
   noteTransportUrl?: string;
   /**
