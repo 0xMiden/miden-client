@@ -1,6 +1,6 @@
 use std::fs::File;
 use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use miden_client::Client;
 use miden_client::account::{Account, AccountFile};
@@ -12,24 +12,6 @@ use tracing::info;
 use crate::errors::CliError;
 use crate::utils::parse_account_id;
 use crate::{FilesystemKeyStore, Parser, get_output_note_with_id_prefix};
-
-/// Checks that the parent directory of a file path exists so we get a clear error
-/// instead of a generic "No such file or directory" from `File::create`.
-///
-/// Note: this is NOT a security boundary — the CLI user already has shell access.
-fn validate_file_path(path: &Path) -> Result<PathBuf, CliError> {
-    // Resolve the parent directory. For a new file the path itself won't exist yet,
-    // so we canonicalize the parent (if present) to give a useful error message.
-    let resolved = if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
-        let canonical_parent = parent.canonicalize().map_err(|_| {
-            CliError::Export(format!("Parent directory does not exist: {}", parent.display()))
-        })?;
-        canonical_parent.join(path.file_name().unwrap_or_default())
-    } else {
-        path.to_path_buf()
-    };
-    Ok(resolved)
-}
 
 #[derive(Debug, Parser, Clone)]
 #[command(about = "Export client output notes, or account data")]
@@ -117,7 +99,7 @@ async fn export_account<AUTH>(
     let account_data = AccountFile::new(account, key_pairs);
 
     let file_path = if let Some(filename) = filename {
-        validate_file_path(&filename)?
+        filename
     } else {
         let current_dir = std::env::current_dir()?;
         current_dir.join(format!("{account_id}.mac"))
@@ -156,7 +138,7 @@ async fn export_note<AUTH: Keystore + Sync>(
         .map_err(|err| CliError::Export(err.to_string()))?;
 
     let file_path = if let Some(filename) = filename {
-        validate_file_path(&filename)?
+        filename
     } else {
         let current_dir = std::env::current_dir()?;
         current_dir.join(format!("{}.mno", note_id.to_hex()))

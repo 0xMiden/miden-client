@@ -99,7 +99,7 @@ const CALLBACK_TIMEOUT_MS = 30000;
 const callbackProxies = {
   getKey: async (pubKey) => {
     return new Promise((resolve, reject) => {
-      const requestId = `${CallbackType.GET_KEY}-${crypto.randomUUID()}`;
+      const requestId = `${CallbackType.GET_KEY}-${Date.now()}-${Math.random()}`;
       const timeoutId = setTimeout(() => {
         if (pendingCallbacks.has(requestId)) {
           pendingCallbacks.delete(requestId);
@@ -118,7 +118,7 @@ const callbackProxies = {
   },
   insertKey: async (pubKey, secretKey) => {
     return new Promise((resolve, reject) => {
-      const requestId = `${CallbackType.INSERT_KEY}-${crypto.randomUUID()}`;
+      const requestId = `${CallbackType.INSERT_KEY}-${Date.now()}-${Math.random()}`;
       const timeoutId = setTimeout(() => {
         if (pendingCallbacks.has(requestId)) {
           pendingCallbacks.delete(requestId);
@@ -137,7 +137,7 @@ const callbackProxies = {
   },
   sign: async (pubKey, signingInputs) => {
     return new Promise((resolve, reject) => {
-      const requestId = `${CallbackType.SIGN}-${crypto.randomUUID()}`;
+      const requestId = `${CallbackType.SIGN}-${Date.now()}-${Math.random()}`;
       const timeoutId = setTimeout(() => {
         if (pendingCallbacks.has(requestId)) {
           pendingCallbacks.delete(requestId);
