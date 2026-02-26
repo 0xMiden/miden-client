@@ -1,8 +1,8 @@
 use alloc::vec::Vec;
 
 use argon2::Argon2;
-use chacha20poly1305::aead::{Aead, KeyInit, OsRng};
-use chacha20poly1305::{AeadCore, ChaCha20Poly1305};
+use chacha20poly1305::aead::{Aead, KeyInit};
+use chacha20poly1305::ChaCha20Poly1305;
 use zeroize::Zeroizing;
 
 use super::KeyStoreError;
@@ -73,7 +73,7 @@ pub struct PasswordEncryptor {
 }
 
 impl PasswordEncryptor {
-    /// Creates a new `PasswordEncryptor` from a password string.
+    /// Creates a new `PasswordEncryptor` from a password.
     ///
     /// The password is stored in a [`Zeroizing`] wrapper that clears memory on drop.
     pub fn new(password: impl Into<Vec<u8>>) -> Self {
@@ -108,7 +108,8 @@ impl KeyEncryptor for PasswordEncryptor {
     fn encrypt(&self, plaintext: &[u8]) -> Result<Vec<u8>, KeyStoreError> {
         // Generate random salt and nonce
         let salt: [u8; SALT_LEN] = rand::random();
-        let nonce = ChaCha20Poly1305::generate_nonce(&mut OsRng);
+        let nonce: [u8; NONCE_LEN] = rand::random();
+        let nonce = chacha20poly1305::Nonce::from(nonce);
 
         // Derive encryption key (zeroized on drop)
         let key = self.derive_key(&salt)?;
