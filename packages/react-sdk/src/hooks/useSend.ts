@@ -1,7 +1,14 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useMiden } from "../context/MidenProvider";
-import { NoteType, TransactionFilter } from "@miden-sdk/miden-sdk";
-import type { Note, TransactionId } from "@miden-sdk/miden-sdk";
+import {
+  FungibleAsset,
+  Note,
+  NoteAssets,
+  NoteType,
+  OutputNote,
+  OutputNoteArray,
+  TransactionRequestBuilder,
+} from "@miden-sdk/miden-sdk";
 import type {
   SendOptions,
   TransactionStage,
@@ -10,6 +17,10 @@ import type {
 import { DEFAULTS } from "../types";
 import { parseAccountId, parseAddress } from "../utils/accountParsing";
 import { runExclusiveDirect } from "../utils/runExclusive";
+import { createNoteAttachment } from "../utils/noteAttachment";
+import { MidenError } from "../utils/errors";
+import { getNoteType, waitForTransactionCommit } from "../utils/noteFilters";
+import type { ClientWithTransactions } from "../utils/noteFilters";
 
 export interface UseSendResult {
   /** Send tokens from one account to another */
@@ -25,20 +36,6 @@ export interface UseSendResult {
   /** Reset the hook state */
   reset: () => void;
 }
-
-type ClientWithTransactions = {
-  syncState: () => Promise<unknown>;
-  getTransactions: (filter: TransactionFilter) => Promise<
-    Array<{
-      id: () => { toHex: () => string };
-      transactionStatus: () => {
-        isPending: () => boolean;
-        isCommitted: () => boolean;
-        isDiscarded: () => boolean;
-      };
-    }>
-  >;
-};
 
 /**
  * Hook to send tokens between accounts.
@@ -73,6 +70,7 @@ type ClientWithTransactions = {
 export function useSend(): UseSendResult {
   const { client, isReady, sync, runExclusive, prover } = useMiden();
   const runExclusiveSafe = runExclusive ?? runExclusiveDirect;
+  const isBusyRef = useRef(false);
 
   const [result, setResult] = useState<TransactionResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -85,16 +83,51 @@ export function useSend(): UseSendResult {
         throw new Error("Miden client is not ready");
       }
 
+      if (isBusyRef.current) {
+        throw new MidenError(
+          "A send is already in progress. Await the previous send before starting another.",
+          { code: "SEND_BUSY" }
+        );
+      }
+
+      isBusyRef.current = true;
       setIsLoading(true);
       setStage("executing");
       setError(null);
 
       try {
+        // Auto-sync before send unless opted out
+        if (!options.skipSync) {
+          await sync();
+        }
+
         const noteType = getNoteType(options.noteType ?? DEFAULTS.NOTE_TYPE);
 
-        // Convert string IDs to AccountId objects
-        const fromAccountId = parseAccountId(options.from);
-        const toAccountId = parseAccountId(options.to);
+        // Resolve amount — if sendAll, query the account balance
+        let amount = options.amount;
+        if (options.sendAll) {
+          const resolvedAmount = await runExclusiveSafe(async () => {
+            const fromId = parseAccountId(options.from);
+            const account = await client.getAccount(fromId);
+            if (!account) throw new Error("Account not found");
+            const assetIdObj = parseAccountId(options.assetId);
+            const balance = account.vault?.()?.getBalance?.(assetIdObj);
+            if (balance === undefined || balance === null) {
+              throw new Error("Could not query account balance");
+            }
+            const bal = BigInt(balance as number | bigint);
+            if (bal === 0n) {
+              throw new Error("Account has zero balance for this asset");
+            }
+            return bal;
+          });
+          amount = resolvedAmount;
+        }
+
+        if (amount === undefined || amount === null) {
+          throw new Error("Amount is required (provide amount or sendAll)");
+        }
+
         const assetId =
           options.assetId ??
           (options as { faucetId?: string }).faucetId ??
@@ -102,20 +135,62 @@ export function useSend(): UseSendResult {
         if (!assetId) {
           throw new Error("Asset ID is required");
         }
-        const assetIdObj = parseAccountId(assetId);
+
+        // Build transaction — use attachment path if attachment provided
+        const hasAttachment =
+          options.attachment !== undefined && options.attachment !== null;
+
+        if (
+          hasAttachment &&
+          (options.recallHeight != null || options.timelockHeight != null)
+        ) {
+          throw new Error(
+            "recallHeight and timelockHeight are not supported when attachment is provided"
+          );
+        }
 
         const txResult = await runExclusiveSafe(async () => {
-          const txRequest = client.newSendTransactionRequest(
-            fromAccountId,
-            toAccountId,
-            assetIdObj,
-            noteType,
-            options.amount,
-            options.recallHeight ?? null,
-            options.timelockHeight ?? null
-          );
+          // Create all WASM AccountId objects inside runExclusiveSafe to
+          // avoid stale pointers if another exclusive operation runs between
+          // creation and consumption.
+          const fromAccountId = parseAccountId(options.from);
+          const toAccountId = parseAccountId(options.to);
+          const assetIdObj = parseAccountId(assetId);
 
-          return await client.executeTransaction(fromAccountId, txRequest);
+          let txRequest;
+
+          if (hasAttachment) {
+            // Manual P2ID note construction with attachment
+            const attachment = createNoteAttachment(options.attachment!);
+            const assets = new NoteAssets([
+              new FungibleAsset(assetIdObj, amount!),
+            ]);
+            const note = Note.createP2IDNote(
+              fromAccountId,
+              toAccountId,
+              assets,
+              noteType,
+              attachment
+            );
+            txRequest = new TransactionRequestBuilder()
+              .withOwnOutputNotes(new OutputNoteArray([OutputNote.full(note)]))
+              .build();
+          } else {
+            txRequest = client.newSendTransactionRequest(
+              fromAccountId,
+              toAccountId,
+              assetIdObj,
+              noteType,
+              amount!,
+              options.recallHeight ?? null,
+              options.timelockHeight ?? null
+            );
+          }
+
+          // Fresh AccountId — the originals may have been consumed by
+          // createP2IDNote or newSendTransactionRequest above.
+          const execAccountId = parseAccountId(options.from);
+          return await client.executeTransaction(execAccountId, txRequest);
         });
 
         setStage("proving");
@@ -128,26 +203,43 @@ export function useSend(): UseSendResult {
           client.submitProvenTransaction(provenTransaction, txResult)
         );
 
+        // Save txId hex BEFORE applyTransaction, which consumes the WASM
+        // pointer inside txResult (and any child objects like TransactionId).
+        const txIdHex = txResult.id().toHex();
+        const txIdString = txResult.id().toString();
+
+        // For private notes, extract the full note BEFORE applyTransaction
+        // consumes the WASM pointers.
+        let fullNote: Note | null = null;
+        if (noteType === NoteType.Private) {
+          fullNote = extractFullNote(txResult);
+        }
+
         await runExclusiveSafe(() =>
           client.applyTransaction(txResult, submissionHeight)
         );
 
-        const txId = txResult.id();
-        await waitForTransactionCommit(client, runExclusiveSafe, txId);
-
         if (noteType === NoteType.Private) {
-          const fullNote = extractFullNote(txResult);
           if (!fullNote) {
             throw new Error("Missing full note for private send");
           }
 
-          const recipientAddress = parseAddress(options.to, toAccountId);
+          await waitForTransactionCommit(
+            client as unknown as ClientWithTransactions,
+            runExclusiveSafe,
+            txIdHex
+          );
+
+          // Create a fresh AccountId — the original toAccountId may have been
+          // consumed by Note.createP2IDNote or newSendTransactionRequest.
+          const recipientAccountId = parseAccountId(options.to);
+          const recipientAddress = parseAddress(options.to, recipientAccountId);
           await runExclusiveSafe(() =>
-            client.sendPrivateNote(fullNote, recipientAddress)
+            client.sendPrivateNote(fullNote!, recipientAddress)
           );
         }
 
-        const txSummary = { transactionId: txResult.id().toString() };
+        const txSummary = { transactionId: txIdString };
 
         setStage("complete");
         setResult(txSummary);
@@ -162,6 +254,7 @@ export function useSend(): UseSendResult {
         throw error;
       } finally {
         setIsLoading(false);
+        isBusyRef.current = false;
       }
     },
     [client, isReady, prover, runExclusive, sync]
@@ -182,49 +275,6 @@ export function useSend(): UseSendResult {
     error,
     reset,
   };
-}
-
-function getNoteType(type: "private" | "public" | "encrypted"): NoteType {
-  switch (type) {
-    case "private":
-      return NoteType.Private;
-    case "public":
-      return NoteType.Public;
-    case "encrypted":
-      return NoteType.Encrypted;
-    default:
-      return NoteType.Private;
-  }
-}
-
-async function waitForTransactionCommit(
-  client: ClientWithTransactions,
-  runExclusiveSafe: <T>(fn: () => Promise<T>) => Promise<T>,
-  txId: TransactionId,
-  maxWaitMs = 10_000,
-  delayMs = 1_000
-) {
-  let waited = 0;
-
-  while (waited < maxWaitMs) {
-    await runExclusiveSafe(() => client.syncState());
-    const [record] = await runExclusiveSafe(() =>
-      client.getTransactions(TransactionFilter.ids([txId]))
-    );
-    if (record) {
-      const status = record.transactionStatus();
-      if (status.isCommitted()) {
-        return;
-      }
-      if (status.isDiscarded()) {
-        throw new Error("Transaction was discarded before commit");
-      }
-    }
-    await new Promise((resolve) => setTimeout(resolve, delayMs));
-    waited += delayMs;
-  }
-
-  throw new Error("Timeout waiting for transaction commit");
 }
 
 function extractFullNote(txResult: unknown): Note | null {

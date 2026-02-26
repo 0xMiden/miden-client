@@ -3,7 +3,13 @@ use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
-use miden_protocol::account::{AccountId, PartialAccount, StorageSlot, StorageSlotContent};
+use miden_protocol::account::{
+    Account,
+    AccountId,
+    PartialAccount,
+    StorageSlot,
+    StorageSlotContent,
+};
 use miden_protocol::asset::{AssetVaultKey, AssetWitness};
 use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::crypto::merkle::MerklePath;
@@ -11,7 +17,7 @@ use miden_protocol::crypto::merkle::mmr::{InOrderIndex, PartialMmr};
 use miden_protocol::note::NoteScript;
 use miden_protocol::transaction::{AccountInputs, PartialBlockchain};
 use miden_protocol::vm::FutureMaybeSend;
-use miden_protocol::{MastForest, Word};
+use miden_protocol::{MastForest, Word, ZERO};
 use miden_tx::{DataStore, DataStoreError, MastForestStore, TransactionMastStore};
 
 use super::{AccountStorageFilter, PartialBlockchainFilter, Store};
@@ -73,9 +79,26 @@ impl DataStore for ClientDataStore {
             .get_minimal_partial_account(account_id)
             .await?
             .ok_or(DataStoreError::AccountNotFound(account_id))?;
-        let partial_account: PartialAccount = partial_account_record
-            .try_into()
-            .map_err(|_| DataStoreError::AccountNotFound(account_id))?;
+
+        // New accounts (nonce == 0) need full storage maps as advice inputs for the
+        // kernel to validate during account creation. For these, fetch the full account
+        // and convert to PartialAccount (which includes full storage for new accounts).
+        // Existing accounts use the minimal partial record directly.
+        let partial_account: PartialAccount = if partial_account_record.nonce() == ZERO {
+            let full_record = self
+                .store
+                .get_account(account_id)
+                .await?
+                .ok_or(DataStoreError::AccountNotFound(account_id))?;
+            let account: Account = full_record
+                .try_into()
+                .map_err(|_| DataStoreError::AccountNotFound(account_id))?;
+            PartialAccount::from(&account)
+        } else {
+            partial_account_record
+                .try_into()
+                .map_err(|_| DataStoreError::AccountNotFound(account_id))?
+        };
 
         // Get header data
         let (block_header, _had_notes) = self
