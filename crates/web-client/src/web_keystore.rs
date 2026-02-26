@@ -234,7 +234,7 @@ impl<R: Rng> Keystore for WebKeyStore<R> {
         };
 
         let secret_key_bytes = hex::decode(secret_key_hex).map_err(|err| {
-            KeyStoreError::DecodingError(format!("error decoding secret key hex: {err}"))
+            KeyStoreError::DecodingError(format!("error decoding secret key hex: {err:?}"))
         })?;
 
         let secret_key = decode_secret_key_from_bytes(&secret_key_bytes)?;
@@ -257,7 +257,7 @@ impl<R: Rng> Keystore for WebKeyStore<R> {
         match account_id_hex {
             Some(hex) => {
                 let id = AccountId::from_hex(&hex).map_err(|err| {
-                    KeyStoreError::DecodingError(format!("error decoding account id hex: {err}"))
+                    KeyStoreError::DecodingError(format!("error decoding account id hex: {err:?}"))
                 })?;
                 Ok(Some(id))
             },
