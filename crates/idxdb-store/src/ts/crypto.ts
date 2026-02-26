@@ -69,10 +69,12 @@ export async function decryptSecretKey(
   iv: Uint8Array
 ): Promise<string> {
   const key = await getOrCreateEncryptionKey(dbId);
+  // Wrap in new Uint8Array() to get Uint8Array<ArrayBuffer> (required by
+  // TypeScript 5.7+ for BufferSource compatibility).
   const decrypted = await crypto.subtle.decrypt(
-    { name: "AES-GCM", iv },
+    { name: "AES-GCM", iv: new Uint8Array(iv) },
     key,
-    encrypted
+    new Uint8Array(encrypted)
   );
   return new TextDecoder().decode(decrypted);
 }
