@@ -12,6 +12,8 @@ import type {
   TransactionRequest,
   NoteType,
   AccountStorageMode,
+  NoteVisibility,
+  StorageMode,
 } from "@miden-sdk/miden-sdk";
 
 // Re-export SDK types for convenience
@@ -29,6 +31,8 @@ export type {
   TransactionRequest,
   NoteType,
   AccountStorageMode,
+  NoteVisibility,
+  StorageMode,
 };
 
 // Re-export signer types for external signer providers
@@ -209,7 +213,7 @@ export interface NoteSummary {
 // Wallet creation options
 export interface CreateWalletOptions {
   /** Storage mode. Default: private */
-  storageMode?: "private" | "public" | "network";
+  storageMode?: StorageMode;
   /** Whether code can be updated. Default: true */
   mutable?: boolean;
   /** Auth scheme: 0 = RpoFalcon512, 1 = EcdsaK256Keccak. Default: 0 */
@@ -227,7 +231,7 @@ export interface CreateFaucetOptions {
   /** Maximum supply */
   maxSupply: bigint;
   /** Storage mode. Default: private */
-  storageMode?: "private" | "public" | "network";
+  storageMode?: StorageMode;
   /** Auth scheme: 0 = RpoFalcon512, 1 = EcdsaK256Keccak. Default: 0 */
   authScheme?: 0 | 1;
 }
@@ -260,7 +264,7 @@ export interface SendOptions {
   /** Amount to send */
   amount: bigint;
   /** Note type. Default: private */
-  noteType?: "private" | "public";
+  noteType?: NoteVisibility;
   /** Block height after which sender can reclaim note */
   recallHeight?: number;
   /** Block height after which recipient can consume note */
@@ -282,7 +286,7 @@ export interface MultiSendOptions {
   /** Recipient list */
   recipients: MultiSendRecipient[];
   /** Note type. Default: private */
-  noteType?: "private" | "public";
+  noteType?: NoteVisibility;
 }
 
 export interface InternalTransferOptions {
@@ -295,7 +299,7 @@ export interface InternalTransferOptions {
   /** Amount to transfer */
   amount: bigint;
   /** Note type. Default: private */
-  noteType?: "private" | "public";
+  noteType?: NoteVisibility;
 }
 
 export interface InternalTransferChainOptions {
@@ -308,7 +312,7 @@ export interface InternalTransferChainOptions {
   /** Amount to transfer per hop */
   amount: bigint;
   /** Note type. Default: private */
-  noteType?: "private" | "public";
+  noteType?: NoteVisibility;
 }
 
 export interface InternalTransferResult {
@@ -344,7 +348,7 @@ export interface MintOptions {
   /** Amount to mint */
   amount: bigint;
   /** Note type. Default: private */
-  noteType?: "private" | "public";
+  noteType?: NoteVisibility;
 }
 
 // Consume options
@@ -368,9 +372,9 @@ export interface SwapOptions {
   /** Amount being requested */
   requestedAmount: bigint;
   /** Note type for swap note. Default: private */
-  noteType?: "private" | "public";
+  noteType?: NoteVisibility;
   /** Note type for payback note. Default: private */
-  paybackNoteType?: "private" | "public";
+  paybackNoteType?: NoteVisibility;
 }
 
 // Arbitrary transaction options

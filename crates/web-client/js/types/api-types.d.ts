@@ -79,6 +79,35 @@ export declare const AuthScheme: {
 export type AuthSchemeType = (typeof AuthScheme)[keyof typeof AuthScheme];
 
 /**
+ * User-friendly note visibility constants for MidenClient options.
+ * Use `NoteVisibility.Public` or `NoteVisibility.Private` instead of raw strings.
+ */
+export declare const NoteVisibility: {
+  readonly Public: "public";
+  readonly Private: "private";
+};
+
+/**
+ * Union of all values in the NoteVisibility const.
+ */
+export type NoteVisibility = (typeof NoteVisibility)[keyof typeof NoteVisibility];
+
+/**
+ * User-friendly storage mode constants for MidenClient options.
+ * Use `StorageMode.Public`, `StorageMode.Private`, or `StorageMode.Network` instead of raw strings.
+ */
+export declare const StorageMode: {
+  readonly Public: "public";
+  readonly Private: "private";
+  readonly Network: "network";
+};
+
+/**
+ * Union of all values in the StorageMode const.
+ */
+export type StorageMode = (typeof StorageMode)[keyof typeof StorageMode];
+
+/**
  * Union of all values in the AccountType const.
  */
 export type AccountType = (typeof AccountType)[keyof typeof AccountType];
@@ -146,8 +175,6 @@ export interface Asset {
   /** Auto-converted to bigint internally. */
   amount: number | bigint;
 }
-
-export type NoteVisibility = "public" | "private";
 
 /**
  * A note reference: hex note ID string, NoteId object, InputNoteRecord, or Note object.

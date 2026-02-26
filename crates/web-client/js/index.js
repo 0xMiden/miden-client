@@ -28,6 +28,17 @@ export const AuthScheme = Object.freeze({
   ECDSA: "ecdsa",
 });
 
+export const NoteVisibility = Object.freeze({
+  Public: "public",
+  Private: "private",
+});
+
+export const StorageMode = Object.freeze({
+  Public: "public",
+  Private: "private",
+  Network: "network",
+});
+
 export { MidenClient };
 export { createP2IDNote, createP2IDENote, buildSwapTag };
 
