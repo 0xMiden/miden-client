@@ -164,8 +164,6 @@ export function MidenProvider({
           let webClient: WebClient;
           let didSignerInit = false;
 
-          console.log("[MidenProvider] init starting", { resolvedConfig, hasSigner: !!signerContext });
-
           if (signerContext && signerContext.isConnected) {
             // External keystore mode - signer provider is present and connected
             const storeName = `MidenClientDB_${signerContext.storeName}`;
@@ -222,13 +220,11 @@ export function MidenProvider({
             const seed = resolvedConfig.seed as Parameters<
               typeof WebClient.createClient
             >[2];
-            console.log("[MidenProvider] calling createClient", resolvedConfig.rpcUrl);
             webClient = await WebClient.createClient(
               resolvedConfig.rpcUrl,
               resolvedConfig.noteTransportUrl,
               seed
             );
-            console.log("[MidenProvider] createClient resolved");
             if (cancelled) return;
           }
 
@@ -266,7 +262,6 @@ export function MidenProvider({
             setClient(webClient);
           }
         } catch (error) {
-          console.error("[MidenProvider] init error", error);
           if (!cancelled) {
             setInitError(
               error instanceof Error ? error : new Error(String(error))
