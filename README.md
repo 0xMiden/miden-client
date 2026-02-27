@@ -133,7 +133,7 @@ Beyond Node.js backends, the TypeScript SDK also serves **non-React frontend env
 The SDK wraps the WASM bridge in a resource-based API that feels native to TypeScript developers. Instead of calling raw WASM methods, developers interact with high-level resource objects:
 
 ```typescript
-import { MidenClient } from "@miden-sdk/ts-sdk";
+import { MidenClient, AccountType } from "@miden-sdk/ts-sdk";
 
 // Node.js backend — e.g., a token distribution service
 const client = await MidenClient.create({ rpcUrl: "https://rpc.testnet.miden.io" });
@@ -209,7 +209,7 @@ function Wallet() {
 Key features:
 
 - **`MidenProvider`** — a single provider component that handles WASM initialization, client construction, auto-sync (configurable interval, default 15s), and lifecycle management. Supports both local keystore and external signer modes.
-- **Query hooks** — `useAccounts()`, `useAccount(id)`, `useNotes()`, `useSyncState()`, `useAssetMetadata()`, `useTransactionHistory()`. All return `{ data, isLoading, error, refetch }`.
+- **Query hooks** — `useAccounts()`, `useAccount(id)`, `useNotes()`, `useSyncState()`, `useAssetMetadata()`, `useTransactionHistory()`. Each returns domain-specific data alongside `isLoading` and `error` state.
 - **Mutation hooks** — `useCreateWallet()`, `useCreateFaucet()`, `useSend()`, `useMultiSend()`, `useMint()`, `useConsume()`, `useSwap()`, `useTransaction()`. Each returns a named action function alongside `isLoading`, `stage`, `error`, and result state, with granular transaction stage tracking (`idle` → `executing` → `proving` → `submitting` → `complete`).
 - **Zustand state management** — a centralized store manages client state, cached data, loading states, and sync status, with optimized selector hooks to minimize unnecessary re-renders.
 - **External signer support** — a `SignerContext` enables integration with external key management services (Para, Turnkey, MidenFi wallet adapter) via a provider pattern, allowing wallets to use hardware keys, passkeys, or custodial signing services.
