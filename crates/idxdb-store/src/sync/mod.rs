@@ -1,7 +1,9 @@
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
+use miden_client::Word;
 use miden_client::account::AccountId;
+use miden_client::asset::AssetVault;
 use miden_client::note::{BlockNumber, NoteId, NoteTag};
 use miden_client::store::StoreError;
 use miden_client::sync::{NoteTagRecord, NoteTagSource, StateSyncUpdate};
@@ -182,14 +184,23 @@ impl WebStore {
             .map(|tx_record| tx_record.details.final_account_state)
             .collect::<Vec<_>>();
 
-        // Remove the account states that are originated from the discarded transactions
-        self.undo_account_states(&account_states_to_rollback).await?;
+        // Remove the account states and pop the corresponding SMT roots from the forest
+        self.rollback_account_states(&account_states_to_rollback).await?;
 
         let transaction_updates: Vec<_> = transaction_updates
             .committed_transactions()
             .chain(transaction_updates.discarded_transactions())
             .map(serialize_transaction_record)
             .collect();
+
+        // Update SMT forest for public account updates
+        for account in account_updates.updated_public_accounts() {
+            let vault = AssetVault::new(account.vault().assets().collect::<Vec<_>>().as_slice())?;
+            let storage = account.storage();
+
+            let mut smt_forest = self.smt_forest.write();
+            smt_forest.insert_account_state(&vault, storage)?;
+        }
 
         let state_update = JsStateSyncUpdate {
             block_num: block_num.as_u32(),
@@ -211,6 +222,29 @@ impl WebStore {
         };
         let promise = idxdb_apply_state_sync(self.db_id(), state_update);
         await_js_value(promise, "failed to apply state sync").await?;
+
+        Ok(())
+    }
+
+    /// Rolls back account states by removing them from the DB and popping their SMT roots
+    /// (vault roots + storage map roots) from the forest.
+    async fn rollback_account_states(
+        &self,
+        account_commitments: &[Word],
+    ) -> Result<(), StoreError> {
+        // Collect the actual SMT roots before deletion so we pop the correct entries
+        let mut smt_roots_to_pop = Vec::new();
+        for commitment in account_commitments {
+            if let Some(header) = self.get_account_header_by_commitment(*commitment).await? {
+                let roots = self.get_smt_roots_for_account_header(&header).await?;
+                smt_roots_to_pop.extend(roots);
+            }
+        }
+
+        self.undo_account_states(account_commitments).await?;
+
+        let mut smt_forest = self.smt_forest.write();
+        smt_forest.pop_roots(smt_roots_to_pop);
 
         Ok(())
     }

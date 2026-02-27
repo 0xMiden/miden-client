@@ -22,8 +22,9 @@ use miden_client::account::{
     AccountId,
     AccountStorage,
     Address,
+    StorageSlotName,
 };
-use miden_client::asset::AssetVault;
+use miden_client::asset::{Asset, AssetVault, AssetVaultKey, AssetWitness, StorageMapWitness};
 use miden_client::block::BlockHeader;
 use miden_client::crypto::{InOrderIndex, MmrPeaks};
 use miden_client::note::{BlockNumber, NoteScript, Nullifier};
@@ -42,6 +43,7 @@ use miden_client::store::{
 };
 use miden_client::sync::{NoteTagRecord, StateSyncUpdate};
 use miden_client::transaction::{TransactionRecord, TransactionStoreUpdate};
+use miden_client::utils::RwLock;
 use serde::de::Error;
 use serde::{Deserialize, Deserializer};
 use wasm_bindgen::prelude::*;
@@ -55,6 +57,7 @@ pub mod import;
 pub mod note;
 mod promise;
 pub mod settings;
+mod smt_forest;
 pub mod sync;
 pub mod transaction;
 
@@ -82,13 +85,57 @@ extern "C" {
 /// which would prevent the struct from being Send + Sync.
 pub struct WebStore {
     database_id: String,
+    smt_forest: RwLock<smt_forest::AccountSmtForest>,
 }
 
 impl WebStore {
     pub async fn new(database_name: String) -> Result<WebStore, JsValue> {
         let promise = open_database(database_name.as_str(), CLIENT_VERSION);
         let _db_id = JsFuture::from(promise).await?;
-        Ok(WebStore { database_id: database_name })
+
+        let store = WebStore {
+            database_id: database_name,
+            smt_forest: RwLock::new(smt_forest::AccountSmtForest::new()),
+        };
+
+        // Initialize SMT forest
+        store.build_smt_forest().await?;
+
+        Ok(store)
+    }
+
+    /// Builds the SMT forest by loading all existing account vault and storage data.
+    ///
+    /// This ensures that the forest contains all necessary Merkle nodes for generating
+    /// witnesses when creating partial accounts or executing transactions.
+    async fn build_smt_forest(&self) -> Result<(), JsValue> {
+        let account_ids = self
+            .get_account_ids()
+            .await
+            .map_err(|e| JsValue::from_str(&format!("Failed to get account IDs: {e:?}")))?;
+
+        for account_id in account_ids {
+            let vault = self.get_account_vault(account_id).await.map_err(|e| {
+                JsValue::from_str(&format!("Failed to get vault for account {account_id}: {e:?}"))
+            })?;
+
+            let storage = self
+                .get_account_storage(account_id, AccountStorageFilter::All)
+                .await
+                .map_err(|e| {
+                    JsValue::from_str(&format!(
+                        "Failed to get storage for account {account_id}: {e:?}"
+                    ))
+                })?;
+
+            self.smt_forest.write().insert_account_state(&vault, &storage).map_err(|e| {
+                JsValue::from_str(&format!(
+                    "Failed to insert account state for {account_id}: {e:?}"
+                ))
+            })?;
+        }
+
+        Ok(())
     }
 
     /// Returns the database ID as a string slice for passing to JS functions.
@@ -308,6 +355,23 @@ impl Store for WebStore {
         filter: AccountStorageFilter,
     ) -> Result<AccountStorage, StoreError> {
         self.get_account_storage(account_id, filter).await
+    }
+
+    async fn get_account_asset(
+        &self,
+        account_id: AccountId,
+        vault_key: AssetVaultKey,
+    ) -> Result<Option<(Asset, AssetWitness)>, StoreError> {
+        self.get_account_asset(account_id, vault_key).await
+    }
+
+    async fn get_account_map_item(
+        &self,
+        account_id: AccountId,
+        slot_name: StorageSlotName,
+        key: Word,
+    ) -> Result<(Word, StorageMapWitness), StoreError> {
+        self.get_account_map_item(account_id, slot_name, key).await
     }
 
     async fn get_addresses_by_account_id(

@@ -143,6 +143,20 @@ const methodHandlers = {
     const serializedSyncSummary = syncSummary.serialize();
     return serializedSyncSummary.buffer;
   },
+  [MethodName.APPLY_TRANSACTION]: async (args) => {
+    const wasm = await getWasmOrThrow();
+    const [serializedTransactionResult, submissionHeight] = args;
+    const transactionResultBytes = new Uint8Array(serializedTransactionResult);
+    const transactionResult = wasm.TransactionResult.deserialize(
+      transactionResultBytes
+    );
+    const transactionUpdate = await wasmWebClient.applyTransaction(
+      transactionResult,
+      submissionHeight
+    );
+    const serializedUpdate = transactionUpdate.serialize();
+    return serializedUpdate.buffer;
+  },
   [MethodName.EXECUTE_TRANSACTION]: async (args) => {
     const wasm = await getWasmOrThrow();
     const [accountIdHex, serializedTransactionRequest] = args;
