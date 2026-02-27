@@ -33,6 +33,7 @@ use super::js_bindings::{
 };
 use crate::account::js_bindings::idxdb_insert_account_address;
 use crate::account::models::{AccountRecordIdxdbObject, AddressIdxdbObject};
+use crate::sync::JsAccountUpdate;
 
 pub async fn upsert_account_code(db_id: &str, account_code: &AccountCode) -> Result<(), JsValue> {
     let root = account_code.commitment().to_string();
@@ -180,9 +181,8 @@ pub fn parse_account_address_idxdb_object(
     Ok((address, native_account_id))
 }
 
-/// Applies the account delta (storage + vault + header) in a single atomic `IndexedDB`
-/// transaction. Value slots and map entries use empty-string sentinels for removals on the JS
-/// side.
+/// Applies a transaction's account delta atomically in a single Dexie transaction.
+/// Combines storage delta + vault delta + account record upsert.
 pub async fn apply_transaction_delta(
     db_id: &str,
     account: &Account,
@@ -190,8 +190,6 @@ pub async fn apply_transaction_delta(
 ) -> Result<(), JsValue> {
     let account_id_str = account.id().to_string();
     let nonce_str = account.nonce().to_string();
-
-    // --- Storage delta ---
 
     let mut updated_slots = Vec::new();
     let mut changed_map_entries = Vec::new();
@@ -230,11 +228,9 @@ pub async fn apply_transaction_delta(
         }
     }
 
-    // --- Vault delta ---
-
+    // Build vault delta
     let mut changed_assets = Vec::new();
 
-    // Process fungible asset changes
     for (faucet_id, _amount_delta) in delta.vault().fungible().iter() {
         let balance = account
             .vault()
@@ -242,14 +238,10 @@ pub async fn apply_transaction_delta(
             .expect("faucet_id from delta should be valid");
 
         if balance > 0 {
-            // Asset still exists in the final state — write its current value
             let asset = FungibleAsset::new(*faucet_id, balance)
                 .expect("balance from vault should be valid");
             changed_assets.push(JsVaultAsset::from_asset(&Asset::Fungible(asset)));
         } else {
-            // Asset was removed — construct a removal sentinel
-            // We need vault_key and faucet_id_prefix for the tombstone; create a dummy asset
-            // with amount 1 just to derive these identifiers.
             let dummy =
                 FungibleAsset::new(*faucet_id, 1).expect("faucet_id from delta should be valid");
             changed_assets.push(JsVaultAsset {
@@ -260,7 +252,6 @@ pub async fn apply_transaction_delta(
         }
     }
 
-    // Process non-fungible asset changes
     for (nft, action) in delta.vault().non_fungible().iter() {
         use miden_client::asset::NonFungibleDeltaAction;
         match action {
@@ -277,8 +268,7 @@ pub async fn apply_transaction_delta(
         }
     }
 
-    // --- Account header ---
-
+    // Account record fields
     let code_root = account.code().commitment().to_string();
     let storage_root = account.storage().to_commitment().to_string();
     let vault_root = account.vault().root().to_string();
@@ -308,8 +298,7 @@ pub async fn apply_transaction_delta(
 /// Writes the full account state atomically in a single Dexie transaction.
 /// Combines storage upsert + map entries upsert + vault assets upsert + account record upsert.
 pub async fn apply_full_account_state(db_id: &str, account: &Account) -> Result<(), JsValue> {
-    let account_state =
-        crate::sync::JsAccountUpdate::from_account(account, account.seed());
+    let account_state = JsAccountUpdate::from_account(account, account.seed());
 
     JsFuture::from(idxdb_apply_full_account_state(db_id, account_state)).await?;
 
