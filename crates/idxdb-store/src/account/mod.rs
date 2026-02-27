@@ -26,7 +26,7 @@ use miden_client::store::{
 use miden_client::utils::Serializable;
 use miden_client::{AccountError, Word};
 
-use super::WebStore;
+use super::IdxdbStore;
 use crate::account::js_bindings::idxdb_get_account_addresses;
 use crate::account::models::AddressIdxdbObject;
 use crate::account::utils::{
@@ -73,7 +73,7 @@ use utils::{
     upsert_account_storage,
 };
 
-impl WebStore {
+impl IdxdbStore {
     pub(super) async fn get_account_ids(&self) -> Result<Vec<AccountId>, StoreError> {
         let promise = idxdb_get_account_ids(self.db_id());
         let account_ids_as_strings: Vec<String> =
