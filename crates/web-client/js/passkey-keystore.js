@@ -324,22 +324,6 @@ async function decryptSecretKey(wrappingKey, envelope, pubKeyCommitment) {
   return new Uint8Array(plaintext);
 }
 
-/**
- * Returns `true` if `data` starts with the MWEB magic header.
- *
- * @param {Uint8Array} data
- * @returns {boolean}
- */
-function isEncryptedPayload(data) {
-  return (
-    data.length >= 4 &&
-    data[0] === ENCRYPTED_MAGIC[0] &&
-    data[1] === ENCRYPTED_MAGIC[1] &&
-    data[2] === ENCRYPTED_MAGIC[2] &&
-    data[3] === ENCRYPTED_MAGIC[3]
-  );
-}
-
 // ════════════════════════════════════════════════════════════════
 // Credential persistence
 // ════════════════════════════════════════════════════════════════
@@ -563,10 +547,16 @@ export async function createPasskeyKeystore(storeName, options = {}) {
           });
 
           // Verify round-trip before deleting plaintext — if decryption
-          // fails the plaintext entry is preserved so the key is not lost.
+          // fails or bytes don't match, the plaintext entry is preserved.
           const verifyRecord = await keystoreDb.keys.get(pubKeyHex);
           const verifyCt = hexToBytes(verifyRecord.ciphertextHex);
-          await decryptSecretKey(wrappingKey, verifyCt, pubKey);
+          const decrypted = await decryptSecretKey(wrappingKey, verifyCt, pubKey);
+          if (
+            decrypted.length !== plaintext.length ||
+            !decrypted.every((b, i) => b === plaintext[i])
+          ) {
+            throw new Error("Migration round-trip verification failed");
+          }
 
           // Remove plaintext from old DB after successful verification
           try {

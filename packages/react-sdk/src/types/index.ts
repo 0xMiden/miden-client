@@ -89,7 +89,7 @@ export interface MidenConfig {
   proverUrls?: ProverUrls;
   /** Default timeout for remote prover requests in milliseconds. */
   proverTimeoutMs?: number | bigint;
-  /** Store isolation key. Required when using passkeyEncryption. */
+  /** Store isolation key. Recommended when using passkeyEncryption (defaults to "default"). */
   storeName?: string;
   /**
    * Opt-in passkey encryption for keys at rest. Pass `true` for defaults

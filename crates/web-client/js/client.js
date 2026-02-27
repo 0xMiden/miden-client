@@ -72,6 +72,7 @@ export class MidenClient {
         const result = await createPasskeyKeystore(storeName, passkeyOpts);
         options = {
           ...options,
+          storeName,
           keystore: { getKey: result.getKey, insertKey: result.insertKey },
         };
       }
