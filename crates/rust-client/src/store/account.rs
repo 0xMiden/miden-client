@@ -3,10 +3,7 @@
 use alloc::vec::Vec;
 use core::fmt::Display;
 
-use miden_protocol::account::{
-    Account, AccountCode, AccountHeader, AccountId, AccountStorageHeader, PartialAccount,
-};
-use miden_protocol::block::BlockNumber;
+use miden_protocol::account::{Account, AccountId, PartialAccount};
 use miden_protocol::{Felt, Word};
 
 use crate::ClientError;
@@ -110,6 +107,9 @@ pub enum AccountStatus {
     /// The seed is preserved for private accounts with nonce=0 that need reconstruction via
     /// `Account::new()`.
     Locked { seed: Option<Word> },
+    /// The account is watched but not owned — the client doesn't hold auth keys for it.
+    /// Watched accounts are always public and participate in `sync_state()`.
+    Watched,
 }
 
 impl AccountStatus {
@@ -121,11 +121,15 @@ impl AccountStatus {
         matches!(self, AccountStatus::Locked { .. })
     }
 
+    pub fn is_watched(&self) -> bool {
+        matches!(self, AccountStatus::Watched)
+    }
+
     pub fn seed(&self) -> Option<&Word> {
         match self {
             AccountStatus::New { seed } => Some(seed),
             AccountStatus::Locked { seed } => seed.as_ref(),
-            AccountStatus::Tracked => None,
+            AccountStatus::Tracked | AccountStatus::Watched => None,
         }
     }
 }
@@ -136,6 +140,7 @@ impl Display for AccountStatus {
             AccountStatus::New { .. } => write!(f, "New"),
             AccountStatus::Tracked => write!(f, "Tracked"),
             AccountStatus::Locked { .. } => write!(f, "Locked"),
+            AccountStatus::Watched => write!(f, "Watched"),
         }
     }
 }
@@ -175,23 +180,3 @@ impl AccountUpdates {
     }
 }
 
-// WATCHED ACCOUNT RECORD
-// ================================================================================================
-
-/// A public account the client watches but does not own.
-///
-/// Watched accounts participate in `sync_state()` — the node reports their commitment changes —
-/// and their state is fetched via `get_account_proof` when a change is detected.
-#[derive(Debug, Clone)]
-pub struct WatchedAccountRecord {
-    /// Account ID (must be a public account).
-    pub account_id: AccountId,
-    /// Last known account header from the network.
-    pub header: AccountHeader,
-    /// Account code.
-    pub code: AccountCode,
-    /// Storage header (slot metadata and top-level values/roots).
-    pub storage_header: AccountStorageHeader,
-    /// Block number up to which this account has been synced.
-    pub last_synced_block: BlockNumber,
-}

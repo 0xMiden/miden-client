@@ -28,6 +28,7 @@ pub(crate) struct SerializedHeaderData {
     pub code_commitment: String,
     pub account_seed: Option<Vec<u8>>,
     pub locked: bool,
+    pub watched: bool,
 }
 
 /// Parse an account header from the provided serialized data.
@@ -42,12 +43,14 @@ pub(crate) fn parse_accounts(
         code_commitment,
         account_seed,
         locked,
+        watched,
     } = serialized_account_parts;
     let account_seed = account_seed.map(|seed| Word::read_from_bytes(&seed[..])).transpose()?;
 
-    let status = match (account_seed, locked) {
-        (seed, true) => AccountStatus::Locked { seed },
-        (Some(seed), _) => AccountStatus::New { seed },
+    let status = match (account_seed, locked, watched) {
+        (_, _, true) => AccountStatus::Watched,
+        (seed, true, _) => AccountStatus::Locked { seed },
+        (Some(seed), _, _) => AccountStatus::New { seed },
         _ => AccountStatus::Tracked,
     };
 
@@ -86,7 +89,7 @@ fn query_account_headers_from_table(
     params: impl Params,
 ) -> Result<Vec<(AccountHeader, AccountStatus)>, StoreError> {
     let query = format!(
-        "SELECT id, nonce, vault_root, storage_commitment, code_commitment, account_seed, locked \
+        "SELECT id, nonce, vault_root, storage_commitment, code_commitment, account_seed, locked, watched \
          FROM {table} WHERE {where_clause}"
     );
     conn.prepare(&query)
@@ -99,6 +102,7 @@ fn query_account_headers_from_table(
             let code_commitment: String = row.get(4)?;
             let account_seed: Option<Vec<u8>> = row.get(5)?;
             let locked: bool = row.get(6)?;
+            let watched: bool = row.get(7)?;
 
             Ok(SerializedHeaderData {
                 id,
@@ -108,6 +112,7 @@ fn query_account_headers_from_table(
                 code_commitment,
                 account_seed,
                 locked,
+                watched,
             })
         })
         .into_store_error()?

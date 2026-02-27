@@ -64,9 +64,7 @@ mod errors;
 pub use errors::*;
 
 mod account;
-pub use account::{
-    AccountRecord, AccountRecordData, AccountStatus, AccountUpdates, WatchedAccountRecord,
-};
+pub use account::{AccountRecord, AccountRecordData, AccountStatus, AccountUpdates};
 mod note_record;
 pub use note_record::{
     InputNoteRecord,
@@ -573,22 +571,13 @@ pub trait Store: Send + Sync {
     // WATCHED ACCOUNTS
     // --------------------------------------------------------------------------------------------
 
-    /// Returns all watched (foreign) account records.
-    async fn get_watched_accounts(&self) -> Result<Vec<WatchedAccountRecord>, StoreError>;
+    /// Inserts a watched account into the store.
+    ///
+    /// Watched accounts store full state (code, storage, vault) in the same tables as owned
+    /// accounts, with the `watched` flag set to `true`.
+    async fn insert_watched_account(&self, account: &Account) -> Result<(), StoreError>;
 
-    /// Returns a watched account by ID, or `None` if not watched.
-    async fn get_watched_account(
-        &self,
-        account_id: AccountId,
-    ) -> Result<Option<WatchedAccountRecord>, StoreError>;
-
-    /// Inserts or updates a watched account record.
-    async fn upsert_watched_account(
-        &self,
-        record: &WatchedAccountRecord,
-    ) -> Result<(), StoreError>;
-
-    /// Removes a watched account.
+    /// Removes a watched account and all its associated data from the store.
     async fn remove_watched_account(&self, account_id: AccountId) -> Result<(), StoreError>;
 }
 

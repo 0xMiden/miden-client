@@ -39,7 +39,7 @@ use miden_client::store::{
     Store,
     StoreError,
     TransactionFilter,
-    WatchedAccountRecord,
+
 };
 use miden_client::sync::{NoteTagRecord, StateSyncUpdate};
 use miden_client::transaction::{TransactionRecord, TransactionStoreUpdate};
@@ -365,22 +365,8 @@ impl Store for WebStore {
     // WATCHED ACCOUNTS
     // --------------------------------------------------------------------------------------------
 
-    async fn get_watched_accounts(&self) -> Result<Vec<WatchedAccountRecord>, StoreError> {
-        todo!("WebStore::get_watched_accounts")
-    }
-
-    async fn get_watched_account(
-        &self,
-        _account_id: AccountId,
-    ) -> Result<Option<WatchedAccountRecord>, StoreError> {
-        todo!("WebStore::get_watched_account")
-    }
-
-    async fn upsert_watched_account(
-        &self,
-        _record: &WatchedAccountRecord,
-    ) -> Result<(), StoreError> {
-        todo!("WebStore::upsert_watched_account")
+    async fn insert_watched_account(&self, _account: &Account) -> Result<(), StoreError> {
+        todo!("WebStore::insert_watched_account")
     }
 
     async fn remove_watched_account(&self, _account_id: AccountId) -> Result<(), StoreError> {

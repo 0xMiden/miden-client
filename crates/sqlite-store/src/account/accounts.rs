@@ -322,7 +322,7 @@ impl SqliteStore {
         Self::insert_storage_slots(&tx, account_id, nonce, account.storage().slots().iter())?;
 
         Self::insert_assets(&tx, account_id, nonce, account.vault().assets())?;
-        Self::insert_account_header(&tx, &account.into(), account.seed())?;
+        Self::insert_account_header(&tx, &account.into(), account.seed(), false)?;
 
         Self::insert_address(&tx, initial_address, account.id())?;
 
@@ -387,20 +387,6 @@ impl SqliteStore {
         tx.commit().into_store_error()
     }
 
-    /// Upserts the foreign account code within an existing transaction.
-    pub(crate) fn upsert_foreign_account_code_tx(
-        tx: &Transaction<'_>,
-        account_id: AccountId,
-        code: &AccountCode,
-    ) -> Result<(), StoreError> {
-        const QUERY: &str =
-            insert_sql!(foreign_account_code { account_id, code_commitment } | REPLACE);
-
-        tx.execute(QUERY, params![account_id.to_hex(), code.commitment().to_string()])
-            .into_store_error()?;
-
-        Ok(())
-    }
 
     pub(crate) fn insert_address(
         tx: &Transaction<'_>,
@@ -431,6 +417,99 @@ impl SqliteStore {
         tx.commit().into_store_error()
     }
 
+    /// Inserts a watched account into the store, storing full state (code, storage, vault)
+    /// in the same tables as owned accounts with the `watched` flag set.
+    pub(crate) fn insert_watched_account(
+        conn: &mut Connection,
+        smt_forest: &Arc<RwLock<AccountSmtForest>>,
+        account: &Account,
+    ) -> Result<(), StoreError> {
+        let tx = conn.transaction().into_store_error()?;
+
+        Self::insert_account_code(&tx, account.code())?;
+
+        let account_id = account.id();
+        let nonce = account.nonce().as_int();
+
+        Self::insert_storage_slots(&tx, account_id, nonce, account.storage().slots().iter())?;
+
+        Self::insert_assets(&tx, account_id, nonce, account.vault().assets())?;
+        Self::insert_account_header(&tx, &account.into(), None, true)?;
+
+        tx.commit().into_store_error()?;
+
+        let mut smt_forest = smt_forest.write().expect("smt_forest write lock not poisoned");
+        smt_forest.insert_account_state(account.vault(), account.storage())?;
+
+        Ok(())
+    }
+
+    /// Removes a watched account and all its associated data from the store.
+    pub(crate) fn remove_watched_account(
+        conn: &mut Connection,
+        smt_forest: &Arc<RwLock<AccountSmtForest>>,
+        account_id: AccountId,
+    ) -> Result<(), StoreError> {
+        let account_id_hex = account_id.to_hex();
+        let tx = conn.transaction().into_store_error()?;
+
+        // Get SMT roots before deletion so we can pop them from the forest
+        let old_roots = Self::get_smt_roots_by_account_id(&tx, account_id)?;
+
+        tx.execute(
+            "DELETE FROM latest_account_headers WHERE id = ?",
+            params![&account_id_hex],
+        )
+        .into_store_error()?;
+        tx.execute(
+            "DELETE FROM historical_account_headers WHERE id = ?",
+            params![&account_id_hex],
+        )
+        .into_store_error()?;
+        tx.execute(
+            "DELETE FROM latest_account_storage WHERE account_id = ?",
+            params![&account_id_hex],
+        )
+        .into_store_error()?;
+        tx.execute(
+            "DELETE FROM historical_account_storage WHERE account_id = ?",
+            params![&account_id_hex],
+        )
+        .into_store_error()?;
+        tx.execute(
+            "DELETE FROM latest_storage_map_entries WHERE account_id = ?",
+            params![&account_id_hex],
+        )
+        .into_store_error()?;
+        tx.execute(
+            "DELETE FROM historical_storage_map_entries WHERE account_id = ?",
+            params![&account_id_hex],
+        )
+        .into_store_error()?;
+        tx.execute(
+            "DELETE FROM latest_account_assets WHERE account_id = ?",
+            params![&account_id_hex],
+        )
+        .into_store_error()?;
+        tx.execute(
+            "DELETE FROM historical_account_assets WHERE account_id = ?",
+            params![&account_id_hex],
+        )
+        .into_store_error()?;
+        tx.execute(
+            "DELETE FROM foreign_account_code WHERE account_id = ?",
+            params![&account_id_hex],
+        )
+        .into_store_error()?;
+
+        tx.commit().into_store_error()?;
+
+        let mut smt_forest = smt_forest.write().expect("smt_forest write lock not poisoned");
+        smt_forest.pop_roots(old_roots);
+
+        Ok(())
+    }
+
     /// Inserts an [`AccountCode`].
     pub(crate) fn insert_account_code(
         tx: &Transaction<'_>,
@@ -458,7 +537,7 @@ impl SqliteStore {
         let account_id = final_account_state.id();
 
         // Insert the new account header
-        Self::insert_account_header(tx, final_account_state, None)?;
+        Self::insert_account_header(tx, final_account_state, None, false)?;
 
         Self::apply_account_vault_delta(
             tx,
@@ -630,7 +709,7 @@ impl SqliteStore {
             new_account_state.storage().slots().iter(),
         )?;
         Self::insert_assets(tx, account_id, nonce, new_account_state.vault().assets())?;
-        Self::insert_account_header(tx, &new_account_state.into(), None)?;
+        Self::insert_account_header(tx, &new_account_state.into(), None, false)?;
 
         // Pop old roots to free memory for nodes no longer reachable
         smt_forest.pop_roots(old_roots);
@@ -708,8 +787,8 @@ impl SqliteStore {
 
         // Rebuild latest_account_headers from historical
         tx.execute(
-            "INSERT INTO latest_account_headers (id, account_commitment, code_commitment, storage_commitment, vault_root, nonce, account_seed, locked)
-             SELECT h.id, h.account_commitment, h.code_commitment, h.storage_commitment, h.vault_root, h.nonce, h.account_seed, h.locked
+            "INSERT INTO latest_account_headers (id, account_commitment, code_commitment, storage_commitment, vault_root, nonce, account_seed, locked, watched)
+             SELECT h.id, h.account_commitment, h.code_commitment, h.storage_commitment, h.vault_root, h.nonce, h.account_seed, h.locked, h.watched
              FROM historical_account_headers h
              WHERE h.id = ?1 AND h.nonce = (SELECT MAX(nonce) FROM historical_account_headers WHERE id = ?1)",
             params![account_id_hex],
@@ -868,6 +947,7 @@ impl SqliteStore {
         tx: &Transaction<'_>,
         account: &AccountHeader,
         account_seed: Option<Word>,
+        watched: bool,
     ) -> Result<(), StoreError> {
         let id: String = account.id().to_hex();
         let code_commitment = account.code_commitment().to_string();
@@ -887,7 +967,8 @@ impl SqliteStore {
                 nonce,
                 account_seed,
                 account_commitment,
-                locked
+                locked,
+                watched
             } | REPLACE
         );
 
@@ -902,6 +983,7 @@ impl SqliteStore {
                 account_seed,
                 commitment,
                 false,
+                watched,
             ],
         )
         .into_store_error()?;
@@ -915,7 +997,8 @@ impl SqliteStore {
                 nonce,
                 account_seed,
                 account_commitment,
-                locked
+                locked,
+                watched
             } | REPLACE
         );
 
@@ -930,6 +1013,7 @@ impl SqliteStore {
                 account_seed,
                 commitment,
                 false,
+                watched,
             ],
         )
         .into_store_error()?;

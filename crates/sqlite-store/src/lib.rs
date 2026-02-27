@@ -45,7 +45,6 @@ use miden_client::store::{
     Store,
     StoreError,
     TransactionFilter,
-    WatchedAccountRecord,
 };
 use miden_client::sync::{NoteTagRecord, StateSyncUpdate};
 use miden_client::transaction::{TransactionRecord, TransactionStoreUpdate};
@@ -498,34 +497,21 @@ impl Store for SqliteStore {
         .await
     }
 
-    async fn get_watched_accounts(&self) -> Result<Vec<WatchedAccountRecord>, StoreError> {
-        self.interact_with_connection(SqliteStore::get_watched_accounts).await
-    }
+    async fn insert_watched_account(&self, account: &Account) -> Result<(), StoreError> {
+        let cloned_account = account.clone();
+        let smt_forest = self.smt_forest.clone();
 
-    async fn get_watched_account(
-        &self,
-        account_id: AccountId,
-    ) -> Result<Option<WatchedAccountRecord>, StoreError> {
         self.interact_with_connection(move |conn| {
-            SqliteStore::get_watched_account(conn, account_id)
-        })
-        .await
-    }
-
-    async fn upsert_watched_account(
-        &self,
-        record: &WatchedAccountRecord,
-    ) -> Result<(), StoreError> {
-        let record = record.clone();
-        self.interact_with_connection(move |conn| {
-            SqliteStore::upsert_watched_account(conn, &record)
+            SqliteStore::insert_watched_account(conn, &smt_forest, &cloned_account)
         })
         .await
     }
 
     async fn remove_watched_account(&self, account_id: AccountId) -> Result<(), StoreError> {
+        let smt_forest = self.smt_forest.clone();
+
         self.interact_with_connection(move |conn| {
-            SqliteStore::remove_watched_account(conn, account_id)
+            SqliteStore::remove_watched_account(conn, &smt_forest, account_id)
         })
         .await
     }

@@ -6,7 +6,6 @@ mod accounts;
 mod helpers;
 mod storage;
 mod vault;
-pub(crate) mod watched;
 
 #[cfg(test)]
 mod tests;

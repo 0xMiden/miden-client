@@ -15,12 +15,12 @@ use super::state_sync_update::TransactionUpdateTracker;
 use super::{AccountUpdates, StateSyncUpdate};
 use crate::ClientError;
 use crate::note::NoteUpdateTracker;
-use crate::rpc::domain::account::AccountStorageRequirements;
+
 use crate::rpc::domain::note::CommittedNote;
 use crate::rpc::domain::sync::StateSyncInfo;
 use crate::rpc::domain::transaction::TransactionInclusion;
-use crate::rpc::{AccountStateAt, NodeRpcClient};
-use crate::store::{InputNoteRecord, OutputNoteRecord, StoreError, WatchedAccountRecord};
+use crate::rpc::NodeRpcClient;
+use crate::store::{InputNoteRecord, OutputNoteRecord, StoreError};
 use crate::transaction::TransactionRecord;
 
 // SYNC REQUEST
@@ -39,10 +39,8 @@ use crate::transaction::TransactionRecord;
 /// Use [`Client::build_sync_input()`](`crate::Client::build_sync_input()`) to build a default input
 /// from the client state, or construct this struct manually for custom sync scenarios.
 pub struct StateSyncInput {
-    /// Account headers to request commitment updates for.
+    /// Account headers to request commitment updates for (including watched accounts).
     pub accounts: Vec<AccountHeader>,
-    /// Watched (foreign) accounts whose commitment changes should be tracked.
-    pub watched_accounts: Vec<WatchedAccountRecord>,
     /// Note tags that the node uses to filter which note inclusions to return.
     pub note_tags: BTreeSet<NoteTag>,
     /// Input notes whose lifecycle should be followed during sync.
@@ -176,7 +174,6 @@ impl StateSync {
     ) -> Result<StateSyncUpdate, ClientError> {
         let StateSyncInput {
             accounts,
-            watched_accounts,
             note_tags,
             input_notes,
             output_notes,
@@ -197,14 +194,7 @@ impl StateSync {
 
         let note_tags = Arc::new(note_tags);
 
-        // Build account_ids including both owned and watched accounts so the node
-        // reports commitment changes for both.
-        let watched_account_ids: BTreeSet<AccountId> =
-            watched_accounts.iter().map(|w| w.account_id).collect();
-        let mut account_ids: Vec<AccountId> = accounts.iter().map(AccountHeader::id).collect();
-        for watched in &watched_accounts {
-            account_ids.push(watched.account_id);
-        }
+        let account_ids: Vec<AccountId> = accounts.iter().map(AccountHeader::id).collect();
         let mut state_sync_steps = Vec::new();
 
         while let Some(step) = self
@@ -252,21 +242,8 @@ impl StateSync {
                 &mut state_sync_update.account_updates,
                 &accounts,
                 &account_commitment_updates,
-                &watched_account_ids,
             )
             .await?;
-
-            let updated_watched = self
-                .watched_account_state_sync(
-                    &watched_accounts,
-                    &account_commitment_updates,
-                    block_header.block_num(),
-                )
-                .await?;
-            state_sync_update
-                .account_updates
-                .updated_watched_accounts
-                .extend(updated_watched);
 
             self.transaction_state_sync(
                 &mut state_sync_update.transaction_updates,
@@ -352,11 +329,9 @@ impl StateSync {
         account_updates: &mut AccountUpdates,
         accounts: &[AccountHeader],
         account_commitment_updates: &[(AccountId, Word)],
-        watched_account_ids: &BTreeSet<AccountId>,
     ) -> Result<(), ClientError> {
         let (public_accounts, private_accounts): (Vec<_>, Vec<_>) = accounts
             .iter()
-            .filter(|h| !watched_account_ids.contains(&h.id()))
             .partition(|account_header| !account_header.id().is_private());
 
         let updated_public_accounts = self
@@ -377,53 +352,6 @@ impl StateSync {
             .extend(AccountUpdates::new(updated_public_accounts, mismatched_private_accounts));
 
         Ok(())
-    }
-
-    /// Fetches updated state for watched accounts whose commitment changed.
-    async fn watched_account_state_sync(
-        &self,
-        watched_accounts: &[WatchedAccountRecord],
-        account_commitment_updates: &[(AccountId, Word)],
-        sync_block_num: BlockNumber,
-    ) -> Result<Vec<WatchedAccountRecord>, ClientError> {
-        let mut updated = Vec::new();
-
-        for watched in watched_accounts {
-            // Check if this watched account's commitment changed
-            let changed = account_commitment_updates.iter().any(|(id, commitment)| {
-                *id == watched.account_id && *commitment != watched.header.commitment()
-            });
-
-            if !changed {
-                continue;
-            }
-
-            // Fetch updated state
-            let known_code = Some(watched.code.clone());
-            let (_block_num, proof) = self
-                .rpc_api
-                .get_account_proof(
-                    watched.account_id,
-                    AccountStorageRequirements::default(),
-                    AccountStateAt::Block(sync_block_num),
-                    known_code,
-                )
-                .await?;
-
-            let Some(details) = proof.into_parts().1 else {
-                continue;
-            };
-
-            updated.push(WatchedAccountRecord {
-                account_id: watched.account_id,
-                header: details.header,
-                code: details.code,
-                storage_header: details.storage_details.header,
-                last_synced_block: sync_block_num,
-            });
-        }
-
-        Ok(updated)
     }
 
     /// Queries the node for the latest state of the public accounts that don't match the current
@@ -643,7 +571,6 @@ mod tests {
     fn empty() -> StateSyncInput {
         StateSyncInput {
             accounts: vec![],
-            watched_accounts: vec![],
             note_tags: BTreeSet::new(),
             input_notes: vec![],
             output_notes: vec![],
