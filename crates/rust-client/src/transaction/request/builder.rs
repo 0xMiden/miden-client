@@ -163,7 +163,7 @@ impl TransactionRequestBuilder {
     ///   accesses during execution.
     /// - **Private accounts**: the node retrieves a proof of the account's existence and injects
     ///   that as advice inputs. Private accounts must always be declared here with their
-    ///   [`PartialAccount`] state.
+    ///   [`PartialAccount`](miden_protocol::account::PartialAccount) state.
     #[must_use]
     pub fn foreign_accounts(
         mut self,
