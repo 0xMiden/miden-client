@@ -149,6 +149,23 @@ jobs:
         if: steps.cache-note-transport.outputs.cache-hit != 'true'
         run: cargo install --git https://github.com/0xMiden/miden-note-transport --locked
 
+  build-remote-prover:
+    name: Build remote-prover
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install Rust
+        run: rustup update --no-self-update
+      - name: Restore remote-prover binary
+        id: cache-remote-prover
+        uses: actions/cache@v4
+        with:
+          path: target/release/testing-remote-prover
+          key: ${{ runner.os }}-prover-${{ hashFiles('Cargo.lock') }}
+      - name: Build remote-prover
+        if: steps.cache-remote-prover.outputs.cache-hit != 'true'
+        run: cargo build --release --package testing-remote-prover --locked
+
   integration-tests:
     name: Integration tests
     runs-on: ubuntu-24.04
@@ -311,7 +328,7 @@ jobs:
   integration-tests-remote-prover-web-client:
     name: Integration tests for remote prover
     runs-on: ubuntu-24.04
-    needs: [build-web-client-dist-folder, build-node-builder]
+    needs: [build-web-client-dist-folder, build-node-builder, build-remote-prover]
     steps:
       - uses: actions/checkout@v6
       - name: Install Rust
@@ -342,15 +359,11 @@ jobs:
         with:
           path: target/release/testing-node-builder
           key: ${{ runner.os }}-node-builder-${{ hashFiles('Cargo.lock') }}
-      - name: Restore prover binary
-        id: cache-prover
-        uses: actions/cache@v4
+      - name: Restore remote-prover binary
+        uses: actions/cache/restore@v4
         with:
           path: target/release/testing-remote-prover
           key: ${{ runner.os }}-prover-${{ hashFiles('Cargo.lock') }}
-      - name: Build prover
-        if: steps.cache-prover.outputs.cache-hit != 'true'
-        run: cargo build --release --package testing-remote-prover --locked
       - name: Start test node
         run: |
           RUST_LOG=none target/release/testing-node-builder &
