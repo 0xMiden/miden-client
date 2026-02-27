@@ -99,7 +99,7 @@ impl WebStore {
         let account_id = executed_tx.account_id();
 
         if delta.is_full_state() {
-            // Full-state path: the delta contains the complete account state.
+            // Full-state path: writes all entries and tombstones for removed ones
             let old_roots =
                 self.collect_account_smt_roots(core::iter::once(account_id)).await?;
 
@@ -114,7 +114,7 @@ impl WebStore {
             smt_forest.insert_account_state(account.vault(), account.storage())?;
             smt_forest.pop_roots(old_roots);
         } else {
-            // Delta path: load only targeted data, avoid loading full Account.
+            // Delta path: write only changed entries (single Dexie transaction)
             let (header, status) = self
                 .get_account_header(account_id)
                 .await?
