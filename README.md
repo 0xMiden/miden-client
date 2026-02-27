@@ -343,24 +343,18 @@ The IndexedDB store creates separate databases per network (`MidenClientDB_testn
 
 ```
 bin/
-├── miden-cli/                # CLI binary (@miden-sdk/rust-sdk wrapper)
+├── miden-cli/                # CLI binary (rust-sdk wrapper)
 ├── integration-tests/        # End-to-end integration tests
 └── miden-bench/              # Benchmarks
 
 crates/
 ├── rust-client/              # rust-sdk — core client library (miden-client)
-├── web-client/               # wasm-bridge + ts-sdk — WASM compilation and TS API
 ├── idxdb-store/              # IndexedDB storage backend (browser)
 ├── sqlite-store/             # SQLite storage backend (native)
-├── node-client/              # Node.js native module (N-API)
 └── testing/                  # Test infrastructure
     ├── miden-client-tests/   # Shared test utilities
     ├── node-builder/         # Test node builder
     └── prover/               # Remote prover for testing
-
-packages/
-├── react-sdk/                # react-sdk — React hooks and providers
-└── vite-plugin/              # Vite plugin for WASM bundling
 ```
 
 ## Getting Started
