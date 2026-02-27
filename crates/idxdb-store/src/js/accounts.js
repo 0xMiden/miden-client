@@ -314,7 +314,7 @@ export async function upsertVaultAssets(dbId, accountId, nonce, assets) {
         logWebStoreError(error, `Error inserting assets`);
     }
 }
-export async function applyAccountDelta(dbId, accountId, nonce, updatedSlots, changedMapEntries, changedAssets, codeRoot, storageRoot, vaultRoot, committed, commitment, accountSeed) {
+export async function applyTransactionDelta(dbId, accountId, nonce, updatedSlots, changedMapEntries, changedAssets, codeRoot, storageRoot, vaultRoot, committed, commitment, accountSeed) {
     try {
         const db = getDatabase(dbId);
         await db.dexie.transaction("rw", [
@@ -427,7 +427,46 @@ export async function applyAccountDelta(dbId, accountId, nonce, updatedSlots, ch
         });
     }
     catch (error) {
-        logWebStoreError(error, `Error applying account delta`);
+        logWebStoreError(error, `Error applying transaction delta`);
+    }
+}
+export async function applyFullAccountState(dbId, accountState) {
+    try {
+        const db = getDatabase(dbId);
+        const { accountId, nonce, storageSlots, storageMapEntries, assets, codeRoot, storageRoot, vaultRoot, committed, accountCommitment, accountSeed, } = accountState;
+        await db.dexie.transaction("rw", [
+            db.latestAccountStorages,
+            db.historicalAccountStorages,
+            db.latestStorageMapEntries,
+            db.historicalStorageMapEntries,
+            db.latestAccountAssets,
+            db.historicalAccountAssets,
+            db.latestAccountHeaders,
+            db.historicalAccountHeaders,
+        ], async () => {
+            // Upsert account storage (calls existing helpers — Dexie nesting
+            // joins them to this outer transaction)
+            await upsertAccountStorage(dbId, accountId, nonce, storageSlots);
+            await upsertStorageMapEntries(dbId, accountId, nonce, storageMapEntries);
+            await upsertVaultAssets(dbId, accountId, nonce, assets);
+            // Upsert account record
+            const data = {
+                id: accountId,
+                codeRoot,
+                storageRoot,
+                vaultRoot,
+                nonce,
+                committed,
+                accountSeed,
+                accountCommitment,
+                locked: false,
+            };
+            await db.historicalAccountHeaders.put(data);
+            await db.latestAccountHeaders.put(data);
+        });
+    }
+    catch (error) {
+        logWebStoreError(error, `Error applying full account state`);
     }
 }
 export async function upsertAccountRecord(dbId, accountId, codeRoot, storageRoot, vaultRoot, nonce, committed, commitment, accountSeed) {

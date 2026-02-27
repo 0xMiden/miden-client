@@ -23,7 +23,8 @@ use super::js_bindings::{
     JsStorageMapEntry,
     JsStorageSlot,
     JsVaultAsset,
-    idxdb_apply_account_delta,
+    idxdb_apply_full_account_state,
+    idxdb_apply_transaction_delta,
     idxdb_upsert_account_code,
     idxdb_upsert_account_record,
     idxdb_upsert_account_storage,
@@ -179,10 +180,10 @@ pub fn parse_account_address_idxdb_object(
     Ok((address, native_account_id))
 }
 
-/// Applies the full account delta (storage + vault + header) in a single atomic `IndexedDB`
+/// Applies the account delta (storage + vault + header) in a single atomic `IndexedDB`
 /// transaction. Value slots and map entries use empty-string sentinels for removals on the JS
 /// side.
-pub async fn apply_account_delta(
+pub async fn apply_transaction_delta(
     db_id: &str,
     account: &Account,
     delta: &AccountDelta,
@@ -285,7 +286,7 @@ pub async fn apply_account_delta(
     let commitment = account.commitment().to_string();
     let account_seed = account.seed().map(|seed| seed.to_bytes());
 
-    JsFuture::from(idxdb_apply_account_delta(
+    JsFuture::from(idxdb_apply_transaction_delta(
         db_id,
         account_id_str,
         nonce_str,
@@ -304,10 +305,13 @@ pub async fn apply_account_delta(
     Ok(())
 }
 
-pub async fn update_account(db_id: &str, new_account_state: &Account) -> Result<(), JsValue> {
-    let account_id = &new_account_state.id();
-    let nonce = new_account_state.nonce().as_int();
-    upsert_account_storage(db_id, account_id, nonce, new_account_state.storage()).await?;
-    upsert_account_asset_vault(db_id, account_id, nonce, new_account_state.vault()).await?;
-    upsert_account_record(db_id, new_account_state).await
+/// Writes the full account state atomically in a single Dexie transaction.
+/// Combines storage upsert + map entries upsert + vault assets upsert + account record upsert.
+pub async fn apply_full_account_state(db_id: &str, account: &Account) -> Result<(), JsValue> {
+    let account_state =
+        crate::sync::JsAccountUpdate::from_account(account, account.seed());
+
+    JsFuture::from(idxdb_apply_full_account_state(db_id, account_state)).await?;
+
+    Ok(())
 }

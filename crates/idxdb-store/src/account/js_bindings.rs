@@ -8,6 +8,8 @@ use miden_client::utils::Serializable;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys;
 
+use crate::sync::JsAccountUpdate;
+
 // INDEXED DB BINDINGS
 // ================================================================================================
 
@@ -122,11 +124,11 @@ extern "C" {
     pub fn idxdb_get_foreign_account_code(db_id: &str, account_ids: Vec<String>)
     -> js_sys::Promise;
 
-    // DELTA WRITES
+    // TRANSACTIONAL WRITES
     // --------------------------------------------------------------------------------------------
 
-    #[wasm_bindgen(js_name = applyAccountDelta)]
-    pub fn idxdb_apply_account_delta(
+    #[wasm_bindgen(js_name = applyTransactionDelta)]
+    pub fn idxdb_apply_transaction_delta(
         db_id: &str,
         account_id: String,
         nonce: String,
@@ -139,6 +141,12 @@ extern "C" {
         committed: bool,
         commitment: String,
         account_seed: Option<Vec<u8>>,
+    ) -> js_sys::Promise;
+
+    #[wasm_bindgen(js_name = applyFullAccountState)]
+    pub fn idxdb_apply_full_account_state(
+        db_id: &str,
+        account_state: JsAccountUpdate,
     ) -> js_sys::Promise;
 
     // UPDATES
