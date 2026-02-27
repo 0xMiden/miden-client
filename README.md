@@ -93,7 +93,7 @@ Rather than forcing one language to do everything, the SDK embraces the boundary
 
 ### `rust-sdk` — The Foundational Core
 
-**Package:** `@miden-sdk/rust-sdk` · **Crate:** `miden-client` · **Location:** [`crates/rust-client`](./crates/rust-client)
+**Package:** `@miden-sdk/rust-sdk` · **Crate:** `miden-client`
 
 The Rust SDK is the single source of truth for all Miden client logic. It is a `#![no_std]`-compatible library that implements:
 
@@ -111,8 +111,6 @@ The Rust SDK is designed to be used directly by Rust backends, CLIs, and any nat
 
 ### `wasm-bridge` — The Compilation Boundary
 
-**Location:** [`crates/web-client`](./crates/web-client)
-
 The WASM bridge is the layer that compiles the Rust core into WebAssembly and exposes it to JavaScript via `wasm-bindgen`. It is **not published as a standalone package** — it exists purely as an internal build artifact that both the TypeScript SDK and React SDK consume.
 
 This layer handles several concerns that are specific to the Rust-to-WASM boundary:
@@ -126,7 +124,7 @@ This layer handles several concerns that are specific to the Rust-to-WASM bounda
 
 ### `ts-sdk` — The TypeScript Developer Experience
 
-**Package:** `@miden-sdk/ts-sdk` · **Location:** [`crates/web-client`](./crates/web-client) (JS layer)
+**Package:** `@miden-sdk/ts-sdk`
 
 The TypeScript SDK is the **primary way to interact with the Miden network from JavaScript/TypeScript**. Its most important use case is **Node.js backend development** — building server-side services, indexers, bots, relayers, market makers, and any backend infrastructure that needs to read Miden state, submit transactions, or manage accounts programmatically. Think of it as the TypeScript equivalent of using the Rust SDK directly: full access to every client capability, but from Node.js with idiomatic async/await patterns and full type safety.
 
@@ -178,7 +176,7 @@ Key features of the TypeScript SDK:
 
 ### `react-sdk` — The React Integration Layer
 
-**Package:** `@miden-sdk/react-sdk` · **Location:** [`packages/react-sdk`](./packages/react-sdk)
+**Package:** `@miden-sdk/react-sdk`
 
 The React SDK provides a complete React integration with hooks, context providers, and state management, following conventions established by libraries like TanStack Query and wagmi:
 
@@ -234,7 +232,7 @@ The `Store` trait abstracts all persistence operations (40+ async methods coveri
 
 ### CLI (`miden-client`)
 
-**Crate:** `miden-client-cli` · **Location:** [`bin/miden-cli`](./bin/miden-cli)
+**Crate:** `miden-client-cli`
 
 The CLI is a full-featured command-line interface for interacting with the Miden network directly from a terminal. It wraps the Rust SDK (`Client<FilesystemKeyStore>`) with SQLite storage, providing a complete Miden experience without writing any code. It's the fastest way to explore the network, prototype transaction flows, and manage accounts during development.
 
