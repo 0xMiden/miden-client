@@ -19,7 +19,6 @@ jobs:
           node-version: "20"
           cache: yarn
           cache-dependency-path: |
-            yarn.lock
             packages/react-sdk/yarn.lock
             packages/react-sdk/examples/wallet/yarn.lock
       - name: Install root dependencies

@@ -34,13 +34,13 @@ jobs:
       - name: Add Rust Cache
         uses: Swatinem/rust-cache@v2
         with:
-          shared-key: rust-build
+          shared-key: rust-release
           prefix-key: ${{ env.RUST_CACHE_KEY }}
           save-if: ${{ github.ref == 'refs/heads/next' }}
       - name: make - build
         run: make build
   build-wasm:
-    name: Build Client for wasm
+    name: Build Client for Wasm
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
@@ -48,11 +48,5 @@ jobs:
         run: rustup update --no-self-update
       - name: Add wasm32-unknown-unknown target
         run: rustup target add wasm32-unknown-unknown
-      - name: Add Rust Cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: rust-build-wasm
-          prefix-key: ${{ env.RUST_CACHE_KEY }}
-          save-if: ${{ github.ref == 'refs/heads/next' }}
       - name: make - build-wasm
         run: make build-wasm

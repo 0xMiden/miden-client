@@ -25,7 +25,7 @@ env:
 
 jobs:
   test:
-    name: Test Rust
+    name: Unit tests
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
@@ -34,9 +34,9 @@ jobs:
       - name: Add Rust Cache
         uses: Swatinem/rust-cache@v2
         with:
-          shared-key: rust-build
+          shared-key: rust-release
           prefix-key: ${{ env.RUST_CACHE_KEY }}
-          save-if: ${{ github.ref == 'refs/heads/next' }}
+          save-if: false
       - uses: taiki-e/install-action@v2
         with:
           tool: nextest@0.9.122
@@ -44,22 +44,17 @@ jobs:
         run: make test
 
   doc-tests:
-    name: doc-tests
+    name: Documentation tests
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
-      - uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: rust-build
-          prefix-key: ${{ env.RUST_CACHE_KEY }}
-          save-if: ${{ github.ref == 'refs/heads/next' }}
       - name: Install rust
         run: rustup update --no-self-update
       - name: Run doc-tests
         run: make test-docs
 
   test-react-sdk:
-    name: Test React SDK
+    name: React SDK tests
     runs-on: ubuntu-24.04
     needs: [build-web-client-dist-folder]
     steps:
@@ -120,9 +115,61 @@ jobs:
       - name: Build React SDK
         run: cd ./packages/react-sdk && yarn build
 
-  integration-tests:
-    name: Run integration tests
+  build-node-builder:
+    name: Build node-builder
     runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install Rust
+        run: rustup update --no-self-update
+      - name: Restore node-builder binary
+        id: cache-node-builder
+        uses: actions/cache@v4
+        with:
+          path: target/release/testing-node-builder
+          key: ${{ runner.os }}-node-builder-${{ hashFiles('Cargo.lock') }}
+      - name: Build node-builder
+        if: steps.cache-node-builder.outputs.cache-hit != 'true'
+        run: cargo build --release --package node-builder --locked
+
+  build-note-transport:
+    name: Build note-transport
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install Rust
+        run: rustup update --no-self-update
+      - name: Restore note-transport binary
+        id: cache-note-transport
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/miden-note-transport-node-bin
+          key: ${{ runner.os }}-note-transport-${{ hashFiles('Cargo.lock') }}
+      - name: Install note-transport
+        if: steps.cache-note-transport.outputs.cache-hit != 'true'
+        run: cargo install --git https://github.com/0xMiden/miden-note-transport --locked
+
+  build-remote-prover:
+    name: Build remote-prover
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install Rust
+        run: rustup update --no-self-update
+      - name: Restore remote-prover binary
+        id: cache-remote-prover
+        uses: actions/cache@v4
+        with:
+          path: target/release/testing-remote-prover
+          key: ${{ runner.os }}-prover-${{ hashFiles('Cargo.lock') }}
+      - name: Build remote-prover
+        if: steps.cache-remote-prover.outputs.cache-hit != 'true'
+        run: cargo build --release --package testing-remote-prover --locked
+
+  integration-tests:
+    name: Integration tests
+    runs-on: ubuntu-24.04
+    needs: [build-node-builder, build-note-transport]
     steps:
       - uses: actions/checkout@v6
       - name: Install Rust
@@ -133,23 +180,37 @@ jobs:
       - name: Add Rust Cache
         uses: Swatinem/rust-cache@v2
         with:
-          shared-key: rust-build
+          shared-key: rust-release
           prefix-key: ${{ env.RUST_CACHE_KEY }}
-          save-if: ${{ github.ref == 'refs/heads/next' }}
+          save-if: false
+      - name: Restore node-builder binary
+        uses: actions/cache/restore@v4
+        with:
+          path: target/release/testing-node-builder
+          key: ${{ runner.os }}-node-builder-${{ hashFiles('Cargo.lock') }}
+      - name: Restore note-transport binary
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.cargo/bin/miden-note-transport-node-bin
+          key: ${{ runner.os }}-note-transport-${{ hashFiles('Cargo.lock') }}
       - name: Start test node
-        run: make start-node-background
+        run: |
+          RUST_LOG=none target/release/testing-node-builder &
+          sleep 4
+          pgrep -f testing-node-builder || (echo "Failed to start node" && exit 1)
       - name: Start note transport
-        run: make start-note-transport-background
+        run: |
+          RUST_LOG=none miden-note-transport-node-bin &
+          sleep 4
+          pgrep -f miden-note-transport-node-bin || (echo "Failed to start note transport" && exit 1)
       - name: Run integration tests
         run: make integration-test-full
       - name: Stop test node
         if: always()
-        run: |
-          make stop-node
+        run: make stop-node
       - name: Stop note transport
         if: always()
-        run: |
-          make stop-note-transport
+        run: make stop-note-transport
 
   build-web-client-dist-folder:
     name: Build Web Client
@@ -160,11 +221,10 @@ jobs:
         run: |
           rustup update --no-self-update
           rustup target add wasm32-unknown-unknown
-
       - name: Add Rust Cache
         uses: Swatinem/rust-cache@v2
         with:
-          shared-key: rust-build-wasm
+          shared-key: rust-wasm
           prefix-key: ${{ env.RUST_CACHE_KEY }}
           save-if: ${{ github.ref == 'refs/heads/next' }}
 
@@ -191,7 +251,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: ./crates/web-client/dist
-          key: ${{ runner.os }}-dist-${{ hashFiles('**/yarn.lock', './crates/web-client/src/**/*.ts', './crates/web-client/pkg/**/*.wasm') }}
+          key: ${{ runner.os }}-dist-${{ hashFiles('**/yarn.lock', './crates/web-client/src/**/*.ts', './crates/web-client/src/**/*.rs', 'Cargo.lock') }}
           restore-keys: ${{ runner.os }}-dist-
 
       - name: Build project
@@ -214,9 +274,9 @@ jobs:
           path: ./crates/web-client/dist
 
   integration-tests-web-client:
-    name: Run integration tests for web client
+    name: Integration tests for web client
     runs-on: ubuntu-24.04
-    needs: [ build-web-client-dist-folder ]
+    needs: [build-web-client-dist-folder, build-node-builder]
     strategy:
       matrix:
         shard_index: [1, 2, 3, 4, 5, 6]
@@ -227,12 +287,18 @@ jobs:
         run: |
           rustup update --no-self-update
           rustup target add wasm32-unknown-unknown
+      - name: Add Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: rust-wasm
+          prefix-key: ${{ env.RUST_CACHE_KEY }}
+          save-if: false
 
       - name: Fetch dist folder
         uses: actions/download-artifact@v4
         with:
           name: web-client-artifacts
-          path: ./crates/web-client
+          path: ./crates/web-client/dist
 
       - name: Install Node.js
         uses: actions/setup-node@v4
@@ -240,14 +306,16 @@ jobs:
           node-version: "20"
       - name: Configure setuid sandbox
         run: . ./scripts/configure-sandbox.sh
-      - name: Add Rust Cache
-        uses: Swatinem/rust-cache@v2
+      - name: Restore node-builder binary
+        uses: actions/cache/restore@v4
         with:
-          shared-key: rust-build
-          prefix-key: ${{ env.RUST_CACHE_KEY }}
-          save-if: ${{ github.ref == 'refs/heads/next' }}
+          path: target/release/testing-node-builder
+          key: ${{ runner.os }}-node-builder-${{ hashFiles('Cargo.lock') }}
       - name: Start test node
-        run: make start-node-background
+        run: |
+          RUST_LOG=none target/release/testing-node-builder &
+          sleep 4
+          pgrep -f testing-node-builder || (echo "Failed to start node" && exit 1)
       - name: Run web client tests
         run: |
           make integration-test-web-client
@@ -258,15 +326,21 @@ jobs:
         run: make stop-node
 
   integration-tests-remote-prover-web-client:
-    name: Run integration tests for remote prover
+    name: Integration tests for remote prover
     runs-on: ubuntu-24.04
-    needs: [ build-web-client-dist-folder ]
+    needs: [build-web-client-dist-folder, build-node-builder, build-remote-prover]
     steps:
       - uses: actions/checkout@v6
       - name: Install Rust
         run: |
           rustup update --no-self-update
           rustup target add wasm32-unknown-unknown
+      - name: Add Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: rust-wasm
+          prefix-key: ${{ env.RUST_CACHE_KEY }}
+          save-if: false
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
@@ -276,20 +350,30 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: web-client-artifacts
-          path: ./crates/web-client
+          path: ./crates/web-client/dist
 
       - name: Configure setuid sandbox
         run: . ./scripts/configure-sandbox.sh
-      - name: Add Rust Cache
-        uses: Swatinem/rust-cache@v2
+      - name: Restore node-builder binary
+        uses: actions/cache/restore@v4
         with:
-          shared-key: rust-build
-          prefix-key: ${{ env.RUST_CACHE_KEY }}
-          save-if: ${{ github.ref == 'refs/heads/next' }}
+          path: target/release/testing-node-builder
+          key: ${{ runner.os }}-node-builder-${{ hashFiles('Cargo.lock') }}
+      - name: Restore remote-prover binary
+        uses: actions/cache/restore@v4
+        with:
+          path: target/release/testing-remote-prover
+          key: ${{ runner.os }}-prover-${{ hashFiles('Cargo.lock') }}
       - name: Start test node
-        run: make start-node-background
+        run: |
+          RUST_LOG=none target/release/testing-node-builder &
+          sleep 4
+          pgrep -f testing-node-builder || (echo "Failed to start node" && exit 1)
       - name: Start prover
-        run: make start-prover-background
+        run: |
+          RUST_LOG=none target/release/testing-remote-prover &
+          sleep 4
+          pgrep -f testing-remote-prover || (echo "Failed to start prover" && exit 1)
       - name: Run remote prover tests
         run: make integration-test-remote-prover-web-client
       - name: Stop test node
