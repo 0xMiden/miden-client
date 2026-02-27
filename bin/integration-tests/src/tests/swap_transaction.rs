@@ -5,6 +5,7 @@ use miden_client::auth::RPO_FALCON_SCHEME_ID;
 use miden_client::note::{Note, NoteDetails, NoteFile, NoteType, SwapNote};
 use miden_client::testing::common::*;
 use miden_client::transaction::{SwapTransactionData, TransactionRequestBuilder};
+use tracing::info;
 
 use crate::tests::config::ClientConfig;
 
@@ -60,7 +61,7 @@ pub async fn test_swap_fully_onchain(client_config: ClientConfig) -> Result<()> 
     .await?;
 
     // mint 1000 BTC for accountA
-    println!("minting 1000 btc for account A");
+    info!(account_id = %account_a.id(), faucet_id = %btc_faucet_account.id(), "Minting 1000 BTC for account A");
 
     let tx_id =
         mint_and_consume(&mut client1, account_a.id(), btc_faucet_account.id(), NoteType::Public)
@@ -68,7 +69,7 @@ pub async fn test_swap_fully_onchain(client_config: ClientConfig) -> Result<()> 
     wait_for_tx(&mut client1, tx_id).await?;
 
     // mint 1000 ETH for accountB
-    println!("minting 1000 eth for account B");
+    info!(account_id = %account_b.id(), faucet_id = %eth_faucet_account.id(), "Minting 1000 ETH for account B");
 
     let tx_id =
         mint_and_consume(&mut client2, account_b.id(), eth_faucet_account.id(), NoteType::Public)
@@ -77,11 +78,11 @@ pub async fn test_swap_fully_onchain(client_config: ClientConfig) -> Result<()> 
 
     // Create ONCHAIN swap note (clientA offers 1 BTC in exchange of 25 ETH)
     // check that account now has 1 less BTC
-    println!("creating swap note with accountA");
     let offered_asset = FungibleAsset::new(btc_faucet_account.id(), OFFERED_ASSET_AMOUNT)?;
     let requested_asset = FungibleAsset::new(eth_faucet_account.id(), REQUESTED_ASSET_AMOUNT)?;
+    info!(account_id = %account_a.id(), offered_amount = OFFERED_ASSET_AMOUNT, requested_amount = REQUESTED_ASSET_AMOUNT, "Creating swap note");
 
-    println!("Running SWAP tx...");
+    info!("Executing SWAP transaction");
     let tx_request = TransactionRequestBuilder::new().build_swap(
         &SwapTransactionData::new(
             account_a.id(),
@@ -110,13 +111,13 @@ pub async fn test_swap_fully_onchain(client_config: ClientConfig) -> Result<()> 
     // add swap note's tag to client2
     // we could technically avoid this step, but for the first iteration of swap notes we'll
     // require to manually add tags
-    println!("Adding swap tag");
+    info!(tag = %swap_note_tag, "Adding swap note tag to client 2");
     client2.add_note_tag(swap_note_tag).await?;
 
     // sync on client 2, we should get the swap note
     // consume swap note with accountB, and check that the vault changed appropriately
     client2.sync_state().await?;
-    println!("Consuming swap note on second client...");
+    info!(note_id = %expected_output_notes[0].id(), account_id = %account_b.id(), "Consuming swap note on client 2");
 
     let note = client2
         .get_input_note(expected_output_notes[0].id())
@@ -129,7 +130,7 @@ pub async fn test_swap_fully_onchain(client_config: ClientConfig) -> Result<()> 
     // sync on client 1, we should get the missing payback note details.
     // try consuming the received note with accountA, it should now have 25 ETH
     client1.sync_state().await?;
-    println!("Consuming swap payback note on first client...");
+    info!(note_id = %expected_payback_note_details[0].id(), account_id = %account_a.id(), "Consuming swap payback note on client 1");
 
     let note = client1
         .get_input_note(expected_payback_note_details[0].id())
@@ -209,14 +210,14 @@ pub async fn test_swap_private(client_config: ClientConfig) -> Result<()> {
     .await?;
 
     // mint 1000 BTC for accountA
-    println!("minting 1000 btc for account A");
+    info!(account_id = %account_a.id(), faucet_id = %btc_faucet_account.id(), "Minting 1000 BTC for account A");
     let tx_id =
         mint_and_consume(&mut client1, account_a.id(), btc_faucet_account.id(), NoteType::Public)
             .await;
     wait_for_tx(&mut client1, tx_id).await?;
 
     // mint 1000 ETH for accountB
-    println!("minting 1000 eth for account B");
+    info!(account_id = %account_b.id(), faucet_id = %eth_faucet_account.id(), "Minting 1000 ETH for account B");
     let tx_id =
         mint_and_consume(&mut client2, account_b.id(), eth_faucet_account.id(), NoteType::Public)
             .await;
@@ -224,11 +225,11 @@ pub async fn test_swap_private(client_config: ClientConfig) -> Result<()> {
 
     // Create ONCHAIN swap note (clientA offers 1 BTC in exchange of 25 ETH)
     // check that account now has 1 less BTC
-    println!("creating swap note with accountA");
     let offered_asset = FungibleAsset::new(btc_faucet_account.id(), OFFERED_ASSET_AMOUNT)?;
     let requested_asset = FungibleAsset::new(eth_faucet_account.id(), REQUESTED_ASSET_AMOUNT)?;
+    info!(account_id = %account_a.id(), offered_amount = OFFERED_ASSET_AMOUNT, requested_amount = REQUESTED_ASSET_AMOUNT, "Creating swap note");
 
-    println!("Running SWAP tx...");
+    info!("Executing SWAP transaction");
     let tx_request = TransactionRequestBuilder::new().build_swap(
         &SwapTransactionData::new(
             account_a.id(),
@@ -272,7 +273,7 @@ pub async fn test_swap_private(client_config: ClientConfig) -> Result<()> {
     client2.sync_state().await?;
 
     // consume swap note with accountB, and check that the vault changed appropriately
-    println!("Consuming swap note on second client...");
+    info!(note_id = %expected_output_notes[0].id(), account_id = %account_b.id(), "Consuming swap note on client 2");
 
     let note = client2
         .get_input_note(expected_output_notes[0].id())
@@ -285,7 +286,7 @@ pub async fn test_swap_private(client_config: ClientConfig) -> Result<()> {
     // sync on client 1, we should get the missing payback note details.
     // try consuming the received note with accountA, it should now have 25 ETH
     client1.sync_state().await?;
-    println!("Consuming swap payback note on first client...");
+    info!(note_id = %expected_payback_note_details[0].id(), account_id = %account_a.id(), "Consuming swap payback note on client 1");
 
     let note = client1
         .get_input_note(expected_payback_note_details[0].id())

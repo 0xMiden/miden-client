@@ -11,7 +11,7 @@ use miden_protocol::note::NoteId;
 use miden_protocol::utils::DeserializationError;
 use thiserror::Error;
 
-use super::NodeRpcClientEndpoint;
+use super::RpcEndpoint;
 
 pub mod node;
 pub use node::EndpointError;
@@ -21,32 +21,34 @@ pub use node::EndpointError;
 
 #[derive(Debug, Error)]
 pub enum RpcError {
-    #[error("accept header validation failed: {0}")]
+    #[error("accept header validation failed")]
     AcceptHeaderError(#[from] AcceptHeaderError),
-    #[error("rpc api response contained an update for a private account: {0}")]
+    #[error(
+        "unexpected update received for private account {0}; private account state should not be sent by the node"
+    )]
     AccountUpdateForPrivateAccountReceived(AccountId),
-    #[error("failed to connect to the api server: {0}")]
+    #[error("failed to connect to the Miden node")]
     ConnectionError(#[source] Box<dyn Error + Send + Sync + 'static>),
-    #[error("failed to deserialize rpc data: {0}")]
+    #[error("failed to deserialize response from the Miden node: {0}")]
     DeserializationError(String),
-    #[error("rpc api response missing an expected field: {0}")]
+    #[error("Miden node response is missing expected field '{0}'")]
     ExpectedDataMissing(String),
     #[error("rpc pagination error: {0}")]
     PaginationError(String),
-    #[error("rpc api response is invalid: {0}")]
+    #[error("received an invalid response from the Miden node: {0}")]
     InvalidResponse(String),
     #[error("grpc request failed for {endpoint}: {error_kind}{}",
         endpoint_error.as_ref().map_or(String::new(), |e| format!(" ({e})")))]
     RequestError {
-        endpoint: NodeRpcClientEndpoint,
+        endpoint: RpcEndpoint,
         error_kind: GrpcError,
         endpoint_error: Option<EndpointError>,
         #[source]
         source: Option<Box<dyn Error + Send + Sync + 'static>>,
     },
-    #[error("note with id {0} was not found")]
+    #[error("note {0} was not found on the Miden node")]
     NoteNotFound(NoteId),
-    #[error("invalid node endpoint: {0}")]
+    #[error("invalid Miden node endpoint '{0}'; expected format: https://host:port")]
     InvalidNodeEndpoint(String),
 }
 
@@ -83,17 +85,19 @@ impl From<RpcConversionError> for RpcError {
 
 #[derive(Debug, Error)]
 pub enum RpcConversionError {
-    #[error("failed to deserialize: {0}")]
+    #[error("failed to deserialize")]
     DeserializationError(#[from] DeserializationError),
-    #[error("value is not in the range 0..modulus")]
+    #[error(
+        "invalid field element: value is outside the valid range (0..modulus, where modulus = 2^64 - 2^32 + 1)"
+    )]
     NotAValidFelt,
-    #[error("note error")]
+    #[error("invalid note type in node response")]
     NoteTypeError(#[from] NoteError),
-    #[error("merkle error")]
+    #[error("merkle proof error in node response")]
     MerkleError(#[from] MerkleError),
-    #[error("failed to convert rpc data: {0}")]
+    #[error("invalid field in node response: {0}")]
     InvalidField(String),
-    #[error("failed to convert int")]
+    #[error("integer conversion failed in node response")]
     InvalidInt(#[from] TryFromIntError),
     #[error("field `{field_name}` expected to be present in protobuf representation of {entity}")]
     MissingFieldInProtobufRepresentation {
@@ -116,21 +120,23 @@ pub enum GrpcError {
     PermissionDenied,
     #[error("resource already exists")]
     AlreadyExists,
-    #[error("resource exhausted or rate limited")]
+    #[error("request was rate-limited or the node's resources are exhausted; retry after a delay")]
     ResourceExhausted,
     #[error("precondition failed")]
     FailedPrecondition,
     #[error("operation was cancelled")]
     Cancelled,
-    #[error("deadline exceeded")]
+    #[error("request to Miden node timed out; the node may be under heavy load")]
     DeadlineExceeded,
-    #[error("service unavailable")]
+    #[error("Miden node is unavailable; check that the node is running and reachable")]
     Unavailable,
-    #[error("internal server error")]
+    #[error("Miden node returned an internal error; this is likely a node-side issue")]
     Internal,
-    #[error("unimplemented method")]
+    #[error("the requested method is not implemented by this version of the Miden node")]
     Unimplemented,
-    #[error("unauthenticated request")]
+    #[error(
+        "request was rejected as unauthenticated; check your credentials and connection settings"
+    )]
     Unauthenticated,
     #[error("operation was aborted")]
     Aborted,

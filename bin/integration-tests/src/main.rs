@@ -30,9 +30,8 @@ mod tests;
 fn main() {
     let args = Args::parse();
 
-    // Initialize tracing from RUST_LOG if set (before subprocess check so subprocesses get
-    // tracing too)
-    init_tracing();
+    // Initialize tracing (before subprocess check so subprocesses get tracing too)
+    init_tracing(args.verbose);
 
     // If running as a subprocess for a single test, execute it and exit
     if let Some(ref test_name) = args.internal_run_test {
@@ -75,14 +74,33 @@ fn main() {
     }
 }
 
-/// Initializes tracing from RUST_LOG environment variable.
-fn init_tracing() {
+/// Initializes tracing.
+///
+/// If `RUST_LOG` is set, it always takes precedence (backwards compatible).
+/// Otherwise, when `--verbose` is set, enables info-level tracing for integration tests and
+/// the client's test utilities.
+///
+/// Tracing output is routed to stderr to avoid corrupting subprocess JSON on stdout.
+fn init_tracing(verbose: bool) {
+    // RUST_LOG always takes precedence for backwards compatibility
     if std::env::var("RUST_LOG").is_ok() {
         tracing_subscriber::registry()
             .with(EnvFilter::from_default_env())
-            .with(tracing_subscriber::fmt::layer().with_target(true))
+            .with(tracing_subscriber::fmt::layer().with_target(true).with_writer(std::io::stderr))
             .init();
+        return;
     }
+
+    if !verbose {
+        return;
+    }
+
+    tracing_subscriber::registry()
+        .with(EnvFilter::new(
+            "miden_client_integration_tests=info,miden_client::test_utils=info",
+        ))
+        .with(tracing_subscriber::fmt::layer().with_target(true).with_writer(std::io::stderr))
+        .init();
 }
 
 // ARGS
@@ -130,6 +148,10 @@ struct Args {
     #[arg(long, default_value = "3")]
     retry_count: usize,
 
+    /// Enable verbose tracing output (info-level logs from tests and client).
+    #[arg(short, long)]
+    verbose: bool,
+
     /// Internal: run a single test by name and exit (hidden from help).
     /// Used by the test runner to spawn subprocesses for parallel execution.
     #[arg(long, hide = true)]
@@ -141,6 +163,7 @@ struct Args {
 struct BaseConfig {
     rpc_endpoint: Endpoint,
     timeout: u64,
+    verbose: bool,
 }
 
 impl TryFrom<Args> for BaseConfig {
@@ -156,6 +179,7 @@ impl TryFrom<Args> for BaseConfig {
         Ok(BaseConfig {
             rpc_endpoint: endpoint,
             timeout: timeout_ms,
+            verbose: args.verbose,
         })
     }
 }
@@ -208,6 +232,7 @@ enum TestCategory {
     Client,
     CustomTransaction,
     Fpi,
+    NetworkFpi,
     NetworkTransaction,
     Onchain,
     PassThrough,
@@ -221,6 +246,7 @@ impl AsRef<str> for TestCategory {
             TestCategory::Client => "client",
             TestCategory::CustomTransaction => "custom_transaction",
             TestCategory::Fpi => "fpi",
+            TestCategory::NetworkFpi => "network_fpi",
             TestCategory::NetworkTransaction => "network_transaction",
             TestCategory::Onchain => "onchain",
             TestCategory::PassThrough => "pass_through",
@@ -550,6 +576,7 @@ fn run_tests_parallel(
     // Get network endpoint string for passing to subprocess
     let network_endpoint = base_config.rpc_endpoint.to_string();
     let timeout = base_config.timeout;
+    let verbose = base_config.verbose;
 
     // Spawn worker threads (each spawns subprocesses)
     let mut handles = Vec::new();
@@ -580,16 +607,20 @@ fn run_tests_parallel(
                 }
 
                 // Spawn subprocess for this test
-                let output = Command::new(&current_exe)
-                    .arg("--internal-run-test")
+                let mut cmd = Command::new(&current_exe);
+                cmd.arg("--internal-run-test")
                     .arg(&test_name)
                     .arg("--network")
                     .arg(&network_endpoint)
                     .arg("--timeout")
-                    .arg(timeout.to_string())
-                    .stdout(Stdio::piped())
-                    .stderr(Stdio::piped())
-                    .output();
+                    .arg(timeout.to_string());
+
+                // Forward verbosity flag
+                if verbose {
+                    cmd.arg("--verbose");
+                }
+
+                let output = cmd.stdout(Stdio::piped()).stderr(Stdio::piped()).output();
 
                 let progress = completed_count.fetch_add(1, Ordering::SeqCst) + 1;
 
@@ -676,6 +707,17 @@ fn run_tests_parallel(
                         && let Some(ref error) = result.error_message
                     {
                         println!("            Error: {error}");
+                    }
+
+                    // Show captured output in verbose mode for all tests, or
+                    // inline for failures
+                    if (verbose || !result.passed)
+                        && let Some(ref output) = result.captured_output
+                        && !output.trim().is_empty()
+                    {
+                        for line in output.lines() {
+                            println!("            {line}");
+                        }
                     }
                 }
 

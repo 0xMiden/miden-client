@@ -23,15 +23,16 @@ use miden_client::rpc::domain::account::{AccountStorageRequirements, StorageMapK
 use miden_client::testing::common::*;
 use miden_client::transaction::{AdviceInputs, ForeignAccount, TransactionRequestBuilder};
 use miden_client::{Felt, Word};
+use tracing::info;
 
 use crate::tests::config::ClientConfig;
 
 // FPI TESTS
 // ================================================================================================
 
-const MAP_KEY: [Felt; 4] = [Felt::new(15), Felt::new(15), Felt::new(15), Felt::new(15)];
-const MAP_SLOT_NAME: &str = "miden::testing::fpi::map";
-const FPI_STORAGE_VALUE: [Felt; 4] =
+pub(crate) const MAP_KEY: [Felt; 4] = [Felt::new(15), Felt::new(15), Felt::new(15), Felt::new(15)];
+pub(crate) const MAP_SLOT_NAME: &str = "miden::testing::fpi::map";
+pub(crate) const FPI_STORAGE_VALUE: [Felt; 4] =
     [Felt::new(9u64), Felt::new(12u64), Felt::new(18u64), Felt::new(30u64)];
 
 pub async fn test_standard_fpi_public(client_config: ClientConfig) -> Result<()> {
@@ -99,9 +100,6 @@ pub async fn test_fpi_execute_program(client_config: ClientConfig) -> Result<()>
 
     let tx_script = client.code_builder().compile_tx_script(&code)?;
     client.sync_state().await?;
-
-    // Wait for a couple of blocks so that the account gets committed
-    wait_for_blocks(&mut client, 2).await;
 
     let map_slot_name = StorageSlotName::new(MAP_SLOT_NAME).expect("slot name should be valid");
     let storage_requirements =
@@ -215,7 +213,7 @@ pub async fn test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
     .await?;
     let outer_foreign_account_id = outer_foreign_account.id();
 
-    println!("Calling FPI function inside a FPI function with new account");
+    info!(inner_id = %inner_foreign_account_id, outer_id = %outer_foreign_account_id, "Executing nested FPI call");
 
     let tx_script = format!(
         "
@@ -249,9 +247,6 @@ pub async fn test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
 
     let tx_script = client.code_builder().compile_tx_script(&tx_script)?;
     client.sync_state().await?;
-
-    // Wait for a couple of blocks so that the account gets committed
-    wait_for_blocks(&mut client, 2).await;
 
     // Create transaction request with FPI
     let builder = TransactionRequestBuilder::new().custom_script(tx_script);
@@ -323,7 +318,7 @@ async fn standard_fpi(
 
     let foreign_account_id = foreign_account.id();
 
-    println!("Calling FPI functions with new account");
+    info!(foreign_id = %foreign_account_id, "Executing FPI call");
 
     let tx_script = format!(
         "
@@ -365,9 +360,6 @@ async fn standard_fpi(
 
     let tx_script = client.code_builder().compile_tx_script(&tx_script)?;
     client.sync_state().await?;
-
-    // Wait for a couple of blocks so that the account gets committed
-    wait_for_blocks(&mut client, 2).await;
 
     // Before the transaction there are no cached foreign accounts
     let foreign_accounts =
@@ -525,7 +517,7 @@ fn foreign_account_with_code(
 /// A tuple containing:
 /// - `Account` - The deployed foreign account.
 /// - `Word` - The procedure root of the foreign account.
-async fn deploy_foreign_account(
+pub(crate) async fn deploy_foreign_account(
     client: &mut TestClient,
     keystore: &FilesystemKeyStore,
     storage_mode: AccountStorageMode,
@@ -542,7 +534,7 @@ async fn deploy_foreign_account(
         .with_context(|| "failed to add key to keystore")?;
     client.add_account(&foreign_account, false).await?;
 
-    println!("Deploying foreign account");
+    info!(account_id = %foreign_account_id, ?storage_mode, "Deploying foreign account");
 
     let tx_id = client
         .submit_new_transaction(

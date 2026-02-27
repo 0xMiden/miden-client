@@ -18,11 +18,11 @@ jobs:
     if: >
       github.event.pull_request.merged == true &&
       contains(github.event.pull_request.labels.*.name, 'patch release')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           ref: next
@@ -41,6 +41,10 @@ jobs:
           override: true
           target: wasm32-unknown-unknown
           components: rust-src
+
+      - name: Install binaryen (wasm-opt)
+        run: |
+          sudo apt-get update && sudo apt-get install -y binaryen
 
       - name: Verify web-client version bump against next
         id: check_web_version

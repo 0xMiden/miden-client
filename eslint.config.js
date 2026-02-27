@@ -10,6 +10,7 @@ module.exports = [
       "docs/**/*",
       "crates/idxdb-store/src/**",
       "packages/react-sdk/**",
+      "packages/vite-plugin/**",
     ],
   },
   {

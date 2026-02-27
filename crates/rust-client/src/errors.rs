@@ -66,85 +66,101 @@ pub enum ClientError {
     AddressAlreadyTracked(String),
     #[error("account with id {0} is already being tracked")]
     AccountAlreadyTracked(AccountId),
-    #[error("address {0} available, but its derived note tag {1} is already being tracked")]
+    #[error(
+        "address {0} cannot be tracked: its derived note tag {1} is already associated with another tracked address"
+    )]
     NoteTagDerivedAddressAlreadyTracked(String, NoteTag),
     #[error("account error")]
     AccountError(#[from] AccountError),
-    #[error("account with id {0} is locked")]
+    #[error("account {0} is locked because the local state may be out of date with the network")]
     AccountLocked(AccountId),
-    #[error("network account commitment {0} doesn't match the imported account commitment")]
+    #[error(
+        "account import failed: the on-chain account commitment ({0}) does not match the commitment of the account being imported"
+    )]
     AccountCommitmentMismatch(Word),
-    #[error("account with id {0} is private")]
+    #[error("account {0} is private and its details cannot be retrieved from the network")]
     AccountIsPrivate(AccountId),
     #[error("account with id {0} not found on the network")]
     AccountNotFoundOnChain(AccountId),
-    #[error("account nonce is too low to import")]
+    #[error(
+        "cannot import account: the local account nonce is higher than the imported one, meaning the local state is newer"
+    )]
     AccountNonceTooLow,
     #[error("asset error")]
     AssetError(#[from] AssetError),
     #[error("account data wasn't found for account id {0}")]
     AccountDataNotFound(AccountId),
-    #[error("error creating the partial blockchain")]
+    #[error("failed to construct the partial blockchain")]
     PartialBlockchainError(#[from] PartialBlockchainError),
-    #[error("data deserialization error")]
+    #[error("failed to deserialize data")]
     DataDeserializationError(#[from] DeserializationError),
     #[error("note with id {0} not found on chain")]
     NoteNotFoundOnChain(NoteId),
-    #[error("error parsing hex")]
+    #[error("failed to parse hex string")]
     HexParseError(#[from] HexParseError),
-    #[error("partial MMR has a forest that does not fit within a u32")]
+    #[error(
+        "the chain Merkle Mountain Range (MMR) forest value exceeds the supported range (must fit in a u32)"
+    )]
     InvalidPartialMmrForest,
-    #[error("can't add new account without seed")]
+    #[error(
+        "cannot track a new account without its seed; the seed is required to validate the account ID's correctness"
+    )]
     AddNewAccountWithoutSeed,
-    #[error("error with merkle path")]
+    #[error("merkle proof error")]
     MerkleError(#[from] MerkleError),
     #[error(
-        "the transaction didn't produce the output notes with the expected recipient digests ({0:?})"
+        "transaction output mismatch: expected output notes with recipient digests {0:?} were not produced by the transaction"
     )]
     MissingOutputRecipients(Vec<Word>),
     #[error("note error")]
     NoteError(#[from] NoteError),
-    #[error("note checker error")]
+    #[error("note consumption check failed")]
     NoteCheckerError(#[from] NoteCheckerError),
     #[error("note import error: {0}")]
     NoteImportError(String),
-    #[error("error while converting input note")]
+    #[error("failed to convert note record")]
     NoteRecordConversionError(#[from] NoteRecordError),
-    #[error("transport api error")]
+    #[error("note transport error")]
     NoteTransportError(#[from] NoteTransportError),
-    #[error("no consumable note for account {0}")]
+    #[error(
+        "account {0} has no notes available to consume; sync the client or check that notes targeting this account exist"
+    )]
     NoConsumableNoteForAccount(AccountId),
-    #[error("rpc api error")]
+    #[error("RPC error")]
     RpcError(#[from] RpcError),
-    #[error("recency condition error: {0}")]
+    #[error(
+        "transaction failed a recency check: {0} — the reference block may be too old; try syncing and resubmitting"
+    )]
     RecencyConditionError(&'static str),
-    #[error("note screener error")]
+    #[error("note relevance check failed")]
     NoteScreenerError(#[from] NoteScreenerError),
-    #[error("store error")]
+    #[error("storage error")]
     StoreError(#[from] StoreError),
-    #[error("transaction executor error")]
+    #[error("transaction execution failed")]
     TransactionExecutorError(#[from] TransactionExecutorError),
-    #[error("transaction input error")]
+    #[error("invalid transaction input")]
     TransactionInputError(#[source] TransactionInputError),
-    #[error("transaction prover error")]
+    #[error("transaction proving failed")]
     TransactionProvingError(#[from] TransactionProverError),
-    #[error("transaction request error")]
+    #[error("invalid transaction request")]
     TransactionRequestError(#[from] TransactionRequestError),
-    #[error("transaction script builder error")]
+    #[error("failed to build transaction script from account interface")]
     AccountInterfaceError(#[from] AccountInterfaceError),
     #[error("transaction script error")]
     TransactionScriptError(#[source] TransactionScriptError),
     #[error("client initialization error: {0}")]
     ClientInitializationError(String),
-    #[error("note tags limit exceeded (max {0})")]
-    NoteTagsLimitExceeded(usize),
-    #[error("accounts limit exceeded (max {0})")]
-    AccountsLimitExceeded(usize),
-    #[error("unsupported authentication scheme ID: {0}")]
+    #[error("cannot track more note tags: the maximum of {0} tracked tags has been reached")]
+    NoteTagsLimitExceeded(u32),
+    #[error("cannot track more accounts: the maximum of {0} tracked accounts has been reached")]
+    AccountsLimitExceeded(u32),
+    #[error(
+        "unsupported authentication scheme ID {0}; supported schemes are: RpoFalcon512 (0) and EcdsaK256Keccak (1)"
+    )]
     UnsupportedAuthSchemeId(u8),
-    #[error("account error is not full: {0}")]
+    #[error("expected full account data for account {0}, but only partial data is available")]
     AccountRecordNotFull(AccountId),
-    #[error("account error is not partial: {0}")]
+    #[error("expected partial account data for account {0}, but full data was found")]
     AccountRecordNotPartial(AccountId),
 }
 
@@ -171,6 +187,44 @@ impl From<&ClientError> for Option<ErrorHint> {
                 ),
                 docs_url: Some(TROUBLESHOOTING_DOC),
             }),
+            ClientError::AccountLocked(account_id) => Some(ErrorHint {
+                message: format!(
+                    "Account {account_id} is locked because the client may be missing its latest \
+                     state. This can happen when the account is shared and another client executed \
+                     a transaction. Run `sync` to fetch the latest state from the network."
+                ),
+                docs_url: Some(TROUBLESHOOTING_DOC),
+            }),
+            ClientError::AccountNonceTooLow => Some(ErrorHint {
+                message: "The account you are trying to import has an older nonce than the version \
+                          already tracked locally. Run `sync` to ensure your local state is current, \
+                          or re-export the account from a more up-to-date source.".to_string(),
+                docs_url: Some(TROUBLESHOOTING_DOC),
+            }),
+            ClientError::NoConsumableNoteForAccount(account_id) => Some(ErrorHint {
+                message: format!(
+                    "No notes were found that account {account_id} can consume. \
+                     Run `sync` to fetch the latest notes from the network, \
+                     and verify that notes targeting this account have been committed on chain."
+                ),
+                docs_url: Some(TROUBLESHOOTING_DOC),
+            }),
+            ClientError::RpcError(RpcError::ConnectionError(_)) => Some(ErrorHint {
+                message: "Could not reach the Miden node. Check that the node endpoint in your \
+                          configuration is correct and that the node is running.".to_string(),
+                docs_url: Some(TROUBLESHOOTING_DOC),
+            }),
+            ClientError::RpcError(RpcError::AcceptHeaderError(_)) => Some(ErrorHint {
+                message: "The node rejected the request due to a version mismatch. \
+                          Ensure your client version is compatible with the node version.".to_string(),
+                docs_url: Some(TROUBLESHOOTING_DOC),
+            }),
+            ClientError::AddNewAccountWithoutSeed => Some(ErrorHint {
+                message: "New accounts require a seed to derive their initial state. \
+                          Use `Client::new_account()` which generates the seed automatically, \
+                          or provide the seed when importing.".to_string(),
+                docs_url: Some(TROUBLESHOOTING_DOC),
+            }),
             _ => None,
         }
     }
@@ -192,6 +246,25 @@ impl From<&TransactionRequestError> for Option<ErrorHint> {
             TransactionRequestError::StorageSlotNotFound(slot, account_id) => {
                 Some(storage_miss_hint(*slot, *account_id))
             },
+            TransactionRequestError::InputNoteNotAuthenticated(note_id) => Some(ErrorHint {
+                message: format!(
+                    "Note {note_id} needs an inclusion proof before it can be consumed as an \
+                     authenticated input. Run `sync` to fetch the latest proofs from the network."
+                ),
+                docs_url: Some(TROUBLESHOOTING_DOC),
+            }),
+            TransactionRequestError::P2IDNoteWithoutAsset => Some(ErrorHint {
+                message: "A pay-to-ID (P2ID) note transfers assets to a target account. \
+                          Add at least one fungible or non-fungible asset to the note.".to_string(),
+                docs_url: Some(TROUBLESHOOTING_DOC),
+            }),
+            TransactionRequestError::InvalidSenderAccount(account_id) => Some(ErrorHint {
+                message: format!(
+                    "Account {account_id} is not tracked by this client. Import or create the \
+                     account first, then retry the transaction."
+                ),
+                docs_url: Some(TROUBLESHOOTING_DOC),
+            }),
             _ => None,
         }
     }
@@ -234,7 +307,7 @@ fn transaction_executor_hint(err: &TransactionExecutorError) -> Option<ErrorHint
             })
         },
         TransactionExecutorError::TransactionProgramExecutionFailed(_) => Some(ErrorHint {
-            message: "Re-run the transaction with debug mode enabled , capture VM diagnostics, and inspect the source manager output to understand why execution failed.".to_string(),
+            message: "Re-run the transaction with debug mode enabled, capture VM diagnostics, and inspect the source manager output to understand why execution failed.".to_string(),
             docs_url: Some(TROUBLESHOOTING_DOC),
         }),
         _ => None,
@@ -248,9 +321,11 @@ fn transaction_executor_hint(err: &TransactionExecutorError) -> Option<ErrorHint
 #[derive(Debug, Error)]
 pub enum IdPrefixFetchError {
     /// No matches were found for the ID prefix.
-    #[error("no matches were found with the {0}")]
+    #[error("no stored notes matched the provided prefix '{0}'")]
     NoMatch(String),
     /// Multiple entities matched with the ID prefix.
-    #[error("found more than one element for the provided {0} and only one match is expected")]
+    #[error(
+        "multiple {0} entries match the provided prefix; provide a longer prefix to narrow it down"
+    )]
     MultipleMatches(String),
 }

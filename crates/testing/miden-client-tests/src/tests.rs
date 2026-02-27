@@ -33,6 +33,7 @@ use miden_client::store::{
     InputNoteRecord,
     InputNoteState,
     NoteFilter,
+    OutputNoteState,
     TransactionFilter,
 };
 use miden_client::sync::{NoteTagRecord, NoteTagSource};
@@ -464,6 +465,89 @@ async fn sync_state_mmr() {
 
     // the blocks for both notes should be stored as they are relevant for the client's accounts
     assert_eq!(client.test_store().get_tracked_block_headers().await.unwrap().len(), 2);
+}
+
+/// Tests that MMR authentication nodes are persisted even when `include_block` is false
+/// (i.e., a synced block has no relevant notes and is not the chain tip).
+///
+/// This covers the scenario where a browser extension popup is closed and reopened:
+/// the in-memory `PartialMmr` is lost and must be fully reconstructable from the store.
+/// Without persisting auth nodes for skipped blocks, the store would be missing nodes
+/// needed for Merkle authentication paths, causing transaction execution to fail.
+#[tokio::test]
+async fn sync_persists_auth_nodes_for_skipped_blocks() {
+    use miden_client::async_trait;
+    use miden_client::rpc::domain::note::CommittedNote;
+    use miden_client::store::InputNoteRecord;
+    use miden_client::sync::{NoteUpdateAction, OnNoteReceived, StateSync, StateSyncInput};
+    use miden_protocol::crypto::merkle::mmr::{Forest, MmrPeaks, PartialMmr};
+
+    // A note screener that discards all notes, forcing `found_relevant_note = false`
+    // for every sync step. This means only the chain tip will have `include_block = true`.
+    struct DiscardAllNotes;
+
+    #[async_trait(?Send)]
+    impl OnNoteReceived for DiscardAllNotes {
+        async fn on_note_received(
+            &self,
+            _committed_note: CommittedNote,
+            _public_note: Option<InputNoteRecord>,
+        ) -> Result<NoteUpdateAction, ClientError> {
+            Ok(NoteUpdateAction::Discard)
+        }
+    }
+
+    // Set up the mock chain (blocks 0-5, notes in blocks 1 and 4)
+    let (_client, rpc_api, _) = Box::pin(create_test_client()).await;
+
+    // Build a PartialMmr starting from an empty forest with the genesis block tracked.
+    // Tracking genesis is critical: it means the MMR must produce authentication nodes
+    // for genesis whenever the tree structure changes (i.e., when new blocks are added).
+    let genesis = rpc_api.get_block_header_by_number(Some(0.into()), false).await.unwrap().0;
+    let mut partial_mmr = PartialMmr::from_peaks(MmrPeaks::new(Forest::empty(), vec![]).unwrap());
+    partial_mmr.add(genesis.commitment(), true); // track genesis
+
+    // Create a StateSync that discards all notes so intermediate blocks are skipped
+    let state_sync = StateSync::new(Arc::new(rpc_api.clone()), Arc::new(DiscardAllNotes), None);
+
+    // Use the note tag from the prebuilt chain (tag 0) so the mock RPC returns
+    // blocks step-by-step (block 1, then block 4, then the chain tip) instead of
+    // jumping directly to the chain tip.
+    let note_tags = BTreeSet::from([NoteTag::new(0)]);
+
+    let state_sync_update = state_sync
+        .sync_state(
+            &mut partial_mmr,
+            StateSyncInput {
+                accounts: vec![],
+                note_tags,
+                input_notes: vec![],
+                output_notes: vec![],
+                uncommitted_transactions: vec![],
+            },
+        )
+        .await
+        .unwrap();
+
+    // Only the chain tip block should be stored as a block header.
+    // Blocks 1 and 4 had matching note tags but the screener discarded them,
+    // so `include_block` was false for those steps.
+    assert_eq!(
+        state_sync_update.block_updates.block_headers().len(),
+        1,
+        "expected only the chain tip block header to be stored"
+    );
+    let (tip_header, ..) = &state_sync_update.block_updates.block_headers()[0];
+    assert_eq!(tip_header.block_num(), rpc_api.get_chain_tip_block_num());
+
+    // Authentication nodes must be non-empty: they include nodes produced during
+    // the intermediate sync steps (blocks 1 and 4) via `extend_authentication_nodes`.
+    // These nodes are needed for the tracked genesis leaf's Merkle proof path, which
+    // changes as the tree grows.
+    assert!(
+        !state_sync_update.block_updates.new_authentication_nodes().is_empty(),
+        "expected authentication nodes from intermediate (skipped) blocks to be persisted"
+    );
 }
 
 #[tokio::test]
@@ -2071,6 +2155,121 @@ async fn swap_chain_test() {
     assert_eq!(last_wallet_balance, 1);
 }
 
+/// Tests that partial output notes (created when a SWAP note is consumed) are correctly included in
+/// `NoteFilter::Unspent` and receive inclusion proofs during sync, transitioning from
+/// `ExpectedPartial` to `CommittedPartial` state.
+///
+/// This is a regression test for a bug where `NoteFilter::Unspent` for output notes did not
+/// include `ExpectedPartial` and `CommittedPartial` states, causing partial output notes to be
+/// excluded from sync operations and never receiving their inclusion proofs.
+#[tokio::test]
+async fn partial_output_note_receives_inclusion_proof_after_sync() {
+    let (mut client, mock_rpc_api, keystore) = Box::pin(create_test_client()).await;
+    client.sync_state().await.unwrap();
+
+    // Set up two wallet-faucet pairs for the swap scenario.
+    let (wallet_a, faucet_a) = setup_wallet_and_faucet(
+        &mut client,
+        AccountStorageMode::Private,
+        &keystore,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await
+    .unwrap();
+
+    let (wallet_b, faucet_b) = setup_wallet_and_faucet(
+        &mut client,
+        AccountStorageMode::Private,
+        &keystore,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await
+    .unwrap();
+
+    // Mint and consume tokens so each wallet holds assets for the swap.
+    mint_and_consume(&mut client, wallet_a.id(), faucet_a.id(), NoteType::Private).await;
+    mock_rpc_api.prove_block();
+    client.sync_state().await.unwrap();
+
+    mint_and_consume(&mut client, wallet_b.id(), faucet_b.id(), NoteType::Private).await;
+    mock_rpc_api.prove_block();
+    client.sync_state().await.unwrap();
+
+    // Wallet A creates a SWAP note: offers 1 unit of faucet_a, requests 1 unit of faucet_b.
+    let offered_asset = Asset::Fungible(FungibleAsset::new(faucet_a.id(), 1).unwrap());
+    let requested_asset = Asset::Fungible(FungibleAsset::new(faucet_b.id(), 1).unwrap());
+
+    let swap_tx_request = TransactionRequestBuilder::new()
+        .build_swap(
+            &SwapTransactionData::new(wallet_a.id(), offered_asset, requested_asset),
+            NoteType::Private,
+            NoteType::Private,
+            client.rng(),
+        )
+        .unwrap();
+
+    let swap_note = swap_tx_request.expected_output_own_notes()[0].clone();
+
+    Box::pin(client.submit_new_transaction(wallet_a.id(), swap_tx_request))
+        .await
+        .unwrap();
+    mock_rpc_api.prove_block();
+    client.sync_state().await.unwrap();
+
+    // Wallet B consumes the SWAP note. The SWAP script creates a payback note for wallet A using
+    // only the recipient digest committed inside the SWAP note. From the VM's perspective this
+    // payback note is an OutputNote::Partial, which gets stored as ExpectedPartial.
+    let consume_tx_request =
+        TransactionRequestBuilder::new().build_consume_notes(vec![swap_note]).unwrap();
+
+    Box::pin(client.submit_new_transaction(wallet_b.id(), consume_tx_request))
+        .await
+        .unwrap();
+
+    // Before the block is proven and synced, the payback note should be tracked as ExpectedPartial.
+    // The fix in filters.rs ensures NoteFilter::Unspent includes ExpectedPartial notes; without it
+    // this query would return an empty list for partial notes.
+    let unspent_before_sync = client.get_output_notes(NoteFilter::Unspent).await.unwrap();
+    let expected_partial_count = unspent_before_sync
+        .iter()
+        .filter(|n| matches!(n.state(), OutputNoteState::ExpectedPartial))
+        .count();
+    assert!(
+        expected_partial_count > 0,
+        "Expected at least one output note in ExpectedPartial state before sync, found 0"
+    );
+
+    // Prove the block (commits wallet B's transaction with the partial payback note).
+    mock_rpc_api.prove_block();
+
+    // Sync to receive inclusion proofs. With the fix, the ExpectedPartial output note is included
+    // in the NoteFilter::Unspent query used by sync, so it receives an inclusion proof and
+    // transitions to CommittedPartial.
+    client.sync_state().await.unwrap();
+
+    // After sync, the partial note should have an inclusion proof (CommittedPartial) and still
+    // appear under NoteFilter::Unspent.
+    let unspent_after_sync = client.get_output_notes(NoteFilter::Unspent).await.unwrap();
+    let committed_partial_count = unspent_after_sync
+        .iter()
+        .filter(|n| matches!(n.state(), OutputNoteState::CommittedPartial { .. }))
+        .count();
+    assert!(
+        committed_partial_count > 0,
+        "Expected at least one output note in CommittedPartial state after sync, found 0"
+    );
+
+    // The note must no longer be stuck in ExpectedPartial — it received its inclusion proof.
+    let remaining_expected_partial = unspent_after_sync
+        .iter()
+        .filter(|n| matches!(n.state(), OutputNoteState::ExpectedPartial))
+        .count();
+    assert_eq!(
+        remaining_expected_partial, 0,
+        "All ExpectedPartial notes should have transitioned to CommittedPartial after sync"
+    );
+}
+
 #[tokio::test]
 async fn empty_storage_map() {
     let (mut client, _, keystore) = create_test_client().await;
@@ -2455,11 +2654,11 @@ async fn add_note_tag_fails_if_note_tag_limit_is_exceeded() {
 
     // add note tags until the limit is exceeded
     for i in 0..note_tags_limit {
-        client.add_note_tag(NoteTag::from(u32::try_from(i).unwrap())).await.unwrap();
+        client.add_note_tag(NoteTag::from(i)).await.unwrap();
     }
 
     // try to add a note tag
-    let tag = NoteTag::from(u32::try_from(note_tags_limit).unwrap());
+    let tag = NoteTag::from(note_tags_limit);
     let result = client.add_note_tag(tag).await;
 
     assert!(matches!(result, Err(ClientError::NoteTagsLimitExceeded(_))));
@@ -2475,7 +2674,7 @@ async fn add_account_fails_if_accounts_limit_is_exceeded() {
         client
             .add_account(
                 &Account::mock(
-                    (i << 8) as u128,
+                    (i << 8).into(),
                     AuthFalcon512Rpo::new(PublicKeyCommitment::from(EMPTY_WORD)),
                 ),
                 false,
@@ -2488,7 +2687,7 @@ async fn add_account_fails_if_accounts_limit_is_exceeded() {
     let result = client
         .add_account(
             &Account::mock(
-                (RpcLimits::default().account_ids_limit << 8) as u128,
+                (RpcLimits::default().account_ids_limit << 8).into(),
                 AuthFalcon512Rpo::new(PublicKeyCommitment::from(EMPTY_WORD)),
             ),
             false,

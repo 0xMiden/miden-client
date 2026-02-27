@@ -1,5 +1,8 @@
 import { createContext, useContext } from "react";
-import type { AccountStorageMode } from "@miden-sdk/miden-sdk";
+import type {
+  AccountStorageMode,
+  AccountComponent,
+} from "@miden-sdk/miden-sdk";
 
 // SIGNER CONTEXT
 // ================================================================================================
@@ -40,6 +43,8 @@ export interface SignerAccountConfig {
   storageMode: AccountStorageMode;
   /** Optional seed for deterministic account ID */
   accountSeed?: Uint8Array;
+  /** Optional custom account components to include in the account (e.g. from a compiled .masp package) */
+  customComponents?: AccountComponent[];
 }
 
 /**

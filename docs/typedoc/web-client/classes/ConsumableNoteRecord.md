@@ -24,7 +24,7 @@ Creates a new consumable note record from an input note record and consumability
 
 ##### note\_consumability
 
-[`NoteConsumability`](NoteConsumability.md)[]
+`NoteConsumability`[]
 
 #### Returns
 
@@ -66,10 +66,10 @@ Returns the underlying input note record.
 
 ### noteConsumability()
 
-> **noteConsumability**(): [`NoteConsumability`](NoteConsumability.md)[]
+> **noteConsumability**(): `NoteConsumability`[]
 
 Returns the consumability entries.
 
 #### Returns
 
-[`NoteConsumability`](NoteConsumability.md)[]
+`NoteConsumability`[]

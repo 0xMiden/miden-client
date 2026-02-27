@@ -2,11 +2,11 @@ use miden_client::Word;
 use miden_client::account::AccountFile as NativeAccountFile;
 use miden_client::keystore::Keystore;
 use miden_client::note::NoteId;
-use miden_client::store::NoteExportType;
 use wasm_bindgen::prelude::*;
 
 use crate::models::account_file::AccountFile;
 use crate::models::account_id::AccountId;
+use crate::models::note_export_format::NoteExportFormat;
 use crate::models::note_file::NoteFile;
 use crate::{WebClient, js_error_with_context};
 
@@ -16,7 +16,7 @@ impl WebClient {
     pub async fn export_note_file(
         &mut self,
         note_id: String,
-        export_type: String,
+        export_format: NoteExportFormat,
     ) -> Result<NoteFile, JsValue> {
         if let Some(client) = self.get_mut_inner() {
             let note_id = NoteId::from_raw(Word::try_from(note_id).map_err(|err| {
@@ -37,18 +37,7 @@ impl WebClient {
                 })?
                 .ok_or(JsValue::from_str("No output note found"))?;
 
-            let export_type = match export_type.as_str() {
-                "Id" => NoteExportType::NoteId,
-                "Full" => NoteExportType::NoteWithProof,
-                "Details" => NoteExportType::NoteDetails,
-                // Fail fast on unspecified/invalid export type instead of defaulting
-                other => {
-                    return Err(JsValue::from_str(&format!(
-                        "Invalid export type: {}. Expected one of: Id | Full | Details",
-                        if other.is_empty() { "<empty>" } else { other }
-                    )));
-                },
-            };
+            let export_type = export_format.into();
 
             let note_file = output_note.into_note_file(&export_type).map_err(|err| {
                 js_error_with_context(err, "failed to convert output note to note file")
@@ -77,7 +66,7 @@ impl WebClient {
     #[wasm_bindgen(js_name = "exportAccountFile")]
     pub async fn export_account_file(
         &mut self,
-        account_id: AccountId,
+        account_id: &AccountId,
     ) -> Result<AccountFile, JsValue> {
         let keystore = self.keystore.clone().expect("Keystore not initialized");
         if let Some(client) = self.get_mut_inner() {

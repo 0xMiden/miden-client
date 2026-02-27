@@ -66,6 +66,12 @@ extern "C" {
         db_id: &str,
         pub_key_commitment_hex: String,
     ) -> js_sys::Promise;
+
+    #[wasm_bindgen(js_name = getAccountIdByKeyCommitment)]
+    pub fn idxdb_get_account_id_by_key_commitment(
+        db_id: &str,
+        pub_key_commitment_hex: String,
+    ) -> js_sys::Promise;
 }
 
 pub async fn insert_account_auth(
@@ -136,6 +142,15 @@ pub async fn get_key_commitments_by_account_id(
     })?;
 
     Ok(commitments)
+}
+
+pub async fn get_account_id_by_key_commitment(
+    db_id: &str,
+    pub_key_commitment_hex: String,
+) -> Result<Option<String>, JsValue> {
+    let promise = idxdb_get_account_id_by_key_commitment(db_id, pub_key_commitment_hex);
+    let js_account_id = JsFuture::from(promise).await?;
+    Ok(js_account_id.as_string())
 }
 
 pub async fn remove_all_mappings_for_key(

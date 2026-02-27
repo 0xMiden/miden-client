@@ -9,10 +9,10 @@ permissions:
 
 jobs:
   publish:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           ref: refs/tags/${{ github.event.release.tag_name }}
@@ -31,6 +31,10 @@ jobs:
           override: true
           target: wasm32-unknown-unknown
           components: rust-src
+
+      - name: Install binaryen (wasm-opt)
+        run: |
+          sudo apt-get update && sudo apt-get install -y binaryen
 
       - name: Ensure release tag has version bump
         id: check_version

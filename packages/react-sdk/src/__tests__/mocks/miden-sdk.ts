@@ -201,7 +201,6 @@ export const MockNoteFilterTypes = {
 // Mock NoteType enum
 export const MockNoteType = {
   Private: 2,
-  Encrypted: 3,
   Public: 1,
 };
 
@@ -394,14 +393,17 @@ export const createMockSdkModule = (
 ) => {
   const mockClient = createMockWebClient(clientOverrides);
 
+  const WebClientMock = Object.assign(
+    vi.fn().mockImplementation(() => mockClient),
+    {
+      createClient: vi.fn().mockResolvedValue(mockClient),
+      createClientWithExternalKeystore: vi.fn().mockResolvedValue(mockClient),
+    }
+  );
+
   return {
-    WebClient: Object.assign(
-      vi.fn().mockImplementation(() => mockClient),
-      {
-        createClient: vi.fn().mockResolvedValue(mockClient),
-        createClientWithExternalKeystore: vi.fn().mockResolvedValue(mockClient),
-      }
-    ),
+    WebClient: WebClientMock,
+    WasmWebClient: WebClientMock,
     AccountId: MockAccountId,
     Address: {
       fromBech32: vi.fn((bech32: string) => ({

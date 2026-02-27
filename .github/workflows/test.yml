@@ -4,36 +4,55 @@ permissions:
 on:
   push:
     branches: [main, next]
+    paths-ignore:
+      - "**.md"
+      - "**.txt"
+      - "docs/**"
   pull_request:
-    types: [opened, reopened, synchronize]
+    paths-ignore:
+      - "**.md"
+      - "**.txt"
+      - "docs/**"
 
-# Only latest commit (per PR) should run 
+# Only latest commit (per PR) should run
 concurrency:
   group: "${{ github.workflow }} @ ${{ github.event.pull_request.head.label || github.head_ref || github.ref }}"
   cancel-in-progress: true
 
+env:
+  CARGO_PROFILE_DEV_DEBUG: 0
+  RUST_CACHE_KEY: rust-cache-2026.02.18
+
 jobs:
   test:
     name: Test Rust
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@main
+      - uses: actions/checkout@v6
       - name: Install Rust
         run: rustup update --no-self-update
       - name: Add Rust Cache
         uses: Swatinem/rust-cache@v2
-      - uses: taiki-e/install-action@nextest
+        with:
+          shared-key: rust-build
+          prefix-key: ${{ env.RUST_CACHE_KEY }}
+          save-if: ${{ github.ref == 'refs/heads/next' }}
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: nextest@0.9.122
       - name: make - test
         run: make test
 
   doc-tests:
     name: doc-tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@main
+      - uses: actions/checkout@v6
       - uses: Swatinem/rust-cache@v2
         with:
-          save-if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/next' }}
+          shared-key: rust-build
+          prefix-key: ${{ env.RUST_CACHE_KEY }}
+          save-if: ${{ github.ref == 'refs/heads/next' }}
       - name: Install rust
         run: rustup update --no-self-update
       - name: Run doc-tests
@@ -41,10 +60,10 @@ jobs:
 
   test-react-sdk:
     name: Test React SDK
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: [build-web-client-dist-folder]
     steps:
-      - uses: actions/checkout@main
+      - uses: actions/checkout@v6
       - name: Fetch web client dist
         uses: actions/download-artifact@v4
         with:
@@ -61,10 +80,10 @@ jobs:
 
   test-react-sdk-integration:
     name: React SDK integration tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: [build-web-client-dist-folder]
     steps:
-      - uses: actions/checkout@main
+      - uses: actions/checkout@v6
       - name: Fetch web client dist
         uses: actions/download-artifact@v4
         with:
@@ -83,10 +102,10 @@ jobs:
 
   build-react-sdk:
     name: Build React SDK
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: [ build-web-client-dist-folder ]
     steps:
-      - uses: actions/checkout@main
+      - uses: actions/checkout@v6
       - name: Fetch web client dist
         uses: actions/download-artifact@v4
         with:
@@ -102,15 +121,21 @@ jobs:
         run: cd ./packages/react-sdk && yarn build
 
   integration-tests:
-    name: Run integration tests on ubuntu-latest
-    runs-on: ubuntu-latest
+    name: Run integration tests
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@main
+      - uses: actions/checkout@v6
       - name: Install Rust
         run: rustup update --no-self-update
-      - uses: taiki-e/install-action@nextest
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: nextest@0.9.122
       - name: Add Rust Cache
         uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: rust-build
+          prefix-key: ${{ env.RUST_CACHE_KEY }}
+          save-if: ${{ github.ref == 'refs/heads/next' }}
       - name: Start test node
         run: make start-node-background
       - name: Start note transport
@@ -128,16 +153,24 @@ jobs:
 
   build-web-client-dist-folder:
     name: Build Web Client
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@main
+      - uses: actions/checkout@v6
       - name: Install Rust (needed for WASM build)
         run: |
           rustup update --no-self-update
           rustup target add wasm32-unknown-unknown
 
+      - name: Install binaryen (wasm-opt)
+        run: |
+          sudo apt-get update && sudo apt-get install -y binaryen
+
       - name: Add Rust Cache
         uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: rust-build-wasm
+          prefix-key: ${{ env.RUST_CACHE_KEY }}
+          save-if: ${{ github.ref == 'refs/heads/next' }}
 
       - name: Install Node.js
         uses: actions/setup-node@v4
@@ -185,15 +218,15 @@ jobs:
           path: ./crates/web-client/dist
 
   integration-tests-web-client:
-    name: Run integration tests for web client on ubuntu-latest
-    runs-on: ubuntu-latest
+    name: Run integration tests for web client
+    runs-on: ubuntu-24.04
     needs: [ build-web-client-dist-folder ]
     strategy:
       matrix:
         shard_index: [1, 2, 3, 4, 5, 6]
         shard_total: [6]
     steps:
-      - uses: actions/checkout@main
+      - uses: actions/checkout@v6
       - name: Install Rust
         run: |
           rustup update --no-self-update
@@ -213,6 +246,10 @@ jobs:
         run: . ./scripts/configure-sandbox.sh
       - name: Add Rust Cache
         uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: rust-build
+          prefix-key: ${{ env.RUST_CACHE_KEY }}
+          save-if: ${{ github.ref == 'refs/heads/next' }}
       - name: Start test node
         run: make start-node-background
       - name: Run web client tests
@@ -225,11 +262,11 @@ jobs:
         run: make stop-node
 
   integration-tests-remote-prover-web-client:
-    name: Run integration tests for remote prover on ubuntu-latest
-    runs-on: ubuntu-latest
+    name: Run integration tests for remote prover
+    runs-on: ubuntu-24.04
     needs: [ build-web-client-dist-folder ]
     steps:
-      - uses: actions/checkout@main
+      - uses: actions/checkout@v6
       - name: Install Rust
         run: |
           rustup update --no-self-update
@@ -249,6 +286,10 @@ jobs:
         run: . ./scripts/configure-sandbox.sh
       - name: Add Rust Cache
         uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: rust-build
+          prefix-key: ${{ env.RUST_CACHE_KEY }}
+          save-if: ${{ github.ref == 'refs/heads/next' }}
       - name: Start test node
         run: make start-node-background
       - name: Start prover

@@ -8,7 +8,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { WebClient } from "@miden-sdk/miden-sdk";
+import { WasmWebClient as WebClient } from "@miden-sdk/miden-sdk";
 import { useMidenStore } from "../store/MidenStore";
 import type { MidenConfig } from "../types";
 import { DEFAULTS } from "../types";
@@ -141,11 +141,6 @@ export function MidenProvider({
       return;
     }
 
-    // Mark as initialized for local keystore mode
-    if (!signerContext) {
-      isInitializedRef.current = true;
-    }
-
     let cancelled = false;
 
     // Wrap the entire init in runExclusive so that if the effect re-triggers
@@ -233,6 +228,9 @@ export function MidenProvider({
           // Set client LAST — this atomically sets isReady=true and
           // isInitializing=false, which enables auto-sync and consumer hooks.
           if (!cancelled) {
+            if (!signerContext) {
+              isInitializedRef.current = true;
+            }
             setClient(webClient);
           }
         } catch (error) {
@@ -248,6 +246,10 @@ export function MidenProvider({
     initClient();
     return () => {
       cancelled = true;
+      // Reset so StrictMode mount-2 can re-init if needed.
+      // The cancelled flag prevents mount-1 from setting state after cleanup,
+      // and runExclusive queuing ensures mount-2 waits for any in-progress init.
+      isInitializedRef.current = false;
     };
   }, [
     runExclusive,

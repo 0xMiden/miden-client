@@ -193,4 +193,99 @@ describe("useTransaction", () => {
       expect(result.current.isLoading).toBe(false);
     });
   });
+
+  describe("concurrency guard", () => {
+    it("should reject concurrent executions with SEND_BUSY", async () => {
+      let resolveSubmit: () => void;
+      const submitPromise = new Promise(
+        (resolve) => (resolveSubmit = () => resolve(createMockTransactionId()))
+      );
+
+      const mockClient = createMockWebClient({
+        submitNewTransaction: vi.fn().mockReturnValue(submitPromise),
+      });
+
+      mockUseMiden.mockReturnValue({
+        client: mockClient,
+        isReady: true,
+        sync: vi.fn().mockResolvedValue(undefined),
+      });
+
+      const { result } = renderHook(() => useTransaction());
+
+      let firstExec: Promise<any>;
+      act(() => {
+        firstExec = result.current.execute({
+          accountId: "0x1",
+          request: createMockTransactionRequest(),
+        });
+      });
+
+      await expect(
+        result.current.execute({
+          accountId: "0x1",
+          request: createMockTransactionRequest(),
+        })
+      ).rejects.toThrow("A transaction is already in progress");
+
+      await act(async () => {
+        resolveSubmit!();
+        await firstExec;
+      });
+    });
+  });
+
+  describe("auto-sync", () => {
+    it("should call sync before execute by default", async () => {
+      const mockSync = vi.fn().mockResolvedValue(undefined);
+      const mockTxId = createMockTransactionId();
+      const mockClient = createMockWebClient({
+        submitNewTransaction: vi.fn().mockResolvedValue(mockTxId),
+      });
+
+      mockUseMiden.mockReturnValue({
+        client: mockClient,
+        isReady: true,
+        sync: mockSync,
+      });
+
+      const { result } = renderHook(() => useTransaction());
+
+      await act(async () => {
+        await result.current.execute({
+          accountId: "0x1",
+          request: createMockTransactionRequest(),
+        });
+      });
+
+      expect(mockSync).toHaveBeenCalled();
+    });
+
+    it("should skip pre-sync when skipSync is true", async () => {
+      const mockSync = vi.fn().mockResolvedValue(undefined);
+      const mockTxId = createMockTransactionId();
+      const mockClient = createMockWebClient({
+        submitNewTransaction: vi.fn().mockResolvedValue(mockTxId),
+      });
+
+      mockUseMiden.mockReturnValue({
+        client: mockClient,
+        isReady: true,
+        sync: mockSync,
+      });
+
+      const { result } = renderHook(() => useTransaction());
+
+      await act(async () => {
+        await result.current.execute({
+          accountId: "0x1",
+          request: createMockTransactionRequest(),
+          skipSync: true,
+        });
+      });
+
+      // Sync called only once (post-execute), not before
+      expect(mockSync).toHaveBeenCalledTimes(1);
+    });
+  });
 });

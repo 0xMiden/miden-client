@@ -55,6 +55,30 @@ var Table;
 function indexes(...items) {
     return items.join(",");
 }
+/** V1 baseline schema. Extracted as a constant because once migrations are enabled, this must
+ *  never be modified — all schema changes should go through new version blocks instead. */
+const V1_STORES = {
+    [Table.AccountCode]: indexes("root"),
+    [Table.AccountStorage]: indexes("[commitment+slotName]", "commitment"),
+    [Table.StorageMapEntries]: indexes("[root+key]", "root"),
+    [Table.AccountAssets]: indexes("[root+vaultKey]", "root", "faucetIdPrefix"),
+    [Table.AccountAuth]: indexes("pubKeyCommitmentHex"),
+    [Table.AccountKeyMapping]: indexes("[accountIdHex+pubKeyCommitmentHex]", "accountIdHex", "pubKeyCommitmentHex"),
+    [Table.Accounts]: indexes("&accountCommitment", "id", "[id+nonce]", "codeRoot", "storageRoot", "vaultRoot"),
+    [Table.Addresses]: indexes("address", "id"),
+    [Table.Transactions]: indexes("id", "statusVariant"),
+    [Table.TransactionScripts]: indexes("scriptRoot"),
+    [Table.InputNotes]: indexes("noteId", "nullifier", "stateDiscriminant"),
+    [Table.OutputNotes]: indexes("noteId", "recipientDigest", "stateDiscriminant", "nullifier"),
+    [Table.NotesScripts]: indexes("scriptRoot"),
+    [Table.StateSync]: indexes("id"),
+    [Table.BlockHeaders]: indexes("blockNum", "hasClientNotes"),
+    [Table.PartialBlockchainNodes]: indexes("id"),
+    [Table.Tags]: indexes("id++", "tag", "sourceNoteId", "sourceAccountId"),
+    [Table.ForeignAccountCode]: indexes("accountId"),
+    [Table.Settings]: indexes("key"),
+    [Table.TrackedAccounts]: indexes("&id"),
+};
 export class MidenDatabase {
     dexie;
     accountCodes;
@@ -79,28 +103,50 @@ export class MidenDatabase {
     trackedAccounts;
     constructor(network) {
         this.dexie = new Dexie(network);
-        this.dexie.version(1).stores({
-            [Table.AccountCode]: indexes("root"),
-            [Table.AccountStorage]: indexes("[commitment+slotName]", "commitment"),
-            [Table.StorageMapEntries]: indexes("[root+key]", "root"),
-            [Table.AccountAssets]: indexes("[root+vaultKey]", "root", "faucetIdPrefix"),
-            [Table.AccountAuth]: indexes("pubKeyCommitmentHex"),
-            [Table.AccountKeyMapping]: indexes("[accountIdHex+pubKeyCommitmentHex]", "accountIdHex", "pubKeyCommitmentHex"),
-            [Table.Accounts]: indexes("&accountCommitment", "id", "[id+nonce]", "codeRoot", "storageRoot", "vaultRoot"),
-            [Table.Addresses]: indexes("address", "id"),
-            [Table.Transactions]: indexes("id", "statusVariant"),
-            [Table.TransactionScripts]: indexes("scriptRoot"),
-            [Table.InputNotes]: indexes("noteId", "nullifier", "stateDiscriminant"),
-            [Table.OutputNotes]: indexes("noteId", "recipientDigest", "stateDiscriminant", "nullifier"),
-            [Table.NotesScripts]: indexes("scriptRoot"),
-            [Table.StateSync]: indexes("id"),
-            [Table.BlockHeaders]: indexes("blockNum", "hasClientNotes"),
-            [Table.PartialBlockchainNodes]: indexes("id"),
-            [Table.Tags]: indexes("id++", "tag", "sourceNoteId", "sourceAccountId"),
-            [Table.ForeignAccountCode]: indexes("accountId"),
-            [Table.Settings]: indexes("key"),
-            [Table.TrackedAccounts]: indexes("&id"),
-        });
+        // --- Schema versioning ---
+        //
+        // NOTE: The migration system is not currently in use. The Miden network
+        // resets on every upgrade, so the database is nuked whenever the client
+        // version changes (see ensureClientVersion). Once the network stabilizes
+        // and data can be preserved across upgrades, the version-change nuke will
+        // be removed and migrations will take over.
+        //
+        // v1 is the baseline schema. To add a migration:
+        //   1. Add a .version(N+1).stores({...}).upgrade(tx => {...}) block below.
+        //      Only list tables whose indexes changed; Dexie carries forward the rest.
+        //   2. Update TypeScript interfaces and the Table enum if needed.
+        //   3. Add a migration test in schema.test.ts.
+        //   4. Run `yarn build` and `yarn test`.
+        //
+        // The version number is a simple incrementing integer, not the client semver.
+        // Use a comment to note which client version introduced the change.
+        //
+        // Example — adding a `createdAt` field with an index to accounts:
+        //
+        //   // v2: Add createdAt to accounts (client v0.7.0)
+        //   this.dexie.version(2).stores({
+        //       accounts: indexes("&accountCommitment", "id", ..., "createdAt"),
+        //   }).upgrade(tx => {
+        //       return tx.table("accounts").toCollection().modify(account => {
+        //           account.createdAt = 0;
+        //       });
+        //   });
+        //
+        // Tips:
+        //   - Index-only changes: omit .upgrade(). Dexie creates indexes automatically.
+        //   - New table: just include it in .stores(). It starts empty.
+        //   - Remove a table: set it to null, e.g. `oldTable: null`.
+        //   - Never modify a previous version block. Always add a new one.
+        //
+        // Note: The `populate` hook (below the version blocks) only fires on
+        // first database creation, NOT during upgrades.
+        //
+        // To enable migrations (stop nuking the DB on version change):
+        //   1. Remove the nuke logic in ensureClientVersion (close/delete/open).
+        //      Just persist the new version instead.
+        //   2. Freeze V1_STORES — never modify it again.
+        //   3. Add version(2+) blocks below for all schema changes going forward.
+        this.dexie.version(1).stores(V1_STORES);
         this.accountCodes = this.dexie.table(Table.AccountCode);
         this.accountStorages = this.dexie.table(Table.AccountStorage);
         this.storageMapEntries = this.dexie.table(Table.StorageMapEntries);
