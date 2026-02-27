@@ -232,9 +232,68 @@ Beyond the four main SDK layers, the repository includes several supporting crat
 
 The `Store` trait abstracts all persistence operations (40+ async methods covering accounts, notes, transactions, chain data, sync state, and settings). Both backends implement atomic updates — if any part of a state sync or transaction application fails, the entire operation rolls back.
 
-### CLI
+### CLI (`miden-client`)
 
-[`bin/miden-cli`](./bin/miden-cli) — a `clap`-based command-line interface wrapping `Client<FilesystemKeyStore>` with SQLite storage. Supports account management, wallet creation, token minting/sending/swapping, note consumption, state sync, import/export, and direct program execution. Auto-discovers configuration from `.miden/miden-client.toml`.
+**Crate:** `miden-client-cli` · **Location:** [`bin/miden-cli`](./bin/miden-cli)
+
+The CLI is a full-featured command-line interface for interacting with the Miden network directly from a terminal. It wraps the Rust SDK (`Client<FilesystemKeyStore>`) with SQLite storage, providing a complete Miden experience without writing any code. It's the fastest way to explore the network, prototype transaction flows, and manage accounts during development.
+
+The CLI auto-discovers configuration from `.miden/miden-client.toml` (local project directory first, then `~/.miden/` global). Running `miden-client init` generates this file with RPC endpoint and database path settings.
+
+**Commands:**
+
+| Command | Description |
+|---------|-------------|
+| `init` | Initialize client configuration for a network (localhost, devnet, testnet, or custom endpoint) |
+| `sync` | Synchronize local state with the Miden node — fetches new blocks, note updates, and account changes |
+| `new-wallet` | Create a new wallet account (private/public storage, mutable/immutable, Falcon/ECDSA auth) |
+| `new-account` | Create a new account with advanced options |
+| `account` | List and inspect accounts — view IDs, balances, storage, vault contents |
+| `mint` | Mint tokens from a faucet account to a recipient |
+| `send` | Send tokens from one account to another (public or private notes) |
+| `swap` | Execute an atomic swap between two token types |
+| `consume-notes` | Consume available notes for an account, claiming their assets |
+| `notes` | List and inspect notes — filter by status (pending, committed, consumed) |
+| `tx` | View transaction history and details |
+| `exec` | Execute arbitrary Miden Assembly programs against an account |
+| `tags` | Manage note tags for filtering which notes the client tracks |
+| `address` | Display account addresses in hex and bech32 formats |
+| `import` / `export` | Import and export accounts and notes for backup or transfer between clients |
+| `info` | Display client state summary — sync height, account count, node connection status |
+
+**Example workflow:**
+
+```bash
+# Initialize for testnet
+miden-client init --network testnet
+
+# Sync with the network
+miden-client sync
+
+# Create a wallet
+miden-client new-wallet
+
+# Create a faucet and mint tokens
+miden-client new-account -t fungible-faucet -s TOKEN -d 8 -m 1000000
+miden-client mint --faucet <faucet-id> --target <wallet-id> --amount 1000
+
+# Consume minted notes and check balance
+miden-client sync
+miden-client consume-notes --account <wallet-id>
+miden-client account -s <wallet-id>
+
+# Send tokens
+miden-client send --sender <wallet-id> --target <recipient-id> --faucet <faucet-id> --amount 100
+```
+
+The `CliClient` struct is also available as a Rust library for projects that want CLI-style configuration discovery without building a full custom client:
+
+```rust
+use miden_client_cli::{CliClient, DebugMode};
+
+let mut client = CliClient::from_system_user_config(DebugMode::Disabled).await?;
+client.sync_state().await?;
+```
 
 ### Vite Plugin
 
@@ -361,14 +420,19 @@ See the [React SDK README](./packages/react-sdk/README.md) for hooks reference, 
 ### CLI
 
 ```bash
-# Install
-cargo install miden-client-cli
+# Install from crates.io
+cargo install miden-client-cli --locked
 
 # Or build from source
 make install
+
+# Initialize and start using
+miden-client init --network testnet
+miden-client sync
+miden-client new-wallet
 ```
 
-See the [CLI README](./bin/miden-cli/README.md) for command reference and configuration.
+The CLI is the quickest way to interact with Miden without writing code — create accounts, mint tokens, send transactions, and inspect state from your terminal. See the [CLI README](./bin/miden-cli/README.md) for the full command reference and configuration.
 
 ## Development
 
