@@ -510,8 +510,8 @@ impl WebStore {
         // Pop undone SMT roots from the forest to release memory
         let smt_roots: Vec<Word> = smt_root_strings
             .iter()
-            .filter_map(|s| Word::try_from(s.as_str()).ok())
-            .collect();
+            .map(|s| Word::try_from(s.as_str()))
+            .collect::<Result<_, _>>()?;
 
         if !smt_roots.is_empty() {
             let mut smt_forest = self.smt_forest.write().expect("smt_forest write lock");
