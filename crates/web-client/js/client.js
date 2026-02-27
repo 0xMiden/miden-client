@@ -60,17 +60,22 @@ export class MidenClient {
       );
     }
     if (options?.passkeyEncryption && !options?.keystore) {
-      const { createPasskeyKeystore } = await import("./passkey-keystore.js");
-      const passkeyOpts =
-        typeof options.passkeyEncryption === "object"
-          ? options.passkeyEncryption
-          : {};
-      const storeName = options?.storeName || "default";
-      const result = await createPasskeyKeystore(storeName, passkeyOpts);
-      options = {
-        ...options,
-        keystore: { getKey: result.getKey, insertKey: result.insertKey },
-      };
+      const { createPasskeyKeystore, isPasskeyPrfSupported } = await import(
+        "./passkey-keystore.js"
+      );
+      if (await isPasskeyPrfSupported()) {
+        const passkeyOpts =
+          typeof options.passkeyEncryption === "object"
+            ? options.passkeyEncryption
+            : {};
+        const storeName = options?.storeName || "default";
+        const result = await createPasskeyKeystore(storeName, passkeyOpts);
+        options = {
+          ...options,
+          keystore: { getKey: result.getKey, insertKey: result.insertKey },
+        };
+      }
+      // Unsupported browser — silently fall through to standard keystore
     }
 
     let inner;
