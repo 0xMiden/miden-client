@@ -231,7 +231,8 @@ export function MidenProvider({
             webClient = await WebClient.createClient(
               resolvedConfig.rpcUrl,
               resolvedConfig.noteTransportUrl,
-              seed
+              seed,
+              resolvedConfig.storeName
             );
             if (cancelled) return;
           }
