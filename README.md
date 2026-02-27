@@ -193,8 +193,8 @@ function App() {
 
 function Wallet() {
   const { wallets } = useAccounts();
-  const { mutate: createWallet, isLoading } = useCreateWallet();
-  const { mutate: send, stage } = useSend(); // stage: idle → executing → proving → submitting → complete
+  const { createWallet, isCreating } = useCreateWallet();
+  const { send, stage } = useSend(); // stage: idle → executing → proving → submitting → complete
 
   return (
     <div>
@@ -210,7 +210,7 @@ Key features:
 
 - **`MidenProvider`** — a single provider component that handles WASM initialization, client construction, auto-sync (configurable interval, default 15s), and lifecycle management. Supports both local keystore and external signer modes.
 - **Query hooks** — `useAccounts()`, `useAccount(id)`, `useNotes()`, `useSyncState()`, `useAssetMetadata()`, `useTransactionHistory()`. All return `{ data, isLoading, error, refetch }`.
-- **Mutation hooks** — `useCreateWallet()`, `useCreateFaucet()`, `useSend()`, `useMultiSend()`, `useMint()`, `useConsume()`, `useSwap()`, `useTransaction()`. All return `{ mutate, data, isLoading, stage, error, reset }` with granular transaction stage tracking.
+- **Mutation hooks** — `useCreateWallet()`, `useCreateFaucet()`, `useSend()`, `useMultiSend()`, `useMint()`, `useConsume()`, `useSwap()`, `useTransaction()`. Each returns a named action function alongside `isLoading`, `stage`, `error`, and result state, with granular transaction stage tracking (`idle` → `executing` → `proving` → `submitting` → `complete`).
 - **Zustand state management** — a centralized store manages client state, cached data, loading states, and sync status, with optimized selector hooks to minimize unnecessary re-renders.
 - **External signer support** — a `SignerContext` enables integration with external key management services (Para, Turnkey, MidenFi wallet adapter) via a provider pattern, allowing wallets to use hardware keys, passkeys, or custodial signing services.
 - **Exclusive execution** — `runExclusive()` provides a mutex for operations that must not interleave, preventing race conditions in the single-threaded WASM environment.
