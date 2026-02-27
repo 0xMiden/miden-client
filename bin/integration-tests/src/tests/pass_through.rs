@@ -28,6 +28,7 @@ use miden_client::testing::common::*;
 use miden_client::transaction::{OutputNote, TransactionRequestBuilder};
 use miden_client::{Client, ClientRng, Word};
 use rand::RngCore;
+use tracing::info;
 
 use crate::tests::config::ClientConfig;
 
@@ -81,14 +82,14 @@ pub async fn test_pass_through(client_config: ClientConfig) -> Result<()> {
     .await?;
 
     // mint 1000 BTC for accountA
-    println!("minting 1000 btc for account A");
+    info!(account_id = %sender.id(), faucet_id = %btc_faucet_account.id(), "Minting 1000 BTC for sender");
 
     let tx_id =
         mint_and_consume(&mut client, sender.id(), btc_faucet_account.id(), NoteType::Public).await;
     wait_for_tx(&mut client, tx_id).await?;
 
     // Create a note that we will send to a pass-through account
-    println!("creating note with accountA");
+    info!(sender_id = %sender.id(), target_id = %target.id(), "Creating pass-through note");
     let asset = FungibleAsset::new(btc_faucet_account.id(), ASSET_AMOUNT)?;
 
     let (pass_through_note_1, pass_through_note_details_1) =
@@ -106,7 +107,7 @@ pub async fn test_pass_through(client_config: ClientConfig) -> Result<()> {
 
     execute_tx_and_sync(&mut client, sender.id(), tx_request).await?;
 
-    println!("consuming pass-through note");
+    info!(note_id = %pass_through_note_1.id(), pass_through_account = %pass_through_account.id(), "Consuming pass-through note");
 
     client
         .import_notes(&[

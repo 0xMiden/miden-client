@@ -27,7 +27,8 @@
     "test:remote_prover": "yarn install && yarn playwright install --with-deps && cross-env MIDEN_WEB_DEV=true yarn run build && cross-env REMOTE_PROVER=true yarn playwright test -g 'with remote prover' ",
     "test:remote_prover:devnet": "cross-env TEST_MIDEN_NETWORK=devnet yarn run test:remote_prover",
     "test:remote_prover:testnet": "cross-env TEST_MIDEN_NETWORK=testnet yarn run test:remote_prover",
-    "test:clean": "yarn install && yarn playwright install --with-deps && MIDEN_WEB_DEV=true yarn run build && yarn playwright test "
+    "test:clean": "yarn install && yarn playwright install --with-deps && MIDEN_WEB_DEV=true yarn run build && yarn playwright test ",
+    "typedoc": "typedoc"
   },
   "devDependencies": {
     "@playwright/test": "^1.55.0",

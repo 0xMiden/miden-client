@@ -21,6 +21,7 @@ use crate::rpc::domain::account::{
     AccountProof,
     AccountStorageDetails,
     AccountStorageMapDetails,
+    AccountStorageRequirements,
     AccountUpdateSummary,
     AccountVaultDetails,
     FetchedAccount,
@@ -38,7 +39,6 @@ use crate::rpc::generated::note::NoteSyncRecord;
 use crate::rpc::generated::rpc::{BlockRange, SyncStateResponse};
 use crate::rpc::generated::transaction::TransactionSummary;
 use crate::rpc::{AccountStateAt, NodeRpcClient, RpcError, RpcStatusInfo};
-use crate::transaction::ForeignAccount;
 
 pub type MockClient<AUTH> = Client<AUTH>;
 
@@ -407,6 +407,10 @@ impl MockRpcApi {
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 impl NodeRpcClient for MockRpcApi {
+    fn has_genesis_commitment(&self) -> Option<Word> {
+        None
+    }
+
     async fn set_genesis_commitment(&self, _commitment: Word) -> Result<(), RpcError> {
         // The mock client doesn't use accept headers, so we don't need to do anything here.
         Ok(())
@@ -551,9 +555,10 @@ impl NodeRpcClient for MockRpcApi {
 
     /// Returns the account proof for the specified account. The `known_account_code` parameter
     /// is ignored in the mock implementation and the latest account code is always returned.
-    async fn get_account(
+    async fn get_account_proof(
         &self,
-        foreign_account: ForeignAccount,
+        account_id: AccountId,
+        account_storage_requirements: AccountStorageRequirements,
         account_state: AccountStateAt,
         _known_account_code: Option<AccountCode>,
     ) -> Result<(BlockNumber, AccountProof), RpcError> {
@@ -564,58 +569,57 @@ impl NodeRpcClient for MockRpcApi {
             AccountStateAt::ChainTip => mock_chain.latest_block_header().block_num(),
         };
 
-        let headers = match &foreign_account {
-            ForeignAccount::Public(account_id, account_storage_requirements) => {
-                let account = mock_chain.committed_account(*account_id).unwrap();
+        let headers = if account_id.is_public() {
+            let account = mock_chain.committed_account(account_id).unwrap();
 
-                let mut map_details = vec![];
-                for slot_name in account_storage_requirements.inner().keys() {
-                    if let Some(StorageSlotContent::Map(storage_map)) =
-                        account.storage().get(slot_name).map(StorageSlot::content)
-                    {
-                        let entries: Vec<StorageMapEntry> = storage_map
-                            .entries()
-                            .map(|(key, value)| StorageMapEntry { key: *key, value: *value })
-                            .collect();
+            let mut map_details = vec![];
+            for slot_name in account_storage_requirements.inner().keys() {
+                if let Some(StorageSlotContent::Map(storage_map)) =
+                    account.storage().get(slot_name).map(StorageSlot::content)
+                {
+                    let entries: Vec<StorageMapEntry> = storage_map
+                        .entries()
+                        .map(|(key, value)| StorageMapEntry { key: *key, value: *value })
+                        .collect();
 
-                        let too_many_entries = entries.len() > 1000;
-                        let account_storage_map_detail = AccountStorageMapDetails {
-                            slot_name: slot_name.clone(),
-                            too_many_entries,
-                            entries: StorageMapEntries::AllEntries(entries),
-                        };
+                    let too_many_entries = entries.len() > 1000;
+                    let account_storage_map_detail = AccountStorageMapDetails {
+                        slot_name: slot_name.clone(),
+                        too_many_entries,
+                        entries: StorageMapEntries::AllEntries(entries),
+                    };
 
-                        map_details.push(account_storage_map_detail);
-                    } else {
-                        panic!("Storage slot {slot_name} is not a map");
-                    }
+                    map_details.push(account_storage_map_detail);
+                } else {
+                    panic!("Storage slot {slot_name} is not a map");
                 }
+            }
 
-                let storage_details = AccountStorageDetails {
-                    header: account.storage().to_header(),
-                    map_details,
-                };
+            let storage_details = AccountStorageDetails {
+                header: account.storage().to_header(),
+                map_details,
+            };
 
-                let mut assets = vec![];
-                for asset in account.vault().assets() {
-                    assets.push(asset);
-                }
-                let vault_details = AccountVaultDetails {
-                    too_many_assets: assets.len() > 1000,
-                    assets,
-                };
+            let mut assets = vec![];
+            for asset in account.vault().assets() {
+                assets.push(asset);
+            }
+            let vault_details = AccountVaultDetails {
+                too_many_assets: assets.len() > 1000,
+                assets,
+            };
 
-                Some(AccountDetails {
-                    header: account.into(),
-                    storage_details,
-                    code: account.code().clone(),
-                    vault_details,
-                })
-            },
-            ForeignAccount::Private(_) => None,
+            Some(AccountDetails {
+                header: account.into(),
+                storage_details,
+                code: account.code().clone(),
+                vault_details,
+            })
+        } else {
+            None
         };
 
-        let witness = mock_chain.account_tree().open(foreign_account.account_id());
+        let witness = mock_chain.account_tree().open(account_id);
 
         let proof = AccountProof::new(witness, headers).unwrap();
 
@@ -755,8 +759,16 @@ impl NodeRpcClient for MockRpcApi {
         Ok(NetworkId::Testnet)
     }
 
-    async fn get_rpc_limits(&self) -> crate::rpc::RpcLimits {
-        crate::rpc::RpcLimits::default()
+    async fn get_rpc_limits(&self) -> Result<crate::rpc::RpcLimits, RpcError> {
+        Ok(crate::rpc::RpcLimits::default())
+    }
+
+    fn has_rpc_limits(&self) -> Option<crate::rpc::RpcLimits> {
+        None
+    }
+
+    async fn set_rpc_limits(&self, _limits: crate::rpc::RpcLimits) {
+        // No-op for mock client
     }
 
     async fn get_status_unversioned(&self) -> Result<RpcStatusInfo, RpcError> {

@@ -8,13 +8,15 @@ use alloc::vec::Vec;
 
 use miden_client::block::BlockNumber;
 use miden_client::note::{NoteId as NativeNoteId, Nullifier};
+use miden_client::rpc::domain::account::AccountStorageRequirements as NativeAccountStorageRequirements;
 use miden_client::rpc::domain::note::FetchedNote as NativeFetchedNote;
-use miden_client::rpc::{GrpcClient, NodeRpcClient};
+use miden_client::rpc::{AccountStateAt, GrpcClient, NodeRpcClient};
 use note::FetchedNote;
 use wasm_bindgen::prelude::*;
 
 use crate::js_error_with_context;
 use crate::models::account_id::AccountId;
+use crate::models::account_proof::AccountProof;
 use crate::models::block_header::BlockHeader;
 use crate::models::endpoint::Endpoint;
 use crate::models::fetched_account::FetchedAccount;
@@ -120,7 +122,7 @@ impl RpcClient {
     #[wasm_bindgen(js_name = "getAccountDetails")]
     pub async fn get_account_details(
         &self,
-        account_id: AccountId,
+        account_id: &AccountId,
     ) -> Result<FetchedAccount, JsValue> {
         let fetched = self
             .inner
@@ -129,6 +131,35 @@ impl RpcClient {
             .map_err(|err| js_error_with_context(err, "failed to get account details"))?;
 
         Ok(fetched.into())
+    }
+
+    /// Fetches an account proof from the node.
+    ///
+    /// This is a lighter-weight alternative to `getAccountDetails` that makes a single RPC call
+    /// and returns the account proof and, for public accounts, the account header, storage slot
+    /// values, and account code without reconstructing the full account state.
+    ///
+    /// For private accounts, the proof is returned but account details will not be available
+    /// since they are not stored on-chain.
+    ///
+    /// Useful for reading storage slot values (e.g., faucet metadata) without the overhead of
+    /// fetching the complete account with all vault assets and storage map entries.
+    #[wasm_bindgen(js_name = "getAccountProof")]
+    pub async fn get_account_proof(&self, account_id: &AccountId) -> Result<AccountProof, JsValue> {
+        let native_id: miden_client::account::AccountId = account_id.into();
+
+        let (block_num, proof) = self
+            .inner
+            .get_account_proof(
+                native_id,
+                NativeAccountStorageRequirements::default(),
+                AccountStateAt::ChainTip,
+                None,
+            )
+            .await
+            .map_err(|err| js_error_with_context(err, "failed to get account"))?;
+
+        Ok(AccountProof::new(proof, block_num))
     }
 
     /// Fetches notes matching the provided tags from the node.

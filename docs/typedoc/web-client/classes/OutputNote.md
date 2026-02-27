@@ -22,13 +22,13 @@ Representation of a note produced by a transaction (full, partial, or header-onl
 
 ### assets()
 
-> **assets**(): [`NoteAssets`](NoteAssets.md)
+> **assets**(): `NoteAssets`
 
 Returns the assets if they are present.
 
 #### Returns
 
-[`NoteAssets`](NoteAssets.md)
+`NoteAssets`
 
 ***
 
@@ -68,13 +68,13 @@ Converts into a full note if the data is present.
 
 ### metadata()
 
-> **metadata**(): [`NoteMetadata`](NoteMetadata.md)
+> **metadata**(): `NoteMetadata`
 
 Returns the metadata that accompanies this output.
 
 #### Returns
 
-[`NoteMetadata`](NoteMetadata.md)
+`NoteMetadata`
 
 ***
 
@@ -130,7 +130,7 @@ Wraps only the header of a note.
 
 ##### note\_header
 
-[`NoteHeader`](NoteHeader.md)
+`NoteHeader`
 
 #### Returns
 
@@ -148,7 +148,7 @@ Wraps a partial note containing assets and recipient only.
 
 ##### partial\_note
 
-[`PartialNote`](PartialNote.md)
+`PartialNote`
 
 #### Returns
 
