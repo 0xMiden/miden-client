@@ -28,6 +28,10 @@ export const AuthScheme = Object.freeze({
 
 export { MidenClient };
 export { createP2IDNote, createP2IDENote, buildSwapTag };
+export {
+  isPasskeyPrfSupported,
+  createPasskeyKeystore,
+} from "./passkey-keystore.js";
 
 // Internal exports — used by integration tests that need direct access to the low-level WebClient proxy.
 export { WebClient as WasmWebClient, MockWebClient as MockWasmWebClient };

@@ -31,6 +31,8 @@ function App() {
     prover: "testnet",           // "local" | "devnet" | "testnet" | custom URL
     autoSyncInterval: 15000,     // ms, set to 0 to disable
     noteTransportUrl: "...",     // optional: for private note delivery
+    passkeyEncryption: true,     // optional: encrypt keys with WebAuthn PRF (biometric)
+    storeName: "my-wallet",      // recommended when using passkeyEncryption
   }}
   loadingComponent={<Loading />}  // shown during WASM init
   errorComponent={<Error />}      // shown on init failure
@@ -42,6 +44,29 @@ function App() {
 | `devnet` | Development, testing with fake tokens |
 | `testnet` | Pre-production testing |
 | `localhost` | Local node at `http://localhost:57291` |
+
+## Passkey Encryption
+
+Encrypt keys at rest using WebAuthn PRF (Touch ID / Face ID / Windows Hello). Requires Chrome 116+, Safari 18+, or Edge 116+.
+
+```tsx
+import { MidenProvider, isPasskeyPrfSupported } from "@miden-sdk/react";
+
+// Check support
+const supported = await isPasskeyPrfSupported();
+
+// Enable in provider
+<MidenProvider config={{
+  rpcUrl: "testnet",
+  passkeyEncryption: true,    // or { credentialId: "...", rpName: "..." }
+  storeName: "my-wallet",     // recommended for migration support
+}}>
+```
+
+- Biometric prompt fires once per `MidenProvider` mount
+- Keys encrypted with AES-256-GCM, wrapping key never exposed to JS
+- Ignored when a `SignerContext` is active (external signers handle their own keys)
+- Credential loss = key loss (recommend iCloud Keychain / Google Password Manager)
 
 ## Reading Data (Query Hooks)
 

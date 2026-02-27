@@ -113,6 +113,82 @@ function App() {
 }
 ```
 
+## Passkey Encryption
+
+The SDK supports opt-in passkey-based encryption for secret keys at rest. When enabled, keys stored in IndexedDB are encrypted using AES-256-GCM with a wrapping key derived from the WebAuthn PRF extension (Touch ID, Face ID, Windows Hello). Decrypting keys requires a biometric prompt each session.
+
+**Browser support:** Chrome 116+, Safari 18+, Edge 116+. Firefox does not support PRF.
+
+### Basic Usage
+
+```tsx
+import { MidenProvider, isPasskeyPrfSupported } from '@miden-sdk/react';
+
+function App() {
+  return (
+    <MidenProvider
+      config={{
+        rpcUrl: 'testnet',
+        passkeyEncryption: true,  // Triggers biometric prompt on init
+        storeName: 'my-wallet',   // Recommended for migration support
+      }}
+    >
+      <YourApp />
+    </MidenProvider>
+  );
+}
+```
+
+When `passkeyEncryption: true`, the provider checks `localStorage` for an existing passkey credential. If found, it authenticates with the existing passkey. If not found, it registers a new passkey. Both trigger a biometric prompt.
+
+### Feature Detection
+
+Always check for support before enabling passkey encryption:
+
+```tsx
+import { isPasskeyPrfSupported } from '@miden-sdk/react';
+
+function PasskeyToggle({ onToggle }) {
+  const [supported, setSupported] = useState(false);
+
+  useEffect(() => {
+    isPasskeyPrfSupported().then(setSupported);
+  }, []);
+
+  if (!supported) return null;
+
+  return (
+    <label>
+      <input type="checkbox" onChange={(e) => onToggle(e.target.checked)} />
+      Encrypt keys with passkey (Touch ID / Face ID)
+    </label>
+  );
+}
+```
+
+### Advanced Options
+
+```tsx
+<MidenProvider
+  config={{
+    rpcUrl: 'testnet',
+    storeName: 'my-wallet',
+    passkeyEncryption: {
+      credentialId: 'base64url-encoded-id',  // Reuse specific passkey
+      rpName: 'My Wallet App',               // Display name during registration
+      userName: 'user@example.com',           // User name during registration
+    },
+  }}
+>
+```
+
+### Important Notes
+
+- **Credential loss is permanent:** If a user loses their passkey (device factory reset without cloud sync), encrypted keys are unrecoverable. Recommend enabling iCloud Keychain or Google Password Manager.
+- **Not compatible with external signers:** When a `SignerContext` is active (Para, Turnkey, etc.), `passkeyEncryption` is ignored — the signer handles key management.
+- **Cross-ecosystem:** Passkeys sync within Apple or Google ecosystems but not across them. Users migrating should export their store first.
+- **Export/import:** `exportStore()`/`importStore()` does not include the encrypted keystore. Export while the client is active.
+
 ## Hooks Reference
 
 ### Core Hooks

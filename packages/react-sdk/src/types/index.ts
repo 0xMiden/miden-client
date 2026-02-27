@@ -61,6 +61,18 @@ export type ProverUrls = {
   testnet?: string;
 };
 
+/** Options for passkey-based key encryption (WebAuthn PRF). */
+export interface PasskeyEncryptionOptions {
+  /** Existing credential ID (base64url). Omit to register a new passkey. */
+  credentialId?: string;
+  /** WebAuthn relying party ID. Defaults to current hostname. */
+  rpId?: string;
+  /** Relying party display name. Defaults to "Miden Client". */
+  rpName?: string;
+  /** User display name for the passkey. Defaults to "Miden Wallet User". */
+  userName?: string;
+}
+
 // Provider configuration
 export interface MidenConfig {
   /** RPC node URL or network name (devnet/testnet/localhost). Defaults to testnet. */
@@ -77,6 +89,20 @@ export interface MidenConfig {
   proverUrls?: ProverUrls;
   /** Default timeout for remote prover requests in milliseconds. */
   proverTimeoutMs?: number | bigint;
+  /** Store isolation key. Recommended when using passkeyEncryption (defaults to "default"). */
+  storeName?: string;
+  /**
+   * Opt-in passkey encryption for keys at rest. Pass `true` for defaults
+   * or a `PasskeyEncryptionOptions` object to reuse an existing credential.
+   *
+   * When `true`, checks localStorage for an existing credential and reuses it
+   * if found; otherwise registers a new passkey (triggering a biometric prompt).
+   *
+   * Requires Chrome 116+, Safari 18+, or Edge 116+.
+   * Not compatible with external signer mode — if a SignerContext is active,
+   * this option is ignored.
+   */
+  passkeyEncryption?: boolean | PasskeyEncryptionOptions;
 }
 
 // Provider state
