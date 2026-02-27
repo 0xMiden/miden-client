@@ -3,13 +3,14 @@ use alloc::sync::Arc;
 use core::error::Error;
 use core::fmt::Write;
 
-use idxdb_store::WebStore;
+use idxdb_store::IdxdbStore;
 use js_sys::{Function, Reflect};
 use miden_client::builder::ClientBuilder;
 use miden_client::crypto::RpoRandomCoin;
 use miden_client::note_transport::NoteTransportClient;
 use miden_client::note_transport::grpc::GrpcNoteTransportClient;
 use miden_client::rpc::{Endpoint, GrpcClient, NodeRpcClient};
+use miden_client::store::{Store, WebStore};
 use miden_client::testing::mock::MockRpcApi;
 use miden_client::testing::note_transport::MockNoteTransportApi;
 use miden_client::{Client, ClientError, DebugMode, ErrorHint, Felt};
@@ -39,13 +40,14 @@ pub mod utils;
 
 mod web_keystore;
 mod web_keystore_callbacks;
+mod web_keystore_db;
 pub use web_keystore::WebKeyStore;
 
 const BASE_STORE_NAME: &str = "MidenClientDB";
 
 #[wasm_bindgen]
 pub struct WebClient {
-    store: Option<Arc<WebStore>>,
+    store: Option<Arc<dyn WebStore>>,
     keystore: Option<WebKeyStore<RpoRandomCoin>>,
     inner: Option<Client<WebKeyStore<RpoRandomCoin>>>,
     mock_rpc_api: Option<Arc<MockRpcApi>>,
@@ -207,10 +209,10 @@ impl WebClient {
 
         let rng = RpoRandomCoin::new(coin_seed.map(Felt::new).into());
 
-        let web_store = Arc::new(
-            WebStore::new(store_name.clone())
+        let idxdb_store = Arc::new(
+            IdxdbStore::new(store_name.clone())
                 .await
-                .map_err(|_| JsValue::from_str("Failed to initialize WebStore"))?,
+                .map_err(|_| JsValue::from_str("Failed to initialize IdxdbStore"))?,
         );
 
         let keystore =
@@ -219,7 +221,7 @@ impl WebClient {
         let mut builder = ClientBuilder::new()
             .rpc(rpc_client)
             .rng(Box::new(rng))
-            .store(web_store.clone())
+            .store(idxdb_store.clone() as Arc<dyn Store>)
             .authenticator(Arc::new(keystore.clone()))
             .in_debug_mode(if self.debug_mode {
                 DebugMode::Enabled
@@ -246,7 +248,7 @@ impl WebClient {
             .map_err(|err| js_error_with_context(err, "Failed to ensure genesis in place"))?;
 
         self.inner = Some(client);
-        self.store = Some(web_store);
+        self.store = Some(idxdb_store as Arc<dyn WebStore>);
         self.keystore = Some(keystore);
 
         Ok(())

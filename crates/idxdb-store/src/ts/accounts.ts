@@ -200,27 +200,6 @@ export async function getAccountVaultAssets(dbId: string, accountId: string) {
   }
 }
 
-export async function getAccountAuthByPubKeyCommitment(
-  dbId: string,
-  pubKeyCommitmentHex: string
-) {
-  const db = getDatabase(dbId);
-  const accountSecretKey = await db.accountAuths
-    .where("pubKeyCommitmentHex")
-    .equals(pubKeyCommitmentHex)
-    .first();
-
-  if (!accountSecretKey) {
-    throw new Error("Account auth not found in cache.");
-  }
-
-  const data = {
-    secretKey: accountSecretKey.secretKeyHex,
-  };
-
-  return data;
-}
-
 export async function getAccountAddresses(dbId: string, accountId: string) {
   try {
     const db = getDatabase(dbId);
@@ -649,27 +628,6 @@ export async function upsertAccountRecord(
   }
 }
 
-export async function insertAccountAuth(
-  dbId: string,
-  pubKeyCommitmentHex: string,
-  secretKey: string
-) {
-  try {
-    const db = getDatabase(dbId);
-    const data = {
-      pubKeyCommitmentHex,
-      secretKeyHex: secretKey,
-    };
-
-    await db.accountAuths.add(data);
-  } catch (error) {
-    logWebStoreError(
-      error,
-      `Error inserting account auth for pubKey: ${pubKeyCommitmentHex}`
-    );
-  }
-}
-
 export async function insertAccountAddress(
   dbId: string,
   accountId: string,
@@ -1039,27 +997,6 @@ export async function insertAccountKeyMapping(
       error,
       `Error inserting account key mapping for account ${accountIdHex} and key ${pubKeyCommitmentHex}`
     );
-  }
-}
-
-export async function removeAccountKeyMapping(
-  dbId: string,
-  accountIdHex: string,
-  pubKeyCommitmentHex: string
-): Promise<boolean> {
-  try {
-    const db = getDatabase(dbId);
-    const deletedCount = await db.accountKeyMappings
-      .where("[accountIdHex+pubKeyCommitmentHex]")
-      .equals([accountIdHex, pubKeyCommitmentHex])
-      .delete();
-    return deletedCount > 0;
-  } catch (error) {
-    logWebStoreError(
-      error,
-      `Error removing account key mapping for account ${accountIdHex} and key ${pubKeyCommitmentHex}`
-    );
-    return false;
   }
 }
 

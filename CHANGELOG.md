@@ -27,6 +27,7 @@
 * Improved integration test logging with a `--verbose` flag for info-level tracing, routed tracing output to stderr to avoid corrupting subprocess JSON, and added `tracing::info!` instrumentation to test helpers ([#1816](https://github.com/0xMiden/miden-client/pull/1816)).
 * Added implementation for the `get_public_key` method on the `FilesystemKeystore` and `WebKeystore` ([#1731](https://github.com/0xMiden/miden-client/pull/1731)).
 * [BREAKING] Made the nullifiers sync optional on the `StateSync` component ([#1756](https://github.com/0xMiden/miden-client/pull/1756)).
+* Decoupled keystore functionality from `WebStore` by moving keystore helper logic from `idxdb-store` into the `web-client` crate, also added `export_store` and `import_store` methods to the `Store` trait, enabling usage of different stores ([#1774](https://github.com/0xMiden/miden-client/issues/1774)).
 * [BREAKING] Added `SyncStateInputs` to bundle the parameters needed to perform the sync state ([#1778](https://github.com/0xMiden/miden-client/pull/1778)).
 
 ### Features

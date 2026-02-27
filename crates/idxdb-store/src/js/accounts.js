@@ -157,20 +157,6 @@ export async function getAccountVaultAssets(dbId, accountId) {
         logWebStoreError(error, `Error fetching account vault for account ${accountId}`);
     }
 }
-export async function getAccountAuthByPubKeyCommitment(dbId, pubKeyCommitmentHex) {
-    const db = getDatabase(dbId);
-    const accountSecretKey = await db.accountAuths
-        .where("pubKeyCommitmentHex")
-        .equals(pubKeyCommitmentHex)
-        .first();
-    if (!accountSecretKey) {
-        throw new Error("Account auth not found in cache.");
-    }
-    const data = {
-        secretKey: accountSecretKey.secretKeyHex,
-    };
-    return data;
-}
 export async function getAccountAddresses(dbId, accountId) {
     try {
         const db = getDatabase(dbId);
@@ -489,19 +475,6 @@ export async function upsertAccountRecord(dbId, accountId, codeRoot, storageRoot
         logWebStoreError(error, `Error inserting account: ${accountId}`);
     }
 }
-export async function insertAccountAuth(dbId, pubKeyCommitmentHex, secretKey) {
-    try {
-        const db = getDatabase(dbId);
-        const data = {
-            pubKeyCommitmentHex,
-            secretKeyHex: secretKey,
-        };
-        await db.accountAuths.add(data);
-    }
-    catch (error) {
-        logWebStoreError(error, `Error inserting account auth for pubKey: ${pubKeyCommitmentHex}`);
-    }
-}
 export async function insertAccountAddress(dbId, accountId, address) {
     try {
         const db = getDatabase(dbId);
@@ -798,20 +771,6 @@ export async function insertAccountKeyMapping(dbId, accountIdHex, pubKeyCommitme
     }
     catch (error) {
         logWebStoreError(error, `Error inserting account key mapping for account ${accountIdHex} and key ${pubKeyCommitmentHex}`);
-    }
-}
-export async function removeAccountKeyMapping(dbId, accountIdHex, pubKeyCommitmentHex) {
-    try {
-        const db = getDatabase(dbId);
-        const deletedCount = await db.accountKeyMappings
-            .where("[accountIdHex+pubKeyCommitmentHex]")
-            .equals([accountIdHex, pubKeyCommitmentHex])
-            .delete();
-        return deletedCount > 0;
-    }
-    catch (error) {
-        logWebStoreError(error, `Error removing account key mapping for account ${accountIdHex} and key ${pubKeyCommitmentHex}`);
-        return false;
     }
 }
 export async function getKeyCommitmentsByAccountId(dbId, accountIdHex) {

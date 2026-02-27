@@ -1,4 +1,3 @@
-use idxdb_store::account::JsStorageMapEntry;
 use miden_client::account::{
     AccountStorage as NativeAccountStorage,
     StorageSlotContent,
@@ -7,6 +6,17 @@ use miden_client::account::{
 use wasm_bindgen::prelude::*;
 
 use crate::models::word::Word;
+
+#[wasm_bindgen(getter_with_clone, inspectable)]
+#[derive(Clone)]
+pub struct StorageMapEntry {
+    #[wasm_bindgen(js_name = "root")]
+    pub root: String,
+    #[wasm_bindgen(js_name = "key")]
+    pub key: String,
+    #[wasm_bindgen(js_name = "value")]
+    pub value: String,
+}
 
 /// Account storage is composed of a variable number of index-addressable storage slots up to 255
 /// slots in total.
@@ -54,13 +64,21 @@ impl AccountStorage {
     /// Returns `undefined` if the slot isn't a map or doesn't exist.
     /// Returns `[]` if the map exists but is empty.
     #[wasm_bindgen(js_name = "getMapEntries")]
-    pub fn get_map_entries(&self, slot_name: &str) -> Option<Vec<JsStorageMapEntry>> {
+    pub fn get_map_entries(&self, slot_name: &str) -> Option<Vec<StorageMapEntry>> {
         let slot = self.0.slots().iter().find(|slot| slot.name().as_str() == slot_name)?;
         let StorageSlotContent::Map(map) = slot.content() else {
             return None;
         };
 
-        Some(JsStorageMapEntry::from_map(map, slot_name))
+        Some(
+            map.entries()
+                .map(|(key, value)| StorageMapEntry {
+                    root: map.root().to_hex(),
+                    key: key.to_hex(),
+                    value: value.to_hex(),
+                })
+                .collect(),
+        )
     }
 }
 

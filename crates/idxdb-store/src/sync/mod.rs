@@ -7,7 +7,7 @@ use miden_client::store::StoreError;
 use miden_client::sync::{NoteTagRecord, NoteTagSource, StateSyncUpdate};
 use miden_client::utils::{Deserializable, Serializable};
 
-use super::WebStore;
+use super::IdxdbStore;
 use super::chain_data::utils::{
     SerializedPartialBlockchainNodeData,
     serialize_partial_blockchain_node,
@@ -33,7 +33,7 @@ use models::{NoteTagIdxdbObject, SyncHeightIdxdbObject};
 mod flattened_vec;
 use flattened_vec::flatten_nested_u8_vec;
 
-impl WebStore {
+impl IdxdbStore {
     pub(crate) async fn get_note_tags(&self) -> Result<Vec<NoteTagRecord>, StoreError> {
         let promise = idxdb_get_note_tags(self.db_id());
         let tags_idxdb: Vec<NoteTagIdxdbObject> =
