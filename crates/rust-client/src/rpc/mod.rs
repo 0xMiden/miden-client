@@ -82,12 +82,12 @@ mod tonic_client;
 #[cfg(feature = "tonic")]
 pub use tonic_client::GrpcClient;
 
+use crate::rpc::domain::account::AccountStorageRequirements;
 use crate::rpc::domain::account_vault::AccountVaultInfo;
 use crate::rpc::domain::storage_map::StorageMapInfo;
 use crate::rpc::domain::transaction::TransactionsInfo;
 use crate::store::InputNoteRecord;
 use crate::store::input_note_states::UnverifiedNoteState;
-use crate::transaction::ForeignAccount;
 
 /// Represents the state that we want to retrieve from the network
 pub enum AccountStateAt {
@@ -112,6 +112,9 @@ pub trait NodeRpcClient: Send + Sync {
     /// genesis commitment in the request headers. If the genesis commitment is already set,
     /// this method does nothing.
     async fn set_genesis_commitment(&self, commitment: Word) -> Result<(), RpcError>;
+
+    /// Returns the genesis commitment if it has been set, without fetching from the node.
+    fn has_genesis_commitment(&self) -> Option<Word>;
 
     /// Given a Proven Transaction, send it to the node for it to be included in a future block
     /// using the `/SubmitProvenTransaction` RPC endpoint.
@@ -205,18 +208,22 @@ pub trait NodeRpcClient: Send + Sync {
     /// `/CheckNullifiers` RPC endpoint.
     async fn check_nullifiers(&self, nullifiers: &[Nullifier]) -> Result<Vec<SmtProof>, RpcError>;
 
-    /// Fetches the account data needed to perform a Foreign Procedure Invocation (FPI) on the
-    /// specified foreign account, using the `GetAccountProof` endpoint.
+    /// Fetches the account proof and optionally its details from the node, using the
+    /// `GetAccountProof` endpoint.
     ///
     /// The `account_state` parameter specifies the block number from which to retrieve
     /// the account proof from (the state of the account at that block).
     ///
+    /// The `storage_requirements` parameter specifies which storage slots and map keys
+    /// should be included in the response for public accounts.
+    ///
     /// The `known_account_code` parameter is the known code commitment
-    /// to prevent unnecessary data fetching. Returns the block number and the FPI account data. If
-    /// the tracked account is not found in the node, the method will return an error.
+    /// to prevent unnecessary data fetching. Returns the block number and the account proof. If
+    /// the account is not found in the node, the method will return an error.
     async fn get_account_proof(
         &self,
-        foreign_account: ForeignAccount,
+        account_id: AccountId,
+        storage_requirements: AccountStorageRequirements,
         account_state: AccountStateAt,
         known_account_code: Option<AccountCode>,
     ) -> Result<(BlockNumber, AccountProof), RpcError>;
@@ -389,6 +396,9 @@ pub trait NodeRpcClient: Send + Sync {
     ///
     /// Implementations may cache the result internally to avoid repeated network calls.
     async fn get_rpc_limits(&self) -> Result<RpcLimits, RpcError>;
+
+    /// Returns the RPC limits if they have been set, without fetching from the node.
+    fn has_rpc_limits(&self) -> Option<RpcLimits>;
 
     /// Sets the RPC limits internally to be used by the client.
     async fn set_rpc_limits(&self, limits: RpcLimits);

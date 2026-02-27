@@ -42,7 +42,7 @@ use crate::rpc::generated::rpc::account_request::account_detail_request::Storage
 use crate::rpc::generated::rpc::BlockRange;
 use crate::rpc::domain::limits::RpcLimits;
 use crate::rpc::{AccountStateAt, generated as proto};
-use crate::transaction::ForeignAccount;
+use crate::rpc::domain::account::AccountStorageRequirements;
 
 mod api_client;
 use api_client::api_client_wrapper::ApiClient;
@@ -368,6 +368,10 @@ impl NodeRpcClient for GrpcClient {
     /// updated to use the new commitment on subsequent requests. If the client is not connected,
     /// the commitment will be stored and used when the client connects. If the genesis commitment
     /// is already set, this method does nothing.
+    fn has_genesis_commitment(&self) -> Option<Word> {
+        *self.genesis_commitment.read()
+    }
+
     async fn set_genesis_commitment(&self, commitment: Word) -> Result<(), RpcError> {
         // Check if already set before doing anything else
         if self.genesis_commitment.read().is_some() {
@@ -585,7 +589,8 @@ impl NodeRpcClient for GrpcClient {
     /// - There is an error during storage deserialization.
     async fn get_account_proof(
         &self,
-        foreign_account: ForeignAccount,
+        account_id: AccountId,
+        storage_requirements: AccountStorageRequirements,
         account_state: AccountStateAt,
         known_account_code: Option<AccountCode>,
     ) -> Result<(BlockNumber, AccountProof), RpcError> {
@@ -595,10 +600,6 @@ impl NodeRpcClient for GrpcClient {
         }
 
         let mut rpc_api = self.ensure_connected().await?;
-
-        // Request proofs one-by-one using the singular API
-        let account_id = foreign_account.account_id();
-        let storage_requirements = foreign_account.storage_slot_requirements();
 
         let storage_maps: Vec<StorageMapDetailRequest> = storage_requirements.clone().into();
 
@@ -942,9 +943,8 @@ impl NodeRpcClient for GrpcClient {
     }
 
     async fn get_network_id(&self) -> Result<NetworkId, RpcError> {
-        let endpoint_str: &str = &self.endpoint.clone();
         let endpoint: Endpoint =
-            Endpoint::try_from(endpoint_str).map_err(RpcError::InvalidNodeEndpoint)?;
+            Endpoint::try_from(self.endpoint.as_str()).map_err(RpcError::InvalidNodeEndpoint)?;
         Ok(endpoint.to_network_id())
     }
 
@@ -965,6 +965,10 @@ impl NodeRpcClient for GrpcClient {
         // Cache fetched values
         self.limits.write().replace(limits);
         Ok(limits)
+    }
+
+    fn has_rpc_limits(&self) -> Option<RpcLimits> {
+        *self.limits.read()
     }
 
     async fn set_rpc_limits(&self, limits: RpcLimits) {

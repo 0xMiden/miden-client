@@ -70,7 +70,7 @@ Returns the value stored at the given slot name, if any.
 
 ### getMapEntries()
 
-> **getMapEntries**(`slot_name`): [`StorageMapEntry`](StorageMapEntry.md)[]
+> **getMapEntries**(`slot_name`): `StorageMapEntry`[]
 
 Get all key-value pairs from the map slot identified by `slot_name`.
 Returns `undefined` if the slot isn't a map or doesn't exist.
@@ -84,7 +84,7 @@ Returns `[]` if the map exists but is empty.
 
 #### Returns
 
-[`StorageMapEntry`](StorageMapEntry.md)[]
+`StorageMapEntry`[]
 
 ***
 

@@ -1,7 +1,6 @@
 import test from "./playwright.global.setup";
 import { Page, expect } from "@playwright/test";
 import {
-  clearStore,
   createNewFaucet,
   createNewWallet,
   fundAccountFromFaucet,
@@ -36,6 +35,21 @@ const importWalletFromSeed = async (
       authSchemeId,
     }
   );
+};
+
+// Creates a new WebClient with a fresh IndexedDB store, simulating a clean
+// start. This ensures both the store and the RPC client cache are empty.
+const createFreshClient = async (page: Page) => {
+  await page.evaluate(async () => {
+    const freshStoreName = `test_fresh_${crypto.randomUUID().slice(0, 8)}`;
+    const client = await window.WasmWebClient.createClient(
+      window.rpcUrl,
+      undefined,
+      undefined,
+      freshStoreName
+    );
+    window.client = client;
+  });
 };
 
 const importAccountById = async (page: Page, accountId: string) => {
@@ -82,7 +96,7 @@ test.describe("import from seed", () => {
     );
 
     // Deleting the account
-    await clearStore(page);
+    await createFreshClient(page);
 
     const { accountId: restoredAccountId } = await importWalletFromSeed(
       page,
@@ -134,7 +148,7 @@ test.describe("import public account by id", () => {
       initialWallet.id
     );
 
-    await clearStore(page);
+    await createFreshClient(page);
 
     const { accountId: restoredAccountId } = await importAccountById(
       page,

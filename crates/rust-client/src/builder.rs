@@ -425,10 +425,9 @@ where
         }
 
         // Set the RPC client with persisted limits if available.
+        // If not present, they will be fetched from the node during sync_state.
         if let Some(limits) = store.get_rpc_limits().await? {
             rpc_api.set_rpc_limits(limits).await;
-        } else if let Ok(limits) = rpc_api.get_rpc_limits().await {
-            store.set_rpc_limits(limits).await?;
         }
 
         // Initialize note transport: prefer explicit client, fall back to config (tonic only)
