@@ -684,7 +684,7 @@ async function rebuildLatestVaultAssets(db, accountId) {
 export async function undoAccountStates(dbId, accountCommitments) {
     try {
         const db = getDatabase(dbId);
-        await db.dexie.transaction("rw", [
+        const smtRoots = await db.dexie.transaction("rw", [
             db.latestAccountStorages,
             db.historicalAccountStorages,
             db.latestStorageMapEntries,
@@ -706,6 +706,27 @@ export async function undoAccountStates(dbId, accountCommitments) {
                     accountNonces.set(record.id, new Set());
                 }
                 accountNonces.get(record.id).add(record.nonce);
+            }
+            // Collect SMT roots before deletion so the Rust side can pop them from the forest.
+            // This mirrors SqliteStore::get_smt_roots_by_account_commitment.
+            const roots = [];
+            for (const record of affectedRecords) {
+                roots.push(record.vaultRoot);
+            }
+            // StorageSlotType::Map = 1
+            const MAP_SLOT_TYPE = 1;
+            for (const [accountId, nonces] of accountNonces) {
+                for (const nonce of nonces) {
+                    const storageEntries = await db.historicalAccountStorages
+                        .where("[accountId+nonce]")
+                        .equals([accountId, nonce])
+                        .toArray();
+                    for (const entry of storageEntries) {
+                        if (entry.slotType === MAP_SLOT_TYPE && entry.slotValue != null) {
+                            roots.push(entry.slotValue);
+                        }
+                    }
+                }
             }
             // Delete matching records from historical account headers
             await db.historicalAccountHeaders
@@ -769,10 +790,13 @@ export async function undoAccountStates(dbId, accountCommitments) {
                     await rebuildLatestVaultAssets(db, accountId);
                 }
             }
+            return roots;
         });
+        return smtRoots;
     }
     catch (error) {
         logWebStoreError(error, `Error undoing account states: ${accountCommitments.join(",")}`);
+        return [];
     }
 }
 export async function removeAccountAuth(dbId, pubKeyCommitmentHex) {

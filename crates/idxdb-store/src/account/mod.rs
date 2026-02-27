@@ -334,6 +334,31 @@ impl WebStore {
         Ok(assets)
     }
 
+    /// Returns a map from slot name to map root for all Map-type storage slots.
+    /// Only loads slot metadata — does NOT load map entries.
+    pub(crate) async fn get_storage_map_roots(
+        &self,
+        account_id: AccountId,
+    ) -> Result<BTreeMap<StorageSlotName, Word>, StoreError> {
+        let promise = idxdb_get_account_storage(self.db_id(), account_id.to_string());
+        let slots: Vec<AccountStorageIdxdbObject> =
+            await_js(promise, "failed to fetch account storage").await?;
+
+        slots
+            .into_iter()
+            .filter(|s| {
+                StorageSlotType::try_from(s.slot_type).ok() == Some(StorageSlotType::Map)
+            })
+            .map(|s| {
+                let name = StorageSlotName::new(s.slot_name).map_err(|err| {
+                    StoreError::DatabaseError(format!("invalid storage slot name: {err}"))
+                })?;
+                let root = Word::try_from(s.slot_value.as_str())?;
+                Ok((name, root))
+            })
+            .collect()
+    }
+
     pub(crate) async fn insert_account(
         &self,
         account: &Account,
@@ -368,6 +393,10 @@ impl WebStore {
                 ))
             })?;
 
+        // Update SMT forest with the new account's vault and storage map nodes
+        let mut smt_forest = self.smt_forest.write().expect("smt_forest write lock");
+        smt_forest.insert_account_state(account.vault(), account.storage())?;
+
         Ok(())
     }
 
@@ -375,18 +404,31 @@ impl WebStore {
         &self,
         new_account_state: &Account,
     ) -> Result<(), StoreError> {
-        let account_id_str = new_account_state.id().to_string();
+        let account_id = new_account_state.id();
+        let account_id_str = account_id.to_string();
         let promise = idxdb_get_account_header(self.db_id(), account_id_str);
         let account_header_idxdb: Option<AccountRecordIdxdbObject> =
             await_js(promise, "failed to fetch account header").await?;
 
-        if account_header_idxdb.is_none() {
-            return Err(StoreError::AccountDataNotFound(new_account_state.id()));
-        }
+        let account_header_idxdb = account_header_idxdb
+            .ok_or(StoreError::AccountDataNotFound(account_id))?;
+
+        // Get old SMT roots before updating so we can pop them after
+        let (old_header, _) = parse_account_record_idxdb_object(account_header_idxdb)?;
+        let old_vault_root = old_header.vault_root();
+        let old_map_roots = self.get_storage_map_roots(account_id).await?;
 
         apply_full_account_state(self.db_id(), new_account_state)
             .await
-            .map_err(|_| StoreError::DatabaseError("failed to update account".to_string()))
+            .map_err(|_| StoreError::DatabaseError("failed to update account".to_string()))?;
+
+        // Update SMT forest: insert new state and release old roots
+        let mut smt_forest = self.smt_forest.write().expect("smt_forest write lock");
+        smt_forest.insert_account_state(new_account_state.vault(), new_account_state.storage())?;
+        smt_forest
+            .pop_roots(old_map_roots.into_values().chain(core::iter::once(old_vault_root)));
+
+        Ok(())
     }
 
     pub(crate) async fn get_account_vault(
@@ -462,7 +504,19 @@ impl WebStore {
         let account_commitments =
             account_states.iter().map(ToString::to_string).collect::<Vec<_>>();
         let promise = idxdb_undo_account_states(self.db_id(), account_commitments);
-        await_js_value(promise, "failed to undo account states").await?;
+        let smt_root_strings: Vec<String> =
+            await_js(promise, "failed to undo account states").await?;
+
+        // Pop undone SMT roots from the forest to release memory
+        let smt_roots: Vec<Word> = smt_root_strings
+            .iter()
+            .map(|s| Word::try_from(s.as_str()))
+            .collect::<Result<_, _>>()?;
+
+        if !smt_roots.is_empty() {
+            let mut smt_forest = self.smt_forest.write().expect("smt_forest write lock");
+            smt_forest.pop_roots(smt_roots);
+        }
 
         Ok(())
     }
@@ -510,5 +564,21 @@ impl WebStore {
         remove_account_address(self.db_id(), address).await.map_err(|js_error| {
             StoreError::DatabaseError(format!("failed to remove account address: {js_error:?}"))
         })
+    }
+
+    /// Collects vault and storage map SMT roots for the given account IDs.
+    pub(crate) async fn collect_account_smt_roots(
+        &self,
+        account_ids: impl Iterator<Item = AccountId>,
+    ) -> Result<Vec<Word>, StoreError> {
+        let mut roots = Vec::new();
+        for account_id in account_ids {
+            if let Some((header, _)) = self.get_account_header(account_id).await? {
+                roots.push(header.vault_root());
+                let map_roots = self.get_storage_map_roots(account_id).await?;
+                roots.extend(map_roots.into_values());
+            }
+        }
+        Ok(roots)
     }
 }

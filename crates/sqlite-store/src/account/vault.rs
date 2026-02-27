@@ -13,7 +13,7 @@ use miden_protocol::crypto::merkle::MerkleError;
 use rusqlite::types::Value;
 use rusqlite::{Connection, Transaction, params};
 
-use crate::smt_forest::AccountSmtForest;
+use miden_client::store::AccountSmtForest;
 use crate::sql_error::SqlResultExt;
 use crate::{SqliteStore, insert_sql, subst, u64_to_value};
 

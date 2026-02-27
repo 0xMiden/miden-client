@@ -54,14 +54,13 @@ use rusqlite::Connection;
 use rusqlite::types::Value;
 use sql_error::SqlResultExt;
 
-use crate::smt_forest::AccountSmtForest;
+use miden_client::store::AccountSmtForest;
 
 mod account;
 mod builder;
 mod chain_data;
 mod db_management;
 mod note;
-mod smt_forest;
 mod sql_error;
 mod sync;
 mod transaction;

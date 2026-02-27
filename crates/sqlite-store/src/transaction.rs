@@ -23,7 +23,7 @@ use rusqlite::{Connection, Transaction, params};
 use super::SqliteStore;
 use super::note::apply_note_updates_tx;
 use super::sync::add_note_tag_tx;
-use crate::smt_forest::AccountSmtForest;
+use miden_client::store::AccountSmtForest;
 use crate::sql_error::SqlResultExt;
 use crate::{insert_sql, subst};
 
