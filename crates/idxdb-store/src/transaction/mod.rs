@@ -15,12 +15,7 @@ use miden_client::transaction::{
 use miden_client::utils::Deserializable;
 
 use super::WebStore;
-use super::account::utils::{
-    apply_storage_delta,
-    apply_vault_delta,
-    update_account,
-    upsert_account_record,
-};
+use super::account::utils::{apply_account_delta, update_account};
 use super::note::utils::apply_note_updates_tx;
 use crate::promise::await_js;
 
@@ -118,15 +113,9 @@ impl WebStore {
             })?;
         } else {
             account.apply_delta(delta)?;
-            // Delta path: write only changed entries
-            apply_storage_delta(self.db_id(), &account, delta).await.map_err(|err| {
-                StoreError::DatabaseError(format!("failed to apply storage delta: {err:?}"))
-            })?;
-            apply_vault_delta(self.db_id(), &account, delta).await.map_err(|err| {
-                StoreError::DatabaseError(format!("failed to apply vault delta: {err:?}"))
-            })?;
-            upsert_account_record(self.db_id(), &account).await.map_err(|err| {
-                StoreError::DatabaseError(format!("failed to upsert account record: {err:?}"))
+            // Delta path: write storage + vault + header in a single atomic transaction
+            apply_account_delta(self.db_id(), &account, delta).await.map_err(|err| {
+                StoreError::DatabaseError(format!("failed to apply account delta: {err:?}"))
             })?;
         }
 

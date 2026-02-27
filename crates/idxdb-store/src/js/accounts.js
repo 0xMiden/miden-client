@@ -314,101 +314,120 @@ export async function upsertVaultAssets(dbId, accountId, nonce, assets) {
         logWebStoreError(error, `Error inserting assets`);
     }
 }
-export async function applyStorageDelta(dbId, accountId, nonce, updatedSlots, changedMapEntries) {
+export async function applyAccountDelta(dbId, accountId, nonce, updatedSlots, changedMapEntries, changedAssets, codeRoot, storageRoot, vaultRoot, committed, commitment, accountSeed) {
     try {
         const db = getDatabase(dbId);
-        // Upsert updated slots to both latest and historical
-        for (const slot of updatedSlots) {
-            await db.latestAccountStorages.put({
-                accountId,
-                slotName: slot.slotName,
-                slotValue: slot.slotValue,
-                slotType: slot.slotType,
-            });
-            await db.historicalAccountStorages.put({
-                accountId,
+        await db.dexie.transaction("rw", [
+            db.latestAccountHeaders,
+            db.historicalAccountHeaders,
+            db.latestAccountStorages,
+            db.historicalAccountStorages,
+            db.latestStorageMapEntries,
+            db.historicalStorageMapEntries,
+            db.latestAccountAssets,
+            db.historicalAccountAssets,
+        ], async () => {
+            // --- Storage delta ---
+            // Upsert updated slots to both latest and historical
+            for (const slot of updatedSlots) {
+                await db.latestAccountStorages.put({
+                    accountId,
+                    slotName: slot.slotName,
+                    slotValue: slot.slotValue,
+                    slotType: slot.slotType,
+                });
+                await db.historicalAccountStorages.put({
+                    accountId,
+                    nonce,
+                    slotName: slot.slotName,
+                    slotValue: slot.slotValue,
+                    slotType: slot.slotType,
+                });
+            }
+            // Process map entries: value="" means removal
+            for (const entry of changedMapEntries) {
+                if (entry.value === "") {
+                    // Removal: delete from latest, write tombstone to historical
+                    await db.latestStorageMapEntries
+                        .where("[accountId+slotName+key]")
+                        .equals([accountId, entry.slotName, entry.key])
+                        .delete();
+                    await db.historicalStorageMapEntries.put({
+                        accountId,
+                        nonce,
+                        slotName: entry.slotName,
+                        key: entry.key,
+                        value: null,
+                    });
+                }
+                else {
+                    // Update: put to both latest and historical
+                    await db.latestStorageMapEntries.put({
+                        accountId,
+                        slotName: entry.slotName,
+                        key: entry.key,
+                        value: entry.value,
+                    });
+                    await db.historicalStorageMapEntries.put({
+                        accountId,
+                        nonce,
+                        slotName: entry.slotName,
+                        key: entry.key,
+                        value: entry.value,
+                    });
+                }
+            }
+            // --- Vault delta ---
+            for (const entry of changedAssets) {
+                if (entry.asset === "") {
+                    // Removal: delete from latest, write tombstone to historical
+                    await db.latestAccountAssets
+                        .where("[accountId+vaultKey]")
+                        .equals([accountId, entry.vaultKey])
+                        .delete();
+                    await db.historicalAccountAssets.put({
+                        accountId,
+                        nonce,
+                        vaultKey: entry.vaultKey,
+                        faucetIdPrefix: entry.faucetIdPrefix,
+                        asset: null,
+                    });
+                }
+                else {
+                    // Update: put to both latest and historical
+                    await db.latestAccountAssets.put({
+                        accountId,
+                        vaultKey: entry.vaultKey,
+                        faucetIdPrefix: entry.faucetIdPrefix,
+                        asset: entry.asset,
+                    });
+                    await db.historicalAccountAssets.put({
+                        accountId,
+                        nonce,
+                        vaultKey: entry.vaultKey,
+                        faucetIdPrefix: entry.faucetIdPrefix,
+                        asset: entry.asset,
+                    });
+                }
+            }
+            // --- Account header ---
+            const headerData = {
+                id: accountId,
+                codeRoot,
+                storageRoot,
+                vaultRoot,
                 nonce,
-                slotName: slot.slotName,
-                slotValue: slot.slotValue,
-                slotType: slot.slotType,
-            });
-        }
-        // Process map entries: value="" means removal
-        for (const entry of changedMapEntries) {
-            if (entry.value === "") {
-                // Removal: delete from latest, write tombstone to historical
-                await db.latestStorageMapEntries
-                    .where("[accountId+slotName+key]")
-                    .equals([accountId, entry.slotName, entry.key])
-                    .delete();
-                await db.historicalStorageMapEntries.put({
-                    accountId,
-                    nonce,
-                    slotName: entry.slotName,
-                    key: entry.key,
-                    value: null,
-                });
-            }
-            else {
-                // Update: put to both latest and historical
-                await db.latestStorageMapEntries.put({
-                    accountId,
-                    slotName: entry.slotName,
-                    key: entry.key,
-                    value: entry.value,
-                });
-                await db.historicalStorageMapEntries.put({
-                    accountId,
-                    nonce,
-                    slotName: entry.slotName,
-                    key: entry.key,
-                    value: entry.value,
-                });
-            }
-        }
+                committed,
+                accountSeed,
+                accountCommitment: commitment,
+                locked: false,
+            };
+            await db.historicalAccountHeaders.put(headerData);
+            await db.latestAccountHeaders.put(headerData);
+        });
     }
     catch (error) {
-        logWebStoreError(error, `Error applying storage delta`);
-    }
-}
-export async function applyVaultDelta(dbId, accountId, nonce, changedAssets) {
-    try {
-        const db = getDatabase(dbId);
-        for (const entry of changedAssets) {
-            if (entry.asset === "") {
-                // Removal: delete from latest, write tombstone to historical
-                await db.latestAccountAssets
-                    .where("[accountId+vaultKey]")
-                    .equals([accountId, entry.vaultKey])
-                    .delete();
-                await db.historicalAccountAssets.put({
-                    accountId,
-                    nonce,
-                    vaultKey: entry.vaultKey,
-                    faucetIdPrefix: entry.faucetIdPrefix,
-                    asset: null,
-                });
-            }
-            else {
-                // Update: put to both latest and historical
-                await db.latestAccountAssets.put({
-                    accountId,
-                    vaultKey: entry.vaultKey,
-                    faucetIdPrefix: entry.faucetIdPrefix,
-                    asset: entry.asset,
-                });
-                await db.historicalAccountAssets.put({
-                    accountId,
-                    nonce,
-                    vaultKey: entry.vaultKey,
-                    faucetIdPrefix: entry.faucetIdPrefix,
-                    asset: entry.asset,
-                });
-            }
-        }
-    }
-    catch (error) {
-        logWebStoreError(error, `Error applying vault delta`);
+        logWebStoreError(error, `Error applying account delta`);
     }
 }
 export async function upsertAccountRecord(dbId, accountId, codeRoot, storageRoot, vaultRoot, nonce, committed, commitment, accountSeed) {

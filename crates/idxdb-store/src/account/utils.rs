@@ -23,8 +23,7 @@ use super::js_bindings::{
     JsStorageMapEntry,
     JsStorageSlot,
     JsVaultAsset,
-    idxdb_apply_storage_delta,
-    idxdb_apply_vault_delta,
+    idxdb_apply_account_delta,
     idxdb_upsert_account_code,
     idxdb_upsert_account_record,
     idxdb_upsert_account_storage,
@@ -180,16 +179,18 @@ pub fn parse_account_address_idxdb_object(
     Ok((address, native_account_id))
 }
 
-/// Writes only the changed storage entries (from the delta) to both latest and historical tables.
-/// Value slots are upserted directly. Map entries with `EMPTY_WORD` values are treated as removals
-/// (empty-string sentinel for the JS side).
-pub async fn apply_storage_delta(
+/// Applies the full account delta (storage + vault + header) in a single atomic `IndexedDB`
+/// transaction. Value slots and map entries use empty-string sentinels for removals on the JS
+/// side.
+pub async fn apply_account_delta(
     db_id: &str,
     account: &Account,
     delta: &AccountDelta,
 ) -> Result<(), JsValue> {
     let account_id_str = account.id().to_string();
     let nonce_str = account.nonce().to_string();
+
+    // --- Storage delta ---
 
     let mut updated_slots = Vec::new();
     let mut changed_map_entries = Vec::new();
@@ -228,27 +229,7 @@ pub async fn apply_storage_delta(
         }
     }
 
-    JsFuture::from(idxdb_apply_storage_delta(
-        db_id,
-        account_id_str,
-        nonce_str,
-        updated_slots,
-        changed_map_entries,
-    ))
-    .await?;
-
-    Ok(())
-}
-
-/// Writes only the changed vault assets (from the delta) to both latest and historical tables.
-/// Assets removed from the vault use an empty-string sentinel for the JS side.
-pub async fn apply_vault_delta(
-    db_id: &str,
-    account: &Account,
-    delta: &AccountDelta,
-) -> Result<(), JsValue> {
-    let account_id_str = account.id().to_string();
-    let nonce_str = account.nonce().to_string();
+    // --- Vault delta ---
 
     let mut changed_assets = Vec::new();
 
@@ -295,8 +276,30 @@ pub async fn apply_vault_delta(
         }
     }
 
-    JsFuture::from(idxdb_apply_vault_delta(db_id, account_id_str, nonce_str, changed_assets))
-        .await?;
+    // --- Account header ---
+
+    let code_root = account.code().commitment().to_string();
+    let storage_root = account.storage().to_commitment().to_string();
+    let vault_root = account.vault().root().to_string();
+    let committed = account.is_public();
+    let commitment = account.commitment().to_string();
+    let account_seed = account.seed().map(|seed| seed.to_bytes());
+
+    JsFuture::from(idxdb_apply_account_delta(
+        db_id,
+        account_id_str,
+        nonce_str,
+        updated_slots,
+        changed_map_entries,
+        changed_assets,
+        code_root,
+        storage_root,
+        vault_root,
+        committed,
+        commitment,
+        account_seed,
+    ))
+    .await?;
 
     Ok(())
 }

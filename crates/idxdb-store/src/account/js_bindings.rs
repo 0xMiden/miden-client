@@ -125,21 +125,20 @@ extern "C" {
     // DELTA WRITES
     // --------------------------------------------------------------------------------------------
 
-    #[wasm_bindgen(js_name = applyStorageDelta)]
-    pub fn idxdb_apply_storage_delta(
+    #[wasm_bindgen(js_name = applyAccountDelta)]
+    pub fn idxdb_apply_account_delta(
         db_id: &str,
         account_id: String,
         nonce: String,
         updated_slots: Vec<JsStorageSlot>,
         changed_map_entries: Vec<JsStorageMapEntry>,
-    ) -> js_sys::Promise;
-
-    #[wasm_bindgen(js_name = applyVaultDelta)]
-    pub fn idxdb_apply_vault_delta(
-        db_id: &str,
-        account_id: String,
-        nonce: String,
         changed_assets: Vec<JsVaultAsset>,
+        code_root: String,
+        storage_root: String,
+        vault_root: String,
+        committed: bool,
+        commitment: String,
+        account_seed: Option<Vec<u8>>,
     ) -> js_sys::Promise;
 
     // UPDATES
