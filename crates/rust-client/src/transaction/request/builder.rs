@@ -158,18 +158,12 @@ impl TransactionRequestBuilder {
     /// depending on whether each foreign account is public or private:
     ///
     /// - **Public accounts**: the node retrieves the state and code for the account and injects
-    ///   them as advice inputs.
+    ///   them as advice inputs. Public accounts can be omitted here, as they will be lazily loaded
+    ///   through RPC calls. Undeclared accounts may trigger additional RPC calls for storage map
+    ///   accesses during execution.
     /// - **Private accounts**: the node retrieves a proof of the account's existence and injects
-    ///   that as advice inputs.
-    ///
-    /// **Public** accounts can be omitted: undeclared public accounts are lazily loaded via RPC
-    /// when the executor encounters them at runtime. Declaring them upfront with the appropriate
-    /// [`AccountStorageRequirements`](crate::rpc::domain::account::AccountStorageRequirements)
-    /// is an optimization, it fetches all needed storage map entries in a single RPC call
-    /// instead of triggering additional calls during execution.
-    ///
-    /// **Private** accounts must always be declared here because their partial state cannot be
-    /// obtained from the network.
+    ///   that as advice inputs. Private accounts must always be declared here with their
+    ///   [`PartialAccount`] state.
     #[must_use]
     pub fn foreign_accounts(
         mut self,
