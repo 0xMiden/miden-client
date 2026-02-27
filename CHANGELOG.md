@@ -28,6 +28,7 @@
 * Added implementation for the `get_public_key` method on the `FilesystemKeystore` and `WebKeystore` ([#1731](https://github.com/0xMiden/miden-client/pull/1731)).
 * [BREAKING] Made the nullifiers sync optional on the `StateSync` component ([#1756](https://github.com/0xMiden/miden-client/pull/1756)).
 * [BREAKING] Added `SyncStateInputs` to bundle the parameters needed to perform the sync state ([#1778](https://github.com/0xMiden/miden-client/pull/1778)).
+* Added lazy loading for foreign accounts. Specifying `TransactionRequestBuilder::foreign_accounts()` for public accounts is no longer required ([#1812](https://github.com/0xMiden/miden-client/pull/1812)).
 
 ### Features
 

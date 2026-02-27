@@ -383,7 +383,11 @@ where
     where
         AUTH: Sync,
     {
-        note::NoteScreener::new(self.store.clone(), self.authenticator.clone())
+        note::NoteScreener::new(
+            self.store.clone(),
+            self.authenticator.clone(),
+            self.rpc_api.clone(),
+        )
     }
 
     /// Returns a reference to the client's random number generator. This can be used to generate

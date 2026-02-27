@@ -158,9 +158,12 @@ impl TransactionRequestBuilder {
     /// depending on whether each foreign account is public or private:
     ///
     /// - **Public accounts**: the node retrieves the state and code for the account and injects
-    ///   them as advice inputs.
+    ///   them as advice inputs. Public accounts can be omitted here, as they will be lazily loaded
+    ///   through RPC calls. Undeclared accounts may trigger additional RPC calls for storage map
+    ///   accesses during execution.
     /// - **Private accounts**: the node retrieves a proof of the account's existence and injects
-    ///   that as advice inputs.
+    ///   that as advice inputs. Private accounts must always be declared here with their
+    ///   [`PartialAccount`](miden_protocol::account::PartialAccount) state.
     #[must_use]
     pub fn foreign_accounts(
         mut self,

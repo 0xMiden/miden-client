@@ -17,6 +17,7 @@ use miden_tx::{
 use thiserror::Error;
 
 use crate::ClientError;
+use crate::rpc::NodeRpcClient;
 use crate::rpc::domain::note::CommittedNote;
 use crate::store::data_store::ClientDataStore;
 use crate::store::{InputNoteRecord, NoteFilter, Store, StoreError};
@@ -53,14 +54,25 @@ pub struct NoteScreener<AUTH> {
     authenticator: Option<Arc<AUTH>>,
     /// Optional transaction arguments to use when checking consumability.
     tx_args: Option<TransactionArgs>,
+    /// RPC client used for lazy-loading foreign account data during note screening.
+    rpc_api: Arc<dyn NodeRpcClient>,
 }
 
 impl<AUTH> NoteScreener<AUTH>
 where
     AUTH: TransactionAuthenticator + Sync,
 {
-    pub fn new(store: Arc<dyn Store>, authenticator: Option<Arc<AUTH>>) -> Self {
-        Self { store, authenticator, tx_args: None }
+    pub fn new(
+        store: Arc<dyn Store>,
+        authenticator: Option<Arc<AUTH>>,
+        rpc_api: Arc<dyn NodeRpcClient>,
+    ) -> Self {
+        Self {
+            store,
+            authenticator,
+            tx_args: None,
+            rpc_api,
+        }
     }
 
     /// Sets the transaction arguments to use when checking note consumability.
@@ -110,7 +122,7 @@ where
         let mut relevant_notes: BTreeMap<NoteId, Vec<NoteConsumability>> = BTreeMap::new();
         let tx_args = self.tx_args();
 
-        let data_store = ClientDataStore::new(self.store.clone());
+        let data_store = ClientDataStore::new(self.store.clone(), self.rpc_api.clone());
         let mut transaction_executor = TransactionExecutor::new(&data_store);
         if let Some(authenticator) = &self.authenticator {
             transaction_executor = transaction_executor.with_authenticator(authenticator.as_ref());
@@ -158,7 +170,7 @@ where
         let tx_args = self.tx_args();
         let account_code = self.get_account_code(account_id).await?;
 
-        let data_store = ClientDataStore::new(self.store.clone());
+        let data_store = ClientDataStore::new(self.store.clone(), self.rpc_api.clone());
         let mut transaction_executor = TransactionExecutor::new(&data_store);
         if let Some(authenticator) = &self.authenticator {
             transaction_executor = transaction_executor.with_authenticator(authenticator.as_ref());
