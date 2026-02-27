@@ -8,7 +8,7 @@ use miden_client::store::NoteFilter;
 use miden_client::testing::mock::MockClient;
 use miden_client::testing::note_transport::{MockNoteTransportApi, MockNoteTransportNode};
 use miden_client::utils::RwLock;
-use miden_standards::note::create_p2id_note;
+use miden_standards::note::P2idNote;
 
 use crate::tests::{create_test_client_builder, insert_new_wallet};
 
@@ -19,12 +19,11 @@ async fn transport_basic() {
     let (mut sender, sender_account) = create_test_user_transport(mock_node.clone()).await;
     let (mut recipient, recipient_account) = create_test_user_transport(mock_node.clone()).await;
     let recipient_address = Address::new(recipient_account.id())
-        .with_routing_parameters(RoutingParameters::new(AddressInterface::BasicWallet))
-        .unwrap();
+        .with_routing_parameters(RoutingParameters::new(AddressInterface::BasicWallet));
     let (mut observer, _observer_account) = create_test_user_transport(mock_node.clone()).await;
 
     // Create note
-    let note = create_p2id_note(
+    let note = P2idNote::create(
         sender_account.id(),
         recipient_account.id(),
         vec![],
@@ -67,10 +66,9 @@ async fn transport_cursor_pagination() {
     let (mut sender, sender_account) = create_test_user_transport(mock_node.clone()).await;
     let (mut recipient, recipient_account) = create_test_user_transport(mock_node.clone()).await;
     let recipient_address = Address::new(recipient_account.id())
-        .with_routing_parameters(RoutingParameters::new(AddressInterface::BasicWallet))
-        .unwrap();
+        .with_routing_parameters(RoutingParameters::new(AddressInterface::BasicWallet));
 
-    let note_a = create_p2id_note(
+    let note_a = P2idNote::create(
         sender_account.id(),
         recipient_account.id(),
         vec![],
@@ -80,7 +78,7 @@ async fn transport_cursor_pagination() {
     )
     .unwrap();
 
-    let note_b = create_p2id_note(
+    let note_b = P2idNote::create(
         sender_account.id(),
         recipient_account.id(),
         vec![],
@@ -111,10 +109,9 @@ async fn transport_duplicate_note_handling() {
     let (mut sender, sender_account) = create_test_user_transport(mock_node.clone()).await;
     let (mut recipient, recipient_account) = create_test_user_transport(mock_node.clone()).await;
     let recipient_address = Address::new(recipient_account.id())
-        .with_routing_parameters(RoutingParameters::new(AddressInterface::BasicWallet))
-        .unwrap();
+        .with_routing_parameters(RoutingParameters::new(AddressInterface::BasicWallet));
 
-    let note = create_p2id_note(
+    let note = P2idNote::create(
         sender_account.id(),
         recipient_account.id(),
         vec![],
@@ -144,11 +141,10 @@ async fn transport_fetch_no_matching_tags() {
     let (mut sender, sender_account) = create_test_user_transport(mock_node.clone()).await;
     let (mut recipient, recipient_account) = create_test_user_transport(mock_node.clone()).await;
     let recipient_address = Address::new(recipient_account.id())
-        .with_routing_parameters(RoutingParameters::new(AddressInterface::BasicWallet))
-        .unwrap();
+        .with_routing_parameters(RoutingParameters::new(AddressInterface::BasicWallet));
     let (mut observer, _observer_account) = create_test_user_transport(mock_node.clone()).await;
 
-    let note = create_p2id_note(
+    let note = P2idNote::create(
         sender_account.id(),
         recipient_account.id(),
         vec![],

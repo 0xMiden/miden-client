@@ -21,7 +21,7 @@ use miden_client::note::{
     NoteStorage,
     NoteTag,
     NoteType,
-    build_p2id_recipient,
+    P2idNote,
 };
 use miden_client::store::{InputNoteState, TransactionFilter};
 use miden_client::testing::common::*;
@@ -236,7 +236,7 @@ fn create_pass_through_note(
 
     let asset_word: Word = asset.into();
 
-    let target_recipient = build_p2id_recipient(target, rng.draw_word())?;
+    let target_recipient = P2idNote::build_recipient(target, rng.draw_word())?;
 
     let inputs = NoteStorage::new(vec![
         asset_word[0],
@@ -255,7 +255,7 @@ fn create_pass_through_note(
     let pass_through_recipient = NoteRecipient::new(serial_num, note_script, inputs);
 
     let metadata =
-        NoteMetadata::new(sender, NoteType::Public, NoteTag::with_account_target(target));
+        NoteMetadata::new(sender, NoteType::Public).with_tag(NoteTag::with_account_target(target));
     let note = Note::new(NoteAssets::new(vec![asset])?, metadata, pass_through_recipient);
 
     let pass_through_note_details =

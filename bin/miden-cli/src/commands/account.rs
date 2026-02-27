@@ -247,7 +247,7 @@ async fn print_summary_table<AUTH>(
     table.add_row(vec![Cell::new("Account ID (hex)"), Cell::new(account.id().to_string())]);
     table.add_row(vec![
         Cell::new("Account Commitment"),
-        Cell::new(account.commitment().to_string()),
+        Cell::new(account.to_commitment().to_string()),
     ]);
     table.add_row(vec![Cell::new("Type"), Cell::new(account_type_display_name(&account.id())?)]);
     table.add_row(vec![
@@ -322,11 +322,8 @@ async fn account_bech_32<AUTH>(
         .iter()
         .any(|c| matches!(c, AccountComponentInterface::BasicWallet))
     {
-        address = address
-            .with_routing_parameters(RoutingParameters::new(AddressInterface::BasicWallet))
-            .map_err(|err| {
-                CliError::Address(err, "Failed to set routing parameters".to_string())
-            })?;
+        address =
+            address.with_routing_parameters(RoutingParameters::new(AddressInterface::BasicWallet));
     }
 
     let encoded = address.encode(cli_config.rpc.endpoint.0.to_network_id());

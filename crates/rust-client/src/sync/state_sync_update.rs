@@ -212,6 +212,17 @@ impl TransactionUpdateTracker {
         if let Some(transaction) = self.transactions.get_mut(&transaction_inclusion.transaction_id)
         {
             transaction.commit_transaction(transaction_inclusion.block_num, timestamp);
+            return;
+        }
+
+        // Fallback for transactions with unauthenticated input notes: the node
+        // authenticates these notes during processing, which changes the transaction
+        // ID. Match by account ID and pre-transaction state instead.
+        if let Some(transaction) = self.transactions.values_mut().find(|tx| {
+            tx.details.account_id == transaction_inclusion.account_id
+                && tx.details.init_account_state == transaction_inclusion.initial_state_commitment
+        }) {
+            transaction.commit_transaction(transaction_inclusion.block_num, timestamp);
         }
     }
 

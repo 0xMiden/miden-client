@@ -147,9 +147,7 @@ impl AccountId {
         let network_id: NativeNetworkId = network_id.into();
 
         let routing_params = RoutingParameters::new(account_interface.into());
-        let address = Address::new(self.0)
-            .with_routing_parameters(routing_params)
-            .map_err(|err| js_error_with_context(err, "failed to set routing parameters"))?;
+        let address = Address::new(self.0).with_routing_parameters(routing_params);
         Ok(address.encode(network_id))
     }
 

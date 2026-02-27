@@ -8,7 +8,7 @@ use miden_client::keystore::Keystore;
 use miden_client::note::{
     BlockNumber,
     NoteType as MidenNoteType,
-    build_swap_tag,
+    SwapNote,
     get_input_note_with_id_prefix,
 };
 use miden_client::store::NoteRecordError;
@@ -264,7 +264,7 @@ impl SwapCmd {
         )
         .await?;
 
-        let payback_note_tag: u32 = build_swap_tag(
+        let payback_note_tag: u32 = SwapNote::build_tag(
             (&self.note_type).into(),
             &swap_transaction.offered_asset(),
             &swap_transaction.requested_asset(),

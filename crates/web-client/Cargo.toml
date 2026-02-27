@@ -29,7 +29,7 @@ miden-protocol  = { workspace = true }
 miden-standards = { workspace = true }
 
 # External dependencies
-async-trait = { workspace = true }
+async-trait              = { workspace = true }
 console_error_panic_hook = { version = "0.1.7" }
 hex = { version = "0.4" }
 js-sys = { version = "0.3" }
@@ -39,9 +39,7 @@ thiserror.workspace = true
 tracing = { workspace = true }
 tracing-subscriber = { default-features = false, features = ["registry"], version = "0.3" }
 tracing-wasm = { version = "0.2" }
-wasm-bindgen = { features = [
-  "serde-serialize",
-], version = "=0.2.105" } # Lock version as .106 removed doc generation for structs
+wasm-bindgen = { features = ["serde-serialize"], version = "=0.2.108" }
 wasm-bindgen-futures = { version = "0.4" }
 
 [lints]

@@ -94,9 +94,8 @@ impl TryFrom<proto::RpcLimits> for RpcLimits {
             note_ids_limit: get_param(&proto, RpcEndpoint::GetNotesById, "note_id")?,
             nullifiers_limit: get_param(&proto, RpcEndpoint::CheckNullifiers, "nullifier")
                 .or_else(|_| get_param(&proto, RpcEndpoint::SyncNullifiers, "nullifier"))?,
-            account_ids_limit: get_param(&proto, RpcEndpoint::SyncState, "account_id")?,
-            note_tags_limit: get_param(&proto, RpcEndpoint::SyncState, "note_tag")
-                .or_else(|_| get_param(&proto, RpcEndpoint::SyncNotes, "note_tag"))?,
+            account_ids_limit: get_param(&proto, RpcEndpoint::SyncTransactions, "account_id")?,
+            note_tags_limit: get_param(&proto, RpcEndpoint::SyncNotes, "note_tag")?,
         })
     }
 }

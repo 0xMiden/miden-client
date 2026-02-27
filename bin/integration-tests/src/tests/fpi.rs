@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use miden_client::account::component::AccountComponent;
+use miden_client::account::component::{AccountComponent, AccountComponentMetadata};
 use miden_client::account::{
     Account,
     AccountBuilder,
@@ -52,21 +52,14 @@ pub async fn test_fpi_execute_program(client_config: ClientConfig) -> Result<()>
         &mut client,
         &keystore,
         AccountStorageMode::Public,
-        format!(
-            r#"
-            const MAP_STORAGE_SLOT = word("{MAP_SLOT_NAME}")
+        "
+            use miden::protocol::active_account
             pub proc get_fpi_map_item
-                # map key
-                push.{map_key}
-
-                # item slot
-                push.MAP_STORAGE_SLOT[0..2]
-                
-                exec.::miden::protocol::active_account::get_map_item
-                swapw dropw
-            end"#,
-            map_key = Word::from(MAP_KEY)
-        ),
+                # inputs are passed as foreign_procedure_inputs:
+                # [slot_id_prefix, slot_id_suffix, KEY, pad(10)]
+                exec.active_account::get_map_item
+            end"
+        .to_string(),
         RPO_FALCON_SCHEME_ID,
     )
     .await?;
@@ -74,17 +67,33 @@ pub async fn test_fpi_execute_program(client_config: ClientConfig) -> Result<()>
     let code = format!(
         "
         use miden::protocol::tx
+        use miden::core::sys
+        const MAP_STORAGE_SLOT = word(\"{MAP_SLOT_NAME}\")
         begin
-            # push the root of the `get_fpi_item` account procedure
+            # pad the stack for the foreign procedure inputs
+            padw padw push.0.0
+
+            # push the key of the desired storage item
+            push.{map_key}
+
+            # push the slot name of the desired storage item
+            push.MAP_STORAGE_SLOT[0..2]
+
+            # push the root of the `get_fpi_map_item` account procedure
             push.{proc_root}
 
             # push the foreign account id
             push.{account_id_suffix} push.{account_id_prefix}
-            # => [foreign_id_prefix, foreign_id_suffix, FOREIGN_PROC_ROOT, storage_item_index]
+            # => [foreign_id_prefix, foreign_id_suffix, FOREIGN_PROC_ROOT,
+            #     slot_id_prefix, slot_id_suffix, KEY, pad(10)]
 
             exec.tx::execute_foreign_procedure
+            # => [VALUE, pad(12)]
+
+            exec.sys::truncate_stack
         end
         ",
+        map_key = Word::from(MAP_KEY),
         account_id_prefix = foreign_account_id.prefix().as_u64(),
         account_id_suffix = foreign_account_id.suffix(),
     );
@@ -142,22 +151,14 @@ pub async fn test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
         &mut client,
         &keystore,
         AccountStorageMode::Public,
-        format!(
-            r#"
-            const STORAGE_MAP_SLOT = word("{MAP_SLOT_NAME}")
+        "
+            use miden::protocol::active_account
             pub proc get_fpi_map_item
-                # map key
-                push.{map_key}
-
-                # push item slot
-                push.STORAGE_MAP_SLOT[0..2]
-
-                # get item
-                exec.::miden::protocol::active_account::get_map_item
-                swapw dropw
-            end"#,
-            map_key = Word::from(MAP_KEY)
-        ),
+                # inputs are passed as foreign_procedure_inputs:
+                # [slot_id_prefix, slot_id_suffix, KEY, pad(10)]
+                exec.active_account::get_map_item
+            end"
+        .to_string(),
         RPO_FALCON_SCHEME_ID,
     )
     .await?;
@@ -170,20 +171,40 @@ pub async fn test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
         format!(
             "
             use miden::protocol::tx
+            use miden::core::sys
+            const STORAGE_MAP_SLOT = word(\"{MAP_SLOT_NAME}\")
             pub proc get_fpi_map_item
-                # push the hash of the `get_fpi_item` account procedure
+                # The outer foreign procedure receives foreign_procedure_inputs(16) on the stack.
+                # We need to set up the inner FPI call with map key and slot as inputs.
+
+                # pad the stack for the inner foreign procedure inputs
+                padw padw push.0.0
+
+                # push the key of the desired storage item
+                push.{map_key}
+
+                # push the slot name of the desired storage item
+                push.STORAGE_MAP_SLOT[0..2]
+
+                # push the hash of the inner account procedure
                 push.{inner_proc_root}
 
                 # push the foreign account id
                 push.{account_id_suffix} push.{account_id_prefix}
-                # => [foreign_id_prefix, foreign_id_suffix, FOREIGN_PROC_ROOT, storage_item_index]
+                # => [foreign_id_prefix, foreign_id_suffix, FOREIGN_PROC_ROOT,
+                #     slot_id_prefix, slot_id_suffix, KEY, pad(10)]
 
                 exec.tx::execute_foreign_procedure
+                # => [VALUE, pad(12)]
 
-                # add one to the result of the foreign procedure call
+                # add one to the first element of the result
                 add.1
+
+                # truncate any remaining stack items to ensure stack depth is 16
+                exec.sys::truncate_stack
             end
             ",
+            map_key = Word::from(MAP_KEY),
             account_id_prefix = inner_foreign_account_id.prefix().as_u64(),
             account_id_suffix = inner_foreign_account_id.suffix(),
         ),
@@ -197,17 +218,26 @@ pub async fn test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
     let tx_script = format!(
         "
         use miden::protocol::tx
-        use miden::protocol::native_account
+        use miden::core::sys
         begin
-            # push the hash of the `get_fpi_item` account procedure
+            # pad the stack for the outer foreign procedure inputs (it doesn't use inputs directly)
+            padw padw padw push.0.0.0.0
+
+            # push the root of the outer account procedure
             push.{outer_proc_root}
 
             # push the foreign account id
             push.{account_id_suffix} push.{account_id_prefix}
-            # => [foreign_id_prefix, foreign_id_suffix, FOREIGN_PROC_ROOT, storage_item_index]
+            # => [foreign_id_prefix, foreign_id_suffix, FOREIGN_PROC_ROOT, pad(16)]
 
             exec.tx::execute_foreign_procedure
+            # => [result(16)]
+
+            # assert the top word equals FPI_STORAGE_VALUE + 1
             push.{fpi_value} add.1 assert_eqw
+
+            # truncate any remaining stack items
+            exec.sys::truncate_stack
         end
         ",
         fpi_value = Word::from(FPI_STORAGE_VALUE),
@@ -274,21 +304,14 @@ async fn standard_fpi(
         &mut client,
         &keystore,
         storage_mode,
-        format!(
-            r#"
-            const STORAGE_MAP_SLOT = word("{MAP_SLOT_NAME}")
+        "
+            use miden::protocol::active_account
             pub proc get_fpi_map_item
-                # map key
-                push.{map_key}
-
-                # push item slot name 
-                push.STORAGE_MAP_SLOT[0..2]
-                
-                exec.::miden::protocol::active_account::get_map_item
-                swapw dropw
-            end"#,
-            map_key = Word::from(MAP_KEY)
-        ),
+                # inputs are passed as foreign_procedure_inputs:
+                # [slot_id_prefix, slot_id_suffix, KEY, pad(10)]
+                exec.active_account::get_map_item
+            end"
+        .to_string(),
         auth_scheme,
     )
     .await?;
@@ -300,18 +323,36 @@ async fn standard_fpi(
     let tx_script = format!(
         "
         use miden::protocol::tx
+        use miden::core::sys
+        const STORAGE_MAP_SLOT = word(\"{MAP_SLOT_NAME}\")
         begin
-            # push the hash of the `get_fpi_item` account procedure
+            # pad the stack for the foreign procedure inputs
+            padw padw push.0.0
+
+            # push the key of the desired storage item
+            push.{map_key}
+
+            # push the slot name of the desired storage item
+            push.STORAGE_MAP_SLOT[0..2]
+
+            # push the hash of the `get_fpi_map_item` account procedure
             push.{proc_root}
 
             # push the foreign account id
             push.{account_id_suffix} push.{account_id_prefix}
-            # => [foreign_id_prefix, foreign_id_suffix, FOREIGN_PROC_ROOT, storage_item_index]
+            # => [foreign_id_prefix, foreign_id_suffix, FOREIGN_PROC_ROOT,
+            #     slot_id_prefix, slot_id_suffix, KEY, pad(10)]
 
             exec.tx::execute_foreign_procedure
+            # => [VALUE, pad(12)]
+
             push.{fpi_value} assert_eqw
+
+            # truncate any remaining stack items
+            exec.sys::truncate_stack
         end
         ",
+        map_key = Word::from(MAP_KEY),
         fpi_value = Word::from(FPI_STORAGE_VALUE),
         account_id_prefix = foreign_account_id.prefix().as_u64(),
         account_id_suffix = foreign_account_id.suffix(),
@@ -427,10 +468,13 @@ fn foreign_account_with_code(
     let component_code = CodeBuilder::default()
         .compile_component_code("miden::testing::fpi_component", code)
         .context("failed to compile foreign account component code")?;
-    let get_item_component = AccountComponent::new(component_code, vec![map_slot])
-        .map_err(|err| anyhow::anyhow!(err))
-        .context("failed to create foreign account component")?
-        .with_supports_all_types();
+    let get_item_component = AccountComponent::new(
+        component_code,
+        vec![map_slot],
+        AccountComponentMetadata::new("miden::testing::fpi_component").with_supports_all_types(),
+    )
+    .map_err(|err| anyhow::anyhow!(err))
+    .context("failed to create foreign account component")?;
 
     let (key_pair, auth_component) = match auth_scheme {
         AuthSchemeId::Falcon512Rpo => {

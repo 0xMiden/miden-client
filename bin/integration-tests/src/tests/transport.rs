@@ -95,8 +95,7 @@ pub async fn test_transport_note_inclusion_proof_and_consumption(
     .context("failed to insert wallet")?;
 
     let recipient_address = Address::new(recipient_account.id())
-        .with_routing_parameters(RoutingParameters::new(AddressInterface::BasicWallet))
-        .context("failed to build address")?;
+        .with_routing_parameters(RoutingParameters::new(AddressInterface::BasicWallet));
 
     // Initial sync
     recipient.sync_state().await.context("recipient initial sync")?;
@@ -198,8 +197,7 @@ pub async fn test_transport_multiple_notes_different_blocks(
     .context("failed to insert wallet")?;
 
     let recipient_address = Address::new(recipient_account.id())
-        .with_routing_parameters(RoutingParameters::new(AddressInterface::BasicWallet))
-        .context("failed to build address")?;
+        .with_routing_parameters(RoutingParameters::new(AddressInterface::BasicWallet));
 
     // Initial sync
     recipient.sync_state().await.context("recipient initial sync")?;
@@ -323,8 +321,7 @@ pub async fn test_transport_note_not_yet_committed(client_config: ClientConfig) 
     .context("failed to insert wallet")?;
 
     let recipient_address = Address::new(recipient_account.id())
-        .with_routing_parameters(RoutingParameters::new(AddressInterface::BasicWallet))
-        .context("failed to build address")?;
+        .with_routing_parameters(RoutingParameters::new(AddressInterface::BasicWallet));
 
     // Initial sync
     recipient.sync_state().await.context("recipient initial sync")?;

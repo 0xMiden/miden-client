@@ -48,9 +48,7 @@ impl Address {
             None => NativeAddress::new(native_account_id),
             Some(interface) if &interface == "BasicWallet" => {
                 let routing_params = RoutingParameters::new(NativeAddressInterface::BasicWallet);
-                NativeAddress::new(native_account_id)
-                    .with_routing_parameters(routing_params)
-                    .map_err(|err| js_error_with_context(err, "failed to set routing params"))?
+                NativeAddress::new(native_account_id).with_routing_parameters(routing_params)
             },
             Some(other_interface) => {
                 return Err(JsValue::from_str(&format!(

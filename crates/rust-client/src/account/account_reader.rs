@@ -59,7 +59,7 @@ impl AccountReader {
     /// Retrieves the account commitment (hash of the full state).
     pub async fn commitment(&self) -> Result<Word, ClientError> {
         let (header, _) = self.header().await?;
-        Ok(header.commitment())
+        Ok(header.to_commitment())
     }
 
     /// Retrieves the storage commitment (root of the storage tree).

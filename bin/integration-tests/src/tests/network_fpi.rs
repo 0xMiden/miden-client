@@ -49,7 +49,7 @@ pub async fn test_network_fpi(client_config: ClientConfig) -> Result<()> {
                 # item slot
                 push.MAP_STORAGE_SLOT[0..2]
                 # => [slot_id_prefix, slot_id_suffix, KEY, pad(16)]
-                
+
                 exec.::miden::protocol::active_account::get_map_item
                 # => [VALUE, pad(16)]
 

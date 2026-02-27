@@ -505,7 +505,7 @@ mod tests {
     use miden_protocol::transaction::OutputNote;
     use miden_protocol::{EMPTY_WORD, Felt, Word};
     use miden_standards::account::auth::{AuthEcdsaK256Keccak, AuthFalcon512Rpo};
-    use miden_standards::note::create_p2id_note;
+    use miden_standards::note::P2idNote;
     use miden_standards::testing::account_component::MockAccountComponent;
     use miden_tx::utils::{Deserializable, Serializable};
 
@@ -539,7 +539,7 @@ mod tests {
 
         let mut notes = vec![];
         for i in 0..6 {
-            let note = create_p2id_note(
+            let note = P2idNote::create(
                 sender_id,
                 target_id,
                 vec![FungibleAsset::new(faucet_id, 100 + i).unwrap().into()],

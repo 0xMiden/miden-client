@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use miden_client::account::AccountStorageMode;
 use miden_client::asset::{Asset, FungibleAsset};
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
-use miden_client::note::{Note, NoteDetails, NoteFile, NoteType, build_swap_tag};
+use miden_client::note::{Note, NoteDetails, NoteFile, NoteType, SwapNote};
 use miden_client::testing::common::*;
 use miden_client::transaction::{SwapTransactionData, TransactionRequestBuilder};
 use tracing::info;
@@ -102,7 +102,7 @@ pub async fn test_swap_fully_onchain(client_config: ClientConfig) -> Result<()> 
 
     execute_tx_and_sync(&mut client1, account_a.id(), tx_request).await?;
 
-    let swap_note_tag = build_swap_tag(
+    let swap_note_tag = SwapNote::build_tag(
         NoteType::Public,
         &Asset::Fungible(offered_asset),
         &Asset::Fungible(requested_asset),
@@ -255,7 +255,7 @@ pub async fn test_swap_private(client_config: ClientConfig) -> Result<()> {
         .await?
         .with_context(|| format!("Output note {} not found", expected_output_notes[0].id()))?;
 
-    let tag = build_swap_tag(
+    let tag = SwapNote::build_tag(
         NoteType::Private,
         &Asset::Fungible(offered_asset),
         &Asset::Fungible(requested_asset),

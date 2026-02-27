@@ -26,7 +26,7 @@ const importWalletFromSeed = async (
       );
       return {
         accountId: account.id().toString(),
-        accountCommitment: account.commitment().toHex(),
+        accountCommitment: account.to_commitment().toHex(),
       };
     },
     {
@@ -60,7 +60,7 @@ const importAccountById = async (page: Page, accountId: string) => {
     const account = await client.getAccount(_accountId);
     return {
       accountId: account?.id().toString(),
-      accountCommitment: account?.commitment().toHex(),
+      accountCommitment: account?.to_commitment().toHex(),
     };
   }, accountId);
 };

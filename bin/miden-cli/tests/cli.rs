@@ -295,8 +295,10 @@ async fn mint_with_untracked_account() -> Result<()> {
         &fungible_faucet_account_id,
     );
 
-    // Sleep for a while to ensure the note is committed on the node
-    sync_until_committed_note(&temp_dir);
+    // Wait until the faucet's mint transaction is committed on the node.
+    // We sync for a committed transaction (not note) because the target account is untracked,
+    // so the output note's tag won't be requested during sync and the note will never appear.
+    sync_until_committed_transaction(&temp_dir);
     Ok(())
 }
 
@@ -329,7 +331,12 @@ async fn token_symbol_mapping() -> Result<()> {
     ]);
 
     let output = mint_cmd.current_dir(&temp_dir).output().unwrap();
-    assert!(output.status.success());
+    assert!(
+        output.status.success(),
+        "token_symbol mint failed.\nstdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
 
     let note_id = String::from_utf8(output.stdout)
         .unwrap()
@@ -413,8 +420,9 @@ async fn import_genesis_accounts_can_be_used_for_transactions() -> Result<()> {
         &fungible_faucet_account_id,
     );
 
-    // Wait until the note is committed on the node
-    sync_until_committed_note(&temp_dir);
+    // Wait until the mint transaction is committed on the node.
+    // We sync for a committed transaction (not note) because the target account is untracked.
+    sync_until_committed_transaction(&temp_dir);
     Ok(())
 }
 
@@ -697,11 +705,8 @@ async fn debug_mode_outputs_logs() -> Result<()> {
     let note_script = client.code_builder().compile_note_script(note_script).unwrap();
     let inputs = NoteStorage::new(vec![]).unwrap();
     let serial_num = client.rng().draw_word();
-    let note_metadata = NoteMetadata::new(
-        account.id(),
-        NoteType::Private,
-        NoteTag::with_account_target(account.id()),
-    );
+    let note_metadata = NoteMetadata::new(account.id(), NoteType::Private)
+        .with_tag(NoteTag::with_account_target(account.id()));
     let note_assets = NoteAssets::new(vec![]).unwrap();
     let note_recipient = NoteRecipient::new(serial_num, note_script, inputs);
     let note = Note::new(note_assets, note_metadata, note_recipient);
@@ -960,10 +965,15 @@ fn set_isolated_miden_home() -> PathBuf {
     path
 }
 
+struct SyncResult {
+    committed_notes: u64,
+    committed_transactions: u64,
+}
+
 // Syncs CLI on directory. It'll try syncing until the command executes successfully. If it never
 // executes successfully, eventually the test will time out (provided the nextest config has a
-// timeout set). It returns the number of updated notes after the sync.
-fn sync_cli(cli_path: &Path) -> u64 {
+// timeout set). It returns the number of committed notes and transactions after the sync.
+fn sync_cli(cli_path: &Path) -> SyncResult {
     loop {
         let mut sync_cmd = cargo_bin_cmd!("miden-client");
         sync_cmd.args(["sync"]);
@@ -971,19 +981,25 @@ fn sync_cli(cli_path: &Path) -> u64 {
         let output = sync_cmd.current_dir(cli_path).output().unwrap();
 
         if output.status.success() {
-            let updated_notes = String::from_utf8(output.stdout)
-                .unwrap()
+            let stdout = String::from_utf8(output.stdout).unwrap();
+
+            let committed_notes = stdout
                 .lines()
                 .find_map(|line| {
-                    if let Some(rest) = line.strip_prefix("Committed notes: ") {
-                        rest.trim().parse::<u64>().ok()
-                    } else {
-                        None
-                    }
+                    line.strip_prefix("Committed notes: ")
+                        .and_then(|rest| rest.trim().parse::<u64>().ok())
                 })
                 .unwrap();
 
-            return updated_notes;
+            let committed_transactions = stdout
+                .lines()
+                .find_map(|line| {
+                    line.strip_prefix("Committed transactions: ")
+                        .and_then(|rest| rest.trim().parse::<u64>().ok())
+                })
+                .unwrap();
+
+            return SyncResult { committed_notes, committed_transactions };
         }
         std::thread::sleep(std::time::Duration::from_secs(3));
     }
@@ -993,6 +1009,7 @@ fn sync_cli(cli_path: &Path) -> u64 {
 /// successfully given account using the CLI given by `cli_path`.
 fn mint_cli(cli_path: &Path, target_account_id: &str, faucet_id: &str) -> String {
     let mut mint_cmd = cargo_bin_cmd!("miden-client");
+    mint_cmd.env("MIDEN_DEBUG", "true");
     mint_cmd.args([
         "mint",
         "--target",
@@ -1005,7 +1022,12 @@ fn mint_cli(cli_path: &Path, target_account_id: &str, faucet_id: &str) -> String
     ]);
 
     let output = mint_cmd.current_dir(cli_path).output().unwrap();
-    assert!(output.status.success());
+    assert!(
+        output.status.success(),
+        "mint_cli failed.\nstdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
 
     String::from_utf8(output.stdout)
         .unwrap()
@@ -1050,7 +1072,14 @@ fn send_cli(cli_path: &Path, from_account_id: &str, to_account_id: &str, faucet_
 
 /// Syncs until a tracked note gets committed.
 fn sync_until_committed_note(cli_path: &Path) {
-    while sync_cli(cli_path) == 0 {
+    while sync_cli(cli_path).committed_notes == 0 {
+        std::thread::sleep(std::time::Duration::from_secs(1));
+    }
+}
+
+/// Syncs until a tracked transaction gets committed.
+fn sync_until_committed_transaction(cli_path: &Path) {
+    while sync_cli(cli_path).committed_transactions == 0 {
         std::thread::sleep(std::time::Duration::from_secs(1));
     }
 }

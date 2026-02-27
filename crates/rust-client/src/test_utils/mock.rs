@@ -32,12 +32,9 @@ use crate::rpc::domain::account_vault::{AccountVaultInfo, AccountVaultUpdate};
 use crate::rpc::domain::note::{CommittedNote, FetchedNote, NoteSyncInfo};
 use crate::rpc::domain::nullifier::NullifierUpdate;
 use crate::rpc::domain::storage_map::{StorageMapInfo, StorageMapUpdate};
-use crate::rpc::domain::sync::StateSyncInfo;
+use crate::rpc::domain::sync::ChainMmrInfo;
 use crate::rpc::domain::transaction::{TransactionRecord, TransactionsInfo};
-use crate::rpc::generated::account::AccountSummary;
 use crate::rpc::generated::note::NoteSyncRecord;
-use crate::rpc::generated::rpc::{BlockRange, SyncStateResponse};
-use crate::rpc::generated::transaction::TransactionSummary;
 use crate::rpc::{AccountStateAt, NodeRpcClient, RpcError, RpcStatusInfo};
 
 pub type MockClient<AUTH> = Client<AUTH>;
@@ -109,89 +106,26 @@ impl MockRpcApi {
         self.mock_chain.read().block_header(block_num.as_usize())
     }
 
-    /// Generates a sync state response based on the request block number.
-    fn get_sync_state_request(
+    /// Finds the next block containing a matching note after `block_from`, or the chain tip.
+    fn find_next_block_with_notes(
         &self,
-        request_block_range: BlockRange,
+        block_from: u32,
         note_tags: &BTreeSet<NoteTag>,
-        account_ids: &[AccountId],
-    ) -> Result<SyncStateResponse, RpcError> {
-        // Determine the next block number to sync
-        let next_block_num = self
-            .mock_chain
+    ) -> BlockNumber {
+        self.mock_chain
             .read()
             .committed_notes()
             .values()
             .filter_map(|note| {
                 let block_num = note.inclusion_proof().location().block_num();
-                if note_tags.contains(&note.metadata().tag())
-                    && block_num.as_u32() > request_block_range.block_from
-                {
+                if note_tags.contains(&note.metadata().tag()) && block_num.as_u32() > block_from {
                     Some(block_num)
                 } else {
                     None
                 }
             })
             .min()
-            .unwrap_or_else(|| self.get_chain_tip_block_num());
-
-        // Retrieve the next block
-        let next_block = self.get_block_by_num(next_block_num);
-
-        // Prepare the MMR delta
-        let from_block_num =
-            if request_block_range.block_from == self.get_chain_tip_block_num().as_u32() {
-                next_block_num.as_usize()
-            } else {
-                request_block_range.block_from as usize + 1
-            };
-
-        let mmr_delta = self
-            .get_mmr()
-            .get_delta(Forest::new(from_block_num), Forest::new(next_block_num.as_usize()))
-            .unwrap();
-
-        // Collect notes that are in the next block
-        let notes = self.get_notes_in_block(next_block_num, note_tags, account_ids);
-
-        let transactions = self
-            .mock_chain
-            .read()
-            .proven_blocks()
-            .iter()
-            .filter(|block| {
-                block.header().block_num().as_u32() > request_block_range.block_from
-                    && block.header().block_num() <= next_block_num
-            })
-            .flat_map(|block| {
-                block.body().transactions().as_slice().iter().map(|tx| TransactionSummary {
-                    transaction_id: Some(tx.id().into()),
-                    block_num: next_block_num.as_u32(),
-                    account_id: Some(tx.account_id().into()),
-                })
-            })
-            .collect();
-
-        let mut accounts = vec![];
-
-        for (block_num, updates) in self.account_commitment_updates.read().iter() {
-            if block_num.as_u32() > request_block_range.block_from && *block_num <= next_block_num {
-                accounts.extend(updates.iter().map(|(account_id, commitment)| AccountSummary {
-                    account_id: Some((*account_id).into()),
-                    account_commitment: Some(commitment.into()),
-                    block_num: block_num.as_u32(),
-                }));
-            }
-        }
-
-        Ok(SyncStateResponse {
-            chain_tip: self.get_chain_tip_block_num().as_u32(),
-            block_header: Some(next_block.into()),
-            mmr_delta: Some(mmr_delta.try_into()?),
-            accounts,
-            transactions,
-            notes,
-        })
+            .unwrap_or_else(|| self.get_chain_tip_block_num())
     }
 
     /// Retrieves account vault updates in a given block range.
@@ -421,51 +355,54 @@ impl NodeRpcClient for MockRpcApi {
     async fn sync_notes(
         &self,
         block_num: BlockNumber,
-        block_to: Option<BlockNumber>,
+        _block_to: Option<BlockNumber>,
         note_tags: &BTreeSet<NoteTag>,
     ) -> Result<NoteSyncInfo, RpcError> {
-        let block_range = BlockRange {
-            block_from: block_num.as_u32(),
-            block_to: block_to.map(|b| b.as_u32()),
-        };
+        let next_block_num = self.find_next_block_with_notes(block_num.as_u32(), note_tags);
+        let next_block = self.get_block_by_num(next_block_num);
 
-        let response = self.get_sync_state_request(block_range, note_tags, &[])?;
+        let note_records = self.get_notes_in_block(next_block_num, note_tags, &[]);
 
-        let response = NoteSyncInfo {
-            chain_tip: response.chain_tip.into(),
-            block_header: response.block_header.unwrap().try_into().unwrap(),
+        let notes = note_records
+            .into_iter()
+            .map(|note| {
+                let note_id: NoteId = note.note_id.unwrap().try_into().unwrap();
+                let note_index = u16::try_from(note.note_index_in_block).unwrap();
+                let merkle_path = note.inclusion_path.unwrap().try_into().unwrap();
+                let metadata = note.metadata.unwrap().try_into().unwrap();
+
+                CommittedNote::new(note_id, note_index, merkle_path, metadata)
+            })
+            .collect();
+
+        Ok(NoteSyncInfo {
+            chain_tip: self.get_chain_tip_block_num(),
+            block_header: next_block,
             mmr_path: self.get_mmr().open(block_num.as_usize()).unwrap().merkle_path,
-            notes: response
-                .notes
-                .into_iter()
-                .map(|note| {
-                    let note_id: NoteId = note.note_id.unwrap().try_into().unwrap();
-                    let note_index = u16::try_from(note.note_index_in_block).unwrap();
-                    let merkle_path = note.inclusion_path.unwrap().try_into().unwrap();
-                    let metadata = note.metadata.unwrap().try_into().unwrap();
-
-                    CommittedNote::new(note_id, note_index, merkle_path, metadata)
-                })
-                .collect(),
-        };
-
-        Ok(response)
+            notes,
+        })
     }
 
-    /// Executes the specified sync state request and returns the response.
-    async fn sync_state(
+    async fn sync_chain_mmr(
         &self,
-        block_num: BlockNumber,
-        account_ids: &[AccountId],
-        note_tags: &BTreeSet<NoteTag>,
-    ) -> Result<StateSyncInfo, RpcError> {
-        let block_range = BlockRange {
-            block_from: block_num.as_u32(),
-            block_to: None,
-        };
-        let response = self.get_sync_state_request(block_range, note_tags, account_ids)?;
+        block_from: BlockNumber,
+        block_to: Option<BlockNumber>,
+    ) -> Result<ChainMmrInfo, RpcError> {
+        let chain_tip = self.get_chain_tip_block_num();
+        let target_block = block_to.unwrap_or(chain_tip).min(chain_tip);
 
-        Ok(response.try_into().unwrap())
+        let from_forest = if block_from == chain_tip {
+            target_block.as_usize()
+        } else {
+            block_from.as_u32() as usize + 1
+        };
+
+        let mmr_delta = self
+            .get_mmr()
+            .get_delta(Forest::new(from_forest), Forest::new(target_block.as_usize()))
+            .unwrap();
+
+        Ok(ChainMmrInfo { mmr_delta })
     }
 
     /// Retrieves the block header for the specified block number. If the block number is not
