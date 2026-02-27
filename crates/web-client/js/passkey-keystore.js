@@ -434,7 +434,7 @@ function hexToBytes(hex) {
   }
   const bytes = new Uint8Array(hex.length / 2);
   for (let i = 0; i < bytes.length; i++) {
-    const byte = parseInt(hex.substr(i * 2, 2), 16);
+    const byte = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
     if (Number.isNaN(byte)) {
       throw new Error(`Invalid hex character at position ${i * 2}`);
     }
@@ -475,6 +475,10 @@ function hexToBytes(hex) {
  * @returns {Promise<{ getKey: Function, insertKey: Function, credentialId: string }>}
  */
 export async function createPasskeyKeystore(storeName, options = {}) {
+  if (!storeName || typeof storeName !== "string") {
+    throw new Error("storeName is required and must be a non-empty string");
+  }
+
   // Check browser support
   const supported = await isPasskeyPrfSupported();
   if (!supported) {
@@ -558,7 +562,13 @@ export async function createPasskeyKeystore(storeName, options = {}) {
             ciphertextHex: bytesToHex(encrypted),
           });
 
-          // Remove plaintext from old DB after successful migration
+          // Verify round-trip before deleting plaintext — if decryption
+          // fails the plaintext entry is preserved so the key is not lost.
+          const verifyRecord = await keystoreDb.keys.get(pubKeyHex);
+          const verifyCt = hexToBytes(verifyRecord.ciphertextHex);
+          await decryptSecretKey(wrappingKey, verifyCt, pubKey);
+
+          // Remove plaintext from old DB after successful verification
           try {
             await mainDb
               .table("accountAuths")
@@ -595,6 +605,8 @@ export async function createPasskeyKeystore(storeName, options = {}) {
     const pubKeyHex = bytesToHex(pubKey);
     const encrypted = await encryptSecretKey(wrappingKey, secretKey, pubKey);
 
+    // Upsert: put() overwrites existing entries. This is intentional —
+    // the WASM side may re-insert during migration or key rotation.
     await keystoreDb.keys.put({
       pubKeyHex,
       ciphertextHex: bytesToHex(encrypted),

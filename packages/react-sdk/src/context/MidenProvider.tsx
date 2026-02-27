@@ -161,7 +161,7 @@ export function MidenProvider({
         setConfig(resolvedConfig);
 
         try {
-          let webClient: WebClient;
+          let webClient: WebClient | undefined;
           let didSignerInit = false;
 
           if (signerContext && signerContext.isConnected) {
@@ -190,33 +190,41 @@ export function MidenProvider({
             setSignerAccountId(accountId);
             didSignerInit = true;
           } else if (resolvedConfig.passkeyEncryption) {
-            // Passkey encryption mode — local keystore with encrypted keys
-            const { createPasskeyKeystore } = await import(
-              "@miden-sdk/miden-sdk"
-            );
-            const passkeyOpts =
-              typeof resolvedConfig.passkeyEncryption === "object"
-                ? resolvedConfig.passkeyEncryption
-                : {};
-            const storeName = resolvedConfig.storeName || "default";
-            const keystore = await createPasskeyKeystore(
-              storeName,
-              passkeyOpts
-            );
-            if (cancelled) return;
+            // Passkey encryption mode — local keystore with encrypted keys.
+            // Fall back to standard (unencrypted) mode if the browser doesn't
+            // support WebAuthn PRF (e.g. Firefox, older browsers).
+            const { createPasskeyKeystore, isPasskeyPrfSupported } =
+              await import("@miden-sdk/miden-sdk");
+            const supported = await isPasskeyPrfSupported();
 
-            webClient = await WebClient.createClientWithExternalKeystore(
-              resolvedConfig.rpcUrl,
-              resolvedConfig.noteTransportUrl,
-              resolvedConfig.seed,
-              storeName,
-              keystore.getKey,
-              keystore.insertKey,
-              undefined // sign — Rust signs locally using getKey
-            );
-            if (cancelled) return;
-          } else {
-            // No signer provider - standard local keystore (existing behavior)
+            if (supported) {
+              const passkeyOpts =
+                typeof resolvedConfig.passkeyEncryption === "object"
+                  ? resolvedConfig.passkeyEncryption
+                  : {};
+              const storeName = resolvedConfig.storeName || "default";
+              const keystore = await createPasskeyKeystore(
+                storeName,
+                passkeyOpts
+              );
+              if (cancelled) return;
+
+              webClient = await WebClient.createClientWithExternalKeystore(
+                resolvedConfig.rpcUrl,
+                resolvedConfig.noteTransportUrl,
+                resolvedConfig.seed,
+                storeName,
+                keystore.getKey,
+                keystore.insertKey,
+                undefined // sign — Rust signs locally using getKey
+              );
+              if (cancelled) return;
+            }
+            // else: fall through to standard createClient below
+          }
+
+          if (!webClient) {
+            // Standard local keystore (no signer, no passkey or unsupported)
             const seed = resolvedConfig.seed as Parameters<
               typeof WebClient.createClient
             >[2];
