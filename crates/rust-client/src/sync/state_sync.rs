@@ -15,10 +15,11 @@ use super::state_sync_update::TransactionUpdateTracker;
 use super::{AccountUpdates, StateSyncUpdate};
 use crate::ClientError;
 use crate::note::NoteUpdateTracker;
-use crate::rpc::NodeRpcClient;
+
 use crate::rpc::domain::note::CommittedNote;
 use crate::rpc::domain::sync::StateSyncInfo;
 use crate::rpc::domain::transaction::TransactionInclusion;
+use crate::rpc::NodeRpcClient;
 use crate::store::{InputNoteRecord, OutputNoteRecord, StoreError};
 use crate::transaction::TransactionRecord;
 
@@ -38,7 +39,7 @@ use crate::transaction::TransactionRecord;
 /// Use [`Client::build_sync_input()`](`crate::Client::build_sync_input()`) to build a default input
 /// from the client state, or construct this struct manually for custom sync scenarios.
 pub struct StateSyncInput {
-    /// Account headers to request commitment updates for.
+    /// Account headers to request commitment updates for (including watched accounts).
     pub accounts: Vec<AccountHeader>,
     /// Note tags that the node uses to filter which note inclusions to return.
     pub note_tags: BTreeSet<NoteTag>,
@@ -165,6 +166,7 @@ impl StateSync {
     /// 6. Transactions are updated with their new states. Transactions might be committed or
     ///    discarded.
     /// 7. The MMR is updated with the new peaks and authentication nodes.
+    #[allow(clippy::too_many_lines)]
     pub async fn sync_state(
         &self,
         current_partial_mmr: &mut PartialMmr,
@@ -191,6 +193,7 @@ impl StateSync {
         };
 
         let note_tags = Arc::new(note_tags);
+
         let account_ids: Vec<AccountId> = accounts.iter().map(AccountHeader::id).collect();
         let mut state_sync_steps = Vec::new();
 
@@ -327,8 +330,9 @@ impl StateSync {
         accounts: &[AccountHeader],
         account_commitment_updates: &[(AccountId, Word)],
     ) -> Result<(), ClientError> {
-        let (public_accounts, private_accounts): (Vec<_>, Vec<_>) =
-            accounts.iter().partition(|account_header| !account_header.id().is_private());
+        let (public_accounts, private_accounts): (Vec<_>, Vec<_>) = accounts
+            .iter()
+            .partition(|account_header| !account_header.id().is_private());
 
         let updated_public_accounts = self
             .get_updated_public_accounts(account_commitment_updates, &public_accounts)

@@ -567,6 +567,18 @@ pub trait Store: Send + Sync {
         &self,
         account_id: AccountId,
     ) -> Result<Option<AccountRecord>, StoreError>;
+
+    // WATCHED ACCOUNTS
+    // --------------------------------------------------------------------------------------------
+
+    /// Inserts a watched account into the store.
+    ///
+    /// Watched accounts store full state (code, storage, vault) in the same tables as owned
+    /// accounts, with the `watched` flag set to `true`.
+    async fn insert_watched_account(&self, account: &Account) -> Result<(), StoreError>;
+
+    /// Removes a watched account and all its associated data from the store.
+    async fn remove_watched_account(&self, account_id: AccountId) -> Result<(), StoreError>;
 }
 
 // PARTIAL BLOCKCHAIN NODE FILTER

@@ -39,6 +39,7 @@ use miden_client::store::{
     Store,
     StoreError,
     TransactionFilter,
+
 };
 use miden_client::sync::{NoteTagRecord, StateSyncUpdate};
 use miden_client::transaction::{TransactionRecord, TransactionStoreUpdate};
@@ -359,6 +360,17 @@ impl Store for WebStore {
 
     async fn list_setting_keys(&self) -> Result<Vec<String>, StoreError> {
         self.list_setting_keys().await
+    }
+
+    // WATCHED ACCOUNTS
+    // --------------------------------------------------------------------------------------------
+
+    async fn insert_watched_account(&self, _account: &Account) -> Result<(), StoreError> {
+        todo!("WebStore::insert_watched_account")
+    }
+
+    async fn remove_watched_account(&self, _account_id: AccountId) -> Result<(), StoreError> {
+        todo!("WebStore::remove_watched_account")
     }
 }
 

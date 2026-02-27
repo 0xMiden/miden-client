@@ -296,6 +296,87 @@ impl<AUTH> Client<AUTH> {
         Ok(())
     }
 
+    // WATCHED ACCOUNTS
+    // --------------------------------------------------------------------------------------------
+
+    /// Watches a public account, fetching its current state from the network.
+    ///
+    /// Watched accounts store full state (code, storage, vault) in the same tables as owned
+    /// accounts, differentiated by the `Watched` status. They are synced during `sync_state()`
+    /// through the same path as owned public accounts.
+    ///
+    /// # Errors
+    ///
+    /// - If the account is private.
+    /// - If the account is already tracked by the client.
+    /// - If the account is not found on the network.
+    pub async fn watch_account(&mut self, account_id: AccountId) -> Result<(), ClientError> {
+        if account_id.is_private() {
+            return Err(ClientError::AccountIsPrivate(account_id));
+        }
+
+        // Verify the account is not already tracked
+        if self.store.get_account_header(account_id).await?.is_some() {
+            return Err(ClientError::AccountAlreadyTracked(account_id));
+        }
+
+        // Fetch the full account state from the network
+        let fetched_account =
+            self.rpc_api.get_account_details(account_id).await.map_err(|err| {
+                match err.endpoint_error() {
+                    Some(EndpointError::GetAccount(GetAccountError::AccountNotFound)) => {
+                        ClientError::AccountNotFoundOnChain(account_id)
+                    },
+                    _ => ClientError::RpcError(err),
+                }
+            })?;
+
+        let account = match fetched_account {
+            FetchedAccount::Private(..) => {
+                return Err(ClientError::AccountIsPrivate(account_id));
+            },
+            FetchedAccount::Public(account, ..) => *account,
+        };
+
+        self.store.insert_watched_account(&account).await?;
+
+        // Also cache the code for lazy FPI
+        let _ = self
+            .store
+            .upsert_foreign_account_code(account_id, account.code().clone())
+            .await;
+
+        Ok(())
+    }
+
+    /// Stops watching a previously watched account.
+    ///
+    /// # Errors
+    ///
+    /// - If the account is not found or is not a watched account.
+    pub async fn unwatch_account(&mut self, account_id: AccountId) -> Result<(), ClientError> {
+        // Validate the account is actually watched
+        match self.store.get_account_header(account_id).await? {
+            Some((_, AccountStatus::Watched)) => {},
+            Some(_) => return Err(ClientError::AccountAlreadyTracked(account_id)),
+            None => return Err(ClientError::AccountDataNotFound(account_id)),
+        }
+
+        self.store.remove_watched_account(account_id).await?;
+        Ok(())
+    }
+
+    /// Returns account headers for all watched accounts.
+    pub async fn get_watched_accounts(
+        &self,
+    ) -> Result<Vec<(AccountHeader, AccountStatus)>, ClientError> {
+        let all_headers = self.store.get_account_headers().await?;
+        Ok(all_headers
+            .into_iter()
+            .filter(|(_, status)| status.is_watched())
+            .collect())
+    }
+
     // ACCOUNT DATA RETRIEVAL
     // --------------------------------------------------------------------------------------------
 

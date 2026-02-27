@@ -496,6 +496,25 @@ impl Store for SqliteStore {
         })
         .await
     }
+
+    async fn insert_watched_account(&self, account: &Account) -> Result<(), StoreError> {
+        let cloned_account = account.clone();
+        let smt_forest = self.smt_forest.clone();
+
+        self.interact_with_connection(move |conn| {
+            SqliteStore::insert_watched_account(conn, &smt_forest, &cloned_account)
+        })
+        .await
+    }
+
+    async fn remove_watched_account(&self, account_id: AccountId) -> Result<(), StoreError> {
+        let smt_forest = self.smt_forest.clone();
+
+        self.interact_with_connection(move |conn| {
+            SqliteStore::remove_watched_account(conn, &smt_forest, account_id)
+        })
+        .await
+    }
 }
 
 // UTILS

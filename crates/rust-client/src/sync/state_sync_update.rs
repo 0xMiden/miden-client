@@ -287,7 +287,7 @@ impl TransactionUpdateTracker {
 /// Contains account changes to apply to the store after a sync request.
 #[derive(Debug, Clone, Default)]
 pub struct AccountUpdates {
-    /// Updated public accounts.
+    /// Updated public accounts (including watched accounts).
     updated_public_accounts: Vec<Account>,
     /// Account commitments received from the network that don't match the currently
     /// locally-tracked state of the private accounts.

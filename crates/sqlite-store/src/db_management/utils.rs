@@ -59,7 +59,9 @@ macro_rules! insert_sql {
 
 type Hash = Blake3Digest<20>;
 
-const MIGRATION_SCRIPTS: [&str; 1] = [include_str!("../store.sql")];
+const MIGRATION_SCRIPTS: [&str; 1] = [
+    include_str!("../store.sql"),
+];
 static MIGRATION_HASHES: LazyLock<Vec<Hash>> = LazyLock::new(compute_migration_hashes);
 static MIGRATIONS: LazyLock<Migrations> = LazyLock::new(prepare_migrations);
 

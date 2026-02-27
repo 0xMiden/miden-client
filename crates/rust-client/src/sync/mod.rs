@@ -157,8 +157,8 @@ where
 
     /// Builds a default [`StateSyncInput`] from the current client state.
     ///
-    /// This includes all tracked account headers, all unique note tags, all unspent input and
-    /// output notes, and all uncommitted transactions.
+    /// This includes all tracked account headers (including watched accounts), all unique note
+    /// tags, all unspent input and output notes, and all uncommitted transactions.
     pub async fn build_sync_input(&self) -> Result<StateSyncInput, ClientError> {
         let accounts = self
             .store
