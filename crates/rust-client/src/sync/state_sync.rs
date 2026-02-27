@@ -18,7 +18,7 @@ use crate::note::NoteUpdateTracker;
 use crate::rpc::NodeRpcClient;
 use crate::rpc::domain::note::CommittedNote;
 use crate::rpc::domain::sync::StateSyncInfo;
-use crate::rpc::domain::transaction::TransactionInclusion;
+use crate::rpc::domain::transaction::{self as rpc_tx, TransactionInclusion};
 use crate::store::{InputNoteRecord, OutputNoteRecord, StoreError};
 use crate::transaction::TransactionRecord;
 
@@ -258,12 +258,14 @@ impl StateSync {
         Ok(state_sync_update)
     }
 
-    /// Executes a single sync request and returns the node response if the chain advanced.
+    /// Executes a single sync step by composing calls to `sync_notes`, `sync_chain_mmr`, and
+    /// `sync_transactions`.
     ///
-    /// This method issues a `/SyncState` call starting from `current_block_num`. If the node
-    /// reports the same block number, `None` is returned, signalling that the client is already at
-    /// the requested height. Otherwise the full [`StateSyncInfo`] is returned for deferred
-    /// processing by the caller.
+    /// `sync_notes` drives the loop: it determines the target block (the first block containing
+    /// a matching note, or the chain tip). If the target block equals `current_block_num`, `None`
+    /// is returned, signalling that the client is already at the requested height.
+    ///
+    /// The other two calls use the same target block to ensure a consistent range.
     async fn sync_state_step(
         &self,
         current_block_num: BlockNumber,
@@ -271,17 +273,59 @@ impl StateSync {
         note_tags: &Arc<BTreeSet<NoteTag>>,
     ) -> Result<Option<StateSyncInfo>, ClientError> {
         info!("Performing sync state step.");
-        let response = self
-            .rpc_api
-            .sync_state(current_block_num, account_ids, note_tags.as_ref())
-            .await?;
 
-        // We don't need to continue if the chain has not advanced, there are no new changes
-        if response.block_header.block_num() == current_block_num {
+        // Retrieve sync_notes
+        let note_sync =
+            self.rpc_api.sync_notes(current_block_num, None, note_tags.as_ref()).await?;
+
+        let target_block = note_sync.block_header.block_num();
+
+        // We don't need to continue if the chain has not advanced
+        if target_block == current_block_num {
             return Ok(None);
         }
 
-        Ok(Some(response))
+        // Get MMR delta for the same range
+        let mmr_delta = self
+            .rpc_api
+            .sync_chain_mmr(current_block_num, Some(target_block))
+            .await?
+            .mmr_delta;
+
+        // Gather transactions for tracked accounts (skip if none)
+        let (account_commitment_updates, transactions) = if account_ids.is_empty() {
+            (vec![], vec![])
+        } else {
+            let tx_info = self
+                .rpc_api
+                .sync_transactions(current_block_num, Some(target_block), account_ids.to_vec())
+                .await?;
+
+            let account_updates = derive_account_commitment_updates(&tx_info.transaction_records);
+
+            let tx_inclusions = tx_info
+                .transaction_records
+                .iter()
+                .map(|r| TransactionInclusion {
+                    transaction_id: r.transaction_header.id(),
+                    block_num: r.block_num,
+                    account_id: r.transaction_header.account_id(),
+                    initial_state_commitment: r.transaction_header.initial_state_commitment(),
+                })
+                .collect();
+
+            (account_updates, tx_inclusions)
+        };
+
+        // Compose StateSyncInfo with sync results
+        Ok(Some(StateSyncInfo {
+            chain_tip: note_sync.chain_tip,
+            block_header: note_sync.block_header,
+            mmr_delta,
+            account_commitment_updates,
+            note_inclusions: note_sync.notes,
+            transactions,
+        }))
     }
 
     // HELPERS
@@ -494,6 +538,36 @@ impl StateSync {
 
 // HELPERS
 // ================================================================================================
+
+/// Derives account commitment updates from transaction records.
+///
+/// For each unique account, takes the `final_state_commitment` from the transaction with the
+/// highest `block_num`. This replicates the old `SyncState` behavior where the node returned
+/// the latest account commitment per account in the synced range.
+fn derive_account_commitment_updates(
+    transaction_records: &[rpc_tx::TransactionRecord],
+) -> Vec<(AccountId, Word)> {
+    let mut latest_by_account: BTreeMap<AccountId, &rpc_tx::TransactionRecord> = BTreeMap::new();
+
+    for record in transaction_records {
+        let account_id = record.transaction_header.account_id();
+        latest_by_account
+            .entry(account_id)
+            .and_modify(|existing| {
+                if record.block_num > existing.block_num {
+                    *existing = record;
+                }
+            })
+            .or_insert(record);
+    }
+
+    latest_by_account
+        .into_iter()
+        .map(|(account_id, record)| {
+            (account_id, record.transaction_header.final_state_commitment())
+        })
+        .collect()
+}
 
 /// Applies changes to the current MMR structure, returns the updated [`MmrPeaks`] and the
 /// authentication nodes for leaves we track.

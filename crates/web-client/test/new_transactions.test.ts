@@ -1006,11 +1006,11 @@ export const discardedTransaction = async (
       );
     }
 
-    // Perform a `.commitment()` check on each account
-    const commitmentBeforeTx = accountStateBeforeTx.commitment().toHex();
-    const commitmentAfterTx = accountStateAfterTx.commitment().toHex();
+    // Perform a `.to_commitment()` check on each account
+    const commitmentBeforeTx = accountStateBeforeTx.to_commitment().toHex();
+    const commitmentAfterTx = accountStateAfterTx.to_commitment().toHex();
     const commitmentAfterDiscardedTx = accountStateAfterDiscardedTx
-      .commitment()
+      .to_commitment()
       .toHex();
 
     return {

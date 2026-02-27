@@ -1,6 +1,7 @@
 use miden_client::Word as NativeWord;
 use miden_client::account::component::{
     AccountComponent as NativeAccountComponent,
+    AccountComponentMetadata,
     AuthFalcon512RpoMultisigConfig as NativeAuthFalcon512RpoMultisigConfig,
     falcon_512_rpo_multisig_library,
 };
@@ -196,10 +197,13 @@ pub fn create_auth_falcon512_rpo_multisig(
     .map_err(|e| js_error_with_context(e, "Failed to build proc thresholds map"))?;
     storage_slots.push(NativeStorageSlot::with_map(proc_map_name, proc_map));
 
-    let native_component =
-        NativeAccountComponent::new(falcon_512_rpo_multisig_library(), storage_slots)
-            .map_err(|e| js_error_with_context(e, "Failed to create multisig account component"))?
-            .with_supports_all_types();
+    let native_component = NativeAccountComponent::new(
+        falcon_512_rpo_multisig_library(),
+        storage_slots,
+        AccountComponentMetadata::new("miden::auth::falcon_512_rpo_multisig")
+            .with_supports_all_types(),
+    )
+    .map_err(|e| js_error_with_context(e, "Failed to create multisig account component"))?;
 
     Ok(native_component.into())
 }

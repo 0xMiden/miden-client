@@ -24,8 +24,8 @@ export const getAccountOneMatch = async (
     const result = await client.getAccount(newAccount.id());
 
     return {
-      commitmentOfCreatedAccount: newAccount.commitment().toHex(),
-      commitmentOfGetAccountResult: result!.commitment().toHex(),
+      commitmentOfCreatedAccount: newAccount.to_commitment().toHex(),
+      commitmentOfGetAccountResult: result!.to_commitment().toHex(),
       isAccountType: result instanceof window.Account,
     };
   });
@@ -46,7 +46,7 @@ export const getAccountNoMatch = async (
 
     return {
       commitmentOfGetAccountResult: result
-        ? result.commitment().toHex()
+        ? result.to_commitment().toHex()
         : undefined,
     };
   });
@@ -96,8 +96,8 @@ export const getAccountsManyMatches = async (
       0
     );
     const commitmentsOfCreatedAccounts = [
-      newAccount1.commitment().toHex(),
-      newAccount2.commitment().toHex(),
+      newAccount1.to_commitment().toHex(),
+      newAccount2.to_commitment().toHex(),
     ];
 
     const result = await client.getAccounts();
@@ -106,7 +106,7 @@ export const getAccountsManyMatches = async (
     const resultTypes = [];
 
     for (let i = 0; i < result.length; i++) {
-      commitmentsOfGetAccountsResult.push(result[i].commitment().toHex());
+      commitmentsOfGetAccountsResult.push(result[i].to_commitment().toHex());
       resultTypes.push(result[i] instanceof window.AccountHeader);
     }
 
@@ -130,7 +130,7 @@ export const getAccountsNoMatches = async (
     const resultTypes = [];
 
     for (let i = 0; i < result.length; i++) {
-      commitmentsOfGetAccountsResult.push(result[i].commitment().toHex());
+      commitmentsOfGetAccountsResult.push(result[i].to_commitment().toHex());
       resultTypes.push(result[i] instanceof window.AccountHeader);
     }
 
