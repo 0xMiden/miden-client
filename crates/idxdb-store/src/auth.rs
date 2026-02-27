@@ -32,13 +32,6 @@ extern "C" {
         pub_key_commitment_hex: String,
     ) -> js_sys::Promise;
 
-    #[wasm_bindgen(js_name = removeAccountKeyMapping)]
-    pub fn idxdb_remove_account_key_mapping(
-        db_id: &str,
-        account_id_hex: String,
-        pub_key_commitment_hex: String,
-    ) -> js_sys::Promise;
-
     #[wasm_bindgen(js_name = getKeyCommitmentsByAccountId)]
     pub fn idxdb_get_key_commitments_by_account_id(
         db_id: &str,

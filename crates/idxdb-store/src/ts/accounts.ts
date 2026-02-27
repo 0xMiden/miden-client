@@ -1000,27 +1000,6 @@ export async function insertAccountKeyMapping(
   }
 }
 
-export async function removeAccountKeyMapping(
-  dbId: string,
-  accountIdHex: string,
-  pubKeyCommitmentHex: string
-): Promise<boolean> {
-  try {
-    const db = getDatabase(dbId);
-    const deletedCount = await db.accountKeyMappings
-      .where("[accountIdHex+pubKeyCommitmentHex]")
-      .equals([accountIdHex, pubKeyCommitmentHex])
-      .delete();
-    return deletedCount > 0;
-  } catch (error) {
-    logWebStoreError(
-      error,
-      `Error removing account key mapping for account ${accountIdHex} and key ${pubKeyCommitmentHex}`
-    );
-    return false;
-  }
-}
-
 export async function getKeyCommitmentsByAccountId(
   dbId: string,
   accountIdHex: string

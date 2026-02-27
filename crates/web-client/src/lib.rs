@@ -248,7 +248,7 @@ impl WebClient {
             .map_err(|err| js_error_with_context(err, "Failed to ensure genesis in place"))?;
 
         self.inner = Some(client);
-        self.store = Some(web_store.clone());
+        self.store = Some(web_store as Arc<dyn Store>);
         self.keystore = Some(keystore);
 
         Ok(())
