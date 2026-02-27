@@ -796,7 +796,7 @@ export async function undoAccountStates(dbId, accountCommitments) {
     }
     catch (error) {
         logWebStoreError(error, `Error undoing account states: ${accountCommitments.join(",")}`);
-        return []; // unreachable — logWebStoreError re-throws
+        return [];
     }
 }
 export async function removeAccountAuth(dbId, pubKeyCommitmentHex) {

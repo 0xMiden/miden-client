@@ -11,7 +11,7 @@ export const mapOption = <T, U>(
 // Anything can be thrown as an error in raw JS (also the TS compiler can't type-check exceptions),
 // so we allow it here.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const logWebStoreError = (error: any, errorContext?: string) => {
+export const logWebStoreError = (error: any, errorContext?: string): never => {
   if (error instanceof Dexie.DexieError) {
     if (errorContext) {
       console.error(
