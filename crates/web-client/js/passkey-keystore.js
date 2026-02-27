@@ -474,8 +474,7 @@ export async function createPasskeyKeystore(storeName, options = {}) {
   }
 
   // Resolve credential ID: provided > localStorage > register new
-  let credentialId =
-    options.credentialId || getStoredCredentialId(storeName);
+  let credentialId = options.credentialId || getStoredCredentialId(storeName);
   let prfOutput;
 
   if (credentialId) {
@@ -550,7 +549,11 @@ export async function createPasskeyKeystore(storeName, options = {}) {
           // fails or bytes don't match, the plaintext entry is preserved.
           const verifyRecord = await keystoreDb.keys.get(pubKeyHex);
           const verifyCt = hexToBytes(verifyRecord.ciphertextHex);
-          const decrypted = await decryptSecretKey(wrappingKey, verifyCt, pubKey);
+          const decrypted = await decryptSecretKey(
+            wrappingKey,
+            verifyCt,
+            pubKey
+          );
           if (
             decrypted.length !== plaintext.length ||
             !decrypted.every((b, i) => b === plaintext[i])

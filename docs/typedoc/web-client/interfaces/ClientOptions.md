@@ -30,9 +30,13 @@ External keystore callbacks.
 
 > **insertKey**: [`InsertKeyCallback`](../type-aliases/InsertKeyCallback.md)
 
-#### sign
+#### sign?
 
-> **sign**: [`SignCallback`](../type-aliases/SignCallback.md)
+> `optional` **sign**: [`SignCallback`](../type-aliases/SignCallback.md)
+
+Optional signing callback. When omitted, the Rust/WASM side calls `getKey`
+to retrieve the secret key and signs locally. Only provide this if you need
+signing to happen outside of WASM (e.g., in a remote HSM).
 
 ***
 
@@ -41,6 +45,21 @@ External keystore callbacks.
 > `optional` **noteTransportUrl**: `string`
 
 Note transport URL (optional).
+
+***
+
+### passkeyEncryption?
+
+> `optional` **passkeyEncryption**: `boolean` \| [`PasskeyEncryptionOptions`](PasskeyEncryptionOptions.md)
+
+Opt-in passkey encryption for keys at rest. Pass `true` for defaults
+or a `PasskeyEncryptionOptions` object to reuse an existing credential.
+
+When `true`, checks localStorage for an existing credential and reuses it
+if found; otherwise registers a new passkey (triggering a biometric prompt).
+
+Requires Chrome 116+, Safari 18+, or Edge 116+. Firefox does NOT support PRF.
+Mutually exclusive with `keystore` — if both are provided, `keystore` takes precedence.
 
 ***
 

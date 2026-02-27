@@ -1,4 +1,9 @@
-import { test as base, expect, BrowserContext, CDPSession } from "@playwright/test";
+import {
+  test as base,
+  expect,
+  BrowserContext,
+  CDPSession,
+} from "@playwright/test";
 import { RUN_ID, getRpcUrl } from "./playwright.global.setup";
 
 /**
@@ -92,9 +97,7 @@ test.describe("passkey keystore", () => {
     const storeName = generateStoreName("register");
 
     const result = await page.evaluate(async (storeName) => {
-      const { createPasskeyKeystore } = await import(
-        "./passkey-keystore.js"
-      );
+      const { createPasskeyKeystore } = await import("./passkey-keystore.js");
       const keystore = await createPasskeyKeystore(storeName);
       return {
         hasGetKey: typeof keystore.getKey === "function",
@@ -120,9 +123,7 @@ test.describe("passkey keystore", () => {
 
     const { credentialId1, credentialId2 } = await page.evaluate(
       async (storeName) => {
-        const { createPasskeyKeystore } = await import(
-          "./passkey-keystore.js"
-        );
+        const { createPasskeyKeystore } = await import("./passkey-keystore.js");
 
         // First call — registers a new passkey
         const ks1 = await createPasskeyKeystore(storeName);
@@ -149,9 +150,7 @@ test.describe("passkey keystore", () => {
     const storeName = generateStoreName("roundtrip");
 
     const result = await page.evaluate(async (storeName) => {
-      const { createPasskeyKeystore } = await import(
-        "./passkey-keystore.js"
-      );
+      const { createPasskeyKeystore } = await import("./passkey-keystore.js");
       const keystore = await createPasskeyKeystore(storeName);
 
       // Create fake pub key commitment (32 bytes) and secret key
@@ -184,9 +183,7 @@ test.describe("passkey keystore", () => {
     const storeName = generateStoreName("unknown");
 
     const result = await page.evaluate(async (storeName) => {
-      const { createPasskeyKeystore } = await import(
-        "./passkey-keystore.js"
-      );
+      const { createPasskeyKeystore } = await import("./passkey-keystore.js");
       const keystore = await createPasskeyKeystore(storeName);
 
       const unknownPubKey = new Uint8Array(32);
@@ -206,9 +203,7 @@ test.describe("passkey keystore", () => {
     const storeName = generateStoreName("magic");
 
     const magicBytes = await page.evaluate(async (storeName) => {
-      const { createPasskeyKeystore } = await import(
-        "./passkey-keystore.js"
-      );
+      const { createPasskeyKeystore } = await import("./passkey-keystore.js");
       const keystore = await createPasskeyKeystore(storeName);
 
       const pubKey = new Uint8Array(32);
@@ -245,9 +240,7 @@ test.describe("passkey keystore", () => {
     const storeName = generateStoreName("unique-ct");
 
     const result = await page.evaluate(async (storeName) => {
-      const { createPasskeyKeystore } = await import(
-        "./passkey-keystore.js"
-      );
+      const { createPasskeyKeystore } = await import("./passkey-keystore.js");
       const keystore = await createPasskeyKeystore(storeName);
 
       const secretKey = new Uint8Array(64);
@@ -296,9 +289,7 @@ test.describe("passkey keystore", () => {
     const storeName = generateStoreName("aad");
 
     const decryptFailed = await page.evaluate(async (storeName) => {
-      const { createPasskeyKeystore } = await import(
-        "./passkey-keystore.js"
-      );
+      const { createPasskeyKeystore } = await import("./passkey-keystore.js");
       const keystore = await createPasskeyKeystore(storeName);
 
       const pubKey1 = new Uint8Array(32);
@@ -381,9 +372,7 @@ test.describe("passkey keystore", () => {
     const storeName = generateStoreName("explicit-cred");
 
     const result = await page.evaluate(async (storeName) => {
-      const { createPasskeyKeystore } = await import(
-        "./passkey-keystore.js"
-      );
+      const { createPasskeyKeystore } = await import("./passkey-keystore.js");
 
       // Register
       const ks1 = await createPasskeyKeystore(storeName);

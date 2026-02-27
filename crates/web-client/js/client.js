@@ -60,9 +60,8 @@ export class MidenClient {
       );
     }
     if (options?.passkeyEncryption && !options?.keystore) {
-      const { createPasskeyKeystore, isPasskeyPrfSupported } = await import(
-        "./passkey-keystore.js"
-      );
+      const { createPasskeyKeystore, isPasskeyPrfSupported } =
+        await import("./passkey-keystore.js");
       if (await isPasskeyPrfSupported()) {
         const passkeyOpts =
           typeof options.passkeyEncryption === "object"
