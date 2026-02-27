@@ -154,9 +154,11 @@ impl AccountSmtForest {
     /// Removes the specified SMT roots from the forest, releasing memory used by nodes
     /// that are no longer reachable from any remaining root.
     ///
-    /// Filters out the empty tree root because `SmtForest::pop_smts` has a ref-count
-    /// underflow bug on empty hash nodes (each node has `left == right`, causing
-    /// double-decrement when the parent's rc reaches zero).
+    /// Filters out the empty tree root because it should never be popped: the empty
+    /// hash nodes are pre-populated infrastructure in the `SmtStore`, and popping the
+    /// empty root would walk and destroy them, corrupting the store for all future
+    /// operations.
+    // TODO(#1834): remove this filter once the miden-crypto fix lands.
     pub fn pop_roots(&mut self, roots: impl IntoIterator<Item = Word>) {
         let empty_tree_root = *EmptySubtreeRoots::entry(SMT_DEPTH, 0);
         self.forest.pop_smts(roots.into_iter().filter(|r| *r != empty_tree_root));
