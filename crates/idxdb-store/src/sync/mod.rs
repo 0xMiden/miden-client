@@ -19,8 +19,8 @@ use super::transaction::utils::serialize_transaction_record;
 use crate::promise::{await_js, await_js_value};
 
 mod js_bindings;
+pub use js_bindings::JsAccountUpdate;
 use js_bindings::{
-    JsAccountUpdate,
     JsStateSyncUpdate,
     idxdb_add_note_tag,
     idxdb_apply_state_sync,

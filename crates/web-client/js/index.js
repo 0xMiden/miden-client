@@ -5,7 +5,32 @@ import {
   releaseSyncLock,
   releaseSyncLockWithError,
 } from "./syncLock.js";
+import { MidenClient } from "./client.js";
+import {
+  createP2IDNote,
+  createP2IDENote,
+  buildSwapTag,
+  _setWasm as _setStandaloneWasm,
+  _setWebClient as _setStandaloneWebClient,
+} from "./standalone.js";
 export * from "../Cargo.toml";
+
+export const AccountType = Object.freeze({
+  MutableWallet: "MutableWallet",
+  ImmutableWallet: "ImmutableWallet",
+  FungibleFaucet: "FungibleFaucet",
+});
+
+export const AuthScheme = Object.freeze({
+  Falcon: "falcon",
+  ECDSA: "ecdsa",
+});
+
+export { MidenClient };
+export { createP2IDNote, createP2IDENote, buildSwapTag };
+
+// Internal exports — used by integration tests that need direct access to the low-level WebClient proxy.
+export { WebClient as WasmWebClient, MockWebClient as MockWasmWebClient };
 
 const buildTypedArraysExport = (exportObject) => {
   return Object.entries(exportObject).reduce(
@@ -59,6 +84,8 @@ const ensureWasm = async () => {
           copyWebClientStatics(module.WebClient);
           webClientStaticsCopied = true;
         }
+        // Set WASM module for standalone utilities
+        _setStandaloneWasm(module);
       }
       return module;
     });
@@ -66,7 +93,7 @@ const ensureWasm = async () => {
   return wasmLoadPromise;
 };
 
-const getWasmOrThrow = async () => {
+export const getWasmOrThrow = async () => {
   const module = await ensureWasm();
   if (!module) {
     throw new Error(
@@ -122,7 +149,7 @@ function createClientProxy(instance) {
   });
 }
 
-export class WebClient {
+class WebClient {
   /**
    * Create a WebClient wrapper.
    *
@@ -563,6 +590,33 @@ export class WebClient {
     }
   }
 
+  async applyTransaction(transactionResult, submissionHeight) {
+    try {
+      if (!this.worker) {
+        const wasmWebClient = await this.getWasmWebClient();
+        return await wasmWebClient.applyTransaction(
+          transactionResult,
+          submissionHeight
+        );
+      }
+
+      const wasm = await getWasmOrThrow();
+      const serializedTransactionResult = transactionResult.serialize();
+      const serializedUpdateBytes = await this.callMethodWithWorker(
+        MethodName.APPLY_TRANSACTION,
+        serializedTransactionResult,
+        submissionHeight
+      );
+
+      return wasm.TransactionStoreUpdate.deserialize(
+        new Uint8Array(serializedUpdateBytes)
+      );
+    } catch (error) {
+      console.error("INDEX.JS: Error in applyTransaction:", error);
+      throw error;
+    }
+  }
+
   /**
    * Syncs the client state with the node.
    *
@@ -645,7 +699,7 @@ export class WebClient {
   }
 }
 
-export class MockWebClient extends WebClient {
+class MockWebClient extends WebClient {
   constructor(seed) {
     super(null, null, seed, "mock");
   }
@@ -874,3 +928,9 @@ function copyWebClientStatics(WasmWebClient) {
     }
   });
 }
+
+// Wire MidenClient dependencies (resolves circular import)
+MidenClient._WasmWebClient = WebClient;
+MidenClient._MockWasmWebClient = MockWebClient;
+MidenClient._getWasmOrThrow = getWasmOrThrow;
+_setStandaloneWebClient(WebClient);

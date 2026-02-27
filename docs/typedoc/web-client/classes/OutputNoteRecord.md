@@ -22,13 +22,13 @@ Represents an output note tracked by the client store.
 
 ### assets()
 
-> **assets**(): [`NoteAssets`](NoteAssets.md)
+> **assets**(): `NoteAssets`
 
 Returns the note assets.
 
 #### Returns
 
-[`NoteAssets`](NoteAssets.md)
+`NoteAssets`
 
 ***
 
@@ -68,13 +68,13 @@ Returns the note ID.
 
 ### inclusionProof()
 
-> **inclusionProof**(): [`NoteInclusionProof`](NoteInclusionProof.md)
+> **inclusionProof**(): `NoteInclusionProof`
 
 Returns the inclusion proof when the note is committed.
 
 #### Returns
 
-[`NoteInclusionProof`](NoteInclusionProof.md)
+`NoteInclusionProof`
 
 ***
 
@@ -104,13 +104,13 @@ Returns true if the note has been consumed on chain.
 
 ### metadata()
 
-> **metadata**(): [`NoteMetadata`](NoteMetadata.md)
+> **metadata**(): `NoteMetadata`
 
 Returns the note metadata.
 
 #### Returns
 
-[`NoteMetadata`](NoteMetadata.md)
+`NoteMetadata`
 
 ***
 
@@ -128,13 +128,13 @@ Returns the nullifier when the recipient is known.
 
 ### recipient()
 
-> **recipient**(): [`NoteRecipient`](NoteRecipient.md)
+> **recipient**(): `NoteRecipient`
 
 Returns the recipient details if available.
 
 #### Returns
 
-[`NoteRecipient`](NoteRecipient.md)
+`NoteRecipient`
 
 ***
 
@@ -152,10 +152,10 @@ Returns the recipient digest committed for the note.
 
 ### state()
 
-> **state**(): [`OutputNoteState`](../enumerations/OutputNoteState.md)
+> **state**(): `OutputNoteState`
 
 Returns the current processing state for this note.
 
 #### Returns
 
-[`OutputNoteState`](../enumerations/OutputNoteState.md)
+`OutputNoteState`
