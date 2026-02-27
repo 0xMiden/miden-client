@@ -1,4 +1,4 @@
-import type { WebClient } from "@miden-sdk/miden-sdk";
+import type { WasmWebClient as WebClient } from "@miden-sdk/miden-sdk";
 import type {
   SignerAccountConfig,
   SignerAccountType,
@@ -8,25 +8,25 @@ import type {
 // ================================================================================================
 
 /**
- * Maps SignerAccountType string to SDK AccountType enum value.
+ * WASM AccountType enum values (from wasm-bindgen).
+ * We define these directly because the simplified API's AccountType const
+ * shadows the WASM enum with string aliases for some variants.
  */
-async function getAccountType(
-  accountType: SignerAccountType
-): Promise<import("@miden-sdk/miden-sdk").AccountType> {
-  const { AccountType } = await import("@miden-sdk/miden-sdk");
+const WASM_ACCOUNT_TYPE: Record<SignerAccountType, number> = {
+  FungibleFaucet: 0,
+  NonFungibleFaucet: 1,
+  RegularAccountImmutableCode: 2,
+  RegularAccountUpdatableCode: 3,
+};
 
-  switch (accountType) {
-    case "RegularAccountImmutableCode":
-      return AccountType.RegularAccountImmutableCode;
-    case "RegularAccountUpdatableCode":
-      return AccountType.RegularAccountUpdatableCode;
-    case "FungibleFaucet":
-      return AccountType.FungibleFaucet;
-    case "NonFungibleFaucet":
-      return AccountType.NonFungibleFaucet;
-    default:
-      return AccountType.RegularAccountImmutableCode;
-  }
+/**
+ * Maps SignerAccountType string to the WASM AccountType enum numeric value.
+ */
+function getAccountType(accountType: SignerAccountType): number {
+  return (
+    WASM_ACCOUNT_TYPE[accountType] ??
+    WASM_ACCOUNT_TYPE.RegularAccountImmutableCode
+  );
 }
 
 /**
@@ -67,7 +67,7 @@ export async function initializeSignerAccount(
 
   // Build account with auth component from public key commitment
   const seed = config.accountSeed ?? crypto.getRandomValues(new Uint8Array(32));
-  const accountType = await getAccountType(config.accountType);
+  const accountType = getAccountType(config.accountType);
 
   const builder = new AccountBuilder(seed);
   const buildResult = builder
@@ -77,7 +77,8 @@ export async function initializeSignerAccount(
         1 // ECDSA auth scheme (K256/Keccak)
       )
     )
-    .accountType(accountType)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .accountType(accountType as any)
     .storageMode(config.storageMode)
     .withBasicWalletComponent()
     .build();

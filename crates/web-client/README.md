@@ -132,69 +132,122 @@ yarn check:wasm-types
 
 The following are just a few simple examples to get started. For more details, see the [API Reference](../../docs/typedoc/web-client/README.md).
 
+### Quick Start
+
+```typescript
+import { MidenClient, AccountType } from "@miden-sdk/miden-sdk";
+
+// 1. Create client (defaults to testnet)
+const client = await MidenClient.create();
+
+// 2. Create a wallet and a token (faucet account)
+const wallet = await client.accounts.create();
+const dagToken = await client.accounts.create({
+  type: AccountType.FungibleFaucet, symbol: "DAG", decimals: 8, maxSupply: 10_000_000n
+});
+
+// 3. Mint tokens
+const mintTxId = await client.transactions.mint({ account: dagToken, to: wallet, amount: 1000n });
+await client.transactions.waitFor(mintTxId.toHex());
+
+// 4. Consume the minted note
+await client.transactions.consumeAll({ account: wallet });
+
+// 5. Send tokens to another address
+await client.transactions.send({
+  account: wallet,
+  to: "0xBOB",
+  token: dagToken,
+  amount: 100n
+});
+
+// 6. Check balance
+const balance = await client.accounts.getBalance(wallet, dagToken);
+console.log(`Balance: ${balance}`); // 900n
+
+// 7. Cleanup
+client.terminate();
+```
+
 ### Create a New Wallet
 
 ```typescript
-import { AccountStorageMode, WebClient } from "@miden-sdk/miden-sdk";
+import { MidenClient, AccountType, AuthScheme } from "@miden-sdk/miden-sdk";
 
-// Instantiate web client object
-const webClient = await WebClient.createClient();
+const client = await MidenClient.create();
 
-// Set up newWallet params
-const accountStorageMode = AccountStorageMode.private();
-const mutable = true;
+// Default wallet (private storage, mutable, Falcon auth)
+const wallet = await client.accounts.create();
 
-// Create new wallet
-const account = await webClient.newWallet(accountStorageMode, mutable);
+// Wallet with options
+const wallet2 = await client.accounts.create({
+  storage: "public",
+  type: AccountType.ImmutableWallet,
+  auth: AuthScheme.ECDSA,
+  seed: "deterministic"
+});
 
-console.log(account.id().toString()); // account id as hex
-console.log(account.isPublic()); // false
-console.log(account.isPrivate()); // true
-console.log(account.isNetwork()); // false
-console.log(account.isFaucet()); // false
+console.log(wallet.id().toString()); // account id as hex
+console.log(wallet.isPublic()); // false
+console.log(wallet.isPrivate()); // true
+console.log(wallet.isFaucet()); // false
 ```
 
-### Create and Execute a New Consume Transaction
-
-Using https://faucet.testnet.miden.io/, send some public test tokens using the account id logged during the new wallet creation. Consume these tokens like this:
+### Create a Faucet
 
 ```typescript
-// Once the faucet finishes minting the tokens, you need to call syncState() so the client knows there is a note available to be consumed. In an actual application, this may need to be in a loop to constantly discover claimable notes.
-await webClient.syncState();
+const faucet = await client.accounts.create({
+  type: AccountType.FungibleFaucet,
+  symbol: "DAG",
+  decimals: 8,
+  maxSupply: 10_000_000n
+});
 
-// Query the client for consumable notes, and retrieve the id of the new note to be consumed
-let consumableNotes = await webClient.getConsumableNotes(account);
-const noteToConsume = consumableNotes[0].inputNoteRecord().toNote();
+console.log(faucet.id().toString());
+console.log(faucet.isFaucet()); // true
+```
 
-// Create a consume transaction request object
-const consumeTransactionRequest = webClient.newConsumeTransactionRequest([
-  noteToConsume,
-]);
+### Send Tokens
 
-// Execute, prove, submit, and apply the transaction in one step
-const transactionId = await webClient.submitNewTransaction(
-  account,
-  consumeTransactionRequest
-);
+```typescript
+const txId = await client.transactions.send({
+  account: wallet,
+  to: "0xBOB",
+  token: dagToken,
+  amount: 100n
+});
+```
 
-// Need to sync state again (in a loop) until the node verifies the transaction
-await syncState();
+### Consume Notes
 
-// Check new account balance
-const updatedAccount = await webClient.getAccount(account);
-const accountBalance = updatedAccount
-  .vault()
-  .getBalance(/* id of remote faucet */)
-  .toString();
-console.log(accountBalance);
+```typescript
+// Sync state to discover new notes
+await client.sync();
+
+// Consume all available notes for an account
+const result = await client.transactions.consumeAll({ account: wallet });
+console.log(`Consumed ${result.consumed} notes, ${result.remaining} remaining`);
+```
+
+### Check Balance
+
+```typescript
+const balance = await client.accounts.getBalance(wallet, dagToken);
+console.log(`Balance: ${balance}`);
 ```
 
 ### Cleanup
 
-When you're finished using a WebClient instance, call `terminate()` to release its Web Worker:
+When you're finished using a MidenClient instance, call `terminate()` to release its Web Worker:
 
 ```typescript
 client.terminate();
+
+// Or use explicit resource management:
+{
+  using client = await MidenClient.create();
+  // ... use client ...
+} // client.terminate() called automatically
 ```
 
 ## License

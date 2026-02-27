@@ -19,7 +19,7 @@ use miden_client::{EMPTY_WORD, Word};
 use rusqlite::types::Value;
 use rusqlite::{Transaction, params};
 
-use miden_client::store::AccountSmtForest;
+use crate::smt_forest::AccountSmtForest;
 use crate::sql_error::SqlResultExt;
 use crate::{SqliteStore, insert_sql, subst, u64_to_value};
 

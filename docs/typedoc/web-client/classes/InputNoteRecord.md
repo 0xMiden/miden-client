@@ -56,13 +56,13 @@ Returns the transaction ID that consumed this note, if any.
 
 ### details()
 
-> **details**(): [`NoteDetails`](NoteDetails.md)
+> **details**(): `NoteDetails`
 
 Returns the note details, if present.
 
 #### Returns
 
-[`NoteDetails`](NoteDetails.md)
+`NoteDetails`
 
 ***
 
@@ -90,13 +90,13 @@ Returns the note ID.
 
 ### inclusionProof()
 
-> **inclusionProof**(): [`NoteInclusionProof`](NoteInclusionProof.md)
+> **inclusionProof**(): `NoteInclusionProof`
 
 Returns the inclusion proof when the note is authenticated.
 
 #### Returns
 
-[`NoteInclusionProof`](NoteInclusionProof.md)
+`NoteInclusionProof`
 
 ***
 
@@ -138,13 +138,13 @@ Returns true if the note is currently being processed.
 
 ### metadata()
 
-> **metadata**(): [`NoteMetadata`](NoteMetadata.md)
+> **metadata**(): `NoteMetadata`
 
 Returns the note metadata if available.
 
 #### Returns
 
-[`NoteMetadata`](NoteMetadata.md)
+`NoteMetadata`
 
 ***
 
@@ -162,25 +162,25 @@ Returns the nullifier for this note.
 
 ### state()
 
-> **state**(): [`InputNoteState`](../enumerations/InputNoteState.md)
+> **state**(): `InputNoteState`
 
 Returns the current processing state for this note.
 
 #### Returns
 
-[`InputNoteState`](../enumerations/InputNoteState.md)
+`InputNoteState`
 
 ***
 
 ### toInputNote()
 
-> **toInputNote**(): [`InputNote`](InputNote.md)
+> **toInputNote**(): `InputNote`
 
 Converts the record into an `InputNote` (including proof when available).
 
 #### Returns
 
-[`InputNote`](InputNote.md)
+`InputNote`
 
 ***
 

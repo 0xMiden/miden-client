@@ -529,14 +529,15 @@ where
         for note in output_notes {
             if output_note_relevances.contains_key(&note.id()) {
                 let metadata = note.metadata().clone();
+                let tag = metadata.tag();
 
                 new_input_notes.push(InputNoteRecord::new(
                     note.into(),
                     current_timestamp,
                     ExpectedNoteState {
-                        metadata: Some(metadata.clone()),
+                        metadata: Some(metadata),
                         after_block_num: submission_height,
-                        tag: Some(metadata.tag()),
+                        tag: Some(tag),
                     }
                     .into(),
                 ));
@@ -686,6 +687,7 @@ where
 
         for foreign_account in foreign_accounts {
             let account_id = foreign_account.account_id();
+            let storage_requirements = foreign_account.storage_slot_requirements();
             let known_account_code = self
                 .store
                 .get_foreign_account_code(vec![account_id])
@@ -696,7 +698,8 @@ where
             let (_, account_proof) = self
                 .rpc_api
                 .get_account_proof(
-                    foreign_account.clone(),
+                    account_id,
+                    storage_requirements,
                     AccountStateAt::Block(block_num),
                     known_account_code,
                 )
@@ -719,7 +722,7 @@ where
                 ForeignAccount::Private(partial_account) => {
                     let (witness, _) = account_proof.into_parts();
 
-                    AccountInputs::new(partial_account.clone(), witness)
+                    AccountInputs::new(partial_account, witness)
                 },
             };
 
