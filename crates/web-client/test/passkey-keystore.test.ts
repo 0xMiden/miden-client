@@ -214,14 +214,19 @@ test.describe("passkey keystore", () => {
       await keystore.insertKey(pubKey, secretKey);
 
       // Read raw data from IndexedDB to verify MWEB magic
-      const Dexie = (await import("dexie")).default;
-      const db = new Dexie(`MidenKeystore_${storeName}`);
-      db.version(1).stores({ keys: "pubKeyHex" });
-
       const pubKeyHex = Array.from(pubKey)
         .map((b: number) => b.toString(16).padStart(2, "0"))
         .join("");
-      const record = await db.table("keys").get(pubKeyHex);
+      const record = await new Promise<any>((resolve, reject) => {
+        const req = indexedDB.open(`MidenKeystore_${storeName}`);
+        req.onsuccess = () => {
+          const tx = req.result.transaction("keys", "readonly");
+          const getReq = tx.objectStore("keys").get(pubKeyHex);
+          getReq.onsuccess = () => resolve(getReq.result);
+          getReq.onerror = () => reject(getReq.error);
+        };
+        req.onerror = () => reject(req.error);
+      });
       const ciphertextHex = record?.ciphertextHex as string;
 
       // First 4 bytes (8 hex chars) should be "MWEB" = 4d574542
@@ -255,10 +260,6 @@ test.describe("passkey keystore", () => {
       await keystore.insertKey(pubKey2, secretKey);
 
       // Read raw ciphertexts from IndexedDB
-      const Dexie = (await import("dexie")).default;
-      const db = new Dexie(`MidenKeystore_${storeName}`);
-      db.version(1).stores({ keys: "pubKeyHex" });
-
       const hex1 = Array.from(pubKey1)
         .map((b: number) => b.toString(16).padStart(2, "0"))
         .join("");
@@ -266,8 +267,20 @@ test.describe("passkey keystore", () => {
         .map((b: number) => b.toString(16).padStart(2, "0"))
         .join("");
 
-      const record1 = await db.table("keys").get(hex1);
-      const record2 = await db.table("keys").get(hex2);
+      const readRecord = (key: string) =>
+        new Promise<any>((resolve, reject) => {
+          const req = indexedDB.open(`MidenKeystore_${storeName}`);
+          req.onsuccess = () => {
+            const tx = req.result.transaction("keys", "readonly");
+            const getReq = tx.objectStore("keys").get(key);
+            getReq.onsuccess = () => resolve(getReq.result);
+            getReq.onerror = () => reject(getReq.error);
+          };
+          req.onerror = () => reject(req.error);
+        });
+
+      const record1 = await readRecord(hex1);
+      const record2 = await readRecord(hex2);
 
       return {
         ct1: record1?.ciphertextHex,
@@ -302,10 +315,6 @@ test.describe("passkey keystore", () => {
       await keystore.insertKey(pubKey1, secretKey);
 
       // Manually swap the ciphertext to pubKey2's entry in IndexedDB
-      const Dexie = (await import("dexie")).default;
-      const db = new Dexie(`MidenKeystore_${storeName}`);
-      db.version(1).stores({ keys: "pubKeyHex" });
-
       const hex1 = Array.from(pubKey1)
         .map((b: number) => b.toString(16).padStart(2, "0"))
         .join("");
@@ -313,11 +322,30 @@ test.describe("passkey keystore", () => {
         .map((b: number) => b.toString(16).padStart(2, "0"))
         .join("");
 
-      const record = await db.table("keys").get(hex1);
+      const dbName = `MidenKeystore_${storeName}`;
+      const record = await new Promise<any>((resolve, reject) => {
+        const req = indexedDB.open(dbName);
+        req.onsuccess = () => {
+          const tx = req.result.transaction("keys", "readonly");
+          const getReq = tx.objectStore("keys").get(hex1);
+          getReq.onsuccess = () => resolve(getReq.result);
+          getReq.onerror = () => reject(getReq.error);
+        };
+        req.onerror = () => reject(req.error);
+      });
       // Put the same ciphertext under pubKey2
-      await db.table("keys").put({
-        pubKeyHex: hex2,
-        ciphertextHex: record?.ciphertextHex,
+      await new Promise<void>((resolve, reject) => {
+        const req = indexedDB.open(dbName);
+        req.onsuccess = () => {
+          const tx = req.result.transaction("keys", "readwrite");
+          const putReq = tx.objectStore("keys").put({
+            pubKeyHex: hex2,
+            ciphertextHex: record?.ciphertextHex,
+          });
+          putReq.onsuccess = () => resolve();
+          putReq.onerror = () => reject(putReq.error);
+        };
+        req.onerror = () => reject(req.error);
       });
 
       // Attempting to decrypt with pubKey2 should fail (AAD mismatch)
