@@ -20,10 +20,11 @@ The SDK is organized as a layered stack. Each layer builds on the one below it, 
 graph TB
     subgraph rust-sdk-repo["rust-sdk repo"]
         rust-sdk["<b>rust-sdk</b><br/>Core client library<br/>accounts · notes · transactions"]
+        wasm-bridge["<b>wasm-bridge</b> (internal)<br/>Compiled via wasm-bindgen<br/>idxdb-store · web-tonic"]
+        rust-sdk -- "cargo build --target wasm32" --> wasm-bridge
     end
 
     subgraph ts-sdk-repo["ts-sdk repo"]
-        wasm-bridge["<b>wasm-bridge</b> (internal)<br/>Compiled via wasm-bindgen<br/>idxdb-store · web-tonic"]
         ts-sdk["<b>ts-sdk</b><br/>Idiomatic TS wrapper<br/>typed API · async helpers"]
     end
 
@@ -31,9 +32,8 @@ graph TB
         react-sdk["<b>react-sdk</b><br/>React integration layer<br/>hooks · context · zustand"]
     end
 
-    rust-sdk -- "cargo build --target wasm32" --> wasm-bridge
-    wasm-bridge -- "wraps" --> ts-sdk
-    wasm-bridge -- "imports" --> react-sdk
+    wasm-bridge -- "npm package" --> ts-sdk
+    wasm-bridge -- "npm package" --> react-sdk
 ```
 
 ### Layer Overview
@@ -51,9 +51,9 @@ The codebase will be split across three repositories, each owning one boundary o
 
 | Repository | Contains | Rationale |
 |------------|----------|-----------|
-| **[`rust-sdk`](https://github.com/0xMiden/rust-sdk)** | Rust core library + CLI + sqlite-store | The foundational Rust crate published to crates.io. Native applications and backends depend on this directly. |
-| **[`ts-sdk`](https://github.com/0xMiden/ts-sdk)** | WASM bridge + idxdb-store + TypeScript API surface + type definitions | Owns the full Rust-to-JavaScript pipeline: compiles `rust-sdk` to WASM via `wasm-bindgen`, provides IndexedDB storage for browsers, and wraps everything in an idiomatic TypeScript API. Published to npm. |
-| **[`react-sdk`](https://github.com/0xMiden/react-sdk)** | React hooks, providers, Zustand store, signer integrations | Framework-specific code that depends on `ts-sdk` as a peer dependency. Evolves independently with React ecosystem changes. |
+| **[`rust-sdk`](https://github.com/0xMiden/rust-sdk)** | Rust core library + WASM bridge + idxdb-store + sqlite-store + CLI | The foundational Rust crate and its WASM compilation boundary. Keeping the bridge in the same repo as the Rust core ensures API changes and their 90+ `wasm_bindgen` wrappers stay in sync. Publishes to crates.io and npm (internal WASM package). |
+| **[`ts-sdk`](https://github.com/0xMiden/ts-sdk)** | TypeScript API surface + type definitions | Pure TypeScript wrapper over the WASM bridge. Consumes the npm package produced by `rust-sdk` and provides an idiomatic async/await API. Published to npm. |
+| **[`react-sdk`](https://github.com/0xMiden/react-sdk)** | React hooks, providers, Zustand store, signer integrations | Framework-specific code that consumes the WASM bridge directly. Evolves independently with React ecosystem changes. |
 
 ## Motivation
 
@@ -81,7 +81,7 @@ The `Client` struct is generic over an authenticator type (`Client<AUTH>`) and u
 
 ### `wasm-bridge` — The Compilation Boundary
 
-The WASM bridge compiles the Rust core into WebAssembly and exposes it to JavaScript via `wasm-bindgen`. It lives in the [`ts-sdk`](https://github.com/0xMiden/ts-sdk) repository alongside the TypeScript surface and is **not published as a standalone package** — it exists as an internal build artifact that the TypeScript and React SDKs consume.
+The WASM bridge compiles the Rust core into WebAssembly and exposes it to JavaScript via `wasm-bindgen`. It lives in this repository (`rust-sdk`) alongside the Rust core it wraps, and is published as an **internal npm package** consumed by the TypeScript and React SDKs. Keeping the bridge co-located with the Rust code ensures that API changes and their 90+ `wasm_bindgen` wrappers can evolve in a single PR.
 
 This layer handles type marshalling (90+ `#[wasm_bindgen]` wrapper types), Web Worker offloading for CPU-intensive operations (ZK proof generation, account creation), IndexedDB storage via `idxdb-store`, and sync locking to prevent state corruption in the browser environment.
 
@@ -157,7 +157,7 @@ The `Store` trait abstracts all persistence operations. Implementations must app
 | Crate | Target | Repository | Description |
 |-------|--------|------------|-------------|
 | `sqlite-store` | Native | `rust-sdk` | SQLite-based persistence using `rusqlite` with connection pooling. Used by the CLI and Rust backends. |
-| `idxdb-store` | Browser | `ts-sdk` | IndexedDB-based persistence using Dexie.js. Supports multiple isolated databases per network. Lives alongside the WASM bridge it serves. |
+| `idxdb-store` | Browser | `rust-sdk` | IndexedDB-based persistence using Dexie.js. Supports multiple isolated databases per network. Lives alongside the WASM bridge it serves. |
 
 ### CLI
 
@@ -210,7 +210,7 @@ The Rust SDK is `#![no_std]` compatible. Platform-specific functionality is prov
 
 ## Repository Structure
 
-This repository (`rust-sdk`) contains the Rust core, CLI, and native storage:
+This repository (`rust-sdk`) contains the Rust core, WASM bridge, storage backends, and CLI:
 
 ```
 bin/
@@ -220,14 +220,16 @@ bin/
 
 crates/
 ├── rust-client/              # Core client library (miden-client)
+├── web-client/               # WASM bridge (wasm-bindgen wrappers)
 ├── sqlite-store/             # SQLite storage backend (native)
+├── idxdb-store/              # IndexedDB storage backend (browser)
 └── testing/                  # Test infrastructure
     ├── miden-client-tests/   # Shared test utilities
     ├── node-builder/         # Test node builder
     └── prover/               # Remote prover for testing
 ```
 
-See also: [`ts-sdk`](https://github.com/0xMiden/ts-sdk) (WASM bridge + TypeScript API) · [`react-sdk`](https://github.com/0xMiden/react-sdk) (React hooks and providers)
+See also: [`ts-sdk`](https://github.com/0xMiden/ts-sdk) (TypeScript API) · [`react-sdk`](https://github.com/0xMiden/react-sdk) (React hooks and providers)
 
 ## Getting Started
 
