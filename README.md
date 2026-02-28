@@ -19,21 +19,21 @@ The SDK is organized as a layered stack. Each layer builds on the one below it, 
 ```mermaid
 graph TB
     subgraph rust-sdk-repo["rust-sdk repo"]
-        rust-sdk["rust-sdk · Rust · native + WASM\nCore client library\naccounts · notes · transactions"]
-        wasm-bridge["wasm-bridge · Rust → WASM · internal\nwasm-bindgen · idxdb-store · web-tonic"]
+        rust-sdk["<b>rust-sdk</b><br/>Core client library<br/>accounts · notes · transactions"]
+        wasm-bridge["<b>wasm-bridge</b><br/>Compiled via wasm-bindgen<br/>idxdb-store · web-tonic"]
     end
 
     subgraph ts-sdk-repo["ts-sdk repo"]
-        ts-sdk["ts-sdk · TypeScript · web + Node.js\nIdiomatic TS wrapper\ntyped API · async helpers"]
+        ts-sdk["<b>ts-sdk</b><br/>Idiomatic TS wrapper<br/>typed API · async helpers"]
     end
 
     subgraph react-sdk-repo["react-sdk repo"]
-        react-sdk["react-sdk · TypeScript · React\nReact integration layer\nhooks · context · zustand"]
+        react-sdk["<b>react-sdk</b><br/>React integration layer<br/>hooks · context · zustand"]
     end
 
     rust-sdk -- "cargo build --target wasm32" --> wasm-bridge
     wasm-bridge -- "imports" --> ts-sdk
-    ts-sdk -- "peer dependency" --> react-sdk
+    wasm-bridge -- "imports" --> react-sdk
 ```
 
 ### Layer Overview
