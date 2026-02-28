@@ -93,28 +93,7 @@ The TypeScript SDK is the **primary way to interact with the Miden network from 
 
 Beyond Node.js backends, the TypeScript SDK also serves **non-React frontend environments** — Vue, Svelte, Angular, Solid, vanilla JavaScript, or any web framework that isn't React. If you're building a Miden-integrated application and don't want (or need) React, this is your entry point.
 
-The SDK wraps the WASM bridge in a resource-based API that feels native to TypeScript developers:
-
-```typescript
-import { MidenClient, AccountType } from "@miden-sdk/ts-sdk";
-
-// Node.js backend — e.g., a token distribution service
-const client = await MidenClient.create({ rpcUrl: "https://rpc.testnet.miden.io" });
-
-const faucet = await client.accounts.create({
-  type: AccountType.FungibleFaucet,
-  symbol: "TOKEN",
-  decimals: 8,
-  maxSupply: 1_000_000_000n,
-});
-
-// Mint and distribute tokens on a schedule
-for (const recipient of recipients) {
-  await client.transactions.mint({ account: faucet, to: recipient, amount: 1000n });
-}
-
-const balance = await client.accounts.getBalance(faucet, faucet);
-```
+See the [`ts-sdk` repository](https://github.com/0xMiden/ts-sdk) for the full API reference and usage examples.
 
 ### `react-sdk` — The React Integration Layer
 
