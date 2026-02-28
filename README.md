@@ -6,7 +6,7 @@
 [![RUST_VERSION](https://img.shields.io/badge/rustc-1.90+-lightgray.svg)](https://www.rust-lang.org/tools/install)
 [![crates.io](https://img.shields.io/crates/v/miden-client)](https://crates.io/crates/miden-client)
 
-The official client SDK for the [Miden](https://miden.io) protocol. This monorepo provides everything needed to interact with the Miden network — from the low-level Rust core to high-level React hooks — across native and browser environments.
+The Rust core of the [Miden](https://miden.io) client SDK. This repository contains the foundational Rust library that powers all Miden client interactions — account management, note handling, transaction building/proving, and state synchronization. It is part of a three-repo SDK architecture alongside [`ts-sdk`](https://github.com/0xMiden/ts-sdk) and [`react-sdk`](https://github.com/0xMiden/react-sdk).
 
 ### Status
 
@@ -20,10 +20,10 @@ The SDK is organized as a layered stack. Each layer builds on the one below it, 
 graph TB
     subgraph rust-sdk-repo["rust-sdk repo"]
         rust-sdk["<b>rust-sdk</b><br/>Core client library<br/>accounts · notes · transactions"]
-        wasm-bridge["<b>wasm-bridge</b><br/>Compiled via wasm-bindgen<br/>idxdb-store · web-tonic"]
     end
 
     subgraph ts-sdk-repo["ts-sdk repo"]
+        wasm-bridge["<b>wasm-bridge</b><br/>Compiled via wasm-bindgen<br/>idxdb-store · web-tonic"]
         ts-sdk["<b>ts-sdk</b><br/>Idiomatic TS wrapper<br/>typed API · async helpers"]
     end
 
@@ -32,7 +32,7 @@ graph TB
     end
 
     rust-sdk -- "cargo build --target wasm32" --> wasm-bridge
-    wasm-bridge -- "imports" --> ts-sdk
+    wasm-bridge -- "wraps" --> ts-sdk
     wasm-bridge -- "imports" --> react-sdk
 ```
 
@@ -51,9 +51,9 @@ The codebase will be split across three repositories, each owning one boundary o
 
 | Repository | Contains | Rationale |
 |------------|----------|-----------|
-| **`rust-sdk`** | Rust core library + WASM bridge + CLI + storage backends (sqlite-store, idxdb-store) | The WASM bridge is a Rust crate compiled with `wasm-bindgen` — it belongs with the Rust code it wraps. Storage backends implement Rust traits and are tightly coupled to the core. |
-| **`ts-sdk`** | TypeScript API surface + JS worker layer + type definitions | The idiomatic TS wrapper, factory methods, resource-based API, and `.d.ts` declarations. Depends on `rust-sdk` as a build-time WASM dependency. |
-| **`react-sdk`** | React hooks, providers, Zustand store, signer integrations | Framework-specific code that depends on `ts-sdk` as a peer dependency. Evolves independently with React ecosystem changes. |
+| **[`rust-sdk`](https://github.com/0xMiden/rust-sdk)** | Rust core library + CLI + sqlite-store | The foundational Rust crate published to crates.io. Native applications and backends depend on this directly. |
+| **[`ts-sdk`](https://github.com/0xMiden/ts-sdk)** | WASM bridge + idxdb-store + TypeScript API surface + type definitions | Owns the full Rust-to-JavaScript pipeline: compiles `rust-sdk` to WASM via `wasm-bindgen`, provides IndexedDB storage for browsers, and wraps everything in an idiomatic TypeScript API. Published to npm. |
+| **[`react-sdk`](https://github.com/0xMiden/react-sdk)** | React hooks, providers, Zustand store, signer integrations | Framework-specific code that depends on `ts-sdk` as a peer dependency. Evolves independently with React ecosystem changes. |
 
 ## Motivation
 
@@ -81,7 +81,7 @@ The `Client` struct is generic over an authenticator type (`Client<AUTH>`) and u
 
 ### `wasm-bridge` — The Compilation Boundary
 
-The WASM bridge compiles the Rust core into WebAssembly and exposes it to JavaScript via `wasm-bindgen`. It is **not published as a standalone package** — it exists purely as an internal build artifact that the TypeScript and React SDKs consume.
+The WASM bridge compiles the Rust core into WebAssembly and exposes it to JavaScript via `wasm-bindgen`. It lives in the [`ts-sdk`](https://github.com/0xMiden/ts-sdk) repository alongside the TypeScript surface and is **not published as a standalone package** — it exists as an internal build artifact that the TypeScript and React SDKs consume.
 
 This layer handles type marshalling (90+ `#[wasm_bindgen]` wrapper types), Web Worker offloading for CPU-intensive operations (ZK proof generation, account creation), IndexedDB storage via `idxdb-store`, and sync locking to prevent state corruption in the browser environment.
 
@@ -120,7 +120,7 @@ const balance = await client.accounts.getBalance(faucet, faucet);
 
 **Package:** [`@miden-sdk/react-sdk`](https://www.npmjs.com/package/@miden-sdk/react-sdk)
 
-The React SDK provides hooks, context providers, and Zustand-based state management for React applications, following conventions established by libraries like TanStack Query and wagmi. See the [React SDK README](./packages/react-sdk/README.md) for the full hooks reference, signer integration, and usage patterns.
+The React SDK provides hooks, context providers, and Zustand-based state management for React applications, following conventions established by libraries like TanStack Query and wagmi. See the [`react-sdk` repository](https://github.com/0xMiden/react-sdk) for the full hooks reference, signer integration, and usage patterns.
 
 ```tsx
 import { MidenProvider, useAccounts, useCreateWallet, useSend } from "@miden-sdk/react-sdk";
@@ -152,12 +152,12 @@ function Wallet() {
 
 ### Storage Backends
 
-| Crate | Target | Description |
-|-------|--------|-------------|
-| [`sqlite-store`](./crates/sqlite-store) | Native | SQLite-based persistence using `rusqlite` with connection pooling. Used by the CLI and Rust backends. |
-| [`idxdb-store`](./crates/idxdb-store) | Browser | IndexedDB-based persistence using Dexie.js. Supports multiple isolated databases per network. |
+The `Store` trait abstracts all persistence operations. Implementations must apply updates atomically — if any part of a state sync or transaction application fails, the entire operation rolls back.
 
-The `Store` trait abstracts all persistence operations. Both backends implement atomic updates — if any part of a state sync or transaction application fails, the entire operation rolls back.
+| Crate | Target | Repository | Description |
+|-------|--------|------------|-------------|
+| `sqlite-store` | Native | `rust-sdk` | SQLite-based persistence using `rusqlite` with connection pooling. Used by the CLI and Rust backends. |
+| `idxdb-store` | Browser | `ts-sdk` | IndexedDB-based persistence using Dexie.js. Supports multiple isolated databases per network. Lives alongside the WASM bridge it serves. |
 
 ### CLI
 
@@ -210,21 +210,24 @@ The Rust SDK is `#![no_std]` compatible. Platform-specific functionality is prov
 
 ## Repository Structure
 
+This repository (`rust-sdk`) contains the Rust core, CLI, and native storage:
+
 ```
 bin/
-├── miden-cli/                # CLI binary (rust-sdk wrapper)
+├── miden-cli/                # CLI binary
 ├── integration-tests/        # End-to-end integration tests
 └── miden-bench/              # Benchmarks
 
 crates/
-├── rust-client/              # rust-sdk — core client library (miden-client)
-├── idxdb-store/              # IndexedDB storage backend (browser)
+├── rust-client/              # Core client library (miden-client)
 ├── sqlite-store/             # SQLite storage backend (native)
 └── testing/                  # Test infrastructure
     ├── miden-client-tests/   # Shared test utilities
     ├── node-builder/         # Test node builder
     └── prover/               # Remote prover for testing
 ```
+
+See also: [`ts-sdk`](https://github.com/0xMiden/ts-sdk) (WASM bridge + TypeScript API) · [`react-sdk`](https://github.com/0xMiden/react-sdk) (React hooks and providers)
 
 ## Getting Started
 
@@ -251,7 +254,7 @@ const wallet = await client.accounts.create();
 await client.sync();
 ```
 
-The TypeScript SDK is the primary choice for Node.js backends — indexers, bots, relayers, distribution services — and non-React browser environments. See the [TypeScript SDK README](./crates/web-client/README.md) for full API documentation.
+The TypeScript SDK is the primary choice for Node.js backends — indexers, bots, relayers, distribution services — and non-React browser environments. See the [`ts-sdk` repository](https://github.com/0xMiden/ts-sdk) for full API documentation.
 
 ### For React developers
 
@@ -271,7 +274,7 @@ function App() {
 }
 ```
 
-See the [React SDK README](./packages/react-sdk/README.md) for hooks reference, signer integration, and usage patterns.
+See the [`react-sdk` repository](https://github.com/0xMiden/react-sdk) for hooks reference, signer integration, and usage patterns.
 
 ### CLI
 
