@@ -120,33 +120,9 @@ const balance = await client.accounts.getBalance(faucet, faucet);
 
 **Package:** [`@miden-sdk/react-sdk`](https://www.npmjs.com/package/@miden-sdk/react-sdk)
 
-The React SDK provides hooks, context providers, and Zustand-based state management for React applications, following conventions established by libraries like TanStack Query and wagmi. See the [`react-sdk` repository](https://github.com/0xMiden/react-sdk) for the full hooks reference, signer integration, and usage patterns.
+The React SDK provides hooks, context providers, and Zustand-based state management for React applications, following conventions established by libraries like TanStack Query and wagmi. Includes hooks for account management (`useAccounts`, `useCreateWallet`), transactions (`useSend`, `useMint`, `useSwap`), note handling (`useNotes`, `useConsume`), and external signer integration (Para, Turnkey, MidenFi).
 
-```tsx
-import { MidenProvider, useAccounts, useCreateWallet, useSend } from "@miden-sdk/react-sdk";
-
-function App() {
-  return (
-    <MidenProvider config={{ rpcUrl: "testnet" }}>
-      <Wallet />
-    </MidenProvider>
-  );
-}
-
-function Wallet() {
-  const { wallets } = useAccounts();
-  const { createWallet, isCreating } = useCreateWallet();
-  const { send, stage } = useSend(); // stage: idle → executing → proving → submitting → complete
-
-  return (
-    <div>
-      <p>{wallets.length} wallets</p>
-      <button onClick={() => createWallet()}>New Wallet</button>
-      <p>Transaction: {stage}</p>
-    </div>
-  );
-}
-```
+See the [`react-sdk` repository](https://github.com/0xMiden/react-sdk) for the full hooks reference, usage patterns, and signer integration guide.
 
 ## Supporting Components
 
