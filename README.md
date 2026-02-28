@@ -41,7 +41,7 @@ graph TB
 | Layer | Published as | Language | Purpose |
 |-------|-------------|----------|---------|
 | **rust-sdk** | [`miden-client`](https://crates.io/crates/miden-client) (crates.io) | Rust | Core client library — account management, note handling, transaction building/execution/proving, state sync, node communication |
-| **wasm-bridge** | *(internal, not published separately)* | Rust → WASM | Compiles the Rust core to WebAssembly via `wasm-bindgen`. Serves as the compilation boundary between Rust and JavaScript |
+| **wasm-bridge** | `@miden-sdk/wasm-bridge` (npm, internal) | Rust → WASM | Compiles the Rust core to WebAssembly via `wasm-bindgen`. Serves as the compilation boundary between Rust and JavaScript |
 | **ts-sdk** | [`@miden-sdk/ts-sdk`](https://www.npmjs.com/package/@miden-sdk/ts-sdk) (npm) | TypeScript | Idiomatic TypeScript wrapper over the WASM bridge. Primary entry point for **Node.js backends** and non-React frontends |
 | **react-sdk** | [`@miden-sdk/react-sdk`](https://www.npmjs.com/package/@miden-sdk/react-sdk) (npm) | TypeScript | React integration layer — hooks, context providers, Zustand state management, auto-sync, and external signer support |
 
