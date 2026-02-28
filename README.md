@@ -23,7 +23,7 @@ graph TB
     end
 
     subgraph ts-sdk-repo["ts-sdk repo"]
-        wasm-bridge["<b>wasm-bridge</b><br/>Compiled via wasm-bindgen<br/>idxdb-store · web-tonic"]
+        wasm-bridge["<b>wasm-bridge</b> (internal)<br/>Compiled via wasm-bindgen<br/>idxdb-store · web-tonic"]
         ts-sdk["<b>ts-sdk</b><br/>Idiomatic TS wrapper<br/>typed API · async helpers"]
     end
 
