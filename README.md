@@ -24,16 +24,16 @@ graph TB
         rust-sdk -- "cargo build --target wasm32" --> wasm-bridge
     end
 
-    subgraph ts-sdk-repo["ts-sdk repo"]
-        ts-sdk["<b>ts-sdk</b><br/>Idiomatic TS wrapper<br/>typed API · async helpers"]
-    end
-
     subgraph react-sdk-repo["react-sdk repo"]
         react-sdk["<b>react-sdk</b><br/>React integration layer<br/>hooks · context · zustand"]
     end
 
-    wasm-bridge -- "npm package" --> ts-sdk
+    subgraph ts-sdk-repo["ts-sdk repo"]
+        ts-sdk["<b>ts-sdk</b><br/>Idiomatic TS wrapper<br/>typed API · async helpers"]
+    end
+
     wasm-bridge -- "npm package" --> react-sdk
+    wasm-bridge -- "npm package" --> ts-sdk
 ```
 
 ### Layer Overview
