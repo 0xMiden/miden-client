@@ -161,16 +161,7 @@ The `Store` trait abstracts all persistence operations. Implementations must app
 
 ### CLI
 
-**Crate:** `miden-client-cli`
-
-A command-line interface for interacting with the Miden network directly from a terminal. Wraps the Rust SDK with SQLite storage. See the [CLI README](./bin/miden-cli/README.md) for the full command reference and configuration.
-
-```bash
-miden-client init --network testnet
-miden-client sync
-miden-client new-wallet
-miden-client send --sender <wallet-id> --target <recipient-id> --faucet <faucet-id> --amount 100
-```
+**Crate:** `miden-client-cli` — a command-line interface wrapping the Rust SDK with SQLite storage. See the [CLI README](./bin/miden-cli/README.md) for the full command reference and configuration.
 
 ### Testing Infrastructure
 
@@ -282,9 +273,6 @@ See the [`react-sdk` repository](https://github.com/0xMiden/react-sdk) for hooks
 
 ```bash
 cargo install miden-client-cli --locked
-miden-client init --network testnet
-miden-client sync
-miden-client new-wallet
 ```
 
 See the [CLI README](./bin/miden-cli/README.md) for the full command reference and configuration.
