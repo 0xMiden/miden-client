@@ -109,7 +109,33 @@ Run without `--fix` to check only. This syncs `packages/react-sdk/package.json` 
 
 ### Changelog
 
-If a PR introduces anything a downstream user might notice - a new feature, a behaviour change, a bug-fix, a deprecation, or a breaking API change - add a bullet to [CHANGELOG.md](./CHANGELOG.md) under the last existing heading (corresponds to the unreleased version when working on the `next` branch). The convention is to write a past-tense summary (e.g. "* [BREAKING] Renamed foo() to bar() in `Client` {#PR number link}"). Internal refactors or smaller tweaks that don’t affect public behaviour can be left out.
+### Changelog
+
+If a PR introduces anything a downstream user might notice - a new feature, a behaviour change, a bug-fix, a deprecation, or a breaking API change - add a bullet to [CHANGELOG.md](./CHANGELOG.md) under the last existing heading (corresponds to the unreleased version when working on the `next` branch). Internal refactors or smaller tweaks that don't affect public behaviour can be left out.
+
+We use a structured changelog format that enables automatic generation of migration guides. See [CHANGELOG_FORMAT.md](./CHANGELOG_FORMAT.md) for the full specification.
+
+**Quick Reference:**
+
+Breaking changes:
+```
+* [BREAKING][category][scope] Description. (#PR)
+```
+- **Categories:** `rename` | `removal` | `param` | `type` | `behavior` | `arch`
+- **Scopes:** `rust` | `web` | `cli` | `store` | `all`
+
+Features and fixes:
+```
+* [FEATURE][scope] Description. (#PR)
+* [FIX][scope] Description. (#PR)
+```
+
+**Examples:**
+```
+* [BREAKING][rename][all] `TonicRpcClient` → `GrpcClient`. (#1360)
+* [FEATURE][web] Added `TransactionSummary` API. (#1620)
+* [FIX][rust] Fixed balance calculation. (#1630)
+```
 
 ### Docs
 
