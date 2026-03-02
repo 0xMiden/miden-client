@@ -122,6 +122,12 @@ jobs:
       - uses: actions/checkout@v6
       - name: Install Rust
         run: rustup update --no-self-update
+      - name: Add Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: rust-release
+          prefix-key: ${{ env.RUST_CACHE_KEY }}
+          save-if: false
       - name: Restore node-builder binary
         id: cache-node-builder
         uses: actions/cache@v4
@@ -156,6 +162,12 @@ jobs:
       - uses: actions/checkout@v6
       - name: Install Rust
         run: rustup update --no-self-update
+      - name: Add Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: rust-release
+          prefix-key: ${{ env.RUST_CACHE_KEY }}
+          save-if: false
       - name: Restore remote-prover binary
         id: cache-remote-prover
         uses: actions/cache@v4
