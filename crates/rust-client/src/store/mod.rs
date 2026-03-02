@@ -136,6 +136,27 @@ pub trait Store: Send + Sync {
         filter: NoteFilter,
     ) -> Result<Vec<OutputNoteRecord>, StoreError>;
 
+    /// Retrieves a single output note at the given offset from the filtered set.
+    ///
+    /// When `sender` is `Some`, only notes whose metadata sender matches are counted toward
+    /// the offset. Returns `None` when the offset is past the end of the matching notes.
+    ///
+    /// The default implementation loads all matching notes via [`Store::get_output_notes`],
+    /// filters by sender in memory, and picks the element at `offset`. Store implementations
+    /// may override this with a more efficient query.
+    async fn get_output_note_by_offset(
+        &self,
+        filter: NoteFilter,
+        sender: Option<AccountId>,
+        offset: u32,
+    ) -> Result<Option<OutputNoteRecord>, StoreError> {
+        let mut notes = self.get_output_notes(filter).await?;
+        if let Some(sender) = sender {
+            notes.retain(|n| n.metadata().sender() == sender);
+        }
+        Ok(notes.into_iter().nth(offset as usize))
+    }
+
     /// Returns the nullifiers of all unspent input notes.
     ///
     /// The default implementation of this method uses [`Store::get_input_notes`].

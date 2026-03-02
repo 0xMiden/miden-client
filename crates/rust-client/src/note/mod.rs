@@ -66,6 +66,7 @@ use crate::store::{InputNoteRecord, NoteFilter, OutputNoteRecord};
 use crate::{Client, ClientError, IdPrefixFetchError};
 
 mod import;
+mod note_reader;
 mod note_screener;
 mod note_update_tracker;
 
@@ -106,6 +107,7 @@ pub use miden_standards::note::{
     SwapNote,
 };
 pub use miden_tx::{FailedNote, NoteConsumptionInfo};
+pub use note_reader::OutputNoteReader;
 pub use note_screener::{NoteConsumability, NoteScreener, NoteScreenerError};
 pub use note_update_tracker::{
     InputNoteUpdate,
@@ -213,6 +215,27 @@ where
         note_id: NoteId,
     ) -> Result<Option<OutputNoteRecord>, ClientError> {
         Ok(self.store.get_output_notes(NoteFilter::Unique(note_id)).await?.pop())
+    }
+
+    /// Returns a [`OutputNoteReader`] that lazily iterates over output notes matching the given
+    /// status filter.
+    ///
+    /// Use the builder methods on [`OutputNoteReader`] to further refine the query before
+    /// iterating.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// let mut reader = client
+    ///     .output_note_reader(NoteFilter::Committed)
+    ///     .for_sender(account_id);
+    ///
+    /// while let Some(note) = reader.next().await? {
+    ///     process(note);
+    /// }
+    /// ```
+    pub fn output_note_reader(&self, status: NoteFilter) -> OutputNoteReader {
+        OutputNoteReader::new(self.store.clone(), status)
     }
 }
 

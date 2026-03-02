@@ -5,6 +5,7 @@ use std::string::{String, ToString};
 use std::vec::Vec;
 
 use miden_client::Word;
+use miden_client::account::AccountId;
 use miden_client::note::{
     BlockNumber,
     NoteAssets,
@@ -35,6 +36,9 @@ use crate::sql_error::SqlResultExt;
 use crate::{insert_sql, subst};
 
 mod filters;
+
+#[cfg(test)]
+mod tests;
 
 // TYPES
 // ================================================================================================
@@ -124,6 +128,36 @@ impl SqliteStore {
             .collect::<Result<Vec<OutputNoteRecord>, _>>()?;
 
         Ok(notes)
+    }
+
+    /// Retrieves a single output note at the given offset from the filtered set.
+    ///
+    /// When `sender` is `Some`, notes are filtered by sender after deserialization since
+    /// metadata is stored as a blob and cannot be filtered in SQL.
+    pub(crate) fn get_output_note_by_offset(
+        conn: &mut Connection,
+        filter: &NoteFilter,
+        sender: Option<AccountId>,
+        offset: u32,
+    ) -> Result<Option<OutputNoteRecord>, StoreError> {
+        if let Some(sender) = sender {
+            // Sender is embedded in the serialized metadata blob, so we filter in memory.
+            let mut notes = Self::get_output_notes(conn, filter)?;
+            notes.retain(|n| n.metadata().sender() == sender);
+            return Ok(notes.into_iter().nth(offset as usize));
+        }
+
+        let (query, params) = filters::note_filter_to_query_output_note_by_offset(filter, offset);
+        let note = conn
+            .prepare(&query)
+            .into_store_error()?
+            .query_map(params_from_iter(params), parse_output_note_columns)
+            .expect("no binding parameters used in query")
+            .map(|result| Ok(result.into_store_error()?).and_then(parse_output_note))
+            .next()
+            .transpose()?;
+
+        Ok(note)
     }
 
     pub(crate) fn upsert_input_notes(

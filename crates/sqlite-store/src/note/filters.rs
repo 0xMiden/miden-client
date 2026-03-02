@@ -8,9 +8,7 @@ use rusqlite::types::Value;
 
 type NoteQueryParams = Vec<Rc<Vec<Value>>>;
 
-/// Returns the output notes query for a specific `NoteFilter`
-pub(super) fn note_filter_to_query_output_notes(filter: &NoteFilter) -> (String, NoteQueryParams) {
-    let base = "SELECT
+const OUTPUT_NOTES_BASE_QUERY: &str = "SELECT
                     note.recipient_digest,
                     note.assets,
                     note.metadata,
@@ -18,8 +16,23 @@ pub(super) fn note_filter_to_query_output_notes(filter: &NoteFilter) -> (String,
                     note.state
                     from output_notes AS note";
 
+/// Returns the output notes query for a specific `NoteFilter`
+pub(super) fn note_filter_to_query_output_notes(filter: &NoteFilter) -> (String, NoteQueryParams) {
     let (condition, params) = note_filter_output_notes_condition(filter);
-    let query = format!("{base} WHERE {condition}");
+    let query = format!("{OUTPUT_NOTES_BASE_QUERY} WHERE {condition}");
+
+    (query, params)
+}
+
+/// Returns a query that fetches a single output note at the given offset from the filtered set.
+pub(super) fn note_filter_to_query_output_note_by_offset(
+    filter: &NoteFilter,
+    offset: u32,
+) -> (String, NoteQueryParams) {
+    let (condition, params) = note_filter_output_notes_condition(filter);
+    let query = format!(
+        "{OUTPUT_NOTES_BASE_QUERY} WHERE {condition} ORDER BY note.note_id ASC LIMIT 1 OFFSET {offset}"
+    );
 
     (query, params)
 }
