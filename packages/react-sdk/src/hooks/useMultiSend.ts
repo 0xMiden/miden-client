@@ -67,7 +67,8 @@ export interface UseMultiSendResult {
  * ```
  */
 export function useMultiSend(): UseMultiSendResult {
-  const { client, isReady, sync, runExclusive, prover } = useMiden();
+  const { client, isReady, sync, runExclusive, prover, signerConnected } =
+    useMiden();
   const runExclusiveSafe = runExclusive ?? runExclusiveDirect;
   const isBusyRef = useRef(false);
 
@@ -80,6 +81,12 @@ export function useMultiSend(): UseMultiSendResult {
     async (options: MultiSendOptions): Promise<TransactionResult> => {
       if (!client || !isReady) {
         throw new Error("Miden client is not ready");
+      }
+
+      if (signerConnected === false) {
+        throw new Error(
+          "Signer is disconnected. Reconnect your wallet to perform transactions."
+        );
       }
 
       if (options.recipients.length === 0) {
@@ -205,7 +212,7 @@ export function useMultiSend(): UseMultiSendResult {
         isBusyRef.current = false;
       }
     },
-    [client, isReady, prover, runExclusive, sync]
+    [client, isReady, prover, runExclusive, signerConnected, sync]
   );
 
   const reset = useCallback(() => {
