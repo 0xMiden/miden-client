@@ -1026,7 +1026,7 @@ export async function undoAccountStates(
       error,
       `Error undoing account states: ${accountCommitments.join(",")}`
     );
-    return [];
+    throw error;
   }
 }
 
