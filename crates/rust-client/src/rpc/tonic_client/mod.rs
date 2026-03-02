@@ -812,7 +812,7 @@ impl NodeRpcClient for GrpcClient {
     }
 
     async fn get_note_script_by_root(&self, root: Word) -> Result<NoteScript, RpcError> {
-        let request = proto::note::NoteRoot { root: Some(root.into()) };
+        let request = proto::note::NoteScriptRoot { root: Some(root.into()) };
 
         let mut rpc_api = self.ensure_connected().await?;
 

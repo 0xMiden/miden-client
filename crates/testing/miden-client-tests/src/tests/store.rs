@@ -2,12 +2,7 @@ use alloc::boxed::Box;
 use alloc::vec::Vec;
 use std::collections::BTreeSet;
 
-use miden_client::auth::{
-    AuthEcdsaK256Keccak,
-    AuthFalcon512Rpo,
-    AuthSecretKey,
-    PublicKeyCommitment,
-};
+use miden_client::auth::{AuthSchemeId, AuthSecretKey, AuthSingleSig, PublicKeyCommitment};
 use miden_protocol::account::{Account, AccountFile};
 use miden_protocol::testing::account_id::{
     ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
@@ -19,15 +14,19 @@ use miden_standards::testing::mock_account::MockAccountExt;
 use crate::tests::create_test_client;
 
 fn create_account_data(account_id: u128) -> AccountFile {
-    let account =
-        Account::mock(account_id, AuthFalcon512Rpo::new(PublicKeyCommitment::from(EMPTY_WORD)));
+    let account = Account::mock(
+        account_id,
+        AuthSingleSig::new(PublicKeyCommitment::from(EMPTY_WORD), AuthSchemeId::Falcon512Rpo),
+    );
 
     AccountFile::new(account.clone(), vec![AuthSecretKey::new_falcon512_rpo()])
 }
 
 fn create_ecdsa_account_data(account_id: u128) -> AccountFile {
-    let account =
-        Account::mock(account_id, AuthEcdsaK256Keccak::new(PublicKeyCommitment::from(EMPTY_WORD)));
+    let account = Account::mock(
+        account_id,
+        AuthSingleSig::new(PublicKeyCommitment::from(EMPTY_WORD), AuthSchemeId::EcdsaK256Keccak),
+    );
 
     AccountFile::new(account.clone(), vec![AuthSecretKey::new_falcon512_rpo()])
 }
@@ -61,7 +60,7 @@ pub async fn try_add_account() {
 
     let account = Account::mock(
         ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
-        AuthFalcon512Rpo::new(PublicKeyCommitment::from(EMPTY_WORD)),
+        AuthSingleSig::new(PublicKeyCommitment::from(EMPTY_WORD), AuthSchemeId::Falcon512Rpo),
     );
 
     // The mock account has nonce 1, we need it to be 0 for the test.
@@ -83,7 +82,7 @@ pub async fn try_add_ecdsa_account() {
 
     let account = Account::mock(
         ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
-        AuthEcdsaK256Keccak::new(PublicKeyCommitment::from(EMPTY_WORD)),
+        AuthSingleSig::new(PublicKeyCommitment::from(EMPTY_WORD), AuthSchemeId::EcdsaK256Keccak),
     );
 
     // The mock account has nonce 1, we need it to be 0 for the test.

@@ -58,7 +58,7 @@ test.describe("import from seed", () => {
 
     const mutable = false;
     const storageMode = StorageMode.PUBLIC;
-    const authSchemeId = 0;
+    const authSchemeId = 2;
 
     const initialWallet = await createNewWallet(page, {
       storageMode,
@@ -116,7 +116,7 @@ test.describe("import public account by id", () => {
 
     const mutable = false;
     const storageMode = StorageMode.PUBLIC;
-    const authSchemeId = 0;
+    const authSchemeId = 2;
 
     const initialWallet = await createNewWallet(page, {
       storageMode,

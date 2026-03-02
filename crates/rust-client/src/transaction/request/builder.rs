@@ -22,7 +22,7 @@ use miden_protocol::note::{
 use miden_protocol::transaction::{OutputNote, TransactionScript};
 use miden_protocol::vm::AdviceMap;
 use miden_protocol::{Felt, Word};
-use miden_standards::note::{P2idNote, P2ideNote, SwapNote};
+use miden_standards::note::{P2idNote, P2ideNote, P2ideNoteStorage, SwapNote};
 
 use super::{
     ForeignAccount,
@@ -536,10 +536,12 @@ impl PaymentNoteDescription {
             // Create a P2IDE note
             P2ideNote::create(
                 self.sender_account_id,
-                self.target_account_id,
+                P2ideNoteStorage::new(
+                    self.target_account_id,
+                    self.reclaim_height,
+                    self.timelock_height,
+                ),
                 self.assets,
-                self.reclaim_height,
-                self.timelock_height,
                 note_type,
                 NoteAttachment::default(),
                 rng,

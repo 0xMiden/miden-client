@@ -26,7 +26,7 @@ use miden_client::asset::{
     NonFungibleAsset,
     NonFungibleAssetDetails,
 };
-use miden_client::auth::{AuthFalcon512Rpo, PublicKeyCommitment};
+use miden_client::auth::{AuthSchemeId, AuthSingleSig, PublicKeyCommitment};
 use miden_client::store::Store;
 use miden_client::testing::common::ACCOUNT_ID_REGULAR;
 use miden_client::{EMPTY_WORD, ONE, ZERO};
@@ -53,7 +53,8 @@ async fn account_code_insertion_no_duplicates() -> anyhow::Result<()> {
     )?;
     let account_code = AccountCode::from_components(
         &[
-            AuthFalcon512Rpo::new(PublicKeyCommitment::from(EMPTY_WORD)).into(),
+            AuthSingleSig::new(PublicKeyCommitment::from(EMPTY_WORD), AuthSchemeId::Falcon512Rpo)
+                .into(),
             account_component,
         ],
         AccountType::RegularAccountUpdatableCode,
@@ -111,7 +112,10 @@ async fn apply_account_delta_additions() -> anyhow::Result<()> {
     // Create and insert an account
     let account = AccountBuilder::new([0; 32])
         .account_type(AccountType::RegularAccountImmutableCode)
-        .with_auth_component(AuthFalcon512Rpo::new(PublicKeyCommitment::from(EMPTY_WORD)))
+        .with_auth_component(AuthSingleSig::new(
+            PublicKeyCommitment::from(EMPTY_WORD),
+            AuthSchemeId::Falcon512Rpo,
+        ))
         .with_component(dummy_component)
         .build()?;
 
@@ -210,7 +214,10 @@ async fn apply_account_delta_removals() -> anyhow::Result<()> {
     ];
     let account = AccountBuilder::new([0; 32])
         .account_type(AccountType::RegularAccountImmutableCode)
-        .with_auth_component(AuthFalcon512Rpo::new(PublicKeyCommitment::from(EMPTY_WORD)))
+        .with_auth_component(AuthSingleSig::new(
+            PublicKeyCommitment::from(EMPTY_WORD),
+            AuthSchemeId::Falcon512Rpo,
+        ))
         .with_component(dummy_component)
         .with_assets(assets.clone())
         .build_existing()?;
@@ -302,7 +309,10 @@ async fn get_account_storage_item_success() -> anyhow::Result<()> {
 
     let account = AccountBuilder::new([0; 32])
         .account_type(AccountType::RegularAccountImmutableCode)
-        .with_auth_component(AuthFalcon512Rpo::new(PublicKeyCommitment::from(EMPTY_WORD)))
+        .with_auth_component(AuthSingleSig::new(
+            PublicKeyCommitment::from(EMPTY_WORD),
+            AuthSchemeId::Falcon512Rpo,
+        ))
         .with_component(dummy_component)
         .build_existing()?;
 
@@ -332,7 +342,10 @@ async fn get_account_storage_item_not_found() -> anyhow::Result<()> {
 
     let account = AccountBuilder::new([0; 32])
         .account_type(AccountType::RegularAccountImmutableCode)
-        .with_auth_component(AuthFalcon512Rpo::new(PublicKeyCommitment::from(EMPTY_WORD)))
+        .with_auth_component(AuthSingleSig::new(
+            PublicKeyCommitment::from(EMPTY_WORD),
+            AuthSchemeId::Falcon512Rpo,
+        ))
         .with_component(dummy_component)
         .build_existing()?;
 
@@ -370,7 +383,10 @@ async fn get_account_map_item_success() -> anyhow::Result<()> {
 
     let account = AccountBuilder::new([0; 32])
         .account_type(AccountType::RegularAccountImmutableCode)
-        .with_auth_component(AuthFalcon512Rpo::new(PublicKeyCommitment::from(EMPTY_WORD)))
+        .with_auth_component(AuthSingleSig::new(
+            PublicKeyCommitment::from(EMPTY_WORD),
+            AuthSchemeId::Falcon512Rpo,
+        ))
         .with_component(dummy_component)
         .build_existing()?;
 
@@ -401,7 +417,10 @@ async fn get_account_map_item_value_slot_error() -> anyhow::Result<()> {
 
     let account = AccountBuilder::new([0; 32])
         .account_type(AccountType::RegularAccountImmutableCode)
-        .with_auth_component(AuthFalcon512Rpo::new(PublicKeyCommitment::from(EMPTY_WORD)))
+        .with_auth_component(AuthSingleSig::new(
+            PublicKeyCommitment::from(EMPTY_WORD),
+            AuthSchemeId::Falcon512Rpo,
+        ))
         .with_component(dummy_component)
         .build_existing()?;
 
@@ -429,7 +448,10 @@ async fn get_account_code() -> anyhow::Result<()> {
 
     let account = AccountBuilder::new([0; 32])
         .account_type(AccountType::RegularAccountImmutableCode)
-        .with_auth_component(AuthFalcon512Rpo::new(PublicKeyCommitment::from(EMPTY_WORD)))
+        .with_auth_component(AuthSingleSig::new(
+            PublicKeyCommitment::from(EMPTY_WORD),
+            AuthSchemeId::Falcon512Rpo,
+        ))
         .with_component(dummy_component)
         .build_existing()?;
 
@@ -479,7 +501,10 @@ async fn account_reader_nonce_and_status() -> anyhow::Result<()> {
 
     let account = AccountBuilder::new([0; 32])
         .account_type(AccountType::RegularAccountImmutableCode)
-        .with_auth_component(AuthFalcon512Rpo::new(PublicKeyCommitment::from(EMPTY_WORD)))
+        .with_auth_component(AuthSingleSig::new(
+            PublicKeyCommitment::from(EMPTY_WORD),
+            AuthSchemeId::Falcon512Rpo,
+        ))
         .with_component(dummy_component)
         .build()?;
 
@@ -552,7 +577,10 @@ async fn account_reader_storage_access() -> anyhow::Result<()> {
 
     let account = AccountBuilder::new([0; 32])
         .account_type(AccountType::RegularAccountImmutableCode)
-        .with_auth_component(AuthFalcon512Rpo::new(PublicKeyCommitment::from(EMPTY_WORD)))
+        .with_auth_component(AuthSingleSig::new(
+            PublicKeyCommitment::from(EMPTY_WORD),
+            AuthSchemeId::Falcon512Rpo,
+        ))
         .with_component(dummy_component)
         .build_existing()?;
 
@@ -586,7 +614,10 @@ async fn account_reader_addresses_access() -> anyhow::Result<()> {
 
     let account = AccountBuilder::new([0; 32])
         .account_type(AccountType::RegularAccountImmutableCode)
-        .with_auth_component(AuthFalcon512Rpo::new(PublicKeyCommitment::from(EMPTY_WORD)))
+        .with_auth_component(AuthSingleSig::new(
+            PublicKeyCommitment::from(EMPTY_WORD),
+            AuthSchemeId::Falcon512Rpo,
+        ))
         .with_component(dummy_component)
         .build_existing()?;
 

@@ -16,7 +16,7 @@ use miden_protocol::asset::{FungibleAsset, TokenSymbol};
 use miden_protocol::note::NoteType;
 use miden_protocol::testing::account_id::ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE;
 use miden_protocol::transaction::{OutputNote, TransactionId};
-use miden_standards::account::auth::{AuthEcdsaK256Keccak, AuthFalcon512Rpo};
+use miden_standards::account::auth::AuthSingleSig;
 use miden_standards::code_builder::CodeBuilder;
 use rand::RngCore;
 use uuid::Uuid;
@@ -79,14 +79,18 @@ pub async fn insert_new_wallet_with_seed(
     let (key_pair, auth_component) = match auth_scheme {
         AuthSchemeId::Falcon512Rpo => {
             let key_pair = AuthSecretKey::new_falcon512_rpo();
-            let auth_component: AccountComponent =
-                AuthFalcon512Rpo::new(key_pair.public_key().to_commitment()).into();
+            let auth_component = AuthSingleSig::new(
+                key_pair.public_key().to_commitment(),
+                AuthSchemeId::Falcon512Rpo,
+            );
             (key_pair, auth_component)
         },
         AuthSchemeId::EcdsaK256Keccak => {
             let key_pair = AuthSecretKey::new_ecdsa_k256_keccak();
-            let auth_component: AccountComponent =
-                AuthEcdsaK256Keccak::new(key_pair.public_key().to_commitment()).into();
+            let auth_component = AuthSingleSig::new(
+                key_pair.public_key().to_commitment(),
+                AuthSchemeId::EcdsaK256Keccak,
+            );
             (key_pair, auth_component)
         },
         scheme => {
@@ -121,14 +125,18 @@ pub async fn insert_new_fungible_faucet(
     let (key_pair, auth_component) = match auth_scheme {
         AuthSchemeId::Falcon512Rpo => {
             let key_pair = AuthSecretKey::new_falcon512_rpo();
-            let auth_component: AccountComponent =
-                AuthFalcon512Rpo::new(key_pair.public_key().to_commitment()).into();
+            let auth_component = AuthSingleSig::new(
+                key_pair.public_key().to_commitment(),
+                AuthSchemeId::Falcon512Rpo,
+            );
             (key_pair, auth_component)
         },
         AuthSchemeId::EcdsaK256Keccak => {
             let key_pair = AuthSecretKey::new_ecdsa_k256_keccak();
-            let auth_component: AccountComponent =
-                AuthEcdsaK256Keccak::new(key_pair.public_key().to_commitment()).into();
+            let auth_component = AuthSingleSig::new(
+                key_pair.public_key().to_commitment(),
+                AuthSchemeId::EcdsaK256Keccak,
+            );
             (key_pair, auth_component)
         },
         scheme => {
@@ -561,7 +569,10 @@ pub async fn insert_account_with_custom_component(
     let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountImmutableCode)
         .storage_mode(storage_mode)
-        .with_auth_component(AuthFalcon512Rpo::new(pub_key.to_commitment()))
+        .with_auth_component(AuthSingleSig::new(
+            pub_key.to_commitment(),
+            AuthSchemeId::Falcon512Rpo,
+        ))
         .with_component(BasicWallet)
         .with_component(custom_component)
         .build()

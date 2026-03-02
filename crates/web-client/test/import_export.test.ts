@@ -86,7 +86,7 @@ test.describe("export and import account", () => {
 
     const mutable = false;
     const storageMode = StorageMode.PRIVATE;
-    const authSchemeId = 0;
+    const authSchemeId = 2;
 
     const initialWallet = await createNewWallet(page, {
       storageMode,
@@ -241,12 +241,12 @@ test.describe("export and import note", () => {
           const account1 = await client.newWallet(
             window.AccountStorageMode.private(),
             true,
-            0
+            window.AuthScheme.AuthRpoFalcon512
           );
           const account2 = await client.newWallet(
             window.AccountStorageMode.private(),
             true,
-            0
+            window.AuthScheme.AuthRpoFalcon512
           );
 
           const p2IdNote = window.Note.createP2IDNote(

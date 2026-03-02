@@ -303,7 +303,7 @@ test.describe("Sync Lock Tests", () => {
         const wallet = await client.newWallet(
           window.AccountStorageMode.private(),
           true,
-          0
+          window.AuthScheme.AuthRpoFalcon512
         );
         const walletId = wallet.id().toString();
 
@@ -749,7 +749,7 @@ test.describe("Sync Lock Timeout Race Condition", () => {
       const wallet = await client.newWallet(
         window.AccountStorageMode.private(),
         true,
-        0
+        window.AuthScheme.AuthRpoFalcon512
       );
       const walletId = wallet.id().toString();
 

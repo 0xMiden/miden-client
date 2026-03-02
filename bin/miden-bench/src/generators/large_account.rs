@@ -34,7 +34,7 @@ use miden_client::account::{
 #[cfg(test)]
 use miden_client::assembly::CodeBuilder;
 #[cfg(test)]
-use miden_client::auth::{AuthFalcon512Rpo, AuthSecretKey};
+use miden_client::auth::{AuthSchemeId, AuthSecretKey, AuthSingleSig};
 
 /// Configuration for generating large accounts (used in tests)
 #[cfg(test)]
@@ -151,7 +151,10 @@ fn create_large_account(config: &LargeAccountConfig) -> anyhow::Result<(Account,
     .expect("basic wallet component should satisfy account component requirements");
 
     let account = AccountBuilder::new(config.seed)
-        .with_auth_component(AuthFalcon512Rpo::new(sk.public_key().to_commitment()))
+        .with_auth_component(AuthSingleSig::new(
+            sk.public_key().to_commitment(),
+            AuthSchemeId::Falcon512Rpo,
+        ))
         .account_type(AccountType::RegularAccountUpdatableCode)
         .with_component(wallet_component)
         .with_component(reader_component)

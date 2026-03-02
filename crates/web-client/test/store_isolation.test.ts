@@ -32,7 +32,11 @@ test.describe("Store Isolation Tests", () => {
     const result = await page.evaluate(async () => {
       const client1 = window.client;
 
-      await client1.newWallet(window.AccountStorageMode.private(), true, 0);
+      await client1.newWallet(
+        window.AccountStorageMode.private(),
+        true,
+        window.AuthScheme.AuthRpoFalcon512
+      );
 
       const client2 = await window.WebClient.createClient(
         window.rpcUrl,
@@ -76,7 +80,7 @@ test.describe("Store Isolation Tests", () => {
       const wallet = await client1.newWallet(
         window.AccountStorageMode.private(),
         true,
-        0
+        window.AuthScheme.AuthRpoFalcon512
       );
       const walletId = wallet.id().toString();
 
@@ -112,8 +116,16 @@ test.describe("Store Isolation Tests", () => {
       );
       await client.syncState();
 
-      await client.newWallet(window.AccountStorageMode.private(), true, 0);
-      await client.newWallet(window.AccountStorageMode.private(), true, 0);
+      await client.newWallet(
+        window.AccountStorageMode.private(),
+        true,
+        window.AuthScheme.AuthRpoFalcon512
+      );
+      await client.newWallet(
+        window.AccountStorageMode.private(),
+        true,
+        window.AuthScheme.AuthRpoFalcon512
+      );
 
       const databases = await window.indexedDB.databases();
       const dbNames = databases.map((db) => db.name);
@@ -151,9 +163,21 @@ test.describe("Store Isolation Tests", () => {
       await Promise.all([client1.syncState(), client2.syncState()]);
 
       await Promise.all([
-        client1.newWallet(window.AccountStorageMode.private(), true, 0),
-        client1.newWallet(window.AccountStorageMode.private(), true, 0),
-        client2.newWallet(window.AccountStorageMode.private(), true, 0),
+        client1.newWallet(
+          window.AccountStorageMode.private(),
+          true,
+          window.AuthScheme.AuthRpoFalcon512
+        ),
+        client1.newWallet(
+          window.AccountStorageMode.private(),
+          true,
+          window.AuthScheme.AuthRpoFalcon512
+        ),
+        client2.newWallet(
+          window.AccountStorageMode.private(),
+          true,
+          window.AuthScheme.AuthRpoFalcon512
+        ),
       ]);
 
       const [accounts1, accounts2] = await Promise.all([
@@ -191,23 +215,23 @@ test.describe("Store Isolation Tests", () => {
       const wallet1a = await client1.newWallet(
         window.AccountStorageMode.private(),
         true,
-        0
+        window.AuthScheme.AuthRpoFalcon512
       );
       const wallet1b = await client1.newWallet(
         window.AccountStorageMode.private(),
         true,
-        0
+        window.AuthScheme.AuthRpoFalcon512
       );
       const wallet1c = await client1.newWallet(
         window.AccountStorageMode.private(),
         true,
-        0
+        window.AuthScheme.AuthRpoFalcon512
       );
 
       const wallet2a = await client2.newWallet(
         window.AccountStorageMode.private(),
         true,
-        0
+        window.AuthScheme.AuthRpoFalcon512
       );
 
       const accounts1 = await client1.getAccounts();

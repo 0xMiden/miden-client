@@ -833,7 +833,7 @@ pub mod api_client {
         /// Returns the script for a note by its root.
         pub async fn get_note_script_by_root(
             &mut self,
-            request: impl tonic::IntoRequest<super::super::note::NoteRoot>,
+            request: impl tonic::IntoRequest<super::super::note::NoteScriptRoot>,
         ) -> core::result::Result<
             tonic::Response<super::MaybeNoteScript>,
             tonic::Status,

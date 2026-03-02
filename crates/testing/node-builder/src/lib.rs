@@ -20,7 +20,7 @@ use miden_node_rpc::Rpc;
 use miden_node_store::{GenesisState, Store};
 use miden_node_utils::crypto::get_rpo_random_coin;
 use miden_node_validator::{Validator, ValidatorSigner};
-use miden_protocol::account::auth::AuthSecretKey;
+use miden_protocol::account::auth::{AuthScheme, AuthSecretKey};
 use miden_protocol::account::{
     Account,
     AccountBuilder,
@@ -35,7 +35,8 @@ use miden_protocol::crypto::dsa::ecdsa_k256_keccak;
 use miden_protocol::testing::account_id::ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET;
 use miden_protocol::utils::Serializable;
 use miden_protocol::{Felt, ONE, Word};
-use miden_standards::AuthScheme;
+use miden_standards::AuthMethod;
+use miden_standards::account::auth::AuthSingleSig;
 use miden_standards::account::components::basic_wallet_library;
 use miden_standards::account::faucets::create_basic_fungible_faucet;
 use rand_chacha::ChaCha20Rng;
@@ -408,15 +409,17 @@ fn generate_genesis_account() -> anyhow::Result<AccountFile> {
     let mut rng = ChaCha20Rng::from_seed(random());
     let secret = AuthSecretKey::new_falcon512_rpo_with_rng(&mut get_rpo_random_coin(&mut rng));
 
+    let auth_method = AuthMethod::SingleSig {
+        approver: (secret.public_key().to_commitment(), AuthScheme::Falcon512Rpo),
+    };
+
     let account = create_basic_fungible_faucet(
         rng.random(),
         TokenSymbol::try_from("TST").expect("TST should be a valid token symbol"),
         12,
         Felt::from(1_000_000u32),
         miden_protocol::account::AccountStorageMode::Public,
-        AuthScheme::Falcon512Rpo {
-            pub_key: secret.public_key().to_commitment(),
-        },
+        auth_method,
     )?;
 
     // Force the account nonce to 1.
@@ -493,8 +496,8 @@ fn create_single_test_faucet(index: u128, secret: &AuthSecretKey) -> anyhow::Res
         .try_into()
         .expect("concatenating two 16-byte arrays yields exactly 32 bytes");
 
-    let auth_scheme = AuthScheme::Falcon512Rpo {
-        pub_key: secret.public_key().to_commitment(),
+    let auth_scheme = AuthMethod::SingleSig {
+        approver: (secret.public_key().to_commitment(), AuthScheme::Falcon512Rpo),
     };
 
     let faucet = create_basic_fungible_faucet(
@@ -533,8 +536,9 @@ fn create_test_account_with_many_assets(faucets: &[Account]) -> anyhow::Result<A
     });
 
     let account = AccountBuilder::new(TEST_ACCOUNT_SEED)
-        .with_auth_component(miden_standards::account::auth::AuthFalcon512Rpo::new(
+        .with_auth_component(AuthSingleSig::new(
             sk.public_key().to_commitment(),
+            AuthScheme::Falcon512Rpo,
         ))
         .account_type(miden_protocol::account::AccountType::RegularAccountUpdatableCode)
         .with_component(acc_component)

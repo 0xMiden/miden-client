@@ -296,7 +296,7 @@ export const customTransaction = async (
       const walletAccount = await client.newWallet(
         window.AccountStorageMode.private(),
         false,
-        0
+        window.AuthScheme.AuthRpoFalcon512
       );
       const faucetAccount = await client.newFaucet(
         window.AccountStorageMode.private(),
@@ -304,7 +304,7 @@ export const customTransaction = async (
         "DAG",
         8,
         BigInt(10000000),
-        0
+        window.AuthScheme.AuthRpoFalcon512
       );
       await client.syncState();
 
@@ -525,7 +525,7 @@ const customTxWithMultipleNotes = async (
       const targetAccount = await client.newWallet(
         window.AccountStorageMode.private(),
         true,
-        0
+        window.AuthScheme.AuthRpoFalcon512
       );
       const targetAccountId = targetAccount.id();
       const senderAccountId = window.AccountId.fromHex(_senderAccountId);
@@ -842,12 +842,12 @@ export const discardedTransaction = async (
     const senderAccount = await client.newWallet(
       window.AccountStorageMode.private(),
       true,
-      0
+      window.AuthScheme.AuthRpoFalcon512
     );
     const targetAccount = await client.newWallet(
       window.AccountStorageMode.private(),
-      0,
-      true
+      false,
+      window.AuthScheme.AuthRpoFalcon512
     );
     const faucetAccount = await client.newFaucet(
       window.AccountStorageMode.private(),
@@ -855,7 +855,7 @@ export const discardedTransaction = async (
       "DAG",
       8,
       BigInt(10000000),
-      0
+      window.AuthScheme.AuthRpoFalcon512
     );
     await client.syncState();
 
@@ -1107,7 +1107,7 @@ export const counterAccountComponent = async (
     const nativeAccount = await client.newWallet(
       window.AccountStorageMode.private(),
       false,
-      0
+      window.AuthScheme.AuthRpoFalcon512
     );
 
     await client.syncState();
@@ -1470,7 +1470,7 @@ test.describe("submitNewTransactionWithProver tests", () => {
         const targetAccount = await client.newWallet(
           window.AccountStorageMode.private(),
           false,
-          0
+          window.AuthScheme.AuthRpoFalcon512
         );
 
         const faucetAccount = await client.newFaucet(
@@ -1479,7 +1479,7 @@ test.describe("submitNewTransactionWithProver tests", () => {
           "DAG",
           8,
           BigInt(10000000),
-          0
+          window.AuthScheme.AuthRpoFalcon512
         );
 
         await client.syncState();
@@ -1601,7 +1601,7 @@ test.describe("submitNewTransactionWithProver tests", () => {
         const senderAccount = await client.newWallet(
           window.AccountStorageMode.private(),
           false,
-          0
+          window.AuthScheme.AuthRpoFalcon512
         );
 
         await client.syncState();

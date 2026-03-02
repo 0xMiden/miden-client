@@ -11,7 +11,7 @@ test.describe("AccountReader tests", () => {
       const account = await client.newWallet(
         window.AccountStorageMode.private(),
         true,
-        0
+        window.AuthScheme.AuthRpoFalcon512
       );
 
       const reader = client.accountReader(account.id());

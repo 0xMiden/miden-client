@@ -9,9 +9,9 @@ use miden_client::account::{
 };
 use miden_client::assembly::{Library as NativeLibrary, MastNodeExt};
 use miden_client::auth::{
-    AuthEcdsaK256Keccak as NativeEcdsaK256Keccak,
-    AuthFalcon512Rpo as NativeFalcon512Rpo,
+    AuthSchemeId as NativeAuthSchemeId,
     AuthSecretKey as NativeSecretKey,
+    AuthSingleSig as NativeSingleSig,
     PublicKeyCommitment,
 };
 use miden_client::vm::Package as NativePackage;
@@ -140,11 +140,11 @@ impl AccountComponent {
     ) -> AccountComponent {
         match auth_scheme {
             AuthScheme::AuthRpoFalcon512 => {
-                let auth = NativeFalcon512Rpo::new(commitment);
+                let auth = NativeSingleSig::new(commitment, NativeAuthSchemeId::Falcon512Rpo);
                 AccountComponent(auth.into())
             },
             AuthScheme::AuthEcdsaK256Keccak => {
-                let auth = NativeEcdsaK256Keccak::new(commitment);
+                let auth = NativeSingleSig::new(commitment, NativeAuthSchemeId::EcdsaK256Keccak);
                 AccountComponent(auth.into())
             },
         }

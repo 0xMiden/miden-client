@@ -18,7 +18,7 @@ export const getAccountOneMatch = async (
     const newAccount = await client.newWallet(
       window.AccountStorageMode.private(),
       true,
-      0
+      window.AuthScheme.AuthRpoFalcon512
     );
 
     const result = await client.getAccount(newAccount.id());
@@ -88,12 +88,12 @@ export const getAccountsManyMatches = async (
     const newAccount1 = await client.newWallet(
       window.AccountStorageMode.private(),
       true,
-      0
+      window.AuthScheme.AuthRpoFalcon512
     );
     const newAccount2 = await client.newWallet(
       window.AccountStorageMode.private(),
       true,
-      0
+      window.AuthScheme.AuthRpoFalcon512
     );
     const commitmentsOfCreatedAccounts = [
       newAccount1.to_commitment().toHex(),
@@ -209,7 +209,7 @@ test.describe("account public commitments", () => {
       const newAccount = await window.client.newWallet(
         window.AccountStorageMode.private(),
         true,
-        0
+        window.AuthScheme.AuthRpoFalcon512
       );
       const accountId = newAccount.id();
 
@@ -289,7 +289,7 @@ test.describe("account public commitments", () => {
       const account = await window.client.newWallet(
         window.AccountStorageMode.private(),
         true,
-        0
+        window.AuthScheme.AuthRpoFalcon512
       );
       const commitments = await window.client.getPublicKeyCommitmentsOfAccount(
         account.id()

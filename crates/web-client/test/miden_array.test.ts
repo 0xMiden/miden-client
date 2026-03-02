@@ -80,7 +80,7 @@ const instanceAccountArrayFromAccounts = async ({
       const account = await window.client.newWallet(
         window.AccountStorageMode.private(),
         true,
-        0
+        window.AuthScheme.AuthRpoFalcon512
       );
       accounts[i] = account.id();
     }
@@ -95,11 +95,15 @@ const mutateAccountIdArray = async ({ page, index }: { page: typeof Page }) => {
       const accountToSet = await window.client.newWallet(
         window.AccountStorageMode.private(),
         true,
-        0
+        window.AuthScheme.AuthRpoFalcon512
       );
       const accounts = await Promise.all(
         Array.from({ length: 10 }, () =>
-          window.client.newWallet(window.AccountStorageMode.private(), true)
+          window.client.newWallet(
+            window.AccountStorageMode.private(),
+            true,
+            window.AuthScheme.AuthRpoFalcon512
+          )
         )
       );
       const accountIds = accounts.map((account) => account.id());
@@ -125,7 +129,7 @@ const arrayReturnsClone = async ({
         const account = await window.client.newWallet(
           window.AccountStorageMode.private(),
           true,
-          0
+          window.AuthScheme.AuthRpoFalcon512
         );
         accounts[i] = account.id();
       }
@@ -134,7 +138,7 @@ const arrayReturnsClone = async ({
       cloned = await window.client.newWallet(
         window.AccountStorageMode.private(),
         true,
-        0
+        window.AuthScheme.AuthRpoFalcon512
       );
       let original = array.get(index);
       return cloned !== original;
@@ -148,7 +152,7 @@ const arrayWithSingleAccount = async ({ page }: { page: typeof Page }) => {
     const account = await window.client.newWallet(
       window.AccountStorageMode.private(),
       true,
-      0
+      window.AuthScheme.AuthRpoFalcon512
     );
     const array = new window.MidenArrays.AccountArray([]);
 

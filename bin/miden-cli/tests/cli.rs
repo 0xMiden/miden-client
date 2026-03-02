@@ -1272,16 +1272,22 @@ fn create_account_with_multisig_auth() {
     // threshold_config is a value slot with [threshold, num_approvers, 0, 0]
     // approver_public_keys and procedure_thresholds are map slots
     let init_storage_data_toml = r#"
-        "miden::standards::auth::falcon512_rpo_multisig::threshold_config.threshold" = "2"
-        "miden::standards::auth::falcon512_rpo_multisig::threshold_config.num_approvers" = "3"
+        "miden::standards::auth::multisig::threshold_config.threshold" = "2"
+        "miden::standards::auth::multisig::threshold_config.num_approvers" = "3"
 
-        "miden::standards::auth::falcon512_rpo_multisig::approver_public_keys" = [
+        "miden::standards::auth::multisig::approver_public_keys" = [
             { key = ["0", "0", "0", "0"], value = "0x0000000000000000000000000000000000000000000000000000000000000001" },
             { key = ["0", "0", "0", "1"], value = "0x0000000000000000000000000000000000000000000000000000000000000002" },
             { key = ["0", "0", "0", "2"], value = "0x0000000000000000000000000000000000000000000000000000000000000003" }
         ]
 
-        "miden::standards::auth::falcon512_rpo_multisig::procedure_thresholds" = [
+        "miden::standards::auth::multisig::approver_schemes" = [
+            { key = ["0", "0", "0", "0"], value = ["2", "0", "0", "0"] },
+            { key = ["0", "0", "0", "1"], value = ["2", "0", "0", "0"] },
+            { key = ["0", "0", "0", "2"], value = ["2", "0", "0", "0"] }
+        ]
+
+        "miden::standards::auth::multisig::procedure_thresholds" = [
             { key = "0xd2d1b6229d7cfb9f2ada31c5cb61453cf464f91828e124437c708eec55b9cd07", value = "1" }
         ]
         "#;
@@ -1313,12 +1319,13 @@ fn create_account_with_acl_auth() {
 
     // Create init storage data file for acl-auth with a test public key
     let init_storage_data_toml = r#"
-        "miden::standards::auth::rpo_falcon512_acl::public_key" = "0x0000000000000000000000000000000000000000000000000000000000000001"
-        "miden::standards::auth::rpo_falcon512_acl::config.num_tracked_procs" = "1"
-        "miden::standards::auth::rpo_falcon512_acl::config.allow_unauthorized_output_notes" = "0"
-        "miden::standards::auth::rpo_falcon512_acl::config.allow_unauthorized_input_notes" = "0"
+        "miden::standards::auth::singlesig_acl::pub_key" = "0x0000000000000000000000000000000000000000000000000000000000000001"
+        "miden::standards::auth::singlesig_acl::scheme" = "Falcon512Rpo"
+        "miden::standards::auth::singlesig_acl::config.num_tracked_procs" = "1"
+        "miden::standards::auth::singlesig_acl::config.allow_unauthorized_output_notes" = "0"
+        "miden::standards::auth::singlesig_acl::config.allow_unauthorized_input_notes" = "0"
 
-        "miden::standards::auth::rpo_falcon512_acl::trigger_procedure_roots" = [
+        "miden::standards::auth::singlesig_acl::trigger_procedure_roots" = [
             { key = ["0", "0", "0", "0"], value = "0xd2d1b6229d7cfb9f2ada31c5cb61453cf464f91828e124437c708eec55b9cd07" }
         ]
         "#;
@@ -1348,9 +1355,10 @@ fn create_account_with_acl_auth() {
 fn create_account_with_ecdsa_auth() {
     let temp_dir = init_cli().1;
 
-    // Create init storage data file for ecdsa-auth with a test public key
+    // Create init storage data file for ecdsa-auth with a test public key and scheme
     let init_storage_data_toml = r#"
-        "miden::standards::auth::ecdsa_k256_keccak::public_key"="0x0000000000000000000000000000000000000000000000000000000000000001"
+        "miden::standards::auth::singlesig::pub_key" = "0x0000000000000000000000000000000000000000000000000000000000000001"
+        "miden::standards::auth::singlesig::scheme" = "EcdsaK256Keccak"
         "#;
     let file_path = temp_dir.join("ecdsa_init_data.toml");
     fs::write(&file_path, init_storage_data_toml).unwrap();
