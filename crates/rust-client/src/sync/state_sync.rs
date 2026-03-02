@@ -8,7 +8,7 @@ use miden_protocol::Word;
 use miden_protocol::account::{Account, AccountHeader, AccountId};
 use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::crypto::merkle::mmr::{InOrderIndex, MmrDelta, MmrPeaks, PartialMmr};
-use miden_protocol::note::{NoteId, NoteTag};
+use miden_protocol::note::{NoteId, NoteTag, Nullifier};
 use tracing::info;
 
 use super::state_sync_update::TransactionUpdateTracker;
@@ -20,7 +20,7 @@ use crate::rpc::domain::note::CommittedNote;
 use crate::rpc::domain::sync::StateSyncInfo;
 use crate::rpc::domain::transaction::{self as rpc_tx, TransactionInclusion};
 use crate::store::{InputNoteRecord, OutputNoteRecord, StoreError};
-use crate::transaction::TransactionRecord;
+use crate::transaction::{TransactionRecord, TransactionStatus};
 
 // SYNC REQUEST
 // ================================================================================================
@@ -528,10 +528,19 @@ impl StateSync {
         // changes between the sync_state and the check_nullifier calls)
         new_nullifiers.retain(|update| update.block_num <= state_sync_update.block_num);
 
+        // Compute the transaction ordering within blocks so consumed notes can be sorted by
+        // consumption time.
+        let nullifier_tx_order = compute_nullifier_tx_order(
+            state_sync_update.transaction_updates.committed_transactions(),
+        );
+
         for nullifier_update in new_nullifiers {
+            let order = nullifier_tx_order.get(&nullifier_update.nullifier).copied();
+
             state_sync_update.note_updates.apply_nullifiers_state_transitions(
                 &nullifier_update,
                 state_sync_update.transaction_updates.committed_transactions(),
+                order,
             )?;
 
             // Process nullifiers and track the updates of local tracked transactions that were
@@ -622,6 +631,85 @@ fn apply_mmr_changes(
     Ok((new_peaks, new_authentication_nodes))
 }
 
+// HELPERS
+// ================================================================================================
+
+/// Builds a map from nullifier to transaction order within the block.
+///
+/// Groups committed transactions by (`account_id`, `block_num`), chains them using
+/// init/final account state, and maps each transaction's `input_note_nullifiers`
+/// to the transaction's position in the chain.
+fn compute_nullifier_tx_order<'a>(
+    committed_transactions: impl Iterator<Item = &'a TransactionRecord>,
+) -> BTreeMap<Nullifier, u32> {
+    use alloc::collections::btree_map::Entry;
+
+    use miden_protocol::account::AccountId;
+
+    // Collect only committed transactions, grouped by (account_id, block_number).
+    let mut groups: BTreeMap<(AccountId, BlockNumber), Vec<&TransactionRecord>> = BTreeMap::new();
+
+    for tx in committed_transactions {
+        if let TransactionStatus::Committed { block_number, .. } = tx.status {
+            groups.entry((tx.details.account_id, block_number)).or_default().push(tx);
+        }
+    }
+
+    let mut result = BTreeMap::new();
+
+    for txs in groups.values() {
+        // Build a lookup from init_account_state -> transaction.
+        let mut init_to_tx: BTreeMap<Word, &TransactionRecord> = BTreeMap::new();
+
+        for tx in txs {
+            init_to_tx.insert(tx.details.init_account_state, tx);
+        }
+
+        // Build a set of all final states to find the chain start.
+        let final_states: BTreeSet<Word> =
+            txs.iter().map(|tx| tx.details.final_account_state).collect();
+
+        // Find the chain start: the tx whose init_account_state is not any other tx's
+        // final_account_state.
+        let chain_start =
+            txs.iter().find(|tx| !final_states.contains(&tx.details.init_account_state));
+
+        // If no chain start is found, the client only tracks a subset of the account's
+        // transactions in this block, so we can't determine ordering. Skip the group.
+        let Some(start_tx) = chain_start else {
+            continue;
+        };
+
+        // Follow the chain: current.final_account_state == next.init_account_state.
+        let mut current = *start_tx;
+        let mut position: u32 = 0;
+
+        loop {
+            // Map all input note nullifiers of this transaction to the current position.
+            for nullifier_word in &current.details.input_note_nullifiers {
+                let nullifier = Nullifier::from_raw(*nullifier_word);
+                if let Entry::Vacant(e) = result.entry(nullifier) {
+                    e.insert(position);
+                }
+            }
+
+            // Follow the chain.
+            if let Some(next_tx) = init_to_tx.get(&current.details.final_account_state) {
+                // Avoid infinite loops (shouldn't happen with valid data).
+                if core::ptr::eq(*next_tx, current) {
+                    break;
+                }
+                current = next_tx;
+                position += 1;
+            } else {
+                break;
+            }
+        }
+    }
+
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use alloc::collections::BTreeSet;
@@ -654,6 +742,101 @@ mod tests {
             input_notes: vec![],
             output_notes: vec![],
             uncommitted_transactions: vec![],
+        }
+    }
+
+    // COMPUTE NULLIFIER TX ORDER TESTS
+    // --------------------------------------------------------------------------------------------
+
+    mod compute_nullifier_tx_order_tests {
+        use alloc::vec;
+
+        use miden_protocol::block::BlockNumber;
+        use miden_protocol::note::Nullifier;
+        use miden_protocol::transaction::{OutputNotes, TransactionId};
+        use miden_protocol::{Felt, ZERO};
+
+        use crate::transaction::{TransactionDetails, TransactionRecord, TransactionStatus};
+
+        fn word(n: u64) -> miden_protocol::Word {
+            [Felt::new(n), ZERO, ZERO, ZERO].into()
+        }
+
+        fn make_tx(
+            init_state: u64,
+            final_state: u64,
+            nullifier_vals: &[u64],
+            block_number: u32,
+        ) -> TransactionRecord {
+            let account_id = miden_protocol::account::AccountId::try_from(
+                miden_protocol::testing::account_id::ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE,
+            )
+            .unwrap();
+
+            let details = TransactionDetails {
+                account_id,
+                init_account_state: word(init_state),
+                final_account_state: word(final_state),
+                input_note_nullifiers: nullifier_vals.iter().map(|v| word(*v)).collect(),
+                output_notes: OutputNotes::new(vec![]).unwrap(),
+                block_num: BlockNumber::GENESIS,
+                submission_height: BlockNumber::GENESIS,
+                expiration_block_num: BlockNumber::GENESIS,
+                creation_timestamp: 0,
+            };
+
+            TransactionRecord::new(
+                TransactionId::from_raw(word(init_state)),
+                details,
+                None,
+                TransactionStatus::Committed {
+                    block_number: BlockNumber::from(block_number),
+                    commit_timestamp: 0,
+                },
+            )
+        }
+
+        #[test]
+        fn chains_transactions_by_account_state() {
+            // Chain: tx_a (state 1->2) -> tx_b (state 2->3) -> tx_c (state 3->4)
+            // Passed in reverse order to verify chaining uses state, not insertion order.
+            let tx_a = make_tx(1, 2, &[10], 5);
+            let tx_b = make_tx(2, 3, &[20], 5);
+            let tx_c = make_tx(3, 4, &[30], 5);
+
+            let result =
+                super::super::compute_nullifier_tx_order([&tx_c, &tx_a, &tx_b].into_iter());
+
+            assert_eq!(result[&Nullifier::from_raw(word(10))], 0);
+            assert_eq!(result[&Nullifier::from_raw(word(20))], 1);
+            assert_eq!(result[&Nullifier::from_raw(word(30))], 2);
+        }
+
+        #[test]
+        fn groups_independently_by_account_and_block() {
+            // Account A, block 5: two chained txs.
+            let tx_a1 = make_tx(1, 2, &[10], 5);
+            let tx_a2 = make_tx(2, 3, &[20], 5);
+
+            // Account A, block 6: independent chain (different block resets position).
+            let tx_a3 = make_tx(3, 4, &[30], 6);
+
+            // Account B, block 5: independent chain (different account resets position).
+            let account_b = miden_protocol::account::AccountId::try_from(
+                miden_protocol::testing::account_id::ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
+            )
+            .unwrap();
+            let mut tx_b1 = make_tx(100, 200, &[40], 5);
+            tx_b1.details.account_id = account_b;
+
+            let result = super::super::compute_nullifier_tx_order(
+                [&tx_a2, &tx_b1, &tx_a3, &tx_a1].into_iter(),
+            );
+
+            assert_eq!(result[&Nullifier::from_raw(word(10))], 0); // account A, block 5, pos 0
+            assert_eq!(result[&Nullifier::from_raw(word(20))], 1); // account A, block 5, pos 1
+            assert_eq!(result[&Nullifier::from_raw(word(30))], 0); // account A, block 6, pos 0
+            assert_eq!(result[&Nullifier::from_raw(word(40))], 0); // account B, block 5, pos 0
         }
     }
 

@@ -31,12 +31,19 @@ pub struct InputNoteUpdate {
     note: InputNoteRecord,
     /// Type of the note update.
     update_type: NoteUpdateType,
+    /// Position of the consuming transaction in the account's state chain within the block.
+    /// `None` for non-consumed notes or notes consumed by external (non-client) transactions.
+    consumed_tx_order: Option<u32>,
 }
 
 impl InputNoteUpdate {
     /// Creates a new [`InputNoteUpdate`] with the provided note with a `None` update type.
     fn new_none(note: InputNoteRecord) -> Self {
-        Self { note, update_type: NoteUpdateType::None }
+        Self {
+            note,
+            update_type: NoteUpdateType::None,
+            consumed_tx_order: None,
+        }
     }
 
     /// Creates a new [`InputNoteUpdate`] with the provided note with an `Insert` update type.
@@ -44,6 +51,7 @@ impl InputNoteUpdate {
         Self {
             note,
             update_type: NoteUpdateType::Insert,
+            consumed_tx_order: None,
         }
     }
 
@@ -52,6 +60,7 @@ impl InputNoteUpdate {
         Self {
             note,
             update_type: NoteUpdateType::Update,
+            consumed_tx_order: None,
         }
     }
 
@@ -60,7 +69,8 @@ impl InputNoteUpdate {
         &self.note
     }
 
-    /// Returns a mutable reference to the inner note record. If the u
+    /// Returns a mutable reference to the inner note record. If the update type is `None` or
+    /// `Update`, it will be set to `Update`.
     fn inner_mut(&mut self) -> &mut InputNoteRecord {
         self.update_type = match self.update_type {
             NoteUpdateType::None | NoteUpdateType::Update => NoteUpdateType::Update,
@@ -78,6 +88,17 @@ impl InputNoteUpdate {
     /// Returns the identifier of the inner note.
     pub fn id(&self) -> NoteId {
         self.note.id()
+    }
+
+    /// Returns the position of the consuming transaction in the account's state chain within the
+    /// block. `None` for non-consumed notes or notes consumed by external transactions.
+    pub fn consumed_tx_order(&self) -> Option<u32> {
+        self.consumed_tx_order
+    }
+
+    /// Sets the consumed transaction order for this note update.
+    fn set_consumed_tx_order(&mut self, order: Option<u32>) {
+        self.consumed_tx_order = order;
     }
 }
 
@@ -312,25 +333,29 @@ impl NoteUpdateTracker {
         &mut self,
         nullifier_update: &NullifierUpdate,
         mut committed_transactions: impl Iterator<Item = &'a TransactionRecord>,
+        consumed_tx_order: Option<u32>,
     ) -> Result<(), ClientError> {
-        if let Some(input_note_record) =
-            self.get_input_note_by_nullifier(nullifier_update.nullifier)
+        if let Some(input_note_update) =
+            self.get_input_note_update_by_nullifier(nullifier_update.nullifier)
         {
             if let Some(consumer_transaction) = committed_transactions
-                .find(|t| input_note_record.consumer_transaction_id() == Some(&t.id))
+                .find(|t| input_note_update.inner().consumer_transaction_id() == Some(&t.id))
             {
                 // The note was being processed by a local transaction that just got committed
                 if let TransactionStatus::Committed { block_number, .. } =
                     consumer_transaction.status
                 {
-                    input_note_record
+                    input_note_update
+                        .inner_mut()
                         .transaction_committed(consumer_transaction.id, block_number)?;
                 }
             } else {
                 // The note was consumed by an external transaction
-                input_note_record
+                input_note_update
+                    .inner_mut()
                     .consumed_externally(nullifier_update.nullifier, nullifier_update.block_num)?;
             }
+            input_note_update.set_consumed_tx_order(consumed_tx_order);
         }
 
         if let Some(output_note_record) =
@@ -356,14 +381,14 @@ impl NoteUpdateTracker {
         self.output_notes.get_mut(&note_id).map(OutputNoteUpdate::inner_mut)
     }
 
-    /// Returns a mutable reference to the input note record with the provided nullifier if it
+    /// Returns a mutable reference to the input note update with the provided nullifier if it
     /// exists.
-    fn get_input_note_by_nullifier(
+    fn get_input_note_update_by_nullifier(
         &mut self,
         nullifier: Nullifier,
-    ) -> Option<&mut InputNoteRecord> {
+    ) -> Option<&mut InputNoteUpdate> {
         let note_id = self.input_notes_by_nullifier.get(&nullifier).copied()?;
-        self.input_notes.get_mut(&note_id).map(InputNoteUpdate::inner_mut)
+        self.input_notes.get_mut(&note_id)
     }
 
     /// Returns a mutable reference to the output note record with the provided nullifier if it

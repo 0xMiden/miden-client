@@ -28,9 +28,12 @@ mod states;
 pub use states::{
     CommittedNoteState,
     ConsumedAuthenticatedLocalNoteState,
+    ConsumedExternalNoteState,
+    ConsumedUnauthenticatedLocalNoteState,
     ExpectedNoteState,
     InputNoteState,
     InvalidNoteState,
+    NoteSubmissionData,
     ProcessingAuthenticatedNoteState,
     ProcessingUnauthenticatedNoteState,
     UnverifiedNoteState,
@@ -128,6 +131,27 @@ impl InputNoteRecord {
     /// Otherwise, returns `None`.
     pub fn consumer_transaction_id(&self) -> Option<&TransactionId> {
         self.state.consumer_transaction_id()
+    }
+
+    /// Returns the account ID that consumed this note, if available.
+    ///
+    /// This is available for notes in processing or consumed-local states, where the
+    /// submission data contains the consumer account. Returns `None` for externally
+    /// consumed notes or notes that haven't been submitted for consumption.
+    pub fn consumer_account(&self) -> Option<AccountId> {
+        match &self.state {
+            InputNoteState::ProcessingAuthenticated(s) => Some(s.submission_data.consumer_account),
+            InputNoteState::ProcessingUnauthenticated(s) => {
+                Some(s.submission_data.consumer_account)
+            },
+            InputNoteState::ConsumedAuthenticatedLocal(s) => {
+                Some(s.submission_data.consumer_account)
+            },
+            InputNoteState::ConsumedUnauthenticatedLocal(s) => {
+                Some(s.submission_data.consumer_account)
+            },
+            _ => None,
+        }
     }
 
     /// Returns true if the note is authenticated, meaning that it has the necessary inclusion
