@@ -17,7 +17,11 @@ use miden_client::account::{
     StorageSlotType,
 };
 use miden_client::asset::{
-    Asset, AssetVault, AssetVaultKey, FungibleAsset, NonFungibleDeltaAction,
+    Asset,
+    AssetVault,
+    AssetVaultKey,
+    FungibleAsset,
+    NonFungibleDeltaAction,
 };
 use miden_client::store::{AccountSmtForest, AccountStatus, StoreError};
 use miden_client::utils::{Deserializable, Serializable};

@@ -16,7 +16,10 @@ use miden_client::utils::Deserializable;
 
 use super::WebStore;
 use super::account::utils::{
-    apply_full_account_state, apply_transaction_delta, compute_storage_delta, compute_vault_delta,
+    apply_full_account_state,
+    apply_transaction_delta,
+    compute_storage_delta,
+    compute_vault_delta,
 };
 use super::note::utils::apply_note_updates_tx;
 use crate::promise::await_js;
@@ -100,8 +103,7 @@ impl WebStore {
 
         if delta.is_full_state() {
             // Full-state path: writes all entries and tombstones for removed ones
-            let old_roots =
-                self.collect_account_smt_roots(core::iter::once(account_id)).await?;
+            let old_roots = self.collect_account_smt_roots(core::iter::once(account_id)).await?;
 
             let account: Account =
                 delta.try_into().expect("casting account from full state delta should not fail");
@@ -132,16 +134,14 @@ impl WebStore {
             let updated_assets;
             let removed_vault_keys;
             {
-                let mut smt_forest =
-                    self.smt_forest.write().expect("smt_forest write lock");
+                let mut smt_forest = self.smt_forest.write().expect("smt_forest write lock");
 
                 // Storage: compute new map roots via SMT forest
                 updated_storage_slots =
                     compute_storage_delta(&mut smt_forest, &old_map_roots, delta)?;
 
                 // Vault: compute new asset values and update SMT forest
-                let (assets, removed_keys) =
-                    compute_vault_delta(&old_vault_assets, delta)?;
+                let (assets, removed_keys) = compute_vault_delta(&old_vault_assets, delta)?;
                 let new_vault_root = smt_forest.update_asset_nodes(
                     old_vault_root,
                     assets.iter().copied(),
@@ -156,7 +156,6 @@ impl WebStore {
                 }
                 updated_assets = assets;
                 removed_vault_keys = removed_keys;
-
             }
 
             // Write to DB atomically

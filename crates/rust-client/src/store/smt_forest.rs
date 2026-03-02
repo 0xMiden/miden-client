@@ -1,11 +1,10 @@
 use alloc::vec::Vec;
 
-use miden_protocol::Word;
-use miden_protocol::account::{AccountStorage, StorageMap, StorageSlotContent, StorageMapWitness};
+use miden_protocol::account::{AccountStorage, StorageMap, StorageMapWitness, StorageSlotContent};
 use miden_protocol::asset::{Asset, AssetVault, AssetVaultKey, AssetWitness};
-use miden_protocol::crypto::merkle::smt::{Smt, SmtForest, SMT_DEPTH};
+use miden_protocol::crypto::merkle::smt::{SMT_DEPTH, Smt, SmtForest};
 use miden_protocol::crypto::merkle::{EmptySubtreeRoots, MerkleError};
-use miden_protocol::EMPTY_WORD;
+use miden_protocol::{EMPTY_WORD, Word};
 
 use super::StoreError;
 

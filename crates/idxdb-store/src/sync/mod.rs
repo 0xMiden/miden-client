@@ -192,9 +192,11 @@ impl WebStore {
             .collect();
 
         // Collect old SMT roots for updated public accounts so we can pop them after
-        let old_roots_to_pop = self.collect_account_smt_roots(
-            account_updates.updated_public_accounts().iter().map(Account::id),
-        ).await?;
+        let old_roots_to_pop = self
+            .collect_account_smt_roots(
+                account_updates.updated_public_accounts().iter().map(Account::id),
+            )
+            .await?;
 
         let state_update = JsStateSyncUpdate {
             block_num: block_num.as_u32(),

@@ -346,9 +346,7 @@ impl WebStore {
 
         slots
             .into_iter()
-            .filter(|s| {
-                StorageSlotType::try_from(s.slot_type).ok() == Some(StorageSlotType::Map)
-            })
+            .filter(|s| StorageSlotType::try_from(s.slot_type).ok() == Some(StorageSlotType::Map))
             .map(|s| {
                 let name = StorageSlotName::new(s.slot_name).map_err(|err| {
                     StoreError::DatabaseError(format!("invalid storage slot name: {err}"))
@@ -410,8 +408,8 @@ impl WebStore {
         let account_header_idxdb: Option<AccountRecordIdxdbObject> =
             await_js(promise, "failed to fetch account header").await?;
 
-        let account_header_idxdb = account_header_idxdb
-            .ok_or(StoreError::AccountDataNotFound(account_id))?;
+        let account_header_idxdb =
+            account_header_idxdb.ok_or(StoreError::AccountDataNotFound(account_id))?;
 
         // Get old SMT roots before updating so we can pop them after
         let (old_header, _) = parse_account_record_idxdb_object(account_header_idxdb)?;
@@ -425,8 +423,7 @@ impl WebStore {
         // Update SMT forest: insert new state and release old roots
         let mut smt_forest = self.smt_forest.write().expect("smt_forest write lock");
         smt_forest.insert_account_state(new_account_state.vault(), new_account_state.storage())?;
-        smt_forest
-            .pop_roots(old_map_roots.into_values().chain(core::iter::once(old_vault_root)));
+        smt_forest.pop_roots(old_map_roots.into_values().chain(core::iter::once(old_vault_root)));
 
         Ok(())
     }

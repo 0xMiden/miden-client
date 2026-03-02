@@ -11,6 +11,7 @@ extern crate alloc;
 use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::vec::Vec;
+use std::sync::{Arc, RwLock};
 
 use base64::Engine;
 use base64::engine::general_purpose;
@@ -45,8 +46,6 @@ use miden_client::sync::{NoteTagRecord, StateSyncUpdate};
 use miden_client::transaction::{TransactionRecord, TransactionStoreUpdate};
 use serde::de::Error;
 use serde::{Deserialize, Deserializer};
-use std::sync::{Arc, RwLock};
-
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::{JsFuture, js_sys};
 
