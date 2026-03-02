@@ -52,7 +52,7 @@ export interface UseConsumeResult {
  * ```
  */
 export function useConsume(): UseConsumeResult {
-  const { client, isReady, sync, prover } = useMiden();
+  const { client, isReady, sync, prover, signerConnected } = useMiden();
 
   const [result, setResult] = useState<TransactionResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -63,6 +63,12 @@ export function useConsume(): UseConsumeResult {
     async (options: ConsumeOptions): Promise<TransactionResult> => {
       if (!client || !isReady) {
         throw new Error("Miden client is not ready");
+      }
+
+      if (signerConnected === false) {
+        throw new Error(
+          "Signer is disconnected. Reconnect your wallet to perform transactions."
+        );
       }
 
       if (options.noteIds.length === 0) {
@@ -116,7 +122,7 @@ export function useConsume(): UseConsumeResult {
         setIsLoading(false);
       }
     },
-    [client, isReady, prover, sync]
+    [client, isReady, prover, signerConnected, sync]
   );
 
   const reset = useCallback(() => {

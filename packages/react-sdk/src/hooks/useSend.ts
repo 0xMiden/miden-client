@@ -67,7 +67,7 @@ export interface UseSendResult {
  * ```
  */
 export function useSend(): UseSendResult {
-  const { client, isReady, sync, prover } = useMiden();
+  const { client, isReady, sync, prover, signerConnected } = useMiden();
   const isBusyRef = useRef(false);
 
   const [result, setResult] = useState<TransactionResult | null>(null);
@@ -79,6 +79,12 @@ export function useSend(): UseSendResult {
     async (options: SendOptions): Promise<TransactionResult> => {
       if (!client || !isReady) {
         throw new Error("Miden client is not ready");
+      }
+
+      if (signerConnected === false) {
+        throw new Error(
+          "Signer is disconnected. Reconnect your wallet to perform transactions."
+        );
       }
 
       if (isBusyRef.current) {
@@ -247,7 +253,7 @@ export function useSend(): UseSendResult {
         isBusyRef.current = false;
       }
     },
-    [client, isReady, prover, sync]
+    [client, isReady, prover, signerConnected, sync]
   );
 
   const reset = useCallback(() => {

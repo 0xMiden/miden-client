@@ -69,7 +69,7 @@ export interface UseInternalTransferResult {
  * ```
  */
 export function useInternalTransfer(): UseInternalTransferResult {
-  const { client, isReady, sync, prover } = useMiden();
+  const { client, isReady, sync, prover, signerConnected } = useMiden();
 
   const [result, setResult] = useState<
     InternalTransferResult | InternalTransferResult[] | null
@@ -84,6 +84,12 @@ export function useInternalTransfer(): UseInternalTransferResult {
     ): Promise<InternalTransferResult> => {
       if (!client || !isReady) {
         throw new Error("Miden client is not ready");
+      }
+
+      if (signerConnected === false) {
+        throw new Error(
+          "Signer is disconnected. Reconnect your wallet to perform transactions."
+        );
       }
 
       const noteType = getNoteType(options.noteType ?? DEFAULTS.NOTE_TYPE);
@@ -133,7 +139,7 @@ export function useInternalTransfer(): UseInternalTransferResult {
         noteId,
       };
     },
-    [client, isReady, prover]
+    [client, isReady, prover, signerConnected]
   );
 
   const transfer = useCallback(

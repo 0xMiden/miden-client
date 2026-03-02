@@ -49,7 +49,7 @@ export interface UseCreateFaucetResult {
  * ```
  */
 export function useCreateFaucet(): UseCreateFaucetResult {
-  const { client, isReady } = useMiden();
+  const { client, isReady, signerConnected } = useMiden();
   const setAccounts = useMidenStore((state) => state.setAccounts);
 
   const [faucet, setFaucet] = useState<Account | null>(null);
@@ -60,6 +60,12 @@ export function useCreateFaucet(): UseCreateFaucetResult {
     async (options: CreateFaucetOptions): Promise<Account> => {
       if (!client || !isReady) {
         throw new Error("Miden client is not ready");
+      }
+
+      if (signerConnected === false) {
+        throw new Error(
+          "Signer is disconnected. Reconnect your wallet to perform transactions."
+        );
       }
 
       setIsCreating(true);
@@ -94,7 +100,7 @@ export function useCreateFaucet(): UseCreateFaucetResult {
         setIsCreating(false);
       }
     },
-    [client, isReady, setAccounts]
+    [client, isReady, setAccounts, signerConnected]
   );
 
   const reset = useCallback(() => {

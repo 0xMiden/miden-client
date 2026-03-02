@@ -49,7 +49,7 @@ export interface UseCreateWalletResult {
  * ```
  */
 export function useCreateWallet(): UseCreateWalletResult {
-  const { client, isReady, sync } = useMiden();
+  const { client, isReady, sync, signerConnected } = useMiden();
   const setAccounts = useMidenStore((state) => state.setAccounts);
 
   const [wallet, setWallet] = useState<Account | null>(null);
@@ -60,6 +60,12 @@ export function useCreateWallet(): UseCreateWalletResult {
     async (options: CreateWalletOptions = {}): Promise<Account> => {
       if (!client || !isReady) {
         throw new Error("Miden client is not ready");
+      }
+
+      if (signerConnected === false) {
+        throw new Error(
+          "Signer is disconnected. Reconnect your wallet to perform transactions."
+        );
       }
 
       await sync();
@@ -96,7 +102,7 @@ export function useCreateWallet(): UseCreateWalletResult {
         setIsCreating(false);
       }
     },
-    [client, isReady, setAccounts]
+    [client, isReady, setAccounts, signerConnected]
   );
 
   const reset = useCallback(() => {
