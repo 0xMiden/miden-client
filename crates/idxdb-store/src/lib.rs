@@ -97,16 +97,20 @@ impl WebStore {
             smt_forest: Arc::new(RwLock::new(AccountSmtForest::new())),
         };
 
-        // Initialize SMT forest with all existing accounts
+        // Collect all account states first, then initialize SMT forest
+        let mut account_states = Vec::new();
         for id in store.get_account_ids().await.map_err(js_error)? {
             let vault = store.get_account_vault(id).await.map_err(js_error)?;
             let storage = store
                 .get_account_storage(id, AccountStorageFilter::All)
                 .await
                 .map_err(js_error)?;
+            account_states.push((vault, storage));
+        }
 
-            let mut smt_forest = store.smt_forest.write().expect("smt_forest write lock");
-            smt_forest.insert_account_state(&vault, &storage).map_err(js_error)?;
+        let mut smt_forest = store.smt_forest.write().expect("smt_forest write lock");
+        for (vault, storage) in &account_states {
+            smt_forest.insert_account_state(vault, storage).map_err(js_error)?;
         }
 
         Ok(store)
