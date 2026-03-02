@@ -5,6 +5,7 @@ members = [
   "bin/integration-tests",
   "bin/miden-cli",
   "crates/idxdb-store",
+  "crates/miden-swapp",
   "crates/rust-client",
   "crates/sqlite-store",
   "crates/testing/miden-client-tests",
@@ -35,7 +36,7 @@ miden-client-sqlite-store = { default-features = false, path = "crates/sqlite-st
 
 # Miden protocol dependencies
 miden-protocol  = { default-features = false, version = "0.13" }
-miden-swapp     = { git = "https://github.com/inicio-labs/miden-swapp", tag = "v0.1.0-alpha" }
+miden-swapp     = { path = "crates/miden-swapp" }
 miden-standards = { default-features = false, version = "0.13" }
 miden-testing   = { default-features = false, version = "0.13" }
 miden-tx        = { default-features = false, version = "0.13" }
