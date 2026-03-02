@@ -930,7 +930,6 @@ export async function undoAccountStates(
         }
 
         // Collect SMT roots before deletion so the Rust side can pop them from the forest.
-        // This mirrors SqliteStore::get_smt_roots_by_account_commitment.
         const roots: string[] = [];
         for (const record of affectedRecords) {
           roots.push(record.vaultRoot);
