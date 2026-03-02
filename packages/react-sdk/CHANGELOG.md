@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.13.4 (TBD)
+
+### Fixes
+* [FIX][web] Fixed signer disconnect destroying WebClient and wiping cached state. The client now stays alive for reads on disconnect, hot-swaps `signCb` on same-identity reconnect (no WASM reinit), and only creates a new client when a different identity connects. All mutation hooks block with a clear error while disconnected ([#1842](https://github.com/0xMiden/miden-client/pull/1842)).
+
 ## 0.13.3 (2026-02-25)
 
 ### Features
