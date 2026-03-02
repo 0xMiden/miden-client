@@ -41,12 +41,16 @@ export async function openDatabase(
 
 enum Table {
   AccountCode = "accountCode",
-  AccountStorage = "accountStorage",
-  AccountAssets = "accountAssets",
-  StorageMapEntries = "storageMapEntries",
+  LatestAccountStorage = "latestAccountStorage",
+  HistoricalAccountStorage = "historicalAccountStorage",
+  LatestAccountAssets = "latestAccountAssets",
+  HistoricalAccountAssets = "historicalAccountAssets",
+  LatestStorageMapEntries = "latestStorageMapEntries",
+  HistoricalStorageMapEntries = "historicalStorageMapEntries",
   AccountAuth = "accountAuth",
   AccountKeyMapping = "accountKeyMapping",
-  Accounts = "accounts",
+  LatestAccountHeaders = "latestAccountHeaders",
+  HistoricalAccountHeaders = "historicalAccountHeaders",
   Addresses = "addresses",
   Transactions = "transactions",
   TransactionScripts = "transactionScripts",
@@ -59,7 +63,6 @@ enum Table {
   Tags = "tags",
   ForeignAccountCode = "foreignAccountCode",
   Settings = "settings",
-  TrackedAccounts = "trackedAccounts",
 }
 
 export interface IAccountCode {
@@ -67,24 +70,49 @@ export interface IAccountCode {
   code: Uint8Array;
 }
 
-export interface IAccountStorage {
-  commitment: string;
+export interface ILatestAccountStorage {
+  accountId: string;
   slotName: string;
   slotValue: string;
   slotType: number;
 }
 
-export interface IStorageMapEntry {
-  root: string;
+export interface IHistoricalAccountStorage {
+  accountId: string;
+  nonce: string;
+  slotName: string;
+  slotValue: string;
+  slotType: number;
+}
+
+export interface ILatestStorageMapEntry {
+  accountId: string;
+  slotName: string;
   key: string;
   value: string;
 }
 
-export interface IAccountAsset {
-  root: string;
+export interface IHistoricalStorageMapEntry {
+  accountId: string;
+  nonce: string;
+  slotName: string;
+  key: string;
+  value: string | null;
+}
+
+export interface ILatestAccountAsset {
+  accountId: string;
   vaultKey: string;
   faucetIdPrefix: string;
   asset: string;
+}
+
+export interface IHistoricalAccountAsset {
+  accountId: string;
+  nonce: string;
+  vaultKey: string;
+  faucetIdPrefix: string;
+  asset: string | null;
 }
 
 export interface IAccountAuth {
@@ -190,26 +218,20 @@ export interface ISetting {
   value: Uint8Array;
 }
 
-export interface ITrackedAccount {
-  id: string;
-}
-
 export interface JsVaultAsset {
-  root: string;
   vaultKey: string;
   faucetIdPrefix: string;
   asset: string;
 }
 
 export interface JsStorageSlot {
-  commitment: string;
   slotName: string;
   slotValue: string;
   slotType: number;
 }
 
 export interface JsStorageMapEntry {
-  root: string;
+  slotName: string;
   key: string;
   value: string;
 }
@@ -218,49 +240,47 @@ function indexes(...items: string[]): string {
   return items.join(",");
 }
 
-export type MidenDexie = Dexie & {
-  accountCodes: Dexie.Table<IAccountCode, string>;
-  accountStorages: Dexie.Table<IAccountStorage, string>;
-  accountAssets: Dexie.Table<IAccountAsset, string>;
-  storageMapEntries: Dexie.Table<IStorageMapEntry, string>;
-  accountAuths: Dexie.Table<IAccountAuth, string>;
-  accountKeyMappings: Dexie.Table<IAccountKeyMapping, string>;
-  accounts: Dexie.Table<IAccount, string>;
-  addresses: Dexie.Table<IAddress, string>;
-  transactions: Dexie.Table<ITransaction, string>;
-  transactionScripts: Dexie.Table<ITransactionScript, string>;
-  inputNotes: Dexie.Table<IInputNote, string>;
-  outputNotes: Dexie.Table<IOutputNote, string>;
-  notesScripts: Dexie.Table<INotesScript, string>;
-  stateSync: Dexie.Table<IStateSync, number>;
-  blockHeaders: Dexie.Table<IBlockHeader, number>;
-  partialBlockchainNodes: Dexie.Table<IPartialBlockchainNode, number>;
-  tags: Dexie.Table<ITag, number>;
-  foreignAccountCode: Dexie.Table<IForeignAccountCode, string>;
-  settings: Dexie.Table<ISetting, string>;
-  trackedAccounts: Dexie.Table<ITrackedAccount, string>;
-};
-
 /** V1 baseline schema. Extracted as a constant because once migrations are enabled, this must
  *  never be modified — all schema changes should go through new version blocks instead. */
 const V1_STORES: Record<string, string> = {
   [Table.AccountCode]: indexes("root"),
-  [Table.AccountStorage]: indexes("[commitment+slotName]", "commitment"),
-  [Table.StorageMapEntries]: indexes("[root+key]", "root"),
-  [Table.AccountAssets]: indexes("[root+vaultKey]", "root", "faucetIdPrefix"),
+  [Table.LatestAccountStorage]: indexes("[accountId+slotName]", "accountId"),
+  [Table.HistoricalAccountStorage]: indexes(
+    "[accountId+nonce+slotName]",
+    "accountId",
+    "[accountId+nonce]"
+  ),
+  [Table.LatestStorageMapEntries]: indexes(
+    "[accountId+slotName+key]",
+    "accountId",
+    "[accountId+slotName]"
+  ),
+  [Table.HistoricalStorageMapEntries]: indexes(
+    "[accountId+nonce+slotName+key]",
+    "accountId",
+    "[accountId+nonce]"
+  ),
+  [Table.LatestAccountAssets]: indexes(
+    "[accountId+vaultKey]",
+    "accountId",
+    "faucetIdPrefix"
+  ),
+  [Table.HistoricalAccountAssets]: indexes(
+    "[accountId+nonce+vaultKey]",
+    "accountId",
+    "[accountId+nonce]"
+  ),
   [Table.AccountAuth]: indexes("pubKeyCommitmentHex"),
   [Table.AccountKeyMapping]: indexes(
     "[accountIdHex+pubKeyCommitmentHex]",
     "accountIdHex",
     "pubKeyCommitmentHex"
   ),
-  [Table.Accounts]: indexes(
+  [Table.LatestAccountHeaders]: indexes("&id", "accountCommitment"),
+  [Table.HistoricalAccountHeaders]: indexes(
     "&accountCommitment",
     "id",
-    "[id+nonce]",
-    "codeRoot",
-    "storageRoot",
-    "vaultRoot"
+    "[id+nonce]"
   ),
   [Table.Addresses]: indexes("address", "id"),
   [Table.Transactions]: indexes("id", "statusVariant"),
@@ -279,18 +299,20 @@ const V1_STORES: Record<string, string> = {
   [Table.Tags]: indexes("id++", "tag", "sourceNoteId", "sourceAccountId"),
   [Table.ForeignAccountCode]: indexes("accountId"),
   [Table.Settings]: indexes("key"),
-  [Table.TrackedAccounts]: indexes("&id"),
 };
 
-export class MidenDatabase {
-  dexie: MidenDexie;
+export type MidenDexie = Dexie & {
   accountCodes: Dexie.Table<IAccountCode, string>;
-  accountStorages: Dexie.Table<IAccountStorage, string>;
-  storageMapEntries: Dexie.Table<IStorageMapEntry, string>;
-  accountAssets: Dexie.Table<IAccountAsset, string>;
+  latestAccountStorages: Dexie.Table<ILatestAccountStorage, string>;
+  historicalAccountStorages: Dexie.Table<IHistoricalAccountStorage, string>;
+  latestStorageMapEntries: Dexie.Table<ILatestStorageMapEntry, string>;
+  historicalStorageMapEntries: Dexie.Table<IHistoricalStorageMapEntry, string>;
+  latestAccountAssets: Dexie.Table<ILatestAccountAsset, string>;
+  historicalAccountAssets: Dexie.Table<IHistoricalAccountAsset, string>;
   accountAuths: Dexie.Table<IAccountAuth, string>;
   accountKeyMappings: Dexie.Table<IAccountKeyMapping, string>;
-  accounts: Dexie.Table<IAccount, string>;
+  latestAccountHeaders: Dexie.Table<IAccount, string>;
+  historicalAccountHeaders: Dexie.Table<IAccount, string>;
   addresses: Dexie.Table<IAddress, string>;
   transactions: Dexie.Table<ITransaction, string>;
   transactionScripts: Dexie.Table<ITransactionScript, string>;
@@ -303,7 +325,33 @@ export class MidenDatabase {
   tags: Dexie.Table<ITag, number>;
   foreignAccountCode: Dexie.Table<IForeignAccountCode, string>;
   settings: Dexie.Table<ISetting, string>;
-  trackedAccounts: Dexie.Table<ITrackedAccount, string>;
+};
+
+export class MidenDatabase {
+  dexie: MidenDexie;
+  accountCodes: Dexie.Table<IAccountCode, string>;
+  latestAccountStorages: Dexie.Table<ILatestAccountStorage, string>;
+  historicalAccountStorages: Dexie.Table<IHistoricalAccountStorage, string>;
+  latestStorageMapEntries: Dexie.Table<ILatestStorageMapEntry, string>;
+  historicalStorageMapEntries: Dexie.Table<IHistoricalStorageMapEntry, string>;
+  latestAccountAssets: Dexie.Table<ILatestAccountAsset, string>;
+  historicalAccountAssets: Dexie.Table<IHistoricalAccountAsset, string>;
+  accountAuths: Dexie.Table<IAccountAuth, string>;
+  accountKeyMappings: Dexie.Table<IAccountKeyMapping, string>;
+  latestAccountHeaders: Dexie.Table<IAccount, string>;
+  historicalAccountHeaders: Dexie.Table<IAccount, string>;
+  addresses: Dexie.Table<IAddress, string>;
+  transactions: Dexie.Table<ITransaction, string>;
+  transactionScripts: Dexie.Table<ITransactionScript, string>;
+  inputNotes: Dexie.Table<IInputNote, string>;
+  outputNotes: Dexie.Table<IOutputNote, string>;
+  notesScripts: Dexie.Table<INotesScript, string>;
+  stateSync: Dexie.Table<IStateSync, number>;
+  blockHeaders: Dexie.Table<IBlockHeader, number>;
+  partialBlockchainNodes: Dexie.Table<IPartialBlockchainNode, number>;
+  tags: Dexie.Table<ITag, number>;
+  foreignAccountCode: Dexie.Table<IForeignAccountCode, string>;
+  settings: Dexie.Table<ISetting, string>;
 
   constructor(network: string) {
     this.dexie = new Dexie(network) as MidenDexie;
@@ -356,22 +404,41 @@ export class MidenDatabase {
     this.accountCodes = this.dexie.table<IAccountCode, string>(
       Table.AccountCode
     );
-    this.accountStorages = this.dexie.table<IAccountStorage, string>(
-      Table.AccountStorage
+    this.latestAccountStorages = this.dexie.table<
+      ILatestAccountStorage,
+      string
+    >(Table.LatestAccountStorage);
+    this.historicalAccountStorages = this.dexie.table<
+      IHistoricalAccountStorage,
+      string
+    >(Table.HistoricalAccountStorage);
+    this.latestStorageMapEntries = this.dexie.table<
+      ILatestStorageMapEntry,
+      string
+    >(Table.LatestStorageMapEntries);
+    this.historicalStorageMapEntries = this.dexie.table<
+      IHistoricalStorageMapEntry,
+      string
+    >(Table.HistoricalStorageMapEntries);
+    this.latestAccountAssets = this.dexie.table<ILatestAccountAsset, string>(
+      Table.LatestAccountAssets
     );
-    this.storageMapEntries = this.dexie.table<IStorageMapEntry, string>(
-      Table.StorageMapEntries
-    );
-    this.accountAssets = this.dexie.table<IAccountAsset, string>(
-      Table.AccountAssets
-    );
+    this.historicalAccountAssets = this.dexie.table<
+      IHistoricalAccountAsset,
+      string
+    >(Table.HistoricalAccountAssets);
     this.accountAuths = this.dexie.table<IAccountAuth, string>(
       Table.AccountAuth
     );
     this.accountKeyMappings = this.dexie.table<IAccountKeyMapping, string>(
       Table.AccountKeyMapping
     );
-    this.accounts = this.dexie.table<IAccount, string>(Table.Accounts);
+    this.latestAccountHeaders = this.dexie.table<IAccount, string>(
+      Table.LatestAccountHeaders
+    );
+    this.historicalAccountHeaders = this.dexie.table<IAccount, string>(
+      Table.HistoricalAccountHeaders
+    );
     this.addresses = this.dexie.table<IAddress, string>(Table.Addresses);
     this.transactions = this.dexie.table<ITransaction, string>(
       Table.Transactions
@@ -397,9 +464,6 @@ export class MidenDatabase {
       Table.ForeignAccountCode
     );
     this.settings = this.dexie.table<ISetting, string>(Table.Settings);
-    this.trackedAccounts = this.dexie.table<ITrackedAccount, string>(
-      Table.TrackedAccounts
-    );
 
     this.dexie.on("populate", () => {
       this.stateSync

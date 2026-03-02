@@ -15,7 +15,7 @@ use miden_client::transaction::{
 use miden_client::utils::Deserializable;
 
 use super::WebStore;
-use super::account::utils::update_account;
+use super::account::utils::{apply_full_account_state, apply_transaction_delta};
 use super::note::utils::apply_note_updates_tx;
 use crate::promise::await_js;
 
@@ -96,7 +96,6 @@ impl WebStore {
         .await?;
 
         // Account Data
-        // TODO: This should be refactored to avoid fetching the whole account state.
         let delta = tx_update.executed_transaction().account_delta();
         let mut account: Account = self
             .get_account(delta.id())
@@ -108,13 +107,17 @@ impl WebStore {
         if delta.is_full_state() {
             account =
                 delta.try_into().expect("casting account from full state delta should not fail");
+            // Full-state path: writes all entries and tombstones for removed ones
+            apply_full_account_state(self.db_id(), &account).await.map_err(|err| {
+                StoreError::DatabaseError(format!("failed to apply full account state: {err:?}"))
+            })?;
         } else {
             account.apply_delta(delta)?;
+            // Delta path: write only changed entries (single Dexie transaction)
+            apply_transaction_delta(self.db_id(), &account, delta).await.map_err(|err| {
+                StoreError::DatabaseError(format!("failed to apply transaction delta: {err:?}"))
+            })?;
         }
-
-        update_account(self.db_id(), &account).await.map_err(|err| {
-            StoreError::DatabaseError(format!("failed to update account: {err:?}"))
-        })?;
 
         // Updates for notes
         apply_note_updates_tx(self.db_id(), tx_update.note_updates()).await?;

@@ -34,7 +34,7 @@ use crate::{Client, ClientError};
 /// Note importing methods.
 impl<AUTH> Client<AUTH>
 where
-    AUTH: TransactionAuthenticator + Sync + 'static,
+    AUTH: TransactionAuthenticator + Send + Sync + 'static,
 {
     // INPUT NOTE CREATION
     // --------------------------------------------------------------------------------------------
