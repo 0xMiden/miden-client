@@ -48,7 +48,6 @@ const BASE_STORE_NAME: &str = "MidenClientDB";
 #[wasm_bindgen]
 pub struct WebClient {
     store: Option<Arc<dyn WebStore>>,
-    keystore: Option<WebKeyStore<RpoRandomCoin>>,
     inner: Option<Client<WebKeyStore<RpoRandomCoin>>>,
     mock_rpc_api: Option<Arc<MockRpcApi>>,
     mock_note_transport_api: Option<Arc<MockNoteTransportApi>>,
@@ -69,7 +68,6 @@ impl WebClient {
         WebClient {
             inner: None,
             store: None,
-            keystore: None,
             mock_rpc_api: None,
             mock_note_transport_api: None,
             debug_mode: false,
@@ -90,6 +88,13 @@ impl WebClient {
 
     pub(crate) fn get_mut_inner(&mut self) -> Option<&mut Client<WebKeyStore<RpoRandomCoin>>> {
         self.inner.as_mut()
+    }
+
+    pub(crate) fn keystore(&self) -> Result<&Arc<WebKeyStore<RpoRandomCoin>>, JsValue> {
+        self.inner
+            .as_ref()
+            .and_then(|c| c.authenticator())
+            .ok_or_else(|| JsValue::from_str("Client not initialized"))
     }
 
     /// Creates a new `WebClient` instance with the specified configuration.
@@ -121,16 +126,16 @@ impl WebClient {
         let store_name =
             store_name.unwrap_or(format!("{}_{}", BASE_STORE_NAME, endpoint.to_network_id()));
 
-        self.setup_client(
-            web_rpc_client,
-            store_name,
-            note_transport_client,
-            seed,
-            None,
-            None,
-            None,
-        )
-        .await?;
+        let rng = create_rng(seed)?;
+        let store = Arc::new(
+            IdxdbStore::new(store_name.clone())
+                .await
+                .map_err(|_| JsValue::from_str("Failed to initialize IdxdbStore"))?,
+        );
+        let keystore = WebKeyStore::new_with_callbacks(rng, store_name, None, None, None);
+
+        self.setup_client(web_rpc_client, store, keystore, rng, note_transport_client)
+            .await?;
 
         Ok(JsValue::from_str("Client created successfully"))
     }
@@ -170,59 +175,33 @@ impl WebClient {
         let store_name =
             store_name.unwrap_or(format!("{}_{}", BASE_STORE_NAME, endpoint.to_network_id()));
 
-        self.setup_client(
-            web_rpc_client,
-            store_name,
-            note_transport_client,
-            seed,
-            get_key_cb,
-            insert_key_cb,
-            sign_cb,
-        )
-        .await?;
+        let rng = create_rng(seed)?;
+        let store = Arc::new(
+            IdxdbStore::new(store_name.clone())
+                .await
+                .map_err(|_| JsValue::from_str("Failed to initialize IdxdbStore"))?,
+        );
+        let keystore =
+            WebKeyStore::new_with_callbacks(rng, store_name, get_key_cb, insert_key_cb, sign_cb);
+
+        self.setup_client(web_rpc_client, store, keystore, rng, note_transport_client)
+            .await?;
 
         Ok(JsValue::from_str("Client created successfully"))
     }
     async fn setup_client(
         &mut self,
         rpc_client: Arc<dyn NodeRpcClient>,
-        store_name: String,
+        store: Arc<IdxdbStore>,
+        keystore: WebKeyStore<RpoRandomCoin>,
+        rng: RpoRandomCoin,
         note_transport_client: Option<Arc<dyn NoteTransportClient>>,
-        seed: Option<Vec<u8>>,
-        get_key_cb: Option<Function>,
-        insert_key_cb: Option<Function>,
-        sign_cb: Option<Function>,
     ) -> Result<(), JsValue> {
-        let mut rng = match seed {
-            Some(seed_bytes) => {
-                if seed_bytes.len() == 32 {
-                    let mut seed_array = [0u8; 32];
-                    seed_array.copy_from_slice(&seed_bytes);
-                    StdRng::from_seed(seed_array)
-                } else {
-                    return Err(JsValue::from_str("Seed must be exactly 32 bytes"));
-                }
-            },
-            None => StdRng::from_os_rng(),
-        };
-        let coin_seed: [u64; 4] = rng.random();
-
-        let rng = RpoRandomCoin::new(coin_seed.map(Felt::new).into());
-
-        let idxdb_store = Arc::new(
-            IdxdbStore::new(store_name.clone())
-                .await
-                .map_err(|_| JsValue::from_str("Failed to initialize IdxdbStore"))?,
-        );
-
-        let keystore =
-            WebKeyStore::new_with_callbacks(rng, store_name, get_key_cb, insert_key_cb, sign_cb);
-
         let mut builder = ClientBuilder::new()
             .rpc(rpc_client)
             .rng(Box::new(rng))
-            .store(idxdb_store.clone() as Arc<dyn Store>)
-            .authenticator(Arc::new(keystore.clone()))
+            .store(store.clone() as Arc<dyn Store>)
+            .authenticator(Arc::new(keystore))
             .in_debug_mode(if self.debug_mode {
                 DebugMode::Enabled
             } else {
@@ -248,8 +227,7 @@ impl WebClient {
             .map_err(|err| js_error_with_context(err, "Failed to ensure genesis in place"))?;
 
         self.inner = Some(client);
-        self.store = Some(idxdb_store as Arc<dyn WebStore>);
-        self.keystore = Some(keystore);
+        self.store = Some(store as Arc<dyn WebStore>);
 
         Ok(())
     }
@@ -261,6 +239,23 @@ impl WebClient {
         };
         Ok(CodeBuilder::from_source_manager(client.code_builder().source_manager().clone()))
     }
+}
+
+pub(crate) fn create_rng(seed: Option<Vec<u8>>) -> Result<RpoRandomCoin, JsValue> {
+    let mut rng = match seed {
+        Some(seed_bytes) => {
+            if seed_bytes.len() == 32 {
+                let mut seed_array = [0u8; 32];
+                seed_array.copy_from_slice(&seed_bytes);
+                StdRng::from_seed(seed_array)
+            } else {
+                return Err(JsValue::from_str("Seed must be exactly 32 bytes"));
+            }
+        },
+        None => StdRng::from_os_rng(),
+    };
+    let coin_seed: [u64; 4] = rng.random();
+    Ok(RpoRandomCoin::new(coin_seed.map(Felt::new).into()))
 }
 
 // ERROR HANDLING HELPERS

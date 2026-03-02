@@ -1,12 +1,13 @@
 use alloc::sync::Arc;
 
+use idxdb_store::IdxdbStore;
 use miden_client::testing::MockChain;
 use miden_client::testing::mock::MockRpcApi;
 use miden_client::testing::note_transport::{MockNoteTransportApi, MockNoteTransportNode};
 use miden_client::utils::{Deserializable, RwLock, Serializable};
 use wasm_bindgen::prelude::*;
 
-use crate::{WebClient, js_error_with_context};
+use crate::{WebClient, WebKeyStore, create_rng, js_error_with_context};
 
 #[wasm_bindgen]
 impl WebClient {
@@ -38,14 +39,21 @@ impl WebClient {
             None => Arc::new(MockNoteTransportApi::default()),
         };
 
+        let store_name = "mock_client_db".to_owned();
+        let rng = create_rng(seed)?;
+        let store = Arc::new(
+            IdxdbStore::new(store_name.clone())
+                .await
+                .map_err(|_| JsValue::from_str("Failed to initialize IdxdbStore"))?,
+        );
+        let keystore = WebKeyStore::new_with_callbacks(rng, store_name, None, None, None);
+
         self.setup_client(
             mock_rpc_api.clone(),
-            "mock_client_db".to_owned(),
+            store,
+            keystore,
+            rng,
             Some(mock_note_transport_api.clone()),
-            seed,
-            None,
-            None,
-            None,
         )
         .await?;
 

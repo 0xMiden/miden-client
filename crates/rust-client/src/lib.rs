@@ -395,6 +395,16 @@ where
     pub fn prover(&self) -> Arc<dyn TransactionProver + Send + Sync> {
         self.tx_prover.clone()
     }
+
+    /// Returns a reference to the authenticator, if configured.
+    pub fn authenticator(&self) -> Option<&Arc<AUTH>> {
+        self.authenticator.as_ref()
+    }
+
+    /// Returns a reference to the client's store.
+    pub fn store(&self) -> &Arc<dyn Store> {
+        &self.store
+    }
 }
 
 impl<AUTH> Client<AUTH> {

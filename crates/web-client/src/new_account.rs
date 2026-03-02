@@ -50,26 +50,24 @@ impl WebClient {
         init_seed: Option<Vec<u8>>,
     ) -> Result<Account, JsValue> {
         self.maybe_sync_before_account_creation().await;
-        let keystore = self.keystore.clone();
-        if let Some(client) = self.get_mut_inner() {
-            let (new_account, key_pair) =
-                generate_wallet(storage_mode, mutable, init_seed, auth_scheme).await?;
+        let keystore = self.keystore()?.clone();
+        let client =
+            self.get_mut_inner().ok_or(JsValue::from_str("Client not initialized"))?;
 
-            client
-                .add_account(&new_account, false)
-                .await
-                .map_err(|err| js_error_with_context(err, "failed to insert new wallet"))?;
+        let (new_account, key_pair) =
+            generate_wallet(storage_mode, mutable, init_seed, auth_scheme).await?;
 
-            keystore
-                .expect("KeyStore should be initialized")
-                .add_key(&key_pair, new_account.id())
-                .await
-                .map_err(|err| err.to_string())?;
+        client
+            .add_account(&new_account, false)
+            .await
+            .map_err(|err| js_error_with_context(err, "failed to insert new wallet"))?;
 
-            Ok(new_account.into())
-        } else {
-            Err(JsValue::from_str("Client not initialized"))
-        }
+        keystore
+            .add_key(&key_pair, new_account.id())
+            .await
+            .map_err(|err| err.to_string())?;
+
+        Ok(new_account.into())
     }
 
     #[wasm_bindgen(js_name = "newFaucet")]
@@ -87,7 +85,7 @@ impl WebClient {
             return Err(JsValue::from_str("Non-fungible faucets are not supported yet"));
         }
 
-        let keystore = self.keystore.clone();
+        let keystore = self.keystore()?.clone();
 
         if let Some(client) = self.get_mut_inner() {
             let mut seed = [0u8; 32];
@@ -141,7 +139,6 @@ impl WebClient {
             };
 
             keystore
-                .expect("KeyStore should be initialized")
                 .add_key(&key_pair, new_account.id())
                 .await
                 .map_err(|err| err.to_string())?;
@@ -180,7 +177,7 @@ impl WebClient {
         account_id: &AccountId,
         secret_key: &WebAuthSecretKey,
     ) -> Result<(), JsValue> {
-        let keystore = self.keystore.as_ref().expect("KeyStore should be initialized");
+        let keystore = self.keystore()?;
         let native_secret_key: AuthSecretKey = secret_key.into();
         let native_account_id = account_id.into();
 
