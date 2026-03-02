@@ -56,7 +56,7 @@ export async function initializeSignerAccount(
   client: WebClient,
   config: SignerAccountConfig
 ): Promise<string> {
-  const { AccountBuilder, AccountComponent, Word } =
+  const { AccountBuilder, AccountComponent, AuthScheme, Word } =
     await import("@miden-sdk/miden-sdk");
 
   // Sync first to get latest state
@@ -74,7 +74,7 @@ export async function initializeSignerAccount(
     .withAuthComponent(
       AccountComponent.createAuthComponentFromCommitment(
         commitmentWord,
-        1 // ECDSA auth scheme (K256/Keccak)
+        AuthScheme.AuthEcdsaK256Keccak
       )
     )
     .accountType(accountType)

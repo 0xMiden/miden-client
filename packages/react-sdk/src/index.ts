@@ -98,7 +98,7 @@ export type {
 } from "./types";
 
 // Default configuration values
-export { DEFAULTS } from "./types";
+export { DEFAULTS, AuthScheme } from "./types";
 
 // Utilities
 export { toBech32AccountId } from "./utils/accountBech32";
