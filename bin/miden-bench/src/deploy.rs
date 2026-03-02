@@ -19,7 +19,7 @@ use miden_client::account::{
     StorageSlotName,
 };
 use miden_client::assembly::CodeBuilder;
-use miden_client::auth::{AuthFalcon512Rpo, AuthSecretKey};
+use miden_client::auth::{AuthSchemeId, AuthSecretKey, AuthSingleSig};
 use miden_client::keystore::{FilesystemKeyStore, Keystore};
 use miden_client::transaction::TransactionRequestBuilder;
 use miden_client::{Client, Serializable};
@@ -107,7 +107,10 @@ fn create_account_with_empty_maps(
     .expect("basic wallet component should satisfy account component requirements");
 
     let account = AccountBuilder::new(seed)
-        .with_auth_component(AuthFalcon512Rpo::new(sk.public_key().to_commitment()))
+        .with_auth_component(AuthSingleSig::new(
+            sk.public_key().to_commitment(),
+            AuthSchemeId::Falcon512Rpo,
+        ))
         .account_type(AccountType::RegularAccountUpdatableCode)
         .with_component(wallet_component)
         .with_component(expansion_component)

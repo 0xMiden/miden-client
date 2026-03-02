@@ -21,7 +21,7 @@ authors      = ["miden contributors"]
 edition      = "2024"
 license      = "MIT"
 repository   = "https://github.com/0xMiden/miden-client"
-rust-version = "1.90"
+rust-version = "1.91"
 version      = "0.14.0"
 
 [profile.test-dev]
@@ -43,13 +43,13 @@ miden-tx        = { branch = "next", default-features = false, git = "https://gi
 # Miden node dependencies
 miden-node-block-producer = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
 miden-node-ntx-builder = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
+miden-node-proto = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
 miden-node-proto-build = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-node" }
 miden-node-rpc = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
 miden-node-store = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
 miden-node-utils = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
 miden-node-validator = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
 miden-note-transport-proto-build = { default-features = false, version = "0.2" }
-miden-remote-prover = { branch = "next", features = ["concurrent"], git = "https://github.com/0xMiden/miden-node" }
 miden-remote-prover-client = { branch = "next", default-features = false, features = [
   "tx-prover",
 ], git = "https://github.com/0xMiden/miden-node" }

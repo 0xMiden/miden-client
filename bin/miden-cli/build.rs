@@ -7,11 +7,10 @@ use miden_client::account::component::{
     MIDEN_PACKAGE_EXTENSION,
     basic_fungible_faucet_library,
     basic_wallet_library,
-    ecdsa_k256_keccak_library,
-    falcon_512_rpo_acl_library,
-    falcon_512_rpo_library,
-    falcon_512_rpo_multisig_library,
+    multisig_library,
     no_auth_library,
+    singlesig_acl_library,
+    singlesig_library,
 };
 use miden_client::assembly::Library;
 use miden_client::utils::Serializable;
@@ -38,31 +37,15 @@ fn main() {
         None,
     );
 
-    build_package(
-        &PathBuf::from("templates/basic-auth.toml"),
-        falcon_512_rpo_library(),
-        Some("auth"),
-    );
+    build_package(&PathBuf::from("templates/basic-auth.toml"), singlesig_library(), Some("auth"));
 
-    build_package(
-        &PathBuf::from("templates/ecdsa-auth.toml"),
-        ecdsa_k256_keccak_library(),
-        Some("auth"),
-    );
+    build_package(&PathBuf::from("templates/ecdsa-auth.toml"), singlesig_library(), Some("auth"));
 
     build_package(&PathBuf::from("templates/no-auth.toml"), no_auth_library(), Some("auth"));
 
-    build_package(
-        &PathBuf::from("templates/multisig-auth.toml"),
-        falcon_512_rpo_multisig_library(),
-        Some("auth"),
-    );
+    build_package(&PathBuf::from("templates/multisig-auth.toml"), multisig_library(), Some("auth"));
 
-    build_package(
-        &PathBuf::from("templates/acl-auth.toml"),
-        falcon_512_rpo_acl_library(),
-        Some("auth"),
-    );
+    build_package(&PathBuf::from("templates/acl-auth.toml"), singlesig_acl_library(), Some("auth"));
 }
 
 /// Builds a package and stores it under `{OUT_DIR}/{PACKAGE_DIR}` or

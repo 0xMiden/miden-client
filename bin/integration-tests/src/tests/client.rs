@@ -152,8 +152,9 @@ pub async fn test_multiple_tx_on_same_block(client_config: ClientConfig) -> Resu
     // wait for 1 block
     wait_for_blocks(&mut client, 1).await;
 
-    // wait for 1 block
+    // wait for both transactions to be committed
     wait_for_tx(&mut client, transaction_id_1).await?;
+    wait_for_tx(&mut client, transaction_id_2).await?;
 
     let transactions = client
         .get_transactions(TransactionFilter::All)
@@ -720,6 +721,7 @@ pub async fn test_consume_multiple_expected_notes(client_config: ClientConfig) -
     );
 
     execute_tx_and_sync(&mut client, faucet_account_id, mint_tx_request.clone()).await?;
+
     unauth_client.sync_state().await.unwrap();
 
     // Filter notes by ownership

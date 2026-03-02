@@ -18,4 +18,4 @@ Authentication schemes supported by the web client.
 
 ### AuthRpoFalcon512
 
-> **AuthRpoFalcon512**: `0`
+> **AuthRpoFalcon512**: `2`

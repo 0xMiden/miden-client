@@ -10,7 +10,7 @@ const mockChainTest = async (testingPage: Page) => {
     const account = await client.newWallet(
       window.AccountStorageMode.private(),
       true,
-      0
+      window.AuthScheme.AuthRpoFalcon512
     );
     const faucetAccount = await client.newFaucet(
       window.AccountStorageMode.private(),
@@ -18,7 +18,7 @@ const mockChainTest = async (testingPage: Page) => {
       "DAG",
       8,
       BigInt(10000000),
-      0
+      window.AuthScheme.AuthRpoFalcon512
     );
 
     const mintTransactionRequest = await client.newMintTransactionRequest(

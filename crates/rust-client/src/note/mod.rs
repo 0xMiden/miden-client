@@ -102,6 +102,7 @@ pub use miden_standards::note::{
     NoteConsumptionStatus,
     NoteExecutionHint,
     P2idNote,
+    P2idNoteStorage,
     StandardNote,
     SwapNote,
 };

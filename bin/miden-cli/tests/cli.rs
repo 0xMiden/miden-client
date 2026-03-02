@@ -295,8 +295,10 @@ async fn mint_with_untracked_account() -> Result<()> {
         &fungible_faucet_account_id,
     );
 
-    // Sleep for a while to ensure the note is committed on the node
-    sync_until_committed_note(&temp_dir);
+    // Wait until the faucet's mint transaction is committed on the node.
+    // We sync for a committed transaction (not note) because the target account is untracked,
+    // so the output note's tag won't be requested during sync and the note will never appear.
+    sync_until_committed_transaction(&temp_dir);
     Ok(())
 }
 
@@ -329,7 +331,12 @@ async fn token_symbol_mapping() -> Result<()> {
     ]);
 
     let output = mint_cmd.current_dir(&temp_dir).output().unwrap();
-    assert!(output.status.success());
+    assert!(
+        output.status.success(),
+        "token_symbol mint failed.\nstdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
 
     let note_id = String::from_utf8(output.stdout)
         .unwrap()
@@ -413,8 +420,9 @@ async fn import_genesis_accounts_can_be_used_for_transactions() -> Result<()> {
         &fungible_faucet_account_id,
     );
 
-    // Wait until the note is committed on the node
-    sync_until_committed_note(&temp_dir);
+    // Wait until the mint transaction is committed on the node.
+    // We sync for a committed transaction (not note) because the target account is untracked.
+    sync_until_committed_transaction(&temp_dir);
     Ok(())
 }
 
@@ -957,10 +965,15 @@ fn set_isolated_miden_home() -> PathBuf {
     path
 }
 
+struct SyncResult {
+    committed_notes: u64,
+    committed_transactions: u64,
+}
+
 // Syncs CLI on directory. It'll try syncing until the command executes successfully. If it never
 // executes successfully, eventually the test will time out (provided the nextest config has a
-// timeout set). It returns the number of updated notes after the sync.
-fn sync_cli(cli_path: &Path) -> u64 {
+// timeout set). It returns the number of committed notes and transactions after the sync.
+fn sync_cli(cli_path: &Path) -> SyncResult {
     loop {
         let mut sync_cmd = cargo_bin_cmd!("miden-client");
         sync_cmd.args(["sync"]);
@@ -968,19 +981,25 @@ fn sync_cli(cli_path: &Path) -> u64 {
         let output = sync_cmd.current_dir(cli_path).output().unwrap();
 
         if output.status.success() {
-            let updated_notes = String::from_utf8(output.stdout)
-                .unwrap()
+            let stdout = String::from_utf8(output.stdout).unwrap();
+
+            let committed_notes = stdout
                 .lines()
                 .find_map(|line| {
-                    if let Some(rest) = line.strip_prefix("Committed notes: ") {
-                        rest.trim().parse::<u64>().ok()
-                    } else {
-                        None
-                    }
+                    line.strip_prefix("Committed notes: ")
+                        .and_then(|rest| rest.trim().parse::<u64>().ok())
                 })
                 .unwrap();
 
-            return updated_notes;
+            let committed_transactions = stdout
+                .lines()
+                .find_map(|line| {
+                    line.strip_prefix("Committed transactions: ")
+                        .and_then(|rest| rest.trim().parse::<u64>().ok())
+                })
+                .unwrap();
+
+            return SyncResult { committed_notes, committed_transactions };
         }
         std::thread::sleep(std::time::Duration::from_secs(3));
     }
@@ -990,6 +1009,7 @@ fn sync_cli(cli_path: &Path) -> u64 {
 /// successfully given account using the CLI given by `cli_path`.
 fn mint_cli(cli_path: &Path, target_account_id: &str, faucet_id: &str) -> String {
     let mut mint_cmd = cargo_bin_cmd!("miden-client");
+    mint_cmd.env("MIDEN_DEBUG", "true");
     mint_cmd.args([
         "mint",
         "--target",
@@ -1002,7 +1022,12 @@ fn mint_cli(cli_path: &Path, target_account_id: &str, faucet_id: &str) -> String
     ]);
 
     let output = mint_cmd.current_dir(cli_path).output().unwrap();
-    assert!(output.status.success());
+    assert!(
+        output.status.success(),
+        "mint_cli failed.\nstdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
 
     String::from_utf8(output.stdout)
         .unwrap()
@@ -1047,7 +1072,14 @@ fn send_cli(cli_path: &Path, from_account_id: &str, to_account_id: &str, faucet_
 
 /// Syncs until a tracked note gets committed.
 fn sync_until_committed_note(cli_path: &Path) {
-    while sync_cli(cli_path) == 0 {
+    while sync_cli(cli_path).committed_notes == 0 {
+        std::thread::sleep(std::time::Duration::from_secs(1));
+    }
+}
+
+/// Syncs until a tracked transaction gets committed.
+fn sync_until_committed_transaction(cli_path: &Path) {
+    while sync_cli(cli_path).committed_transactions == 0 {
         std::thread::sleep(std::time::Duration::from_secs(1));
     }
 }
@@ -1240,16 +1272,22 @@ fn create_account_with_multisig_auth() {
     // threshold_config is a value slot with [threshold, num_approvers, 0, 0]
     // approver_public_keys and procedure_thresholds are map slots
     let init_storage_data_toml = r#"
-        "miden::standards::auth::falcon512_rpo_multisig::threshold_config.threshold" = "2"
-        "miden::standards::auth::falcon512_rpo_multisig::threshold_config.num_approvers" = "3"
+        "miden::standards::auth::multisig::threshold_config.threshold" = "2"
+        "miden::standards::auth::multisig::threshold_config.num_approvers" = "3"
 
-        "miden::standards::auth::falcon512_rpo_multisig::approver_public_keys" = [
+        "miden::standards::auth::multisig::approver_public_keys" = [
             { key = ["0", "0", "0", "0"], value = "0x0000000000000000000000000000000000000000000000000000000000000001" },
             { key = ["0", "0", "0", "1"], value = "0x0000000000000000000000000000000000000000000000000000000000000002" },
             { key = ["0", "0", "0", "2"], value = "0x0000000000000000000000000000000000000000000000000000000000000003" }
         ]
 
-        "miden::standards::auth::falcon512_rpo_multisig::procedure_thresholds" = [
+        "miden::standards::auth::multisig::approver_schemes" = [
+            { key = ["0", "0", "0", "0"], value = ["2", "0", "0", "0"] },
+            { key = ["0", "0", "0", "1"], value = ["2", "0", "0", "0"] },
+            { key = ["0", "0", "0", "2"], value = ["2", "0", "0", "0"] }
+        ]
+
+        "miden::standards::auth::multisig::procedure_thresholds" = [
             { key = "0xd2d1b6229d7cfb9f2ada31c5cb61453cf464f91828e124437c708eec55b9cd07", value = "1" }
         ]
         "#;
@@ -1281,12 +1319,13 @@ fn create_account_with_acl_auth() {
 
     // Create init storage data file for acl-auth with a test public key
     let init_storage_data_toml = r#"
-        "miden::standards::auth::rpo_falcon512_acl::public_key" = "0x0000000000000000000000000000000000000000000000000000000000000001"
-        "miden::standards::auth::rpo_falcon512_acl::config.num_tracked_procs" = "1"
-        "miden::standards::auth::rpo_falcon512_acl::config.allow_unauthorized_output_notes" = "0"
-        "miden::standards::auth::rpo_falcon512_acl::config.allow_unauthorized_input_notes" = "0"
+        "miden::standards::auth::singlesig_acl::pub_key" = "0x0000000000000000000000000000000000000000000000000000000000000001"
+        "miden::standards::auth::singlesig_acl::scheme" = "Falcon512Rpo"
+        "miden::standards::auth::singlesig_acl::config.num_tracked_procs" = "1"
+        "miden::standards::auth::singlesig_acl::config.allow_unauthorized_output_notes" = "0"
+        "miden::standards::auth::singlesig_acl::config.allow_unauthorized_input_notes" = "0"
 
-        "miden::standards::auth::rpo_falcon512_acl::trigger_procedure_roots" = [
+        "miden::standards::auth::singlesig_acl::trigger_procedure_roots" = [
             { key = ["0", "0", "0", "0"], value = "0xd2d1b6229d7cfb9f2ada31c5cb61453cf464f91828e124437c708eec55b9cd07" }
         ]
         "#;
@@ -1316,9 +1355,10 @@ fn create_account_with_acl_auth() {
 fn create_account_with_ecdsa_auth() {
     let temp_dir = init_cli().1;
 
-    // Create init storage data file for ecdsa-auth with a test public key
+    // Create init storage data file for ecdsa-auth with a test public key and scheme
     let init_storage_data_toml = r#"
-        "miden::standards::auth::ecdsa_k256_keccak::public_key"="0x0000000000000000000000000000000000000000000000000000000000000001"
+        "miden::standards::auth::singlesig::pub_key" = "0x0000000000000000000000000000000000000000000000000000000000000001"
+        "miden::standards::auth::singlesig::scheme" = "EcdsaK256Keccak"
         "#;
     let file_path = temp_dir.join("ecdsa_init_data.toml");
     fs::write(&file_path, init_storage_data_toml).unwrap();

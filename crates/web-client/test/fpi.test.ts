@@ -86,7 +86,7 @@ export const testStandardFpi = async (page: Page): Promise<void> => {
     let newAccount = await client.newWallet(
       window.AccountStorageMode.public(),
       false,
-      0
+      window.AuthScheme.AuthRpoFalcon512
     );
 
     let txScript = `
