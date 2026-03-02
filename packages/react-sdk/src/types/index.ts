@@ -338,8 +338,8 @@ export interface MintOptions {
 export interface ConsumeOptions {
   /** Account ID that will consume the notes */
   accountId: AccountRef;
-  /** List of note IDs or Note objects to consume. Pass Note objects directly for unauthenticated consumption. */
-  noteIds: (string | NoteId | Note)[];
+  /** Notes to consume: strings (hex IDs), NoteId objects, InputNoteRecords, or Note objects. */
+  notes: (string | NoteId | InputNoteRecord | Note)[];
 }
 
 // Swap options

@@ -39,7 +39,8 @@ export class NotesResource {
     this.#client.assertNotTerminated();
     const wasm = await this.#getWasm();
     const accountId = resolveAccountRef(opts.account, wasm);
-    return await this.#inner.getConsumableNotes(accountId);
+    const consumable = await this.#inner.getConsumableNotes(accountId);
+    return consumable.map((c) => c.inputNoteRecord());
   }
 
   async import(noteFile) {

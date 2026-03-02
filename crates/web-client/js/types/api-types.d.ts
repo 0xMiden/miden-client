@@ -17,7 +17,6 @@ import type {
   TransactionRecord,
   InputNoteRecord,
   OutputNoteRecord,
-  ConsumableNoteRecord,
   NoteId,
   NoteFile,
   NoteTag,
@@ -577,9 +576,7 @@ export interface NotesResource {
 
   listSent(query?: NoteQuery): Promise<OutputNoteRecord[]>;
 
-  listAvailable(options: {
-    account: AccountRef;
-  }): Promise<ConsumableNoteRecord[]>;
+  listAvailable(options: { account: AccountRef }): Promise<InputNoteRecord[]>;
 
   import(noteFile: NoteFile): Promise<NoteId>;
   export(noteId: NoteInput, options?: ExportNoteOptions): Promise<NoteFile>;

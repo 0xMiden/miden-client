@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import { useMiden } from "../context/MidenProvider";
 import { NoteFilter, NoteFilterTypes, NoteId } from "@miden-sdk/miden-sdk";
-import type { Note } from "@miden-sdk/miden-sdk";
+import type { Note, InputNoteRecord } from "@miden-sdk/miden-sdk";
 import type {
   ConsumeOptions,
   TransactionStage,
@@ -30,14 +30,14 @@ export interface UseConsumeResult {
  *
  * @example
  * ```tsx
- * function ConsumeNotesButton({ accountId, noteIds }: Props) {
+ * function ConsumeNotesButton({ accountId, notes }: Props) {
  *   const { consume, isLoading, stage, error } = useConsume();
  *
  *   const handleConsume = async () => {
  *     try {
  *       const result = await consume({
  *         accountId,
- *         noteIds,
+ *         notes,
  *       });
  *       console.log('Consumed! TX:', result.transactionId);
  *     } catch (err) {
@@ -68,8 +68,8 @@ export function useConsume(): UseConsumeResult {
         throw new Error("Miden client is not ready");
       }
 
-      if (options.noteIds.length === 0) {
-        throw new Error("No note IDs provided");
+      if (options.notes.length === 0) {
+        throw new Error("No notes provided");
       }
 
       setIsLoading(true);
@@ -82,24 +82,34 @@ export function useConsume(): UseConsumeResult {
 
         setStage("proving");
         const txResult = await runExclusiveSafe(async () => {
-          // Separate Note objects (for unauthenticated consumption) from ID-based lookups
+          // Resolve each input to a Note object:
+          // - InputNoteRecord (has .toNote()) → unwrap via .toNote()
+          // - Note (has .id() but not .toNote()) → use directly
+          // - string → look up from store by hex ID
+          // - NoteId → look up from store
           const directNotes: Note[] = [];
           const noteIdInputs: NoteId[] = [];
 
-          for (const item of options.noteIds) {
-            // Note objects have an .id() method; NoteId objects do not
-            if (
+          for (const item of options.notes) {
+            if (typeof item === "string") {
+              noteIdInputs.push(NoteId.fromHex(item));
+            } else if (
               item !== null &&
               typeof item === "object" &&
-              typeof (item as { id?: unknown }).id === "function"
+              typeof (item as InputNoteRecord).toNote === "function"
             ) {
+              // InputNoteRecord — unwrap to Note
+              directNotes.push((item as InputNoteRecord).toNote());
+            } else if (
+              item !== null &&
+              typeof item === "object" &&
+              typeof (item as Note).id === "function"
+            ) {
+              // Note object — use directly
               directNotes.push(item as Note);
             } else {
-              noteIdInputs.push(
-                typeof item === "string"
-                  ? NoteId.fromHex(item)
-                  : (item as NoteId)
-              );
+              // NoteId
+              noteIdInputs.push(item as NoteId);
             }
           }
 
