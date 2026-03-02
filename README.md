@@ -21,7 +21,7 @@ graph TB
     subgraph rust-sdk-repo["rust-sdk repo"]
         rust-sdk["<b>rust-sdk</b><br/>Core client library<br/>accounts · notes · transactions"]
         wasm-bridge["<b>wasm-bridge</b> (internal)<br/>Compiled via wasm-bindgen<br/>idxdb-store · web-tonic"]
-        rust-sdk -- "cargo build --target wasm32" --> wasm-bridge
+        rust-sdk -- "wasm-bindgen + Rollup" --> wasm-bridge
     end
 
     subgraph react-sdk-repo["react-sdk repo"]
