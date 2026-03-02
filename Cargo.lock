@@ -3315,13 +3315,15 @@ dependencies = [
 [[package]]
 name = "miden-swapp"
 version = "0.1.0"
-source = "git+https://github.com/inicio-labs/miden-swapp?tag=v0.1.0-alpha#0c484f2b76105b472c1cb55ccb10906bfdb91e72"
 dependencies = [
+ "anyhow",
  "miden-core",
  "miden-crypto",
  "miden-mast-package",
  "miden-protocol",
  "miden-standards",
+ "miden-testing",
+ "tokio",
 ]
 
 [[package]]
