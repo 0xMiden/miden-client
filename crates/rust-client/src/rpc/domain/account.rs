@@ -5,16 +5,8 @@ use core::fmt::{self, Debug, Display, Formatter};
 
 use miden_protocol::Word;
 use miden_protocol::account::{
-    Account,
-    AccountCode,
-    AccountHeader,
-    AccountId,
-    AccountStorageHeader,
-    StorageMap,
-    StorageMapWitness,
-    StorageSlotHeader,
-    StorageSlotName,
-    StorageSlotType,
+    Account, AccountCode, AccountHeader, AccountId, AccountStorageHeader, StorageMap,
+    StorageMapWitness, StorageSlotHeader, StorageSlotName, StorageSlotType,
 };
 use miden_protocol::asset::Asset;
 use miden_protocol::block::BlockNumber;
@@ -671,8 +663,7 @@ impl From<AccountStorageRequirements> for Vec<account_detail_request::StorageMap
     fn from(
         value: AccountStorageRequirements,
     ) -> Vec<account_detail_request::StorageMapDetailRequest> {
-        use account_detail_request;
-        use account_detail_request::storage_map_detail_request;
+        use account_detail_request::{self, storage_map_detail_request};
         let request_map = value.0;
         let mut requests = Vec::with_capacity(request_map.len());
         for (slot_name, _map_keys) in request_map {
