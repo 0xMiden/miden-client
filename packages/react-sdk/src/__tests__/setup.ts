@@ -16,6 +16,7 @@ vi.mock("@miden-sdk/miden-sdk", () => {
     getAccount: vi.fn().mockResolvedValue(null),
     newWallet: vi.fn().mockResolvedValue({}),
     newFaucet: vi.fn().mockResolvedValue({}),
+    newAccount: vi.fn().mockResolvedValue(undefined),
     syncState: vi.fn().mockResolvedValue({ blockNum: vi.fn(() => 100) }),
     getSyncHeight: vi.fn().mockResolvedValue(100),
     getInputNotes: vi.fn().mockResolvedValue([]),
@@ -48,6 +49,9 @@ vi.mock("@miden-sdk/miden-sdk", () => {
     exportAccountFile: vi
       .fn()
       .mockResolvedValue({ serialize: () => new Uint8Array() }),
+    signCb: null as
+      | ((pubKey: Uint8Array, signingInputs: Uint8Array) => Promise<Uint8Array>)
+      | null,
     free: vi.fn(),
   };
 
@@ -153,15 +157,25 @@ vi.mock("@miden-sdk/miden-sdk", () => {
     NoteAttachmentScheme: {
       none: vi.fn(() => ({ type: "none" })),
     },
-    Word: class Word {
-      values: BigUint64Array;
-      constructor(values: BigUint64Array) {
-        this.values = values;
+    Word: Object.assign(
+      class Word {
+        values: BigUint64Array;
+        constructor(values: BigUint64Array) {
+          this.values = values;
+        }
+        toU64s() {
+          return Array.from(this.values);
+        }
+      },
+      {
+        deserialize: vi.fn(
+          () =>
+            new (class Word {
+              values = new BigUint64Array(4);
+            })()
+        ),
       }
-      toU64s() {
-        return Array.from(this.values);
-      }
-    },
+    ),
     NoteAttachment: Object.assign(class NoteAttachment {}, {
       newWord: vi.fn(
         (_scheme: unknown, _word: unknown) => new (class NoteAttachment {})()
@@ -233,6 +247,42 @@ vi.mock("@miden-sdk/miden-sdk", () => {
       static deserialize() {
         return new AccountFile();
       }
+    },
+    AccountType: {
+      RegularAccountImmutableCode: 0,
+      RegularAccountUpdatableCode: 1,
+      FungibleFaucet: 2,
+      NonFungibleFaucet: 3,
+    },
+    AccountBuilder: class AccountBuilder {
+      _seed: Uint8Array;
+      constructor(seed: Uint8Array) {
+        this._seed = seed;
+      }
+      withAuthComponent() {
+        return this;
+      }
+      accountType() {
+        return this;
+      }
+      storageMode() {
+        return this;
+      }
+      withBasicWalletComponent() {
+        return this;
+      }
+      withComponent() {
+        return this;
+      }
+      build() {
+        const mockAccount = {
+          id: vi.fn(() => createMockAccountId("0xsigner_account")),
+        };
+        return { account: mockAccount };
+      }
+    },
+    AccountComponent: {
+      createAuthComponentFromCommitment: vi.fn(() => ({})),
     },
   };
 });

@@ -66,7 +66,8 @@ type TransactionRequestFactory = (
  * ```
  */
 export function useTransaction(): UseTransactionResult {
-  const { client, isReady, sync, runExclusive, prover } = useMiden();
+  const { client, isReady, sync, runExclusive, prover, signerConnected } =
+    useMiden();
   const runExclusiveSafe = runExclusive ?? runExclusiveDirect;
   const isBusyRef = useRef(false);
 
@@ -79,6 +80,12 @@ export function useTransaction(): UseTransactionResult {
     async (options: ExecuteTransactionOptions): Promise<TransactionResult> => {
       if (!client || !isReady) {
         throw new Error("Miden client is not ready");
+      }
+
+      if (signerConnected === false) {
+        throw new Error(
+          "Signer is disconnected. Reconnect your wallet to perform transactions."
+        );
       }
 
       if (isBusyRef.current) {
@@ -135,7 +142,7 @@ export function useTransaction(): UseTransactionResult {
         isBusyRef.current = false;
       }
     },
-    [client, isReady, prover, runExclusive, sync]
+    [client, isReady, prover, runExclusive, signerConnected, sync]
   );
 
   const reset = useCallback(() => {

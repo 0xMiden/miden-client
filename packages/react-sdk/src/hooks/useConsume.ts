@@ -53,7 +53,8 @@ export interface UseConsumeResult {
  * ```
  */
 export function useConsume(): UseConsumeResult {
-  const { client, isReady, sync, runExclusive, prover } = useMiden();
+  const { client, isReady, sync, runExclusive, prover, signerConnected } =
+    useMiden();
   const runExclusiveSafe = runExclusive ?? runExclusiveDirect;
 
   const [result, setResult] = useState<TransactionResult | null>(null);
@@ -65,6 +66,12 @@ export function useConsume(): UseConsumeResult {
     async (options: ConsumeOptions): Promise<TransactionResult> => {
       if (!client || !isReady) {
         throw new Error("Miden client is not ready");
+      }
+
+      if (signerConnected === false) {
+        throw new Error(
+          "Signer is disconnected. Reconnect your wallet to perform transactions."
+        );
       }
 
       if (options.noteIds.length === 0) {
@@ -122,7 +129,7 @@ export function useConsume(): UseConsumeResult {
         setIsLoading(false);
       }
     },
-    [client, isReady, prover, runExclusive, sync]
+    [client, isReady, prover, runExclusive, signerConnected, sync]
   );
 
   const reset = useCallback(() => {

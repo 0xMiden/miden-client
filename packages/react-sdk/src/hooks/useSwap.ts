@@ -57,7 +57,8 @@ export interface UseSwapResult {
  * ```
  */
 export function useSwap(): UseSwapResult {
-  const { client, isReady, sync, runExclusive, prover } = useMiden();
+  const { client, isReady, sync, runExclusive, prover, signerConnected } =
+    useMiden();
   const runExclusiveSafe = runExclusive ?? runExclusiveDirect;
 
   const [result, setResult] = useState<TransactionResult | null>(null);
@@ -69,6 +70,12 @@ export function useSwap(): UseSwapResult {
     async (options: SwapOptions): Promise<TransactionResult> => {
       if (!client || !isReady) {
         throw new Error("Miden client is not ready");
+      }
+
+      if (signerConnected === false) {
+        throw new Error(
+          "Signer is disconnected. Reconnect your wallet to perform transactions."
+        );
       }
 
       setIsLoading(true);
@@ -124,7 +131,7 @@ export function useSwap(): UseSwapResult {
         setIsLoading(false);
       }
     },
-    [client, isReady, prover, runExclusive, sync]
+    [client, isReady, prover, runExclusive, signerConnected, sync]
   );
 
   const reset = useCallback(() => {

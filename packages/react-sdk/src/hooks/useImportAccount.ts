@@ -57,7 +57,7 @@ type AccountFileWithAccount = AccountFileType & {
  * ```
  */
 export function useImportAccount(): UseImportAccountResult {
-  const { client, isReady, runExclusive } = useMiden();
+  const { client, isReady, runExclusive, signerConnected } = useMiden();
   const runExclusiveSafe = runExclusive ?? runExclusiveDirect;
   const setAccounts = useMidenStore((state) => state.setAccounts);
 
@@ -69,6 +69,12 @@ export function useImportAccount(): UseImportAccountResult {
     async (options: ImportAccountOptions): Promise<Account> => {
       if (!client || !isReady) {
         throw new Error("Miden client is not ready");
+      }
+
+      if (signerConnected === false) {
+        throw new Error(
+          "Signer is disconnected. Reconnect your wallet to perform transactions."
+        );
       }
 
       setIsImporting(true);
@@ -179,7 +185,7 @@ export function useImportAccount(): UseImportAccountResult {
         setIsImporting(false);
       }
     },
-    [client, isReady, runExclusive, setAccounts]
+    [client, isReady, runExclusive, setAccounts, signerConnected]
   );
 
   const reset = useCallback(() => {
