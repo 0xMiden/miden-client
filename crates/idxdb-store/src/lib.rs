@@ -112,6 +112,7 @@ impl WebStore {
         for (vault, storage) in &account_states {
             smt_forest.insert_account_state(vault, storage).map_err(js_error)?;
         }
+        drop(smt_forest);
 
         Ok(store)
     }
