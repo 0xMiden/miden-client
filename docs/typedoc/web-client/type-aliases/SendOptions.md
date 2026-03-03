@@ -6,8 +6,8 @@
 
 # ~~Type Alias: SendOptions~~
 
-> **SendOptions** = [`SendOptionsAuthenticated`](../interfaces/SendOptionsAuthenticated.md) \| [`SendOptionsUnauthenticated`](../interfaces/SendOptionsUnauthenticated.md)
+> **SendOptions** = [`SendOptionsDefault`](../interfaces/SendOptionsDefault.md) \| [`SendOptionsReturnNote`](../interfaces/SendOptionsReturnNote.md)
 
 ## Deprecated
 
-Use SendOptionsAuthenticated or SendOptionsUnauthenticated instead
+Use SendOptionsDefault or SendOptionsReturnNote instead

@@ -94,7 +94,7 @@
 
 ### listAvailable()
 
-> **listAvailable**(`options`): `Promise`\<[`ConsumableNoteRecord`](../classes/ConsumableNoteRecord.md)[]\>
+> **listAvailable**(`options`): `Promise`\<[`InputNoteRecord`](../classes/InputNoteRecord.md)[]\>
 
 #### Parameters
 
@@ -106,7 +106,7 @@
 
 #### Returns
 
-`Promise`\<[`ConsumableNoteRecord`](../classes/ConsumableNoteRecord.md)[]\>
+`Promise`\<[`InputNoteRecord`](../classes/InputNoteRecord.md)[]\>
 
 ***
 

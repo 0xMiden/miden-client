@@ -8,8 +8,8 @@
 
 ## Extended by
 
-- [`SendOptionsAuthenticated`](SendOptionsAuthenticated.md)
-- [`SendOptionsUnauthenticated`](SendOptionsUnauthenticated.md)
+- [`SendOptionsDefault`](SendOptionsDefault.md)
+- [`SendOptionsReturnNote`](SendOptionsReturnNote.md)
 - [`MintOptions`](MintOptions.md)
 - [`ConsumeOptions`](ConsumeOptions.md)
 - [`ConsumeAllOptions`](ConsumeAllOptions.md)

@@ -276,11 +276,11 @@ export interface SendOptions {
   recallHeight?: number;
   /** Block height after which recipient can consume note */
   timelockHeight?: number;
-  /** false = unauthenticated P2ID (returns Note object). Default: true (authenticated) */
-  authenticated?: boolean;
+  /** true = build note in JS and return the Note object (e.g. for out-of-band delivery). Default: false */
+  returnNote?: boolean;
 }
 
-// Send result — txId always set; note is non-null only for unauthenticated sends
+// Send result — txId always set; note is non-null only when returnNote is true
 export interface SendResult {
   txId: string;
   note: Note | null;

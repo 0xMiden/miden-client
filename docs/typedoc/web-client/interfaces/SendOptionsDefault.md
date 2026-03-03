@@ -2,9 +2,9 @@
 
 ***
 
-[@miden-sdk/miden-sdk](../README.md) / SendOptionsAuthenticated
+[@miden-sdk/miden-sdk](../README.md) / SendOptionsDefault
 
-# Interface: SendOptionsAuthenticated
+# Interface: SendOptionsDefault
 
 ## Extends
 
@@ -21,12 +21,6 @@
 ### amount
 
 > **amount**: `number` \| `bigint`
-
-***
-
-### authenticated?
-
-> `optional` **authenticated**: `true`
 
 ***
 
@@ -47,6 +41,12 @@ Override default prover.
 > `optional` **reclaimAfter**: `number`
 
 Block height after which the sender can reclaim the note. This is a block number, not wall-clock time.
+
+***
+
+### returnNote?
+
+> `optional` **returnNote**: `false`
 
 ***
 

@@ -110,8 +110,8 @@ export function useSend(): UseSendResult {
         }
         const assetIdObj = parseAccountId(assetId);
 
-        // Unauthenticated P2ID path: create note locally, submit as output note
-        if (options.authenticated === false) {
+        // returnNote path: build note in JS, submit as output note, return Note object
+        if (options.returnNote === true) {
           const assets = new NoteAssets([
             new FungibleAsset(assetIdObj, options.amount),
           ]);
@@ -152,7 +152,7 @@ export function useSend(): UseSendResult {
           return sendResult;
         }
 
-        // Authenticated path (default)
+        // On-chain path (default)
         const txResult = await runExclusiveSafe(async () => {
           const txRequest = client.newSendTransactionRequest(
             fromAccountId,

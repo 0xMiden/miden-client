@@ -19,11 +19,12 @@ export class TransactionsResource {
     this.#client.assertNotTerminated();
     const wasm = await this.#getWasm();
 
-    if (opts.authenticated === false) {
-      // Unauthenticated P2ID path — create note in JS, return Note object
+    if (opts.returnNote === true) {
+      // returnNote path — build the P2ID note in JS so we can return the Note
+      // object to the caller (e.g. for out-of-band delivery to the recipient).
       if (opts.reclaimAfter != null || opts.timelockUntil != null) {
         throw new Error(
-          "reclaimAfter and timelockUntil are not supported for unauthenticated sends"
+          "reclaimAfter and timelockUntil are not supported when returnNote is true"
         );
       }
 
@@ -61,7 +62,7 @@ export class TransactionsResource {
       return { txId, note };
     }
 
-    // Authenticated path (default) — existing P2ID with optional reclaim/timelock
+    // Default path — note built in WASM with optional reclaim/timelock
     const { accountId, request } = await this.#buildSendRequest(opts, wasm);
     const txId = await this.#submitOrSubmitWithProver(
       accountId,

@@ -2,9 +2,9 @@
 
 ***
 
-[@miden-sdk/miden-sdk](../README.md) / SendOptionsUnauthenticated
+[@miden-sdk/miden-sdk](../README.md) / SendOptionsReturnNote
 
-# Interface: SendOptionsUnauthenticated
+# Interface: SendOptionsReturnNote
 
 ## Extends
 
@@ -24,12 +24,6 @@
 
 ***
 
-### authenticated
-
-> **authenticated**: `false`
-
-***
-
 ### prover?
 
 > `optional` **prover**: [`TransactionProver`](../classes/TransactionProver.md)
@@ -39,6 +33,12 @@ Override default prover.
 #### Inherited from
 
 [`TransactionOptions`](TransactionOptions.md).[`prover`](TransactionOptions.md#prover)
+
+***
+
+### returnNote
+
+> **returnNote**: `true`
 
 ***
 

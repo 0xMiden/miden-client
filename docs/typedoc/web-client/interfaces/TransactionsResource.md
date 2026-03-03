@@ -114,7 +114,7 @@
 
 ###### options
 
-[`SendOptionsAuthenticated`](SendOptionsAuthenticated.md)
+[`SendOptionsDefault`](SendOptionsDefault.md)
 
 ##### Returns
 
@@ -128,7 +128,7 @@
 
 ###### options
 
-[`SendOptionsUnauthenticated`](SendOptionsUnauthenticated.md)
+[`SendOptionsReturnNote`](SendOptionsReturnNote.md)
 
 ##### Returns
 
