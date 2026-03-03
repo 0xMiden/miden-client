@@ -324,7 +324,7 @@ const TX_DISCARD_DELTA: u32 = 20;
 ///
 /// If the `MIDEN_KEYSTORE_PASSWORD` environment variable is set to a non-empty value, the
 /// keystore will encrypt secret keys at rest using that password. Otherwise, keys are stored
-/// as plaintext (existing behavior).
+/// as plaintext.
 fn create_keystore(
     keys_directory: std::path::PathBuf,
 ) -> Result<CliKeyStore, miden_client::keystore::KeyStoreError> {
