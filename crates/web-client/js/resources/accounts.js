@@ -76,16 +76,8 @@ export class AccountsResource {
     const account = built.account;
     const accountId = account.id();
 
+    await this.#inner.newAccount(account, false);
     await this.#inner.addAccountSecretKeyToWebStore(accountId, opts.auth);
-    try {
-      await this.#inner.newAccount(account, false);
-    } catch (err) {
-      throw new Error(
-        `Contract account creation failed after storing secret key for ${accountId.toString()}. ` +
-          `The secret key was stored but the account was not. ` +
-          `Original error: ${err?.message ?? err}`
-      );
-    }
     return await this.#inner.getAccount(accountId);
   }
 
