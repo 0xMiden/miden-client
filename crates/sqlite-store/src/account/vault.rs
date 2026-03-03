@@ -7,13 +7,12 @@ use std::vec::Vec;
 use miden_client::Word;
 use miden_client::account::{AccountDelta, AccountHeader, AccountId, AccountIdPrefix};
 use miden_client::asset::{Asset, FungibleAsset, NonFungibleDeltaAction};
-use miden_client::store::StoreError;
+use miden_client::store::{AccountSmtForest, StoreError};
 use miden_protocol::asset::AssetVaultKey;
 use miden_protocol::crypto::merkle::MerkleError;
 use rusqlite::types::Value;
 use rusqlite::{Connection, Transaction, params};
 
-use crate::smt_forest::AccountSmtForest;
 use crate::sql_error::SqlResultExt;
 use crate::{SqliteStore, insert_sql, subst, u64_to_value};
 

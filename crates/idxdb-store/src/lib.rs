@@ -57,7 +57,6 @@ pub mod import;
 pub mod note;
 mod promise;
 pub mod settings;
-mod smt_forest;
 pub mod sync;
 pub mod transaction;
 
@@ -85,7 +84,7 @@ extern "C" {
 /// which would prevent the struct from being Send + Sync.
 pub struct WebStore {
     database_id: String,
-    smt_forest: RwLock<smt_forest::AccountSmtForest>,
+    smt_forest: RwLock<miden_client::store::AccountSmtForest>,
 }
 
 impl WebStore {
@@ -95,7 +94,7 @@ impl WebStore {
 
         let store = WebStore {
             database_id: database_name,
-            smt_forest: RwLock::new(smt_forest::AccountSmtForest::new()),
+            smt_forest: RwLock::new(miden_client::store::AccountSmtForest::new()),
         };
 
         // Initialize SMT forest

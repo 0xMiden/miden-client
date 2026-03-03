@@ -530,10 +530,9 @@ impl WebStore {
             .ok_or(StoreError::AccountDataNotFound(account_id))?
             .0;
 
-        let vault_key_word: Word = vault_key.into();
         let smt_forest = self.smt_forest.read();
 
-        match smt_forest.get_asset_and_witness(account_header.vault_root(), vault_key_word) {
+        match smt_forest.get_asset_and_witness(account_header.vault_root(), vault_key) {
             Ok(result) => Ok(Some(result)),
             Err(StoreError::MerkleStoreError(MerkleError::UntrackedKey(_))) => Ok(None),
             Err(e) => Err(e),

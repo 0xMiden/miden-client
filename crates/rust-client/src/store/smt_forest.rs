@@ -1,8 +1,12 @@
-use miden_client::account::{AccountStorage, StorageMap, StorageSlotContent};
-use miden_client::asset::{Asset, AssetVault, AssetWitness, StorageMapWitness};
-use miden_client::crypto::{EmptySubtreeRoots, MerkleError, SMT_DEPTH, Smt, SmtForest};
-use miden_client::store::StoreError;
-use miden_client::{EMPTY_WORD, Word};
+use alloc::vec::Vec;
+
+use miden_protocol::account::{AccountStorage, StorageMap, StorageMapWitness, StorageSlotContent};
+use miden_protocol::asset::{Asset, AssetVault, AssetVaultKey, AssetWitness};
+use miden_protocol::crypto::merkle::smt::{SMT_DEPTH, Smt, SmtForest};
+use miden_protocol::crypto::merkle::{EmptySubtreeRoots, MerkleError};
+use miden_protocol::{EMPTY_WORD, Word};
+
+use super::StoreError;
 
 /// Thin wrapper around `SmtForest` for account vault/storage proofs and updates.
 #[derive(Debug, Default, Clone, Eq, PartialEq)]
@@ -19,12 +23,14 @@ impl AccountSmtForest {
     pub fn get_asset_and_witness(
         &self,
         vault_root: Word,
-        vault_key: Word,
+        vault_key: AssetVaultKey,
     ) -> Result<(Asset, AssetWitness), StoreError> {
-        let proof = self.forest.open(vault_root, vault_key)?;
-        let asset_word = proof.get(&vault_key).ok_or(MerkleError::UntrackedKey(vault_key))?;
+        let vault_key_word = vault_key.into();
+        let proof = self.forest.open(vault_root, vault_key_word)?;
+        let asset_word =
+            proof.get(&vault_key_word).ok_or(MerkleError::UntrackedKey(vault_key_word))?;
         if asset_word == EMPTY_WORD {
-            return Err(MerkleError::UntrackedKey(vault_key).into());
+            return Err(MerkleError::UntrackedKey(vault_key_word).into());
         }
 
         let asset = Asset::try_from(asset_word)?;
@@ -47,20 +53,19 @@ impl AccountSmtForest {
     // --------------------------------------------------------------------------------------------
 
     /// Updates the SMT forest with the new asset values.
-    #[allow(dead_code)]
     pub fn update_asset_nodes(
         &mut self,
         root: Word,
-        assets: impl Iterator<Item = Asset>,
-        removed_vault_keys: impl Iterator<Item = Word>,
+        new_assets: impl Iterator<Item = Asset>,
+        removed_vault_keys: impl Iterator<Item = AssetVaultKey>,
     ) -> Result<Word, StoreError> {
-        let entries: Vec<(Word, Word)> = assets
+        let entries: Vec<(Word, Word)> = new_assets
             .map(|asset| {
                 let key: Word = asset.vault_key().into();
                 let value: Word = asset.into();
                 (key, value)
             })
-            .chain(removed_vault_keys.map(|key| (key, EMPTY_WORD)))
+            .chain(removed_vault_keys.map(|key| (key.into(), EMPTY_WORD)))
             .collect();
 
         if entries.is_empty() {
@@ -72,7 +77,6 @@ impl AccountSmtForest {
     }
 
     /// Updates the SMT forest with the new storage map values.
-    #[allow(dead_code)]
     pub fn update_storage_map_nodes(
         &mut self,
         root: Word,
@@ -102,6 +106,9 @@ impl AccountSmtForest {
 
         let empty_root = *EmptySubtreeRoots::entry(SMT_DEPTH, 0);
         let entries: Vec<(Word, Word)> = smt.entries().map(|(k, v)| (*k, *v)).collect();
+        if entries.is_empty() {
+            return Ok(());
+        }
         let new_root = self.forest.batch_insert(empty_root, entries).map_err(StoreError::from)?;
         debug_assert_eq!(new_root, smt.root());
         Ok(())
@@ -134,13 +141,23 @@ impl AccountSmtForest {
         let empty_root = *EmptySubtreeRoots::entry(SMT_DEPTH, 0);
         let entries: Vec<(Word, Word)> =
             map.entries().map(|(k, v)| (StorageMap::hash_key(*k), *v)).collect();
+        if entries.is_empty() {
+            return Ok(());
+        }
         self.forest.batch_insert(empty_root, entries).map_err(StoreError::from)?;
         Ok(())
     }
 
     /// Removes the specified SMT roots from the forest, releasing memory used by nodes
     /// that are no longer reachable from any remaining root.
+    ///
+    /// Filters out the empty tree root because it should never be popped: the empty
+    /// hash nodes are pre-populated infrastructure in the `SmtStore`, and popping the
+    /// empty root would walk and destroy them, corrupting the store for all future
+    /// operations.
+    // TODO(#1834): remove this filter once the miden-crypto fix lands.
     pub fn pop_roots(&mut self, roots: impl IntoIterator<Item = Word>) {
-        self.forest.pop_smts(roots);
+        let empty_tree_root = *EmptySubtreeRoots::entry(SMT_DEPTH, 0);
+        self.forest.pop_smts(roots.into_iter().filter(|r| *r != empty_tree_root));
     }
 }
