@@ -1,6 +1,7 @@
 use alloc::sync::Arc;
 
 use idxdb_store::IdxdbStore;
+use miden_client::store::WebStore;
 use miden_client::testing::MockChain;
 use miden_client::testing::mock::MockRpcApi;
 use miden_client::testing::note_transport::{MockNoteTransportApi, MockNoteTransportNode};
@@ -41,7 +42,7 @@ impl WebClient {
 
         let store_name = "mock_client_db".to_owned();
         let rng = create_rng(seed)?;
-        let store = Arc::new(
+        let store: Arc<dyn WebStore> = Arc::new(
             IdxdbStore::new(store_name.clone())
                 .await
                 .map_err(|_| JsValue::from_str("Failed to initialize IdxdbStore"))?,

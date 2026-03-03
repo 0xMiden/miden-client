@@ -61,10 +61,7 @@ impl WebClient {
             .await
             .map_err(|err| js_error_with_context(err, "failed to import public account"))?;
 
-        keystore
-            .add_key(&key_pair, native_id)
-            .await
-            .map_err(|err| err.to_string())?;
+        keystore.add_key(&key_pair, native_id).await.map_err(|err| err.to_string())?;
 
         Ok(Account::from(generated_acct))
     }

@@ -127,7 +127,7 @@ impl WebClient {
             store_name.unwrap_or(format!("{}_{}", BASE_STORE_NAME, endpoint.to_network_id()));
 
         let rng = create_rng(seed)?;
-        let store = Arc::new(
+        let store: Arc<dyn WebStore> = Arc::new(
             IdxdbStore::new(store_name.clone())
                 .await
                 .map_err(|_| JsValue::from_str("Failed to initialize IdxdbStore"))?,
@@ -176,7 +176,7 @@ impl WebClient {
             store_name.unwrap_or(format!("{}_{}", BASE_STORE_NAME, endpoint.to_network_id()));
 
         let rng = create_rng(seed)?;
-        let store = Arc::new(
+        let store: Arc<dyn WebStore> = Arc::new(
             IdxdbStore::new(store_name.clone())
                 .await
                 .map_err(|_| JsValue::from_str("Failed to initialize IdxdbStore"))?,
@@ -192,7 +192,7 @@ impl WebClient {
     async fn setup_client(
         &mut self,
         rpc_client: Arc<dyn NodeRpcClient>,
-        store: Arc<IdxdbStore>,
+        store: Arc<dyn WebStore>,
         keystore: WebKeyStore<RpoRandomCoin>,
         rng: RpoRandomCoin,
         note_transport_client: Option<Arc<dyn NoteTransportClient>>,
@@ -217,9 +217,9 @@ impl WebClient {
             .await
             .map_err(|err| js_error_with_context(err, "Failed to create client"))?;
 
-        // Ensure genesis block is fetched and stored in IndexedDB.
+        // Ensure genesis block is fetched and stored.
         // This is important for web workers that create their own client instances -
-        // they will read the genesis from the shared IndexedDB and automatically
+        // they will read the genesis from the shared store and automatically
         // set the genesis commitment on their RPC client.
         client
             .ensure_genesis_in_place()
@@ -227,7 +227,7 @@ impl WebClient {
             .map_err(|err| js_error_with_context(err, "Failed to ensure genesis in place"))?;
 
         self.inner = Some(client);
-        self.store = Some(store as Arc<dyn WebStore>);
+        self.store = Some(store);
 
         Ok(())
     }

@@ -51,8 +51,7 @@ impl WebClient {
     ) -> Result<Account, JsValue> {
         self.maybe_sync_before_account_creation().await;
         let keystore = self.keystore()?.clone();
-        let client =
-            self.get_mut_inner().ok_or(JsValue::from_str("Client not initialized"))?;
+        let client = self.get_mut_inner().ok_or(JsValue::from_str("Client not initialized"))?;
 
         let (new_account, key_pair) =
             generate_wallet(storage_mode, mutable, init_seed, auth_scheme).await?;
