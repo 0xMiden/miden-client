@@ -1,1 +1,0 @@
-/Users/jm-lambda/Personal/CLAUDE.md

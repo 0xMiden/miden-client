@@ -10,8 +10,8 @@ use crate::models::word::Word;
 #[wasm_bindgen(getter_with_clone, inspectable)]
 #[derive(Clone)]
 pub struct StorageMapEntry {
-    #[wasm_bindgen(js_name = "root")]
-    pub root: String,
+    #[wasm_bindgen(js_name = "slotName")]
+    pub slot_name: String,
     #[wasm_bindgen(js_name = "key")]
     pub key: String,
     #[wasm_bindgen(js_name = "value")]
@@ -73,7 +73,7 @@ impl AccountStorage {
         Some(
             map.entries()
                 .map(|(key, value)| StorageMapEntry {
-                    root: map.root().to_hex(),
+                    slot_name: slot_name.to_string(),
                     key: key.to_hex(),
                     value: value.to_hex(),
                 })
