@@ -189,7 +189,7 @@ miden-client init --block-delta 256
   miden-client account new-wallet --storage-mode private
   ```
 
-  When enabled, newly created key files are encrypted on disk. Existing plaintext key files are still readable (backward compatible), so encryption can be enabled on an existing keystore without migration. To encrypt all existing plaintext key files, use the `migrate_to_encrypted()` method from the Rust API.
+  When enabled, newly created key files are encrypted on disk. Existing plaintext key files are still readable (backward compatible), so encryption can be enabled on an existing keystore without migration.
 
   If the variable is unset or empty, keys are stored as plaintext (the default behavior).
 
