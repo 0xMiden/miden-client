@@ -1,4 +1,4 @@
-//! Provides a lazy iterator over output notes.
+//! Provides a lazy iterator over consumed output notes.
 
 use alloc::sync::Arc;
 
@@ -7,22 +7,21 @@ use miden_protocol::account::AccountId;
 use crate::ClientError;
 use crate::store::{NoteFilter, OutputNoteRecord, Store};
 
-/// A lazy iterator over output notes.
+/// A lazy iterator over consumed output notes.
 ///
 /// Each call to [`OutputNoteReader::next`] executes a store query and returns the
 /// next matching note. Use builder methods to configure filters before
 /// iterating.
 pub struct OutputNoteReader {
     store: Arc<dyn Store>,
-    status: NoteFilter,
     sender: Option<AccountId>,
     offset: u32,
 }
 
 impl OutputNoteReader {
-    /// Creates a new `OutputNoteReader` for output notes with the given status filter.
-    pub fn new(store: Arc<dyn Store>, status: NoteFilter) -> Self {
-        Self { store, status, sender: None, offset: 0 }
+    /// Creates a new `OutputNoteReader` that iterates over consumed output notes.
+    pub fn new(store: Arc<dyn Store>) -> Self {
+        Self { store, sender: None, offset: 0 }
     }
 
     /// Filters notes by sender account ID.
@@ -32,13 +31,14 @@ impl OutputNoteReader {
         self
     }
 
-    /// Returns the next output note, or `None` when all matching notes have been returned.
+    /// Returns the next consumed output note, or `None` when all matching notes have been
+    /// returned.
     ///
     /// Each call executes a single store query.
     pub async fn next(&mut self) -> Result<Option<OutputNoteRecord>, ClientError> {
         let note = self
             .store
-            .get_output_note_by_offset(self.status.clone(), self.sender, self.offset)
+            .get_output_note_by_offset(NoteFilter::Consumed, self.sender, self.offset)
             .await
             .map_err(ClientError::StoreError)?;
 

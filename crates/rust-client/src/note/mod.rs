@@ -217,8 +217,7 @@ where
         Ok(self.store.get_output_notes(NoteFilter::Unique(note_id)).await?.pop())
     }
 
-    /// Returns a [`OutputNoteReader`] that lazily iterates over output notes matching the given
-    /// status filter.
+    /// Returns a [`OutputNoteReader`] that lazily iterates over consumed output notes.
     ///
     /// Use the builder methods on [`OutputNoteReader`] to further refine the query before
     /// iterating.
@@ -227,15 +226,15 @@ where
     ///
     /// ```rust,ignore
     /// let mut reader = client
-    ///     .output_note_reader(NoteFilter::Committed)
+    ///     .output_note_reader()
     ///     .for_sender(account_id);
     ///
     /// while let Some(note) = reader.next().await? {
     ///     process(note);
     /// }
     /// ```
-    pub fn output_note_reader(&self, status: NoteFilter) -> OutputNoteReader {
-        OutputNoteReader::new(self.store.clone(), status)
+    pub fn output_note_reader(&self) -> OutputNoteReader {
+        OutputNoteReader::new(self.store.clone())
     }
 }
 
