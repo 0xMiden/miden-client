@@ -1,6 +1,7 @@
 use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::string::String;
+use alloc::vec::Vec;
 use std::fs;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::io::Write;
@@ -16,8 +17,9 @@ use miden_tx::auth::{SigningInputs, TransactionAuthenticator};
 use miden_tx::utils::sync::RwLock;
 use miden_tx::utils::{Deserializable, Serializable};
 use serde::{Deserialize, Serialize};
+use zeroize::Zeroizing;
 
-use super::encryption::{KeyEncryptor, is_encrypted};
+use super::encryption::{PasswordEncryptor, is_encrypted};
 use super::{KeyStoreError, Keystore};
 
 // INDEX FILE
@@ -145,7 +147,7 @@ impl KeyIndex {
 ///
 /// Account-to-key mappings are stored in a separate JSON index file.
 ///
-/// Optionally supports encrypting secret key files at rest via a [`KeyEncryptor`]. When an
+/// Optionally supports encrypting secret key files at rest via a [`PasswordEncryptor`]. When an
 /// encryptor is set (see [`with_encryption`](Self::with_encryption)), keys are encrypted on
 /// write and decrypted on read. Existing plaintext key files are auto-detected and can still be
 /// read even when encryption is enabled.
@@ -155,7 +157,7 @@ pub struct FilesystemKeyStore {
     /// The in-memory index of account-to-key mappings.
     index: RwLock<KeyIndex>,
     /// Optional encryptor for secret key files.
-    encryptor: Option<Arc<dyn KeyEncryptor>>,
+    encryptor: Option<Arc<PasswordEncryptor>>,
 }
 
 impl std::fmt::Debug for FilesystemKeyStore {
@@ -203,61 +205,9 @@ impl FilesystemKeyStore {
     /// When set, new keys are encrypted on write. On read, encrypted files are decrypted
     /// automatically, and plaintext files are still readable (backward compatible).
     #[must_use]
-    pub fn with_encryption(mut self, encryptor: impl KeyEncryptor + 'static) -> Self {
+    pub fn with_encryption(mut self, encryptor: PasswordEncryptor) -> Self {
         self.encryptor = Some(Arc::new(encryptor));
         self
-    }
-
-    /// Re-encrypts all existing plaintext key files using the configured encryptor.
-    ///
-    /// Returns the number of files that were migrated. Files that are already encrypted are
-    /// skipped. Deduplicates file paths to avoid re-encrypting the same file twice (a key
-    /// commitment can appear under multiple accounts).
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if no encryptor is configured, or if any file cannot be read/written.
-    pub fn migrate_to_encrypted(&self) -> Result<usize, KeyStoreError> {
-        let encryptor = self.encryptor.as_ref().ok_or_else(|| {
-            KeyStoreError::StorageError("no encryptor configured for migration".into())
-        })?;
-
-        // Collect unique file paths under the lock, then drop it before doing expensive I/O.
-        // Each Argon2id derivation takes ~100ms, so we don't want to hold the lock during
-        // encryption.
-        let seen_paths = {
-            let index = self.index.read();
-            let mut paths = BTreeSet::new();
-            for commitments in index.mappings.values() {
-                for hex in commitments {
-                    if let Ok(word) = Word::try_from(hex.as_str()) {
-                        let commitment = PublicKeyCommitment::from(word);
-                        let file_path = key_file_path(&self.keys_directory, commitment);
-                        if file_path.exists() {
-                            paths.insert(file_path);
-                        }
-                    }
-                }
-            }
-            paths
-        };
-
-        let mut migrated = 0usize;
-        for file_path in seen_paths {
-            let bytes = fs::read(&file_path)
-                .map_err(keystore_error("error reading key file for migration"))?;
-
-            // Skip files that are already encrypted
-            if is_encrypted(&bytes) {
-                continue;
-            }
-
-            let encrypted = encryptor.encrypt(&bytes)?;
-            atomic_write(&file_path, &encrypted)?;
-            migrated += 1;
-        }
-
-        Ok(migrated)
     }
 
     /// Adds a secret key to the keystore without updating account mappings.
@@ -297,7 +247,7 @@ impl FilesystemKeyStore {
     fn read_secret_key_file(&self, file_path: &Path) -> Result<AuthSecretKey, KeyStoreError> {
         let bytes = fs::read(file_path).map_err(keystore_error("error reading secret key file"))?;
 
-        let key_bytes = if is_encrypted(&bytes) {
+        let key_bytes: Zeroizing<Vec<u8>> = if is_encrypted(&bytes) {
             let encryptor = self.encryptor.as_ref().ok_or_else(|| {
                 KeyStoreError::DecodingError(
                     "key file is encrypted but no encryptor is configured; \
@@ -305,9 +255,9 @@ impl FilesystemKeyStore {
                         .into(),
                 )
             })?;
-            encryptor.decrypt(&bytes)?
+            Zeroizing::new(encryptor.decrypt(&bytes)?)
         } else {
-            bytes
+            Zeroizing::new(bytes)
         };
 
         AuthSecretKey::read_from_bytes(key_bytes.as_slice()).map_err(|err| {
@@ -321,12 +271,12 @@ impl FilesystemKeyStore {
         file_path: &Path,
         key: &AuthSecretKey,
     ) -> Result<(), KeyStoreError> {
-        let plaintext = key.to_bytes();
+        let plaintext = Zeroizing::new(key.to_bytes());
 
         let data = if let Some(encryptor) = &self.encryptor {
             encryptor.encrypt(&plaintext)?
         } else {
-            plaintext
+            plaintext.to_vec()
         };
 
         atomic_write(file_path, &data)
@@ -479,6 +429,8 @@ fn hash_pub_key(pub_key: Word) -> String {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::atomic::{AtomicU64, Ordering};
+
     use miden_protocol::account::auth::AuthSecretKey;
     use miden_protocol::account::{AccountId, AccountIdVersion, AccountStorageMode, AccountType};
 
@@ -486,11 +438,16 @@ mod tests {
     use crate::keystore::PasswordEncryptor;
     use crate::keystore::encryption::is_encrypted;
 
-    /// Helper: creates a temporary directory and returns a `FilesystemKeyStore` rooted there.
-    fn temp_keystore() -> (FilesystemKeyStore, tempfile::TempDir) {
-        let dir = tempfile::tempdir().expect("failed to create temp dir");
-        let ks =
-            FilesystemKeyStore::new(dir.path().to_path_buf()).expect("failed to create keystore");
+    /// Monotonic counter for unique test directory names.
+    static TEST_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+    /// Helper: creates a unique temporary directory and returns a `FilesystemKeyStore` rooted
+    /// there. The directory lives under `std::env::temp_dir()` and is not automatically cleaned
+    /// up, but the OS will reclaim it eventually.
+    fn temp_keystore() -> (FilesystemKeyStore, PathBuf) {
+        let id = TEST_COUNTER.fetch_add(1, Ordering::Relaxed);
+        let dir = std::env::temp_dir().join(format!("miden_ks_test_{}_{id}", std::process::id()));
+        let ks = FilesystemKeyStore::new(dir.clone()).expect("failed to create keystore");
         (ks, dir)
     }
 
@@ -582,7 +539,7 @@ mod tests {
         ks.add_key(&secret_key, account_id).await.unwrap();
 
         // Open a new keystore on the same directory with a wrong password
-        let ks_wrong = FilesystemKeyStore::new(dir.path().to_path_buf())
+        let ks_wrong = FilesystemKeyStore::new(dir.clone())
             .unwrap()
             .with_encryption(PasswordEncryptor::new("wrong-password"));
 
@@ -604,7 +561,7 @@ mod tests {
         ks_plain.add_key(&secret_key, account_id).await.unwrap();
 
         // Open the same directory with encryption enabled
-        let ks_enc = FilesystemKeyStore::new(dir.path().to_path_buf())
+        let ks_enc = FilesystemKeyStore::new(dir.clone())
             .unwrap()
             .with_encryption(PasswordEncryptor::new("some-password"));
 
@@ -627,7 +584,7 @@ mod tests {
         ks_enc.add_key(&secret_key, account_id).await.unwrap();
 
         // Open the same directory without encryption
-        let ks_plain = FilesystemKeyStore::new(dir.path().to_path_buf()).unwrap();
+        let ks_plain = FilesystemKeyStore::new(dir.clone()).unwrap();
 
         let result = ks_plain.get_key(commitment).await;
         assert!(result.is_err(), "plaintext keystore should error on encrypted files");
@@ -638,91 +595,6 @@ mod tests {
             err_msg.contains("encrypted") || err_msg.contains("encryptor"),
             "error should mention encryption: {err_msg}"
         );
-    }
-
-    // MIGRATION TESTS
-    // --------------------------------------------------------------------------------------------
-
-    #[tokio::test]
-    async fn migrate_to_encrypted_converts_plaintext_files() {
-        let (ks, _dir) = temp_keystore();
-        let secret_key = AuthSecretKey::new_falcon512_rpo();
-        let commitment = secret_key.public_key().to_commitment();
-        let account_id = test_account_id(0);
-
-        // Write as plaintext
-        ks.add_key(&secret_key, account_id).await.unwrap();
-
-        // Verify it's plaintext
-        let file_path = key_file_path(&ks.keys_directory, commitment);
-        assert!(!is_encrypted(&fs::read(&file_path).unwrap()));
-
-        // Enable encryption and migrate
-        let ks = ks.with_encryption(PasswordEncryptor::new("migration-password"));
-        let migrated = ks.migrate_to_encrypted().unwrap();
-        assert_eq!(migrated, 1, "should have migrated 1 file");
-
-        // Verify the file is now encrypted
-        assert!(is_encrypted(&fs::read(&file_path).unwrap()));
-
-        // Verify we can still read the key
-        let retrieved = ks.get_key(commitment).await.unwrap();
-        assert!(retrieved.is_some());
-        assert_eq!(retrieved.unwrap().to_bytes(), secret_key.to_bytes());
-    }
-
-    #[tokio::test]
-    async fn migrate_skips_already_encrypted_files() {
-        let (ks, _dir) = temp_keystore();
-        let ks = ks.with_encryption(PasswordEncryptor::new("password"));
-
-        let secret_key = AuthSecretKey::new_falcon512_rpo();
-        let account_id = test_account_id(0);
-
-        // Write as encrypted
-        ks.add_key(&secret_key, account_id).await.unwrap();
-
-        // Migrate should skip already-encrypted files
-        let migrated = ks.migrate_to_encrypted().unwrap();
-        assert_eq!(migrated, 0, "should not re-encrypt already encrypted files");
-    }
-
-    #[tokio::test]
-    async fn migrate_without_encryptor_errors() {
-        let (ks, _dir) = temp_keystore();
-
-        let result = ks.migrate_to_encrypted();
-        assert!(result.is_err(), "migration without encryptor should fail");
-    }
-
-    #[tokio::test]
-    async fn migrate_deduplicates_shared_keys() {
-        let (ks, dir) = temp_keystore();
-        let secret_key = AuthSecretKey::new_falcon512_rpo();
-        let commitment = secret_key.public_key().to_commitment();
-
-        // Associate the same key with two different accounts.
-        let account_id_1 = test_account_id(0);
-        let account_id_2 = test_account_id(1);
-
-        ks.add_key(&secret_key, account_id_1).await.unwrap();
-        // add_key writes the key file again but that's fine — same file path
-        ks.add_key(&secret_key, account_id_2).await.unwrap();
-
-        // Enable encryption and migrate
-        let ks = FilesystemKeyStore::new(dir.path().to_path_buf())
-            .unwrap()
-            .with_encryption(PasswordEncryptor::new("password"));
-        let migrated = ks.migrate_to_encrypted().unwrap();
-        assert_eq!(
-            migrated, 1,
-            "same key file shared by two accounts should only be migrated once"
-        );
-
-        // Verify the key is readable
-        let retrieved = ks.get_key(commitment).await.unwrap();
-        assert!(retrieved.is_some());
-        assert_eq!(retrieved.unwrap().to_bytes(), secret_key.to_bytes());
     }
 
     // MULTIPLE KEYS
