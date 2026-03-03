@@ -18,7 +18,7 @@ fn create_test_output_note(sender: AccountId, tag: NoteTag, index: u32) -> Outpu
     let metadata = NoteMetadata::new(sender, NoteType::Public, tag);
     let assets = NoteAssets::new(vec![]).unwrap();
     // Use a unique recipient digest per note so they get distinct IDs.
-    let recipient_digest: Word = [Felt::new(index as u64), ZERO, ZERO, ZERO].into();
+    let recipient_digest: Word = [Felt::new(u64::from(index)), ZERO, ZERO, ZERO].into();
     OutputNoteRecord::new(
         recipient_digest,
         assets,
@@ -164,7 +164,10 @@ async fn get_output_note_by_offset_returns_correct_note() {
 
     // Verify each offset returns the correct note.
     for (i, expected) in all_notes.iter().enumerate() {
-        let note = store.get_output_note_by_offset(NoteFilter::All, None, i as u32).await.unwrap();
+        let note = store
+            .get_output_note_by_offset(NoteFilter::All, None, u32::try_from(i).unwrap())
+            .await
+            .unwrap();
         assert_eq!(note.as_ref().unwrap().id(), expected.id());
     }
 
