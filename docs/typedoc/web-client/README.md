@@ -17,7 +17,6 @@
 - [AccountId](classes/AccountId.md)
 - [AccountStorage](classes/AccountStorage.md)
 - [AssetVault](classes/AssetVault.md)
-- [ConsumableNoteRecord](classes/ConsumableNoteRecord.md)
 - [Felt](classes/Felt.md)
 - [InputNoteRecord](classes/InputNoteRecord.md)
 - [MidenClient](classes/MidenClient.md)
