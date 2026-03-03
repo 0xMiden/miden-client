@@ -39,7 +39,6 @@ use miden_client::store::{
     Store,
     StoreError,
     TransactionFilter,
-    WebStore,
 };
 use miden_client::sync::{NoteTagRecord, StateSyncUpdate};
 use miden_client::transaction::{TransactionRecord, TransactionStoreUpdate};
@@ -360,10 +359,7 @@ impl Store for IdxdbStore {
     async fn list_setting_keys(&self) -> Result<Vec<String>, StoreError> {
         self.list_setting_keys().await
     }
-}
 
-#[async_trait::async_trait(?Send)]
-impl WebStore for IdxdbStore {
     async fn export_store(&self) -> Result<String, StoreError> {
         self.export_store().await
     }

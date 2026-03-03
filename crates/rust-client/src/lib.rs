@@ -395,9 +395,17 @@ where
     pub fn prover(&self) -> Arc<dyn TransactionProver + Send + Sync> {
         self.tx_prover.clone()
     }
+
+    pub fn authenticator(&self) -> Option<&Arc<AUTH>> {
+        self.authenticator.as_ref()
+    }
 }
 
 impl<AUTH> Client<AUTH> {
+    pub fn store(&self) -> &Arc<dyn Store> {
+        &self.store
+    }
+
     // LIMITS
     // --------------------------------------------------------------------------------------------
 

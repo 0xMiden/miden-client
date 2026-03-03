@@ -567,18 +567,22 @@ pub trait Store: Send + Sync {
         &self,
         account_id: AccountId,
     ) -> Result<Option<AccountRecord>, StoreError>;
-}
 
-/// Extension trait for [`Store`] implementations that support export/import of the full store
-/// contents as a serialized string. This is primarily used by web-based stores (e.g. `IndexedDB`).
-#[cfg(target_arch = "wasm32")]
-#[async_trait::async_trait(?Send)]
-pub trait WebStore: Store {
     /// Exports the entire store contents as a serialized string.
-    async fn export_store(&self) -> Result<String, StoreError>;
+    ///
+    /// Not all store implementations support this operation. The default implementation
+    /// returns [`StoreError::OperationNotSupported`].
+    async fn export_store(&self) -> Result<String, StoreError> {
+        Err(StoreError::OperationNotSupported("export_store".into()))
+    }
 
     /// Imports store contents from a serialized string, replacing all existing data.
-    async fn import_store(&self, data: String) -> Result<(), StoreError>;
+    ///
+    /// Not all store implementations support this operation. The default implementation
+    /// returns [`StoreError::OperationNotSupported`].
+    async fn import_store(&self, _data: String) -> Result<(), StoreError> {
+        Err(StoreError::OperationNotSupported("import_store".into()))
+    }
 }
 
 // PARTIAL BLOCKCHAIN NODE FILTER
