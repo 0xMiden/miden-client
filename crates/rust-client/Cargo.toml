@@ -88,7 +88,6 @@ tonic-prost-build                = { version = "0.14" }
 miden-protocol  = { default-features = false, features = ["testing"], workspace = true }
 miden-standards = { features = ["testing"], workspace = true }
 miden-testing   = { default-features = false, workspace = true }
-tempfile        = { version = "3.24" }
 tokio           = { workspace = true }
 web-sys         = { features = ["console"], version = "0.3" }
 
