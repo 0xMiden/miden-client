@@ -6,11 +6,6 @@ help: ## Show description of all commands
 
 # --- Variables -----------------------------------------------------------------------------------
 
-# Enable file generation in the `src` directory.
-# This is used in the build script of the client to generate the node RPC-related code, from the
-# protobuf files.
-CODEGEN=CODEGEN=1
-
 FEATURES_CLIENT=--features "std"
 WARNINGS=RUSTDOCFLAGS="-D warnings"
 
@@ -188,13 +183,16 @@ stop-prover: ## Stop prover process
 install: ## Install the CLI binary
 	cargo install --path bin/miden-cli --locked
 
+install-bench: ## Install the benchmark binary
+	cargo install --path bin/miden-bench --locked
+
 install-tests: ## Install the tests binary
 	cargo install --path bin/integration-tests --locked
 
 # --- Building ------------------------------------------------------------------------------------
 
 build: ## Build the CLI binary, client library and tests binary in release mode
-	CODEGEN=1 cargo build --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --release
+	cargo build --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --release
 	cargo build --package testing-remote-prover --release --locked
 	cargo build --package miden-client-integration-tests --release --locked
 

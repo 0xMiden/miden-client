@@ -137,7 +137,11 @@ test.describe("export and import note", () => {
   ) => {
     return await testingPage.evaluate(
       async ({ noteId, exportType }) => {
-        const noteFile = await window.client.exportNoteFile(noteId, exportType);
+        const format =
+          window.NoteExportFormat[
+            exportType as keyof typeof window.NoteExportFormat
+          ];
+        const noteFile = await window.client.exportNoteFile(noteId, format);
         return noteFile.noteType();
       },
       { noteId, exportType }
@@ -151,7 +155,11 @@ test.describe("export and import note", () => {
   ) => {
     return await testingPage.evaluate(
       async ({ noteId, exportType }) => {
-        const noteFile = await window.client.exportNoteFile(noteId, exportType);
+        const format =
+          window.NoteExportFormat[
+            exportType as keyof typeof window.NoteExportFormat
+          ];
+        const noteFile = await window.client.exportNoteFile(noteId, format);
         return noteFile.serialize();
       },
       { noteId, exportType }

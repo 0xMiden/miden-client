@@ -46,7 +46,6 @@ if (!versionMatch) {
 
 const major = Number(versionMatch[1]);
 const minor = Number(versionMatch[2]);
-const expectedVersion = webClientVersion;
 const expectedRange = `^${major}.${minor}.0`;
 
 const peerDeps = reactSdkPkg.peerDependencies || {};
@@ -69,9 +68,15 @@ if (actualRange !== expectedRange) {
   );
 }
 
-if (actualVersion !== expectedVersion) {
+const reactVersionMatch = /^(\d+)\.(\d+)\.(\d+)(-.+)?$/.exec(actualVersion);
+if (!reactVersionMatch) {
+  errors.push(`Unsupported react-sdk version format: "${actualVersion}"`);
+} else if (
+  Number(reactVersionMatch[1]) !== major ||
+  Number(reactVersionMatch[2]) !== minor
+) {
   errors.push(
-    `React SDK version "${actualVersion}" does not match web-client version "${expectedVersion}".`
+    `React SDK version "${actualVersion}" has different major.minor than web-client "${webClientVersion}". They must share the same major.minor version.`
   );
 }
 
@@ -96,11 +101,6 @@ if (errors.length > 0) {
       updated = true;
     }
 
-    if (actualVersion !== expectedVersion) {
-      reactSdkPkg.version = expectedVersion;
-      updated = true;
-    }
-
     if (walletRange !== expectedRange) {
       walletDeps["@miden-sdk/miden-sdk"] = expectedRange;
       walletExamplePkg.dependencies = walletDeps;
@@ -111,7 +111,7 @@ if (errors.length > 0) {
       writeJson(reactSdkPath, reactSdkPkg);
       writeJson(walletExamplePath, walletExamplePkg);
       console.log(
-        `Updated react-sdk version to "${expectedVersion}", peer range to "${expectedRange}", and wallet dependency based on web-client ${webClientVersion}.`
+        `Updated react-sdk peer range to "${expectedRange}" and wallet dependency based on web-client ${webClientVersion}.`
       );
     }
 

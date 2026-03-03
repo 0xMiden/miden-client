@@ -378,6 +378,14 @@ where
         assembly::CodeBuilder::with_source_manager(self.source_manager.clone())
     }
 
+    /// Returns an instance of [`note::NoteScreener`] configured for this client.
+    pub fn note_screener(&self) -> note::NoteScreener<AUTH>
+    where
+        AUTH: Sync,
+    {
+        note::NoteScreener::new(self.store.clone(), self.authenticator.clone())
+    }
+
     /// Returns a reference to the client's random number generator. This can be used to generate
     /// randomness for various purposes such as serial numbers, keys, etc.
     pub fn rng(&mut self) -> &mut ClientRng {
@@ -395,8 +403,8 @@ impl<AUTH> Client<AUTH> {
 
     /// Checks if the note tag limit has been exceeded.
     pub async fn check_note_tag_limit(&self) -> Result<(), ClientError> {
-        let limits = self.rpc_api.get_rpc_limits().await;
-        if self.store.get_unique_note_tags().await?.len() >= limits.note_tags_limit {
+        let limits = self.rpc_api.get_rpc_limits().await?;
+        if self.store.get_unique_note_tags().await?.len() >= limits.note_tags_limit as usize {
             return Err(ClientError::NoteTagsLimitExceeded(limits.note_tags_limit));
         }
         Ok(())
@@ -404,8 +412,8 @@ impl<AUTH> Client<AUTH> {
 
     /// Checks if the account limit has been exceeded.
     pub async fn check_account_limit(&self) -> Result<(), ClientError> {
-        let limits = self.rpc_api.get_rpc_limits().await;
-        if self.store.get_account_ids().await?.len() >= limits.account_ids_limit {
+        let limits = self.rpc_api.get_rpc_limits().await?;
+        if self.store.get_account_ids().await?.len() >= limits.account_ids_limit as usize {
             return Err(ClientError::AccountsLimitExceeded(limits.account_ids_limit));
         }
         Ok(())

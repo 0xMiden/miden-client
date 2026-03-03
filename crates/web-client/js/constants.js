@@ -13,8 +13,6 @@ export const CallbackType = Object.freeze({
 
 export const MethodName = Object.freeze({
   CREATE_CLIENT: "createClient",
-  NEW_WALLET: "newWallet",
-  NEW_FAUCET: "newFaucet",
   EXECUTE_TRANSACTION: "executeTransaction",
   PROVE_TRANSACTION: "proveTransaction",
   SUBMIT_NEW_TRANSACTION: "submitNewTransaction",

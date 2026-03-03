@@ -2,7 +2,7 @@ use clap::ValueEnum;
 use comfy_table::{Attribute, Cell, ContentArrangement, Table, presets};
 use miden_client::address::Address;
 use miden_client::asset::Asset;
-use miden_client::auth::TransactionAuthenticator;
+use miden_client::keystore::Keystore;
 use miden_client::note::{
     Note,
     NoteConsumability,
@@ -72,7 +72,7 @@ pub struct NotesCmd {
 }
 
 impl NotesCmd {
-    pub async fn execute<AUTH: TransactionAuthenticator + Sync + 'static>(
+    pub async fn execute<AUTH: Keystore + Sync + 'static>(
         &self,
         mut client: Client<AUTH>,
     ) -> Result<(), CliError> {
@@ -121,7 +121,7 @@ struct CliNoteSummary {
 
 // LIST NOTES
 // ================================================================================================
-async fn list_notes<AUTH: TransactionAuthenticator + Sync>(
+async fn list_notes<AUTH: Keystore + Sync>(
     client: Client<AUTH>,
     filter: ClientNoteFilter,
 ) -> Result<(), CliError> {
@@ -147,7 +147,7 @@ async fn list_notes<AUTH: TransactionAuthenticator + Sync>(
 // SHOW NOTE
 // ================================================================================================
 #[allow(clippy::too_many_lines)]
-async fn show_note<AUTH: TransactionAuthenticator + Sync>(
+async fn show_note<AUTH: Keystore + Sync>(
     client: Client<AUTH>,
     note_id: String,
     with_code: bool,
@@ -316,7 +316,7 @@ async fn show_note<AUTH: TransactionAuthenticator + Sync>(
 
 // LIST CONSUMABLE INPUT NOTES
 // ================================================================================================
-async fn list_consumable_notes<AUTH: TransactionAuthenticator + Sync>(
+async fn list_consumable_notes<AUTH: Keystore + Sync>(
     client: Client<AUTH>,
     account_id: Option<&String>,
 ) -> Result<(), CliError> {
@@ -333,7 +333,7 @@ async fn list_consumable_notes<AUTH: TransactionAuthenticator + Sync>(
 // ================================================================================================
 
 /// Send a (stored) note
-async fn send<AUTH: TransactionAuthenticator + Sync>(
+async fn send<AUTH: Keystore + Sync>(
     client: &mut Client<AUTH>,
     note_id: &str,
     address: &str,
@@ -359,7 +359,7 @@ async fn send<AUTH: TransactionAuthenticator + Sync>(
 /// Fetched notes are stored in the store.
 async fn fetch<AUTH>(client: &mut Client<AUTH>) -> Result<(), CliError>
 where
-    AUTH: TransactionAuthenticator + Sync + 'static,
+    AUTH: Keystore + Sync + 'static,
 {
     client.fetch_private_notes().await?;
 

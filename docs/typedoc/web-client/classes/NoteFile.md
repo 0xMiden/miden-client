@@ -44,13 +44,13 @@ Returns the after-block hint when present.
 
 ### inclusionProof()
 
-> **inclusionProof**(): [`NoteInclusionProof`](NoteInclusionProof.md)
+> **inclusionProof**(): `NoteInclusionProof`
 
 Returns the inclusion proof if present.
 
 #### Returns
 
-[`NoteInclusionProof`](NoteInclusionProof.md)
+`NoteInclusionProof`
 
 ***
 
@@ -68,13 +68,13 @@ Returns the full note when the file includes it.
 
 ### noteDetails()
 
-> **noteDetails**(): [`NoteDetails`](NoteDetails.md)
+> **noteDetails**(): `NoteDetails`
 
 Returns the note details if present.
 
 #### Returns
 
-[`NoteDetails`](NoteDetails.md)
+`NoteDetails`
 
 ***
 
@@ -191,7 +191,7 @@ Creates a `NoteFile` from an input note, preserving proof when available.
 
 ##### note
 
-[`InputNote`](InputNote.md)
+`InputNote`
 
 #### Returns
 
@@ -209,7 +209,7 @@ Creates a `NoteFile` from note details.
 
 ##### note\_details
 
-[`NoteDetails`](NoteDetails.md)
+`NoteDetails`
 
 #### Returns
 

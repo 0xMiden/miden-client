@@ -41,11 +41,16 @@ export async function openDatabase(
 
 enum Table {
   AccountCode = "accountCode",
-  AccountStorage = "accountStorage",
-  AccountAssets = "accountAssets",
-  StorageMapEntries = "storageMapEntries",
+  LatestAccountStorage = "latestAccountStorage",
+  HistoricalAccountStorage = "historicalAccountStorage",
+  LatestAccountAssets = "latestAccountAssets",
+  HistoricalAccountAssets = "historicalAccountAssets",
+  LatestStorageMapEntries = "latestStorageMapEntries",
+  HistoricalStorageMapEntries = "historicalStorageMapEntries",
   AccountAuth = "accountAuth",
-  Accounts = "accounts",
+  AccountKeyMapping = "accountKeyMapping",
+  LatestAccountHeaders = "latestAccountHeaders",
+  HistoricalAccountHeaders = "historicalAccountHeaders",
   Addresses = "addresses",
   Transactions = "transactions",
   TransactionScripts = "transactionScripts",
@@ -58,7 +63,6 @@ enum Table {
   Tags = "tags",
   ForeignAccountCode = "foreignAccountCode",
   Settings = "settings",
-  TrackedAccounts = "trackedAccounts",
 }
 
 export interface IAccountCode {
@@ -66,29 +70,59 @@ export interface IAccountCode {
   code: Uint8Array;
 }
 
-export interface IAccountStorage {
-  commitment: string;
+export interface ILatestAccountStorage {
+  accountId: string;
   slotName: string;
   slotValue: string;
   slotType: number;
 }
 
-export interface IStorageMapEntry {
-  root: string;
+export interface IHistoricalAccountStorage {
+  accountId: string;
+  nonce: string;
+  slotName: string;
+  slotValue: string;
+  slotType: number;
+}
+
+export interface ILatestStorageMapEntry {
+  accountId: string;
+  slotName: string;
   key: string;
   value: string;
 }
 
-export interface IAccountAsset {
-  root: string;
+export interface IHistoricalStorageMapEntry {
+  accountId: string;
+  nonce: string;
+  slotName: string;
+  key: string;
+  value: string | null;
+}
+
+export interface ILatestAccountAsset {
+  accountId: string;
   vaultKey: string;
   faucetIdPrefix: string;
   asset: string;
 }
 
+export interface IHistoricalAccountAsset {
+  accountId: string;
+  nonce: string;
+  vaultKey: string;
+  faucetIdPrefix: string;
+  asset: string | null;
+}
+
 export interface IAccountAuth {
   pubKeyCommitmentHex: string;
   secretKeyHex: string;
+}
+
+export interface IAccountKeyMapping {
+  accountIdHex: string;
+  pubKeyCommitmentHex: string;
 }
 
 export interface IAccount {
@@ -184,26 +218,20 @@ export interface ISetting {
   value: Uint8Array;
 }
 
-export interface ITrackedAccount {
-  id: string;
-}
-
 export interface JsVaultAsset {
-  root: string;
   vaultKey: string;
   faucetIdPrefix: string;
   asset: string;
 }
 
 export interface JsStorageSlot {
-  commitment: string;
   slotName: string;
   slotValue: string;
   slotType: number;
 }
 
 export interface JsStorageMapEntry {
-  root: string;
+  slotName: string;
   key: string;
   value: string;
 }
@@ -212,13 +240,79 @@ function indexes(...items: string[]): string {
   return items.join(",");
 }
 
+/** V1 baseline schema. Extracted as a constant because once migrations are enabled, this must
+ *  never be modified — all schema changes should go through new version blocks instead. */
+const V1_STORES: Record<string, string> = {
+  [Table.AccountCode]: indexes("root"),
+  [Table.LatestAccountStorage]: indexes("[accountId+slotName]", "accountId"),
+  [Table.HistoricalAccountStorage]: indexes(
+    "[accountId+nonce+slotName]",
+    "accountId",
+    "[accountId+nonce]"
+  ),
+  [Table.LatestStorageMapEntries]: indexes(
+    "[accountId+slotName+key]",
+    "accountId",
+    "[accountId+slotName]"
+  ),
+  [Table.HistoricalStorageMapEntries]: indexes(
+    "[accountId+nonce+slotName+key]",
+    "accountId",
+    "[accountId+nonce]"
+  ),
+  [Table.LatestAccountAssets]: indexes(
+    "[accountId+vaultKey]",
+    "accountId",
+    "faucetIdPrefix"
+  ),
+  [Table.HistoricalAccountAssets]: indexes(
+    "[accountId+nonce+vaultKey]",
+    "accountId",
+    "[accountId+nonce]"
+  ),
+  [Table.AccountAuth]: indexes("pubKeyCommitmentHex"),
+  [Table.AccountKeyMapping]: indexes(
+    "[accountIdHex+pubKeyCommitmentHex]",
+    "accountIdHex",
+    "pubKeyCommitmentHex"
+  ),
+  [Table.LatestAccountHeaders]: indexes("&id", "accountCommitment"),
+  [Table.HistoricalAccountHeaders]: indexes(
+    "&accountCommitment",
+    "id",
+    "[id+nonce]"
+  ),
+  [Table.Addresses]: indexes("address", "id"),
+  [Table.Transactions]: indexes("id", "statusVariant"),
+  [Table.TransactionScripts]: indexes("scriptRoot"),
+  [Table.InputNotes]: indexes("noteId", "nullifier", "stateDiscriminant"),
+  [Table.OutputNotes]: indexes(
+    "noteId",
+    "recipientDigest",
+    "stateDiscriminant",
+    "nullifier"
+  ),
+  [Table.NotesScripts]: indexes("scriptRoot"),
+  [Table.StateSync]: indexes("id"),
+  [Table.BlockHeaders]: indexes("blockNum", "hasClientNotes"),
+  [Table.PartialBlockchainNodes]: indexes("id"),
+  [Table.Tags]: indexes("id++", "tag", "sourceNoteId", "sourceAccountId"),
+  [Table.ForeignAccountCode]: indexes("accountId"),
+  [Table.Settings]: indexes("key"),
+};
+
 export type MidenDexie = Dexie & {
   accountCodes: Dexie.Table<IAccountCode, string>;
-  accountStorages: Dexie.Table<IAccountStorage, string>;
-  accountAssets: Dexie.Table<IAccountAsset, string>;
-  storageMapEntries: Dexie.Table<IStorageMapEntry, string>;
+  latestAccountStorages: Dexie.Table<ILatestAccountStorage, string>;
+  historicalAccountStorages: Dexie.Table<IHistoricalAccountStorage, string>;
+  latestStorageMapEntries: Dexie.Table<ILatestStorageMapEntry, string>;
+  historicalStorageMapEntries: Dexie.Table<IHistoricalStorageMapEntry, string>;
+  latestAccountAssets: Dexie.Table<ILatestAccountAsset, string>;
+  historicalAccountAssets: Dexie.Table<IHistoricalAccountAsset, string>;
   accountAuths: Dexie.Table<IAccountAuth, string>;
-  accounts: Dexie.Table<IAccount, string>;
+  accountKeyMappings: Dexie.Table<IAccountKeyMapping, string>;
+  latestAccountHeaders: Dexie.Table<IAccount, string>;
+  historicalAccountHeaders: Dexie.Table<IAccount, string>;
   addresses: Dexie.Table<IAddress, string>;
   transactions: Dexie.Table<ITransaction, string>;
   transactionScripts: Dexie.Table<ITransactionScript, string>;
@@ -231,17 +325,21 @@ export type MidenDexie = Dexie & {
   tags: Dexie.Table<ITag, number>;
   foreignAccountCode: Dexie.Table<IForeignAccountCode, string>;
   settings: Dexie.Table<ISetting, string>;
-  trackedAccounts: Dexie.Table<ITrackedAccount, string>;
 };
 
 export class MidenDatabase {
   dexie: MidenDexie;
   accountCodes: Dexie.Table<IAccountCode, string>;
-  accountStorages: Dexie.Table<IAccountStorage, string>;
-  storageMapEntries: Dexie.Table<IStorageMapEntry, string>;
-  accountAssets: Dexie.Table<IAccountAsset, string>;
+  latestAccountStorages: Dexie.Table<ILatestAccountStorage, string>;
+  historicalAccountStorages: Dexie.Table<IHistoricalAccountStorage, string>;
+  latestStorageMapEntries: Dexie.Table<ILatestStorageMapEntry, string>;
+  historicalStorageMapEntries: Dexie.Table<IHistoricalStorageMapEntry, string>;
+  latestAccountAssets: Dexie.Table<ILatestAccountAsset, string>;
+  historicalAccountAssets: Dexie.Table<IHistoricalAccountAsset, string>;
   accountAuths: Dexie.Table<IAccountAuth, string>;
-  accounts: Dexie.Table<IAccount, string>;
+  accountKeyMappings: Dexie.Table<IAccountKeyMapping, string>;
+  latestAccountHeaders: Dexie.Table<IAccount, string>;
+  historicalAccountHeaders: Dexie.Table<IAccount, string>;
   addresses: Dexie.Table<IAddress, string>;
   transactions: Dexie.Table<ITransaction, string>;
   transactionScripts: Dexie.Table<ITransactionScript, string>;
@@ -254,70 +352,93 @@ export class MidenDatabase {
   tags: Dexie.Table<ITag, number>;
   foreignAccountCode: Dexie.Table<IForeignAccountCode, string>;
   settings: Dexie.Table<ISetting, string>;
-  trackedAccounts: Dexie.Table<ITrackedAccount, string>;
 
   constructor(network: string) {
     this.dexie = new Dexie(network) as MidenDexie;
 
-    this.dexie.version(1).stores({
-      [Table.AccountCode]: indexes("root"),
-      [Table.AccountStorage]: indexes("[commitment+slotName]", "commitment"),
-      [Table.StorageMapEntries]: indexes("[root+key]", "root"),
-      [Table.AccountAssets]: indexes(
-        "[root+vaultKey]",
-        "root",
-        "faucetIdPrefix"
-      ),
-      [Table.AccountAuth]: indexes("pubKeyCommitmentHex"),
-      [Table.Accounts]: indexes(
-        "&accountCommitment",
-        "id",
-        "[id+nonce]",
-        "codeRoot",
-        "storageRoot",
-        "vaultRoot"
-      ),
-      [Table.Addresses]: indexes("address", "id"),
-      [Table.Transactions]: indexes("id", "statusVariant"),
-      [Table.TransactionScripts]: indexes("scriptRoot"),
-      [Table.InputNotes]: indexes("noteId", "nullifier", "stateDiscriminant"),
-      [Table.OutputNotes]: indexes(
-        "noteId",
-        "recipientDigest",
-        "stateDiscriminant",
-        "nullifier"
-      ),
-      [Table.NotesScripts]: indexes("scriptRoot"),
-      [Table.StateSync]: indexes("id"),
-      [Table.BlockHeaders]: indexes("blockNum", "hasClientNotes"),
-      [Table.PartialBlockchainNodes]: indexes("id"),
-      [Table.Tags]: indexes(
-        "id++",
-        "tag",
-        "source_note_id",
-        "source_account_id"
-      ),
-      [Table.ForeignAccountCode]: indexes("accountId"),
-      [Table.Settings]: indexes("key"),
-      [Table.TrackedAccounts]: indexes("&id"),
-    });
+    // --- Schema versioning ---
+    //
+    // NOTE: The migration system is not currently in use. The Miden network
+    // resets on every upgrade, so the database is nuked whenever the client
+    // version changes (see ensureClientVersion). Once the network stabilizes
+    // and data can be preserved across upgrades, the version-change nuke will
+    // be removed and migrations will take over.
+    //
+    // v1 is the baseline schema. To add a migration:
+    //   1. Add a .version(N+1).stores({...}).upgrade(tx => {...}) block below.
+    //      Only list tables whose indexes changed; Dexie carries forward the rest.
+    //   2. Update TypeScript interfaces and the Table enum if needed.
+    //   3. Add a migration test in schema.test.ts.
+    //   4. Run `yarn build` and `yarn test`.
+    //
+    // The version number is a simple incrementing integer, not the client semver.
+    // Use a comment to note which client version introduced the change.
+    //
+    // Example — adding a `createdAt` field with an index to accounts:
+    //
+    //   // v2: Add createdAt to accounts (client v0.7.0)
+    //   this.dexie.version(2).stores({
+    //       accounts: indexes("&accountCommitment", "id", ..., "createdAt"),
+    //   }).upgrade(tx => {
+    //       return tx.table("accounts").toCollection().modify(account => {
+    //           account.createdAt = 0;
+    //       });
+    //   });
+    //
+    // Tips:
+    //   - Index-only changes: omit .upgrade(). Dexie creates indexes automatically.
+    //   - New table: just include it in .stores(). It starts empty.
+    //   - Remove a table: set it to null, e.g. `oldTable: null`.
+    //   - Never modify a previous version block. Always add a new one.
+    //
+    // Note: The `populate` hook (below the version blocks) only fires on
+    // first database creation, NOT during upgrades.
+    //
+    // To enable migrations (stop nuking the DB on version change):
+    //   1. Remove the nuke logic in ensureClientVersion (close/delete/open).
+    //      Just persist the new version instead.
+    //   2. Freeze V1_STORES — never modify it again.
+    //   3. Add version(2+) blocks below for all schema changes going forward.
+    this.dexie.version(1).stores(V1_STORES);
 
     this.accountCodes = this.dexie.table<IAccountCode, string>(
       Table.AccountCode
     );
-    this.accountStorages = this.dexie.table<IAccountStorage, string>(
-      Table.AccountStorage
+    this.latestAccountStorages = this.dexie.table<
+      ILatestAccountStorage,
+      string
+    >(Table.LatestAccountStorage);
+    this.historicalAccountStorages = this.dexie.table<
+      IHistoricalAccountStorage,
+      string
+    >(Table.HistoricalAccountStorage);
+    this.latestStorageMapEntries = this.dexie.table<
+      ILatestStorageMapEntry,
+      string
+    >(Table.LatestStorageMapEntries);
+    this.historicalStorageMapEntries = this.dexie.table<
+      IHistoricalStorageMapEntry,
+      string
+    >(Table.HistoricalStorageMapEntries);
+    this.latestAccountAssets = this.dexie.table<ILatestAccountAsset, string>(
+      Table.LatestAccountAssets
     );
-    this.storageMapEntries = this.dexie.table<IStorageMapEntry, string>(
-      Table.StorageMapEntries
-    );
-    this.accountAssets = this.dexie.table<IAccountAsset, string>(
-      Table.AccountAssets
-    );
+    this.historicalAccountAssets = this.dexie.table<
+      IHistoricalAccountAsset,
+      string
+    >(Table.HistoricalAccountAssets);
     this.accountAuths = this.dexie.table<IAccountAuth, string>(
       Table.AccountAuth
     );
-    this.accounts = this.dexie.table<IAccount, string>(Table.Accounts);
+    this.accountKeyMappings = this.dexie.table<IAccountKeyMapping, string>(
+      Table.AccountKeyMapping
+    );
+    this.latestAccountHeaders = this.dexie.table<IAccount, string>(
+      Table.LatestAccountHeaders
+    );
+    this.historicalAccountHeaders = this.dexie.table<IAccount, string>(
+      Table.HistoricalAccountHeaders
+    );
     this.addresses = this.dexie.table<IAddress, string>(Table.Addresses);
     this.transactions = this.dexie.table<ITransaction, string>(
       Table.Transactions
@@ -343,9 +464,6 @@ export class MidenDatabase {
       Table.ForeignAccountCode
     );
     this.settings = this.dexie.table<ISetting, string>(Table.Settings);
-    this.trackedAccounts = this.dexie.table<ITrackedAccount, string>(
-      Table.TrackedAccounts
-    );
 
     this.dexie.on("populate", () => {
       this.stateSync

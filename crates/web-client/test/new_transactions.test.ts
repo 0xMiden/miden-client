@@ -749,7 +749,7 @@ export const customAccountComponent = async (
         window.AccountComponent.createAuthComponentFromSecretKey(secretKey);
 
       let accountBuilderResult = new window.AccountBuilder(walletSeed)
-        .accountType(window.AccountType.RegularAccountImmutableCode)
+        .accountType(2 /* WASM AccountType.RegularAccountImmutableCode */)
         .storageMode(window.AccountStorageMode.public())
         .withAuthComponent(authComponent)
         .withComponent(mappingAccountComponent)
@@ -961,7 +961,7 @@ export const discardedTransaction = async (
       senderTxResult.executedTransaction().id().toHex()
     );
 
-    await client.forceImportStore(preConsumeStore, "tests");
+    await client.forceImportStore(preConsumeStore, window.storeName);
 
     // Get the account state before the transaction is applied
     const accountStateBeforeTx = (await client.getAccount(
@@ -1453,7 +1453,7 @@ test.describe("submitNewTransactionWithProver tests", () => {
           window.createAuthFalcon512RpoMultisig(multisigConfig);
 
         const accountBuilderResult = new window.AccountBuilder(walletSeed)
-          .accountType(window.AccountType.RegularAccountImmutableCode)
+          .accountType(2 /* WASM AccountType.RegularAccountImmutableCode */)
           .storageMode(window.AccountStorageMode.private())
           .withAuthComponent(multisigComponent)
           .withBasicWalletComponent()

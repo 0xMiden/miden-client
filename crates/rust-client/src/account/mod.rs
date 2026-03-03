@@ -34,10 +34,9 @@
 //!
 //! For more details on accounts, refer to the [Account] documentation.
 
-use alloc::collections::BTreeSet;
 use alloc::vec::Vec;
 
-use miden_protocol::account::auth::{PublicKey, PublicKeyCommitment};
+use miden_protocol::account::auth::PublicKey;
 pub use miden_protocol::account::{
     Account,
     AccountBuilder,
@@ -75,17 +74,14 @@ use miden_standards::account::auth::{AuthEcdsaK256Keccak, AuthFalcon512Rpo};
 // ================================================================================================
 pub use miden_standards::account::interface::AccountInterfaceExt;
 use miden_standards::account::wallets::BasicWallet;
-use miden_tx::utils::{Deserializable, Serializable};
 
 use super::Client;
-use crate::Word;
 use crate::auth::AuthSchemeId;
 use crate::errors::ClientError;
 use crate::rpc::domain::account::FetchedAccount;
+use crate::rpc::node::{EndpointError, GetAccountError};
 use crate::store::{AccountStatus, AccountStorageFilter};
 use crate::sync::NoteTagRecord;
-
-const PUBLIC_KEY_COMMITMENT_SETTING_SUFFIX: &str = "_public_key_commitments";
 
 pub mod component {
     pub const MIDEN_PACKAGE_EXTENSION: &str = "masp";
@@ -227,7 +223,15 @@ impl<AUTH> Client<AUTH> {
     /// - If the account is private.
     /// - There was an error sending the request to the network.
     pub async fn import_account_by_id(&mut self, account_id: AccountId) -> Result<(), ClientError> {
-        let fetched_account = self.rpc_api.get_account_details(account_id).await?;
+        let fetched_account =
+            self.rpc_api.get_account_details(account_id).await.map_err(|err| {
+                match err.endpoint_error() {
+                    Some(EndpointError::GetAccount(GetAccountError::AccountNotFound)) => {
+                        ClientError::AccountNotFoundOnChain(account_id)
+                    },
+                    _ => ClientError::RpcError(err),
+                }
+            })?;
 
         let account = match fetched_account {
             FetchedAccount::Private(..) => {
@@ -290,129 +294,6 @@ impl<AUTH> Client<AUTH> {
     ) -> Result<(), ClientError> {
         self.store.remove_address(address, account_id).await?;
         Ok(())
-    }
-
-    /// Removes a list of public key commitments associated with the given account ID.
-    ///
-    /// Commitments are stored as a `BTreeSet`, so duplicates in `pub_key_commitments` are ignored
-    /// and missing commitments are skipped. If the account is not registered or has no stored
-    /// commitments, this is a no-op.
-    ///
-    /// If the resulting set is empty, the settings entry is removed. Returns `true` if at least
-    /// one commitment was removed, or `false` otherwise.
-    pub async fn deregister_account_public_key_commitment(
-        &self,
-        account_id: &AccountId,
-        pub_key_commitments: &[PublicKeyCommitment],
-    ) -> Result<bool, ClientError> {
-        let setting_key =
-            format!("{}{}", account_id.to_hex(), PUBLIC_KEY_COMMITMENT_SETTING_SUFFIX);
-        let Some(known) = self.store.get_setting(setting_key.clone()).await? else {
-            return Ok(false);
-        };
-        let mut commitments: BTreeSet<Word> = Deserializable::read_from_bytes(&known)
-            .map_err(ClientError::DataDeserializationError)?;
-
-        if commitments.is_empty() {
-            self.store.remove_setting(setting_key).await.map_err(ClientError::StoreError)?;
-            return Ok(false);
-        }
-
-        let mut removed_any = false;
-        for commitment in pub_key_commitments {
-            let word = Word::from(*commitment);
-            if commitments.remove(&word) {
-                removed_any = true;
-            }
-        }
-
-        if !removed_any {
-            return Ok(false);
-        }
-
-        if commitments.is_empty() {
-            self.store.remove_setting(setting_key).await.map_err(ClientError::StoreError)?;
-            return Ok(true);
-        }
-
-        self.store
-            .set_setting(setting_key, Serializable::to_bytes(&commitments))
-            .await
-            .map_err(ClientError::StoreError)?;
-        Ok(true)
-    }
-
-    /// Returns the previously stored public key commitments associated with the given
-    /// [`AccountId`], if any.
-    ///
-    /// Once retrieved, this list of public key commitments can be used in conjunction with
-    /// [`FilesystemKeyStore::get_key`](crate::keystore::FilesystemKeyStore::get_key) to retrieve
-    /// secret keys.
-    ///
-    /// Commitments are stored as a `BTreeSet`, so the returned list is deduplicated. Returns an
-    /// empty vector if the account is not registered or no commitments are stored.
-    pub async fn get_account_public_key_commitments(
-        &self,
-        account_id: &AccountId,
-    ) -> Result<Vec<PublicKeyCommitment>, ClientError> {
-        let setting_key =
-            format!("{}{}", account_id.to_hex(), PUBLIC_KEY_COMMITMENT_SETTING_SUFFIX);
-        match self.store.get_setting(setting_key).await? {
-            Some(known) => {
-                let commitments: BTreeSet<Word> = Deserializable::read_from_bytes(&known)
-                    .map_err(ClientError::DataDeserializationError)?;
-                Ok(commitments.into_iter().map(PublicKeyCommitment::from).collect())
-            },
-            None => Ok(vec![]),
-        }
-    }
-
-    /// Adds a list of public key commitments associated with the given account ID.
-    ///
-    /// Commitments are stored as a `BTreeSet`, so duplicates are ignored. If the account already
-    /// has known commitments, the new ones are merged into the existing set.
-    ///
-    /// This is useful because with a public key commitment, we can retrieve its corresponding
-    /// secret key using, for example,
-    /// [`FilesystemKeyStore::get_key`](crate::keystore::FilesystemKeyStore::get_key). This yields
-    /// an indirect mapping from account ID to its secret keys: account ID -> public key commitments
-    /// -> secret keys (via keystore).
-    ///
-    /// To identify these keys and avoid collisions, the account ID is turned into its hex
-    /// representation and a suffix is added. If the resulting set is empty, any existing settings
-    /// entry is removed.
-    pub async fn register_account_public_key_commitments(
-        &self,
-        account_id: &AccountId,
-        pub_keys: &[PublicKey],
-    ) -> Result<(), ClientError> {
-        let setting_key =
-            format!("{}{}", account_id.to_hex(), PUBLIC_KEY_COMMITMENT_SETTING_SUFFIX);
-        // Store commitments as Words because PublicKeyCommitment doesn't implement
-        // (De)Serializable.
-        let (had_setting, mut commitments): (bool, BTreeSet<Word>) =
-            match self.store.get_setting(setting_key.clone()).await? {
-                Some(known) => {
-                    let known: BTreeSet<Word> = Deserializable::read_from_bytes(&known)
-                        .map_err(ClientError::DataDeserializationError)?;
-                    (true, known)
-                },
-                None => (false, BTreeSet::new()),
-            };
-
-        commitments.extend(pub_keys.iter().map(|pk| Word::from(pk.to_commitment())));
-
-        if commitments.is_empty() {
-            if had_setting {
-                self.store.remove_setting(setting_key).await.map_err(ClientError::StoreError)?;
-            }
-            return Ok(());
-        }
-
-        self.store
-            .set_setting(setting_key, Serializable::to_bytes(&commitments))
-            .await
-            .map_err(ClientError::StoreError)
     }
 
     // ACCOUNT DATA RETRIEVAL

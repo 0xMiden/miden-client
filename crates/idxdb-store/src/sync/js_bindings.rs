@@ -129,8 +129,8 @@ pub struct JsAccountUpdate {
     pub storage_map_entries: Vec<JsStorageMapEntry>,
 
     /// The merkle root of the account's asset vault.
-    #[wasm_bindgen(js_name = "assetVaultRoot")]
-    pub asset_vault_root: String,
+    #[wasm_bindgen(js_name = "vaultRoot")]
+    pub vault_root: String,
 
     /// The account's asset vault.
     #[wasm_bindgen(js_name = "assets")]
@@ -166,35 +166,22 @@ impl JsAccountUpdate {
         let asset_vault = account.vault();
         Self {
             storage_root: account.storage().to_commitment().to_string(),
-            storage_slots: account
-                .storage()
-                .slots()
-                .iter()
-                .map(|slot| JsStorageSlot {
-                    commitment: account.storage().to_commitment().to_hex(),
-                    slot_name: slot.name().to_string(),
-                    slot_value: slot.value().to_hex(),
-                    slot_type: slot.slot_type().to_bytes()[0],
-                })
-                .collect(),
+            storage_slots: account.storage().slots().iter().map(JsStorageSlot::from_slot).collect(),
             storage_map_entries: account
                 .storage()
                 .slots()
                 .iter()
                 .filter_map(|slot| {
                     if let StorageSlotContent::Map(map) = slot.content() {
-                        Some(JsStorageMapEntry::from_map(map))
+                        Some(JsStorageMapEntry::from_map(map, slot.name().as_str()))
                     } else {
                         None
                     }
                 })
                 .flatten()
                 .collect(),
-            asset_vault_root: asset_vault.root().to_string(),
-            assets: asset_vault
-                .assets()
-                .map(|asset| JsVaultAsset::from_asset(&asset, asset_vault.root()))
-                .collect(),
+            vault_root: asset_vault.root().to_string(),
+            assets: asset_vault.assets().map(|asset| JsVaultAsset::from_asset(&asset)).collect(),
             account_id: account.id().to_string(),
             code_root: account.code().commitment().to_string(),
             committed: account.is_public(),

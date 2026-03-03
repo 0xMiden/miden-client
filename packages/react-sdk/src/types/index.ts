@@ -1,5 +1,5 @@
 import type {
-  WebClient,
+  WasmWebClient as WebClient,
   Account,
   AccountHeader,
   AccountId,
@@ -30,6 +30,14 @@ export type {
   NoteType,
   AccountStorageMode,
 };
+
+// Re-export signer types for external signer providers
+export type {
+  SignCallback,
+  SignerAccountType,
+  SignerAccountConfig,
+  SignerContextValue,
+} from "../context/SignerContext";
 
 export type RpcUrlConfig =
   | string

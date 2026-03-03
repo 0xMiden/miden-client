@@ -6,7 +6,7 @@ test.describe("Store Isolation Tests", () => {
     page,
   }) => {
     const result = await page.evaluate(async () => {
-      const client = await window.WebClient.createClient(
+      const client = await window.WasmWebClient.createClient(
         window.rpcUrl,
         undefined,
         undefined,
@@ -34,7 +34,7 @@ test.describe("Store Isolation Tests", () => {
 
       await client1.newWallet(window.AccountStorageMode.private(), true, 0);
 
-      const client2 = await window.WebClient.createClient(
+      const client2 = await window.WasmWebClient.createClient(
         window.rpcUrl,
         undefined,
         undefined,
@@ -52,10 +52,11 @@ test.describe("Store Isolation Tests", () => {
         accounts1Len: accounts1.length,
         accounts2Len: accounts2.length,
         dbNames,
+        storeName: window.storeName,
       };
     });
 
-    expect(result.dbNames).toContain("tests");
+    expect(result.dbNames).toContain(result.storeName);
     expect(result.dbNames).toContain("IsolatedStore1");
 
     expect(result.accounts1Len).toBe(1);
@@ -64,7 +65,7 @@ test.describe("Store Isolation Tests", () => {
 
   test("reconnecting to same store preserves data", async ({ page }) => {
     const result = await page.evaluate(async () => {
-      const client1 = await window.WebClient.createClient(
+      const client1 = await window.WasmWebClient.createClient(
         window.rpcUrl,
         undefined,
         undefined,
@@ -79,7 +80,7 @@ test.describe("Store Isolation Tests", () => {
       );
       const walletId = wallet.id().toString();
 
-      const client1b = await window.WebClient.createClient(
+      const client1b = await window.WasmWebClient.createClient(
         window.rpcUrl,
         undefined,
         undefined,
@@ -103,7 +104,7 @@ test.describe("Store Isolation Tests", () => {
   test("custom store name creates isolated database", async ({ page }) => {
     const result = await page.evaluate(async () => {
       const customStoreName = "MyCustomStore_v1";
-      const client = await window.WebClient.createClient(
+      const client = await window.WasmWebClient.createClient(
         window.rpcUrl,
         undefined,
         undefined,
@@ -134,13 +135,13 @@ test.describe("Store Isolation Tests", () => {
     page,
   }) => {
     const result = await page.evaluate(async () => {
-      const client1 = await window.WebClient.createClient(
+      const client1 = await window.WasmWebClient.createClient(
         window.rpcUrl,
         undefined,
         undefined,
         "ConcurrentStore1"
       );
-      const client2 = await window.WebClient.createClient(
+      const client2 = await window.WasmWebClient.createClient(
         window.rpcUrl,
         undefined,
         undefined,
@@ -172,13 +173,13 @@ test.describe("Store Isolation Tests", () => {
 
   test("multiple accounts per store remain isolated", async ({ page }) => {
     const result = await page.evaluate(async () => {
-      const client1 = await window.WebClient.createClient(
+      const client1 = await window.WasmWebClient.createClient(
         window.rpcUrl,
         undefined,
         undefined,
         "MultiAccount1"
       );
-      const client2 = await window.WebClient.createClient(
+      const client2 = await window.WasmWebClient.createClient(
         window.rpcUrl,
         undefined,
         undefined,
@@ -237,13 +238,13 @@ test.describe("Store Isolation Tests", () => {
 
   test("input notes are isolated between stores", async ({ page }) => {
     const result = await page.evaluate(async () => {
-      const client1 = await window.WebClient.createClient(
+      const client1 = await window.WasmWebClient.createClient(
         window.rpcUrl,
         undefined,
         undefined,
         "NoteStore1"
       );
-      const client2 = await window.WebClient.createClient(
+      const client2 = await window.WasmWebClient.createClient(
         window.rpcUrl,
         undefined,
         undefined,

@@ -22,6 +22,34 @@ use crate::rpc::domain::transaction::TransactionInclusion;
 use crate::store::{InputNoteRecord, OutputNoteRecord, StoreError};
 use crate::transaction::TransactionRecord;
 
+// SYNC REQUEST
+// ================================================================================================
+
+/// Bundles the client state needed to perform a sync operation.
+///
+/// The sync process uses these inputs to:
+/// - Request account commitment updates from the node for the provided accounts.
+/// - Filter which note inclusions the node returns based on the provided note tags.
+/// - Follow the lifecycle of every tracked note (input and output), transitioning them from pending
+///   to committed to consumed as the network state advances.
+/// - Track uncommitted transactions so they can be marked as committed when the node confirms them,
+///   or discarded when they become stale.
+///
+/// Use [`Client::build_sync_input()`](`crate::Client::build_sync_input()`) to build a default input
+/// from the client state, or construct this struct manually for custom sync scenarios.
+pub struct StateSyncInput {
+    /// Account headers to request commitment updates for.
+    pub accounts: Vec<AccountHeader>,
+    /// Note tags that the node uses to filter which note inclusions to return.
+    pub note_tags: BTreeSet<NoteTag>,
+    /// Input notes whose lifecycle should be followed during sync.
+    pub input_notes: Vec<InputNoteRecord>,
+    /// Output notes whose lifecycle should be followed during sync.
+    pub output_notes: Vec<OutputNoteRecord>,
+    /// Transactions to track for commitment or discard during sync.
+    pub uncommitted_transactions: Vec<TransactionRecord>,
+}
+
 // SYNC CALLBACKS
 // ================================================================================================
 
@@ -55,16 +83,12 @@ pub trait OnNoteReceived {
         public_note: Option<InputNoteRecord>,
     ) -> Result<NoteUpdateAction, ClientError>;
 }
-
 // STATE SYNC
 // ================================================================================================
 
-/// The state sync components encompasses the client's sync logic. It is then used to request
+/// The state sync component encompasses the client's sync logic. It is then used to request
 /// updates from the node and apply them to the relevant elements. The updates are then returned and
 /// can be applied to the store to persist the changes.
-///
-/// When created it receives a callback that will be executed when a new note inclusion is received
-/// in the sync response.
 #[derive(Clone)]
 pub struct StateSync {
     /// The RPC client used to communicate with the node.
@@ -75,10 +99,17 @@ pub struct StateSync {
     /// Number of blocks after which pending transactions are considered stale and discarded.
     /// If `None`, there is no limit and transactions will be kept indefinitely.
     tx_discard_delta: Option<u32>,
+    /// Whether to check for nullifiers during state sync. When enabled, the component will query
+    /// the nullifiers for unspent notes at each sync step. This allows to detect when tracked
+    /// notes have been consumed externally and discard local transactions that depend on them.
+    sync_nullifiers: bool,
 }
 
 impl StateSync {
     /// Creates a new instance of the state sync component.
+    ///
+    /// The nullifiers sync is enabled by default. To disable it, see
+    /// [`Self::disable_nullifier_sync`].
     ///
     /// # Arguments
     ///
@@ -90,13 +121,36 @@ impl StateSync {
         note_screener: Arc<dyn OnNoteReceived>,
         tx_discard_delta: Option<u32>,
     ) -> Self {
-        Self { rpc_api, note_screener, tx_discard_delta }
+        Self {
+            rpc_api,
+            note_screener,
+            tx_discard_delta,
+            sync_nullifiers: true,
+        }
+    }
+
+    /// Disables the nullifier sync.
+    ///
+    /// When disabled, the component will not query the node for new nullifiers after each sync
+    /// step. This is useful for clients that don't need to track note consumption, such as
+    /// faucets.
+    pub fn disable_nullifier_sync(&mut self) {
+        self.sync_nullifiers = false;
+    }
+
+    /// Enables the nullifier sync.
+    pub fn enable_nullifier_sync(&mut self) {
+        self.sync_nullifiers = true;
     }
 
     /// Syncs the state of the client with the chain tip of the node, returning the updates that
     /// should be applied to the store.
     ///
-    /// During the sync process, the client will go through the following steps:
+    /// Use [`Client::build_sync_input()`](`crate::Client::build_sync_input()`) to build the default
+    /// input, or assemble it manually for custom sync. The `current_partial_mmr` is taken by
+    /// mutable reference so callers can keep it in memory across syncs.
+    ///
+    /// During the sync process, the following steps are performed:
     /// 1. A request is sent to the node to get the state updates. This request includes tracked
     ///    account IDs and the tags of notes that might have changed or that might be of interest to
     ///    the client.
@@ -111,22 +165,18 @@ impl StateSync {
     /// 6. Transactions are updated with their new states. Transactions might be committed or
     ///    discarded.
     /// 7. The MMR is updated with the new peaks and authentication nodes.
-    ///
-    /// # Arguments
-    /// * `current_partial_blockchain` - The current partial view of the blockchain.
-    /// * `accounts` - All the headers of tracked accounts.
-    /// * `note_tags` - The note tags to be used in the sync state request.
-    /// * `unspent_input_notes` - The current state of unspent input notes tracked by the client.
-    /// * `unspent_output_notes` - The current state of unspent output notes tracked by the client.
     pub async fn sync_state(
         &self,
-        mut current_partial_mmr: PartialMmr,
-        accounts: Vec<AccountHeader>,
-        note_tags: BTreeSet<NoteTag>,
-        unspent_input_notes: Vec<InputNoteRecord>,
-        unspent_output_notes: Vec<OutputNoteRecord>,
-        uncommitted_transactions: Vec<TransactionRecord>,
+        current_partial_mmr: &mut PartialMmr,
+        input: StateSyncInput,
     ) -> Result<StateSyncUpdate, ClientError> {
+        let StateSyncInput {
+            accounts,
+            note_tags,
+            input_notes,
+            output_notes,
+            uncommitted_transactions,
+        } = input;
         let block_num = u32::try_from(
             current_partial_mmr.forest().num_leaves().checked_sub(1).unwrap_or_default(),
         )
@@ -135,7 +185,7 @@ impl StateSync {
 
         let mut state_sync_update = StateSyncUpdate {
             block_num,
-            note_updates: NoteUpdateTracker::new(unspent_input_notes, unspent_output_notes),
+            note_updates: NoteUpdateTracker::new(input_notes, output_notes),
             transaction_updates: TransactionUpdateTracker::new(uncommitted_transactions),
             ..Default::default()
         };
@@ -210,7 +260,7 @@ impl StateSync {
             let (new_mmr_peaks, new_authentication_nodes) = apply_mmr_changes(
                 &block_header,
                 found_relevant_note,
-                &mut current_partial_mmr,
+                current_partial_mmr,
                 mmr_delta,
             )?;
 
@@ -224,9 +274,10 @@ impl StateSync {
                 );
             }
         }
-        info!("Syncing nullifiers.");
-
-        self.sync_nullifiers(&mut state_sync_update, block_num).await?;
+        if self.sync_nullifiers {
+            info!("Syncing nullifiers.");
+            self.nullifiers_state_sync(&mut state_sync_update, block_num).await?;
+        }
 
         Ok(state_sync_update)
     }
@@ -398,7 +449,7 @@ impl StateSync {
     /// notes. It then processes the nullifiers to apply the state transitions on the note updates.
     ///
     /// The `state_sync_update` parameter will be updated to track the new discarded transactions.
-    async fn sync_nullifiers(
+    async fn nullifiers_state_sync(
         &self,
         state_sync_update: &mut StateSyncUpdate,
         current_block_num: BlockNumber,
@@ -486,4 +537,80 @@ fn apply_mmr_changes(
         .append(&mut current_partial_mmr.add(new_block.commitment(), new_block_has_relevant_notes));
 
     Ok((new_peaks, new_authentication_nodes))
+}
+
+#[cfg(test)]
+mod tests {
+    use alloc::collections::BTreeSet;
+    use alloc::sync::Arc;
+
+    use async_trait::async_trait;
+    use miden_protocol::crypto::merkle::mmr::{Forest, PartialMmr};
+
+    use super::*;
+    use crate::testing::mock::MockRpcApi;
+
+    /// Mock note screener that discards all notes, for minimal test setup.
+    struct MockScreener;
+
+    #[async_trait(?Send)]
+    impl OnNoteReceived for MockScreener {
+        async fn on_note_received(
+            &self,
+            _committed_note: CommittedNote,
+            _public_note: Option<InputNoteRecord>,
+        ) -> Result<NoteUpdateAction, ClientError> {
+            Ok(NoteUpdateAction::Discard)
+        }
+    }
+
+    fn empty() -> StateSyncInput {
+        StateSyncInput {
+            accounts: vec![],
+            note_tags: BTreeSet::new(),
+            input_notes: vec![],
+            output_notes: vec![],
+            uncommitted_transactions: vec![],
+        }
+    }
+
+    #[tokio::test]
+    async fn sync_state_across_multiple_iterations_with_same_mmr() {
+        // Setup: create a mock chain and advance it so there are blocks to sync.
+        let mock_rpc = MockRpcApi::default();
+        mock_rpc.advance_blocks(3);
+        let chain_tip_1 = mock_rpc.get_chain_tip_block_num();
+
+        let state_sync = StateSync::new(Arc::new(mock_rpc.clone()), Arc::new(MockScreener), None);
+
+        // Build the initial PartialMmr from genesis (only 1 leaf).
+        let genesis_peaks = mock_rpc.get_mmr().peaks_at(Forest::new(1)).unwrap();
+        let mut partial_mmr = PartialMmr::from_peaks(genesis_peaks);
+        assert_eq!(partial_mmr.forest().num_leaves(), 1);
+
+        // First sync
+        let update = state_sync.sync_state(&mut partial_mmr, empty()).await.unwrap();
+
+        assert_eq!(update.block_num, chain_tip_1);
+        let forest_1 = partial_mmr.forest();
+        // The MMR should contain one leaf per block (genesis + the new blocks).
+        assert_eq!(forest_1.num_leaves(), chain_tip_1.as_u32() as usize + 1);
+
+        // Second sync
+        mock_rpc.advance_blocks(2);
+        let chain_tip_2 = mock_rpc.get_chain_tip_block_num();
+
+        let update = state_sync.sync_state(&mut partial_mmr, empty()).await.unwrap();
+
+        assert_eq!(update.block_num, chain_tip_2);
+        let forest_2 = partial_mmr.forest();
+        assert!(forest_2 > forest_1);
+        assert_eq!(forest_2.num_leaves(), chain_tip_2.as_u32() as usize + 1);
+
+        // Third sync (no new blocks)
+        let update = state_sync.sync_state(&mut partial_mmr, empty()).await.unwrap();
+
+        assert_eq!(update.block_num, chain_tip_2);
+        assert_eq!(partial_mmr.forest(), forest_2);
+    }
 }
