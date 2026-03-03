@@ -6,7 +6,7 @@
 [![RUST_VERSION](https://img.shields.io/badge/rustc-1.90+-lightgray.svg)](https://www.rust-lang.org/tools/install)
 [![crates.io](https://img.shields.io/crates/v/miden-client)](https://crates.io/crates/miden-client)
 
-The Rust core of the [Miden](https://miden.io) client SDK. This repository contains the foundational Rust library that powers all Miden client interactions — account management, note handling, transaction building/proving, and state synchronization. It is part of a three-repo SDK architecture alongside [`ts-sdk`](https://github.com/0xMiden/ts-sdk) and [`react-sdk`](https://github.com/0xMiden/react-sdk).
+The Rust core of the [Miden](https://miden.io) client SDK. This repository contains the foundational Rust library that powers all Miden client interactions — account management, note handling, transaction building/proving, and state synchronization. It is part of a four-repo SDK architecture alongside [`wasm-bridge`](https://github.com/0xMiden/wasm-bridge), [`ts-sdk`](https://github.com/0xMiden/ts-sdk), and [`react-sdk`](https://github.com/0xMiden/react-sdk).
 
 ### Status
 
@@ -20,20 +20,23 @@ The SDK is organized as a layered stack. Each layer builds on the one below it, 
 graph TB
     subgraph rust-sdk-repo["rust-sdk repo"]
         rust-sdk["<b>rust-sdk</b><br/>Core client library<br/>accounts · notes · transactions"]
-        wasm-bridge["<b>wasm-bridge</b> (internal)<br/>Compiled via wasm-bindgen<br/>idxdb-store · web-tonic"]
-        rust-sdk -- "wasm-bindgen + Rollup" --> wasm-bridge
     end
 
-    subgraph react-sdk-repo["react-sdk repo"]
-        react-sdk["<b>react-sdk</b><br/>React integration layer<br/>hooks · context · zustand"]
+    subgraph wasm-bridge-repo["wasm-bridge repo"]
+        wasm-bridge["<b>wasm-bridge</b><br/>Rust → WASM compilation boundary<br/>wasm-bindgen · idxdb-store · web workers"]
     end
 
     subgraph ts-sdk-repo["ts-sdk repo"]
         ts-sdk["<b>ts-sdk</b><br/>Idiomatic TS wrapper<br/>typed API · async helpers"]
     end
 
-    wasm-bridge -- "npm package" --> react-sdk
+    subgraph react-sdk-repo["react-sdk repo"]
+        react-sdk["<b>react-sdk</b><br/>React integration layer<br/>hooks · context · zustand"]
+    end
+
+    rust-sdk -- "crates.io dependency" --> wasm-bridge
     wasm-bridge -- "npm package" --> ts-sdk
+    wasm-bridge -- "npm package" --> react-sdk
 ```
 
 ### Layer Overview
@@ -41,18 +44,19 @@ graph TB
 | Layer | Published as | Language | Purpose |
 |-------|-------------|----------|---------|
 | **rust-sdk** | [`miden-client`](https://crates.io/crates/miden-client) (crates.io) | Rust | Core client library — account management, note handling, transaction building/execution/proving, state sync, node communication |
-| **wasm-bridge** | `@miden-sdk/wasm-bridge` (npm, internal) | Rust → WASM | Compiles the Rust core to WebAssembly via `wasm-bindgen`. Serves as the compilation boundary between Rust and JavaScript |
+| **wasm-bridge** | [`@miden-sdk/wasm-bridge`](https://www.npmjs.com/package/@miden-sdk/wasm-bridge) (npm) | Rust → WASM + JS | Compiles the Rust core to WebAssembly via `wasm-bindgen`. Owns the full build pipeline (Rollup, Web Workers, IndexedDB storage) and publishes the npm package consumed by downstream SDKs |
 | **ts-sdk** | [`@miden-sdk/ts-sdk`](https://www.npmjs.com/package/@miden-sdk/ts-sdk) (npm) | TypeScript | Idiomatic TypeScript wrapper over the WASM bridge. Primary entry point for **Node.js backends** and non-React frontends |
 | **react-sdk** | [`@miden-sdk/react-sdk`](https://www.npmjs.com/package/@miden-sdk/react-sdk) (npm) | TypeScript | React integration layer — hooks, context providers, Zustand state management, auto-sync, and external signer support |
 
 ### Repository Split
 
-The codebase will be split across three repositories, each owning one boundary of the stack:
+The codebase is split across four repositories, each owning one boundary of the stack:
 
 | Repository | Contains | Rationale |
 |------------|----------|-----------|
-| **[`rust-sdk`](https://github.com/0xMiden/rust-sdk)** | Rust core library + WASM bridge + idxdb-store + sqlite-store + CLI | The foundational Rust crate and its WASM compilation boundary. Keeping the bridge in the same repo as the Rust core ensures API changes and their 90+ `wasm_bindgen` wrappers stay in sync. Publishes to crates.io and npm (internal WASM package). |
-| **[`ts-sdk`](https://github.com/0xMiden/ts-sdk)** | TypeScript API surface + type definitions | Pure TypeScript wrapper over the WASM bridge. Consumes the npm package produced by `rust-sdk` and provides an idiomatic async/await API. Published to npm. |
+| **[`rust-sdk`](https://github.com/0xMiden/rust-sdk)** | Rust core library + sqlite-store + CLI | The foundational Rust crate and native tooling. Pure Rust — no WASM targets, no JS toolchain. Publishes to crates.io. |
+| **[`wasm-bridge`](https://github.com/0xMiden/wasm-bridge)** | WASM compilation boundary + idxdb-store + JS glue + Web Workers | Compiles the Rust core to WebAssembly and owns the full browser build pipeline (Rollup, wasm-bindgen, Web Workers, IndexedDB storage). Publishes to npm. Separating this from the Rust SDK eliminates mixed-target CI complexity and gives the bridge its own release cadence. |
+| **[`ts-sdk`](https://github.com/0xMiden/ts-sdk)** | TypeScript API surface + type definitions | Pure TypeScript wrapper over the WASM bridge. Consumes the npm package produced by `wasm-bridge` and provides an idiomatic async/await API. Published to npm. |
 | **[`react-sdk`](https://github.com/0xMiden/react-sdk)** | React hooks, providers, Zustand store, signer integrations | Framework-specific code that consumes the WASM bridge directly. Evolves independently with React ecosystem changes. |
 
 ## Motivation
@@ -81,9 +85,21 @@ The `Client` struct is generic over an authenticator type (`Client<AUTH>`) and u
 
 ### `wasm-bridge` — The Compilation Boundary
 
-The WASM bridge compiles the Rust core into WebAssembly and exposes it to JavaScript via `wasm-bindgen`. It lives in this repository (`rust-sdk`) alongside the Rust core it wraps, and is published as an **internal npm package** consumed by the TypeScript and React SDKs. Keeping the bridge co-located with the Rust code ensures that API changes and their 90+ `wasm_bindgen` wrappers can evolve in a single PR.
+**Repository:** [`wasm-bridge`](https://github.com/0xMiden/wasm-bridge) · **Package:** [`@miden-sdk/wasm-bridge`](https://www.npmjs.com/package/@miden-sdk/wasm-bridge)
 
-This layer handles type marshalling (90+ `#[wasm_bindgen]` wrapper types), Web Worker offloading for CPU-intensive operations (ZK proof generation, account creation), IndexedDB storage via `idxdb-store`, and sync locking to prevent state corruption in the browser environment.
+The WASM bridge compiles the Rust core into WebAssembly and exposes it to JavaScript. It lives in its own repository with its own Rust + JS build pipeline (Rollup, `wasm-bindgen`, TypeScript), and publishes the npm package consumed by both the TypeScript and React SDKs.
+
+This is a substantial layer — ~150 files across Rust and JavaScript — that handles:
+
+- **Type marshalling** — 90+ `#[wasm_bindgen]` wrapper types that translate Rust structs into JavaScript-friendly objects.
+- **Web Worker offloading** — CPU-intensive operations (ZK proof generation, account creation) run in a dedicated Web Worker, preventing the main thread from freezing.
+- **IndexedDB storage** — the `idxdb-store` crate provides browser-compatible persistence via Dexie.js, supporting multiple isolated databases per network.
+- **Sync locking** — prevents concurrent state sync operations from corrupting the local store in the browser environment.
+- **External signer support** — callback-based keystore integration for third-party wallet providers (Para, Turnkey, MidenFi).
+
+Separating the bridge from the Rust SDK eliminates mixed-target CI complexity (`cargo publish --dry-run` no longer needs to exclude WASM crates), gives the bridge its own release cadence, and isolates the JS toolchain (Rollup, Node.js, Playwright) from the pure-Rust repository.
+
+See the [`wasm-bridge` repository](https://github.com/0xMiden/wasm-bridge) for build instructions, the full binding API, and Web Worker configuration.
 
 ### `ts-sdk` — The TypeScript Developer Experience
 
@@ -112,7 +128,7 @@ The `Store` trait abstracts all persistence operations. Implementations must app
 | Crate | Target | Repository | Description |
 |-------|--------|------------|-------------|
 | `sqlite-store` | Native | `rust-sdk` | SQLite-based persistence using `rusqlite` with connection pooling. Used by the CLI and Rust backends. |
-| `idxdb-store` | Browser | `rust-sdk` | IndexedDB-based persistence using Dexie.js. Supports multiple isolated databases per network. Lives alongside the WASM bridge it serves. |
+| `idxdb-store` | Browser | `wasm-bridge` | IndexedDB-based persistence using Dexie.js. Supports multiple isolated databases per network. Lives alongside the WASM bridge it serves. |
 
 ### CLI
 
@@ -147,16 +163,13 @@ State synchronization atomically applies a bundle of changes — new block heade
 
 ZK proof generation and account creation are CPU-intensive operations that can take several seconds. The WASM bridge automatically offloads these to a dedicated Web Worker, preventing the main thread from freezing.
 
-### no_std Core with Platform-Specific Backends
+### no_std Core
 
-The Rust SDK is `#![no_std]` compatible. Platform-specific functionality is provided through feature flags:
-
-- **Native:** `std` feature enables `tonic` gRPC with TLS, filesystem keystore, and concurrent execution.
-- **WASM:** `wasm32` target enables `tonic-web-wasm-client` for gRPC-Web and `web-sys` for browser APIs.
+The Rust SDK is `#![no_std]` compatible, with platform-specific functionality gated behind feature flags (`std` enables `tonic` gRPC with TLS, filesystem keystore, and concurrent execution). This makes the core library compilable to `wasm32` targets — a capability exercised by the [`wasm-bridge`](https://github.com/0xMiden/wasm-bridge) repository — while keeping this repository focused on a single native target with no WASM or JS toolchain required.
 
 ## Repository Structure
 
-This repository (`rust-sdk`) contains the Rust core, WASM bridge, storage backends, and CLI:
+This repository (`rust-sdk`) contains the Rust core library, native storage backend, CLI, and test infrastructure:
 
 ```
 bin/
@@ -166,16 +179,14 @@ bin/
 
 crates/
 ├── rust-client/              # Core client library (miden-client)
-├── web-client/               # WASM bridge (wasm-bindgen wrappers)
 ├── sqlite-store/             # SQLite storage backend (native)
-├── idxdb-store/              # IndexedDB storage backend (browser)
 └── testing/                  # Test infrastructure
     ├── miden-client-tests/   # Shared test utilities
     ├── node-builder/         # Test node builder
     └── prover/               # Remote prover for testing
 ```
 
-See also: [`ts-sdk`](https://github.com/0xMiden/ts-sdk) (TypeScript API) · [`react-sdk`](https://github.com/0xMiden/react-sdk) (React hooks and providers)
+See also: [`wasm-bridge`](https://github.com/0xMiden/wasm-bridge) (WASM compilation + browser runtime) · [`ts-sdk`](https://github.com/0xMiden/ts-sdk) (TypeScript API) · [`react-sdk`](https://github.com/0xMiden/react-sdk) (React hooks and providers)
 
 ## Getting Started
 
@@ -237,7 +248,6 @@ See the [CLI README](./bin/miden-cli/README.md) for the full command reference a
 ### Prerequisites
 
 - Rust toolchain (see `rust-toolchain.toml`)
-- Node.js >= 18 + Yarn
 - `make` for build orchestration
 
 ### Common Commands
@@ -245,9 +255,8 @@ See the [CLI README](./bin/miden-cli/README.md) for the full command reference a
 ```bash
 make install-tools          # Install dev tools (nextest, taplo, typos, etc.)
 make build                  # Build all Rust crates
-make build-wasm             # Build WASM targets
-make lint                   # Run all lints (format, clippy, typos, eslint)
-make format                 # Format all code (Rust, TS, TOML)
+make lint                   # Run all lints (format, clippy, typos)
+make format                 # Format all code (Rust, TOML)
 make test                   # Run unit tests
 make integration-test       # Run integration tests (requires test node)
 ```
