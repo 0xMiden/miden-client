@@ -389,35 +389,21 @@ export class TransactionsResource {
     const accountId = resolveAccountRef(opts.account, wasm);
     const noteInputs = Array.isArray(opts.notes) ? opts.notes : [opts.notes];
 
-    // Detect direct Note objects (unauthenticated consumption path).
-    // Note objects have .id() but not .toNote(); NoteId has neither .id() nor .toNote().
-    const hasDirectNotes = noteInputs.some(
-      (input) =>
-        input !== null &&
-        typeof input === "object" &&
-        typeof input.id === "function" &&
-        typeof input.toNote !== "function"
-    );
+    const isDirectNote = (input) =>
+      input !== null &&
+      typeof input === "object" &&
+      typeof input.id === "function" &&
+      typeof input.toNote !== "function";
+
+    const hasDirectNotes = noteInputs.some(isDirectNote);
 
     if (hasDirectNotes) {
-      // Resolve all inputs to Note objects, then use NoteAndArgs builder path
+      // At least one raw Note object — use NoteAndArgs builder path
       // (the only WASM path that accepts unauthenticated notes not in the store).
       const resolvedNotes = await Promise.all(
         noteInputs.map(async (input) => {
-          // Already a Note object
-          if (
-            input !== null &&
-            typeof input === "object" &&
-            typeof input.id === "function" &&
-            typeof input.toNote !== "function"
-          ) {
-            return input;
-          }
-          // InputNoteRecord
-          if (input && typeof input.toNote === "function") {
-            return input.toNote();
-          }
-          // String or NoteId — fetch from store
+          if (isDirectNote(input)) return input;
+          if (input && typeof input.toNote === "function") return input.toNote();
           return await this.#resolveNoteInput(input);
         })
       );
