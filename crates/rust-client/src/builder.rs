@@ -547,7 +547,7 @@ impl ClientBuilder<FilesystemKeyStore> {
     pub fn filesystem_keystore_encrypted(
         self,
         keystore_path: impl Into<std::path::PathBuf>,
-        encryptor: impl crate::keystore::KeyEncryptor + 'static,
+        encryptor: crate::keystore::PasswordEncryptor,
     ) -> Result<Self, ClientError> {
         let keystore = FilesystemKeyStore::new(keystore_path.into())
             .map_err(|e| ClientError::ClientInitializationError(e.to_string()))?
