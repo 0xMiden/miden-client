@@ -1,5 +1,5 @@
 [package]
-name = "consume-asset-script"
+name = "consume-asset"
 version = "0.1.0"
 edition = "2024"
 
@@ -20,7 +20,7 @@ miden = "0.10.0"
 "miden:basic-wallet" = { path = "../basic-wallet/target/generated-wit/" }
 
 [package.metadata.component]
-package = "miden:consume-asset-script"
+package = "miden:consume-asset"
 
 [package.metadata.miden]
 project-kind = "transaction-script"
