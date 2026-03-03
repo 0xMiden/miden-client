@@ -161,13 +161,7 @@ describe("useConsume", () => {
 
     it("should consume multiple notes in one transaction", async () => {
       const mockTxId = createMockTransactionId();
-      const inputIds = [
-        "0xnote1",
-        "0xnote2",
-        "0xnote3",
-        "0xnote4",
-        "0xnote5",
-      ];
+      const inputIds = ["0xnote1", "0xnote2", "0xnote3", "0xnote4", "0xnote5"];
       const noteRecords = createNoteRecords(inputIds);
       const mockClient = createMockWebClient({
         getInputNotes: vi.fn().mockResolvedValue(noteRecords),

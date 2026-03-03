@@ -403,7 +403,8 @@ export class TransactionsResource {
       const resolvedNotes = await Promise.all(
         noteInputs.map(async (input) => {
           if (isDirectNote(input)) return input;
-          if (input && typeof input.toNote === "function") return input.toNote();
+          if (input && typeof input.toNote === "function")
+            return input.toNote();
           return await this.#resolveNoteInput(input);
         })
       );
