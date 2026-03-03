@@ -54,7 +54,7 @@ impl WebClient {
     /// Meant to be used in conjunction with the `forceImportStore` method
     #[wasm_bindgen(js_name = "exportStore")]
     pub async fn export_store(&mut self) -> Result<JsValue, JsValue> {
-        let store = self.store.as_ref().ok_or(JsValue::from_str("Store not initialized"))?;
+        let store = self.inner.as_ref().ok_or(JsValue::from_str("Client not initialized"))?.store();
 
         let json_string = store
             .export_store()
@@ -69,7 +69,13 @@ impl WebClient {
         &mut self,
         account_id: AccountId,
     ) -> Result<AccountFile, JsValue> {
-        let keystore = self.keystore.clone().expect("Keystore not initialized");
+        let keystore = self
+            .inner
+            .as_ref()
+            .ok_or(JsValue::from_str("Client not initialized"))?
+            .authenticator()
+            .cloned()
+            .expect("Authenticator not initialized");
         if let Some(client) = self.get_mut_inner() {
             let account = client
                 .get_account(account_id.into())

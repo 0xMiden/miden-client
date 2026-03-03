@@ -86,6 +86,8 @@ pub enum StoreError {
     StorageMapError(#[from] StorageMapError),
     #[error("error instantiating transaction script")]
     TransactionScriptError(#[from] TransactionScriptError),
+    #[error("operation not supported: {0}")]
+    OperationNotSupported(String),
     #[error("account vault data for root {0} not found")]
     VaultDataNotFound(Word),
     #[error("failed to parse word: {0}")]

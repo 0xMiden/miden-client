@@ -125,8 +125,12 @@ impl WebClient {
     /// ```
     #[wasm_bindgen(js_name = "accountReader")]
     pub fn account_reader(&self, account_id: &AccountId) -> Result<AccountReader, JsValue> {
-        let store: Arc<dyn Store> =
-            self.store.clone().ok_or(JsValue::from_str("Store not initialized"))?;
+        let store: Arc<dyn Store> = self
+            .inner
+            .as_ref()
+            .ok_or(JsValue::from_str("Client not initialized"))?
+            .store()
+            .clone();
         Ok(AccountReader::new(store, account_id.into()))
     }
 
@@ -139,7 +143,13 @@ impl WebClient {
         &mut self,
         pub_key_commitment: &Word,
     ) -> Result<AuthSecretKey, JsValue> {
-        let keystore = self.keystore.clone().expect("Keystore not initialized");
+        let keystore = self
+            .inner
+            .as_ref()
+            .ok_or(JsValue::from_str("Client not initialized"))?
+            .authenticator()
+            .cloned()
+            .expect("Authenticator not initialized");
 
         let auth_secret_key = keystore
             .get_key((*pub_key_commitment.as_native()).into())
@@ -159,7 +169,13 @@ impl WebClient {
         &mut self,
         account_id: &AccountId,
     ) -> Result<Vec<Word>, JsValue> {
-        let keystore = self.keystore.clone().expect("Keystore not initialized");
+        let keystore = self
+            .inner
+            .as_ref()
+            .ok_or(JsValue::from_str("Client not initialized"))?
+            .authenticator()
+            .cloned()
+            .expect("Authenticator not initialized");
         Ok(keystore
             .get_account_key_commitments(account_id.as_native())
             .await
@@ -219,9 +235,12 @@ impl WebClient {
         pub_key_commitment: &Word,
     ) -> Result<Option<Account>, JsValue> {
         let keystore = self
-            .keystore
-            .clone()
-            .ok_or_else(|| JsValue::from_str("Keystore not initialized"))?;
+            .inner
+            .as_ref()
+            .ok_or(JsValue::from_str("Client not initialized"))?
+            .authenticator()
+            .cloned()
+            .ok_or_else(|| JsValue::from_str("Authenticator not initialized"))?;
 
         let account_id = keystore
             .get_account_id_by_key_commitment((*pub_key_commitment.as_native()).into())
