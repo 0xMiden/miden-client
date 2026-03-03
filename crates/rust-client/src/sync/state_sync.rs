@@ -519,10 +519,19 @@ impl StateSync {
         // changes between the sync_state and the check_nullifier calls)
         new_nullifiers.retain(|update| update.block_num <= state_sync_update.block_num);
 
+        // Compute the transaction ordering within blocks so consumed notes can be sorted by
+        // consumption time.
+        let nullifier_tx_order = crate::note::compute_nullifier_tx_order(
+            state_sync_update.transaction_updates.committed_transactions(),
+        );
+
         for nullifier_update in new_nullifiers {
+            let order = nullifier_tx_order.get(&nullifier_update.nullifier).copied();
+
             state_sync_update.note_updates.apply_nullifiers_state_transitions(
                 &nullifier_update,
                 state_sync_update.transaction_updates.committed_transactions(),
+                order,
             )?;
 
             // Process nullifiers and track the updates of local tracked transactions that were

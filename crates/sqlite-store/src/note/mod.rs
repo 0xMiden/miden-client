@@ -67,6 +67,7 @@ struct SerializedOutputNoteData {
     pub expected_height: u32,
     pub state_discriminant: u8,
     pub state: Vec<u8>,
+    pub consumed_block_height: Option<u32>,
 }
 
 /// Represents the parts retrieved from the database to build an `InputNoteRecord`.
@@ -297,10 +298,11 @@ pub(super) fn upsert_input_note_tx(
     .map(|_| ())
 }
 
-/// Inserts the provided input note into the database.
+/// Inserts the provided output note into the database.
 pub fn upsert_output_note_tx(
     tx: &Transaction<'_>,
     note: &OutputNoteRecord,
+    consumed_tx_order: Option<u32>,
 ) -> Result<(), StoreError> {
     const NOTE_QUERY: &str = insert_sql!(
         output_notes {
@@ -311,7 +313,9 @@ pub fn upsert_output_note_tx(
             nullifier,
             expected_height,
             state_discriminant,
-            state
+            state,
+            consumed_block_height,
+            consumed_tx_order
         } | REPLACE
     );
 
@@ -324,6 +328,7 @@ pub fn upsert_output_note_tx(
         expected_height,
         state_discriminant,
         state,
+        consumed_block_height,
     } = serialize_output_note(note);
 
     tx.execute(
@@ -337,6 +342,8 @@ pub fn upsert_output_note_tx(
             expected_height,
             state_discriminant,
             state,
+            consumed_block_height,
+            consumed_tx_order,
         ],
     )
     .into_store_error()?;
@@ -482,6 +489,11 @@ fn serialize_output_note(note: &OutputNoteRecord) -> SerializedOutputNoteData {
     let state_discriminant = note.state().discriminant();
     let state = note.state().to_bytes();
 
+    let consumed_block_height = match note.state() {
+        OutputNoteState::Consumed { block_height, .. } => Some(block_height.as_u32()),
+        _ => None,
+    };
+
     SerializedOutputNoteData {
         id,
         assets,
@@ -491,6 +503,7 @@ fn serialize_output_note(note: &OutputNoteRecord) -> SerializedOutputNoteData {
         expected_height: note.expected_height().as_u32(),
         state_discriminant,
         state,
+        consumed_block_height,
     }
 }
 
@@ -503,7 +516,7 @@ pub(crate) fn apply_note_updates_tx(
     }
 
     for output_note in note_updates.updated_output_notes() {
-        upsert_output_note_tx(tx, output_note.inner())?;
+        upsert_output_note_tx(tx, output_note.inner(), output_note.consumed_tx_order())?;
     }
 
     Ok(())

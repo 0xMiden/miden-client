@@ -19,7 +19,12 @@ const OUTPUT_NOTES_BASE_QUERY: &str = "SELECT
 /// Returns the output notes query for a specific `NoteFilter`
 pub(super) fn note_filter_to_query_output_notes(filter: &NoteFilter) -> (String, NoteQueryParams) {
     let (condition, params) = note_filter_output_notes_condition(filter);
-    let query = format!("{OUTPUT_NOTES_BASE_QUERY} WHERE {condition}");
+    let query = format!(
+        "{OUTPUT_NOTES_BASE_QUERY} WHERE {condition} \
+         ORDER BY note.consumed_block_height IS NULL, note.consumed_block_height ASC, \
+                  note.consumed_tx_order IS NULL, note.consumed_tx_order ASC, \
+                  note.note_id ASC"
+    );
 
     (query, params)
 }
@@ -31,7 +36,11 @@ pub(super) fn note_filter_to_query_output_note_by_offset(
 ) -> (String, NoteQueryParams) {
     let (condition, params) = note_filter_output_notes_condition(filter);
     let query = format!(
-        "{OUTPUT_NOTES_BASE_QUERY} WHERE {condition} ORDER BY note.note_id ASC LIMIT 1 OFFSET {offset}"
+        "{OUTPUT_NOTES_BASE_QUERY} WHERE {condition} \
+         ORDER BY note.consumed_block_height IS NULL, note.consumed_block_height ASC, \
+                  note.consumed_tx_order IS NULL, note.consumed_tx_order ASC, \
+                  note.note_id ASC \
+         LIMIT 1 OFFSET {offset}"
     );
 
     (query, params)
