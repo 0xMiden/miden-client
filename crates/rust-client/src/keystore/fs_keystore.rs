@@ -326,7 +326,7 @@ impl FilesystemKeyStore {
         let data = if let Some(encryptor) = &self.encryptor {
             encryptor.encrypt(&plaintext)?
         } else {
-            plaintext.clone()
+            plaintext
         };
 
         atomic_write(file_path, &data)
