@@ -14,6 +14,7 @@
 * Added `NoteScreener` constructor via `Client::note_screener()` and improved note consumability checks with batch note screening support ([#1803](https://github.com/0xMiden/miden-client/pull/1803)).
 * [FEATURE][web] Added `getAccountProof` method to the web client's `RpcClient`, allowing lightweight retrieval of account header, storage slot values, and code via a single RPC call ([#1794](https://github.com/0xMiden/miden-client/pull/1794)).
 * Added `getAccountByKeyCommitment` method to `WebClient` for retrieving accounts by public key commitment ([#1729](https://github.com/0xMiden/miden-client/pull/1729)).
+* Added automatic registration of note scripts required by network transactions (NTX). The client now checks the node's script registry before submitting a transaction and registers any missing scripts via a separate registration transaction ([#1840](https://github.com/0xMiden/miden-client/pull/1840)).
 
 ### Changes
 
@@ -22,6 +23,7 @@
 * Refactored integration tests binary with subprocess-per-test execution; added automatic retry of failed tests (`--retry-count`), captured stdout/stderr per test, and tracing support via `RUST_LOG` ([#1743](https://github.com/0xMiden/miden-client/pull/1743)).
 * Added implementation for the `get_public_key` method on the `FilesystemKeystore` and `WebKeystore` ([#1731](https://github.com/0xMiden/miden-client/pull/1731)).
 * [BREAKING] Made the nullifiers sync optional on the `StateSync` component ([#1756](https://github.com/0xMiden/miden-client/pull/1756)).
+
 
 ## 0.13.1 (TBD)
 
