@@ -202,7 +202,9 @@ impl NoteFilterExt for NoteFilter {
                         OutputNoteState::STATE_EXPECTED_PARTIAL,
                     ],
                     NoteFilter::Unspent => vec![
+                        OutputNoteState::STATE_EXPECTED_PARTIAL,
                         OutputNoteState::STATE_EXPECTED_FULL,
+                        OutputNoteState::STATE_COMMITTED_PARTIAL,
                         OutputNoteState::STATE_COMMITTED_FULL,
                     ],
                     _ => unreachable!(), // Safety net, should never be reached

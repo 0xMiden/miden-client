@@ -2,33 +2,57 @@ name: Build
 on:
   push:
     branches: [main, next]
+    paths-ignore:
+      - "**.md"
+      - "**.txt"
+      - "docs/**"
   pull_request:
-    types: [opened, reopened, synchronize]
+    paths-ignore:
+      - "**.md"
+      - "**.txt"
+      - "docs/**"
+
 permissions:
   contents: read
 
+concurrency:
+  group: "${{ github.workflow }} @ ${{ github.event.pull_request.head.label || github.head_ref || github.ref }}"
+  cancel-in-progress: true
+
+env:
+  CARGO_PROFILE_DEV_DEBUG: 0
+  RUST_CACHE_KEY: rust-cache-2026.02.18
+
 jobs:
   build:
-    name: Build Client and CLI on ubuntu-latest
-    runs-on: ubuntu-latest
+    name: Build Client and CLI
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@main
+      - uses: actions/checkout@v6
       - name: Install Rust toolchain
         run: rustup update --no-self-update
       - name: Add Rust Cache
         uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: rust-build
+          prefix-key: ${{ env.RUST_CACHE_KEY }}
+          save-if: ${{ github.ref == 'refs/heads/next' }}
       - name: make - build
         run: make build
   build-wasm:
-    name: Build Client on ubuntu-latest for wasm
-    runs-on: ubuntu-latest
+    name: Build Client for wasm
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@main
+      - uses: actions/checkout@v6
       - name: Install Rust toolchain
         run: rustup update --no-self-update
       - name: Add wasm32-unknown-unknown target
         run: rustup target add wasm32-unknown-unknown
       - name: Add Rust Cache
         uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: rust-build-wasm
+          prefix-key: ${{ env.RUST_CACHE_KEY }}
+          save-if: ${{ github.ref == 'refs/heads/next' }}
       - name: make - build-wasm
         run: make build-wasm

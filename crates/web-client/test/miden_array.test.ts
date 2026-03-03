@@ -203,17 +203,16 @@ test.describe("Specific array tests (using AccountIdArray)", () => {
 
   test("OOB array mutate throws", async ({ page }) => {
     const index = Math.ceil(Math.random() * (1 << 30)) + 1;
-    const params = { page, index };
-    await Promise.all([
-      expect(mutateAccountIdArray(params)).rejects.toThrowError(
-        /out of bounds access/
-      ),
-      expect(mutateAccountIdArray(params)).rejects.toThrowError(
-        /tried to access at index/
-      ),
-      expect(mutateAccountIdArray(params)).rejects.toThrowError("0"),
-      expect(mutateAccountIdArray(params)).rejects.toThrowError("AccountId"),
-    ]);
+    try {
+      await mutateAccountIdArray({ page, index });
+      throw new Error("Expected mutateAccountIdArray to throw");
+    } catch (error: any) {
+      const message = error.message || String(error);
+      expect(message).toMatch(/out of bounds access/);
+      expect(message).toMatch(/tried to access at index/);
+      expect(message).toContain("0");
+      expect(message).toContain("AccountId");
+    }
   });
 });
 

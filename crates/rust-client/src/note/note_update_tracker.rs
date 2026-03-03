@@ -295,7 +295,7 @@ impl NoteUpdateTracker {
 
         if let Some(output_note_record) = self.get_output_note_by_id(*committed_note.note_id()) {
             // The note belongs to our locally tracked set of output notes
-            output_note_record.inclusion_proof_received(inclusion_proof.clone())?;
+            output_note_record.inclusion_proof_received(inclusion_proof)?;
         }
 
         Ok(is_tracked_as_input_note)

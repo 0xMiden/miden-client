@@ -6,4 +6,4 @@
 
 # Variable: MidenArrays
 
-> `const` **MidenArrays**: `MidenArrayConstructors`
+> `const` **MidenArrays**: [`MidenArrayConstructors`](../type-aliases/MidenArrayConstructors.md)

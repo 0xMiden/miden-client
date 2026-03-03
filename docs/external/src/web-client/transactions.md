@@ -5,43 +5,40 @@ sidebar_position: 9
 
 # Retrieving Transaction History with the Miden SDK
 
-This guide demonstrates how to retrieve and work with transaction history using the Miden SDK. We'll cover different ways to query transactions and access their properties. Each example includes detailed annotations to explain the key parameters and returned properties.
+This guide demonstrates how to retrieve and work with transaction history using the Miden SDK.
 
-## Basic Transaction Retrieval
-
-To get a list of all transactions:
+## Listing All Transactions
 
 ```typescript
-import { TransactionFilter, WebClient } from "@miden-sdk/miden-sdk";
+import { MidenClient } from "@miden-sdk/miden-sdk";
 
 try {
-    // Initialize the web client
-    const webClient = await WebClient.createClient();
+    const client = await MidenClient.create();
 
-    // Get all transactions
-    const allTransactions = await webClient.getTransactions(TransactionFilter.all());
+    // List all transactions
+    const allTransactions = await client.transactions.list();
 
-    // Iterate through transactions
     for (const tx of allTransactions) {
-        console.log(tx.id().toString());           // Transaction ID
-        console.log(tx.accountId().toString());    // Account ID associated with the transaction
-        console.log(tx.blockNum().toString());     // Block number where the transaction was included
-        
+        console.log("Transaction ID:", tx.id().toString());
+        console.log("Account ID:", tx.accountId().toString());
+        console.log("Block Number:", tx.blockNum().toString());
+
         // Check transaction status
         const status = tx.transactionStatus();
         if (status.isPending()) {
             console.log("Status: Pending");
         } else if (status.isCommitted()) {
             console.log("Status: Committed in block", status.getBlockNum());
+            console.log("Committed at:", status.getCommitTimestamp());
         } else if (status.isDiscarded()) {
             console.log("Status: Discarded");
         }
-        
+
         // Account state changes
-        console.log("Initial Account State:", tx.initAccountState().toHex());
-        console.log("Final Account State:", tx.finalAccountState().toHex());
-        
-        // Input and output notes
+        console.log("Initial State:", tx.initAccountState().toHex());
+        console.log("Final State:", tx.finalAccountState().toHex());
+
+        // Notes information
         console.log("Input Note Nullifiers:", tx.inputNoteNullifiers().map(n => n.toHex()));
         console.log("Output Notes:", tx.outputNotes().toString());
     }
@@ -50,103 +47,40 @@ try {
 }
 ```
 
-## Retrieving Uncommitted Transactions
-
-To get transactions that haven't been committed to the blockchain yet:
+## Filtering Transactions
 
 ```typescript
-import { TransactionFilter, WebClient } from "@miden-sdk/miden-sdk";
+import { MidenClient } from "@miden-sdk/miden-sdk";
 
 try {
-    // Initialize the web client
-    const webClient = await WebClient.createClient();
+    const client = await MidenClient.create();
 
     // Get uncommitted transactions
-    const uncommittedTransactions = await webClient.getTransactions(TransactionFilter.uncommitted());
-
-    // Process transactions as needed
-    for (const tx of uncommittedTransactions) {
-        console.log("Uncommitted Transaction:", tx.id().toString());
-        const status = tx.transactionStatus();
-        if (status.isPending()) {
-            console.log("Status: Pending");
-        } else if (status.isDiscarded()) {
-            console.log("Status: Discarded");
-        }
+    const uncommitted = await client.transactions.list({ status: "uncommitted" });
+    for (const tx of uncommitted) {
+        console.log("Uncommitted:", tx.id().toString());
     }
+
+    // Get specific transactions by ID
+    const specific = await client.transactions.list({ ids: [txId1, txId2] });
+
+    // Get expired transactions
+    const expired = await client.transactions.list({ expiredBefore: 1000 });
 } catch (error) {
-    console.error("Failed to retrieve uncommitted transactions:", error.message);
-}
-```
-
-## Working with Transaction Records
-
-Each transaction record contains detailed information about the transaction:
-
-```typescript
-import { WebClient } from "@miden-sdk/miden-sdk";
-
-try {
-    // Initialize the web client
-    const webClient = await WebClient.createClient();
-
-    const transactions = await webClient.getTransactions(TransactionFilter.all());
-
-    for (const tx of transactions) {
-        // Basic transaction info
-        console.log("Transaction ID:", tx.id().toString());
-        console.log("Account ID:", tx.accountId().toString());
-        console.log("Block Number:", tx.blockNum().toString());
-        console.log("Created at:", tx.creationTimestamp());
-
-        // Transaction status
-        const status = tx.transactionStatus();
-        if (status.isPending()) {
-            console.log("Status: Pending");
-        } else if (status.isCommitted()) {
-            console.log("Status: Committed in block", status.getBlockNum());
-            console.log("Status: Committed in timestamp", status.getCommitTimestamp())
-        } else if (status.isDiscarded()) {
-            console.log("Status: Discarded");
-        }
-        
-        // Account state changes
-        console.log("Initial State:", tx.initAccountState().toHex());
-        console.log("Final State:", tx.finalAccountState().toHex());
-        
-        // Notes information
-        console.log("Input Note Nullifiers:", tx.inputNoteNullifiers().map(n => n.toHex()));
-        console.log("Output Notes:", tx.outputNotes().toString());
-    }
-} catch (error) {
-    console.error("Failed to process transaction records:", error.message);
+    console.error("Failed to filter transactions:", error.message);
 }
 ```
 
 ## Transaction Statuses
 
 Transactions can have the following statuses:
-- `pending`: Transaction is waiting to be processed
-- `committed`: Transaction has been successfully processed and included in a block (includes block number)
-- `discarded`: Transaction was discarded and will not be processed
+- **Pending** — Transaction is waiting to be processed
+- **Committed** — Transaction has been successfully included in a block
+- **Discarded** — Transaction was discarded and will not be processed
 
-You can check the status of a transaction using the following methods:
-- `isPending()`: Returns true if the transaction is pending
-- `isCommitted()`: Returns `true` if the transaction is committed
-- `isDiscarded()`: Returns `true` if the transaction is discarded
-- `getBlockNum()`: Returns the block number if the transaction is committed, otherwise returns `null`
-- `getCommittedTimestamp()`: Returns the timestamp when the transaction was committed, or `null` if it was not
-
-## Relevant Documentation
-
-For more detailed information about the classes and methods used in these examples, refer to the following API documentation:
-
-- [WebClient](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/WebClient.md) - Main client class for interacting with the Miden network
-- [TransactionRecord](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/TransactionRecord.md) - Historical transaction records and their properties
-- [TransactionFilter](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/TransactionFilter.md) - Transaction filtering options
-- [TransactionId](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/TransactionId.md) - Transaction identifier class
-- [AccountId](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/AccountId.md) - Account identifier class
-- [OutputNotes](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/OutputNotes.md) - Output notes associated with transactions
-- [TransactionStatus](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/TransactionStatus.md) - Transaction status information and methods
-
-For a complete list of available classes and utilities, see the [SDK API Reference](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/README.md). 
+Check status using methods on the `TransactionStatus` object:
+- `isPending()` — Returns `true` if the transaction is pending
+- `isCommitted()` — Returns `true` if the transaction is committed
+- `isDiscarded()` — Returns `true` if the transaction is discarded
+- `getBlockNum()` — Returns the block number if committed, otherwise `null`
+- `getCommitTimestamp()` — Returns the commit timestamp if committed, otherwise `null`

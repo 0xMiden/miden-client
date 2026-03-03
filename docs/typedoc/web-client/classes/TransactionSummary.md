@@ -22,13 +22,13 @@ Represents a transaction summary.
 
 ### accountDelta()
 
-> **accountDelta**(): [`AccountDelta`](AccountDelta.md)
+> **accountDelta**(): `AccountDelta`
 
 Returns the account delta described by the summary.
 
 #### Returns
 
-[`AccountDelta`](AccountDelta.md)
+`AccountDelta`
 
 ***
 
@@ -44,25 +44,25 @@ Returns the account delta described by the summary.
 
 ### inputNotes()
 
-> **inputNotes**(): [`InputNotes`](InputNotes.md)
+> **inputNotes**(): `InputNotes`
 
 Returns the input notes referenced by the summary.
 
 #### Returns
 
-[`InputNotes`](InputNotes.md)
+`InputNotes`
 
 ***
 
 ### outputNotes()
 
-> **outputNotes**(): [`OutputNotes`](OutputNotes.md)
+> **outputNotes**(): `OutputNotes`
 
 Returns the output notes referenced by the summary.
 
 #### Returns
 
-[`OutputNotes`](OutputNotes.md)
+`OutputNotes`
 
 ***
 

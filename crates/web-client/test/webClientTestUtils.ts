@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { expect } from "chai";
-import { TransactionProver, WebClient } from "../dist";
+import { TransactionProver } from "../dist";
 import test from "./playwright.global.setup";
 import { Page } from "@playwright/test";
 

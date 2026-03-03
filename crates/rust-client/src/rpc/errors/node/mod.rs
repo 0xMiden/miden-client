@@ -17,7 +17,7 @@ pub use sync::{
 use thiserror::Error;
 pub use transaction::AddTransactionError;
 
-use crate::rpc::NodeRpcClientEndpoint;
+use crate::rpc::RpcEndpoint;
 
 /// Application-level error returned by the node for a specific RPC endpoint.
 ///
@@ -66,52 +66,50 @@ pub enum EndpointError {
 ///
 /// Returns `None` if details are empty or if the endpoint doesn't have typed errors.
 pub fn parse_node_error(
-    endpoint: &NodeRpcClientEndpoint,
+    endpoint: &RpcEndpoint,
     details: &[u8],
     message: &str,
 ) -> Option<EndpointError> {
     let code = *details.first()?;
 
     match endpoint {
-        NodeRpcClientEndpoint::SubmitProvenTx => {
+        RpcEndpoint::SubmitProvenTx => {
             Some(EndpointError::AddTransaction(AddTransactionError::from_code(code, message)))
         },
-        NodeRpcClientEndpoint::GetBlockHeaderByNumber => {
+        RpcEndpoint::GetBlockHeaderByNumber => {
             Some(EndpointError::GetBlockHeader(GetBlockHeaderError::from_code(code, message)))
         },
-        NodeRpcClientEndpoint::GetBlockByNumber => {
+        RpcEndpoint::GetBlockByNumber => {
             Some(EndpointError::GetBlockByNumber(GetBlockByNumberError::from_code(code, message)))
         },
-        NodeRpcClientEndpoint::SyncNotes => {
+        RpcEndpoint::SyncNotes => {
             Some(EndpointError::NoteSync(NoteSyncError::from_code(code, message)))
         },
-        NodeRpcClientEndpoint::SyncNullifiers => {
+        RpcEndpoint::SyncNullifiers => {
             Some(EndpointError::SyncNullifiers(SyncNullifiersError::from_code(code, message)))
         },
-        NodeRpcClientEndpoint::SyncAccountVault => {
+        RpcEndpoint::SyncAccountVault => {
             Some(EndpointError::SyncAccountVault(SyncAccountVaultError::from_code(code, message)))
         },
-        NodeRpcClientEndpoint::SyncStorageMaps => Some(EndpointError::SyncStorageMaps(
+        RpcEndpoint::SyncStorageMaps => Some(EndpointError::SyncStorageMaps(
             SyncAccountStorageMapsError::from_code(code, message),
         )),
-        NodeRpcClientEndpoint::SyncTransactions => {
+        RpcEndpoint::SyncTransactions => {
             Some(EndpointError::SyncTransactions(SyncTransactionsError::from_code(code, message)))
         },
-        NodeRpcClientEndpoint::GetNotesById => {
+        RpcEndpoint::GetNotesById => {
             Some(EndpointError::GetNotesById(GetNotesByIdError::from_code(code, message)))
         },
-        NodeRpcClientEndpoint::GetNoteScriptByRoot => Some(EndpointError::GetNoteScriptByRoot(
+        RpcEndpoint::GetNoteScriptByRoot => Some(EndpointError::GetNoteScriptByRoot(
             GetNoteScriptByRootError::from_code(code, message),
         )),
-        NodeRpcClientEndpoint::CheckNullifiers => {
+        RpcEndpoint::CheckNullifiers => {
             Some(EndpointError::CheckNullifiers(CheckNullifiersError::from_code(code, message)))
         },
-        NodeRpcClientEndpoint::GetAccount => {
+        RpcEndpoint::GetAccount => {
             Some(EndpointError::GetAccount(GetAccountError::from_code(code, message)))
         },
         // These endpoints don't have typed errors from the node
-        NodeRpcClientEndpoint::SyncChainMmr
-        | NodeRpcClientEndpoint::Status
-        | NodeRpcClientEndpoint::GetLimits => None,
+        RpcEndpoint::SyncChainMmr | RpcEndpoint::Status | RpcEndpoint::GetLimits => None,
     }
 }

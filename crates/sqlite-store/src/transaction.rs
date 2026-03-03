@@ -114,13 +114,13 @@ impl SqliteStore {
 
         let updated_fungible_assets = Self::get_account_fungible_assets_for_delta(
             conn,
-            &executed_transaction.initial_account().into(),
+            executed_transaction.account_id(),
             executed_transaction.account_delta(),
         )?;
 
-        let updated_storage_maps = Self::get_account_storage_maps_for_delta(
+        let old_map_roots = Self::get_storage_map_roots_for_delta(
             conn,
-            &executed_transaction.initial_account().into(),
+            executed_transaction.account_id(),
             executed_transaction.account_delta(),
         )?;
 
@@ -165,7 +165,7 @@ impl SqliteStore {
             &executed_transaction.initial_account().into(),
             executed_transaction.final_account(),
             updated_fungible_assets,
-            updated_storage_maps,
+            &old_map_roots,
             executed_transaction.account_delta(),
         )?;
         drop(smt_forest);

@@ -6,15 +6,17 @@ on:
   pull_request:
     types: [opened, reopened, synchronize, labeled, unlabeled]
 
+permissions:
+  contents: read
 
 jobs:
   docs-check:
     name: Check that web client documentation is up-to-date
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v6
 
 
       - name: Check for bypass label

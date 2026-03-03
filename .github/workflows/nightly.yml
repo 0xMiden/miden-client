@@ -1,0 +1,102 @@
+# Checks that run once per day.
+#
+# These are generally expensive jobs that don't provide enough utility to run on _every_ PR.
+name: nightly
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 6 * * *" # Everyday at 06:00am UTC
+
+permissions:
+  contents: read
+
+jobs:
+  # Run tests on the beta channel to provide feedback for Rust team.
+  beta-test:
+    name: test on beta channel
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: "next"
+      - name: Rustup
+        run: rustup install beta && rustup default beta
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: nextest@0.9.122
+      - name: Run tests
+        run: make test
+
+  # Check that our MSRV complies with our specified rust version.
+  # Each workspace package is verified independently via a matrix for clear per-package errors.
+  workspace-packages:
+    name: list packages
+    runs-on: ubuntu-24.04
+    outputs:
+      packages: ${{ steps.package-matrix.outputs.packages }}
+    # Deliberately use stable rust instead of the toolchain.toml version.
+    # This prevents installing the toolchain version which isn't crucial for this operation.
+    env:
+      RUSTUP_TOOLCHAIN: stable
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: "next"
+      - name: Extract workspace packages
+        id: package-matrix
+        run: |
+          PACKAGES=$(cargo metadata --format-version 1 --no-deps \
+            | jq -c '
+              .workspace_members as $members
+              | .packages
+              | map(select(.id as $id | $members | index($id)))
+              | map(.name)
+            ')
+
+          echo "packages=$PACKAGES" >> "$GITHUB_OUTPUT"
+
+  msrv:
+    needs: workspace-packages
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        package: ${{ fromJson(needs.workspace-packages.outputs.packages) }}
+    # Deliberately use stable rust instead of the toolchain.toml version.
+    # This prevents issues where e.g. `cargo-msrv` requires a newer version of rust than the toolchain.toml version.
+    env:
+      RUSTUP_TOOLCHAIN: stable
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: "next"
+      - name: Add wasm target
+        if: matrix.package == 'miden-client-web' || matrix.package == 'miden-idxdb-store'
+        run: rustup target add wasm32-unknown-unknown
+      - name: Install binstall
+        uses: cargo-bins/cargo-binstall@main
+      - name: Install cargo-msrv
+        run: cargo binstall --no-confirm cargo-msrv
+      - name: Get manifest path for package
+        id: pkg
+        run: |
+          MANIFEST_PATH=$(cargo metadata --format-version 1 --no-deps \
+            | jq -r '
+              .packages[]
+              | select(.name == "${{ matrix.package }}")
+              | .manifest_path
+            ')
+          echo "manifest_path=$MANIFEST_PATH" >> "$GITHUB_OUTPUT"
+      - name: Show package info
+        run: |
+          echo "Package: ${{ matrix.package }}"
+          echo "Manifest path: ${{ steps.pkg.outputs.manifest_path }}"
+          cargo msrv show --manifest-path "${{ steps.pkg.outputs.manifest_path }}"
+      - name: Check MSRV
+        run: |
+          EXTRA_ARGS=""
+          if [[ "${{ matrix.package }}" == "miden-client-web" || "${{ matrix.package }}" == "miden-idxdb-store" ]]; then
+            EXTRA_ARGS="--target wasm32-unknown-unknown"
+          fi
+          cargo msrv verify --manifest-path "${{ steps.pkg.outputs.manifest_path }}" $EXTRA_ARGS

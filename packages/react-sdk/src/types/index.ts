@@ -1,6 +1,6 @@
 import { AuthScheme } from "@miden-sdk/miden-sdk";
 import type {
-  WebClient,
+  WasmWebClient as WebClient,
   Account,
   AccountHeader,
   AccountId,

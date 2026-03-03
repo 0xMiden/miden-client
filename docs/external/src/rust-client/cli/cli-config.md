@@ -39,7 +39,7 @@ timeout_ms = 10000
 
 The client supports both **global** and **local** configuration with intelligent priority handling:
 
-1. **Global Configuration** (default): Located at `~/.miden/miden-client.toml` in your home directory
+1. **Global Configuration** (default): Located at `~/.miden/miden-client.toml` in your home directory. The global directory location can be overridden with the `MIDEN_CLIENT_HOME` environment variable (see [Environment variables](#environment-variables)).
 2. **Local Configuration** (project-specific): Located at `./.miden/miden-client.toml` in your current working directory
 
 **Priority Order**: Local configuration takes precedence over global configuration. If both exist, the client will use the local configuration and ignore the global one.
@@ -170,6 +170,15 @@ miden-client init --block-delta 256
 ```
 
 ### Environment variables
+
+- `MIDEN_CLIENT_HOME`: Overrides the default global `.miden` directory (`~/.miden`). When set, all commands that reference the global directory will use the specified path instead. This is useful for keeping separate environments or storing the client data in a non-default location. For example:
+
+  ```sh
+  export MIDEN_CLIENT_HOME=/path/to/custom/miden
+  miden-client init
+  ```
+
+  Note that this only affects the **global** directory. If a local `./.miden` directory exists, it still takes precedence over the global one (whether default or overridden).
 
 - `MIDEN_DEBUG`: When set to `true`, enables debug mode on the transaction executor and the script compiler. For any script that has been compiled and executed in this mode, debug logs will be output in order to facilitate MASM debugging ([these instructions](https://0xMiden.github.io/miden-vm/user_docs/assembly/debugging.html) can be used to do so). This variable can be overridden by the `--debug` CLI flag.
 
