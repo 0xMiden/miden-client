@@ -55,6 +55,7 @@ pub use miden_protocol::account::{
     PartialStorage,
     PartialStorageMap,
     StorageMap,
+    StorageMapKey,
     StorageMapWitness,
     StorageSlot,
     StorageSlotContent,

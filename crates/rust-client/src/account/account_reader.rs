@@ -3,7 +3,13 @@
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
-use miden_protocol::account::{AccountHeader, AccountId, StorageMapWitness, StorageSlotName};
+use miden_protocol::account::{
+    AccountHeader,
+    AccountId,
+    StorageMapKey,
+    StorageMapWitness,
+    StorageSlotName,
+};
 use miden_protocol::address::Address;
 use miden_protocol::asset::{Asset, AssetVaultKey};
 use miden_protocol::{Felt, Word};
@@ -150,7 +156,7 @@ impl AccountReader {
     pub async fn get_storage_map_item(
         &self,
         slot_name: impl Into<StorageSlotName>,
-        key: Word,
+        key: StorageMapKey,
     ) -> Result<Word, ClientError> {
         let (value, _witness) =
             self.store.get_account_map_item(self.account_id, slot_name.into(), key).await?;
@@ -166,7 +172,7 @@ impl AccountReader {
     pub async fn get_storage_map_witness(
         &self,
         slot_name: impl Into<StorageSlotName>,
-        key: Word,
+        key: StorageMapKey,
     ) -> Result<(Word, StorageMapWitness), ClientError> {
         self.store
             .get_account_map_item(self.account_id, slot_name.into(), key)

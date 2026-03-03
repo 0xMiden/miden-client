@@ -28,6 +28,7 @@ use miden_client::account::{
     AccountStorageMode,
     AccountType,
     StorageMap,
+    StorageMapKey,
     StorageSlot,
     StorageSlotName,
 };
@@ -195,7 +196,7 @@ fn create_large_storage_slot(name: &str, num_entries: usize, seed: u32) -> Stora
             let key_val = seed.wrapping_mul(1000).wrapping_add(i);
             let key = [Felt::new(key_val as u64); 4];
             let value = random_word(&mut rng);
-            (key.into(), value.into())
+            (StorageMapKey::new(key.into()), value.into())
         })
         .collect();
 

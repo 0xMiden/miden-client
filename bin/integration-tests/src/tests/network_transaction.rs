@@ -80,7 +80,9 @@ const COUNTER_CONTRACT: &str = r#"
 
 const INCR_NONCE_AUTH_CODE: &str = "
     use miden::protocol::native_account
-    pub proc auth__basic
+
+    @auth_script
+    pub proc auth_basic
         exec.native_account::incr_nonce
         drop
     end

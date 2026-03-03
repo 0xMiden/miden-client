@@ -11,6 +11,7 @@ use miden_client::account::{
     AccountStorage,
     Address,
     StorageMap,
+    StorageMapKey,
     StorageSlot,
     StorageSlotName,
     StorageSlotType,
@@ -281,7 +282,10 @@ impl WebStore {
         let mut maps = BTreeMap::new();
         for entry in account_maps_idxdb {
             let map = maps.entry(entry.slot_name).or_insert_with(StorageMap::new);
-            map.insert(Word::try_from(entry.key.as_str())?, Word::try_from(entry.value.as_str())?)?;
+            map.insert(
+                StorageMapKey::new(Word::try_from(entry.key.as_str())?),
+                Word::try_from(entry.value.as_str())?,
+            )?;
         }
 
         let slots: Vec<StorageSlot> = filtered_slots

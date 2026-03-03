@@ -33,6 +33,7 @@ use miden_protocol::account::{
     AccountHeader,
     AccountId,
     AccountStorage,
+    StorageMapKey,
     StorageMapWitness,
     StorageSlot,
     StorageSlotContent,
@@ -539,7 +540,7 @@ pub trait Store: Send + Sync {
         &self,
         account_id: AccountId,
         slot_name: StorageSlotName,
-        key: Word,
+        key: StorageMapKey,
     ) -> Result<(Word, StorageMapWitness), StoreError> {
         let storage = self
             .get_account_storage(account_id, AccountStorageFilter::SlotName(slot_name.clone()))

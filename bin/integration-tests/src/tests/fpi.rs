@@ -7,13 +7,14 @@ use miden_client::account::{
     PartialAccount,
     PartialStorage,
     StorageMap,
+    StorageMapKey,
     StorageSlot,
     StorageSlotName,
 };
 use miden_client::assembly::CodeBuilder;
 use miden_client::auth::{AuthSchemeId, AuthSecretKey, AuthSingleSig, RPO_FALCON_SCHEME_ID};
 use miden_client::keystore::{FilesystemKeyStore, Keystore};
-use miden_client::rpc::domain::account::{AccountStorageRequirements, StorageMapKey};
+use miden_client::rpc::domain::account::AccountStorageRequirements;
 use miden_client::testing::common::*;
 use miden_client::transaction::{AdviceInputs, ForeignAccount, TransactionRequestBuilder};
 use miden_client::{Felt, Word};
@@ -100,7 +101,7 @@ pub async fn test_fpi_execute_program(client_config: ClientConfig) -> Result<()>
 
     let map_slot_name = StorageSlotName::new(MAP_SLOT_NAME).expect("slot name should be valid");
     let storage_requirements =
-        AccountStorageRequirements::new([(map_slot_name, &[StorageMapKey::from(MAP_KEY)])]);
+        AccountStorageRequirements::new([(map_slot_name, &[StorageMapKey::new(MAP_KEY.into())])]);
 
     // We create a new client here to force the creation of a new, fresh prover with no previous
     // MAST forest data.
@@ -254,7 +255,7 @@ pub async fn test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
     // We will require slot 0, key `MAP_KEY` as well as account proof
     let map_slot_name = StorageSlotName::new(MAP_SLOT_NAME).expect("slot name should be valid");
     let storage_requirements =
-        AccountStorageRequirements::new([(map_slot_name, &[StorageMapKey::from(MAP_KEY)])]);
+        AccountStorageRequirements::new([(map_slot_name, &[StorageMapKey::new(MAP_KEY.into())])]);
 
     let foreign_accounts = [
         ForeignAccount::public(inner_foreign_account_id, storage_requirements.clone())?,
@@ -375,7 +376,7 @@ async fn standard_fpi(
     // We will require slot 0, key `MAP_KEY` as well as account proof
     let map_slot_name = StorageSlotName::new(MAP_SLOT_NAME).expect("slot name should be valid");
     let storage_requirements =
-        AccountStorageRequirements::new([(map_slot_name, &[StorageMapKey::from(MAP_KEY)])]);
+        AccountStorageRequirements::new([(map_slot_name, &[StorageMapKey::new(MAP_KEY.into())])]);
 
     let foreign_account = if storage_mode == AccountStorageMode::Public {
         ForeignAccount::public(foreign_account_id, storage_requirements)
@@ -464,7 +465,7 @@ fn foreign_account_with_code(
 ) -> Result<(Account, Word, AuthSecretKey)> {
     // store our expected value on map from slot 0 (map key 15)
     let mut storage_map = StorageMap::new();
-    storage_map.insert(MAP_KEY.into(), FPI_STORAGE_VALUE.into())?;
+    storage_map.insert(StorageMapKey::new(MAP_KEY.into()), FPI_STORAGE_VALUE.into())?;
 
     let map_slot_name = StorageSlotName::new(MAP_SLOT_NAME).expect("slot name should be valid");
     let map_slot = StorageSlot::with_map(map_slot_name, storage_map);

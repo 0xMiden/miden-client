@@ -35,22 +35,22 @@ miden-client              = { default-features = false, path = "crates/rust-clie
 miden-client-sqlite-store = { default-features = false, path = "crates/sqlite-store", version = "0.14" }
 
 # Miden protocol dependencies
-miden-protocol  = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base" }
-miden-standards = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base" }
-miden-testing   = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base" }
-miden-tx        = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base" }
+miden-protocol  = { default-features = false, version = "=0.14.0-alpha.1" }
+miden-standards = { default-features = false, version = "=0.14.0-alpha.1" }
+miden-testing   = { default-features = false, version = "=0.14.0-alpha.1" }
+miden-tx        = { default-features = false, version = "=0.14.0-alpha.1" }
 
 # Miden node dependencies
-miden-node-block-producer = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
-miden-node-ntx-builder = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
-miden-node-proto = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
-miden-node-proto-build = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-node" }
-miden-node-rpc = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
-miden-node-store = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
-miden-node-utils = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
-miden-node-validator = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
+miden-node-block-producer = { branch = "mmagician-use-storage-map-key-wrapper", git = "https://github.com/0xMiden/miden-node" }
+miden-node-ntx-builder = { branch = "mmagician-use-storage-map-key-wrapper", git = "https://github.com/0xMiden/miden-node" }
+miden-node-proto = { branch = "mmagician-use-storage-map-key-wrapper", git = "https://github.com/0xMiden/miden-node" }
+miden-node-proto-build = { branch = "mmagician-use-storage-map-key-wrapper", default-features = false, git = "https://github.com/0xMiden/miden-node" }
+miden-node-rpc = { branch = "mmagician-use-storage-map-key-wrapper", git = "https://github.com/0xMiden/miden-node" }
+miden-node-store = { branch = "mmagician-use-storage-map-key-wrapper", git = "https://github.com/0xMiden/miden-node" }
+miden-node-utils = { branch = "mmagician-use-storage-map-key-wrapper", git = "https://github.com/0xMiden/miden-node" }
+miden-node-validator = { branch = "mmagician-use-storage-map-key-wrapper", git = "https://github.com/0xMiden/miden-node" }
 miden-note-transport-proto-build = { default-features = false, version = "0.2" }
-miden-remote-prover-client = { branch = "next", default-features = false, features = [
+miden-remote-prover-client = { branch = "mmagician-use-storage-map-key-wrapper", default-features = false, features = [
   "tx-prover",
 ], git = "https://github.com/0xMiden/miden-node" }
 

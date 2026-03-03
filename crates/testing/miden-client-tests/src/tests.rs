@@ -76,6 +76,7 @@ use miden_protocol::account::{
     AccountStorageMode,
     AccountType,
     StorageMap,
+    StorageMapKey,
     StorageSlot,
     StorageSlotContent,
     StorageSlotName,
@@ -2285,7 +2286,10 @@ async fn storage_and_vault_proofs() {
     // can be updated.
     let mut storage_map = StorageMap::new();
     storage_map
-        .insert(MAP_KEY.into(), [Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(1)].into())
+        .insert(
+            StorageMapKey::new(MAP_KEY.into()),
+            [Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(1)].into(),
+        )
         .unwrap();
 
     let bump_component_code = CodeBuilder::default()
@@ -2406,7 +2410,11 @@ async fn storage_and_vault_proofs() {
         // Check that specific map item proof matches the one in the storage
         let (value, proof) = client
             .test_store()
-            .get_account_map_item(account_id, bump_map_slot_name.clone(), MAP_KEY.into())
+            .get_account_map_item(
+                account_id,
+                bump_map_slot_name.clone(),
+                StorageMapKey::new(MAP_KEY.into()),
+            )
             .await
             .unwrap();
 
@@ -2419,8 +2427,8 @@ async fn storage_and_vault_proofs() {
             panic!("Expected bump map slot content to be a map");
         };
 
-        assert_eq!(value, map.get(&MAP_KEY.into()));
-        assert_eq!(proof, map.open(&MAP_KEY.into()));
+        assert_eq!(value, map.get(&StorageMapKey::new(MAP_KEY.into())));
+        assert_eq!(proof, map.open(&StorageMapKey::new(MAP_KEY.into())));
     }
 }
 
@@ -3006,7 +3014,10 @@ async fn storage_and_vault_proofs_ecdsa() {
     // The storage map is still updated via named-slot access in `BUMP_MAP_CODE`.
     let mut storage_map = StorageMap::new();
     storage_map
-        .insert(MAP_KEY.into(), [Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(1)].into())
+        .insert(
+            StorageMapKey::new(MAP_KEY.into()),
+            [Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(1)].into(),
+        )
         .unwrap();
 
     let bump_component_code = CodeBuilder::default()
@@ -3123,7 +3134,11 @@ async fn storage_and_vault_proofs_ecdsa() {
         // Check that specific map item proof matches the one in the storage
         let (value, proof) = client
             .test_store()
-            .get_account_map_item(account_id, bump_map_slot_name.clone(), MAP_KEY.into())
+            .get_account_map_item(
+                account_id,
+                bump_map_slot_name.clone(),
+                StorageMapKey::new(MAP_KEY.into()),
+            )
             .await
             .unwrap();
 
@@ -3136,7 +3151,7 @@ async fn storage_and_vault_proofs_ecdsa() {
             panic!("Expected bump map slot content to be a map");
         };
 
-        assert_eq!(value, map.get(&MAP_KEY.into()));
-        assert_eq!(proof, map.open(&MAP_KEY.into()));
+        assert_eq!(value, map.get(&StorageMapKey::new(MAP_KEY.into())));
+        assert_eq!(proof, map.open(&StorageMapKey::new(MAP_KEY.into())));
     }
 }

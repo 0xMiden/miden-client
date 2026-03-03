@@ -18,6 +18,7 @@ use miden_client::account::{
     PartialAccount,
     PartialStorage,
     PartialStorageMap,
+    StorageMapKey,
     StorageSlotName,
     StorageSlotType,
 };
@@ -259,7 +260,7 @@ impl SqliteStore {
         smt_forest: &Arc<RwLock<AccountSmtForest>>,
         account_id: AccountId,
         slot_name: StorageSlotName,
-        key: Word,
+        key: StorageMapKey,
     ) -> Result<(Word, StorageMapWitness), StoreError> {
         let header = Self::get_account_header(conn, account_id)?
             .ok_or(StoreError::AccountDataNotFound(account_id))?
@@ -275,7 +276,7 @@ impl SqliteStore {
 
         let smt_forest = smt_forest.read().expect("smt_forest read lock not poisoned");
         let witness = smt_forest.get_storage_map_item_witness(map_root, key)?;
-        let item = witness.get(&key).unwrap_or(miden_client::EMPTY_WORD);
+        let item = witness.get(key).unwrap_or(miden_client::EMPTY_WORD);
 
         Ok((item, witness))
     }

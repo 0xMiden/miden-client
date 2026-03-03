@@ -8,6 +8,7 @@ use miden_client::account::{
     AccountId,
     Address,
     StorageMap,
+    StorageMapKey,
     StorageSlot,
     StorageSlotName,
     StorageSlotType,
@@ -289,7 +290,7 @@ pub(crate) fn query_storage_maps(
     let mut maps = BTreeMap::new();
     for (slot_name, key, value) in map_entries {
         let map = maps.entry(slot_name).or_insert_with(StorageMap::new);
-        map.insert(key, value)?;
+        map.insert(StorageMapKey::new(key), value)?;
     }
 
     Ok(maps)

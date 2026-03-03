@@ -486,6 +486,7 @@ mod tests {
         AccountComponent,
         AccountId,
         AccountType,
+        StorageMapKey,
         StorageSlotName,
     };
     use miden_protocol::asset::FungibleAsset;
@@ -574,7 +575,7 @@ mod tests {
                     target_id,
                     AccountStorageRequirements::new([(
                         StorageSlotName::new("demo::storage_slot").unwrap(),
-                        &[Word::default()],
+                        &[StorageMapKey::new(Word::default())],
                     )]),
                 )
                 .unwrap(),

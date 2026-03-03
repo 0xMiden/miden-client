@@ -27,6 +27,7 @@ use miden_client::account::{
     AccountId,
     AccountStorage,
     Address,
+    StorageMapKey,
     StorageSlotName,
 };
 use miden_client::asset::{Asset, AssetVault, AssetWitness};
@@ -443,7 +444,7 @@ impl Store for SqliteStore {
         &self,
         account_id: AccountId,
         slot_name: StorageSlotName,
-        key: Word,
+        key: StorageMapKey,
     ) -> Result<(Word, StorageMapWitness), StoreError> {
         let smt_forest = self.smt_forest.clone();
 

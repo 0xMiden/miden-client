@@ -28,6 +28,7 @@ use miden_protocol::account::{
     AccountComponentMetadata,
     AccountFile,
     StorageMap,
+    StorageMapKey,
 };
 use miden_protocol::asset::{Asset, FungibleAsset, TokenSymbol};
 use miden_protocol::block::FeeParameters;
@@ -551,8 +552,8 @@ fn create_test_account_with_many_assets(faucets: &[Account]) -> anyhow::Result<A
 
 /// Creates a storage map with many entries for stress-testing storage handling.
 fn create_large_storage_map() -> miden_protocol::account::StorageSlot {
-    let map_entries =
-        (0..NUM_STORAGE_MAP_ENTRIES).map(|i| (Word::from([i; 4]), Word::from([i; 4])));
+    let map_entries = (0..NUM_STORAGE_MAP_ENTRIES)
+        .map(|i| (StorageMapKey::new(Word::from([i; 4])), Word::from([i; 4])));
 
     miden_protocol::account::StorageSlot::with_map(
         miden_protocol::account::StorageSlotName::new("miden::test_account::map::too_many_entries")

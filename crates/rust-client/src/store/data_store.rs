@@ -7,6 +7,7 @@ use miden_protocol::account::{
     Account,
     AccountId,
     PartialAccount,
+    StorageMapKey,
     StorageSlot,
     StorageSlotContent,
 };
@@ -174,7 +175,7 @@ impl DataStore for ClientDataStore {
         &self,
         account_id: AccountId,
         map_root: Word,
-        map_key: Word,
+        map_key: StorageMapKey,
     ) -> Result<miden_protocol::account::StorageMapWitness, DataStoreError> {
         let account_storage = self
             .store

@@ -13,6 +13,7 @@ use miden_client::account::{
     AccountType,
     Address,
     StorageMap,
+    StorageMapKey,
     StorageSlot,
     StorageSlotContent,
     StorageSlotName,
@@ -127,7 +128,7 @@ async fn apply_account_delta_additions() -> anyhow::Result<()> {
     storage_delta.set_item(value_slot_name.clone(), [ZERO, ZERO, ZERO, ONE].into())?;
     storage_delta.set_map_item(
         map_slot_name.clone(),
-        [ONE, ZERO, ZERO, ZERO].into(),
+        StorageMapKey::new([ONE, ZERO, ZERO, ZERO].into()),
         [ONE, ONE, ONE, ONE].into(),
     )?;
 
@@ -193,7 +194,8 @@ async fn apply_account_delta_removals() -> anyhow::Result<()> {
         StorageSlotName::new("miden::testing::sqlite_store::map").expect("valid slot name");
 
     let mut dummy_map = StorageMap::new();
-    dummy_map.insert([ONE, ZERO, ZERO, ZERO].into(), [ONE, ONE, ONE, ONE].into())?;
+    dummy_map
+        .insert(StorageMapKey::new([ONE, ZERO, ZERO, ZERO].into()), [ONE, ONE, ONE, ONE].into())?;
 
     let dummy_component = AccountComponent::new(
         basic_wallet_library(),
@@ -229,7 +231,7 @@ async fn apply_account_delta_removals() -> anyhow::Result<()> {
     storage_delta.set_item(value_slot_name.clone(), EMPTY_WORD)?;
     storage_delta.set_map_item(
         map_slot_name.clone(),
-        [ONE, ZERO, ZERO, ZERO].into(),
+        StorageMapKey::new([ONE, ZERO, ZERO, ZERO].into()),
         EMPTY_WORD,
     )?;
 
@@ -367,7 +369,7 @@ async fn get_account_map_item_success() -> anyhow::Result<()> {
     let map_slot_name =
         StorageSlotName::new("miden::testing::sqlite_store::map").expect("valid slot name");
 
-    let test_key: miden_client::Word = [ONE, ZERO, ZERO, ZERO].into();
+    let test_key = StorageMapKey::new([ONE, ZERO, ZERO, ZERO].into());
     let test_value: miden_client::Word = [ONE, ONE, ONE, ONE].into();
 
     let mut storage_map = StorageMap::new();
@@ -426,7 +428,7 @@ async fn get_account_map_item_value_slot_error() -> anyhow::Result<()> {
     store.insert_account(&account, default_address).await?;
 
     // Test get_account_map_item on a value slot (should error)
-    let test_key: miden_client::Word = [ONE, ZERO, ZERO, ZERO].into();
+    let test_key = StorageMapKey::new([ONE, ZERO, ZERO, ZERO].into());
     let result = store.get_account_map_item(account.id(), value_slot_name, test_key).await;
 
     assert!(result.is_err());
@@ -698,7 +700,7 @@ async fn setup_account_with_map(
     let mut map = StorageMap::new();
     for i in 1..=map_size {
         map.insert(
-            [Felt::new(i), ZERO, ZERO, ZERO].into(),
+            StorageMapKey::new([Felt::new(i), ZERO, ZERO, ZERO].into()),
             [Felt::new(i * 100), ZERO, ZERO, ZERO].into(),
         )?;
     }
@@ -732,7 +734,7 @@ async fn apply_single_entry_update(
     let mut storage_delta = AccountStorageDelta::new();
     storage_delta.set_map_item(
         map_slot_name.clone(),
-        [Felt::new(1), ZERO, ZERO, ZERO].into(),
+        StorageMapKey::new([Felt::new(1), ZERO, ZERO, ZERO].into()),
         [Felt::new(nonce * 1000), ZERO, ZERO, ZERO].into(),
     )?;
 
@@ -799,7 +801,7 @@ async fn undo_account_state_restores_previous_latest() -> anyhow::Result<()> {
     let mut storage_delta = AccountStorageDelta::new();
     storage_delta.set_map_item(
         map_slot_name.clone(),
-        [Felt::new(1), ZERO, ZERO, ZERO].into(),
+        StorageMapKey::new([Felt::new(1), ZERO, ZERO, ZERO].into()),
         [Felt::new(1000), ZERO, ZERO, ZERO].into(),
     )?;
     let vault_delta = AccountVaultDelta::from_iters(
@@ -891,7 +893,7 @@ async fn undo_account_state_deletes_account_entirely() -> anyhow::Result<()> {
     let mut map = StorageMap::new();
     for i in 1..=3u64 {
         map.insert(
-            [Felt::new(i), ZERO, ZERO, ZERO].into(),
+            StorageMapKey::new([Felt::new(i), ZERO, ZERO, ZERO].into()),
             [Felt::new(i * 100), ZERO, ZERO, ZERO].into(),
         )?;
     }
@@ -972,7 +974,7 @@ async fn lock_account_affects_latest_and_historical() -> anyhow::Result<()> {
     let mut storage_delta = AccountStorageDelta::new();
     storage_delta.set_map_item(
         map_slot_name.clone(),
-        [Felt::new(1), ZERO, ZERO, ZERO].into(),
+        StorageMapKey::new([Felt::new(1), ZERO, ZERO, ZERO].into()),
         [Felt::new(2000), ZERO, ZERO, ZERO].into(),
     )?;
     let vault_delta = AccountVaultDelta::from_iters(
@@ -1077,13 +1079,13 @@ async fn undo_after_update_account_state_does_not_resurrect_removed_entries() ->
     let nf_faucet_id = AccountId::try_from(ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET)?;
 
     // Build initial map with 3 entries: A (key=1), B (key=2), C (key=3)
-    let key_a = [Felt::new(1), ZERO, ZERO, ZERO].into();
-    let key_c = [Felt::new(3), ZERO, ZERO, ZERO].into();
+    let key_a = StorageMapKey::new([Felt::new(1), ZERO, ZERO, ZERO].into());
+    let key_c = StorageMapKey::new([Felt::new(3), ZERO, ZERO, ZERO].into());
 
     let mut initial_map = StorageMap::new();
     initial_map.insert(key_a, [Felt::new(100), ZERO, ZERO, ZERO].into())?;
     initial_map.insert(
-        [Felt::new(2), ZERO, ZERO, ZERO].into(),
+        StorageMapKey::new([Felt::new(2), ZERO, ZERO, ZERO].into()),
         [Felt::new(200), ZERO, ZERO, ZERO].into(),
     )?;
     initial_map.insert(key_c, [Felt::new(300), ZERO, ZERO, ZERO].into())?;

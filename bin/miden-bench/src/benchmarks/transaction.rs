@@ -359,7 +359,7 @@ fn build_slot_infos_from_storage(
             let name = slot.name().to_string();
             let idx = name.strip_prefix("miden::bench::map_slot_")?.parse::<usize>().ok()?;
             if let StorageSlotContent::Map(map) = slot.content() {
-                let keys: Vec<Word> = map.entries().map(|(k, _v)| *k).collect();
+                let keys: Vec<Word> = map.entries().map(|(k, _v)| Word::from(*k)).collect();
                 Some((idx, keys))
             } else {
                 None
