@@ -37,31 +37,14 @@ const ARGON2_P_COST: u32 = 1;
 /// Derived key length for ChaCha20-Poly1305 (32 bytes).
 const KEY_LEN: usize = 32;
 
-// KEY ENCRYPTOR TRAIT
-// ================================================================================================
-
-/// Trait for encrypting and decrypting secret key bytes.
-///
-/// Implementations are used by [`FilesystemKeyStore`](super::FilesystemKeyStore) to encrypt keys
-/// at rest. The trait is object-safe so it can be stored as `Arc<dyn KeyEncryptor>`.
-pub trait KeyEncryptor: Send + Sync {
-    /// Encrypts plaintext key bytes, returning the ciphertext (including any headers/metadata
-    /// needed for decryption).
-    fn encrypt(&self, plaintext: &[u8]) -> Result<Vec<u8>, KeyStoreError>;
-
-    /// Decrypts ciphertext previously produced by [`encrypt`](Self::encrypt), returning the
-    /// original plaintext key bytes.
-    fn decrypt(&self, ciphertext: &[u8]) -> Result<Vec<u8>, KeyStoreError>;
-}
-
 // PASSWORD ENCRYPTOR
 // ================================================================================================
 
 /// Password-based key encryptor using Argon2id for key derivation and ChaCha20-Poly1305 for
 /// authenticated encryption.
 ///
-/// Each call to [`encrypt`](KeyEncryptor::encrypt) generates a unique random salt and nonce, so
-/// the same plaintext encrypted twice will produce different ciphertexts.
+/// Each call to [`encrypt`](PasswordEncryptor::encrypt) generates a unique random salt and nonce,
+/// so the same plaintext encrypted twice will produce different ciphertexts.
 ///
 /// ## Encrypted file format
 ///
@@ -100,10 +83,10 @@ impl PasswordEncryptor {
 
         Ok(key)
     }
-}
 
-impl KeyEncryptor for PasswordEncryptor {
-    fn encrypt(&self, plaintext: &[u8]) -> Result<Vec<u8>, KeyStoreError> {
+    /// Encrypts plaintext key bytes, returning the ciphertext (including any headers/metadata
+    /// needed for decryption).
+    pub fn encrypt(&self, plaintext: &[u8]) -> Result<Vec<u8>, KeyStoreError> {
         // Generate random salt and nonce
         let salt: [u8; SALT_LEN] = rand::random();
         let nonce: [u8; NONCE_LEN] = rand::random();
@@ -130,7 +113,9 @@ impl KeyEncryptor for PasswordEncryptor {
         Ok(output)
     }
 
-    fn decrypt(&self, data: &[u8]) -> Result<Vec<u8>, KeyStoreError> {
+    /// Decrypts ciphertext previously produced by [`encrypt`](Self::encrypt), returning the
+    /// original plaintext key bytes.
+    pub fn decrypt(&self, data: &[u8]) -> Result<Vec<u8>, KeyStoreError> {
         if data.len() < HEADER_LEN {
             return Err(KeyStoreError::DecodingError("encrypted file too short".into()));
         }
