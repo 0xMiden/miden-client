@@ -23,7 +23,7 @@ graph TB
     end
 
     subgraph wasm-bridge-repo["wasm-bridge repo"]
-        wasm-bridge["<b>wasm-bridge</b><br/>Rust → WASM compilation boundary<br/>wasm-bindgen · idxdb-store · web workers"]
+        wasm-bridge["<b>wasm-bridge</b><br/>WASM runtime layer<br/>wasm-bindgen · idxdb-store · web workers"]
     end
 
     subgraph ts-sdk-repo["ts-sdk repo"]
@@ -44,7 +44,7 @@ graph TB
 | Layer | Published as | Language | Purpose |
 |-------|-------------|----------|---------|
 | **rust-sdk** | [`miden-client`](https://crates.io/crates/miden-client) (crates.io) | Rust | Core client library — account management, note handling, transaction building/execution/proving, state sync, node communication |
-| **wasm-bridge** | [`@miden-sdk/wasm-bridge`](https://www.npmjs.com/package/@miden-sdk/wasm-bridge) (npm) | Rust → WASM + JS | Compiles the Rust core to WebAssembly via `wasm-bindgen`. Owns the full build pipeline (Rollup, Web Workers, IndexedDB storage) and publishes the npm package consumed by downstream SDKs |
+| **wasm-bridge** | [`@miden-sdk/wasm-bridge`](https://www.npmjs.com/package/@miden-sdk/wasm-bridge) (npm) | Rust → WASM + JS | WASM runtime layer — compiles the Rust core to WebAssembly, manages Web Worker orchestration, IndexedDB persistence, and browser-specific infrastructure. Publishes the npm package consumed by downstream SDKs |
 | **ts-sdk** | [`@miden-sdk/ts-sdk`](https://www.npmjs.com/package/@miden-sdk/ts-sdk) (npm) | TypeScript | Idiomatic TypeScript wrapper over the WASM bridge. Primary entry point for **Node.js backends** and non-React frontends |
 | **react-sdk** | [`@miden-sdk/react-sdk`](https://www.npmjs.com/package/@miden-sdk/react-sdk) (npm) | TypeScript | React integration layer — hooks, context providers, Zustand state management, auto-sync, and external signer support |
 
@@ -55,7 +55,7 @@ The codebase is split across four repositories, each owning one boundary of the 
 | Repository | Contains | Rationale |
 |------------|----------|-----------|
 | **[`rust-sdk`](https://github.com/0xMiden/rust-sdk)** | Rust core library + sqlite-store + CLI | The foundational Rust crate and native tooling. Pure Rust — no WASM targets, no JS toolchain. Publishes to crates.io. |
-| **[`wasm-bridge`](https://github.com/0xMiden/wasm-bridge)** | WASM compilation boundary + idxdb-store + JS glue + Web Workers | Compiles the Rust core to WebAssembly and owns the full browser build pipeline (Rollup, wasm-bindgen, Web Workers, IndexedDB storage). Publishes to npm. Separating this from the Rust SDK eliminates mixed-target CI complexity and gives the bridge its own release cadence. |
+| **[`wasm-bridge`](https://github.com/0xMiden/wasm-bridge)** | WASM runtime layer + idxdb-store + JS glue + Web Workers | The browser runtime for the Rust SDK — WASM compilation, Web Worker orchestration, IndexedDB storage, and sync locking. Publishes to npm. |
 | **[`ts-sdk`](https://github.com/0xMiden/ts-sdk)** | TypeScript API surface + type definitions | Pure TypeScript wrapper over the WASM bridge. Consumes the npm package produced by `wasm-bridge` and provides an idiomatic async/await API. Published to npm. |
 | **[`react-sdk`](https://github.com/0xMiden/react-sdk)** | React hooks, providers, Zustand store, signer integrations | Framework-specific code that consumes the WASM bridge directly. Evolves independently with React ecosystem changes. |
 
@@ -83,11 +83,11 @@ The Rust SDK is the single source of truth for all Miden client logic. It is a `
 
 The `Client` struct is generic over an authenticator type (`Client<AUTH>`) and uses trait-based dependency injection for storage (`Store`), RPC (`NodeRpcClient`), proving (`TransactionProver`), and key management (`Keystore`), making every component swappable.
 
-### `wasm-bridge` — The Compilation Boundary
+### `wasm-bridge` — The WASM Runtime Layer
 
 **Repository:** [`wasm-bridge`](https://github.com/0xMiden/wasm-bridge) · **Package:** [`@miden-sdk/wasm-bridge`](https://www.npmjs.com/package/@miden-sdk/wasm-bridge)
 
-The WASM bridge compiles the Rust core into WebAssembly and exposes it to JavaScript. It lives in its own repository with its own Rust + JS build pipeline (Rollup, `wasm-bindgen`, TypeScript), and publishes the npm package consumed by both the TypeScript and React SDKs.
+The WASM bridge is the browser runtime for the Rust SDK. It compiles the Rust core into WebAssembly, but goes well beyond compilation — it owns the entire browser execution environment, including worker orchestration, persistent storage, and concurrency safety. It lives in its own repository with its own Rust + JS build pipeline (Rollup, `wasm-bindgen`, TypeScript), and publishes the npm package consumed by both the TypeScript and React SDKs.
 
 This is a substantial layer — ~150 files across Rust and JavaScript — that handles:
 
@@ -96,8 +96,6 @@ This is a substantial layer — ~150 files across Rust and JavaScript — that h
 - **IndexedDB storage** — the `idxdb-store` crate provides browser-compatible persistence via Dexie.js, supporting multiple isolated databases per network.
 - **Sync locking** — prevents concurrent state sync operations from corrupting the local store in the browser environment.
 - **External signer support** — callback-based keystore integration for third-party wallet providers (Para, Turnkey, MidenFi).
-
-Separating the bridge from the Rust SDK eliminates mixed-target CI complexity (`cargo publish --dry-run` no longer needs to exclude WASM crates), gives the bridge its own release cadence, and isolates the JS toolchain (Rollup, Node.js, Playwright) from the pure-Rust repository.
 
 See the [`wasm-bridge` repository](https://github.com/0xMiden/wasm-bridge) for build instructions, the full binding API, and Web Worker configuration.
 
@@ -186,7 +184,7 @@ crates/
     └── prover/               # Remote prover for testing
 ```
 
-See also: [`wasm-bridge`](https://github.com/0xMiden/wasm-bridge) (WASM compilation + browser runtime) · [`ts-sdk`](https://github.com/0xMiden/ts-sdk) (TypeScript API) · [`react-sdk`](https://github.com/0xMiden/react-sdk) (React hooks and providers)
+See also: [`wasm-bridge`](https://github.com/0xMiden/wasm-bridge) (WASM runtime layer) · [`ts-sdk`](https://github.com/0xMiden/ts-sdk) (TypeScript API) · [`react-sdk`](https://github.com/0xMiden/react-sdk) (React hooks and providers)
 
 ## Getting Started
 
