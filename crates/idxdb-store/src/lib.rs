@@ -11,7 +11,6 @@ extern crate alloc;
 use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::vec::Vec;
-use std::sync::{Arc, RwLock};
 
 use base64::Engine;
 use base64::engine::general_purpose;
@@ -23,8 +22,9 @@ use miden_client::account::{
     AccountId,
     AccountStorage,
     Address,
+    StorageSlotName,
 };
-use miden_client::asset::AssetVault;
+use miden_client::asset::{Asset, AssetVault, AssetVaultKey, AssetWitness, StorageMapWitness};
 use miden_client::block::BlockHeader;
 use miden_client::crypto::{InOrderIndex, MmrPeaks};
 use miden_client::note::{BlockNumber, NoteScript, Nullifier};
@@ -44,6 +44,7 @@ use miden_client::store::{
 };
 use miden_client::sync::{NoteTagRecord, StateSyncUpdate};
 use miden_client::transaction::{TransactionRecord, TransactionStoreUpdate};
+use miden_client::utils::RwLock;
 use serde::de::Error;
 use serde::{Deserialize, Deserializer};
 use wasm_bindgen::prelude::*;
@@ -84,7 +85,7 @@ extern "C" {
 /// which would prevent the struct from being Send + Sync.
 pub struct WebStore {
     database_id: String,
-    pub(crate) smt_forest: Arc<RwLock<AccountSmtForest>>,
+    smt_forest: RwLock<AccountSmtForest>,
 }
 
 impl WebStore {
@@ -94,38 +95,53 @@ impl WebStore {
 
         let store = WebStore {
             database_id: database_name,
-            smt_forest: Arc::new(RwLock::new(AccountSmtForest::new())),
+            smt_forest: RwLock::new(AccountSmtForest::new()),
         };
 
-        // Collect all account states first, then initialize SMT forest
-        let mut account_states = Vec::new();
-        for id in store.get_account_ids().await.map_err(js_error)? {
-            let vault = store.get_account_vault(id).await.map_err(js_error)?;
-            let storage = store
-                .get_account_storage(id, AccountStorageFilter::All)
-                .await
-                .map_err(js_error)?;
-            account_states.push((vault, storage));
-        }
-
-        let mut smt_forest = store.smt_forest.write().map_err(|e| js_error(format!("smt_forest write lock poisoned: {e}")))?;
-        for (vault, storage) in &account_states {
-            smt_forest.insert_account_state(vault, storage).map_err(js_error)?;
-        }
-        drop(smt_forest);
+        // Initialize SMT forest
+        store.build_smt_forest().await?;
 
         Ok(store)
+    }
+
+    /// Builds the SMT forest by loading all existing account vault and storage data.
+    ///
+    /// This ensures that the forest contains all necessary Merkle nodes for generating
+    /// witnesses when creating partial accounts or executing transactions.
+    async fn build_smt_forest(&self) -> Result<(), JsValue> {
+        let account_ids = self
+            .get_account_ids()
+            .await
+            .map_err(|e| JsValue::from_str(&format!("Failed to get account IDs: {e:?}")))?;
+
+        for account_id in account_ids {
+            let vault = self.get_account_vault(account_id).await.map_err(|e| {
+                JsValue::from_str(&format!("Failed to get vault for account {account_id}: {e:?}"))
+            })?;
+
+            let storage = self
+                .get_account_storage(account_id, AccountStorageFilter::All)
+                .await
+                .map_err(|e| {
+                    JsValue::from_str(&format!(
+                        "Failed to get storage for account {account_id}: {e:?}"
+                    ))
+                })?;
+
+            self.smt_forest.write().insert_account_state(&vault, &storage).map_err(|e| {
+                JsValue::from_str(&format!(
+                    "Failed to insert account state for {account_id}: {e:?}"
+                ))
+            })?;
+        }
+
+        Ok(())
     }
 
     /// Returns the database ID as a string slice for passing to JS functions.
     pub(crate) fn db_id(&self) -> &str {
         self.database_id.as_str()
     }
-}
-
-/// Converts a displayable error into a `JsValue` for WASM interop.
-fn js_error(e: impl core::fmt::Display) -> JsValue {
-    JsValue::from_str(&e.to_string())
 }
 
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
@@ -339,6 +355,23 @@ impl Store for WebStore {
         filter: AccountStorageFilter,
     ) -> Result<AccountStorage, StoreError> {
         self.get_account_storage(account_id, filter).await
+    }
+
+    async fn get_account_asset(
+        &self,
+        account_id: AccountId,
+        vault_key: AssetVaultKey,
+    ) -> Result<Option<(Asset, AssetWitness)>, StoreError> {
+        self.get_account_asset(account_id, vault_key).await
+    }
+
+    async fn get_account_map_item(
+        &self,
+        account_id: AccountId,
+        slot_name: StorageSlotName,
+        key: Word,
+    ) -> Result<(Word, StorageMapWitness), StoreError> {
+        self.get_account_map_item(account_id, slot_name, key).await
     }
 
     async fn get_addresses_by_account_id(

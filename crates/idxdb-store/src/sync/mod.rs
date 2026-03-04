@@ -1,10 +1,11 @@
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
-use miden_client::account::{Account, AccountId};
+use miden_client::Word;
+use miden_client::account::AccountId;
 use miden_client::note::{BlockNumber, NoteId, NoteTag};
 use miden_client::store::StoreError;
-use miden_client::sync::{NoteTagRecord, NoteTagSource, StateSyncUpdate};
+use miden_client::sync::{BlockUpdates, NoteTagRecord, NoteTagSource, StateSyncUpdate};
 use miden_client::utils::{Deserializable, Serializable};
 
 use super::WebStore;
@@ -119,30 +120,14 @@ impl WebStore {
             account_updates,
         } = state_sync_update;
 
-        // Serialize data for updating block header
-        let block_headers_len = block_updates.block_headers().len();
-        let mut block_headers_as_bytes = Vec::with_capacity(block_headers_len);
-        let mut new_mmr_peaks_as_bytes = Vec::with_capacity(block_headers_len);
-        let mut block_nums = Vec::with_capacity(block_headers_len);
-        let mut block_has_relevant_notes = Vec::with_capacity(block_headers_len);
-
-        for (block_header, has_client_notes, mmr_peaks) in block_updates.block_headers() {
-            block_headers_as_bytes.push(block_header.to_bytes());
-            new_mmr_peaks_as_bytes.push(mmr_peaks.peaks().to_vec().to_bytes());
-            block_nums.push(block_header.block_num().as_u32());
-            block_has_relevant_notes.push(u8::from(*has_client_notes));
-        }
-
-        // Serialize data for updating partial blockchain nodes
-        let auth_nodes_len = block_updates.new_authentication_nodes().len();
-        let mut serialized_node_ids = Vec::with_capacity(auth_nodes_len);
-        let mut serialized_nodes = Vec::with_capacity(auth_nodes_len);
-        for (id, node) in block_updates.new_authentication_nodes() {
-            let SerializedPartialBlockchainNodeData { id, node } =
-                serialize_partial_blockchain_node(*id, *node)?;
-            serialized_node_ids.push(id);
-            serialized_nodes.push(node);
-        }
+        let (
+            block_headers_as_bytes,
+            new_mmr_peaks_as_bytes,
+            block_nums,
+            block_has_relevant_notes,
+            serialized_node_ids,
+            serialized_nodes,
+        ) = serialize_block_updates(&block_updates)?;
 
         let (serialized_input_notes, serialized_output_notes): (Vec<_>, Vec<_>) = {
             let input_notes = note_updates.updated_input_notes();
@@ -175,8 +160,8 @@ impl WebStore {
             .map(|tx_record| tx_record.details.final_account_state)
             .collect::<Vec<_>>();
 
-        // Remove the account states that are originated from the discarded transactions
-        self.undo_account_states(&account_states_to_rollback).await?;
+        // Remove the account states and pop the corresponding SMT roots from the forest
+        self.rollback_account_states(&account_states_to_rollback).await?;
 
         let transaction_updates: Vec<_> = transaction_updates
             .committed_transactions()
@@ -184,12 +169,23 @@ impl WebStore {
             .map(serialize_transaction_record)
             .collect();
 
-        // Collect old SMT roots for updated public accounts so we can pop them after
-        let old_roots_to_pop = self
-            .collect_account_smt_roots(
-                account_updates.updated_public_accounts().iter().map(Account::id),
-            )
-            .await?;
+        // Collect old SMT roots before updating so we can pop them after
+        let mut old_roots_to_pop = Vec::new();
+        for account in account_updates.updated_public_accounts() {
+            if let Some((header, _)) = self.get_account_header(account.id()).await? {
+                let roots = self.get_smt_roots_for_account_header(&header).await?;
+                old_roots_to_pop.extend(roots);
+            }
+        }
+
+        // Update SMT forest for public account updates and pop old roots
+        {
+            let mut smt_forest = self.smt_forest.write();
+            for account in account_updates.updated_public_accounts() {
+                smt_forest.insert_account_state(account.vault(), account.storage())?;
+            }
+            smt_forest.pop_roots(old_roots_to_pop);
+        }
 
         let state_update = JsStateSyncUpdate {
             block_num: block_num.as_u32(),
@@ -212,15 +208,68 @@ impl WebStore {
         let promise = idxdb_apply_state_sync(self.db_id(), state_update);
         await_js_value(promise, "failed to apply state sync").await?;
 
-        // Update SMT forest: insert new states and release old roots
-        {
-            let mut smt_forest = self.smt_forest.write().map_err(|e| StoreError::DatabaseError(format!("smt_forest write lock poisoned: {e}")))?;
-            for account in account_updates.updated_public_accounts() {
-                smt_forest.insert_account_state(account.vault(), account.storage())?;
+        Ok(())
+    }
+
+    /// Rolls back account states by removing them from the DB and popping their SMT roots
+    /// (vault roots + storage map roots) from the forest.
+    async fn rollback_account_states(
+        &self,
+        account_commitments: &[Word],
+    ) -> Result<(), StoreError> {
+        // Collect the actual SMT roots before deletion so we pop the correct entries
+        let mut smt_roots_to_pop = Vec::new();
+        for commitment in account_commitments {
+            if let Some(header) = self.get_account_header_by_commitment(*commitment).await? {
+                let roots = self.get_smt_roots_for_account_header(&header).await?;
+                smt_roots_to_pop.extend(roots);
             }
-            smt_forest.pop_roots(old_roots_to_pop);
         }
+
+        self.undo_account_states(account_commitments).await?;
+
+        let mut smt_forest = self.smt_forest.write();
+        smt_forest.pop_roots(smt_roots_to_pop);
 
         Ok(())
     }
+}
+
+type SerializedBlockData =
+    (Vec<Vec<u8>>, Vec<Vec<u8>>, Vec<u32>, Vec<u8>, Vec<String>, Vec<String>);
+
+fn serialize_block_updates(
+    block_updates: &BlockUpdates,
+) -> Result<SerializedBlockData, StoreError> {
+    let block_headers_len = block_updates.block_headers().len();
+    let mut block_headers_as_bytes = Vec::with_capacity(block_headers_len);
+    let mut new_mmr_peaks_as_bytes = Vec::with_capacity(block_headers_len);
+    let mut block_nums = Vec::with_capacity(block_headers_len);
+    let mut block_has_relevant_notes = Vec::with_capacity(block_headers_len);
+
+    for (block_header, has_client_notes, mmr_peaks) in block_updates.block_headers() {
+        block_headers_as_bytes.push(block_header.to_bytes());
+        new_mmr_peaks_as_bytes.push(mmr_peaks.peaks().to_vec().to_bytes());
+        block_nums.push(block_header.block_num().as_u32());
+        block_has_relevant_notes.push(u8::from(*has_client_notes));
+    }
+
+    let auth_nodes_len = block_updates.new_authentication_nodes().len();
+    let mut serialized_node_ids = Vec::with_capacity(auth_nodes_len);
+    let mut serialized_nodes = Vec::with_capacity(auth_nodes_len);
+    for (id, node) in block_updates.new_authentication_nodes() {
+        let SerializedPartialBlockchainNodeData { id, node } =
+            serialize_partial_blockchain_node(*id, *node)?;
+        serialized_node_ids.push(id);
+        serialized_nodes.push(node);
+    }
+
+    Ok((
+        block_headers_as_bytes,
+        new_mmr_peaks_as_bytes,
+        block_nums,
+        block_has_relevant_notes,
+        serialized_node_ids,
+        serialized_nodes,
+    ))
 }
