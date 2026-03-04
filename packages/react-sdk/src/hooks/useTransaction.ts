@@ -3,6 +3,7 @@ import { useMiden } from "../context/MidenProvider";
 import type {
   TransactionRequest,
   WasmWebClient as WebClient,
+  AccountId as AccountIdType,
 } from "@miden-sdk/miden-sdk";
 import type {
   TransactionStage,
@@ -152,6 +153,10 @@ export function useTransaction(): UseTransactionResult {
     error,
     reset,
   };
+}
+
+function resolveAccountId(accountId: string | AccountIdType): AccountIdType {
+  return parseAccountId(accountId);
 }
 
 async function resolveRequest(

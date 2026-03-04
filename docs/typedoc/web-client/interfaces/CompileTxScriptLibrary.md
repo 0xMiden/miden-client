@@ -8,21 +8,17 @@
 
 ## Properties
 
-### code
+### component
 
-> **code**: `string`
+> **component**: `AccountComponent`
+
+AccountComponent whose procedures become available to the script.
 
 ***
 
 ### linking?
 
-> `optional` **linking**: `"static"` \| `"dynamic"`
+> `optional` **linking**: `"dynamic"` \| `"static"`
 
-"static"  — copies library into the script (for off-chain libraries).
-"dynamic" — links without copying (for on-chain FPI libraries). Default.
-
-***
-
-### namespace
-
-> **namespace**: `string`
+`"dynamic"` (default) — procedures are linked via DYNCALL at runtime.
+`"static"` — procedures are inlined at compile time.

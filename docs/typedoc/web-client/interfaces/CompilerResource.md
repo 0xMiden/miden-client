@@ -10,11 +10,13 @@
 
 ### component()
 
-> **component**(`opts`): `Promise`\<`AccountComponent`\>
+> **component**(`options`): `Promise`\<`AccountComponent`\>
+
+Compile MASM source into an AccountComponent.
 
 #### Parameters
 
-##### opts
+##### options
 
 [`CompileComponentOptions`](CompileComponentOptions.md)
 
@@ -26,11 +28,13 @@
 
 ### txScript()
 
-> **txScript**(`opts`): `Promise`\<`TransactionScript`\>
+> **txScript**(`options`): `Promise`\<`TransactionScript`\>
+
+Compile MASM source into a TransactionScript.
 
 #### Parameters
 
-##### opts
+##### options
 
 [`CompileTxScriptOptions`](CompileTxScriptOptions.md)
 

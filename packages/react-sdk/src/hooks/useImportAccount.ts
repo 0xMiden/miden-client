@@ -145,7 +145,7 @@ export function useImportAccount(): UseImportAccountResult {
               throw new Error("Account not found after import");
             }
             case "id": {
-              const accountId = parseAccountId(options.accountId);
+              const accountId = resolveAccountId(options.accountId);
               await client.importAccountById(accountId);
               const fetchedAccount = await client.getAccount(accountId);
               if (!fetchedAccount) {
@@ -195,6 +195,10 @@ export function useImportAccount(): UseImportAccountResult {
     error,
     reset,
   };
+}
+
+function resolveAccountId(accountId: string | AccountIdType): AccountIdType {
+  return parseAccountId(accountId);
 }
 
 async function resolveAccountFile(
