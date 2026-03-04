@@ -15,7 +15,7 @@ use miden_client::store::input_note_states::{
     ExpectedNoteState,
     NoteSubmissionData,
 };
-use miden_client::store::{InputNoteRecord, NoteFilter, OutputNoteRecord, OutputNoteState, Store};
+use miden_client::store::{InputNoteRecord, NoteFilter, Store};
 use miden_client::{Felt, ZERO};
 use miden_protocol::Word;
 use miden_protocol::account::AccountId;
@@ -32,77 +32,6 @@ use crate::tests::create_test_store;
 
 // HELPERS
 // ================================================================================================
-
-/// Helper to create a test `OutputNoteRecord` in `ExpectedPartial` state with a unique recipient
-/// digest.
-fn create_test_output_note(sender: AccountId, tag: NoteTag, index: u32) -> OutputNoteRecord {
-    let metadata = NoteMetadata::new(sender, NoteType::Public, tag);
-    let assets = NoteAssets::new(vec![]).unwrap();
-    // Use a unique recipient digest per note so they get distinct IDs.
-    let recipient_digest: Word = [Felt::new(u64::from(index)), ZERO, ZERO, ZERO].into();
-    OutputNoteRecord::new(
-        recipient_digest,
-        assets,
-        metadata,
-        OutputNoteState::ExpectedPartial,
-        BlockNumber::from(0u32),
-    )
-}
-
-/// Helper to create a test `OutputNoteRecord` in `Consumed` state with a specific block height.
-fn create_consumed_output_note_at_height(
-    sender: AccountId,
-    tag: NoteTag,
-    index: u32,
-    block_height: u32,
-) -> OutputNoteRecord {
-    let metadata = NoteMetadata::new(sender, NoteType::Public, tag);
-    let assets = NoteAssets::new(vec![]).unwrap();
-    let serial_number: Word = [Felt::new(u64::from(index)), ZERO, ZERO, ZERO].into();
-    let recipient = NoteRecipient::new(
-        serial_number,
-        StandardNote::SWAP.script(),
-        NoteStorage::new(vec![]).unwrap(),
-    );
-    let recipient_digest = recipient.digest();
-    OutputNoteRecord::new(
-        recipient_digest,
-        assets,
-        metadata,
-        OutputNoteState::Consumed {
-            block_height: BlockNumber::from(block_height),
-            recipient,
-        },
-        BlockNumber::from(0u32),
-    )
-}
-
-/// Insert output notes into the store using a raw connection.
-async fn insert_output_notes(store: &crate::SqliteStore, notes: &[OutputNoteRecord]) {
-    insert_output_notes_with_tx_order(store, notes, None).await;
-}
-
-/// Insert output notes into the store using a raw connection, with a specific consumed tx order.
-async fn insert_output_notes_with_tx_order(
-    store: &crate::SqliteStore,
-    notes: &[OutputNoteRecord],
-    consumed_tx_order: Option<u32>,
-) {
-    let notes = notes.to_vec();
-    store
-        .interact_with_connection(move |conn| {
-            let tx = conn
-                .transaction()
-                .map_err(|e| miden_client::store::StoreError::QueryError(e.to_string()))?;
-            for note in &notes {
-                super::upsert_output_note_tx(&tx, note, consumed_tx_order)?;
-            }
-            tx.commit()
-                .map_err(|e| miden_client::store::StoreError::QueryError(e.to_string()))
-        })
-        .await
-        .unwrap();
-}
 
 /// Helper to create a consumed-external input note (no consumer account).
 fn create_consumed_external_input_note(index: u32, block_height: u32) -> InputNoteRecord {
@@ -157,7 +86,7 @@ fn create_consumed_input_note_with_consumer(
     );
     let details = NoteDetails::new(assets, recipient);
 
-    let metadata = NoteMetadata::new(consumer, NoteType::Public, NoteTag::from(index));
+    let metadata = NoteMetadata::new(consumer, NoteType::Public).with_tag(NoteTag::from(index));
 
     let state = ConsumedUnauthenticatedLocalNoteState {
         metadata,
@@ -277,26 +206,6 @@ async fn input_note_reader_filters_by_consumer() {
 }
 
 #[tokio::test]
-async fn input_note_reader_reset_restarts_iteration() {
-    let store = create_test_store().await;
-
-    let notes: Vec<_> = (0..2u32).map(|i| create_consumed_external_input_note(20 + i, 1)).collect();
-    store.upsert_input_notes(&notes).await.unwrap();
-
-    let store: Arc<dyn Store> = Arc::new(store);
-    let mut reader = InputNoteReader::new(store);
-
-    // Read the first note.
-    let first = reader.next().await.unwrap().unwrap();
-
-    // Reset and re-read — should get the same first note.
-    reader.reset();
-    let after_reset = reader.next().await.unwrap().unwrap();
-
-    assert_eq!(first.id(), after_reset.id());
-}
-
-#[tokio::test]
 async fn input_note_reader_filters_by_block_range() {
     let store = create_test_store().await;
 
@@ -315,8 +224,7 @@ async fn input_note_reader_filters_by_block_range() {
 
     // Filter to blocks 3..=5
     let mut reader = InputNoteReader::new(store)
-        .from_block(BlockNumber::from(3u32))
-        .to_block(BlockNumber::from(5u32));
+        .in_block_range(BlockNumber::from(3u32), BlockNumber::from(5u32));
 
     let mut collected = Vec::new();
     while let Some(note) = reader.next().await.unwrap() {
@@ -326,6 +234,44 @@ async fn input_note_reader_filters_by_block_range() {
     assert_eq!(collected.len(), 2);
     assert_eq!(collected[0].id(), note_b3.id());
     assert_eq!(collected[1].id(), note_b5.id());
+}
+
+#[tokio::test]
+async fn input_note_reader_filters_by_consumer_and_block_range() {
+    let store = create_test_store().await;
+    let consumer_a =
+        AccountId::try_from(ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE).unwrap();
+    let consumer_b = AccountId::try_from(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET).unwrap();
+
+    // consumer_a at blocks 1, 3, 5; consumer_b at block 3.
+    let alice_at_1 = create_consumed_input_note_with_consumer(consumer_a, 20, 1);
+    let alice_at_3 = create_consumed_input_note_with_consumer(consumer_a, 21, 3);
+    let bob_at_3 = create_consumed_input_note_with_consumer(consumer_b, 22, 3);
+    let alice_at_5 = create_consumed_input_note_with_consumer(consumer_a, 23, 5);
+
+    store
+        .upsert_input_notes(&[alice_at_1, alice_at_3.clone(), bob_at_3, alice_at_5.clone()])
+        .await
+        .unwrap();
+
+    let store: Arc<dyn Store> = Arc::new(store);
+
+    // Filter to consumer_a in blocks 3..=5 — should return alice_at_3 and alice_at_5 only.
+    let mut reader = InputNoteReader::new(store)
+        .for_consumer(consumer_a)
+        .in_block_range(BlockNumber::from(3u32), BlockNumber::from(5u32));
+
+    let mut collected = Vec::new();
+    while let Some(note) = reader.next().await.unwrap() {
+        collected.push(note);
+    }
+
+    assert_eq!(collected.len(), 2);
+    assert_eq!(collected[0].id(), alice_at_3.id());
+    assert_eq!(collected[1].id(), alice_at_5.id());
+    for note in &collected {
+        assert_eq!(note.consumer_account(), Some(consumer_a));
+    }
 }
 
 // ORDERING TESTS (INPUT NOTES)
@@ -385,104 +331,6 @@ async fn consumed_input_notes_null_tx_order_sort_last_within_block() {
     insert_input_notes_with_tx_order(&store, std::slice::from_ref(&note_without_order), None).await;
 
     let notes = store.get_input_notes(NoteFilter::Consumed).await.unwrap();
-    assert_eq!(notes.len(), 2);
-    // Note with tx_order should come first (non-NULL sorts before NULL in ASC).
-    assert_eq!(notes[0].id(), note_with_order.id());
-    assert_eq!(notes[1].id(), note_without_order.id());
-}
-
-// EXISTING OUTPUT NOTE ORDERING TESTS (kept intact)
-// ================================================================================================
-
-#[tokio::test]
-async fn get_output_note_by_offset_returns_correct_note() {
-    let store = create_test_store().await;
-    let sender = AccountId::try_from(ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE).unwrap();
-
-    let notes: Vec<_> = (0..3u32)
-        .map(|i| create_test_output_note(sender, NoteTag::from(500 + i), 40 + i))
-        .collect();
-    insert_output_notes(&store, &notes).await;
-
-    // Get all notes to know the expected order.
-    let all_notes = store.get_output_notes(NoteFilter::All).await.unwrap();
-    assert_eq!(all_notes.len(), 3);
-
-    // Verify each offset returns the correct note.
-    for (i, expected) in all_notes.iter().enumerate() {
-        let note = store
-            .get_output_note_by_offset(NoteFilter::All, None, u32::try_from(i).unwrap())
-            .await
-            .unwrap();
-        assert_eq!(note.as_ref().unwrap().id(), expected.id());
-    }
-
-    // Offset past the end returns None.
-    let none = store.get_output_note_by_offset(NoteFilter::All, None, 3).await.unwrap();
-    assert!(none.is_none());
-}
-
-#[tokio::test]
-async fn consumed_output_notes_ordered_by_block_height_then_tx_order() {
-    let store = create_test_store().await;
-    let sender = AccountId::try_from(ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE).unwrap();
-
-    // Create consumed notes at different block heights.
-    let note_block3 = create_consumed_output_note_at_height(sender, NoteTag::from(100u32), 0, 3);
-    let note_block1 = create_consumed_output_note_at_height(sender, NoteTag::from(101u32), 1, 1);
-    let note_block2 = create_consumed_output_note_at_height(sender, NoteTag::from(102u32), 2, 2);
-
-    // Insert in non-sorted order, each with a tx_order.
-    insert_output_notes_with_tx_order(&store, std::slice::from_ref(&note_block3), Some(0)).await;
-    insert_output_notes_with_tx_order(&store, std::slice::from_ref(&note_block1), Some(1)).await;
-    insert_output_notes_with_tx_order(&store, std::slice::from_ref(&note_block2), Some(0)).await;
-
-    // Retrieve consumed notes — should be ordered by block_height ASC, tx_order ASC.
-    let notes = store.get_output_notes(NoteFilter::Consumed).await.unwrap();
-    assert_eq!(notes.len(), 3);
-    assert_eq!(notes[0].id(), note_block1.id()); // block 1, tx_order 1
-    assert_eq!(notes[1].id(), note_block2.id()); // block 2, tx_order 0
-    assert_eq!(notes[2].id(), note_block3.id()); // block 3, tx_order 0
-}
-
-#[tokio::test]
-async fn consumed_output_notes_same_block_ordered_by_tx_order() {
-    let store = create_test_store().await;
-    let sender = AccountId::try_from(ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE).unwrap();
-
-    // All notes consumed at the same block height, different tx_order.
-    let note_tx2 = create_consumed_output_note_at_height(sender, NoteTag::from(200u32), 10, 5);
-    let note_tx0 = create_consumed_output_note_at_height(sender, NoteTag::from(201u32), 11, 5);
-    let note_tx1 = create_consumed_output_note_at_height(sender, NoteTag::from(202u32), 12, 5);
-
-    insert_output_notes_with_tx_order(&store, std::slice::from_ref(&note_tx2), Some(2)).await;
-    insert_output_notes_with_tx_order(&store, std::slice::from_ref(&note_tx0), Some(0)).await;
-    insert_output_notes_with_tx_order(&store, std::slice::from_ref(&note_tx1), Some(1)).await;
-
-    let notes = store.get_output_notes(NoteFilter::Consumed).await.unwrap();
-    assert_eq!(notes.len(), 3);
-    assert_eq!(notes[0].id(), note_tx0.id()); // tx_order 0
-    assert_eq!(notes[1].id(), note_tx1.id()); // tx_order 1
-    assert_eq!(notes[2].id(), note_tx2.id()); // tx_order 2
-}
-
-#[tokio::test]
-async fn consumed_output_notes_null_tx_order_sort_last_within_block() {
-    let store = create_test_store().await;
-    let sender = AccountId::try_from(ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE).unwrap();
-
-    // Two notes at the same block: one with tx_order, one without (external consumption).
-    let note_with_order =
-        create_consumed_output_note_at_height(sender, NoteTag::from(300u32), 20, 5);
-    let note_without_order =
-        create_consumed_output_note_at_height(sender, NoteTag::from(301u32), 21, 5);
-
-    insert_output_notes_with_tx_order(&store, std::slice::from_ref(&note_with_order), Some(0))
-        .await;
-    insert_output_notes_with_tx_order(&store, std::slice::from_ref(&note_without_order), None)
-        .await;
-
-    let notes = store.get_output_notes(NoteFilter::Consumed).await.unwrap();
     assert_eq!(notes.len(), 2);
     // Note with tx_order should come first (non-NULL sorts before NULL in ASC).
     assert_eq!(notes[0].id(), note_with_order.id());

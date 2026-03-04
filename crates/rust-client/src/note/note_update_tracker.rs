@@ -1,5 +1,4 @@
 use alloc::collections::BTreeMap;
-use alloc::vec::Vec;
 
 use miden_protocol::block::BlockHeader;
 use miden_protocol::note::{NoteId, NoteInclusionProof, Nullifier};
@@ -110,19 +109,12 @@ pub struct OutputNoteUpdate {
     note: OutputNoteRecord,
     /// Type of the note update.
     update_type: NoteUpdateType,
-    /// Position of the consuming transaction in the account's state chain within the block.
-    /// `None` for non-consumed notes or notes consumed by external (non-client) transactions.
-    consumed_tx_order: Option<u32>,
 }
 
 impl OutputNoteUpdate {
     /// Creates a new [`OutputNoteUpdate`] with the provided note with a `None` update type.
     fn new_none(note: OutputNoteRecord) -> Self {
-        Self {
-            note,
-            update_type: NoteUpdateType::None,
-            consumed_tx_order: None,
-        }
+        Self { note, update_type: NoteUpdateType::None }
     }
 
     /// Creates a new [`OutputNoteUpdate`] with the provided note with an `Insert` update type.
@@ -130,7 +122,6 @@ impl OutputNoteUpdate {
         Self {
             note,
             update_type: NoteUpdateType::Insert,
-            consumed_tx_order: None,
         }
     }
 
@@ -139,7 +130,6 @@ impl OutputNoteUpdate {
         Self {
             note,
             update_type: NoteUpdateType::Update,
-            consumed_tx_order: None,
         }
     }
 
@@ -167,17 +157,6 @@ impl OutputNoteUpdate {
     /// Returns the identifier of the inner note.
     pub fn id(&self) -> NoteId {
         self.note.id()
-    }
-
-    /// Returns the position of the consuming transaction in the account's state chain within the
-    /// block. `None` for non-consumed notes or notes consumed by external transactions.
-    pub fn consumed_tx_order(&self) -> Option<u32> {
-        self.consumed_tx_order
-    }
-
-    /// Sets the consumed transaction order for this note update.
-    fn set_consumed_tx_order(&mut self, order: Option<u32>) {
-        self.consumed_tx_order = order;
     }
 }
 
@@ -350,10 +329,6 @@ impl NoteUpdateTracker {
     /// 1. The note was being processed by a local transaction that just got committed.
     /// 2. The note was consumed by an external transaction. If a local transaction was processing
     ///    the note and it didn't get committed, the transaction should be discarded.
-    ///
-    /// The `consumed_tx_order` parameter specifies the position of the consuming transaction in
-    /// the account's state chain within the block. `None` for notes consumed by external
-    /// (non-client) transactions.
     pub(crate) fn apply_nullifiers_state_transitions<'a>(
         &mut self,
         nullifier_update: &NullifierUpdate,
@@ -383,13 +358,11 @@ impl NoteUpdateTracker {
             input_note_update.set_consumed_tx_order(consumed_tx_order);
         }
 
-        if let Some(output_note_update) =
-            self.get_output_note_update_by_nullifier(nullifier_update.nullifier)
+        if let Some(output_note_record) =
+            self.get_output_note_by_nullifier(nullifier_update.nullifier)
         {
-            output_note_update
-                .inner_mut()
+            output_note_record
                 .nullifier_received(nullifier_update.nullifier, nullifier_update.block_num)?;
-            output_note_update.set_consumed_tx_order(consumed_tx_order);
         }
 
         Ok(())
@@ -418,14 +391,14 @@ impl NoteUpdateTracker {
         self.input_notes.get_mut(&note_id)
     }
 
-    /// Returns a mutable reference to the output note update with the provided nullifier if it
+    /// Returns a mutable reference to the output note record with the provided nullifier if it
     /// exists.
-    fn get_output_note_update_by_nullifier(
+    fn get_output_note_by_nullifier(
         &mut self,
         nullifier: Nullifier,
-    ) -> Option<&mut OutputNoteUpdate> {
+    ) -> Option<&mut OutputNoteRecord> {
         let note_id = self.output_notes_by_nullifier.get(&nullifier).copied()?;
-        self.output_notes.get_mut(&note_id)
+        self.output_notes.get_mut(&note_id).map(OutputNoteUpdate::inner_mut)
     }
 
     /// Insert an input note update
@@ -454,81 +427,4 @@ impl NoteUpdateTracker {
         };
         self.output_notes.insert(note_id, update);
     }
-}
-
-// HELPERS
-// ================================================================================================
-
-/// Builds a map from nullifier to transaction order within the block.
-///
-/// Groups committed transactions by (`account_id`, `block_num`), chains them using
-/// init/final account state, and maps each transaction's `input_note_nullifiers`
-/// to the transaction's position in the chain.
-pub(crate) fn compute_nullifier_tx_order<'a>(
-    committed_transactions: impl Iterator<Item = &'a TransactionRecord>,
-) -> BTreeMap<Nullifier, u32> {
-    use alloc::collections::btree_map::Entry;
-
-    use miden_protocol::Word;
-    use miden_protocol::account::AccountId;
-    use miden_protocol::block::BlockNumber;
-
-    // Collect only committed transactions, grouped by (account_id, block_number).
-    let mut groups: BTreeMap<(AccountId, BlockNumber), Vec<&TransactionRecord>> = BTreeMap::new();
-
-    for tx in committed_transactions {
-        if let TransactionStatus::Committed { block_number, .. } = tx.status {
-            groups.entry((tx.details.account_id, block_number)).or_default().push(tx);
-        }
-    }
-
-    let mut result = BTreeMap::new();
-
-    for ((_account_id, _block_num), txs) in groups {
-        // Build a lookup from init_account_state -> transaction.
-        let mut init_to_tx: BTreeMap<Word, &TransactionRecord> = BTreeMap::new();
-
-        for tx in &txs {
-            init_to_tx.insert(tx.details.init_account_state, tx);
-        }
-
-        // Find the chain start: the tx whose init_account_state is not any other tx's
-        // final_account_state.
-        let chain_start = txs.iter().find(|tx| {
-            !txs.iter()
-                .any(|other| other.details.final_account_state == tx.details.init_account_state)
-        });
-
-        let Some(start_tx) = chain_start else {
-            continue;
-        };
-
-        // Follow the chain: current.final_account_state == next.init_account_state.
-        let mut current = *start_tx;
-        let mut position: u32 = 0;
-
-        loop {
-            // Map all input note nullifiers of this transaction to the current position.
-            for nullifier_word in &current.details.input_note_nullifiers {
-                let nullifier = Nullifier::from_raw(*nullifier_word);
-                if let Entry::Vacant(e) = result.entry(nullifier) {
-                    e.insert(position);
-                }
-            }
-
-            // Follow the chain.
-            if let Some(next_tx) = init_to_tx.get(&current.details.final_account_state) {
-                // Avoid infinite loops (shouldn't happen with valid data).
-                if core::ptr::eq(*next_tx, current) {
-                    break;
-                }
-                current = next_tx;
-                position += 1;
-            } else {
-                break;
-            }
-        }
-    }
-
-    result
 }

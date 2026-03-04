@@ -57,6 +57,7 @@ struct SerializedInputNoteData {
     pub created_at: u64,
     pub consumed_block_height: Option<u32>,
     pub consumed_tx_order: Option<u32>,
+    pub consumer_account_id: Option<String>,
 }
 
 /// Represents an `OutputNoteRecord` serialized to be stored in the database.
@@ -69,7 +70,6 @@ struct SerializedOutputNoteData {
     pub expected_height: u32,
     pub state_discriminant: u8,
     pub state: Vec<u8>,
-    pub consumed_block_height: Option<u32>,
 }
 
 /// Represents the parts retrieved from the database to build an `InputNoteRecord`.
@@ -133,40 +133,8 @@ impl SqliteStore {
         Ok(notes)
     }
 
-    /// Retrieves a single output note at the given offset from the filtered set.
-    ///
-    /// When `sender` is `Some`, notes are filtered by sender after deserialization since
-    /// metadata is stored as a blob and cannot be filtered in SQL.
-    pub(crate) fn get_output_note_by_offset(
-        conn: &mut Connection,
-        filter: &NoteFilter,
-        sender: Option<AccountId>,
-        offset: u32,
-    ) -> Result<Option<OutputNoteRecord>, StoreError> {
-        if let Some(sender) = sender {
-            // Sender is embedded in the serialized metadata blob, so we filter in memory.
-            let mut notes = Self::get_output_notes(conn, filter)?;
-            notes.retain(|n| n.metadata().sender() == sender);
-            return Ok(notes.into_iter().nth(offset as usize));
-        }
-
-        let (query, params) = filters::note_filter_to_query_output_note_by_offset(filter, offset);
-        let note = conn
-            .prepare(&query)
-            .into_store_error()?
-            .query_map(params_from_iter(params), parse_output_note_columns)
-            .expect("no binding parameters used in query")
-            .map(|result| Ok(result.into_store_error()?).and_then(parse_output_note))
-            .next()
-            .transpose()?;
-
-        Ok(note)
-    }
-
-    /// Retrieves a single input note at the given offset from the filtered set.
-    ///
-    /// When `consumer` is `Some`, notes are filtered by consumer after deserialization since
-    /// consumer account is stored in the serialized state blob and cannot be filtered in SQL.
+    /// Retrieves a single input note at the given offset from the filtered set,
+    /// optionally restricted to a consumer account and/or block range.
     pub(crate) fn get_input_note_by_offset(
         conn: &mut Connection,
         filter: &NoteFilter,
@@ -175,39 +143,10 @@ impl SqliteStore {
         block_end: Option<BlockNumber>,
         offset: u32,
     ) -> Result<Option<InputNoteRecord>, StoreError> {
-        if let Some(consumer) = consumer {
-            // Consumer is embedded in the serialized state blob, so we filter in memory.
-            let mut notes = Self::get_input_notes(conn, filter)?;
-            notes.retain(|n| n.consumer_account() == Some(consumer));
-            if let Some(start) = block_start {
-                notes.retain(|n| match n.state() {
-                    InputNoteState::ConsumedAuthenticatedLocal(s) => {
-                        s.nullifier_block_height >= start
-                    },
-                    InputNoteState::ConsumedUnauthenticatedLocal(s) => {
-                        s.nullifier_block_height >= start
-                    },
-                    InputNoteState::ConsumedExternal(s) => s.nullifier_block_height >= start,
-                    _ => true,
-                });
-            }
-            if let Some(end) = block_end {
-                notes.retain(|n| match n.state() {
-                    InputNoteState::ConsumedAuthenticatedLocal(s) => {
-                        s.nullifier_block_height <= end
-                    },
-                    InputNoteState::ConsumedUnauthenticatedLocal(s) => {
-                        s.nullifier_block_height <= end
-                    },
-                    InputNoteState::ConsumedExternal(s) => s.nullifier_block_height <= end,
-                    _ => true,
-                });
-            }
-            return Ok(notes.into_iter().nth(offset as usize));
-        }
-
+        let consumer_hex = consumer.map(AccountId::to_hex);
         let (query, params) = filters::note_filter_to_query_input_note_by_offset(
             filter,
+            consumer_hex.as_deref(),
             block_start,
             block_end,
             offset,
@@ -326,6 +265,7 @@ pub(super) fn upsert_input_note_tx(
         created_at,
         consumed_block_height,
         consumed_tx_order,
+        consumer_account_id,
     } = serialize_input_note(note, consumed_tx_order);
 
     const SCRIPT_QUERY: &str =
@@ -345,6 +285,7 @@ pub(super) fn upsert_input_note_tx(
             created_at,
             consumed_block_height,
             consumed_tx_order,
+            consumer_account_id,
         } | REPLACE
     );
 
@@ -362,17 +303,17 @@ pub(super) fn upsert_input_note_tx(
             created_at,
             consumed_block_height,
             consumed_tx_order,
+            consumer_account_id,
         ],
     )
     .map_err(|err| StoreError::QueryError(err.to_string()))
     .map(|_| ())
 }
 
-/// Inserts the provided output note into the database.
+/// Inserts the provided input note into the database.
 pub fn upsert_output_note_tx(
     tx: &Transaction<'_>,
     note: &OutputNoteRecord,
-    consumed_tx_order: Option<u32>,
 ) -> Result<(), StoreError> {
     const NOTE_QUERY: &str = insert_sql!(
         output_notes {
@@ -383,9 +324,7 @@ pub fn upsert_output_note_tx(
             nullifier,
             expected_height,
             state_discriminant,
-            state,
-            consumed_block_height,
-            consumed_tx_order
+            state
         } | REPLACE
     );
 
@@ -398,7 +337,6 @@ pub fn upsert_output_note_tx(
         expected_height,
         state_discriminant,
         state,
-        consumed_block_height,
     } = serialize_output_note(note);
 
     tx.execute(
@@ -412,8 +350,6 @@ pub fn upsert_output_note_tx(
             expected_height,
             state_discriminant,
             state,
-            consumed_block_height,
-            consumed_tx_order,
         ],
     )
     .into_store_error()?;
@@ -498,6 +434,8 @@ fn serialize_input_note(
         _ => None,
     };
 
+    let consumer_account_id = note.consumer_account().map(AccountId::to_hex);
+
     SerializedInputNoteData {
         id,
         assets,
@@ -511,6 +449,7 @@ fn serialize_input_note(
         created_at,
         consumed_block_height,
         consumed_tx_order,
+        consumer_account_id,
     }
 }
 
@@ -571,11 +510,6 @@ fn serialize_output_note(note: &OutputNoteRecord) -> SerializedOutputNoteData {
     let state_discriminant = note.state().discriminant();
     let state = note.state().to_bytes();
 
-    let consumed_block_height = match note.state() {
-        OutputNoteState::Consumed { block_height, .. } => Some(block_height.as_u32()),
-        _ => None,
-    };
-
     SerializedOutputNoteData {
         id,
         assets,
@@ -585,7 +519,6 @@ fn serialize_output_note(note: &OutputNoteRecord) -> SerializedOutputNoteData {
         expected_height: note.expected_height().as_u32(),
         state_discriminant,
         state,
-        consumed_block_height,
     }
 }
 
@@ -598,7 +531,7 @@ pub(crate) fn apply_note_updates_tx(
     }
 
     for output_note in note_updates.updated_output_notes() {
-        upsert_output_note_tx(tx, output_note.inner(), output_note.consumed_tx_order())?;
+        upsert_output_note_tx(tx, output_note.inner())?;
     }
 
     Ok(())

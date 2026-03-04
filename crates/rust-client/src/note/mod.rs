@@ -109,7 +109,6 @@ pub use miden_standards::note::{
 pub use miden_tx::{FailedNote, NoteConsumptionInfo};
 pub use note_reader::InputNoteReader;
 pub use note_screener::{NoteConsumability, NoteScreener, NoteScreenerError};
-pub(crate) use note_update_tracker::compute_nullifier_tx_order;
 pub use note_update_tracker::{
     InputNoteUpdate,
     NoteUpdateTracker,

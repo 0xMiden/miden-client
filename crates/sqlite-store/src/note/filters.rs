@@ -9,7 +9,9 @@ use rusqlite::types::Value;
 
 type NoteQueryParams = Vec<Rc<Vec<Value>>>;
 
-const OUTPUT_NOTES_BASE_QUERY: &str = "SELECT
+/// Returns the output notes query for a specific `NoteFilter`
+pub(super) fn note_filter_to_query_output_notes(filter: &NoteFilter) -> (String, NoteQueryParams) {
+    let base = "SELECT
                     note.recipient_digest,
                     note.assets,
                     note.metadata,
@@ -17,32 +19,8 @@ const OUTPUT_NOTES_BASE_QUERY: &str = "SELECT
                     note.state
                     from output_notes AS note";
 
-/// Returns the output notes query for a specific `NoteFilter`
-pub(super) fn note_filter_to_query_output_notes(filter: &NoteFilter) -> (String, NoteQueryParams) {
     let (condition, params) = note_filter_output_notes_condition(filter);
-    let query = format!(
-        "{OUTPUT_NOTES_BASE_QUERY} WHERE {condition} \
-         ORDER BY note.consumed_block_height IS NULL, note.consumed_block_height ASC, \
-                  note.consumed_tx_order IS NULL, note.consumed_tx_order ASC, \
-                  note.note_id ASC"
-    );
-
-    (query, params)
-}
-
-/// Returns a query that fetches a single output note at the given offset from the filtered set.
-pub(super) fn note_filter_to_query_output_note_by_offset(
-    filter: &NoteFilter,
-    offset: u32,
-) -> (String, NoteQueryParams) {
-    let (condition, params) = note_filter_output_notes_condition(filter);
-    let query = format!(
-        "{OUTPUT_NOTES_BASE_QUERY} WHERE {condition} \
-         ORDER BY note.consumed_block_height IS NULL, note.consumed_block_height ASC, \
-                  note.consumed_tx_order IS NULL, note.consumed_tx_order ASC, \
-                  note.note_id ASC \
-         LIMIT 1 OFFSET {offset}"
-    );
+    let query = format!("{base} WHERE {condition}");
 
     (query, params)
 }
@@ -123,26 +101,35 @@ const INPUT_NOTES_BASE_QUERY: &str = "SELECT
 
 pub(super) fn note_filter_to_query_input_notes(filter: &NoteFilter) -> (String, NoteQueryParams) {
     let (condition, params) = note_filter_input_notes_condition(filter);
-    let query = format!(
-        "{INPUT_NOTES_BASE_QUERY} WHERE {condition} \
-         ORDER BY note.consumed_block_height IS NULL, note.consumed_block_height ASC, \
-                  note.consumed_tx_order IS NULL, note.consumed_tx_order ASC, \
-                  note.note_id ASC"
-    );
+    let query = if matches!(filter, NoteFilter::Consumed) {
+        format!(
+            "{INPUT_NOTES_BASE_QUERY} WHERE {condition} \
+             ORDER BY note.consumed_block_height ASC, \
+                      note.consumed_tx_order IS NULL, note.consumed_tx_order ASC, \
+                      note.note_id ASC"
+        )
+    } else {
+        format!("{INPUT_NOTES_BASE_QUERY} WHERE {condition}")
+    };
 
     (query, params)
 }
 
 /// Returns a query that fetches a single input note at the given offset from the filtered set,
-/// optionally restricted to a block range.
+/// optionally restricted to a consumer account and/or block range.
 pub(super) fn note_filter_to_query_input_note_by_offset(
     filter: &NoteFilter,
+    consumer: Option<&str>,
     block_start: Option<BlockNumber>,
     block_end: Option<BlockNumber>,
     offset: u32,
 ) -> (String, NoteQueryParams) {
     use core::fmt::Write;
-    let (mut condition, params) = note_filter_input_notes_condition(filter);
+    let (mut condition, mut params) = note_filter_input_notes_condition(filter);
+    if let Some(consumer) = consumer {
+        params.push(Rc::new(vec![Value::Text(consumer.to_string())]));
+        condition.push_str(" AND note.consumer_account_id IN rarray(?)");
+    }
     if let Some(start) = block_start {
         let _ = write!(condition, " AND note.consumed_block_height >= {}", start.as_u32());
     }

@@ -16,8 +16,7 @@ use crate::store::{InputNoteRecord, NoteFilter, Store};
 pub struct InputNoteReader {
     store: Arc<dyn Store>,
     consumer: Option<AccountId>,
-    block_start: Option<BlockNumber>,
-    block_end: Option<BlockNumber>,
+    block_range: Option<(BlockNumber, BlockNumber)>,
     offset: u32,
 }
 
@@ -27,8 +26,7 @@ impl InputNoteReader {
         Self {
             store,
             consumer: None,
-            block_start: None,
-            block_end: None,
+            block_range: None,
             offset: 0,
         }
     }
@@ -40,18 +38,16 @@ impl InputNoteReader {
         self
     }
 
-    /// Restricts iteration to notes consumed at or after the given block.
+    /// Restricts iteration to notes consumed within the given block range (inclusive).
     #[must_use]
-    pub fn from_block(mut self, block: BlockNumber) -> Self {
-        self.block_start = Some(block);
+    pub fn in_block_range(mut self, from: BlockNumber, to: BlockNumber) -> Self {
+        self.block_range = Some((from, to));
         self
     }
 
-    /// Restricts iteration to notes consumed at or before the given block.
-    #[must_use]
-    pub fn to_block(mut self, block: BlockNumber) -> Self {
-        self.block_end = Some(block);
-        self
+    /// Resets the iterator to the beginning.
+    pub fn reset(&mut self) {
+        self.offset = 0;
     }
 
     /// Returns the next consumed input note, or `None` when all matching notes have been
@@ -59,16 +55,19 @@ impl InputNoteReader {
     ///
     /// Each call executes a single store query.
     pub async fn next(&mut self) -> Result<Option<InputNoteRecord>, ClientError> {
-        // TODO: The note filter should be configurable instead of hardcoding
-        // `NoteFilter::Consumed`. This would allow iterating over input notes in any state
-        // while keeping the lazy access.
+        let (block_start, block_end) = match self.block_range {
+            Some((from, to)) => (Some(from), Some(to)),
+            None => (None, None),
+        };
+
+        // TODO: The note filter should be configurable instead of hardcoding `NoteFilter::Consumed`
         let note = self
             .store
             .get_input_note_by_offset(
                 NoteFilter::Consumed,
                 self.consumer,
-                self.block_start,
-                self.block_end,
+                block_start,
+                block_end,
                 self.offset,
             )
             .await
@@ -78,10 +77,5 @@ impl InputNoteReader {
             self.offset += 1;
         }
         Ok(note)
-    }
-
-    /// Resets the reader to the beginning.
-    pub fn reset(&mut self) {
-        self.offset = 0;
     }
 }

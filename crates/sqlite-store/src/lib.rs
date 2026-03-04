@@ -211,18 +211,6 @@ impl Store for SqliteStore {
             .await
     }
 
-    async fn get_output_note_by_offset(
-        &self,
-        filter: NoteFilter,
-        sender: Option<AccountId>,
-        offset: u32,
-    ) -> Result<Option<OutputNoteRecord>, StoreError> {
-        self.interact_with_connection(move |conn| {
-            SqliteStore::get_output_note_by_offset(conn, &filter, sender, offset)
-        })
-        .await
-    }
-
     async fn get_input_note_by_offset(
         &self,
         filter: NoteFilter,
