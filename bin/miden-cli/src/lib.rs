@@ -24,7 +24,7 @@ use self::commands::export::ExportCmd;
 use self::commands::import::ImportCmd;
 use self::commands::init::InitCmd;
 use self::commands::new_account::{NewAccountCmd, NewWalletCmd};
-use self::commands::new_transactions::{ConsumeNotesCmd, MintCmd, SendCmd, SwapCmd};
+use self::commands::new_transactions::{ConsumeNotesCmd, MintCmd, PswapCmd, SendCmd, SwapCmd};
 use self::commands::notes::NotesCmd;
 use self::commands::sync::SyncCmd;
 use self::commands::tags::TagsCmd;
@@ -396,6 +396,7 @@ pub enum Command {
     Transaction(TransactionCmd),
     Mint(MintCmd),
     Send(SendCmd),
+    Pswap(PswapCmd),
     Swap(SwapCmd),
     ConsumeNotes(ConsumeNotesCmd),
     Exec(ExecCmd),
@@ -463,6 +464,7 @@ impl Cli {
             Command::Mint(mint) => Box::pin(mint.execute(client)).await,
             Command::Send(send) => Box::pin(send.execute(client)).await,
             Command::Swap(swap) => Box::pin(swap.execute(client)).await,
+            Command::Pswap(pswap) => Box::pin(pswap.execute(client)).await,
             Command::ConsumeNotes(consume_notes) => Box::pin(consume_notes.execute(client)).await,
         }
     }

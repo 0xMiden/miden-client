@@ -1,25 +1,18 @@
 use std::io;
 use std::sync::Arc;
 
-use clap::{Parser, ValueEnum};
+use clap::{Parser, Subcommand, ValueEnum};
 use miden_client::account::AccountId;
-use miden_client::asset::{FungibleAsset, NonFungibleDeltaAction};
+use miden_client::asset::{Asset, FungibleAsset, NonFungibleDeltaAction};
 use miden_client::auth::TransactionAuthenticator;
 use miden_client::note::{
-    BlockNumber,
-    NoteType as MidenNoteType,
-    build_swap_tag,
+    BlockNumber, Note, NoteAttachment, NoteType as MidenNoteType, build_swap_tag,
     get_input_note_with_id_prefix,
 };
 use miden_client::store::NoteRecordError;
 use miden_client::transaction::{
-    ExecutedTransaction,
-    InputNote,
-    OutputNote,
-    PaymentNoteDescription,
-    SwapTransactionData,
-    TransactionRequest,
-    TransactionRequestBuilder,
+    ExecutedTransaction, InputNote, OutputNote, PaymentNoteDescription, SwapTransactionData,
+    TransactionRequest, TransactionRequestBuilder,
 };
 use miden_client::{Client, RemoteTransactionProver};
 use tracing::info;
@@ -28,9 +21,7 @@ use crate::config::CliConfig;
 use crate::create_dynamic_table;
 use crate::errors::CliError;
 use crate::utils::{
-    SHARED_TOKEN_DOCUMENTATION,
-    get_input_acc_id_by_prefix_or_default,
-    load_faucet_details_map,
+    SHARED_TOKEN_DOCUMENTATION, get_input_acc_id_by_prefix_or_default, load_faucet_details_map,
     parse_account_id,
 };
 
@@ -365,6 +356,275 @@ impl ConsumeNotesCmd {
         )
         .await
     }
+}
+
+// PSWAP COMMANDS
+// ================================================================================================
+
+/// The CLI does not currently support in-flight (pending) fill amounts.
+/// Pass zero so the full remaining balance is available for filling.
+const PSWAP_INFLIGHT_AMOUNT: u64 = 0;
+
+/// Partial swap (PSWAP) commands.
+#[derive(Debug, Parser, Clone)]
+#[command(about = "Create, consume, or cancel partial swap notes")]
+pub struct PswapCmd {
+    #[command(subcommand)]
+    action: PswapAction,
+}
+
+#[derive(Debug, Subcommand, Clone)]
+pub enum PswapAction {
+    /// Create a new partial swap note.
+    Create(PswapCreateCmd),
+
+    /// Consume (fill) an existing partial swap note.
+    Consume(PswapConsumeCmd),
+
+    /// Cancel an existing partial swap note.
+    Cancel(PswapCancelCmd),
+}
+
+impl PswapCmd {
+    pub async fn execute<AUTH: TransactionAuthenticator + Sync + 'static>(
+        &self,
+        client: Client<AUTH>,
+    ) -> Result<(), CliError> {
+        match &self.action {
+            PswapAction::Create(cmd) => cmd.execute(client).await,
+            PswapAction::Consume(cmd) => cmd.execute(client).await,
+            PswapAction::Cancel(cmd) => cmd.execute(client).await,
+        }
+    }
+}
+
+/// Create a partial swap note offering one fungible asset in exchange for another.
+#[derive(Debug, Parser, Clone)]
+#[command(after_long_help = "\
+Examples:
+  # Offer 100 tokens from faucet A for 50 tokens from faucet B (public note)
+  miden-client pswap create \\
+    --source 0xd0e1f2a3b4c5d6e7 \\
+    --offered-faucet 0x2a7e654f2c508c10 \\
+    --offered-amount 100 \\
+    --requested-faucet 0x398e39a0535a3b0e \\
+    --requested-amount 50 \\
+    --note-type public
+
+  # Same as above but skip confirmation and delegate proving
+  miden-client pswap create \\
+    --source 0xd0e1f2a3b4c5d6e7 \\
+    --offered-faucet 0x2a7e654f2c508c10 \\
+    --offered-amount 100 \\
+    --requested-faucet 0x398e39a0535a3b0e \\
+    --requested-amount 50 \\
+    --note-type private --force --delegate-proving
+")]
+pub struct PswapCreateCmd {
+    /// Sender account ID or its hex prefix.
+    #[arg(short = 's', long = "source")]
+    sender_account_id: String,
+
+    /// Faucet ID of the offered asset.
+    #[arg(long)]
+    offered_faucet: String,
+
+    /// Amount of the offered asset.
+    #[arg(long)]
+    offered_amount: u64,
+
+    /// Faucet ID of the requested asset.
+    #[arg(long)]
+    requested_faucet: String,
+
+    /// Amount of the requested asset.
+    #[arg(long)]
+    requested_amount: u64,
+
+    /// Visibility of the PSWAP note to be created.
+    #[arg(short, long, value_enum)]
+    note_type: NoteType,
+
+    /// Flag to submit the executed transaction without asking for confirmation.
+    #[arg(long, default_value_t = false)]
+    force: bool,
+
+    /// Flag to delegate proving to the remote prover specified in the config file.
+    #[arg(long, default_value_t = false)]
+    delegate_proving: bool,
+}
+
+impl PswapCreateCmd {
+    pub async fn execute<AUTH: TransactionAuthenticator + Sync + 'static>(
+        &self,
+        mut client: Client<AUTH>,
+    ) -> Result<(), CliError> {
+        let sender_id = parse_account_id(&client, &self.sender_account_id).await?;
+
+        let offered_faucet_id = parse_account_id(&client, &self.offered_faucet).await?;
+        let offered_asset = Asset::Fungible(
+            FungibleAsset::new(offered_faucet_id, self.offered_amount).map_err(CliError::Asset)?,
+        );
+
+        let requested_faucet_id = parse_account_id(&client, &self.requested_faucet).await?;
+        let requested_asset = Asset::Fungible(
+            FungibleAsset::new(requested_faucet_id, self.requested_amount)
+                .map_err(CliError::Asset)?,
+        );
+
+        let tx_request = TransactionRequestBuilder::new()
+            .build_pswap_create(
+                sender_id,
+                offered_asset,
+                requested_asset,
+                (&self.note_type).into(),
+                NoteAttachment::default(),
+                client.rng(),
+            )
+            .map_err(|err| {
+                CliError::Transaction(
+                    err.into(),
+                    "Failed to build PSWAP create transaction".to_string(),
+                )
+            })?;
+
+        execute_transaction(&mut client, sender_id, tx_request, self.force, self.delegate_proving)
+            .await
+    }
+}
+
+/// Consume (partially fill) an existing partial swap note.
+#[derive(Debug, Parser, Clone)]
+#[command(after_long_help = "\
+Examples:
+  # Fill 25 tokens from an existing PSWAP note
+  miden-client pswap consume \\
+    --source 0xd0e1f2a3b4c5d6e7 \\
+    --note 0x1a2b3c4d \\
+    --fill-amount 25
+
+  # Same as above but skip confirmation
+  miden-client pswap consume \\
+    --source 0xd0e1f2a3b4c5d6e7 \\
+    --note 0x1a2b3c4d \\
+    --fill-amount 25 --force
+")]
+pub struct PswapConsumeCmd {
+    /// Consumer account ID or its hex prefix.
+    #[arg(short = 's', long = "source")]
+    source: String,
+
+    /// Note ID or hex prefix of the PSWAP note to consume.
+    #[arg(long)]
+    note: String,
+
+    /// Amount to fill from the swap.
+    #[arg(long)]
+    fill_amount: u64,
+
+    /// Flag to submit the executed transaction without asking for confirmation.
+    #[arg(long, default_value_t = false)]
+    force: bool,
+
+    /// Flag to delegate proving to the remote prover specified in the config file.
+    #[arg(long, default_value_t = false)]
+    delegate_proving: bool,
+}
+
+impl PswapConsumeCmd {
+    pub async fn execute<AUTH: TransactionAuthenticator + Sync + 'static>(
+        &self,
+        mut client: Client<AUTH>,
+    ) -> Result<(), CliError> {
+        let consumer_id = parse_account_id(&client, &self.source).await?;
+        let note = resolve_input_note(&client, &self.note).await?;
+
+        let tx_request = TransactionRequestBuilder::new()
+            .build_pswap_consume(&note, consumer_id, self.fill_amount, PSWAP_INFLIGHT_AMOUNT)
+            .map_err(|err| {
+                CliError::Transaction(
+                    err.into(),
+                    "Failed to build PSWAP consume transaction".to_string(),
+                )
+            })?;
+
+        execute_transaction(&mut client, consumer_id, tx_request, self.force, self.delegate_proving)
+            .await
+    }
+}
+
+/// Cancel an existing partial swap note, reclaiming the offered asset.
+#[derive(Debug, Parser, Clone)]
+#[command(after_long_help = "\
+Examples:
+  # Cancel a PSWAP note by its ID prefix
+  miden-client pswap cancel \\
+    --source 0xd0e1f2a3b4c5d6e7 \\
+    --note 0x1a2b3c4d
+
+  # Same as above but skip confirmation
+  miden-client pswap cancel \\
+    --source 0xd0e1f2a3b4c5d6e7 \\
+    --note 0x1a2b3c4d --force
+")]
+pub struct PswapCancelCmd {
+    /// Account ID or its hex prefix of the note creator.
+    #[arg(short = 's', long = "source")]
+    source: String,
+
+    /// Note ID or hex prefix of the PSWAP note to cancel.
+    #[arg(long)]
+    note: String,
+
+    /// Flag to submit the executed transaction without asking for confirmation.
+    #[arg(long, default_value_t = false)]
+    force: bool,
+
+    /// Flag to delegate proving to the remote prover specified in the config file.
+    #[arg(long, default_value_t = false)]
+    delegate_proving: bool,
+}
+
+impl PswapCancelCmd {
+    pub async fn execute<AUTH: TransactionAuthenticator + Sync + 'static>(
+        &self,
+        mut client: Client<AUTH>,
+    ) -> Result<(), CliError> {
+        let sender_id = parse_account_id(&client, &self.source).await?;
+        let note = resolve_input_note(&client, &self.note).await?;
+
+        let tx_request =
+            TransactionRequestBuilder::new().build_pswap_cancel(note).map_err(|err| {
+                CliError::Transaction(
+                    err.into(),
+                    "Failed to build PSWAP cancel transaction".to_string(),
+                )
+            })?;
+
+        execute_transaction(&mut client, sender_id, tx_request, self.force, self.delegate_proving)
+            .await
+    }
+}
+
+// HELPERS
+// ================================================================================================
+
+/// Resolves a note ID prefix to a fully-qualified [`Note`].
+async fn resolve_input_note<AUTH: TransactionAuthenticator + Sync>(
+    client: &Client<AUTH>,
+    note_id_prefix: &str,
+) -> Result<Note, CliError> {
+    let note_record = get_input_note_with_id_prefix(client, note_id_prefix)
+        .await
+        .map_err(|_| {
+            CliError::Input(format!(
+                "Input note ID {note_id_prefix} is neither a valid Note ID nor a prefix of a known Note ID"
+            ))
+        })?;
+
+    note_record.try_into().map_err(|err: NoteRecordError| {
+        CliError::Transaction(err.into(), "Failed to convert note record".to_string())
+    })
 }
 
 // EXECUTE TRANSACTION
