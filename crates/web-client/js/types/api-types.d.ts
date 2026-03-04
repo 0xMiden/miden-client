@@ -495,6 +495,8 @@ export interface BuildSwapTagOptions {
 export interface CompileComponentOptions {
   code: string;
   slots: StorageSlot[];
+  /** Whether to call `.withSupportsAllTypes()` on the compiled component. Defaults to `true`. */
+  supportAllTypes?: boolean;
 }
 
 export interface CompileTxScriptLibrary {

@@ -12,18 +12,16 @@ export class CompilerResource {
   /**
    * Compiles MASM code + slots into an AccountComponent ready for accounts.create().
    *
-   * @param {{ code: string, slots: StorageSlot[] }} opts
+   * @param {{ code: string, slots: StorageSlot[], supportAllTypes?: boolean }} opts
    * @returns {Promise<AccountComponent>}
    */
-  async component({ code, slots }) {
+  async component({ code, slots, supportAllTypes = true }) {
     this.#client.assertNotTerminated();
     const wasm = await this.#getWasm();
     const builder = this.#inner.createCodeBuilder();
     const compiled = builder.compileAccountComponentCode(code);
-    return wasm.AccountComponent.compile(
-      compiled,
-      slots
-    ).withSupportsAllTypes();
+    const component = wasm.AccountComponent.compile(compiled, slots);
+    return supportAllTypes ? component.withSupportsAllTypes() : component;
   }
 
   /**
