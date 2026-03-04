@@ -110,8 +110,8 @@ use miden_standards::account::wallets::BasicWallet;
 use miden_standards::note::{NoteConsumptionStatus, WellKnownNote, utils};
 use miden_standards::testing::mock_account::MockAccountExt;
 use miden_standards::testing::note::NoteBuilder;
-use miden_swapp::BasicWallet as PswapBasicWallet;
 use miden_testing::{MockChain, MockChainBuilder, TxContextInput};
+use pswap::BasicWallet as PswapBasicWallet;
 use rand::rngs::StdRng;
 use rand::{Rng, RngCore, SeedableRng};
 
@@ -2249,7 +2249,7 @@ async fn pswap_create_and_consume_test_impl() {
     // Bob can consume (fill) the PSWAP note by providing faucet2 tokens and receiving
     // faucet1 tokens in return.
     //
-    // Bob's account uses the miden-swapp BasicWallet component which includes the procedures
+    // Bob's account uses the pswap BasicWallet component which includes the procedures
     // required for executing PSWAP note scripts.
 
     let (mut client, mock_rpc_api, keystore) = create_test_client().await;
@@ -2269,7 +2269,7 @@ async fn pswap_create_and_consume_test_impl() {
         .await
         .unwrap();
 
-    // Setup Bob's wallet with miden-swapp BasicWallet component (needed for PSWAP consumption).
+    // Setup Bob's wallet with pswap BasicWallet component (needed for PSWAP consumption).
     let bob_key_pair = AuthSecretKey::new_falcon512_rpo_with_rng(client.rng());
     let bob_pub_key = bob_key_pair.public_key();
     let mut bob_seed = [0u8; 32];

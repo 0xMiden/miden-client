@@ -25,7 +25,7 @@ cd swapp-note && cargo miden build --release
 cd consume-asset && cargo miden build --release
 ```
 
-The compiled `.masp` files are included in the repository and referenced by the `miden-swapp` crate via `include_bytes!`.
+The compiled `.masp` files are included in the repository and referenced by the `pswap` crate via `include_bytes!`.
 
 ## Dependencies
 

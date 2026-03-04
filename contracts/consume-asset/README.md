@@ -22,7 +22,7 @@ This script is used by solvers during cross-swap settlement. When two swap notes
 cargo miden build --release
 ```
 
-The compiled `.masp` file is referenced by the `miden-swapp` crate via `include_bytes!`.
+The compiled `.masp` file is referenced by the `pswap` crate via `include_bytes!`.
 
 ## Dependencies
 

@@ -389,7 +389,7 @@ impl TransactionRequestBuilder {
         note_attachment: NoteAttachment,
         rng: &mut ClientRng,
     ) -> Result<TransactionRequest, TransactionRequestError> {
-        let pswap_note = miden_swapp::PswapNote::create(
+        let pswap_note = pswap::PswapNote::create(
             creator_account_id,
             offered_asset,
             requested_asset,
@@ -416,7 +416,7 @@ impl TransactionRequestBuilder {
         fill_amount: u64,
         inflight_amount: u64,
     ) -> Result<TransactionRequest, TransactionRequestError> {
-        let (p2id_note, remainder_note) = miden_swapp::PswapNote::create_output_notes(
+        let (p2id_note, remainder_note) = pswap::PswapNote::create_output_notes(
             pswap_note,
             consumer_account_id,
             fill_amount,

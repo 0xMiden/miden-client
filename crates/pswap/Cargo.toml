@@ -1,6 +1,6 @@
 [package]
 edition                = "2024"
-name                   = "miden-swapp"
+name                   = "pswap"
 rust-version.workspace = true
 version                = "0.1.0"
 

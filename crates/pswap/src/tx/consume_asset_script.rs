@@ -40,7 +40,7 @@ pub struct ConsumeAssetData {
 /// # Usage
 ///
 /// ```ignore
-/// use miden_swapp::ConsumeAssetScript;
+/// use pswap::ConsumeAssetScript;
 ///
 /// // 1. Get the TransactionScript
 /// let tx_script = ConsumeAssetScript::tx_script();
