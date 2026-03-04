@@ -63,6 +63,9 @@ pub(crate) mod data_store;
 mod errors;
 pub use errors::*;
 
+mod smt_forest;
+pub use smt_forest::AccountSmtForest;
+
 mod account;
 pub use account::{AccountRecord, AccountRecordData, AccountStatus, AccountUpdates};
 mod note_record;
