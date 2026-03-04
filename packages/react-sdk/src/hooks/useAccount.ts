@@ -36,9 +36,7 @@ import { useAssetMetadata } from "./useAssetMetadata";
  * }
  * ```
  */
-export function useAccount(
-  accountId: AccountRef | undefined
-): AccountResult {
+export function useAccount(accountId: AccountRef | undefined): AccountResult {
   const { client, isReady, runExclusive } = useMiden();
   const runExclusiveSafe = runExclusive ?? runExclusiveDirect;
   const accountDetails = useMidenStore((state) => state.accountDetails);
