@@ -83,6 +83,7 @@ use miden_protocol::crypto::rand::{FeltRng, RpoRandomCoin};
 use miden_protocol::note::{
     Note,
     NoteAssets,
+    NoteAttachment,
     NoteFile,
     NoteInputs,
     NoteMetadata,
@@ -110,6 +111,7 @@ use miden_standards::note::{NoteConsumptionStatus, WellKnownNote, utils};
 use miden_standards::testing::mock_account::MockAccountExt;
 use miden_standards::testing::note::NoteBuilder;
 use miden_testing::{MockChain, MockChainBuilder, TxContextInput};
+use pswap::BasicWallet as PswapBasicWallet;
 use rand::rngs::StdRng;
 use rand::{Rng, RngCore, SeedableRng};
 
@@ -2138,6 +2140,248 @@ async fn swap_chain_test() {
     let last_wallet_account: Account =
         client.get_account(last_wallet).await.unwrap().unwrap().try_into().unwrap();
     assert_eq!(last_wallet_account.vault().get_balance(account_pairs[0].1.id()).unwrap(), 1);
+}
+
+#[tokio::test]
+async fn pswap_create_test() {
+    // This test verifies that:
+    // 1. Alice can create a PSWAP note offering her asset and requesting another.
+
+    let (mut client, mock_rpc_api, keystore) = Box::pin(create_test_client()).await;
+
+    // Setup Alice's wallet and faucet.
+    let (alice_wallet, alice_faucet) = setup_wallet_and_faucet(
+        &mut client,
+        AccountStorageMode::Private,
+        &keystore,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await
+    .unwrap();
+
+    // Setup a second faucet (Bob's) so Alice can request its asset.
+    let (_, bob_faucet) = setup_wallet_and_faucet(
+        &mut client,
+        AccountStorageMode::Private,
+        &keystore,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await
+    .unwrap();
+
+    // Mint assets for Alice.
+    mint_and_consume(&mut client, alice_wallet.id(), alice_faucet.id(), NoteType::Private).await;
+    mock_rpc_api.prove_block();
+    client.sync_state().await.unwrap();
+
+    // Verify Alice has assets before creating the PSWAP note.
+    let alice_account: Account = client
+        .get_account(alice_wallet.id())
+        .await
+        .unwrap()
+        .unwrap()
+        .try_into()
+        .unwrap();
+    let alice_balance_before = alice_account.vault().get_balance(alice_faucet.id()).unwrap();
+    assert!(alice_balance_before > 0, "Alice should have assets before creating PSWAP");
+
+    let offered_amount = 1u64;
+    let requested_amount = 1u64;
+    let offered_asset =
+        Asset::Fungible(FungibleAsset::new(alice_faucet.id(), offered_amount).unwrap());
+    let requested_asset =
+        Asset::Fungible(FungibleAsset::new(bob_faucet.id(), requested_amount).unwrap());
+
+    // Step 1: Alice creates a PSWAP note.
+    let tx_request = TransactionRequestBuilder::new()
+        .build_pswap_create(
+            alice_wallet.id(),
+            offered_asset,
+            requested_asset,
+            NoteType::Private,
+            NoteAttachment::default(),
+            client.rng(),
+        )
+        .unwrap();
+
+    let _pswap_note = tx_request.expected_output_own_notes()[0].clone();
+    Box::pin(client.submit_new_transaction(alice_wallet.id(), tx_request))
+        .await
+        .unwrap();
+    mock_rpc_api.prove_block();
+    client.sync_state().await.unwrap();
+
+    // Verify Alice's balance decreased after creating the PSWAP note.
+    let alice_account: Account = client
+        .get_account(alice_wallet.id())
+        .await
+        .unwrap()
+        .unwrap()
+        .try_into()
+        .unwrap();
+    let alice_balance_after_create = alice_account.vault().get_balance(alice_faucet.id()).unwrap();
+    assert_eq!(
+        alice_balance_after_create,
+        alice_balance_before - offered_amount,
+        "Alice's balance should decrease by the offered amount"
+    );
+}
+
+#[test]
+fn pswap_create_and_consume_test() {
+    // Run on a thread with a larger stack to avoid stack overflow in debug builds.
+    // The async future state machine for this test is too large for the default stack.
+    std::thread::Builder::new()
+        .stack_size(16 * 1024 * 1024)
+        .spawn(|| {
+            tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap()
+                .block_on(pswap_create_and_consume_test_impl());
+        })
+        .unwrap()
+        .join()
+        .unwrap();
+}
+
+async fn pswap_create_and_consume_test_impl() {
+    // Bob can consume (fill) the PSWAP note by providing faucet2 tokens and receiving
+    // faucet1 tokens in return.
+    //
+    // Bob's account uses the pswap BasicWallet component which includes the procedures
+    // required for executing PSWAP note scripts.
+
+    let (mut client, mock_rpc_api, keystore) = create_test_client().await;
+
+    // Setup Alice's wallet (standard BasicWallet) and faucet1 (offered asset).
+    let (alice_wallet, faucet1) = setup_wallet_and_faucet(
+        &mut client,
+        AccountStorageMode::Private,
+        &keystore,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await
+    .unwrap();
+
+    // Setup faucet2 (requested asset).
+    let faucet2 = insert_new_fungible_faucet(&mut client, AccountStorageMode::Private, &keystore)
+        .await
+        .unwrap();
+
+    // Setup Bob's wallet with pswap BasicWallet component (needed for PSWAP consumption).
+    let bob_key_pair = AuthSecretKey::new_falcon512_rpo_with_rng(client.rng());
+    let bob_pub_key = bob_key_pair.public_key();
+    let mut bob_seed = [0u8; 32];
+    client.rng().fill_bytes(&mut bob_seed);
+
+    let bob_wallet = AccountBuilder::new(bob_seed)
+        .account_type(AccountType::RegularAccountImmutableCode)
+        .storage_mode(AccountStorageMode::Private)
+        .with_auth_component(AuthFalcon512Rpo::new(bob_pub_key.to_commitment()))
+        .with_component(BasicWallet)
+        .with_component(PswapBasicWallet::component())
+        .build()
+        .unwrap();
+
+    keystore.add_key(&bob_key_pair).unwrap();
+    client.add_account(&bob_wallet, false).await.unwrap();
+
+    // Mint faucet1 tokens to Alice.
+    mint_and_consume(&mut client, alice_wallet.id(), faucet1.id(), NoteType::Private).await;
+    mock_rpc_api.prove_block();
+    client.sync_state().await.unwrap();
+
+    // Mint faucet2 tokens to Bob.
+    mint_and_consume(&mut client, bob_wallet.id(), faucet2.id(), NoteType::Private).await;
+    mock_rpc_api.prove_block();
+    client.sync_state().await.unwrap();
+
+    // Verify Alice has faucet1 tokens before creating PSWAP.
+    let alice_account: Account = client
+        .get_account(alice_wallet.id())
+        .await
+        .unwrap()
+        .unwrap()
+        .try_into()
+        .unwrap();
+    let alice_faucet1_before = alice_account.vault().get_balance(faucet1.id()).unwrap();
+    assert_eq!(alice_faucet1_before, MINT_AMOUNT, "Alice should have MINT_AMOUNT of faucet1");
+
+    // Verify Bob has faucet2 tokens before consuming PSWAP.
+    let bob_account: Account =
+        client.get_account(bob_wallet.id()).await.unwrap().unwrap().try_into().unwrap();
+    let bob_faucet2_before = bob_account.vault().get_balance(faucet2.id()).unwrap();
+    assert_eq!(bob_faucet2_before, MINT_AMOUNT, "Bob should have MINT_AMOUNT of faucet2");
+
+    // Step 1: Alice creates a PSWAP note offering faucet1 tokens for faucet2 tokens.
+    let offered_amount = 100u64;
+    let requested_amount = 50u64;
+    let offered_asset = Asset::Fungible(FungibleAsset::new(faucet1.id(), offered_amount).unwrap());
+    let requested_asset =
+        Asset::Fungible(FungibleAsset::new(faucet2.id(), requested_amount).unwrap());
+
+    let create_request = TransactionRequestBuilder::new()
+        .build_pswap_create(
+            alice_wallet.id(),
+            offered_asset,
+            requested_asset,
+            NoteType::Private,
+            NoteAttachment::default(),
+            client.rng(),
+        )
+        .unwrap();
+
+    let pswap_note = create_request.expected_output_own_notes()[0].clone();
+    client.submit_new_transaction(alice_wallet.id(), create_request).await.unwrap();
+    mock_rpc_api.prove_block();
+    client.sync_state().await.unwrap();
+
+    // Verify Alice's faucet1 balance decreased after creating the PSWAP note.
+    let alice_account: Account = client
+        .get_account(alice_wallet.id())
+        .await
+        .unwrap()
+        .unwrap()
+        .try_into()
+        .unwrap();
+    let alice_faucet1_after_create = alice_account.vault().get_balance(faucet1.id()).unwrap();
+    assert_eq!(
+        alice_faucet1_after_create,
+        MINT_AMOUNT - offered_amount,
+        "Alice's faucet1 balance should decrease by the offered amount"
+    );
+
+    // Step 2: Bob consumes the PSWAP note (full fill).
+    let fill_amount = requested_amount;
+    let inflight_amount = 0u64;
+
+    let consume_request = TransactionRequestBuilder::new()
+        .build_pswap_consume(&pswap_note, bob_wallet.id(), fill_amount, inflight_amount)
+        .unwrap();
+
+    client.submit_new_transaction(bob_wallet.id(), consume_request).await.unwrap();
+    mock_rpc_api.prove_block();
+    client.sync_state().await.unwrap();
+
+    // Verify Bob's balances after consuming the PSWAP note.
+    let bob_account: Account =
+        client.get_account(bob_wallet.id()).await.unwrap().unwrap().try_into().unwrap();
+
+    // Bob should have spent fill_amount of faucet2 tokens.
+    let bob_faucet2_after = bob_account.vault().get_balance(faucet2.id()).unwrap();
+    assert_eq!(
+        bob_faucet2_after,
+        MINT_AMOUNT - fill_amount,
+        "Bob's faucet2 balance should decrease by the fill amount"
+    );
+
+    // Bob should have received the offered faucet1 tokens (full fill = all offered tokens).
+    let bob_faucet1_after = bob_account.vault().get_balance(faucet1.id()).unwrap();
+    assert_eq!(
+        bob_faucet1_after, offered_amount,
+        "Bob should have received all offered faucet1 tokens"
+    );
 }
 
 #[tokio::test]

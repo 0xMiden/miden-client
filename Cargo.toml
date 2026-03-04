@@ -5,6 +5,7 @@ members = [
   "bin/integration-tests",
   "bin/miden-cli",
   "crates/idxdb-store",
+  "crates/pswap",
   "crates/rust-client",
   "crates/sqlite-store",
   "crates/testing/miden-client-tests",
@@ -35,6 +36,7 @@ miden-client-sqlite-store = { default-features = false, path = "crates/sqlite-st
 
 # Miden protocol dependencies
 miden-protocol  = { default-features = false, version = "0.13" }
+pswap           = { path = "crates/pswap" }
 miden-standards = { default-features = false, version = "0.13" }
 miden-testing   = { default-features = false, version = "0.13" }
 miden-tx        = { default-features = false, version = "0.13" }

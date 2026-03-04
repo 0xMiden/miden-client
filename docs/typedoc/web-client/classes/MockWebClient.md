@@ -134,7 +134,7 @@ Creates a new `WebClient` instance with the specified configuration.
 
 ##### seed?
 
-`Uint8Array`
+`Uint8Array`\<`ArrayBufferLike`\>
 
 ##### store\_name?
 
@@ -179,7 +179,7 @@ Creates a new `WebClient` instance with external keystore callbacks.
 
 ##### seed?
 
-`Uint8Array`
+`Uint8Array`\<`ArrayBufferLike`\>
 
 ##### store\_name?
 
@@ -232,15 +232,15 @@ applications as it uses a mock chain that simulates the behavior of a real node.
 
 ##### seed?
 
-`Uint8Array`
+`Uint8Array`\<`ArrayBufferLike`\>
 
 ##### serialized\_mock\_chain?
 
-`Uint8Array`
+`Uint8Array`\<`ArrayBufferLike`\>
 
 ##### serialized\_mock\_note\_transport\_node?
 
-`Uint8Array`
+`Uint8Array`\<`ArrayBufferLike`\>
 
 #### Returns
 
@@ -970,6 +970,98 @@ Returns all the existing setting keys from the store.
 
 ***
 
+### newPswapCancelTransactionRequest()
+
+> **newPswapCancelTransactionRequest**(`pswap_note`): [`TransactionRequest`](TransactionRequest.md)
+
+#### Parameters
+
+##### pswap\_note
+
+[`Note`](Note.md)
+
+#### Returns
+
+[`TransactionRequest`](TransactionRequest.md)
+
+#### Inherited from
+
+[`WebClient`](WebClient.md).[`newPswapCancelTransactionRequest`](WebClient.md#newpswapcanceltransactionrequest)
+
+***
+
+### newPswapConsumeTransactionRequest()
+
+> **newPswapConsumeTransactionRequest**(`pswap_note`, `consumer_account_id`, `fill_amount`, `inflight_amount`): [`TransactionRequest`](TransactionRequest.md)
+
+#### Parameters
+
+##### pswap\_note
+
+[`Note`](Note.md)
+
+##### consumer\_account\_id
+
+[`AccountId`](AccountId.md)
+
+##### fill\_amount
+
+`bigint`
+
+##### inflight\_amount
+
+`bigint`
+
+#### Returns
+
+[`TransactionRequest`](TransactionRequest.md)
+
+#### Inherited from
+
+[`WebClient`](WebClient.md).[`newPswapConsumeTransactionRequest`](WebClient.md#newpswapconsumetransactionrequest)
+
+***
+
+### newPswapCreateTransactionRequest()
+
+> **newPswapCreateTransactionRequest**(`creator_account_id`, `offered_asset_faucet_id`, `offered_asset_amount`, `requested_asset_faucet_id`, `requested_asset_amount`, `note_type`): [`TransactionRequest`](TransactionRequest.md)
+
+#### Parameters
+
+##### creator\_account\_id
+
+[`AccountId`](AccountId.md)
+
+##### offered\_asset\_faucet\_id
+
+[`AccountId`](AccountId.md)
+
+##### offered\_asset\_amount
+
+`bigint`
+
+##### requested\_asset\_faucet\_id
+
+[`AccountId`](AccountId.md)
+
+##### requested\_asset\_amount
+
+`bigint`
+
+##### note\_type
+
+[`NoteType`](../enumerations/NoteType.md)
+
+#### Returns
+
+[`TransactionRequest`](TransactionRequest.md)
+
+#### Inherited from
+
+[`WebClient`](WebClient.md).[`newPswapCreateTransactionRequest`](WebClient.md#newpswapcreatetransactionrequest)
+
+***
+
 ### newSendTransactionRequest()
 
 > **newSendTransactionRequest**(`sender_account_id`, `target_account_id`, `faucet_id`, `note_type`, `amount`, `recall_height?`, `timelock_height?`): [`TransactionRequest`](TransactionRequest.md)
@@ -1078,7 +1170,7 @@ Returns all the existing setting keys from the store.
 
 ##### init\_seed?
 
-`Uint8Array`
+`Uint8Array`\<`ArrayBufferLike`\>
 
 #### Returns
 
@@ -1543,13 +1635,13 @@ Factory method to create and initialize a new wrapped MockWebClient.
 
 Serialized mock chain (optional).
 
-`Uint8Array` | `ArrayBuffer`
+`ArrayBuffer` | `Uint8Array`\<`ArrayBufferLike`\>
 
 ##### serializedMockNoteTransportNode?
 
 Serialized mock note transport node (optional).
 
-`Uint8Array` | `ArrayBuffer`
+`ArrayBuffer` | `Uint8Array`\<`ArrayBufferLike`\>
 
 ##### seed?
 
@@ -1569,7 +1661,7 @@ A promise that resolves to a fully initialized MockWebClient.
 
 #### Overrides
 
-[`WebClient`](WebClient.md).[`createClient`](WebClient.md#createclient-2)
+[`WebClient`](WebClient.md).[`createClient`](WebClient.md#createclient-1)
 
 ***
 
@@ -1635,4 +1727,4 @@ A promise that resolves to a fully initialized WebClient.
 
 #### Inherited from
 
-[`WebClient`](WebClient.md).[`createClientWithExternalKeystore`](WebClient.md#createclientwithexternalkeystore-2)
+[`WebClient`](WebClient.md).[`createClientWithExternalKeystore`](WebClient.md#createclientwithexternalkeystore-1)
