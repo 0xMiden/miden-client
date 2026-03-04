@@ -19,6 +19,7 @@ path = "tests/integration.rs"
 
 [dependencies]
 # Workspace dependencies
+miden-agglayer            = { workspace = true }
 miden-client              = { features = ["std", "testing", "tonic"], workspace = true }
 miden-client-sqlite-store = { workspace = true }
 

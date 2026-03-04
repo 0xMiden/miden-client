@@ -231,6 +231,7 @@ impl std::fmt::Debug for TestCase {
 enum TestCategory {
     Client,
     CustomTransaction,
+    E2e,
     Fpi,
     NetworkTransaction,
     Onchain,
@@ -244,6 +245,7 @@ impl AsRef<str> for TestCategory {
         match self {
             TestCategory::Client => "client",
             TestCategory::CustomTransaction => "custom_transaction",
+            TestCategory::E2e => "end-to-end",
             TestCategory::Fpi => "fpi",
             TestCategory::NetworkTransaction => "network_transaction",
             TestCategory::Onchain => "onchain",

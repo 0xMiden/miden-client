@@ -2787,6 +2787,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "clap",
+ "miden-agglayer",
  "miden-client",
  "miden-client-sqlite-store",
  "num_cpus",
