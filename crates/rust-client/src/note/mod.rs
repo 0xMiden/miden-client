@@ -107,7 +107,7 @@ pub use miden_standards::note::{
     SwapNote,
 };
 pub use miden_tx::{FailedNote, NoteConsumptionInfo};
-pub use note_reader::OutputNoteReader;
+pub use note_reader::InputNoteReader;
 pub use note_screener::{NoteConsumability, NoteScreener, NoteScreenerError};
 pub(crate) use note_update_tracker::compute_nullifier_tx_order;
 pub use note_update_tracker::{
@@ -218,24 +218,24 @@ where
         Ok(self.store.get_output_notes(NoteFilter::Unique(note_id)).await?.pop())
     }
 
-    /// Returns a [`OutputNoteReader`] that lazily iterates over consumed output notes.
+    /// Returns an [`InputNoteReader`] that lazily iterates over consumed input notes.
     ///
-    /// Use the builder methods on [`OutputNoteReader`] to further refine the query before
+    /// Use the builder methods on [`InputNoteReader`] to further refine the query before
     /// iterating.
     ///
     /// # Example
     ///
     /// ```rust,ignore
     /// let mut reader = client
-    ///     .output_note_reader()
-    ///     .for_sender(account_id);
+    ///     .input_note_reader()
+    ///     .for_consumer(account_id);
     ///
     /// while let Some(note) = reader.next().await? {
     ///     process(note);
     /// }
     /// ```
-    pub fn output_note_reader(&self) -> OutputNoteReader {
-        OutputNoteReader::new(self.store.clone())
+    pub fn input_note_reader(&self) -> InputNoteReader {
+        InputNoteReader::new(self.store.clone())
     }
 }
 
