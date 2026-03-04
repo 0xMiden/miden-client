@@ -1,11 +1,16 @@
 use anyhow::{Context, Result};
-use miden_agglayer::{ExitRoot, UpdateGerNote, create_bridge_account, AggLayerBridge};
+use miden_agglayer::{AggLayerBridge, ExitRoot, UpdateGerNote, create_bridge_account};
 use miden_client::account::AccountStorageMode;
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
-use miden_client::testing::common::{insert_new_wallet, wait_for_blocks, wait_for_node, wait_for_tx};
+use miden_client::crypto::{FeltRng, Rpo256};
+use miden_client::testing::common::{
+    insert_new_wallet,
+    wait_for_blocks,
+    wait_for_node,
+    wait_for_tx,
+};
 use miden_client::transaction::{OutputNote, TransactionRequestBuilder};
-use miden_client::{Felt, crypto::{Rpo256, FeltRng}, Word, ZERO, ONE};
-
+use miden_client::{Felt, ONE, Word, ZERO};
 
 use crate::tests::config::ClientConfig;
 
@@ -39,7 +44,8 @@ pub async fn test_e2e_update_ger(client_config: ClientConfig) -> Result<()> {
 
     // CREATE BRIDGE ACCOUNT
     // --------------------------------------------------------------------------------------------
-    let bridge_account = create_bridge_account(client.rng().draw_word(), bridge_admin.id(), ger_manager.id());
+    let bridge_account =
+        create_bridge_account(client.rng().draw_word(), bridge_admin.id(), ger_manager.id());
     client.add_account(&bridge_account, false).await?;
 
     // Deploy the bridge account on-chain with a no-op transaction
@@ -50,9 +56,9 @@ pub async fn test_e2e_update_ger(client_config: ClientConfig) -> Result<()> {
     // CREATE UPDATE_GER NOTE
     // --------------------------------------------------------------------------------------------
     let ger_bytes: [u8; 32] = [
-        0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66,
-        0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x00, 0x11, 0x22, 0x33, 0x44,
-        0x55, 0x66, 0x77, 0x88,
+        0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,
+        0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66,
+        0x77, 0x88,
     ];
     let ger = ExitRoot::from(ger_bytes);
     let update_ger_note =
@@ -94,13 +100,10 @@ pub async fn test_e2e_update_ger(client_config: ClientConfig) -> Result<()> {
     let ger_storage_slot = AggLayerBridge::ger_map_slot_name();
     let stored_value = updated_bridge_account
         .storage()
-        .get_map_item(&ger_storage_slot, ger_hash)
+        .get_map_item(ger_storage_slot, ger_hash)
         .expect("GER hash should be stored in the map");
     let expected_value: Word = [ONE, ZERO, ZERO, ZERO].into();
     assert_eq!(stored_value, expected_value, "GER hash should map to [1, 0, 0, 0]");
 
     Ok(())
 }
-
-// HELPERS
-// ================================================================================================
