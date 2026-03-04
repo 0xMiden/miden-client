@@ -12,7 +12,7 @@ use miden_protocol::{Felt, Word};
 // ================================================================================================
 
 const CONSUME_ASSET_SCRIPT_BYTES: &[u8] =
-    include_bytes!("../../../../contracts/consume-asset-script/consume_asset_script.masp");
+    include_bytes!("../../../../contracts/consume-asset/consume_asset.masp");
 
 /// Load the compiled consume-asset-script program once.
 static CONSUME_ASSET_SCRIPT_PROGRAM: LazyLock<TransactionScript> = LazyLock::new(|| {
