@@ -116,22 +116,6 @@
 
 ***
 
-### getOrImport()
-
-> **getOrImport**(`accountId`): `Promise`\<[`Account`](../classes/Account.md)\>
-
-#### Parameters
-
-##### accountId
-
-[`AccountRef`](../type-aliases/AccountRef.md)
-
-#### Returns
-
-`Promise`\<[`Account`](../classes/Account.md)\>
-
-***
-
 ### import()
 
 > **import**(`input`): `Promise`\<[`Account`](../classes/Account.md)\>

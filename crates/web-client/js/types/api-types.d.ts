@@ -17,6 +17,7 @@ import type {
   TransactionRecord,
   InputNoteRecord,
   OutputNoteRecord,
+  ConsumableNoteRecord,
   NoteId,
   NoteFile,
   NoteTag,
@@ -78,7 +79,7 @@ export declare const AuthScheme: {
 export type AuthSchemeType = (typeof AuthScheme)[keyof typeof AuthScheme];
 
 /**
- * User-friendly note visibility constants for MidenClient options.
+ * User-friendly note visibility constants.
  * Use `NoteVisibility.Public` or `NoteVisibility.Private` instead of raw strings.
  */
 export declare const NoteVisibility: {
@@ -87,13 +88,7 @@ export declare const NoteVisibility: {
 };
 
 /**
- * Union of all values in the NoteVisibility const.
- */
-export type NoteVisibility =
-  (typeof NoteVisibility)[keyof typeof NoteVisibility];
-
-/**
- * User-friendly storage mode constants for MidenClient options.
+ * User-friendly storage mode constants.
  * Use `StorageMode.Public`, `StorageMode.Private`, or `StorageMode.Network` instead of raw strings.
  */
 export declare const StorageMode: {
@@ -102,10 +97,8 @@ export declare const StorageMode: {
   readonly Network: "network";
 };
 
-/**
- * Union of all values in the StorageMode const.
- */
-export type StorageMode = (typeof StorageMode)[keyof typeof StorageMode];
+/** Union of valid StorageMode string values. */
+export type StorageMode = "public" | "private" | "network";
 
 /**
  * Union of all values in the AccountType const.
@@ -138,25 +131,12 @@ export type AccountTypeValue =
 // ════════════════════════════════════════════════════════════════
 
 export interface ClientOptions {
-  /**
-   * RPC endpoint. Accepts shorthands or a raw URL:
-   * - `"testnet"` — Miden testnet RPC (`https://rpc.testnet.miden.io`)
-   * - `"devnet"` — Miden devnet RPC (`https://rpc.devnet.miden.io`)
-   * - `"localhost"` / `"local"` — local node (`http://localhost:57291`)
-   * - any other string — treated as a raw RPC endpoint URL
-   * Defaults to the SDK testnet RPC if omitted.
-   */
-  rpcUrl?: "testnet" | "devnet" | "localhost" | "local" | (string & {});
+  /** RPC endpoint URL. Defaults to testnet RPC. */
+  rpcUrl?: string;
   /** Note transport URL (optional). */
   noteTransportUrl?: string;
-  /**
-   * Prover to use for transactions. Accepts shorthands or a raw URL:
-   * - `"local"` — local (in-browser) prover
-   * - `"devnet"` — Miden devnet remote prover
-   * - `"testnet"` — Miden testnet remote prover
-   * - any other string — treated as a raw remote prover URL
-   */
-  proverUrl?: "local" | "devnet" | "testnet" | (string & {});
+  /** Auto-creates a remote prover from this URL. */
+  proverUrl?: string;
   /** Hashed to 32 bytes via SHA-256. */
   seed?: string | Uint8Array;
   /** Store isolation key. */
@@ -189,6 +169,8 @@ export interface Asset {
   amount: number | bigint;
 }
 
+export type NoteVisibility = "public" | "private";
+
 /**
  * A note reference: hex note ID string, NoteId object, InputNoteRecord, or Note object.
  */
@@ -198,30 +180,7 @@ export type NoteInput = string | NoteId | Note | InputNoteRecord;
 // Account types
 // ════════════════════════════════════════════════════════════════
 
-/**
- * Options for creating a custom contract account.
- *
- * Unlike wallets/faucets, `auth` must be a raw `AuthSecretKey` WASM object —
- * the caller must retain it for signing. Construct via `AuthSecretKey.rpoFalconWithRNG(seed)`.
- * Storage defaults to `"public"` (unlike wallets which default to `"private"`).
- */
-export interface ContractCreateOptions {
-  type: "ImmutableContract" | "MutableContract";
-  /** Defaults to "public" (differs from wallet default of "private"). */
-  storage?: StorageMode;
-  /** Required — used to derive a deterministic account ID. */
-  seed: Uint8Array;
-  /**
-   * Required raw WASM AuthSecretKey. Use `AuthSecretKey.rpoFalconWithRNG(seed)`.
-   * Must be a concrete object (not a string) because the caller needs to retain
-   * the key for transaction signing.
-   */
-  auth: AuthSecretKey;
-  /** Additional compiled account components from `compile.component()`. */
-  components?: AccountComponent[];
-}
-
-/** Create a wallet (default), faucet, or custom contract. Discriminated by `type` field. */
+/** Create a wallet, faucet, or contract. Discriminated by `type` field. */
 export type CreateAccountOptions =
   | WalletCreateOptions
   | FaucetCreateOptions
@@ -230,7 +189,7 @@ export type CreateAccountOptions =
 export interface WalletCreateOptions {
   /** Account type. Defaults to "MutableWallet". Use AccountType enum. */
   type?: "MutableWallet" | "ImmutableWallet";
-  storage?: StorageMode;
+  storage?: "private" | "public";
   auth?: AuthSchemeType;
   seed?: string | Uint8Array;
 }
@@ -240,8 +199,20 @@ export interface FaucetCreateOptions {
   symbol: string;
   decimals: number;
   maxSupply: number | bigint;
-  storage?: StorageMode;
+  storage?: "private" | "public";
   auth?: AuthSchemeType;
+}
+
+export interface ContractCreateOptions {
+  type: "ImmutableContract" | "MutableContract";
+  /** Raw 32-byte seed (Uint8Array). Required. */
+  seed: Uint8Array;
+  /** Auth secret key. Required. */
+  auth: AuthSecretKey;
+  /** Pre-compiled AccountComponent instances. */
+  components?: AccountComponent[];
+  /** Storage mode. Defaults to "public" for contracts. */
+  storage?: StorageMode;
 }
 
 export interface AccountDetails {
@@ -255,12 +226,12 @@ export interface AccountDetails {
 /**
  * Discriminated union for account import.
  *
- * - `AccountRef` (string, AccountId, Account, AccountHeader) — Import a public account by ID (fetches state from the network).
+ * - `string` — Import a public account by its hex or bech32 ID (fetches state from the network).
  * - `{ file: AccountFile }` — Import from a previously exported account file (works for both public and private accounts).
  * - `{ seed, type?, auth? }` — Reconstruct a **public** account from its init seed. **Does not work for private accounts** — use the account file workflow instead.
  */
 export type ImportAccountInput =
-  | AccountRef
+  | string
   | { file: AccountFile }
   | {
       seed: Uint8Array;
@@ -288,44 +259,23 @@ export interface TransactionOptions {
   prover?: TransactionProver;
 }
 
-export interface SendOptionsDefault extends TransactionOptions {
+export interface SendOptions extends TransactionOptions {
   account: AccountRef;
   to: AccountRef;
   token: AccountRef;
   amount: number | bigint;
   type?: NoteVisibility;
-  returnNote?: false;
   /** Block height after which the sender can reclaim the note. This is a block number, not wall-clock time. */
   reclaimAfter?: number;
   /** Block height until which the note is timelocked. This is a block number, not wall-clock time. */
   timelockUntil?: number;
 }
 
-export interface SendOptionsReturnNote extends TransactionOptions {
-  account: AccountRef;
-  to: AccountRef;
-  token: AccountRef;
-  amount: number | bigint;
-  type?: NoteVisibility;
-  returnNote: true;
-}
-
-/** @deprecated Use SendOptionsDefault or SendOptionsReturnNote instead */
-export type SendOptions = SendOptionsDefault | SendOptionsReturnNote;
-
-export interface SendResult {
-  txId: TransactionId;
-  note: Note | null;
-}
-
 export interface MintOptions extends TransactionOptions {
   /** Faucet (executing account). */
   account: AccountRef;
-  /** Recipient account. */
   to: AccountRef;
-  /** Amount to mint. */
   amount: number | bigint;
-  /** Note visibility. Defaults to "public". */
   type?: NoteVisibility;
 }
 
@@ -345,6 +295,18 @@ export interface SwapOptions extends TransactionOptions {
   request: Asset;
   type?: NoteVisibility;
   paybackType?: NoteVisibility;
+}
+
+export interface ExecuteOptions extends TransactionOptions {
+  /** Account executing the custom script. */
+  account: AccountRef;
+  /** Compiled TransactionScript. */
+  script: TransactionScript;
+  /** Foreign accounts referenced by the script. */
+  foreignAccounts?: (
+    | AccountRef
+    | { id: AccountRef; storage?: AccountStorageRequirements }
+  )[];
 }
 
 export interface PreviewSendOptions {
@@ -398,14 +360,6 @@ export interface WaitOptions {
   onProgress?: (status: WaitStatus) => void;
 }
 
-export interface ExecuteOptions extends TransactionOptions {
-  account: AccountRef;
-  script: TransactionScript;
-  foreignAccounts?: Array<
-    AccountRef | { id: AccountRef; storage?: AccountStorageRequirements }
-  >;
-}
-
 /** Result of consumeAll — includes count of remaining notes for pagination. */
 export interface ConsumeAllResult {
   txId: TransactionId | null;
@@ -419,7 +373,7 @@ export interface ConsumeAllResult {
  */
 export type TransactionQuery =
   | { status: "uncommitted" }
-  | { ids: (string | TransactionId)[] }
+  | { ids: string[] }
   | { expiredBefore: number };
 
 // ════════════════════════════════════════════════════════════════
@@ -436,7 +390,7 @@ export type NoteQuery =
         | "processing"
         | "unverified";
     }
-  | { ids: (string | NoteId)[] };
+  | { ids: string[] };
 
 /** Options for standalone note creation utilities. */
 export interface NoteOptions {
@@ -462,7 +416,7 @@ export interface FetchPrivateNotesOptions {
 }
 
 export interface SendPrivateOptions {
-  noteId: NoteInput;
+  noteId: string;
   to: AccountRef;
 }
 
@@ -489,44 +443,12 @@ export interface BuildSwapTagOptions {
 }
 
 // ════════════════════════════════════════════════════════════════
-// Compiler types
-// ════════════════════════════════════════════════════════════════
-
-export interface CompileComponentOptions {
-  code: string;
-  slots: StorageSlot[];
-  /** Whether to call `.withSupportsAllTypes()` on the compiled component. Defaults to `true`. */
-  supportAllTypes?: boolean;
-}
-
-export interface CompileTxScriptLibrary {
-  namespace: string;
-  code: string;
-  /**
-   * "static"  — copies library into the script (for off-chain libraries).
-   * "dynamic" — links without copying (for on-chain FPI libraries). Default.
-   */
-  linking?: "static" | "dynamic";
-}
-
-export interface CompileTxScriptOptions {
-  code: string;
-  libraries?: CompileTxScriptLibrary[];
-}
-
-// ════════════════════════════════════════════════════════════════
 // Resource interfaces
 // ════════════════════════════════════════════════════════════════
-
-export interface CompilerResource {
-  component(opts: CompileComponentOptions): Promise<AccountComponent>;
-  txScript(opts: CompileTxScriptOptions): Promise<TransactionScript>;
-}
 
 export interface AccountsResource {
   create(options?: CreateAccountOptions): Promise<Account>;
   get(accountId: AccountRef): Promise<Account | null>;
-  getOrImport(accountId: AccountRef): Promise<Account>;
   list(): Promise<AccountHeader[]>;
   getDetails(accountId: AccountRef): Promise<AccountDetails>;
   getBalance(accountId: AccountRef, tokenId: AccountRef): Promise<bigint>;
@@ -542,18 +464,11 @@ export interface AccountsResource {
 }
 
 export interface TransactionsResource {
-  send(
-    options: SendOptionsDefault
-  ): Promise<{ txId: TransactionId; note: null }>;
-  send(
-    options: SendOptionsReturnNote
-  ): Promise<{ txId: TransactionId; note: Note }>;
-  send(options: SendOptions): Promise<SendResult>;
+  send(options: SendOptions): Promise<TransactionId>;
   mint(options: MintOptions): Promise<TransactionId>;
   consume(options: ConsumeOptions): Promise<TransactionId>;
   swap(options: SwapOptions): Promise<TransactionId>;
   consumeAll(options: ConsumeAllOptions): Promise<ConsumeAllResult>;
-  execute(options: ExecuteOptions): Promise<TransactionId>;
 
   preview(options: PreviewOptions): Promise<TransactionSummary>;
 
@@ -567,24 +482,74 @@ export interface TransactionsResource {
     options?: TransactionOptions
   ): Promise<TransactionId>;
 
+  /** Execute a custom transaction script, optionally referencing foreign accounts (FPI). */
+  execute(options: ExecuteOptions): Promise<TransactionId>;
+
   list(query?: TransactionQuery): Promise<TransactionRecord[]>;
 
-  waitFor(txId: string | TransactionId, options?: WaitOptions): Promise<void>;
+  waitFor(txId: string, options?: WaitOptions): Promise<void>;
 }
 
 export interface NotesResource {
   list(query?: NoteQuery): Promise<InputNoteRecord[]>;
-  get(noteId: NoteInput): Promise<InputNoteRecord | null>;
+  get(noteId: string): Promise<InputNoteRecord | null>;
 
   listSent(query?: NoteQuery): Promise<OutputNoteRecord[]>;
 
-  listAvailable(options: { account: AccountRef }): Promise<InputNoteRecord[]>;
+  listAvailable(options: {
+    account: AccountRef;
+  }): Promise<ConsumableNoteRecord[]>;
 
   import(noteFile: NoteFile): Promise<NoteId>;
-  export(noteId: NoteInput, options?: ExportNoteOptions): Promise<NoteFile>;
+  export(noteId: string, options?: ExportNoteOptions): Promise<NoteFile>;
 
   fetchPrivate(options?: FetchPrivateNotesOptions): Promise<void>;
   sendPrivate(options: SendPrivateOptions): Promise<void>;
+}
+
+// ════════════════════════════════════════════════════════════════
+// Compiler types
+// ════════════════════════════════════════════════════════════════
+
+export interface CompileComponentOptions {
+  /** MASM source code for the component. */
+  source: string;
+  /** Initial storage slots for the component. */
+  storageSlots?: StorageSlot[];
+  /**
+   * When true, the component accepts all input types for Falcon-signed
+   * transactions by automatically adding `exec.auth::auth_tx_rpo_falcon512`
+   * to a library context. Default: true.
+   *
+   * **BREAKING (v0.12):** This flag was added in v0.12 and defaults to `true`.
+   * Set to `false` if you compile a component that already includes its own
+   * auth transaction kernel invocation or intentionally omits one.
+   */
+  supportAllTypes?: boolean;
+}
+
+export interface CompileTxScriptLibrary {
+  /** AccountComponent whose procedures become available to the script. */
+  component: AccountComponent;
+  /**
+   * `"dynamic"` (default) — procedures are linked via DYNCALL at runtime.
+   * `"static"` — procedures are inlined at compile time.
+   */
+  linking?: "dynamic" | "static";
+}
+
+export interface CompileTxScriptOptions {
+  /** MASM source code for the transaction script. */
+  source: string;
+  /** Component libraries to link. */
+  libraries?: CompileTxScriptLibrary[];
+}
+
+export interface CompilerResource {
+  /** Compile MASM source into an AccountComponent. */
+  component(options: CompileComponentOptions): Promise<AccountComponent>;
+  /** Compile MASM source into a TransactionScript. */
+  txScript(options: CompileTxScriptOptions): Promise<TransactionScript>;
 }
 
 export interface TagsResource {

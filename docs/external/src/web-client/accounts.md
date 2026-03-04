@@ -32,32 +32,6 @@ try {
 }
 ```
 
-## Get or Import an Account
-
-`getOrImport()` returns the locally stored account if it exists, or imports it from the network if it does not. This avoids the common pattern of calling `get()`, checking for `null`, then calling `import()`.
-
-```typescript
-import { MidenClient } from "@miden-sdk/miden-sdk";
-
-try {
-    const client = await MidenClient.create();
-
-    // If the account is already local, returns it immediately.
-    // If not, fetches its public state from the network and stores it.
-    const account = await client.accounts.getOrImport("mtst1arjemrxne8lj5qz4mg9c8mtyxg954483");
-    console.log("Account nonce:", account.nonce().toString());
-} catch (error) {
-    console.error("Failed:", error.message);
-}
-```
-
-**When to use `getOrImport()` vs `get()`:**
-
-- Use `getOrImport()` when you need to interact with an account you didn't create — for example, a contract or faucet deployed by another party. You may not know whether it's already been imported locally.
-- Use `get()` when you only want to read accounts already in your local store (e.g. accounts you created or previously imported).
-
-Once imported, the account is stored locally and kept up to date automatically via `sync()`. Subsequent calls to `getOrImport()` with the same ID will return the local copy without hitting the network.
-
 ## Listing All Accounts
 
 ```typescript

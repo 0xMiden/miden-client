@@ -16,7 +16,7 @@
 
 ##### noteId
 
-[`NoteInput`](../type-aliases/NoteInput.md)
+`string`
 
 ##### options?
 
@@ -52,7 +52,7 @@
 
 ##### noteId
 
-[`NoteInput`](../type-aliases/NoteInput.md)
+`string`
 
 #### Returns
 
@@ -94,7 +94,7 @@
 
 ### listAvailable()
 
-> **listAvailable**(`options`): `Promise`\<[`InputNoteRecord`](../classes/InputNoteRecord.md)[]\>
+> **listAvailable**(`options`): `Promise`\<[`ConsumableNoteRecord`](../classes/ConsumableNoteRecord.md)[]\>
 
 #### Parameters
 
@@ -106,7 +106,7 @@
 
 #### Returns
 
-`Promise`\<[`InputNoteRecord`](../classes/InputNoteRecord.md)[]\>
+`Promise`\<[`ConsumableNoteRecord`](../classes/ConsumableNoteRecord.md)[]\>
 
 ***
 

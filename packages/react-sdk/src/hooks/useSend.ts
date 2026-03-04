@@ -1,27 +1,21 @@
 import { useCallback, useState } from "react";
 import { useMiden } from "../context/MidenProvider";
-import {
-  FungibleAsset,
-  Note,
-  NoteAssets,
-  NoteAttachment,
-  NoteType,
-  OutputNote,
-  OutputNoteArray,
-  TransactionFilter,
-  TransactionRequestBuilder,
-} from "@miden-sdk/miden-sdk";
-import type { TransactionId } from "@miden-sdk/miden-sdk";
-import type { SendOptions, SendResult, TransactionStage } from "../types";
+import { NoteType, TransactionFilter } from "@miden-sdk/miden-sdk";
+import type { Note, TransactionId } from "@miden-sdk/miden-sdk";
+import type {
+  SendOptions,
+  TransactionStage,
+  TransactionResult,
+} from "../types";
 import { DEFAULTS } from "../types";
 import { parseAccountId, parseAddress } from "../utils/accountParsing";
 import { runExclusiveDirect } from "../utils/runExclusive";
 
 export interface UseSendResult {
   /** Send tokens from one account to another */
-  send: (options: SendOptions) => Promise<SendResult>;
+  send: (options: SendOptions) => Promise<TransactionResult>;
   /** The transaction result */
-  result: SendResult | null;
+  result: TransactionResult | null;
   /** Whether the transaction is in progress */
   isLoading: boolean;
   /** Current stage of the transaction */
@@ -80,13 +74,13 @@ export function useSend(): UseSendResult {
   const { client, isReady, sync, runExclusive, prover } = useMiden();
   const runExclusiveSafe = runExclusive ?? runExclusiveDirect;
 
-  const [result, setResult] = useState<SendResult | null>(null);
+  const [result, setResult] = useState<TransactionResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [stage, setStage] = useState<TransactionStage>("idle");
   const [error, setError] = useState<Error | null>(null);
 
   const send = useCallback(
-    async (options: SendOptions): Promise<SendResult> => {
+    async (options: SendOptions): Promise<TransactionResult> => {
       if (!client || !isReady) {
         throw new Error("Miden client is not ready");
       }
@@ -110,49 +104,6 @@ export function useSend(): UseSendResult {
         }
         const assetIdObj = parseAccountId(assetId);
 
-        // returnNote path: build note in JS, submit as output note, return Note object
-        if (options.returnNote === true) {
-          const assets = new NoteAssets([
-            new FungibleAsset(assetIdObj, options.amount),
-          ]);
-          const p2idNote = Note.createP2IDNote(
-            fromAccountId,
-            toAccountId,
-            assets,
-            noteType,
-            new NoteAttachment()
-          );
-
-          const txRequest = new TransactionRequestBuilder()
-            .withOwnOutputNotes(
-              new OutputNoteArray([OutputNote.full(p2idNote)])
-            )
-            .build();
-
-          setStage("proving");
-          const txId = await runExclusiveSafe(() =>
-            prover
-              ? client.submitNewTransactionWithProver(
-                  fromAccountId,
-                  txRequest,
-                  prover
-                )
-              : client.submitNewTransaction(fromAccountId, txRequest)
-          );
-
-          const sendResult: SendResult = {
-            txId: txId.toString(),
-            note: p2idNote,
-          };
-
-          setStage("complete");
-          setResult(sendResult);
-          await sync();
-
-          return sendResult;
-        }
-
-        // On-chain path (default)
         const txResult = await runExclusiveSafe(async () => {
           const txRequest = client.newSendTransactionRequest(
             fromAccountId,
@@ -196,17 +147,14 @@ export function useSend(): UseSendResult {
           );
         }
 
-        const sendResult: SendResult = {
-          txId: txResult.id().toString(),
-          note: null,
-        };
+        const txSummary = { transactionId: txResult.id().toString() };
 
         setStage("complete");
-        setResult(sendResult);
+        setResult(txSummary);
 
         await sync();
 
-        return sendResult;
+        return txSummary;
       } catch (err) {
         const error = err instanceof Error ? err : new Error(String(err));
         setError(error);

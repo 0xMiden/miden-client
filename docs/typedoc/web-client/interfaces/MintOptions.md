@@ -24,8 +24,6 @@ Faucet (executing account).
 
 > **amount**: `number` \| `bigint`
 
-Amount to mint.
-
 ***
 
 ### prover?
@@ -58,15 +56,11 @@ This is NOT a block height. For block-height-based parameters, see
 
 > **to**: [`AccountRef`](../type-aliases/AccountRef.md)
 
-Recipient account.
-
 ***
 
 ### type?
 
 > `optional` **type**: [`NoteVisibility`](../type-aliases/NoteVisibility.md)
-
-Note visibility. Defaults to "public".
 
 ***
 

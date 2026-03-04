@@ -761,11 +761,11 @@ import { useConsume } from '@miden-sdk/react';
 function ConsumeNotes() {
   const { consume, result, isLoading, stage, error, reset } = useConsume();
 
-  const handleConsume = async (notes: string[]) => {
+  const handleConsume = async (noteIds: string[]) => {
     try {
       const { transactionId } = await consume({
         accountId: '0xmywallet...',  // Your wallet ID
-        notes,                        // Note IDs, InputNoteRecords, or Note objects
+        noteIds: noteIds,             // Array of note IDs to consume
       });
 
       console.log('Consumed! TX:', transactionId);

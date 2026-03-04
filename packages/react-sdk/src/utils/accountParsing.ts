@@ -1,12 +1,5 @@
 import { AccountId, Address } from "@miden-sdk/miden-sdk";
-import type {
-  AccountId as AccountIdType,
-  Account,
-  AccountHeader,
-} from "@miden-sdk/miden-sdk";
-
-/** Account reference — any account ID form accepted by the React SDK hooks. */
-export type AccountRef = string | AccountIdType | Account | AccountHeader;
+import type { AccountId as AccountIdType } from "@miden-sdk/miden-sdk";
 
 const normalizeAccountIdInput = (value: string): string =>
   value.trim().replace(/^miden:/i, "");
@@ -29,28 +22,21 @@ const parseAccountIdFromString = (value: string): AccountIdType => {
   return AccountId.fromHex(normalizeHexInput(value));
 };
 
-export const parseAccountId = (value: AccountRef): AccountIdType => {
-  if (typeof value === "string") {
-    return parseAccountIdFromString(normalizeAccountIdInput(value));
+export const parseAccountId = (
+  value: string | AccountIdType
+): AccountIdType => {
+  if (typeof value !== "string") {
+    return value;
   }
-  // Account or AccountHeader — extract their AccountId via .id()
-  if (typeof (value as Account | AccountHeader).id === "function") {
-    return (value as Account | AccountHeader).id();
-  }
-  // Already an AccountId
-  return value as AccountIdType;
+
+  const normalized = normalizeAccountIdInput(value);
+  return parseAccountIdFromString(normalized);
 };
 
 export const parseAddress = (
-  value: AccountRef,
+  value: string,
   accountId?: AccountIdType
 ): Address => {
-  if (typeof value !== "string") {
-    // Non-string: resolve the AccountId and wrap in Address
-    const resolvedId = accountId ?? parseAccountId(value);
-    return Address.fromAccountId(resolvedId, "BasicWallet");
-  }
-
   const normalized = normalizeAccountIdInput(value);
 
   if (isBech32Input(normalized)) {
