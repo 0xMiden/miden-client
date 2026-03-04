@@ -75,7 +75,12 @@ export class MidenClient {
           keystore: { getKey: result.getKey, insertKey: result.insertKey },
         };
       }
-      // Unsupported browser — silently fall through to standard keystore
+      // Unsupported browser — fall through to standard keystore
+      else {
+        console.warn(
+          "passkeyEncryption was requested but WebAuthn PRF is not supported in this browser. Falling back to standard keystore."
+        );
+      }
     }
 
     let inner;

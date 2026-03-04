@@ -8,8 +8,8 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <MidenProvider
       config={{
-        rpcUrl: "localhost",
-        prover: "local",
+        rpcUrl: "devnet",
+        prover: "devnet",
         passkeyEncryption: true,
         storeName: "wallet-example",
       }}
