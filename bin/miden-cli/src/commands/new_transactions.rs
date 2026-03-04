@@ -415,7 +415,7 @@ impl PswapCmd {
 Examples:
   # Offer 100 tokens from faucet A for 50 tokens from faucet B (public note)
   miden-client pswap create \\
-    --source 0xd0e1f2a3b4c5d6e7 \\
+    --sender 0xd0e1f2a3b4c5d6e7 \\
     --offered-faucet 0x2a7e654f2c508c10 \\
     --offered-amount 100 \\
     --requested-faucet 0x398e39a0535a3b0e \\
@@ -424,7 +424,7 @@ Examples:
 
   # Same as above but skip confirmation and delegate proving
   miden-client pswap create \\
-    --source 0xd0e1f2a3b4c5d6e7 \\
+    --sender 0xd0e1f2a3b4c5d6e7 \\
     --offered-faucet 0x2a7e654f2c508c10 \\
     --offered-amount 100 \\
     --requested-faucet 0x398e39a0535a3b0e \\
@@ -433,7 +433,7 @@ Examples:
 ")]
 pub struct PswapCreateCmd {
     /// Sender account ID or its hex prefix.
-    #[arg(short = 's', long = "source")]
+    #[arg(short = 's', long = "sender")]
     sender_account_id: String,
 
     /// Faucet ID of the offered asset.
@@ -510,20 +510,20 @@ impl PswapCreateCmd {
 Examples:
   # Fill 25 tokens from an existing PSWAP note
   miden-client pswap consume \\
-    --source 0xd0e1f2a3b4c5d6e7 \\
+    --account 0xd0e1f2a3b4c5d6e7 \\
     --note 0x1a2b3c4d \\
     --fill-amount 25
 
   # Same as above but skip confirmation
   miden-client pswap consume \\
-    --source 0xd0e1f2a3b4c5d6e7 \\
+    --account 0xd0e1f2a3b4c5d6e7 \\
     --note 0x1a2b3c4d \\
     --fill-amount 25 --force
 ")]
 pub struct PswapConsumeCmd {
     /// Consumer account ID or its hex prefix.
-    #[arg(short = 's', long = "source")]
-    source: String,
+    #[arg(short = 'a', long = "account")]
+    account: String,
 
     /// Note ID or hex prefix of the PSWAP note to consume.
     #[arg(long)]
@@ -547,7 +547,7 @@ impl PswapConsumeCmd {
         &self,
         mut client: Client<AUTH>,
     ) -> Result<(), CliError> {
-        let consumer_id = parse_account_id(&client, &self.source).await?;
+        let consumer_id = parse_account_id(&client, &self.account).await?;
         let note = resolve_input_note(&client, &self.note).await?;
 
         let tx_request = TransactionRequestBuilder::new()
@@ -570,18 +570,18 @@ impl PswapConsumeCmd {
 Examples:
   # Cancel a PSWAP note by its ID prefix
   miden-client pswap cancel \\
-    --source 0xd0e1f2a3b4c5d6e7 \\
+    --sender 0xd0e1f2a3b4c5d6e7 \\
     --note 0x1a2b3c4d
 
   # Same as above but skip confirmation
   miden-client pswap cancel \\
-    --source 0xd0e1f2a3b4c5d6e7 \\
+    --sender 0xd0e1f2a3b4c5d6e7 \\
     --note 0x1a2b3c4d --force
 ")]
 pub struct PswapCancelCmd {
     /// Account ID or its hex prefix of the note creator.
-    #[arg(short = 's', long = "source")]
-    source: String,
+    #[arg(short = 's', long = "sender")]
+    sender: String,
 
     /// Note ID or hex prefix of the PSWAP note to cancel.
     #[arg(long)]
@@ -601,7 +601,7 @@ impl PswapCancelCmd {
         &self,
         mut client: Client<AUTH>,
     ) -> Result<(), CliError> {
-        let sender_id = parse_account_id(&client, &self.source).await?;
+        let sender_id = parse_account_id(&client, &self.sender).await?;
         let note = resolve_input_note(&client, &self.note).await?;
 
         let tx_request =

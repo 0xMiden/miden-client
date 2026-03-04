@@ -626,41 +626,64 @@ fn cli_empty_commands() {
     assert_command_fails_but_does_not_panic(
         pswap_cancel_cmd.args(["pswap", "cancel"]).current_dir(&temp_dir),
     );
+
+    // unknown subcommand should fail
+    let mut cmd = cargo_bin_cmd!("miden-client");
+    assert_command_fails_but_does_not_panic(cmd.args(["pswap", "unknown"]).current_dir(&temp_dir));
+}
+
+#[test]
+fn pswap_cli_help_output() {
+    let temp_dir = init_cli().1;
+
+    // `pswap --help` should succeed and list subcommands
+    let mut cmd = cargo_bin_cmd!("miden-client");
+    let output = cmd.args(["pswap", "--help"]).current_dir(&temp_dir).output().unwrap();
+    assert!(output.status.success(), "pswap --help should succeed");
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(stdout.contains("create"), "Help should list 'create' subcommand");
+    assert!(stdout.contains("consume"), "Help should list 'consume' subcommand");
+    assert!(stdout.contains("cancel"), "Help should list 'cancel' subcommand");
+
+    // `pswap create --help` should succeed and show flag names
+    let mut cmd = cargo_bin_cmd!("miden-client");
+    let output = cmd.args(["pswap", "create", "--help"]).current_dir(&temp_dir).output().unwrap();
+    assert!(output.status.success(), "pswap create --help should succeed");
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(stdout.contains("--sender"), "Help should show --sender flag");
+    assert!(stdout.contains("--offered-faucet"), "Help should show --offered-faucet flag");
+    assert!(stdout.contains("--note-type"), "Help should show --note-type flag");
+    assert!(stdout.contains("Examples:"), "Help should contain examples section");
+
+    // `pswap consume --help` should show --account (not --source)
+    let mut cmd = cargo_bin_cmd!("miden-client");
+    let output = cmd
+        .args(["pswap", "consume", "--help"])
+        .current_dir(&temp_dir)
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "pswap consume --help should succeed");
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(stdout.contains("--account"), "Help should show --account flag");
+    assert!(stdout.contains("--fill-amount"), "Help should show --fill-amount flag");
 }
 
 #[test]
 fn pswap_cli_invalid_args() {
     let temp_dir = init_cli().1;
 
-    // offered-amount must be a valid u64, not a string
-    let mut cmd = cargo_bin_cmd!("miden-client");
-    assert_command_fails_but_does_not_panic(
-        cmd.args([
+    // Invalid u64 values for numeric fields (offered-amount, requested-amount)
+    // are rejected by clap at parse time.
+    for (field, bad_value) in [
+        ("--offered-amount", "not_a_number"),
+        ("--requested-amount", "abc"),
+        ("--offered-amount", "-10"),
+    ] {
+        let mut cmd = cargo_bin_cmd!("miden-client");
+        let mut args = vec![
             "pswap",
             "create",
-            "--source",
-            "0xaabbccdd",
-            "--offered-faucet",
-            "0x1111111111111111",
-            "--offered-amount",
-            "not_a_number",
-            "--requested-faucet",
-            "0x2222222222222222",
-            "--requested-amount",
-            "50",
-            "--note-type",
-            "public",
-        ])
-        .current_dir(&temp_dir),
-    );
-
-    // requested-amount must be a valid u64, not a string
-    let mut cmd = cargo_bin_cmd!("miden-client");
-    assert_command_fails_but_does_not_panic(
-        cmd.args([
-            "pswap",
-            "create",
-            "--source",
+            "--sender",
             "0xaabbccdd",
             "--offered-faucet",
             "0x1111111111111111",
@@ -669,20 +692,24 @@ fn pswap_cli_invalid_args() {
             "--requested-faucet",
             "0x2222222222222222",
             "--requested-amount",
-            "abc",
+            "50",
             "--note-type",
             "public",
-        ])
-        .current_dir(&temp_dir),
-    );
+        ];
+        // Replace the default value with the bad value for the target field
+        if let Some(pos) = args.iter().position(|a| *a == field) {
+            args[pos + 1] = bad_value;
+        }
+        assert_command_fails_but_does_not_panic(cmd.args(&args).current_dir(&temp_dir));
+    }
 
-    // note-type must be "public" or "private", not an arbitrary string
+    // Invalid note-type
     let mut cmd = cargo_bin_cmd!("miden-client");
     assert_command_fails_but_does_not_panic(
         cmd.args([
             "pswap",
             "create",
-            "--source",
+            "--sender",
             "0xaabbccdd",
             "--offered-faucet",
             "0x1111111111111111",
@@ -698,13 +725,13 @@ fn pswap_cli_invalid_args() {
         .current_dir(&temp_dir),
     );
 
-    // fill-amount must be a valid u64 for consume
+    // Invalid fill-amount for consume
     let mut cmd = cargo_bin_cmd!("miden-client");
     assert_command_fails_but_does_not_panic(
         cmd.args([
             "pswap",
             "consume",
-            "--source",
+            "--account",
             "0xaabbccdd",
             "--note",
             "0xdeadbeef",
@@ -713,32 +740,6 @@ fn pswap_cli_invalid_args() {
         ])
         .current_dir(&temp_dir),
     );
-
-    // negative values should be rejected for u64 fields
-    let mut cmd = cargo_bin_cmd!("miden-client");
-    assert_command_fails_but_does_not_panic(
-        cmd.args([
-            "pswap",
-            "create",
-            "--source",
-            "0xaabbccdd",
-            "--offered-faucet",
-            "0x1111111111111111",
-            "--offered-amount",
-            "-10",
-            "--requested-faucet",
-            "0x2222222222222222",
-            "--requested-amount",
-            "50",
-            "--note-type",
-            "public",
-        ])
-        .current_dir(&temp_dir),
-    );
-
-    // unknown subcommand should fail
-    let mut cmd = cargo_bin_cmd!("miden-client");
-    assert_command_fails_but_does_not_panic(cmd.args(["pswap", "unknown"]).current_dir(&temp_dir));
 }
 
 #[tokio::test]
