@@ -604,6 +604,141 @@ fn cli_empty_commands() {
 
     let mut swam_cmd = cargo_bin_cmd!("miden-client");
     assert_command_fails_but_does_not_panic(swam_cmd.args(["swap"]).current_dir(&temp_dir));
+
+    // pswap with no subcommand should fail
+    let mut pswap_cmd = cargo_bin_cmd!("miden-client");
+    assert_command_fails_but_does_not_panic(pswap_cmd.args(["pswap"]).current_dir(&temp_dir));
+
+    // pswap create with no args should fail
+    let mut pswap_create_cmd = cargo_bin_cmd!("miden-client");
+    assert_command_fails_but_does_not_panic(
+        pswap_create_cmd.args(["pswap", "create"]).current_dir(&temp_dir),
+    );
+
+    // pswap consume with no args should fail
+    let mut pswap_consume_cmd = cargo_bin_cmd!("miden-client");
+    assert_command_fails_but_does_not_panic(
+        pswap_consume_cmd.args(["pswap", "consume"]).current_dir(&temp_dir),
+    );
+
+    // pswap cancel with no args should fail
+    let mut pswap_cancel_cmd = cargo_bin_cmd!("miden-client");
+    assert_command_fails_but_does_not_panic(
+        pswap_cancel_cmd.args(["pswap", "cancel"]).current_dir(&temp_dir),
+    );
+}
+
+#[test]
+fn pswap_cli_invalid_args() {
+    let temp_dir = init_cli().1;
+
+    // offered-amount must be a valid u64, not a string
+    let mut cmd = cargo_bin_cmd!("miden-client");
+    assert_command_fails_but_does_not_panic(
+        cmd.args([
+            "pswap",
+            "create",
+            "--source",
+            "0xaabbccdd",
+            "--offered-faucet",
+            "0x1111111111111111",
+            "--offered-amount",
+            "not_a_number",
+            "--requested-faucet",
+            "0x2222222222222222",
+            "--requested-amount",
+            "50",
+            "--note-type",
+            "public",
+        ])
+        .current_dir(&temp_dir),
+    );
+
+    // requested-amount must be a valid u64, not a string
+    let mut cmd = cargo_bin_cmd!("miden-client");
+    assert_command_fails_but_does_not_panic(
+        cmd.args([
+            "pswap",
+            "create",
+            "--source",
+            "0xaabbccdd",
+            "--offered-faucet",
+            "0x1111111111111111",
+            "--offered-amount",
+            "100",
+            "--requested-faucet",
+            "0x2222222222222222",
+            "--requested-amount",
+            "abc",
+            "--note-type",
+            "public",
+        ])
+        .current_dir(&temp_dir),
+    );
+
+    // note-type must be "public" or "private", not an arbitrary string
+    let mut cmd = cargo_bin_cmd!("miden-client");
+    assert_command_fails_but_does_not_panic(
+        cmd.args([
+            "pswap",
+            "create",
+            "--source",
+            "0xaabbccdd",
+            "--offered-faucet",
+            "0x1111111111111111",
+            "--offered-amount",
+            "100",
+            "--requested-faucet",
+            "0x2222222222222222",
+            "--requested-amount",
+            "50",
+            "--note-type",
+            "invalid",
+        ])
+        .current_dir(&temp_dir),
+    );
+
+    // fill-amount must be a valid u64 for consume
+    let mut cmd = cargo_bin_cmd!("miden-client");
+    assert_command_fails_but_does_not_panic(
+        cmd.args([
+            "pswap",
+            "consume",
+            "--source",
+            "0xaabbccdd",
+            "--note",
+            "0xdeadbeef",
+            "--fill-amount",
+            "not_a_number",
+        ])
+        .current_dir(&temp_dir),
+    );
+
+    // negative values should be rejected for u64 fields
+    let mut cmd = cargo_bin_cmd!("miden-client");
+    assert_command_fails_but_does_not_panic(
+        cmd.args([
+            "pswap",
+            "create",
+            "--source",
+            "0xaabbccdd",
+            "--offered-faucet",
+            "0x1111111111111111",
+            "--offered-amount",
+            "-10",
+            "--requested-faucet",
+            "0x2222222222222222",
+            "--requested-amount",
+            "50",
+            "--note-type",
+            "public",
+        ])
+        .current_dir(&temp_dir),
+    );
+
+    // unknown subcommand should fail
+    let mut cmd = cargo_bin_cmd!("miden-client");
+    assert_command_fails_but_does_not_panic(cmd.args(["pswap", "unknown"]).current_dir(&temp_dir));
 }
 
 #[tokio::test]

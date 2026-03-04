@@ -6,13 +6,22 @@ use miden_client::account::AccountId;
 use miden_client::asset::{Asset, FungibleAsset, NonFungibleDeltaAction};
 use miden_client::auth::TransactionAuthenticator;
 use miden_client::note::{
-    BlockNumber, Note, NoteAttachment, NoteType as MidenNoteType, build_swap_tag,
+    BlockNumber,
+    Note,
+    NoteAttachment,
+    NoteType as MidenNoteType,
+    build_swap_tag,
     get_input_note_with_id_prefix,
 };
 use miden_client::store::NoteRecordError;
 use miden_client::transaction::{
-    ExecutedTransaction, InputNote, OutputNote, PaymentNoteDescription, SwapTransactionData,
-    TransactionRequest, TransactionRequestBuilder,
+    ExecutedTransaction,
+    InputNote,
+    OutputNote,
+    PaymentNoteDescription,
+    SwapTransactionData,
+    TransactionRequest,
+    TransactionRequestBuilder,
 };
 use miden_client::{Client, RemoteTransactionProver};
 use tracing::info;
@@ -21,7 +30,9 @@ use crate::config::CliConfig;
 use crate::create_dynamic_table;
 use crate::errors::CliError;
 use crate::utils::{
-    SHARED_TOKEN_DOCUMENTATION, get_input_acc_id_by_prefix_or_default, load_faucet_details_map,
+    SHARED_TOKEN_DOCUMENTATION,
+    get_input_acc_id_by_prefix_or_default,
+    load_faucet_details_map,
     parse_account_id,
 };
 
