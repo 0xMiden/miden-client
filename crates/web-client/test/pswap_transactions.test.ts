@@ -55,12 +55,11 @@ test.describe("pswap transaction tests", () => {
 
         const expectedOutputNotes = pswapCreateRequest.expectedOutputOwnNotes();
 
-        const createResult =
-          await window.helpers.executeAndApplyTransaction(
-            accountAId,
-            pswapCreateRequest,
-            undefined
-          );
+        const createResult = await window.helpers.executeAndApplyTransaction(
+          accountAId,
+          pswapCreateRequest,
+          undefined
+        );
 
         await window.helpers.waitForTransaction(
           createResult.executedTransaction().id().toHex()
@@ -86,12 +85,11 @@ test.describe("pswap transaction tests", () => {
           .expectedFutureNotes()
           .map((futureNote) => futureNote.noteDetails);
 
-        const consumeResult =
-          await window.helpers.executeAndApplyTransaction(
-            accountBId,
-            pswapConsumeRequest,
-            undefined
-          );
+        const consumeResult = await window.helpers.executeAndApplyTransaction(
+          accountBId,
+          pswapConsumeRequest,
+          undefined
+        );
 
         await window.helpers.waitForTransaction(
           consumeResult.executedTransaction().id().toHex()
@@ -101,9 +99,7 @@ test.describe("pswap transaction tests", () => {
         const paybackNoteId = expectedPaybackNoteDetails[0].id().toString();
         const paybackNoteRecord = await client.getInputNote(paybackNoteId);
         if (!paybackNoteRecord) {
-          throw new Error(
-            `Payback note with ID ${paybackNoteId} not found`
-          );
+          throw new Error(`Payback note with ID ${paybackNoteId} not found`);
         }
         const paybackNote = paybackNoteRecord.toNote();
         const consumePaybackRequest = client.newConsumeTransactionRequest([
@@ -209,12 +205,11 @@ test.describe("pswap transaction tests", () => {
 
         const expectedOutputNotes = pswapCreateRequest.expectedOutputOwnNotes();
 
-        const createResult =
-          await window.helpers.executeAndApplyTransaction(
-            accountAId,
-            pswapCreateRequest,
-            undefined
-          );
+        const createResult = await window.helpers.executeAndApplyTransaction(
+          accountAId,
+          pswapCreateRequest,
+          undefined
+        );
 
         await window.helpers.waitForTransaction(
           createResult.executedTransaction().id().toHex()
@@ -232,12 +227,11 @@ test.describe("pswap transaction tests", () => {
         const pswapCancelRequest =
           client.newPswapCancelTransactionRequest(pswapNote);
 
-        const cancelResult =
-          await window.helpers.executeAndApplyTransaction(
-            accountAId,
-            pswapCancelRequest,
-            undefined
-          );
+        const cancelResult = await window.helpers.executeAndApplyTransaction(
+          accountAId,
+          pswapCancelRequest,
+          undefined
+        );
 
         await window.helpers.waitForTransaction(
           cancelResult.executedTransaction().id().toHex()

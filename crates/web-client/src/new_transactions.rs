@@ -420,7 +420,12 @@ impl WebClient {
         let native_note = NativeNote::from(pswap_note);
 
         let pswap_consume_request = NativeTransactionRequestBuilder::new()
-            .build_pswap_consume(&native_note, consumer_account_id.into(), fill_amount, inflight_amount)
+            .build_pswap_consume(
+                &native_note,
+                consumer_account_id.into(),
+                fill_amount,
+                inflight_amount,
+            )
             .map_err(|err| {
                 js_error_with_context(err, "failed to create pswap consume transaction request")
             })?;

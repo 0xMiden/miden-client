@@ -10,7 +10,14 @@ use miden_protocol::crypto::merkle::InnerNodeInfo;
 use miden_protocol::crypto::merkle::store::MerkleStore;
 use miden_protocol::errors::NoteError;
 use miden_protocol::note::{
-    Note, NoteAttachment, NoteDetails, NoteId, NoteRecipient, NoteTag, NoteType, PartialNote,
+    Note,
+    NoteAttachment,
+    NoteDetails,
+    NoteId,
+    NoteRecipient,
+    NoteTag,
+    NoteType,
+    PartialNote,
 };
 use miden_protocol::transaction::{OutputNote, TransactionScript};
 use miden_protocol::vm::AdviceMap;
@@ -18,7 +25,10 @@ use miden_protocol::{Felt, Word};
 use miden_standards::note::{create_p2id_note, create_p2ide_note, create_swap_note};
 
 use super::{
-    ForeignAccount, NoteArgs, TransactionRequest, TransactionRequestError,
+    ForeignAccount,
+    NoteArgs,
+    TransactionRequest,
+    TransactionRequestError,
     TransactionScriptTemplate,
 };
 use crate::ClientRng;
