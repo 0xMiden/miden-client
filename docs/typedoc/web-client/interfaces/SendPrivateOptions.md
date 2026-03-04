@@ -10,7 +10,7 @@
 
 ### noteId
 
-> **noteId**: `string`
+> **noteId**: [`NoteInput`](../type-aliases/NoteInput.md)
 
 ***
 
