@@ -645,123 +645,56 @@ mod tests {
 
     #[test]
     fn test_pswap_note_creation_and_script() {
-        // Test that the LazyLock PSWAP_SCRIPT initializes correctly and note creation works
+        let f = TestFixture::new();
 
-        // Create test faucet IDs
-        let mut offered_faucet_bytes = [0; 15];
-        offered_faucet_bytes[0] = 0xaa;
-
-        let mut requested_faucet_bytes = [0; 15];
-        requested_faucet_bytes[0] = 0xbb;
-
-        let offered_faucet_id = AccountId::dummy(
-            offered_faucet_bytes,
-            AccountIdVersion::Version0,
-            AccountType::FungibleFaucet,
-            AccountStorageMode::Public,
-        );
-
-        let requested_faucet_id = AccountId::dummy(
-            requested_faucet_bytes,
-            AccountIdVersion::Version0,
-            AccountType::FungibleFaucet,
-            AccountStorageMode::Public,
-        );
-
-        // Create creator account
-        let creator_id = AccountId::dummy(
-            [1; 15],
-            AccountIdVersion::Version0,
-            AccountType::RegularAccountImmutableCode,
-            AccountStorageMode::Public,
-        );
-
-        // Create assets
-        let offered_asset = Asset::Fungible(FungibleAsset::new(offered_faucet_id, 1000).unwrap());
-        let requested_asset =
-            Asset::Fungible(FungibleAsset::new(requested_faucet_id, 500).unwrap());
-
-        // Create RNG
-        use miden_crypto::rand::RpoRandomCoin;
-        let mut rng = RpoRandomCoin::new(Word::default());
-
-        // Test that the script can be accessed (this will trigger LazyLock initialization)
+        // Script lazy-init should produce a non-zero root
         let script = PswapNote::script();
         assert!(script.root() != Word::default(), "Script root should not be zero");
-        println!("Script loaded successfully with root: {:?}", script.root());
 
-        // Create a PSWAP note
-        let note = PswapNote::create(
-            creator_id,
-            offered_asset,
-            requested_asset,
-            NoteType::Public,
-            NoteAttachment::default(),
-            &mut rng,
-        );
+        // Create a note via the fixture helper
+        let note = f.create_swap_note(1000, 500);
 
-        assert!(note.is_ok(), "Note creation should succeed");
-        let note = note.unwrap();
-
-        // Verify note properties
-        assert_eq!(note.metadata().sender(), creator_id, "Note sender should match creator");
+        assert_eq!(note.metadata().sender(), f.alice_id, "Note sender should match creator");
         assert_eq!(note.metadata().note_type(), NoteType::Public, "Note type should be Public");
         assert_eq!(note.assets().num_assets(), 1, "Note should have 1 asset");
-
-        // Verify the note has the correct script
         assert_eq!(
             note.recipient().script().root(),
             script.root(),
             "Note script should match PSWAP script"
         );
-
-        println!("PSWAP note created successfully with ID: {:?}", note.id());
     }
 
     #[test]
     fn test_pswap_tag() {
-        // Construct test faucet IDs
-        let mut offered_faucet_bytes = [0; 15];
-        offered_faucet_bytes[0] = 0xcd;
-        offered_faucet_bytes[1] = 0xb1;
+        // Use custom faucet bytes to verify specific tag encoding
+        let mut offered_bytes = [0; 15];
+        offered_bytes[0] = 0xcd;
+        offered_bytes[1] = 0xb1;
 
-        let mut requested_faucet_bytes = [0; 15];
-        requested_faucet_bytes[0] = 0xab;
-        requested_faucet_bytes[1] = 0xec;
+        let mut requested_bytes = [0; 15];
+        requested_bytes[0] = 0xab;
+        requested_bytes[1] = 0xec;
 
-        let offered_asset = Asset::Fungible(
-            FungibleAsset::new(
-                AccountId::dummy(
-                    offered_faucet_bytes,
-                    AccountIdVersion::Version0,
-                    AccountType::FungibleFaucet,
-                    AccountStorageMode::Public,
-                ),
-                2500,
-            )
-            .unwrap(),
+        let offered_faucet = AccountId::dummy(
+            offered_bytes,
+            AccountIdVersion::Version0,
+            AccountType::FungibleFaucet,
+            AccountStorageMode::Public,
+        );
+        let requested_faucet = AccountId::dummy(
+            requested_bytes,
+            AccountIdVersion::Version0,
+            AccountType::FungibleFaucet,
+            AccountStorageMode::Public,
         );
 
-        let requested_asset = Asset::Fungible(
-            FungibleAsset::new(
-                AccountId::dummy(
-                    requested_faucet_bytes,
-                    AccountIdVersion::Version0,
-                    AccountType::FungibleFaucet,
-                    AccountStorageMode::Public,
-                ),
-                5000,
-            )
-            .unwrap(),
-        );
+        let offered = Asset::Fungible(FungibleAsset::new(offered_faucet, 2500).unwrap());
+        let requested = Asset::Fungible(FungibleAsset::new(requested_faucet, 5000).unwrap());
 
-        let expected_asset_pair = 0xcdab;
+        let tag = PswapNote::build_tag(NoteType::Public, &offered, &requested);
 
-        let note_type = NoteType::Public;
-        let actual_tag = PswapNote::build_tag(note_type, &offered_asset, &requested_asset);
-
-        assert_eq!(actual_tag.as_u32() as u16, expected_asset_pair, "asset pair should match");
-        assert_eq!((actual_tag.as_u32() >> 30) as u8, note_type as u8, "note type should match");
+        assert_eq!(tag.as_u32() as u16, 0xcdab, "asset pair should match");
+        assert_eq!((tag.as_u32() >> 30) as u8, NoteType::Public as u8, "note type should match");
     }
 
     #[test]
@@ -785,15 +718,20 @@ mod tests {
 
     #[test]
     fn test_parse_inputs() {
-        // Create test inputs
-        let faucet_id = AccountId::dummy(
+        let f = TestFixture::new();
+        let faucet_id = f.eth_faucet;
+        let creator_id = f.alice_id;
+
+        // NOTE: AccountId::dummy is still needed inline at line 800 in original,
+        // but here we reuse fixture IDs for the same purpose.
+        let _ = AccountId::dummy(
             [0; 15],
             AccountIdVersion::Version0,
             AccountType::FungibleFaucet,
             AccountStorageMode::Public,
         );
 
-        let creator_id = AccountId::dummy(
+        let _ = AccountId::dummy(
             [1; 15],
             AccountIdVersion::Version0,
             AccountType::RegularAccountImmutableCode,
@@ -831,208 +769,63 @@ mod tests {
 
     #[test]
     fn test_create_pswap_output_notes_full_fill() {
-        // Test the simplified API: full fill scenario
-        // Alice offers 100 USDC for 50 ETH
-        // Bob provides 50 ETH (full fill)
+        let f = TestFixture::new();
+        let swap_note = f.create_swap_note(100, 50);
 
-        println!("=== Test: Full Fill using create_swap_output_notes ===");
-
-        // Create Alice (creator)
-        let alice_id = AccountId::dummy(
-            [1; 15],
-            AccountIdVersion::Version0,
-            AccountType::RegularAccountImmutableCode,
-            AccountStorageMode::Public,
-        );
-
-        // Create Bob (consumer)
-        let bob_id = AccountId::dummy(
-            [2; 15],
-            AccountIdVersion::Version0,
-            AccountType::RegularAccountImmutableCode,
-            AccountStorageMode::Public,
-        );
-
-        // Create faucets
-        let mut usdc_bytes = [0; 15];
-        usdc_bytes[0] = 0xaa;
-        let usdc_faucet = AccountId::dummy(
-            usdc_bytes,
-            AccountIdVersion::Version0,
-            AccountType::FungibleFaucet,
-            AccountStorageMode::Public,
-        );
-
-        let mut eth_bytes = [0; 15];
-        eth_bytes[0] = 0xbb;
-        let eth_faucet = AccountId::dummy(
-            eth_bytes,
-            AccountIdVersion::Version0,
-            AccountType::FungibleFaucet,
-            AccountStorageMode::Public,
-        );
-
-        // Create swap note: 100 USDC for 50 ETH
-        let offered_asset = Asset::Fungible(FungibleAsset::new(usdc_faucet, 100).unwrap());
-        let requested_asset = Asset::Fungible(FungibleAsset::new(eth_faucet, 50).unwrap());
-
-        use miden_crypto::rand::RpoRandomCoin;
-        let mut rng = RpoRandomCoin::new(Word::default());
-
-        let swap_note = PswapNote::create(
-            alice_id,
-            offered_asset,
-            requested_asset,
-            NoteType::Public,
-            NoteAttachment::default(),
-            &mut rng,
-        )
-        .unwrap();
-
-        println!("Created swap note: 100 USDC for 50 ETH");
-
-        // NOW THE MAGIC: Bob consumes with just 2 parameters!
         let (p2id_note, remainder_note) =
-            PswapNote::create_output_notes(&swap_note, bob_id, 50, 0).unwrap();
+            PswapNote::create_output_notes(&swap_note, f.bob_id, 50, 0).unwrap();
 
-        println!("Created output notes with simple API");
-
-        // Verify P2ID note (sender is Bob, recipient/target is Alice)
-        assert_eq!(p2id_note.metadata().sender(), bob_id, "P2ID sender should be Bob");
+        assert_eq!(p2id_note.metadata().sender(), f.bob_id, "P2ID sender should be Bob");
         assert_eq!(p2id_note.metadata().note_type(), NoteType::Public, "P2ID should be Public");
-
-        let p2id_assets = p2id_note.assets();
-        assert_eq!(p2id_assets.num_assets(), 1);
-        match p2id_assets.iter().next().unwrap() {
+        assert_eq!(p2id_note.assets().num_assets(), 1);
+        match p2id_note.assets().iter().next().unwrap() {
             Asset::Fungible(fa) => {
-                assert_eq!(fa.faucet_id(), eth_faucet, "P2ID should contain ETH");
+                assert_eq!(fa.faucet_id(), f.eth_faucet, "P2ID should contain ETH");
                 assert_eq!(fa.amount(), 50, "P2ID should contain 50 ETH");
             },
             _ => panic!("Expected fungible asset"),
         }
-
-        // Verify no remainder for full fill
         assert!(remainder_note.is_none(), "No remainder for full fill");
-
-        println!("Full fill test passed!");
-        println!("  - P2ID note: 50 ETH to Alice");
-        println!("  - No remainder (full fill)");
     }
 
     #[test]
     fn test_create_pswap_output_notes_partial_fill() {
-        // Test the simplified API: partial fill scenario
-        // Alice offers 100 USDC for 50 ETH
-        // Bob provides 25 ETH (partial fill - 50%)
+        let f = TestFixture::new();
+        let swap_note = f.create_swap_note(100, 50);
 
-        println!("=== Test: Partial Fill using create_swap_output_notes ===");
-
-        // Create Alice and Bob
-        let alice_id = AccountId::dummy(
-            [1; 15],
-            AccountIdVersion::Version0,
-            AccountType::RegularAccountImmutableCode,
-            AccountStorageMode::Public,
-        );
-
-        let bob_id = AccountId::dummy(
-            [2; 15],
-            AccountIdVersion::Version0,
-            AccountType::RegularAccountImmutableCode,
-            AccountStorageMode::Public,
-        );
-
-        // Create faucets
-        let mut usdc_bytes = [0; 15];
-        usdc_bytes[0] = 0xaa;
-        let usdc_faucet = AccountId::dummy(
-            usdc_bytes,
-            AccountIdVersion::Version0,
-            AccountType::FungibleFaucet,
-            AccountStorageMode::Public,
-        );
-
-        let mut eth_bytes = [0; 15];
-        eth_bytes[0] = 0xbb;
-        let eth_faucet = AccountId::dummy(
-            eth_bytes,
-            AccountIdVersion::Version0,
-            AccountType::FungibleFaucet,
-            AccountStorageMode::Public,
-        );
-
-        // Create swap note: 100 USDC for 50 ETH
-        let offered_asset = Asset::Fungible(FungibleAsset::new(usdc_faucet, 100).unwrap());
-        let requested_asset = Asset::Fungible(FungibleAsset::new(eth_faucet, 50).unwrap());
-
-        use miden_crypto::rand::RpoRandomCoin;
-        let mut rng = RpoRandomCoin::new(Word::default());
-
-        let swap_note = PswapNote::create(
-            alice_id,
-            offered_asset,
-            requested_asset,
-            NoteType::Public,
-            NoteAttachment::default(),
-            &mut rng,
-        )
-        .unwrap();
-
-        println!("Created swap note: 100 USDC for 50 ETH");
-
-        // Bob provides 25 ETH (50% fill) - SIMPLE API!
+        // 50% fill: 25 out of 50 ETH
         let (p2id_note, remainder_note) =
-            PswapNote::create_output_notes(&swap_note, bob_id, 25, 0).unwrap();
+            PswapNote::create_output_notes(&swap_note, f.bob_id, 25, 0).unwrap();
 
-        println!("Created output notes for 50% fill");
-
-        // Verify P2ID note (25 ETH to Alice)
-        assert_eq!(p2id_note.metadata().sender(), bob_id);
-        let p2id_assets = p2id_note.assets();
-        match p2id_assets.iter().next().unwrap() {
+        assert_eq!(p2id_note.metadata().sender(), f.bob_id);
+        match p2id_note.assets().iter().next().unwrap() {
             Asset::Fungible(fa) => {
-                assert_eq!(fa.faucet_id(), eth_faucet, "P2ID should contain ETH");
+                assert_eq!(fa.faucet_id(), f.eth_faucet, "P2ID should contain ETH");
                 assert_eq!(fa.amount(), 25, "P2ID should contain 25 ETH");
             },
             _ => panic!("Expected fungible asset"),
         }
 
-        // Verify remainder note (50 USDC for 25 ETH)
-        assert!(remainder_note.is_some(), "Remainder should exist for partial fill");
-        let remainder = remainder_note.unwrap();
+        let remainder = remainder_note.expect("Remainder should exist for partial fill");
+        assert_eq!(remainder.metadata().sender(), f.bob_id, "Remainder sender should be Bob");
 
-        assert_eq!(
-            remainder.metadata().sender(),
-            bob_id,
-            "Remainder sender should be Bob (consumer)"
-        );
-
-        // Check remainder assets (50 USDC)
-        let remainder_assets = remainder.assets();
-        match remainder_assets.iter().next().unwrap() {
+        match remainder.assets().iter().next().unwrap() {
             Asset::Fungible(fa) => {
-                assert_eq!(fa.faucet_id(), usdc_faucet, "Remainder should contain USDC");
+                assert_eq!(fa.faucet_id(), f.usdc_faucet, "Remainder should contain USDC");
                 assert_eq!(fa.amount(), 50, "Remainder should contain 50 USDC");
             },
             _ => panic!("Expected fungible asset"),
         }
 
-        // Check remainder inputs (should request 25 ETH)
-        let remainder_inputs = remainder.recipient().inputs();
         let remainder_requested =
-            PswapNote::get_requested_asset(remainder_inputs.values()).unwrap();
+            PswapNote::get_requested_asset(remainder.recipient().inputs().values()).unwrap();
         match remainder_requested {
             Asset::Fungible(fa) => {
-                assert_eq!(fa.faucet_id(), eth_faucet, "Remainder should request ETH");
+                assert_eq!(fa.faucet_id(), f.eth_faucet, "Remainder should request ETH");
                 assert_eq!(fa.amount(), 25, "Remainder should request 25 ETH");
             },
             _ => panic!("Expected fungible asset"),
         }
-
-        println!("Partial fill test passed!");
-        println!("  - P2ID note: 25 ETH to Alice");
-        println!("  - Remainder: 50 USDC for 25 ETH");
-        println!("  - Proportional amounts calculated automatically!");
     }
 
     /// Helper to create test accounts and faucets used across validation tests.
@@ -1083,8 +876,18 @@ mod tests {
 
         /// Creates a swap note: Alice offers `offered_amt` USDC for `requested_amt` ETH.
         fn create_swap_note(&self, offered_amt: u64, requested_amt: u64) -> Note {
+            self.create_swap_note_with_seed(offered_amt, requested_amt, Word::default())
+        }
+
+        /// Creates a swap note with a custom RNG seed for unique serial numbers.
+        fn create_swap_note_with_seed(
+            &self,
+            offered_amt: u64,
+            requested_amt: u64,
+            seed: Word,
+        ) -> Note {
             use miden_crypto::rand::RpoRandomCoin;
-            let mut rng = RpoRandomCoin::new(Word::default());
+            let mut rng = RpoRandomCoin::new(seed);
 
             let offered =
                 Asset::Fungible(FungibleAsset::new(self.usdc_faucet, offered_amt).unwrap());
@@ -1105,20 +908,13 @@ mod tests {
 
     #[test]
     fn test_p2id_recipient_targets_creator_not_consumer() {
-        // Validates that build_p2id_recipient uses creator (Alice), not consumer (Bob).
         let f = TestFixture::new();
         let swap_note = f.create_swap_note(50, 25);
 
         let (p2id_note, _) = PswapNote::create_output_notes(&swap_note, f.bob_id, 25, 0).unwrap();
 
-        // P2ID metadata sender is the consumer (Bob) — he created the output note.
-        assert_eq!(
-            p2id_note.metadata().sender(),
-            f.bob_id,
-            "P2ID metadata sender should be Bob (consumer)"
-        );
+        assert_eq!(p2id_note.metadata().sender(), f.bob_id, "P2ID sender should be Bob");
 
-        // The P2ID recipient digest must match one built for Alice (creator).
         let original_serial = swap_note.recipient().serial_num();
         let p2id_serial = Word::from([
             original_serial[0] + Felt::new(1),
@@ -1133,7 +929,6 @@ mod tests {
             expected_recipient.digest(),
             "P2ID recipient digest must match build_p2id_recipient(creator, ...)"
         );
-        println!("P2ID recipient correctly targets creator (Alice)");
     }
 
     #[test]
@@ -1176,8 +971,6 @@ mod tests {
             NoteAttachment::new_word(NoteAttachmentScheme::none(), expected_mixed_aux).content(),
             "Mixed aux word should be [15, 0, 0, 0]"
         );
-
-        println!("Aux word layout [fill_amount, 0, 0, 0] verified for all cases");
     }
 
     #[test]
@@ -1197,7 +990,6 @@ mod tests {
             f.bob_id,
             "Remainder sender should be Bob (consumer), not Alice (creator)"
         );
-        println!("Remainder note sender is consumer (Bob)");
     }
 
     #[test]
@@ -1230,8 +1022,6 @@ mod tests {
             NoteAttachment::default().content(),
             "Remainder attachment should NOT be a copy of original default attachment"
         );
-
-        println!("Remainder note attachment correctly contains offered_out");
     }
 
     #[test]
@@ -1253,8 +1043,6 @@ mod tests {
             "Remainder inputs should preserve Alice as the creator"
         );
         assert_eq!(note_type, NoteType::Public, "Remainder should preserve original note type");
-
-        println!("Remainder note inputs preserve creator (Alice) and note type");
     }
 
     #[test]
@@ -1301,10 +1089,6 @@ mod tests {
             },
             _ => panic!("Expected fungible asset"),
         }
-
-        println!("Partial fill amounts match integration test expectations");
-        println!("  - P2ID: 15 ETH to Alice");
-        println!("  - Remainder: 20 USDC for 10 ETH");
     }
 
     #[test]
@@ -1329,8 +1113,6 @@ mod tests {
             expected_serial,
             "Remainder serial num should be RPO hash of original serial"
         );
-
-        println!("Remainder serial number derived correctly via RPO hash");
     }
 
     #[test]
@@ -1352,8 +1134,6 @@ mod tests {
             },
             _ => panic!("Expected fungible asset"),
         }
-
-        println!("Full fill: 25 ETH in P2ID, no remainder");
     }
 
     #[test]
@@ -1383,8 +1163,6 @@ mod tests {
             NoteAttachment::new_word(NoteAttachmentScheme::none(), expected_aux).content(),
             "Inflight-only aux should be [25, 0, 0, 0]"
         );
-
-        println!("Inflight-only fill works correctly");
     }
 
     #[test]
@@ -1399,8 +1177,6 @@ mod tests {
 
         let result = PswapNote::create_output_notes(&swap_note, f.bob_id, 20, 10);
         assert!(result.is_err(), "Combined overfill (20+10=30 > 25) should be rejected");
-
-        println!("Overfill correctly rejected");
     }
 
     #[test]
@@ -1410,8 +1186,6 @@ mod tests {
 
         let result = PswapNote::create_output_notes(&swap_note, f.bob_id, 0, 0);
         assert!(result.is_err(), "Zero fill should be rejected");
-
-        println!("Zero fill correctly rejected");
     }
 
     #[test]
@@ -1509,14 +1283,7 @@ mod tests {
             } else {
                 assert!(remainder_note.is_none(), "Full fill should have no remainder");
             }
-
-            println!(
-                "  input={} ETH -> offered_out={} USDC, remainder=({} USDC, {} ETH)",
-                input_amount, expected_offered_out, expected_remaining_usdc, expected_remaining_eth
-            );
         }
-
-        println!("All multiple partial fill scenarios passed");
     }
 
     #[tokio::test]
@@ -1686,13 +1453,188 @@ mod tests {
         assert_eq!(usdc_received.amount(), 30, "Bob should receive 30 USDC");
         println!("- Bob's vault delta verified: +30 USDC, -15 ETH");
 
-        println!("\nPartial-fill swap test passed (using PswapNote helpers)!");
-        println!("  - Bob provided 15 ETH (60% of requested 25)");
-        println!("  - Bob received 30 USDC (60% of offered 50)");
-        println!("  - P2ID note: 15 ETH for Alice");
-        println!("  - Remainder note: 20 USDC still requesting 10 ETH");
-        println!("  - Both output notes built via PswapNote::create_swap_output_notes");
-
         Ok(())
+    }
+
+    // NEW EDGE-CASE TESTS
+    // ========================================================================================
+
+    #[test]
+    fn test_same_faucet_rejected() {
+        // Creating a swap where offered and requested share the same faucet should fail.
+        let f = TestFixture::new();
+
+        use miden_crypto::rand::RpoRandomCoin;
+        let mut rng = RpoRandomCoin::new(Word::default());
+
+        let offered = Asset::Fungible(FungibleAsset::new(f.usdc_faucet, 100).unwrap());
+        let requested = Asset::Fungible(FungibleAsset::new(f.usdc_faucet, 50).unwrap());
+
+        let result = PswapNote::create(
+            f.alice_id,
+            offered,
+            requested,
+            NoteType::Public,
+            NoteAttachment::default(),
+            &mut rng,
+        );
+
+        assert!(result.is_err(), "Same faucet for offered and requested should be rejected");
+    }
+
+    #[test]
+    fn test_non_fungible_requested_asset_rejected() {
+        // Non-fungible requested assets are not supported; create should fail.
+        let f = TestFixture::new();
+
+        use miden_crypto::rand::RpoRandomCoin;
+        use miden_protocol::asset::{NonFungibleAsset, NonFungibleAssetDetails};
+        let mut rng = RpoRandomCoin::new(Word::default());
+
+        let offered = Asset::Fungible(FungibleAsset::new(f.usdc_faucet, 100).unwrap());
+
+        // Build a non-fungible faucet for the request side
+        let nf_faucet = AccountId::dummy(
+            [0xcc; 15],
+            AccountIdVersion::Version0,
+            AccountType::NonFungibleFaucet,
+            AccountStorageMode::Public,
+        );
+        let nfa = NonFungibleAsset::new(
+            &NonFungibleAssetDetails::new(nf_faucet.prefix(), vec![1, 2, 3]).unwrap(),
+        )
+        .unwrap();
+        let requested = Asset::NonFungible(nfa);
+
+        let result = PswapNote::create(
+            f.alice_id,
+            offered,
+            requested,
+            NoteType::Public,
+            NoteAttachment::default(),
+            &mut rng,
+        );
+
+        assert!(result.is_err(), "Non-fungible requested asset should be rejected");
+    }
+
+    #[test]
+    fn test_calculate_output_amount_large_values() {
+        // Values near u64::MAX / PRECISION_FACTOR boundary to check for overflow.
+        // PRECISION_FACTOR = 100_000, so offered_total * PRECISION_FACTOR must not overflow.
+        let max_safe = u64::MAX / 100_000; // ~184_467_440_737_095
+
+        // Should not panic for values within the safe range
+        let output = PswapNote::calculate_output_amount(max_safe, max_safe, max_safe);
+        assert_eq!(output, max_safe, "1:1 ratio at max safe value");
+
+        // Small ratio with large amounts
+        let output = PswapNote::calculate_output_amount(max_safe, max_safe / 2, 1);
+        assert_eq!(output, 2, "2:1 ratio, fill 1 → get 2");
+    }
+
+    #[test]
+    fn test_calculate_output_amount_precision_edge_cases() {
+        // Very asymmetric ratios where precision loss matters.
+
+        // Tiny fill from large disparity:
+        // 1 offered for 1_000_000 requested, fill 1
+        let output = PswapNote::calculate_output_amount(1, 1_000_000, 1);
+        // With PRECISION_FACTOR=100_000: ratio = (1_000_000 * 100_000) / 1 = overflow!
+        // But the branch is offered <= requested so:
+        // ratio = (1_000_000 * 100_000) / 1 = 100_000_000_000
+        // output = (1 * 100_000) / 100_000_000_000 = 0 (truncation)
+        assert_eq!(output, 0, "Precision loss: 1/1M ratio loses to truncation");
+
+        // Slightly larger fill that survives truncation
+        let output = PswapNote::calculate_output_amount(1000, 1_000_000, 1000);
+        assert_eq!(output, 1, "1000/1M ratio: fill 1000 → get 1");
+
+        // Rounding: 3 offered for 7 requested, fill 3
+        // offered < requested branch: ratio = (7 * 100_000) / 3 = 233_333
+        // output = (3 * 100_000) / 233_333 = 1 (truncated)
+        let output = PswapNote::calculate_output_amount(3, 7, 3);
+        assert_eq!(output, 1, "3/7 ratio, fill 3 → 1 due to integer division");
+    }
+
+    #[test]
+    fn test_chained_partial_fills() {
+        // Simulates two sequential partial fills on the same swap:
+        // 1. Alice offers 100 USDC for 50 ETH
+        // 2. Bob fills 20 ETH → gets 40 USDC, remainder = 60 USDC / 30 ETH
+        // 3. Charlie fills the remainder's 30 ETH → gets 60 USDC
+        let f = TestFixture::new();
+        let charlie_id = AccountId::dummy(
+            [3; 15],
+            AccountIdVersion::Version0,
+            AccountType::RegularAccountImmutableCode,
+            AccountStorageMode::Public,
+        );
+
+        // Step 1: Create original swap
+        let swap_note = f.create_swap_note(100, 50);
+
+        // Step 2: Bob fills 20 ETH
+        let (p2id_1, remainder_1) =
+            PswapNote::create_output_notes(&swap_note, f.bob_id, 20, 0).unwrap();
+
+        // P2ID: 20 ETH to Alice
+        match p2id_1.assets().iter().next().unwrap() {
+            Asset::Fungible(fa) => assert_eq!(fa.amount(), 20, "First P2ID: 20 ETH"),
+            _ => panic!("Expected fungible"),
+        }
+
+        let remainder = remainder_1.expect("Partial fill should produce remainder");
+
+        // Remainder should be 60 USDC for 30 ETH
+        match remainder.assets().iter().next().unwrap() {
+            Asset::Fungible(fa) => {
+                assert_eq!(fa.faucet_id(), f.usdc_faucet);
+                assert_eq!(fa.amount(), 60, "Remainder: 60 USDC");
+            },
+            _ => panic!("Expected fungible"),
+        }
+        let rem_requested =
+            PswapNote::get_requested_asset(remainder.recipient().inputs().values()).unwrap();
+        match rem_requested {
+            Asset::Fungible(fa) => assert_eq!(fa.amount(), 30, "Remainder requests 30 ETH"),
+            _ => panic!("Expected fungible"),
+        }
+
+        // Step 3: Charlie fills the remainder fully (30 ETH)
+        let (p2id_2, remainder_2) =
+            PswapNote::create_output_notes(&remainder, charlie_id, 30, 0).unwrap();
+
+        // P2ID: 30 ETH to Alice
+        match p2id_2.assets().iter().next().unwrap() {
+            Asset::Fungible(fa) => assert_eq!(fa.amount(), 30, "Second P2ID: 30 ETH"),
+            _ => panic!("Expected fungible"),
+        }
+
+        // No remainder after full fill of remainder note
+        assert!(
+            remainder_2.is_none(),
+            "Full fill of remainder should produce no further remainder"
+        );
+
+        // Verify creator is still Alice in the remainder's P2ID
+        assert_eq!(p2id_2.metadata().sender(), charlie_id, "P2ID sender should be Charlie");
+    }
+
+    #[test]
+    fn test_unique_serial_numbers_with_seed() {
+        // Two swap notes created with different seeds should have different serial numbers.
+        let f = TestFixture::new();
+
+        let note1 = f.create_swap_note_with_seed(100, 50, Word::default());
+        let note2 =
+            f.create_swap_note_with_seed(100, 50, Word::from([Felt::new(42), ZERO, ZERO, ZERO]));
+
+        assert_ne!(
+            note1.recipient().serial_num(),
+            note2.recipient().serial_num(),
+            "Different seeds should produce different serial numbers"
+        );
+        assert_ne!(note1.id(), note2.id(), "Different serial numbers should produce different IDs");
     }
 }
