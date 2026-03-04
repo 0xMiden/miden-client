@@ -325,9 +325,9 @@ export interface WaitForNotesOptions {
 // Mint options
 export interface MintOptions {
   /** Target account to receive minted tokens */
-  targetAccountId: string;
+  targetAccountId: AccountRef;
   /** Faucet account to mint from */
-  faucetId: string;
+  faucetId: AccountRef;
   /** Amount to mint */
   amount: bigint;
   /** Note type. Default: private */

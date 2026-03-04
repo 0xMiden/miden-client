@@ -3,14 +3,13 @@ import { useMiden } from "../context/MidenProvider";
 import type {
   TransactionRequest,
   WasmWebClient as WebClient,
-  AccountId as AccountIdType,
 } from "@miden-sdk/miden-sdk";
 import type {
   TransactionStage,
   TransactionResult,
   ExecuteTransactionOptions,
 } from "../types";
-import { parseAccountId, type AccountRef } from "../utils/accountParsing";
+import { parseAccountId } from "../utils/accountParsing";
 import { runExclusiveDirect } from "../utils/runExclusive";
 
 export interface UseTransactionResult {
@@ -86,7 +85,7 @@ export function useTransaction(): UseTransactionResult {
       try {
         setStage("proving");
         const txResult = await runExclusiveSafe(async () => {
-          const accountIdObj = resolveAccountId(options.accountId);
+          const accountIdObj = parseAccountId(options.accountId);
           const txRequest = await resolveRequest(options.request, client);
           const txId = prover
             ? await client.submitNewTransactionWithProver(
@@ -131,10 +130,6 @@ export function useTransaction(): UseTransactionResult {
     error,
     reset,
   };
-}
-
-function resolveAccountId(accountId: AccountRef): AccountIdType {
-  return parseAccountId(accountId);
 }
 
 async function resolveRequest(

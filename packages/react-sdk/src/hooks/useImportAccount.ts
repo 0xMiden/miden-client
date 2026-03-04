@@ -10,7 +10,7 @@ import type {
 } from "@miden-sdk/miden-sdk";
 import type { ImportAccountOptions } from "../types";
 import { DEFAULTS } from "../types";
-import { parseAccountId, type AccountRef } from "../utils/accountParsing";
+import { parseAccountId } from "../utils/accountParsing";
 import { runExclusiveDirect } from "../utils/runExclusive";
 import { ensureAccountBech32 } from "../utils/accountBech32";
 
@@ -145,7 +145,7 @@ export function useImportAccount(): UseImportAccountResult {
               throw new Error("Account not found after import");
             }
             case "id": {
-              const accountId = resolveAccountId(options.accountId);
+              const accountId = parseAccountId(options.accountId);
               await client.importAccountById(accountId);
               const fetchedAccount = await client.getAccount(accountId);
               if (!fetchedAccount) {
@@ -195,10 +195,6 @@ export function useImportAccount(): UseImportAccountResult {
     error,
     reset,
   };
-}
-
-function resolveAccountId(accountId: AccountRef): AccountIdType {
-  return parseAccountId(accountId);
 }
 
 async function resolveAccountFile(
