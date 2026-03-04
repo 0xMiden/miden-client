@@ -117,8 +117,8 @@ pub use request::{
     TransactionRequestBuilder,
     TransactionRequestError,
     TransactionScriptTemplate,
-    account_proof_into_inputs,
 };
+pub(crate) use request::account_proof_into_inputs;
 
 mod result;
 // RE-EXPORTS

@@ -134,7 +134,7 @@ impl Deserializable for ForeignAccount {
 }
 
 /// Converts an [`AccountProof`] to [`AccountInputs`].
-pub fn account_proof_into_inputs(
+pub(crate) fn account_proof_into_inputs(
     account_proof: AccountProof,
 ) -> Result<AccountInputs, TransactionRequestError> {
     let (witness, account_details) = account_proof.into_parts();
