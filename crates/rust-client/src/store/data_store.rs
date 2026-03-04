@@ -123,11 +123,11 @@ impl ClientDataStore {
         map_root: Word,
         map_key: Word,
     ) -> Result<StorageMapWitness, DataStoreError> {
-        let (slot_name, known_code) =
-            self.resolve_cached_slot_name(account_id, map_root)?;
+        let (slot_name, known_code) = self.resolve_cached_slot_name(account_id, map_root)?;
 
-        let map_entries =
-            self.fetch_storage_map_entries(account_id, slot_name, map_key, known_code).await?;
+        let map_entries = self
+            .fetch_storage_map_entries(account_id, slot_name, map_key, known_code)
+            .await?;
 
         storage_map_entries_into_witness(map_entries, map_key)
     }
@@ -219,10 +219,7 @@ fn storage_map_entries_into_witness(
         StorageMapEntries::AllEntries(entries) => {
             let storage_entries_iter = entries.iter().map(|e| (e.key, e.value));
             let map = StorageMap::with_entries(storage_entries_iter).map_err(|err| {
-                DataStoreError::other_with_source(
-                    "failed to build storage map from entries",
-                    err,
-                )
+                DataStoreError::other_with_source("failed to build storage map from entries", err)
             })?;
             Ok(map.open(&map_key))
         },

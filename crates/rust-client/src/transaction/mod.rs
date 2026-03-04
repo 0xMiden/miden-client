@@ -108,6 +108,7 @@ mod store_update;
 pub use store_update::TransactionStoreUpdate;
 
 mod request;
+pub(crate) use request::account_proof_into_inputs;
 pub use request::{
     ForeignAccount,
     NoteArgs,
@@ -118,7 +119,6 @@ pub use request::{
     TransactionRequestError,
     TransactionScriptTemplate,
 };
-pub(crate) use request::account_proof_into_inputs;
 
 mod result;
 // RE-EXPORTS
