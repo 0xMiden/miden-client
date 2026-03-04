@@ -664,5 +664,4 @@ impl WebStore {
             StoreError::DatabaseError(format!("failed to remove account address: {js_error:?}"))
         })
     }
-
 }
