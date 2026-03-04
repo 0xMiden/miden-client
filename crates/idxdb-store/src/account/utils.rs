@@ -182,6 +182,7 @@ pub fn parse_account_address_idxdb_object(
 }
 
 /// Applies a transaction's account delta atomically in a single Dexie transaction.
+/// Combines storage delta + vault delta + account record upsert.
 pub async fn apply_transaction_delta(
     db_id: &str,
     account: &Account,

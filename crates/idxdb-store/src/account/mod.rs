@@ -614,10 +614,8 @@ impl WebStore {
             .map(|s| Word::try_from(s.as_str()))
             .collect::<Result<_, _>>()?;
 
-        if !smt_roots.is_empty() {
-            let mut smt_forest = self.smt_forest.write();
-            smt_forest.pop_roots(smt_roots);
-        }
+        let mut smt_forest = self.smt_forest.write();
+        smt_forest.pop_roots(smt_roots);
 
         Ok(())
     }
