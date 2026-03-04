@@ -17,3 +17,11 @@
 ### slots
 
 > **slots**: `StorageSlot`[]
+
+***
+
+### supportAllTypes?
+
+> `optional` **supportAllTypes**: `boolean`
+
+Whether to call `.withSupportsAllTypes()` on the compiled component. Defaults to `true`.
