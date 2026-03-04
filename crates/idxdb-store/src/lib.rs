@@ -108,7 +108,7 @@ impl WebStore {
             account_states.push((vault, storage));
         }
 
-        let mut smt_forest = store.smt_forest.write().expect("smt_forest write lock");
+        let mut smt_forest = store.smt_forest.write().map_err(|e| js_error(format!("smt_forest write lock poisoned: {e}")))?;
         for (vault, storage) in &account_states {
             smt_forest.insert_account_state(vault, storage).map_err(js_error)?;
         }

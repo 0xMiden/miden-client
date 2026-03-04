@@ -214,7 +214,7 @@ impl WebStore {
 
         // Update SMT forest: insert new states and release old roots
         {
-            let mut smt_forest = self.smt_forest.write().expect("smt_forest write lock");
+            let mut smt_forest = self.smt_forest.write().map_err(|e| StoreError::DatabaseError(format!("smt_forest write lock poisoned: {e}")))?;
             for account in account_updates.updated_public_accounts() {
                 smt_forest.insert_account_state(account.vault(), account.storage())?;
             }

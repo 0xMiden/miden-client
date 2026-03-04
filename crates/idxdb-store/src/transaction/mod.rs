@@ -112,7 +112,7 @@ impl WebStore {
             })?;
 
             // Update SMT forest: insert new state and release old roots
-            let mut smt_forest = self.smt_forest.write().expect("smt_forest write lock");
+            let mut smt_forest = self.smt_forest.write().map_err(|e| StoreError::DatabaseError(format!("smt_forest write lock poisoned: {e}")))?;
             smt_forest.insert_account_state(account.vault(), account.storage())?;
             smt_forest.pop_roots(old_roots);
         } else {
@@ -134,7 +134,7 @@ impl WebStore {
             let updated_assets;
             let removed_vault_keys;
             {
-                let mut smt_forest = self.smt_forest.write().expect("smt_forest write lock");
+                let mut smt_forest = self.smt_forest.write().map_err(|e| StoreError::DatabaseError(format!("smt_forest write lock poisoned: {e}")))?;
 
                 // Storage: compute new map roots via SMT forest
                 updated_storage_slots =

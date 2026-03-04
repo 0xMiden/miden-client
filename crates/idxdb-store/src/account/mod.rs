@@ -392,7 +392,7 @@ impl WebStore {
             })?;
 
         // Update SMT forest with the new account's vault and storage map nodes
-        let mut smt_forest = self.smt_forest.write().expect("smt_forest write lock");
+        let mut smt_forest = self.smt_forest.write().map_err(|e| StoreError::DatabaseError(format!("smt_forest write lock poisoned: {e}")))?;
         smt_forest.insert_account_state(account.vault(), account.storage())?;
 
         Ok(())
@@ -421,7 +421,7 @@ impl WebStore {
             .map_err(|_| StoreError::DatabaseError("failed to update account".to_string()))?;
 
         // Update SMT forest: insert new state and release old roots
-        let mut smt_forest = self.smt_forest.write().expect("smt_forest write lock");
+        let mut smt_forest = self.smt_forest.write().map_err(|e| StoreError::DatabaseError(format!("smt_forest write lock poisoned: {e}")))?;
         smt_forest.insert_account_state(new_account_state.vault(), new_account_state.storage())?;
         smt_forest.pop_roots(old_map_roots.into_values().chain(core::iter::once(old_vault_root)));
 
@@ -511,7 +511,7 @@ impl WebStore {
             .collect::<Result<_, _>>()?;
 
         if !smt_roots.is_empty() {
-            let mut smt_forest = self.smt_forest.write().expect("smt_forest write lock");
+            let mut smt_forest = self.smt_forest.write().map_err(|e| StoreError::DatabaseError(format!("smt_forest write lock poisoned: {e}")))?;
             smt_forest.pop_roots(smt_roots);
         }
 
