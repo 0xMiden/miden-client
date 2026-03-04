@@ -136,7 +136,7 @@ impl CliConfig {
     /// Returns `true` when this config was loaded from the local `.miden` directory.
     ///
     /// This is typically set when loading via [`CliConfig::from_local_dir`] or
-    /// [`CliConfig::from_system`] (when local takes precedence).
+    /// [`CliConfig::load`] (when local takes precedence).
     pub fn is_local(&self) -> bool {
         matches!(&self.config_dir, Some(ConfigDir { kind: ConfigKind::Local, .. }))
     }
@@ -144,7 +144,7 @@ impl CliConfig {
     /// Returns `true` when this config was loaded from the global `.miden` directory.
     ///
     /// This is typically set when loading via [`CliConfig::from_global_dir`] or
-    /// [`CliConfig::from_system`] (when local config is not available).
+    /// [`CliConfig::load`] (when local config is not available).
     pub fn is_global(&self) -> bool {
         matches!(&self.config_dir, Some(ConfigDir { kind: ConfigKind::Global, .. }))
     }
