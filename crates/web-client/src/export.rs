@@ -69,13 +69,7 @@ impl WebClient {
         &mut self,
         account_id: AccountId,
     ) -> Result<AccountFile, JsValue> {
-        let keystore = self
-            .inner
-            .as_ref()
-            .ok_or(JsValue::from_str("Client not initialized"))?
-            .authenticator()
-            .cloned()
-            .expect("Authenticator not initialized");
+        let keystore = self.keystore()?.clone();
         if let Some(client) = self.get_mut_inner() {
             let account = client
                 .get_account(account_id.into())

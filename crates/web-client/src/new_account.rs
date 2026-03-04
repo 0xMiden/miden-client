@@ -50,13 +50,7 @@ impl WebClient {
         init_seed: Option<Vec<u8>>,
     ) -> Result<Account, JsValue> {
         self.maybe_sync_before_account_creation().await;
-        let keystore = self
-            .inner
-            .as_ref()
-            .ok_or(JsValue::from_str("Client not initialized"))?
-            .authenticator()
-            .cloned()
-            .expect("Authenticator not initialized");
+        let keystore = self.keystore()?.clone();
         if let Some(client) = self.get_mut_inner() {
             let (new_account, key_pair) =
                 generate_wallet(storage_mode, mutable, init_seed, auth_scheme).await?;
@@ -92,13 +86,7 @@ impl WebClient {
             return Err(JsValue::from_str("Non-fungible faucets are not supported yet"));
         }
 
-        let keystore = self
-            .inner
-            .as_ref()
-            .ok_or(JsValue::from_str("Client not initialized"))?
-            .authenticator()
-            .cloned()
-            .expect("Authenticator not initialized");
+        let keystore = self.keystore()?.clone();
 
         if let Some(client) = self.get_mut_inner() {
             let mut seed = [0u8; 32];
@@ -190,12 +178,7 @@ impl WebClient {
         account_id: &AccountId,
         secret_key: &WebAuthSecretKey,
     ) -> Result<(), JsValue> {
-        let keystore = self
-            .inner
-            .as_ref()
-            .ok_or(JsValue::from_str("Client not initialized"))?
-            .authenticator()
-            .expect("Authenticator not initialized");
+        let keystore = self.keystore()?;
         let native_secret_key: AuthSecretKey = secret_key.into();
         let native_account_id = account_id.into();
 

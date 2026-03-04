@@ -19,13 +19,7 @@ impl WebClient {
         &mut self,
         account_file: AccountFile,
     ) -> Result<JsValue, JsValue> {
-        let keystore = self
-            .inner
-            .as_ref()
-            .ok_or(JsValue::from_str("Client not initialized"))?
-            .authenticator()
-            .cloned()
-            .expect("Authenticator not initialized");
+        let keystore = self.keystore()?.clone();
         if let Some(client) = self.get_mut_inner() {
             let account_data: NativeAccountFile = account_file.into();
             let account_id = account_data.account.id().to_string();
@@ -54,13 +48,7 @@ impl WebClient {
         mutable: bool,
         auth_scheme: AuthScheme,
     ) -> Result<Account, JsValue> {
-        let keystore = self
-            .inner
-            .as_ref()
-            .ok_or(JsValue::from_str("Client not initialized"))?
-            .authenticator()
-            .cloned()
-            .expect("Authenticator not initialized");
+        let keystore = self.keystore()?.clone();
         let client = self.get_mut_inner().ok_or(JsValue::from_str("Client not initialized"))?;
 
         let (generated_acct, key_pair) =

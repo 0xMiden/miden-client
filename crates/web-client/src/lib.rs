@@ -74,6 +74,13 @@ impl WebClient {
         self.inner.as_mut()
     }
 
+    pub(crate) fn keystore(&self) -> Result<&Arc<WebKeyStore<RpoRandomCoin>>, JsValue> {
+        self.inner
+            .as_ref()
+            .and_then(|c| c.authenticator())
+            .ok_or_else(|| JsValue::from_str("Client not initialized"))
+    }
+
     /// Creates a new `WebClient` instance with the specified configuration.
     ///
     /// # Arguments
