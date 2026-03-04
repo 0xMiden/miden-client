@@ -23,7 +23,7 @@ export async function getAllAccountHeaders(dbId) {
             }
         });
         const latestRecords = Array.from(latestRecordsMap.values());
-        const resultObject = await Promise.all(latestRecords.map((record) => {
+        const resultObject = latestRecords.map((record) => {
             let accountSeedBase64 = undefined;
             if (record.accountSeed) {
                 const seedAsBytes = new Uint8Array(record.accountSeed);
@@ -42,7 +42,7 @@ export async function getAllAccountHeaders(dbId) {
                 committed: record.committed,
                 accountCommitment: record.accountCommitment || "",
             };
-        }));
+        });
         return resultObject;
     }
     catch (error) {

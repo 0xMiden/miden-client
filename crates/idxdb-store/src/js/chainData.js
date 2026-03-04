@@ -38,7 +38,7 @@ export async function getBlockHeaders(dbId, blockNumbers) {
     try {
         const db = getDatabase(dbId);
         const results = await db.blockHeaders.bulkGet(blockNumbers);
-        const processedResults = await Promise.all(results.map((result) => {
+        const processedResults = results.map((result) => {
             if (result === undefined) {
                 return null;
             }
@@ -52,7 +52,7 @@ export async function getBlockHeaders(dbId, blockNumbers) {
                     hasClientNotes: result.hasClientNotes === "true",
                 };
             }
-        }));
+        });
         return processedResults;
     }
     catch (err) {
@@ -66,7 +66,7 @@ export async function getTrackedBlockHeaders(dbId) {
             .where("hasClientNotes")
             .equals("true")
             .toArray();
-        const processedRecords = await Promise.all(allMatchingRecords.map((record) => {
+        const processedRecords = allMatchingRecords.map((record) => {
             const headerBase64 = uint8ArrayToBase64(record.header);
             const partialBlockchainPeaksBase64 = uint8ArrayToBase64(record.partialBlockchainPeaks);
             return {
@@ -75,7 +75,7 @@ export async function getTrackedBlockHeaders(dbId) {
                 partialBlockchainPeaks: partialBlockchainPeaksBase64,
                 hasClientNotes: record.hasClientNotes === "true",
             };
-        }));
+        });
         return processedRecords;
     }
     catch (err) {

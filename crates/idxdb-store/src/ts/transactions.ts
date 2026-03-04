@@ -79,8 +79,8 @@ export async function getTransactions(dbId: string, filter: string) {
       }
     });
 
-    const processedTransactions = await Promise.all(
-      transactionRecords.map((transactionRecord) => {
+    const processedTransactions = transactionRecords.map(
+      (transactionRecord) => {
         let txScriptBase64: undefined | string = undefined;
         if (transactionRecord.scriptRoot) {
           const txScript = scriptMap.get(transactionRecord.scriptRoot);
@@ -105,7 +105,7 @@ export async function getTransactions(dbId: string, filter: string) {
         };
 
         return data;
-      })
+      }
     );
 
     return processedTransactions;

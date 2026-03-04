@@ -53,8 +53,6 @@ test.describe("pswap transaction tests", () => {
           window.NoteType.Private
         );
 
-        const expectedOutputNotes = pswapCreateRequest.expectedOutputOwnNotes();
-
         const createResult = await window.helpers.executeAndApplyTransaction(
           accountAId,
           pswapCreateRequest,
@@ -65,13 +63,14 @@ test.describe("pswap transaction tests", () => {
           createResult.executedTransaction().id().toHex()
         );
 
-        // Retrieve the PSWAP note
-        const pswapNoteId = expectedOutputNotes[0].id().toString();
-        const inputNoteRecord = await client.getInputNote(pswapNoteId);
-        if (!inputNoteRecord) {
-          throw new Error(`PSWAP note with ID ${pswapNoteId} not found`);
+        // Retrieve the PSWAP note directly from the transaction's output notes.
+        // PSWAP notes are not stored as input notes because the NoteScreener
+        // cannot find accounts with the PswapBasicWallet component needed to
+        // consume them.
+        const pswapNote = createResult.createdNotes().notes()[0].intoFull();
+        if (!pswapNote) {
+          throw new Error("PSWAP note not found in transaction output");
         }
-        const pswapNote = inputNoteRecord.toNote();
 
         // Account B consumes the PSWAP note with full fill (50 of asset B)
         const pswapConsumeRequest = client.newPswapConsumeTransactionRequest(
@@ -203,8 +202,6 @@ test.describe("pswap transaction tests", () => {
           window.NoteType.Private
         );
 
-        const expectedOutputNotes = pswapCreateRequest.expectedOutputOwnNotes();
-
         const createResult = await window.helpers.executeAndApplyTransaction(
           accountAId,
           pswapCreateRequest,
@@ -215,13 +212,11 @@ test.describe("pswap transaction tests", () => {
           createResult.executedTransaction().id().toHex()
         );
 
-        // Retrieve the PSWAP note
-        const pswapNoteId = expectedOutputNotes[0].id().toString();
-        const inputNoteRecord = await client.getInputNote(pswapNoteId);
-        if (!inputNoteRecord) {
-          throw new Error(`PSWAP note with ID ${pswapNoteId} not found`);
+        // Retrieve the PSWAP note directly from the transaction's output notes.
+        const pswapNote = createResult.createdNotes().notes()[0].intoFull();
+        if (!pswapNote) {
+          throw new Error("PSWAP note not found in transaction output");
         }
-        const pswapNote = inputNoteRecord.toNote();
 
         // Cancel the PSWAP with account A
         const pswapCancelRequest =

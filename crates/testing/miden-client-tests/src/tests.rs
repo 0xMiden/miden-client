@@ -2238,7 +2238,7 @@ fn pswap_create_and_consume_test() {
                 .enable_all()
                 .build()
                 .unwrap()
-                .block_on(pswap_create_and_consume_test_impl())
+                .block_on(pswap_create_and_consume_test_impl());
         })
         .unwrap()
         .join()

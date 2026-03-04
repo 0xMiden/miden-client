@@ -42,11 +42,11 @@
 
 #### Get Signature
 
-> **get** **scriptRoot**(): `Uint8Array`
+> **get** **scriptRoot**(): `Uint8Array`\<`ArrayBufferLike`\>
 
 ##### Returns
 
-`Uint8Array`
+`Uint8Array`\<`ArrayBufferLike`\>
 
 #### Set Signature
 
@@ -56,7 +56,7 @@
 
 ###### value
 
-`Uint8Array`
+`Uint8Array`\<`ArrayBufferLike`\>
 
 ##### Returns
 
@@ -68,11 +68,11 @@
 
 #### Get Signature
 
-> **get** **txScript**(): `Uint8Array`
+> **get** **txScript**(): `Uint8Array`\<`ArrayBufferLike`\>
 
 ##### Returns
 
-`Uint8Array`
+`Uint8Array`\<`ArrayBufferLike`\>
 
 #### Set Signature
 
@@ -82,7 +82,7 @@
 
 ###### value
 
-`Uint8Array`
+`Uint8Array`\<`ArrayBufferLike`\>
 
 ##### Returns
 

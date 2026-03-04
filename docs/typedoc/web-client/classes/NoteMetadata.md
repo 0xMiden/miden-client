@@ -49,18 +49,6 @@ Creates metadata for a note.
 
 ***
 
-### attachment()
-
-> **attachment**(): [`NoteAttachment`](NoteAttachment.md)
-
-Returns the attachment of the note.
-
-#### Returns
-
-[`NoteAttachment`](NoteAttachment.md)
-
-***
-
 ### free()
 
 > **free**(): `void`
