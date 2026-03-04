@@ -429,10 +429,10 @@ impl TryFrom<proto::rpc::account_storage_details::account_storage_map_details::a
     type Error = RpcError;
 
     fn try_from(value: proto::rpc::account_storage_details::account_storage_map_details::all_map_entries::StorageMapEntry) -> Result<Self, Self::Error> {
-        let key: Word =
+        let key: StorageMapKey =
             value.key.ok_or(RpcError::ExpectedDataMissing("key".into()))?.try_into()?;
         let value = value.value.ok_or(RpcError::ExpectedDataMissing("value".into()))?.try_into()?;
-        Ok(Self { key: StorageMapKey::new(key), value })
+        Ok(Self { key, value })
     }
 }
 

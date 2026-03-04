@@ -41,18 +41,16 @@ miden-testing   = { default-features = false, version = "=0.14.0-alpha.1" }
 miden-tx        = { default-features = false, version = "=0.14.0-alpha.1" }
 
 # Miden node dependencies
-miden-node-block-producer = { branch = "mmagician-use-storage-map-key-wrapper", git = "https://github.com/0xMiden/miden-node" }
-miden-node-ntx-builder = { branch = "mmagician-use-storage-map-key-wrapper", git = "https://github.com/0xMiden/miden-node" }
-miden-node-proto = { branch = "mmagician-use-storage-map-key-wrapper", git = "https://github.com/0xMiden/miden-node" }
-miden-node-proto-build = { branch = "mmagician-use-storage-map-key-wrapper", default-features = false, git = "https://github.com/0xMiden/miden-node" }
-miden-node-rpc = { branch = "mmagician-use-storage-map-key-wrapper", git = "https://github.com/0xMiden/miden-node" }
-miden-node-store = { branch = "mmagician-use-storage-map-key-wrapper", git = "https://github.com/0xMiden/miden-node" }
-miden-node-utils = { branch = "mmagician-use-storage-map-key-wrapper", git = "https://github.com/0xMiden/miden-node" }
-miden-node-validator = { branch = "mmagician-use-storage-map-key-wrapper", git = "https://github.com/0xMiden/miden-node" }
+miden-node-block-producer        = { version = "=0.14.0-alpha.1" }
+miden-node-ntx-builder           = { version = "=0.14.0-alpha.1" }
+miden-node-proto                 = { version = "=0.14.0-alpha.1" }
+miden-node-proto-build           = { default-features = false, version = "=0.14.0-alpha.1" }
+miden-node-rpc                   = { version = "=0.14.0-alpha.1" }
+miden-node-store                 = { version = "=0.14.0-alpha.1" }
+miden-node-utils                 = { version = "=0.14.0-alpha.1" }
+miden-node-validator             = { version = "=0.14.0-alpha.1" }
 miden-note-transport-proto-build = { default-features = false, version = "0.2" }
-miden-remote-prover-client = { branch = "mmagician-use-storage-map-key-wrapper", default-features = false, features = [
-  "tx-prover",
-], git = "https://github.com/0xMiden/miden-node" }
+miden-remote-prover-client       = { default-features = false, features = ["tx-prover"], version = "=0.14.0-alpha.1" }
 
 # External dependencies
 anyhow      = { default-features = false, version = "1.0" }
@@ -78,3 +76,6 @@ module_name_repetitions     = "allow" # Many triggers, and is a stylistic choice
 must_use_candidate          = "allow" # This marks many fn's which isn't helpful.
 should_panic_without_expect = "allow" # We don't care about the specific panic message.
 # End of pedantic lints.
+
+[patch.crates-io]
+miden-node-block-producer = { path = "../miden-node/crates/block-producer" }

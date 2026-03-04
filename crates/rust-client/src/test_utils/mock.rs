@@ -261,7 +261,7 @@ impl MockRpcApi {
                         let storage_map_info = StorageMapUpdate {
                             block_num: block_number,
                             slot_name: slot_name.clone(),
-                            key: (*key).into(),
+                            key: *key.inner(),
                             value: *value,
                         };
                         updates.push(storage_map_info);
