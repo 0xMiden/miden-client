@@ -2,9 +2,9 @@
 
 ***
 
-[@miden-sdk/miden-sdk](../README.md) / MintOptions
+[@miden-sdk/miden-sdk](../README.md) / ExecuteOptions
 
-# Interface: MintOptions
+# Interface: ExecuteOptions
 
 ## Extends
 
@@ -16,15 +16,11 @@
 
 > **account**: [`AccountRef`](../type-aliases/AccountRef.md)
 
-Faucet (executing account).
-
 ***
 
-### amount
+### foreignAccounts?
 
-> **amount**: `number` \| `bigint`
-
-Amount to mint.
+> `optional` **foreignAccounts**: ([`AccountRef`](../type-aliases/AccountRef.md) \| \{ `id`: [`AccountRef`](../type-aliases/AccountRef.md); `storage?`: `AccountStorageRequirements`; \})[]
 
 ***
 
@@ -40,6 +36,12 @@ Override default prover.
 
 ***
 
+### script
+
+> **script**: `TransactionScript`
+
+***
+
 ### timeout?
 
 > `optional` **timeout**: `number`
@@ -51,22 +53,6 @@ This is NOT a block height. For block-height-based parameters, see
 #### Inherited from
 
 [`TransactionOptions`](TransactionOptions.md).[`timeout`](TransactionOptions.md#timeout)
-
-***
-
-### to
-
-> **to**: [`AccountRef`](../type-aliases/AccountRef.md)
-
-Recipient account.
-
-***
-
-### type?
-
-> `optional` **type**: [`NoteVisibility`](../type-aliases/NoteVisibility.md)
-
-Note visibility. Defaults to "public".
 
 ***
 
