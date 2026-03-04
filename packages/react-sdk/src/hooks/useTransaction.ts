@@ -9,7 +9,7 @@ import type {
   TransactionResult,
   ExecuteTransactionOptions,
 } from "../types";
-import { parseAccountId, type AccountRef } from "../utils/accountParsing";
+import { parseAccountId } from "../utils/accountParsing";
 import { runExclusiveDirect } from "../utils/runExclusive";
 import { MidenError } from "../utils/errors";
 
