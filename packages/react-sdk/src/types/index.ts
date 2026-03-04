@@ -1,4 +1,5 @@
 import { AuthScheme } from "@miden-sdk/miden-sdk";
+import type { AccountRef } from "../utils/accountParsing";
 import type {
   WasmWebClient as WebClient,
   Account,
@@ -15,6 +16,8 @@ import type {
   NoteId,
   AccountStorageMode,
   Note,
+  NoteVisibility,
+  StorageMode,
 } from "@miden-sdk/miden-sdk";
 
 /** Flexible account reference — hex string, bech32 string, or WASM AccountId */
@@ -38,6 +41,8 @@ export type {
   NoteId,
   Note,
   AccountStorageMode,
+  NoteVisibility,
+  StorageMode,
 };
 
 export type { AccountRef } from "../utils/accountParsing";
@@ -51,9 +56,6 @@ export type {
   SignerAccountConfig,
   SignerContextValue,
 } from "../context/SignerContext";
-
-export type StorageMode = "private" | "public" | "network";
-export type NoteVisibility = "private" | "public";
 
 export type RpcUrlConfig =
   | string
