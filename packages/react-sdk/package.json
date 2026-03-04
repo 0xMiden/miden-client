@@ -66,5 +66,12 @@
   },
   "bugs": {
     "url": "https://github.com/0xMiden/miden-client/issues"
+  },
+  "resolutions": {
+    "@isaacs/brace-expansion": ">=5.0.1",
+    "esbuild": ">=0.25.0",
+    "minimatch": ">=10.2.1",
+    "rollup": ">=4.59.0",
+    "qs": ">=6.15.0"
   }
 }
