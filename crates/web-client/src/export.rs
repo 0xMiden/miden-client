@@ -54,7 +54,7 @@ impl WebClient {
     /// Meant to be used in conjunction with the `forceImportStore` method
     #[wasm_bindgen(js_name = "exportStore")]
     pub async fn export_store(&mut self) -> Result<JsValue, JsValue> {
-        let store = self.inner.as_ref().ok_or(JsValue::from_str("Client not initialized"))?.store();
+        let store = self.store()?;
 
         let json_string = store
             .export_store()

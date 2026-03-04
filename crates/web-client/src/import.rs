@@ -103,7 +103,7 @@ impl WebClient {
         store_dump: JsValue,
         _store_name: &str,
     ) -> Result<JsValue, JsValue> {
-        let store = self.inner.as_ref().ok_or(JsValue::from_str("Client not initialized"))?.store();
+        let store = self.store()?;
 
         let json_string =
             store_dump.as_string().ok_or(JsValue::from_str("Store dump must be a string"))?;

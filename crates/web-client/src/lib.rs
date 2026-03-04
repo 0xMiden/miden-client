@@ -74,6 +74,13 @@ impl WebClient {
         self.inner.as_mut()
     }
 
+    pub(crate) fn store(&self) -> Result<&Arc<dyn Store>, JsValue> {
+        self.inner
+            .as_ref()
+            .map(Client::store)
+            .ok_or_else(|| JsValue::from_str("Client not initialized"))
+    }
+
     pub(crate) fn keystore(&self) -> Result<&Arc<WebKeyStore<RpoRandomCoin>>, JsValue> {
         self.inner
             .as_ref()

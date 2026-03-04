@@ -122,8 +122,7 @@ impl WebClient {
     /// ```
     #[wasm_bindgen(js_name = "accountReader")]
     pub fn account_reader(&self, account_id: &AccountId) -> Result<AccountReader, JsValue> {
-        let client = self.inner.as_ref().ok_or(JsValue::from_str("Client not initialized"))?;
-        Ok(AccountReader::new(client.store().clone(), account_id.into()))
+        Ok(AccountReader::new(self.store()?.clone(), account_id.into()))
     }
 
     /// Retrieves an authentication secret key from the keystore given a public key commitment.
