@@ -1,8 +1,8 @@
 use anyhow::{Context, Result};
-use miden_agglayer::{AggLayerBridge, ExitRoot, UpdateGerNote, create_bridge_account};
+use miden_agglayer::{ExitRoot, UpdateGerNote, create_bridge_account};
 use miden_client::account::AccountStorageMode;
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
-use miden_client::crypto::{FeltRng, Rpo256};
+use miden_client::crypto::FeltRng;
 use miden_client::testing::common::{
     insert_new_wallet,
     wait_for_blocks,
@@ -10,9 +10,9 @@ use miden_client::testing::common::{
     wait_for_tx,
 };
 use miden_client::transaction::{OutputNote, TransactionRequestBuilder};
-use miden_client::{Felt, ONE, Word, ZERO};
 
 use crate::tests::config::ClientConfig;
+use crate::utils::is_ger_registered;
 
 // TESTS
 // ================================================================================================
@@ -84,26 +84,10 @@ pub async fn test_agglayer_update_ger(client_config: ClientConfig) -> Result<()>
         .cloned()
         .with_context(|| "bridge account details not available")?;
 
-    // Compute the expected GER hash: rpo256::merge(GER_UPPER, GER_LOWER)
-    let mut ger_lower: [Felt; 4] = ger.to_elements()[0..4].try_into().unwrap();
-    let mut ger_upper: [Felt; 4] = ger.to_elements()[4..8].try_into().unwrap();
-    // Elements are reversed: rpo256::merge treats stack as if loaded BE from memory
-    // The following will produce matching hashes:
-    // Rust
-    // Hasher::merge(&[a, b, c, d], &[e, f, g, h])
-    // MASM
-    // rpo256::merge(h, g, f, e, d, c, b, a)
-    ger_lower.reverse();
-    ger_upper.reverse();
-    let ger_hash = Rpo256::merge(&[ger_upper.into(), ger_lower.into()]);
+    // get the boolean indicating whether the GER was successfully registered in the bridge account
+    let is_registered = is_ger_registered(ger, updated_bridge_account)?;
 
-    let ger_storage_slot = AggLayerBridge::ger_map_slot_name();
-    let stored_value = updated_bridge_account
-        .storage()
-        .get_map_item(ger_storage_slot, ger_hash)
-        .expect("GER hash should be stored in the map");
-    let expected_value: Word = [ONE, ZERO, ZERO, ZERO].into();
-    assert_eq!(stored_value, expected_value, "GER hash should map to [1, 0, 0, 0]");
+    assert!(is_registered, "GER was not registered in the bridge account");
 
     Ok(())
 }

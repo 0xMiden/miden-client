@@ -19,6 +19,7 @@ use crate::tests::config::ClientConfig;
 
 mod generated_tests;
 mod tests;
+mod utils;
 
 // MAIN
 // ================================================================================================
