@@ -35,6 +35,7 @@ use miden_client::crypto::{InOrderIndex, MmrPeaks};
 use miden_client::note::{BlockNumber, NoteScript, NoteTag, Nullifier};
 use miden_client::store::{
     AccountRecord,
+    AccountSmtForest,
     AccountStatus,
     AccountStorageFilter,
     BlockRelevance,
@@ -54,14 +55,11 @@ use rusqlite::Connection;
 use rusqlite::types::Value;
 use sql_error::SqlResultExt;
 
-use crate::smt_forest::AccountSmtForest;
-
 mod account;
 mod builder;
 mod chain_data;
 mod db_management;
 mod note;
-mod smt_forest;
 mod sql_error;
 mod sync;
 mod transaction;

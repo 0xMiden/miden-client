@@ -14,12 +14,11 @@ use miden_client::account::{
     StorageSlotName,
     StorageSlotType,
 };
-use miden_client::store::StoreError;
+use miden_client::store::{AccountSmtForest, StoreError};
 use miden_client::{EMPTY_WORD, Word};
 use rusqlite::types::Value;
 use rusqlite::{Transaction, params};
 
-use crate::smt_forest::AccountSmtForest;
 use crate::sql_error::SqlResultExt;
 use crate::{SqliteStore, insert_sql, subst, u64_to_value};
 

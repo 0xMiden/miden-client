@@ -25,6 +25,7 @@ use miden_client::asset::{Asset, AssetVault, AssetWitness, FungibleAsset};
 use miden_client::store::{
     AccountRecord,
     AccountRecordData,
+    AccountSmtForest,
     AccountStatus,
     AccountStorageFilter,
     StoreError,
@@ -47,7 +48,6 @@ use crate::account::helpers::{
     query_storage_values,
     query_vault_assets,
 };
-use crate::smt_forest::AccountSmtForest;
 use crate::sql_error::SqlResultExt;
 use crate::sync::{add_note_tag_tx, remove_note_tag_tx};
 use crate::{SqliteStore, column_value_as_u64, insert_sql, subst, u64_to_value};
