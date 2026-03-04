@@ -40,6 +40,7 @@
 * [FEATURE][web] New `MidenClient` class with resource-based API (`client.accounts`, `client.transactions`, `client.notes`, `client.tags`, `client.settings`). Provides high-level transaction helpers (`send`, `mint`, `consume`, `swap`, `consumeAll`), transaction dry-runs via `preview()`, confirmation polling via `waitFor()`, and flexible account/note references that accept hex strings, bech32 strings, or WASM objects interchangeably (`AccountRef`, `NoteInput` types). Factory methods: `MidenClient.create()`, `MidenClient.createTestnet()`, `MidenClient.createMock()`. ([#1762](https://github.com/0xMiden/miden-client/pull/1762))
 * [FEATURE][web] Added `TransactionId.fromHex()` static constructor for creating transaction IDs from hex strings. ([#1762](https://github.com/0xMiden/miden-client/pull/1762))
 * [FEATURE][web] Added standalone tree-shakeable note utilities (`createP2IDNote`, `createP2IDENote`, `buildSwapTag`) usable without a client instance. ([#1762](https://github.com/0xMiden/miden-client/pull/1762))
+* [FEATURE][web] SDK ergonomics: `accounts.getOrImport(ref)` convenience method, `accounts.import()` accepts full `AccountRef`, `transactions.send()` return type changed to `SendResult` with optional `returnNote`, notes API simplified (`listAvailable` returns `InputNoteRecord[]`, `consume` accepts `Note` objects), `MidenClient.create()` accepts rpcUrl/proverUrl shorthands.
 
 ### Fixes
 
