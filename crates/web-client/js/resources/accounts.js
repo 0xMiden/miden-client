@@ -131,8 +131,10 @@ export class AccountsResource {
     this.#client.assertNotTerminated();
     const wasm = await this.#getWasm();
 
-    if (typeof input === "string") {
-      // Import by ID (hex or bech32 string)
+    // Early exit for string, Account, and AccountHeader types before property
+    // checks, preventing misrouting if a WASM object ever gains a .file or .seed
+    // property. Bare AccountId (no .id() method) falls through to the fallback.
+    if (typeof input === "string" || typeof input.id === "function") {
       const id = resolveAccountRef(input, wasm);
       await this.#inner.importAccountById(id);
       return await this.#inner.getAccount(id);
@@ -166,9 +168,10 @@ export class AccountsResource {
       );
     }
 
-    throw new Error(
-      "Invalid import input: expected a string, { file }, or { seed }"
-    );
+    // Fallback: treat as AccountRef (string, AccountId, Account, AccountHeader)
+    const id = resolveAccountRef(input, wasm);
+    await this.#inner.importAccountById(id);
+    return await this.#inner.getAccount(id);
   }
 
   async export(ref) {

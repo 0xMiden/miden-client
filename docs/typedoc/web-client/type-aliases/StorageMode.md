@@ -6,6 +6,6 @@
 
 # Type Alias: StorageMode
 
-> **StorageMode** = `"public"` \| `"private"` \| `"network"`
+> **StorageMode** = *typeof* [`StorageMode`](../variables/StorageMode.md)\[keyof *typeof* [`StorageMode`](../variables/StorageMode.md)\]
 
-Union of valid StorageMode string values.
+Union of all values in the StorageMode const.

@@ -8,7 +8,7 @@
 
 > `const` **NoteVisibility**: `object`
 
-User-friendly note visibility constants.
+User-friendly note visibility constants for MidenClient options.
 Use `NoteVisibility.Public` or `NoteVisibility.Private` instead of raw strings.
 
 ## Type Declaration

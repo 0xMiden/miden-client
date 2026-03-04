@@ -1046,17 +1046,14 @@ test.describe("MidenClient API - Integration", () => {
         interval: 1_000,
       });
 
-      // Consume the minted note
+      // Consume the minted notes
       const consumable = await client.notes.listAvailable({
         account: wallet,
       });
-      const consumeNoteIds = consumable.map((c) =>
-        c.inputNoteRecord().id().toString()
-      );
 
       const consumeTxId = await client.transactions.consume({
         account: wallet,
-        notes: consumeNoteIds,
+        notes: consumable,
       });
 
       await client.transactions.waitFor(consumeTxId.toHex(), {
@@ -1072,7 +1069,7 @@ test.describe("MidenClient API - Integration", () => {
         mintTxId: mintTxId.toHex(),
         consumeTxId: consumeTxId.toHex(),
         balance: balance.toString(),
-        consumedCount: consumeNoteIds.length,
+        consumedCount: consumable.length,
       };
     });
 

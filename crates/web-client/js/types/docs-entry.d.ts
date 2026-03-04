@@ -13,7 +13,6 @@ export {
   AccountId,
   AccountStorage,
   AssetVault,
-  ConsumableNoteRecord,
   Felt,
   InputNoteRecord,
   Note,

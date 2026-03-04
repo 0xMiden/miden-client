@@ -2,9 +2,9 @@
 
 ***
 
-[@miden-sdk/miden-sdk](../README.md) / ExecuteOptions
+[@miden-sdk/miden-sdk](../README.md) / SendOptionsReturnNote
 
-# Interface: ExecuteOptions
+# Interface: SendOptionsReturnNote
 
 ## Extends
 
@@ -18,9 +18,9 @@
 
 ***
 
-### foreignAccounts?
+### amount
 
-> `optional` **foreignAccounts**: ([`AccountRef`](../type-aliases/AccountRef.md) \| \{ `id`: [`AccountRef`](../type-aliases/AccountRef.md); `storage?`: `AccountStorageRequirements`; \})[]
+> **amount**: `number` \| `bigint`
 
 ***
 
@@ -36,9 +36,9 @@ Override default prover.
 
 ***
 
-### script
+### returnNote
 
-> **script**: `TransactionScript`
+> **returnNote**: `true`
 
 ***
 
@@ -53,6 +53,24 @@ This is NOT a block height. For block-height-based parameters, see
 #### Inherited from
 
 [`TransactionOptions`](TransactionOptions.md).[`timeout`](TransactionOptions.md#timeout)
+
+***
+
+### to
+
+> **to**: [`AccountRef`](../type-aliases/AccountRef.md)
+
+***
+
+### token
+
+> **token**: [`AccountRef`](../type-aliases/AccountRef.md)
+
+***
+
+### type?
+
+> `optional` **type**: [`NoteVisibility`](../type-aliases/NoteVisibility.md)
 
 ***
 

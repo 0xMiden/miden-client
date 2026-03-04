@@ -8,7 +8,7 @@
 
 > `const` **StorageMode**: `object`
 
-User-friendly storage mode constants.
+User-friendly storage mode constants for MidenClient options.
 Use `StorageMode.Public`, `StorageMode.Private`, or `StorageMode.Network` instead of raw strings.
 
 ## Type Declaration

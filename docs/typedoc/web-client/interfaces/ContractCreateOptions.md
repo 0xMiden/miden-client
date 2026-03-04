@@ -6,13 +6,21 @@
 
 # Interface: ContractCreateOptions
 
+Options for creating a custom contract account.
+
+Unlike wallets/faucets, `auth` must be a raw `AuthSecretKey` WASM object —
+the caller must retain it for signing. Construct via `AuthSecretKey.rpoFalconWithRNG(seed)`.
+Storage defaults to `"public"` (unlike wallets which default to `"private"`).
+
 ## Properties
 
 ### auth
 
 > **auth**: `AuthSecretKey`
 
-Auth secret key. Required.
+Required raw WASM AuthSecretKey. Use `AuthSecretKey.rpoFalconWithRNG(seed)`.
+Must be a concrete object (not a string) because the caller needs to retain
+the key for transaction signing.
 
 ***
 
@@ -20,7 +28,7 @@ Auth secret key. Required.
 
 > `optional` **components**: `AccountComponent`[]
 
-Pre-compiled AccountComponent instances.
+Additional compiled account components from `compile.component()`.
 
 ***
 
@@ -28,7 +36,7 @@ Pre-compiled AccountComponent instances.
 
 > **seed**: `Uint8Array`
 
-Raw 32-byte seed (Uint8Array). Required.
+Required — used to derive a deterministic account ID.
 
 ***
 
@@ -36,7 +44,7 @@ Raw 32-byte seed (Uint8Array). Required.
 
 > `optional` **storage**: [`StorageMode`](../type-aliases/StorageMode.md)
 
-Storage mode. Defaults to "public" for contracts.
+Defaults to "public" (differs from wallet default of "private").
 
 ***
 

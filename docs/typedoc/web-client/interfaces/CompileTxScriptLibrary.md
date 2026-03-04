@@ -12,21 +12,17 @@
 
 > **code**: `string`
 
-MASM source code for the library.
-
 ***
 
 ### linking?
 
-> `optional` **linking**: `"dynamic"` \| `"static"`
+> `optional` **linking**: `"static"` \| `"dynamic"`
 
-`"dynamic"` (default) — procedures are linked via DYNCALL at runtime.
-`"static"` — procedures are inlined at compile time.
+"static"  — copies library into the script (for off-chain libraries).
+"dynamic" — links without copying (for on-chain FPI libraries). Default.
 
 ***
 
 ### namespace
 
 > **namespace**: `string`
-
-MASM namespace for the library (e.g. "counter::module").
