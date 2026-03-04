@@ -17,7 +17,7 @@ use crate::tests::config::ClientConfig;
 // TESTS
 // ================================================================================================
 
-pub async fn test_e2e_update_ger(client_config: ClientConfig) -> Result<()> {
+pub async fn test_agglayer_update_ger(client_config: ClientConfig) -> Result<()> {
     let (mut client, keystore) = client_config.into_client().await?;
     wait_for_node(&mut client).await;
     client.sync_state().await?;
