@@ -348,6 +348,7 @@ fn write_secret_key_file(file_path: &Path, key: &AuthSecretKey) -> Result<(), Ke
 }
 
 /// Writes an [`AuthSecretKey`] into a file.
+// TODO: on Windows, set restrictive ACLs to limit access to the current user.
 #[cfg(not(unix))]
 fn write_secret_key_file(file_path: &Path, key: &AuthSecretKey) -> Result<(), KeyStoreError> {
     fs::write(file_path, key.to_bytes()).map_err(keystore_error("error writing secret key file"))

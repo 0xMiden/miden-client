@@ -447,9 +447,7 @@ impl NodeRpcClient for GrpcClient {
                 .try_into()?;
 
             Some(MmrProof {
-                forest: Forest::new(usize::try_from(forest).map_err(|_| {
-                    RpcError::ExpectedDataMissing("ChainLength value exceeds usize".into())
-                })?),
+                forest: Forest::new(usize::try_from(forest).expect("u64 should fit in usize")),
                 position: block_header.block_num().as_usize(),
                 merkle_path,
             })
