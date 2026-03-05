@@ -2,53 +2,54 @@ use miden_client::account::StorageSlotName;
 use miden_client::block::BlockNumber;
 use miden_client::rpc::domain::account::AccountProof as NativeAccountProof;
 use miden_protocol::account::AccountStorageHeader;
-use wasm_bindgen::prelude::*;
+use js_export_macro::js_export;
 
 use super::account_code::AccountCode;
 use super::account_header::AccountHeader;
 use super::account_id::AccountId;
 use super::word::Word;
 use crate::js_error_with_context;
+use crate::platform::JsErr;
 
 /// Proof of existence of an account's state at a specific block number, as returned by the node.
 ///
 /// For public accounts, this includes the account header, storage slot values and account code.
 /// For private accounts, only the account commitment and merkle proof are available.
 #[derive(Clone)]
-#[wasm_bindgen]
+#[js_export]
 pub struct AccountProof {
     inner: NativeAccountProof,
     block_num: BlockNumber,
 }
 
-#[wasm_bindgen]
+#[js_export]
 impl AccountProof {
     /// Returns the account ID.
-    #[wasm_bindgen(js_name = "accountId")]
+    #[js_export(js_name = "accountId")]
     pub fn account_id(&self) -> AccountId {
         self.inner.account_id().into()
     }
 
     /// Returns the block number at which this proof was retrieved.
-    #[wasm_bindgen(js_name = "blockNum")]
+    #[js_export(js_name = "blockNum")]
     pub fn block_num(&self) -> u32 {
         self.block_num.as_u32()
     }
 
     /// Returns the account commitment (hash of the full state).
-    #[wasm_bindgen(js_name = "accountCommitment")]
+    #[js_export(js_name = "accountCommitment")]
     pub fn account_commitment(&self) -> Word {
         self.inner.account_commitment().into()
     }
 
     /// Returns the account header, if available (public accounts only).
-    #[wasm_bindgen(js_name = "accountHeader")]
+    #[js_export(js_name = "accountHeader")]
     pub fn account_header(&self) -> Option<AccountHeader> {
         self.inner.account_header().map(Into::into)
     }
 
     /// Returns the account code, if available (public accounts only).
-    #[wasm_bindgen(js_name = "accountCode")]
+    #[js_export(js_name = "accountCode")]
     pub fn account_code(&self) -> Option<AccountCode> {
         self.inner.account_code().map(Into::into)
     }
@@ -59,8 +60,8 @@ impl AccountProof {
     /// For `Map` slots, this returns the map root commitment.
     ///
     /// Returns `undefined` if the account is private or the slot name is not found.
-    #[wasm_bindgen(js_name = "getStorageSlotValue")]
-    pub fn get_storage_slot_value(&self, slot_name: &str) -> Result<Option<Word>, JsValue> {
+    #[js_export(js_name = "getStorageSlotValue")]
+    pub fn get_storage_slot_value(&self, slot_name: String) -> Result<Option<Word>, JsErr> {
         let Some(storage_header) = self.inner.storage_header() else {
             return Ok(None);
         };
@@ -74,7 +75,7 @@ impl AccountProof {
     }
 
     /// Returns the number of storage slots, if available (public accounts only).
-    #[wasm_bindgen(js_name = "numStorageSlots")]
+    #[js_export(js_name = "numStorageSlots")]
     pub fn num_storage_slots(&self) -> Option<u8> {
         self.inner.storage_header().map(AccountStorageHeader::num_slots)
     }

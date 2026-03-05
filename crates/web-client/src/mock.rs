@@ -1,15 +1,31 @@
 use alloc::sync::Arc;
 
-use idxdb_store::IdxdbStore;
-use miden_client::store::WebStore;
-use miden_client::testing::MockChain;
 use miden_client::testing::mock::MockRpcApi;
-use miden_client::testing::note_transport::{MockNoteTransportApi, MockNoteTransportNode};
-use miden_client::utils::{Deserializable, RwLock, Serializable};
+use miden_client::testing::note_transport::MockNoteTransportApi;
+use miden_client::utils::Serializable;
+
+#[cfg(feature = "browser")]
+use idxdb_store::IdxdbStore;
+#[cfg(feature = "browser")]
+use miden_client::store::WebStore;
+#[cfg(feature = "browser")]
+use miden_client::testing::MockChain;
+#[cfg(feature = "browser")]
+use miden_client::testing::note_transport::MockNoteTransportNode;
+#[cfg(feature = "browser")]
+use miden_client::utils::{Deserializable, RwLock};
+#[cfg(feature = "browser")]
 use wasm_bindgen::prelude::*;
 
-use crate::{WebClient, WebKeyStore, create_rng, js_error_with_context};
+use js_export_macro::js_export;
 
+use crate::platform::{JsErr, from_str_err};
+use crate::{WebClient, js_error_with_context};
+
+#[cfg(feature = "browser")]
+use crate::{WebKeyStore, create_rng};
+
+#[cfg(feature = "browser")]
 #[wasm_bindgen]
 impl WebClient {
     /// Creates a new client with a mock RPC API. Useful for testing purposes and proof-of-concept
@@ -63,43 +79,46 @@ impl WebClient {
 
         Ok(JsValue::from_str("Client created successfully"))
     }
+}
 
+#[js_export]
+impl WebClient {
     /// Returns the inner serialized mock chain if it exists.
-    #[wasm_bindgen(js_name = "serializeMockChain")]
-    pub fn serialize_mock_chain(&mut self) -> Result<Vec<u8>, JsValue> {
+    #[js_export(js_name = "serializeMockChain")]
+    pub fn serialize_mock_chain(&self) -> Result<Vec<u8>, JsErr> {
         self.mock_rpc_api
             .as_ref()
             .map(|api| api.mock_chain.read().to_bytes())
             .ok_or_else(|| {
-                JsValue::from_str("Mock chain is not initialized. Create a mock client first.")
+                from_str_err("Mock chain is not initialized. Create a mock client first.")
             })
     }
 
     /// Returns the inner serialized mock note transport node if it exists.
-    #[wasm_bindgen(js_name = "serializeMockNoteTransportNode")]
-    pub fn serialize_mock_note_transport_node(&mut self) -> Result<Vec<u8>, JsValue> {
+    #[js_export(js_name = "serializeMockNoteTransportNode")]
+    pub fn serialize_mock_note_transport_node(&self) -> Result<Vec<u8>, JsErr> {
         self.mock_note_transport_api
             .as_ref()
             .map(|api| api.mock_node.read().to_bytes())
             .ok_or_else(|| {
-                JsValue::from_str(
+                from_str_err(
                     "Mock note transport node is not initialized. Create a mock client first.",
                 )
             })
     }
 
-    #[wasm_bindgen(js_name = "proveBlock")]
-    pub fn prove_block(&mut self) -> Result<(), JsValue> {
+    #[js_export(js_name = "proveBlock")]
+    pub fn prove_block(&self) -> Result<(), JsErr> {
         match self.mock_rpc_api.as_ref() {
             Some(api) => {
                 api.prove_block();
                 Ok(())
             },
-            None => Err(JsValue::from_str("WebClient does not have a mock chain.")),
+            None => Err(from_str_err("WebClient does not have a mock chain.")),
         }
     }
 
-    #[wasm_bindgen(js_name = "usesMockChain")]
+    #[js_export(js_name = "usesMockChain")]
     pub fn uses_mock_chain(&self) -> bool {
         self.mock_rpc_api.is_some()
     }

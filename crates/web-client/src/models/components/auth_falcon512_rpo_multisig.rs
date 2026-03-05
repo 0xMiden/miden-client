@@ -1,3 +1,4 @@
+use js_export_macro::js_export;
 use miden_client::Word as NativeWord;
 use miden_client::account::component::{
     AccountComponent as NativeAccountComponent,
@@ -10,53 +11,53 @@ use miden_client::account::{
     StorageSlotName,
 };
 use miden_client::auth::PublicKeyCommitment;
-use wasm_bindgen::prelude::*;
 
 use crate::js_error_with_context;
 use crate::models::account_component::AccountComponent;
 use crate::models::word::Word;
+use crate::platform::JsErr;
 
-#[wasm_bindgen]
+#[js_export]
 #[derive(Clone)]
 pub struct ProcedureThreshold {
     proc_root: Word,
     threshold: u32,
 }
 
-#[wasm_bindgen]
+#[js_export]
 impl ProcedureThreshold {
-    #[wasm_bindgen(constructor)]
+    #[js_export(constructor)]
     pub fn new(proc_root: &Word, threshold: u32) -> ProcedureThreshold {
         ProcedureThreshold { proc_root: proc_root.clone(), threshold }
     }
 
-    #[wasm_bindgen(getter, js_name = "procRoot")]
+    #[js_export(getter, js_name = "procRoot")]
     pub fn proc_root(&self) -> Word {
         self.proc_root.clone()
     }
 
-    #[wasm_bindgen(getter)]
+    #[js_export(getter)]
     pub fn threshold(&self) -> u32 {
         self.threshold
     }
 }
 
 /// Multisig auth configuration for `RpoFalcon512` signatures.
-#[wasm_bindgen]
+#[js_export]
 #[derive(Clone)]
 pub struct AuthFalcon512RpoMultisigConfig(NativeAuthFalcon512RpoMultisigConfig);
 
-#[wasm_bindgen]
+#[js_export]
 impl AuthFalcon512RpoMultisigConfig {
     /// Build a configuration with a list of approver public key commitments and a default
     /// threshold.
     ///
     /// `default_threshold` must be >= 1 and <= `approvers.length`.
-    #[wasm_bindgen(constructor)]
+    #[js_export(constructor)]
     pub fn new(
         approvers: Vec<Word>,
         default_threshold: u32,
-    ) -> Result<AuthFalcon512RpoMultisigConfig, JsValue> {
+    ) -> Result<AuthFalcon512RpoMultisigConfig, JsErr> {
         let native_approvers: Vec<PublicKeyCommitment> = approvers
             .into_iter()
             .map(|word| {
@@ -72,11 +73,11 @@ impl AuthFalcon512RpoMultisigConfig {
     }
 
     /// Attach per-procedure thresholds. Each threshold must be >= 1 and <= `approvers.length`.
-    #[wasm_bindgen(js_name = "withProcThresholds")]
+    #[js_export(js_name = "withProcThresholds")]
     pub fn with_proc_thresholds(
-        self,
+        &self,
         proc_thresholds: Vec<ProcedureThreshold>,
-    ) -> Result<AuthFalcon512RpoMultisigConfig, JsValue> {
+    ) -> Result<AuthFalcon512RpoMultisigConfig, JsErr> {
         let native_proc_thresholds = proc_thresholds
             .into_iter()
             .map(|entry| {
@@ -87,19 +88,20 @@ impl AuthFalcon512RpoMultisigConfig {
 
         let config = self
             .0
+            .clone()
             .with_proc_thresholds(native_proc_thresholds)
             .map_err(|e| js_error_with_context(e, "Invalid per-procedure thresholds"))?;
 
         Ok(AuthFalcon512RpoMultisigConfig(config))
     }
 
-    #[wasm_bindgen(getter, js_name = "defaultThreshold")]
+    #[js_export(getter, js_name = "defaultThreshold")]
     pub fn default_threshold(&self) -> u32 {
         self.0.default_threshold()
     }
 
     /// Approver public key commitments as Words.
-    #[wasm_bindgen(getter)]
+    #[js_export(getter)]
     pub fn approvers(&self) -> Vec<Word> {
         self.0
             .approvers()
@@ -112,7 +114,7 @@ impl AuthFalcon512RpoMultisigConfig {
     }
 
     /// Per-procedure thresholds.
-    #[wasm_bindgen(js_name = "getProcThresholds")]
+    #[js_export(js_name = "getProcThresholds")]
     pub fn get_proc_thresholds(&self) -> Vec<ProcedureThreshold> {
         self.0
             .proc_thresholds()
@@ -126,10 +128,11 @@ impl AuthFalcon512RpoMultisigConfig {
 }
 
 /// Create an auth component for `Falcon512Rpo` multisig.
-#[wasm_bindgen(js_name = "createAuthFalcon512RpoMultisig")]
+#[cfg_attr(feature = "browser", wasm_bindgen::prelude::wasm_bindgen(js_name = "createAuthFalcon512RpoMultisig"))]
+#[cfg_attr(feature = "nodejs", napi_derive::napi(js_name = "createAuthFalcon512RpoMultisig"))]
 pub fn create_auth_falcon512_rpo_multisig(
     config: AuthFalcon512RpoMultisigConfig,
-) -> Result<AccountComponent, JsValue> {
+) -> Result<AccountComponent, JsErr> {
     let native_config: NativeAuthFalcon512RpoMultisigConfig = config.into();
 
     let mut storage_slots = Vec::with_capacity(4);
@@ -159,7 +162,7 @@ pub fn create_auth_falcon512_rpo_multisig(
             })?;
             Ok((NativeWord::from([idx, 0, 0, 0]), (*pk).into()))
         })
-        .collect::<Result<_, JsValue>>()?;
+        .collect::<Result<_, JsErr>>()?;
     let approver_map = NativeStorageMap::with_entries(map_entries.into_iter())
         .map_err(|e| js_error_with_context(e, "Failed to build approver map"))?;
     let approver_map_name = StorageSlotName::new(
@@ -209,3 +212,6 @@ impl From<AuthFalcon512RpoMultisigConfig> for NativeAuthFalcon512RpoMultisigConf
         config.0
     }
 }
+
+impl_napi_from_value!(AuthFalcon512RpoMultisigConfig);
+impl_napi_from_value!(ProcedureThreshold);

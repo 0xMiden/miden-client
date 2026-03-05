@@ -1,5 +1,5 @@
 use miden_client::store::NoteFilter as NativeNoteFilter;
-use wasm_bindgen::prelude::*;
+use js_export_macro::js_export;
 
 use super::note_id::NoteId;
 
@@ -7,23 +7,23 @@ use super::note_id::NoteId;
 
 /// Filter options for querying notes from the store.
 #[derive(Clone)]
-#[wasm_bindgen]
+#[js_export]
 pub struct NoteFilter {
     note_type: NoteFilterTypes,
     note_ids: Option<Vec<NoteId>>,
 }
 
-#[wasm_bindgen]
+#[js_export]
 impl NoteFilter {
     /// Creates a new filter for the given type and optional note IDs.
-    #[wasm_bindgen(constructor)]
+    #[js_export(constructor)]
     pub fn new(note_type: NoteFilterTypes, note_ids: Option<Vec<NoteId>>) -> NoteFilter {
         NoteFilter { note_type, note_ids }
     }
 }
 
 #[derive(Clone)]
-#[wasm_bindgen]
+#[js_export]
 pub enum NoteFilterTypes {
     All,
     Consumed,
@@ -96,3 +96,5 @@ impl From<&NoteFilter> for NativeNoteFilter {
         }
     }
 }
+
+impl_napi_from_value!(NoteFilter);

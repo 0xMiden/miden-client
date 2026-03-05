@@ -1,15 +1,27 @@
+use js_export_macro::js_export;
 use miden_client::crypto::MerklePath as NativeMerklePath;
-use wasm_bindgen::prelude::*;
 
 use super::word::Word;
+use crate::platform::JsU64;
 
 /// Represents a Merkle path.
 #[derive(Clone)]
-#[wasm_bindgen]
+#[js_export]
 pub struct MerklePath(NativeMerklePath);
 
-#[wasm_bindgen]
+#[js_export]
 impl MerklePath {
+    /// Computes the root given a leaf index and value.
+    #[js_export(js_name = "computeRoot")]
+    pub fn compute_root(&self, index: JsU64, node: &Word) -> Word {
+        self.0.compute_root(index as u64, node.clone().into()).unwrap().into()
+    }
+
+    /// Verifies the path against a root.
+    pub fn verify(&self, index: JsU64, node: &Word, root: &Word) -> bool {
+        self.0.verify(index as u64, node.clone().into(), &root.clone().into()).is_ok()
+    }
+
     /// Returns the depth of the path.
     pub fn depth(&self) -> u8 {
         self.0.depth()
@@ -18,17 +30,6 @@ impl MerklePath {
     /// Returns the nodes that make up the path.
     pub fn nodes(&self) -> Vec<Word> {
         self.0.nodes().iter().map(Into::into).collect()
-    }
-
-    /// Computes the root given a leaf index and value.
-    #[wasm_bindgen(js_name = "computeRoot")]
-    pub fn compute_root(&self, index: u64, node: &Word) -> Word {
-        self.0.compute_root(index, node.clone().into()).unwrap().into()
-    }
-
-    /// Verifies the path against a root.
-    pub fn verify(&self, index: u64, node: &Word, root: &Word) -> bool {
-        self.0.verify(index, node.clone().into(), &root.clone().into()).is_ok()
     }
 }
 

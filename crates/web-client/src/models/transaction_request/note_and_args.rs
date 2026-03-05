@@ -1,7 +1,8 @@
 use miden_client::note::Note as NativeNote;
 use miden_client::transaction::NoteArgs as NativeNoteArgs;
-use wasm_bindgen::prelude::*;
+use js_export_macro::js_export;
 
+#[cfg(feature = "browser")]
 use crate::models::miden_arrays::NoteAndArgsArray;
 use crate::models::note::Note;
 use crate::models::word::Word;
@@ -9,16 +10,16 @@ use crate::models::word::Word;
 pub type NoteArgs = Word;
 
 #[derive(Clone)]
-#[wasm_bindgen]
+#[js_export]
 pub struct NoteAndArgs {
     note: Note,
     args: Option<NoteArgs>,
 }
 
-#[wasm_bindgen]
+#[js_export]
 impl NoteAndArgs {
     /// Creates a new note/args pair for transaction building.
-    #[wasm_bindgen(constructor)]
+    #[js_export(constructor)]
     pub fn new(note: Note, args: Option<NoteArgs>) -> NoteAndArgs {
         NoteAndArgs { note, args }
     }
@@ -40,14 +41,18 @@ impl From<&NoteAndArgs> for (NativeNote, Option<NativeNoteArgs>) {
     }
 }
 
+#[cfg(feature = "browser")]
 impl From<NoteAndArgsArray> for Vec<(NativeNote, Option<NativeNoteArgs>)> {
     fn from(note_and_args_array: NoteAndArgsArray) -> Self {
         note_and_args_array.__inner.into_iter().map(Into::into).collect()
     }
 }
 
+#[cfg(feature = "browser")]
 impl From<&NoteAndArgsArray> for Vec<(NativeNote, Option<NativeNoteArgs>)> {
     fn from(note_and_args_array: &NoteAndArgsArray) -> Self {
         note_and_args_array.__inner.iter().map(Into::into).collect()
     }
 }
+
+impl_napi_from_value!(NoteAndArgs);

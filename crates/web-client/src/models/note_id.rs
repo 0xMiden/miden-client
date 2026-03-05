@@ -1,8 +1,9 @@
 use miden_client::note::NoteId as NativeNoteId;
-use wasm_bindgen::prelude::*;
+use js_export_macro::js_export;
 
 use super::word::Word;
 use crate::js_error_with_context;
+use crate::platform::JsErr;
 
 /// Returns a unique identifier of a note, which is simultaneously a commitment to the note.
 ///
@@ -19,27 +20,27 @@ use crate::js_error_with_context;
 /// - To compute a note ID, we do not need to know the note's `serial_num`. Knowing the hash of the
 ///   `serial_num` (as well as script root, input commitment, and note assets) is sufficient.
 #[derive(Clone, Copy)]
-#[wasm_bindgen]
+#[js_export]
 pub struct NoteId(NativeNoteId);
 
-#[wasm_bindgen]
+#[js_export]
 impl NoteId {
     /// Builds a note ID from the recipient and asset commitments.
-    #[wasm_bindgen(constructor)]
+    #[js_export(constructor)]
     pub fn new(recipient_digest: &Word, asset_commitment_digest: &Word) -> NoteId {
         NoteId(NativeNoteId::new(recipient_digest.into(), asset_commitment_digest.into()))
     }
 
     /// Parses a note ID from its hex encoding.
-    #[wasm_bindgen(js_name = "fromHex")]
-    pub fn from_hex(hex: &str) -> Result<NoteId, JsValue> {
-        let native_note_id = NativeNoteId::try_from_hex(hex)
+    #[js_export(js_name = "fromHex")]
+    pub fn from_hex(hex: String) -> Result<NoteId, JsErr> {
+        let native_note_id = NativeNoteId::try_from_hex(&hex)
             .map_err(|err| js_error_with_context(err, "error instantiating NoteId from hex"))?;
         Ok(NoteId(native_note_id))
     }
 
     /// Returns the canonical hex representation of the note ID.
-    #[wasm_bindgen(js_name = "toString")]
+    #[js_export(js_name = "toString")]
     #[allow(clippy::inherent_to_string)]
     pub fn to_string(&self) -> String {
         self.0.to_string()
@@ -72,3 +73,5 @@ impl From<&NoteId> for NativeNoteId {
         note_id.0
     }
 }
+
+impl_napi_from_value!(NoteId);

@@ -1,4 +1,3 @@
-use js_sys::Uint8Array;
 use miden_client::account::AccountId as NativeAccountId;
 use miden_client::address::{
     Address as NativeAddress,
@@ -7,34 +6,48 @@ use miden_client::address::{
     NetworkId as NativeNetworkId,
     RoutingParameters,
 };
-use wasm_bindgen::JsValue;
-use wasm_bindgen::prelude::wasm_bindgen;
+use js_export_macro::js_export;
+#[cfg(feature = "browser")]
+use wasm_bindgen::prelude::*;
+#[cfg(feature = "nodejs")]
+use napi_derive::napi;
 
 use super::NoteTag;
 use super::account_id::{AccountId, NetworkId};
 use crate::js_error_with_context;
-use crate::utils::deserialize_from_uint8array;
+use crate::platform::{JsBytes, JsErr, from_str_err};
+use crate::utils::deserialize_from_bytes;
 
 /// Representation of a Miden address (account ID plus routing parameters).
-#[wasm_bindgen(inspectable)]
+#[cfg_attr(feature = "browser", wasm_bindgen(inspectable))]
+#[cfg_attr(feature = "nodejs", napi)]
 #[derive(Clone, Debug)]
 pub struct Address(NativeAddress);
 
-#[wasm_bindgen]
 /// Specifies which procedures an account accepts, and by extension which notes it can consume.
+#[cfg(feature = "browser")]
+#[wasm_bindgen]
 pub enum AddressInterface {
     BasicWallet = "BasicWallet",
 }
 
-#[wasm_bindgen]
+/// Specifies which procedures an account accepts, and by extension which notes it can consume.
+#[cfg(feature = "nodejs")]
+#[napi]
+#[repr(u8)]
+pub enum AddressInterface {
+    BasicWallet = 0,
+}
+
+#[js_export]
 impl Address {
     /// Deserializes a byte array into an `Address`.
-    pub fn deserialize(bytes: &Uint8Array) -> Result<Address, JsValue> {
-        let native_address: NativeAddress = deserialize_from_uint8array(bytes)?;
+    pub fn deserialize(bytes: JsBytes) -> Result<Address, JsErr> {
+        let native_address: NativeAddress = deserialize_from_bytes(&bytes)?;
         Ok(Self(native_address))
     }
 
-    #[wasm_bindgen(js_name = "fromAccountId")]
+    #[js_export(js_name = "fromAccountId")]
     // Can't pass the proper AddressInterface enum here since wasm_bindgen does not derive the ref
     // trait for enum types. But we can still leave its definition since it gets exported as a
     // constant for the JS SDK.
@@ -42,7 +55,7 @@ impl Address {
     pub fn from_account_id(
         account_id: &AccountId,
         interface: Option<String>,
-    ) -> Result<Self, JsValue> {
+    ) -> Result<Self, JsErr> {
         let native_account_id: NativeAccountId = account_id.into();
         let native_address = match interface {
             None => NativeAddress::new(native_account_id),
@@ -53,7 +66,7 @@ impl Address {
                     .map_err(|err| js_error_with_context(err, "failed to set routing params"))?
             },
             Some(other_interface) => {
-                return Err(JsValue::from_str(&format!(
+                return Err(from_str_err(&format!(
                     "Failed to build address from account id, wrong interface value given: {other_interface}"
                 )));
             },
@@ -63,40 +76,40 @@ impl Address {
     }
 
     /// Builds an address from a bech32-encoded string.
-    #[wasm_bindgen(js_name = fromBech32)]
-    pub fn from_bech32(bech32: &str) -> Result<Self, JsValue> {
-        let (_net_id, address) = NativeAddress::decode(bech32).map_err(|err| {
+    #[js_export(js_name = "fromBech32")]
+    pub fn from_bech32(bech32: String) -> Result<Self, JsErr> {
+        let (_net_id, address) = NativeAddress::decode(&bech32).map_err(|err| {
             js_error_with_context(err, "could not convert bech32 into an address")
         })?;
         Ok(Self(address))
     }
 
     /// Returns the address interface.
-    pub fn interface(&self) -> Result<AddressInterface, JsValue> {
+    pub fn interface(&self) -> Result<AddressInterface, JsErr> {
         match self.0.interface() {
             Some(interface) => interface.try_into(),
-            None => Err(JsValue::from_str("Address has no specified interface")),
+            None => Err(from_str_err("Address has no specified interface")),
         }
     }
 
     /// Returns the account ID embedded in the address.
-    #[wasm_bindgen(js_name = "accountId")]
-    pub fn account_id(&self) -> Result<AccountId, JsValue> {
+    #[js_export(js_name = "accountId")]
+    pub fn account_id(&self) -> Result<AccountId, JsErr> {
         match &self.0.id() {
             AddressId::AccountId(account_id_address) => Ok(account_id_address.into()),
-            _other => Err("Unsupported Account address type".into()),
+            _other => Err(from_str_err("Unsupported Account address type")),
         }
     }
 
     /// Converts the address into a note tag.
-    #[wasm_bindgen(js_name = "toNoteTag")]
+    #[js_export(js_name = "toNoteTag")]
     pub fn to_note_tag(&self) -> NoteTag {
         self.0.to_note_tag().into()
     }
 
     /// Encodes the address using the provided network prefix.
-    #[wasm_bindgen(js_name = "toBech32")]
-    pub fn to_bech32(&self, network_id: NetworkId) -> Result<String, JsValue> {
+    #[js_export(js_name = "toBech32")]
+    pub fn to_bech32(&self, network_id: NetworkId) -> Result<String, JsErr> {
         let net_id: NativeNetworkId = network_id.into();
         Ok(self.0.encode(net_id))
     }
@@ -134,20 +147,22 @@ impl TryFrom<AddressInterface> for NativeAddressInterface {
     fn try_from(value: AddressInterface) -> Result<Self, &'static str> {
         match value {
             AddressInterface::BasicWallet => Ok(NativeAddressInterface::BasicWallet),
+            #[cfg(feature = "browser")]
             AddressInterface::__Invalid => Err("Non-valid address interface given"),
         }
     }
 }
 
 impl TryFrom<NativeAddressInterface> for AddressInterface {
-    type Error = JsValue;
+    type Error = JsErr;
     fn try_from(value: NativeAddressInterface) -> Result<Self, Self::Error> {
         match value {
             NativeAddressInterface::BasicWallet => Ok(AddressInterface::BasicWallet),
             _other => {
-                Err("AddressInterface from miden-protocol crate was instantiated with an unsupported value"
-                    .into())
+                Err(from_str_err("AddressInterface from miden-protocol crate was instantiated with an unsupported value"))
             },
         }
     }
 }
+
+impl_napi_from_value!(Address);

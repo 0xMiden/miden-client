@@ -1,7 +1,11 @@
 use miden_client::note::{NoteDetails as NativeNoteDetails, NoteId as NativeNoteId};
 use miden_client::notes::NoteFile as NativeNoteFile;
 use miden_client::{Deserializable, Serializable};
+use js_export_macro::js_export;
+#[cfg(feature = "browser")]
 use wasm_bindgen::prelude::*;
+#[cfg(feature = "nodejs")]
+use napi_derive::napi;
 
 use super::input_note::InputNote;
 use super::note::Note;
@@ -11,17 +15,20 @@ use crate::models::note_details::NoteDetails;
 use crate::models::note_id::NoteId;
 use crate::models::note_inclusion_proof::NoteInclusionProof;
 use crate::models::note_tag::NoteTag;
+use crate::platform::JsErr;
 
 /// A serialized representation of a note.
-#[wasm_bindgen(inspectable)]
+#[derive(Clone)]
+#[cfg_attr(feature = "browser", wasm_bindgen(inspectable))]
+#[cfg_attr(feature = "nodejs", napi)]
 pub struct NoteFile {
     pub(crate) inner: NativeNoteFile,
 }
 
-#[wasm_bindgen]
+#[js_export]
 impl NoteFile {
     /// Returns this `NoteFile`'s types.
-    #[wasm_bindgen(js_name = noteType)]
+    #[js_export(js_name = noteType)]
     pub fn note_type(&self) -> String {
         match &self.inner {
             NativeNoteFile::NoteId(_) => "NoteId".to_owned(),
@@ -31,7 +38,7 @@ impl NoteFile {
     }
 
     /// Returns the note ID for any `NoteFile` variant.
-    #[wasm_bindgen(js_name = "noteId")]
+    #[js_export(js_name = "noteId")]
     pub fn note_id(&self) -> NoteId {
         match &self.inner {
             NativeNoteFile::NoteId(note_id) => (*note_id).into(),
@@ -41,7 +48,7 @@ impl NoteFile {
     }
 
     /// Returns the note details if present.
-    #[wasm_bindgen(js_name = "noteDetails")]
+    #[js_export(js_name = "noteDetails")]
     pub fn note_details(&self) -> Option<NoteDetails> {
         match &self.inner {
             NativeNoteFile::NoteDetails { details, .. } => Some(details.into()),
@@ -58,7 +65,7 @@ impl NoteFile {
     }
 
     /// Returns the inclusion proof if present.
-    #[wasm_bindgen(js_name = "inclusionProof")]
+    #[js_export(js_name = "inclusionProof")]
     pub fn inclusion_proof(&self) -> Option<NoteInclusionProof> {
         match &self.inner {
             NativeNoteFile::NoteWithProof(_, proof) => Some(proof.into()),
@@ -67,7 +74,7 @@ impl NoteFile {
     }
 
     /// Returns the after-block hint when present.
-    #[wasm_bindgen(js_name = "afterBlockNum")]
+    #[js_export(js_name = "afterBlockNum")]
     pub fn after_block_num(&self) -> Option<u32> {
         match &self.inner {
             NativeNoteFile::NoteDetails { after_block_num, .. } => Some(after_block_num.as_u32()),
@@ -76,7 +83,7 @@ impl NoteFile {
     }
 
     /// Returns the note tag hint when present.
-    #[wasm_bindgen(js_name = "noteTag")]
+    #[js_export(js_name = "noteTag")]
     pub fn note_tag(&self) -> Option<NoteTag> {
         match &self.inner {
             NativeNoteFile::NoteDetails { tag, .. } => tag.map(Into::into),
@@ -94,7 +101,7 @@ impl NoteFile {
     }
 
     /// Turn a notefile into its byte representation.
-    #[wasm_bindgen(js_name = serialize)]
+    #[js_export(js_name = serialize)]
     pub fn serialize(&self) -> Vec<u8> {
         let mut buffer = vec![];
         self.inner.write_into(&mut buffer);
@@ -103,15 +110,15 @@ impl NoteFile {
 
     /// Given a valid byte representation of a `NoteFile`,
     /// return it as a struct.
-    #[wasm_bindgen(js_name = deserialize)]
-    pub fn deserialize(bytes: &[u8]) -> Result<Self, JsValue> {
+    #[js_export(js_name = deserialize)]
+    pub fn deserialize(bytes: &[u8]) -> Result<Self, JsErr> {
         let deserialized = NativeNoteFile::read_from_bytes(bytes)
             .map_err(|err| js_error_with_context(err, "notefile deserialization failed"))?;
         Ok(Self { inner: deserialized })
     }
 
     /// Creates a `NoteFile` from an input note, preserving proof when available.
-    #[wasm_bindgen(js_name = fromInputNote)]
+    #[js_export(js_name = fromInputNote)]
     pub fn from_input_note(note: &InputNote) -> Self {
         if let Some(inclusion_proof) = note.proof() {
             Self {
@@ -126,7 +133,7 @@ impl NoteFile {
     }
 
     /// Creates a `NoteFile` from an output note, choosing details when present.
-    #[wasm_bindgen(js_name = fromOutputNote)]
+    #[js_export(js_name = fromOutputNote)]
     pub fn from_output_note(note: &OutputNote) -> Self {
         let native_note = note.note();
         match (native_note.assets(), native_note.recipient()) {
@@ -139,13 +146,13 @@ impl NoteFile {
     }
 
     /// Creates a `NoteFile` from note details.
-    #[wasm_bindgen(js_name = fromNoteDetails)]
+    #[js_export(js_name = fromNoteDetails)]
     pub fn from_note_details(note_details: &NoteDetails) -> Self {
         note_details.into()
     }
 
     /// Creates a `NoteFile` from a note ID.
-    #[wasm_bindgen(js_name = fromNoteId)]
+    #[js_export(js_name = fromNoteId)]
     pub fn from_note_id(note_details: &NoteId) -> Self {
         note_details.into()
     }
@@ -179,3 +186,5 @@ impl From<&NoteId> for NoteFile {
         NoteFile { inner: note_id.into() }
     }
 }
+
+impl_napi_from_value!(NoteFile);

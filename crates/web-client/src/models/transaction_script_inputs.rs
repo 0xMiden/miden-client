@@ -1,24 +1,25 @@
 use miden_client::{Felt as NativeFelt, Word as NativeWord};
-use wasm_bindgen::prelude::*;
+use js_export_macro::js_export;
 
 use super::miden_arrays::FeltArray;
 use super::word::Word;
+#[cfg(feature = "browser")]
 use crate::models::miden_arrays::TransactionScriptInputPairArray;
 
 /// A script argument represented as a word plus additional felts.
 #[derive(Clone)]
-#[wasm_bindgen]
+#[js_export]
 pub struct TransactionScriptInputPair {
     word: Word,
     felts: FeltArray,
 }
 
-#[wasm_bindgen]
+#[js_export]
 impl TransactionScriptInputPair {
     /// Creates a new script input pair.
-    #[wasm_bindgen(constructor)]
-    pub fn new(word: Word, felts: &FeltArray) -> TransactionScriptInputPair {
-        TransactionScriptInputPair { word, felts: felts.clone() }
+    #[js_export(constructor)]
+    pub fn new(word: Word, felts: FeltArray) -> TransactionScriptInputPair {
+        TransactionScriptInputPair { word, felts }
     }
 
     /// Returns the word part of the input.
@@ -35,12 +36,11 @@ impl TransactionScriptInputPair {
 impl From<TransactionScriptInputPair> for (NativeWord, Vec<NativeFelt>) {
     fn from(transaction_script_input_pair: TransactionScriptInputPair) -> Self {
         let native_word: NativeWord = transaction_script_input_pair.word.into();
-        let native_felts: Vec<NativeFelt> = transaction_script_input_pair
-            .felts
-            .__inner
-            .into_iter()
-            .map(Into::into)
-            .collect();
+        let felts = transaction_script_input_pair.felts;
+        #[cfg(feature = "browser")]
+        let native_felts: Vec<NativeFelt> = felts.__inner.into_iter().map(Into::into).collect();
+        #[cfg(feature = "nodejs")]
+        let native_felts: Vec<NativeFelt> = Vec::from(felts).into_iter().map(Into::into).collect();
         (native_word, native_felts)
     }
 }
@@ -48,16 +48,17 @@ impl From<TransactionScriptInputPair> for (NativeWord, Vec<NativeFelt>) {
 impl From<&TransactionScriptInputPair> for (NativeWord, Vec<NativeFelt>) {
     fn from(transaction_script_input_pair: &TransactionScriptInputPair) -> Self {
         let native_word: NativeWord = transaction_script_input_pair.word.clone().into();
-        let native_felts: Vec<NativeFelt> = transaction_script_input_pair
-            .felts
-            .__inner
-            .iter()
-            .map(|felt| (*felt).into())
-            .collect();
+        let felts = &transaction_script_input_pair.felts;
+        #[cfg(feature = "browser")]
+        let native_felts: Vec<NativeFelt> =
+            felts.__inner.iter().map(|felt| (*felt).into()).collect();
+        #[cfg(feature = "nodejs")]
+        let native_felts: Vec<NativeFelt> = felts.iter().map(|felt| (*felt).into()).collect();
         (native_word, native_felts)
     }
 }
 
+#[cfg(feature = "browser")]
 impl From<TransactionScriptInputPairArray> for Vec<(NativeWord, Vec<NativeFelt>)> {
     fn from(transaction_script_input_pair_array: TransactionScriptInputPairArray) -> Self {
         transaction_script_input_pair_array
@@ -68,8 +69,11 @@ impl From<TransactionScriptInputPairArray> for Vec<(NativeWord, Vec<NativeFelt>)
     }
 }
 
+#[cfg(feature = "browser")]
 impl From<&TransactionScriptInputPairArray> for Vec<(NativeWord, Vec<NativeFelt>)> {
     fn from(transaction_script_input_pair_array: &TransactionScriptInputPairArray) -> Self {
         transaction_script_input_pair_array.__inner.iter().map(Into::into).collect()
     }
 }
+
+impl_napi_from_value!(TransactionScriptInputPair);

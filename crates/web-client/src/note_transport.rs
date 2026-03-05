@@ -1,18 +1,20 @@
-use wasm_bindgen::prelude::*;
+use js_export_macro::js_export;
 
+use crate::platform::{JsErr, from_str_err};
 use crate::{WebClient, js_error_with_context};
 
-#[wasm_bindgen]
+#[js_export]
 impl WebClient {
     /// Send a private note via the note transport layer
-    #[wasm_bindgen(js_name = "sendPrivateNote")]
+    #[js_export(js_name = "sendPrivateNote")]
     pub async fn send_private_note(
-        &mut self,
+        &self,
         note: crate::models::note::Note,
         address: crate::models::address::Address,
-    ) -> Result<(), JsValue> {
-        let client = self.get_mut_inner().ok_or_else(|| {
-            JsValue::from_str("Client not initialized. Call createClient() first.")
+    ) -> Result<(), JsErr> {
+        let mut guard = self.get_mut_inner().await;
+        let client = guard.as_mut().ok_or_else(|| {
+            from_str_err("Client not initialized. Call createClient() first.")
         })?;
 
         client
@@ -26,10 +28,11 @@ impl WebClient {
     /// Fetch private notes from the note transport layer
     ///
     /// Uses an internal pagination mechanism to avoid fetching duplicate notes.
-    #[wasm_bindgen(js_name = "fetchPrivateNotes")]
-    pub async fn fetch_private_notes(&mut self) -> Result<(), JsValue> {
-        let client = self.get_mut_inner().ok_or_else(|| {
-            JsValue::from_str("Client not initialized. Call createClient() first.")
+    #[js_export(js_name = "fetchPrivateNotes")]
+    pub async fn fetch_private_notes(&self) -> Result<(), JsErr> {
+        let mut guard = self.get_mut_inner().await;
+        let client = guard.as_mut().ok_or_else(|| {
+            from_str_err("Client not initialized. Call createClient() first.")
         })?;
 
         client
@@ -45,10 +48,11 @@ impl WebClient {
     /// Fetches all notes stored in the transport layer, with no pagination.
     /// Prefer using [`WebClient::fetch_private_notes`] for a more efficient, on-going,
     /// fetching mechanism.
-    #[wasm_bindgen(js_name = "fetchAllPrivateNotes")]
-    pub async fn fetch_all_private_notes(&mut self) -> Result<(), JsValue> {
-        let client = self.get_mut_inner().ok_or_else(|| {
-            JsValue::from_str("Client not initialized. Call createClient() first.")
+    #[js_export(js_name = "fetchAllPrivateNotes")]
+    pub async fn fetch_all_private_notes(&self) -> Result<(), JsErr> {
+        let mut guard = self.get_mut_inner().await;
+        let client = guard.as_mut().ok_or_else(|| {
+            from_str_err("Client not initialized. Call createClient() first.")
         })?;
 
         client

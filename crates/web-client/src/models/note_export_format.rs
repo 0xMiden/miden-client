@@ -1,7 +1,7 @@
 use miden_client::store::NoteExportType;
-use wasm_bindgen::prelude::*;
+use js_export_macro::js_export;
 
-#[wasm_bindgen]
+#[js_export]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum NoteExportFormat {
     Id,

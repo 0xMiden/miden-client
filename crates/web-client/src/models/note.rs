@@ -10,8 +10,7 @@ use miden_client::note::{
 use miden_client::{Felt as NativeFelt, Word as NativeWord};
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
-use wasm_bindgen::prelude::*;
-use wasm_bindgen_futures::js_sys::Uint8Array;
+use js_export_macro::js_export;
 
 use super::NoteType;
 use super::account_id::AccountId;
@@ -23,21 +22,22 @@ use super::note_recipient::NoteRecipient;
 use super::note_script::NoteScript;
 use super::word::Word;
 use crate::js_error_with_context;
-use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
+use crate::platform::{JsBytes, JsErr};
+use crate::utils::{deserialize_from_bytes, serialize_to_bytes};
 
 /// A note bundles public metadata with private details: assets, script, inputs, and a serial number
 /// grouped into a recipient. The public identifier (`NoteId`) commits to those
 /// details, while the nullifier stays hidden until the note is consumed. Assets move by
 /// transferring them into the note; the script and inputs define how and when consumption can
 /// happen. See `NoteRecipient` for the shape of the recipient data.
-#[wasm_bindgen]
+#[js_export]
 #[derive(Clone)]
 pub struct Note(pub(crate) NativeNote);
 
-#[wasm_bindgen]
+#[js_export]
 impl Note {
     /// Creates a new note from the provided assets, metadata, and recipient.
-    #[wasm_bindgen(constructor)]
+    #[js_export(constructor)]
     pub fn new(
         note_assets: &NoteAssets,
         note_metadata: &NoteMetadata,
@@ -47,13 +47,13 @@ impl Note {
     }
 
     /// Serializes the note into bytes.
-    pub fn serialize(&self) -> Uint8Array {
-        serialize_to_uint8array(&self.0)
+    pub fn serialize(&self) -> JsBytes {
+        serialize_to_bytes(&self.0)
     }
 
     /// Deserializes a note from its byte representation.
-    pub fn deserialize(bytes: &Uint8Array) -> Result<Note, JsValue> {
-        deserialize_from_uint8array::<NativeNote>(bytes).map(Note)
+    pub fn deserialize(bytes: JsBytes) -> Result<Note, JsErr> {
+        deserialize_from_bytes::<NativeNote>(&bytes).map(Note)
     }
 
     /// Returns the unique identifier of the note.
@@ -96,14 +96,14 @@ impl Note {
     }
 
     /// Builds a standard P2ID note that targets the specified account.
-    #[wasm_bindgen(js_name = "createP2IDNote")]
+    #[js_export(js_name = "createP2IDNote")]
     pub fn create_p2id_note(
         sender: &AccountId,
         target: &AccountId,
         assets: &NoteAssets,
         note_type: NoteType,
         attachment: &NoteAttachment,
-    ) -> Result<Self, JsValue> {
+    ) -> Result<Self, JsErr> {
         let mut rng = StdRng::from_os_rng();
         let coin_seed: [u64; 4] = rng.random();
         let mut rng = RpoRandomCoin::new(coin_seed.map(NativeFelt::new).into());
@@ -125,7 +125,7 @@ impl Note {
     }
 
     /// Builds a P2IDE note that can be reclaimed or timelocked based on block heights.
-    #[wasm_bindgen(js_name = "createP2IDENote")]
+    #[js_export(js_name = "createP2IDENote")]
     pub fn create_p2ide_note(
         sender: &AccountId,
         target: &AccountId,
@@ -134,7 +134,7 @@ impl Note {
         timelock_height: Option<u32>,
         note_type: NoteType,
         attachment: &NoteAttachment,
-    ) -> Result<Self, JsValue> {
+    ) -> Result<Self, JsErr> {
         let mut rng = StdRng::from_os_rng();
         let coin_seed: [u64; 4] = rng.random();
         let mut rng = RpoRandomCoin::new(coin_seed.map(NativeFelt::new).into());
@@ -184,3 +184,5 @@ impl From<&Note> for NativeNote {
         note.0.clone()
     }
 }
+
+impl_napi_from_value!(Note);

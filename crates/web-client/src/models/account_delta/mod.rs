@@ -1,10 +1,10 @@
 use miden_client::account::AccountDelta as NativeAccountDelta;
-use wasm_bindgen::prelude::*;
-use wasm_bindgen_futures::js_sys::Uint8Array;
+use js_export_macro::js_export;
 
 use crate::models::account_id::AccountId;
 use crate::models::felt::Felt;
-use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
+use crate::platform::{JsBytes, JsErr};
+use crate::utils::{deserialize_from_bytes, serialize_to_bytes};
 
 /// `AccountDelta` stores the differences between two account states.
 ///
@@ -13,7 +13,7 @@ use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
 /// - `vault`: an `AccountVaultDelta` object that contains the changes to the account vault.
 /// - `nonce`: if the nonce of the account has changed, the new nonce is stored here.
 #[derive(Clone)]
-#[wasm_bindgen]
+#[js_export]
 pub struct AccountDelta(NativeAccountDelta);
 
 pub mod storage;
@@ -22,16 +22,16 @@ pub mod vault;
 use storage::AccountStorageDelta;
 use vault::AccountVaultDelta;
 
-#[wasm_bindgen]
+#[js_export]
 impl AccountDelta {
     /// Serializes the account delta into bytes.
-    pub fn serialize(&self) -> Uint8Array {
-        serialize_to_uint8array(&self.0)
+    pub fn serialize(&self) -> JsBytes {
+        serialize_to_bytes(&self.0)
     }
 
     /// Deserializes an account delta from bytes.
-    pub fn deserialize(bytes: &Uint8Array) -> Result<AccountDelta, JsValue> {
-        deserialize_from_uint8array::<NativeAccountDelta>(bytes).map(AccountDelta)
+    pub fn deserialize(bytes: JsBytes) -> Result<AccountDelta, JsErr> {
+        deserialize_from_bytes::<NativeAccountDelta>(&bytes).map(AccountDelta)
     }
 
     /// Returns the affected account ID.
@@ -40,7 +40,7 @@ impl AccountDelta {
     }
 
     /// Returns true if there are no changes.
-    #[wasm_bindgen(js_name = "isEmpty")]
+    #[js_export(js_name = "isEmpty")]
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
@@ -55,7 +55,7 @@ impl AccountDelta {
     }
 
     /// Returns the nonce change.
-    #[wasm_bindgen(js_name = "nonceDelta")]
+    #[js_export(js_name = "nonceDelta")]
     pub fn nonce_delta(&self) -> Felt {
         self.0.nonce_delta().into()
     }

@@ -5,22 +5,23 @@ use miden_client::rpc::domain::account::{
     AccountStorageRequirements as NativeAccountStorageRequirements,
     StorageMapKey as NativeStorageMapKey,
 };
-use wasm_bindgen::prelude::*;
+use js_export_macro::js_export;
 
 use crate::models::word::Word;
+use crate::platform::{JsErr, from_str_err};
 
 /// Storage slot index paired with map keys that must be present.
-#[wasm_bindgen]
+#[js_export]
 #[derive(Clone)]
 pub struct SlotAndKeys {
     storage_slot_name: String,
     storage_map_keys: Vec<Word>,
 }
 
-#[wasm_bindgen]
+#[js_export]
 impl SlotAndKeys {
     /// Creates a new slot-and-keys entry.
-    #[wasm_bindgen(constructor)]
+    #[js_export(constructor)]
     pub fn new(storage_slot_name: String, storage_map_keys: Vec<Word>) -> SlotAndKeys {
         SlotAndKeys { storage_slot_name, storage_map_keys }
     }
@@ -37,28 +38,28 @@ impl SlotAndKeys {
 }
 
 #[derive(Clone)]
-#[wasm_bindgen]
+#[js_export]
 pub struct AccountStorageRequirements(NativeAccountStorageRequirements);
 
-#[wasm_bindgen]
+#[js_export]
 impl AccountStorageRequirements {
     /// Creates empty storage requirements.
-    #[wasm_bindgen(constructor)]
+    #[js_export(constructor)]
     pub fn new() -> AccountStorageRequirements {
         AccountStorageRequirements(NativeAccountStorageRequirements::default())
     }
 
     /// Builds storage requirements from a list of slot/key pairs.
-    #[wasm_bindgen(js_name = "fromSlotAndKeysArray")]
+    #[js_export(js_name = "fromSlotAndKeysArray")]
     pub fn from_slot_and_keys_array(
         slots_and_keys: Vec<SlotAndKeys>,
-    ) -> Result<AccountStorageRequirements, JsValue> {
+    ) -> Result<AccountStorageRequirements, JsErr> {
         let mut intermediate: Vec<(NativeStorageSlotName, Vec<NativeStorageMapKey>)> =
             Vec::with_capacity(slots_and_keys.len());
 
         for sk in slots_and_keys {
             let slot_name = NativeStorageSlotName::new(sk.storage_slot_name)
-                .map_err(|err| JsValue::from_str(&format!("invalid storage slot name: {err}")))?;
+                .map_err(|err| from_str_err(&format!("invalid storage slot name: {err}")))?;
 
             let native_keys: Vec<NativeStorageMapKey> =
                 sk.storage_map_keys.into_iter().map(Into::into).collect();
@@ -108,3 +109,6 @@ impl From<&NativeAccountStorageRequirements> for AccountStorageRequirements {
         AccountStorageRequirements(native_account_storage_requirements.clone())
     }
 }
+
+impl_napi_from_value!(SlotAndKeys);
+impl_napi_from_value!(AccountStorageRequirements);

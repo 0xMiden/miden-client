@@ -1,6 +1,6 @@
 use miden_client::account::AccountHeader as NativeAccountHeader;
 use miden_client::transaction::ExecutedTransaction as NativeExecutedTransaction;
-use wasm_bindgen::prelude::*;
+use js_export_macro::js_export;
 
 use super::account_delta::AccountDelta;
 use super::account_header::AccountHeader;
@@ -22,10 +22,10 @@ use super::transaction_id::TransactionId;
 ///   inputs that the host provided to Miden VM while executing the transaction (i.e., advice
 ///   witness).
 #[derive(Clone)]
-#[wasm_bindgen]
+#[js_export]
 pub struct ExecutedTransaction(NativeExecutedTransaction);
 
-#[wasm_bindgen]
+#[js_export]
 impl ExecutedTransaction {
     /// Returns the transaction ID.
     pub fn id(&self) -> TransactionId {
@@ -33,50 +33,50 @@ impl ExecutedTransaction {
     }
 
     /// Returns the account the transaction was executed against.
-    #[wasm_bindgen(js_name = "accountId")]
+    #[js_export(js_name = "accountId")]
     pub fn account_id(&self) -> AccountId {
         self.0.account_id().into()
     }
 
     //TODO: Expose partial account
     /// Returns the initial account header before execution.
-    #[wasm_bindgen(js_name = "initialAccountHeader")]
+    #[js_export(js_name = "initialAccountHeader")]
     pub fn initial_account_header(&self) -> AccountHeader {
         NativeAccountHeader::from(self.0.initial_account()).into()
     }
 
     /// Returns the final account header after execution.
-    #[wasm_bindgen(js_name = "finalAccountHeader")]
+    #[js_export(js_name = "finalAccountHeader")]
     pub fn final_account_header(&self) -> AccountHeader {
         self.0.final_account().into()
     }
 
     /// Returns the input notes consumed by the transaction.
-    #[wasm_bindgen(js_name = "inputNotes")]
+    #[js_export(js_name = "inputNotes")]
     pub fn input_notes(&self) -> InputNotes {
         self.0.input_notes().into()
     }
 
     /// Returns the output notes produced by the transaction.
-    #[wasm_bindgen(js_name = "outputNotes")]
+    #[js_export(js_name = "outputNotes")]
     pub fn output_notes(&self) -> OutputNotes {
         self.0.output_notes().into()
     }
 
     /// Returns the arguments passed to the transaction script.
-    #[wasm_bindgen(js_name = "txArgs")]
+    #[js_export(js_name = "txArgs")]
     pub fn tx_args(&self) -> TransactionArgs {
         self.0.tx_args().into()
     }
 
     /// Returns the block header that included the transaction.
-    #[wasm_bindgen(js_name = "blockHeader")]
+    #[js_export(js_name = "blockHeader")]
     pub fn block_header(&self) -> BlockHeader {
         self.0.block_header().into()
     }
 
     /// Returns the account delta resulting from execution.
-    #[wasm_bindgen(js_name = "accountDelta")]
+    #[js_export(js_name = "accountDelta")]
     pub fn account_delta(&self) -> AccountDelta {
         self.0.account_delta().into()
     }

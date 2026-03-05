@@ -1,18 +1,19 @@
 use miden_client::account::AccountComponentCode as NativeAccountComponentCode;
-use wasm_bindgen::prelude::*;
+use js_export_macro::js_export;
 
 use crate::models::library::Library;
+use crate::platform::JsErr;
 
 #[derive(Debug, Clone)]
-#[wasm_bindgen]
+#[js_export]
 /// A Library that has been assembled for use as component code.
 pub struct AccountComponentCode(NativeAccountComponentCode);
 
-#[wasm_bindgen]
+#[js_export]
 impl AccountComponentCode {
     /// Returns the underlying Library
-    #[wasm_bindgen(js_name = "asLibrary")]
-    pub fn as_library(&self) -> Result<Library, JsValue> {
+    #[js_export(js_name = "asLibrary")]
+    pub fn as_library(&self) -> Result<Library, JsErr> {
         let native_library = self.0.as_library();
         Ok(native_library.into())
     }
@@ -32,3 +33,5 @@ impl From<AccountComponentCode> for NativeAccountComponentCode {
         native_account_component.0
     }
 }
+
+impl_napi_from_value!(AccountComponentCode);

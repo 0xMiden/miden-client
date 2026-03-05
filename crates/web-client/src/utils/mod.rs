@@ -1,28 +1,41 @@
 use miden_client::SliceReader;
 use miden_client::utils::{Deserializable, Serializable};
-use wasm_bindgen::prelude::*;
-use wasm_bindgen_futures::js_sys::Uint8Array;
 
 use crate::js_error_with_context;
+use crate::platform::{JsBytes, JsErr, bytes_to_js};
 
 #[cfg(feature = "testing")]
 pub mod test_utils;
 
-/// Serializes any value that implements `Serializable` into a `Uint8Array`.
-pub fn serialize_to_uint8array<T: Serializable>(value: &T) -> Uint8Array {
+/// Serializes any value that implements `Serializable` into the platform byte type.
+#[cfg(feature = "browser")]
+pub fn serialize_to_bytes<T: Serializable>(value: &T) -> JsBytes {
     let mut buffer = Vec::new();
-    // Call the trait method to write into the buffer.
     value.write_into(&mut buffer);
-    Uint8Array::from(&buffer[..])
+    bytes_to_js(&buffer)
 }
 
-/// Deserializes a `Uint8Array` into any type that implements `Deserializable`.
-pub fn deserialize_from_uint8array<T: Deserializable>(bytes: &Uint8Array) -> Result<T, JsValue> {
-    let vec = bytes.to_vec();
+/// Serializes any value that implements `Serializable` into the platform byte type.
+#[cfg(feature = "nodejs")]
+pub fn serialize_to_bytes<T: Serializable>(value: &T) -> JsBytes {
+    let mut buffer = Vec::new();
+    value.write_into(&mut buffer);
+    bytes_to_js(buffer)
+}
+
+/// Deserializes platform bytes into any type that implements `Deserializable`.
+pub fn deserialize_from_bytes<T: Deserializable>(bytes: &JsBytes) -> Result<T, JsErr> {
+    let vec = crate::platform::js_to_bytes(bytes);
     let mut reader = SliceReader::new(&vec);
     let context = alloc::format!("failed to deserialize {}", core::any::type_name::<T>());
     T::read_from(&mut reader).map_err(|e| js_error_with_context(e, &context))
 }
+
+// Keep old names as aliases for backwards compatibility during migration
+#[cfg(feature = "browser")]
+pub use serialize_to_bytes as serialize_to_uint8array;
+#[cfg(feature = "browser")]
+pub use deserialize_from_bytes as deserialize_from_uint8array;
 
 #[cfg(test)]
 mod tests {
@@ -30,7 +43,6 @@ mod tests {
 
     use super::*;
 
-    // Mock types for testing
     #[derive(Debug)]
     struct MockFailureType;
 
@@ -40,18 +52,16 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "browser")]
     #[test]
-    fn deserialize_from_uint8array_failure_with_type_context() {
-        // Create some invalid bytes
-        let uint8_array = Uint8Array::new_with_length(10);
+    fn deserialize_from_bytes_failure_with_type_context() {
+        use wasm_bindgen_futures::js_sys::Uint8Array;
 
-        // Try to deserialize with a type that always fails
-        let result = deserialize_from_uint8array::<MockFailureType>(&uint8_array);
+        let uint8_array = Uint8Array::new_with_length(10);
+        let result = deserialize_from_bytes::<MockFailureType>(&uint8_array);
 
         assert!(result.is_err());
         let error = result.unwrap_err();
-
-        // Verify the error contains the type name
         let error_string = error.as_string().unwrap();
         assert!(error_string.contains("MockFailureType"));
         assert!(error_string.contains("failed to deserialize"));

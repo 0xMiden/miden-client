@@ -1,6 +1,6 @@
 use miden_client::Word as NativeWord;
 use miden_client::note::NoteDetails as NativeNoteDetails;
-use wasm_bindgen::prelude::*;
+use js_export_macro::js_export;
 
 use super::note_assets::NoteAssets;
 use super::note_id::NoteId;
@@ -11,13 +11,13 @@ use super::word::Word;
 ///
 /// See the {@link Note} type for more details.
 #[derive(Clone)]
-#[wasm_bindgen]
+#[js_export]
 pub struct NoteDetails(NativeNoteDetails);
 
-#[wasm_bindgen]
+#[js_export]
 impl NoteDetails {
     /// Creates a new set of note details from the given assets and recipient.
-    #[wasm_bindgen(constructor)]
+    #[js_export(constructor)]
     pub fn new(note_assets: &NoteAssets, note_recipient: &NoteRecipient) -> NoteDetails {
         NoteDetails(NativeNoteDetails::new(note_assets.into(), note_recipient.into()))
     }
@@ -70,3 +70,5 @@ impl From<&NativeNoteDetails> for NoteDetails {
         NoteDetails(note_details.clone())
     }
 }
+
+impl_napi_from_value!(NoteDetails);

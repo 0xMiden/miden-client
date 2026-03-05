@@ -5,8 +5,7 @@ use miden_client::account::{
     AccountType as NativeAccountType,
 };
 use miden_client::transaction::AccountInterface;
-use wasm_bindgen::prelude::*;
-use wasm_bindgen_futures::js_sys::Uint8Array;
+use js_export_macro::js_export;
 
 use crate::models::account_code::AccountCode;
 use crate::models::account_id::AccountId;
@@ -14,7 +13,8 @@ use crate::models::account_storage::AccountStorage;
 use crate::models::asset_vault::AssetVault;
 use crate::models::felt::Felt;
 use crate::models::word::Word;
-use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
+use crate::platform::{JsBytes, JsErr};
+use crate::utils::{deserialize_from_bytes, serialize_to_bytes};
 
 /// An account which can store assets and define rules for manipulating them.
 ///
@@ -35,10 +35,10 @@ use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
 /// The recommended way to build an account is through an `AccountBuilder`, which can be
 /// instantiated directly from a 32-byte seed.
 #[derive(Clone)]
-#[wasm_bindgen]
+#[js_export]
 pub struct Account(NativeAccount);
 
-#[wasm_bindgen]
+#[js_export]
 impl Account {
     /// Returns the account identifier.
     pub fn id(&self) -> AccountId {
@@ -71,59 +71,59 @@ impl Account {
     }
 
     /// Returns true if the account is a faucet.
-    #[wasm_bindgen(js_name = "isFaucet")]
+    #[js_export(js_name = "isFaucet")]
     pub fn is_faucet(&self) -> bool {
         self.0.is_faucet()
     }
 
     /// Returns true if the account is a regular account (immutable or updatable code).
-    #[wasm_bindgen(js_name = "isRegularAccount")]
+    #[js_export(js_name = "isRegularAccount")]
     pub fn is_regular_account(&self) -> bool {
         self.0.is_regular_account()
     }
 
     /// Returns true if the account can update its code.
-    #[wasm_bindgen(js_name = "isUpdatable")]
+    #[js_export(js_name = "isUpdatable")]
     pub fn is_updatable(&self) -> bool {
         matches!(self.0.account_type(), NativeAccountType::RegularAccountUpdatableCode)
     }
 
     /// Returns true if the account exposes public storage.
-    #[wasm_bindgen(js_name = "isPublic")]
+    #[js_export(js_name = "isPublic")]
     pub fn is_public(&self) -> bool {
         self.0.is_public()
     }
 
     /// Returns true if the account storage is private.
-    #[wasm_bindgen(js_name = "isPrivate")]
+    #[js_export(js_name = "isPrivate")]
     pub fn is_private(&self) -> bool {
         self.0.is_private()
     }
 
     /// Returns true if this is a network-owned account.
-    #[wasm_bindgen(js_name = "isNetwork")]
+    #[js_export(js_name = "isNetwork")]
     pub fn is_network(&self) -> bool {
         self.0.is_network()
     }
 
     /// Returns true if the account has not yet been committed to the chain.
-    #[wasm_bindgen(js_name = "isNew")]
+    #[js_export(js_name = "isNew")]
     pub fn is_new(&self) -> bool {
         self.0.is_new()
     }
 
     /// Serializes the account into bytes.
-    pub fn serialize(&self) -> Uint8Array {
-        serialize_to_uint8array(&self.0)
+    pub fn serialize(&self) -> JsBytes {
+        serialize_to_bytes(&self.0)
     }
 
     /// Restores an account from its serialized bytes.
-    pub fn deserialize(bytes: &Uint8Array) -> Result<Account, JsValue> {
-        deserialize_from_uint8array::<NativeAccount>(bytes).map(Account)
+    pub fn deserialize(bytes: JsBytes) -> Result<Account, JsErr> {
+        deserialize_from_bytes::<NativeAccount>(&bytes).map(Account)
     }
 
     /// Returns the public key commitments derived from the account's authentication scheme.
-    #[wasm_bindgen(js_name = "getPublicKeyCommitments")]
+    #[js_export(js_name = "getPublicKeyCommitments")]
     pub fn get_public_key_commitments(&self) -> Vec<Word> {
         let inner_account = &self.0;
         let mut pks = vec![];
@@ -163,3 +163,5 @@ impl From<&Account> for NativeAccount {
         account.0.clone()
     }
 }
+
+impl_napi_from_value!(Account);

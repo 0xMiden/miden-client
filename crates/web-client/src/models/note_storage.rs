@@ -1,5 +1,5 @@
 use miden_client::note::NoteStorage as NativeNoteStorage;
-use wasm_bindgen::prelude::*;
+use js_export_macro::js_export;
 
 use super::felt::Felt;
 use crate::models::miden_arrays::FeltArray;
@@ -12,15 +12,15 @@ use crate::models::miden_arrays::FeltArray;
 /// All storage items associated with a note can be reduced to a single commitment which is
 /// computed as an RPO256 hash over the storage elements.
 #[derive(Clone)]
-#[wasm_bindgen]
+#[js_export]
 pub struct NoteStorage(NativeNoteStorage);
 
-#[wasm_bindgen]
+#[js_export]
 impl NoteStorage {
     /// Creates note storage from a list of field elements.
-    #[wasm_bindgen(constructor)]
-    pub fn new(felt_array: &FeltArray) -> NoteStorage {
-        let native_felts = felt_array.into();
+    #[js_export(constructor)]
+    pub fn new(felt_array: FeltArray) -> NoteStorage {
+        let native_felts = super::felt::felt_array_to_native_vec(&felt_array);
         let native_note_storage = NativeNoteStorage::new(native_felts).unwrap();
         NoteStorage(native_note_storage)
     }

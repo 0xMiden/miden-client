@@ -136,3 +136,4 @@ declare_js_miden_arrays! {
     (crate::models::transaction_request::note_details_and_tag::NoteDetailsAndTag) -> NoteDetailsAndTagArray,
     (crate::models::transaction_request::note_id_and_args::NoteIdAndArgs) -> NoteIdAndArgsArray
 }
+

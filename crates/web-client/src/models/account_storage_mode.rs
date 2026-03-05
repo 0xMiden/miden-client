@@ -1,14 +1,16 @@
 use core::str::FromStr;
 
 use miden_client::account::AccountStorageMode as NativeAccountStorageMode;
-use wasm_bindgen::prelude::*;
+use js_export_macro::js_export;
+
+use crate::platform::{JsErr, from_str_err};
 
 /// Storage visibility mode for an account.
-#[wasm_bindgen]
+#[js_export]
 #[derive(Clone)]
 pub struct AccountStorageMode(NativeAccountStorageMode);
 
-#[wasm_bindgen]
+#[js_export]
 impl AccountStorageMode {
     /// Creates a private storage mode.
     pub fn private() -> AccountStorageMode {
@@ -26,15 +28,15 @@ impl AccountStorageMode {
     }
 
     /// Parses a storage mode from its string representation.
-    #[wasm_bindgen(js_name = "tryFromStr")]
-    pub fn try_from_str(s: &str) -> Result<AccountStorageMode, JsValue> {
-        let mode = NativeAccountStorageMode::from_str(s)
-            .map_err(|e| JsValue::from_str(&format!("Invalid AccountStorageMode string: {e:?}")))?;
+    #[js_export(js_name = "tryFromStr")]
+    pub fn try_from_str(s: String) -> Result<AccountStorageMode, JsErr> {
+        let mode = NativeAccountStorageMode::from_str(&s)
+            .map_err(|e| from_str_err(&format!("Invalid AccountStorageMode string: {e:?}")))?;
         Ok(AccountStorageMode(mode))
     }
 
     /// Returns the storage mode as a string.
-    #[wasm_bindgen(js_name = "asStr")]
+    #[js_export(js_name = "asStr")]
     pub fn as_str(&self) -> String {
         self.0.to_string()
     }

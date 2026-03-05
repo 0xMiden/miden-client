@@ -1,35 +1,35 @@
+use js_export_macro::js_export;
 use miden_client::rpc::Endpoint as NativeEndpoint;
-use wasm_bindgen::prelude::*;
+
+use crate::platform::{JsErr, from_str_err};
 
 /// The `Endpoint` struct represents a network endpoint, consisting of a protocol, a host, and a
 /// port.
 ///
 /// This struct is used to define the address of a Miden node that the client will connect to.
 #[derive(Clone)]
-#[wasm_bindgen]
+#[js_export]
 pub struct Endpoint(NativeEndpoint);
 
-#[wasm_bindgen]
+#[js_export]
 impl Endpoint {
     /// Creates an endpoint from a URL string.
     ///
     /// @param url - The URL string (e.g., <https://localhost:57291>)
     /// @throws throws an error if the URL is invalid
-    #[wasm_bindgen(constructor)]
-    pub fn new(url: &str) -> Result<Endpoint, JsValue> {
-        NativeEndpoint::try_from(url)
+    #[js_export(constructor)]
+    pub fn new(url: String) -> Result<Endpoint, JsErr> {
+        NativeEndpoint::try_from(url.as_str())
             .map(Endpoint)
-            .map_err(|err| JsValue::from_str(&err))
+            .map_err(|err| from_str_err(&err))
     }
 
     /// Returns the endpoint for the Miden testnet.
-    #[wasm_bindgen]
     pub fn testnet() -> Endpoint {
         Endpoint(NativeEndpoint::testnet())
     }
 
     /// Returns the endpoint for the Miden devnet.
-    #[wasm_bindgen]
     pub fn devnet() -> Endpoint {
         Endpoint(NativeEndpoint::devnet())
     }
@@ -37,31 +37,30 @@ impl Endpoint {
     /// Returns the endpoint for a local Miden node.
     ///
     /// Uses <http://localhost:57291>
-    #[wasm_bindgen]
     pub fn localhost() -> Endpoint {
         Endpoint(NativeEndpoint::localhost())
     }
 
     /// Returns the protocol of the endpoint.
-    #[wasm_bindgen(getter)]
+    #[js_export(getter)]
     pub fn protocol(&self) -> String {
         self.0.protocol().to_string()
     }
 
     /// Returns the host of the endpoint.
-    #[wasm_bindgen(getter)]
+    #[js_export(getter)]
     pub fn host(&self) -> String {
         self.0.host().to_string()
     }
 
     /// Returns the port of the endpoint.
-    #[wasm_bindgen(getter)]
+    #[js_export(getter)]
     pub fn port(&self) -> Option<u16> {
         self.0.port()
     }
 
     /// Returns the string representation of the endpoint.
-    #[wasm_bindgen(js_name = "toString")]
+    #[js_export(js_name = "toString")]
     #[allow(clippy::inherent_to_string)]
     pub fn to_string(&self) -> String {
         self.0.to_string()
@@ -88,3 +87,5 @@ impl From<&Endpoint> for NativeEndpoint {
         endpoint.0.clone()
     }
 }
+
+impl_napi_from_value!(Endpoint);

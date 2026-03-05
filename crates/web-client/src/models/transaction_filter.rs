@@ -1,15 +1,15 @@
 use miden_client::store::TransactionFilter as NativeTransactionFilter;
 use miden_client::transaction::TransactionId as NativeTransactionId;
-use wasm_bindgen::prelude::*;
+use js_export_macro::js_export;
 
 use super::transaction_id::TransactionId;
 
 /// Filter used when querying stored transactions.
 #[derive(Clone)]
-#[wasm_bindgen]
+#[js_export]
 pub struct TransactionFilter(NativeTransactionFilter);
 
-#[wasm_bindgen]
+#[js_export]
 impl TransactionFilter {
     /// Matches all transactions.
     pub fn all() -> TransactionFilter {
@@ -29,7 +29,7 @@ impl TransactionFilter {
     }
 
     /// Matches transactions that expired before the given block number.
-    #[wasm_bindgen(js_name = "expiredBefore")]
+    #[js_export(js_name = "expiredBefore")]
     pub fn expired_before(block_num: u32) -> TransactionFilter {
         TransactionFilter(NativeTransactionFilter::ExpiredBefore(block_num.into()))
     }
@@ -49,3 +49,5 @@ impl From<&TransactionFilter> for NativeTransactionFilter {
         filter.0.clone()
     }
 }
+
+impl_napi_from_value!(TransactionFilter);

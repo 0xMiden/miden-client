@@ -19,31 +19,65 @@ ignored = ["wasm-bindgen-futures"]
 crate-type = ["cdylib"]
 
 [features]
+default = ["browser"]
+browser = [
+  "dep:idxdb-store",
+  "dep:wasm-bindgen",
+  "dep:wasm-bindgen-futures",
+  "dep:js-sys",
+  "dep:serde-wasm-bindgen",
+  "dep:console_error_panic_hook",
+  "dep:web-sys",
+  "miden-client/tonic",
+]
+nodejs = [
+  "dep:napi",
+  "dep:napi-derive",
+  "dep:napi-build",
+  "dep:miden-client-sqlite-store",
+  "dep:tokio",
+  "miden-client/std",
+  "miden-client/tonic",
+]
 testing = ["miden-client/testing"]
 
 [dependencies]
 # Workspace dependencies
-idxdb-store     = { workspace = true }
-miden-client    = { features = ["testing", "tonic"], workspace = true }
+miden-client    = { features = ["testing"], workspace = true }
 miden-protocol  = { workspace = true }
 miden-standards = { workspace = true }
 
-# External dependencies
+# Proc macro for dual wasm_bindgen/napi annotations
+js-export-macro = { path = "../js-export-macro" }
+
+# Common external dependencies
 async-trait = { workspace = true }
-console_error_panic_hook = { version = "0.1.7" }
 hex = { version = "0.4" }
-js-sys = { version = "0.3" }
 rand = { workspace = true }
 serde = { features = ["derive"], workspace = true }
-serde-wasm-bindgen = { version = "0.6" }
 thiserror.workspace = true
+
+# Browser-only dependencies (wasm_bindgen)
+idxdb-store             = { workspace = true, optional = true }
+console_error_panic_hook = { version = "0.1.7", optional = true }
+js-sys                  = { version = "0.3", optional = true }
+serde-wasm-bindgen      = { version = "0.6", optional = true }
 wasm-bindgen = { features = [
   "serde-serialize",
-], version = "=0.2.105" } # Lock version as .106 removed doc generation for structs
-wasm-bindgen-futures = { version = "0.4" }
+], version = "=0.2.105", optional = true } # Lock version as .106 removed doc generation for structs
+wasm-bindgen-futures    = { version = "0.4", optional = true }
 
-[dev-dependencies]
-web-sys = { features = ["console"], version = "0.3" }
+# Node.js-only dependencies (napi-rs)
+napi        = { workspace = true, features = ["tokio_rt"], optional = true }
+napi-derive = { workspace = true, optional = true }
+miden-client-sqlite-store = { workspace = true, optional = true }
+tokio       = { workspace = true, optional = true }
+
+# web-sys is a browser-only dependency used for console logging
+web-sys = { features = ["console"], version = "0.3", optional = true }
+
+[build-dependencies]
+napi-build = { workspace = true, optional = true }
 
 [lints]
 workspace = true

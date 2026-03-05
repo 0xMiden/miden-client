@@ -1,26 +1,26 @@
 use miden_client::transaction::TransactionRecord as NativeTransactionRecord;
-use wasm_bindgen::prelude::*;
+
+use js_export_macro::js_export;
 
 use super::models::transaction_filter::TransactionFilter;
 use super::models::transaction_record::TransactionRecord;
+use crate::platform::{JsErr, from_str_err};
 use crate::{WebClient, js_error_with_context};
 
-#[wasm_bindgen]
+#[js_export]
 impl WebClient {
-    #[wasm_bindgen(js_name = "getTransactions")]
+    #[js_export(js_name = "getTransactions")]
     pub async fn get_transactions(
-        &mut self,
+        &self,
         transaction_filter: TransactionFilter,
-    ) -> Result<Vec<TransactionRecord>, JsValue> {
-        if let Some(client) = self.get_mut_inner() {
-            let transaction_records: Vec<NativeTransactionRecord> = client
-                .get_transactions(transaction_filter.into())
-                .await
-                .map_err(|err| js_error_with_context(err, "failed to get transactions"))?;
+    ) -> Result<Vec<TransactionRecord>, JsErr> {
+        let mut guard = self.get_mut_inner().await;
+        let client = guard.as_mut().ok_or_else(|| from_str_err("Client not initialized"))?;
+        let transaction_records: Vec<NativeTransactionRecord> = client
+            .get_transactions(transaction_filter.into())
+            .await
+            .map_err(|err| js_error_with_context(err, "failed to get transactions"))?;
 
-            Ok(transaction_records.into_iter().map(Into::into).collect())
-        } else {
-            Err(JsValue::from_str("Client not initialized"))
-        }
+        Ok(transaction_records.into_iter().map(Into::into).collect())
     }
 }

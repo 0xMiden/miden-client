@@ -4,7 +4,7 @@ use miden_client::note::{
     PartialNote as NativePartialNote,
 };
 use miden_client::transaction::OutputNote as NativeOutputNote;
-use wasm_bindgen::prelude::*;
+use js_export_macro::js_export;
 
 use super::note::Note;
 use super::note_assets::NoteAssets;
@@ -13,14 +13,15 @@ use super::note_id::NoteId;
 use super::note_metadata::NoteMetadata;
 use super::partial_note::PartialNote;
 use super::word::Word;
+#[cfg(feature = "browser")]
 use crate::models::miden_arrays::OutputNoteArray;
 
 /// Representation of a note produced by a transaction (full, partial, or header-only).
 #[derive(Clone)]
-#[wasm_bindgen]
+#[js_export]
 pub struct OutputNote(NativeOutputNote);
 
-#[wasm_bindgen]
+#[js_export]
 impl OutputNote {
     /// Wraps a full note output.
     pub fn full(note: &Note) -> OutputNote {
@@ -51,7 +52,7 @@ impl OutputNote {
     }
 
     /// Returns the recipient digest if the recipient is known.
-    #[wasm_bindgen(js_name = "recipientDigest")]
+    #[js_export(js_name = "recipientDigest")]
     pub fn recipient_digest(&self) -> Option<Word> {
         self.0.recipient_digest().map(Into::into)
     }
@@ -68,14 +69,17 @@ impl OutputNote {
     }
 
     /// Converts into a full note if the data is present.
-    #[wasm_bindgen(js_name = "intoFull")]
-    pub fn into_full(self) -> Option<Note> {
-        match self.0 {
-            NativeOutputNote::Full(note) => Some(note.into()),
+    #[js_export(js_name = "intoFull")]
+    pub fn into_full(&self) -> Option<Note> {
+        match &self.0 {
+            NativeOutputNote::Full(note) => Some(note.clone().into()),
             _ => None,
         }
     }
+}
 
+// Internal methods accessible from Rust code (not processed by napi/wasm_bindgen).
+impl OutputNote {
     pub(crate) fn note(&self) -> &NativeOutputNote {
         &self.0
     }
@@ -111,14 +115,18 @@ impl From<&OutputNote> for NativeOutputNote {
 // CONVERSIONS
 // ================================================================================================
 
+#[cfg(feature = "browser")]
 impl From<OutputNoteArray> for Vec<NativeOutputNote> {
     fn from(output_notes_array: OutputNoteArray) -> Self {
         output_notes_array.__inner.into_iter().map(Into::into).collect()
     }
 }
 
+#[cfg(feature = "browser")]
 impl From<&OutputNoteArray> for Vec<NativeOutputNote> {
     fn from(output_notes_array: &OutputNoteArray) -> Self {
         output_notes_array.__inner.iter().map(Into::into).collect()
     }
 }
+
+impl_napi_from_value!(OutputNote);

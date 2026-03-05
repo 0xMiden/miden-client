@@ -1,19 +1,19 @@
 use miden_client::account::AccountFile as NativeAccountFile;
-use wasm_bindgen::prelude::*;
-use wasm_bindgen_futures::js_sys::Uint8Array;
+use js_export_macro::js_export;
 
 use crate::models::account::Account;
 use crate::models::account_id::AccountId;
-use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
+use crate::platform::{JsBytes, JsErr};
+use crate::utils::{deserialize_from_bytes, serialize_to_bytes};
 
 #[derive(Debug, Clone)]
-#[wasm_bindgen]
+#[js_export]
 pub struct AccountFile(NativeAccountFile);
 
-#[wasm_bindgen]
+#[js_export]
 impl AccountFile {
     /// Returns the account ID.
-    #[wasm_bindgen(js_name = "accountId")]
+    #[js_export(js_name = "accountId")]
     pub fn account_id(&self) -> AccountId {
         self.0.account.id().into()
     }
@@ -24,19 +24,19 @@ impl AccountFile {
     }
 
     /// Returns the number of auth secret keys included.
-    #[wasm_bindgen(js_name = "authSecretKeyCount")]
+    #[js_export(js_name = "authSecretKeyCount")]
     pub fn auth_secret_key_count(&self) -> usize {
         self.0.auth_secret_keys.len()
     }
 
     /// Serializes the `AccountFile` into a byte array
-    pub fn serialize(&self) -> Uint8Array {
-        serialize_to_uint8array(&self.0)
+    pub fn serialize(&self) -> JsBytes {
+        serialize_to_bytes(&self.0)
     }
 
     /// Deserializes a byte array into an `AccountFile`
-    pub fn deserialize(bytes: &Uint8Array) -> Result<AccountFile, JsValue> {
-        let native_account_file: NativeAccountFile = deserialize_from_uint8array(bytes)?;
+    pub fn deserialize(bytes: JsBytes) -> Result<AccountFile, JsErr> {
+        let native_account_file: NativeAccountFile = deserialize_from_bytes(&bytes)?;
         Ok(Self(native_account_file))
     }
 }
@@ -52,3 +52,5 @@ impl From<AccountFile> for NativeAccountFile {
         account_file.0
     }
 }
+
+impl_napi_from_value!(AccountFile);

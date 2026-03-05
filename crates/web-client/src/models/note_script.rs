@@ -1,38 +1,38 @@
 use miden_client::PrettyPrint;
 use miden_client::note::NoteScript as NativeNoteScript;
 use miden_standards::note::StandardNote;
-use wasm_bindgen::prelude::*;
-use wasm_bindgen_futures::js_sys::Uint8Array;
+use js_export_macro::js_export;
 
 use super::word::Word;
 use crate::models::package::Package;
-use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
+use crate::platform::{JsBytes, JsErr};
+use crate::utils::{deserialize_from_bytes, serialize_to_bytes};
 
 /// An executable program of a note.
 ///
 /// A note's script represents a program which must be executed for a note to be consumed. As such
 /// it defines the rules and side effects of consuming a given note.
 #[derive(Clone)]
-#[wasm_bindgen]
+#[js_export]
 pub struct NoteScript(NativeNoteScript);
 
-#[wasm_bindgen]
+#[js_export]
 impl NoteScript {
     /// Pretty-prints the MAST source for this script.
-    #[wasm_bindgen(js_name = toString)]
+    #[js_export(js_name = toString)]
     #[allow(clippy::inherent_to_string)]
     pub fn to_string(&self) -> String {
         self.0.to_pretty_string()
     }
 
     /// Serializes the script into bytes.
-    pub fn serialize(&self) -> Uint8Array {
-        serialize_to_uint8array(&self.0)
+    pub fn serialize(&self) -> JsBytes {
+        serialize_to_bytes(&self.0)
     }
 
     /// Deserializes a script from bytes.
-    pub fn deserialize(bytes: &Uint8Array) -> Result<NoteScript, JsValue> {
-        deserialize_from_uint8array::<NativeNoteScript>(bytes).map(NoteScript)
+    pub fn deserialize(bytes: JsBytes) -> Result<NoteScript, JsErr> {
+        deserialize_from_bytes::<NativeNoteScript>(&bytes).map(NoteScript)
     }
 
     /// Returns the well-known P2ID script.
@@ -57,8 +57,8 @@ impl NoteScript {
 
     /// Creates a `NoteScript` from the given `Package`.
     /// Throws if the package is invalid.
-    #[wasm_bindgen(js_name = "fromPackage")]
-    pub fn from_package(package: &Package) -> Result<NoteScript, JsValue> {
+    #[js_export(js_name = "fromPackage")]
+    pub fn from_package(package: &Package) -> Result<NoteScript, JsErr> {
         let program = package.as_program()?;
         let native_note_script = NativeNoteScript::new(program.into());
         Ok(native_note_script.into())

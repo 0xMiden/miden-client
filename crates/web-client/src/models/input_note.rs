@@ -1,6 +1,6 @@
 use miden_client::note::{Note as NativeNote, NoteInclusionProof as NativeNoteInclusionProof};
 use miden_client::transaction::InputNote as NativeInputNote;
-use wasm_bindgen::prelude::*;
+use js_export_macro::js_export;
 
 use super::note::Note;
 use super::note_id::NoteId;
@@ -10,10 +10,10 @@ use super::word::Word;
 
 /// Note supplied as an input to a transaction, optionally with authentication data.
 #[derive(Clone)]
-#[wasm_bindgen]
+#[js_export]
 pub struct InputNote(pub(crate) NativeInputNote);
 
-#[wasm_bindgen]
+#[js_export]
 impl InputNote {
     /// Creates an authenticated input note from a note and its inclusion proof.
     ///

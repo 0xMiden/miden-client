@@ -1,15 +1,15 @@
 use miden_client::transaction::{InputNote as NativeInputNote, InputNotes as NativeInputNotes};
-use wasm_bindgen::prelude::*;
+use js_export_macro::js_export;
 
 use super::input_note::InputNote;
 use super::word::Word;
 
 /// Input notes for a transaction, empty if the transaction does not consume notes.
 #[derive(Clone)]
-#[wasm_bindgen]
+#[js_export]
 pub struct InputNotes(NativeInputNotes<NativeInputNote>);
 
-#[wasm_bindgen]
+#[js_export]
 impl InputNotes {
     /// Returns the commitment to all input notes.
     pub fn commitment(&self) -> Word {
@@ -17,19 +17,19 @@ impl InputNotes {
     }
 
     /// Returns the number of input notes.
-    #[wasm_bindgen(js_name = "numNotes")]
+    #[js_export(js_name = "numNotes")]
     pub fn num_notes(&self) -> u8 {
         u8::try_from(self.0.num_notes()).expect("only 256 input notes is allowed")
     }
 
     /// Returns true if there are no input notes.
-    #[wasm_bindgen(js_name = "isEmpty")]
+    #[js_export(js_name = "isEmpty")]
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
 
     /// Returns the input note at the specified index.
-    #[wasm_bindgen(js_name = "getNote")]
+    #[js_export(js_name = "getNote")]
     pub fn get_note(&self, index: u8) -> InputNote {
         self.0.get_note(index as usize).into()
     }
