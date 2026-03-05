@@ -44,9 +44,9 @@ describe("useImportStore", () => {
 
       const { result } = renderHook(() => useImportStore());
 
-      await expect(
-        result.current.importStore({}, "TestStore")
-      ).rejects.toThrow("Miden client is not ready");
+      await expect(result.current.importStore({}, "TestStore")).rejects.toThrow(
+        "Miden client is not ready"
+      );
     });
 
     it("should import store successfully", async () => {
@@ -103,9 +103,7 @@ describe("useImportStore", () => {
 
     it("should set error on failure", async () => {
       const mockClient = createMockWebClient({
-        forceImportStore: vi
-          .fn()
-          .mockRejectedValue(new Error("Import failed")),
+        forceImportStore: vi.fn().mockRejectedValue(new Error("Import failed")),
       });
       const runExclusive = vi.fn((fn: () => unknown) => fn());
 
@@ -119,9 +117,9 @@ describe("useImportStore", () => {
       const { result } = renderHook(() => useImportStore());
 
       await act(async () => {
-        await expect(
-          result.current.importStore({}, "Store")
-        ).rejects.toThrow("Import failed");
+        await expect(result.current.importStore({}, "Store")).rejects.toThrow(
+          "Import failed"
+        );
       });
 
       await waitFor(() => {
@@ -133,9 +131,7 @@ describe("useImportStore", () => {
     it("should not call sync on failure", async () => {
       const mockSync = vi.fn();
       const mockClient = createMockWebClient({
-        forceImportStore: vi
-          .fn()
-          .mockRejectedValue(new Error("Import failed")),
+        forceImportStore: vi.fn().mockRejectedValue(new Error("Import failed")),
       });
       const runExclusive = vi.fn((fn: () => unknown) => fn());
 

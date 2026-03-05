@@ -85,9 +85,7 @@ describe("useImportNote", () => {
     it("should call sync after successful import", async () => {
       const mockSync = vi.fn().mockResolvedValue(undefined);
       const mockClient = createMockWebClient({
-        importNoteFile: vi
-          .fn()
-          .mockResolvedValue({ toString: () => "0xnote" }),
+        importNoteFile: vi.fn().mockResolvedValue({ toString: () => "0xnote" }),
       });
       const runExclusive = vi.fn((fn: () => unknown) => fn());
 
