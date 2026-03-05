@@ -29,10 +29,16 @@ pub async fn test_agglayer_update_ger(client_config: ClientConfig) -> Result<()>
 
     let (ger_manager_id, bridge_account_id) = match AgglayerConfig::from_env()? {
         Some(agglayer_config) => {
+            println!("Loading agglayer accounts from genesis files");
+            println!("  bridge admin:  {}", agglayer_config.bridge_admin_id());
+            println!("  GER manager:   {}", agglayer_config.ger_manager_id());
+            println!("  bridge:        {}", agglayer_config.bridge_id());
+            println!("  faucet:        {}", agglayer_config.faucet_id());
             agglayer_config.import_into_client(&mut client, &keystore).await?;
             (agglayer_config.ger_manager_id(), agglayer_config.bridge_id())
         },
         None => {
+            println!("Creating agglayer accounts at runtime (AGGLAYER_ACCOUNTS_DIR not set)");
             // Create accounts at runtime
             let (bridge_admin, ..) = insert_new_wallet(
                 &mut client,
@@ -55,6 +61,9 @@ pub async fn test_agglayer_update_ger(client_config: ClientConfig) -> Result<()>
                 bridge_admin.id(),
                 ger_manager.id(),
             );
+            println!("  bridge admin:  {}", bridge_admin.id());
+            println!("  GER manager:   {}", ger_manager.id());
+            println!("  bridge:        {}", bridge_account.id());
             client.add_account(&bridge_account, false).await?;
 
             // Deploy the bridge account on-chain with a no-op transaction
@@ -71,6 +80,7 @@ pub async fn test_agglayer_update_ger(client_config: ClientConfig) -> Result<()>
     // --------------------------------------------------------------------------------------------
     let ger_bytes: [u8; 32] = rand::random();
     let ger = ExitRoot::from(ger_bytes);
+    println!("Submitting UpdateGerNote with random GER: {ger_bytes:02x?}");
     let update_ger_note =
         UpdateGerNote::create(ger, ger_manager_id, bridge_account_id, client.rng())?;
 
@@ -95,6 +105,7 @@ pub async fn test_agglayer_update_ger(client_config: ClientConfig) -> Result<()>
         .with_context(|| "bridge account details not available")?;
 
     let is_registered = is_ger_registered(ger, updated_bridge_account)?;
+    println!("GER registered: {is_registered}");
 
     assert!(is_registered, "GER was not registered in the bridge account");
 
