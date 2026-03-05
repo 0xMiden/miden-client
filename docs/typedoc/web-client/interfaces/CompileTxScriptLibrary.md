@@ -8,11 +8,11 @@
 
 ## Properties
 
-### component
+### code
 
-> **component**: `AccountComponent`
+> **code**: `string`
 
-AccountComponent whose procedures become available to the script.
+MASM source code for the library.
 
 ***
 
@@ -22,3 +22,11 @@ AccountComponent whose procedures become available to the script.
 
 `"dynamic"` (default) — procedures are linked via DYNCALL at runtime.
 `"static"` — procedures are inlined at compile time.
+
+***
+
+### namespace
+
+> **namespace**: `string`
+
+MASM namespace for the library (e.g. "counter::module").

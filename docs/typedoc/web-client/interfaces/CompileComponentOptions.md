@@ -8,17 +8,17 @@
 
 ## Properties
 
-### source
+### code
 
-> **source**: `string`
+> **code**: `string`
 
 MASM source code for the component.
 
 ***
 
-### storageSlots?
+### slots?
 
-> `optional` **storageSlots**: `StorageSlot`[]
+> `optional` **slots**: `StorageSlot`[]
 
 Initial storage slots for the component.
 
