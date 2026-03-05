@@ -33,6 +33,35 @@ export const parseAccountId = (
   return parseAccountIdFromString(normalized);
 };
 
+/**
+ * Check if an account ID represents a faucet.
+ * Faucet IDs have bits 61..=60 == 0b10 (Fungible Faucet) or 0b11 (Non-fungible Faucet).
+ */
+export function isFaucetId(accountId: unknown): boolean {
+  try {
+    let hex =
+      typeof (accountId as { toHex?: () => string }).toHex === "function"
+        ? (accountId as { toHex: () => string }).toHex()
+        : String(accountId);
+
+    if (hex.startsWith("0x") || hex.startsWith("0X")) {
+      hex = hex.slice(2);
+    }
+
+    // Account type is in bits 61..60 of the u64:
+    // 0b00 = Regular account (off-chain)
+    // 0b01 = Regular account (on-chain)
+    // 0b10 = Fungible faucet
+    // 0b11 = Non-fungible faucet
+    const firstByte = parseInt(hex.slice(0, 2), 16);
+    const accountType = (firstByte >> 4) & 0b11;
+
+    return accountType === 0b10 || accountType === 0b11;
+  } catch {
+    return false;
+  }
+}
+
 export const parseAddress = (
   value: string,
   accountId?: AccountIdType
