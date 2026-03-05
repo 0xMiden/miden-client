@@ -129,7 +129,6 @@ impl WebStore {
             let final_header = executed_tx.final_account();
 
             // Compute storage and vault changes using SMT forest, then stage new roots.
-            // The lock must be dropped before the async DB write.
             let (updated_storage_slots, updated_assets, removed_vault_keys) = {
                 let mut smt_forest = self.smt_forest.write();
 
@@ -184,7 +183,6 @@ impl WebStore {
 
                 (updated_storage_slots, updated_assets, removed_vault_keys)
             };
-            // smt_forest lock is now dropped — safe to await
 
             apply_transaction_delta(
                 self.db_id(),
