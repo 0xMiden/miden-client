@@ -37,7 +37,7 @@ export const testStandardFpi = async (page: Page): Promise<string> => {
                 swapw dropw
             end
         `;
-    let builder = client.createCodeBuilder();
+    let builder = await client.createCodeBuilder();
     let componentLibrary = builder.buildLibrary(COMPONENT_LIB_PATH, code);
     let getItemComponent = window.AccountComponent.fromLibrary(
       componentLibrary,

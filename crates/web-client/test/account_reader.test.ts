@@ -14,7 +14,7 @@ test.describe("AccountReader tests", () => {
         0
       );
 
-      const reader = client.accountReader(account.id());
+      const reader = await client.accountReader(account.id());
 
       const nonce = await reader.nonce();
       const commitment = await reader.commitment();

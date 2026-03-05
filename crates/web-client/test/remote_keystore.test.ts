@@ -187,7 +187,7 @@ test.describe("remote keystore", () => {
 
       await client.syncState();
 
-      const txRequest = (client as any).newMintTransactionRequest(
+      const txRequest = await (client as any).newMintTransactionRequest(
         wallet.id(),
         faucet.id(),
         window.NoteType.Public,

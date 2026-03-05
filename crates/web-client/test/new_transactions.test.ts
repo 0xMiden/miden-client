@@ -419,7 +419,7 @@ export const customTransaction = async (
             end
         `;
 
-      let builder = client.createCodeBuilder();
+      let builder = await client.createCodeBuilder();
       let compiledNoteScript = builder.compileNoteScript(noteScript);
       let noteStorage = new window.NoteStorage(
         new window.MidenArrays.FeltArray([
@@ -730,7 +730,7 @@ export const customAccountComponent = async (
         end
       `;
       const client = window.client;
-      let builder = client.createCodeBuilder();
+      let builder = await client.createCodeBuilder();
       let storageMap = new window.StorageMap();
       let storageSlotMap = window.StorageSlot.map(MAP_SLOT_NAME, storageMap);
 
@@ -859,7 +859,7 @@ export const discardedTransaction = async (
     );
     await client.syncState();
 
-    let mintTransactionRequest = client.newMintTransactionRequest(
+    let mintTransactionRequest = await client.newMintTransactionRequest(
       senderAccount.id(),
       faucetAccount.id(),
       window.NoteType.Private,
@@ -900,7 +900,7 @@ export const discardedTransaction = async (
       senderConsumeTransactionUpdate.executedTransaction().id().toHex()
     );
 
-    let sendTransactionRequest = client.newSendTransactionRequest(
+    let sendTransactionRequest = await client.newSendTransactionRequest(
       senderAccount.id(),
       targetAccount.id(),
       faucetAccount.id(),
@@ -1085,7 +1085,7 @@ export const counterAccountComponent = async (
     // Create counter account
     let emptyStorageSlot = window.StorageSlot.emptyValue(COUNTER_SLOT_NAME);
 
-    let builder = client.createCodeBuilder();
+    let builder = await client.createCodeBuilder();
 
     let accountComponentCode = builder.compileAccountComponentCode(accountCode);
     let counterAccountComponent = window.AccountComponent.compile(
@@ -1261,7 +1261,7 @@ export const testStorageMap = async (page: Page): Promise<any> => {
                 end
         `;
 
-    let builder = client.createCodeBuilder();
+    let builder = await client.createCodeBuilder();
     let accountComponentCode = builder.compileAccountComponentCode(accountCode);
     let bumpItemComponent = window.AccountComponent.compile(
       accountComponentCode,
@@ -1397,7 +1397,7 @@ test.describe("submitNewTransactionWithProver tests", () => {
 
         await client.syncState();
 
-        const mintTransactionRequest = client.newMintTransactionRequest(
+        const mintTransactionRequest = await client.newMintTransactionRequest(
           targetAccountId,
           faucetAccountId,
           window.NoteType.Public,
@@ -1484,7 +1484,7 @@ test.describe("submitNewTransactionWithProver tests", () => {
 
         await client.syncState();
 
-        const mintTransactionRequest = client.newMintTransactionRequest(
+        const mintTransactionRequest = await client.newMintTransactionRequest(
           targetAccount.id(),
           faucetAccount.id(),
           window.NoteType.Public,
@@ -1531,7 +1531,7 @@ test.describe("submitNewTransactionWithProver tests", () => {
           consumeTransactionUpdate.executedTransaction().id().toHex()
         );
 
-        const sendTransactionRequest = client.newSendTransactionRequest(
+        const sendTransactionRequest = await client.newSendTransactionRequest(
           targetAccount.id(),
           accountBuilderResult.account.id(),
           faucetAccount.id(),

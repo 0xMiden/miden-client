@@ -225,7 +225,7 @@ export const compileTxScript = async (
       0
     );
 
-    let builder = client.createCodeBuilder();
+    let builder = await client.createCodeBuilder();
     const compiledScript = builder.compileNoteScript(_script);
 
     return {

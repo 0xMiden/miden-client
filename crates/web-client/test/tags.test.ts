@@ -94,7 +94,7 @@ test.describe("remove_tag tests", () => {
       );
 
       // Mint a note (adds a tag with sourceNoteId for the output note)
-      const mintRequest = client.newMintTransactionRequest(
+      const mintRequest = await client.newMintTransactionRequest(
         wallet.id(),
         faucet.id(),
         window.NoteType.Private,
