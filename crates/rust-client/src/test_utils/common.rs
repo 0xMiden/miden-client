@@ -10,12 +10,12 @@ use std::vec::Vec;
 use anyhow::{Context, Result};
 use miden_protocol::Felt;
 use miden_protocol::account::auth::AuthSecretKey;
-use miden_protocol::account::{Account, AccountId, AccountStorageMode};
+use miden_protocol::account::{Account, AccountComponentMetadata, AccountId, AccountStorageMode};
 use miden_protocol::asset::{FungibleAsset, TokenSymbol};
 use miden_protocol::note::NoteType;
 use miden_protocol::testing::account_id::ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE;
 use miden_protocol::transaction::{OutputNote, TransactionId};
-use miden_standards::account::auth::{AuthEcdsaK256Keccak, AuthFalcon512Rpo};
+use miden_standards::account::auth::AuthSingleSig;
 use miden_standards::code_builder::CodeBuilder;
 use rand::RngCore;
 use tracing::{debug, info};
@@ -26,7 +26,7 @@ use crate::account::{AccountBuilder, AccountType, StorageSlot};
 use crate::auth::AuthSchemeId;
 use crate::crypto::FeltRng;
 pub use crate::keystore::{FilesystemKeyStore, Keystore};
-use crate::note::{Note, NoteAttachment, create_p2id_note};
+use crate::note::{Note, NoteAttachment, P2idNote};
 use crate::rpc::RpcError;
 use crate::store::{NoteFilter, TransactionFilter};
 use crate::sync::SyncSummary;
@@ -79,14 +79,18 @@ pub async fn insert_new_wallet_with_seed(
     let (key_pair, auth_component) = match auth_scheme {
         AuthSchemeId::Falcon512Rpo => {
             let key_pair = AuthSecretKey::new_falcon512_rpo();
-            let auth_component: AccountComponent =
-                AuthFalcon512Rpo::new(key_pair.public_key().to_commitment()).into();
+            let auth_component = AuthSingleSig::new(
+                key_pair.public_key().to_commitment(),
+                AuthSchemeId::Falcon512Rpo,
+            );
             (key_pair, auth_component)
         },
         AuthSchemeId::EcdsaK256Keccak => {
             let key_pair = AuthSecretKey::new_ecdsa_k256_keccak();
-            let auth_component: AccountComponent =
-                AuthEcdsaK256Keccak::new(key_pair.public_key().to_commitment()).into();
+            let auth_component = AuthSingleSig::new(
+                key_pair.public_key().to_commitment(),
+                AuthSchemeId::EcdsaK256Keccak,
+            );
             (key_pair, auth_component)
         },
         scheme => {
@@ -123,14 +127,18 @@ pub async fn insert_new_fungible_faucet(
     let (key_pair, auth_component) = match auth_scheme {
         AuthSchemeId::Falcon512Rpo => {
             let key_pair = AuthSecretKey::new_falcon512_rpo();
-            let auth_component: AccountComponent =
-                AuthFalcon512Rpo::new(key_pair.public_key().to_commitment()).into();
+            let auth_component = AuthSingleSig::new(
+                key_pair.public_key().to_commitment(),
+                AuthSchemeId::Falcon512Rpo,
+            );
             (key_pair, auth_component)
         },
         AuthSchemeId::EcdsaK256Keccak => {
             let key_pair = AuthSecretKey::new_ecdsa_k256_keccak();
-            let auth_component: AccountComponent =
-                AuthEcdsaK256Keccak::new(key_pair.public_key().to_commitment()).into();
+            let auth_component = AuthSingleSig::new(
+                key_pair.public_key().to_commitment(),
+                AuthSchemeId::EcdsaK256Keccak,
+            );
             (key_pair, auth_component)
         },
         scheme => {
@@ -484,7 +492,7 @@ pub fn mint_multiple_fungible_asset(
         .iter()
         .map(|account_id| {
             OutputNote::Full(
-                create_p2id_note(
+                P2idNote::create(
                     asset.faucet_id(),
                     *account_id,
                     vec![asset.into()],
@@ -565,9 +573,12 @@ pub async fn insert_account_with_custom_component(
     let component_code = CodeBuilder::default()
         .compile_component_code("custom::component", custom_code)
         .map_err(|err| ClientError::TransactionRequestError(err.into()))?;
-    let custom_component = AccountComponent::new(component_code, storage_slots)
-        .map_err(ClientError::AccountError)?
-        .with_supports_all_types();
+    let custom_component = AccountComponent::new(
+        component_code,
+        storage_slots,
+        AccountComponentMetadata::new("miden::testing::custom_component").with_supports_all_types(),
+    )
+    .map_err(ClientError::AccountError)?;
 
     let mut init_seed = [0u8; 32];
     client.rng().fill_bytes(&mut init_seed);
@@ -578,7 +589,10 @@ pub async fn insert_account_with_custom_component(
     let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountImmutableCode)
         .storage_mode(storage_mode)
-        .with_auth_component(AuthFalcon512Rpo::new(pub_key.to_commitment()))
+        .with_auth_component(AuthSingleSig::new(
+            pub_key.to_commitment(),
+            AuthSchemeId::Falcon512Rpo,
+        ))
         .with_component(BasicWallet)
         .with_component(custom_component)
         .build()

@@ -9,8 +9,8 @@ use wasm_bindgen::prelude::*;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[wasm_bindgen]
 pub enum AuthScheme {
-    AuthRpoFalcon512 = 0,
     AuthEcdsaK256Keccak = 1,
+    AuthRpoFalcon512 = 2,
 }
 
 // Compile-time check to ensure both enums stay aligned.

@@ -2,7 +2,7 @@ use alloc::boxed::Box;
 use alloc::sync::Arc;
 
 use miden_client::assembly::CodeBuilder;
-use miden_client::auth::{AuthFalcon512Rpo, AuthSecretKey, RPO_FALCON_SCHEME_ID};
+use miden_client::auth::{AuthSchemeId, AuthSecretKey, AuthSingleSig, RPO_FALCON_SCHEME_ID};
 use miden_client::keystore::Keystore;
 use miden_client::transaction::{
     ProvenTransaction,
@@ -16,8 +16,10 @@ use miden_client::{ClientError, async_trait};
 use miden_protocol::account::{
     AccountBuilder,
     AccountComponent,
+    AccountComponentMetadata,
     AccountStorageMode,
     StorageMap,
+    StorageMapKey,
     StorageSlot,
     StorageSlotName,
 };
@@ -52,7 +54,10 @@ async fn transaction_creates_two_notes() {
 
     let account = AccountBuilder::new(Default::default())
         .with_component(BasicWallet)
-        .with_auth_component(AuthFalcon512Rpo::new(pub_key.to_commitment()))
+        .with_auth_component(AuthSingleSig::new(
+            pub_key.to_commitment(),
+            AuthSchemeId::Falcon512Rpo,
+        ))
         .with_assets([asset_1, asset_2])
         .build_existing()
         .unwrap();
@@ -206,7 +211,7 @@ async fn lazy_foreign_account_loading() {
     let map_slot_name = StorageSlotName::new("miden::testing::fpi::map").unwrap();
 
     let mut storage_map = StorageMap::new();
-    storage_map.insert(map_key, map_value).unwrap();
+    storage_map.insert(StorageMapKey::new(map_key), map_value).unwrap();
     let map_slot = StorageSlot::with_map(map_slot_name, storage_map);
 
     let component_code = CodeBuilder::default()
@@ -224,15 +229,22 @@ async fn lazy_foreign_account_loading() {
             ),
         )
         .unwrap();
-    let fpi_component = AccountComponent::new(component_code, vec![map_slot])
-        .unwrap()
-        .with_supports_all_types();
+    let fpi_component = AccountComponent::new(
+        component_code,
+        vec![map_slot],
+        AccountComponentMetadata::new("miden::testing::fpi_lazy_component")
+            .with_supports_all_types(),
+    )
+    .unwrap();
     let proc_root = fpi_component.mast_forest().procedure_digests().next().unwrap();
 
     let secret_key = AuthSecretKey::new_falcon512_rpo();
     let foreign_account = AccountBuilder::new(Default::default())
         .with_component(fpi_component)
-        .with_auth_component(AuthFalcon512Rpo::new(secret_key.public_key().to_commitment()))
+        .with_auth_component(AuthSingleSig::new(
+            secret_key.public_key().to_commitment(),
+            AuthSchemeId::Falcon512Rpo,
+        ))
         .storage_mode(AccountStorageMode::Public)
         .build()
         .unwrap();

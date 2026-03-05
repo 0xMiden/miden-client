@@ -22,6 +22,7 @@ use miden_client::account::{
     AccountId,
     AccountStorage,
     Address,
+    StorageMapKey,
     StorageSlotName,
 };
 use miden_client::asset::{Asset, AssetVault, AssetVaultKey, AssetWitness, StorageMapWitness};
@@ -368,7 +369,7 @@ impl Store for WebStore {
         &self,
         account_id: AccountId,
         slot_name: StorageSlotName,
-        key: Word,
+        key: StorageMapKey,
     ) -> Result<(Word, StorageMapWitness), StoreError> {
         self.get_account_map_item(account_id, slot_name, key).await
     }

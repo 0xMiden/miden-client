@@ -10,6 +10,7 @@ use miden_protocol::account::{
     PartialAccount,
     PartialStorageMap,
     StorageMap,
+    StorageMapKey,
     StorageMapWitness,
     StorageSlot,
     StorageSlotContent,
@@ -46,7 +47,7 @@ pub struct ClientDataStore {
     /// Cache of storage map witnesses, keyed by (`account_id`, `map_root`, `map_key`). Avoids
     /// redundant RPC calls when the same map entry is accessed multiple times within a
     /// transaction.
-    storage_map_cache: RwLock<BTreeMap<(AccountId, Word, Word), StorageMapWitness>>,
+    storage_map_cache: RwLock<BTreeMap<(AccountId, Word, StorageMapKey), StorageMapWitness>>,
     /// RPC client used to lazy-load foreign account data on cache miss.
     rpc_api: Arc<dyn NodeRpcClient>,
 }
@@ -90,7 +91,7 @@ impl ClientDataStore {
         &self,
         account_id: AccountId,
         map_root: Word,
-        map_key: Word,
+        map_key: StorageMapKey,
     ) -> Result<Option<StorageMapWitness>, DataStoreError> {
         match self
             .store
@@ -191,7 +192,7 @@ impl ClientDataStore {
         &self,
         account_id: AccountId,
         slot_name: StorageSlotName,
-        map_key: Word,
+        map_key: StorageMapKey,
         known_code: AccountCode,
     ) -> Result<StorageMapEntries, DataStoreError> {
         let storage_requirements = AccountStorageRequirements::new([(slot_name, &[map_key])]);
@@ -262,7 +263,7 @@ impl ClientDataStore {
 /// Converts [`StorageMapEntries`] into a [`StorageMapWitness`] for the given key.
 fn storage_map_entries_into_witness(
     entries: StorageMapEntries,
-    map_key: Word,
+    map_key: StorageMapKey,
 ) -> Result<StorageMapWitness, DataStoreError> {
     match entries {
         StorageMapEntries::AllEntries(entries) => {
@@ -399,7 +400,7 @@ impl DataStore for ClientDataStore {
         &self,
         account_id: AccountId,
         map_root: Word,
-        map_key: Word,
+        map_key: StorageMapKey,
     ) -> Result<StorageMapWitness, DataStoreError> {
         let cache_key = (account_id, map_root, map_key);
 

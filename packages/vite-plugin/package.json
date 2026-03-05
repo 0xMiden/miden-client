@@ -1,0 +1,52 @@
+{
+  "name": "@miden-sdk/vite-plugin",
+  "version": "0.13.4",
+  "description": "Vite plugin for Miden dApps — WASM dedup, COOP/COEP headers, and gRPC-web proxy",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm --dts --clean",
+    "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "vite": "^5.0.0 || ^6.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.0.0",
+    "vite": "^5.0.0"
+  },
+  "keywords": [
+    "miden",
+    "vite",
+    "plugin",
+    "wasm",
+    "blockchain",
+    "rollup",
+    "zk"
+  ],
+  "author": "Miden Contributors",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/0xMiden/miden-client"
+  },
+  "bugs": {
+    "url": "https://github.com/0xMiden/miden-client/issues"
+  }
+}

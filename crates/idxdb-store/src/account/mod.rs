@@ -14,6 +14,7 @@ use miden_client::account::{
     PartialStorage,
     PartialStorageMap,
     StorageMap,
+    StorageMapKey,
     StorageSlot,
     StorageSlotName,
     StorageSlotType,
@@ -343,7 +344,10 @@ impl WebStore {
         let mut maps = BTreeMap::new();
         for entry in account_maps_idxdb {
             let map = maps.entry(entry.slot_name).or_insert_with(StorageMap::new);
-            map.insert(Word::try_from(entry.key.as_str())?, Word::try_from(entry.value.as_str())?)?;
+            map.insert(
+                StorageMapKey::new(Word::try_from(entry.key.as_str())?),
+                Word::try_from(entry.value.as_str())?,
+            )?;
         }
 
         let slots: Vec<StorageSlot> = filtered_slots
@@ -449,48 +453,20 @@ impl WebStore {
             return Err(StoreError::AccountDataNotFound(new_account_state.id()));
         }
 
-        // Get old SMT roots (vault + storage maps) before updating so we can prune them after
-        let old_header = self.get_account_header(new_account_state.id()).await?.map(|(h, _)| h);
-        let old_roots = if let Some(header) = old_header {
-            self.get_smt_roots_for_account_header(&header).await?
-        } else {
-            Vec::new()
-        };
-
         apply_full_account_state(self.db_id(), new_account_state)
             .await
             .map_err(|_| StoreError::DatabaseError("failed to update account".to_string()))?;
 
-        // Update the SMT forest with the new account state
+        // Update the SMT forest with the new account state (insert nodes + replace roots
+        // atomically)
         let mut smt_forest = self.smt_forest.write();
-        smt_forest.insert_account_state(new_account_state.vault(), new_account_state.storage())?;
-
-        // Pop old roots to free memory for nodes no longer reachable
-        smt_forest.pop_roots(old_roots);
+        smt_forest.insert_and_register_account_state(
+            new_account_state.id(),
+            new_account_state.vault(),
+            new_account_state.storage(),
+        )?;
 
         Ok(())
-    }
-
-    /// Returns all SMT roots (vault root + storage map roots) for the given account header.
-    ///
-    /// This is used to identify which roots should be popped from the SMT forest when
-    /// an account is updated, to prevent memory leaks.
-    pub(crate) async fn get_smt_roots_for_account_header(
-        &self,
-        header: &AccountHeader,
-    ) -> Result<Vec<Word>, StoreError> {
-        let mut roots = vec![header.vault_root()];
-
-        // Get all storage map roots from the account's storage
-        let storage_slot_headers = self.get_storage_slot_headers(header.id()).await?;
-
-        for (_slot_name, slot_type, value) in storage_slot_headers {
-            if slot_type == StorageSlotType::Map {
-                roots.push(value);
-            }
-        }
-
-        Ok(roots)
     }
 
     pub(crate) async fn get_account_vault(
@@ -543,7 +519,7 @@ impl WebStore {
         &self,
         account_id: AccountId,
         slot_name: StorageSlotName,
-        key: Word,
+        key: StorageMapKey,
     ) -> Result<(Word, StorageMapWitness), StoreError> {
         // TODO: prevent fetching the full storage when we only need one map item
         // https://github.com/0xMiden/miden-client/issues/1746

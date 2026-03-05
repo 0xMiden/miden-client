@@ -66,7 +66,7 @@ impl WebClient {
     #[wasm_bindgen(js_name = "exportAccountFile")]
     pub async fn export_account_file(
         &mut self,
-        account_id: AccountId,
+        account_id: &AccountId,
     ) -> Result<AccountFile, JsValue> {
         let keystore = self.keystore.clone().expect("Keystore not initialized");
         if let Some(client) = self.get_mut_inner() {

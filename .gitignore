@@ -43,6 +43,10 @@ miden-client.toml
 !packages/react-sdk/
 !packages/react-sdk/**
 packages/react-sdk/dist/
+!packages/vite-plugin/
+!packages/vite-plugin/**
+packages/vite-plugin/dist/
+packages/vite-plugin/node_modules/
 keystore/
 
 # Ignore files that spawn using `cargo run`
