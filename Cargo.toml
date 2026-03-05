@@ -42,16 +42,18 @@ miden-testing   = { default-features = false, version = "=0.14.0-alpha.1" }
 miden-tx        = { default-features = false, version = "=0.14.0-alpha.1" }
 
 # Miden node dependencies
-miden-node-block-producer        = { version = "=0.14.0-alpha.2" }
-miden-node-ntx-builder           = { version = "=0.14.0-alpha.2" }
-miden-node-proto                 = { version = "=0.14.0-alpha.2" }
-miden-node-proto-build           = { default-features = false, version = "=0.14.0-alpha.2" }
-miden-node-rpc                   = { version = "=0.14.0-alpha.2" }
-miden-node-store                 = { version = "=0.14.0-alpha.2" }
-miden-node-utils                 = { version = "=0.14.0-alpha.2" }
-miden-node-validator             = { version = "=0.14.0-alpha.2" }
+miden-node-block-producer = { branch = "mmagician-claude/fix-genesis-network-accounts", git = "https://github.com/0xMiden/miden-node" }
+miden-node-ntx-builder = { branch = "mmagician-claude/fix-genesis-network-accounts", git = "https://github.com/0xMiden/miden-node" }
+miden-node-proto = { branch = "mmagician-claude/fix-genesis-network-accounts", git = "https://github.com/0xMiden/miden-node" }
+miden-node-proto-build = { branch = "mmagician-claude/fix-genesis-network-accounts", default-features = false, git = "https://github.com/0xMiden/miden-node" }
+miden-node-rpc = { branch = "mmagician-claude/fix-genesis-network-accounts", git = "https://github.com/0xMiden/miden-node" }
+miden-node-store = { branch = "mmagician-claude/fix-genesis-network-accounts", git = "https://github.com/0xMiden/miden-node" }
+miden-node-utils = { branch = "mmagician-claude/fix-genesis-network-accounts", git = "https://github.com/0xMiden/miden-node" }
+miden-node-validator = { branch = "mmagician-claude/fix-genesis-network-accounts", git = "https://github.com/0xMiden/miden-node" }
 miden-note-transport-proto-build = { default-features = false, version = "0.2" }
-miden-remote-prover-client       = { default-features = false, features = ["tx-prover"], version = "=0.14.0-alpha.2" }
+miden-remote-prover-client = { branch = "mmagician-claude/fix-genesis-network-accounts", default-features = false, features = [
+  "tx-prover",
+], git = "https://github.com/0xMiden/miden-node" }
 
 # External dependencies
 anyhow      = { default-features = false, version = "1.0" }
