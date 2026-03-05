@@ -62,6 +62,7 @@
 //! For more detailed information about each function and error type, refer to the specific API
 //! documentation.
 
+use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
@@ -80,7 +81,7 @@ use tracing::info;
 use super::Client;
 use crate::ClientError;
 use crate::note::NoteUpdateTracker;
-use crate::rpc::AccountStateAt;
+use crate::rpc::{AccountStateAt, GrpcError, RpcError};
 use crate::store::data_store::ClientDataStore;
 use crate::store::input_note_states::ExpectedNoteState;
 use crate::store::{
@@ -203,6 +204,18 @@ where
         transaction_request: TransactionRequest,
         tx_prover: Arc<dyn TransactionProver>,
     ) -> Result<TransactionId, ClientError> {
+        // Pre-flight: register any missing NTX scripts before the main transaction.
+        // Boxed to avoid inflating this future's size (the registration path contains its
+        // own full execute → prove → submit pipeline).
+        if !transaction_request.expected_ntx_scripts().is_empty() {
+            Box::pin(self.ensure_ntx_scripts_registered(
+                account_id,
+                transaction_request.expected_ntx_scripts(),
+                tx_prover.clone(),
+            ))
+            .await?;
+        }
+
         let tx_result = self.execute_transaction(account_id, transaction_request).await?;
         let tx_id = tx_result.executed_transaction().id();
 
@@ -612,6 +625,54 @@ where
         } else {
             validate_basic_account_request(transaction_request, &account)
         }
+    }
+
+    /// Checks whether the node's `note_scripts` registry already has each of the expected NTX
+    /// scripts. For any script that is missing, creates and submits a registration transaction
+    /// that produces a public note carrying that script.
+    ///
+    /// `account_id` is the account that will execute the registration transaction.
+    async fn ensure_ntx_scripts_registered(
+        &mut self,
+        account_id: AccountId,
+        scripts: &[NoteScript],
+        tx_prover: Arc<dyn TransactionProver>,
+    ) -> Result<(), ClientError> {
+        let mut missing_scripts = Vec::new();
+
+        for script in scripts {
+            let script_root = script.root();
+
+            // Check if the node already has this script registered.
+            match self.rpc_api.get_note_script_by_root(script_root).await {
+                Ok(_) => {},
+                Err(RpcError::RequestError { error_kind: GrpcError::NotFound, .. }) => {
+                    missing_scripts.push(script.clone());
+                },
+                Err(other) => {
+                    return Err(ClientError::NtxScriptRegistrationFailed(format!(
+                        "failed to check script with root {script_root:?}: {other}"
+                    )));
+                },
+            }
+        }
+
+        if missing_scripts.is_empty() {
+            return Ok(());
+        }
+
+        let registration_request = TransactionRequestBuilder::new().build_register_note_scripts(
+            account_id,
+            missing_scripts,
+            self.rng(),
+        )?;
+
+        let tx_result = self.execute_transaction(account_id, registration_request).await?;
+        let proven = self.prove_transaction_with(&tx_result, tx_prover).await?;
+        let submission_height = self.submit_proven_transaction(proven, &tx_result).await?;
+        self.apply_transaction(&tx_result, submission_height).await?;
+
+        Ok(())
     }
 
     /// Filters out invalid or non-consumable input notes by simulating

@@ -146,6 +146,8 @@ pub enum ClientError {
     AccountRecordNotFull(AccountId),
     #[error("account error is not partial: {0}")]
     AccountRecordNotPartial(AccountId),
+    #[error("failed to register NTX note script: {0}")]
+    NtxScriptRegistrationFailed(String),
 }
 
 // CONVERSIONS
