@@ -145,14 +145,15 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
-      - name: Install Rust
-        run: rustup update --no-self-update
       - name: Restore note-transport binary
         id: cache-note-transport
         uses: actions/cache@v4
         with:
           path: ~/.cargo/bin/miden-note-transport-node-bin
           key: ${{ runner.os }}-note-transport-${{ hashFiles('Cargo.lock') }}
+      - name: Install Rust
+        if: steps.cache-note-transport.outputs.cache-hit != 'true'
+        run: rustup update --no-self-update
       - name: Install note-transport
         if: steps.cache-note-transport.outputs.cache-hit != 'true'
         run: cargo install --git https://github.com/0xMiden/miden-note-transport --locked
