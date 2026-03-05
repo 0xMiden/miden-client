@@ -9,8 +9,14 @@ import type {
   TransactionResult,
   ExecuteTransactionOptions,
 } from "../types";
-import { parseAccountId } from "../utils/accountParsing";
+import { parseAccountId, parseAddress } from "../utils/accountParsing";
 import { runExclusiveDirect } from "../utils/runExclusive";
+import { proveWithFallback } from "../utils/prover";
+import { useMidenStore } from "../store/MidenStore";
+import {
+  waitForTransactionCommit,
+  extractFullNotes,
+} from "../utils/transactions";
 
 export interface UseTransactionResult {
   /** Execute a transaction request end-to-end */
@@ -34,6 +40,10 @@ type TransactionRequestFactory = (
 /**
  * Hook to execute arbitrary transaction requests.
  *
+ * When `privateNoteRecipient` is set, uses the 4-step pipeline
+ * (execute → prove → submit → apply) and delivers private output notes
+ * to the recipient after commit.
+ *
  * @example
  * ```tsx
  * function CustomTransactionButton({ accountId }: { accountId: string }) {
@@ -52,6 +62,7 @@ type TransactionRequestFactory = (
  *           NoteType.Private,
  *           NoteType.Private
  *         ),
+ *       privateNoteRecipient: "0xrecipient...",
  *     });
  *   };
  *
@@ -83,10 +94,57 @@ export function useTransaction(): UseTransactionResult {
       setError(null);
 
       try {
+        const accountIdObj = parseAccountId(options.accountId);
+        const txRequest = await resolveRequest(options.request, client);
+
+        if (options.privateNoteRecipient != null) {
+          // 4-step pipeline: execute → prove → submit → apply → deliver private notes
+          const txResult = await runExclusiveSafe(() =>
+            client.executeTransaction(accountIdObj, txRequest)
+          );
+
+          setStage("proving");
+          const proverConfig = useMidenStore.getState().config;
+          const provenTransaction = await proveWithFallback(
+            (resolvedProver) =>
+              runExclusiveSafe(() =>
+                client.proveTransaction(txResult, resolvedProver)
+              ),
+            proverConfig
+          );
+
+          setStage("submitting");
+          const submissionHeight = await runExclusiveSafe(() =>
+            client.submitProvenTransaction(provenTransaction, txResult)
+          );
+
+          await runExclusiveSafe(() =>
+            client.applyTransaction(txResult, submissionHeight)
+          );
+
+          const txId = txResult.id();
+          await waitForTransactionCommit(client, runExclusiveSafe, txId);
+
+          // Deliver private output notes to recipient
+          const recipientAddress = parseAddress(options.privateNoteRecipient);
+          const fullNotes = extractFullNotes(txResult);
+          for (const note of fullNotes) {
+            await runExclusiveSafe(() =>
+              client.sendPrivateNote(note, recipientAddress)
+            );
+          }
+
+          const txSummary = { transactionId: txId.toString() };
+
+          setStage("complete");
+          setResult(txSummary);
+          await sync();
+          return txSummary;
+        }
+
+        // Simple path: submitNewTransaction (no private note delivery needed)
         setStage("proving");
         const txResult = await runExclusiveSafe(async () => {
-          const accountIdObj = parseAccountId(options.accountId);
-          const txRequest = await resolveRequest(options.request, client);
           const txId = prover
             ? await client.submitNewTransactionWithProver(
                 accountIdObj,

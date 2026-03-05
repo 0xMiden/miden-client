@@ -370,6 +370,12 @@ export interface ExecuteTransactionOptions {
   request:
     | TransactionRequest
     | ((client: WebClient) => TransactionRequest | Promise<TransactionRequest>);
+  /**
+   * When set, private output notes from this transaction are delivered to the
+   * given recipient after the transaction is committed. Accepts any AccountRef
+   * form (hex string, bech32, AccountId, Account, AccountHeader).
+   */
+  privateNoteRecipient?: AccountRef;
 }
 
 // Transaction result
