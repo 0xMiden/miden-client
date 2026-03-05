@@ -31,6 +31,7 @@
 * [BREAKING] Made the nullifiers sync optional on the `StateSync` component ([#1756](https://github.com/0xMiden/miden-client/pull/1756)).
 * [BREAKING] Added `SyncStateInputs` to bundle the parameters needed to perform the sync state ([#1778](https://github.com/0xMiden/miden-client/pull/1778)).
 * [BREAKING][type][web] `AuthSecretKey.getRpoFalcon512SecretKeyAsFelts()` and `getEcdsaK256KeccakSecretKeyAsFelts()` now return `Result<Vec<Felt>, JsValue>` instead of panicking on key type mismatch ([#1833](https://github.com/0xMiden/miden-client/pull/1833)).
+* [BREAKING][rename][cli] Renamed `CliConfig::from_system()` to `CliConfig::load()` and `CliClient::from_system_user_config()` to `CliClient::new()` for better discoverability ([#1848](https://github.com/0xMiden/miden-client/pull/1848)).
 
 ### Features
 
@@ -85,8 +86,7 @@
 * Fixed a race condition in `pruneIrrelevantBlocks` that could delete the current block header when multiple tabs share IndexedDB, causing sync to panic ([#1650](https://github.com/0xMiden/miden-client/pull/1650)).
 * Fixed a race condition where concurrent sync operations could cause sync height to go backwards, leading to block header deletion and subsequent panics ([#1650](https://github.com/0xMiden/miden-client/pull/1650)).
 * Changed `get_current_partial_mmr` to return a `StoreError::BlockHeaderNotFound` error instead of panicking when the block header is missing ([#1650](https://github.com/0xMiden/miden-client/pull/1650)).
-* Added `CliClient` wrapper and `CliConfig::load()` (formerly `from_system()`) to allow creating a CLI-configured client programmatically ([#1642](https://github.com/0xMiden/miden-client/pull/1642)).
-* [BREAKING][rename][cli] Renamed `CliConfig::from_system()` to `CliConfig::load()` and `CliClient::from_system_user_config()` to `CliClient::new()` for better discoverability ([#1848](https://github.com/0xMiden/miden-client/pull/1848)).
+* Added `CliClient` wrapper and `CliConfig::from_system()` to allow creating a CLI-configured client programmatically ([#1642](https://github.com/0xMiden/miden-client/pull/1642)).
 * [BREAKING] Updated `BlockNumber` IndexedDB type: changed from `string` to `number` ([#1684](https://github.com/0xMiden/miden-client/pull/1684)).
 * [BREAKING] Upgraded to protocol 0.13: exposed and aligned note-related structs to WebClient; `NoteTag` and `NoteAttachment` APIs updated renamed `NoteTag.fromAccountId` to `withAccountTarget`, added `withCustomAccountTarget`; added `NoteAttachmentScheme` wrapper and content accessors (`asWord`, `asArray`) to `NoteAttachment`; removed `NoteExecutionMode` ([#1685](https://github.com/0xMiden/miden-client/pull/1685)).
 * Added sync lock to coordinate concurrent `syncState()` calls in the WebClient using the Web Locks API, with coalescing behavior where concurrent callers share results from an in-progress sync ([#1690](https://github.com/0xMiden/miden-client/pull/1690)).
