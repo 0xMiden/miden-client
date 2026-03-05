@@ -45,6 +45,8 @@ export type { AccountRef } from "../utils/accountParsing";
 // Re-export signer types for external signer providers
 export type {
   SignCallback,
+  GetKeyCallback,
+  InsertKeyCallback,
   SignerAccountType,
   SignerAccountConfig,
   SignerContextValue,
