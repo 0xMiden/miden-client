@@ -191,6 +191,10 @@ pub fn parse_account_address_idxdb_object(
     Ok((address, native_account_id))
 }
 
+/// Computes updated storage slot roots from the delta using the SMT forest.
+///
+/// Value slots are taken directly from the delta. Map slots are computed incrementally
+/// by applying the map delta entries to the old root via the SMT forest.
 pub fn compute_storage_delta(
     smt_forest: &mut AccountSmtForest,
     old_map_roots: &BTreeMap<StorageSlotName, Word>,
