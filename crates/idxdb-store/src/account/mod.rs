@@ -471,6 +471,11 @@ impl WebStore {
         &self,
         new_account_state: &Account,
     ) -> Result<(), StoreError> {
+        let account_id = new_account_state.id();
+        self.get_account_header(account_id)
+            .await?
+            .ok_or(StoreError::AccountDataNotFound(account_id))?;
+
         apply_full_account_state(self.db_id(), new_account_state)
             .await
             .map_err(|_| StoreError::DatabaseError("failed to update account".to_string()))?;
