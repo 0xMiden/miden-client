@@ -92,7 +92,7 @@ impl FetchedNote {
     ///
     /// For public notes, it contains the complete note data.
     /// For private notes, it will be undefined.
-    #[js_export(getter)]
+    #[js_export(getter, js_name = "note")]
     pub fn get_note(&self) -> Option<Note> {
         self.note.clone()
     }

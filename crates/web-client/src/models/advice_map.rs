@@ -22,9 +22,9 @@ impl AdviceMap {
     }
 
     /// Inserts a value for the given key, returning any previous value.
-    pub fn insert(&mut self, key: &Word, value: FeltArray) -> Option<Vec<Felt>> {
+    pub fn insert(&mut self, key: &Word, value: &FeltArray) -> Option<Vec<Felt>> {
         let native_key: NativeWord = key.into();
-        let native_felts: Vec<NativeFelt> = super::felt::felt_array_to_native_vec(&value);
+        let native_felts: Vec<NativeFelt> = super::felt::felt_array_to_native_vec(value);
         let arc_felts: Arc<[NativeFelt]> = native_felts.into();
         self.0
             .insert(native_key, arc_felts)
