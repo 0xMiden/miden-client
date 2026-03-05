@@ -43,6 +43,7 @@ export type {
   MidenConfig,
   RpcUrlConfig,
   ProverConfig,
+  ProverTarget,
   ProverUrls,
   MidenState,
   TransactionStage,

@@ -59,7 +59,8 @@ export type RpcUrlConfig =
   | "localhost"
   | "local";
 
-export type ProverConfig =
+/** Single prover target — a well-known name, custom URL, or object with URL + timeout. */
+export type ProverTarget =
   | "local"
   | "devnet"
   | "testnet"
@@ -67,6 +68,19 @@ export type ProverConfig =
   | {
       url: string;
       timeoutMs?: number | bigint;
+    };
+
+export type ProverConfig =
+  | ProverTarget
+  | {
+      /** Primary prover to try first */
+      primary: ProverTarget;
+      /** Fallback prover if primary fails (e.g. "local") */
+      fallback?: ProverTarget;
+      /** Return true to skip the fallback (e.g. on mobile where local proving is too slow) */
+      disableFallback?: () => boolean;
+      /** Called when the primary prover fails and the fallback is used */
+      onFallback?: () => void;
     };
 
 export type ProverUrls = {
