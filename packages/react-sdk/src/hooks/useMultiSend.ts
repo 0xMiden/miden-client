@@ -22,6 +22,8 @@ import { createNoteAttachment } from "../utils/noteAttachment";
 import { MidenError } from "../utils/errors";
 import { getNoteType, waitForTransactionCommit } from "../utils/noteFilters";
 import type { ClientWithTransactions } from "../utils/noteFilters";
+import { proveWithFallback } from "../utils/prover";
+import { useMidenStore } from "../store/MidenStore";
 
 export interface UseMultiSendResult {
   /** Create multiple P2ID output notes in one transaction */
@@ -151,8 +153,13 @@ export function useMultiSend(): UseMultiSendResult {
         );
 
         setStage("proving");
-        const provenTransaction = await runExclusiveSafe(() =>
-          client.proveTransaction(txResult, prover ?? undefined)
+        const proverConfig = useMidenStore.getState().config;
+        const provenTransaction = await proveWithFallback(
+          (resolvedProver) =>
+            runExclusiveSafe(() =>
+              client.proveTransaction(txResult, resolvedProver)
+            ),
+          proverConfig
         );
 
         setStage("submitting");
