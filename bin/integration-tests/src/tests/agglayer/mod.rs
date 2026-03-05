@@ -7,7 +7,7 @@ use miden_client::keystore::Keystore;
 use miden_client::testing::common::FilesystemKeyStore;
 
 pub mod agglayer_bridge_in_out;
-pub mod agglayer_test_utils;
+mod agglayer_test_utils;
 pub mod ger;
 
 /// Configuration for agglayer tests when running against a node with pre-deployed
