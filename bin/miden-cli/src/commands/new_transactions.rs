@@ -72,7 +72,7 @@ pub struct MintCmd {
 }
 
 impl MintCmd {
-    pub async fn execute<AUTH: Keystore + Sync + 'static>(
+    pub async fn execute<AUTH: Keystore + Send + Sync + 'static>(
         &self,
         mut client: Client<AUTH>,
     ) -> Result<(), CliError> {
@@ -143,7 +143,7 @@ pub struct SendCmd {
 }
 
 impl SendCmd {
-    pub async fn execute<AUTH: Keystore + Sync + 'static>(
+    pub async fn execute<AUTH: Keystore + Send + Sync + 'static>(
         &self,
         mut client: Client<AUTH>,
     ) -> Result<(), CliError> {
@@ -221,7 +221,7 @@ pub struct SwapCmd {
 }
 
 impl SwapCmd {
-    pub async fn execute<AUTH: Keystore + Sync + 'static>(
+    pub async fn execute<AUTH: Keystore + Send + Sync + 'static>(
         &self,
         mut client: Client<AUTH>,
     ) -> Result<(), CliError> {
@@ -299,7 +299,7 @@ pub struct ConsumeNotesCmd {
 }
 
 impl ConsumeNotesCmd {
-    pub async fn execute<AUTH: Keystore + Sync + 'static>(
+    pub async fn execute<AUTH: Keystore + Send + Sync + 'static>(
         &self,
         mut client: Client<AUTH>,
     ) -> Result<(), CliError> {
@@ -370,7 +370,7 @@ impl ConsumeNotesCmd {
 // EXECUTE TRANSACTION
 // ================================================================================================
 
-async fn execute_transaction<AUTH: Keystore + Sync + 'static>(
+async fn execute_transaction<AUTH: Keystore + Send + Sync + 'static>(
     client: &mut Client<AUTH>,
     account_id: AccountId,
     transaction_request: TransactionRequest,

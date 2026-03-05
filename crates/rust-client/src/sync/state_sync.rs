@@ -554,7 +554,7 @@ mod tests {
     /// Mock note screener that discards all notes, for minimal test setup.
     struct MockScreener;
 
-    #[async_trait(?Send)]
+    #[async_trait]
     impl OnNoteReceived for MockScreener {
         async fn on_note_received(
             &self,
