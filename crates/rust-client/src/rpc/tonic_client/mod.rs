@@ -7,7 +7,7 @@ use core::error::Error;
 use miden_protocol::asset::{Asset, AssetVault};
 
 use miden_protocol::account::{
-    Account, AccountCode, AccountId, AccountStorage, StorageMap, StorageMapKey, StorageSlot,
+    Account, AccountCode, AccountId, AccountStorage, StorageMap, StorageSlot,
     StorageSlotType,
 };
 use miden_protocol::address::NetworkId;
@@ -340,7 +340,7 @@ impl GrpcClient {
                             .updates
                             .iter()
                             .filter(|slot_info| slot_info.slot_name == *slot_header.name())
-                            .map(|slot_info| (StorageMapKey::new(slot_info.key), slot_info.value))
+                            .map(|slot_info| (slot_info.key, slot_info.value))
                             .collect();
                         StorageMap::with_entries(map_entries)
                     } else {

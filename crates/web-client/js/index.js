@@ -590,6 +590,33 @@ class WebClient {
     }
   }
 
+  async applyTransaction(transactionResult, submissionHeight) {
+    try {
+      if (!this.worker) {
+        const wasmWebClient = await this.getWasmWebClient();
+        return await wasmWebClient.applyTransaction(
+          transactionResult,
+          submissionHeight
+        );
+      }
+
+      const wasm = await getWasmOrThrow();
+      const serializedTransactionResult = transactionResult.serialize();
+      const serializedUpdateBytes = await this.callMethodWithWorker(
+        MethodName.APPLY_TRANSACTION,
+        serializedTransactionResult,
+        submissionHeight
+      );
+
+      return wasm.TransactionStoreUpdate.deserialize(
+        new Uint8Array(serializedUpdateBytes)
+      );
+    } catch (error) {
+      console.error("INDEX.JS: Error in applyTransaction:", error);
+      throw error;
+    }
+  }
+
   /**
    * Syncs the client state with the node.
    *

@@ -2712,10 +2712,10 @@ dependencies = [
  "getrandom 0.3.4",
  "hex",
  "miden-mast-package",
- "miden-node-proto-build",
+ "miden-node-proto-build 0.14.0-alpha.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "miden-note-transport-proto-build",
  "miden-protocol",
- "miden-remote-prover-client",
+ "miden-remote-prover-client 0.14.0-alpha.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "miden-standards",
  "miden-testing",
  "miden-tx",
@@ -2916,7 +2916,6 @@ dependencies = [
  "rand_core 0.9.5",
  "rand_hc",
  "rayon",
- "rocksdb",
  "sha2",
  "sha3",
  "subtle",
@@ -2981,6 +2980,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "miden-large-smt-backend-rocksdb"
+version = "0.14.0-alpha.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b8516c2f011f391d971de92eb7f2d6d4bf6626256afd3a18e13d720bd273a4e5"
+dependencies = [
+ "miden-crypto",
+ "miden-protocol",
+ "rayon",
+ "rocksdb",
+ "winter-utils",
+]
+
+[[package]]
 name = "miden-mast-package"
 version = "0.20.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3036,17 +3048,16 @@ dependencies = [
 
 [[package]]
 name = "miden-node-block-producer"
-version = "0.14.0-alpha.1"
-source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-use-storage-map-key-wrapper#2b4834e623e90cfbb87eee5165e97e9eedf5d377"
+version = "0.14.0-alpha.2"
 dependencies = [
  "anyhow",
  "futures",
  "itertools 0.14.0",
- "miden-node-proto",
- "miden-node-proto-build",
- "miden-node-utils",
+ "miden-node-proto 0.14.0-alpha.2",
+ "miden-node-proto-build 0.14.0-alpha.2",
+ "miden-node-utils 0.14.0-alpha.2",
  "miden-protocol",
- "miden-remote-prover-client",
+ "miden-remote-prover-client 0.14.0-alpha.2",
  "miden-standards",
  "miden-tx-batch-prover",
  "rand",
@@ -3062,8 +3073,9 @@ dependencies = [
 
 [[package]]
 name = "miden-node-db"
-version = "0.14.0-alpha.1"
-source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-use-storage-map-key-wrapper#2b4834e623e90cfbb87eee5165e97e9eedf5d377"
+version = "0.14.0-alpha.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d5fab953ac867b3badee8992e3136337b2f841a59532b36a32d3a49db48f2a3e"
 dependencies = [
  "deadpool",
  "deadpool-diesel",
@@ -3076,8 +3088,17 @@ dependencies = [
 
 [[package]]
 name = "miden-node-grpc-error-macro"
-version = "0.14.0-alpha.1"
-source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-use-storage-map-key-wrapper#2b4834e623e90cfbb87eee5165e97e9eedf5d377"
+version = "0.14.0-alpha.2"
+dependencies = [
+ "quote",
+ "syn 2.0.116",
+]
+
+[[package]]
+name = "miden-node-grpc-error-macro"
+version = "0.14.0-alpha.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a36ec98567892988875adee9d6f1a257bc45b395074ba75fdd1716968d755424"
 dependencies = [
  "quote",
  "syn 2.0.116",
@@ -3085,8 +3106,9 @@ dependencies = [
 
 [[package]]
 name = "miden-node-ntx-builder"
-version = "0.14.0-alpha.1"
-source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-use-storage-map-key-wrapper#2b4834e623e90cfbb87eee5165e97e9eedf5d377"
+version = "0.14.0-alpha.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1529edc437c1b0d47a08e81a9e071dd5b41898db74e78724d6b1dfad358575fe"
 dependencies = [
  "anyhow",
  "build-rs",
@@ -3095,12 +3117,12 @@ dependencies = [
  "futures",
  "libsqlite3-sys",
  "miden-node-db",
- "miden-node-proto",
- "miden-node-utils",
+ "miden-node-proto 0.14.0-alpha.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "miden-node-utils 0.14.0-alpha.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "miden-protocol",
- "miden-remote-prover-client",
+ "miden-remote-prover-client 0.14.0-alpha.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "miden-standards",
  "miden-tx",
- "prost",
  "thiserror",
  "tokio",
  "tokio-stream",
@@ -3112,18 +3134,43 @@ dependencies = [
 
 [[package]]
 name = "miden-node-proto"
-version = "0.14.0-alpha.1"
-source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-use-storage-map-key-wrapper#2b4834e623e90cfbb87eee5165e97e9eedf5d377"
+version = "0.14.0-alpha.2"
 dependencies = [
  "anyhow",
  "build-rs",
  "fs-err",
  "hex",
  "http 1.4.0",
- "miden-node-grpc-error-macro",
- "miden-node-proto-build",
- "miden-node-rocksdb-cxx-linkage-fix",
- "miden-node-utils",
+ "miden-node-grpc-error-macro 0.14.0-alpha.2",
+ "miden-node-proto-build 0.14.0-alpha.2",
+ "miden-node-rocksdb-cxx-linkage-fix 0.14.0-alpha.2",
+ "miden-node-utils 0.14.0-alpha.2",
+ "miden-protocol",
+ "miden-standards",
+ "miette",
+ "prost",
+ "thiserror",
+ "tonic",
+ "tonic-prost",
+ "tonic-prost-build",
+ "url",
+]
+
+[[package]]
+name = "miden-node-proto"
+version = "0.14.0-alpha.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9673c82b6b20dffa33ee318b2916997fc5ec8e7a9e8775dc5503f808420fa1c7"
+dependencies = [
+ "anyhow",
+ "build-rs",
+ "fs-err",
+ "hex",
+ "http 1.4.0",
+ "miden-node-grpc-error-macro 0.14.0-alpha.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "miden-node-proto-build 0.14.0-alpha.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "miden-node-rocksdb-cxx-linkage-fix 0.14.0-alpha.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "miden-node-utils 0.14.0-alpha.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "miden-protocol",
  "miden-standards",
  "miette",
@@ -3137,8 +3184,20 @@ dependencies = [
 
 [[package]]
 name = "miden-node-proto-build"
-version = "0.14.0-alpha.1"
-source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-use-storage-map-key-wrapper#2b4834e623e90cfbb87eee5165e97e9eedf5d377"
+version = "0.14.0-alpha.2"
+dependencies = [
+ "build-rs",
+ "fs-err",
+ "miette",
+ "protox",
+ "tonic-prost-build",
+]
+
+[[package]]
+name = "miden-node-proto-build"
+version = "0.14.0-alpha.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4a30c66cd4e47906068f042ab9e5daf0bde89c7930df12878350334509c467d4"
 dependencies = [
  "build-rs",
  "fs-err",
@@ -3149,21 +3208,27 @@ dependencies = [
 
 [[package]]
 name = "miden-node-rocksdb-cxx-linkage-fix"
-version = "0.14.0-alpha.1"
-source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-use-storage-map-key-wrapper#2b4834e623e90cfbb87eee5165e97e9eedf5d377"
+version = "0.14.0-alpha.2"
+
+[[package]]
+name = "miden-node-rocksdb-cxx-linkage-fix"
+version = "0.14.0-alpha.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dff7dee7adb1adc0edb06b44dd620960c98cc4360bcc819c6e422cc701b27dcc"
 
 [[package]]
 name = "miden-node-rpc"
-version = "0.14.0-alpha.1"
-source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-use-storage-map-key-wrapper#2b4834e623e90cfbb87eee5165e97e9eedf5d377"
+version = "0.14.0-alpha.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6506393908975ec790c86f4fb886e4afa2ca6377367fe90e43b86acded51a994"
 dependencies = [
  "anyhow",
  "futures",
  "http 1.4.0",
  "mediatype",
- "miden-node-proto",
- "miden-node-proto-build",
- "miden-node-utils",
+ "miden-node-proto 0.14.0-alpha.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "miden-node-proto-build 0.14.0-alpha.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "miden-node-utils 0.14.0-alpha.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "miden-protocol",
  "miden-tx",
  "semver 1.0.27",
@@ -3181,8 +3246,9 @@ dependencies = [
 
 [[package]]
 name = "miden-node-store"
-version = "0.14.0-alpha.1"
-source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-use-storage-map-key-wrapper#2b4834e623e90cfbb87eee5165e97e9eedf5d377"
+version = "0.14.0-alpha.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7934fb675f726eb0c629aab67100db4205905082584a12435a63f34a361dc4b2"
 dependencies = [
  "anyhow",
  "build-rs",
@@ -3198,13 +3264,14 @@ dependencies = [
  "miden-agglayer",
  "miden-block-prover",
  "miden-crypto",
+ "miden-large-smt-backend-rocksdb",
  "miden-node-db",
- "miden-node-proto",
- "miden-node-proto-build",
- "miden-node-rocksdb-cxx-linkage-fix",
- "miden-node-utils",
+ "miden-node-proto 0.14.0-alpha.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "miden-node-proto-build 0.14.0-alpha.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "miden-node-rocksdb-cxx-linkage-fix 0.14.0-alpha.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "miden-node-utils 0.14.0-alpha.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "miden-protocol",
- "miden-remote-prover-client",
+ "miden-remote-prover-client 0.14.0-alpha.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "miden-standards",
  "pretty_assertions",
  "rand",
@@ -3223,8 +3290,7 @@ dependencies = [
 
 [[package]]
 name = "miden-node-utils"
-version = "0.14.0-alpha.1"
-source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-use-storage-map-key-wrapper#2b4834e623e90cfbb87eee5165e97e9eedf5d377"
+version = "0.14.0-alpha.2"
 dependencies = [
  "anyhow",
  "bytes",
@@ -3232,7 +3298,35 @@ dependencies = [
  "http-body-util",
  "itertools 0.14.0",
  "lru",
- "miden-node-rocksdb-cxx-linkage-fix",
+ "miden-node-rocksdb-cxx-linkage-fix 0.14.0-alpha.2",
+ "miden-protocol",
+ "opentelemetry",
+ "opentelemetry-otlp",
+ "opentelemetry_sdk",
+ "rand",
+ "thiserror",
+ "tokio",
+ "tonic",
+ "tower-http",
+ "tracing",
+ "tracing-opentelemetry",
+ "tracing-subscriber",
+ "url",
+]
+
+[[package]]
+name = "miden-node-utils"
+version = "0.14.0-alpha.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aeae0edcc9fea34eacabe2c5aba3e627f5e0c5bbdc09cf5f7d2c8abfdedc8c8e"
+dependencies = [
+ "anyhow",
+ "bytes",
+ "http 1.4.0",
+ "http-body-util",
+ "itertools 0.14.0",
+ "lru",
+ "miden-node-rocksdb-cxx-linkage-fix 0.14.0-alpha.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "miden-protocol",
  "opentelemetry",
  "opentelemetry-otlp",
@@ -3251,8 +3345,9 @@ dependencies = [
 
 [[package]]
 name = "miden-node-validator"
-version = "0.14.0-alpha.1"
-source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-use-storage-map-key-wrapper#2b4834e623e90cfbb87eee5165e97e9eedf5d377"
+version = "0.14.0-alpha.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0424ab436696dc378b9270272f948dbdefd7bcca13a0505d82b093d875aee68b"
 dependencies = [
  "anyhow",
  "aws-config",
@@ -3261,9 +3356,9 @@ dependencies = [
  "diesel",
  "diesel_migrations",
  "miden-node-db",
- "miden-node-proto",
- "miden-node-proto-build",
- "miden-node-utils",
+ "miden-node-proto 0.14.0-alpha.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "miden-node-proto-build 0.14.0-alpha.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "miden-node-utils 0.14.0-alpha.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "miden-protocol",
  "miden-tx",
  "thiserror",
@@ -3365,13 +3460,34 @@ dependencies = [
 
 [[package]]
 name = "miden-remote-prover-client"
-version = "0.14.0-alpha.1"
-source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-use-storage-map-key-wrapper#2b4834e623e90cfbb87eee5165e97e9eedf5d377"
+version = "0.14.0-alpha.2"
 dependencies = [
  "build-rs",
  "fs-err",
  "getrandom 0.4.1",
- "miden-node-proto-build",
+ "miden-node-proto-build 0.14.0-alpha.2",
+ "miden-protocol",
+ "miden-tx",
+ "miette",
+ "prost",
+ "thiserror",
+ "tokio",
+ "tonic",
+ "tonic-prost",
+ "tonic-prost-build",
+ "tonic-web-wasm-client",
+]
+
+[[package]]
+name = "miden-remote-prover-client"
+version = "0.14.0-alpha.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9f0e863d665235aed7986e4e6ecaf75884f3e8382cd2c219bc6e68146ae3f576"
+dependencies = [
+ "build-rs",
+ "fs-err",
+ "getrandom 0.4.1",
+ "miden-node-proto-build 0.14.0-alpha.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "miden-protocol",
  "miden-tx",
  "miette",
@@ -3631,7 +3747,7 @@ dependencies = [
  "miden-node-ntx-builder",
  "miden-node-rpc",
  "miden-node-store",
- "miden-node-utils",
+ "miden-node-utils 0.14.0-alpha.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "miden-node-validator",
  "miden-protocol",
  "miden-standards",
@@ -5174,8 +5290,8 @@ version = "0.14.0"
 dependencies = [
  "anyhow",
  "async-trait",
- "miden-node-proto",
- "miden-node-utils",
+ "miden-node-proto 0.14.0-alpha.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "miden-node-utils 0.14.0-alpha.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "miden-protocol",
  "miden-tx",
  "tokio",
