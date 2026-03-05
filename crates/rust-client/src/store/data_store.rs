@@ -43,6 +43,10 @@ pub struct ClientDataStore {
     transaction_mast_store: Arc<TransactionMastStore>,
     /// Cache of foreign account inputs that should be returned to the executor on demand.
     foreign_account_inputs: RwLock<BTreeMap<AccountId, AccountInputs>>,
+    /// Cache of storage map witnesses, keyed by (`account_id`, `map_root`, `map_key`). Avoids
+    /// redundant RPC calls when the same map entry is accessed multiple times within a
+    /// transaction.
+    storage_map_cache: RwLock<BTreeMap<(AccountId, Word, Word), StorageMapWitness>>,
     /// RPC client used to lazy-load foreign account data on cache miss.
     rpc_api: Arc<dyn NodeRpcClient>,
 }
@@ -53,6 +57,7 @@ impl ClientDataStore {
             store,
             transaction_mast_store: Arc::new(TransactionMastStore::new()),
             foreign_account_inputs: RwLock::new(BTreeMap::new()),
+            storage_map_cache: RwLock::new(BTreeMap::new()),
             rpc_api,
         }
     }
@@ -386,19 +391,24 @@ impl DataStore for ClientDataStore {
         Ok(asset_witnesses)
     }
 
-    /// Retrieves the [`StorageMapWitness`] requested from the store. Alternatively fetching it from
-    /// the RPC if not available locally.
-    ///
-    /// # Errors
-    /// Returns [`DataStoreError::AccountNotFound`] if the account is private and has not been
-    /// pre-registered with [`Self::register_foreign_account_inputs`].
+    /// Retrieves the [`StorageMapWitness`] requested from the store. Alternatively fetching it
+    /// from the RPC if not available locally. Witnesses fetched via RPC are cached in memory so
+    /// that repeated accesses to the same map entry within a transaction avoid additional RPC
+    /// calls.
     async fn get_storage_map_witness(
         &self,
         account_id: AccountId,
         map_root: Word,
         map_key: Word,
     ) -> Result<StorageMapWitness, DataStoreError> {
-        // Try the local store first.
+        let cache_key = (account_id, map_root, map_key);
+
+        // Check the in-memory witness cache first.
+        if let Some(witness) = self.storage_map_cache.read().get(&cache_key).cloned() {
+            return Ok(witness);
+        }
+
+        // Try the local store.
         if let Some(witness) =
             self.get_local_storage_map_witness(account_id, map_root, map_key).await?
         {
@@ -417,7 +427,9 @@ impl DataStore for ClientDataStore {
             .fetch_storage_map_entries(account_id, slot_name, map_key, known_code)
             .await?;
 
-        storage_map_entries_into_witness(map_entries, map_key)
+        let witness = storage_map_entries_into_witness(map_entries, map_key)?;
+        self.storage_map_cache.write().insert(cache_key, witness.clone());
+        Ok(witness)
     }
 
     /// Returns the [`AccountInputs`] for the given foreign account from the cache or
