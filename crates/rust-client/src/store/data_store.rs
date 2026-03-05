@@ -1,7 +1,7 @@
 use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::vec::Vec;
-use std::sync::Arc;
+use alloc::sync::Arc;
 
 use miden_protocol::account::{
     Account,
@@ -148,7 +148,7 @@ impl ClientDataStore {
             .into_values()
             .next();
 
-        let (_, account_proof) = self
+        let (_, account_proof): (BlockNumber, _) = self
             .rpc_api
             .get_account_proof(
                 account_id,
@@ -196,7 +196,7 @@ impl ClientDataStore {
         known_code: AccountCode,
     ) -> Result<StorageMapEntries, DataStoreError> {
         let storage_requirements = AccountStorageRequirements::new([(slot_name, &[map_key])]);
-        let (_, account_proof) = self
+        let (_, account_proof): (BlockNumber, _) = self
             .rpc_api
             .get_account_proof(
                 account_id,
@@ -479,7 +479,7 @@ impl DataStore for ClientDataStore {
             }
 
             // Store miss, fetch from the network via RPC.
-            let note_script =
+            let note_script: NoteScript =
                 rpc_api.get_note_script_by_root(script_root).await.map_err(|err| {
                     DataStoreError::other_with_source("failed to fetch note script via RPC", err)
                 })?;
