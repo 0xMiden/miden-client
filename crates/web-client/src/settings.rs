@@ -1,12 +1,12 @@
 #[cfg(feature = "browser")]
 use wasm_bindgen::prelude::*;
-#[cfg(feature = "nodejs")]
-use napi_derive::napi;
+
+use js_export_macro::js_export;
 
 use crate::platform::{JsErr, from_str_err};
 use crate::{WebClient, js_error_with_context};
 
-// Browser-specific settings methods that use serde_wasm_bindgen for JsValue serialization
+// Browser-specific settings methods that need serde_wasm_bindgen for JsValue serialization
 #[cfg(feature = "browser")]
 #[wasm_bindgen]
 impl WebClient {
@@ -44,32 +44,11 @@ impl WebClient {
         })?;
         Ok(())
     }
-
-    /// Deletes a setting key-value from the store.
-    #[wasm_bindgen(js_name = "removeSetting")]
-    pub async fn remove_setting(&self, key: String) -> Result<(), JsValue> {
-        let mut guard = self.get_mut_inner().await;
-        let client = guard.as_mut().ok_or_else(|| JsValue::from_str("Client not initialized"))?;
-        client.remove_setting(key).await.map_err(|err| {
-            js_error_with_context(err, "failed to delete setting value in the store")
-        })?;
-        Ok(())
-    }
-
-    /// Returns all the existing setting keys from the store.
-    #[wasm_bindgen(js_name = "listSettingKeys")]
-    pub async fn list_setting_keys(&self) -> Result<Vec<String>, JsValue> {
-        let mut guard = self.get_mut_inner().await;
-        let client = guard.as_mut().ok_or_else(|| JsValue::from_str("Client not initialized"))?;
-        client.list_setting_keys().await.map_err(|err| {
-            js_error_with_context(err, "failed to list setting keys in the store")
-        })
-    }
 }
 
 // Node.js-specific settings methods that use Vec<u8> directly
 #[cfg(feature = "nodejs")]
-#[napi]
+#[napi_derive::napi]
 impl WebClient {
     /// Retrieves the setting value for `key`, or `None` if it hasn't been set.
     #[napi(js_name = "getSetting")]
@@ -91,9 +70,13 @@ impl WebClient {
         })?;
         Ok(())
     }
+}
 
+// Shared settings methods (identical logic for both platforms)
+#[js_export]
+impl WebClient {
     /// Deletes a setting key-value from the store.
-    #[napi(js_name = "removeSetting")]
+    #[js_export(js_name = "removeSetting")]
     pub async fn remove_setting(&self, key: String) -> Result<(), JsErr> {
         let mut guard = self.get_mut_inner().await;
         let client = guard.as_mut().ok_or_else(|| from_str_err("Client not initialized"))?;
@@ -104,7 +87,7 @@ impl WebClient {
     }
 
     /// Returns all the existing setting keys from the store.
-    #[napi(js_name = "listSettingKeys")]
+    #[js_export(js_name = "listSettingKeys")]
     pub async fn list_setting_keys(&self) -> Result<Vec<String>, JsErr> {
         let mut guard = self.get_mut_inner().await;
         let client = guard.as_mut().ok_or_else(|| from_str_err("Client not initialized"))?;

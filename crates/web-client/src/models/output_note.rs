@@ -13,7 +13,6 @@ use super::note_id::NoteId;
 use super::note_metadata::NoteMetadata;
 use super::partial_note::PartialNote;
 use super::word::Word;
-#[cfg(feature = "browser")]
 use crate::models::miden_arrays::OutputNoteArray;
 
 /// Representation of a note produced by a transaction (full, partial, or header-only).
@@ -115,17 +114,17 @@ impl From<&OutputNote> for NativeOutputNote {
 // CONVERSIONS
 // ================================================================================================
 
-#[cfg(feature = "browser")]
 impl From<OutputNoteArray> for Vec<NativeOutputNote> {
     fn from(output_notes_array: OutputNoteArray) -> Self {
-        output_notes_array.__inner.into_iter().map(Into::into).collect()
+        let items: Vec<OutputNote> = output_notes_array.into();
+        items.into_iter().map(Into::into).collect()
     }
 }
 
-#[cfg(feature = "browser")]
 impl From<&OutputNoteArray> for Vec<NativeOutputNote> {
     fn from(output_notes_array: &OutputNoteArray) -> Self {
-        output_notes_array.__inner.iter().map(Into::into).collect()
+        let items: Vec<OutputNote> = output_notes_array.into();
+        items.into_iter().map(Into::into).collect()
     }
 }
 

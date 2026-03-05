@@ -9,7 +9,6 @@ use js_export_macro::js_export;
 use super::note_script::NoteScript;
 use super::note_storage::NoteStorage;
 use super::word::Word;
-#[cfg(feature = "browser")]
 use crate::models::miden_arrays::NoteRecipientArray as RecipientArray;
 
 /// Value that describes under which condition a note can be consumed.
@@ -92,10 +91,10 @@ impl From<&NoteRecipient> for NativeNoteRecipient {
     }
 }
 
-#[cfg(feature = "browser")]
 impl From<&RecipientArray> for Vec<NativeNoteRecipient> {
     fn from(recipient_array: &RecipientArray) -> Self {
-        recipient_array.__inner.iter().map(NativeNoteRecipient::from).collect()
+        let items: Vec<NoteRecipient> = recipient_array.into();
+        items.into_iter().map(NativeNoteRecipient::from).collect()
     }
 }
 

@@ -8,19 +8,10 @@ use crate::platform::{JsBytes, JsErr, bytes_to_js};
 pub mod test_utils;
 
 /// Serializes any value that implements `Serializable` into the platform byte type.
-#[cfg(feature = "browser")]
 pub fn serialize_to_bytes<T: Serializable>(value: &T) -> JsBytes {
     let mut buffer = Vec::new();
     value.write_into(&mut buffer);
     bytes_to_js(&buffer)
-}
-
-/// Serializes any value that implements `Serializable` into the platform byte type.
-#[cfg(feature = "nodejs")]
-pub fn serialize_to_bytes<T: Serializable>(value: &T) -> JsBytes {
-    let mut buffer = Vec::new();
-    value.write_into(&mut buffer);
-    bytes_to_js(buffer)
 }
 
 /// Deserializes platform bytes into any type that implements `Deserializable`.

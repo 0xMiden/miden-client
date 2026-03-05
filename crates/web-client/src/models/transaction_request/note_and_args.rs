@@ -2,7 +2,6 @@ use miden_client::note::Note as NativeNote;
 use miden_client::transaction::NoteArgs as NativeNoteArgs;
 use js_export_macro::js_export;
 
-#[cfg(feature = "browser")]
 use crate::models::miden_arrays::NoteAndArgsArray;
 use crate::models::note::Note;
 use crate::models::word::Word;
@@ -41,17 +40,17 @@ impl From<&NoteAndArgs> for (NativeNote, Option<NativeNoteArgs>) {
     }
 }
 
-#[cfg(feature = "browser")]
 impl From<NoteAndArgsArray> for Vec<(NativeNote, Option<NativeNoteArgs>)> {
     fn from(note_and_args_array: NoteAndArgsArray) -> Self {
-        note_and_args_array.__inner.into_iter().map(Into::into).collect()
+        let items: Vec<NoteAndArgs> = note_and_args_array.into();
+        items.into_iter().map(Into::into).collect()
     }
 }
 
-#[cfg(feature = "browser")]
 impl From<&NoteAndArgsArray> for Vec<(NativeNote, Option<NativeNoteArgs>)> {
     fn from(note_and_args_array: &NoteAndArgsArray) -> Self {
-        note_and_args_array.__inner.iter().map(Into::into).collect()
+        let items: Vec<NoteAndArgs> = note_and_args_array.into();
+        items.into_iter().map(Into::into).collect()
     }
 }
 

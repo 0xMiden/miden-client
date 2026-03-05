@@ -166,17 +166,9 @@ impl AccountComponent {
     ) -> Result<AccountComponent, JsErr> {
         let native_package: NativePackage = package.into();
         let native_library = native_package.unwrap_library().as_ref().clone();
-        #[cfg(feature = "browser")]
-        let native_slots: Vec<NativeStorageSlot> = storage_slots
-            .__inner
-            .into_iter()
-            .map(|storage_slot| storage_slot.into())
-            .collect();
-        #[cfg(feature = "nodejs")]
-        let native_slots: Vec<NativeStorageSlot> = Vec::from(storage_slots)
-            .into_iter()
-            .map(|storage_slot| storage_slot.into())
-            .collect();
+        let items: Vec<StorageSlot> = storage_slots.into();
+        let native_slots: Vec<NativeStorageSlot> =
+            items.into_iter().map(|storage_slot| storage_slot.into()).collect();
 
         NativeAccountComponent::new(native_library, native_slots)
             .map(AccountComponent)

@@ -16,6 +16,7 @@ use miden_client::vm::AdviceMap as NativeAdviceMap;
 use js_export_macro::js_export;
 
 use crate::models::advice_map::AdviceMap;
+use crate::models::foreign_account::ForeignAccount;
 use crate::models::miden_arrays::{
     ForeignAccountArray,
     NoteAndArgsArray,
@@ -23,7 +24,11 @@ use crate::models::miden_arrays::{
     NoteRecipientArray,
     OutputNoteArray,
 };
+use crate::models::note_recipient::NoteRecipient;
+use crate::models::output_note::OutputNote;
 use crate::models::transaction_request::TransactionRequest;
+use crate::models::transaction_request::note_and_args::NoteAndArgs;
+use crate::models::transaction_request::note_details_and_tag::NoteDetailsAndTag;
 use crate::models::transaction_script::TransactionScript;
 use crate::models::word::Word;
 
@@ -55,12 +60,9 @@ impl TransactionRequestBuilder {
     /// Adds input notes with optional arguments.
     #[js_export(js_name = "withInputNotes")]
     pub fn with_input_notes(&mut self, notes: NoteAndArgsArray) -> Self {
-        #[cfg(feature = "browser")]
+        let items: Vec<NoteAndArgs> = notes.into();
         let native_note_and_note_args: Vec<(NativeNote, Option<NativeNoteArgs>)> =
-            notes.__inner.into_iter().map(Into::into).collect();
-        #[cfg(feature = "nodejs")]
-        let native_note_and_note_args: Vec<(NativeNote, Option<NativeNoteArgs>)> =
-            Vec::from(notes).into_iter().map(Into::into).collect();
+            items.into_iter().map(Into::into).collect();
         self.0 = self.0.clone().input_notes(native_note_and_note_args);
         self.clone()
     }
@@ -68,12 +70,9 @@ impl TransactionRequestBuilder {
     /// Adds notes created by the sender that should be emitted by the transaction.
     #[js_export(js_name = "withOwnOutputNotes")]
     pub fn with_own_output_notes(&mut self, notes: OutputNoteArray) -> Self {
-        #[cfg(feature = "browser")]
+        let items: Vec<OutputNote> = notes.into();
         let native_output_notes: Vec<NativeOutputNote> =
-            notes.__inner.into_iter().map(Into::into).collect();
-        #[cfg(feature = "nodejs")]
-        let native_output_notes: Vec<NativeOutputNote> =
-            Vec::from(notes).into_iter().map(Into::into).collect();
+            items.into_iter().map(Into::into).collect();
         self.0 = self.0.clone().own_output_notes(native_output_notes);
         self.clone()
     }
@@ -89,12 +88,9 @@ impl TransactionRequestBuilder {
     /// Declares expected output recipients (used for verification).
     #[js_export(js_name = "withExpectedOutputRecipients")]
     pub fn with_expected_output_notes(&mut self, recipients: NoteRecipientArray) -> Self {
-        #[cfg(feature = "browser")]
+        let items: Vec<NoteRecipient> = recipients.into();
         let native_recipients: Vec<NativeNoteRecipient> =
-            recipients.__inner.into_iter().map(Into::into).collect();
-        #[cfg(feature = "nodejs")]
-        let native_recipients: Vec<NativeNoteRecipient> =
-            Vec::from(recipients).into_iter().map(NativeNoteRecipient::from).collect();
+            items.into_iter().map(NativeNoteRecipient::from).collect();
         self.0 = self.0.clone().expected_output_recipients(native_recipients);
         self.clone()
     }
@@ -105,12 +101,9 @@ impl TransactionRequestBuilder {
         &mut self,
         note_details_and_tag: NoteDetailsAndTagArray,
     ) -> Self {
-        #[cfg(feature = "browser")]
+        let items: Vec<NoteDetailsAndTag> = note_details_and_tag.into();
         let native_note_details_and_tag: Vec<(NativeNoteDetails, NativeNoteTag)> =
-            note_details_and_tag.__inner.into_iter().map(Into::into).collect();
-        #[cfg(feature = "nodejs")]
-        let native_note_details_and_tag: Vec<(NativeNoteDetails, NativeNoteTag)> =
-            Vec::from(note_details_and_tag).into_iter().map(Into::into).collect();
+            items.into_iter().map(Into::into).collect();
         self.0 = self.0.clone().expected_future_notes(native_note_details_and_tag);
         self.clone()
     }
@@ -126,12 +119,9 @@ impl TransactionRequestBuilder {
     /// Registers foreign accounts referenced by the transaction.
     #[js_export(js_name = "withForeignAccounts")]
     pub fn with_foreign_accounts(&mut self, foreign_accounts: ForeignAccountArray) -> Self {
-        #[cfg(feature = "browser")]
+        let items: Vec<ForeignAccount> = foreign_accounts.into();
         let native_foreign_accounts: Vec<NativeForeignAccount> =
-            foreign_accounts.__inner.into_iter().map(Into::into).collect();
-        #[cfg(feature = "nodejs")]
-        let native_foreign_accounts: Vec<NativeForeignAccount> =
-            Vec::from(foreign_accounts).into_iter().map(Into::into).collect();
+            items.into_iter().map(Into::into).collect();
         self.0 = self.0.clone().foreign_accounts(native_foreign_accounts);
         self.clone()
     }

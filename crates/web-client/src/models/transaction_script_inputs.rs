@@ -3,7 +3,6 @@ use js_export_macro::js_export;
 
 use super::miden_arrays::FeltArray;
 use super::word::Word;
-#[cfg(feature = "browser")]
 use crate::models::miden_arrays::TransactionScriptInputPairArray;
 
 /// A script argument represented as a word plus additional felts.
@@ -37,9 +36,6 @@ impl From<TransactionScriptInputPair> for (NativeWord, Vec<NativeFelt>) {
     fn from(transaction_script_input_pair: TransactionScriptInputPair) -> Self {
         let native_word: NativeWord = transaction_script_input_pair.word.into();
         let felts = transaction_script_input_pair.felts;
-        #[cfg(feature = "browser")]
-        let native_felts: Vec<NativeFelt> = felts.__inner.into_iter().map(Into::into).collect();
-        #[cfg(feature = "nodejs")]
         let native_felts: Vec<NativeFelt> = Vec::from(felts).into_iter().map(Into::into).collect();
         (native_word, native_felts)
     }
@@ -49,30 +45,23 @@ impl From<&TransactionScriptInputPair> for (NativeWord, Vec<NativeFelt>) {
     fn from(transaction_script_input_pair: &TransactionScriptInputPair) -> Self {
         let native_word: NativeWord = transaction_script_input_pair.word.clone().into();
         let felts = &transaction_script_input_pair.felts;
-        #[cfg(feature = "browser")]
         let native_felts: Vec<NativeFelt> =
-            felts.__inner.iter().map(|felt| (*felt).into()).collect();
-        #[cfg(feature = "nodejs")]
-        let native_felts: Vec<NativeFelt> = felts.iter().map(|felt| (*felt).into()).collect();
+            Vec::from(felts).into_iter().map(Into::into).collect();
         (native_word, native_felts)
     }
 }
 
-#[cfg(feature = "browser")]
 impl From<TransactionScriptInputPairArray> for Vec<(NativeWord, Vec<NativeFelt>)> {
     fn from(transaction_script_input_pair_array: TransactionScriptInputPairArray) -> Self {
-        transaction_script_input_pair_array
-            .__inner
-            .into_iter()
-            .map(Into::into)
-            .collect()
+        let items: Vec<TransactionScriptInputPair> = transaction_script_input_pair_array.into();
+        items.into_iter().map(Into::into).collect()
     }
 }
 
-#[cfg(feature = "browser")]
 impl From<&TransactionScriptInputPairArray> for Vec<(NativeWord, Vec<NativeFelt>)> {
     fn from(transaction_script_input_pair_array: &TransactionScriptInputPairArray) -> Self {
-        transaction_script_input_pair_array.__inner.iter().map(Into::into).collect()
+        let items: Vec<TransactionScriptInputPair> = transaction_script_input_pair_array.into();
+        items.into_iter().map(Into::into).collect()
     }
 }
 

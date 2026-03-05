@@ -16,9 +16,6 @@ impl Rpo256 {
     /// Computes an RPO256 digest from the provided field elements.
     #[js_export(js_name = "hashElements")]
     pub fn hash_elements(felt_array: FeltArray) -> Word {
-        #[cfg(feature = "browser")]
-        let felts: Vec<Felt> = felt_array.into();
-        #[cfg(feature = "nodejs")]
         let felts: Vec<Felt> = Vec::from(felt_array);
         let native_felts: Vec<NativeFelt> = felts.iter().map(Into::into).collect();
 

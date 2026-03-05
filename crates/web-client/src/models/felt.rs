@@ -61,21 +61,9 @@ impl From<&Felt> for NativeFelt {
 // CONVERSIONS
 // ================================================================================================
 
-#[cfg(feature = "browser")]
-impl From<&FeltArray> for Vec<NativeFelt> {
-    fn from(felt_array: &FeltArray) -> Self {
-        felt_array.__inner.iter().map(Into::into).collect()
-    }
-}
-
 /// Converts a FeltArray reference to a Vec of native Felt values.
-/// This function works for both browser (where FeltArray is a struct) and
-/// nodejs (where FeltArray is a Vec type alias) builds.
 pub(crate) fn felt_array_to_native_vec(felt_array: &FeltArray) -> Vec<NativeFelt> {
-    #[cfg(feature = "browser")]
-    { felt_array.__inner.iter().map(Into::into).collect() }
-    #[cfg(feature = "nodejs")]
-    { felt_array.iter().map(Into::into).collect() }
+    Vec::from(felt_array).into_iter().map(Into::into).collect()
 }
 
 impl_napi_from_value!(Felt);

@@ -45,7 +45,7 @@ pub(crate) fn bytes_to_js(bytes: &[u8]) -> JsBytes {
 
 /// Convert a byte slice to the platform-specific byte array type.
 #[cfg(feature = "nodejs")]
-pub(crate) fn bytes_to_js(bytes: Vec<u8>) -> JsBytes {
+pub(crate) fn bytes_to_js(bytes: &[u8]) -> JsBytes {
     napi::bindgen_prelude::Buffer::from(bytes)
 }
 
