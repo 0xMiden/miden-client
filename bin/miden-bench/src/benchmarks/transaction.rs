@@ -1,8 +1,8 @@
 use std::time::{Duration, Instant};
 
-use miden_client::account::{AccountId, StorageSlotContent};
+use miden_client::account::{AccountId, StorageMapKey, StorageSlotContent};
 use miden_client::keystore::FilesystemKeyStore;
-use miden_client::{Client, Serializable, Word};
+use miden_client::{Client, Serializable};
 
 use crate::config::{self, BenchConfig};
 use crate::deploy::wait_for_block_advancement;
@@ -17,7 +17,7 @@ use crate::report::format_size;
 #[derive(Clone, Debug)]
 pub struct StorageSlotInfo {
     pub name: String,
-    pub keys: Vec<Word>,
+    pub keys: Vec<StorageMapKey>,
 }
 
 impl StorageSlotInfo {
@@ -31,7 +31,7 @@ impl StorageSlotInfo {
 pub struct ReadOp {
     /// Index into the `slot_infos` array (matches the reader procedure index).
     pub slot_idx: usize,
-    pub key: Word,
+    pub key: StorageMapKey,
 }
 
 // ORCHESTRATOR
@@ -352,14 +352,14 @@ fn build_slot_infos_from_storage(
     storage: &miden_client::account::AccountStorage,
 ) -> Vec<StorageSlotInfo> {
     // Collect bench map slots with their parsed indices
-    let mut indexed: Vec<(usize, Vec<Word>)> = storage
+    let mut indexed: Vec<(usize, Vec<StorageMapKey>)> = storage
         .slots()
         .iter()
         .filter_map(|slot| {
             let name = slot.name().to_string();
             let idx = name.strip_prefix("miden::bench::map_slot_")?.parse::<usize>().ok()?;
             if let StorageSlotContent::Map(map) = slot.content() {
-                let keys: Vec<Word> = map.entries().map(|(k, _v)| Word::from(*k)).collect();
+                let keys: Vec<StorageMapKey> = map.entries().map(|(k, _v)| *k).collect();
                 Some((idx, keys))
             } else {
                 None
@@ -376,7 +376,7 @@ fn build_slot_infos_from_storage(
 
     // Build contiguous slot_infos [0..=max_idx] so procedure indices match the account's
     // reader component. Slots missing from storage get empty key lists (no reads generated).
-    let mut keys_by_idx = vec![Vec::new(); max_idx + 1];
+    let mut keys_by_idx: Vec<Vec<StorageMapKey>> = vec![Vec::new(); max_idx + 1];
     for (idx, keys) in indexed {
         keys_by_idx[idx] = keys;
     }

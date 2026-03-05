@@ -1,5 +1,5 @@
 name = "acl_auth"
-description = "Access Control List (ACL) authentication component. Provides fine-grained authentication control based on procedure calls and note operations. Storage layout: Slot 0 - public key, Slot 1 - scheme ID, Slot 2 - ACL config, Slot 3 - trigger procedures map"
+description = "Access Control List (ACL) authentication component. Provides fine-grained authentication control based on procedure calls and note operations. Storage layout: pub_key - public key commitment, scheme - authentication scheme ID, config - ACL configuration, trigger_procedure_roots - map of procedure roots requiring authentication"
 version = "0.1.0"
 supported-types = ["RegularAccountUpdatableCode", "RegularAccountImmutableCode", "FungibleFaucet", "NonFungibleFaucet"]
 

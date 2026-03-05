@@ -364,7 +364,7 @@ async fn create_client_account<AUTH: Keystore + Sync + 'static>(
 
     // Load the component templates and initialization storage data.
 
-    let cli_config = CliConfig::from_system()?;
+    let cli_config = CliConfig::load()?;
     debug!("Loading packages...");
     let packages = load_packages(&cli_config, package_paths)?;
     debug!("Loaded {} packages", packages.len());

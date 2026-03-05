@@ -407,7 +407,7 @@ async fn execute_transaction<AUTH: Keystore + Sync + 'static>(
     println!("Proving transaction...");
 
     let prover = if delegated_proving {
-        let cli_config = CliConfig::from_system()?;
+        let cli_config = CliConfig::load()?;
         let remote_prover_endpoint =
             cli_config.remote_prover_endpoint.as_ref().ok_or(CliError::Config(
                 "Remote prover endpoint".to_string().into(),

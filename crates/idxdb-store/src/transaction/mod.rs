@@ -119,6 +119,12 @@ impl WebStore {
             })?;
         }
 
+        {
+            // Use a separate scope to prevent holding the `MutexGuard` across an await point
+            let mut smt_forest = self.smt_forest.write();
+            smt_forest.insert_account_state(account.vault(), account.storage())?;
+        }
+
         // Updates for notes
         apply_note_updates_tx(self.db_id(), tx_update.note_updates()).await?;
 

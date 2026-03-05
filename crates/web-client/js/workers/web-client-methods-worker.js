@@ -164,6 +164,20 @@ const methodHandlers = {
     const serializedSyncSummary = syncSummary.serialize();
     return serializedSyncSummary.buffer;
   },
+  [MethodName.APPLY_TRANSACTION]: async (args) => {
+    const wasm = await getWasmOrThrow();
+    const [serializedTransactionResult, submissionHeight] = args;
+    const transactionResultBytes = new Uint8Array(serializedTransactionResult);
+    const transactionResult = wasm.TransactionResult.deserialize(
+      transactionResultBytes
+    );
+    const transactionUpdate = await wasmWebClient.applyTransaction(
+      transactionResult,
+      submissionHeight
+    );
+    const serializedUpdate = transactionUpdate.serialize();
+    return serializedUpdate.buffer;
+  },
   [MethodName.EXECUTE_TRANSACTION]: async (args) => {
     const wasm = await getWasmOrThrow();
     const [accountIdHex, serializedTransactionRequest] = args;
@@ -369,8 +383,14 @@ async function processMessage(event) {
         hasGetKeyCb,
         hasInsertKeyCb,
         hasSignCb,
+        logLevel,
       ] = args;
       const wasm = await getWasmOrThrow();
+
+      if (logLevel) {
+        wasm.setupLogging(logLevel);
+      }
+
       wasmWebClient = new wasm.WebClient();
 
       // Check if any callbacks are provided
@@ -401,8 +421,13 @@ async function processMessage(event) {
       self.postMessage({ ready: true });
       return;
     } else if (action === WorkerAction.INIT_MOCK) {
-      const [seed] = args;
+      const [seed, logLevel] = args;
       const wasm = await getWasmOrThrow();
+
+      if (logLevel) {
+        wasm.setupLogging(logLevel);
+      }
+
       wasmWebClient = new wasm.WebClient();
       await wasmWebClient.createMockClient(seed);
 

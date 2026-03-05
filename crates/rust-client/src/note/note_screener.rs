@@ -254,12 +254,12 @@ where
 /// Error when screening notes to check relevance to a client.
 #[derive(Debug, Error)]
 pub enum NoteScreenerError {
-    #[error("account data wasn't found for account id {0}")]
+    #[error("account {0} data not found in the store")]
     AccountDataNotFound(AccountId),
-    #[error("error while fetching data from the store")]
+    #[error("failed to fetch data from the store")]
     StoreError(#[from] StoreError),
-    #[error("error while checking note")]
+    #[error("note consumption check failed")]
     NoteCheckerError(#[from] NoteCheckerError),
-    #[error("error while building transaction request")]
+    #[error("failed to build transaction request")]
     TransactionRequestError(#[from] TransactionRequestError),
 }
