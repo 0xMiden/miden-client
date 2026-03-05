@@ -9,6 +9,12 @@ React hooks library for the Miden Web Client. Provides a simple, ergonomic inter
 - **Auto-Sync** - Automatic background synchronization with the network
 - **TypeScript First** - Full type safety with comprehensive type exports
 - **Consistent Patterns** - All hooks follow predictable patterns for loading, errors, and state
+- **Note Attachments** - Send and read arbitrary data payloads on notes via `useSend()` and `readNoteAttachment()`
+- **Temporal Note Tracking** - `useNoteStream()` tracks when notes first appear, with built-in filtering, handled-note exclusion, and phase snapshots
+- **Session Wallets** - `useSessionAccount()` manages the create-fund-consume lifecycle for temporary wallets
+- **Concurrency Safety** - Transaction hooks prevent double-sends with built-in concurrency guards
+- **Auto Pre-Sync** - Transaction hooks sync before executing by default (opt out with `skipSync`)
+- **WASM Error Wrapping** - Cryptic WASM errors are intercepted and replaced with actionable messages
 
 ## Installation
 
@@ -438,6 +444,8 @@ function NotesList() {
   const { notes: committedNotes } = useNotes({
     status: 'committed',  // 'all' | 'consumed' | 'committed' | 'expected' | 'processing'
     accountId: '0x...',   // Filter by account
+    sender: '0x...',      // Filter by sender (any format, normalized internally)
+    excludeIds: ['0xnote1...'], // Exclude specific note IDs
   });
 
   return (
@@ -457,6 +465,61 @@ function NotesList() {
       ))}
     </div>
   );
+}
+```
+
+#### `useNoteStream(options?)`
+
+Temporal note tracking with a unified model. Replaces the common pattern of
+`handledNoteIds` refs, deferred baselines, and dual-track note decoding.
+Returns `StreamedNote` objects that merge summary data with the underlying
+record and pre-decode attachments.
+
+Features:
+- **Unified `StreamedNote` type** with sender (bech32), amount, assets, attachment, and `firstSeenAt` timestamp
+- **Built-in filtering** by sender, status, `since` timestamp, `excludeIds`, and custom `amountFilter`
+- **`markHandled` / `markAllHandled`** to exclude processed notes without removing them from the store
+- **`snapshot()`** to capture current note IDs and timestamp for passing to the next phase
+
+```tsx
+import { useNoteStream } from '@miden-sdk/react';
+
+function IncomingNotes({ opponentId }: { opponentId: string }) {
+  const { notes, latest, markHandled, snapshot } = useNoteStream({
+    sender: opponentId,       // Only notes from this sender
+    status: 'committed',      // 'all' | 'consumed' | 'committed' | 'expected' | 'processing'
+    // since: phaseStartTime, // Only notes after this timestamp
+    // excludeIds: staleIds,  // Exclude specific note IDs
+    // amountFilter: (a) => a >= 100n,
+  });
+
+  useEffect(() => {
+    if (latest) {
+      console.log('New note!', latest.attachment);
+      markHandled(latest.id);
+    }
+  }, [latest, markHandled]);
+
+  // Capture state for next phase
+  const handlePhaseEnd = () => {
+    const snap = snapshot(); // { ids: Set<string>, timestamp: number }
+    // Pass snap.ids as excludeIds or snap.timestamp as since to next phase
+  };
+
+  return <div>{notes.length} unhandled notes</div>;
+}
+```
+
+The `StreamedNote` type provides:
+```typescript
+interface StreamedNote {
+  id: string;              // Note ID (hex)
+  sender: string;          // Sender account ID (bech32)
+  amount: bigint;          // First fungible asset amount (0n if none)
+  assets: NoteAsset[];     // All assets on the note
+  record: InputNoteRecord; // Underlying record for escape-hatch access
+  firstSeenAt: number;     // Timestamp (ms) when first observed
+  attachment: bigint[] | null; // Pre-decoded attachment values
 }
 ```
 
@@ -507,6 +570,12 @@ It collapses the multi-step transaction pipeline into a single call with stage
 tracking. You get private note delivery without having to remember the extra
 send step.
 
+Built-in features:
+- **Auto pre-sync** before executing (disable with `skipSync: true`)
+- **Concurrency guard** prevents double-sends while a transaction is in-flight
+- **Attachment support** for sending arbitrary data with notes
+- **`sendAll`** to send the full balance of an asset
+
 ```tsx
 import { useSend } from '@miden-sdk/react';
 
@@ -529,8 +598,11 @@ function SendForm() {
         amount: 100n,             // Amount in smallest units
 
         // Optional parameters
-        noteType: 'private',      // 'private' | 'public' | 'encrypted' (default: 'private')
+        noteType: 'private',      // 'private' | 'public' (default: 'private')
         recallHeight: 1000,       // Sender can reclaim after this block
+        attachment: [1n, 2n, 3n], // Arbitrary data payload
+        skipSync: false,          // Skip auto-sync before send (default: false)
+        sendAll: false,           // Send full balance (ignores amount)
       });
 
       console.log('Sent! TX:', transactionId);
@@ -561,6 +633,11 @@ each note to recipients via `sendPrivateNote`.
 It builds the request and executes the full pipeline in one go. That means
 fewer chances to handle batching incorrectly or forget private note delivery.
 
+Built-in features:
+- **Auto pre-sync** before executing (disable with `skipSync: true`)
+- **Concurrency guard** prevents double-sends while a transaction is in-flight
+- **Per-recipient note type and attachment overrides**
+
 ```tsx
 import { useMultiSend } from '@miden-sdk/react';
 
@@ -573,9 +650,10 @@ function MultiSendButton() {
       assetId: '0xtoken...',
       recipients: [
         { to: '0xrec1...', amount: 100n },
-        { to: '0xrec2...', amount: 250n },
+        { to: '0xrec2...', amount: 250n, attachment: [42n] },
       ],
-      noteType: 'public',
+      noteType: 'public',  // Default for all recipients
+      skipSync: false,      // Optional: skip auto-sync (default: false)
     });
   };
 
@@ -731,7 +809,7 @@ function MintForm() {
         faucetId: '0xmyfaucet...',      // Your faucet ID
         targetAccountId: '0xwallet...', // Recipient wallet
         amount: 1000n * 10n**8n,        // Amount to mint
-        noteType: 'private',            // Optional: 'private' | 'public' | 'encrypted'
+        noteType: 'private',            // Optional: 'private' | 'public'
       });
 
       console.log('Minted! TX:', transactionId);
@@ -838,6 +916,10 @@ It standardizes the execute/prove/submit flow while still letting you craft the
 request. You get progress and error handling without wrapping every call
 yourself.
 
+Built-in features:
+- **Auto pre-sync** before executing (disable with `skipSync: true`)
+- **Concurrency guard** prevents double-executions while a transaction is in-flight
+
 ```tsx
 import { useTransaction } from '@miden-sdk/react';
 import { AccountId, NoteType } from '@miden-sdk/miden-sdk';
@@ -858,6 +940,7 @@ function CustomTransactionButton({ accountId }: { accountId: string }) {
           NoteType.Private,
           NoteType.Private
         ),
+      skipSync: false, // Optional: skip auto-sync (default: false)
     });
   };
 
@@ -866,6 +949,152 @@ function CustomTransactionButton({ accountId }: { accountId: string }) {
       {isLoading ? stage : 'Run Transaction'}
     </button>
   );
+}
+```
+
+#### `useSessionAccount(options)`
+
+Manage a session wallet lifecycle: create, fund, and consume in a single flow.
+Replaces the common 300+ line pattern of creating a temporary wallet, waiting
+for funding, and consuming the funding note. Persists the session wallet ID
+to localStorage for page reloads.
+
+```tsx
+import { useSessionAccount, useSend } from '@miden-sdk/react';
+
+function SessionWallet({ mainWalletId, assetId }: { mainWalletId: string; assetId: string }) {
+  const { send } = useSend();
+  const { initialize, sessionAccountId, isReady, step, error, reset } =
+    useSessionAccount({
+      fund: async (sessionId) => {
+        // Send tokens from main wallet to session wallet
+        await send({ from: mainWalletId, to: sessionId, assetId, amount: 100n });
+      },
+      assetId,
+      // Optional:
+      // walletOptions: { storageMode: 'public', mutable: true, authScheme: 0 },
+      // pollIntervalMs: 3000,
+      // storagePrefix: 'miden-session',
+    });
+
+  if (error) return <div>Error: {error.message} <button onClick={reset}>Retry</button></div>;
+  if (isReady) return <div>Session ready: {sessionAccountId}</div>;
+
+  return (
+    <button onClick={initialize} disabled={step !== 'idle'}>
+      {step === 'idle' ? 'Start Session' : `${step}...`}
+    </button>
+  );
+}
+```
+
+Steps: `idle` -> `creating` -> `funding` -> `consuming` -> `ready`
+
+## Utilities
+
+The SDK exports standalone utility functions for common tasks.
+
+### Note Attachments
+
+Read and write arbitrary data payloads on notes:
+
+```typescript
+import { readNoteAttachment, createNoteAttachment } from '@miden-sdk/react';
+
+// Read attachment from a note record
+const data = readNoteAttachment(noteRecord);
+if (data) {
+  console.log(data.values); // bigint[]
+  console.log(data.kind);   // 'word' (<=4 values) or 'array' (>4 values)
+}
+
+// Create attachment for sending
+const attachment = createNoteAttachment([1n, 2n, 3n]);
+// <= 4 values -> Word (auto-padded to 4)
+// > 4 values -> Array (auto-padded to multiple of 4)
+```
+
+### Account ID Normalization
+
+Compare and normalize account IDs across hex and bech32 formats:
+
+```typescript
+import { normalizeAccountId, accountIdsEqual } from '@miden-sdk/react';
+
+const bech32 = normalizeAccountId('0x1234...');  // Returns bech32 format
+accountIdsEqual('0x1234...', 'miden1abc...');     // true (format-agnostic)
+```
+
+### Byte Conversion
+
+Utilities for bigint/byte conversions useful in cryptographic note data:
+
+```typescript
+import { bytesToBigInt, bigIntToBytes, concatBytes } from '@miden-sdk/react';
+
+const n = bytesToBigInt(new Uint8Array([0x01, 0x00])); // 256n
+const bytes = bigIntToBytes(256n, 2);                   // Uint8Array([0x01, 0x00])
+const combined = concatBytes(bytes1, bytes2);            // Concatenated Uint8Array
+```
+
+### Storage Helpers
+
+IndexedDB migration and namespaced localStorage persistence:
+
+```typescript
+import { migrateStorage, clearMidenStorage, createMidenStorage } from '@miden-sdk/react';
+
+// Auto-clear stale IndexedDB when SDK version changes
+await migrateStorage({
+  version: '0.13.1',
+  // versionKey: 'miden:storageVersion',  // default
+  // reloadOnClear: true,                 // default
+  // onBeforeClear: () => { /* save data */ },
+});
+
+// Namespaced localStorage for app state
+const store = createMidenStorage('myapp');
+store.set('lastOpponent', '0x1234...');
+const opponent = store.get<string>('lastOpponent');
+store.remove('lastOpponent');
+store.clear(); // Clears only keys under 'myapp:' prefix
+```
+
+### Wallet Detection
+
+Wait for a browser extension wallet to be detected before connecting:
+
+```typescript
+import { waitForWalletDetection } from '@miden-sdk/react';
+
+const adapter = wallets[0].adapter;
+
+// Default 5s timeout
+await waitForWalletDetection(adapter);
+
+// Custom timeout
+await waitForWalletDetection(adapter, 10000);
+
+// Returns immediately if already installed, otherwise
+// listens for readyStateChange events with a timeout.
+```
+
+This replaces the common 30-line polling+timeout pattern needed when the wallet extension loads slowly. The adapter is duck-typed — any object with `readyState`, `on("readyStateChange", ...)`, and `off("readyStateChange", ...)` will work.
+
+### Error Handling Utilities
+
+WASM errors are cryptic. The SDK wraps common patterns with actionable messages:
+
+```typescript
+import { MidenError, wrapWasmError } from '@miden-sdk/react';
+
+try {
+  await client.someMethod(accountId);
+} catch (e) {
+  const wrapped = wrapWasmError(e);
+  // MidenError with code: 'WASM_CLASS_MISMATCH' | 'WASM_POINTER_CONSUMED' |
+  //   'WASM_NOT_INITIALIZED' | 'WASM_SYNC_REQUIRED' | 'SEND_BUSY' | 'UNKNOWN'
+  console.log(wrapped.message); // Human-readable with fix suggestions
 }
 ```
 
@@ -948,6 +1177,157 @@ function MyFeature() {
 }
 ```
 
+## External Signer Integration
+
+For wallets using external key management, wrap your app with a signer provider **above** `MidenProvider`. The signer provider populates a `SignerContext` with a `signCb` and an `accountConfig`; `MidenProvider` picks these up automatically to create the client and initialize the account.
+
+### Para (EVM Wallets)
+
+```tsx
+import { ParaSignerProvider } from '@miden-sdk/para';
+
+function App() {
+  return (
+    <ParaSignerProvider apiKey="your-api-key" environment="PRODUCTION">
+      <MidenProvider config={{ rpcUrl: 'testnet' }}>
+        <YourApp />
+      </MidenProvider>
+    </ParaSignerProvider>
+  );
+}
+
+// Access Para-specific data
+const { para, wallet, isConnected } = useParaSigner();
+```
+
+### Turnkey
+
+```tsx
+import { TurnkeySignerProvider } from '@miden-sdk/miden-turnkey-react';
+
+function App() {
+  return (
+    // Config is optional — defaults to https://api.turnkey.com
+    // and reads VITE_TURNKEY_ORG_ID from environment
+    <TurnkeySignerProvider>
+      <MidenProvider config={{ rpcUrl: 'testnet' }}>
+        <YourApp />
+      </MidenProvider>
+    </TurnkeySignerProvider>
+  );
+}
+
+// Or with explicit config:
+<TurnkeySignerProvider config={{
+  apiBaseUrl: 'https://api.turnkey.com',
+  defaultOrganizationId: 'your-org-id',
+}}>
+  ...
+</TurnkeySignerProvider>
+```
+
+Connect via passkey authentication:
+
+```tsx
+import { useSigner } from '@miden-sdk/react';
+import { useTurnkeySigner } from '@miden-sdk/miden-turnkey-react';
+
+const { isConnected, connect, disconnect } = useSigner();
+await connect(); // triggers passkey flow
+
+const { client, account, setAccount } = useTurnkeySigner();
+```
+
+### MidenFi Wallet Adapter
+
+```tsx
+import { MidenFiSignerProvider } from '@miden-sdk/wallet-adapter-react';
+
+function App() {
+  return (
+    <MidenFiSignerProvider network="Testnet">
+      <MidenProvider config={{ rpcUrl: 'testnet' }}>
+        <YourApp />
+      </MidenProvider>
+    </MidenFiSignerProvider>
+  );
+}
+```
+
+### Unified Signer Hook
+
+`useSigner()` works with any signer provider:
+
+```tsx
+import { useSigner } from '@miden-sdk/react';
+
+function ConnectButton() {
+  const signer = useSigner();
+  if (!signer) return null; // local keystore mode
+
+  const { isConnected, connect, disconnect, name } = signer;
+  return isConnected
+    ? <button onClick={disconnect}>Disconnect {name}</button>
+    : <button onClick={connect}>Connect with {name}</button>;
+}
+```
+
+### Custom Account Components
+
+Signer providers can include custom `AccountComponent` instances in the account via the `customComponents` field on `SignerAccountConfig`. This is useful for attaching application-specific logic compiled from `.masp` packages (e.g. a DEX component or custom smart contract) alongside the default auth and basic wallet components.
+
+Pre-built signer providers (Para, Turnkey, MidenFi) accept `customComponents` as a prop and forward it into `accountConfig`:
+
+```tsx
+import { ParaSignerProvider } from '@miden-sdk/para';
+import type { AccountComponent } from '@miden-sdk/miden-sdk';
+
+const dexComponent: AccountComponent = await loadCompiledComponent();
+
+<ParaSignerProvider
+  apiKey="your-api-key"
+  environment="PRODUCTION"
+  customComponents={[dexComponent]}
+>
+  <MidenProvider config={{ rpcUrl: 'testnet' }}>
+    <YourApp />
+  </MidenProvider>
+</ParaSignerProvider>
+```
+
+When building a custom signer provider, pass `customComponents` through the `SignerContext` directly:
+
+```tsx
+import { SignerContext } from '@miden-sdk/react';
+import type { AccountComponent } from '@miden-sdk/miden-sdk';
+
+function MySignerProvider({ children, customComponents }: {
+  children: React.ReactNode;
+  customComponents?: AccountComponent[];
+}) {
+  return (
+    <SignerContext.Provider value={{
+      name: 'MySigner',
+      storeName: `mysigner_${userId}`,
+      isConnected: true,
+      accountConfig: {
+        publicKeyCommitment: userPublicKeyCommitment,
+        accountType: 'RegularAccountUpdatableCode',
+        storageMode: myStorageMode,
+        customComponents,
+      },
+      signCb: async (pubKey, signingInputs) => signature,
+      connect: async () => { /* ... */ },
+      disconnect: async () => { /* ... */ },
+    }}>
+      {children}
+    </SignerContext.Provider>
+  );
+}
+```
+
+Components are appended to the `AccountBuilder` after the default basic wallet component and before `build()` is called, so the account always includes wallet functionality plus any extras you provide. The field is optional — omitting it or passing an empty array preserves the default behavior.
+
 ## Default Values
 
 The SDK uses privacy-first defaults:
@@ -957,7 +1337,8 @@ The SDK uses privacy-first defaults:
 | `storageMode` | `'private'` | Account data stored off-chain |
 | `mutable` | `true` | Wallet code can be updated |
 | `authScheme` | `0` (Falcon) | Post-quantum secure signatures |
-| `noteType` | `'private'` | Note contents encrypted |
+| `noteType` | `'private'` | Note contents are private |
+| `skipSync` | `false` | Auto-sync before transactions |
 | `decimals` | `8` | Token decimal places |
 | `autoSyncInterval` | `15000` | Sync every 15 seconds |
 
@@ -988,6 +1369,16 @@ import type {
   ExecuteTransactionOptions,
   NotesFilter,
 
+  // Note stream types
+  StreamedNote,
+  UseNoteStreamOptions,
+  UseNoteStreamReturn,
+
+  // Session account types
+  UseSessionAccountOptions,
+  UseSessionAccountReturn,
+  SessionAccountStep,
+
   // Hook results
   AccountResult,
   AccountsResult,
@@ -998,6 +1389,11 @@ import type {
   TransactionStage,
   AssetBalance,
   SyncState,
+
+  // Utility types
+  NoteAttachmentData,
+  MidenErrorCode,
+  MigrateStorageOptions,
 } from '@miden-sdk/react';
 ```
 
@@ -1016,7 +1412,7 @@ yarn dev
 ## Requirements
 
 - React 18.0 or higher
-- `@miden-sdk/miden-sdk` ^0.13.0-0
+- `@miden-sdk/miden-sdk` ^0.13.1
 
 ## Browser Support
 

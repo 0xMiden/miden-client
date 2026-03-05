@@ -375,9 +375,6 @@ pub async fn test_import_expected_notes_from_the_past_as_committed(
 
     execute_tx_and_sync(&mut client_1, faucet_account.id(), tx_request).await?;
 
-    // Use client 1 to wait until a couple of blocks have passed
-    wait_for_blocks(&mut client_1, 3).await;
-
     // importing the note before client_2 is synced will result in a note with `Expected` state
     let note_id = client_2
         .import_notes(&[NoteFile::NoteDetails {
@@ -713,21 +710,22 @@ pub async fn test_consume_multiple_expected_notes(client_config: ClientConfig) -
     let faucet_account_id = faucet_account_header.id();
     let to_account_ids = [target_basic_account_1.id(), target_basic_account_2.id()];
 
-    // Mint tokens to the accounts
     let fungible_asset = FungibleAsset::new(faucet_account_id, TRANSFER_AMOUNT).unwrap();
+
+    // Mint tokens to the accounts
     let mint_tx_request = mint_multiple_fungible_asset(
         fungible_asset,
         &[to_account_ids[0], to_account_ids[0], to_account_ids[1], to_account_ids[1]],
         NoteType::Private,
         client.rng(),
     );
-
-    execute_tx_and_sync(&mut client, faucet_account_id, mint_tx_request.clone()).await?;
+    let all_expected_notes = mint_tx_request.expected_output_own_notes();
+    execute_tx_and_sync(&mut client, faucet_account_id, mint_tx_request).await?;
 
     unauth_client.sync_state().await.unwrap();
 
     // Filter notes by ownership
-    let expected_notes = mint_tx_request.expected_output_own_notes().into_iter();
+    let expected_notes = all_expected_notes.into_iter();
     let client_notes: Vec<_> = client.get_input_notes(NoteFilter::All).await.unwrap();
     let client_notes_ids: Vec<_> = client_notes.iter().map(|note| note.id()).collect();
 

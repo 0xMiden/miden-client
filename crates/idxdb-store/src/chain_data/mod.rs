@@ -130,7 +130,18 @@ impl WebStore {
                 let promise = idxdb_get_partial_blockchain_nodes(self.db_id(), formatted_list);
                 let js_value =
                     await_js_value(promise, "failed to get partial blockchain nodes").await?;
-                process_partial_blockchain_nodes_from_js_value(js_value)
+                let nodes = process_partial_blockchain_nodes_from_js_value(js_value)?;
+
+                // Verify that all requested nodes were found. Missing nodes indicate
+                // that MMR authentication nodes were not persisted during a previous
+                // sync (e.g. the browser extension was closed mid-sync).
+                for id in &ids {
+                    if !nodes.contains_key(id) {
+                        return Err(StoreError::PartialBlockchainNodeNotFound(id.inner() as u64));
+                    }
+                }
+
+                Ok(nodes)
             },
             PartialBlockchainFilter::Forest(forest) => {
                 if forest.is_empty() {

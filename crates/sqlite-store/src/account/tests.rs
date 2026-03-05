@@ -853,7 +853,11 @@ async fn undo_account_state_restores_previous_latest() -> anyhow::Result<()> {
         .interact_with_connection(move |conn| {
             let tx = conn.transaction().into_store_error()?;
             let mut smt_forest = smt_forest.write().expect("smt_forest write lock not poisoned");
-            SqliteStore::undo_account_state(&tx, &mut smt_forest, &[post_delta_commitment])?;
+            SqliteStore::undo_account_state(
+                &tx,
+                &mut smt_forest,
+                &[(account_id, post_delta_commitment)],
+            )?;
             tx.commit().into_store_error()?;
             Ok(())
         })
@@ -933,7 +937,7 @@ async fn undo_account_state_deletes_account_entirely() -> anyhow::Result<()> {
         .interact_with_connection(move |conn| {
             let tx = conn.transaction().into_store_error()?;
             let mut smt_forest = smt_forest.write().expect("smt_forest write lock not poisoned");
-            SqliteStore::undo_account_state(&tx, &mut smt_forest, &[commitment])?;
+            SqliteStore::undo_account_state(&tx, &mut smt_forest, &[(account_id, commitment)])?;
             tx.commit().into_store_error()?;
             Ok(())
         })
@@ -1138,6 +1142,7 @@ async fn undo_after_update_account_state_does_not_resurrect_removed_entries() ->
                 &BTreeMap::new(),
                 &delta_1,
             )?;
+            smt_forest.commit_roots(account_id);
             tx.commit().into_store_error()?;
             Ok(())
         })
@@ -1232,7 +1237,11 @@ async fn undo_after_update_account_state_does_not_resurrect_removed_entries() ->
         .interact_with_connection(move |conn| {
             let tx = conn.transaction().into_store_error()?;
             let mut smt_forest = smt_forest.write().expect("smt_forest write lock not poisoned");
-            SqliteStore::undo_account_state(&tx, &mut smt_forest, &[commitment_next])?;
+            SqliteStore::undo_account_state(
+                &tx,
+                &mut smt_forest,
+                &[(account_id, commitment_next)],
+            )?;
             tx.commit().into_store_error()?;
             Ok(())
         })
