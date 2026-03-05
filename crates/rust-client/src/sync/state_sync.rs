@@ -65,8 +65,9 @@ pub enum NoteUpdateAction {
     Discard,
 }
 
-#[async_trait(?Send)]
-pub trait OnNoteReceived {
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+pub trait OnNoteReceived: Send + Sync {
     /// Callback that gets executed when a new note is received as part of the sync response.
     ///
     /// It receives:
@@ -636,7 +637,7 @@ mod tests {
     /// Mock note screener that discards all notes, for minimal test setup.
     struct MockScreener;
 
-    #[async_trait(?Send)]
+    #[async_trait]
     impl OnNoteReceived for MockScreener {
         async fn on_note_received(
             &self,

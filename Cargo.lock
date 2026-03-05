@@ -2784,6 +2784,7 @@ dependencies = [
  "async-trait",
  "clap",
  "miden-client",
+ "miden-client-service",
  "miden-client-sqlite-store",
  "num_cpus",
  "rand",
@@ -2795,6 +2796,16 @@ dependencies = [
  "tracing-subscriber",
  "url",
  "uuid",
+]
+
+[[package]]
+name = "miden-client-service"
+version = "0.14.0"
+dependencies = [
+ "miden-client",
+ "miden-protocol",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]

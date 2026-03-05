@@ -15,7 +15,7 @@ pub struct TransactionCmd {
 }
 
 impl TransactionCmd {
-    pub async fn execute<AUTH: Keystore + Sync + 'static>(
+    pub async fn execute<AUTH: Keystore + Send + Sync + 'static>(
         &self,
         client: Client<AUTH>,
     ) -> Result<(), CliError> {
@@ -26,7 +26,7 @@ impl TransactionCmd {
 
 // LIST TRANSACTIONS
 // ================================================================================================
-async fn list_transactions<AUTH: Keystore + Sync + 'static>(
+async fn list_transactions<AUTH: Keystore + Send + Sync + 'static>(
     client: Client<AUTH>,
 ) -> Result<(), CliError> {
     let transactions = client.get_transactions(TransactionFilter::All).await?;

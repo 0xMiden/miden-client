@@ -3,6 +3,7 @@ module.exports = [
     // Ignore patterns
     ignores: [
       "crates/web-client/dist/**/*",
+      "crates/react-sdk/dist/**/*",
       "target/**/*",
       "**/target/**/*",
       "miden-node/**/*",

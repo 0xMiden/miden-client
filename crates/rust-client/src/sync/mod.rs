@@ -31,7 +31,7 @@
 //! # use miden_client::{Client, ClientError};
 //! # use miden_protocol::{block::BlockHeader, Felt, Word, StarkField};
 //! # use miden_protocol::crypto::rand::FeltRng;
-//! # async fn run_sync<AUTH: TransactionAuthenticator + Sync + 'static>(client: &mut Client<AUTH>) -> Result<(), ClientError> {
+//! # async fn run_sync<AUTH: TransactionAuthenticator + Send + Sync + 'static>(client: &mut Client<AUTH>) -> Result<(), ClientError> {
 //! // Attempt to synchronize the client's state with the Miden network.
 //! // The requested data is based on the client's state: it gets updates for accounts, relevant
 //! // notes, etc. For more information on the data that gets requested, see the doc comments for
@@ -88,7 +88,7 @@ pub use state_sync_update::{
 /// Client synchronization methods.
 impl<AUTH> Client<AUTH>
 where
-    AUTH: TransactionAuthenticator + Sync + 'static,
+    AUTH: TransactionAuthenticator + Send + Sync + 'static,
 {
     // SYNC STATE
     // --------------------------------------------------------------------------------------------
@@ -185,6 +185,33 @@ where
         })
     }
 
+    /// Gets the state sync update from the network without applying it.
+    ///
+    /// This method performs the same network requests as [`sync_state()`](Self::sync_state) but
+    /// returns the raw [`StateSyncUpdate`] instead of applying it to the store. This is useful
+    /// when you want to inspect or modify the update before applying it, or when implementing
+    /// custom sync logic.
+    ///
+    /// Use [`apply_state_sync()`](Self::apply_state_sync) to apply the returned update.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// let update = client.get_sync_update().await?;
+    /// println!("Sync would update {} accounts", update.accounts.updated_accounts.len());
+    /// client.apply_state_sync(update).await?;
+    /// ```
+    pub async fn get_sync_update(&self) -> Result<StateSyncUpdate, ClientError> {
+        let note_screener = self.note_screener();
+        let state_sync =
+            StateSync::new(self.rpc_api.clone(), Arc::new(note_screener), self.tx_discard_delta);
+
+        let mut current_partial_mmr = self.store.get_current_partial_mmr().await?;
+        let input = self.build_sync_input().await?;
+
+        state_sync.sync_state(&mut current_partial_mmr, input).await
+    }
+
     /// Applies the state sync update to the store and prunes the irrelevant block headers.
     ///
     /// See [`crate::Store::apply_state_sync()`] for what the update implies.
@@ -214,7 +241,7 @@ where
 // ================================================================================================
 
 /// Contains stats about the sync operation.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct SyncSummary {
     /// Block number up to which the client has been synced.
     pub block_num: BlockNumber,

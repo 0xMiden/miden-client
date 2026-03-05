@@ -9,7 +9,7 @@ use crate::errors::CliError;
 pub struct SyncCmd {}
 
 impl SyncCmd {
-    pub async fn execute<AUTH: Keystore + Sync + 'static>(
+    pub async fn execute<AUTH: Keystore + Send + Sync + 'static>(
         &self,
         mut client: Client<AUTH>,
     ) -> Result<(), CliError> {

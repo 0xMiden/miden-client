@@ -35,7 +35,7 @@
 //! /// containing 100 tokens of `faucet_id`'s fungible asset.
 //! async fn create_and_submit_transaction<
 //!     R: rand::Rng,
-//!     AUTH: TransactionAuthenticator + Sync + 'static,
+//!     AUTH: TransactionAuthenticator + Send + Sync + 'static,
 //! >(
 //!     client: &mut Client<AUTH>,
 //!     sender_id: AccountId,
@@ -152,7 +152,7 @@ pub use result::TransactionResult;
 /// Transaction management methods
 impl<AUTH> Client<AUTH>
 where
-    AUTH: TransactionAuthenticator + Sync + 'static,
+    AUTH: TransactionAuthenticator + Send + Sync + 'static,
 {
     // TRANSACTION DATA RETRIEVAL
     // --------------------------------------------------------------------------------------------
