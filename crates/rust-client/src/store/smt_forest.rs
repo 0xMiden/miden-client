@@ -1,6 +1,12 @@
 use alloc::vec::Vec;
 
-use miden_protocol::account::{AccountStorage, StorageMap, StorageMapWitness, StorageSlotContent};
+use miden_protocol::account::{
+    AccountStorage,
+    StorageMap,
+    StorageMapKey,
+    StorageMapWitness,
+    StorageSlotContent,
+};
 use miden_protocol::asset::{Asset, AssetVault, AssetVaultKey, AssetWitness};
 use miden_protocol::crypto::merkle::smt::{SMT_DEPTH, Smt, SmtForest};
 use miden_protocol::crypto::merkle::{EmptySubtreeRoots, MerkleError};
@@ -42,9 +48,9 @@ impl AccountSmtForest {
     pub fn get_storage_map_item_witness(
         &self,
         map_root: Word,
-        key: Word,
+        key: StorageMapKey,
     ) -> Result<StorageMapWitness, StoreError> {
-        let hashed_key = StorageMap::hash_key(key);
+        let hashed_key = key.hash().as_word();
         let proof = self.forest.open(map_root, hashed_key).map_err(StoreError::from)?;
         Ok(StorageMapWitness::new(proof, [key])?)
     }
@@ -80,10 +86,10 @@ impl AccountSmtForest {
     pub fn update_storage_map_nodes(
         &mut self,
         root: Word,
-        entries: impl Iterator<Item = (Word, Word)>,
+        entries: impl Iterator<Item = (StorageMapKey, Word)>,
     ) -> Result<Word, StoreError> {
         let entries: Vec<(Word, Word)> =
-            entries.map(|(key, value)| (StorageMap::hash_key(key), value)).collect();
+            entries.map(|(key, value)| (key.hash().as_word(), value)).collect();
 
         if entries.is_empty() {
             return Ok(root);
@@ -140,7 +146,7 @@ impl AccountSmtForest {
     pub fn insert_storage_map_nodes_for_map(&mut self, map: &StorageMap) -> Result<(), StoreError> {
         let empty_root = *EmptySubtreeRoots::entry(SMT_DEPTH, 0);
         let entries: Vec<(Word, Word)> =
-            map.entries().map(|(k, v)| (StorageMap::hash_key(*k), *v)).collect();
+            map.entries().map(|(k, v)| (k.hash().as_word(), *v)).collect();
         if entries.is_empty() {
             return Ok(());
         }

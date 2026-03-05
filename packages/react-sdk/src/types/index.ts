@@ -1,3 +1,4 @@
+import { AuthScheme } from "@miden-sdk/miden-sdk";
 import type {
   WasmWebClient as WebClient,
   Account,
@@ -15,6 +16,7 @@ import type {
 } from "@miden-sdk/miden-sdk";
 
 // Re-export SDK types for convenience
+export { AuthScheme };
 export type {
   WebClient,
   Account,
@@ -212,8 +214,8 @@ export interface CreateWalletOptions {
   storageMode?: "private" | "public" | "network";
   /** Whether code can be updated. Default: true */
   mutable?: boolean;
-  /** Auth scheme: 0 = RpoFalcon512, 1 = EcdsaK256Keccak. Default: 0 */
-  authScheme?: 0 | 1;
+  /** Auth scheme. Default: AuthScheme.AuthRpoFalcon512 */
+  authScheme?: AuthScheme;
   /** Initial seed for deterministic account ID */
   initSeed?: Uint8Array;
 }
@@ -228,8 +230,8 @@ export interface CreateFaucetOptions {
   maxSupply: bigint;
   /** Storage mode. Default: private */
   storageMode?: "private" | "public" | "network";
-  /** Auth scheme: 0 = RpoFalcon512, 1 = EcdsaK256Keccak. Default: 0 */
-  authScheme?: 0 | 1;
+  /** Auth scheme. Default: AuthScheme.AuthRpoFalcon512 */
+  authScheme?: AuthScheme;
 }
 
 // Account import options
@@ -246,7 +248,7 @@ export type ImportAccountOptions =
       type: "seed";
       seed: Uint8Array;
       mutable?: boolean;
-      authScheme?: 0 | 1;
+      authScheme?: AuthScheme;
     };
 
 // Send options
@@ -394,7 +396,7 @@ export const DEFAULTS = {
   AUTO_SYNC_INTERVAL: 15000,
   STORAGE_MODE: "private" as const,
   WALLET_MUTABLE: true,
-  AUTH_SCHEME: 0 as const,
+  AUTH_SCHEME: AuthScheme.AuthRpoFalcon512,
   NOTE_TYPE: "private" as const,
   FAUCET_DECIMALS: 8,
 } as const;

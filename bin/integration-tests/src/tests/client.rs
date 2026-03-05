@@ -7,6 +7,7 @@ use miden_client::account::{
     AccountId,
     AccountStorageMode,
     StorageMap,
+    StorageMapKey,
     StorageSlot,
     StorageSlotName,
 };
@@ -153,8 +154,9 @@ pub async fn test_multiple_tx_on_same_block(client_config: ClientConfig) -> Resu
     // wait for 1 block
     wait_for_blocks(&mut client, 1).await;
 
-    // wait for 1 block
+    // wait for both transactions to be committed
     wait_for_tx(&mut client, transaction_id_1).await?;
+    wait_for_tx(&mut client, transaction_id_2).await?;
 
     let transactions = client
         .get_transactions(TransactionFilter::All)
@@ -721,6 +723,7 @@ pub async fn test_consume_multiple_expected_notes(client_config: ClientConfig) -
     );
 
     execute_tx_and_sync(&mut client, faucet_account_id, mint_tx_request.clone()).await?;
+
     unauth_client.sync_state().await.unwrap();
 
     // Filter notes by ownership
@@ -1348,7 +1351,7 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
 
     let mut storage_map = StorageMap::new();
     storage_map.insert(
-        [Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)].into(),
+        StorageMapKey::new([Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)].into()),
         [Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(1)].into(),
     )?;
 

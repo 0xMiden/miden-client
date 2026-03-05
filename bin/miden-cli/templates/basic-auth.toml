@@ -1,10 +1,15 @@
 name = "basic_auth"
-description = "Basic authentication component, for verifying RPO Falcon signatures."
+description = "Basic authentication component, for verifying RPO Falcon or ECDSA K256 Keccak signatures."
 version = "0.1.0"
 supported-types = ["RegularAccountUpdatableCode", "RegularAccountImmutableCode", "FungibleFaucet", "NonFungibleFaucet"]
 
 [storage]
 [[storage.slots]]
-name = "miden::standards::auth::rpo_falcon512::public_key"
-description = "Falcon public key"
-type = "miden::standards::auth::falcon512_rpo::pub_key"
+name = "miden::standards::auth::singlesig::pub_key"
+description = "Public key commitment"
+type = "miden::standards::auth::pub_key"
+
+[[storage.slots]]
+name = "miden::standards::auth::singlesig::scheme"
+description = "Authentication scheme ID"
+type = "miden::standards::auth::scheme"

@@ -1,9 +1,9 @@
 import test from "./playwright.global.setup";
 import { expect } from "@playwright/test";
 
-// WASM AuthScheme enum: 0 = AuthRpoFalcon512 (Falcon), 1 = AuthEcdsaK256Keccak (ECDSA)
+// WASM AuthScheme enum: 2 = AuthRpoFalcon512 (Falcon), 1 = AuthEcdsaK256Keccak (ECDSA)
 const SCHEMES = [
-  ["rpoFalconWithRNG", 0],
+  ["rpoFalconWithRNG", 2],
   ["ecdsaWithRNG", 1],
 ] as const;
 

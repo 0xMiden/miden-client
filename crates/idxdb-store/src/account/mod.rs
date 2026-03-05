@@ -14,6 +14,7 @@ use miden_client::account::{
     PartialStorage,
     PartialStorageMap,
     StorageMap,
+    StorageMapKey,
     StorageSlot,
     StorageSlotName,
     StorageSlotType,
@@ -343,7 +344,10 @@ impl WebStore {
         let mut maps = BTreeMap::new();
         for entry in account_maps_idxdb {
             let map = maps.entry(entry.slot_name).or_insert_with(StorageMap::new);
-            map.insert(Word::try_from(entry.key.as_str())?, Word::try_from(entry.value.as_str())?)?;
+            map.insert(
+                StorageMapKey::new(Word::try_from(entry.key.as_str())?),
+                Word::try_from(entry.value.as_str())?,
+            )?;
         }
 
         let slots: Vec<StorageSlot> = filtered_slots
@@ -543,7 +547,7 @@ impl WebStore {
         &self,
         account_id: AccountId,
         slot_name: StorageSlotName,
-        key: Word,
+        key: StorageMapKey,
     ) -> Result<(Word, StorageMapWitness), StoreError> {
         // TODO: prevent fetching the full storage when we only need one map item
         // https://github.com/0xMiden/miden-client/issues/1746

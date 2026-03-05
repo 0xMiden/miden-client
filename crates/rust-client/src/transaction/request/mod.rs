@@ -480,12 +480,13 @@ pub enum TransactionRequestError {
 mod tests {
     use std::vec::Vec;
 
-    use miden_protocol::account::auth::PublicKeyCommitment;
+    use miden_protocol::account::auth::{AuthScheme, PublicKeyCommitment};
     use miden_protocol::account::{
         AccountBuilder,
         AccountComponent,
         AccountId,
         AccountType,
+        StorageMapKey,
         StorageSlotName,
     };
     use miden_protocol::asset::FungibleAsset;
@@ -498,8 +499,8 @@ mod tests {
     };
     use miden_protocol::transaction::OutputNote;
     use miden_protocol::{EMPTY_WORD, Felt, Word};
-    use miden_standards::account::auth::{AuthEcdsaK256Keccak, AuthFalcon512Rpo};
-    use miden_standards::note::create_p2id_note;
+    use miden_standards::account::auth::AuthSingleSig;
+    use miden_standards::note::P2idNote;
     use miden_standards::testing::account_component::MockAccountComponent;
     use miden_tx::utils::{Deserializable, Serializable};
 
@@ -510,14 +511,16 @@ mod tests {
     #[test]
     fn transaction_request_serialization() {
         assert_transaction_request_serialization_with(|| {
-            AuthFalcon512Rpo::new(PublicKeyCommitment::from(EMPTY_WORD)).into()
+            AuthSingleSig::new(PublicKeyCommitment::from(EMPTY_WORD), AuthScheme::Falcon512Rpo)
+                .into()
         });
     }
 
     #[test]
     fn transaction_request_serialization_ecdsa() {
         assert_transaction_request_serialization_with(|| {
-            AuthEcdsaK256Keccak::new(PublicKeyCommitment::from(EMPTY_WORD)).into()
+            AuthSingleSig::new(PublicKeyCommitment::from(EMPTY_WORD), AuthScheme::EcdsaK256Keccak)
+                .into()
         });
     }
 
@@ -533,7 +536,7 @@ mod tests {
 
         let mut notes = vec![];
         for i in 0..6 {
-            let note = create_p2id_note(
+            let note = P2idNote::create(
                 sender_id,
                 target_id,
                 vec![FungibleAsset::new(faucet_id, 100 + i).unwrap().into()],
@@ -572,7 +575,7 @@ mod tests {
                     target_id,
                     AccountStorageRequirements::new([(
                         StorageSlotName::new("demo::storage_slot").unwrap(),
-                        &[Word::default()],
+                        &[StorageMapKey::new(Word::default())],
                     )]),
                 )
                 .unwrap(),

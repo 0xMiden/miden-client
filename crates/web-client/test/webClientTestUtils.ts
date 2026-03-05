@@ -561,6 +561,7 @@ export const createNewWallet = async (
     {
       storageMode: storageMode,
       mutable: mutable,
+      authSchemeId: authSchemeId,
       _serializedClientSeed: serializedClientSeed,
       isolatedClient: isolatedClient,
       _serializedWalletSeed: serializedWalletSeed,
@@ -575,7 +576,7 @@ export const createNewFaucet = async (
   tokenSymbol: string = "DAG",
   decimals: number = 8,
   maxSupply: bigint = BigInt(10000000),
-  authSchemeId: number
+  authSchemeId: number = 2
 ): Promise<NewAccountTestResult> => {
   return await testingPage.evaluate(
     async ({
@@ -879,27 +880,27 @@ interface SetupWalletFaucetResult {
 }
 
 export const setupWalletAndFaucet = async (
-  testingPage: Page,
-  authSchemeID: Number = 0
+  testingPage: Page
 ): Promise<SetupWalletFaucetResult> => {
   return await testingPage.evaluate(async () => {
     const client = window.client;
     const account = await client.newWallet(
       window.AccountStorageMode.private(),
       true,
-      0
+      window.AuthScheme.AuthRpoFalcon512
     );
     const faucetAccount = await client.newFaucet(
       window.AccountStorageMode.private(),
       false,
       "DAG",
       8,
-      BigInt(10000000)
+      BigInt(10000000),
+      window.AuthScheme.AuthRpoFalcon512
     );
 
     return {
       accountId: account.id().toString(),
-      accountCommitment: account.commitment().toHex(),
+      accountCommitment: account.to_commitment().toHex(),
       faucetId: faucetAccount.id().toString(),
     };
   });
@@ -912,7 +913,7 @@ export const getAccount = async (testingPage: Page, accountId: string) => {
     const account = await client.getAccount(accountId);
     return {
       id: account?.id().toString(),
-      commitment: account?.commitment().toHex(),
+      commitment: account?.to_commitment().toHex(),
       nonce: account?.nonce().toString(),
       vaultCommitment: account?.vault().root().toHex(),
       storageCommitment: account?.storage().commitment().toHex(),

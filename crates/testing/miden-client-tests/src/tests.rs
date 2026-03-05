@@ -17,9 +17,9 @@ use miden_client::assembly::{
     Path,
 };
 use miden_client::auth::{
-    AuthEcdsaK256Keccak,
-    AuthFalcon512Rpo,
+    AuthSchemeId,
     AuthSecretKey,
+    AuthSingleSig,
     PublicKeyCommitment,
     RPO_FALCON_SCHEME_ID,
 };
@@ -70,11 +70,13 @@ use miden_protocol::account::{
     AccountBuilder,
     AccountCode,
     AccountComponent,
+    AccountComponentMetadata,
     AccountHeader,
     AccountId,
     AccountStorageMode,
     AccountType,
     StorageMap,
+    StorageMapKey,
     StorageSlot,
     StorageSlotContent,
     StorageSlotName,
@@ -107,7 +109,7 @@ use miden_protocol::{EMPTY_WORD, Felt, ONE, Word};
 use miden_standards::account::faucets::BasicFungibleFaucet;
 use miden_standards::account::interface::AccountInterfaceError;
 use miden_standards::account::wallets::BasicWallet;
-use miden_standards::note::{NoteConsumptionStatus, StandardNote, utils};
+use miden_standards::note::{NoteConsumptionStatus, P2idNoteStorage, StandardNote};
 use miden_standards::testing::mock_account::MockAccountExt;
 use miden_standards::testing::note::NoteBuilder;
 use miden_testing::{MockChain, MockChainBuilder, TxContextInput};
@@ -292,7 +294,7 @@ async fn insert_same_account_twice_fails() {
 
     let account = Account::mock(
         ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_2,
-        AuthFalcon512Rpo::new(PublicKeyCommitment::from(EMPTY_WORD)),
+        AuthSingleSig::new(PublicKeyCommitment::from(EMPTY_WORD), AuthSchemeId::Falcon512Rpo),
     );
 
     assert!(client.add_account(&account, false).await.is_ok());
@@ -306,7 +308,7 @@ async fn account_code() {
 
     let account = Account::mock(
         ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE,
-        AuthFalcon512Rpo::new(PublicKeyCommitment::from(EMPTY_WORD)),
+        AuthSingleSig::new(PublicKeyCommitment::from(EMPTY_WORD), AuthSchemeId::Falcon512Rpo),
     );
 
     let account_code = account.code();
@@ -328,7 +330,7 @@ async fn get_account_by_id() {
 
     let account = Account::mock(
         ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_UPDATABLE_CODE,
-        AuthFalcon512Rpo::new(PublicKeyCommitment::from(EMPTY_WORD)),
+        AuthSingleSig::new(PublicKeyCommitment::from(EMPTY_WORD), AuthSchemeId::Falcon512Rpo),
     );
 
     client.add_account(&account, false).await.unwrap();
@@ -726,9 +728,9 @@ async fn note_without_asset() {
 
     // Create note without assets
     let serial_num = client.rng().draw_word();
-    let recipient = utils::build_p2id_recipient(wallet.id(), serial_num).unwrap();
+    let recipient = P2idNoteStorage::new(wallet.id()).into_recipient(serial_num);
     let tag = NoteTag::with_account_target(wallet.id());
-    let metadata = NoteMetadata::new(wallet.id(), NoteType::Private, tag);
+    let metadata = NoteMetadata::new(wallet.id(), NoteType::Private).with_tag(tag);
     let vault = NoteAssets::new(vec![]).unwrap();
 
     let note = Note::new(vault.clone(), metadata, recipient.clone());
@@ -745,7 +747,7 @@ async fn note_without_asset() {
     assert!(transaction.is_ok());
 
     // Create the same transaction for the faucet
-    let metadata = NoteMetadata::new(faucet.id(), NoteType::Private, tag);
+    let metadata = NoteMetadata::new(faucet.id(), NoteType::Private).with_tag(tag);
     let note = Note::new(vault, metadata, recipient);
 
     let transaction_request = TransactionRequestBuilder::new()
@@ -2202,9 +2204,12 @@ async fn empty_storage_map() {
         .unwrap();
     let map_slot_name = StorageSlotName::new(EMPTY_STORAGE_MAP_SLOT_NAME).unwrap();
     let map_slot = StorageSlot::with_map(map_slot_name, storage_map);
-    let component = AccountComponent::new(component_code, vec![map_slot])
-        .unwrap()
-        .with_supports_all_types();
+    let component = AccountComponent::new(
+        component_code,
+        vec![map_slot],
+        AccountComponentMetadata::new("miden::testing::dummy_component").with_supports_all_types(),
+    )
+    .unwrap();
 
     let key_pair = AuthSecretKey::new_falcon512_rpo();
     let pub_key = key_pair.public_key();
@@ -2215,7 +2220,10 @@ async fn empty_storage_map() {
     let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountImmutableCode)
         .storage_mode(AccountStorageMode::Public)
-        .with_auth_component(AuthFalcon512Rpo::new(pub_key.to_commitment()))
+        .with_auth_component(AuthSingleSig::new(
+            pub_key.to_commitment(),
+            AuthSchemeId::Falcon512Rpo,
+        ))
         .with_component(BasicWallet)
         .with_component(component)
         .build()
@@ -2278,7 +2286,10 @@ async fn storage_and_vault_proofs() {
     // can be updated.
     let mut storage_map = StorageMap::new();
     storage_map
-        .insert(MAP_KEY.into(), [Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(1)].into())
+        .insert(
+            StorageMapKey::new(MAP_KEY.into()),
+            [Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(1)].into(),
+        )
         .unwrap();
 
     let bump_component_code = CodeBuilder::default()
@@ -2289,9 +2300,13 @@ async fn storage_and_vault_proofs() {
         .unwrap();
     let bump_map_slot_name = StorageSlotName::new(BUMP_MAP_SLOT_NAME).unwrap();
     let bump_map_slot = StorageSlot::with_map(bump_map_slot_name.clone(), storage_map);
-    let bump_item_component = AccountComponent::new(bump_component_code, vec![bump_map_slot])
-        .unwrap()
-        .with_supports_all_types();
+    let bump_item_component = AccountComponent::new(
+        bump_component_code,
+        vec![bump_map_slot],
+        AccountComponentMetadata::new("miden::testing::bump_map_component")
+            .with_supports_all_types(),
+    )
+    .unwrap();
 
     // Build script that bumps the storage map item and adds a new one each time.
     let assembler: Assembler = TransactionKernel::assembler();
@@ -2324,7 +2339,10 @@ async fn storage_and_vault_proofs() {
     let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountImmutableCode)
         .storage_mode(AccountStorageMode::Public)
-        .with_auth_component(AuthFalcon512Rpo::new(pub_key.to_commitment()))
+        .with_auth_component(AuthSingleSig::new(
+            pub_key.to_commitment(),
+            AuthSchemeId::Falcon512Rpo,
+        ))
         .with_component(BasicWallet)
         .with_component(bump_item_component)
         .build()
@@ -2392,7 +2410,11 @@ async fn storage_and_vault_proofs() {
         // Check that specific map item proof matches the one in the storage
         let (value, proof) = client
             .test_store()
-            .get_account_map_item(account_id, bump_map_slot_name.clone(), MAP_KEY.into())
+            .get_account_map_item(
+                account_id,
+                bump_map_slot_name.clone(),
+                StorageMapKey::new(MAP_KEY.into()),
+            )
             .await
             .unwrap();
 
@@ -2405,8 +2427,8 @@ async fn storage_and_vault_proofs() {
             panic!("Expected bump map slot content to be a map");
         };
 
-        assert_eq!(value, map.get(&MAP_KEY.into()));
-        assert_eq!(proof, map.open(&MAP_KEY.into()));
+        assert_eq!(value, map.get(&StorageMapKey::new(MAP_KEY.into())));
+        assert_eq!(proof, map.open(&StorageMapKey::new(MAP_KEY.into())));
     }
 }
 
@@ -2417,7 +2439,7 @@ async fn account_addresses_basic_wallet() {
 
     let account = Account::mock(
         ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_2,
-        AuthFalcon512Rpo::new(PublicKeyCommitment::from(EMPTY_WORD)),
+        AuthSingleSig::new(PublicKeyCommitment::from(EMPTY_WORD), AuthSchemeId::Falcon512Rpo),
     );
 
     client.add_account(&account, false).await.unwrap();
@@ -2428,8 +2450,7 @@ async fn account_addresses_basic_wallet() {
 
     // Even when the account has a basic wallet, the address list should not contain it by default
     let routing_params = RoutingParameters::new(AddressInterface::BasicWallet);
-    let basic_wallet_address =
-        Address::new(account.id()).with_routing_parameters(routing_params).unwrap();
+    let basic_wallet_address = Address::new(account.id()).with_routing_parameters(routing_params);
     assert!(!addresses.contains(&basic_wallet_address));
 }
 
@@ -2447,8 +2468,7 @@ async fn account_addresses_non_basic_wallet() {
     assert!(addresses.contains(&unspecified_default_address));
 
     let routing_params = RoutingParameters::new(AddressInterface::BasicWallet);
-    let basic_wallet_address =
-        Address::new(account.id()).with_routing_parameters(routing_params).unwrap();
+    let basic_wallet_address = Address::new(account.id()).with_routing_parameters(routing_params);
     assert!(!addresses.contains(&basic_wallet_address));
 }
 
@@ -2459,7 +2479,7 @@ async fn account_add_address_after_creation() {
 
     let account = Account::mock(
         ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_2,
-        AuthFalcon512Rpo::new(PublicKeyCommitment::from(EMPTY_WORD)),
+        AuthSingleSig::new(PublicKeyCommitment::from(EMPTY_WORD), AuthSchemeId::Falcon512Rpo),
     );
 
     client.add_account(&account, false).await.unwrap();
@@ -2473,8 +2493,7 @@ async fn account_add_address_after_creation() {
     // The basic wallet address cannot be added
     // as it is already present after account creation
     let routing_params = RoutingParameters::new(AddressInterface::BasicWallet);
-    let basic_wallet_address =
-        Address::new(account.id()).with_routing_parameters(routing_params).unwrap();
+    let basic_wallet_address = Address::new(account.id()).with_routing_parameters(routing_params);
     assert!(client.add_address(basic_wallet_address.clone(), account.id()).await.is_err());
 
     // We can remove the basic wallet address
@@ -2524,8 +2543,8 @@ async fn consume_note_with_custom_script() {
 
     let note_storage = NoteStorage::new(vec![]).unwrap();
     let serial_num = client.rng().draw_word();
-    let note_metadata =
-        NoteMetadata::new(sender_id, NoteType::Private, NoteTag::with_account_target(receiver_id));
+    let note_metadata = NoteMetadata::new(sender_id, NoteType::Private)
+        .with_tag(NoteTag::with_account_target(receiver_id));
     let note_assets = NoteAssets::new(vec![]).unwrap();
     let note_recipient = NoteRecipient::new(serial_num, note_script.clone(), note_storage);
     let custom_note = Note::new(note_assets, note_metadata, note_recipient);
@@ -2587,7 +2606,10 @@ async fn add_account_fails_if_accounts_limit_is_exceeded() {
             .add_account(
                 &Account::mock(
                     (i << 8).into(),
-                    AuthFalcon512Rpo::new(PublicKeyCommitment::from(EMPTY_WORD)),
+                    AuthSingleSig::new(
+                        PublicKeyCommitment::from(EMPTY_WORD),
+                        AuthSchemeId::Falcon512Rpo,
+                    ),
                 ),
                 false,
             )
@@ -2600,7 +2622,10 @@ async fn add_account_fails_if_accounts_limit_is_exceeded() {
         .add_account(
             &Account::mock(
                 (RpcLimits::default().account_ids_limit << 8).into(),
-                AuthFalcon512Rpo::new(PublicKeyCommitment::from(EMPTY_WORD)),
+                AuthSingleSig::new(
+                    PublicKeyCommitment::from(EMPTY_WORD),
+                    AuthSchemeId::Falcon512Rpo,
+                ),
             ),
             false,
         )
@@ -2864,7 +2889,10 @@ async fn insert_new_wallet(
     let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountImmutableCode)
         .storage_mode(storage_mode)
-        .with_auth_component(AuthFalcon512Rpo::new(pub_key.to_commitment()))
+        .with_auth_component(AuthSingleSig::new(
+            pub_key.to_commitment(),
+            AuthSchemeId::Falcon512Rpo,
+        ))
         .with_component(BasicWallet)
         .build()
         .unwrap();
@@ -2890,7 +2918,10 @@ async fn insert_new_ecdsa_wallet(
     let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountImmutableCode)
         .storage_mode(storage_mode)
-        .with_auth_component(AuthEcdsaK256Keccak::new(pub_key.to_commitment()))
+        .with_auth_component(AuthSingleSig::new(
+            pub_key.to_commitment(),
+            AuthSchemeId::EcdsaK256Keccak,
+        ))
         .with_component(BasicWallet)
         .build()
         .unwrap();
@@ -2921,7 +2952,10 @@ async fn insert_new_fungible_faucet(
     let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::FungibleFaucet)
         .storage_mode(storage_mode)
-        .with_auth_component(AuthFalcon512Rpo::new(pub_key.to_commitment()))
+        .with_auth_component(AuthSingleSig::new(
+            pub_key.to_commitment(),
+            AuthSchemeId::Falcon512Rpo,
+        ))
         .with_component(BasicFungibleFaucet::new(symbol, 10, max_supply).unwrap())
         .build()
         .unwrap();
@@ -2954,7 +2988,10 @@ async fn insert_new_ecdsa_fungible_faucet(
     let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::FungibleFaucet)
         .storage_mode(storage_mode)
-        .with_auth_component(AuthEcdsaK256Keccak::new(pub_key.to_commitment()))
+        .with_auth_component(AuthSingleSig::new(
+            pub_key.to_commitment(),
+            AuthSchemeId::EcdsaK256Keccak,
+        ))
         .with_component(BasicFungibleFaucet::new(symbol, 10, max_supply).unwrap())
         .build()
         .unwrap();
@@ -2977,7 +3014,10 @@ async fn storage_and_vault_proofs_ecdsa() {
     // The storage map is still updated via named-slot access in `BUMP_MAP_CODE`.
     let mut storage_map = StorageMap::new();
     storage_map
-        .insert(MAP_KEY.into(), [Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(1)].into())
+        .insert(
+            StorageMapKey::new(MAP_KEY.into()),
+            [Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(1)].into(),
+        )
         .unwrap();
 
     let bump_component_code = CodeBuilder::default()
@@ -2988,9 +3028,13 @@ async fn storage_and_vault_proofs_ecdsa() {
         .unwrap();
     let bump_map_slot_name = StorageSlotName::new(BUMP_MAP_SLOT_NAME).unwrap();
     let bump_map_slot = StorageSlot::with_map(bump_map_slot_name.clone(), storage_map);
-    let bump_item_component = AccountComponent::new(bump_component_code, vec![bump_map_slot])
-        .unwrap()
-        .with_supports_all_types();
+    let bump_item_component = AccountComponent::new(
+        bump_component_code,
+        vec![bump_map_slot],
+        AccountComponentMetadata::new("miden::testing::bump_map_component")
+            .with_supports_all_types(),
+    )
+    .unwrap();
 
     // Build script that bumps the storage map item and adds a new one each time.
     let assembler: Assembler = TransactionKernel::assembler();
@@ -3023,7 +3067,10 @@ async fn storage_and_vault_proofs_ecdsa() {
     let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountImmutableCode)
         .storage_mode(AccountStorageMode::Public)
-        .with_auth_component(AuthEcdsaK256Keccak::new(pub_key.to_commitment()))
+        .with_auth_component(AuthSingleSig::new(
+            pub_key.to_commitment(),
+            AuthSchemeId::EcdsaK256Keccak,
+        ))
         .with_component(BasicWallet)
         .with_component(bump_item_component)
         .build()
@@ -3087,7 +3134,11 @@ async fn storage_and_vault_proofs_ecdsa() {
         // Check that specific map item proof matches the one in the storage
         let (value, proof) = client
             .test_store()
-            .get_account_map_item(account_id, bump_map_slot_name.clone(), MAP_KEY.into())
+            .get_account_map_item(
+                account_id,
+                bump_map_slot_name.clone(),
+                StorageMapKey::new(MAP_KEY.into()),
+            )
             .await
             .unwrap();
 
@@ -3100,7 +3151,7 @@ async fn storage_and_vault_proofs_ecdsa() {
             panic!("Expected bump map slot content to be a map");
         };
 
-        assert_eq!(value, map.get(&MAP_KEY.into()));
-        assert_eq!(proof, map.open(&MAP_KEY.into()));
+        assert_eq!(value, map.get(&StorageMapKey::new(MAP_KEY.into())));
+        assert_eq!(proof, map.open(&StorageMapKey::new(MAP_KEY.into())));
     }
 }
