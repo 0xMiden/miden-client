@@ -7,6 +7,7 @@ use miden_client::account::{
     AccountId,
     AccountStorageMode,
     StorageMap,
+    StorageMapKey,
     StorageSlot,
     StorageSlotName,
 };
@@ -153,8 +154,9 @@ pub async fn test_multiple_tx_on_same_block(client_config: ClientConfig) -> Resu
     // wait for 1 block
     wait_for_blocks(&mut client, 1).await;
 
-    // wait for 1 block
+    // wait for both transactions to be committed
     wait_for_tx(&mut client, transaction_id_1).await?;
+    wait_for_tx(&mut client, transaction_id_2).await?;
 
     let transactions = client
         .get_transactions(TransactionFilter::All)
@@ -372,9 +374,6 @@ pub async fn test_import_expected_notes_from_the_past_as_committed(
     let block_height_before = client_1.get_sync_height().await.unwrap();
 
     execute_tx_and_sync(&mut client_1, faucet_account.id(), tx_request).await?;
-
-    // Use client 1 to wait until a couple of blocks have passed
-    wait_for_blocks(&mut client_1, 3).await;
 
     // importing the note before client_2 is synced will result in a note with `Expected` state
     let note_id = client_2
@@ -711,20 +710,22 @@ pub async fn test_consume_multiple_expected_notes(client_config: ClientConfig) -
     let faucet_account_id = faucet_account_header.id();
     let to_account_ids = [target_basic_account_1.id(), target_basic_account_2.id()];
 
-    // Mint tokens to the accounts
     let fungible_asset = FungibleAsset::new(faucet_account_id, TRANSFER_AMOUNT).unwrap();
+
+    // Mint tokens to the accounts
     let mint_tx_request = mint_multiple_fungible_asset(
         fungible_asset,
         &[to_account_ids[0], to_account_ids[0], to_account_ids[1], to_account_ids[1]],
         NoteType::Private,
         client.rng(),
     );
+    let all_expected_notes = mint_tx_request.expected_output_own_notes();
+    execute_tx_and_sync(&mut client, faucet_account_id, mint_tx_request).await?;
 
-    execute_tx_and_sync(&mut client, faucet_account_id, mint_tx_request.clone()).await?;
     unauth_client.sync_state().await.unwrap();
 
     // Filter notes by ownership
-    let expected_notes = mint_tx_request.expected_output_own_notes().into_iter();
+    let expected_notes = all_expected_notes.into_iter();
     let client_notes: Vec<_> = client.get_input_notes(NoteFilter::All).await.unwrap();
     let client_notes_ids: Vec<_> = client_notes.iter().map(|note| note.id()).collect();
 
@@ -1348,7 +1349,7 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
 
     let mut storage_map = StorageMap::new();
     storage_map.insert(
-        [Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)].into(),
+        StorageMapKey::new([Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)].into()),
         [Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(1)].into(),
     )?;
 

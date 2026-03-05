@@ -122,7 +122,11 @@ impl WebStore {
         {
             // Use a separate scope to prevent holding the `MutexGuard` across an await point
             let mut smt_forest = self.smt_forest.write();
-            smt_forest.insert_account_state(account.vault(), account.storage())?;
+            smt_forest.insert_and_stage_account_state(
+                account.id(),
+                account.vault(),
+                account.storage(),
+            )?;
         }
 
         // Updates for notes

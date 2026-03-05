@@ -5,6 +5,11 @@ supported-types = ["RegularAccountUpdatableCode", "RegularAccountImmutableCode",
 
 [storage]
 [[storage.slots]]
-name = "miden::standards::auth::ecdsa_k256_keccak::public_key"
+name = "miden::standards::auth::singlesig::pub_key"
 description = "ECDSA K256 Keccak public key"
-type = "miden::standards::auth::ecdsa_k256_keccak::pub_key"
+type = "miden::standards::auth::pub_key"
+
+[[storage.slots]]
+name = "miden::standards::auth::singlesig::scheme"
+description = "Authentication scheme ID"
+type = "miden::standards::auth::scheme"

@@ -20,7 +20,7 @@ export const getBasicFungibleFaucet = async (
   tokenSymbol: string = "DAG",
   decimals: number = 8,
   maxSupply: bigint = BigInt(10000000),
-  authSchemeId: number = 0
+  authSchemeId: number = 2
 ): Promise<basicFungibleFaucetResult> => {
   return await page.evaluate(
     async ({
@@ -74,7 +74,7 @@ export const createWallet = async (
     const account = await client.newWallet(
       window.AccountStorageMode.tryFromStr("PUBLIC"),
       false,
-      0,
+      window.AuthScheme.AuthRpoFalcon512,
       undefined
     );
     const basicFungibleFaucet =

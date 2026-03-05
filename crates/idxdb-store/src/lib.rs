@@ -22,6 +22,7 @@ use miden_client::account::{
     AccountId,
     AccountStorage,
     Address,
+    StorageMapKey,
     StorageSlotName,
 };
 use miden_client::asset::{Asset, AssetVault, AssetVaultKey, AssetWitness, StorageMapWitness};
@@ -128,11 +129,14 @@ impl WebStore {
                     ))
                 })?;
 
-            self.smt_forest.write().insert_account_state(&vault, &storage).map_err(|e| {
-                JsValue::from_str(&format!(
-                    "Failed to insert account state for {account_id}: {e:?}"
-                ))
-            })?;
+            self.smt_forest
+                .write()
+                .insert_and_register_account_state(account_id, &vault, &storage)
+                .map_err(|e| {
+                    JsValue::from_str(&format!(
+                        "Failed to insert account state for {account_id}: {e:?}"
+                    ))
+                })?;
         }
 
         Ok(())
@@ -369,7 +373,7 @@ impl Store for WebStore {
         &self,
         account_id: AccountId,
         slot_name: StorageSlotName,
-        key: Word,
+        key: StorageMapKey,
     ) -> Result<(Word, StorageMapWitness), StoreError> {
         self.get_account_map_item(account_id, slot_name, key).await
     }

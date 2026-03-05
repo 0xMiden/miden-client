@@ -200,9 +200,17 @@ pub mod auth {
         PublicKeyCommitment,
         Signature,
     };
-    pub use miden_standards::AuthScheme;
-    pub use miden_standards::account::auth::{AuthEcdsaK256Keccak, AuthFalcon512Rpo, NoAuth};
+    pub use miden_standards::account::auth::{
+        AuthMultisig,
+        AuthMultisigConfig,
+        AuthSingleSig,
+        AuthSingleSigAcl,
+        AuthSingleSigAclConfig,
+        NoAuth,
+    };
     pub use miden_tx::auth::{BasicAuthenticator, SigningInputs, TransactionAuthenticator};
+
+    pub use crate::account::component::AuthScheme;
 
     pub const RPO_FALCON_SCHEME_ID: AuthSchemeId = AuthSchemeId::Falcon512Rpo;
     pub const ECDSA_K256_KECCAK_SCHEME_ID: AuthSchemeId = AuthSchemeId::EcdsaK256Keccak;

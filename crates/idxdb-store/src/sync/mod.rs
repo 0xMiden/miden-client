@@ -160,8 +160,20 @@ impl WebStore {
             .map(|tx_record| tx_record.details.final_account_state)
             .collect::<Vec<_>>();
 
-        // Remove the account states and pop the corresponding SMT roots from the forest
+        // Remove the account states and discard their SMT roots from the forest
         self.rollback_account_states(&account_states_to_rollback).await?;
+
+        // Discard roots for rolled-back accounts
+        {
+            let mut smt_forest = self.smt_forest.write();
+            for tx_record in transaction_updates.discarded_transactions() {
+                smt_forest.discard_roots(tx_record.details.account_id);
+            }
+            // Commit roots for successfully committed transactions
+            for tx_record in transaction_updates.committed_transactions() {
+                smt_forest.commit_roots(tx_record.details.account_id);
+            }
+        }
 
         let transaction_updates: Vec<_> = transaction_updates
             .committed_transactions()
@@ -169,22 +181,16 @@ impl WebStore {
             .map(serialize_transaction_record)
             .collect();
 
-        // Collect old SMT roots before updating so we can pop them after
-        let mut old_roots_to_pop = Vec::new();
-        for account in account_updates.updated_public_accounts() {
-            if let Some((header, _)) = self.get_account_header(account.id()).await? {
-                let roots = self.get_smt_roots_for_account_header(&header).await?;
-                old_roots_to_pop.extend(roots);
-            }
-        }
-
-        // Update SMT forest for public account updates and pop old roots
+        // Update SMT forest for public account updates (insert nodes + replace roots atomically)
         {
             let mut smt_forest = self.smt_forest.write();
             for account in account_updates.updated_public_accounts() {
-                smt_forest.insert_account_state(account.vault(), account.storage())?;
+                smt_forest.insert_and_register_account_state(
+                    account.id(),
+                    account.vault(),
+                    account.storage(),
+                )?;
             }
-            smt_forest.pop_roots(old_roots_to_pop);
         }
 
         let state_update = JsStateSyncUpdate {
@@ -211,26 +217,13 @@ impl WebStore {
         Ok(())
     }
 
-    /// Rolls back account states by removing them from the DB and popping their SMT roots
-    /// (vault roots + storage map roots) from the forest.
+    /// Rolls back account states by removing them from the DB.
+    /// SMT root cleanup is handled separately via `discard_roots`.
     async fn rollback_account_states(
         &self,
         account_commitments: &[Word],
     ) -> Result<(), StoreError> {
-        // Collect the actual SMT roots before deletion so we pop the correct entries
-        let mut smt_roots_to_pop = Vec::new();
-        for commitment in account_commitments {
-            if let Some(header) = self.get_account_header_by_commitment(*commitment).await? {
-                let roots = self.get_smt_roots_for_account_header(&header).await?;
-                smt_roots_to_pop.extend(roots);
-            }
-        }
-
         self.undo_account_states(account_commitments).await?;
-
-        let mut smt_forest = self.smt_forest.write();
-        smt_forest.pop_roots(smt_roots_to_pop);
-
         Ok(())
     }
 }
