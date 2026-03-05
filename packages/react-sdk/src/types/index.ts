@@ -423,6 +423,12 @@ export interface ExecuteTransactionOptions {
     | ((client: WebClient) => TransactionRequest | Promise<TransactionRequest>);
   /** Skip auto-sync before transaction. Default: false */
   skipSync?: boolean;
+  /**
+   * When set, private output notes from this transaction are delivered to the
+   * given recipient after the transaction is committed. Accepts any AccountRef
+   * form (hex string, bech32, AccountId, Account, AccountHeader).
+   */
+  privateNoteRecipient?: AccountRef;
 }
 
 // Transaction result
