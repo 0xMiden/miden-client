@@ -75,15 +75,7 @@ export class AccountsResource {
     const built = builder.build();
     const account = built.account;
 
-    await this.#inner.newAccount(account, false);
-    try {
-      await this.#inner.addAccountSecretKeyToWebStore(account.id(), opts.auth);
-    } catch (err) {
-      throw new Error(
-        `Account was created but secret key storage failed. ` +
-          `The account may be in an inconsistent state. Original error: ${err}`
-      );
-    }
+    await this.#inner.newAccountWithSecretKey(account, opts.auth);
     return account;
   }
 
