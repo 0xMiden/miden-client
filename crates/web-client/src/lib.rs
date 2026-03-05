@@ -75,7 +75,6 @@ pub struct WebClient {
     inner: AsyncCell<Option<Client<ClientAuth>>>,
     mock_rpc_api: Option<Arc<MockRpcApi>>,
     mock_note_transport_api: Option<Arc<MockNoteTransportApi>>,
-    debug_mode: bool,
 }
 
 // SAFETY: WebClient is only used from JavaScript's single-threaded runtime (Node.js).
@@ -106,20 +105,7 @@ impl WebClient {
             inner: AsyncCell::new(None),
             mock_rpc_api: None,
             mock_note_transport_api: None,
-            debug_mode: false,
         }
-    }
-
-    /// Sets the debug mode for transaction execution.
-    ///
-    /// When enabled, the transaction executor will record additional information useful for
-    /// debugging (the values on the VM stack and the state of the advice provider). This is
-    /// disabled by default since it adds overhead.
-    ///
-    /// Must be called before `createClient`.
-    #[js_export(js_name = "setDebugMode")]
-    pub fn set_debug_mode(&mut self, enabled: bool) {
-        self.debug_mode = enabled;
     }
 
     #[js_export(js_name = "createCodeBuilder")]
@@ -165,6 +151,9 @@ impl WebClient {
     /// * `store_name`: Optional name for the web store. If `None`, the store name defaults to
     ///   `MidenClientDB_{network_id}`, where `network_id` is derived from the `node_url`.
     ///   Explicitly setting this allows for creating multiple isolated clients.
+    /// * `debug_mode`: Optional flag to enable debug mode for transaction execution. When enabled,
+    ///   the transaction executor records additional information useful for debugging. Defaults to
+    ///   disabled.
     #[wasm_bindgen(js_name = "createClient")]
     pub async fn create_client(
         &self,
@@ -172,6 +161,7 @@ impl WebClient {
         node_note_transport_url: Option<String>,
         seed: Option<Vec<u8>>,
         store_name: Option<String>,
+        debug_mode: Option<bool>,
     ) -> Result<JsValue, JsValue> {
         let endpoint = node_url.map_or(Ok(Endpoint::testnet()), |url| {
             Endpoint::try_from(url.as_str()).map_err(|_| JsValue::from_str("Invalid node URL"))
@@ -194,7 +184,7 @@ impl WebClient {
         let keystore =
             WebKeyStore::new_with_callbacks(rng, store_name.clone(), None, None, None);
 
-        self.setup_client(web_rpc_client, store, keystore, rng, note_transport_client)
+        self.setup_client(web_rpc_client, store, keystore, rng, note_transport_client, debug_mode)
             .await?;
 
         Ok(JsValue::from_str("Client created successfully"))
@@ -212,6 +202,8 @@ impl WebClient {
     /// * `get_key_cb`: Callback to retrieve the secret key bytes for a given public key.
     /// * `insert_key_cb`: Callback to persist a secret key.
     /// * `sign_cb`: Callback to produce serialized signature bytes for the provided inputs.
+    /// * `debug_mode`: Optional flag to enable debug mode for transaction execution. Defaults to
+    ///   disabled.
     #[wasm_bindgen(js_name = "createClientWithExternalKeystore")]
     pub async fn create_client_with_external_keystore(
         &self,
@@ -222,6 +214,7 @@ impl WebClient {
         get_key_cb: Option<Function>,
         insert_key_cb: Option<Function>,
         sign_cb: Option<Function>,
+        debug_mode: Option<bool>,
     ) -> Result<JsValue, JsValue> {
         let endpoint = node_url.map_or(Ok(Endpoint::testnet()), |url| {
             Endpoint::try_from(url.as_str()).map_err(|_| JsValue::from_str("Invalid node URL"))
@@ -244,7 +237,7 @@ impl WebClient {
         let keystore =
             WebKeyStore::new_with_callbacks(rng, store_name, get_key_cb, insert_key_cb, sign_cb);
 
-        self.setup_client(web_rpc_client, store, keystore, rng, note_transport_client)
+        self.setup_client(web_rpc_client, store, keystore, rng, note_transport_client, debug_mode)
             .await?;
 
         Ok(JsValue::from_str("Client created successfully"))
@@ -257,13 +250,14 @@ impl WebClient {
         keystore: WebKeyStore<RpoRandomCoin>,
         rng: RpoRandomCoin,
         note_transport_client: Option<Arc<dyn NoteTransportClient>>,
+        debug_mode: Option<bool>,
     ) -> Result<(), JsValue> {
         let mut builder = ClientBuilder::new()
             .rpc(rpc_client)
             .rng(Box::new(rng))
             .store(store)
             .authenticator(Arc::new(keystore))
-            .in_debug_mode(if self.debug_mode {
+            .in_debug_mode(if debug_mode.unwrap_or(false) {
                 DebugMode::Enabled
             } else {
                 DebugMode::Disabled
@@ -301,6 +295,8 @@ impl WebClient {
     /// * `seed`: Optional seed for account initialization.
     /// * `db_path`: Path to the SQLite database file.
     /// * `keystore_path`: Path to the directory for storing keys.
+    /// * `debug_mode`: Optional flag to enable debug mode for transaction execution. Defaults to
+    ///   disabled.
     #[napi(js_name = "createClient")]
     pub async fn create_client(
         &self,
@@ -309,6 +305,7 @@ impl WebClient {
         seed: Option<Vec<u8>>,
         db_path: String,
         keystore_path: String,
+        debug_mode: Option<bool>,
     ) -> Result<String, JsErr> {
         let endpoint = node_url.map_or(Ok(Endpoint::testnet()), |url| {
             Endpoint::try_from(url.as_str()).map_err(|_| from_str_err("Invalid node URL"))
@@ -336,7 +333,7 @@ impl WebClient {
         let keystore = FilesystemKeyStore::new(keystore_path.into())
             .map_err(|e| from_str_err(&format!("Failed to initialize keystore: {e}")))?;
 
-        self.setup_client(rpc_client, store, keystore, rng, note_transport_client)
+        self.setup_client(rpc_client, store, keystore, rng, note_transport_client, debug_mode)
             .await?;
 
         Ok("Client created successfully".to_string())
@@ -349,15 +346,15 @@ impl WebClient {
         keystore: FilesystemKeyStore,
         rng: RpoRandomCoin,
         note_transport_client: Option<Arc<dyn NoteTransportClient>>,
+        debug_mode: Option<bool>,
     ) -> Result<(), JsErr> {
-        let debug_mode = self.debug_mode;
         let client = maybe_wrap_send(async move {
             let mut builder = ClientBuilder::new()
                 .rpc(rpc_client)
                 .rng(Box::new(rng))
                 .store(store)
                 .authenticator(Arc::new(keystore))
-                .in_debug_mode(if debug_mode {
+                .in_debug_mode(if debug_mode.unwrap_or(false) {
                     DebugMode::Enabled
                 } else {
                     DebugMode::Disabled

@@ -62,14 +62,16 @@ export class MidenClient {
         options?.storeName,
         options.keystore.getKey,
         options.keystore.insertKey,
-        options.keystore.sign
+        options.keystore.sign,
+        options?.debugMode
       );
     } else {
       inner = await WebClientClass.createClient(
         options?.rpcUrl,
         options?.noteTransportUrl,
         seed,
-        options?.storeName
+        options?.storeName,
+        options?.debugMode
       );
     }
 
