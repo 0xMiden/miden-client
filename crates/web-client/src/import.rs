@@ -2,6 +2,8 @@ use miden_client::account::{AccountFile as NativeAccountFile, AccountId as Nativ
 use miden_client::keystore::Keystore;
 
 use js_export_macro::js_export;
+#[cfg(feature = "browser")]
+use wasm_bindgen::prelude::*;
 
 use crate::helpers::generate_wallet;
 use crate::models::account::Account;
@@ -105,23 +107,23 @@ impl WebClient {
 /// This is a standalone utility function, not a WebClient method, because store
 /// export/import is an IndexedDB concern handled externally from the client.
 #[cfg(feature = "browser")]
-#[wasm_bindgen::prelude::wasm_bindgen(js_name = "forceImportStore")]
+#[wasm_bindgen(js_name = "forceImportStore")]
 pub async fn force_import_store(
-    store_dump: wasm_bindgen::JsValue,
+    store_dump: JsValue,
     store_name: String,
-) -> Result<wasm_bindgen::JsValue, wasm_bindgen::JsValue> {
+) -> Result<JsValue, JsValue> {
     let json_string = store_dump
         .as_string()
-        .ok_or(wasm_bindgen::JsValue::from_str("Store dump must be a string"))?;
+        .ok_or(JsValue::from_str("Store dump must be a string"))?;
 
     let store = idxdb_store::IdxdbStore::new(store_name)
         .await
-        .map_err(|_| wasm_bindgen::JsValue::from_str("Failed to open store"))?;
+        .map_err(|_| JsValue::from_str("Failed to open store"))?;
 
     store
         .import_store(json_string)
         .await
         .map_err(|err| js_error_with_context(err, "failed to import store"))?;
 
-    Ok(wasm_bindgen::JsValue::from_str("Store imported successfully"))
+    Ok(JsValue::from_str("Store imported successfully"))
 }
