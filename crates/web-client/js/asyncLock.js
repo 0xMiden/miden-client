@@ -1,7 +1,7 @@
 /**
  * A simple promise-chain mutex for serializing async operations.
  *
- * Error-resilient: if one operation throws, the next still runs (no deadlocks).
+ * Ignores errors: if one operation throws, the next still runs (no deadlocks).
  */
 export class AsyncLock {
   constructor() {
