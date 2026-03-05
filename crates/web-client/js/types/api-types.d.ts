@@ -513,9 +513,9 @@ export interface NotesResource {
 
 export interface CompileComponentOptions {
   /** MASM source code for the component. */
-  source: string;
+  code: string;
   /** Initial storage slots for the component. */
-  storageSlots?: StorageSlot[];
+  slots?: StorageSlot[];
   /**
    * When true, the component accepts all input types for Falcon-signed
    * transactions by automatically adding `exec.auth::auth_tx_rpo_falcon512`
@@ -529,8 +529,10 @@ export interface CompileComponentOptions {
 }
 
 export interface CompileTxScriptLibrary {
-  /** AccountComponent whose procedures become available to the script. */
-  component: AccountComponent;
+  /** MASM namespace for the library (e.g. "counter::module"). */
+  namespace: string;
+  /** MASM source code for the library. */
+  code: string;
   /**
    * `"dynamic"` (default) — procedures are linked via DYNCALL at runtime.
    * `"static"` — procedures are inlined at compile time.
@@ -540,7 +542,7 @@ export interface CompileTxScriptLibrary {
 
 export interface CompileTxScriptOptions {
   /** MASM source code for the transaction script. */
-  source: string;
+  code: string;
   /** Component libraries to link. */
   libraries?: CompileTxScriptLibrary[];
 }
