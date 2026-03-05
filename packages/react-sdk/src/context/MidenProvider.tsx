@@ -268,7 +268,9 @@ export function MidenProvider({
     if (interval <= 0) return;
 
     syncIntervalRef.current = setInterval(() => {
-      sync();
+      if (!useMidenStore.getState().syncPaused) {
+        sync();
+      }
     }, interval);
 
     return () => {
