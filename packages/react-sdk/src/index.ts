@@ -35,6 +35,8 @@ export { useSwap } from "./hooks/useSwap";
 export { useTransaction } from "./hooks/useTransaction";
 export { useExportStore } from "./hooks/useExportStore";
 export { useImportStore } from "./hooks/useImportStore";
+export { useImportNote } from "./hooks/useImportNote";
+export { useExportNote } from "./hooks/useExportNote";
 
 // Types
 export type {
@@ -120,8 +122,12 @@ export type { UseSwapResult } from "./hooks/useSwap";
 export type { UseTransactionResult } from "./hooks/useTransaction";
 export type { UseExportStoreResult } from "./hooks/useExportStore";
 export type { UseImportStoreResult } from "./hooks/useImportStore";
+export type { UseImportNoteResult } from "./hooks/useImportNote";
+export type { UseExportNoteResult } from "./hooks/useExportNote";
 export type { UseExportStoreResult } from "./hooks/useExportStore";
 export type { UseImportStoreResult } from "./hooks/useImportStore";
+export type { UseImportNoteResult } from "./hooks/useImportNote";
+export type { UseExportNoteResult } from "./hooks/useExportNote";
 export type { UseImportNoteResult } from "./hooks/useImportNote";
 export type { UseExportNoteResult } from "./hooks/useExportNote";
 export type { UseSyncControlResult } from "./hooks/useSyncControl";
