@@ -168,8 +168,8 @@ export function MidenProvider({
               resolvedConfig.noteTransportUrl,
               resolvedConfig.seed,
               storeName,
-              undefined, // getKeyCb - not needed for public accounts
-              undefined, // insertKeyCb - not needed for public accounts
+              signerContext.getKeyCb,
+              signerContext.insertKeyCb,
               signerContext.signCb
             );
 
