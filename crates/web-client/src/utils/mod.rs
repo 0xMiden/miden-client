@@ -22,11 +22,6 @@ pub fn deserialize_from_bytes<T: Deserializable>(bytes: &JsBytes) -> Result<T, J
     T::read_from(&mut reader).map_err(|e| js_error_with_context(e, &context))
 }
 
-// Keep old names as aliases for backwards compatibility during migration
-#[cfg(feature = "browser")]
-pub use serialize_to_bytes as serialize_to_uint8array;
-#[cfg(feature = "browser")]
-pub use deserialize_from_bytes as deserialize_from_uint8array;
 
 #[cfg(test)]
 mod tests {

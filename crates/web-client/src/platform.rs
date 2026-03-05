@@ -50,13 +50,6 @@ pub(crate) fn bytes_to_js(bytes: &[u8]) -> JsBytes {
 }
 
 /// Convert a platform-specific byte array to a Vec<u8>.
-#[cfg(feature = "browser")]
-pub(crate) fn js_to_bytes(js_bytes: &JsBytes) -> Vec<u8> {
-    js_bytes.to_vec()
-}
-
-/// Convert a platform-specific byte array to a Vec<u8>.
-#[cfg(feature = "nodejs")]
 pub(crate) fn js_to_bytes(js_bytes: &JsBytes) -> Vec<u8> {
     js_bytes.to_vec()
 }
