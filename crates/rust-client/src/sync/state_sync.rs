@@ -665,9 +665,11 @@ fn compute_nullifier_tx_order<'a>(
         let chain_start =
             txs.iter().find(|tx| !final_states.contains(&tx.details.init_account_state));
 
-        let start_tx = chain_start.expect(
-            "transaction chain should not be cyclic: every account must have a unique starting state",
-        );
+        // If no chain start is found, the client only tracks a subset of the account's
+        // transactions in this block, so we can't determine ordering. Skip the group.
+        let Some(start_tx) = chain_start else {
+            continue;
+        };
 
         // Follow the chain: current.final_account_state == next.init_account_state.
         let mut current = *start_tx;
