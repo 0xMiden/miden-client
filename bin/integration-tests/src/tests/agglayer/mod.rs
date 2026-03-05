@@ -12,6 +12,8 @@ pub mod ger;
 /// agglayer accounts (e.g. complete genesis or devnet).
 ///
 /// Loaded from `.mac` files in the directory specified by `AGGLAYER_ACCOUNTS_DIR` env var.
+/// Account IDs and keys are read from files, but the actual account state is fetched
+/// from the network to ensure it's up-to-date (idempotent across repeated runs).
 pub struct AgglayerConfig {
     pub bridge_admin: AccountFile,
     pub ger_manager: AccountFile,
@@ -50,7 +52,6 @@ impl AgglayerConfig {
         }
     }
 
-    #[allow(dead_code)]
     pub fn bridge_admin_id(&self) -> AccountId {
         self.bridge_admin.account.id()
     }
@@ -63,31 +64,34 @@ impl AgglayerConfig {
         self.bridge.account.id()
     }
 
-    #[allow(dead_code)]
     pub fn faucet_id(&self) -> AccountId {
         self.faucet.account.id()
     }
 
-    /// Imports all agglayer accounts and their secret keys into the client and keystore.
+    /// Imports all agglayer accounts into the client by fetching the latest state from the
+    /// network. Secret keys are loaded from the `.mac` files and added to the keystore.
+    ///
+    /// This ensures the client always has up-to-date account state, making tests idempotent
+    /// even when run repeatedly against the same node.
     pub async fn import_into_client(
         &self,
         client: &mut miden_client::testing::common::TestClient,
         keystore: &FilesystemKeyStore,
     ) -> Result<()> {
         for account_file in [&self.bridge_admin, &self.ger_manager, &self.bridge, &self.faucet] {
-            client.add_account(&account_file.account, false).await.with_context(|| {
-                format!("failed to add account {} to client", account_file.account.id())
-            })?;
+            let account_id = account_file.account.id();
 
+            // Fetch the latest account state from the network
+            client
+                .import_account_by_id(account_id)
+                .await
+                .with_context(|| format!("failed to import account {account_id} from network"))?;
+
+            // Add secret keys from the .mac file to the keystore
             for secret_key in &account_file.auth_secret_keys {
-                keystore.add_key(secret_key, account_file.account.id()).await.with_context(
-                    || {
-                        format!(
-                            "failed to add key for account {} to keystore",
-                            account_file.account.id()
-                        )
-                    },
-                )?;
+                keystore.add_key(secret_key, account_id).await.with_context(|| {
+                    format!("failed to add key for account {account_id} to keystore")
+                })?;
             }
         }
 
