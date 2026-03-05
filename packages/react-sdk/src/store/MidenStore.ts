@@ -18,6 +18,7 @@ interface MidenStoreState {
 
   // Sync state
   sync: SyncState;
+  syncPaused: boolean;
 
   // Cached data
   accounts: AccountHeader[];
@@ -40,6 +41,7 @@ interface MidenStoreState {
   setConfig: (config: MidenConfig) => void;
 
   setSyncState: (sync: Partial<SyncState>) => void;
+  setSyncPaused: (paused: boolean) => void;
 
   setAccounts: (accounts: AccountHeader[]) => void;
   setAccountDetails: (accountId: string, account: Account) => void;
@@ -70,6 +72,7 @@ const initialState = {
   config: {},
 
   sync: initialSyncState,
+  syncPaused: false,
 
   accounts: [],
   accountDetails: new Map<string, Account>(),
@@ -108,6 +111,8 @@ export const useMidenStore = create<MidenStoreState>()((set) => ({
     set((state) => ({
       sync: { ...state.sync, ...sync },
     })),
+
+  setSyncPaused: (syncPaused) => set({ syncPaused }),
 
   setAccounts: (accounts) => set({ accounts }),
 
