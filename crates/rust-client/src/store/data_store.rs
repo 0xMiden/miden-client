@@ -1,7 +1,7 @@
 use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, BTreeSet};
-use alloc::sync::Arc;
 use alloc::vec::Vec;
+use std::sync::Arc;
 
 use miden_protocol::account::{
     Account,
@@ -116,54 +116,69 @@ impl ClientDataStore {
         }
     }
 
-    /// Fetches a storage map witness from the network for a foreign account.
-    async fn fetch_remote_storage_map_witness(
+    /// Fetches a public foreign account's inputs from the network, caches them, and returns them.
+    ///
+    /// This calls `get_account_proof` with empty [`AccountStorageRequirements`], so the
+    /// response includes the account header and code but no storage map entries.
+    ///
+    /// # Errors
+    /// Returns [`DataStoreError::AccountNotFound`] if the account is private.
+    async fn fetch_and_cache_foreign_account(
         &self,
         account_id: AccountId,
-        map_root: Word,
-        map_key: Word,
-    ) -> Result<StorageMapWitness, DataStoreError> {
-        let (slot_name, known_code) = self.resolve_cached_slot_name(account_id, map_root)?;
+        account_state_at: AccountStateAt,
+    ) -> Result<AccountInputs, DataStoreError> {
+        if !account_id.is_public() {
+            return Err(DataStoreError::AccountNotFound(account_id));
+        }
 
-        let map_entries = self
-            .fetch_storage_map_entries(account_id, slot_name, map_key, known_code)
-            .await?;
+        let known_account_code = self
+            .store
+            .get_foreign_account_code(vec![account_id])
+            .await
+            .map_err(|err| {
+                DataStoreError::other_with_source("failed to query foreign account code cache", err)
+            })?
+            .into_values()
+            .next();
 
-        storage_map_entries_into_witness(map_entries, map_key)
-    }
-
-    /// Resolves the slot name and account code for a map root from the
-    /// `foreign_account_inputs` cache.
-    fn resolve_cached_slot_name(
-        &self,
-        account_id: AccountId,
-        map_root: Word,
-    ) -> Result<(StorageSlotName, AccountCode), DataStoreError> {
-        let cache = self.foreign_account_inputs.read();
-        let inputs = cache.get(&account_id).ok_or_else(|| DataStoreError::Other {
-            error_msg: format!(
-                "foreign account {account_id} not found in cache; \
-                 cannot resolve storage map with root {map_root}"
+        let (_, account_proof) = self
+            .rpc_api
+            .get_account_proof(
+                account_id,
+                AccountStorageRequirements::default(),
+                account_state_at,
+                known_account_code,
             )
-            .into(),
-            source: None,
-        })?;
-
-        let storage_header = inputs.storage().header();
-        let slot_name = storage_header
-            .slots()
-            .find(|slot| slot.slot_type().is_map() && slot.value() == map_root)
-            .map(|slot| slot.name().clone())
-            .ok_or_else(|| DataStoreError::Other {
-                error_msg: format!(
-                    "did not find map slot with root {map_root} for foreign account \
-                     {account_id}"
+            .await
+            .map_err(|err| {
+                DataStoreError::other_with_source(
+                    "failed to fetch foreign account proof via RPC",
+                    err,
                 )
-                .into(),
-                source: None,
             })?;
 
-        Ok((slot_name, inputs.code().clone()))
+        let account_inputs = account_proof_into_inputs(account_proof).map_err(|err| {
+            DataStoreError::other_with_source("failed to convert account proof to inputs", err)
+        })?;
+
+        self.transaction_mast_store.load_account_code(account_inputs.code());
+
+        let _ = self
+            .store
+            .upsert_foreign_account_code(account_id, account_inputs.code().clone())
+            .await
+            .inspect_err(|err| {
+                tracing::warn!(
+                    %account_id,
+                    %err,
+                    "Failed to persist foreign account code to store"
+                );
+            });
+
+        self.foreign_account_inputs.write().insert(account_id, account_inputs.clone());
+
+        Ok(account_inputs)
     }
 
     /// Fetches storage map entries from the network via RPC.
@@ -207,6 +222,35 @@ impl ClientDataStore {
             })?;
 
         Ok(map_detail.entries)
+    }
+
+    /// Resolves the slot name and account code for a map root from the cached foreign account
+    /// inputs.
+    fn resolve_slot_name_and_code(
+        &self,
+        account_id: AccountId,
+        map_root: Word,
+    ) -> Result<(StorageSlotName, AccountCode), DataStoreError> {
+        let cache = self.foreign_account_inputs.read();
+        let inputs = cache
+            .get(&account_id)
+            .ok_or_else(|| DataStoreError::AccountNotFound(account_id))?;
+
+        let slot_name = inputs
+            .storage()
+            .header()
+            .slots()
+            .find(|slot| slot.slot_type().is_map() && slot.value() == map_root)
+            .map(|slot| slot.name().clone())
+            .ok_or_else(|| DataStoreError::Other {
+                error_msg: format!(
+                    "did not find map slot with root {map_root} for foreign account {account_id}"
+                )
+                .into(),
+                source: None,
+            })?;
+
+        Ok((slot_name, inputs.code().clone()))
     }
 }
 
@@ -344,26 +388,43 @@ impl DataStore for ClientDataStore {
 
     /// Retrieves the [`StorageMapWitness`] requested from the store. Alternatively fetching it from
     /// the RPC if not available locally.
+    ///
+    /// # Errors
+    /// Returns [`DataStoreError::AccountNotFound`] if the account is private and has not been
+    /// pre-registered with [`Self::register_foreign_account_inputs`].
     async fn get_storage_map_witness(
         &self,
         account_id: AccountId,
         map_root: Word,
         map_key: Word,
     ) -> Result<StorageMapWitness, DataStoreError> {
+        // Try the local store first.
         if let Some(witness) =
             self.get_local_storage_map_witness(account_id, map_root, map_key).await?
         {
             return Ok(witness);
         }
 
-        self.fetch_remote_storage_map_witness(account_id, map_root, map_key).await
+        // Ensure the account inputs are cached before resolving the slot name.
+        if !self.foreign_account_inputs.read().contains_key(&account_id) {
+            self.fetch_and_cache_foreign_account(account_id, AccountStateAt::ChainTip)
+                .await?;
+        }
+
+        let (slot_name, known_code) = self.resolve_slot_name_and_code(account_id, map_root)?;
+
+        let map_entries = self
+            .fetch_storage_map_entries(account_id, slot_name, map_key, known_code)
+            .await?;
+
+        storage_map_entries_into_witness(map_entries, map_key)
     }
 
     /// Returns the [`AccountInputs`] for the given foreign account from the cache or
     /// alternatively fetching them from the RPC if not available locally.
     ///
     /// # Errors
-    /// Returns an [`DataStoreError::AccountNotFound`] error if account is private and has not been
+    /// Returns [`DataStoreError::AccountNotFound`] if the account is private and has not been
     /// pre-registered with [`Self::register_foreign_account_inputs`].
     async fn get_foreign_account_inputs(
         &self,
@@ -378,64 +439,8 @@ impl DataStore for ClientDataStore {
             }
         }
 
-        // Cache miss, lazy loading is only possible for public accounts.
-        if !foreign_account_id.is_public() {
-            return Err(DataStoreError::AccountNotFound(foreign_account_id));
-        }
-
-        let known_account_code = self
-            .store
-            .get_foreign_account_code(vec![foreign_account_id])
+        self.fetch_and_cache_foreign_account(foreign_account_id, AccountStateAt::Block(ref_block))
             .await
-            .map_err(|err| {
-                DataStoreError::other_with_source("failed to query foreign account code cache", err)
-            })?
-            .into_values()
-            .next();
-
-        let (_, account_proof) = self
-            .rpc_api
-            .get_account_proof(
-                foreign_account_id,
-                AccountStorageRequirements::default(),
-                AccountStateAt::Block(ref_block),
-                known_account_code,
-            )
-            .await
-            .map_err(|err| {
-                DataStoreError::other_with_source(
-                    "failed to fetch foreign account proof via RPC",
-                    err,
-                )
-            })?;
-
-        let account_inputs = account_proof_into_inputs(account_proof).map_err(|err| {
-            DataStoreError::other_with_source("failed to convert account proof to inputs", err)
-        })?;
-
-        // Load the account code into the MAST store so the executor can resolve
-        // procedure hashes during execution.
-        self.transaction_mast_store.load_account_code(account_inputs.code());
-
-        // Persist the fetched code for future transactions.
-        let _ = self
-            .store
-            .upsert_foreign_account_code(foreign_account_id, account_inputs.code().clone())
-            .await
-            .inspect_err(|err| {
-                tracing::warn!(
-                    account_id = %foreign_account_id,
-                    %err,
-                    "Failed to persist foreign account code to store"
-                );
-            });
-
-        // Cache the result for subsequent calls within the same transaction.
-        self.foreign_account_inputs
-            .write()
-            .insert(foreign_account_id, account_inputs.clone());
-
-        Ok(account_inputs)
     }
 
     /// Returns the [`NoteScript`] for the given script root from the store or alternatively
@@ -451,11 +456,12 @@ impl DataStore for ClientDataStore {
             // Fast path: check the local store first.
             match store.get_note_script(script_root).await {
                 Ok(note_script) => return Ok(Some(note_script)),
+                Err(StoreError::NoteScriptNotFound(_)) => {},
                 Err(err) => {
-                    tracing::debug!(
-                        %err,
-                        "note script not found locally, will try remote fetch"
-                    );
+                    return Err(DataStoreError::other_with_source(
+                        format!("failed to get note script {script_root} from store"),
+                        err,
+                    ));
                 },
             }
 
