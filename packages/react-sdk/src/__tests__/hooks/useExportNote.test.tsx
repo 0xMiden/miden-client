@@ -79,9 +79,7 @@ describe("useExportNote", () => {
 
     it("should set error on failure", async () => {
       const mockClient = createMockWebClient({
-        exportNoteFile: vi
-          .fn()
-          .mockRejectedValue(new Error("Note not found")),
+        exportNoteFile: vi.fn().mockRejectedValue(new Error("Note not found")),
       });
       const runExclusive = vi.fn((fn: () => unknown) => fn());
 
@@ -94,9 +92,9 @@ describe("useExportNote", () => {
       const { result } = renderHook(() => useExportNote());
 
       await act(async () => {
-        await expect(
-          result.current.exportNote("0xbadnote")
-        ).rejects.toThrow("Note not found");
+        await expect(result.current.exportNote("0xbadnote")).rejects.toThrow(
+          "Note not found"
+        );
       });
 
       await waitFor(() => {
