@@ -160,6 +160,13 @@ pub fn generate_claim_data_for_account(account_id: AccountId) -> (ProofData, Lea
         foundry_dir.display()
     );
 
+    // Ensure the test-vectors output directory exists (it is gitignored so may not
+    // be present in a fresh checkout).
+    let output_dir = foundry_dir.join("test-vectors");
+    std::fs::create_dir_all(&output_dir).unwrap_or_else(|e| {
+        panic!("failed to create test-vectors directory at {}: {}", output_dir.display(), e)
+    });
+
     // Run forge test with the destination address as an environment variable
     let output = std::process::Command::new("forge")
         .arg("test")
