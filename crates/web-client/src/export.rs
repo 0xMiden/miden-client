@@ -68,7 +68,10 @@ impl WebClient {
         &mut self,
         account_id: AccountId,
     ) -> Result<AccountFile, JsValue> {
-        let keystore = self.keystore.clone().expect("Keystore not initialized");
+        let keystore = self
+            .keystore
+            .clone()
+            .ok_or_else(|| JsValue::from_str("Client not initialized"))?;
         if let Some(client) = self.get_mut_inner() {
             let account = client
                 .get_account(account_id.into())
