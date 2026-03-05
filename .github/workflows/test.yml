@@ -210,6 +210,7 @@ jobs:
       - name: Install Foundry dependencies
         working-directory: bin/integration-tests/foundry-vectors
         run: |
+          rm -rf lib/forge-std lib/zkevm-contracts lib/openzeppelin-contracts-upgradeable
           forge install foundry-rs/forge-std --no-git
           forge install 0xPolygonHermez/zkevm-contracts --no-git
           forge install OpenZeppelin/openzeppelin-contracts-upgradeable@v4.9.6 --no-git
