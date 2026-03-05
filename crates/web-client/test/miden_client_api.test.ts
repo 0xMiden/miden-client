@@ -296,36 +296,6 @@ test.describe("MidenClient API - Mock Chain", () => {
     expect(result.txId.length).toBeGreaterThan(0);
   });
 
-  test("exportStore and importStore round-trip", async ({ page }) => {
-    const result = await page.evaluate(async () => {
-      const client = await window.MidenClient.createMock();
-
-      // Create an account
-      const wallet = await client.accounts.create();
-      const walletId = wallet.id().toString();
-
-      // Export the store
-      const snapshot = await client.exportStore();
-
-      // Create a new mock client and import the store
-      const client2 = await window.MidenClient.createMock();
-      await client2.importStore(snapshot);
-
-      // Check the account exists in the new client
-      const accounts = await client2.accounts.list();
-      const accountIds = accounts.map((a) => a.id().toString());
-
-      return {
-        version: snapshot.version,
-        walletId,
-        foundInImport: accountIds.includes(walletId),
-      };
-    });
-
-    expect(result.version).toBe(1);
-    expect(result.foundInImport).toBe(true);
-  });
-
   test("usesMockChain and proveBlock", async ({ page }) => {
     const result = await page.evaluate(async () => {
       const client = await window.MidenClient.createMock();
@@ -656,22 +626,6 @@ test.describe("MidenClient API - Mock Chain", () => {
 
     expect(result.threw).toBe(true);
     expect(result.message).toContain("null or undefined");
-  });
-
-  test("importStore rejects invalid version", async ({ page }) => {
-    const result = await page.evaluate(async () => {
-      const client = await window.MidenClient.createMock();
-
-      try {
-        await client.importStore({ version: 99, data: {} });
-        return { threw: false };
-      } catch (e) {
-        return { threw: true, message: e.message };
-      }
-    });
-
-    expect(result.threw).toBe(true);
-    expect(result.message).toContain("Unsupported store snapshot version");
   });
 
   test("accounts.export returns a valid AccountFile", async ({ page }) => {

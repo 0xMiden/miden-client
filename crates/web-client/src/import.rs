@@ -1,8 +1,6 @@
 use miden_client::account::{AccountFile as NativeAccountFile, AccountId as NativeAccountId};
 use miden_client::keystore::Keystore;
 
-#[cfg(feature = "browser")]
-use wasm_bindgen::prelude::*;
 use js_export_macro::js_export;
 
 use crate::helpers::generate_wallet;
@@ -102,26 +100,28 @@ impl WebClient {
     }
 }
 
+/// Imports store contents from a JSON string into an IndexedDB store, replacing all existing data.
+///
+/// This is a standalone utility function, not a WebClient method, because store
+/// export/import is an IndexedDB concern handled externally from the client.
 #[cfg(feature = "browser")]
-#[wasm_bindgen]
-impl WebClient {
-    #[wasm_bindgen(js_name = "forceImportStore")]
-    pub async fn force_import_store(
-        &self,
-        store_dump: JsValue,
-        _store_name: String,
-    ) -> Result<JsValue, JsValue> {
-        let store_guard = self.store.lock().await;
-        let store = store_guard.as_ref().ok_or(JsValue::from_str("Store not initialized"))?;
+#[wasm_bindgen::prelude::wasm_bindgen(js_name = "forceImportStore")]
+pub async fn force_import_store(
+    store_dump: wasm_bindgen::JsValue,
+    store_name: String,
+) -> Result<wasm_bindgen::JsValue, wasm_bindgen::JsValue> {
+    let json_string = store_dump
+        .as_string()
+        .ok_or(wasm_bindgen::JsValue::from_str("Store dump must be a string"))?;
 
-        let json_string =
-            store_dump.as_string().ok_or(JsValue::from_str("Store dump must be a string"))?;
+    let store = idxdb_store::IdxdbStore::new(store_name)
+        .await
+        .map_err(|_| wasm_bindgen::JsValue::from_str("Failed to open store"))?;
 
-        store
-            .import_store(json_string)
-            .await
-            .map_err(|err| js_error_with_context(err, "failed to import store"))?;
+    store
+        .import_store(json_string)
+        .await
+        .map_err(|err| js_error_with_context(err, "failed to import store"))?;
 
-        Ok(JsValue::from_str("Store imported successfully"))
-    }
+    Ok(wasm_bindgen::JsValue::from_str("Store imported successfully"))
 }

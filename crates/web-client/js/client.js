@@ -177,33 +177,6 @@ export class MidenClient {
     this.terminate();
   }
 
-  /**
-   * Exports the client store as a versioned snapshot.
-   *
-   * @returns {Promise<StoreSnapshot>} The store snapshot.
-   */
-  async exportStore() {
-    this.assertNotTerminated();
-    const data = await this.#inner.exportStore();
-    return { version: 1, data };
-  }
-
-  /**
-   * Imports a previously exported store snapshot.
-   *
-   * @param {StoreSnapshot} snapshot - The store snapshot to import.
-   */
-  async importStore(snapshot) {
-    this.assertNotTerminated();
-    if (!snapshot || snapshot.version !== 1) {
-      throw new Error(
-        `Unsupported store snapshot version: ${snapshot?.version}. Expected version 1.`
-      );
-    }
-    // Second arg is the store password (empty string = no encryption)
-    await this.#inner.forceImportStore(snapshot.data, "");
-  }
-
   // ── Mock-only methods ──
 
   /** Advances the mock chain by one block. Only available on mock clients. */

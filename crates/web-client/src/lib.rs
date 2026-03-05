@@ -32,8 +32,6 @@ use idxdb_store::IdxdbStore;
 #[cfg(feature = "browser")]
 use js_sys::{Function, Reflect};
 #[cfg(feature = "browser")]
-use miden_client::store::WebStore;
-#[cfg(feature = "browser")]
 use wasm_bindgen::prelude::*;
 
 #[cfg(feature = "nodejs")]
@@ -74,10 +72,6 @@ const BASE_STORE_NAME: &str = "MidenClientDB";
 
 #[js_export]
 pub struct WebClient {
-    #[cfg(feature = "browser")]
-    store: AsyncCell<Option<Arc<dyn WebStore>>>,
-    #[cfg(feature = "nodejs")]
-    store: AsyncCell<Option<Arc<dyn Store>>>,
     inner: AsyncCell<Option<Client<ClientAuth>>>,
     mock_rpc_api: Option<Arc<MockRpcApi>>,
     mock_note_transport_api: Option<Arc<MockNoteTransportApi>>,
@@ -110,7 +104,6 @@ impl WebClient {
 
         WebClient {
             inner: AsyncCell::new(None),
-            store: AsyncCell::new(None),
             mock_rpc_api: None,
             mock_note_transport_api: None,
             debug_mode: false,
@@ -193,12 +186,13 @@ impl WebClient {
             store_name.unwrap_or(format!("{}_{}", BASE_STORE_NAME, endpoint.to_network_id()));
 
         let rng = create_rng(seed)?;
-        let store: Arc<dyn WebStore> = Arc::new(
+        let store: Arc<dyn Store> = Arc::new(
             IdxdbStore::new(store_name.clone())
                 .await
                 .map_err(|_| JsValue::from_str("Failed to initialize IdxdbStore"))?,
         );
-        let keystore = WebKeyStore::new_with_callbacks(rng, store_name, None, None, None);
+        let keystore =
+            WebKeyStore::new_with_callbacks(rng, store_name.clone(), None, None, None);
 
         self.setup_client(web_rpc_client, store, keystore, rng, note_transport_client)
             .await?;
@@ -242,7 +236,7 @@ impl WebClient {
             store_name.unwrap_or(format!("{}_{}", BASE_STORE_NAME, endpoint.to_network_id()));
 
         let rng = create_rng(seed)?;
-        let store: Arc<dyn WebStore> = Arc::new(
+        let store: Arc<dyn Store> = Arc::new(
             IdxdbStore::new(store_name.clone())
                 .await
                 .map_err(|_| JsValue::from_str("Failed to initialize IdxdbStore"))?,
@@ -259,7 +253,7 @@ impl WebClient {
     async fn setup_client(
         &self,
         rpc_client: Arc<dyn NodeRpcClient>,
-        store: Arc<dyn WebStore>,
+        store: Arc<dyn Store>,
         keystore: WebKeyStore<RpoRandomCoin>,
         rng: RpoRandomCoin,
         note_transport_client: Option<Arc<dyn NoteTransportClient>>,
@@ -267,7 +261,7 @@ impl WebClient {
         let mut builder = ClientBuilder::new()
             .rpc(rpc_client)
             .rng(Box::new(rng))
-            .store(store.clone() as Arc<dyn Store>)
+            .store(store)
             .authenticator(Arc::new(keystore))
             .in_debug_mode(if self.debug_mode {
                 DebugMode::Enabled
@@ -290,7 +284,6 @@ impl WebClient {
             .map_err(|err| js_error_with_context(err, "Failed to ensure genesis in place"))?;
 
         *self.inner.lock().await = Some(client);
-        *self.store.lock().await = Some(store);
 
         Ok(())
     }
@@ -358,11 +351,11 @@ impl WebClient {
         note_transport_client: Option<Arc<dyn NoteTransportClient>>,
     ) -> Result<(), JsErr> {
         let debug_mode = self.debug_mode;
-        let (client, store) = maybe_wrap_send(async move {
+        let client = maybe_wrap_send(async move {
             let mut builder = ClientBuilder::new()
                 .rpc(rpc_client)
                 .rng(Box::new(rng))
-                .store(store.clone())
+                .store(store)
                 .authenticator(Arc::new(keystore))
                 .in_debug_mode(if debug_mode {
                     DebugMode::Enabled
@@ -384,12 +377,11 @@ impl WebClient {
                 .await
                 .map_err(|err| js_error_with_context(err, "Failed to ensure genesis in place"))?;
 
-            Ok::<_, JsErr>((client, store))
+            Ok::<_, JsErr>(client)
         })
         .await?;
 
         *self.inner.lock().await = Some(client);
-        *self.store.lock().await = Some(store);
 
         Ok(())
     }

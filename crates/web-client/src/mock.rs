@@ -7,7 +7,7 @@ use miden_client::utils::Serializable;
 #[cfg(feature = "browser")]
 use idxdb_store::IdxdbStore;
 #[cfg(feature = "browser")]
-use miden_client::store::WebStore;
+use miden_client::store::Store;
 #[cfg(feature = "browser")]
 use miden_client::testing::MockChain;
 #[cfg(feature = "browser")]
@@ -58,7 +58,7 @@ impl WebClient {
 
         let store_name = "mock_client_db".to_owned();
         let rng = create_rng(seed)?;
-        let store: Arc<dyn WebStore> = Arc::new(
+        let store: Arc<dyn Store> = Arc::new(
             IdxdbStore::new(store_name.clone())
                 .await
                 .map_err(|_| JsValue::from_str("Failed to initialize IdxdbStore"))?,

@@ -3,8 +3,6 @@ use miden_client::account::AccountFile as NativeAccountFile;
 use miden_client::keystore::Keystore;
 use miden_client::note::NoteId;
 
-#[cfg(feature = "browser")]
-use wasm_bindgen::prelude::*;
 use js_export_macro::js_export;
 
 use crate::models::account_file::AccountFile;
@@ -92,22 +90,23 @@ impl WebClient {
     }
 }
 
-/// Retrieves the entire underlying store and returns it as a `JsValue`
+/// Exports the contents of an IndexedDB store as a JSON string.
 ///
-/// Meant to be used in conjunction with the `forceImportStore` method
+/// This is a standalone utility function, not a WebClient method, because store
+/// export/import is an IndexedDB concern handled externally from the client.
 #[cfg(feature = "browser")]
-#[wasm_bindgen]
-impl WebClient {
-    #[wasm_bindgen(js_name = "exportStore")]
-    pub async fn export_store(&self) -> Result<JsValue, JsValue> {
-        let store_guard = self.store.lock().await;
-        let store = store_guard.as_ref().ok_or(JsValue::from_str("Store not initialized"))?;
+#[wasm_bindgen::prelude::wasm_bindgen(js_name = "exportStore")]
+pub async fn export_store(
+    store_name: String,
+) -> Result<wasm_bindgen::JsValue, wasm_bindgen::JsValue> {
+    let store = idxdb_store::IdxdbStore::new(store_name)
+        .await
+        .map_err(|_| wasm_bindgen::JsValue::from_str("Failed to open store"))?;
 
-        let json_string = store
-            .export_store()
-            .await
-            .map_err(|err| js_error_with_context(err, "failed to export store"))?;
+    let json_string = store
+        .export_store()
+        .await
+        .map_err(|err| js_error_with_context(err, "failed to export store"))?;
 
-        Ok(JsValue::from_str(&json_string))
-    }
+    Ok(wasm_bindgen::JsValue::from_str(&json_string))
 }

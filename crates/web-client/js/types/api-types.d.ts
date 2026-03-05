@@ -368,12 +368,6 @@ export interface MockOptions {
   serializedNoteTransport?: Uint8Array;
 }
 
-/** Versioned store snapshot for backup/restore. */
-export interface StoreSnapshot {
-  version: number;
-  data: unknown;
-}
-
 // ════════════════════════════════════════════════════════════════
 // Swap tag options
 // ════════════════════════════════════════════════════════════════
@@ -485,11 +479,6 @@ export declare class MidenClient {
   readonly defaultProver: TransactionProver | null;
   /** Terminates the underlying Web Worker. After this, all method calls throw. */
   terminate(): void;
-
-  /** Exports the client store as a versioned snapshot. */
-  exportStore(): Promise<StoreSnapshot>;
-  /** Imports a previously exported store snapshot. */
-  importStore(snapshot: StoreSnapshot): Promise<void>;
 
   /** Advances the mock chain by one block. Only available on mock clients. */
   proveBlock(): void;
