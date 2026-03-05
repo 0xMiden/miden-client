@@ -5,7 +5,7 @@ use miden_client::note::build_swap_tag as native_build_swap_tag;
 use crate::models::account_id::AccountId;
 use crate::models::sync_summary::SyncSummary;
 use crate::models::{NoteTag, NoteType};
-use crate::platform::{JsErr, JsU64, from_str_err};
+use crate::platform::{JsErr, JsU64, from_str_err, maybe_wrap_send};
 use crate::{WebClient, js_error_with_context};
 
 #[js_export]
@@ -56,12 +56,7 @@ impl WebClient {
         let mut guard = self.get_mut_inner().await;
         let client = guard.as_mut().ok_or_else(|| from_str_err("Client not initialized"))?;
 
-        let fut = client.sync_state();
-        #[cfg(feature = "nodejs")]
-        let sync_result = crate::wrap_send(fut).await;
-        #[cfg(feature = "browser")]
-        let sync_result = fut.await;
-        let sync_summary = sync_result
+        let sync_summary = maybe_wrap_send(client.sync_state()).await
             .map_err(|err| js_error_with_context(err, "failed to sync state"))?;
 
         Ok(sync_summary.into())

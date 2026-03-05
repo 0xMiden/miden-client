@@ -123,6 +123,38 @@ pub type JsU64 = u64;
 #[cfg(feature = "nodejs")]
 pub type JsU64 = f64;
 
+// FUTURE SEND WRAPPER
+// ================================================================================================
+
+/// On browser (WASM), futures are not `Send` and don't need to be — just pass through.
+#[cfg(feature = "browser")]
+pub(crate) fn maybe_wrap_send<F: std::future::Future>(
+    future: F,
+) -> impl std::future::Future<Output = F::Output> {
+    future
+}
+
+/// On Node.js, napi-rs requires `Send` futures for its tokio runtime.
+/// This unsafely asserts `Send` — safe because napi's JS runtime is single-threaded,
+/// so the non-Send trait objects never actually cross thread boundaries.
+#[cfg(feature = "nodejs")]
+pub(crate) fn maybe_wrap_send<F: std::future::Future>(
+    future: F,
+) -> impl std::future::Future<Output = F::Output> + Send {
+    struct AssertSend<F>(F);
+    unsafe impl<F> Send for AssertSend<F> {}
+    impl<F: std::future::Future> std::future::Future for AssertSend<F> {
+        type Output = F::Output;
+        fn poll(
+            self: std::pin::Pin<&mut Self>,
+            cx: &mut std::task::Context<'_>,
+        ) -> std::task::Poll<Self::Output> {
+            unsafe { self.map_unchecked_mut(|s| &mut s.0) }.poll(cx)
+        }
+    }
+    AssertSend(future)
+}
+
 // CLIENT AUTH TYPE
 // ================================================================================================
 

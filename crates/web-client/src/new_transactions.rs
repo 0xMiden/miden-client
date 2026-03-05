@@ -24,7 +24,7 @@ use crate::models::transaction_request::TransactionRequest;
 use crate::models::transaction_result::TransactionResult;
 use crate::models::transaction_store_update::TransactionStoreUpdate;
 use crate::models::transaction_summary::TransactionSummary;
-use crate::platform::{JsErr, JsU64, from_str_err};
+use crate::platform::{JsErr, JsU64, from_str_err, maybe_wrap_send};
 use crate::{WebClient, js_error_with_context};
 
 #[js_export]
@@ -232,11 +232,7 @@ impl WebClient {
         let mut guard = self.get_mut_inner().await;
         let client = guard.as_mut().ok_or_else(|| from_str_err("Client not initialized"))?;
         let fut = Box::pin(client.execute_transaction(account_id.into(), transaction_request.into()));
-        #[cfg(feature = "nodejs")]
-        let result = crate::wrap_send(fut).await;
-        #[cfg(feature = "browser")]
-        let result = fut.await;
-        result
+        maybe_wrap_send(fut).await
             .map(TransactionResult::from)
             .map_err(|err| js_error_with_context(err, "failed to execute transaction"))
     }
@@ -264,10 +260,7 @@ impl WebClient {
         let salt = native_request.auth_arg().unwrap_or_default();
 
         let fut = Box::pin(client.execute_transaction(account_id.into(), native_request));
-        #[cfg(feature = "nodejs")]
-        let execute_result = crate::wrap_send(fut).await;
-        #[cfg(feature = "browser")]
-        let execute_result = fut.await;
+        let execute_result = maybe_wrap_send(fut).await;
         match execute_result {
             Ok(res) => {
                 // construct summary from executed transaction
@@ -301,11 +294,7 @@ impl WebClient {
             prover.map_or_else(|| client.prover(), |custom_prover| custom_prover.get_prover());
 
         let fut = Box::pin(client.prove_transaction_with(transaction_result.native(), prover_arc));
-        #[cfg(feature = "nodejs")]
-        let result = crate::wrap_send(fut).await;
-        #[cfg(feature = "browser")]
-        let result = fut.await;
-        result
+        maybe_wrap_send(fut).await
             .map(Into::into)
             .map_err(|err| js_error_with_context(err, "failed to prove transaction"))
     }
@@ -338,21 +327,14 @@ impl WebClient {
             transaction_result.native(),
             BlockNumber::from(submission_height),
         ));
-        #[cfg(feature = "nodejs")]
-        let store_update_result = crate::wrap_send(fut).await;
-        #[cfg(feature = "browser")]
-        let store_update_result = fut.await;
-        let update = store_update_result
+        let update = maybe_wrap_send(fut).await
             .map(TransactionStoreUpdate::from)
             .map_err(|err| js_error_with_context(err, "failed to build transaction update"))?;
 
         let native_update: NativeTransactionStoreUpdate = (&update).into();
         let fut = Box::pin(client.apply_transaction_update(native_update));
-        #[cfg(feature = "nodejs")]
-        let apply_result = crate::wrap_send(fut).await;
-        #[cfg(feature = "browser")]
-        let apply_result = fut.await;
-        apply_result
+        maybe_wrap_send(fut)
+            .await
             .map_err(|err| js_error_with_context(err, "failed to apply transaction result"))?;
 
         Ok(update)

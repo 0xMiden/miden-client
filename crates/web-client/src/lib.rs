@@ -22,6 +22,8 @@ use miden_client::testing::note_transport::MockNoteTransportApi;
 use miden_client::{Client, ClientError, DebugMode, ErrorHint, Felt};
 use models::code_builder::CodeBuilder;
 use platform::{AsyncCell, ClientAuth, JsErr, from_str_err};
+#[cfg(feature = "nodejs")]
+use platform::maybe_wrap_send;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 
@@ -67,30 +69,6 @@ mod web_keystore_callbacks;
 mod web_keystore_db;
 #[cfg(feature = "browser")]
 pub use web_keystore::WebKeyStore;
-
-/// Wraps a non-Send future as Send.
-///
-/// # Safety
-/// This is safe in our context because napi's async methods run on a single
-/// tokio runtime thread. The non-Send trait objects (StoreFactory, OnNoteReceived,
-/// TransactionProver) don't actually cross thread boundaries.
-#[cfg(feature = "nodejs")]
-pub(crate) fn wrap_send<F: std::future::Future>(
-    future: F,
-) -> impl std::future::Future<Output = F::Output> + Send {
-    struct AssertSend<F>(F);
-    unsafe impl<F> Send for AssertSend<F> {}
-    impl<F: std::future::Future> std::future::Future for AssertSend<F> {
-        type Output = F::Output;
-        fn poll(
-            self: std::pin::Pin<&mut Self>,
-            cx: &mut std::task::Context<'_>,
-        ) -> std::task::Poll<Self::Output> {
-            unsafe { self.map_unchecked_mut(|s| &mut s.0) }.poll(cx)
-        }
-    }
-    AssertSend(future)
-}
 
 const BASE_STORE_NAME: &str = "MidenClientDB";
 
@@ -165,28 +143,13 @@ impl WebClient {
 
 // Internal helpers
 impl WebClient {
-    #[cfg(feature = "browser")]
-    pub(crate) async fn get_mut_inner(
-        &self,
-    ) -> std::cell::RefMut<'_, Option<Client<ClientAuth>>> {
-        self.inner.lock().await
-    }
-
-    #[cfg(feature = "nodejs")]
     pub(crate) async fn get_mut_inner(
         &self,
     ) -> impl core::ops::DerefMut<Target = Option<Client<ClientAuth>>> + '_ {
         self.inner.lock().await
     }
-}
 
-// Browser-specific client creation
-#[cfg(feature = "browser")]
-#[wasm_bindgen]
-impl WebClient {
-    pub(crate) async fn keystore(
-        &self,
-    ) -> Result<Arc<WebKeyStore<RpoRandomCoin>>, JsErr> {
+    pub(crate) async fn keystore(&self) -> Result<Arc<ClientAuth>, JsErr> {
         let guard = self.inner.lock().await;
         guard
             .as_ref()
@@ -194,7 +157,12 @@ impl WebClient {
             .cloned()
             .ok_or_else(|| from_str_err("Client not initialized"))
     }
+}
 
+// Browser-specific client creation
+#[cfg(feature = "browser")]
+#[wasm_bindgen]
+impl WebClient {
     /// Creates a new `WebClient` instance with the specified configuration.
     ///
     /// # Arguments
@@ -332,15 +300,6 @@ impl WebClient {
 #[cfg(feature = "nodejs")]
 #[napi]
 impl WebClient {
-    pub(crate) async fn keystore(&self) -> Result<Arc<FilesystemKeyStore>, JsErr> {
-        let guard = self.inner.lock().await;
-        guard
-            .as_ref()
-            .and_then(|c| c.authenticator())
-            .cloned()
-            .ok_or_else(|| from_str_err("Client not initialized"))
-    }
-
     /// Creates a new `WebClient` instance with the specified configuration.
     ///
     /// # Arguments
@@ -399,7 +358,7 @@ impl WebClient {
         note_transport_client: Option<Arc<dyn NoteTransportClient>>,
     ) -> Result<(), JsErr> {
         let debug_mode = self.debug_mode;
-        let (client, store) = wrap_send(async move {
+        let (client, store) = maybe_wrap_send(async move {
             let mut builder = ClientBuilder::new()
                 .rpc(rpc_client)
                 .rng(Box::new(rng))
@@ -456,46 +415,42 @@ pub(crate) fn create_rng(seed: Option<Vec<u8>>) -> Result<RpoRandomCoin, JsErr> 
 // ERROR HANDLING HELPERS
 // ================================================================================================
 
-#[cfg(feature = "browser")]
 pub(crate) fn js_error_with_context<T>(err: T, context: &str) -> JsErr
 where
     T: Error + 'static,
 {
-    let mut error_string = context.to_string();
-    let mut source = Some(&err as &dyn Error);
-    while let Some(err) = source {
-        write!(error_string, ": {err}").expect("writing to string should always succeed");
-        source = err.source();
-    }
-
+    let error_message = build_error_chain(context, &err);
     let help = hint_from_error(&err);
-    let js_error: JsValue = JsError::new(&error_string).into();
 
-    if let Some(help) = help {
-        let _ = Reflect::set(&js_error, &JsValue::from_str("help"), &JsValue::from_str(&help));
+    #[cfg(feature = "browser")]
+    {
+        let js_error: JsValue = JsError::new(&error_message).into();
+        if let Some(help) = help {
+            let _ =
+                Reflect::set(&js_error, &JsValue::from_str("help"), &JsValue::from_str(&help));
+        }
+        js_error
     }
 
-    js_error
+    #[cfg(feature = "nodejs")]
+    {
+        let message = match help {
+            Some(help) => format!("{error_message} [help: {help}]"),
+            None => error_message,
+        };
+        napi::Error::from_reason(message)
+    }
 }
 
-#[cfg(feature = "nodejs")]
-pub(crate) fn js_error_with_context<T>(err: T, context: &str) -> JsErr
-where
-    T: Error + 'static,
-{
-    let mut error_string = context.to_string();
-    let mut source = Some(&err as &dyn Error);
-    while let Some(err) = source {
-        write!(error_string, ": {err}").expect("writing to string should always succeed");
-        source = err.source();
+/// Walks the error chain and builds a `context: err1: err2: ...` message.
+fn build_error_chain(context: &str, err: &(dyn Error + 'static)) -> String {
+    let mut msg = context.to_string();
+    let mut source = Some(err);
+    while let Some(e) = source {
+        write!(msg, ": {e}").expect("writing to string should always succeed");
+        source = e.source();
     }
-
-    let help = hint_from_error(&err);
-    if let Some(help) = help {
-        write!(error_string, " [help: {help}]").expect("writing to string should always succeed");
-    }
-
-    napi::Error::from_reason(error_string)
+    msg
 }
 
 fn hint_from_error(err: &(dyn Error + 'static)) -> Option<String> {

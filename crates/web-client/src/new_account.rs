@@ -20,7 +20,7 @@ use super::models::auth::AuthScheme;
 use super::models::auth_secret_key::AuthSecretKey as WebAuthSecretKey;
 use crate::helpers::generate_wallet;
 use crate::models::account_id::AccountId;
-use crate::platform::{JsErr, JsU64, from_str_err};
+use crate::platform::{JsErr, JsU64, from_str_err, maybe_wrap_send};
 use crate::{WebClient, js_error_with_context};
 
 impl WebClient {
@@ -40,14 +40,7 @@ impl WebClient {
         if should_sync {
             let mut guard = self.get_mut_inner().await;
             if let Some(client) = guard.as_mut() {
-                #[cfg(feature = "nodejs")]
-                {
-                    let _ = crate::wrap_send(client.sync_state()).await;
-                }
-                #[cfg(feature = "browser")]
-                {
-                    let _ = client.sync_state().await;
-                }
+                let _ = maybe_wrap_send(client.sync_state()).await;
             }
         }
     }
