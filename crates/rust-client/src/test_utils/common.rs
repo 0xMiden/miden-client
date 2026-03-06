@@ -337,12 +337,11 @@ pub async fn wait_for_consumable_notes(
         }
 
         let current_block = client.get_sync_height().await.unwrap();
-        if current_block >= deadline_block {
-            panic!(
-                "account {account_id} has no consumable notes after waiting {max_blocks} blocks \
-                 (from block {start_block} to {current_block})"
-            );
-        }
+        assert!(
+            current_block < deadline_block,
+            "account {account_id} has no consumable notes after waiting {max_blocks} blocks \
+             (from block {start_block} to {current_block})"
+        );
 
         debug!(
             %account_id,
