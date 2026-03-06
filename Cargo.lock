@@ -2841,6 +2841,7 @@ dependencies = [
  "miden-protocol",
  "miden-standards",
  "rand",
+ "serde",
  "serde-wasm-bindgen",
  "thiserror",
  "tracing",
