@@ -40,6 +40,7 @@ use miden_client::note::NoteAssets;
 use miden_client::testing::common::{
     insert_new_wallet,
     wait_for_blocks,
+    wait_for_consumable_notes,
     wait_for_node,
     wait_for_tx,
 };
@@ -284,23 +285,15 @@ pub async fn test_bridge_in_out(client_config: ClientConfig) -> Result<()> {
     wait_for_tx(&mut ger_manager_client, tx_id).await?;
     println!("[bridge_in_out] CLAIM note submitted from GER manager");
 
-    // Wait for agglayer faucet to consume the CLAIM note and create P2ID note
-    wait_for_blocks(&mut ger_manager_client, 2).await;
-    println!("[bridge_in_out] Waited for agglayer faucet to consume CLAIM note");
-
-    // CONSUME P2ID NOTE WITH DESTINATION ACCOUNT
-    // After the faucet consumes the CLAIM note, it creates a P2ID note targeting the
-    // destination account. We need to sync, find the note, and consume it.
-    user_client.sync_state().await?;
-
-    let consumable_notes = user_client.get_consumable_notes(Some(destination_account.id())).await?;
+    // Wait for agglayer faucet to consume the CLAIM note and create P2ID note.
+    // The faucet processes the CLAIM as a network transaction and outputs a P2ID note
+    // targeting the destination account. This involves a multi-step chain of network
+    // transactions, so we poll with retries rather than waiting a fixed number of blocks.
+    let consumable_notes =
+        wait_for_consumable_notes(&mut user_client, destination_account.id(), 10).await;
     println!(
         "[bridge_in_out] Found {} consumable notes for destination account",
         consumable_notes.len()
-    );
-    assert!(
-        !consumable_notes.is_empty(),
-        "destination account should have at least one consumable P2ID note after bridge-in"
     );
 
     // Consume all available notes for the destination account (should be the P2ID note)
