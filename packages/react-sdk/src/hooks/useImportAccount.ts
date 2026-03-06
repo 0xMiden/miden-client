@@ -11,7 +11,6 @@ import type {
 import type { ImportAccountOptions } from "../types";
 import { DEFAULTS } from "../types";
 import { parseAccountId } from "../utils/accountParsing";
-import { runExclusiveDirect } from "../utils/runExclusive";
 import { ensureAccountBech32 } from "../utils/accountBech32";
 
 export interface UseImportAccountResult {
@@ -57,8 +56,7 @@ type AccountFileWithAccount = AccountFileType & {
  * ```
  */
 export function useImportAccount(): UseImportAccountResult {
-  const { client, isReady, runExclusive } = useMiden();
-  const runExclusiveSafe = runExclusive ?? runExclusiveDirect;
+  const { client, isReady } = useMiden();
   const setAccounts = useMidenStore((state) => state.setAccounts);
 
   const [account, setAccount] = useState<Account | null>(null);
@@ -78,7 +76,7 @@ export function useImportAccount(): UseImportAccountResult {
         type AccountHeaders = Awaited<ReturnType<WebClient["getAccounts"]>>;
         let accountsAfter: AccountHeaders | null = null;
 
-        const imported = await runExclusiveSafe(async () => {
+        const imported = await (async (): Promise<Account> => {
           switch (options.type) {
             case "file": {
               const accountsBefore = await client.getAccounts();
@@ -163,7 +161,7 @@ export function useImportAccount(): UseImportAccountResult {
               );
             }
           }
-        });
+        })();
 
         ensureAccountBech32(imported);
         const accounts = accountsAfter ?? (await client.getAccounts());
@@ -179,7 +177,7 @@ export function useImportAccount(): UseImportAccountResult {
         setIsImporting(false);
       }
     },
-    [client, isReady, runExclusive, setAccounts]
+    [client, isReady, setAccounts]
   );
 
   const reset = useCallback(() => {

@@ -7,7 +7,6 @@ import type {
 } from "../types";
 import { DEFAULTS } from "../types";
 import { parseAccountId } from "../utils/accountParsing";
-import { runExclusiveDirect } from "../utils/runExclusive";
 import { getNoteType } from "../utils/noteFilters";
 
 export interface UseMintResult {
@@ -55,8 +54,7 @@ export interface UseMintResult {
  * ```
  */
 export function useMint(): UseMintResult {
-  const { client, isReady, sync, runExclusive, prover } = useMiden();
-  const runExclusiveSafe = runExclusive ?? runExclusiveDirect;
+  const { client, isReady, sync, prover } = useMiden();
 
   const [result, setResult] = useState<TransactionResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -81,24 +79,22 @@ export function useMint(): UseMintResult {
         const faucetIdObj = parseAccountId(options.faucetId);
 
         setStage("proving");
-        const txResult = await runExclusiveSafe(async () => {
-          const txRequest = client.newMintTransactionRequest(
-            targetAccountIdObj,
-            faucetIdObj,
-            noteType,
-            options.amount
-          );
+        const txRequest = client.newMintTransactionRequest(
+          targetAccountIdObj,
+          faucetIdObj,
+          noteType,
+          options.amount
+        );
 
-          const txId = prover
-            ? await client.submitNewTransactionWithProver(
-                faucetIdObj,
-                txRequest,
-                prover
-              )
-            : await client.submitNewTransaction(faucetIdObj, txRequest);
+        const txId = prover
+          ? await client.submitNewTransactionWithProver(
+              faucetIdObj,
+              txRequest,
+              prover
+            )
+          : await client.submitNewTransaction(faucetIdObj, txRequest);
 
-          return { transactionId: txId.toString() };
-        });
+        const txResult = { transactionId: txId.toString() };
 
         setStage("complete");
         setResult(txResult);
@@ -115,7 +111,7 @@ export function useMint(): UseMintResult {
         setIsLoading(false);
       }
     },
-    [client, isReady, prover, runExclusive, sync]
+    [client, isReady, prover, sync]
   );
 
   const reset = useCallback(() => {

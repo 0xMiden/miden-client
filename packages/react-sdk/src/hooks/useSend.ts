@@ -16,7 +16,6 @@ import type {
 } from "../types";
 import { DEFAULTS } from "../types";
 import { parseAccountId, parseAddress } from "../utils/accountParsing";
-import { runExclusiveDirect } from "../utils/runExclusive";
 import { createNoteAttachment } from "../utils/noteAttachment";
 import { MidenError } from "../utils/errors";
 import { getNoteType, waitForTransactionCommit } from "../utils/noteFilters";
@@ -68,8 +67,7 @@ export interface UseSendResult {
  * ```
  */
 export function useSend(): UseSendResult {
-  const { client, isReady, sync, runExclusive, prover } = useMiden();
-  const runExclusiveSafe = runExclusive ?? runExclusiveDirect;
+  const { client, isReady, sync, prover } = useMiden();
   const isBusyRef = useRef(false);
 
   const [result, setResult] = useState<TransactionResult | null>(null);
@@ -106,22 +104,19 @@ export function useSend(): UseSendResult {
         // Resolve amount — if sendAll, query the account balance
         let amount = options.amount;
         if (options.sendAll) {
-          const resolvedAmount = await runExclusiveSafe(async () => {
-            const fromId = parseAccountId(options.from);
-            const account = await client.getAccount(fromId);
-            if (!account) throw new Error("Account not found");
-            const assetIdObj = parseAccountId(options.assetId);
-            const balance = account.vault?.()?.getBalance?.(assetIdObj);
-            if (balance === undefined || balance === null) {
-              throw new Error("Could not query account balance");
-            }
-            const bal = BigInt(balance as number | bigint);
-            if (bal === 0n) {
-              throw new Error("Account has zero balance for this asset");
-            }
-            return bal;
-          });
-          amount = resolvedAmount;
+          const fromId = parseAccountId(options.from);
+          const account = await client.getAccount(fromId);
+          if (!account) throw new Error("Account not found");
+          const assetIdObj = parseAccountId(options.assetId);
+          const balance = account.vault?.()?.getBalance?.(assetIdObj);
+          if (balance === undefined || balance === null) {
+            throw new Error("Could not query account balance");
+          }
+          const bal = BigInt(balance as number | bigint);
+          if (bal === 0n) {
+            throw new Error("Account has zero balance for this asset");
+          }
+          amount = bal;
         }
 
         if (amount === undefined || amount === null) {
@@ -149,58 +144,58 @@ export function useSend(): UseSendResult {
           );
         }
 
-        const txResult = await runExclusiveSafe(async () => {
-          // Create all WASM AccountId objects inside runExclusiveSafe to
-          // avoid stale pointers if another exclusive operation runs between
-          // creation and consumption.
-          const fromAccountId = parseAccountId(options.from);
-          const toAccountId = parseAccountId(options.to);
-          const assetIdObj = parseAccountId(assetId);
+        const fromAccountId = parseAccountId(options.from);
+        const toAccountId = parseAccountId(options.to);
+        const assetIdObj = parseAccountId(assetId);
 
-          let txRequest;
+        let txRequest;
 
-          if (hasAttachment) {
-            // Manual P2ID note construction with attachment
-            const attachment = createNoteAttachment(options.attachment!);
-            const assets = new NoteAssets([
-              new FungibleAsset(assetIdObj, amount!),
-            ]);
-            const note = Note.createP2IDNote(
-              fromAccountId,
-              toAccountId,
-              assets,
-              noteType,
-              attachment
-            );
-            txRequest = new TransactionRequestBuilder()
-              .withOwnOutputNotes(new OutputNoteArray([OutputNote.full(note)]))
-              .build();
-          } else {
-            txRequest = client.newSendTransactionRequest(
-              fromAccountId,
-              toAccountId,
-              assetIdObj,
-              noteType,
-              amount!,
-              options.recallHeight ?? null,
-              options.timelockHeight ?? null
-            );
-          }
+        if (hasAttachment) {
+          // Manual P2ID note construction with attachment
+          const attachment = createNoteAttachment(options.attachment!);
+          const assets = new NoteAssets([
+            new FungibleAsset(assetIdObj, amount!),
+          ]);
+          const note = Note.createP2IDNote(
+            fromAccountId,
+            toAccountId,
+            assets,
+            noteType,
+            attachment
+          );
+          txRequest = new TransactionRequestBuilder()
+            .withOwnOutputNotes(new OutputNoteArray([OutputNote.full(note)]))
+            .build();
+        } else {
+          txRequest = client.newSendTransactionRequest(
+            fromAccountId,
+            toAccountId,
+            assetIdObj,
+            noteType,
+            amount!,
+            options.recallHeight ?? null,
+            options.timelockHeight ?? null
+          );
+        }
 
-          // Fresh AccountId — the originals may have been consumed by
-          // createP2IDNote or newSendTransactionRequest above.
-          const execAccountId = parseAccountId(options.from);
-          return await client.executeTransaction(execAccountId, txRequest);
-        });
+        // Fresh AccountId — the originals may have been consumed by
+        // createP2IDNote or newSendTransactionRequest above.
+        const execAccountId = parseAccountId(options.from);
+        const txResult = await client.executeTransaction(
+          execAccountId,
+          txRequest
+        );
 
         setStage("proving");
-        const provenTransaction = await runExclusiveSafe(() =>
-          client.proveTransaction(txResult, prover ?? undefined)
+        const provenTransaction = await client.proveTransaction(
+          txResult,
+          prover ?? undefined
         );
 
         setStage("submitting");
-        const submissionHeight = await runExclusiveSafe(() =>
-          client.submitProvenTransaction(provenTransaction, txResult)
+        const submissionHeight = await client.submitProvenTransaction(
+          provenTransaction,
+          txResult
         );
 
         // Save txId hex BEFORE applyTransaction, which consumes the WASM
@@ -215,9 +210,7 @@ export function useSend(): UseSendResult {
           fullNote = extractFullNote(txResult);
         }
 
-        await runExclusiveSafe(() =>
-          client.applyTransaction(txResult, submissionHeight)
-        );
+        await client.applyTransaction(txResult, submissionHeight);
 
         if (noteType === NoteType.Private) {
           if (!fullNote) {
@@ -226,7 +219,6 @@ export function useSend(): UseSendResult {
 
           await waitForTransactionCommit(
             client as unknown as ClientWithTransactions,
-            runExclusiveSafe,
             txIdHex
           );
 
@@ -234,9 +226,7 @@ export function useSend(): UseSendResult {
           // consumed by Note.createP2IDNote or newSendTransactionRequest.
           const recipientAccountId = parseAccountId(options.to);
           const recipientAddress = parseAddress(options.to, recipientAccountId);
-          await runExclusiveSafe(() =>
-            client.sendPrivateNote(fullNote!, recipientAddress)
-          );
+          await client.sendPrivateNote(fullNote!, recipientAddress);
         }
 
         const txSummary = { transactionId: txIdString };
@@ -257,7 +247,7 @@ export function useSend(): UseSendResult {
         isBusyRef.current = false;
       }
     },
-    [client, isReady, prover, runExclusive, sync]
+    [client, isReady, prover, sync]
   );
 
   const reset = useCallback(() => {

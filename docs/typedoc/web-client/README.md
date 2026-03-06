@@ -147,6 +147,7 @@
 
 ## Interfaces
 
+- [StateChangedEvent](interfaces/StateChangedEvent.md)
 - [WasmWebClient](interfaces/WasmWebClient.md)
 
 ## Type Aliases

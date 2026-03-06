@@ -65,7 +65,6 @@ type ClientWithTransactions = {
  */
 export async function waitForTransactionCommit(
   client: ClientWithTransactions,
-  runExclusiveSafe: <T>(fn: () => Promise<T>) => Promise<T>,
   txIdHex: string,
   maxWaitMs = 10_000,
   delayMs = 1_000
@@ -74,14 +73,12 @@ export async function waitForTransactionCommit(
   const targetHex = normalizeHex(txIdHex);
 
   while (Date.now() < deadline) {
-    await runExclusiveSafe(() => client.syncState());
+    await client.syncState();
     // TODO: Use TransactionFilter.ids([txId]) once TransactionId.fromHex()
     // is available in the SDK. Currently we fetch all transactions and scan
     // linearly because creating a TransactionId WASM object from a hex string
     // is not supported. This is O(n) per poll iteration.
-    const records = await runExclusiveSafe(() =>
-      client.getTransactions(TransactionFilter.all())
-    );
+    const records = await client.getTransactions(TransactionFilter.all());
     const record = records.find(
       (r) => normalizeHex(r.id().toHex()) === targetHex
     );

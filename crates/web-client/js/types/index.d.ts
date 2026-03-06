@@ -55,6 +55,15 @@ type MidenArrayConstructors = {
 
 export declare const MidenArrays: MidenArrayConstructors;
 
+/** Payload delivered to {@link WebClient.onStateChanged} listeners. */
+export interface StateChangedEvent {
+  type: "stateChanged";
+  /** The mutating operation that triggered the event. */
+  operation?: string;
+  /** The store / database name that was mutated. */
+  storeName: string;
+}
+
 // WebClient wrapper class that uses a worker and forwards missing methods to WASM.
 export declare class WebClient extends WasmWebClient {
   /**
@@ -125,7 +134,20 @@ export declare class WebClient extends WasmWebClient {
   syncStateWithTimeout(timeoutMs?: number): Promise<SyncSummary>;
 
   /**
-   * Terminates the underlying worker.
+   * Register a listener that fires when another browser tab mutates the same
+   * IndexedDB database (cross-tab BroadcastChannel notification, Layer 3).
+   *
+   * The WebClient automatically calls `syncState()` on cross-tab changes,
+   * so in-memory state is already refreshed when your callback runs. Use
+   * this for additional work like re-fetching accounts or updating UI.
+   *
+   * @param callback - Invoked with a {@link StateChangedEvent} payload.
+   * @returns An unsubscribe function — call it to remove the listener.
+   */
+  onStateChanged(callback: (event: StateChangedEvent) => void): () => void;
+
+  /**
+   * Terminates the underlying worker and cleans up the BroadcastChannel.
    */
   terminate(): void;
 }
