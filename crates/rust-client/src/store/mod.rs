@@ -139,6 +139,48 @@ pub trait Store: Send + Sync {
         filter: NoteFilter,
     ) -> Result<Vec<OutputNoteRecord>, StoreError>;
 
+    /// Retrieves a single input note at the given offset from the filtered set.
+    ///
+    /// When `consumer` is `Some`, only notes whose consumer account matches are counted
+    /// toward the offset. Optionally restricts to a block range via `block_start` and
+    /// `block_end`. Returns `None` when the offset is past the end of the matching notes.
+    ///
+    /// The default implementation loads all matching notes via [`Store::get_input_notes`],
+    /// filters by consumer and block range in memory, and picks the element at `offset`.
+    /// Store implementations may override this with a more efficient query.
+    async fn get_input_note_by_offset(
+        &self,
+        filter: NoteFilter,
+        consumer: Option<AccountId>,
+        block_start: Option<BlockNumber>,
+        block_end: Option<BlockNumber>,
+        offset: u32,
+    ) -> Result<Option<InputNoteRecord>, StoreError> {
+        let mut notes = self.get_input_notes(filter).await?;
+        if let Some(consumer) = consumer {
+            notes.retain(|n| n.consumer_account() == Some(consumer));
+        }
+        if let Some(start) = block_start {
+            notes.retain(|n| match n.state() {
+                InputNoteState::ConsumedAuthenticatedLocal(s) => s.nullifier_block_height >= start,
+                InputNoteState::ConsumedUnauthenticatedLocal(s) => {
+                    s.nullifier_block_height >= start
+                },
+                InputNoteState::ConsumedExternal(s) => s.nullifier_block_height >= start,
+                _ => false,
+            });
+        }
+        if let Some(end) = block_end {
+            notes.retain(|n| match n.state() {
+                InputNoteState::ConsumedAuthenticatedLocal(s) => s.nullifier_block_height <= end,
+                InputNoteState::ConsumedUnauthenticatedLocal(s) => s.nullifier_block_height <= end,
+                InputNoteState::ConsumedExternal(s) => s.nullifier_block_height <= end,
+                _ => false,
+            });
+        }
+        Ok(notes.into_iter().nth(offset as usize))
+    }
+
     /// Returns the nullifiers of all unspent input notes.
     ///
     /// The default implementation of this method uses [`Store::get_input_notes`].

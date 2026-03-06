@@ -157,12 +157,16 @@ CREATE TABLE input_notes (
     state_discriminant UNSIGNED INT NOT NULL,               -- state discriminant of the note, used to query by state
     state BLOB NOT NULL,                                    -- serialized note state
     created_at UNSIGNED BIG INT NOT NULL,                   -- timestamp of the note creation/import
+    consumed_block_height INTEGER NULL,                     -- block height at which the note was consumed; NULL for non-consumed notes
+    consumed_tx_order INTEGER NULL,                         -- position of the consuming tx in the account's state chain within the block; NULL for external consumption or non-consumed notes
+    consumer_account_id TEXT NULL,                          -- account ID that consumed this note; NULL for non-consumed or externally consumed notes
 
     PRIMARY KEY (note_id),
     FOREIGN KEY (script_root) REFERENCES notes_scripts(script_root)
 ) WITHOUT ROWID;
 CREATE INDEX idx_input_notes_state ON input_notes(state_discriminant);
 CREATE INDEX idx_input_notes_nullifier ON input_notes(nullifier);
+CREATE INDEX idx_input_notes_consumption ON input_notes(consumed_block_height, consumed_tx_order);
 
 CREATE TABLE output_notes (
     note_id TEXT NOT NULL,                                  -- the note id
