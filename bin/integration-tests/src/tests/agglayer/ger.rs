@@ -31,12 +31,8 @@ pub async fn test_agglayer_update_ger(client_config: ClientConfig) -> Result<()>
     let ger_bytes: [u8; 32] = rand::random();
     let ger = ExitRoot::from(ger_bytes);
     println!("Submitting UpdateGerNote with random GER: {ger_bytes:02x?}");
-    let update_ger_note = UpdateGerNote::create(
-        ger,
-        ger_manager_id,
-        bridge_id,
-        ger_manager.client.rng(),
-    )?;
+    let update_ger_note =
+        UpdateGerNote::create(ger, ger_manager_id, bridge_id, ger_manager.client.rng())?;
 
     let tx_request = TransactionRequestBuilder::new()
         .own_output_notes(vec![OutputNote::Full(update_ger_note)])
