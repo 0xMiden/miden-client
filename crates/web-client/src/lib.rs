@@ -162,12 +162,12 @@ impl WebClient {
         );
 
         let rng = create_rng(seed)?;
-        let keystore = WebKeyStore::new_with_callbacks(rng, store_name, None, None, None);
+        let keystore = Arc::new(WebKeyStore::new_with_callbacks(rng, store_name, None, None, None));
 
         self.setup_client(
             web_rpc_client,
             store,
-            Arc::new(keystore),
+            keystore,
             rng,
             note_transport_client,
             debug_mode.unwrap_or(false),
@@ -221,13 +221,18 @@ impl WebClient {
         );
 
         let rng = create_rng(seed)?;
-        let keystore =
-            WebKeyStore::new_with_callbacks(rng, store_name, get_key_cb, insert_key_cb, sign_cb);
+        let keystore = Arc::new(WebKeyStore::new_with_callbacks(
+            rng,
+            store_name,
+            get_key_cb,
+            insert_key_cb,
+            sign_cb,
+        ));
 
         self.setup_client(
             web_rpc_client,
             store,
-            Arc::new(keystore),
+            keystore,
             rng,
             note_transport_client,
             debug_mode.unwrap_or(false),

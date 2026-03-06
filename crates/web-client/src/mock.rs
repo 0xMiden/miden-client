@@ -47,13 +47,18 @@ impl WebClient {
         );
 
         let rng = create_rng(seed)?;
-        let keystore =
-            WebKeyStore::new_with_callbacks(rng, "mock_client_db".to_owned(), None, None, None);
+        let keystore = Arc::new(WebKeyStore::new_with_callbacks(
+            rng,
+            "mock_client_db".to_owned(),
+            None,
+            None,
+            None,
+        ));
 
         self.setup_client(
             mock_rpc_api.clone(),
             store as Arc<dyn Store>,
-            Arc::new(keystore),
+            keystore,
             rng,
             Some(mock_note_transport_api.clone()),
             false,
