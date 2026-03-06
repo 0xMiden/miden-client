@@ -61,6 +61,12 @@ export interface SignerAccountConfig {
   storageMode: AccountStorageMode;
   /** Optional seed for deterministic account ID */
   accountSeed?: Uint8Array;
+  /**
+   * Optional existing account ID to import instead of building from scratch.
+   * When provided, skips AccountBuilder and imports the account by ID from the chain.
+   * Useful for wallets that create accounts externally (e.g., via a vault).
+   */
+  importAccountId?: string;
 }
 
 /**
