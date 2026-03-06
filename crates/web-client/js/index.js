@@ -128,21 +128,25 @@ function createClientProxy(instance) {
           // synchronous return value.
           if (SYNC_METHODS.has(prop)) {
             return (...args) => value.apply(target.wasmWebClient, args);
-          }
-          // Write methods: cross-tab lock (outer) → WASM lock (inner)
-          if (WRITE_METHODS.has(prop)) {
+          } else if (WRITE_METHODS.has(prop)) {
+            // Write methods: cross-tab lock (outer) → WASM lock (inner)
             return (...args) =>
               target._withWrite(prop, () =>
                 target._wasmLock.runExclusive(() =>
                   value.apply(target.wasmWebClient, args)
                 )
               );
-          }
-          // Read methods: WASM lock only
-          return (...args) =>
-            target._wasmLock.runExclusive(() =>
-              value.apply(target.wasmWebClient, args)
+          } else if (READ_METHODS.has(prop)) {
+            // Read methods: WASM lock only
+            return (...args) =>
+              target._wasmLock.runExclusive(() =>
+                value.apply(target.wasmWebClient, args)
+              );
+          } else {
+            throw new Error(
+              `Unclassified WASM method: "${prop}". Add it to SYNC_METHODS, WRITE_METHODS, or READ_METHODS.`
             );
+          }
         }
         return value;
       }
@@ -316,6 +320,10 @@ export class WebClient {
     this._writeLockTimeoutMs = 60_000;
 
     // Layer 3: BroadcastChannel for cross-tab state-change notifications.
+    // If construction fails (e.g. unsupported WebView), Layer 3 is disabled
+    // but correctness is preserved: the cross-tab write lock (Layer 2) still
+    // prevents concurrent writes, and the next explicit user action will
+    // trigger a sync. Tabs just won't receive proactive refresh signals.
     const channelName = `miden-state-${storeName || "default"}`;
     try {
       this._stateChannel =
