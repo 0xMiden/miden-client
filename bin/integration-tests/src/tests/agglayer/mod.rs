@@ -168,7 +168,7 @@ impl AgglayerConfig {
 // ================================================================================================
 
 /// A client + keystore pair for a single test entity.
-pub struct Actor {
+pub struct ClientPair {
     pub client: TestClient,
     pub keystore: FilesystemKeyStore,
 }
@@ -179,26 +179,26 @@ pub type CoreAccountIds = (AccountId, AccountId, AccountId);
 /// Creates three clients sharing the same RPC endpoint, for bridge admin, GER manager, and user.
 pub async fn create_agglayer_clients(
     client_config: &ClientConfig,
-) -> Result<(Actor, Actor, Actor)> {
+) -> Result<(ClientPair, ClientPair, ClientPair)> {
     let (mut client, keystore) = client_config.clone().into_client().await?;
     wait_for_node(&mut client).await;
     client.sync_state().await?;
     println!("[setup] Bridge admin client initialized");
-    let bridge_admin = Actor { client, keystore };
+    let bridge_admin = ClientPair { client, keystore };
 
     let (client, keystore) = ClientConfig::default()
         .with_rpc_endpoint(client_config.rpc_endpoint())
         .into_client()
         .await?;
     println!("[setup] GER manager client initialized");
-    let ger_manager = Actor { client, keystore };
+    let ger_manager = ClientPair { client, keystore };
 
     let (client, keystore) = ClientConfig::default()
         .with_rpc_endpoint(client_config.rpc_endpoint())
         .into_client()
         .await?;
     println!("[setup] User client initialized");
-    let user = Actor { client, keystore };
+    let user = ClientPair { client, keystore };
 
     Ok((bridge_admin, ger_manager, user))
 }
@@ -209,9 +209,9 @@ pub async fn create_agglayer_clients(
 /// In runtime mode, creates, deploys, and distributes accounts.
 pub async fn setup_core_accounts(
     config: Option<&AgglayerConfig>,
-    bridge_admin: &mut Actor,
-    ger_manager: &mut Actor,
-    user: &mut Actor,
+    bridge_admin: &mut ClientPair,
+    ger_manager: &mut ClientPair,
+    user: &mut ClientPair,
 ) -> Result<CoreAccountIds> {
     match config {
         Some(config) => {
@@ -235,9 +235,9 @@ pub async fn setup_core_accounts(
                 )
                 .await?;
 
-            for actor in [&mut *bridge_admin, &mut *ger_manager, &mut *user] {
+            for pair in [&mut *bridge_admin, &mut *ger_manager, &mut *user] {
                 config
-                    .import_account(config.bridge_id(), &mut actor.client, &actor.keystore)
+                    .import_account(config.bridge_id(), &mut pair.client, &pair.keystore)
                     .await?;
             }
 
