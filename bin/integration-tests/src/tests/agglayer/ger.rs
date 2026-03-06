@@ -1,17 +1,9 @@
 use anyhow::{Context, Result};
-use miden_agglayer::{ExitRoot, UpdateGerNote, create_bridge_account};
-use miden_client::account::AccountStorageMode;
-use miden_client::auth::RPO_FALCON_SCHEME_ID;
-use miden_client::crypto::FeltRng;
-use miden_client::testing::common::{
-    insert_new_wallet,
-    wait_for_blocks,
-    wait_for_node,
-    wait_for_tx,
-};
+use miden_agglayer::{ExitRoot, UpdateGerNote};
+use miden_client::testing::common::{wait_for_blocks, wait_for_tx};
 use miden_client::transaction::{OutputNote, TransactionRequestBuilder};
 
-use super::AgglayerConfig;
+use super::{AgglayerConfig, create_agglayer_clients, setup_core_accounts};
 use crate::tests::config::ClientConfig;
 use crate::utils::is_ger_registered;
 
@@ -23,58 +15,16 @@ use crate::utils::is_ger_registered;
 /// If `AGGLAYER_ACCOUNTS_DIR` is set, loads pre-deployed accounts from `.mac` files (complete
 /// genesis mode). Otherwise, creates all accounts at runtime (empty genesis mode).
 pub async fn test_agglayer_update_ger(client_config: ClientConfig) -> Result<()> {
-    let (mut client, keystore) = client_config.into_client().await?;
-    wait_for_node(&mut client).await;
-    client.sync_state().await?;
-
-    let (ger_manager_id, bridge_account_id) = match AgglayerConfig::from_env()? {
-        Some(agglayer_config) => {
-            println!("Loading agglayer accounts from genesis files");
-            println!("  bridge admin:  {}", agglayer_config.bridge_admin_id());
-            println!("  GER manager:   {}", agglayer_config.ger_manager_id());
-            println!("  bridge:        {}", agglayer_config.bridge_id());
-            println!("  faucet:        {}", agglayer_config.faucet_id());
-            agglayer_config.import_into_client(&mut client, &keystore).await?;
-            (agglayer_config.ger_manager_id(), agglayer_config.bridge_id())
-        },
-        None => {
-            println!("Creating agglayer accounts at runtime (AGGLAYER_ACCOUNTS_DIR not set)");
-            // Create accounts at runtime
-            let (bridge_admin, ..) = insert_new_wallet(
-                &mut client,
-                AccountStorageMode::Private,
-                &keystore,
-                RPO_FALCON_SCHEME_ID,
-            )
-            .await?;
-
-            let (ger_manager, ..) = insert_new_wallet(
-                &mut client,
-                AccountStorageMode::Private,
-                &keystore,
-                RPO_FALCON_SCHEME_ID,
-            )
-            .await?;
-
-            let bridge_account = create_bridge_account(
-                client.rng().draw_word(),
-                bridge_admin.id(),
-                ger_manager.id(),
-            );
-            println!("  bridge admin:  {}", bridge_admin.id());
-            println!("  GER manager:   {}", ger_manager.id());
-            println!("  bridge:        {}", bridge_account.id());
-            client.add_account(&bridge_account, false).await?;
-
-            // Deploy the bridge account on-chain with a no-op transaction
-            let deploy_tx_request = TransactionRequestBuilder::new().build()?;
-            let tx_id =
-                client.submit_new_transaction(bridge_account.id(), deploy_tx_request).await?;
-            wait_for_tx(&mut client, tx_id).await?;
-
-            (ger_manager.id(), bridge_account.id())
-        },
-    };
+    let agglayer_config = AgglayerConfig::from_env()?;
+    let (mut bridge_admin, mut ger_manager, mut user) =
+        create_agglayer_clients(&client_config).await?;
+    let (_bridge_admin_id, ger_manager_id, bridge_id) = setup_core_accounts(
+        agglayer_config.as_ref(),
+        &mut bridge_admin,
+        &mut ger_manager,
+        &mut user,
+    )
+    .await?;
 
     // CREATE UPDATE_GER NOTE
     // --------------------------------------------------------------------------------------------
@@ -82,23 +32,24 @@ pub async fn test_agglayer_update_ger(client_config: ClientConfig) -> Result<()>
     let ger = ExitRoot::from(ger_bytes);
     println!("Submitting UpdateGerNote with random GER: {ger_bytes:02x?}");
     let update_ger_note =
-        UpdateGerNote::create(ger, ger_manager_id, bridge_account_id, client.rng())?;
+        UpdateGerNote::create(ger, ger_manager_id, bridge_id, ger_manager.client.rng())?;
 
     let tx_request = TransactionRequestBuilder::new()
         .own_output_notes(vec![OutputNote::Full(update_ger_note)])
         .build()?;
-    let tx_id = client.submit_new_transaction(ger_manager_id, tx_request).await?;
-    wait_for_tx(&mut client, tx_id).await?;
+    let tx_id = ger_manager.client.submit_new_transaction(ger_manager_id, tx_request).await?;
+    wait_for_tx(&mut ger_manager.client, tx_id).await?;
 
     // WAIT FOR NETWORK ACCOUNT TO PROCESS UPDATE_GER NOTE
     // --------------------------------------------------------------------------------------------
-    wait_for_blocks(&mut client, 2).await;
+    wait_for_blocks(&mut ger_manager.client, 2).await;
 
     // VERIFY GER HASH WAS STORED IN MAP
     // --------------------------------------------------------------------------------------------
-    let updated_bridge_account = client
+    let updated_bridge_account = ger_manager
+        .client
         .test_rpc_api()
-        .get_account_details(bridge_account_id)
+        .get_account_details(bridge_id)
         .await?
         .account()
         .cloned()

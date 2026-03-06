@@ -136,13 +136,17 @@ const FOUNDRY_OUTPUT_JSON: &str = "test-vectors/claim_asset_vectors_local_tx.jso
 /// This function:
 /// 1. Converts the `AccountId` to an Ethereum address format (0x-prefixed hex)
 /// 2. Invokes `forge test` with the `DESTINATION_ADDRESS` environment variable
-/// 3. Reads and parses the generated JSON file
-/// 4. Returns the `(ProofData, LeafData, ExitRoot)` tuple
+/// 3. Optionally passes `ORIGIN_TOKEN_ADDRESS` if provided (e.g. from a genesis faucet)
+/// 4. Reads and parses the generated JSON file
+/// 5. Returns the `(ProofData, LeafData, ExitRoot)` tuple
 ///
 /// # Panics
 ///
 /// Panics if `forge` is not installed, the test fails, or the JSON output cannot be parsed.
-pub fn generate_claim_data_for_account(account_id: AccountId) -> (ProofData, LeafData, ExitRoot) {
+pub fn generate_claim_data_for_account(
+    account_id: AccountId,
+    origin_token_address: Option<&EthAddressFormat>,
+) -> (ProofData, LeafData, ExitRoot) {
     let destination_address = EthAddressFormat::from_account_id(account_id);
     let destination_hex = destination_address.to_hex();
     println!(
@@ -168,15 +172,21 @@ pub fn generate_claim_data_for_account(account_id: AccountId) -> (ProofData, Lea
     });
 
     // Run forge test with the destination address as an environment variable
-    let output = std::process::Command::new("forge")
-        .arg("test")
+    let mut cmd = std::process::Command::new("forge");
+    cmd.arg("test")
         .arg("-vv")
         .arg("--match-contract")
         .arg("ClaimAssetTestVectorsLocalTx")
         .env("DESTINATION_ADDRESS", &destination_hex)
-        .current_dir(&foundry_dir)
-        .output()
-        .expect("failed to execute `forge test` — is foundry installed?");
+        .current_dir(&foundry_dir);
+
+    if let Some(addr) = origin_token_address {
+        let addr_hex = addr.to_hex();
+        println!("[foundry] Using origin token address: {}", addr_hex);
+        cmd.env("ORIGIN_TOKEN_ADDRESS", &addr_hex);
+    }
+
+    let output = cmd.output().expect("failed to execute `forge test` — is foundry installed?");
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
