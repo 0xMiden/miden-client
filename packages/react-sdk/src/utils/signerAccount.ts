@@ -56,8 +56,9 @@ export async function initializeSignerAccount(
   client: WebClient,
   config: SignerAccountConfig
 ): Promise<string> {
-  const { AccountBuilder, AccountComponent, AuthScheme, Word } =
-    await import("@miden-sdk/miden-sdk");
+  const { AccountBuilder, AccountComponent, AuthScheme, Word } = await import(
+    "@miden-sdk/miden-sdk"
+  );
 
   // Sync first to get latest state
   await client.syncState();
