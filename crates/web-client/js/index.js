@@ -310,6 +310,11 @@ export class WebClient {
     // Layer 1: In-process WASM lock — serializes all main-thread WASM calls.
     this._wasmLock = new AsyncLock();
 
+    // Layer 2 timeout: how long to wait to acquire the cross-tab write lock
+    // before aborting. Set to 0 to wait indefinitely. Can be overridden on
+    // the instance, e.g. client._writeLockTimeoutMs = 0.
+    this._writeLockTimeoutMs = 60_000;
+
     // Layer 3: BroadcastChannel for cross-tab state-change notifications.
     const channelName = `miden-state-${storeName || "default"}`;
     try {
@@ -474,14 +479,18 @@ export class WebClient {
       return fn();
     }
 
-    const result = await withWriteLock(storeName, async () => {
-      _writeLockHeldByStore.set(storeName, true);
-      try {
-        return await fn();
-      } finally {
-        _writeLockHeldByStore.set(storeName, false);
-      }
-    });
+    const result = await withWriteLock(
+      storeName,
+      async () => {
+        _writeLockHeldByStore.set(storeName, true);
+        try {
+          return await fn();
+        } finally {
+          _writeLockHeldByStore.set(storeName, false);
+        }
+      },
+      this._writeLockTimeoutMs
+    );
 
     // Layer 3: notify other tabs. Skip for syncState — sync is not a
     // user-facing mutation, and broadcasting it would cause a ping-pong
