@@ -67,12 +67,27 @@ export class NotesResource {
   async sendPrivate(opts) {
     this.#client.assertNotTerminated();
     const wasm = await this.#getWasm();
-    const noteHex = resolveNoteIdHex(opts.noteId);
-    const noteRecord = await this.#inner.getInputNote(noteHex);
-    if (!noteRecord) {
-      throw new Error(`Note not found: ${noteHex}`);
+
+    let note;
+    const input = opts.noteId;
+    // Check if input is a Note object (has .id() and .assets() but not .toNote())
+    if (
+      input &&
+      typeof input === "object" &&
+      typeof input.id === "function" &&
+      typeof input.assets === "function" &&
+      typeof input.toNote !== "function"
+    ) {
+      note = input;
+    } else {
+      const noteHex = resolveNoteIdHex(input);
+      const noteRecord = await this.#inner.getInputNote(noteHex);
+      if (!noteRecord) {
+        throw new Error(`Note not found: ${noteHex}`);
+      }
+      note = noteRecord.toNote();
     }
-    const note = noteRecord.toNote();
+
     const address = resolveAddress(opts.to, wasm);
     await this.#inner.sendPrivateNote(note, address);
   }
