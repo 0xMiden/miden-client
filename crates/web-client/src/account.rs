@@ -1,5 +1,8 @@
+use alloc::sync::Arc;
+
 use miden_client::Word as NativeWord;
 use miden_client::keystore::Keystore;
+use miden_client::store::Store;
 use wasm_bindgen::prelude::*;
 
 use crate::models::account::Account;
@@ -122,7 +125,8 @@ impl WebClient {
     /// ```
     #[wasm_bindgen(js_name = "accountReader")]
     pub fn account_reader(&self, account_id: &AccountId) -> Result<AccountReader, JsValue> {
-        let store = self.store.clone().ok_or(JsValue::from_str("Store not initialized"))?;
+        let store: Arc<dyn Store> =
+            self.store.clone().ok_or(JsValue::from_str("Store not initialized"))?;
         Ok(AccountReader::new(store, account_id.into()))
     }
 

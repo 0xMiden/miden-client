@@ -9,7 +9,7 @@ use miden_client::note::BlockNumber;
 use miden_client::store::{BlockRelevance, PartialBlockchainFilter, StoreError};
 use miden_client::utils::Deserializable;
 
-use super::WebStore;
+use super::IdxdbStore;
 use crate::promise::{await_js, await_js_value, await_ok};
 
 mod js_bindings;
@@ -41,7 +41,7 @@ use utils::{
     serialize_partial_blockchain_node,
 };
 
-impl WebStore {
+impl IdxdbStore {
     pub(crate) async fn insert_block_header(
         &self,
         block_header: &BlockHeader,

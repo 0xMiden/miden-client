@@ -14,7 +14,7 @@ use miden_client::transaction::{
 };
 use miden_client::utils::Deserializable;
 
-use super::WebStore;
+use super::IdxdbStore;
 use super::account::utils::{
     apply_full_account_state,
     apply_transaction_delta,
@@ -33,7 +33,7 @@ use models::TransactionIdxdbObject;
 pub mod utils;
 use utils::insert_proven_transaction_data;
 
-impl WebStore {
+impl IdxdbStore {
     pub async fn get_transactions(
         &self,
         filter: TransactionFilter,

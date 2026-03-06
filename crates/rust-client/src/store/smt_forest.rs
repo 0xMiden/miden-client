@@ -287,11 +287,9 @@ impl AccountSmtForest {
         roots
     }
 
-    /// Pops SMT roots from the forest, filtering out the empty tree root.
-    // TODO(#1834): remove this filter once the miden-crypto fix lands.
+    /// Pops SMT roots from the forest that are no longer referenced by any account.
     fn safe_pop_smts(&mut self, roots: impl IntoIterator<Item = Word>) {
-        let empty_tree_root = *EmptySubtreeRoots::entry(SMT_DEPTH, 0);
-        self.forest.pop_smts(roots.into_iter().filter(|r| *r != empty_tree_root));
+        self.forest.pop_smts(roots);
     }
 }
 

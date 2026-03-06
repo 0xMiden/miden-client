@@ -42,6 +42,7 @@ use miden_client::store::{
     Store,
     StoreError,
     TransactionFilter,
+    WebStore,
 };
 use miden_client::sync::{NoteTagRecord, StateSyncUpdate};
 use miden_client::transaction::{TransactionRecord, TransactionStoreUpdate};
@@ -79,22 +80,22 @@ extern "C" {
     fn open_database(network: &str, client_version: &str) -> js_sys::Promise;
 }
 
-/// `WebStore` provides an `IndexedDB`-backed implementation of the Store trait.
+/// `IdxdbStore` provides an `IndexedDB`-backed implementation of the Store trait.
 ///
 /// The database reference is stored in a JavaScript registry and looked up by
 /// `database_id` when needed. This avoids storing `JsValue` references in Rust
 /// which would prevent the struct from being Send + Sync.
-pub struct WebStore {
+pub struct IdxdbStore {
     database_id: String,
     smt_forest: RwLock<AccountSmtForest>,
 }
 
-impl WebStore {
-    pub async fn new(database_name: String) -> Result<WebStore, JsValue> {
+impl IdxdbStore {
+    pub async fn new(database_name: String) -> Result<IdxdbStore, JsValue> {
         let promise = open_database(database_name.as_str(), CLIENT_VERSION);
         let _db_id = JsFuture::from(promise).await?;
 
-        let store = WebStore {
+        let store = IdxdbStore {
             database_id: database_name,
             smt_forest: RwLock::new(AccountSmtForest::new()),
         };
@@ -148,9 +149,8 @@ impl WebStore {
     }
 }
 
-#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
-#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
-impl Store for WebStore {
+#[async_trait::async_trait(?Send)]
+impl Store for IdxdbStore {
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     fn get_current_timestamp(&self) -> Option<u64> {
         Some(current_timestamp_u64())
@@ -427,6 +427,17 @@ impl Store for WebStore {
 
     async fn list_setting_keys(&self) -> Result<Vec<String>, StoreError> {
         self.list_setting_keys().await
+    }
+}
+
+#[async_trait::async_trait(?Send)]
+impl WebStore for IdxdbStore {
+    async fn export_store(&self) -> Result<String, StoreError> {
+        self.export_store().await
+    }
+
+    async fn import_store(&self, data: String) -> Result<(), StoreError> {
+        self.import_store(data).await
     }
 }
 
