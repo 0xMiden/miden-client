@@ -2783,6 +2783,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "clap",
+ "miden-agglayer",
  "miden-client",
  "miden-client-sqlite-store",
  "num_cpus",
@@ -3650,6 +3651,7 @@ name = "node-builder"
 version = "0.14.0"
 dependencies = [
  "anyhow",
+ "miden-agglayer",
  "miden-node-block-producer",
  "miden-node-ntx-builder",
  "miden-node-rpc",

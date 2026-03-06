@@ -115,6 +115,51 @@ The integration tests cover several categories:
 - **Network Transaction**: Network-level transaction processing
 - **Onchain**: On-chain account and note operations
 - **Swap Transaction**: Asset swap functionality
+- **AggLayer**: AggLayer bridge integration (GER updates, bridge-in/out)
+
+## AggLayer Tests
+
+AggLayer tests verify the bridge integration flow: GER updates, faucet registration, bridge-in (claiming), and bridge-out.
+
+### Two genesis modes
+
+AggLayer tests support two modes, depending on whether the node has agglayer accounts pre-deployed at genesis:
+
+1. **Empty genesis (runtime setup)**: All accounts (bridge admin, GER manager, bridge, faucet) are created at runtime. This is the default and works against any node started with `make start-node`.
+
+2. **Complete genesis (pre-deployed)**: Agglayer accounts are included in the genesis block. Start the node with `make start-node-agglayer`, then point the tests at the `.mac` files:
+
+```bash
+# Start node with agglayer genesis accounts
+make start-node-agglayer
+
+# Run genesis-aware tests
+AGGLAYER_ACCOUNTS_DIR=./data/ miden-client-integration-tests --contains "with_genesis"
+```
+
+### Environment variables
+
+- `AGGLAYER_ACCOUNTS_DIR` - Path to directory containing agglayer `.mac` account files. Required for `*_with_genesis` tests. The node writes these files to `./data/` when started with `AGGLAYER_GENESIS=1`. On devnet, this would point to wherever the devnet account files are stored.
+
+### Genesis account files
+
+When the node is started with `make start-node-agglayer` (or `AGGLAYER_GENESIS=1`), the following files are written to the data directory:
+
+- `bridge_admin.mac` - Bridge admin wallet (includes secret key)
+- `ger_manager.mac` - GER manager wallet (includes secret key)
+- `bridge.mac` - AggLayer bridge account (no secret key, NoAuth)
+- `agglayer_faucet.mac` - AggLayer faucet account (no secret key, NoAuth)
+
+The genesis faucet uses a deterministic test origin token address (`0xAAAA...AA`) and is pre-registered in the bridge's faucet registry.
+
+### Testing against devnet
+
+The same tests work against devnet by setting `AGGLAYER_ACCOUNTS_DIR` to the directory containing devnet-specific `.mac` files and using the appropriate RPC endpoint:
+
+```bash
+AGGLAYER_ACCOUNTS_DIR=/path/to/devnet/accounts \
+  miden-client-integration-tests --network devnet --contains "with_genesis"
+```
 
 ## Test Case Generation
 
