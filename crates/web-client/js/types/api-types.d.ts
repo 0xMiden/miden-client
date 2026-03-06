@@ -517,5 +517,14 @@ export declare function createP2IDENote(options: P2IDEOptions): OutputNote;
 /** Builds a swap tag for note matching. Returns a NoteTag (use `.asU32()` for the numeric value). */
 export declare function buildSwapTag(options: BuildSwapTagOptions): NoteTag;
 
+/** Exports the entire contents of an IndexedDB store as a JSON string. */
+export declare function exportStore(storeName: string): Promise<string>;
+
+/** Imports store contents from a JSON string, replacing all existing data. */
+export declare function importStore(
+  storeName: string,
+  storeDump: string
+): Promise<void>;
+
 /** Returns the initialized WASM module. Throws if WASM is unavailable. */
 export declare function getWasmOrThrow(): Promise<typeof WasmExports>;

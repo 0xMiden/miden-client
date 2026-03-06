@@ -22,11 +22,13 @@ export class MidenClient {
   #terminated = false;
   #defaultProver = null;
   #isMock = false;
+  #storeName = null;
 
-  constructor(inner, getWasm, defaultProver) {
+  constructor(inner, getWasm, defaultProver, storeName) {
     this.#inner = inner;
     this.#getWasm = getWasm;
     this.#defaultProver = defaultProver ?? null;
+    this.#storeName = storeName ?? null;
 
     this.accounts = new AccountsResource(inner, getWasm, this);
     this.transactions = new TransactionsResource(inner, getWasm, this);
@@ -82,7 +84,12 @@ export class MidenClient {
       );
     }
 
-    const client = new MidenClient(inner, getWasm, defaultProver);
+    const client = new MidenClient(
+      inner,
+      getWasm,
+      defaultProver,
+      options?.storeName
+    );
 
     if (options?.autoSync) {
       await client.sync();
@@ -129,7 +136,7 @@ export class MidenClient {
       seed
     );
 
-    const client = new MidenClient(inner, getWasm, null);
+    const client = new MidenClient(inner, getWasm, null, "mock_client_db");
     client.#isMock = true;
     return client;
   }
@@ -184,7 +191,13 @@ export class MidenClient {
    */
   async exportStore() {
     this.assertNotTerminated();
-    const data = await this.#inner.exportStore();
+    if (!this.#storeName) {
+      throw new Error(
+        "Store name not available. Cannot export store for mock clients."
+      );
+    }
+    const wasm = await this.#getWasm();
+    const data = await wasm.exportStore(this.#storeName);
     return { version: 1, data };
   }
 
@@ -195,13 +208,18 @@ export class MidenClient {
    */
   async importStore(snapshot) {
     this.assertNotTerminated();
+    if (!this.#storeName) {
+      throw new Error(
+        "Store name not available. Cannot import store for mock clients."
+      );
+    }
     if (!snapshot || snapshot.version !== 1) {
       throw new Error(
         `Unsupported store snapshot version: ${snapshot?.version}. Expected version 1.`
       );
     }
-    // Second arg is the store password (empty string = no encryption)
-    await this.#inner.forceImportStore(snapshot.data, "");
+    const wasm = await this.#getWasm();
+    await wasm.importStore(this.#storeName, snapshot.data);
   }
 
   // ── Mock-only methods ──
