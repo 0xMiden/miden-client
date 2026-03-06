@@ -201,9 +201,7 @@ impl Interceptor for MetadataInterceptor {
 /// The interceptor sets the `accept` header to the Miden API version and optionally includes the
 /// genesis commitment.
 fn accept_header_interceptor(genesis_digest: Option<Word>) -> MetadataInterceptor {
-    // Strip any pre-release suffix (e.g. "0.14.0-alpha.1" -> "0.14.0") as the node
-    // version requirement only matches major & minor
-    let version = env!("CARGO_PKG_VERSION").split('-').next().expect("non-empty version");
+    let version = env!("CARGO_PKG_VERSION");
     let mut accept_value = format!("application/vnd.miden; version={version}");
     if let Some(commitment) = genesis_digest {
         write!(accept_value, "; genesis={}", commitment.to_hex())
