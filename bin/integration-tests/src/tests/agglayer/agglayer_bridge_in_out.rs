@@ -36,7 +36,12 @@ use miden_client::asset::{Asset, FungibleAsset};
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
 use miden_client::crypto::FeltRng;
 use miden_client::note::NoteAssets;
-use miden_client::testing::common::{insert_new_wallet, wait_for_blocks, wait_for_tx};
+use miden_client::testing::common::{
+    insert_new_wallet,
+    wait_for_blocks,
+    wait_for_consumable_notes,
+    wait_for_tx,
+};
 use miden_client::transaction::{OutputNote, TransactionRequestBuilder};
 
 use super::agglayer_test_utils::generate_claim_data_for_account;
@@ -219,18 +224,15 @@ pub async fn test_bridge_in_out(client_config: ClientConfig) -> Result<()> {
     wait_for_tx(&mut ger_manager.0, tx_id).await?;
     println!("[bridge_in_out] CLAIM note submitted");
 
-    wait_for_blocks(&mut ger_manager.0, 2).await;
-
-    // Consume P2ID note with destination account
-    user.0.sync_state().await?;
-    let consumable_notes = user.0.get_consumable_notes(Some(destination_account.id())).await?;
+    // Wait for agglayer faucet to consume the CLAIM note and create P2ID note.
+    // The faucet processes the CLAIM as a network transaction and outputs a P2ID note
+    // targeting the destination account. This involves a multi-step chain of network
+    // transactions, so we poll with retries rather than waiting a fixed number of blocks.
+    let consumable_notes =
+        wait_for_consumable_notes(&mut user.0, destination_account.id(), 10).await;
     println!(
         "[bridge_in_out] Found {} consumable notes for destination",
         consumable_notes.len()
-    );
-    assert!(
-        !consumable_notes.is_empty(),
-        "destination account should have at least one consumable P2ID note after bridge-in"
     );
 
     let notes_to_consume: Vec<_> =
