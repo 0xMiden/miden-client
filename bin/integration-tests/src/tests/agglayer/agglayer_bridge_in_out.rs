@@ -227,8 +227,10 @@ pub async fn test_bridge_in_out(client_config: ClientConfig) -> Result<()> {
     wait_for_tx(&mut bridge_admin_client, tx_id).await?;
     println!("[bridge_in_out] CONFIG_AGG_BRIDGE note submitted from bridge admin");
 
-    // Wait for bridge to consume the config note as network transaction
-    wait_for_blocks(&mut bridge_admin_client, 2).await;
+    // Wait for bridge to consume the config note as network transaction.
+    // In CI, the node's network transaction queue may be congested from parallel tests,
+    // so we allow more blocks than the minimum needed locally.
+    wait_for_blocks(&mut bridge_admin_client, 5).await;
     println!("[bridge_in_out] Waited for bridge to consume CONFIG_AGG_BRIDGE note");
 
     ger_manager_client.sync_state().await?;
@@ -253,8 +255,9 @@ pub async fn test_bridge_in_out(client_config: ClientConfig) -> Result<()> {
     wait_for_tx(&mut ger_manager_client, tx_id).await?;
     println!("[bridge_in_out] UPDATE_GER note submitted from GER manager");
 
-    // Wait for bridge to consume the UPDATE_GER note
-    wait_for_blocks(&mut ger_manager_client, 2).await;
+    // Wait for bridge to consume the UPDATE_GER note.
+    // Allow extra blocks for CI where the node processes many concurrent network transactions.
+    wait_for_blocks(&mut ger_manager_client, 5).await;
     println!("[bridge_in_out] Waited for bridge to consume UPDATE_GER note");
 
     // CREATE AND SUBMIT CLAIM NOTE (consumed by agglayer faucet as network tx)
@@ -290,7 +293,7 @@ pub async fn test_bridge_in_out(client_config: ClientConfig) -> Result<()> {
     // targeting the destination account. This involves a multi-step chain of network
     // transactions, so we poll with retries rather than waiting a fixed number of blocks.
     let consumable_notes =
-        wait_for_consumable_notes(&mut user_client, destination_account.id(), 10).await;
+        wait_for_consumable_notes(&mut user_client, destination_account.id(), 30).await;
     println!(
         "[bridge_in_out] Found {} consumable notes for destination account",
         consumable_notes.len()
@@ -354,8 +357,9 @@ pub async fn test_bridge_in_out(client_config: ClientConfig) -> Result<()> {
     wait_for_tx(&mut user_client, tx_id).await?;
     println!("[bridge_in_out] B2AGG note submitted from destination account");
 
-    // Wait for bridge to consume the B2AGG note as network transaction
-    wait_for_blocks(&mut user_client, 2).await;
+    // Wait for bridge to consume the B2AGG note as network transaction.
+    // Allow extra blocks for CI where the node processes many concurrent network transactions.
+    wait_for_blocks(&mut user_client, 5).await;
     println!("[bridge_in_out] Waited for bridge to consume B2AGG note");
 
     println!("[bridge_in_out] Test completed successfully");
