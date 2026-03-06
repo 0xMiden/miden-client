@@ -222,7 +222,7 @@ export const compileTxScript = async (
     let walletAccount = await client.newWallet(
       window.AccountStorageMode.private(),
       true,
-      0
+      window.AuthScheme.AuthRpoFalcon512
     );
 
     let builder = client.createCodeBuilder();

@@ -120,20 +120,22 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
-      - name: Install Rust
-        run: rustup update --no-self-update
-      - name: Add Rust Cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: rust-release
-          prefix-key: ${{ env.RUST_CACHE_KEY }}
-          save-if: false
       - name: Restore node-builder binary
         id: cache-node-builder
         uses: actions/cache@v4
         with:
           path: target/release/testing-node-builder
           key: ${{ runner.os }}-node-builder-${{ hashFiles('Cargo.lock') }}
+      - name: Install Rust
+        if: steps.cache-node-builder.outputs.cache-hit != 'true'
+        run: rustup update --no-self-update
+      - name: Add Rust Cache
+        if: steps.cache-node-builder.outputs.cache-hit != 'true'
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: rust-release
+          prefix-key: ${{ env.RUST_CACHE_KEY }}
+          save-if: false
       - name: Build node-builder
         if: steps.cache-node-builder.outputs.cache-hit != 'true'
         run: cargo build --release --package node-builder --locked
@@ -143,14 +145,15 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
-      - name: Install Rust
-        run: rustup update --no-self-update
       - name: Restore note-transport binary
         id: cache-note-transport
         uses: actions/cache@v4
         with:
           path: ~/.cargo/bin/miden-note-transport-node-bin
           key: ${{ runner.os }}-note-transport-${{ hashFiles('Cargo.lock') }}
+      - name: Install Rust
+        if: steps.cache-note-transport.outputs.cache-hit != 'true'
+        run: rustup update --no-self-update
       - name: Install note-transport
         if: steps.cache-note-transport.outputs.cache-hit != 'true'
         run: cargo install --git https://github.com/0xMiden/miden-note-transport --locked
@@ -160,20 +163,22 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
-      - name: Install Rust
-        run: rustup update --no-self-update
-      - name: Add Rust Cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: rust-release
-          prefix-key: ${{ env.RUST_CACHE_KEY }}
-          save-if: false
       - name: Restore remote-prover binary
         id: cache-remote-prover
         uses: actions/cache@v4
         with:
           path: target/release/testing-remote-prover
           key: ${{ runner.os }}-prover-${{ hashFiles('Cargo.lock') }}
+      - name: Install Rust
+        if: steps.cache-remote-prover.outputs.cache-hit != 'true'
+        run: rustup update --no-self-update
+      - name: Add Rust Cache
+        if: steps.cache-remote-prover.outputs.cache-hit != 'true'
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: rust-release
+          prefix-key: ${{ env.RUST_CACHE_KEY }}
+          save-if: false
       - name: Build remote-prover
         if: steps.cache-remote-prover.outputs.cache-hit != 'true'
         run: cargo build --release --package testing-remote-prover --locked
@@ -233,6 +238,11 @@ jobs:
         run: |
           rustup update --no-self-update
           rustup target add wasm32-unknown-unknown
+
+      - name: Install binaryen (wasm-opt)
+        run: |
+          sudo apt-get update && sudo apt-get install -y binaryen
+
       - name: Add Rust Cache
         uses: Swatinem/rust-cache@v2
         with:

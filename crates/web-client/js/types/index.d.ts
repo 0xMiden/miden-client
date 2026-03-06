@@ -15,6 +15,24 @@ import type {
   SignCallback,
 } from "./api-types";
 
+export type LogLevel =
+  | "error"
+  | "warn"
+  | "info"
+  | "debug"
+  | "trace"
+  | "off"
+  | "none";
+
+/**
+ * Initializes the tracing subscriber that routes Rust log output to the
+ * browser console. Call once per thread (main thread / Web Worker).
+ * Subsequent calls on the same thread are harmless no-ops.
+ *
+ * @param logLevel - The maximum log level to display.
+ */
+export declare function setupLogging(logLevel: LogLevel): void;
+
 // ════════════════════════════════════════════════════════════════
 // Internal exports (not public API — for tests and advanced usage)
 // ════════════════════════════════════════════════════════════════
@@ -25,7 +43,8 @@ export declare class WasmWebClient extends WasmWebClientBase {
     rpcUrl?: string,
     noteTransportUrl?: string,
     seed?: Uint8Array,
-    storeName?: string
+    storeName?: string,
+    logLevel?: LogLevel
   ): Promise<WasmWebClient>;
 
   static createClientWithExternalKeystore(
@@ -35,7 +54,8 @@ export declare class WasmWebClient extends WasmWebClientBase {
     storeName?: string,
     getKeyCb?: GetKeyCallback,
     insertKeyCb?: InsertKeyCallback,
-    signCb?: SignCallback
+    signCb?: SignCallback,
+    logLevel?: LogLevel
   ): Promise<WasmWebClient>;
 
   syncState(): Promise<SyncSummary>;
@@ -48,7 +68,8 @@ export declare class MockWasmWebClient extends WasmWebClient {
   static createClient(
     serializedMockChain?: Uint8Array,
     serializedMockNoteTransportNode?: Uint8Array,
-    seed?: Uint8Array
+    seed?: Uint8Array,
+    logLevel?: LogLevel
   ): Promise<MockWasmWebClient>;
 
   proveBlock(): void;

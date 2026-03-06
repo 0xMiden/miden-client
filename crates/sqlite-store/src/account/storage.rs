@@ -14,12 +14,11 @@ use miden_client::account::{
     StorageSlotName,
     StorageSlotType,
 };
-use miden_client::store::StoreError;
+use miden_client::store::{AccountSmtForest, StoreError};
 use miden_client::{EMPTY_WORD, Word};
 use rusqlite::types::Value;
 use rusqlite::{Transaction, params};
 
-use crate::smt_forest::AccountSmtForest;
 use crate::sql_error::SqlResultExt;
 use crate::{SqliteStore, insert_sql, subst, u64_to_value};
 
@@ -301,8 +300,8 @@ impl SqliteStore {
 
         for (slot_name, map_delta) in delta.storage().maps() {
             let old_root = old_map_roots.get(slot_name).copied().unwrap_or(default_map_root);
-            let entries: Vec<(Word, Word)> =
-                map_delta.entries().iter().map(|(key, value)| ((*key).into(), *value)).collect();
+            let entries: Vec<_> =
+                map_delta.entries().iter().map(|(key, value)| (*key.inner(), *value)).collect();
 
             let new_root = smt_forest.update_storage_map_nodes(old_root, entries.into_iter())?;
             updated_slots.insert(slot_name.clone(), (new_root, StorageSlotType::Map));

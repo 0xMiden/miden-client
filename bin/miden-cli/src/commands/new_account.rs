@@ -14,7 +14,7 @@ use miden_client::account::component::{
     StorageSlotSchema,
 };
 use miden_client::account::{Account, AccountBuilder, AccountStorageMode, AccountType};
-use miden_client::auth::{AuthFalcon512Rpo, AuthSecretKey};
+use miden_client::auth::{AuthSchemeId, AuthSecretKey, AuthSingleSig};
 use miden_client::keystore::Keystore;
 use miden_client::transaction::TransactionRequestBuilder;
 use miden_client::utils::Deserializable;
@@ -364,7 +364,7 @@ async fn create_client_account<AUTH: Keystore + Sync + 'static>(
 
     // Load the component templates and initialization storage data.
 
-    let cli_config = CliConfig::from_system()?;
+    let cli_config = CliConfig::load()?;
     debug!("Loading packages...");
     let packages = load_packages(&cli_config, package_paths)?;
     debug!("Loaded {} packages", packages.len());
@@ -391,8 +391,10 @@ async fn create_client_account<AUTH: Keystore + Sync + 'static>(
     } else {
         debug!("Adding default Falcon auth component");
         let kp = AuthSecretKey::new_falcon512_rpo_with_rng(client.rng());
-        builder =
-            builder.with_auth_component(AuthFalcon512Rpo::new(kp.public_key().to_commitment()));
+        builder = builder.with_auth_component(AuthSingleSig::new(
+            kp.public_key().to_commitment(),
+            AuthSchemeId::Falcon512Rpo,
+        ));
         Some(kp)
     };
 
