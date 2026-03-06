@@ -66,6 +66,12 @@ export interface SignerAccountConfig {
   accountSeed?: Uint8Array;
   /** Optional custom account components to include in the account (e.g. from a compiled .masp package) */
   customComponents?: AccountComponent[];
+  /**
+   * Optional existing account ID to import instead of building from scratch.
+   * When provided, skips AccountBuilder and imports the account by ID from the chain.
+   * Useful for wallets that create accounts externally (e.g., via a vault).
+   */
+  importAccountId?: string;
 }
 
 /**
