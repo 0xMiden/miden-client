@@ -167,8 +167,11 @@ impl AgglayerConfig {
 // SHARED TEST SETUP
 // ================================================================================================
 
-/// A client + keystore pair.
-pub type ClientWithKeystore = (TestClient, FilesystemKeyStore);
+/// A client + keystore pair for a single test entity.
+pub struct Actor {
+    pub client: TestClient,
+    pub keystore: FilesystemKeyStore,
+}
 
 /// Account IDs produced by the core setup: `(bridge_admin_id, ger_manager_id, bridge_id)`.
 pub type CoreAccountIds = (AccountId, AccountId, AccountId);
@@ -176,26 +179,28 @@ pub type CoreAccountIds = (AccountId, AccountId, AccountId);
 /// Creates three clients sharing the same RPC endpoint, for bridge admin, GER manager, and user.
 pub async fn create_agglayer_clients(
     client_config: &ClientConfig,
-) -> Result<(ClientWithKeystore, ClientWithKeystore, ClientWithKeystore)> {
-    let (mut bridge_admin_client, bridge_admin_keystore) =
-        client_config.clone().into_client().await?;
-    wait_for_node(&mut bridge_admin_client).await;
-    bridge_admin_client.sync_state().await?;
+) -> Result<(Actor, Actor, Actor)> {
+    let (mut client, keystore) = client_config.clone().into_client().await?;
+    wait_for_node(&mut client).await;
+    client.sync_state().await?;
     println!("[setup] Bridge admin client initialized");
+    let bridge_admin = Actor { client, keystore };
 
-    let ger_manager = ClientConfig::default()
+    let (client, keystore) = ClientConfig::default()
         .with_rpc_endpoint(client_config.rpc_endpoint())
         .into_client()
         .await?;
     println!("[setup] GER manager client initialized");
+    let ger_manager = Actor { client, keystore };
 
-    let user = ClientConfig::default()
+    let (client, keystore) = ClientConfig::default()
         .with_rpc_endpoint(client_config.rpc_endpoint())
         .into_client()
         .await?;
     println!("[setup] User client initialized");
+    let user = Actor { client, keystore };
 
-    Ok(((bridge_admin_client, bridge_admin_keystore), ger_manager, user))
+    Ok((bridge_admin, ger_manager, user))
 }
 
 /// Sets up the core agglayer accounts (bridge admin, GER manager, bridge) across 3 clients.
@@ -204,9 +209,9 @@ pub async fn create_agglayer_clients(
 /// In runtime mode, creates, deploys, and distributes accounts.
 pub async fn setup_core_accounts(
     config: Option<&AgglayerConfig>,
-    bridge_admin: &mut ClientWithKeystore,
-    ger_manager: &mut ClientWithKeystore,
-    user: &mut ClientWithKeystore,
+    bridge_admin: &mut Actor,
+    ger_manager: &mut Actor,
+    user: &mut Actor,
 ) -> Result<CoreAccountIds> {
     match config {
         Some(config) => {
@@ -216,14 +221,24 @@ pub async fn setup_core_accounts(
             println!("[setup]   bridge:        {}", config.bridge_id());
 
             config
-                .import_account(config.bridge_admin_id(), &mut bridge_admin.0, &bridge_admin.1)
+                .import_account(
+                    config.bridge_admin_id(),
+                    &mut bridge_admin.client,
+                    &bridge_admin.keystore,
+                )
                 .await?;
             config
-                .import_account(config.ger_manager_id(), &mut ger_manager.0, &ger_manager.1)
+                .import_account(
+                    config.ger_manager_id(),
+                    &mut ger_manager.client,
+                    &ger_manager.keystore,
+                )
                 .await?;
 
-            for (client, keystore) in [&mut *bridge_admin, &mut *ger_manager, &mut *user] {
-                config.import_account(config.bridge_id(), client, keystore).await?;
+            for actor in [&mut *bridge_admin, &mut *ger_manager, &mut *user] {
+                config
+                    .import_account(config.bridge_id(), &mut actor.client, &actor.keystore)
+                    .await?;
             }
 
             Ok((config.bridge_admin_id(), config.ger_manager_id(), config.bridge_id()))
@@ -232,23 +247,23 @@ pub async fn setup_core_accounts(
             println!("[setup] Creating core accounts at runtime");
 
             let (bridge_admin_account, ..) = insert_new_wallet(
-                &mut bridge_admin.0,
+                &mut bridge_admin.client,
                 AccountStorageMode::Private,
-                &bridge_admin.1,
+                &bridge_admin.keystore,
                 RPO_FALCON_SCHEME_ID,
             )
             .await?;
 
             let (ger_manager_account, ..) = insert_new_wallet(
-                &mut ger_manager.0,
+                &mut ger_manager.client,
                 AccountStorageMode::Private,
-                &ger_manager.1,
+                &ger_manager.keystore,
                 RPO_FALCON_SCHEME_ID,
             )
             .await?;
 
             let bridge_account = create_bridge_account(
-                bridge_admin.0.rng().draw_word(),
+                bridge_admin.client.rng().draw_word(),
                 bridge_admin_account.id(),
                 ger_manager_account.id(),
             );
@@ -256,14 +271,16 @@ pub async fn setup_core_accounts(
             println!("[setup]   GER manager:   {}", ger_manager_account.id());
             println!("[setup]   bridge:        {}", bridge_account.id());
 
-            bridge_admin.0.add_account(&bridge_account, false).await?;
-            ger_manager.0.add_account(&bridge_account, false).await?;
-            user.0.add_account(&bridge_account, false).await?;
+            bridge_admin.client.add_account(&bridge_account, false).await?;
+            ger_manager.client.add_account(&bridge_account, false).await?;
+            user.client.add_account(&bridge_account, false).await?;
 
             let deploy_tx = TransactionRequestBuilder::new().build()?;
-            let tx_id =
-                bridge_admin.0.submit_new_transaction(bridge_account.id(), deploy_tx).await?;
-            wait_for_tx(&mut bridge_admin.0, tx_id).await?;
+            let tx_id = bridge_admin
+                .client
+                .submit_new_transaction(bridge_account.id(), deploy_tx)
+                .await?;
+            wait_for_tx(&mut bridge_admin.client, tx_id).await?;
             println!("[setup] Bridge account deployed on-chain");
 
             Ok((bridge_admin_account.id(), ger_manager_account.id(), bridge_account.id()))

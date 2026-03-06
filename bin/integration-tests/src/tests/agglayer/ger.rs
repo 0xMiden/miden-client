@@ -31,23 +31,27 @@ pub async fn test_agglayer_update_ger(client_config: ClientConfig) -> Result<()>
     let ger_bytes: [u8; 32] = rand::random();
     let ger = ExitRoot::from(ger_bytes);
     println!("Submitting UpdateGerNote with random GER: {ger_bytes:02x?}");
-    let update_ger_note =
-        UpdateGerNote::create(ger, ger_manager_id, bridge_id, ger_manager.0.rng())?;
+    let update_ger_note = UpdateGerNote::create(
+        ger,
+        ger_manager_id,
+        bridge_id,
+        ger_manager.client.rng(),
+    )?;
 
     let tx_request = TransactionRequestBuilder::new()
         .own_output_notes(vec![OutputNote::Full(update_ger_note)])
         .build()?;
-    let tx_id = ger_manager.0.submit_new_transaction(ger_manager_id, tx_request).await?;
-    wait_for_tx(&mut ger_manager.0, tx_id).await?;
+    let tx_id = ger_manager.client.submit_new_transaction(ger_manager_id, tx_request).await?;
+    wait_for_tx(&mut ger_manager.client, tx_id).await?;
 
     // WAIT FOR NETWORK ACCOUNT TO PROCESS UPDATE_GER NOTE
     // --------------------------------------------------------------------------------------------
-    wait_for_blocks(&mut ger_manager.0, 2).await;
+    wait_for_blocks(&mut ger_manager.client, 2).await;
 
     // VERIFY GER HASH WAS STORED IN MAP
     // --------------------------------------------------------------------------------------------
     let updated_bridge_account = ger_manager
-        .0
+        .client
         .test_rpc_api()
         .get_account_details(bridge_id)
         .await?
