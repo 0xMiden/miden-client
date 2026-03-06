@@ -161,15 +161,15 @@ impl WebClient {
                 .map_err(|_| JsValue::from_str("Failed to initialize IdxdbStore"))?,
         );
 
+        let rng = create_rng(seed)?;
+        let keystore = WebKeyStore::new_with_callbacks(rng, store_name, None, None, None);
+
         self.setup_client(
             web_rpc_client,
             store,
-            store_name,
+            Arc::new(keystore),
+            rng,
             note_transport_client,
-            seed,
-            None,
-            None,
-            None,
             debug_mode.unwrap_or(false),
         )
         .await?;
@@ -220,58 +220,39 @@ impl WebClient {
                 .map_err(|_| JsValue::from_str("Failed to initialize IdxdbStore"))?,
         );
 
+        let rng = create_rng(seed)?;
+        let keystore =
+            WebKeyStore::new_with_callbacks(rng, store_name, get_key_cb, insert_key_cb, sign_cb);
+
         self.setup_client(
             web_rpc_client,
             store,
-            store_name,
+            Arc::new(keystore),
+            rng,
             note_transport_client,
-            seed,
-            get_key_cb,
-            insert_key_cb,
-            sign_cb,
             debug_mode.unwrap_or(false),
         )
         .await?;
 
         Ok(JsValue::from_str("Client created successfully"))
     }
-    #[allow(clippy::too_many_arguments)]
+
+    /// Shared client setup. Platform-specific callers create the store and keystore,
+    /// then pass them here for the common `ClientBuilder` logic.
     async fn setup_client(
         &mut self,
         rpc_client: Arc<dyn NodeRpcClient>,
         store: Arc<dyn Store>,
-        store_name: String,
+        keystore: Arc<ClientAuth>,
+        rng: RpoRandomCoin,
         note_transport_client: Option<Arc<dyn NoteTransportClient>>,
-        seed: Option<Vec<u8>>,
-        get_key_cb: Option<Function>,
-        insert_key_cb: Option<Function>,
-        sign_cb: Option<Function>,
         debug_mode: bool,
     ) -> Result<(), JsValue> {
-        let mut rng = match seed {
-            Some(seed_bytes) => {
-                if seed_bytes.len() == 32 {
-                    let mut seed_array = [0u8; 32];
-                    seed_array.copy_from_slice(&seed_bytes);
-                    StdRng::from_seed(seed_array)
-                } else {
-                    return Err(JsValue::from_str("Seed must be exactly 32 bytes"));
-                }
-            },
-            None => StdRng::from_os_rng(),
-        };
-        let coin_seed: [u64; 4] = rng.random();
-
-        let rng = RpoRandomCoin::new(coin_seed.map(Felt::new).into());
-
-        let keystore =
-            WebKeyStore::new_with_callbacks(rng, store_name, get_key_cb, insert_key_cb, sign_cb);
-
         let mut builder = ClientBuilder::new()
             .rpc(rpc_client)
             .rng(Box::new(rng))
             .store(store)
-            .authenticator(Arc::new(keystore))
+            .authenticator(keystore)
             .in_debug_mode(if debug_mode {
                 DebugMode::Enabled
             } else {
@@ -308,6 +289,26 @@ impl WebClient {
         };
         Ok(CodeBuilder::from_source_manager(client.code_builder().source_manager().clone()))
     }
+}
+
+// HELPERS
+// ================================================================================================
+
+pub(crate) fn create_rng(seed: Option<Vec<u8>>) -> Result<RpoRandomCoin, JsValue> {
+    let mut rng = match seed {
+        Some(seed_bytes) => {
+            if seed_bytes.len() == 32 {
+                let mut seed_array = [0u8; 32];
+                seed_array.copy_from_slice(&seed_bytes);
+                StdRng::from_seed(seed_array)
+            } else {
+                return Err(JsValue::from_str("Seed must be exactly 32 bytes"));
+            }
+        },
+        None => StdRng::from_os_rng(),
+    };
+    let coin_seed: [u64; 4] = rng.random();
+    Ok(RpoRandomCoin::new(coin_seed.map(Felt::new).into()))
 }
 
 // ERROR HANDLING HELPERS
