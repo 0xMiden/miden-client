@@ -2786,6 +2786,7 @@ dependencies = [
  "miden-agglayer",
  "miden-client",
  "miden-client-sqlite-store",
+ "miden-protocol",
  "num_cpus",
  "rand",
  "regex",
@@ -2820,12 +2821,17 @@ dependencies = [
 name = "miden-client-unit-tests"
 version = "0.14.0"
 dependencies = [
+ "anyhow",
+ "miden-agglayer",
  "miden-client",
  "miden-client-sqlite-store",
  "miden-protocol",
  "miden-standards",
  "miden-testing",
+ "miden-tx",
  "rand",
+ "serde",
+ "serde_json",
  "tokio",
 ]
 

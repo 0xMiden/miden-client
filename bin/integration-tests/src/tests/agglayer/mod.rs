@@ -6,6 +6,8 @@ use miden_client::account::{AccountFile, AccountId};
 use miden_client::keystore::Keystore;
 use miden_client::testing::common::FilesystemKeyStore;
 
+pub mod agglayer_bridge_in_out;
+mod agglayer_test_utils;
 pub mod ger;
 
 /// Configuration for agglayer tests when running against a node with pre-deployed
