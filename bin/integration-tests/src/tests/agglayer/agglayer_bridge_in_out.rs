@@ -276,6 +276,7 @@ pub async fn test_bridge_in_out(client_config: ClientConfig) -> Result<()> {
     user.client.sync_state().await?;
 
     let bridge_out_amount = 1000u64;
+    let destination_network = 0u32;
     let l1_destination_address =
         EthAddressFormat::from_hex("0xabcdefabcdefabcdefabcdefabcdefabcdefabcd")
             .expect("valid L1 destination address");
@@ -283,7 +284,7 @@ pub async fn test_bridge_in_out(client_config: ClientConfig) -> Result<()> {
     let bridge_asset: Asset =
         FungibleAsset::new(agglayer_faucet_id, bridge_out_amount).unwrap().into();
     let b2agg_note = B2AggNote::create(
-        0u32,
+        destination_network,
         l1_destination_address,
         NoteAssets::new(vec![bridge_asset])?,
         bridge_id,
