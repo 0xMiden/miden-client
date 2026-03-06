@@ -13,6 +13,7 @@ import type {
   Felt,
   TransactionId,
   TransactionRequest,
+  TransactionResult,
   TransactionSummary,
   TransactionRecord,
   InputNoteRecord,
@@ -300,6 +301,13 @@ export type SendOptions = SendOptionsDefault | SendOptionsReturnNote;
 export interface SendResult {
   txId: TransactionId;
   note: Note | null;
+  result: TransactionResult;
+}
+
+/** Result of methods that previously returned bare TransactionId. */
+export interface TransactionSubmitResult {
+  txId: TransactionId;
+  result: TransactionResult;
 }
 
 export interface MintOptions extends TransactionOptions {
@@ -399,6 +407,7 @@ export interface ConsumeAllResult {
   txId: TransactionId | null;
   consumed: number;
   remaining: number;
+  result?: TransactionResult;
 }
 
 /**
@@ -450,7 +459,7 @@ export interface FetchPrivateNotesOptions {
 }
 
 export interface SendPrivateOptions {
-  noteId: NoteInput;
+  noteId: NoteInput | Note;
   to: AccountRef;
 }
 
@@ -501,16 +510,16 @@ export interface AccountsResource {
 export interface TransactionsResource {
   send(
     options: SendOptionsDefault
-  ): Promise<{ txId: TransactionId; note: null }>;
+  ): Promise<{ txId: TransactionId; note: null; result: TransactionResult }>;
   send(
     options: SendOptionsReturnNote
-  ): Promise<{ txId: TransactionId; note: Note }>;
+  ): Promise<{ txId: TransactionId; note: Note; result: TransactionResult }>;
   send(options: SendOptions): Promise<SendResult>;
-  mint(options: MintOptions): Promise<TransactionId>;
-  consume(options: ConsumeOptions): Promise<TransactionId>;
-  swap(options: SwapOptions): Promise<TransactionId>;
+  mint(options: MintOptions): Promise<TransactionSubmitResult>;
+  consume(options: ConsumeOptions): Promise<TransactionSubmitResult>;
+  swap(options: SwapOptions): Promise<TransactionSubmitResult>;
   consumeAll(options: ConsumeAllOptions): Promise<ConsumeAllResult>;
-  execute(options: ExecuteOptions): Promise<TransactionId>;
+  execute(options: ExecuteOptions): Promise<TransactionSubmitResult>;
 
   preview(options: PreviewOptions): Promise<TransactionSummary>;
 
@@ -522,7 +531,7 @@ export interface TransactionsResource {
     account: AccountRef,
     request: TransactionRequest,
     options?: TransactionOptions
-  ): Promise<TransactionId>;
+  ): Promise<TransactionSubmitResult>;
 
   list(query?: TransactionQuery): Promise<TransactionRecord[]>;
 
