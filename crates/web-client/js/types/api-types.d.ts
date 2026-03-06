@@ -96,6 +96,21 @@ export type AccountTypeValue =
   | "FungibleFaucet";
 
 // ════════════════════════════════════════════════════════════════
+// Passkey encryption options
+// ════════════════════════════════════════════════════════════════
+
+export interface PasskeyEncryptionOptions {
+  /** Existing credential ID (base64url). Omit to register a new passkey. */
+  credentialId?: string;
+  /** WebAuthn relying party ID. Defaults to current hostname. */
+  rpId?: string;
+  /** Relying party display name. Defaults to "Miden Client". */
+  rpName?: string;
+  /** User display name for the passkey. Defaults to "Miden Wallet User". */
+  userName?: string;
+}
+
+// ════════════════════════════════════════════════════════════════
 // Client options
 // ════════════════════════════════════════════════════════════════
 
@@ -116,8 +131,24 @@ export interface ClientOptions {
   keystore?: {
     getKey: GetKeyCallback;
     insertKey: InsertKeyCallback;
-    sign: SignCallback;
+    /**
+     * Optional signing callback. When omitted, the Rust/WASM side calls `getKey`
+     * to retrieve the secret key and signs locally. Only provide this if you need
+     * signing to happen outside of WASM (e.g., in a remote HSM).
+     */
+    sign?: SignCallback;
   };
+  /**
+   * Opt-in passkey encryption for keys at rest. Pass `true` for defaults
+   * or a `PasskeyEncryptionOptions` object to reuse an existing credential.
+   *
+   * When `true`, checks localStorage for an existing credential and reuses it
+   * if found; otherwise registers a new passkey (triggering a biometric prompt).
+   *
+   * Requires Chrome 116+, Safari 18+, or Edge 116+. Firefox does NOT support PRF.
+   * Mutually exclusive with `keystore` — if both are provided, `keystore` takes precedence.
+   */
+  passkeyEncryption?: boolean | PasskeyEncryptionOptions;
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -519,3 +550,37 @@ export declare function buildSwapTag(options: BuildSwapTagOptions): NoteTag;
 
 /** Returns the initialized WASM module. Throws if WASM is unavailable. */
 export declare function getWasmOrThrow(): Promise<typeof WasmExports>;
+
+// ════════════════════════════════════════════════════════════════
+// Passkey utilities (tree-shakeable)
+// ════════════════════════════════════════════════════════════════
+
+/**
+ * Returns `true` if the current browser supports WebAuthn with the PRF extension,
+ * which is required for passkey-based key encryption.
+ *
+ * Supported browsers: Chrome 116+, Safari 18+, Edge 116+. Firefox does NOT support PRF.
+ */
+export declare function isPasskeyPrfSupported(): Promise<boolean>;
+
+/** Result of `createPasskeyKeystore()`. */
+export interface PasskeyKeystore {
+  /** Decrypts and returns the secret key for a given pub key commitment. */
+  getKey: GetKeyCallback;
+  /** Encrypts and stores a secret key for a given pub key commitment. */
+  insertKey: InsertKeyCallback;
+  /** The credential ID (base64url) of the passkey used for this keystore. */
+  credentialId: string;
+}
+
+/**
+ * Creates a passkey-encrypted keystore backed by WebAuthn PRF.
+ *
+ * Registers a new passkey or authenticates with an existing one (biometric prompt),
+ * then returns `getKey`/`insertKey` callbacks that transparently encrypt/decrypt
+ * secret keys using the PRF-derived wrapping key.
+ */
+export declare function createPasskeyKeystore(
+  storeName: string,
+  options?: PasskeyEncryptionOptions
+): Promise<PasskeyKeystore>;

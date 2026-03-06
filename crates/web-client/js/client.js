@@ -53,6 +53,36 @@ export class MidenClient {
 
     const seed = options?.seed ? await hashSeed(options.seed) : undefined;
 
+    // Resolve passkey encryption → keystore callbacks (before the keystore branch)
+    if (options?.passkeyEncryption && options?.keystore) {
+      console.warn(
+        "Both passkeyEncryption and keystore provided; keystore takes precedence."
+      );
+    }
+    if (options?.passkeyEncryption && !options?.keystore) {
+      const { createPasskeyKeystore, isPasskeyPrfSupported } =
+        await import("./passkey-keystore.js");
+      if (await isPasskeyPrfSupported()) {
+        const passkeyOpts =
+          typeof options.passkeyEncryption === "object"
+            ? options.passkeyEncryption
+            : {};
+        const storeName = options?.storeName || "default";
+        const result = await createPasskeyKeystore(storeName, passkeyOpts);
+        options = {
+          ...options,
+          storeName,
+          keystore: { getKey: result.getKey, insertKey: result.insertKey },
+        };
+      }
+      // Unsupported browser — fall through to standard keystore
+      else {
+        console.warn(
+          "passkeyEncryption was requested but WebAuthn PRF is not supported in this browser. Falling back to standard keystore."
+        );
+      }
+    }
+
     let inner;
     if (options?.keystore) {
       inner = await WebClientClass.createClientWithExternalKeystore(

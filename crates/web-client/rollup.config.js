@@ -83,6 +83,16 @@ export default [
       commonjs(),
     ],
   },
+  // Build the passkey-keystore as a standalone module (used by tests and direct imports)
+  {
+    input: "./js/passkey-keystore.js",
+    output: {
+      dir: `dist`,
+      format: "es",
+      sourcemap: true,
+    },
+    plugins: [resolve(), commonjs()],
+  },
   // Build the worker file
   {
     input: "./js/workers/web-client-methods-worker.js",

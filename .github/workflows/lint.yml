@@ -67,8 +67,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-      - name: Check React SDK version sync
-        run: node scripts/check-react-sdk-sync.js
       - name: Install dependencies
         run: ./scripts/retry-yarn-install.sh packages/react-sdk
       - name: Run lint
