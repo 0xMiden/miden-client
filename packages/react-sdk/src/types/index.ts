@@ -45,6 +45,8 @@ export type { AccountRef } from "../utils/accountParsing";
 // Re-export signer types for external signer providers
 export type {
   SignCallback,
+  GetKeyCallback,
+  InsertKeyCallback,
   SignerAccountType,
   SignerAccountConfig,
   SignerContextValue,
@@ -57,7 +59,8 @@ export type RpcUrlConfig =
   | "localhost"
   | "local";
 
-export type ProverConfig =
+/** Single prover target — a well-known name, custom URL, or object with URL + timeout. */
+export type ProverTarget =
   | "local"
   | "devnet"
   | "testnet"
@@ -65,6 +68,19 @@ export type ProverConfig =
   | {
       url: string;
       timeoutMs?: number | bigint;
+    };
+
+export type ProverConfig =
+  | ProverTarget
+  | {
+      /** Primary prover to try first */
+      primary: ProverTarget;
+      /** Fallback prover if primary fails (e.g. "local") */
+      fallback?: ProverTarget;
+      /** Return true to skip the fallback (e.g. on mobile where local proving is too slow) */
+      disableFallback?: () => boolean;
+      /** Called when the primary prover fails and the fallback is used */
+      onFallback?: () => void;
     };
 
 export type ProverUrls = {
@@ -368,6 +384,12 @@ export interface ExecuteTransactionOptions {
   request:
     | TransactionRequest
     | ((client: WebClient) => TransactionRequest | Promise<TransactionRequest>);
+  /**
+   * When set, private output notes from this transaction are delivered to the
+   * given recipient after the transaction is committed. Accepts any AccountRef
+   * form (hex string, bech32, AccountId, Account, AccountHeader).
+   */
+  privateNoteRecipient?: AccountRef;
 }
 
 // Transaction result

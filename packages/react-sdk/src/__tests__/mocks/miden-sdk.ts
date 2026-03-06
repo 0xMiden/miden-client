@@ -351,6 +351,18 @@ export const createMockWebClient = (
     importPublicAccountFromSeed: vi.fn().mockResolvedValue(createMockAccount()),
     exportAccountFile: vi.fn().mockResolvedValue(createMockAccountFile()),
 
+    // Store operations
+    exportStore: vi.fn().mockResolvedValue({ tables: {} }),
+    forceImportStore: vi.fn().mockResolvedValue(undefined),
+
+    // Note file operations
+    exportNoteFile: vi
+      .fn()
+      .mockResolvedValue({ serialize: () => new Uint8Array([1, 2, 3]) }),
+    importNoteFile: vi
+      .fn()
+      .mockResolvedValue({ toString: () => "0xnote_imported" }),
+
     // Cleanup
     free: vi.fn(),
   };
@@ -385,6 +397,10 @@ export type MockWebClientType = {
   importAccountById: ReturnType<typeof vi.fn>;
   importPublicAccountFromSeed: ReturnType<typeof vi.fn>;
   exportAccountFile: ReturnType<typeof vi.fn>;
+  exportStore: ReturnType<typeof vi.fn>;
+  forceImportStore: ReturnType<typeof vi.fn>;
+  exportNoteFile: ReturnType<typeof vi.fn>;
+  importNoteFile: ReturnType<typeof vi.fn>;
   free: ReturnType<typeof vi.fn>;
 };
 

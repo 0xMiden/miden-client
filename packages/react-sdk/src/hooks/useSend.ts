@@ -8,14 +8,18 @@ import {
   NoteType,
   OutputNote,
   OutputNoteArray,
-  TransactionFilter,
   TransactionRequestBuilder,
 } from "@miden-sdk/miden-sdk";
-import type { TransactionId } from "@miden-sdk/miden-sdk";
 import type { SendOptions, SendResult, TransactionStage } from "../types";
 import { DEFAULTS } from "../types";
 import { parseAccountId, parseAddress } from "../utils/accountParsing";
 import { runExclusiveDirect } from "../utils/runExclusive";
+import { proveWithFallback } from "../utils/prover";
+import { useMidenStore } from "../store/MidenStore";
+import {
+  waitForTransactionCommit,
+  extractFullNote,
+} from "../utils/transactions";
 
 export interface UseSendResult {
   /** Send tokens from one account to another */
@@ -31,20 +35,6 @@ export interface UseSendResult {
   /** Reset the hook state */
   reset: () => void;
 }
-
-type ClientWithTransactions = {
-  syncState: () => Promise<unknown>;
-  getTransactions: (filter: TransactionFilter) => Promise<
-    Array<{
-      id: () => { toHex: () => string };
-      transactionStatus: () => {
-        isPending: () => boolean;
-        isCommitted: () => boolean;
-        isDiscarded: () => boolean;
-      };
-    }>
-  >;
-};
 
 /**
  * Hook to send tokens between accounts.
@@ -168,8 +158,13 @@ export function useSend(): UseSendResult {
         });
 
         setStage("proving");
-        const provenTransaction = await runExclusiveSafe(() =>
-          client.proveTransaction(txResult, prover ?? undefined)
+        const proverConfig = useMidenStore.getState().config;
+        const provenTransaction = await proveWithFallback(
+          (resolvedProver) =>
+            runExclusiveSafe(() =>
+              client.proveTransaction(txResult, resolvedProver)
+            ),
+          proverConfig
         );
 
         setStage("submitting");
@@ -244,52 +239,5 @@ function getNoteType(type: "private" | "public"): NoteType {
       return NoteType.Public;
     default:
       return NoteType.Private;
-  }
-}
-
-async function waitForTransactionCommit(
-  client: ClientWithTransactions,
-  runExclusiveSafe: <T>(fn: () => Promise<T>) => Promise<T>,
-  txId: TransactionId,
-  maxWaitMs = 10_000,
-  delayMs = 1_000
-) {
-  let waited = 0;
-
-  while (waited < maxWaitMs) {
-    await runExclusiveSafe(() => client.syncState());
-    const [record] = await runExclusiveSafe(() =>
-      client.getTransactions(TransactionFilter.ids([txId]))
-    );
-    if (record) {
-      const status = record.transactionStatus();
-      if (status.isCommitted()) {
-        return;
-      }
-      if (status.isDiscarded()) {
-        throw new Error("Transaction was discarded before commit");
-      }
-    }
-    await new Promise((resolve) => setTimeout(resolve, delayMs));
-    waited += delayMs;
-  }
-
-  throw new Error("Timeout waiting for transaction commit");
-}
-
-function extractFullNote(txResult: unknown): Note | null {
-  try {
-    const executedTx = (
-      txResult as { executedTransaction?: () => unknown }
-    ).executedTransaction?.() as {
-      outputNotes?: () => {
-        notes?: () => Array<{ intoFull?: () => Note | null }>;
-      };
-    };
-    const notes = executedTx?.outputNotes?.().notes?.() ?? [];
-    const note = notes[0];
-    return note?.intoFull?.() ?? null;
-  } catch {
-    return null;
   }
 }

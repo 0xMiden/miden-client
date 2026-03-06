@@ -173,8 +173,8 @@ export function MidenProvider({
               resolvedConfig.noteTransportUrl,
               resolvedConfig.seed,
               storeName,
-              undefined, // getKeyCb - not needed for public accounts
-              undefined, // insertKeyCb - not needed for public accounts
+              signerContext.getKeyCb,
+              signerContext.insertKeyCb,
               signerContext.signCb
             );
 
@@ -268,7 +268,9 @@ export function MidenProvider({
     if (interval <= 0) return;
 
     syncIntervalRef.current = setInterval(() => {
-      sync();
+      if (!useMidenStore.getState().syncPaused) {
+        sync();
+      }
     }, interval);
 
     return () => {

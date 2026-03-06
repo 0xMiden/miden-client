@@ -49,7 +49,7 @@ export class TransactionsResource {
         )
         .build();
 
-      const txId = await this.#submitOrSubmitWithProver(
+      const { txId, result } = await this.#submitOrSubmitWithProver(
         senderId,
         request,
         opts.prover
@@ -59,12 +59,12 @@ export class TransactionsResource {
         await this.waitFor(txId.toHex(), { timeout: opts.timeout });
       }
 
-      return { txId, note };
+      return { txId, note, result };
     }
 
     // Default path — note built in WASM with optional reclaim/timelock
     const { accountId, request } = await this.#buildSendRequest(opts, wasm);
-    const txId = await this.#submitOrSubmitWithProver(
+    const { txId, result } = await this.#submitOrSubmitWithProver(
       accountId,
       request,
       opts.prover
@@ -74,7 +74,7 @@ export class TransactionsResource {
       await this.waitFor(txId.toHex(), { timeout: opts.timeout });
     }
 
-    return { txId, note: null };
+    return { txId, note: null, result };
   }
 
   async mint(opts) {
@@ -82,7 +82,7 @@ export class TransactionsResource {
     const wasm = await this.#getWasm();
     const { accountId, request } = await this.#buildMintRequest(opts, wasm);
 
-    const txId = await this.#submitOrSubmitWithProver(
+    const { txId, result } = await this.#submitOrSubmitWithProver(
       accountId,
       request,
       opts.prover
@@ -92,7 +92,7 @@ export class TransactionsResource {
       await this.waitFor(txId.toHex(), { timeout: opts.timeout });
     }
 
-    return txId;
+    return { txId, result };
   }
 
   async consume(opts) {
@@ -100,7 +100,7 @@ export class TransactionsResource {
     const wasm = await this.#getWasm();
     const { accountId, request } = await this.#buildConsumeRequest(opts, wasm);
 
-    const txId = await this.#submitOrSubmitWithProver(
+    const { txId, result } = await this.#submitOrSubmitWithProver(
       accountId,
       request,
       opts.prover
@@ -110,7 +110,7 @@ export class TransactionsResource {
       await this.waitFor(txId.toHex(), { timeout: opts.timeout });
     }
 
-    return txId;
+    return { txId, result };
   }
 
   async consumeAll(opts) {
@@ -139,7 +139,7 @@ export class TransactionsResource {
 
     const request = await this.#inner.newConsumeTransactionRequest(notes);
 
-    const txId = await this.#submitOrSubmitWithProver(
+    const { txId, result } = await this.#submitOrSubmitWithProver(
       wasm.AccountId.fromHex(accountIdHex),
       request,
       opts.prover
@@ -153,6 +153,7 @@ export class TransactionsResource {
       txId,
       consumed: toConsume.length,
       remaining: total - toConsume.length,
+      result,
     };
   }
 
@@ -161,7 +162,7 @@ export class TransactionsResource {
     const wasm = await this.#getWasm();
     const { accountId, request } = await this.#buildSwapRequest(opts, wasm);
 
-    const txId = await this.#submitOrSubmitWithProver(
+    const { txId, result } = await this.#submitOrSubmitWithProver(
       accountId,
       request,
       opts.prover
@@ -171,7 +172,7 @@ export class TransactionsResource {
       await this.waitFor(txId.toHex(), { timeout: opts.timeout });
     }
 
-    return txId;
+    return { txId, result };
   }
 
   async preview(opts) {
@@ -236,7 +237,7 @@ export class TransactionsResource {
     }
 
     const request = builder.build();
-    const txId = await this.#submitOrSubmitWithProver(
+    const { txId, result } = await this.#submitOrSubmitWithProver(
       accountId,
       request,
       opts.prover
@@ -246,7 +247,7 @@ export class TransactionsResource {
       await this.waitFor(txId.toHex(), { timeout: opts.timeout });
     }
 
-    return txId;
+    return { txId, result };
   }
 
   async submit(account, request, opts) {
@@ -481,14 +482,14 @@ export class TransactionsResource {
   }
 
   async #submitOrSubmitWithProver(accountId, request, perCallProver) {
+    const result = await this.#inner.executeTransaction(accountId, request);
     const prover = perCallProver ?? this.#client.defaultProver;
-    if (prover) {
-      return await this.#inner.submitNewTransactionWithProver(
-        accountId,
-        request,
-        prover
-      );
-    }
-    return await this.#inner.submitNewTransaction(accountId, request);
+    const proven = prover
+      ? await this.#inner.proveTransaction(result, prover)
+      : await this.#inner.proveTransaction(result);
+    const height = await this.#inner.submitProvenTransaction(proven, result);
+    await this.#inner.applyTransaction(result, height);
+    const txId = result.id();
+    return { txId, result };
   }
 }
