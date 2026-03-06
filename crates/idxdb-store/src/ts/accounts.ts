@@ -855,11 +855,11 @@ async function rebuildLatestVaultAssets(db: MidenDatabase, accountId: string) {
 export async function undoAccountStates(
   dbId: string,
   accountCommitments: string[]
-) {
+): Promise<string[]> {
   try {
     const db = getDatabase(dbId);
 
-    await db.dexie.transaction(
+    const smtRoots = await db.dexie.transaction(
       "rw",
       [
         db.latestAccountStorages,
@@ -885,6 +885,27 @@ export async function undoAccountStates(
             accountNonces.set(record.id, new Set());
           }
           accountNonces.get(record.id)!.add(record.nonce);
+        }
+
+        // Collect SMT roots before deletion so the Rust side can pop them from the forest.
+        const roots: string[] = [];
+        for (const record of affectedRecords) {
+          roots.push(record.vaultRoot);
+        }
+        // StorageSlotType::Map = 1
+        const MAP_SLOT_TYPE = 1;
+        for (const [accountId, nonces] of accountNonces) {
+          for (const nonce of nonces) {
+            const storageEntries = await db.historicalAccountStorages
+              .where("[accountId+nonce]")
+              .equals([accountId, nonce])
+              .toArray();
+            for (const entry of storageEntries) {
+              if (entry.slotType === MAP_SLOT_TYPE && entry.slotValue != null) {
+                roots.push(entry.slotValue);
+              }
+            }
+          }
         }
 
         // Delete matching records from historical account headers
@@ -952,12 +973,17 @@ export async function undoAccountStates(
             await rebuildLatestVaultAssets(db, accountId);
           }
         }
+
+        return roots;
       }
     );
+
+    return smtRoots;
   } catch (error) {
     logWebStoreError(
       error,
       `Error undoing account states: ${accountCommitments.join(",")}`
     );
+    throw error;
   }
 }

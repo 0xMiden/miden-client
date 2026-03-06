@@ -400,6 +400,29 @@ impl IdxdbStore {
         Ok(assets)
     }
 
+    /// Returns a map from slot name to map root for all Map-type storage slots.
+    /// Only loads slot metadata — does NOT load map entries.
+    pub(crate) async fn get_storage_map_roots(
+        &self,
+        account_id: AccountId,
+    ) -> Result<BTreeMap<StorageSlotName, Word>, StoreError> {
+        let promise = idxdb_get_account_storage(self.db_id(), account_id.to_string());
+        let slots: Vec<AccountStorageIdxdbObject> =
+            await_js(promise, "failed to fetch account storage").await?;
+
+        slots
+            .into_iter()
+            .filter(|s| StorageSlotType::try_from(s.slot_type).ok() == Some(StorageSlotType::Map))
+            .map(|s| {
+                let name = StorageSlotName::new(s.slot_name).map_err(|err| {
+                    StoreError::DatabaseError(format!("invalid storage slot name: {err}"))
+                })?;
+                let root = Word::try_from(s.slot_value.as_str())?;
+                Ok((name, root))
+            })
+            .collect()
+    }
+
     pub(crate) async fn insert_account(
         &self,
         account: &Account,
@@ -435,7 +458,11 @@ impl IdxdbStore {
             })?;
 
         let mut smt_forest = self.smt_forest.write();
-        smt_forest.insert_account_state(account.vault(), account.storage())?;
+        smt_forest.insert_and_register_account_state(
+            account.id(),
+            account.vault(),
+            account.storage(),
+        )?;
 
         Ok(())
     }
@@ -444,14 +471,10 @@ impl IdxdbStore {
         &self,
         new_account_state: &Account,
     ) -> Result<(), StoreError> {
-        let account_id_str = new_account_state.id().to_string();
-        let promise = idxdb_get_account_header(self.db_id(), account_id_str);
-        let account_header_idxdb: Option<AccountRecordIdxdbObject> =
-            await_js(promise, "failed to fetch account header").await?;
-
-        if account_header_idxdb.is_none() {
-            return Err(StoreError::AccountDataNotFound(new_account_state.id()));
-        }
+        let account_id = new_account_state.id();
+        self.get_account_header(account_id)
+            .await?
+            .ok_or(StoreError::AccountDataNotFound(account_id))?;
 
         apply_full_account_state(self.db_id(), new_account_state)
             .await
