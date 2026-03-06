@@ -401,10 +401,8 @@ test.describe("passkey keystore", () => {
 
     const result = await page.evaluate(async (storeName) => {
       // 1. Seed the main DB with a plaintext key using native IndexedDB
-      const pubKeyHex =
-        "aa".repeat(32); // 32-byte fake pub key commitment as hex
-      const secretKeyHex =
-        "bb".repeat(64); // 64-byte fake secret key as hex
+      const pubKeyHex = "aa".repeat(32); // 32-byte fake pub key commitment as hex
+      const secretKeyHex = "bb".repeat(64); // 64-byte fake secret key as hex
 
       await new Promise<void>((resolve, reject) => {
         const req = indexedDB.open(storeName, 1);
@@ -551,7 +549,9 @@ test.describe("passkey keystore", () => {
       return {
         first: first ? Array.from(first) : null,
         second: second ? Array.from(second) : null,
-        match: first != null && second != null &&
+        match:
+          first != null &&
+          second != null &&
           Array.from(first).every((b, i) => b === Array.from(second!)[i]),
       };
     }, storeName);
