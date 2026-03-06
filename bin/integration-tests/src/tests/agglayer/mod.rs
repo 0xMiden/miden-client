@@ -170,12 +170,8 @@ impl AgglayerConfig {
 /// A client + keystore pair.
 pub type ClientWithKeystore = (TestClient, FilesystemKeyStore);
 
-/// Account IDs produced by the core setup.
-pub struct CoreAccountIds {
-    pub bridge_admin_id: AccountId,
-    pub ger_manager_id: AccountId,
-    pub bridge_id: AccountId,
-}
+/// Account IDs produced by the core setup: `(bridge_admin_id, ger_manager_id, bridge_id)`.
+pub type CoreAccountIds = (AccountId, AccountId, AccountId);
 
 /// Creates three clients sharing the same RPC endpoint, for bridge admin, GER manager, and user.
 pub async fn create_agglayer_clients(
@@ -230,11 +226,7 @@ pub async fn setup_core_accounts(
                 config.import_account(config.bridge_id(), client, keystore).await?;
             }
 
-            Ok(CoreAccountIds {
-                bridge_admin_id: config.bridge_admin_id(),
-                ger_manager_id: config.ger_manager_id(),
-                bridge_id: config.bridge_id(),
-            })
+            Ok((config.bridge_admin_id(), config.ger_manager_id(), config.bridge_id()))
         },
         None => {
             println!("[setup] Creating core accounts at runtime");
@@ -274,11 +266,7 @@ pub async fn setup_core_accounts(
             wait_for_tx(&mut bridge_admin.0, tx_id).await?;
             println!("[setup] Bridge account deployed on-chain");
 
-            Ok(CoreAccountIds {
-                bridge_admin_id: bridge_admin_account.id(),
-                ger_manager_id: ger_manager_account.id(),
-                bridge_id: bridge_account.id(),
-            })
+            Ok((bridge_admin_account.id(), ger_manager_account.id(), bridge_account.id()))
         },
     }
 }

@@ -18,7 +18,7 @@ pub async fn test_agglayer_update_ger(client_config: ClientConfig) -> Result<()>
     let agglayer_config = AgglayerConfig::from_env()?;
     let (mut bridge_admin, mut ger_manager, mut user) =
         create_agglayer_clients(&client_config).await?;
-    let core = setup_core_accounts(
+    let (_bridge_admin_id, ger_manager_id, bridge_id) = setup_core_accounts(
         agglayer_config.as_ref(),
         &mut bridge_admin,
         &mut ger_manager,
@@ -32,12 +32,12 @@ pub async fn test_agglayer_update_ger(client_config: ClientConfig) -> Result<()>
     let ger = ExitRoot::from(ger_bytes);
     println!("Submitting UpdateGerNote with random GER: {ger_bytes:02x?}");
     let update_ger_note =
-        UpdateGerNote::create(ger, core.ger_manager_id, core.bridge_id, ger_manager.0.rng())?;
+        UpdateGerNote::create(ger, ger_manager_id, bridge_id, ger_manager.0.rng())?;
 
     let tx_request = TransactionRequestBuilder::new()
         .own_output_notes(vec![OutputNote::Full(update_ger_note)])
         .build()?;
-    let tx_id = ger_manager.0.submit_new_transaction(core.ger_manager_id, tx_request).await?;
+    let tx_id = ger_manager.0.submit_new_transaction(ger_manager_id, tx_request).await?;
     wait_for_tx(&mut ger_manager.0, tx_id).await?;
 
     // WAIT FOR NETWORK ACCOUNT TO PROCESS UPDATE_GER NOTE
@@ -49,7 +49,7 @@ pub async fn test_agglayer_update_ger(client_config: ClientConfig) -> Result<()>
     let updated_bridge_account = ger_manager
         .0
         .test_rpc_api()
-        .get_account_details(core.bridge_id)
+        .get_account_details(bridge_id)
         .await?
         .account()
         .cloned()

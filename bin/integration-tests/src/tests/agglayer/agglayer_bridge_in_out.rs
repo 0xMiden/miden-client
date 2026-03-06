@@ -54,14 +54,30 @@ use crate::tests::config::ClientConfig;
 /// Tests the full bridge-in then bridge-out flow using network transactions.
 ///
 /// If `AGGLAYER_ACCOUNTS_DIR` is set, loads bridge admin, GER manager, bridge, and faucet
-/// from genesis files. Otherwise, creates all accounts at runtime.
+/// from genesis files. Otherwise, creates and deploys all accounts at runtime.
+/// In both modes, a fresh destination account is always created for the user.
 ///
-/// In both modes, a fresh destination account is created for the user.
+/// Setup & config:
+/// 1. Creates bridge admin, GER manager (real wallets), bridge account, and agglayer faucet
+///    (loaded from genesis or created at runtime)
+/// 2. Deploys bridge and agglayer faucet on-chain (skipped in genesis mode)
+/// 3. Registers faucet in bridge via CONFIG_AGG_BRIDGE note (skipped in genesis mode)
+/// 4. Creates and deploys destination account (basic wallet, always fresh)
+///
+/// Bridge-in:
+/// 5. Generates CLAIM proof data by running the foundry test for the destination account
+/// 6. Submits UPDATE_GER note from GER manager -> consumed by bridge as network tx
+/// 7. Submits CLAIM note from GER manager -> consumed by agglayer faucet as network tx
+/// 8. Destination account consumes the resulting P2ID note to receive bridged tokens
+///
+/// Bridge-out:
+/// 9. Destination account creates B2AGG note with bridged-in assets
+/// 10. B2AGG note is consumed by bridge as a network transaction
 pub async fn test_bridge_in_out(client_config: ClientConfig) -> Result<()> {
     let agglayer_config = AgglayerConfig::from_env()?;
     let (mut bridge_admin, mut ger_manager, mut user) =
         create_agglayer_clients(&client_config).await?;
-    let core = setup_core_accounts(
+    let (bridge_admin_id, ger_manager_id, bridge_id) = setup_core_accounts(
         agglayer_config.as_ref(),
         &mut bridge_admin,
         &mut ger_manager,
@@ -118,7 +134,7 @@ pub async fn test_bridge_in_out(client_config: ClientConfig) -> Result<()> {
                 "AGG",
                 8u8,
                 Felt::new(FungibleAsset::MAX_AMOUNT),
-                core.bridge_id,
+                bridge_id,
                 &origin_token_address,
                 origin_network,
                 scale,
@@ -144,8 +160,8 @@ pub async fn test_bridge_in_out(client_config: ClientConfig) -> Result<()> {
             // Register faucet in bridge via CONFIG_AGG_BRIDGE note
             let config_note = ConfigAggBridgeNote::create(
                 agglayer_faucet.id(),
-                core.bridge_admin_id,
-                core.bridge_id,
+                bridge_admin_id,
+                bridge_id,
                 bridge_admin.0.rng(),
             )?;
             let config_output_tx = TransactionRequestBuilder::new()
@@ -153,7 +169,7 @@ pub async fn test_bridge_in_out(client_config: ClientConfig) -> Result<()> {
                 .build()?;
             let tx_id = bridge_admin
                 .0
-                .submit_new_transaction(core.bridge_admin_id, config_output_tx)
+                .submit_new_transaction(bridge_admin_id, config_output_tx)
                 .await?;
             wait_for_tx(&mut bridge_admin.0, tx_id).await?;
             println!("[bridge_in_out] CONFIG_AGG_BRIDGE note submitted");
@@ -190,11 +206,11 @@ pub async fn test_bridge_in_out(client_config: ClientConfig) -> Result<()> {
     // ============================================================================================
 
     let update_ger_note =
-        UpdateGerNote::create(ger, core.ger_manager_id, core.bridge_id, ger_manager.0.rng())?;
+        UpdateGerNote::create(ger, ger_manager_id, bridge_id, ger_manager.0.rng())?;
     let tx_request = TransactionRequestBuilder::new()
         .own_output_notes(vec![OutputNote::Full(update_ger_note)])
         .build()?;
-    let tx_id = ger_manager.0.submit_new_transaction(core.ger_manager_id, tx_request).await?;
+    let tx_id = ger_manager.0.submit_new_transaction(ger_manager_id, tx_request).await?;
     wait_for_tx(&mut ger_manager.0, tx_id).await?;
     println!("[bridge_in_out] UPDATE_GER note submitted");
 
@@ -214,13 +230,13 @@ pub async fn test_bridge_in_out(client_config: ClientConfig) -> Result<()> {
     let claim_note = create_claim_note(
         claim_inputs,
         agglayer_faucet_id,
-        core.ger_manager_id,
+        ger_manager_id,
         ger_manager.0.rng(),
     )?;
     let tx_request = TransactionRequestBuilder::new()
         .own_output_notes(vec![OutputNote::Full(claim_note)])
         .build()?;
-    let tx_id = ger_manager.0.submit_new_transaction(core.ger_manager_id, tx_request).await?;
+    let tx_id = ger_manager.0.submit_new_transaction(ger_manager_id, tx_request).await?;
     wait_for_tx(&mut ger_manager.0, tx_id).await?;
     println!("[bridge_in_out] CLAIM note submitted");
 
@@ -270,7 +286,7 @@ pub async fn test_bridge_in_out(client_config: ClientConfig) -> Result<()> {
         0u32,
         l1_destination_address,
         NoteAssets::new(vec![bridge_asset])?,
-        core.bridge_id,
+        bridge_id,
         destination_account.id(),
         user.0.rng(),
     )?;
