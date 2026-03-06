@@ -1,3 +1,4 @@
+use idxdb_store::IdxdbStore;
 use miden_client::Word;
 use miden_client::account::AccountFile as NativeAccountFile;
 use miden_client::keystore::Keystore;
@@ -49,27 +50,12 @@ impl WebClient {
         }
     }
 
-    /// Retrieves the entire underlying store and returns it as a `JsValue`
-    ///
-    /// Meant to be used in conjunction with the `forceImportStore` method
-    #[wasm_bindgen(js_name = "exportStore")]
-    pub async fn export_store(&mut self) -> Result<JsValue, JsValue> {
-        let store = self.store.as_ref().ok_or(JsValue::from_str("Store not initialized"))?;
-
-        let json_string = store
-            .export_store()
-            .await
-            .map_err(|err| js_error_with_context(err, "failed to export store"))?;
-
-        Ok(JsValue::from_str(&json_string))
-    }
-
     #[wasm_bindgen(js_name = "exportAccountFile")]
     pub async fn export_account_file(
         &mut self,
         account_id: &AccountId,
     ) -> Result<AccountFile, JsValue> {
-        let keystore = self.keystore.clone().expect("Keystore not initialized");
+        let keystore = self.keystore()?.clone();
         if let Some(client) = self.get_mut_inner() {
             let account = client
                 .get_account(account_id.into())
@@ -105,4 +91,21 @@ impl WebClient {
             Err(JsValue::from_str("Client not initialized"))
         }
     }
+}
+
+/// Exports the entire contents of an `IndexedDB` store as a JSON string.
+///
+/// Use together with [`import_store`].
+#[wasm_bindgen(js_name = "exportStore")]
+pub async fn export_store(store_name: &str) -> Result<JsValue, JsValue> {
+    let store = IdxdbStore::new(store_name.into())
+        .await
+        .map_err(|err| JsValue::from_str(&format!("failed to open store: {err:?}")))?;
+
+    let json_string = store
+        .export_store()
+        .await
+        .map_err(|err| JsValue::from_str(&format!("failed to export store: {err:?}")))?;
+
+    Ok(JsValue::from_str(&json_string))
 }
