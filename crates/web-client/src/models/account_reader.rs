@@ -4,6 +4,7 @@ use alloc::vec::Vec;
 use miden_client::account::{
     AccountId as NativeAccountId,
     AccountReader as NativeAccountReader,
+    StorageMapKey,
     StorageSlotName,
 };
 use miden_client::store::Store;
@@ -160,7 +161,7 @@ impl AccountReader {
             .map_err(|err| js_error_with_context(err, "invalid slot name"))?;
 
         self.0
-            .get_storage_map_item(slot_name, *key.as_native())
+            .get_storage_map_item(slot_name, StorageMapKey::new(*key.as_native()))
             .await
             .map(Into::into)
             .map_err(|err| js_error_with_context(err, "failed to get storage map item"))

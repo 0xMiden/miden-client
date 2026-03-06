@@ -8,6 +8,7 @@ use miden_client::account::{
     AccountId,
     Address,
     StorageMap,
+    StorageMapKey,
     StorageSlot,
     StorageSlotName,
     StorageSlotType,
@@ -282,9 +283,9 @@ pub(crate) fn query_storage_maps(
             let (slot_name, key, value) = result.into_store_error()?;
             let slot_name = StorageSlotName::new(slot_name)
                 .map_err(|err| StoreError::ParsingError(err.to_string()))?;
-            Ok((slot_name, Word::try_from(key)?, Word::try_from(value)?))
+            Ok((slot_name, StorageMapKey::new(Word::try_from(key)?), Word::try_from(value)?))
         })
-        .collect::<Result<Vec<(StorageSlotName, Word, Word)>, StoreError>>()?;
+        .collect::<Result<Vec<(StorageSlotName, StorageMapKey, Word)>, StoreError>>()?;
 
     let mut maps = BTreeMap::new();
     for (slot_name, key, value) in map_entries {

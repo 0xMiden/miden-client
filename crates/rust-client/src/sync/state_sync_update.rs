@@ -143,6 +143,15 @@ impl BlockUpdates {
         &self.block_headers
     }
 
+    /// Adds authentication nodes without an associated block header.
+    ///
+    /// This is used when a synced block is not stored (no relevant notes and not the chain tip)
+    /// but the MMR authentication nodes it produced must still be persisted so that the on-disk
+    /// state stays consistent with the in-memory `PartialMmr`.
+    pub fn extend_authentication_nodes(&mut self, nodes: Vec<(InOrderIndex, Word)>) {
+        self.new_authentication_nodes.extend(nodes);
+    }
+
     /// Returns the new authentication nodes that are meant to be stored in order to authenticate
     /// block headers.
     pub fn new_authentication_nodes(&self) -> &[(InOrderIndex, Word)] {
@@ -202,6 +211,17 @@ impl TransactionUpdateTracker {
     ) {
         if let Some(transaction) = self.transactions.get_mut(&transaction_inclusion.transaction_id)
         {
+            transaction.commit_transaction(transaction_inclusion.block_num, timestamp);
+            return;
+        }
+
+        // Fallback for transactions with unauthenticated input notes: the node
+        // authenticates these notes during processing, which changes the transaction
+        // ID. Match by account ID and pre-transaction state instead.
+        if let Some(transaction) = self.transactions.values_mut().find(|tx| {
+            tx.details.account_id == transaction_inclusion.account_id
+                && tx.details.init_account_state == transaction_inclusion.initial_state_commitment
+        }) {
             transaction.commit_transaction(transaction_inclusion.block_num, timestamp);
         }
     }

@@ -1,5 +1,5 @@
 use miden_client::asset::{Asset as NativeAsset, FungibleAsset as NativeFungibleAsset};
-use miden_client::note::build_swap_tag as native_build_swap_tag;
+use miden_client::note::SwapNote;
 use wasm_bindgen::prelude::*;
 
 use crate::models::account_id::AccountId;
@@ -64,7 +64,7 @@ impl WebClient {
                 })?
                 .into();
 
-        let native_note_tag = native_build_swap_tag(
+        let native_note_tag = SwapNote::build_tag(
             note_type.into(),
             &offered_fungible_asset,
             &requested_fungible_asset,

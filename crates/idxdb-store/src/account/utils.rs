@@ -15,7 +15,7 @@ use miden_client::account::{
 use miden_client::asset::{Asset, AssetVault, FungibleAsset};
 use miden_client::store::{AccountStatus, StoreError};
 use miden_client::utils::{Deserializable, Serializable};
-use miden_client::{EMPTY_WORD, Felt, Word};
+use miden_client::{EMPTY_WORD, Felt, Word, ZERO};
 use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::JsFuture;
 
@@ -99,7 +99,7 @@ pub async fn upsert_account_record(db_id: &str, account: &Account) -> Result<(),
     let committed = account.is_public();
     let nonce = account.nonce().to_string();
     let account_seed = account.seed().map(|seed| seed.to_bytes());
-    let commitment = account.commitment().to_string();
+    let commitment = account.to_commitment().to_string();
 
     let promise = idxdb_upsert_account_record(
         db_id,
@@ -273,8 +273,12 @@ pub async fn apply_transaction_delta(
     let storage_root = account.storage().to_commitment().to_string();
     let vault_root = account.vault().root().to_string();
     let committed = account.is_public();
-    let commitment = account.commitment().to_string();
-    let account_seed = account.seed().map(|seed| seed.to_bytes());
+    let commitment = account.to_commitment().to_string();
+    let account_seed = if account.nonce() == ZERO {
+        account.seed().map(|seed| seed.to_bytes())
+    } else {
+        None
+    };
 
     JsFuture::from(idxdb_apply_transaction_delta(
         db_id,

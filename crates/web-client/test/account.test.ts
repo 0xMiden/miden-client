@@ -18,14 +18,14 @@ export const getAccountOneMatch = async (
     const newAccount = await client.newWallet(
       window.AccountStorageMode.private(),
       true,
-      0
+      window.AuthScheme.AuthRpoFalcon512
     );
 
     const result = await client.getAccount(newAccount.id());
 
     return {
-      commitmentOfCreatedAccount: newAccount.commitment().toHex(),
-      commitmentOfGetAccountResult: result!.commitment().toHex(),
+      commitmentOfCreatedAccount: newAccount.to_commitment().toHex(),
+      commitmentOfGetAccountResult: result!.to_commitment().toHex(),
       isAccountType: result instanceof window.Account,
     };
   });
@@ -46,7 +46,7 @@ export const getAccountNoMatch = async (
 
     return {
       commitmentOfGetAccountResult: result
-        ? result.commitment().toHex()
+        ? result.to_commitment().toHex()
         : undefined,
     };
   });
@@ -88,16 +88,16 @@ export const getAccountsManyMatches = async (
     const newAccount1 = await client.newWallet(
       window.AccountStorageMode.private(),
       true,
-      0
+      window.AuthScheme.AuthRpoFalcon512
     );
     const newAccount2 = await client.newWallet(
       window.AccountStorageMode.private(),
       true,
-      0
+      window.AuthScheme.AuthRpoFalcon512
     );
     const commitmentsOfCreatedAccounts = [
-      newAccount1.commitment().toHex(),
-      newAccount2.commitment().toHex(),
+      newAccount1.to_commitment().toHex(),
+      newAccount2.to_commitment().toHex(),
     ];
 
     const result = await client.getAccounts();
@@ -106,7 +106,7 @@ export const getAccountsManyMatches = async (
     const resultTypes = [];
 
     for (let i = 0; i < result.length; i++) {
-      commitmentsOfGetAccountsResult.push(result[i].commitment().toHex());
+      commitmentsOfGetAccountsResult.push(result[i].to_commitment().toHex());
       resultTypes.push(result[i] instanceof window.AccountHeader);
     }
 
@@ -130,7 +130,7 @@ export const getAccountsNoMatches = async (
     const resultTypes = [];
 
     for (let i = 0; i < result.length; i++) {
-      commitmentsOfGetAccountsResult.push(result[i].commitment().toHex());
+      commitmentsOfGetAccountsResult.push(result[i].to_commitment().toHex());
       resultTypes.push(result[i] instanceof window.AccountHeader);
     }
 
@@ -209,7 +209,7 @@ test.describe("account public commitments", () => {
       const newAccount = await window.client.newWallet(
         window.AccountStorageMode.private(),
         true,
-        0
+        window.AuthScheme.AuthRpoFalcon512
       );
       const accountId = newAccount.id();
 
@@ -289,7 +289,7 @@ test.describe("account public commitments", () => {
       const account = await window.client.newWallet(
         window.AccountStorageMode.private(),
         true,
-        0
+        window.AuthScheme.AuthRpoFalcon512
       );
       const commitments = await window.client.getPublicKeyCommitmentsOfAccount(
         account.id()
@@ -344,7 +344,7 @@ test.describe("getAccountByKeyCommitment tests", () => {
       const wallet = await client.newWallet(
         window.AccountStorageMode.private(),
         true,
-        0
+        window.AuthScheme.AuthRpoFalcon512
       );
 
       const commitments = await client.getPublicKeyCommitmentsOfAccount(
@@ -393,12 +393,12 @@ test.describe("getAccountByKeyCommitment tests", () => {
       const wallet1 = await client.newWallet(
         window.AccountStorageMode.private(),
         true,
-        0
+        window.AuthScheme.AuthRpoFalcon512
       );
       const wallet2 = await client.newWallet(
         window.AccountStorageMode.private(),
         true,
-        0
+        window.AuthScheme.AuthRpoFalcon512
       );
 
       const commitments2 = await client.getPublicKeyCommitmentsOfAccount(
@@ -427,7 +427,7 @@ test.describe("getAccountByKeyCommitment tests", () => {
       const wallet = await client.newWallet(
         window.AccountStorageMode.private(),
         true,
-        0
+        window.AuthScheme.AuthRpoFalcon512
       );
 
       const additionalSecretKey = window.AuthSecretKey.ecdsaWithRNG(null);
@@ -463,7 +463,7 @@ test.describe("getAccountByKeyCommitment tests", () => {
         "TST",
         8,
         BigInt(10000000),
-        0
+        window.AuthScheme.AuthRpoFalcon512
       );
 
       const commitments = await client.getPublicKeyCommitmentsOfAccount(

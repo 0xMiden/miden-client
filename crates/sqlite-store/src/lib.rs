@@ -27,6 +27,7 @@ use miden_client::account::{
     AccountId,
     AccountStorage,
     Address,
+    StorageMapKey,
     StorageSlotName,
 };
 use miden_client::asset::{Asset, AssetVault, AssetWitness};
@@ -35,6 +36,7 @@ use miden_client::crypto::{InOrderIndex, MmrPeaks};
 use miden_client::note::{BlockNumber, NoteScript, NoteTag, Nullifier};
 use miden_client::store::{
     AccountRecord,
+    AccountSmtForest,
     AccountStatus,
     AccountStorageFilter,
     BlockRelevance,
@@ -54,14 +56,11 @@ use rusqlite::Connection;
 use rusqlite::types::Value;
 use sql_error::SqlResultExt;
 
-use crate::smt_forest::AccountSmtForest;
-
 mod account;
 mod builder;
 mod chain_data;
 mod db_management;
 mod note;
-mod smt_forest;
 mod sql_error;
 mod sync;
 mod transaction;
@@ -107,9 +106,14 @@ impl SqliteStore {
         for id in store.get_account_ids().await? {
             let vault = store.get_account_vault(id).await?;
             let storage = store.get_account_storage(id, AccountStorageFilter::All).await?;
+            let header = store.get_account_header(id).await?;
 
             let mut smt_forest = store.smt_forest.write().expect("smt write lock not poisoned");
-            smt_forest.insert_account_state(&vault, &storage)?;
+            if header.is_some() {
+                smt_forest.insert_and_register_account_state(id, &vault, &storage)?;
+            } else {
+                smt_forest.insert_account_state(&vault, &storage)?;
+            }
         }
 
         Ok(store)
@@ -443,7 +447,7 @@ impl Store for SqliteStore {
         &self,
         account_id: AccountId,
         slot_name: StorageSlotName,
-        key: Word,
+        key: StorageMapKey,
     ) -> Result<(Word, StorageMapWitness), StoreError> {
         let smt_forest = self.smt_forest.clone();
 

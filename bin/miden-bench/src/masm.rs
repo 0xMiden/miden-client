@@ -18,13 +18,14 @@ const MAX_OPS_PER_BLOCK: usize = 7_000;
 /// Writes the MASM instructions for a single map entry read (push key, call reader, drop result).
 fn write_read_op_instructions(script: &mut String, op: &ReadOp) {
     // Push key (4 felts)
+    let key = op.key.as_word();
     writeln!(
         script,
         "    push.{}.{}.{}.{}",
-        op.key[3].as_int(),
-        op.key[2].as_int(),
-        op.key[1].as_int(),
-        op.key[0].as_int()
+        key[3].as_int(),
+        key[2].as_int(),
+        key[1].as_int(),
+        key[0].as_int()
     )
     .expect("write to string should not fail");
 

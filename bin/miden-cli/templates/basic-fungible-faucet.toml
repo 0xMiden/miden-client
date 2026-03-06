@@ -8,8 +8,8 @@ supported-types = ["FungibleFaucet"]
 name = "miden::standards::fungible_faucets::metadata"
 description = "Contains metadata about the token associated to the faucet account"
 type = [
+    { type = "void" },
     { name = "max_supply", description = "Maximum supply of the token in base units" },
     { name = "decimals", type = "u8", description = "Number of decimal places" },
     { name = "ticker", type = "miden::standards::fungible_faucets::metadata::token_symbol", description = "Token symbol of the faucet's asset, limited to 4 characters." },
-    { type = "void" },
 ]
