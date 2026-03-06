@@ -43,11 +43,15 @@ mod web_keystore_callbacks;
 mod web_keystore_db;
 pub use web_keystore::WebKeyStore;
 
+/// Client authenticator type. Gate with `#[cfg]` to support other keystores, e.g.
+/// `FilesystemKeyStore` for Node.js.
+pub(crate) type ClientAuth = WebKeyStore<RpoRandomCoin>;
+
 const BASE_STORE_NAME: &str = "MidenClientDB";
 
 #[wasm_bindgen]
 pub struct WebClient {
-    inner: Option<Client<WebKeyStore<RpoRandomCoin>>>,
+    inner: Option<Client<ClientAuth>>,
     mock_rpc_api: Option<Arc<MockRpcApi>>,
     mock_note_transport_api: Option<Arc<MockNoteTransportApi>>,
 }
@@ -70,7 +74,7 @@ impl WebClient {
         }
     }
 
-    pub(crate) fn get_mut_inner(&mut self) -> Option<&mut Client<WebKeyStore<RpoRandomCoin>>> {
+    pub(crate) fn get_mut_inner(&mut self) -> Option<&mut Client<ClientAuth>> {
         self.inner.as_mut()
     }
 
@@ -81,7 +85,7 @@ impl WebClient {
             .ok_or_else(|| JsValue::from_str("Client not initialized"))
     }
 
-    pub(crate) fn keystore(&self) -> Result<&Arc<WebKeyStore<RpoRandomCoin>>, JsValue> {
+    pub(crate) fn keystore(&self) -> Result<&Arc<ClientAuth>, JsValue> {
         self.inner
             .as_ref()
             .and_then(|c| c.authenticator())
