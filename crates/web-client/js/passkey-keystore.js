@@ -360,7 +360,7 @@ function openKeystoreDb(storeName) {
 /**
  * Opens the main client Dexie database for migration fallback reads.
  *
- * This reads directly from the idxdb-store's `accountAuths` table, which
+ * This reads directly from the idxdb-store's `accountAuth` table, which
  * stores plaintext secret keys keyed by `pubKeyCommitmentHex`.
  *
  * The DB name must match what the WASM/Rust side uses. When storeName is
@@ -377,7 +377,7 @@ function openMainDbForMigration(storeName) {
   // Declare just the table we need — Dexie allows partial schema declarations
   // for read-only access to existing databases.
   db.version(1).stores({
-    accountAuths: "pubKeyCommitmentHex",
+    accountAuth: "pubKeyCommitmentHex",
   });
   return db;
 }
@@ -445,7 +445,7 @@ function hexToBytes(hex) {
  *
  * **Migration**: When `getKey` finds no encrypted entry in the keystore DB but
  * `storeName` is explicitly provided, it attempts to read the plaintext key from
- * the main client database's `accountAuths` table. If found, the key is
+ * the main client database's `accountAuth` table. If found, the key is
  * transparently re-encrypted and migrated to the keystore DB. Migration is only
  * available when `storeName` is explicitly provided (since the auto-generated DB
  * name is not known to JS before WASM initialization).
@@ -526,7 +526,7 @@ export async function createPasskeyKeystore(storeName, options = {}) {
     if (mainDb) {
       try {
         const authRecord = await mainDb
-          .table("accountAuths")
+          .table("accountAuth")
           .where("pubKeyCommitmentHex")
           .equals(pubKeyHex)
           .first();
@@ -564,7 +564,7 @@ export async function createPasskeyKeystore(storeName, options = {}) {
           // Remove plaintext from old DB after successful verification
           try {
             await mainDb
-              .table("accountAuths")
+              .table("accountAuth")
               .where("pubKeyCommitmentHex")
               .equals(pubKeyHex)
               .delete();

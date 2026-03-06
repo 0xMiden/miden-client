@@ -391,6 +391,216 @@ test.describe("passkey keystore", () => {
     expect(result.hasTransactions).toBe(true);
   });
 
+  test("migration: reads plaintext key from main DB, encrypts, and removes plaintext", async ({
+    page,
+    browserName,
+  }) => {
+    test.skip(browserName !== "chromium", "CDP required");
+
+    const storeName = generateStoreName("migrate");
+
+    const result = await page.evaluate(async (storeName) => {
+      // 1. Seed the main DB with a plaintext key using native IndexedDB
+      const pubKeyHex =
+        "aa".repeat(32); // 32-byte fake pub key commitment as hex
+      const secretKeyHex =
+        "bb".repeat(64); // 64-byte fake secret key as hex
+
+      await new Promise<void>((resolve, reject) => {
+        const req = indexedDB.open(storeName, 1);
+        req.onupgradeneeded = () => {
+          const db = req.result;
+          if (!db.objectStoreNames.contains("accountAuth")) {
+            db.createObjectStore("accountAuth", {
+              keyPath: "pubKeyCommitmentHex",
+            });
+          }
+        };
+        req.onsuccess = () => {
+          const db = req.result;
+          const tx = db.transaction("accountAuth", "readwrite");
+          tx.objectStore("accountAuth").put({
+            pubKeyCommitmentHex: pubKeyHex,
+            secretKeyHex,
+          });
+          tx.oncomplete = () => {
+            db.close();
+            resolve();
+          };
+          tx.onerror = () => reject(tx.error);
+        };
+        req.onerror = () => reject(req.error);
+      });
+
+      // 2. Create passkey keystore — migration should kick in on getKey
+      const { createPasskeyKeystore } = await import("./passkey-keystore.js");
+      const keystore = await createPasskeyKeystore(storeName);
+
+      // 3. Convert hex pubKey to bytes for getKey call
+      const pubKeyBytes = new Uint8Array(32);
+      for (let i = 0; i < 32; i++) {
+        pubKeyBytes[i] = parseInt(pubKeyHex.slice(i * 2, i * 2 + 2), 16);
+      }
+
+      const retrieved = await keystore.getKey(pubKeyBytes);
+
+      // 4. Verify the returned key matches the original plaintext
+      const expectedBytes = new Uint8Array(64);
+      for (let i = 0; i < 64; i++) {
+        expectedBytes[i] = parseInt(secretKeyHex.slice(i * 2, i * 2 + 2), 16);
+      }
+
+      // 5. Check plaintext was removed from main DB
+      const plaintextGone = await new Promise<boolean>((resolve, reject) => {
+        const req = indexedDB.open(storeName);
+        req.onsuccess = () => {
+          const db = req.result;
+          const tx = db.transaction("accountAuth", "readonly");
+          const getReq = tx.objectStore("accountAuth").get(pubKeyHex);
+          getReq.onsuccess = () => {
+            db.close();
+            resolve(getReq.result == null);
+          };
+          getReq.onerror = () => reject(getReq.error);
+        };
+        req.onerror = () => reject(req.error);
+      });
+
+      // 6. Check encrypted entry exists in keystore DB
+      const encryptedExists = await new Promise<boolean>((resolve, reject) => {
+        const req = indexedDB.open(`MidenKeystore_${storeName}`);
+        req.onsuccess = () => {
+          const db = req.result;
+          const tx = db.transaction("keys", "readonly");
+          const getReq = tx.objectStore("keys").get(pubKeyHex);
+          getReq.onsuccess = () => {
+            db.close();
+            resolve(getReq.result != null);
+          };
+          getReq.onerror = () => reject(getReq.error);
+        };
+        req.onerror = () => reject(req.error);
+      });
+
+      return {
+        retrieved: retrieved ? Array.from(retrieved) : null,
+        expected: Array.from(expectedBytes),
+        plaintextGone,
+        encryptedExists,
+      };
+    }, storeName);
+
+    expect(result.retrieved).toEqual(result.expected);
+    expect(result.plaintextGone).toBe(true);
+    expect(result.encryptedExists).toBe(true);
+  });
+
+  test("migration: subsequent getKey reads from encrypted keystore, not main DB", async ({
+    page,
+    browserName,
+  }) => {
+    test.skip(browserName !== "chromium", "CDP required");
+
+    const storeName = generateStoreName("migrate-cached");
+
+    const result = await page.evaluate(async (storeName) => {
+      // Seed main DB with plaintext key
+      const pubKeyHex = "cc".repeat(32);
+      const secretKeyHex = "dd".repeat(64);
+
+      await new Promise<void>((resolve, reject) => {
+        const req = indexedDB.open(storeName, 1);
+        req.onupgradeneeded = () => {
+          const db = req.result;
+          if (!db.objectStoreNames.contains("accountAuth")) {
+            db.createObjectStore("accountAuth", {
+              keyPath: "pubKeyCommitmentHex",
+            });
+          }
+        };
+        req.onsuccess = () => {
+          const db = req.result;
+          const tx = db.transaction("accountAuth", "readwrite");
+          tx.objectStore("accountAuth").put({
+            pubKeyCommitmentHex: pubKeyHex,
+            secretKeyHex,
+          });
+          tx.oncomplete = () => {
+            db.close();
+            resolve();
+          };
+          tx.onerror = () => reject(tx.error);
+        };
+        req.onerror = () => reject(req.error);
+      });
+
+      const { createPasskeyKeystore } = await import("./passkey-keystore.js");
+      const keystore = await createPasskeyKeystore(storeName);
+
+      const pubKeyBytes = new Uint8Array(32);
+      for (let i = 0; i < 32; i++) {
+        pubKeyBytes[i] = parseInt(pubKeyHex.slice(i * 2, i * 2 + 2), 16);
+      }
+
+      // First call triggers migration
+      const first = await keystore.getKey(pubKeyBytes);
+
+      // Second call should read from encrypted keystore (plaintext is gone)
+      const second = await keystore.getKey(pubKeyBytes);
+
+      return {
+        first: first ? Array.from(first) : null,
+        second: second ? Array.from(second) : null,
+        match: first != null && second != null &&
+          Array.from(first).every((b, i) => b === Array.from(second!)[i]),
+      };
+    }, storeName);
+
+    expect(result.first).not.toBeNull();
+    expect(result.second).toEqual(result.first);
+    expect(result.match).toBe(true);
+  });
+
+  test("migration: skipped when main DB has no matching key", async ({
+    page,
+    browserName,
+  }) => {
+    test.skip(browserName !== "chromium", "CDP required");
+
+    const storeName = generateStoreName("migrate-miss");
+
+    const result = await page.evaluate(async (storeName) => {
+      // Create main DB with accountAuth table but no matching entry
+      await new Promise<void>((resolve, reject) => {
+        const req = indexedDB.open(storeName, 1);
+        req.onupgradeneeded = () => {
+          const db = req.result;
+          if (!db.objectStoreNames.contains("accountAuth")) {
+            db.createObjectStore("accountAuth", {
+              keyPath: "pubKeyCommitmentHex",
+            });
+          }
+        };
+        req.onsuccess = () => {
+          req.result.close();
+          resolve();
+        };
+        req.onerror = () => reject(req.error);
+      });
+
+      const { createPasskeyKeystore } = await import("./passkey-keystore.js");
+      const keystore = await createPasskeyKeystore(storeName);
+
+      const pubKeyBytes = new Uint8Array(32);
+      crypto.getRandomValues(pubKeyBytes);
+
+      const retrieved = await keystore.getKey(pubKeyBytes);
+      return { retrieved };
+    }, storeName);
+
+    expect(result.retrieved).toBeUndefined();
+  });
+
   test("explicit credentialId option reuses existing passkey", async ({
     page,
     browserName,
