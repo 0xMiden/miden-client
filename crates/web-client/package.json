@@ -1,6 +1,6 @@
 {
   "name": "@miden-sdk/miden-sdk",
-  "version": "0.13.1",
+  "version": "0.14.0-alpha.1",
   "description": "Miden Wasm SDK",
   "collaborators": [
     "Miden"
