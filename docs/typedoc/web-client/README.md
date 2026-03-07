@@ -42,9 +42,15 @@
 - [Asset](interfaces/Asset.md)
 - [BuildSwapTagOptions](interfaces/BuildSwapTagOptions.md)
 - [ClientOptions](interfaces/ClientOptions.md)
+- [CompileComponentOptions](interfaces/CompileComponentOptions.md)
+- [CompilerResource](interfaces/CompilerResource.md)
+- [CompileTxScriptLibrary](interfaces/CompileTxScriptLibrary.md)
+- [CompileTxScriptOptions](interfaces/CompileTxScriptOptions.md)
 - [ConsumeAllOptions](interfaces/ConsumeAllOptions.md)
 - [ConsumeAllResult](interfaces/ConsumeAllResult.md)
 - [ConsumeOptions](interfaces/ConsumeOptions.md)
+- [ContractCreateOptions](interfaces/ContractCreateOptions.md)
+- [ExecuteOptions](interfaces/ExecuteOptions.md)
 - [ExportAccountOptions](interfaces/ExportAccountOptions.md)
 - [ExportNoteOptions](interfaces/ExportNoteOptions.md)
 - [FaucetCreateOptions](interfaces/FaucetCreateOptions.md)
@@ -85,6 +91,7 @@
 - [NoteVisibility](type-aliases/NoteVisibility.md)
 - [PreviewOptions](type-aliases/PreviewOptions.md)
 - [SignCallback](type-aliases/SignCallback.md)
+- [StorageMode](type-aliases/StorageMode.md)
 - [TransactionQuery](type-aliases/TransactionQuery.md)
 - [WaitStatus](type-aliases/WaitStatus.md)
 
@@ -93,6 +100,8 @@
 - [AccountType](variables/AccountType.md)
 - [AuthScheme](variables/AuthScheme.md)
 - [MidenArrays](variables/MidenArrays.md)
+- [NoteVisibility](variables/NoteVisibility.md)
+- [StorageMode](variables/StorageMode.md)
 
 ## Functions
 

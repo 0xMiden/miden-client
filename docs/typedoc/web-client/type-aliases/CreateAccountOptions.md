@@ -6,6 +6,6 @@
 
 # Type Alias: CreateAccountOptions
 
-> **CreateAccountOptions** = [`WalletCreateOptions`](../interfaces/WalletCreateOptions.md) \| [`FaucetCreateOptions`](../interfaces/FaucetCreateOptions.md)
+> **CreateAccountOptions** = [`WalletCreateOptions`](../interfaces/WalletCreateOptions.md) \| [`FaucetCreateOptions`](../interfaces/FaucetCreateOptions.md) \| [`ContractCreateOptions`](../interfaces/ContractCreateOptions.md)
 
-Create a wallet (default) or faucet. Discriminated by `type` field.
+Create a wallet, faucet, or contract. Discriminated by `type` field.
