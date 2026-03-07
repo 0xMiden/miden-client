@@ -32,21 +32,19 @@ export class AccountsResource {
         BigInt(opts.maxSupply),
         authScheme
       );
-    }
-
-    if (
+    } else if (
       opts?.type === "ImmutableContract" ||
       opts?.type === "MutableContract"
     ) {
       return await this.#createContract(opts, wasm);
+    } else {
+      // Default: wallet (mutable or immutable based on type)
+      const mutable = resolveAccountMutability(opts?.type);
+      const storageMode = resolveStorageMode(opts?.storage ?? "private", wasm);
+      const authScheme = resolveAuthScheme(opts?.auth, wasm);
+      const seed = opts?.seed ? await hashSeed(opts.seed) : undefined;
+      return await this.#inner.newWallet(storageMode, mutable, authScheme, seed);
     }
-
-    // Default: wallet (mutable or immutable based on type)
-    const mutable = resolveAccountMutability(opts?.type);
-    const storageMode = resolveStorageMode(opts?.storage ?? "private", wasm);
-    const authScheme = resolveAuthScheme(opts?.auth, wasm);
-    const seed = opts?.seed ? await hashSeed(opts.seed) : undefined;
-    return await this.#inner.newWallet(storageMode, mutable, authScheme, seed);
   }
 
   async #createContract(opts, wasm) {
