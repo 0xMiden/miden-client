@@ -43,7 +43,12 @@ export class AccountsResource {
       const storageMode = resolveStorageMode(opts?.storage ?? "private", wasm);
       const authScheme = resolveAuthScheme(opts?.auth, wasm);
       const seed = opts?.seed ? await hashSeed(opts.seed) : undefined;
-      return await this.#inner.newWallet(storageMode, mutable, authScheme, seed);
+      return await this.#inner.newWallet(
+        storageMode,
+        mutable,
+        authScheme,
+        seed
+      );
     }
   }
 
