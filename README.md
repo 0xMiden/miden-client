@@ -52,4 +52,16 @@ To test the project's code, we provide both unit tests (which can be run with `c
 Interested in contributing? Check [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 ## License
-This project is [MIT licensed](./LICENSE).
+This project is [MIT licensed](./LICENSE). 
+  ### Common CLI Errors & Fixes
+
+This section lists frequent errors users encounter when using `miden-client-cli` and how to resolve them.
+
+- **MissingOutputRecipients** or **PublicNoteMissingDetails**  
+  **Cause**: The transaction request is missing expected output recipients.  
+  **Fix**: Add `.expected_output_recipients(vec![recipient])` to your `TransactionRequestBuilder`.  
+  Example:
+  ```rust
+  let request = TransactionRequestBuilder::new()
+      .expected_output_recipients(vec![recipient_tag])
+      .build()?;
