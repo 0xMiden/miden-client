@@ -184,6 +184,8 @@ jobs:
     needs: [build-node-builder, build-note-transport]
     steps:
       - uses: actions/checkout@v6
+        with:
+          submodules: recursive
       - name: Install Rust
         run: rustup update --no-self-update
       - uses: taiki-e/install-action@v2
@@ -205,6 +207,8 @@ jobs:
         with:
           path: ~/.cargo/bin/miden-note-transport-node-bin
           key: ${{ runner.os }}-note-transport-${{ hashFiles('Cargo.lock') }}
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
       - name: Start test node
         run: |
           RUST_LOG=none target/release/testing-node-builder &
