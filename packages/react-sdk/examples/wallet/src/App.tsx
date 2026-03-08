@@ -1,6 +1,6 @@
 import { useEffect, useState, type ChangeEvent, type ReactNode } from "react";
 import { formatAssetAmount, formatNoteSummary, parseAssetAmount } from "@miden-sdk/react";
-import { useMiden, useAccounts, useAccount, useNotes, useCreateWallet, useConsume, useSend } from "@miden-sdk/react";
+import { useMiden, useSigner, useMultiSigner, useAccounts, useAccount, useNotes, useCreateWallet, useConsume, useSend } from "@miden-sdk/react";
 
 const Panel = ({ title, children }: { title: string; children: ReactNode }) => (
   <div className="panel">
@@ -11,26 +11,126 @@ const Panel = ({ title, children }: { title: string; children: ReactNode }) => (
 
 export default function App() {
   const { isReady, error } = useMiden();
+  const signer = useSigner();
+  const multiSigner = useMultiSigner();
+  const [useLocal, setUseLocal] = useState(false);
+
+  if (error) return <div className="center">Error: {error.message}</div>;
+
+  // Show signer selector if not connected and not using local keystore
+  if (!signer?.isConnected && !useLocal) {
+    return (
+      <SignerSelector
+        multiSigner={multiSigner}
+        onUseLocal={() => setUseLocal(true)}
+      />
+    );
+  }
+
+  if (!isReady) return <div className="center">Initializing...</div>;
+
+  return (
+    <WalletApp
+      onSwitch={() => {
+        multiSigner?.disconnectSigner();
+        setUseLocal(false);
+      }}
+      signerName={signer?.name}
+    />
+  );
+}
+
+function SignerSelector({
+  multiSigner,
+  onUseLocal,
+}: {
+  multiSigner: ReturnType<typeof useMultiSigner>;
+  onUseLocal: () => void;
+}) {
+  const [connecting, setConnecting] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleConnect = async (name: string) => {
+    if (!multiSigner) return;
+    setConnecting(name);
+    setError(null);
+    try {
+      await multiSigner.connectSigner(name);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Connection failed");
+    } finally {
+      setConnecting(null);
+    }
+  };
+
+  return (
+    <div className="wallet">
+      <h1>Connect Wallet</h1>
+      <div className="form">
+        {multiSigner?.signers.map((s) => (
+          <button
+            key={s.name}
+            onClick={() => handleConnect(s.name)}
+            disabled={connecting !== null}
+          >
+            {connecting === s.name ? `Connecting ${s.name}...` : s.name}
+          </button>
+        ))}
+        <button onClick={onUseLocal} disabled={connecting !== null}>
+          Use Local Keystore
+        </button>
+      </div>
+      {error && <div className="center">Error: {error}</div>}
+    </div>
+  );
+}
+
+function WalletApp({
+  onSwitch,
+  signerName,
+}: {
+  onSwitch: () => void;
+  signerName?: string;
+}) {
   const { wallets, isLoading } = useAccounts();
   const { createWallet, isCreating } = useCreateWallet();
   const handleCreate = () => createWallet();
   const createLabel = isCreating ? "Creating..." : "Create wallet";
 
-  if (error) return <div className="center">Error: {error.message}</div>;
-  if (!isReady || isLoading) return <div className="center">{!isReady ? "Initializing..." : "Loading..."}</div>;
+  if (isLoading) return <div className="center">Loading...</div>;
 
   const accountId = wallets[0]?.id().toString();
   if (!accountId)
     return (
       <div className="wallet">
-        <h1>Wallet</h1>
+        <Header signerName={signerName} onSwitch={onSwitch} />
         <button onClick={handleCreate} disabled={isCreating}>
           {createLabel}
         </button>
       </div>
     );
 
-  return <Wallet accountId={accountId} />;
+  return (
+    <div className="wallet">
+      <Header signerName={signerName} onSwitch={onSwitch} />
+      <Wallet accountId={accountId} />
+    </div>
+  );
+}
+
+function Header({
+  signerName,
+  onSwitch,
+}: {
+  signerName?: string;
+  onSwitch: () => void;
+}) {
+  return (
+    <div className="row">
+      <h1>Wallet{signerName ? ` (${signerName})` : " (Local)"}</h1>
+      <button onClick={onSwitch}>Switch wallet</button>
+    </div>
+  );
 }
 
 function Wallet({ accountId }: { accountId: string }) {
@@ -58,7 +158,6 @@ function Wallet({ accountId }: { accountId: string }) {
       await send({ from: accountId, to, assetId, amount: amt, noteType });
       setAmount("");
     } catch (error) {
-      // Keep example lean; log errors for visibility.
       console.error(error);
     }
   };
@@ -72,8 +171,7 @@ function Wallet({ accountId }: { accountId: string }) {
   const sendLabel = isSending ? "Sending..." : "Send";
 
   return (
-    <div className="wallet">
-      <h1>Wallet</h1>
+    <>
       <Panel title="Address">
         <div className="mono">{account?.bech32id?.() ?? "Loading..."}</div>
       </Panel>
@@ -135,6 +233,6 @@ function Wallet({ accountId }: { accountId: string }) {
           </button>
         </div>
       </Panel>
-    </div>
+    </>
   );
 }

@@ -10,7 +10,10 @@
   },
   "dependencies": {
     "@miden-sdk/miden-sdk": "^0.13.0",
+    "@miden-sdk/miden-turnkey-react": "^0.13.3",
+    "@miden-sdk/para": "^0.13.3",
     "@miden-sdk/react": "^0.13.3",
+    "@miden-sdk/wallet-adapter-react": "^0.13.3",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
