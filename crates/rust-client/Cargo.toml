@@ -36,10 +36,13 @@ std = [
   "tonic/transport",
 ]
 testing = ["dep:miden-testing", "dep:uuid", "miden-protocol/testing", "miden-standards/testing", "miden-tx/testing"]
+dap = ["dep:miden-debug"]
 tonic = []
 
 [dependencies]
 # Miden dependencies
+miden-debug                = { optional = true, workspace = true }
+miden-mast-package         = { default-features = false, version = "0.20" }
 miden-protocol             = { workspace = true }
 miden-remote-prover-client = { default-features = false, features = ["tx-prover"], workspace = true }
 miden-standards            = { workspace = true }

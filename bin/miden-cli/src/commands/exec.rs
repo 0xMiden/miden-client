@@ -47,6 +47,12 @@ pub struct ExecCmd {
     /// Print the output stack grouped into words
     #[arg(long, default_value_t = false)]
     hex_words: bool,
+
+    /// Start a DAP debug adapter server on the given address (e.g. "127.0.0.1:4711")
+    /// and wait for a DAP client to connect before executing.
+    #[cfg(feature = "dap")]
+    #[arg(long = "start-debug-adapter")]
+    start_debug_adapter: Option<String>,
 }
 
 impl ExecCmd {
@@ -87,6 +93,21 @@ impl ExecCmd {
 
         let tx_script = client.code_builder().compile_tx_script(&program)?;
 
+        #[cfg(feature = "dap")]
+        let result = if let Some(ref addr) = self.start_debug_adapter {
+            miden_debug::DapConfig::set_global(miden_debug::DapConfig {
+                listen_addr: addr.clone(),
+            });
+            client
+                .execute_program_with_dap(account_id, tx_script, advice_inputs, BTreeSet::new())
+                .await
+        } else {
+            client
+                .execute_program(account_id, tx_script, advice_inputs, BTreeSet::new())
+                .await
+        };
+
+        #[cfg(not(feature = "dap"))]
         let result = client
             .execute_program(account_id, tx_script, advice_inputs, BTreeMap::new())
             .await;
