@@ -57,6 +57,9 @@ miden-remote-prover-client = { default-features = false, features = [
   "tx-prover",
 ], git = "https://github.com/0xMiden/miden-node", rev = "c2d61c0eee9f81dd6335ed51c3424a9bd5e34dd8" }
 
+# Miden debug dependency
+miden-debug = { default-features = false, features = ["dap", "std"], path = "../miden-debug" }
+
 # External dependencies
 anyhow      = { default-features = false, version = "1.0" }
 async-trait = { version = "0.1" }
@@ -81,3 +84,9 @@ module_name_repetitions     = "allow" # Many triggers, and is a stylistic choice
 must_use_candidate          = "allow" # This marks many fn's which isn't helpful.
 should_panic_without_expect = "allow" # We don't care about the specific panic message.
 # End of pedantic lints.
+
+[patch."https://github.com/0xMiden/miden-base"]
+miden-protocol = { path = "../protocol/crates/miden-protocol" }
+miden-standards = { path = "../protocol/crates/miden-standards" }
+miden-testing = { path = "../protocol/crates/miden-testing" }
+miden-tx = { path = "../protocol/crates/miden-tx" }
