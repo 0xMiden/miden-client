@@ -403,7 +403,7 @@ export async function applyTransactionDelta(dbId, accountId, nonce, updatedSlots
                 vaultRoot,
                 nonce,
                 committed,
-                accountSeed: null,
+                accountSeed: undefined,
                 accountCommitment: commitment,
                 locked: false,
             };

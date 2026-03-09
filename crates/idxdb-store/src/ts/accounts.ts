@@ -505,7 +505,7 @@ export async function applyTransactionDelta(
           vaultRoot,
           nonce,
           committed,
-          accountSeed: null,
+          accountSeed: undefined,
           accountCommitment: commitment,
           locked: false,
         };
