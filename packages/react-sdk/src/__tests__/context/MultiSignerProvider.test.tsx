@@ -51,7 +51,10 @@ function TestConsumer() {
 describe("MultiSignerProvider", () => {
   describe("SignerSlot registration", () => {
     it("registers signer from nearest SignerContext.Provider", async () => {
-      const para = createMockSignerContext({ name: "Para", storeName: "para_1" });
+      const para = createMockSignerContext({
+        name: "Para",
+        storeName: "para_1",
+      });
 
       render(
         <MultiSignerProvider>
@@ -65,7 +68,10 @@ describe("MultiSignerProvider", () => {
     });
 
     it("registers multiple distinct signers", async () => {
-      const para = createMockSignerContext({ name: "Para", storeName: "para_1" });
+      const para = createMockSignerContext({
+        name: "Para",
+        storeName: "para_1",
+      });
       const turnkey = createMockSignerContext({
         name: "Turnkey",
         storeName: "turnkey_1",
@@ -83,7 +89,10 @@ describe("MultiSignerProvider", () => {
     });
 
     it("unregisters on unmount", async () => {
-      const para = createMockSignerContext({ name: "Para", storeName: "para_1" });
+      const para = createMockSignerContext({
+        name: "Para",
+        storeName: "para_1",
+      });
       const turnkey = createMockSignerContext({
         name: "Turnkey",
         storeName: "turnkey_1",
@@ -150,7 +159,10 @@ describe("MultiSignerProvider", () => {
     });
 
     it("returns all registered signers", () => {
-      const para = createMockSignerContext({ name: "Para", storeName: "para_1" });
+      const para = createMockSignerContext({
+        name: "Para",
+        storeName: "para_1",
+      });
       const turnkey = createMockSignerContext({
         name: "Turnkey",
         storeName: "turnkey_1",
@@ -168,7 +180,10 @@ describe("MultiSignerProvider", () => {
     });
 
     it("activeSigner is null initially", () => {
-      const para = createMockSignerContext({ name: "Para", storeName: "para_1" });
+      const para = createMockSignerContext({
+        name: "Para",
+        storeName: "para_1",
+      });
 
       render(
         <MultiSignerProvider>
@@ -447,7 +462,10 @@ describe("MultiSignerProvider", () => {
     });
 
     it("useSigner() sees null when no signer is active", () => {
-      const para = createMockSignerContext({ name: "Para", storeName: "para_1" });
+      const para = createMockSignerContext({
+        name: "Para",
+        storeName: "para_1",
+      });
 
       render(
         <MultiSignerProvider>
@@ -522,7 +540,10 @@ describe("MultiSignerProvider", () => {
     it("rapid switching discards stale connect via generation counter", async () => {
       let paraResolve: () => void;
       const paraConnect = vi.fn(
-        () => new Promise<void>((resolve) => { paraResolve = resolve; })
+        () =>
+          new Promise<void>((resolve) => {
+            paraResolve = resolve;
+          })
       );
       const turnkeyConnect = vi.fn().mockResolvedValue(undefined);
 
@@ -594,7 +615,10 @@ describe("MultiSignerProvider", () => {
     });
 
     it("SignerSlot outside MultiSignerProvider does not throw", () => {
-      const para = createMockSignerContext({ name: "Para", storeName: "para_1" });
+      const para = createMockSignerContext({
+        name: "Para",
+        storeName: "para_1",
+      });
 
       // Should render without errors — registry is null, so SignerSlot no-ops
       expect(() => {
@@ -609,7 +633,10 @@ describe("MultiSignerProvider", () => {
     it("disconnectSigner invalidates in-flight connectSigner", async () => {
       let paraResolve: () => void;
       const paraConnect = vi.fn(
-        () => new Promise<void>((resolve) => { paraResolve = resolve; })
+        () =>
+          new Promise<void>((resolve) => {
+            paraResolve = resolve;
+          })
       );
 
       const para = createDisconnectedSignerContext({

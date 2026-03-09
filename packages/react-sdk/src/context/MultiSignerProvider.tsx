@@ -92,7 +92,7 @@ export function MultiSignerProvider({ children }: { children: ReactNode }) {
 
   // Active signer from snapshot (for deps that need reactive updates)
   const activeSigner = activeSignerName
-    ? signersSnapshot.find((s) => s.name === activeSignerName) ?? null
+    ? (signersSnapshot.find((s) => s.name === activeSignerName) ?? null)
     : null;
 
   // Stable function wrappers that delegate to the ref at call time.
@@ -154,51 +154,52 @@ export function MultiSignerProvider({ children }: { children: ReactNode }) {
     setActiveSignerName(name);
   }, []);
 
-  const connectSigner = useCallback(async (name: string) => {
-    const currentName = activeSignerNameRef.current;
-    const currentSigner = currentName
-      ? signersRef.current.get(currentName)
-      : null;
+  const connectSigner = useCallback(
+    async (name: string) => {
+      const currentName = activeSignerNameRef.current;
+      const currentSigner = currentName
+        ? signersRef.current.get(currentName)
+        : null;
 
-    // No-op if already connected to target
-    if (currentName === name && currentSigner?.isConnected) return;
+      // No-op if already connected to target
+      if (currentName === name && currentSigner?.isConnected) return;
 
-    // Validate before setting active — don't transiently point at an invalid name
-    const newSigner = signersRef.current.get(name);
-    if (!newSigner) throw new Error(`Signer "${name}" not found`);
+      // Validate before setting active — don't transiently point at an invalid name
+      const newSigner = signersRef.current.get(name);
+      if (!newSigner) throw new Error(`Signer "${name}" not found`);
 
-    const generation = ++generationRef.current;
+      const generation = ++generationRef.current;
 
-    // Set active name immediately so MidenProvider sees the new signer
-    setActiveName(name);
+      // Set active name immediately so MidenProvider sees the new signer
+      setActiveName(name);
 
-    // Disconnect old signer (fire-and-forget)
-    if (currentSigner?.isConnected) {
-      currentSigner.disconnect().catch((err) => {
-        console.warn("Failed to disconnect previous signer:", err);
-      });
-    }
+      // Disconnect old signer (fire-and-forget)
+      if (currentSigner?.isConnected) {
+        currentSigner.disconnect().catch((err) => {
+          console.warn("Failed to disconnect previous signer:", err);
+        });
+      }
 
-    try {
-      await newSigner.connect();
+      try {
+        await newSigner.connect();
 
-      // Stale check — another connect/disconnect call happened while we awaited
-      if (generation !== generationRef.current) return;
-    } catch (err) {
-      // Stale — don't clobber current activeSignerName
-      if (generation !== generationRef.current) return;
-      setActiveName(null);
-      throw err;
-    }
-  }, [setActiveName]);
+        // Stale check — another connect/disconnect call happened while we awaited
+        if (generation !== generationRef.current) return;
+      } catch (err) {
+        // Stale — don't clobber current activeSignerName
+        if (generation !== generationRef.current) return;
+        setActiveName(null);
+        throw err;
+      }
+    },
+    [setActiveName]
+  );
 
   const disconnectSigner = useCallback(async () => {
     ++generationRef.current; // Invalidate any in-flight connectSigner
 
     const currentName = activeSignerNameRef.current;
-    const signer = currentName
-      ? signersRef.current.get(currentName)
-      : null;
+    const signer = currentName ? signersRef.current.get(currentName) : null;
 
     // Clear active first so MidenProvider sees null → local mode
     setActiveName(null);
