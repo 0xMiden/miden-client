@@ -13,8 +13,8 @@ The TypeScript SDK is a pure TypeScript package that wraps the [WASM bridge](../
 
 ```mermaid
 flowchart LR
-    A["Rust core\n(miden-client)"] -->|"compiled to WASM"| B["WASM bridge\n(@miden-sdk/wasm-bridge)"]
-    B -->|"npm dependency"| C["TypeScript SDK\n(@miden-sdk/ts-sdk)"]
+    A["Rust core<br/>(miden-client)"] -->|"compiled to WASM"| B["WASM bridge<br/>(@miden-sdk/wasm-bridge)"]
+    B -->|"npm dependency"| C["TypeScript SDK<br/>(@miden-sdk/ts-sdk)"]
     C --> D["Your application"]
 ```
 
@@ -27,19 +27,19 @@ At runtime, the SDK splits work across two threads:
 ```mermaid
 flowchart TB
     subgraph Main["Main thread (your app)"]
-        App["Application code"] --> API["MidenClient API\n(thin proxy)"]
+        App["Application code"] --> API["MidenClient API<br/>(thin proxy)"]
     end
 
     subgraph Worker["Web Worker thread"]
-        Core["Rust client core\n(WASM)"]
-        Core --> Store["IndexedDB\nstore"]
-        Core --> RPC["gRPC-web\nRPC client"]
-        Core --> KS["IndexedDB\nkeystore"]
+        Core["Rust client core<br/>(WASM)"]
+        Core --> Store["IndexedDB<br/>store"]
+        Core --> RPC["gRPC-web<br/>RPC client"]
+        Core --> KS["IndexedDB<br/>keystore"]
     end
 
     API <-->|"postMessage"| Core
     RPC <-->|"gRPC-web"| Node["Miden node"]
-    RPC <-->|"gRPC-web"| NT["Note transport\nnetwork"]
+    RPC <-->|"gRPC-web"| NT["Note transport<br/>network"]
 ```
 
 **Why a Web Worker?** Transaction proving and MASM compilation are CPU-intensive. Running them on the main thread would freeze the UI. The Web Worker keeps your application responsive while heavy operations run in the background.
@@ -60,9 +60,9 @@ flowchart TB
     Client --> Tags["client.tags"]
     Client --> Sync["client.sync()"]
 
-    Accounts ~~~ A1["create · get · list\ngetDetails · getBalance\nimport · export\naddAddress · removeAddress"]
-    Transactions ~~~ T1["mint · send · consume\nconsumeAll · swap · execute\nsubmit · preview\nlist · waitFor"]
-    Notes ~~~ N1["get · list · listSent\nlistAvailable\nimport · export\nsendPrivate · fetchPrivate"]
+    Accounts ~~~ A1["create · get · list<br/>getDetails · getBalance<br/>import · export<br/>addAddress · removeAddress"]
+    Transactions ~~~ T1["mint · send · consume<br/>consumeAll · swap · execute<br/>submit · preview<br/>list · waitFor"]
+    Notes ~~~ N1["get · list · listSent<br/>listAvailable<br/>import · export<br/>sendPrivate · fetchPrivate"]
     Compile ~~~ C1["component · txScript"]
     Tags ~~~ TG1["add · remove · list"]
 ```
