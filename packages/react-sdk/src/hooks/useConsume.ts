@@ -7,6 +7,7 @@ import type {
   TransactionResult,
 } from "../types";
 import { parseAccountId } from "../utils/accountParsing";
+import { assertSignerConnected } from "../utils/errors";
 
 export interface UseConsumeResult {
   /** Consume one or more notes */
@@ -65,11 +66,7 @@ export function useConsume(): UseConsumeResult {
         throw new Error("Miden client is not ready");
       }
 
-      if (signerConnected === false) {
-        throw new Error(
-          "Signer is disconnected. Reconnect your wallet to perform transactions."
-        );
-      }
+      assertSignerConnected(signerConnected);
 
       if (options.noteIds.length === 0) {
         throw new Error("No note IDs provided");

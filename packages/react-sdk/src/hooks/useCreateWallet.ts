@@ -6,6 +6,7 @@ import type { Account } from "@miden-sdk/miden-sdk";
 import type { CreateWalletOptions } from "../types";
 import { DEFAULTS } from "../types";
 import { ensureAccountBech32 } from "../utils/accountBech32";
+import { assertSignerConnected } from "../utils/errors";
 
 export interface UseCreateWalletResult {
   /** Create a new wallet with optional configuration */
@@ -62,11 +63,7 @@ export function useCreateWallet(): UseCreateWalletResult {
         throw new Error("Miden client is not ready");
       }
 
-      if (signerConnected === false) {
-        throw new Error(
-          "Signer is disconnected. Reconnect your wallet to perform transactions."
-        );
-      }
+      assertSignerConnected(signerConnected);
 
       await sync();
 

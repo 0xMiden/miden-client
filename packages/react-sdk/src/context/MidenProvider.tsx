@@ -202,10 +202,7 @@ export function MidenProvider({
         // Hot-swap the signCb on the existing WebClient instance.
         // The worker reads this.signCb fresh on every callback invocation.
         // signCbRef is already kept in sync by the dedicated useEffect above.
-        const clientObj = store.client as unknown as Record<string, unknown>;
-        if ("signCb" in clientObj) {
-          clientObj.signCb = wrappedSignCb;
-        }
+        store.client.setSignCb(wrappedSignCb);
         setSignerConnected(true);
         return;
       }

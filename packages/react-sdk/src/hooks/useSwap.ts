@@ -8,6 +8,7 @@ import type {
 import { DEFAULTS } from "../types";
 import { parseAccountId } from "../utils/accountParsing";
 import { getNoteType } from "../utils/noteFilters";
+import { assertSignerConnected } from "../utils/errors";
 
 export interface UseSwapResult {
   /** Create an atomic swap offer */
@@ -69,11 +70,7 @@ export function useSwap(): UseSwapResult {
         throw new Error("Miden client is not ready");
       }
 
-      if (signerConnected === false) {
-        throw new Error(
-          "Signer is disconnected. Reconnect your wallet to perform transactions."
-        );
-      }
+      assertSignerConnected(signerConnected);
 
       setIsLoading(true);
       setStage("executing");

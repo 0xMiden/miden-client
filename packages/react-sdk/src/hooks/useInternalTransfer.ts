@@ -18,6 +18,7 @@ import type {
   TransactionStage,
 } from "../types";
 import { DEFAULTS } from "../types";
+import { assertSignerConnected } from "../utils/errors";
 import { parseAccountId } from "../utils/accountParsing";
 import { getNoteType } from "../utils/noteFilters";
 
@@ -86,11 +87,7 @@ export function useInternalTransfer(): UseInternalTransferResult {
         throw new Error("Miden client is not ready");
       }
 
-      if (signerConnected === false) {
-        throw new Error(
-          "Signer is disconnected. Reconnect your wallet to perform transactions."
-        );
-      }
+      assertSignerConnected(signerConnected);
 
       const noteType = getNoteType(options.noteType ?? DEFAULTS.NOTE_TYPE);
       const senderId = parseAccountId(options.from);

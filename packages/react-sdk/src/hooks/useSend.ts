@@ -17,7 +17,7 @@ import type {
 import { DEFAULTS } from "../types";
 import { parseAccountId, parseAddress } from "../utils/accountParsing";
 import { createNoteAttachment } from "../utils/noteAttachment";
-import { MidenError } from "../utils/errors";
+import { MidenError, assertSignerConnected } from "../utils/errors";
 import { getNoteType, waitForTransactionCommit } from "../utils/noteFilters";
 import type { ClientWithTransactions } from "../utils/noteFilters";
 
@@ -81,11 +81,7 @@ export function useSend(): UseSendResult {
         throw new Error("Miden client is not ready");
       }
 
-      if (signerConnected === false) {
-        throw new Error(
-          "Signer is disconnected. Reconnect your wallet to perform transactions."
-        );
-      }
+      assertSignerConnected(signerConnected);
 
       if (isBusyRef.current) {
         throw new MidenError(

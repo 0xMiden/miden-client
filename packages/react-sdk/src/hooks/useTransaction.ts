@@ -11,7 +11,7 @@ import type {
   ExecuteTransactionOptions,
 } from "../types";
 import { parseAccountId } from "../utils/accountParsing";
-import { MidenError } from "../utils/errors";
+import { MidenError, assertSignerConnected } from "../utils/errors";
 
 export interface UseTransactionResult {
   /** Execute a transaction request end-to-end */
@@ -79,11 +79,7 @@ export function useTransaction(): UseTransactionResult {
         throw new Error("Miden client is not ready");
       }
 
-      if (signerConnected === false) {
-        throw new Error(
-          "Signer is disconnected. Reconnect your wallet to perform transactions."
-        );
-      }
+      assertSignerConnected(signerConnected);
 
       if (isBusyRef.current) {
         throw new MidenError(

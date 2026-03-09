@@ -12,6 +12,7 @@ import type { ImportAccountOptions } from "../types";
 import { DEFAULTS } from "../types";
 import { parseAccountId } from "../utils/accountParsing";
 import { ensureAccountBech32 } from "../utils/accountBech32";
+import { assertSignerConnected } from "../utils/errors";
 
 export interface UseImportAccountResult {
   /** Import an existing account into the client */
@@ -69,11 +70,7 @@ export function useImportAccount(): UseImportAccountResult {
         throw new Error("Miden client is not ready");
       }
 
-      if (signerConnected === false) {
-        throw new Error(
-          "Signer is disconnected. Reconnect your wallet to perform transactions."
-        );
-      }
+      assertSignerConnected(signerConnected);
 
       setIsImporting(true);
       setError(null);

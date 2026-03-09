@@ -52,6 +52,7 @@ vi.mock("@miden-sdk/miden-sdk", () => {
     signCb: null as
       | ((pubKey: Uint8Array, signingInputs: Uint8Array) => Promise<Uint8Array>)
       | null,
+    setSignCb: vi.fn(),
     free: vi.fn(),
   };
 

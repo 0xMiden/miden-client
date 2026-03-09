@@ -5,6 +5,7 @@ import { AccountStorageMode } from "@miden-sdk/miden-sdk";
 import type { Account } from "@miden-sdk/miden-sdk";
 import type { CreateFaucetOptions } from "../types";
 import { DEFAULTS } from "../types";
+import { assertSignerConnected } from "../utils/errors";
 
 export interface UseCreateFaucetResult {
   /** Create a new faucet with the specified options */
@@ -62,11 +63,7 @@ export function useCreateFaucet(): UseCreateFaucetResult {
         throw new Error("Miden client is not ready");
       }
 
-      if (signerConnected === false) {
-        throw new Error(
-          "Signer is disconnected. Reconnect your wallet to perform transactions."
-        );
-      }
+      assertSignerConnected(signerConnected);
 
       setIsCreating(true);
       setError(null);
