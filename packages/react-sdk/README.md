@@ -1245,7 +1245,7 @@ import { MidenFiSignerProvider } from '@miden-sdk/wallet-adapter-react';
 
 function App() {
   return (
-    <MidenFiSignerProvider network="Testnet">
+    <MidenFiSignerProvider network="testnet">
       <MidenProvider config={{ rpcUrl: 'testnet' }}>
         <YourApp />
       </MidenProvider>
@@ -1271,6 +1271,75 @@ function ConnectButton() {
     : <button onClick={connect}>Connect with {name}</button>;
 }
 ```
+
+### Multi-Signer Setup
+
+For apps that support multiple signer providers (e.g. Para + Turnkey + MidenFi), use `MultiSignerProvider` and `SignerSlot` to let users choose which signer to connect:
+
+```tsx
+import {
+  MidenProvider,
+  MultiSignerProvider,
+  SignerSlot,
+  useMultiSigner,
+} from '@miden-sdk/react';
+import { ParaSignerProvider } from '@miden-sdk/use-miden-para-react';
+import { TurnkeySignerProvider } from '@miden-sdk/miden-turnkey-react';
+import { MidenFiSignerProvider } from '@miden-sdk/miden-wallet-adapter-react';
+
+function App() {
+  return (
+    <MultiSignerProvider>
+      <ParaSignerProvider apiKey="your-api-key" environment="BETA">
+        <SignerSlot />
+      </ParaSignerProvider>
+      <TurnkeySignerProvider>
+        <SignerSlot />
+      </TurnkeySignerProvider>
+      <MidenFiSignerProvider network="testnet">
+        <SignerSlot />
+      </MidenFiSignerProvider>
+      <MidenProvider config={{ rpcUrl: 'testnet', prover: 'testnet' }}>
+        <YourApp />
+      </MidenProvider>
+    </MultiSignerProvider>
+  );
+}
+```
+
+Each `SignerSlot` captures its nearest ancestor signer provider's context and registers it with `MultiSignerProvider`. The `MidenProvider` sees whichever signer is currently active (or `null` for local keystore mode).
+
+Use `useMultiSigner()` to list available signers and switch between them:
+
+```tsx
+function SignerSelector() {
+  const multiSigner = useMultiSigner();
+
+  return (
+    <div>
+      {multiSigner?.signers.map((s) => (
+        <button key={s.name} onClick={() => multiSigner.connectSigner(s.name)}>
+          {s.name}
+        </button>
+      ))}
+      <button onClick={() => multiSigner?.disconnectSigner()}>
+        Use Local Keystore
+      </button>
+    </div>
+  );
+}
+```
+
+The `useMultiSigner()` hook returns:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `signers` | `SignerContextValue[]` | All registered signer providers |
+| `activeSigner` | `SignerContextValue \| null` | Currently active signer |
+| `connectSigner(name)` | `(name: string) => Promise<void>` | Switch to a signer by name |
+| `disconnectSigner()` | `() => Promise<void>` | Disconnect active signer (falls back to local keystore) |
+
+> **Note:** `MultiSignerProvider` is optional. Single-signer apps can continue using a signer provider directly above `MidenProvider` as shown in the individual provider examples above.
 
 ### Custom Account Components
 
