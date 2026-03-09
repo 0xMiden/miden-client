@@ -176,51 +176,36 @@ impl StateSync {
 
         let public_note_records = self.fetch_public_note_details(&public_note_ids).await?;
 
+        // Collect account commitment updates across all sync steps. Each account only needs
+        // to be checked once since GetAccount always returns the latest state.
+        let merged_commitment_updates: Vec<(AccountId, Word)> = state_sync_steps
+            .iter()
+            .flat_map(|s| s.account_commitment_updates.iter())
+            .map(|(id, w)| (*id, *w))
+            .collect::<BTreeMap<_, _>>()
+            .into_iter()
+            .collect();
+
+        self.account_state_sync(
+            &mut state_sync_update.account_updates,
+            &accounts,
+            &merged_commitment_updates,
+        )
+        .await?;
+
         // Apply local changes. These involve updating the MMR and applying state transitions
         // to notes based on the received information.
         info!("Applying state transitions locally.");
-
-        let mut fetched_public_account_ids: BTreeSet<AccountId> = BTreeSet::new();
 
         for sync_step in state_sync_steps {
             let StateSyncInfo {
                 chain_tip,
                 block_header,
                 mmr_delta,
-                account_commitment_updates,
                 note_inclusions,
                 transactions,
+                ..
             } = sync_step;
-
-            // Filter out public accounts already fetched in a previous step.
-            // Since /GetAccount always returns the latest state, re-fetching is redundant.
-            // This is safe because an account ID is always exclusively public or private
-            // (determined by `AccountId::is_private()`), so private accounts are never
-            // added to `fetched_public_account_ids` and their mismatch detection is
-            // unaffected by this filter.
-            let filtered_commitment_updates: Vec<_> = account_commitment_updates
-                .into_iter()
-                .filter(|(id, _)| !fetched_public_account_ids.contains(id))
-                .collect();
-
-            // Track the current count so we can detect newly appended entries below.
-            // This relies on `AccountUpdates::extend` appending via `Vec::extend`.
-            let prev_public_count =
-                state_sync_update.account_updates.updated_public_accounts().len();
-
-            self.account_state_sync(
-                &mut state_sync_update.account_updates,
-                &accounts,
-                &filtered_commitment_updates,
-            )
-            .await?;
-
-            // Record newly fetched public accounts so they're skipped in future steps
-            for account in
-                &state_sync_update.account_updates.updated_public_accounts()[prev_public_count..]
-            {
-                fetched_public_account_ids.insert(account.id());
-            }
 
             self.transaction_state_sync(
                 &mut state_sync_update.transaction_updates,
