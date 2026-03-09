@@ -487,9 +487,9 @@ export declare class MidenClient {
   terminate(): void;
 
   /** Exports the client store as a versioned snapshot. */
-  exportStore(): Promise<StoreSnapshot>;
+  exportStore(storeName: string): Promise<StoreSnapshot>;
   /** Imports a previously exported store snapshot. */
-  importStore(snapshot: StoreSnapshot): Promise<void>;
+  importStore(storeName: string, snapshot: StoreSnapshot): Promise<void>;
 
   /** Advances the mock chain by one block. Only available on mock clients. */
   proveBlock(): void;

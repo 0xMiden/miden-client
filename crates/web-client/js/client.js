@@ -22,13 +22,11 @@ export class MidenClient {
   #terminated = false;
   #defaultProver = null;
   #isMock = false;
-  #storeName = null;
 
-  constructor(inner, getWasm, defaultProver, storeName) {
+  constructor(inner, getWasm, defaultProver) {
     this.#inner = inner;
     this.#getWasm = getWasm;
     this.#defaultProver = defaultProver ?? null;
-    this.#storeName = storeName ?? null;
 
     this.accounts = new AccountsResource(inner, getWasm, this);
     this.transactions = new TransactionsResource(inner, getWasm, this);
@@ -84,12 +82,7 @@ export class MidenClient {
       );
     }
 
-    const client = new MidenClient(
-      inner,
-      getWasm,
-      defaultProver,
-      options?.storeName
-    );
+    const client = new MidenClient(inner, getWasm, defaultProver);
 
     if (options?.autoSync) {
       await client.sync();
@@ -136,7 +129,7 @@ export class MidenClient {
       seed
     );
 
-    const client = new MidenClient(inner, getWasm, null, "mock_client_db");
+    const client = new MidenClient(inner, getWasm, null);
     client.#isMock = true;
     return client;
   }
@@ -187,39 +180,31 @@ export class MidenClient {
   /**
    * Exports the client store as a versioned snapshot.
    *
+   * @param {string} storeName - The IndexedDB store name to export.
    * @returns {Promise<StoreSnapshot>} The store snapshot.
    */
-  async exportStore() {
+  async exportStore(storeName) {
     this.assertNotTerminated();
-    if (!this.#storeName) {
-      throw new Error(
-        "Cannot export store without a store name."
-      );
-    }
     const wasm = await this.#getWasm();
-    const data = await wasm.exportStore(this.#storeName);
+    const data = await wasm.exportStore(storeName);
     return { version: 1, data };
   }
 
   /**
    * Imports a previously exported store snapshot.
    *
+   * @param {string} storeName - The IndexedDB store name to import into.
    * @param {StoreSnapshot} snapshot - The store snapshot to import.
    */
-  async importStore(snapshot) {
+  async importStore(storeName, snapshot) {
     this.assertNotTerminated();
-    if (!this.#storeName) {
-      throw new Error(
-        "Cannot import store without a store name."
-      );
-    }
     if (!snapshot || snapshot.version !== 1) {
       throw new Error(
         `Unsupported store snapshot version: ${snapshot?.version}. Expected version 1.`
       );
     }
     const wasm = await this.#getWasm();
-    await wasm.importStore(this.#storeName, snapshot.data);
+    await wasm.importStore(storeName, snapshot.data);
   }
 
   // ── Mock-only methods ──

@@ -305,11 +305,11 @@ test.describe("MidenClient API - Mock Chain", () => {
       const walletId = wallet.id().toString();
 
       // Export the store
-      const snapshot = await client.exportStore();
+      const snapshot = await client.exportStore("mock_client_db");
 
       // Create a new mock client and import the store
       const client2 = await window.MidenClient.createMock();
-      await client2.importStore(snapshot);
+      await client2.importStore("mock_client_db", snapshot);
 
       // Check the account exists in the new client
       const accounts = await client2.accounts.list();
@@ -663,7 +663,7 @@ test.describe("MidenClient API - Mock Chain", () => {
       const client = await window.MidenClient.createMock();
 
       try {
-        await client.importStore({ version: 99, data: {} });
+        await client.importStore("mock_client_db", { version: 99, data: {} });
         return { threw: false };
       } catch (e) {
         return { threw: true, message: e.message };
