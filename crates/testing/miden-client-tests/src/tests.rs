@@ -583,13 +583,8 @@ async fn sync_state_no_redundant_get_account_calls() {
     // Create an AccountHeader with stale state (nonce 0, dummy commitments).
     // This ensures every sync step's reported commitment differs from our local header,
     // which would trigger a fetch in every step without the fix.
-    let account_header = AccountHeader::new(
-        account_id,
-        Felt::new(0),
-        EMPTY_WORD,
-        EMPTY_WORD,
-        EMPTY_WORD,
-    );
+    let account_header =
+        AccountHeader::new(account_id, Felt::new(0), EMPTY_WORD, EMPTY_WORD, EMPTY_WORD);
 
     // Build a PartialMmr starting from genesis
     let genesis = rpc_api.get_block_header_by_number(Some(0.into()), false).await.unwrap().0;

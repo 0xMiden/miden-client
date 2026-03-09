@@ -216,8 +216,8 @@ impl StateSync {
             .await?;
 
             // Record newly fetched public accounts so they're skipped in future steps
-            for account in &state_sync_update.account_updates.updated_public_accounts()
-                [prev_public_count..]
+            for account in
+                &state_sync_update.account_updates.updated_public_accounts()[prev_public_count..]
             {
                 fetched_public_account_ids.insert(account.id());
             }
