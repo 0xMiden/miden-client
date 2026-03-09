@@ -201,7 +201,7 @@ impl WebClient {
             keystore
                 .add_key(&native_secret_key, account_id)
                 .await
-                .map_err(|err| err.to_string())?;
+                .map_err(|err| js_error_with_context(err, "failed to add secret key"))?;
 
             Ok(())
         } else {
