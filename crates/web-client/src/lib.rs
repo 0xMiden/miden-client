@@ -109,7 +109,7 @@ impl WebClient {
         }
     }
 
-    /// Returns the name of the underlying store (e.g. the IndexedDB database name).
+    /// Returns the name of the underlying store (e.g. the `IndexedDB` database name).
     #[wasm_bindgen(js_name = "storeName")]
     pub fn store_name(&self) -> Result<String, JsValue> {
         self.store_name
