@@ -57,7 +57,6 @@
 //! For more details on the API and error handling, see the documentation for the specific functions
 //! and types in this module.
 
-use alloc::string::ToString;
 use alloc::vec::Vec;
 
 use miden_protocol::account::AccountId;
@@ -82,7 +81,6 @@ pub use miden_protocol::note::{
     NoteAttachmentKind,
     NoteAttachmentScheme,
     NoteDetails,
-    NoteExecutionHint,
     NoteFile,
     NoteHeader,
     NoteId,
@@ -98,14 +96,14 @@ pub use miden_protocol::note::{
     PartialNote,
 };
 pub use miden_protocol::transaction::ToInputNoteCommitments;
-pub use miden_standards::note::utils::{build_p2id_recipient, build_swap_tag};
 pub use miden_standards::note::{
     NetworkAccountTarget,
     NoteConsumptionStatus,
+    NoteExecutionHint,
+    P2idNote,
+    P2idNoteStorage,
     StandardNote,
-    create_p2id_note,
-    create_p2ide_note,
-    create_swap_note,
+    SwapNote,
 };
 pub use miden_tx::{FailedNote, NoteConsumptionInfo};
 pub use note_screener::{NoteConsumability, NoteScreener, NoteScreenerError};
@@ -187,10 +185,7 @@ where
         &self,
         note: InputNoteRecord,
     ) -> Result<Vec<NoteConsumability>, ClientError> {
-        self.note_screener()
-            .can_consume(&note.clone().try_into()?)
-            .await
-            .map_err(Into::into)
+        self.note_screener().can_consume(&note.try_into()?).await.map_err(Into::into)
     }
 
     /// Retrieves the input note given a [`NoteId`]. Returns `None` if the note is not found.
@@ -241,16 +236,14 @@ where
         .await
         .map_err(|err| {
             tracing::error!("Error when fetching all notes from the store: {err}");
-            IdPrefixFetchError::NoMatch(format!("note ID prefix {note_id_prefix}").to_string())
+            IdPrefixFetchError::NoMatch(format!("note ID prefix {note_id_prefix}"))
         })?
         .into_iter()
         .filter(|note_record| note_record.id().to_hex().starts_with(note_id_prefix))
         .collect::<Vec<_>>();
 
     if input_note_records.is_empty() {
-        return Err(IdPrefixFetchError::NoMatch(
-            format!("note ID prefix {note_id_prefix}").to_string(),
-        ));
+        return Err(IdPrefixFetchError::NoMatch(format!("note ID prefix {note_id_prefix}")));
     }
     if input_note_records.len() > 1 {
         let input_note_record_ids =
@@ -260,9 +253,9 @@ where
             note_id_prefix,
             input_note_record_ids
         );
-        return Err(IdPrefixFetchError::MultipleMatches(
-            format!("note ID prefix {note_id_prefix}").to_string(),
-        ));
+        return Err(IdPrefixFetchError::MultipleMatches(format!(
+            "note ID prefix {note_id_prefix}"
+        )));
     }
 
     Ok(input_note_records

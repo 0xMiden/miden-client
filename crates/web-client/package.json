@@ -1,6 +1,6 @@
 {
   "name": "@miden-sdk/miden-sdk",
-  "version": "0.13.0",
+  "version": "0.13.1",
   "description": "Miden Wasm SDK",
   "collaborators": [
     "Miden"
@@ -27,7 +27,8 @@
     "test:remote_prover": "yarn install && yarn playwright install --with-deps && cross-env MIDEN_WEB_DEV=true yarn run build && cross-env REMOTE_PROVER=true yarn playwright test -g 'with remote prover' ",
     "test:remote_prover:devnet": "cross-env TEST_MIDEN_NETWORK=devnet yarn run test:remote_prover",
     "test:remote_prover:testnet": "cross-env TEST_MIDEN_NETWORK=testnet yarn run test:remote_prover",
-    "test:clean": "yarn install && yarn playwright install --with-deps && MIDEN_WEB_DEV=true yarn run build && yarn playwright test "
+    "test:clean": "yarn install && yarn playwright install --with-deps && MIDEN_WEB_DEV=true yarn run build && yarn playwright test ",
+    "typedoc": "typedoc"
   },
   "devDependencies": {
     "@playwright/test": "^1.55.0",
@@ -43,7 +44,7 @@
     "mocha": "^10.7.3",
     "puppeteer": "^23.1.0",
     "rimraf": "^6.0.1",
-    "rollup": "^3.27.2",
+    "rollup": "^4.59.0",
     "rollup-plugin-copy": "^3.5.0",
     "ts-node": "^10.9.2",
     "typedoc": "^0.28.1",
@@ -54,5 +55,12 @@
     "@rollup/plugin-typescript": "^12.3.0",
     "dexie": "^4.0.1",
     "glob": "^11.0.0"
+  },
+  "resolutions": {
+    "rollup": ">=4.59.0",
+    "basic-ftp": ">=5.2.0",
+    "tar": ">=7.5.8",
+    "qs": ">=6.14.1",
+    "minimatch": ">=10.2.1"
   }
 }

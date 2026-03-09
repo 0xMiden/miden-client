@@ -33,6 +33,7 @@ use miden_protocol::account::{
     AccountHeader,
     AccountId,
     AccountStorage,
+    StorageMapKey,
     StorageMapWitness,
     StorageSlot,
     StorageSlotContent,
@@ -62,6 +63,9 @@ pub(crate) mod data_store;
 
 mod errors;
 pub use errors::*;
+
+mod smt_forest;
+pub use smt_forest::AccountSmtForest;
 
 mod account;
 pub use account::{AccountRecord, AccountRecordData, AccountStatus, AccountUpdates};
@@ -539,7 +543,7 @@ pub trait Store: Send + Sync {
         &self,
         account_id: AccountId,
         slot_name: StorageSlotName,
-        key: Word,
+        key: StorageMapKey,
     ) -> Result<(Word, StorageMapWitness), StoreError> {
         let storage = self
             .get_account_storage(account_id, AccountStorageFilter::SlotName(slot_name.clone()))
@@ -567,6 +571,18 @@ pub trait Store: Send + Sync {
         &self,
         account_id: AccountId,
     ) -> Result<Option<AccountRecord>, StoreError>;
+}
+
+/// Extension trait for [`Store`] implementations that support export/import of the full store
+/// contents as a serialized string. This is primarily used by web-based stores (e.g. `IndexedDB`).
+#[cfg(target_arch = "wasm32")]
+#[async_trait::async_trait(?Send)]
+pub trait WebStore: Store {
+    /// Exports the entire store contents as a serialized string.
+    async fn export_store(&self) -> Result<String, StoreError>;
+
+    /// Imports store contents from a serialized string, replacing all existing data.
+    async fn import_store(&self, data: String) -> Result<(), StoreError>;
 }
 
 // PARTIAL BLOCKCHAIN NODE FILTER

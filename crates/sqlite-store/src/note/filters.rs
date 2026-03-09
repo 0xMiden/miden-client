@@ -72,8 +72,10 @@ pub(super) fn note_filter_output_notes_condition(filter: &NoteFilter) -> (String
         },
         NoteFilter::Unspent => {
             format!(
-                "state_discriminant in ({}, {})",
+                "state_discriminant in ({}, {}, {}, {})",
+                OutputNoteState::STATE_EXPECTED_PARTIAL,
                 OutputNoteState::STATE_EXPECTED_FULL,
+                OutputNoteState::STATE_COMMITTED_PARTIAL,
                 OutputNoteState::STATE_COMMITTED_FULL,
             )
         },

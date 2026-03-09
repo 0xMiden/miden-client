@@ -11,6 +11,7 @@ use miden_protocol::account::{
     AccountId,
     AccountStorageHeader,
     StorageMap,
+    StorageMapKey,
     StorageMapWitness,
     StorageSlotHeader,
     StorageSlotName,
@@ -399,7 +400,7 @@ impl TryFrom<proto::rpc::account_storage_details::AccountStorageMapDetails>
                             .proof
                             .ok_or(RpcError::ExpectedDataMissing("proof".into()))?
                             .try_into()?;
-                        StorageMapWitness::new(proof, [key])
+                        StorageMapWitness::new(proof, [StorageMapKey::new(key)])
                             .map_err(|e| RpcError::InvalidResponse(e.to_string()))
                     })
                     .collect::<Result<Vec<StorageMapWitness>, RpcError>>()?;
@@ -418,7 +419,7 @@ impl TryFrom<proto::rpc::account_storage_details::AccountStorageMapDetails>
 /// A storage map entry containing a key-value pair.
 #[derive(Clone, Debug)]
 pub struct StorageMapEntry {
-    pub key: Word,
+    pub key: StorageMapKey,
     pub value: Word,
 }
 
@@ -428,7 +429,8 @@ impl TryFrom<proto::rpc::account_storage_details::account_storage_map_details::a
     type Error = RpcError;
 
     fn try_from(value: proto::rpc::account_storage_details::account_storage_map_details::all_map_entries::StorageMapEntry) -> Result<Self, Self::Error> {
-        let key = value.key.ok_or(RpcError::ExpectedDataMissing("key".into()))?.try_into()?;
+        let key: StorageMapKey =
+            value.key.ok_or(RpcError::ExpectedDataMissing("key".into()))?.try_into()?;
         let value = value.value.ok_or(RpcError::ExpectedDataMissing("value".into()))?.try_into()?;
         Ok(Self { key, value })
     }
@@ -525,7 +527,7 @@ impl AccountProof {
             ..
         }) = &account_details
         {
-            if account_header.commitment() != account_witness.state_commitment() {
+            if account_header.to_commitment() != account_witness.state_commitment() {
                 return Err(AccountProofError::InconsistentAccountCommitment);
             }
             if account_header.id() != account_witness.id() {
@@ -638,8 +640,6 @@ impl TryFrom<proto::account::AccountWitness> for AccountWitness {
 // ACCOUNT STORAGE REQUEST
 // ================================================================================================
 
-pub type StorageMapKey = Word;
-
 /// Describes storage slots indices to be requested, as well as a list of keys for each of those
 /// slots.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -671,8 +671,7 @@ impl From<AccountStorageRequirements> for Vec<account_detail_request::StorageMap
     fn from(
         value: AccountStorageRequirements,
     ) -> Vec<account_detail_request::StorageMapDetailRequest> {
-        use account_detail_request;
-        use account_detail_request::storage_map_detail_request;
+        use account_detail_request::{self, storage_map_detail_request};
         let request_map = value.0;
         let mut requests = Vec::with_capacity(request_map.len());
         for (slot_name, _map_keys) in request_map {

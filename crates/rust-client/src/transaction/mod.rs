@@ -541,14 +541,15 @@ where
         for note in output_notes {
             if output_note_relevances.contains_key(&note.id()) {
                 let metadata = note.metadata().clone();
+                let tag = metadata.tag();
 
                 new_input_notes.push(InputNoteRecord::new(
                     note.into(),
                     current_timestamp,
                     ExpectedNoteState {
-                        metadata: Some(metadata.clone()),
+                        metadata: Some(metadata),
                         after_block_num: submission_height,
-                        tag: Some(metadata.tag()),
+                        tag: Some(tag),
                     }
                     .into(),
                 ));
@@ -747,6 +748,7 @@ where
 
         for foreign_account in foreign_accounts {
             let account_id = foreign_account.account_id();
+            let storage_requirements = foreign_account.storage_slot_requirements();
             let known_account_code = self
                 .store
                 .get_foreign_account_code(vec![account_id])
@@ -757,7 +759,8 @@ where
             let (_, account_proof) = self
                 .rpc_api
                 .get_account_proof(
-                    foreign_account.clone(),
+                    account_id,
+                    storage_requirements,
                     AccountStateAt::Block(block_num),
                     known_account_code,
                 )
@@ -780,7 +783,7 @@ where
                 ForeignAccount::Private(partial_account) => {
                     let (witness, _) = account_proof.into_parts();
 
-                    AccountInputs::new(partial_account.clone(), witness)
+                    AccountInputs::new(partial_account, witness)
                 },
             };
 
@@ -897,17 +900,10 @@ fn validate_basic_account_request(
 /// - Checking the relevance of notes to save them as input notes.
 /// - Validate hashes versus expected output notes after a transaction is executed.
 pub fn notes_from_output(output_notes: &OutputNotes) -> impl Iterator<Item = &Note> {
-    output_notes
-        .iter()
-        .filter(|n| matches!(n, OutputNote::Full(_)))
-        .map(|n| match n {
-            OutputNote::Full(n) => n,
-            // The following todo!() applies until we have a way to support flows where we have
-            // partial details of the note
-            OutputNote::Header(_) | OutputNote::Partial(_) => {
-                todo!("For now, all details should be held in OutputNote::Fulls")
-            },
-        })
+    output_notes.iter().filter_map(|n| match n {
+        OutputNote::Full(n) => Some(n),
+        OutputNote::Header(_) | OutputNote::Partial(_) => None,
+    })
 }
 
 /// Validates that the executed transaction's output recipients match what was expected in the

@@ -47,7 +47,7 @@ pub type CliKeyStore = FilesystemKeyStore;
 ///
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 /// // Create a CLI-configured client
-/// let mut client = CliClient::from_system_user_config(DebugMode::Disabled).await?;
+/// let mut client = CliClient::new(DebugMode::Disabled).await?;
 ///
 /// // All Client methods work automatically via Deref
 /// client.sync_state().await?;
@@ -87,7 +87,7 @@ impl CliClient {
     ///
     /// For standard client initialization that matches CLI behavior, use:
     /// ```ignore
-    /// CliClient::from_system_user_config(debug_mode).await?
+    /// CliClient::new(debug_mode).await?
     /// ```
     ///
     /// This method **does not** follow the CLI's configuration priority logic (local → global).
@@ -123,7 +123,7 @@ impl CliClient {
     /// let client = CliClient::from_config(config, DebugMode::Disabled).await?;
     ///
     /// // Prefer this for standard CLI-like behavior:
-    /// let client = CliClient::from_system_user_config(DebugMode::Disabled).await?;
+    /// let client = CliClient::new(DebugMode::Disabled).await?;
     /// # Ok(())
     /// # }
     /// ```
@@ -164,12 +164,18 @@ impl CliClient {
 
     /// Creates a new `CliClient` instance configured using the system user configuration.
     ///
+    /// # ✅ Recommended Constructor
+    ///
+    /// **This is the recommended way to create a `CliClient` instance.**
+    ///
     /// This method implements the configuration logic used by the CLI tool, allowing external
     /// projects to create a Client instance with the same configuration. It searches for
     /// configuration files in the following order:
     ///
     /// 1. Local `.miden/miden-client.toml` in the current working directory
     /// 2. Global `.miden/miden-client.toml` in the home directory
+    ///
+    /// If no configuration file is found, it silently initializes a default configuration.
     ///
     /// The client is initialized with:
     /// - `SQLite` store from the configured path
@@ -204,10 +210,10 @@ impl CliClient {
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// // Create a client with default settings (debug disabled)
-    /// let mut client = CliClient::from_system_user_config(DebugMode::Disabled).await?;
+    /// let mut client = CliClient::new(DebugMode::Disabled).await?;
     ///
     /// // Or with debug mode enabled
-    /// let mut client = CliClient::from_system_user_config(DebugMode::Enabled).await?;
+    /// let mut client = CliClient::new(DebugMode::Enabled).await?;
     ///
     /// // Use it like a regular Client
     /// client.sync_state().await?;
@@ -221,9 +227,7 @@ impl CliClient {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn from_system_user_config(
-        debug_mode: miden_client::DebugMode,
-    ) -> Result<Self, CliError> {
+    pub async fn new(debug_mode: miden_client::DebugMode) -> Result<Self, CliError> {
         // Check if client is not yet initialized => silently initialize the client
         if !config_file_exists()? {
             let init_cmd = InitCmd::default();
@@ -231,7 +235,7 @@ impl CliClient {
         }
 
         // Load configuration from system
-        let config = CliConfig::from_system()?;
+        let config = CliConfig::load()?;
 
         // Create client using the loaded configuration
         Self::from_config(config, debug_mode).await
@@ -247,7 +251,7 @@ impl CliClient {
     /// use miden_client_cli::{CliClient, DebugMode};
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-    /// let cli_client = CliClient::from_system_user_config(DebugMode::Disabled).await?;
+    /// let cli_client = CliClient::new(DebugMode::Disabled).await?;
     /// let inner_client = cli_client.into_inner();
     /// # Ok(())
     /// # }
@@ -431,7 +435,7 @@ impl Cli {
         };
 
         // Load configuration
-        let cli_config = CliConfig::from_system()?;
+        let cli_config = CliConfig::load()?;
 
         // Create keystore for commands that need it
         let keystore = CliKeyStore::new(cli_config.secret_keys_directory.clone())

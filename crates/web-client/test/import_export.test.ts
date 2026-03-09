@@ -38,7 +38,7 @@ const getAccount = async (accountId: string, page: Page) => {
     const account = await client.getAccount(accountId);
     return {
       accountId: account?.id().toString(),
-      accountCommitment: account?.commitment().toHex(),
+      accountCommitment: account?.to_commitment().toHex(),
     };
   }, accountId);
 };
@@ -86,7 +86,7 @@ test.describe("export and import account", () => {
 
     const mutable = false;
     const storageMode = StorageMode.PRIVATE;
-    const authSchemeId = 0;
+    const authSchemeId = 2;
 
     const initialWallet = await createNewWallet(page, {
       storageMode,
@@ -137,7 +137,11 @@ test.describe("export and import note", () => {
   ) => {
     return await testingPage.evaluate(
       async ({ noteId, exportType }) => {
-        const noteFile = await window.client.exportNoteFile(noteId, exportType);
+        const format =
+          window.NoteExportFormat[
+            exportType as keyof typeof window.NoteExportFormat
+          ];
+        const noteFile = await window.client.exportNoteFile(noteId, format);
         return noteFile.noteType();
       },
       { noteId, exportType }
@@ -151,7 +155,11 @@ test.describe("export and import note", () => {
   ) => {
     return await testingPage.evaluate(
       async ({ noteId, exportType }) => {
-        const noteFile = await window.client.exportNoteFile(noteId, exportType);
+        const format =
+          window.NoteExportFormat[
+            exportType as keyof typeof window.NoteExportFormat
+          ];
+        const noteFile = await window.client.exportNoteFile(noteId, format);
         return noteFile.serialize();
       },
       { noteId, exportType }
@@ -241,12 +249,12 @@ test.describe("export and import note", () => {
           const account1 = await client.newWallet(
             window.AccountStorageMode.private(),
             true,
-            0
+            window.AuthScheme.AuthRpoFalcon512
           );
           const account2 = await client.newWallet(
             window.AccountStorageMode.private(),
             true,
-            0
+            window.AuthScheme.AuthRpoFalcon512
           );
 
           const p2IdNote = window.Note.createP2IDNote(

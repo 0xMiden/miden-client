@@ -127,11 +127,11 @@ Will turn the Account ID into its bech32 string representation.
 
 ##### network\_id
 
-[`NetworkId`](NetworkId.md)
+`NetworkId`
 
 ##### account\_interface
 
-[`BasicWallet`](../enumerations/AccountInterface.md#basicwallet)
+`AccountInterface`
 
 #### Returns
 
@@ -174,6 +174,8 @@ Given a bech32 encoded string, return the matching Account ID for it.
 > `static` **fromHex**(`hex`): `AccountId`
 
 Builds an account ID from its hex string representation.
+
+Returns an error if the provided string is not a valid hex-encoded account ID.
 
 #### Parameters
 

@@ -2,7 +2,7 @@ use std::sync::{Arc, LazyLock};
 use std::vec;
 
 use anyhow::{Context, Result, anyhow};
-use miden_client::account::component::AccountComponent;
+use miden_client::account::component::{AccountComponent, AccountComponentMetadata};
 use miden_client::account::{
     Account,
     AccountBuilder,
@@ -48,7 +48,7 @@ use crate::tests::config::ClientConfig;
 // HELPERS
 // ================================================================================================
 
-static COUNTER_SLOT_NAME: LazyLock<StorageSlotName> = LazyLock::new(|| {
+pub(crate) static COUNTER_SLOT_NAME: LazyLock<StorageSlotName> = LazyLock::new(|| {
     StorageSlotName::new("miden::testing::counter_contract::counter").expect("slot name is valid")
 });
 
@@ -80,7 +80,9 @@ const COUNTER_CONTRACT: &str = r#"
 
 const INCR_NONCE_AUTH_CODE: &str = "
     use miden::protocol::native_account
-    pub proc auth__basic
+
+    @auth_script
+    pub proc auth_basic
         exec.native_account::incr_nonce
         drop
     end
@@ -94,7 +96,7 @@ const INCR_SCRIPT_CODE: &str = "
 ";
 
 /// Deploys a counter contract as a network account
-async fn deploy_counter_contract(
+pub(crate) async fn deploy_counter_contract(
     client: &mut TestClient,
     storage_mode: AccountStorageMode,
 ) -> Result<Account> {
@@ -124,18 +126,25 @@ async fn get_counter_contract_account(
     let counter_code = CodeBuilder::default()
         .compile_component_code("miden::testing::counter_contract", COUNTER_CONTRACT)
         .context("failed to compile counter contract component code")?;
-    let counter_component = AccountComponent::new(counter_code, vec![counter_slot])
-        .map_err(|err| anyhow::anyhow!(err))
-        .context("failed to create counter contract component")?
-        .with_supports_all_types();
+    let counter_component = AccountComponent::new(
+        counter_code,
+        vec![counter_slot],
+        AccountComponentMetadata::new("miden::testing::counter_component")
+            .with_supports_all_types(),
+    )
+    .map_err(|err| anyhow::anyhow!(err))
+    .context("failed to create counter contract component")?;
 
     let incr_nonce_auth_code = CodeBuilder::default()
         .compile_component_code("miden::testing::incr_nonce_auth", INCR_NONCE_AUTH_CODE)
         .context("failed to compile increment nonce auth component code")?;
-    let incr_nonce_auth = AccountComponent::new(incr_nonce_auth_code, vec![])
-        .map_err(|err| anyhow::anyhow!(err))
-        .context("failed to create increment nonce auth component")?
-        .with_supports_all_types();
+    let incr_nonce_auth = AccountComponent::new(
+        incr_nonce_auth_code,
+        vec![],
+        AccountComponentMetadata::new("miden::testing::incr_nonce_auth").with_supports_all_types(),
+    )
+    .map_err(|err| anyhow::anyhow!(err))
+    .context("failed to create increment nonce auth component")?;
 
     let mut init_seed = [0u8; 32];
     client.rng().fill_bytes(&mut init_seed);
@@ -183,7 +192,23 @@ pub async fn test_counter_contract_ntx(client_config: ClientConfig) -> Result<()
 
     execute_tx_and_sync(&mut client, native_account.id(), tx_request).await?;
 
-    wait_for_blocks(&mut client, 2).await;
+    // Wait for the node to consume the network notes in subsequent blocks
+    let expected_counter = Word::from([ZERO, ZERO, ZERO, Felt::new(1 + BUMP_NOTE_NUMBER)]);
+    for _ in 0..10 {
+        let a = client
+            .test_rpc_api()
+            .get_account_details(network_account.id())
+            .await?
+            .account()
+            .cloned()
+            .with_context(|| "account details not available")?;
+
+        if a.storage().get_item(&COUNTER_SLOT_NAME)? == expected_counter {
+            return Ok(());
+        }
+
+        wait_for_blocks(&mut client, 1).await;
+    }
 
     let a = client
         .test_rpc_api()
@@ -193,10 +218,7 @@ pub async fn test_counter_contract_ntx(client_config: ClientConfig) -> Result<()
         .cloned()
         .with_context(|| "account details not available")?;
 
-    assert_eq!(
-        a.storage().get_item(&COUNTER_SLOT_NAME)?,
-        Word::from([ZERO, ZERO, ZERO, Felt::new(1 + BUMP_NOTE_NUMBER)])
-    );
+    assert_eq!(a.storage().get_item(&COUNTER_SLOT_NAME)?, expected_counter);
     Ok(())
 }
 
@@ -287,15 +309,24 @@ fn get_network_note<T: Rng>(
     network_account: AccountId,
     rng: &mut T,
 ) -> Result<Note> {
+    get_network_note_with_script(sender, network_account, INCR_SCRIPT_CODE, rng)
+}
+
+pub(crate) fn get_network_note_with_script<T: Rng>(
+    sender: AccountId,
+    network_account: AccountId,
+    script: &str,
+    rng: &mut T,
+) -> Result<Note> {
     let target = NetworkAccountTarget::new(network_account, NoteExecutionHint::Always)?;
     let attachment: NoteAttachment = target.into();
-    let metadata =
-        NoteMetadata::new(sender, NoteType::Public, NoteTag::with_account_target(network_account))
-            .with_attachment(attachment);
+    let metadata = NoteMetadata::new(sender, NoteType::Public)
+        .with_tag(NoteTag::with_account_target(network_account))
+        .with_attachment(attachment);
 
     let script = CodeBuilder::new()
         .with_dynamically_linked_library(counter_contract_library())?
-        .compile_note_script(INCR_SCRIPT_CODE)?;
+        .compile_note_script(script)?;
     let recipient = NoteRecipient::new(
         Word::new([
             Felt::new(rng.random()),

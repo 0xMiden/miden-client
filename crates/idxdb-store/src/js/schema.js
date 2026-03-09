@@ -32,12 +32,16 @@ export async function openDatabase(network, clientVersion) {
 var Table;
 (function (Table) {
     Table["AccountCode"] = "accountCode";
-    Table["AccountStorage"] = "accountStorage";
-    Table["AccountAssets"] = "accountAssets";
-    Table["StorageMapEntries"] = "storageMapEntries";
+    Table["LatestAccountStorage"] = "latestAccountStorage";
+    Table["HistoricalAccountStorage"] = "historicalAccountStorage";
+    Table["LatestAccountAssets"] = "latestAccountAssets";
+    Table["HistoricalAccountAssets"] = "historicalAccountAssets";
+    Table["LatestStorageMapEntries"] = "latestStorageMapEntries";
+    Table["HistoricalStorageMapEntries"] = "historicalStorageMapEntries";
     Table["AccountAuth"] = "accountAuth";
     Table["AccountKeyMapping"] = "accountKeyMapping";
-    Table["Accounts"] = "accounts";
+    Table["LatestAccountHeaders"] = "latestAccountHeaders";
+    Table["HistoricalAccountHeaders"] = "historicalAccountHeaders";
     Table["Addresses"] = "addresses";
     Table["Transactions"] = "transactions";
     Table["TransactionScripts"] = "transactionScripts";
@@ -50,7 +54,6 @@ var Table;
     Table["Tags"] = "tags";
     Table["ForeignAccountCode"] = "foreignAccountCode";
     Table["Settings"] = "settings";
-    Table["TrackedAccounts"] = "trackedAccounts";
 })(Table || (Table = {}));
 function indexes(...items) {
     return items.join(",");
@@ -59,12 +62,16 @@ function indexes(...items) {
  *  never be modified — all schema changes should go through new version blocks instead. */
 const V1_STORES = {
     [Table.AccountCode]: indexes("root"),
-    [Table.AccountStorage]: indexes("[commitment+slotName]", "commitment"),
-    [Table.StorageMapEntries]: indexes("[root+key]", "root"),
-    [Table.AccountAssets]: indexes("[root+vaultKey]", "root", "faucetIdPrefix"),
+    [Table.LatestAccountStorage]: indexes("[accountId+slotName]", "accountId"),
+    [Table.HistoricalAccountStorage]: indexes("[accountId+nonce+slotName]", "accountId", "[accountId+nonce]"),
+    [Table.LatestStorageMapEntries]: indexes("[accountId+slotName+key]", "accountId", "[accountId+slotName]"),
+    [Table.HistoricalStorageMapEntries]: indexes("[accountId+nonce+slotName+key]", "accountId", "[accountId+nonce]"),
+    [Table.LatestAccountAssets]: indexes("[accountId+vaultKey]", "accountId", "faucetIdPrefix"),
+    [Table.HistoricalAccountAssets]: indexes("[accountId+nonce+vaultKey]", "accountId", "[accountId+nonce]"),
     [Table.AccountAuth]: indexes("pubKeyCommitmentHex"),
     [Table.AccountKeyMapping]: indexes("[accountIdHex+pubKeyCommitmentHex]", "accountIdHex", "pubKeyCommitmentHex"),
-    [Table.Accounts]: indexes("&accountCommitment", "id", "[id+nonce]", "codeRoot", "storageRoot", "vaultRoot"),
+    [Table.LatestAccountHeaders]: indexes("&id", "accountCommitment"),
+    [Table.HistoricalAccountHeaders]: indexes("&accountCommitment", "id", "[id+nonce]"),
     [Table.Addresses]: indexes("address", "id"),
     [Table.Transactions]: indexes("id", "statusVariant"),
     [Table.TransactionScripts]: indexes("scriptRoot"),
@@ -77,17 +84,20 @@ const V1_STORES = {
     [Table.Tags]: indexes("id++", "tag", "sourceNoteId", "sourceAccountId"),
     [Table.ForeignAccountCode]: indexes("accountId"),
     [Table.Settings]: indexes("key"),
-    [Table.TrackedAccounts]: indexes("&id"),
 };
 export class MidenDatabase {
     dexie;
     accountCodes;
-    accountStorages;
-    storageMapEntries;
-    accountAssets;
+    latestAccountStorages;
+    historicalAccountStorages;
+    latestStorageMapEntries;
+    historicalStorageMapEntries;
+    latestAccountAssets;
+    historicalAccountAssets;
     accountAuths;
     accountKeyMappings;
-    accounts;
+    latestAccountHeaders;
+    historicalAccountHeaders;
     addresses;
     transactions;
     transactionScripts;
@@ -100,7 +110,6 @@ export class MidenDatabase {
     tags;
     foreignAccountCode;
     settings;
-    trackedAccounts;
     constructor(network) {
         this.dexie = new Dexie(network);
         // --- Schema versioning ---
@@ -148,12 +157,16 @@ export class MidenDatabase {
         //   3. Add version(2+) blocks below for all schema changes going forward.
         this.dexie.version(1).stores(V1_STORES);
         this.accountCodes = this.dexie.table(Table.AccountCode);
-        this.accountStorages = this.dexie.table(Table.AccountStorage);
-        this.storageMapEntries = this.dexie.table(Table.StorageMapEntries);
-        this.accountAssets = this.dexie.table(Table.AccountAssets);
+        this.latestAccountStorages = this.dexie.table(Table.LatestAccountStorage);
+        this.historicalAccountStorages = this.dexie.table(Table.HistoricalAccountStorage);
+        this.latestStorageMapEntries = this.dexie.table(Table.LatestStorageMapEntries);
+        this.historicalStorageMapEntries = this.dexie.table(Table.HistoricalStorageMapEntries);
+        this.latestAccountAssets = this.dexie.table(Table.LatestAccountAssets);
+        this.historicalAccountAssets = this.dexie.table(Table.HistoricalAccountAssets);
         this.accountAuths = this.dexie.table(Table.AccountAuth);
         this.accountKeyMappings = this.dexie.table(Table.AccountKeyMapping);
-        this.accounts = this.dexie.table(Table.Accounts);
+        this.latestAccountHeaders = this.dexie.table(Table.LatestAccountHeaders);
+        this.historicalAccountHeaders = this.dexie.table(Table.HistoricalAccountHeaders);
         this.addresses = this.dexie.table(Table.Addresses);
         this.transactions = this.dexie.table(Table.Transactions);
         this.transactionScripts = this.dexie.table(Table.TransactionScripts);
@@ -166,7 +179,6 @@ export class MidenDatabase {
         this.tags = this.dexie.table(Table.Tags);
         this.foreignAccountCode = this.dexie.table(Table.ForeignAccountCode);
         this.settings = this.dexie.table(Table.Settings);
-        this.trackedAccounts = this.dexie.table(Table.TrackedAccounts);
         this.dexie.on("populate", () => {
             this.stateSync
                 .put({ id: 1, blockNum: 0 })

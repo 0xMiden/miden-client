@@ -1,16 +1,21 @@
 name = "acl_auth"
-description = "Access Control List (ACL) authentication component using RPO Falcon512. Provides fine-grained authentication control based on procedure calls and note operations. Storage layout: Slot 0 - public key, Slot 1 - ACL config, Slot 2 - trigger procedures map"
+description = "Access Control List (ACL) authentication component. Provides fine-grained authentication control based on procedure calls and note operations. Storage layout: pub_key - public key commitment, scheme - authentication scheme ID, config - ACL configuration, trigger_procedure_roots - map of procedure roots requiring authentication"
 version = "0.1.0"
 supported-types = ["RegularAccountUpdatableCode", "RegularAccountImmutableCode", "FungibleFaucet", "NonFungibleFaucet"]
 
 [storage]
 [[storage.slots]]
-name = "miden::standards::auth::rpo_falcon512_acl::public_key"
-description = "Falcon public key"
-type = "miden::standards::auth::falcon512_rpo::pub_key"
+name = "miden::standards::auth::singlesig_acl::pub_key"
+description = "Public key commitment"
+type = "miden::standards::auth::pub_key"
 
 [[storage.slots]]
-name = "miden::standards::auth::rpo_falcon512_acl::config"
+name = "miden::standards::auth::singlesig_acl::scheme"
+description = "Authentication scheme ID"
+type = "miden::standards::auth::scheme"
+
+[[storage.slots]]
+name = "miden::standards::auth::singlesig_acl::config"
 description = "ACL configuration: [num_tracked_procs, allow_unauthorized_output_notes, allow_unauthorized_input_notes, 0]"
 type = [
     { name = "num_tracked_procs", type = "u32", description = "Number of procedures tracked for authentication" },
@@ -20,6 +25,6 @@ type = [
 ]
 
 [[storage.slots]]
-name = "miden::standards::auth::rpo_falcon512_acl::trigger_procedure_roots"
+name = "miden::standards::auth::singlesig_acl::trigger_procedure_roots"
 description = "Map with trigger procedure roots that require authentication"
 type = { key = "word", value = "word" }

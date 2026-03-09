@@ -49,7 +49,7 @@ use core::fmt;
 use domain::account::{AccountProof, FetchedAccount};
 use domain::note::{FetchedNote, NoteSyncInfo};
 use domain::nullifier::NullifierUpdate;
-use domain::sync::StateSyncInfo;
+use domain::sync::ChainMmrInfo;
 use miden_protocol::Word;
 use miden_protocol::account::{Account, AccountCode, AccountHeader, AccountId};
 use miden_protocol::address::NetworkId;
@@ -82,12 +82,12 @@ mod tonic_client;
 #[cfg(feature = "tonic")]
 pub use tonic_client::GrpcClient;
 
+use crate::rpc::domain::account::AccountStorageRequirements;
 use crate::rpc::domain::account_vault::AccountVaultInfo;
 use crate::rpc::domain::storage_map::StorageMapInfo;
 use crate::rpc::domain::transaction::TransactionsInfo;
 use crate::store::InputNoteRecord;
 use crate::store::input_note_states::UnverifiedNoteState;
-use crate::transaction::ForeignAccount;
 
 /// Represents the state that we want to retrieve from the network
 pub enum AccountStateAt {
@@ -153,24 +153,15 @@ pub trait NodeRpcClient: Send + Sync {
     /// verify that each note is part of the block's note tree.
     async fn get_notes_by_id(&self, note_ids: &[NoteId]) -> Result<Vec<FetchedNote>, RpcError>;
 
-    /// Fetches info from the node necessary to perform a state sync using the
-    /// `/SyncState` RPC endpoint.
+    /// Fetches the MMR delta for a given block range using the `/SyncChainMmr` RPC endpoint.
     ///
-    /// - `block_num` is the last block number known by the client. The returned [`StateSyncInfo`]
-    ///   should contain data starting from the next block, until the first block which contains a
-    ///   note of matching the requested tag, or the chain tip if there are no notes.
-    /// - `account_ids` is a list of account IDs and determines the accounts the client is
-    ///   interested in and should receive account updates of.
-    /// - `note_tags` is a list of tags used to filter the notes the client is interested in, which
-    ///   serves as a "note group" filter. Notice that you can't filter by a specific note ID.
-    /// - `nullifiers_tags` similar to `note_tags`, is a list of tags used to filter the nullifiers
-    ///   corresponding to some notes the client is interested in.
-    async fn sync_state(
+    /// - `block_from` is the last block number already present in the caller's MMR.
+    /// - `block_to` is the optional upper bound of the range. If `None`, syncs up to the chain tip.
+    async fn sync_chain_mmr(
         &self,
-        block_num: BlockNumber,
-        account_ids: &[AccountId],
-        note_tags: &BTreeSet<NoteTag>,
-    ) -> Result<StateSyncInfo, RpcError>;
+        block_from: BlockNumber,
+        block_to: Option<BlockNumber>,
+    ) -> Result<ChainMmrInfo, RpcError>;
 
     /// Fetches the current state of an account from the node using the `/GetAccountDetails` RPC
     /// endpoint.
@@ -208,18 +199,22 @@ pub trait NodeRpcClient: Send + Sync {
     /// `/CheckNullifiers` RPC endpoint.
     async fn check_nullifiers(&self, nullifiers: &[Nullifier]) -> Result<Vec<SmtProof>, RpcError>;
 
-    /// Fetches the account data needed to perform a Foreign Procedure Invocation (FPI) on the
-    /// specified foreign account, using the `GetAccountProof` endpoint.
+    /// Fetches the account proof and optionally its details from the node, using the
+    /// `GetAccountProof` endpoint.
     ///
     /// The `account_state` parameter specifies the block number from which to retrieve
     /// the account proof from (the state of the account at that block).
     ///
+    /// The `storage_requirements` parameter specifies which storage slots and map keys
+    /// should be included in the response for public accounts.
+    ///
     /// The `known_account_code` parameter is the known code commitment
-    /// to prevent unnecessary data fetching. Returns the block number and the FPI account data. If
-    /// the tracked account is not found in the node, the method will return an error.
+    /// to prevent unnecessary data fetching. Returns the block number and the account proof. If
+    /// the account is not found in the node, the method will return an error.
     async fn get_account_proof(
         &self,
-        foreign_account: ForeignAccount,
+        account_id: AccountId,
+        storage_requirements: AccountStorageRequirements,
         account_state: AccountStateAt,
         known_account_code: Option<AccountCode>,
     ) -> Result<(BlockNumber, AccountProof), RpcError>;
@@ -419,7 +414,7 @@ pub enum RpcEndpoint {
     GetBlockByNumber,
     GetBlockHeaderByNumber,
     GetNotesById,
-    SyncState,
+    SyncChainMmr,
     SubmitProvenTx,
     SyncNotes,
     GetNoteScriptByRoot,
@@ -440,7 +435,7 @@ impl RpcEndpoint {
             RpcEndpoint::GetBlockByNumber => "GetBlockByNumber",
             RpcEndpoint::GetBlockHeaderByNumber => "GetBlockHeaderByNumber",
             RpcEndpoint::GetNotesById => "GetNotesById",
-            RpcEndpoint::SyncState => "SyncState",
+            RpcEndpoint::SyncChainMmr => "SyncChainMmr",
             RpcEndpoint::SubmitProvenTx => "SubmitProvenTransaction",
             RpcEndpoint::SyncNotes => "SyncNotes",
             RpcEndpoint::GetNoteScriptByRoot => "GetNoteScriptByRoot",
@@ -466,7 +461,7 @@ impl fmt::Display for RpcEndpoint {
                 write!(f, "get_block_header_by_number")
             },
             RpcEndpoint::GetNotesById => write!(f, "get_notes_by_id"),
-            RpcEndpoint::SyncState => write!(f, "sync_state"),
+            RpcEndpoint::SyncChainMmr => write!(f, "sync_chain_mmr"),
             RpcEndpoint::SubmitProvenTx => write!(f, "submit_proven_transaction"),
             RpcEndpoint::SyncNotes => write!(f, "sync_notes"),
             RpcEndpoint::GetNoteScriptByRoot => write!(f, "get_note_script_by_root"),

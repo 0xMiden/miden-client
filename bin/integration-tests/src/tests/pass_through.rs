@@ -1,13 +1,14 @@
 use anyhow::Result;
-use miden_client::account::component::{
-    AuthFalcon512RpoAcl,
-    AuthFalcon512RpoAclConfig,
-    BasicWallet,
-};
+use miden_client::account::component::BasicWallet;
 use miden_client::account::{Account, AccountBuilder, AccountId, AccountStorageMode, AccountType};
 use miden_client::assembly::CodeBuilder;
 use miden_client::asset::{Asset, FungibleAsset};
-use miden_client::auth::{AuthSchemeId, TransactionAuthenticator};
+use miden_client::auth::{
+    AuthSchemeId,
+    AuthSingleSigAcl,
+    AuthSingleSigAclConfig,
+    TransactionAuthenticator,
+};
 use miden_client::crypto::FeltRng;
 use miden_client::crypto::rpo_falcon512::SecretKey;
 use miden_client::note::{
@@ -21,13 +22,14 @@ use miden_client::note::{
     NoteStorage,
     NoteTag,
     NoteType,
-    build_p2id_recipient,
+    P2idNoteStorage,
 };
 use miden_client::store::{InputNoteState, TransactionFilter};
 use miden_client::testing::common::*;
 use miden_client::transaction::{OutputNote, TransactionRequestBuilder};
 use miden_client::{Client, ClientRng, Word};
 use rand::RngCore;
+use tracing::info;
 
 use crate::tests::config::ClientConfig;
 
@@ -81,14 +83,14 @@ pub async fn test_pass_through(client_config: ClientConfig) -> Result<()> {
     .await?;
 
     // mint 1000 BTC for accountA
-    println!("minting 1000 btc for account A");
+    info!(account_id = %sender.id(), faucet_id = %btc_faucet_account.id(), "Minting 1000 BTC for sender");
 
     let tx_id =
         mint_and_consume(&mut client, sender.id(), btc_faucet_account.id(), NoteType::Public).await;
     wait_for_tx(&mut client, tx_id).await?;
 
     // Create a note that we will send to a pass-through account
-    println!("creating note with accountA");
+    info!(sender_id = %sender.id(), target_id = %target.id(), "Creating pass-through note");
     let asset = FungibleAsset::new(btc_faucet_account.id(), ASSET_AMOUNT)?;
 
     let (pass_through_note_1, pass_through_note_details_1) =
@@ -106,7 +108,7 @@ pub async fn test_pass_through(client_config: ClientConfig) -> Result<()> {
 
     execute_tx_and_sync(&mut client, sender.id(), tx_request).await?;
 
-    println!("consuming pass-through note");
+    info!(note_id = %pass_through_note_1.id(), pass_through_account = %pass_through_account.id(), "Consuming pass-through note");
 
     client
         .import_notes(&[
@@ -198,11 +200,12 @@ async fn create_pass_through_account<AUTH: TransactionAuthenticator>(
     let key_pair = SecretKey::with_rng(client.rng());
     let pub_key = key_pair.public_key().to_commitment();
 
-    let acl_config = AuthFalcon512RpoAclConfig::new()
+    let acl_config = AuthSingleSigAclConfig::new()
         .with_allow_unauthorized_input_notes(true)
         .with_allow_unauthorized_output_notes(true);
 
-    let auth_component = AuthFalcon512RpoAcl::new(pub_key.into(), acl_config).unwrap();
+    let auth_component =
+        AuthSingleSigAcl::new(pub_key.into(), AuthSchemeId::Falcon512Rpo, acl_config).unwrap();
 
     let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountImmutableCode)
@@ -235,7 +238,7 @@ fn create_pass_through_note(
 
     let asset_word: Word = asset.into();
 
-    let target_recipient = build_p2id_recipient(target, rng.draw_word())?;
+    let target_recipient = P2idNoteStorage::new(target).into_recipient(rng.draw_word());
 
     let inputs = NoteStorage::new(vec![
         asset_word[0],
@@ -254,7 +257,7 @@ fn create_pass_through_note(
     let pass_through_recipient = NoteRecipient::new(serial_num, note_script, inputs);
 
     let metadata =
-        NoteMetadata::new(sender, NoteType::Public, NoteTag::with_account_target(target));
+        NoteMetadata::new(sender, NoteType::Public).with_tag(NoteTag::with_account_target(target));
     let note = Note::new(NoteAssets::new(vec![asset])?, metadata, pass_through_recipient);
 
     let pass_through_note_details =

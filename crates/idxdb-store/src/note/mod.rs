@@ -14,7 +14,7 @@ use miden_client::store::{
 use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::js_sys::{Array, Promise};
 
-use super::WebStore;
+use super::IdxdbStore;
 use crate::note::utils::upsert_note_script_tx;
 use crate::promise::await_js;
 
@@ -41,7 +41,7 @@ use utils::{
     upsert_input_note_tx,
 };
 
-impl WebStore {
+impl IdxdbStore {
     pub(crate) async fn get_input_notes(
         &self,
         filter: NoteFilter,
@@ -202,7 +202,9 @@ impl NoteFilterExt for NoteFilter {
                         OutputNoteState::STATE_EXPECTED_PARTIAL,
                     ],
                     NoteFilter::Unspent => vec![
+                        OutputNoteState::STATE_EXPECTED_PARTIAL,
                         OutputNoteState::STATE_EXPECTED_FULL,
+                        OutputNoteState::STATE_COMMITTED_PARTIAL,
                         OutputNoteState::STATE_COMMITTED_FULL,
                     ],
                     _ => unreachable!(), // Safety net, should never be reached

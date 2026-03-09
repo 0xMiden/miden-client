@@ -1,12 +1,13 @@
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
-use idxdb_store::WebStore;
 use miden_client::account::{
     AccountId as NativeAccountId,
     AccountReader as NativeAccountReader,
+    StorageMapKey,
     StorageSlotName,
 };
+use miden_client::store::Store;
 use wasm_bindgen::prelude::*;
 
 use super::account_header::AccountHeader;
@@ -27,7 +28,7 @@ pub struct AccountReader(NativeAccountReader);
 #[wasm_bindgen]
 impl AccountReader {
     /// Creates a new `AccountReader` for the given account.
-    pub(crate) fn new(store: Arc<WebStore>, account_id: NativeAccountId) -> Self {
+    pub(crate) fn new(store: Arc<dyn Store>, account_id: NativeAccountId) -> Self {
         let inner = NativeAccountReader::new(store, account_id);
         Self(inner)
     }
@@ -160,7 +161,7 @@ impl AccountReader {
             .map_err(|err| js_error_with_context(err, "invalid slot name"))?;
 
         self.0
-            .get_storage_map_item(slot_name, *key.as_native())
+            .get_storage_map_item(slot_name, StorageMapKey::new(*key.as_native()))
             .await
             .map(Into::into)
             .map_err(|err| js_error_with_context(err, "failed to get storage map item"))

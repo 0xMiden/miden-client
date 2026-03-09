@@ -1,14 +1,17 @@
 use miden_client::Word as NativeWord;
-use miden_client::account::component::AccountComponent as NativeAccountComponent;
+use miden_client::account::component::{
+    AccountComponent as NativeAccountComponent,
+    AccountComponentMetadata,
+};
 use miden_client::account::{
     AccountComponentCode as NativeAccountComponentCode,
     StorageSlot as NativeStorageSlot,
 };
 use miden_client::assembly::{Library as NativeLibrary, MastNodeExt};
 use miden_client::auth::{
-    AuthEcdsaK256Keccak as NativeEcdsaK256Keccak,
-    AuthFalcon512Rpo as NativeFalcon512Rpo,
+    AuthSchemeId as NativeAuthSchemeId,
     AuthSecretKey as NativeSecretKey,
+    AuthSingleSig as NativeSingleSig,
     PublicKeyCommitment,
 };
 use miden_client::vm::Package as NativePackage;
@@ -72,19 +75,32 @@ impl AccountComponent {
 
         let native_account_code: NativeAccountComponentCode = account_code.into();
 
-        NativeAccountComponent::new(native_account_code, native_slots)
-            .map(AccountComponent)
-            .map_err(|e| js_error_with_context(e, "Failed to compile account component"))
+        NativeAccountComponent::new(
+            native_account_code,
+            native_slots,
+            AccountComponentMetadata::new("custom"),
+        )
+        .map(AccountComponent)
+        .map_err(|e| js_error_with_context(e, "Failed to compile account component"))
     }
 
     /// Marks the component as supporting all account types.
     #[wasm_bindgen(js_name = "withSupportsAllTypes")]
-    pub fn with_supports_all_types(mut self) -> Self {
-        self.0 = self.0.with_supports_all_types();
-        self
+    pub fn with_supports_all_types(self) -> Self {
+        let metadata = self.0.metadata().clone().with_supports_all_types();
+        let code = self.0.component_code().clone();
+        let slots = self.0.storage_slots().to_vec();
+        AccountComponent(
+            NativeAccountComponent::new(code, slots, metadata)
+                .expect("reconstructing component with updated metadata should not fail"),
+        )
     }
 
     /// Returns the hex-encoded MAST root for a procedure by name.
+    ///
+    /// Matches by full path, relative path, or local name (after the last `::`).
+    /// When matching by local name, if multiple procedures share the same local
+    /// name across modules, the first match is returned.
     #[wasm_bindgen(js_name = "getProcedureHash")]
     pub fn get_procedure_hash(&self, procedure_name: &str) -> Result<String, JsValue> {
         let library = self.0.component_code().as_library();
@@ -92,9 +108,14 @@ impl AccountComponent {
         let get_proc_export = library
             .exports()
             .find(|export| {
-                export.as_procedure().is_some()
-                    && (export.path().as_ref().as_str() == procedure_name
-                        || export.path().as_ref().to_relative().as_str() == procedure_name)
+                if export.as_procedure().is_none() {
+                    return false;
+                }
+                let export_path = export.path();
+                let path_str = export_path.as_ref().as_str();
+                path_str == procedure_name
+                    || export_path.as_ref().to_relative().as_str() == procedure_name
+                    || path_str.rsplit_once("::").is_some_and(|(_, local)| local == procedure_name)
             })
             .ok_or_else(|| {
                 JsValue::from_str(&format!(
@@ -128,11 +149,11 @@ impl AccountComponent {
     ) -> AccountComponent {
         match auth_scheme {
             AuthScheme::AuthRpoFalcon512 => {
-                let auth = NativeFalcon512Rpo::new(commitment);
+                let auth = NativeSingleSig::new(commitment, NativeAuthSchemeId::Falcon512Rpo);
                 AccountComponent(auth.into())
             },
             AuthScheme::AuthEcdsaK256Keccak => {
-                let auth = NativeEcdsaK256Keccak::new(commitment);
+                let auth = NativeSingleSig::new(commitment, NativeAuthSchemeId::EcdsaK256Keccak);
                 AccountComponent(auth.into())
             },
         }
@@ -187,11 +208,13 @@ impl AccountComponent {
             .map(|storage_slot| storage_slot.clone().into())
             .collect();
 
-        NativeAccountComponent::new(native_library, native_slots)
-            .map(AccountComponent)
-            .map_err(|e| {
-                js_error_with_context(e, "Failed to create account component from package")
-            })
+        NativeAccountComponent::new(
+            native_library,
+            native_slots,
+            AccountComponentMetadata::new("custom"),
+        )
+        .map(AccountComponent)
+        .map_err(|e| js_error_with_context(e, "Failed to create account component from package"))
     }
 
     /// Creates an account component from a compiled library and storage slots.
@@ -204,11 +227,13 @@ impl AccountComponent {
         let native_slots: Vec<NativeStorageSlot> =
             storage_slots.into_iter().map(Into::into).collect();
 
-        NativeAccountComponent::new(native_library, native_slots)
-            .map(AccountComponent)
-            .map_err(|e| {
-                js_error_with_context(e, "Failed to create account component from library")
-            })
+        NativeAccountComponent::new(
+            native_library,
+            native_slots,
+            AccountComponentMetadata::new("custom"),
+        )
+        .map(AccountComponent)
+        .map_err(|e| js_error_with_context(e, "Failed to create account component from library"))
     }
 }
 

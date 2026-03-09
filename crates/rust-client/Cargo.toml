@@ -17,7 +17,8 @@ all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [package.metadata.cargo-machete]
-ignored = ["getrandom"]
+# "prost-types" and "tonic-prost" are ignored because they are needed by the generated proto bindings.
+ignored = ["getrandom", "prost-types", "tonic-prost"]
 
 [lib]
 crate-type = ["lib"]
@@ -65,7 +66,7 @@ uuid         = { features = ["js", "serde", "v4"], optional = true, version = "1
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom             = { features = ["wasm_js"], version = "0.3" }
-tonic-web-wasm-client = { default-features = false, version = "0.8" }
+tonic-web-wasm-client = { default-features = false, version = "0.9" }
 web-sys               = { features = ["Storage", "Window", "console"], version = "0.3" }
 
 [build-dependencies]

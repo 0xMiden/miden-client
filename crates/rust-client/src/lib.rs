@@ -171,13 +171,21 @@ pub mod asset {
         NonFungibleAssetDelta,
         NonFungibleDeltaAction,
     };
+    pub use miden_protocol::account::{
+        AccountStorageHeader,
+        StorageMapWitness,
+        StorageSlotContent,
+        StorageSlotHeader,
+    };
     pub use miden_protocol::asset::{
         Asset,
         AssetVault,
+        AssetVaultKey,
         AssetWitness,
         FungibleAsset,
         NonFungibleAsset,
         NonFungibleAssetDetails,
+        PartialVault,
         TokenSymbol,
     };
 }
@@ -192,9 +200,17 @@ pub mod auth {
         PublicKeyCommitment,
         Signature,
     };
-    pub use miden_standards::AuthScheme;
-    pub use miden_standards::account::auth::{AuthEcdsaK256Keccak, AuthFalcon512Rpo, NoAuth};
+    pub use miden_standards::account::auth::{
+        AuthMultisig,
+        AuthMultisigConfig,
+        AuthSingleSig,
+        AuthSingleSigAcl,
+        AuthSingleSigAclConfig,
+        NoAuth,
+    };
     pub use miden_tx::auth::{BasicAuthenticator, SigningInputs, TransactionAuthenticator};
+
+    pub use crate::account::component::AuthScheme;
 
     pub const RPO_FALCON_SCHEME_ID: AuthSchemeId = AuthSchemeId::Falcon512Rpo;
     pub const ECDSA_K256_KECCAK_SCHEME_ID: AuthSchemeId = AuthSchemeId::EcdsaK256Keccak;
@@ -222,9 +238,23 @@ pub mod crypto {
         MmrProof,
         PartialMmr,
     };
-    pub use miden_protocol::crypto::merkle::smt::{LeafIndex, SMT_DEPTH, SmtLeaf, SmtProof};
+    pub use miden_protocol::crypto::merkle::smt::{
+        LeafIndex,
+        SMT_DEPTH,
+        Smt,
+        SmtForest,
+        SmtLeaf,
+        SmtProof,
+    };
     pub use miden_protocol::crypto::merkle::store::MerkleStore;
-    pub use miden_protocol::crypto::merkle::{MerklePath, MerkleTree, NodeIndex, SparseMerklePath};
+    pub use miden_protocol::crypto::merkle::{
+        EmptySubtreeRoots,
+        MerkleError,
+        MerklePath,
+        MerkleTree,
+        NodeIndex,
+        SparseMerklePath,
+    };
     pub use miden_protocol::crypto::rand::{FeltRng, RpoRandomCoin};
 }
 

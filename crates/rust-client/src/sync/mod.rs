@@ -55,14 +55,13 @@
 //! `committed_note_updates` and `consumed_note_updates`) to understand how the sync data is
 //! processed and applied to the local store.
 
-use alloc::collections::BTreeSet;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::cmp::max;
 
 use miden_protocol::account::AccountId;
 use miden_protocol::block::BlockNumber;
-use miden_protocol::note::{NoteId, NoteTag};
+use miden_protocol::note::NoteId;
 use miden_protocol::transaction::TransactionId;
 use miden_tx::auth::TransactionAuthenticator;
 use miden_tx::utils::{Deserializable, DeserializationError, Serializable};
@@ -76,7 +75,7 @@ mod tag;
 pub use tag::{NoteTagRecord, NoteTagSource};
 
 mod state_sync;
-pub use state_sync::{NoteUpdateAction, OnNoteReceived, StateSync};
+pub use state_sync::{NoteUpdateAction, OnNoteReceived, StateSync, StateSyncInput};
 
 mod state_sync_update;
 pub use state_sync_update::{
@@ -122,48 +121,23 @@ where
         self.ensure_genesis_in_place().await?;
         self.ensure_rpc_limits_in_place().await?;
 
-        let note_screener = self.note_screener();
-        let state_sync =
-            StateSync::new(self.rpc_api.clone(), Arc::new(note_screener), self.tx_discard_delta);
-
-        // Get current state of the client
-        let accounts = self
-            .store
-            .get_account_headers()
-            .await?
-            .into_iter()
-            .map(|(acc_header, _)| acc_header)
-            .collect();
-
-        let note_tags: BTreeSet<NoteTag> = self.store.get_unique_note_tags().await?;
-
         // Note Transport update
         // TODO We can run both sync_state, fetch_transport_notes futures in parallel
         if self.is_note_transport_enabled() {
             let cursor = self.store.get_note_transport_cursor().await?;
-            self.fetch_transport_notes(cursor, note_tags.clone()).await?;
+            let note_tags = self.store.get_unique_note_tags().await?;
+            self.fetch_transport_notes(cursor, note_tags).await?;
         }
 
-        let unspent_input_notes = self.store.get_input_notes(NoteFilter::Unspent).await?;
-        let unspent_output_notes = self.store.get_output_notes(NoteFilter::Unspent).await?;
-
-        let uncommitted_transactions =
-            self.store.get_transactions(TransactionFilter::Uncommitted).await?;
-
-        // Build current partial MMR
+        // Build sync state components
+        let note_screener = self.note_screener();
+        let state_sync =
+            StateSync::new(self.rpc_api.clone(), Arc::new(note_screener), self.tx_discard_delta);
         let mut current_partial_mmr = self.store.get_current_partial_mmr().await?;
+        let input = self.build_sync_input().await?;
 
         // Get the sync update from the network
-        let state_sync_update: StateSyncUpdate = state_sync
-            .sync_state(
-                &mut current_partial_mmr,
-                accounts,
-                note_tags,
-                unspent_input_notes,
-                unspent_output_notes,
-                uncommitted_transactions,
-            )
-            .await?;
+        let state_sync_update = state_sync.sync_state(&mut current_partial_mmr, input).await?;
 
         let sync_summary: SyncSummary = (&state_sync_update).into();
         debug!(sync_summary = ?sync_summary, "Sync summary computed");
@@ -181,14 +155,46 @@ where
         Ok(sync_summary)
     }
 
-    /// Applies the state sync update to the store.
+    /// Builds a default [`StateSyncInput`] from the current client state.
+    ///
+    /// This includes all tracked account headers, all unique note tags, all unspent input and
+    /// output notes, and all uncommitted transactions.
+    pub async fn build_sync_input(&self) -> Result<StateSyncInput, ClientError> {
+        let accounts = self
+            .store
+            .get_account_headers()
+            .await?
+            .into_iter()
+            .map(|(acc_header, _)| acc_header)
+            .collect();
+
+        let note_tags = self.store.get_unique_note_tags().await?;
+
+        let input_notes = self.store.get_input_notes(NoteFilter::Unspent).await?;
+        let output_notes = self.store.get_output_notes(NoteFilter::Unspent).await?;
+
+        let uncommitted_transactions =
+            self.store.get_transactions(TransactionFilter::Uncommitted).await?;
+
+        Ok(StateSyncInput {
+            accounts,
+            note_tags,
+            input_notes,
+            output_notes,
+            uncommitted_transactions,
+        })
+    }
+
+    /// Applies the state sync update to the store and prunes the irrelevant block headers.
     ///
     /// See [`crate::Store::apply_state_sync()`] for what the update implies.
     pub async fn apply_state_sync(&mut self, update: StateSyncUpdate) -> Result<(), ClientError> {
-        self.store.apply_state_sync(update).await.map_err(ClientError::StoreError)?;
+        self.store.apply_state_sync(update).await?;
 
         // Remove irrelevant block headers
-        self.store.prune_irrelevant_blocks().await.map_err(ClientError::StoreError)
+        self.store.prune_irrelevant_blocks().await?;
+
+        Ok(())
     }
 
     /// Ensures that the RPC limits are set in the RPC client. If not already cached,

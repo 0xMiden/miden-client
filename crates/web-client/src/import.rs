@@ -108,10 +108,14 @@ impl WebClient {
         _store_name: &str,
     ) -> Result<JsValue, JsValue> {
         let store = self.store.as_ref().ok_or(JsValue::from_str("Store not initialized"))?;
+
+        let json_string =
+            store_dump.as_string().ok_or(JsValue::from_str("Store dump must be a string"))?;
+
         store
-            .force_import_store(store_dump)
+            .import_store(json_string)
             .await
-            .map_err(|err| js_error_with_context(err, "failed to force import store"))?;
+            .map_err(|err| js_error_with_context(err, "failed to import store"))?;
 
         Ok(JsValue::from_str("Store imported successfully"))
     }
