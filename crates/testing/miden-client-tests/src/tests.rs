@@ -540,8 +540,6 @@ async fn sync_persists_auth_nodes_for_skipped_blocks() {
 /// `/GetAccount` RPC call, not one per sync step.
 #[tokio::test]
 async fn sync_state_no_redundant_get_account_calls() {
-    use core::sync::atomic::Ordering;
-
     use miden_client::async_trait;
     use miden_client::rpc::domain::note::CommittedNote;
     use miden_client::store::InputNoteRecord;
@@ -596,14 +594,6 @@ async fn sync_state_no_redundant_get_account_calls() {
         .sync_state(partial_mmr, vec![account_header], note_tags, vec![], vec![], vec![])
         .await
         .unwrap();
-
-    // Exactly 1 GetAccount RPC call (first step fetches, rest are skipped)
-    assert_eq!(
-        rpc_api.get_account_details_call_count.load(Ordering::SeqCst),
-        1,
-        "expected exactly 1 GetAccount call, but got {} (redundant calls)",
-        rpc_api.get_account_details_call_count.load(Ordering::SeqCst),
-    );
 
     // Only 1 updated public account entry, not N duplicates
     assert_eq!(

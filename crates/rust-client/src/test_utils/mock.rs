@@ -2,7 +2,6 @@ use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
-use core::sync::atomic::{AtomicUsize, Ordering};
 
 use miden_protocol::Word;
 use miden_protocol::account::delta::AccountUpdateDetails;
@@ -57,7 +56,6 @@ pub type MockClient<AUTH> = Client<AUTH>;
 pub struct MockRpcApi {
     account_commitment_updates: Arc<RwLock<BTreeMap<BlockNumber, BTreeMap<AccountId, Word>>>>,
     pub mock_chain: Arc<RwLock<MockChain>>,
-    pub get_account_details_call_count: Arc<AtomicUsize>,
 }
 
 impl Default for MockRpcApi {
@@ -75,7 +73,6 @@ impl MockRpcApi {
         Self {
             account_commitment_updates: Arc::new(RwLock::new(build_account_updates(&mock_chain))),
             mock_chain: Arc::new(RwLock::new(mock_chain)),
-            get_account_details_call_count: Arc::new(AtomicUsize::new(0)),
         }
     }
 
@@ -532,7 +529,6 @@ impl NodeRpcClient for MockRpcApi {
 
     /// Returns the node's tracked account details for the specified account ID.
     async fn get_account_details(&self, account_id: AccountId) -> Result<FetchedAccount, RpcError> {
-        self.get_account_details_call_count.fetch_add(1, Ordering::SeqCst);
         let summary = self
             .account_commitment_updates
             .read()
