@@ -1339,8 +1339,6 @@ The `useMultiSigner()` hook returns:
 | `connectSigner(name)` | `(name: string) => Promise<void>` | Switch to a signer by name |
 | `disconnectSigner()` | `() => Promise<void>` | Disconnect active signer (falls back to local keystore) |
 
-> **Note:** `MultiSignerProvider` is optional. Single-signer apps can continue using a signer provider directly above `MidenProvider` as shown in the individual provider examples above.
-
 ### Custom Account Components
 
 Signer providers can include custom `AccountComponent` instances in the account via the `customComponents` field on `SignerAccountConfig`. This is useful for attaching application-specific logic compiled from `.masp` packages (e.g. a DEX component or custom smart contract) alongside the default auth and basic wallet components.
