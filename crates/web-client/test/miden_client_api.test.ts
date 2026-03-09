@@ -305,24 +305,22 @@ test.describe("MidenClient API - Mock Chain", () => {
       const walletId = wallet.id().toString();
 
       // Export the store
-      const snapshot = await client.exportStore("mock_client_db");
+      const storeData = await window.exportStore(client.storeName());
 
       // Create a new mock client and import the store
       const client2 = await window.MidenClient.createMock();
-      await client2.importStore("mock_client_db", snapshot);
+      await window.importStore(client2.storeName(), storeData);
 
       // Check the account exists in the new client
       const accounts = await client2.accounts.list();
       const accountIds = accounts.map((a) => a.id().toString());
 
       return {
-        version: snapshot.version,
         walletId,
         foundInImport: accountIds.includes(walletId),
       };
     });
 
-    expect(result.version).toBe(1);
     expect(result.foundInImport).toBe(true);
   });
 
@@ -656,22 +654,6 @@ test.describe("MidenClient API - Mock Chain", () => {
 
     expect(result.threw).toBe(true);
     expect(result.message).toContain("null or undefined");
-  });
-
-  test("importStore rejects invalid version", async ({ page }) => {
-    const result = await page.evaluate(async () => {
-      const client = await window.MidenClient.createMock();
-
-      try {
-        await client.importStore("mock_client_db", { version: 99, data: {} });
-        return { threw: false };
-      } catch (e) {
-        return { threw: true, message: e.message };
-      }
-    });
-
-    expect(result.threw).toBe(true);
-    expect(result.message).toContain("Unsupported store snapshot version");
   });
 
   test("accounts.export returns a valid AccountFile", async ({ page }) => {

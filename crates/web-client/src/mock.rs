@@ -62,6 +62,7 @@ impl WebClient {
             rng,
             Some(mock_note_transport_api.clone()),
             false,
+            "mock_client_db".to_owned(),
         )
         .await?;
 

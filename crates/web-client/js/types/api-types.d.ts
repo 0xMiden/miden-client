@@ -486,10 +486,8 @@ export declare class MidenClient {
   /** Terminates the underlying Web Worker. After this, all method calls throw. */
   terminate(): void;
 
-  /** Exports the client store as a versioned snapshot. */
-  exportStore(storeName: string): Promise<StoreSnapshot>;
-  /** Imports a previously exported store snapshot. */
-  importStore(storeName: string, snapshot: StoreSnapshot): Promise<void>;
+  /** Returns the name of the underlying store (e.g. the IndexedDB database name). */
+  storeName(): string;
 
   /** Advances the mock chain by one block. Only available on mock clients. */
   proveBlock(): void;

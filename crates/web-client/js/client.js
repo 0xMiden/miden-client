@@ -178,33 +178,13 @@ export class MidenClient {
   }
 
   /**
-   * Exports the client store as a versioned snapshot.
+   * Returns the name of the underlying store (e.g. the IndexedDB database name).
    *
-   * @param {string} storeName - The IndexedDB store name to export.
-   * @returns {Promise<StoreSnapshot>} The store snapshot.
+   * @returns {string} The store name.
    */
-  async exportStore(storeName) {
+  storeName() {
     this.assertNotTerminated();
-    const wasm = await this.#getWasm();
-    const data = await wasm.exportStore(storeName);
-    return { version: 1, data };
-  }
-
-  /**
-   * Imports a previously exported store snapshot.
-   *
-   * @param {string} storeName - The IndexedDB store name to import into.
-   * @param {StoreSnapshot} snapshot - The store snapshot to import.
-   */
-  async importStore(storeName, snapshot) {
-    this.assertNotTerminated();
-    if (!snapshot || snapshot.version !== 1) {
-      throw new Error(
-        `Unsupported store snapshot version: ${snapshot?.version}. Expected version 1.`
-      );
-    }
-    const wasm = await this.#getWasm();
-    await wasm.importStore(storeName, snapshot.data);
+    return this.#inner.storeName();
   }
 
   // ── Mock-only methods ──
