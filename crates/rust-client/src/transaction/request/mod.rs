@@ -388,7 +388,7 @@ impl Deserializable for TransactionRequest {
         let ignore_invalid_input_notes = source.read_u8()? == 1;
         let script_arg = Option::<Word>::read_from(source)?;
         let auth_arg = Option::<Word>::read_from(source)?;
-        let expected_ntx_scripts = Vec::<NoteScript>::read_from(source).unwrap_or_default();
+        let expected_ntx_scripts = Vec::<NoteScript>::read_from(source)?;
 
         Ok(TransactionRequest {
             input_notes,

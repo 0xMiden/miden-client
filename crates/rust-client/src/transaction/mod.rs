@@ -204,9 +204,8 @@ where
         transaction_request: TransactionRequest,
         tx_prover: Arc<dyn TransactionProver>,
     ) -> Result<TransactionId, ClientError> {
-        // Pre-flight: register any missing NTX scripts before the main transaction.
-        // Boxed to avoid inflating this future's size (the registration path contains its
-        // own full execute → prove → submit pipeline).
+        // Register any missing NTX scripts before the main transaction.
+        // The registration path contains its own full execute -> prove -> submit pipeline.
         if !transaction_request.expected_ntx_scripts().is_empty() {
             Box::pin(self.ensure_ntx_scripts_registered(
                 account_id,
@@ -649,9 +648,10 @@ where
                     missing_scripts.push(script.clone());
                 },
                 Err(other) => {
-                    return Err(ClientError::NtxScriptRegistrationFailed(format!(
-                        "failed to check script with root {script_root:?}: {other}"
-                    )));
+                    return Err(ClientError::NtxScriptRegistrationFailed {
+                        script_root,
+                        source: other,
+                    });
                 },
             }
         }
