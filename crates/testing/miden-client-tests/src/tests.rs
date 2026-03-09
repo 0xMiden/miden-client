@@ -540,8 +540,8 @@ async fn sync_persists_auth_nodes_for_skipped_blocks() {
 /// `/GetAccount` RPC call, not one per sync step.
 ///
 /// Before the fix, the stale `accounts` snapshot was compared against each step's commitment,
-/// producing N redundant fetches. After the fix, the first step fetches the account and
-/// subsequent steps skip it via `fetched_public_account_ids`.
+/// producing N redundant fetches. After the fix, account commitment updates are collected
+/// across all steps and processed once before the per-block loop.
 #[tokio::test]
 async fn sync_state_no_redundant_get_account_calls() {
     use core::sync::atomic::Ordering;

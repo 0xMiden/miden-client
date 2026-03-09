@@ -176,8 +176,8 @@ impl StateSync {
 
         let public_note_records = self.fetch_public_note_details(&public_note_ids).await?;
 
-        // Deduplicate account commitment updates across all sync steps. Each account only
-        // needs to be fetched once since GetAccount always returns the latest state.
+        // Collect account commitment updates across all sync steps. Each account only needs
+        // to be checked once since GetAccount always returns the latest state.
         let merged_commitment_updates: Vec<(AccountId, Word)> = state_sync_steps
             .iter()
             .flat_map(|s| s.account_commitment_updates.iter())
