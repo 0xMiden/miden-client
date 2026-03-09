@@ -80,22 +80,6 @@
 
 ***
 
-### getOrImport()
-
-> **getOrImport**(`accountId`): `Promise`\<[`Account`](../classes/Account.md)\>
-
-#### Parameters
-
-##### accountId
-
-[`AccountRef`](../type-aliases/AccountRef.md)
-
-#### Returns
-
-`Promise`\<[`Account`](../classes/Account.md)\>
-
-***
-
 ### getBalance()
 
 > **getBalance**(`accountId`, `tokenId`): `Promise`\<`bigint`\>
@@ -129,6 +113,22 @@
 #### Returns
 
 `Promise`\<[`AccountDetails`](AccountDetails.md)\>
+
+***
+
+### getOrImport()
+
+> **getOrImport**(`accountId`): `Promise`\<[`Account`](../classes/Account.md)\>
+
+#### Parameters
+
+##### accountId
+
+[`AccountRef`](../type-aliases/AccountRef.md)
+
+#### Returns
+
+`Promise`\<[`Account`](../classes/Account.md)\>
 
 ***
 

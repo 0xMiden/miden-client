@@ -112,7 +112,7 @@ describe("useConsume", () => {
       await act(async () => {
         txResult = await result.current.consume({
           accountId: "0xaccount",
-          noteIds,
+          notes: noteIds,
         });
       });
 
@@ -151,7 +151,7 @@ describe("useConsume", () => {
       await act(async () => {
         await result.current.consume({
           accountId: "0xaccount",
-          noteIds,
+          notes: noteIds,
         });
       });
 
@@ -184,7 +184,7 @@ describe("useConsume", () => {
       await act(async () => {
         await result.current.consume({
           accountId: "0xaccount",
-          noteIds,
+          notes: noteIds,
         });
       });
 
