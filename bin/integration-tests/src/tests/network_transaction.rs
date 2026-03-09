@@ -186,6 +186,9 @@ pub async fn test_counter_contract_ntx(client_config: ClientConfig) -> Result<()
 
     execute_tx_and_sync(&mut client, native_account.id(), tx_request).await?;
 
+    // execute_tx_and_sync only waits for the *sending* tx to be committed. The node
+    // processes network account notes in a subsequent block, so we must wait before
+    // querying the network account's updated state via RPC.
     wait_for_blocks(&mut client, 2).await;
 
     let a = client
@@ -241,6 +244,7 @@ pub async fn test_recall_note_before_ntx_consumes_it(client_config: ClientConfig
         client.submit_proven_transaction(consume_proven, &consume_result).await?;
     client.apply_transaction(&consume_result, consume_submission_height).await?;
 
+    // Wait for the node to process the network transaction in a subsequent block.
     wait_for_blocks(&mut client, 2).await;
 
     // The network account should have original value
