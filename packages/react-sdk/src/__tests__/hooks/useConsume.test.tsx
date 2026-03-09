@@ -63,7 +63,7 @@ describe("useConsume", () => {
       await expect(
         result.current.consume({
           accountId: "0xaccount",
-          noteIds: ["0xnote1", "0xnote2"],
+          notes: ["0xnote1", "0xnote2"],
         })
       ).rejects.toThrow("Miden client is not ready");
     });
@@ -82,9 +82,9 @@ describe("useConsume", () => {
       await expect(
         result.current.consume({
           accountId: "0xaccount",
-          noteIds: [],
+          notes: [],
         })
-      ).rejects.toThrow("No note IDs provided");
+      ).rejects.toThrow("No notes provided");
     });
 
     it("should execute consume transaction", async () => {
@@ -226,7 +226,7 @@ describe("useConsume", () => {
       act(() => {
         consumePromise = result.current.consume({
           accountId: "0x1",
-          noteIds: ["0xnote1"],
+          notes: ["0xnote1"],
         });
       });
 
@@ -269,7 +269,7 @@ describe("useConsume", () => {
         await expect(
           result.current.consume({
             accountId: "0x1",
-            noteIds: ["0xconsumed"],
+            notes: ["0xconsumed"],
           })
         ).rejects.toThrow("Note already consumed");
       });
@@ -302,7 +302,7 @@ describe("useConsume", () => {
         await expect(
           result.current.consume({
             accountId: "0x1",
-            noteIds: ["invalid-format"],
+            notes: ["invalid-format"],
           })
         ).rejects.toThrow("Invalid note ID format");
       });
@@ -332,7 +332,7 @@ describe("useConsume", () => {
         await expect(
           result.current.consume({
             accountId: "0xnonexistent",
-            noteIds: ["0xnote1"],
+            notes: ["0xnote1"],
           })
         ).rejects.toThrow("Account not found");
       });
@@ -363,7 +363,7 @@ describe("useConsume", () => {
       await act(async () => {
         await result.current.consume({
           accountId: "0x1",
-          noteIds: ["0xnote1"],
+          notes: ["0xnote1"],
         });
       });
 
@@ -411,7 +411,7 @@ describe("useConsume", () => {
       await act(async () => {
         await result.current.consume({
           accountId: "0x1",
-          noteIds: ["0xnote1"],
+          notes: ["0xnote1"],
         });
       });
 
@@ -426,7 +426,7 @@ describe("useConsume", () => {
       await act(async () => {
         await result.current.consume({
           accountId: "0x1",
-          noteIds: ["0xnote2"],
+          notes: ["0xnote2"],
         });
       });
 
@@ -458,7 +458,7 @@ describe("useConsume", () => {
       await act(async () => {
         await result.current.consume({
           accountId: "0x1",
-          noteIds: ["0xnote1"],
+          notes: ["0xnote1"],
         });
       });
 

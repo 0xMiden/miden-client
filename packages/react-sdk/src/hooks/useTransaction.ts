@@ -155,10 +155,6 @@ export function useTransaction(): UseTransactionResult {
   };
 }
 
-function resolveAccountId(accountId: string | AccountIdType): AccountIdType {
-  return parseAccountId(accountId);
-}
-
 async function resolveRequest(
   request: TransactionRequest | TransactionRequestFactory,
   client: WebClient

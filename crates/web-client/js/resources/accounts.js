@@ -82,6 +82,11 @@ export class AccountsResource {
     return account;
   }
 
+  async getOrImport(ref) {
+    this.#client.assertNotTerminated();
+    return (await this.get(ref)) ?? (await this.import(ref));
+  }
+
   async get(ref) {
     this.#client.assertNotTerminated();
     const wasm = await this.#getWasm();

@@ -449,6 +449,7 @@ export interface BuildSwapTagOptions {
 export interface AccountsResource {
   create(options?: CreateAccountOptions): Promise<Account>;
   get(accountId: AccountRef): Promise<Account | null>;
+  getOrImport(accountId: AccountRef): Promise<Account>;
   list(): Promise<AccountHeader[]>;
   getDetails(accountId: AccountRef): Promise<AccountDetails>;
   getBalance(accountId: AccountRef, tokenId: AccountRef): Promise<bigint>;

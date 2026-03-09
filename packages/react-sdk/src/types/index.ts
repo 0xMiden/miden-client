@@ -1,5 +1,4 @@
 import { AuthScheme } from "@miden-sdk/miden-sdk";
-import type { AccountRef } from "../utils/accountParsing";
 import type {
   WasmWebClient as WebClient,
   Account,
@@ -13,9 +12,13 @@ import type {
   TransactionRecord,
   TransactionRequest,
   NoteType,
+  NoteId,
   AccountStorageMode,
   Note,
 } from "@miden-sdk/miden-sdk";
+
+/** Flexible account reference — hex string, bech32 string, or WASM AccountId */
+export type AccountRef = string | AccountId;
 
 // Re-export SDK types for convenience
 export { AuthScheme };
@@ -34,7 +37,6 @@ export type {
   NoteType,
   AccountStorageMode,
   Note,
-  AccountRef,
 };
 
 // Re-export signer types for external signer providers
@@ -318,6 +320,38 @@ export interface MultiSendOptions {
   skipSync?: boolean;
 }
 
+export interface InternalTransferOptions {
+  /** Sender account ID */
+  from: string;
+  /** Recipient account ID */
+  to: string;
+  /** Asset ID to send (token id) */
+  assetId: string;
+  /** Amount to transfer */
+  amount: bigint;
+  /** Note type. Default: private */
+  noteType?: "private" | "public";
+}
+
+export interface InternalTransferChainOptions {
+  /** Initial sender account ID */
+  from: string;
+  /** Ordered list of recipient account IDs */
+  recipients: string[];
+  /** Asset ID to send (token id) */
+  assetId: string;
+  /** Amount to transfer per hop */
+  amount: bigint;
+  /** Note type. Default: private */
+  noteType?: "private" | "public";
+}
+
+export interface InternalTransferResult {
+  createTransactionId: string;
+  consumeTransactionId: string;
+  noteId: string;
+}
+
 export interface WaitForCommitOptions {
   /** Timeout in milliseconds. Default: 10000 */
   timeoutMs?: number;
@@ -353,7 +387,7 @@ export interface ConsumeOptions {
   /** Account ID that will consume the notes */
   accountId: string;
   /** Notes to consume — accepts note IDs (hex strings), NoteId objects, InputNoteRecord, or Note objects */
-  notes: (string | import("@miden-sdk/miden-sdk").NoteId | InputNoteRecord | Note)[];
+  notes: (string | NoteId | InputNoteRecord | Note)[];
 }
 
 // Swap options
