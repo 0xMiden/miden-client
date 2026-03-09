@@ -525,6 +525,13 @@ class WebClient {
     });
   }
 
+  async newAccountWithSecretKey(account, secretKey) {
+    return this._serializeWasmCall(async () => {
+      const wasmWebClient = await this.getWasmWebClient();
+      return await wasmWebClient.newAccountWithSecretKey(account, secretKey);
+    });
+  }
+
   async addAccountSecretKeyToWebStore(accountId, secretKey) {
     return this._serializeWasmCall(async () => {
       const wasmWebClient = await this.getWasmWebClient();

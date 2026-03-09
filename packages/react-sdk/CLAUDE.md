@@ -133,7 +133,7 @@ const { mutate: consume } = useConsume();
 
 await consume({
   accountId: myAccountId,
-  notes: [noteId1, noteId2],  // note IDs, InputNoteRecords, or Note objects
+  noteIds: [noteId1, noteId2],  // optional: consume specific notes
 });
 ```
 

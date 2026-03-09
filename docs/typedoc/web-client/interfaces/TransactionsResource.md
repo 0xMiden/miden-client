@@ -44,6 +44,8 @@
 
 > **execute**(`options`): `Promise`\<[`TransactionId`](../classes/TransactionId.md)\>
 
+Execute a custom transaction script, optionally referencing foreign accounts (FPI).
+
 #### Parameters
 
 ##### options
@@ -106,47 +108,17 @@
 
 ### send()
 
-#### Call Signature
+> **send**(`options`): `Promise`\<[`TransactionId`](../classes/TransactionId.md)\>
 
-> **send**(`options`): `Promise`\<\{ `note`: `null`; `txId`: [`TransactionId`](../classes/TransactionId.md); \}\>
+#### Parameters
 
-##### Parameters
+##### options
 
-###### options
+[`SendOptions`](SendOptions.md)
 
-[`SendOptionsDefault`](SendOptionsDefault.md)
+#### Returns
 
-##### Returns
-
-`Promise`\<\{ `note`: `null`; `txId`: [`TransactionId`](../classes/TransactionId.md); \}\>
-
-#### Call Signature
-
-> **send**(`options`): `Promise`\<\{ `note`: [`Note`](../classes/Note.md); `txId`: [`TransactionId`](../classes/TransactionId.md); \}\>
-
-##### Parameters
-
-###### options
-
-[`SendOptionsReturnNote`](SendOptionsReturnNote.md)
-
-##### Returns
-
-`Promise`\<\{ `note`: [`Note`](../classes/Note.md); `txId`: [`TransactionId`](../classes/TransactionId.md); \}\>
-
-#### Call Signature
-
-> **send**(`options`): `Promise`\<[`SendResult`](SendResult.md)\>
-
-##### Parameters
-
-###### options
-
-[`SendOptions`](../type-aliases/SendOptions.md)
-
-##### Returns
-
-`Promise`\<[`SendResult`](SendResult.md)\>
+`Promise`\<[`TransactionId`](../classes/TransactionId.md)\>
 
 ***
 
@@ -201,7 +173,7 @@ Note: WASM requires accountId separately, so `account` is the first argument.
 
 ##### txId
 
-`string` | [`TransactionId`](../classes/TransactionId.md)
+`string`
 
 ##### options?
 

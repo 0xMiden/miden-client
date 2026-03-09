@@ -32,21 +32,24 @@ export class AccountsResource {
         BigInt(opts.maxSupply),
         authScheme
       );
-    }
-
-    if (
+    } else if (
       opts?.type === "ImmutableContract" ||
       opts?.type === "MutableContract"
     ) {
       return await this.#createContract(opts, wasm);
+    } else {
+      // Default: wallet (mutable or immutable based on type)
+      const mutable = resolveAccountMutability(opts?.type);
+      const storageMode = resolveStorageMode(opts?.storage ?? "private", wasm);
+      const authScheme = resolveAuthScheme(opts?.auth, wasm);
+      const seed = opts?.seed ? await hashSeed(opts.seed) : undefined;
+      return await this.#inner.newWallet(
+        storageMode,
+        mutable,
+        authScheme,
+        seed
+      );
     }
-
-    // Default: wallet (mutable or immutable based on type)
-    const mutable = resolveAccountMutability(opts?.type);
-    const storageMode = resolveStorageMode(opts?.storage ?? "private", wasm);
-    const authScheme = resolveAuthScheme(opts?.auth, wasm);
-    const seed = opts?.seed ? await hashSeed(opts.seed) : undefined;
-    return await this.#inner.newWallet(storageMode, mutable, authScheme, seed);
   }
 
   async #createContract(opts, wasm) {
@@ -74,11 +77,9 @@ export class AccountsResource {
 
     const built = builder.build();
     const account = built.account;
-    const accountId = account.id();
 
-    await this.#inner.newAccount(account, false);
-    await this.#inner.addAccountSecretKeyToWebStore(accountId, opts.auth);
-    return await this.#inner.getAccount(accountId);
+    await this.#inner.newAccountWithSecretKey(account, opts.auth);
+    return account;
   }
 
   async getOrImport(ref) {
@@ -130,10 +131,8 @@ export class AccountsResource {
     this.#client.assertNotTerminated();
     const wasm = await this.#getWasm();
 
-    // Early exit for string, Account, and AccountHeader types before property
-    // checks, preventing misrouting if a WASM object ever gains a .file or .seed
-    // property. Bare AccountId (no .id() method) falls through to the fallback.
-    if (typeof input === "string" || typeof input.id === "function") {
+    if (typeof input === "string") {
+      // Import by ID (hex or bech32 string)
       const id = resolveAccountRef(input, wasm);
       await this.#inner.importAccountById(id);
       return await this.#inner.getAccount(id);
@@ -167,10 +166,9 @@ export class AccountsResource {
       );
     }
 
-    // Fallback: treat as AccountRef (string, AccountId, Account, AccountHeader)
-    const id = resolveAccountRef(input, wasm);
-    await this.#inner.importAccountById(id);
-    return await this.#inner.getAccount(id);
+    throw new Error(
+      "Invalid import input: expected a string, { file }, or { seed }"
+    );
   }
 
   async export(ref) {
