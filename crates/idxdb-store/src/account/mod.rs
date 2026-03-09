@@ -184,7 +184,7 @@ impl IdxdbStore {
         let account_code = self.get_account_code(account_header.code_commitment()).await?;
 
         let account_storage = self.get_storage(account_id, AccountStorageFilter::All).await?;
-        let assets = self.get_vault_assets(account_id).await?;
+        let assets = self.get_vault_assets(account_id, None).await?;
         let account_vault = AssetVault::new(&assets)?;
 
         let account = Account::new(
@@ -384,8 +384,13 @@ impl IdxdbStore {
     pub(super) async fn get_vault_assets(
         &self,
         account_id: AccountId,
+        faucet_id_prefixes: Option<Vec<String>>,
     ) -> Result<Vec<Asset>, StoreError> {
-        let promise = idxdb_get_account_vault_assets(self.db_id(), account_id.to_string());
+        let promise = idxdb_get_account_vault_assets(
+            self.db_id(),
+            account_id.to_string(),
+            faucet_id_prefixes,
+        );
         let vault_assets_idxdb: Vec<AccountAssetIdxdbObject> =
             await_js(promise, "failed to fetch vault assets").await?;
 
@@ -501,7 +506,7 @@ impl IdxdbStore {
             .await?
             .ok_or(StoreError::AccountDataNotFound(account_id))?;
 
-        let assets = self.get_vault_assets(account_id).await?;
+        let assets = self.get_vault_assets(account_id, None).await?;
         Ok(AssetVault::new(&assets)?)
     }
 

@@ -177,21 +177,28 @@ export async function getAccountStorageMaps(dbId: string, accountId: string) {
   }
 }
 
-export async function getAccountVaultAssets(dbId: string, accountId: string) {
+export async function getAccountVaultAssets(
+  dbId: string,
+  accountId: string,
+  faucetIdPrefixes?: string[]
+) {
   try {
     const db = getDatabase(dbId);
-    const allMatchingRecords = await db.latestAccountAssets
-      .where("accountId")
-      .equals(accountId)
-      .toArray();
+    let query = db.latestAccountAssets.where("accountId").equals(accountId);
 
-    const assets = allMatchingRecords.map((record) => {
-      return {
-        asset: record.asset,
-      };
-    });
+    let records;
+    if (faucetIdPrefixes?.length) {
+      const prefixSet = new Set(faucetIdPrefixes);
+      records = await query
+        .and((record) => prefixSet.has(record.faucetIdPrefix))
+        .toArray();
+    } else {
+      records = await query.toArray();
+    }
 
-    return assets;
+    return records.map((record) => ({
+      asset: record.asset,
+    }));
   } catch (error: unknown) {
     logWebStoreError(
       error,

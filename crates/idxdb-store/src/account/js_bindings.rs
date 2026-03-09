@@ -44,7 +44,11 @@ extern "C" {
     pub fn idxdb_get_account_storage_maps(db_id: &str, account_id: String) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = getAccountVaultAssets)]
-    pub fn idxdb_get_account_vault_assets(db_id: &str, account_id: String) -> js_sys::Promise;
+    pub fn idxdb_get_account_vault_assets(
+        db_id: &str,
+        account_id: String,
+        faucet_id_prefixes: Option<Vec<String>>,
+    ) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = getAccountAddresses)]
     pub fn idxdb_get_account_addresses(db_id: &str, account_id: String) -> js_sys::Promise;

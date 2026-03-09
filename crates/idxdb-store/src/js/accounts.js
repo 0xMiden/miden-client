@@ -139,19 +139,23 @@ export async function getAccountStorageMaps(dbId, accountId) {
         logWebStoreError(error, `Error fetching account storage maps for account ${accountId}`);
     }
 }
-export async function getAccountVaultAssets(dbId, accountId) {
+export async function getAccountVaultAssets(dbId, accountId, faucetIdPrefixes) {
     try {
         const db = getDatabase(dbId);
-        const allMatchingRecords = await db.latestAccountAssets
-            .where("accountId")
-            .equals(accountId)
-            .toArray();
-        const assets = allMatchingRecords.map((record) => {
-            return {
-                asset: record.asset,
-            };
-        });
-        return assets;
+        let query = db.latestAccountAssets.where("accountId").equals(accountId);
+        let records;
+        if (faucetIdPrefixes?.length) {
+            const prefixSet = new Set(faucetIdPrefixes);
+            records = await query
+                .and((record) => prefixSet.has(record.faucetIdPrefix))
+                .toArray();
+        }
+        else {
+            records = await query.toArray();
+        }
+        return records.map((record) => ({
+            asset: record.asset,
+        }));
     }
     catch (error) {
         logWebStoreError(error, `Error fetching account vault for account ${accountId}`);
