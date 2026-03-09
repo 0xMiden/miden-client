@@ -19,7 +19,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
       <TurnkeySignerProvider>
         <SignerSlot />
       </TurnkeySignerProvider>
-      <MidenFiSignerProvider network="Testnet" autoConnect={false}>
+      <MidenFiSignerProvider network="testnet" autoConnect={false}>
         <SignerSlot />
       </MidenFiSignerProvider>
       <MidenProvider
