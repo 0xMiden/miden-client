@@ -900,16 +900,16 @@ test.describe("MidenClient API - Mock Chain", () => {
       // Serialize chain so the second client sees the same blocks
       const chain = client.serializeMockChain();
 
-      // Create a fresh mock client with the same chain but empty store
+      // Create a fresh mock client with the same chain but empty local store.
+      // Do NOT sync — sync auto-imports accounts from the chain.
       const client2 = await window.MidenClient.createMock({
         serializedMockChain: chain,
       });
-      await client2.sync();
 
-      // The account should NOT exist locally
+      // The account should NOT exist locally (no sync yet)
       const before = await client2.accounts.get(walletId);
 
-      // getOrImport should fetch it from the (mock) network
+      // getOrImport should find it missing locally and import from the network
       const imported = await client2.accounts.getOrImport(walletId);
 
       return {
