@@ -14,7 +14,6 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      // Local dev overrides — not needed when using published packages
       "@miden-sdk/react": path.resolve(__dirname, "../../src/index.ts"),
       "@miden-sdk/miden-turnkey-react": path.resolve(__dirname, "../../../../../miden-turnkey/packages/use-miden-turnkey-react/dist/index.mjs"),
     },
