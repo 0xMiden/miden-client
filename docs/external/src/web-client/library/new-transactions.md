@@ -1,6 +1,6 @@
 ---
-title: New-transactions
-sidebar_position: 8
+title: New Transactions
+sidebar_position: 9
 ---
 
 # Creating Transactions with the Miden SDK

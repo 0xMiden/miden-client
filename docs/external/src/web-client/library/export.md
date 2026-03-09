@@ -1,6 +1,6 @@
 ---
-title: export
-sidebar_position: 4
+title: Export
+sidebar_position: 5
 ---
 
 # Exporting Data with the Miden SDK

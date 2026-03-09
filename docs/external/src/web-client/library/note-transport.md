@@ -1,6 +1,6 @@
 ---
-title: note-transport
-sidebar_position: 10
+title: Note Transport
+sidebar_position: 11
 ---
 
 # Note Transport with the Miden SDK

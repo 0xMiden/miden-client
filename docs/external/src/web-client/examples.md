@@ -1,6 +1,6 @@
 ---
 title: Examples
-sidebar_position: 11
+sidebar_position: 6
 ---
 
 # Miden SDK Examples
@@ -33,7 +33,7 @@ The examples in this section showcase various capabilities of the Miden SDK, inc
   - Working with consumable notes
   - Send and fetch private notes using the note transport network
 
-For installation instructions, prerequisites, and setup details, please refer to the [SDK README](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/README.md).
+For installation instructions, prerequisites, and setup details, please refer to the [SDK README](https://github.com/0xMiden/miden-client/blob/main/docs/typedoc/web-client/README.md).
 
 Each example is self-contained and includes:
 

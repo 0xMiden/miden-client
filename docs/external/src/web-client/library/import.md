@@ -1,6 +1,6 @@
 ---
-title: import
-sidebar_position: 3
+title: Import
+sidebar_position: 4
 ---
 
 # Importing Data with the Miden SDK

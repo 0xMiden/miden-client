@@ -1,6 +1,6 @@
 ---
-title: notes
-sidebar_position: 5
+title: Notes
+sidebar_position: 6
 ---
 
 # Working with Notes in the Miden SDK

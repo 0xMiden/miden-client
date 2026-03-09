@@ -1,6 +1,6 @@
 ---
-title: tags
-sidebar_position: 7
+title: Tags
+sidebar_position: 8
 ---
 
 # Working with Note Tags in the Miden SDK

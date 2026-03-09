@@ -1,6 +1,6 @@
 ---
-title: sync
-sidebar_position: 6
+title: Sync
+sidebar_position: 7
 ---
 
 # Synchronizing State with the Miden SDK

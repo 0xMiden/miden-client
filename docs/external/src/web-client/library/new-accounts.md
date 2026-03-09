@@ -1,5 +1,5 @@
 ---
-title: New-accounts
+title: New Accounts
 sidebar_position: 2
 ---
 
