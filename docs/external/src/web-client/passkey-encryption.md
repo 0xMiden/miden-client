@@ -156,6 +156,7 @@ If a user loses their passkey (device factory reset without cloud sync, ecosyste
 Mitigations:
 1. Recommend enabling cloud sync (iCloud Keychain, Google Password Manager).
 2. Users should export their store while the client is active before switching ecosystems.
+3. Provide a seed phrase (mnemonic) backup — pass a deterministic `initSeed` when creating the wallet so the same seed regenerates the same keys regardless of the passkey. Note that for **private accounts**, recovering the keys alone is not enough; you must also back up the account data (e.g. via `exportAccountFile`).
 
 ## Security Properties
 
