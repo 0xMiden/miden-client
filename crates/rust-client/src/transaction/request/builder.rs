@@ -420,11 +420,7 @@ impl TransactionRequestBuilder {
                 let note_storage = NoteStorage::new(vec![])?;
                 let recipient = NoteRecipient::new(serial_num, script, note_storage);
                 let note_assets = NoteAssets::new(vec![])?;
-                let metadata = NoteMetadata::new(
-                    sender_account_id,
-                    NoteType::Public,
-                    NoteTag::with_account_target(sender_account_id),
-                );
+                let metadata = NoteMetadata::new(sender_account_id, NoteType::Public);
                 Ok(OutputNote::Full(Note::new(note_assets, metadata, recipient)))
             })
             .collect::<Result<_, NoteError>>()?;
