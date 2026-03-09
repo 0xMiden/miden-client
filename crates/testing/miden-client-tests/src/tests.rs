@@ -537,10 +537,7 @@ async fn sync_persists_auth_nodes_for_skipped_blocks() {
 }
 
 /// Tests that a public account modified across multiple sync steps only triggers a single
-/// `/GetAccount` RPC call, not one per sync step.
-///
-/// Before the fix, the stale `accounts` snapshot was compared against each step's commitment,
-/// producing N redundant fetches. After the fix, account commitment updates are collected
+/// `/GetAccount` RPC call, not one per sync step. Account commitment updates are collected
 /// across all steps and processed once before the per-block loop.
 #[tokio::test]
 async fn sync_state_no_redundant_get_account_calls() {
