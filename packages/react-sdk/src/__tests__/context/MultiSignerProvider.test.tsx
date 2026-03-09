@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, act, renderHook } from "@testing-library/react";
-import React, { type ReactNode } from "react";
+import { type ReactNode } from "react";
 import { SignerContext, useSigner } from "../../context/SignerContext";
 import type { SignerContextValue } from "../../context/SignerContext";
 import {
