@@ -56,7 +56,7 @@ struct SerializedInputNoteData {
     pub state: Vec<u8>,
     pub created_at: u64,
     pub consumed_block_height: Option<u32>,
-    pub consumed_tx_order: Option<u32>,
+    pub consumed_tx_order: Option<u16>,
     pub consumer_account_id: Option<String>,
 }
 
@@ -250,7 +250,7 @@ impl SqliteStore {
 pub(super) fn upsert_input_note_tx(
     tx: &Transaction<'_>,
     note: &InputNoteRecord,
-    consumed_tx_order: Option<u32>,
+    consumed_tx_order: Option<u16>,
 ) -> Result<(), StoreError> {
     let SerializedInputNoteData {
         id,
@@ -408,7 +408,7 @@ fn parse_input_note(
 /// Serialize the provided input note into database compatible types.
 fn serialize_input_note(
     note: &InputNoteRecord,
-    consumed_tx_order: Option<u32>,
+    consumed_tx_order: Option<u16>,
 ) -> SerializedInputNoteData {
     let id = note.id().as_word().to_string();
     let nullifier = note.nullifier().to_hex();

@@ -33,7 +33,7 @@ pub struct InputNoteUpdate {
     update_type: NoteUpdateType,
     /// Position of the consuming transaction in the account's state chain within the block.
     /// `None` for non-consumed notes or notes consumed by external (non-client) transactions.
-    consumed_tx_order: Option<u32>,
+    consumed_tx_order: Option<u16>,
 }
 
 impl InputNoteUpdate {
@@ -333,7 +333,7 @@ impl NoteUpdateTracker {
         &mut self,
         nullifier_update: &NullifierUpdate,
         mut committed_transactions: impl Iterator<Item = &'a TransactionRecord>,
-        consumed_tx_order: Option<u32>,
+        consumed_tx_order: Option<u16>,
     ) -> Result<(), ClientError> {
         if let Some(input_note_update) =
             self.get_input_note_update_by_nullifier(nullifier_update.nullifier)
