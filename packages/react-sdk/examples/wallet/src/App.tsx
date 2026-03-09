@@ -47,19 +47,15 @@ function SignerSelector({
   multiSigner: ReturnType<typeof useMultiSigner>;
   onUseLocal: () => void;
 }) {
-  const [connecting, setConnecting] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const handleConnect = async (name: string) => {
     if (!multiSigner) return;
-    setConnecting(name);
     setError(null);
     try {
       await multiSigner.connectSigner(name);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Connection failed");
-    } finally {
-      setConnecting(null);
     }
   };
 
@@ -71,12 +67,11 @@ function SignerSelector({
           <button
             key={s.name}
             onClick={() => handleConnect(s.name)}
-            disabled={connecting !== null}
           >
-            {connecting === s.name ? `Connecting ${s.name}...` : s.name}
+            {s.name}
           </button>
         ))}
-        <button onClick={onUseLocal} disabled={connecting !== null}>
+        <button onClick={onUseLocal}>
           Use Local Keystore
         </button>
       </div>
