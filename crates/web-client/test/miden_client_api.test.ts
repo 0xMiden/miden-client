@@ -285,7 +285,7 @@ test.describe("MidenClient API - Mock Chain", () => {
       );
 
       // Submit the pre-built request through the high-level API
-      const txId = await client.transactions.submit(faucet, mintRequest);
+      const { txId } = await client.transactions.submit(faucet, mintRequest);
 
       return {
         txId: txId.toHex(),
