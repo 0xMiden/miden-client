@@ -44,10 +44,9 @@ pub struct ClientDataStore {
     transaction_mast_store: Arc<TransactionMastStore>,
     /// Cache of foreign account inputs that should be returned to the executor on demand.
     foreign_account_inputs: RwLock<BTreeMap<AccountId, AccountInputs>>,
-    /// Cache of storage map witnesses, keyed by (`account_id`, `map_root`, `map_key`). Avoids
-    /// redundant RPC calls when the same map entry is accessed multiple times within a
-    /// transaction.
-    storage_map_cache: RwLock<BTreeMap<(AccountId, Word, StorageMapKey), StorageMapWitness>>,
+    /// Cache of storage map witnesses, keyed by (`map_root`, `map_key`). Avoids redundant RPC
+    /// calls when the same map entry is accessed multiple times within a transaction.
+    storage_map_cache: RwLock<BTreeMap<(Word, StorageMapKey), StorageMapWitness>>,
     /// RPC client used to lazy-load foreign account data on cache miss.
     rpc_api: Arc<dyn NodeRpcClient>,
 }
@@ -402,7 +401,7 @@ impl DataStore for ClientDataStore {
         map_root: Word,
         map_key: StorageMapKey,
     ) -> Result<StorageMapWitness, DataStoreError> {
-        let cache_key = (account_id, map_root, map_key);
+        let cache_key = (map_root, map_key);
 
         // Check the in-memory witness cache first.
         if let Some(witness) = self.storage_map_cache.read().get(&cache_key).cloned() {
