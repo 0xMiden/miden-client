@@ -286,7 +286,6 @@ pub async fn apply_transaction_delta(
     db_id: &str,
     account_id: AccountId,
     final_header: &AccountHeader,
-    account_seed: Option<Word>,
     updated_storage_slots: &BTreeMap<StorageSlotName, (Word, StorageSlotType)>,
     updated_assets: &[Asset],
     removed_vault_keys: &[AssetVaultKey],
@@ -343,8 +342,6 @@ pub async fn apply_transaction_delta(
     let vault_root = final_header.vault_root().to_string();
     let committed = account_id.is_public();
     let commitment = final_header.to_commitment().to_string();
-    let account_seed_bytes = account_seed.map(|seed| seed.to_bytes());
-
     JsFuture::from(idxdb_apply_transaction_delta(
         db_id,
         account_id_str,
@@ -357,7 +354,6 @@ pub async fn apply_transaction_delta(
         vault_root,
         committed,
         commitment,
-        account_seed_bytes,
     ))
     .await?;
 

@@ -117,12 +117,6 @@ impl IdxdbStore {
             )?;
         } else {
             // Delta path: load only targeted data, avoid loading full Account.
-            let (_header, status) = self
-                .get_account_header(account_id)
-                .await?
-                .ok_or(StoreError::AccountDataNotFound(account_id))?;
-            let seed = status.seed().copied();
-
             let old_vault_assets = self.get_vault_assets(account_id).await?;
             let old_map_roots = self.get_storage_map_roots(account_id).await?;
 
@@ -188,7 +182,6 @@ impl IdxdbStore {
                 self.db_id(),
                 account_id,
                 final_header,
-                seed,
                 &updated_storage_slots,
                 &updated_assets,
                 &removed_vault_keys,

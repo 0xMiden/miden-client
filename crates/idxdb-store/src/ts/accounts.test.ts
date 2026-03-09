@@ -53,8 +53,7 @@ describe("Account delta and undo operations", () => {
       STORAGE_ROOT_N1, // storageRoot
       VAULT_ROOT_N1, // vaultRoot
       false, // committed
-      COMMITMENT_N1, // commitment
-      undefined // accountSeed
+      COMMITMENT_N1 // commitment
     );
 
     // Apply nonce "2" — updated account state with changed values
@@ -69,8 +68,7 @@ describe("Account delta and undo operations", () => {
       STORAGE_ROOT_N2, // storageRoot
       VAULT_ROOT_N2, // vaultRoot
       false, // committed
-      COMMITMENT_N2, // commitment
-      undefined // accountSeed
+      COMMITMENT_N2 // commitment
     );
 
     // Verify latest shows nonce "2" state

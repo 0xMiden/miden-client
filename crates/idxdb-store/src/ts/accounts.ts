@@ -396,8 +396,7 @@ export async function applyTransactionDelta(
   storageRoot: string,
   vaultRoot: string,
   committed: boolean,
-  commitment: string,
-  accountSeed: Uint8Array | undefined
+  commitment: string
 ) {
   try {
     const db = getDatabase(dbId);
@@ -506,7 +505,7 @@ export async function applyTransactionDelta(
           vaultRoot,
           nonce,
           committed,
-          accountSeed,
+          accountSeed: null,
           accountCommitment: commitment,
           locked: false,
         };
