@@ -601,8 +601,7 @@ async fn sync_state_no_redundant_get_account_calls() {
         .await
         .unwrap();
 
-    // With the fix: exactly 1 GetAccount RPC call (first step fetches, rest are skipped)
-    // Without the fix: 3 calls (one per sync step that reports a commitment change)
+    // Exactly 1 GetAccount RPC call (first step fetches, rest are skipped)
     assert_eq!(
         rpc_api.get_account_details_call_count.load(Ordering::SeqCst),
         1,
