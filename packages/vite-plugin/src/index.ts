@@ -41,6 +41,13 @@ export function midenVitePlugin(options?: MidenVitePluginOptions): Plugin {
     rpcProxyPath = "/rpc.Api",
   } = options ?? {};
 
+  const requiredDedupe = [
+    "react",
+    "react-dom",
+    "react/jsx-runtime",
+    "@miden-sdk/react",
+  ];
+
   return {
     name: "@miden-sdk/vite-plugin",
     enforce: "pre",
@@ -83,28 +90,14 @@ export function midenVitePlugin(options?: MidenVitePluginOptions): Plugin {
         };
       }
 
-      // Merge with any existing esbuild plugins the user may have configured
-      const existingPlugins =
-        userConfig.optimizeDeps?.esbuildOptions?.plugins ?? [];
-
       return {
         resolve: {
           alias,
-          dedupe: [
-            ...wasmPackages,
-            "react",
-            "react-dom",
-            "react/jsx-runtime",
-            "@miden-sdk/react",
-          ],
+          dedupe: [...wasmPackages, ...requiredDedupe],
           preserveSymlinks: true,
         },
         optimizeDeps: {
           exclude: [...wasmPackages],
-          esbuildOptions: {
-            target: "esnext",
-            plugins: [...existingPlugins, externalizeMidenReact],
-          },
         },
         build: {
           target: "esnext",
@@ -116,6 +109,42 @@ export function midenVitePlugin(options?: MidenVitePluginOptions): Plugin {
         server: serverConfig,
         preview: previewConfig,
       };
+    },
+
+    // Use configResolved to inject the esbuild externalization plugin and
+    // dedupe entries into the final resolved config. This runs AFTER all
+    // plugins' config() hooks have been merged, so other plugins (e.g.
+    // vite-plugin-node-polyfills) can't overwrite these entries.
+    configResolved(config) {
+      // Ensure esbuild externalization plugin is present
+      if (!config.optimizeDeps.esbuildOptions) {
+        config.optimizeDeps.esbuildOptions = {};
+      }
+      const esbuildOpts = config.optimizeDeps.esbuildOptions;
+      if (!esbuildOpts.plugins) {
+        esbuildOpts.plugins = [];
+      }
+      const hasPlugin = esbuildOpts.plugins.some(
+        (p: any) => p.name === "externalize-miden-react"
+      );
+      if (!hasPlugin) {
+        esbuildOpts.plugins.push(externalizeMidenReact);
+      }
+
+      // Ensure esnext target for top-level await in WASM
+      if (!esbuildOpts.target) {
+        esbuildOpts.target = "esnext";
+      }
+
+      // Ensure required dedupe entries are present
+      if (!config.resolve.dedupe) {
+        (config.resolve as any).dedupe = [];
+      }
+      for (const dep of requiredDedupe) {
+        if (!config.resolve.dedupe.includes(dep)) {
+          config.resolve.dedupe.push(dep);
+        }
+      }
     },
   };
 }
