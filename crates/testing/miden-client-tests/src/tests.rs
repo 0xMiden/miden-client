@@ -575,7 +575,7 @@ async fn sync_state_no_redundant_get_account_calls() {
             .proven_blocks()
             .iter()
             .flat_map(|b| b.body().updated_accounts().iter())
-            .map(|u| u.account_id())
+            .map(miden_protocol::block::BlockAccountUpdate::account_id)
             .find(|id| !id.is_private())
             .expect("prebuilt mock chain should have a public account")
     };
