@@ -73,9 +73,7 @@ const ERROR_PATTERNS: ErrorPattern[] = [
  * Throws if the signer is disconnected.
  * No-op when signerConnected is `true` (connected) or `null` (no signer provider).
  */
-export function assertSignerConnected(
-  signerConnected: boolean | null
-): void {
+export function assertSignerConnected(signerConnected: boolean | null): void {
   if (signerConnected === false) {
     throw new Error(
       "Signer is disconnected. Reconnect your wallet to perform transactions."
