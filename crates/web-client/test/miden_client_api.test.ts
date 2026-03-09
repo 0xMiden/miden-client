@@ -869,6 +869,60 @@ test.describe("MidenClient API - Mock Chain", () => {
     expect(result.fitsU32).toBe(true);
   });
 
+  test("accounts.getOrImport returns existing account without importing", async ({
+    page,
+  }) => {
+    const result = await page.evaluate(async () => {
+      const client = await window.MidenClient.createMock();
+      const wallet = await client.accounts.create({ storage: "public" });
+      const walletId = wallet.id().toString();
+
+      // getOrImport should return the already-local account
+      const fetched = await client.accounts.getOrImport(walletId);
+
+      return {
+        fetchedId: fetched.id().toString(),
+        originalId: walletId,
+      };
+    });
+
+    expect(result.fetchedId).toBe(result.originalId);
+  });
+
+  test("accounts.getOrImport imports account not in local store", async ({
+    page,
+  }) => {
+    const result = await page.evaluate(async () => {
+      const client = await window.MidenClient.createMock();
+      const wallet = await client.accounts.create({ storage: "public" });
+      const walletId = wallet.id().toString();
+
+      // Serialize chain so the second client sees the same blocks
+      const chain = client.serializeMockChain();
+
+      // Create a fresh mock client with the same chain but empty store
+      const client2 = await window.MidenClient.createMock({
+        serializedMockChain: chain,
+      });
+      await client2.sync();
+
+      // The account should NOT exist locally
+      const before = await client2.accounts.get(walletId);
+
+      // getOrImport should fetch it from the (mock) network
+      const imported = await client2.accounts.getOrImport(walletId);
+
+      return {
+        beforeWasNull: before === null,
+        importedId: imported.id().toString(),
+        originalId: walletId,
+      };
+    });
+
+    expect(result.beforeWasNull).toBe(true);
+    expect(result.importedId).toBe(result.originalId);
+  });
+
   test("serializeMockChain and restore", async ({ page }) => {
     const result = await page.evaluate(async () => {
       const client = await window.MidenClient.createMock();

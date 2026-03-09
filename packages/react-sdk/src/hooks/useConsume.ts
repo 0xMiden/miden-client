@@ -82,49 +82,62 @@ export function useConsume(): UseConsumeResult {
 
         setStage("proving");
         const txResult = await runExclusiveSafe(async () => {
-          // Resolve each input to a Note object:
+          // Resolve each input to a Note object, preserving original order:
           // - InputNoteRecord (has .toNote()) → unwrap via .toNote()
           // - Note (has .id() but not .toNote()) → use directly
           // - string → look up from store by hex ID
           // - NoteId → look up from store
-          const directNotes: Note[] = [];
-          const noteIdInputs: NoteId[] = [];
+          const resolved: Note[] = new Array(options.notes.length);
+          const lookupIndices: number[] = [];
+          const lookupIds: NoteId[] = [];
 
-          for (const item of options.notes) {
+          for (let i = 0; i < options.notes.length; i++) {
+            const item = options.notes[i];
             if (typeof item === "string") {
-              noteIdInputs.push(NoteId.fromHex(item));
+              lookupIndices.push(i);
+              lookupIds.push(NoteId.fromHex(item));
             } else if (
               item !== null &&
               typeof item === "object" &&
               typeof (item as InputNoteRecord).toNote === "function"
             ) {
-              // InputNoteRecord — unwrap to Note
-              directNotes.push((item as InputNoteRecord).toNote());
+              resolved[i] = (item as InputNoteRecord).toNote();
             } else if (
               item !== null &&
               typeof item === "object" &&
               typeof (item as Note).id === "function"
             ) {
-              // Note object — use directly
-              directNotes.push(item as Note);
+              resolved[i] = item as Note;
             } else {
-              // NoteId
-              noteIdInputs.push(item as NoteId);
+              lookupIndices.push(i);
+              lookupIds.push(item as NoteId);
             }
           }
 
-          let storeLookupNotes: Note[] = [];
-          if (noteIdInputs.length > 0) {
-            const filter = new NoteFilter(NoteFilterTypes.List, noteIdInputs);
+          if (lookupIds.length > 0) {
+            const filter = new NoteFilter(NoteFilterTypes.List, lookupIds);
             const noteRecords = await client.getInputNotes(filter);
-            storeLookupNotes = noteRecords.map((record) => record.toNote());
 
-            if (storeLookupNotes.length !== noteIdInputs.length) {
+            if (noteRecords.length !== lookupIds.length) {
               throw new Error("Some notes could not be found for provided IDs");
             }
+
+            // Match returned records back to their original positions by ID
+            const recordById = new Map(
+              noteRecords.map((r) => [r.id().toString(), r])
+            );
+            for (let j = 0; j < lookupIndices.length; j++) {
+              const record = recordById.get(lookupIds[j].toString());
+              if (!record) {
+                throw new Error(
+                  "Some notes could not be found for provided IDs"
+                );
+              }
+              resolved[lookupIndices[j]] = record.toNote();
+            }
           }
 
-          const notes = [...storeLookupNotes, ...directNotes];
+          const notes = resolved;
 
           if (notes.length === 0) {
             throw new Error("No notes found for provided IDs");
