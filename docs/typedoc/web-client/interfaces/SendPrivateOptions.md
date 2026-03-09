@@ -8,9 +8,9 @@
 
 ## Properties
 
-### noteId
+### note
 
-> **noteId**: [`NoteInput`](../type-aliases/NoteInput.md)
+> **note**: [`NoteInput`](../type-aliases/NoteInput.md) \| [`Note`](../classes/Note.md)
 
 ***
 

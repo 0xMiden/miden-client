@@ -73,6 +73,7 @@
 - [TagsResource](interfaces/TagsResource.md)
 - [TransactionOptions](interfaces/TransactionOptions.md)
 - [TransactionsResource](interfaces/TransactionsResource.md)
+- [TransactionSubmitResult](interfaces/TransactionSubmitResult.md)
 - [WaitOptions](interfaces/WaitOptions.md)
 - [WalletCreateOptions](interfaces/WalletCreateOptions.md)
 

@@ -14,6 +14,12 @@
 
 ***
 
+### result
+
+> **result**: `TransactionResult`
+
+***
+
 ### txId
 
 > **txId**: [`TransactionId`](../classes/TransactionId.md)

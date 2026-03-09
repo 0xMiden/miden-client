@@ -10,7 +10,7 @@
 
 ### consume()
 
-> **consume**(`options`): `Promise`\<[`TransactionId`](../classes/TransactionId.md)\>
+> **consume**(`options`): `Promise`\<[`TransactionSubmitResult`](TransactionSubmitResult.md)\>
 
 #### Parameters
 
@@ -20,7 +20,7 @@
 
 #### Returns
 
-`Promise`\<[`TransactionId`](../classes/TransactionId.md)\>
+`Promise`\<[`TransactionSubmitResult`](TransactionSubmitResult.md)\>
 
 ***
 
@@ -42,7 +42,7 @@
 
 ### execute()
 
-> **execute**(`options`): `Promise`\<[`TransactionId`](../classes/TransactionId.md)\>
+> **execute**(`options`): `Promise`\<[`TransactionSubmitResult`](TransactionSubmitResult.md)\>
 
 #### Parameters
 
@@ -52,7 +52,7 @@
 
 #### Returns
 
-`Promise`\<[`TransactionId`](../classes/TransactionId.md)\>
+`Promise`\<[`TransactionSubmitResult`](TransactionSubmitResult.md)\>
 
 ***
 
@@ -74,7 +74,7 @@
 
 ### mint()
 
-> **mint**(`options`): `Promise`\<[`TransactionId`](../classes/TransactionId.md)\>
+> **mint**(`options`): `Promise`\<[`TransactionSubmitResult`](TransactionSubmitResult.md)\>
 
 #### Parameters
 
@@ -84,7 +84,7 @@
 
 #### Returns
 
-`Promise`\<[`TransactionId`](../classes/TransactionId.md)\>
+`Promise`\<[`TransactionSubmitResult`](TransactionSubmitResult.md)\>
 
 ***
 
@@ -108,7 +108,7 @@
 
 #### Call Signature
 
-> **send**(`options`): `Promise`\<\{ `note`: `null`; `txId`: [`TransactionId`](../classes/TransactionId.md); \}\>
+> **send**(`options`): `Promise`\<\{ `note`: `null`; `result`: `TransactionResult`; `txId`: [`TransactionId`](../classes/TransactionId.md); \}\>
 
 ##### Parameters
 
@@ -118,11 +118,11 @@
 
 ##### Returns
 
-`Promise`\<\{ `note`: `null`; `txId`: [`TransactionId`](../classes/TransactionId.md); \}\>
+`Promise`\<\{ `note`: `null`; `result`: `TransactionResult`; `txId`: [`TransactionId`](../classes/TransactionId.md); \}\>
 
 #### Call Signature
 
-> **send**(`options`): `Promise`\<\{ `note`: [`Note`](../classes/Note.md); `txId`: [`TransactionId`](../classes/TransactionId.md); \}\>
+> **send**(`options`): `Promise`\<\{ `note`: [`Note`](../classes/Note.md); `result`: `TransactionResult`; `txId`: [`TransactionId`](../classes/TransactionId.md); \}\>
 
 ##### Parameters
 
@@ -132,7 +132,7 @@
 
 ##### Returns
 
-`Promise`\<\{ `note`: [`Note`](../classes/Note.md); `txId`: [`TransactionId`](../classes/TransactionId.md); \}\>
+`Promise`\<\{ `note`: [`Note`](../classes/Note.md); `result`: `TransactionResult`; `txId`: [`TransactionId`](../classes/TransactionId.md); \}\>
 
 #### Call Signature
 
@@ -152,7 +152,7 @@
 
 ### submit()
 
-> **submit**(`account`, `request`, `options?`): `Promise`\<[`TransactionId`](../classes/TransactionId.md)\>
+> **submit**(`account`, `request`, `options?`): `Promise`\<[`TransactionSubmitResult`](TransactionSubmitResult.md)\>
 
 Submit a pre-built TransactionRequest.
 Note: WASM requires accountId separately, so `account` is the first argument.
@@ -173,13 +173,13 @@ Note: WASM requires accountId separately, so `account` is the first argument.
 
 #### Returns
 
-`Promise`\<[`TransactionId`](../classes/TransactionId.md)\>
+`Promise`\<[`TransactionSubmitResult`](TransactionSubmitResult.md)\>
 
 ***
 
 ### swap()
 
-> **swap**(`options`): `Promise`\<[`TransactionId`](../classes/TransactionId.md)\>
+> **swap**(`options`): `Promise`\<[`TransactionSubmitResult`](TransactionSubmitResult.md)\>
 
 #### Parameters
 
@@ -189,7 +189,7 @@ Note: WASM requires accountId separately, so `account` is the first argument.
 
 #### Returns
 
-`Promise`\<[`TransactionId`](../classes/TransactionId.md)\>
+`Promise`\<[`TransactionSubmitResult`](TransactionSubmitResult.md)\>
 
 ***
 
