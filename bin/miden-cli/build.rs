@@ -1,10 +1,21 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::{env, fs};
 
+use miden_client::account::AccountType;
 use miden_client::account::component::{
     AccountComponentMetadata,
+    AuthMultisig,
+    AuthSingleSig,
+    AuthSingleSigAcl,
+    BasicFungibleFaucet,
+    BasicWallet,
+    FeltSchema,
     MIDEN_PACKAGE_EXTENSION,
+    NoAuth,
+    SchemaType,
+    StorageSchema,
+    StorageSlotSchema,
     basic_fungible_faucet_library,
     basic_wallet_library,
     multisig_library,
@@ -29,36 +40,123 @@ use miden_client::vm::{
 const PACKAGE_DIR: &str = "packages";
 
 fn main() {
-    build_package(&PathBuf::from("templates/basic-wallet.toml"), basic_wallet_library(), None);
+    // Basic wallet (no storage schema)
+    let basic_wallet_metadata = AccountComponentMetadata::new(BasicWallet::NAME)
+        .with_description("Basic wallet component for receiving and sending assets")
+        .with_supports_all_types();
+    build_package("basic-wallet", basic_wallet_library(), &basic_wallet_metadata, None);
 
+    // Basic fungible faucet
+    //
+    // NOTE: We use a custom schema instead of `BasicFungibleFaucet::metadata_slot_schema()`
+    // because the upstream schema defines `token_supply` as a `felt` field with a default,
+    // but the CLI's `process_packages` prompts interactively for all schema requirements
+    // regardless of defaults. Using `void` for the supply field (which is managed internally
+    // by the faucet) avoids prompting the user for a value they shouldn't set.
+    let faucet_metadata_schema = (
+        BasicFungibleFaucet::metadata_slot().clone(),
+        StorageSlotSchema::value(
+            "Token metadata",
+            [
+                FeltSchema::new_void(),
+                FeltSchema::felt("max_supply"),
+                FeltSchema::u8("decimals"),
+                FeltSchema::new_typed(SchemaType::token_symbol(), "symbol"),
+            ],
+        ),
+    );
+    let basic_faucet_metadata = AccountComponentMetadata::new(BasicFungibleFaucet::NAME)
+        .with_description("Basic fungible faucet component for minting and burning tokens")
+        .with_supported_type(AccountType::FungibleFaucet)
+        .with_storage_schema(
+            StorageSchema::new([faucet_metadata_schema]).expect("storage schema should be valid"),
+        );
     build_package(
-        &PathBuf::from("templates/basic-fungible-faucet.toml"),
+        "basic-fungible-faucet",
         basic_fungible_faucet_library(),
+        &basic_faucet_metadata,
         None,
     );
 
-    build_package(&PathBuf::from("templates/basic-auth.toml"), singlesig_library(), Some("auth"));
+    // Basic auth (singlesig - supports both RPO Falcon and ECDSA)
+    let singlesig_metadata = AccountComponentMetadata::new(AuthSingleSig::NAME)
+        .with_description(
+            "Authentication component using ECDSA K256 Keccak or Rpo Falcon 512 signature scheme",
+        )
+        .with_supports_all_types()
+        .with_storage_schema(
+            StorageSchema::new([
+                AuthSingleSig::public_key_slot_schema(),
+                AuthSingleSig::auth_scheme_slot_schema(),
+            ])
+            .expect("storage schema should be valid"),
+        );
 
-    build_package(&PathBuf::from("templates/ecdsa-auth.toml"), singlesig_library(), Some("auth"));
+    build_package("basic-auth", singlesig_library(), &singlesig_metadata, Some("auth"));
 
-    build_package(&PathBuf::from("templates/no-auth.toml"), no_auth_library(), Some("auth"));
+    // ECDSA auth (same component, different package name for discoverability)
+    build_package("ecdsa-auth", singlesig_library(), &singlesig_metadata, Some("auth"));
 
-    build_package(&PathBuf::from("templates/multisig-auth.toml"), multisig_library(), Some("auth"));
+    // No auth
+    let no_auth_metadata = AccountComponentMetadata::new(NoAuth::NAME)
+        .with_description("No authentication component")
+        .with_supports_all_types();
+    build_package("no-auth", no_auth_library(), &no_auth_metadata, Some("auth"));
 
-    build_package(&PathBuf::from("templates/acl-auth.toml"), singlesig_acl_library(), Some("auth"));
+    // Multisig auth
+    //
+    // NOTE: We use a custom schema for `approver_schemes` because the upstream
+    // `approver_auth_scheme_slot_schema()` defines the map value as
+    // `SchemaType::auth_scheme()` (a felt type), but the type registry expects
+    // felt-types-as-words in the format `[0, 0, 0, <felt>]` while the actual
+    // storage uses `[felt, 0, 0, 0]`. Using `native_word()` avoids this
+    // validation mismatch. See: https://github.com/0xMiden/miden-base/issues/XXX
+    let approver_schemes_schema = (
+        AuthMultisig::approver_scheme_ids_slot().clone(),
+        StorageSlotSchema::map("Approver scheme IDs", SchemaType::u32(), SchemaType::native_word()),
+    );
+    let multisig_metadata = AccountComponentMetadata::new(AuthMultisig::NAME)
+        .with_description("Multisig authentication component using hybrid signature schemes")
+        .with_supports_all_types()
+        .with_storage_schema(
+            StorageSchema::new([
+                AuthMultisig::threshold_config_slot_schema(),
+                AuthMultisig::approver_public_keys_slot_schema(),
+                approver_schemes_schema,
+                AuthMultisig::executed_transactions_slot_schema(),
+                AuthMultisig::procedure_thresholds_slot_schema(),
+            ])
+            .expect("storage schema should be valid"),
+        );
+    build_package("multisig-auth", multisig_library(), &multisig_metadata, Some("auth"));
+
+    // ACL auth
+    let acl_metadata =
+        AccountComponentMetadata::new(AuthSingleSigAcl::NAME)
+            .with_description(
+                "Authentication component with procedure-based ACL using ECDSA K256 Keccak or Rpo Falcon 512 signature scheme",
+            )
+            .with_supports_all_types()
+            .with_storage_schema(
+                StorageSchema::new([
+                    AuthSingleSigAcl::public_key_slot_schema(),
+                    AuthSingleSigAcl::auth_scheme_slot_schema(),
+                    AuthSingleSigAcl::config_slot_schema(),
+                    AuthSingleSigAcl::trigger_procedure_roots_slot_schema(),
+                ])
+                .expect("storage schema should be valid"),
+            );
+    build_package("acl-auth", singlesig_acl_library(), &acl_metadata, Some("auth"));
 }
 
 /// Builds a package and stores it under `{OUT_DIR}/{PACKAGE_DIR}` or
 /// `{OUT_DIR}/{PACKAGE_DIR}/{subdirectory}` if a subdirectory is provided.
-pub fn build_package(metadata_path: &Path, library: Library, subdirectory: Option<&str>) {
-    let toml_string = fs::read_to_string(metadata_path)
-        .unwrap_or_else(|_| panic!("Failed to read file {}", metadata_path.display()));
-
-    let template_metadata =
-        AccountComponentMetadata::from_toml(&toml_string).unwrap_or_else(|err| {
-            panic!("Failed to deserialize component metadata in {}: {err}", metadata_path.display())
-        });
-
+pub fn build_package(
+    package_name: &str,
+    library: Library,
+    metadata: &AccountComponentMetadata,
+    subdirectory: Option<&str>,
+) {
     // NOTE: Taken from the miden-compiler's build_package function:
     // https://github.com/0xMiden/compiler/blob/61ee77f57c07c197323728642f8feca972b24217/midenc-compile/src/stages/assemble.rs#L71-L88
     // Gather all of the procedure metadata for exports of this package
@@ -81,12 +179,12 @@ pub fn build_package(metadata_path: &Path, library: Library, subdirectory: Optio
     let manifest = PackageManifest::new(exports);
 
     let account_component_metadata_section =
-        Section::new(SectionId::ACCOUNT_COMPONENT_METADATA, template_metadata.to_bytes());
+        Section::new(SectionId::ACCOUNT_COMPONENT_METADATA, metadata.to_bytes());
 
     let package = Package {
-        name: template_metadata.name().to_string(),
-        version: Some(template_metadata.version().clone()),
-        description: Some(template_metadata.description().to_string()),
+        name: metadata.name().to_string(),
+        version: Some(metadata.version().clone()),
+        description: Some(metadata.description().to_string()),
         mast,
         manifest,
         sections: vec![account_component_metadata_section],
@@ -102,21 +200,13 @@ pub fn build_package(metadata_path: &Path, library: Library, subdirectory: Optio
     }
     fs::create_dir_all(&packages_out_dir).expect("Failed to packages directory in OUT_DIR");
 
-    let mut output_filename = metadata_path
-        .file_stem()
-        .expect("metadata path should have a file stem")
-        .to_os_string();
-    output_filename.push(format!(".{MIDEN_PACKAGE_EXTENSION}"));
-
+    let output_filename = format!("{package_name}.{MIDEN_PACKAGE_EXTENSION}");
     let output_file = packages_out_dir.join(&output_filename);
 
     fs::write(&output_file, package.to_bytes()).unwrap_or_else(|e| {
         panic!(
             "Failed to write Package {} to file {} in {}. Error: {}",
-            package.name,
-            output_filename.display(),
-            out_dir,
-            e
+            package.name, output_filename, out_dir, e
         );
     });
 }
