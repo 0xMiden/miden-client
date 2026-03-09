@@ -5,26 +5,36 @@ sidebar_position: 1
 
 # Miden client
 
-The Miden client currently has three main components:
+The Miden client SDK is organized as a layered stack. The Rust core is the single source of truth for all client logic. Browser-facing SDKs build on top of it through a WASM bridge layer, giving TypeScript and React developers native access to the full protocol without needing a Rust toolchain.
 
-1. [Miden client library](#miden-client-library).
-2. [Miden client CLI](#miden-client-cli).
-3. [Miden web client](#miden-web-client).
+```mermaid
+graph TB
+    subgraph rust-sdk["rust-sdk"]
+        core["<b>miden-client</b><br/>Core Rust library<br/>accounts · notes · transactions<br/>proving · state sync"]
+    end
 
-### Miden client library
+    subgraph wasm-bridge["wasm-bridge"]
+        bridge["<b>@miden-sdk/wasm-bridge</b><br/>WASM compilation + JS glue<br/>Web Worker orchestration<br/>IndexedDB store + keystore<br/>type marshalling"]
+    end
 
-The Miden client library is a Rust library that can be integrated into projects, allowing developers to interact with the Miden rollup.
+    subgraph ts-sdk["ts-sdk"]
+        ts["<b>@miden-sdk/ts-sdk</b><br/>Idiomatic TypeScript wrapper<br/>async/await API · type definitions"]
+    end
 
-The library provides a set of APIs and functions for executing transactions, generating proofs, and managing activity on the Miden network.
+    subgraph react-sdk["react-sdk"]
+        react["<b>@miden-sdk/react-sdk</b><br/>React hooks + providers<br/>Zustand state · signer integrations"]
+    end
 
-### Miden client CLI
+    core -- "crates.io" --> bridge
+    bridge -- "npm" --> ts
+    bridge -- "npm" --> react
+```
 
-The Miden client also includes a command-line interface (CLI) that serves as a wrapper around the library, exposing its basic functionality in a user-friendly manner.
+| Layer | Published as | Language | Purpose |
+|-------|-------------|----------|---------|
+| **[Rust SDK](./rust-client/index.md)** | `miden-client` (crates.io) | Rust | Core client library and CLI — account management, transaction building/execution/proving, state sync, node communication. `#![no_std]` compatible with trait-based DI for storage, RPC, proving, and key management |
+| **WASM bridge** | `@miden-sdk/wasm-bridge` (npm) | Rust → WASM + JS | Compiles the Rust core to WebAssembly via `wasm-bindgen`. Manages Web Worker offloading, IndexedDB persistence, sync locking, and external signer support |
+| **[TypeScript SDK](./web-client/index.md)** | `@miden-sdk/ts-sdk` (npm) | TypeScript | Pure TypeScript wrapper over the WASM bridge. Primary entry point for Node.js backends and non-React browser apps |
+| **React SDK** | `@miden-sdk/react-sdk` (npm) | TypeScript | React integration — hooks, context providers, Zustand state management, and wallet signer integrations |
 
-The CLI provides commands for interacting with the Miden rollup, such as submitting transactions, syncing with the network, and managing account data.
-
-More information about the CLI can be found in the [CLI section](./rust-client/cli).
-
-### Miden web client
-
-The Miden web client is a web-based interface that allows users to interact with the Miden rollup through a browser. It wraps most of the functionality of the Rust library and provides a user-friendly interface for managing accounts, submitting transactions, and monitoring activity on the network.
+The TypeScript and React SDKs are siblings — both consume the WASM bridge directly, neither depends on the other.

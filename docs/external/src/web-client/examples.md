@@ -3,63 +3,43 @@ title: Examples
 sidebar_position: 6
 ---
 
-# Miden SDK Examples
+# Examples
 
-This directory contains practical examples demonstrating how to use the `@miden-sdk/miden-sdk` in your web applications. These examples cover core functionality and common use cases for interacting with the Miden blockchain and virtual machine.
+Code examples for common SDK operations, organized by topic.
 
-## Overview
+## Tutorials
 
-The examples in this section showcase various capabilities of the Miden SDK, including:
+For guided, end-to-end walkthroughs, see the [Getting started](./get-started/index.md) tutorials:
 
-- Account Operations
+- [Create account and use faucet](./get-started/create-account-use-faucet.md)
+- [Public peer-to-peer transfer](./get-started/p2p-public.md)
+- [Private peer-to-peer transfer](./get-started/p2p-private.md)
+- [Mock client](./get-started/mock-client.md)
 
-  - Creating new wallets
-  - Creating new faucets
-  - Importing existing accounts
-  - Exporting account data
-  - Retrieving account data
+## Library reference examples
 
-- Transaction Operations
+Each library reference page contains code examples for its topic:
 
-  - Creating standard mint, consume, and send transaction requests
-  - Creating custom transaction requests
-  - Executing transactions
-  - Submitting transactions to the network
-  - Retrieving transaction history
+### Account operations
 
-- Note Operations
-  - Retrieve input and output notes
-  - Import and export notes
-  - Working with consumable notes
-  - Send and fetch private notes using the note transport network
+- [Creating wallets, contracts, and faucets](./library/new-accounts.md)
+- [Retrieving accounts and checking balances](./library/accounts.md)
+- [Importing accounts](./library/import.md)
+- [Exporting accounts](./library/export.md)
 
-For installation instructions, prerequisites, and setup details, please refer to the [SDK README](https://github.com/0xMiden/miden-client/blob/main/docs/typedoc/web-client/README.md).
+### Transaction operations
 
-Each example is self-contained and includes:
+- [Minting, sending, consuming, and swapping](./library/new-transactions.md) — includes remote prover, custom scripts, and FPI
+- [Retrieving transaction history](./library/transactions.md)
 
-- Complete source code
-- Step-by-step explanations
-- Expected outputs
-- Common pitfalls and troubleshooting tips
+### Note operations
 
-## Client Initialization
+- [Listing, filtering, importing, and exporting notes](./library/notes.md)
+- [Sending and fetching private notes](./library/note-transport.md)
 
-Most if not all examples require you to initialize the Miden Client. You can do this via:
+### Other
 
-```typescript
-import { MidenClient } from "@miden-sdk/miden-sdk";
-
-// Initialize the client
-const client = await MidenClient.create();
-
-// Or with options
-const client = await MidenClient.create({
-  rpcUrl: "http://localhost:57291",
-  autoSync: true
-});
-
-// For testing with a mock chain
-const client = await MidenClient.createMock();
-```
-
-> **Note:** The `WebClient` class is deprecated. Use `MidenClient.create()` instead.
+- [Compiling MASM components and transaction scripts](./library/compile.md)
+- [Synchronizing state](./library/sync.md)
+- [Managing note tags](./library/tags.md)
+- [Working with the mock client](./library/mock.md)

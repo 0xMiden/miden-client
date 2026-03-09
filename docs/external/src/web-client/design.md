@@ -5,83 +5,145 @@ sidebar_position: 4
 
 # Design
 
-The Miden Web SDK shares the same core architecture as the [Rust client](../rust-client/design.md), compiled to WebAssembly with TypeScript bindings. It has the following architectural components:
+This page explains how the TypeScript SDK is structured and how its pieces fit together at runtime.
 
-- [Store](#store)
-- [RPC client](#rpc-client)
-- [Transaction executor](#transaction-executor)
-- [Keystore](#keystore)
-- [Note screener](#note-screener)
-- [State sync](#state-sync)
-- [Note transport](#note-transport)
-- [Web Worker architecture](#web-worker-architecture)
-- [WASM compilation pipeline](#wasm-compilation-pipeline)
+## How the SDK reaches the browser
 
-## Store
+The TypeScript SDK is a pure TypeScript package that wraps the [WASM bridge](../index.md) — a separate layer that compiles the [Rust client core](../rust-client/design.md) to WebAssembly and bundles it with browser infrastructure (Web Workers, IndexedDB, JS glue). The SDK itself contains no Rust or WASM code; it consumes the bridge as an npm dependency and provides the idiomatic TypeScript API you interact with.
 
-The store manages persistence of client state using IndexedDB in the browser:
+```mermaid
+flowchart LR
+    A["Rust core\n(miden-client)"] -->|"compiled to WASM"| B["WASM bridge\n(@miden-sdk/wasm-bridge)"]
+    B -->|"npm dependency"| C["TypeScript SDK\n(@miden-sdk/ts-sdk)"]
+    C --> D["Your application"]
+```
 
-- Accounts: state history, vault assets, and account code
+From your perspective, `npm install` is all you need — the WASM binary, Web Worker script, and all bindings are bundled transitively.
+
+## Runtime architecture
+
+At runtime, the SDK splits work across two threads:
+
+```mermaid
+flowchart TB
+    subgraph Main["Main thread (your app)"]
+        App["Application code"] --> API["MidenClient API\n(thin proxy)"]
+    end
+
+    subgraph Worker["Web Worker thread"]
+        Core["Rust client core\n(WASM)"]
+        Core --> Store["IndexedDB\nstore"]
+        Core --> RPC["gRPC-web\nRPC client"]
+        Core --> KS["IndexedDB\nkeystore"]
+    end
+
+    API <-->|"postMessage"| Core
+    RPC <-->|"gRPC-web"| Node["Miden node"]
+    RPC <-->|"gRPC-web"| NT["Note transport\nnetwork"]
+```
+
+**Why a Web Worker?** Transaction proving and MASM compilation are CPU-intensive. Running them on the main thread would freeze the UI. The Web Worker keeps your application responsive while heavy operations run in the background.
+
+Every `MidenClient` instance owns one Web Worker. The TypeScript API you interact with is a thin proxy that serializes calls to the worker via `postMessage` and returns the results as promises.
+
+## Client API surface
+
+The `MidenClient` exposes a resource-based API — each domain area is grouped under a namespace:
+
+```mermaid
+flowchart TB
+    Client["MidenClient"]
+    Client --> Accounts["client.accounts"]
+    Client --> Transactions["client.transactions"]
+    Client --> Notes["client.notes"]
+    Client --> Compile["client.compile"]
+    Client --> Tags["client.tags"]
+    Client --> Sync["client.sync()"]
+
+    Accounts ~~~ A1["create · get · list\ngetDetails · getBalance\nimport · export\naddAddress · removeAddress"]
+    Transactions ~~~ T1["mint · send · consume\nconsumeAll · swap · execute\nsubmit · preview\nlist · waitFor"]
+    Notes ~~~ N1["get · list · listSent\nlistAvailable\nimport · export\nsendPrivate · fetchPrivate"]
+    Compile ~~~ C1["component · txScript"]
+    Tags ~~~ TG1["add · remove · list"]
+```
+
+| Namespace | Responsibility |
+|-----------|---------------|
+| **`client.accounts`** | Account lifecycle: create wallets/faucets/contracts, retrieve state, check balances, import/export, manage addresses |
+| **`client.transactions`** | Transaction lifecycle: build, execute, prove, submit, and track transactions. Supports mint, send, consume, swap, custom MASM scripts, and FPI |
+| **`client.notes`** | Note management: list/filter input and output notes, import/export, send and fetch private notes via the note transport network |
+| **`client.compile`** | MASM compilation: compile account components and transaction scripts in the browser, with library linking support |
+| **`client.tags`** | Tag management: add/remove note tags that control which notes the client discovers during sync |
+| **`client.sync()`** | State synchronization: pull the latest state from the Miden node and update local data |
+
+Top-level methods like `client.exportStore()`, `client.importStore()`, and `client.terminate()` handle store backup/restore and worker lifecycle.
+
+## Transaction lifecycle
+
+When you call a high-level method like `client.transactions.send()`, the SDK handles the full lifecycle automatically:
+
+```mermaid
+sequenceDiagram
+    participant App as Your app
+    participant API as MidenClient
+    participant Worker as Web Worker (WASM)
+    participant Node as Miden node
+
+    App->>API: transactions.send({ ... })
+    API->>Worker: postMessage(send request)
+    Worker->>Worker: 1. Build TransactionRequest
+    Worker->>Worker: 2. Execute in Miden VM
+    Worker->>Worker: 3. Generate ZK proof
+    Worker->>Node: 4. Submit proven transaction
+    Node-->>Worker: Transaction ID
+    Worker->>Worker: 5. Store transaction + output notes
+    Worker-->>API: TransactionId
+    API-->>App: TransactionId
+```
+
+Steps 2–3 are the most expensive. For complex transactions, you can offload proving to a remote prover by passing `proverUrl` at client creation or a `prover` per-transaction.
+
+## Persistence
+
+The SDK uses [IndexedDB](https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API) for all browser-side persistence — no server or filesystem needed.
+
+**Store** — persists the client's view of the blockchain:
+- Account state (history, vault assets, code)
 - Transactions and their scripts
-- Notes (input and output)
+- Input and output notes
 - Note tags
-- Block headers and chain information needed to execute transactions and consume notes
+- Block headers and chain data required for transaction execution
 
-The store can track any number of accounts and notes.
+Because Miden supports off-chain execution and proving, the client only stores the blockchain history intervals relevant to its tracked accounts — not the entire chain.
 
-## RPC client
+**Keystore** — persists private keys for tracked accounts, stored separately from the main store. Keys are used to sign transactions during execution.
 
-The RPC client communicates with the Miden node through gRPC methods. The web-compatible implementation uses gRPC-web, making it suitable for browser environments.
+Both databases are scoped to the browser origin, so different domains cannot access each other's data.
 
-## Transaction executor
+## Network communication
 
-The transaction executor uses the Miden VM (compiled to WASM) to execute transactions within the transaction kernel. When executing, the executor needs access to relevant blockchain history, which it retrieves from the store.
+The SDK communicates with two external services:
 
-## Keystore
+| Service | Protocol | Purpose |
+|---------|----------|---------|
+| **Miden node** | gRPC-web | Sync state, submit transactions, fetch public account data |
+| **Note transport network** | gRPC-web | Exchange private notes between users |
 
-The keystore stores and manages private keys for tracked accounts. The web keystore implementation uses IndexedDB for secure browser-based key storage. Private keys are used by the executor to sign and authenticate transactions.
+Standard gRPC uses HTTP/2 features that browsers don't expose directly. The SDK uses [gRPC-web](https://github.com/grpc/grpc-web), which works over HTTP/1.1 and HTTP/2, making it compatible with browser environments. A gRPC-web proxy (like Envoy) may be required in front of the Miden node depending on the deployment.
 
-## Note screener
+## Resource management
 
-The note screener checks the consumability of notes by tracked accounts. It performs fast static checks (e.g., checking inputs for well-known notes) and dry runs of consumption transactions to determine which accounts can consume a given note.
-
-## State sync
-
-The state sync component handles synchronization of client state with the network. It repeatedly queries the node until the chain tip is reached, updating tracked elements (accounts, notes, transactions) with each response.
-
-## Note transport
-
-The SDK provides access to the note transport network for exchanging private notes. Notes are primarily exchanged using their tags as identifiers — by default the tag is derived from the recipient account ID, though it can also be randomized for increased privacy.
-
-Methods include:
-
-- `notes.sendPrivate()` — Send a note to the note transport network
-- `notes.fetchPrivate()` — Fetch notes from the network by note tag, with pagination support
-
-## Web Worker architecture
-
-The SDK uses a dedicated [Web Worker](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API) to offload computationally intensive operations. This keeps the main thread responsive while the worker handles:
-
-- Transaction proving
-- State synchronization
-- Account creation
-- MASM compilation
-
-Each `MidenClient` instance holds one Web Worker thread. Call `client.terminate()` to release it when done, or use [explicit resource management](https://github.com/tc39/proposal-explicit-resource-management):
+Each `MidenClient` holds a Web Worker thread and IndexedDB connections. In long-running applications (e.g., a wallet that switches between networks), it's important to release these resources:
 
 ```typescript
+// Explicit cleanup
+client.terminate();
+
+// Or automatic cleanup via TC39 Explicit Resource Management
 {
   using client = await MidenClient.create();
   // client.terminate() called automatically at end of scope
 }
 ```
 
-## WASM compilation pipeline
-
-The SDK is built from the `web-client` Rust crate, which:
-
-- Is implemented in Rust and compiled to WebAssembly
-- Uses `wasm-bindgen` to expose JavaScript-compatible bindings
-- Depends on the Rust client crate, which contains core logic for blockchain interaction
-
-A custom `rollup.config.js` bundles the WASM module, JS bindings, and web worker into a distributable NPM package.
+After `terminate()`, all method calls throw `Error("Client terminated")`.
