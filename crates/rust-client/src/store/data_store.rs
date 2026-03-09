@@ -125,18 +125,11 @@ impl ClientDataStore {
     ///
     /// This calls `get_account_proof` with empty [`AccountStorageRequirements`], so the
     /// response includes the account header and code but no storage map entries.
-    ///
-    /// # Errors
-    /// Returns [`DataStoreError::AccountNotFound`] if the account is private.
     async fn fetch_and_cache_foreign_account(
         &self,
         account_id: AccountId,
         account_state_at: AccountStateAt,
     ) -> Result<AccountInputs, DataStoreError> {
-        if !account_id.is_public() {
-            return Err(DataStoreError::AccountNotFound(account_id));
-        }
-
         let known_account_code = self
             .store
             .get_foreign_account_code(vec![account_id])
@@ -187,6 +180,9 @@ impl ClientDataStore {
     }
 
     /// Fetches storage map entries from the network via RPC.
+    ///
+    /// # Errors
+    /// Returns [`DataStoreError::Other`] if the account is private.
     async fn fetch_storage_map_entries(
         &self,
         account_id: AccountId,
@@ -194,6 +190,13 @@ impl ClientDataStore {
         map_key: StorageMapKey,
         known_code: AccountCode,
     ) -> Result<StorageMapEntries, DataStoreError> {
+        if !account_id.is_public() {
+            return Err(DataStoreError::Other {
+                error_msg: format!("account {account_id} is not public").into(),
+                source: None,
+            });
+        }
+
         let storage_requirements = AccountStorageRequirements::new([(slot_name, &[map_key])]);
         let (_, account_proof): (BlockNumber, _) = self
             .rpc_api
