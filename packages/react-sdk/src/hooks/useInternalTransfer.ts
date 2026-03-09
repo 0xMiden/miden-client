@@ -94,7 +94,7 @@ export function useInternalTransfer(): UseInternalTransferResult {
       const assetId = parseAccountId(options.assetId);
 
       const assets = new NoteAssets([
-        new FungibleAsset(assetId, options.amount),
+        new FungibleAsset(assetId, BigInt(options.amount)),
       ]);
       const note = Note.createP2IDNote(
         senderId,

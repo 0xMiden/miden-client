@@ -127,6 +127,7 @@ export function useSend(): UseSendResult {
         if (amount === undefined || amount === null) {
           throw new Error("Amount is required (provide amount or sendAll)");
         }
+        amount = BigInt(amount);
 
         const assetId =
           options.assetId ??
