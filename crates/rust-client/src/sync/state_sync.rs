@@ -641,7 +641,7 @@ fn apply_mmr_changes(
 /// to the transaction's position in the chain.
 fn compute_nullifier_tx_order<'a>(
     committed_transactions: impl Iterator<Item = &'a TransactionRecord>,
-) -> BTreeMap<Nullifier, u32> {
+) -> BTreeMap<Nullifier, u16> {
     use alloc::collections::btree_map::Entry;
 
     use miden_protocol::account::AccountId;
@@ -682,7 +682,7 @@ fn compute_nullifier_tx_order<'a>(
 
         // Follow the chain: current.final_account_state == next.init_account_state.
         let mut current = *start_tx;
-        let mut position: u32 = 0;
+        let mut position: u16 = 0;
 
         loop {
             // Map all input note nullifiers of this transaction to the current position.

@@ -92,12 +92,12 @@ impl InputNoteUpdate {
 
     /// Returns the position of the consuming transaction in the account's state chain within the
     /// block. `None` for non-consumed notes or notes consumed by external transactions.
-    pub fn consumed_tx_order(&self) -> Option<u32> {
+    pub fn consumed_tx_order(&self) -> Option<u16> {
         self.consumed_tx_order
     }
 
     /// Sets the consumed transaction order for this note update.
-    fn set_consumed_tx_order(&mut self, order: Option<u32>) {
+    fn set_consumed_tx_order(&mut self, order: Option<u16>) {
         self.consumed_tx_order = order;
     }
 }
