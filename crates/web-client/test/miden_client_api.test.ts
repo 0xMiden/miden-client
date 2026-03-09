@@ -889,7 +889,7 @@ test.describe("MidenClient API - Mock Chain", () => {
     expect(result.fetchedId).toBe(result.originalId);
   });
 
-  test("accounts.getOrImport works across serialized mock chain", async ({
+  test("accounts.getOrImport imports account not in local store", async ({
     page,
   }) => {
     const result = await page.evaluate(async () => {
@@ -900,20 +900,26 @@ test.describe("MidenClient API - Mock Chain", () => {
       // Serialize chain so the second client sees the same blocks
       const chain = client.serializeMockChain();
 
-      // Create a fresh mock client with the same chain
+      // Create a fresh mock client with the same chain but empty store
       const client2 = await window.MidenClient.createMock({
         serializedMockChain: chain,
       });
+      await client2.sync();
 
-      // getOrImport should return the account (either from local store or network)
+      // The account should NOT exist locally
+      const before = await client2.accounts.get(walletId);
+
+      // getOrImport should fetch it from the (mock) network
       const imported = await client2.accounts.getOrImport(walletId);
 
       return {
+        beforeWasNull: before === null,
         importedId: imported.id().toString(),
         originalId: walletId,
       };
     });
 
+    expect(result.beforeWasNull).toBe(true);
     expect(result.importedId).toBe(result.originalId);
   });
 
