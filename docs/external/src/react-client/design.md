@@ -65,22 +65,40 @@ flowchart TB
 The SDK uses [Zustand](https://zustand.docs.pmnd.rs/) for centralized state:
 
 ```mermaid
-flowchart TB
-    subgraph ZustandStore["MidenStore"]
-        Client["client state<br/>isReady · isInitializing · config"]
-        Sync["sync state<br/>syncHeight · isSyncing · lastSyncTime"]
-        Accounts["account cache<br/>accountHeaders · accountDetails"]
-        Notes["note cache<br/>inputNotes · consumableNotes<br/>noteFirstSeen"]
-        Assets["asset metadata<br/>symbol · decimals per faucet ID"]
+flowchart LR
+    subgraph Hooks["Selector hooks"]
+        direction TB
+        H1["useAccounts()"]
+        H2["useAccount(id)"]
+        H3["useNotes()"]
+        H4["useSyncState()"]
+        H5["useNoteStream()"]
     end
 
-    Hook1["useAccounts()"] --> Accounts
-    Hook2["useAccount(id)"] --> Accounts
-    Hook2 --> Assets
-    Hook3["useNotes()"] --> Notes
-    Hook4["useSyncState()"] --> Sync
-    Hook5["useNoteStream()"] --> Notes
+    subgraph Store["MidenStore"]
+        direction TB
+        Accounts["Account cache"]
+        Notes["Note cache"]
+        Sync["Sync state"]
+        Assets["Asset metadata"]
+        Client["Client state"]
+    end
+
+    H1 --> Accounts
+    H2 --> Accounts
+    H2 --> Assets
+    H3 --> Notes
+    H4 --> Sync
+    H5 --> Notes
 ```
+
+| Store slice | Contents |
+|-------------|----------|
+| **Account cache** | `accountHeaders`, `accountDetails` |
+| **Note cache** | `inputNotes`, `consumableNotes`, `noteFirstSeen` |
+| **Sync state** | `syncHeight`, `isSyncing`, `lastSyncTime` |
+| **Asset metadata** | `symbol`, `decimals` per faucet ID |
+| **Client state** | `isReady`, `isInitializing`, `config` |
 
 Components subscribe to specific slices of the store via selector hooks, so they only re-render when their data changes — not on every sync cycle.
 
@@ -130,15 +148,13 @@ The SDK supports third-party wallet providers through a layered context pattern.
 
 ```mermaid
 flowchart TB
-    subgraph Multi["MultiSignerProvider (optional)"]
-        Para["ParaSignerProvider<br/>+ SignerSlot"]
-        Turnkey["TurnkeySignerProvider<br/>+ SignerSlot"]
-        MidenFi["MidenFiSignerProvider<br/>+ SignerSlot"]
-    end
+    Para["ParaSignerProvider"] --> Multi["MultiSignerProvider<br/>(optional)"]
+    Turnkey["TurnkeySignerProvider"] --> Multi
+    MidenFi["MidenFiSignerProvider"] --> Multi
 
-    Multi -->|"forwards active<br/>SignerContext"| MP["MidenProvider<br/>detects SignerContext"]
+    Multi -->|"forwards active SignerContext"| MP["MidenProvider"]
     MP --> App["Your components"]
-    MP -.->|"creates client with<br/>external keystore"| WASM["Web Worker"]
+    MP -.->|"creates client with external keystore"| WASM["Web Worker"]
 ```
 
 When `MidenProvider` detects a `SignerContext` above it in the tree, it:
