@@ -18,6 +18,9 @@ import "../src/DepositContractTestHelpers.sol";
  * To specify a custom destination address (e.g. from a Miden AccountId):
  *   DESTINATION_ADDRESS=0x00000000... forge test -vv --match-contract ClaimAssetTestVectorsLocalTx
  *
+ * To specify a custom origin token address (e.g. matching a genesis faucet):
+ *   ORIGIN_TOKEN_ADDRESS=0x... forge test -vv --match-contract ClaimAssetTestVectorsLocalTx
+ *
  * The output can be used to verify Miden's ability to process L1 bridge transactions.
  */
 contract ClaimAssetTestVectorsLocalTx is Test, DepositContractV2, DepositContractTestHelpers {
@@ -57,6 +60,25 @@ contract ClaimAssetTestVectorsLocalTx is Test, DepositContractV2, DepositContrac
     }
 
     /**
+     * @notice Resolves the origin token address from the ORIGIN_TOKEN_ADDRESS environment variable.
+     *         Falls back to a default address if the env var is not set.
+     * @return The origin token address to use in the test vectors
+     */
+    function _resolveOriginTokenAddress() internal view returns (address) {
+        address defaultAddress = 0x2DC70fb75b88d2eB4715bc06E1595E6D97c34DFF;
+
+        try vm.envAddress("ORIGIN_TOKEN_ADDRESS") returns (address envAddr) {
+            console.log("Using origin token address from ORIGIN_TOKEN_ADDRESS env var:");
+            console.log(envAddr);
+            return envAddr;
+        } catch {
+            console.log("ORIGIN_TOKEN_ADDRESS env var not set, using default:");
+            console.log(defaultAddress);
+            return defaultAddress;
+        }
+    }
+
+    /**
      * @notice Generates bridge asset test vectors with VALID Merkle proofs.
      *         Simulates a user calling bridgeAsset() to bridge tokens from L1 to Miden.
      *
@@ -73,7 +95,7 @@ contract ClaimAssetTestVectorsLocalTx is Test, DepositContractV2, DepositContrac
 
         uint8 leafType = 0;
         uint32 originNetwork = 0;
-        address originTokenAddress = 0x2DC70fb75b88d2eB4715bc06E1595E6D97c34DFF;
+        address originTokenAddress = _resolveOriginTokenAddress();
         uint32 destinationNetwork = 20;
         address destinationAddress = _resolveDestinationAddress();
         uint256 amount = 100000000000000000000;
