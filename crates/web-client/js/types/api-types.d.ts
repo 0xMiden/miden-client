@@ -459,7 +459,7 @@ export interface FetchPrivateNotesOptions {
 }
 
 export interface SendPrivateOptions {
-  noteId: NoteInput | Note;
+  note: NoteInput | Note;
   to: AccountRef;
 }
 

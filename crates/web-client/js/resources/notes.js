@@ -69,7 +69,7 @@ export class NotesResource {
     const wasm = await this.#getWasm();
 
     let note;
-    const input = opts.noteId;
+    const input = opts.note;
     // Check if input is a Note object (has .id() and .assets() but not .toNote())
     if (
       input &&
