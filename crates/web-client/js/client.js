@@ -193,7 +193,7 @@ export class MidenClient {
     this.assertNotTerminated();
     if (!this.#storeName) {
       throw new Error(
-        "Store name not available. Cannot export store for mock clients."
+        "Cannot export store without a store name."
       );
     }
     const wasm = await this.#getWasm();
@@ -210,7 +210,7 @@ export class MidenClient {
     this.assertNotTerminated();
     if (!this.#storeName) {
       throw new Error(
-        "Store name not available. Cannot import store for mock clients."
+        "Cannot import store without a store name."
       );
     }
     if (!snapshot || snapshot.version !== 1) {
