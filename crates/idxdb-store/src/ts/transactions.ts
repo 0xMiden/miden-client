@@ -1,5 +1,6 @@
 import { getDatabase, ITransaction, ITransactionScript } from "./schema.js";
 import { logWebStoreError, mapOption, uint8ArrayToBase64 } from "./utils.js";
+import type { Transaction } from "dexie";
 
 interface ProcessedTransaction {
   scriptRoot?: string;
@@ -118,7 +119,7 @@ export async function insertTransactionScript(
   dbId: string,
   scriptRoot: Uint8Array,
   txScript: Uint8Array,
-  tx?: any
+  tx?: Transaction
 ) {
   try {
     const db = getDatabase(dbId);
@@ -144,7 +145,7 @@ export async function upsertTransactionRecord(
   statusVariant: number,
   status: Uint8Array,
   scriptRoot?: Uint8Array,
-  tx?: any
+  tx?: Transaction
 ) {
   try {
     const db = getDatabase(dbId);

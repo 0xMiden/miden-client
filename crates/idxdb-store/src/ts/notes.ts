@@ -1,4 +1,5 @@
 import { getDatabase, IInputNote, IOutputNote } from "./schema.js";
+import type { Transaction } from "dexie";
 
 import { logWebStoreError, uint8ArrayToBase64 } from "./utils.js";
 
@@ -129,10 +130,10 @@ export async function upsertInputNote(
   serializedCreatedAt: string,
   stateDiscriminant: number,
   state: Uint8Array,
-  tx?: any
+  tx?: Transaction
 ) {
   const db = getDatabase(dbId);
-  const doWork = async (t: any) => {
+  const doWork = async (t: Transaction) => {
     try {
       const data = {
         noteId,
@@ -172,10 +173,10 @@ export async function upsertOutputNote(
   expectedHeight: number,
   stateDiscriminant: number,
   state: Uint8Array,
-  tx?: any
+  tx?: Transaction
 ) {
   const db = getDatabase(dbId);
-  const doWork = async (t: any) => {
+  const doWork = async (t: Transaction) => {
     try {
       const data = {
         noteId,

@@ -212,6 +212,32 @@ function indexes(...items: string[]): string {
   return items.join(",");
 }
 
+// Dexie dynamically adds table accessors to Transaction objects at runtime,
+// but the Transaction type doesn't declare them. This augmentation bridges that gap.
+declare module "dexie" {
+  interface Transaction {
+    accountCodes: Table<IAccountCode, string>;
+    accountStorages: Table<IAccountStorage, string>;
+    accountAssets: Table<IAccountAsset, string>;
+    storageMapEntries: Table<IStorageMapEntry, string>;
+    accountAuths: Table<IAccountAuth, string>;
+    accounts: Table<IAccount, string>;
+    addresses: Table<IAddress, string>;
+    transactions: Table<ITransaction, string>;
+    transactionScripts: Table<ITransactionScript, string>;
+    inputNotes: Table<IInputNote, string>;
+    outputNotes: Table<IOutputNote, string>;
+    notesScripts: Table<INotesScript, string>;
+    stateSync: Table<IStateSync, number>;
+    blockHeaders: Table<IBlockHeader, number>;
+    partialBlockchainNodes: Table<IPartialBlockchainNode, number>;
+    tags: Table<ITag, number>;
+    foreignAccountCode: Table<IForeignAccountCode, string>;
+    settings: Table<ISetting, string>;
+    trackedAccounts: Table<ITrackedAccount, string>;
+  }
+}
+
 export type MidenDexie = Dexie & {
   accountCodes: Dexie.Table<IAccountCode, string>;
   accountStorages: Dexie.Table<IAccountStorage, string>;
