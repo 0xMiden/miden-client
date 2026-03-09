@@ -92,6 +92,9 @@ export async function applyStateSync(dbId, stateUpdate) {
         db.transactionScripts,
     ];
     return await db.dexie.transaction("rw", tablesToAccess, async () => {
+        // Within a Dexie transaction callback, db.tableName operations are
+        // automatically routed through the active transaction. We do NOT pass
+        // the tx parameter because its table accessors are unreliable at runtime.
         let inputNotesWriteOp = Promise.all(serializedInputNotes.map((note) => {
             return upsertInputNote(dbId, note.noteId, note.noteAssets, note.serialNumber, note.inputs, note.noteScriptRoot, note.noteScript, note.nullifier, note.createdAt, note.stateDiscriminant, note.state);
         }));
@@ -183,10 +186,7 @@ async function updateCommittedNoteTags(db, inputNoteIds) {
     try {
         for (let i = 0; i < inputNoteIds.length; i++) {
             const noteId = inputNoteIds[i];
-            await db.tags
-                .where("source_note_id")
-                .equals(noteId)
-                .delete();
+            await db.tags.where("source_note_id").equals(noteId).delete();
         }
     }
     catch (error) {

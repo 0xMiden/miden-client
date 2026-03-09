@@ -393,10 +393,7 @@ async function updateCommittedNoteTags(
   try {
     for (let i = 0; i < inputNoteIds.length; i++) {
       const noteId = inputNoteIds[i];
-      await db.tags
-        .where("source_note_id")
-        .equals(noteId)
-        .delete();
+      await db.tags.where("source_note_id").equals(noteId).delete();
     }
   } catch (error) {
     logWebStoreError(error, "Failed to pudate committed note tags");
