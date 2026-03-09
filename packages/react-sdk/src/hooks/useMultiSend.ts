@@ -113,7 +113,7 @@ export function useMultiSend(): UseMultiSendResult {
             const iterAssetId = parseAccountId(options.assetId);
             const receiverId = parseAccountId(to);
             const assets = new NoteAssets([
-              new FungibleAsset(iterAssetId, amount),
+              new FungibleAsset(iterAssetId, BigInt(amount)),
             ]);
             const resolvedNoteType = recipientNoteType
               ? getNoteType(recipientNoteType)

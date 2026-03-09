@@ -91,9 +91,9 @@ export function useSwap(): UseSwapResult {
           const txRequest = client.newSwapTransactionRequest(
             accountIdObj,
             offeredFaucetIdObj,
-            options.offeredAmount,
+            BigInt(options.offeredAmount),
             requestedFaucetIdObj,
-            options.requestedAmount,
+            BigInt(options.requestedAmount),
             noteType,
             paybackNoteType
           );

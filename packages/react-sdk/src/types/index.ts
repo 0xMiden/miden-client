@@ -229,7 +229,7 @@ export interface CreateFaucetOptions {
   /** Number of decimals. Default: 8 */
   decimals?: number;
   /** Maximum supply */
-  maxSupply: bigint;
+  maxSupply: bigint | number;
   /** Storage mode. Default: private */
   storageMode?: "private" | "public" | "network";
   /** Auth scheme: 0 = RpoFalcon512, 1 = EcdsaK256Keccak. Default: 0 */
@@ -262,7 +262,7 @@ export interface SendOptions {
   /** Asset ID to send (token id) */
   assetId: string;
   /** Amount to send (ignored when sendAll is true) */
-  amount?: bigint;
+  amount?: bigint | number;
   /** Note type. Default: private */
   noteType?: "private" | "public";
   /** Block height after which sender can reclaim note */
@@ -281,7 +281,7 @@ export interface MultiSendRecipient {
   /** Recipient account ID */
   to: string;
   /** Amount to send */
-  amount: bigint;
+  amount: bigint | number;
   /** Per-recipient note type override */
   noteType?: "private" | "public";
   /** Per-recipient attachment */
@@ -309,7 +309,7 @@ export interface InternalTransferOptions {
   /** Asset ID to send (token id) */
   assetId: string;
   /** Amount to transfer */
-  amount: bigint;
+  amount: bigint | number;
   /** Note type. Default: private */
   noteType?: "private" | "public";
 }
@@ -322,7 +322,7 @@ export interface InternalTransferChainOptions {
   /** Asset ID to send (token id) */
   assetId: string;
   /** Amount to transfer per hop */
-  amount: bigint;
+  amount: bigint | number;
   /** Note type. Default: private */
   noteType?: "private" | "public";
 }
@@ -358,7 +358,7 @@ export interface MintOptions {
   /** Faucet account to mint from */
   faucetId: string;
   /** Amount to mint */
-  amount: bigint;
+  amount: bigint | number;
   /** Note type. Default: private */
   noteType?: "private" | "public";
 }
@@ -378,11 +378,11 @@ export interface SwapOptions {
   /** Faucet ID of the offered asset */
   offeredFaucetId: string;
   /** Amount being offered */
-  offeredAmount: bigint;
+  offeredAmount: bigint | number;
   /** Faucet ID of the requested asset */
   requestedFaucetId: string;
   /** Amount being requested */
-  requestedAmount: bigint;
+  requestedAmount: bigint | number;
   /** Note type for swap note. Default: private */
   noteType?: "private" | "public";
   /** Note type for payback note. Default: private */
