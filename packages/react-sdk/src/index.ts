@@ -37,9 +37,13 @@ export { useSwap } from "./hooks/useSwap";
 export { useTransaction } from "./hooks/useTransaction";
 export { useSessionAccount } from "./hooks/useSessionAccount";
 
+// Passkey utilities (re-exported from @miden-sdk/miden-sdk)
+export { isPasskeyPrfSupported } from "@miden-sdk/miden-sdk";
+
 // Types
 export type {
   MidenConfig,
+  PasskeyEncryptionOptions,
   RpcUrlConfig,
   ProverConfig,
   ProverUrls,
