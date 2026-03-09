@@ -5,7 +5,11 @@ import { createRequire } from "node:module";
 export interface MidenVitePluginOptions {
   /** Packages to deduplicate. Default: ["@miden-sdk/miden-sdk"] */
   wasmPackages?: string[];
-  /** Enable COOP/COEP headers on dev server. Default: true */
+  /**
+   * Enable COOP/COEP headers on dev server for SharedArrayBuffer support.
+   * Default: false — enabling this breaks OAuth popup flows (e.g. Para)
+   * because `same-origin` COOP nullifies `window.opener` in popups.
+   */
   crossOriginIsolation?: boolean;
   /** gRPC-web proxy target URL. Default: "https://rpc.testnet.miden.io". Set to false to disable. */
   rpcProxyTarget?: string | false;
@@ -13,10 +17,26 @@ export interface MidenVitePluginOptions {
   rpcProxyPath?: string;
 }
 
+/**
+ * Esbuild plugin that externalizes @miden-sdk/react during Vite's dep pre-bundling.
+ * Without this, esbuild inlines a separate copy of the module (and its
+ * React.createContext calls) into each pre-bundled dependency chunk, breaking
+ * React context identity matching across signer providers.
+ */
+const externalizeMidenReact = {
+  name: "externalize-miden-react",
+  setup(build: any) {
+    build.onResolve({ filter: /^@miden-sdk\/react$/ }, () => ({
+      path: "@miden-sdk/react",
+      external: true,
+    }));
+  },
+};
+
 export function midenVitePlugin(options?: MidenVitePluginOptions): Plugin {
   const {
     wasmPackages = ["@miden-sdk/miden-sdk"],
-    crossOriginIsolation = true,
+    crossOriginIsolation = false,
     rpcProxyTarget = "https://rpc.testnet.miden.io",
     rpcProxyPath = "/rpc.Api",
   } = options ?? {};
@@ -63,14 +83,28 @@ export function midenVitePlugin(options?: MidenVitePluginOptions): Plugin {
         };
       }
 
+      // Merge with any existing esbuild plugins the user may have configured
+      const existingPlugins =
+        userConfig.optimizeDeps?.esbuildOptions?.plugins ?? [];
+
       return {
         resolve: {
           alias,
-          dedupe: [...wasmPackages],
+          dedupe: [
+            ...wasmPackages,
+            "react",
+            "react-dom",
+            "react/jsx-runtime",
+            "@miden-sdk/react",
+          ],
           preserveSymlinks: true,
         },
         optimizeDeps: {
           exclude: [...wasmPackages],
+          esbuildOptions: {
+            target: "esnext",
+            plugins: [...existingPlugins, externalizeMidenReact],
+          },
         },
         build: {
           target: "esnext",
