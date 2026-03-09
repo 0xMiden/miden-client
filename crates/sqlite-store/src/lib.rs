@@ -486,10 +486,8 @@ impl Store for SqliteStore {
         &self,
         account_id: AccountId,
     ) -> Result<Option<AccountRecord>, StoreError> {
-        let smt_forest = self.smt_forest.clone();
-
         self.interact_with_connection(move |conn| {
-            SqliteStore::get_minimal_partial_account(conn, &smt_forest, account_id)
+            SqliteStore::get_minimal_partial_account(conn, account_id)
         })
         .await
     }

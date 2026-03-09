@@ -323,12 +323,17 @@
     dexie "^4.0.1"
     glob "^11.0.0"
 
-"@miden-sdk/react@^0.13.0":
-  version "0.13.2"
-  resolved "https://registry.yarnpkg.com/@miden-sdk/react/-/react-0.13.2.tgz#bad9b88449bb7ca1a2e55274b360b1e729a409fe"
-  integrity sha512-78i3/5YUUwitqvJA02HVXZ61RXEOyaiRsm1agVUtOblOmazuIgMEW4P3gdlX9YUiGr06l9O+Rw1ol5FZCOJTXQ==
+"@miden-sdk/react@^0.13.3":
+  version "0.13.3"
+  resolved "https://registry.yarnpkg.com/@miden-sdk/react/-/react-0.13.3.tgz#943f560709053f78d2914912571780e4690609f7"
+  integrity sha512-jJ/j61C/53bsDXi80AllZSygoGd5+GSFRFLSMHLIto3zO9IiQ7JTbmHOtKLp7qTh+VozLyE0wE/pTsWYoVtKQg==
   dependencies:
     zustand "^5.0.0"
+
+"@miden-sdk/vite-plugin@^0.13.4":
+  version "0.13.4"
+  resolved "https://registry.yarnpkg.com/@miden-sdk/vite-plugin/-/vite-plugin-0.13.4.tgz#72370985960b888395e1850d3b1e2ab41bde8b12"
+  integrity sha512-BojOl1hF01wsHAXWDTm9gcMkMDqngE28SDLXZFJT2c6lgUouB7LzMkmKvWz0+qO0clOKY2/4R5LBQeAj5m74ZA==
 
 "@rolldown/pluginutils@1.0.0-beta.27":
   version "1.0.0-beta.27"
