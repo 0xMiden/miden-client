@@ -5,11 +5,7 @@ import { paraVitePlugin } from "@miden-sdk/use-miden-para-react/vite";
 import path from "path";
 
 export default defineConfig({
-  plugins: [
-    react(),
-    midenVitePlugin(),
-    paraVitePlugin(),
-  ],
+  plugins: [react(), midenVitePlugin(), paraVitePlugin()],
   resolve: {
     alias: {
       // Use local source for react-sdk development

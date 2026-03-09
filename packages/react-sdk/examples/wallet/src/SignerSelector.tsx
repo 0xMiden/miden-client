@@ -25,16 +25,11 @@ export function SignerSelector({
       <h1>Connect Wallet</h1>
       <div className="form">
         {multiSigner?.signers.map((s) => (
-          <button
-            key={s.name}
-            onClick={() => handleConnect(s.name)}
-          >
+          <button key={s.name} onClick={() => handleConnect(s.name)}>
             {s.name}
           </button>
         ))}
-        <button onClick={onUseLocal}>
-          Use Local Keystore
-        </button>
+        <button onClick={onUseLocal}>Use Local Keystore</button>
       </div>
       {error && <div className="center">Error: {error}</div>}
     </div>

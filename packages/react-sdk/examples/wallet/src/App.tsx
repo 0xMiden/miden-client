@@ -20,12 +20,7 @@ export default function App() {
 
   // Show signer selector if not connected and not using local keystore
   if (!signer?.isConnected && !useLocal) {
-    return (
-      <SignerSelector
-        multiSigner={multiSigner}
-        onUseLocal={() => setUseLocal(true)}
-      />
-    );
+    return <SignerSelector multiSigner={multiSigner} onUseLocal={() => setUseLocal(true)} />;
   }
 
   if (!isReady) return <div className="center">Initializing...</div>;
@@ -41,13 +36,7 @@ export default function App() {
   );
 }
 
-function WalletApp({
-  onSwitch,
-  signerName,
-}: {
-  onSwitch: () => void;
-  signerName?: string;
-}) {
+function WalletApp({ onSwitch, signerName }: { onSwitch: () => void; signerName?: string }) {
   const { wallets, isLoading } = useAccounts();
   const { createWallet, isCreating } = useCreateWallet();
   const handleCreate = () => createWallet();
@@ -74,13 +63,7 @@ function WalletApp({
   );
 }
 
-function Header({
-  signerName,
-  onSwitch,
-}: {
-  signerName?: string;
-  onSwitch: () => void;
-}) {
+function Header({ signerName, onSwitch }: { signerName?: string; onSwitch: () => void }) {
   return (
     <div className="row">
       <h1>Wallet{signerName ? ` (${signerName})` : " (Local)"}</h1>

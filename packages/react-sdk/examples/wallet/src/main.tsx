@@ -10,10 +10,7 @@ import App from "./App";
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <MultiSignerProvider>
-      <ParaSignerProvider
-        apiKey={import.meta.env.VITE_PARA_API_KEY}
-        environment="BETA"
-      >
+      <ParaSignerProvider apiKey={import.meta.env.VITE_PARA_API_KEY} environment="BETA">
         <SignerSlot />
       </ParaSignerProvider>
       <TurnkeySignerProvider>
