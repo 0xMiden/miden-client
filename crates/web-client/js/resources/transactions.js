@@ -487,9 +487,9 @@ export class TransactionsResource {
     const proven = prover
       ? await this.#inner.proveTransaction(result, prover)
       : await this.#inner.proveTransaction(result);
+    const txId = result.id();
     const height = await this.#inner.submitProvenTransaction(proven, result);
     await this.#inner.applyTransaction(result, height);
-    const txId = result.id();
     return { txId, result };
   }
 }

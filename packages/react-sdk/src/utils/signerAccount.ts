@@ -73,8 +73,11 @@ export async function initializeSignerAccount(
     const accountId = parseAccountId(config.importAccountId);
     try {
       await client.importAccountById(accountId);
-    } catch {
-      // May already exist locally after a previous init
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (!msg.includes("already being tracked")) {
+        throw e;
+      }
     }
     await client.syncState();
     return config.importAccountId;
