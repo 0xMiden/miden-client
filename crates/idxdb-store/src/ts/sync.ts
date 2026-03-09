@@ -196,89 +196,6 @@ export async function applyStateSync(
     flattenedPartialBlockChainPeaks
   );
 
-  let inputNotesWriteOp = Promise.all(
-    serializedInputNotes.map((note) => {
-      return upsertInputNote(
-        dbId,
-        note.noteId,
-        note.noteAssets,
-        note.serialNumber,
-        note.inputs,
-        note.noteScriptRoot,
-        note.noteScript,
-        note.nullifier,
-        note.createdAt,
-        note.stateDiscriminant,
-        note.state
-      );
-    })
-  );
-
-  let outputNotesWriteOp = Promise.all(
-    serializedOutputNotes.map((note) => {
-      return upsertOutputNote(
-        dbId,
-        note.noteId,
-        note.noteAssets,
-        note.recipientDigest,
-        note.metadata,
-        note.nullifier,
-        note.expectedHeight,
-        note.stateDiscriminant,
-        note.state
-      );
-    })
-  );
-
-  let transactionWriteOp = Promise.all(
-    transactionUpdates.map((transactionRecord) => {
-      let promises = [
-        upsertTransactionRecord(
-          dbId,
-          transactionRecord.id,
-          transactionRecord.details,
-          transactionRecord.blockNum,
-          transactionRecord.statusVariant,
-          transactionRecord.status,
-          transactionRecord.scriptRoot
-        ),
-      ];
-
-      if (transactionRecord.scriptRoot && transactionRecord.txScript) {
-        promises.push(
-          insertTransactionScript(
-            dbId,
-            transactionRecord.scriptRoot,
-            transactionRecord.txScript
-          )
-        );
-      }
-
-      return Promise.all(promises);
-    })
-  );
-
-  let accountUpdatesWriteOp = Promise.all(
-    accountUpdates.flatMap((accountUpdate) => {
-      return [
-        upsertAccountStorage(dbId, accountUpdate.storageSlots),
-        upsertStorageMapEntries(dbId, accountUpdate.storageMapEntries),
-        upsertVaultAssets(dbId, accountUpdate.assets),
-        upsertAccountRecord(
-          dbId,
-          accountUpdate.accountId,
-          accountUpdate.codeRoot,
-          accountUpdate.storageRoot,
-          accountUpdate.assetVaultRoot,
-          accountUpdate.nonce,
-          accountUpdate.committed,
-          accountUpdate.accountCommitment,
-          accountUpdate.accountSeed
-        ),
-      ];
-    })
-  );
-
   const tablesToAccess = [
     db.stateSync,
     db.inputNotes,
@@ -287,9 +204,104 @@ export async function applyStateSync(
     db.blockHeaders,
     db.partialBlockchainNodes,
     db.tags,
+    db.notesScripts,
+    db.accountStorages,
+    db.storageMapEntries,
+    db.accountAssets,
+    db.accounts,
+    db.trackedAccounts,
+    db.transactionScripts,
   ];
 
   return await db.dexie.transaction("rw", tablesToAccess, async (tx) => {
+    let inputNotesWriteOp = Promise.all(
+      serializedInputNotes.map((note) => {
+        return upsertInputNote(
+          dbId,
+          note.noteId,
+          note.noteAssets,
+          note.serialNumber,
+          note.inputs,
+          note.noteScriptRoot,
+          note.noteScript,
+          note.nullifier,
+          note.createdAt,
+          note.stateDiscriminant,
+          note.state,
+          tx
+        );
+      })
+    );
+
+    let outputNotesWriteOp = Promise.all(
+      serializedOutputNotes.map((note) => {
+        return upsertOutputNote(
+          dbId,
+          note.noteId,
+          note.noteAssets,
+          note.recipientDigest,
+          note.metadata,
+          note.nullifier,
+          note.expectedHeight,
+          note.stateDiscriminant,
+          note.state,
+          tx
+        );
+      })
+    );
+
+    let transactionWriteOp = Promise.all(
+      transactionUpdates.map((transactionRecord) => {
+        let promises = [
+          upsertTransactionRecord(
+            dbId,
+            transactionRecord.id,
+            transactionRecord.details,
+            transactionRecord.blockNum,
+            transactionRecord.statusVariant,
+            transactionRecord.status,
+            transactionRecord.scriptRoot,
+            tx
+          ),
+        ];
+
+        if (transactionRecord.scriptRoot && transactionRecord.txScript) {
+          promises.push(
+            insertTransactionScript(
+              dbId,
+              transactionRecord.scriptRoot,
+              transactionRecord.txScript,
+              tx
+            )
+          );
+        }
+
+        return Promise.all(promises);
+      })
+    );
+
+    let accountUpdatesWriteOp = Promise.all(
+      accountUpdates.flatMap((accountUpdate) => {
+        return [
+          upsertAccountStorage(dbId, accountUpdate.storageSlots, tx),
+          upsertStorageMapEntries(dbId, accountUpdate.storageMapEntries, tx),
+          upsertVaultAssets(dbId, accountUpdate.assets, tx),
+          upsertAccountRecord(
+            dbId,
+            accountUpdate.accountId,
+            accountUpdate.codeRoot,
+            accountUpdate.storageRoot,
+            accountUpdate.assetVaultRoot,
+            accountUpdate.nonce,
+            accountUpdate.committed,
+            accountUpdate.accountCommitment,
+            accountUpdate.accountSeed,
+            tx
+          ),
+        ];
+      })
+    );
+
     await Promise.all([
       inputNotesWriteOp,
       outputNotesWriteOp,

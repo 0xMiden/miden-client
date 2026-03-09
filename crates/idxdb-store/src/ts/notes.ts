@@ -128,40 +128,38 @@ export async function upsertInputNote(
   nullifier: string,
   serializedCreatedAt: string,
   stateDiscriminant: number,
-  state: Uint8Array
+  state: Uint8Array,
+  tx?: any
 ) {
   const db = getDatabase(dbId);
-  return db.dexie.transaction(
-    "rw",
-    db.inputNotes,
-    db.notesScripts,
-    async (tx) => {
-      try {
-        const data = {
-          noteId,
-          assets,
-          serialNumber,
-          inputs,
-          scriptRoot,
-          nullifier,
-          state,
-          stateDiscriminant,
-          serializedCreatedAt,
-        };
+  const doWork = async (t: any) => {
+    try {
+      const data = {
+        noteId,
+        assets,
+        serialNumber,
+        inputs,
+        scriptRoot,
+        nullifier,
+        state,
+        stateDiscriminant,
+        serializedCreatedAt,
+      };
 
-        await tx.inputNotes.put(data);
+      await t.inputNotes.put(data);
 
-        const noteScriptData = {
-          scriptRoot,
-          serializedNoteScript,
-        };
+      const noteScriptData = {
+        scriptRoot,
+        serializedNoteScript,
+      };
 
-        await tx.notesScripts.put(noteScriptData);
-      } catch (error) {
-        logWebStoreError(error, `Error inserting note: ${noteId}`);
-      }
+      await t.notesScripts.put(noteScriptData);
+    } catch (error) {
+      logWebStoreError(error, `Error inserting note: ${noteId}`);
     }
-  );
+  };
+  if (tx) return doWork(tx);
+  return db.dexie.transaction("rw", db.inputNotes, db.notesScripts, doWork);
 }
 
 export async function upsertOutputNote(
@@ -173,32 +171,30 @@ export async function upsertOutputNote(
   nullifier: string | undefined,
   expectedHeight: number,
   stateDiscriminant: number,
-  state: Uint8Array
+  state: Uint8Array,
+  tx?: any
 ) {
   const db = getDatabase(dbId);
-  return db.dexie.transaction(
-    "rw",
-    db.outputNotes,
-    db.notesScripts,
-    async (tx) => {
-      try {
-        const data = {
-          noteId,
-          assets,
-          recipientDigest,
-          metadata,
-          nullifier: nullifier ? nullifier : undefined,
-          expectedHeight,
-          stateDiscriminant,
-          state,
-        };
+  const doWork = async (t: any) => {
+    try {
+      const data = {
+        noteId,
+        assets,
+        recipientDigest,
+        metadata,
+        nullifier: nullifier ? nullifier : undefined,
+        expectedHeight,
+        stateDiscriminant,
+        state,
+      };
 
-        await tx.outputNotes.put(data);
-      } catch (error) {
-        logWebStoreError(error, `Error inserting note: ${noteId}`);
-      }
+      await t.outputNotes.put(data);
+    } catch (error) {
+      logWebStoreError(error, `Error inserting note: ${noteId}`);
     }
-  );
+  };
+  if (tx) return doWork(tx);
+  return db.dexie.transaction("rw", db.outputNotes, db.notesScripts, doWork);
 }
 
 async function processInputNotes(dbId: string, notes: IInputNote[]) {

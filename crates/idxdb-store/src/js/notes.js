@@ -132,7 +132,8 @@ export async function upsertInputNote(dbId, noteId, assets, serialNumber, inputs
             logWebStoreError(error, `Error inserting note: ${noteId}`);
         }
     };
-    if (tx) return doWork(tx);
+    if (tx)
+        return doWork(tx);
     return db.dexie.transaction("rw", db.inputNotes, db.notesScripts, doWork);
 }
 export async function upsertOutputNote(dbId, noteId, assets, recipientDigest, metadata, nullifier, expectedHeight, stateDiscriminant, state, tx) {
@@ -155,7 +156,8 @@ export async function upsertOutputNote(dbId, noteId, assets, recipientDigest, me
             logWebStoreError(error, `Error inserting note: ${noteId}`);
         }
     };
-    if (tx) return doWork(tx);
+    if (tx)
+        return doWork(tx);
     return db.dexie.transaction("rw", db.outputNotes, db.notesScripts, doWork);
 }
 async function processInputNotes(dbId, notes) {

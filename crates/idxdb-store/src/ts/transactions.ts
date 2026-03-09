@@ -117,7 +117,8 @@ export async function getTransactions(dbId: string, filter: string) {
 export async function insertTransactionScript(
   dbId: string,
   scriptRoot: Uint8Array,
-  txScript: Uint8Array
+  txScript: Uint8Array,
+  tx?: any
 ) {
   try {
     const db = getDatabase(dbId);
@@ -129,7 +130,7 @@ export async function insertTransactionScript(
       txScript: mapOption(txScript, (txScript) => new Uint8Array(txScript)),
     };
 
-    await db.transactionScripts.put(data);
+    await (tx || db).transactionScripts.put(data);
   } catch (error) {
     logWebStoreError(error, "Failed to insert transaction script");
   }
@@ -142,7 +143,8 @@ export async function upsertTransactionRecord(
   blockNum: number,
   statusVariant: number,
   status: Uint8Array,
-  scriptRoot?: Uint8Array
+  scriptRoot?: Uint8Array,
+  tx?: any
 ) {
   try {
     const db = getDatabase(dbId);
@@ -155,7 +157,7 @@ export async function upsertTransactionRecord(
       status,
     };
 
-    await db.transactions.put(data);
+    await (tx || db).transactions.put(data);
   } catch (err) {
     logWebStoreError(err, "Failed to insert proven transaction data");
   }
