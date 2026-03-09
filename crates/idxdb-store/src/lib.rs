@@ -146,6 +146,10 @@ impl IdxdbStore {
 
 #[async_trait::async_trait(?Send)]
 impl Store for IdxdbStore {
+    fn identifier(&self) -> &str {
+        &self.database_id
+    }
+
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     fn get_current_timestamp(&self) -> Option<u64> {
         Some(current_timestamp_u64())

@@ -124,11 +124,11 @@ Serializes the mock note transport node state.
 
 ***
 
-### storeName()
+### storeIdentifier()
 
-> **storeName**(): `string`
+> **storeIdentifier**(): `string`
 
-Returns the name of the underlying store (e.g. the IndexedDB database name).
+Returns the identifier of the underlying store (e.g. IndexedDB database name, file path).
 
 #### Returns
 

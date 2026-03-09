@@ -305,11 +305,11 @@ test.describe("MidenClient API - Mock Chain", () => {
       const walletId = wallet.id().toString();
 
       // Export the store
-      const storeData = await window.exportStore(client.storeName());
+      const storeData = await window.exportStore(client.storeIdentifier());
 
       // Create a new mock client and import the store
       const client2 = await window.MidenClient.createMock();
-      await window.importStore(client2.storeName(), storeData);
+      await window.importStore(client2.storeIdentifier(), storeData);
 
       // Check the account exists in the new client
       const accounts = await client2.accounts.list();

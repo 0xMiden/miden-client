@@ -85,7 +85,6 @@ pub fn setup_logging(log_level: &str) {
 #[wasm_bindgen]
 pub struct WebClient {
     inner: Option<Client<ClientAuth>>,
-    store_name: Option<String>,
     mock_rpc_api: Option<Arc<MockRpcApi>>,
     mock_note_transport_api: Option<Arc<MockNoteTransportApi>>,
 }
@@ -103,18 +102,15 @@ impl WebClient {
         console_error_panic_hook::set_once();
         WebClient {
             inner: None,
-            store_name: None,
             mock_rpc_api: None,
             mock_note_transport_api: None,
         }
     }
 
-    /// Returns the name of the underlying store (e.g. the `IndexedDB` database name).
-    #[wasm_bindgen(js_name = "storeName")]
-    pub fn store_name(&self) -> Result<String, JsValue> {
-        self.store_name
-            .clone()
-            .ok_or_else(|| JsValue::from_str("Client not initialized"))
+    /// Returns the identifier of the underlying store (e.g. `IndexedDB` database name, file path).
+    #[wasm_bindgen(js_name = "storeIdentifier")]
+    pub fn store_identifier(&self) -> Result<String, JsValue> {
+        Ok(self.store()?.identifier().to_string())
     }
 
     pub(crate) fn get_mut_inner(&mut self) -> Option<&mut Client<ClientAuth>> {
@@ -182,7 +178,6 @@ impl WebClient {
             rng,
             note_transport_client,
             debug_mode.unwrap_or(false),
-            store_name,
         )
         .await?;
 
@@ -248,7 +243,6 @@ impl WebClient {
             rng,
             note_transport_client,
             debug_mode.unwrap_or(false),
-            store_name,
         )
         .await?;
 
@@ -265,7 +259,6 @@ impl WebClient {
         rng: RpoRandomCoin,
         note_transport_client: Option<Arc<dyn NoteTransportClient>>,
         debug_mode: bool,
-        store_name: String,
     ) -> Result<(), JsValue> {
         let mut builder = ClientBuilder::new()
             .rpc(rpc_client)
@@ -297,7 +290,6 @@ impl WebClient {
             .map_err(|err| js_error_with_context(err, "Failed to ensure genesis in place"))?;
 
         self.inner = Some(client);
-        self.store_name = Some(store_name);
 
         Ok(())
     }

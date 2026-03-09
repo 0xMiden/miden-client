@@ -178,13 +178,13 @@ export class MidenClient {
   }
 
   /**
-   * Returns the name of the underlying store (e.g. the IndexedDB database name).
+   * Returns the identifier of the underlying store (e.g. IndexedDB database name, file path).
    *
-   * @returns {string} The store name.
+   * @returns {string} The store identifier.
    */
-  storeName() {
+  storeIdentifier() {
     this.assertNotTerminated();
-    return this.#inner.storeName();
+    return this.#inner.storeIdentifier();
   }
 
   // ── Mock-only methods ──

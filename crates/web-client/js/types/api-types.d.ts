@@ -486,8 +486,8 @@ export declare class MidenClient {
   /** Terminates the underlying Web Worker. After this, all method calls throw. */
   terminate(): void;
 
-  /** Returns the name of the underlying store (e.g. the IndexedDB database name). */
-  storeName(): string;
+  /** Returns the identifier of the underlying store (e.g. IndexedDB database name, file path). */
+  storeIdentifier(): string;
 
   /** Advances the mock chain by one block. Only available on mock clients. */
   proveBlock(): void;
