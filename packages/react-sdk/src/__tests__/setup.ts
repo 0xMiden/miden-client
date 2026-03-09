@@ -240,6 +240,13 @@ vi.mock("@miden-sdk/miden-sdk", () => {
       Nullifiers: 7,
       Unverified: 8,
     },
+    TransactionId: {
+      fromHex: vi.fn((hex: string) => ({
+        toString: vi.fn(() => hex),
+        toHex: vi.fn(() => hex),
+        free: vi.fn(),
+      })),
+    },
     TransactionFilter: {
       all: vi.fn(() => ({})),
       uncommitted: vi.fn(() => ({})),
