@@ -779,15 +779,15 @@
     dexie "^4.0.1"
     glob "^11.0.0"
 
-"@miden-sdk/miden-turnkey-react@^1.0.2":
-  version "1.0.2"
-  resolved "https://registry.npmjs.org/@miden-sdk/miden-turnkey-react/-/miden-turnkey-react-1.0.2.tgz"
-  integrity sha512-ILVbPIpN7yVO+gVwFyqea5QqwZ/3eYlhR7JWHlQbYFvc6RmSMshi146I3Yfc2Xk01OYDY74usbkGHKywmnJZQg==
+"@miden-sdk/miden-turnkey-react@^1.0.4":
+  version "1.0.4"
+  resolved "https://registry.npmjs.org/@miden-sdk/miden-turnkey-react/-/miden-turnkey-react-1.0.4.tgz"
+  integrity sha512-PKH6lSafT1W+gc41tzDObKhgvPVseh7SCtlLHitv6Nee889aiD96EiDrxIwKZ6E336GEr8hEgVPzk5S/4pvYgQ==
 
-"@miden-sdk/miden-turnkey@^1.0.3":
-  version "1.0.3"
-  resolved "https://registry.npmjs.org/@miden-sdk/miden-turnkey/-/miden-turnkey-1.0.3.tgz"
-  integrity sha512-75x/yZbuMeCUvDlUOtWKZzbPWsNKFADjXJD+4nkNw7p1tI8ZEp3P2txRRrFdPsHK6JZbjnEif2j7/x47SA2vfA==
+"@miden-sdk/miden-turnkey@^1.0.4":
+  version "1.0.4"
+  resolved "https://registry.npmjs.org/@miden-sdk/miden-turnkey/-/miden-turnkey-1.0.4.tgz"
+  integrity sha512-CnBLvmMunbOB8oWwcTpHZTzaIevH1ZLAUf5nb7jHduFTdVpMsHcfwS882qQ/iCIvUbQmYPXyc4en655/O5lSxw==
   dependencies:
     "@miden-sdk/miden-sdk" "^0.13.1"
     "@turnkey/core" "^1.8.2"
