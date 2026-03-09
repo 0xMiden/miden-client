@@ -10,7 +10,7 @@
 
 ### note
 
-> **note**: [`NoteInput`](../type-aliases/NoteInput.md) \| [`Note`](../classes/Note.md)
+> **note**: [`NoteInput`](../type-aliases/NoteInput.md)
 
 ***
 

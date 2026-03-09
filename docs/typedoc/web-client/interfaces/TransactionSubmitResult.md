@@ -6,7 +6,7 @@
 
 # Interface: TransactionSubmitResult
 
-Result of submitting a transaction — includes the transaction ID and the transaction result.
+Result of methods that previously returned bare TransactionId.
 
 ## Properties
 
