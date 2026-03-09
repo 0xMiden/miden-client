@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.13.3 (TBD)
+
+* [FIX][rust] Fixed redundant `/GetAccount` RPC calls during `sync_state()` — a public account active across N sync steps now triggers exactly 1 fetch instead of N ([#1876](https://github.com/0xMiden/miden-client/pull/1876)).
+* [FIX][web] Fixed `PrematureCommitError` crash during `syncState()` by moving all IndexedDB writes into a single Dexie transaction instead of spawning competing inner transactions ([#1876](https://github.com/0xMiden/miden-client/pull/1876)).
+
 ## 0.13.2 (2026-02-26)
 
 * Updated to `miden-crypto` v0.19.5 ([#1813](https://github.com/0xMiden/miden-client/pull/1813)).
