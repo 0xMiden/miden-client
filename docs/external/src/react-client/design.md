@@ -11,6 +11,7 @@ This page explains how the React SDK is structured and how its pieces fit togeth
 
 The React SDK is a pure TypeScript/React package that wraps the [WASM bridge](../index.md). It consumes `@miden-sdk/miden-sdk` as a peer dependency and adds React-specific patterns — hooks, context providers, and Zustand state management — on top.
 
+
 ```mermaid
 flowchart LR
     A["Rust core<br/>(miden-client)"] -->|"compiled to WASM"| B["WASM bridge<br/>(@miden-sdk/wasm-bridge)"]
@@ -18,11 +19,13 @@ flowchart LR
     C --> D["Your React app"]
 ```
 
+
 The React SDK contains no Rust or WASM code of its own. From your perspective, `npm install @miden-sdk/react @miden-sdk/miden-sdk` is all you need.
 
 ## Runtime architecture
 
 At runtime, the SDK introduces three layers between your components and the WASM bridge:
+
 
 ```mermaid
 flowchart TB
@@ -51,6 +54,7 @@ flowchart TB
     RPC --> NT["Note transport"]
 ```
 
+
 ### Provider
 
 `MidenProvider` is the root of the SDK. It:
@@ -63,6 +67,7 @@ flowchart TB
 ### Zustand store
 
 The SDK uses [Zustand](https://zustand.docs.pmnd.rs/) for centralized state:
+
 
 ```mermaid
 flowchart TB
@@ -82,6 +87,7 @@ flowchart TB
     Hook5["useNoteStream()"] --> Notes
 ```
 
+
 Components subscribe to specific slices of the store via selector hooks, so they only re-render when their data changes — not on every sync cycle.
 
 ### Hooks layer
@@ -91,6 +97,7 @@ Hooks follow two patterns:
 **Query hooks** (`useAccounts`, `useAccount`, `useNotes`, `useNoteStream`, `useSyncState`, `useTransactionHistory`, `useAssetMetadata`) read from the Zustand store, auto-fetch on mount if the cache is empty, and re-fetch after each sync.
 
 **Mutation hooks** (`useSend`, `useConsume`, `useMint`, `useSwap`, `useCreateWallet`, `useCreateFaucet`, `useTransaction`) execute transactions through the provider's `runExclusive()`, track progress through stages, and refresh the store on completion.
+
 
 ```mermaid
 sequenceDiagram
@@ -115,6 +122,7 @@ sequenceDiagram
     P-->>C: re-render with updated state
 ```
 
+
 ## WASM concurrency safety
 
 The WASM bridge is single-threaded — concurrent access from multiple React components causes "recursive use of an object detected" errors. The SDK prevents this with two mechanisms:
@@ -128,6 +136,7 @@ WASM object pointers (like `AccountId`) are only valid within the `runExclusive`
 
 The SDK supports third-party wallet providers through a layered context pattern. A single signer provider can sit directly above `MidenProvider`, or multiple signers can be registered via `MultiSignerProvider`:
 
+
 ```mermaid
 flowchart TB
     subgraph Multi["MultiSignerProvider (optional)"]
@@ -140,6 +149,7 @@ flowchart TB
     MP --> App["Your components"]
     MP -.->|"creates client with<br/>external keystore"| WASM["Web Worker"]
 ```
+
 
 When `MidenProvider` detects a `SignerContext` above it in the tree, it:
 
