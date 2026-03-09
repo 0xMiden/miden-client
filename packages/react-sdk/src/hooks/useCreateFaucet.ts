@@ -5,7 +5,6 @@ import { AccountStorageMode } from "@miden-sdk/miden-sdk";
 import type { Account } from "@miden-sdk/miden-sdk";
 import type { CreateFaucetOptions } from "../types";
 import { DEFAULTS } from "../types";
-import { runExclusiveDirect } from "../utils/runExclusive";
 
 export interface UseCreateFaucetResult {
   /** Create a new faucet with the specified options */
@@ -50,8 +49,7 @@ export interface UseCreateFaucetResult {
  * ```
  */
 export function useCreateFaucet(): UseCreateFaucetResult {
-  const { client, isReady, runExclusive } = useMiden();
-  const runExclusiveSafe = runExclusive ?? runExclusiveDirect;
+  const { client, isReady } = useMiden();
   const setAccounts = useMidenStore((state) => state.setAccounts);
 
   const [faucet, setFaucet] = useState<Account | null>(null);
@@ -74,19 +72,16 @@ export function useCreateFaucet(): UseCreateFaucetResult {
         const decimals = options.decimals ?? DEFAULTS.FAUCET_DECIMALS;
         const authScheme = options.authScheme ?? DEFAULTS.AUTH_SCHEME;
 
-        const newFaucet = await runExclusiveSafe(async () => {
-          const createdFaucet = await client.newFaucet(
-            storageMode,
-            false, // nonFungible - currently only fungible faucets supported
-            options.tokenSymbol,
-            decimals,
-            options.maxSupply,
-            authScheme
-          );
-          const accounts = await client.getAccounts();
-          setAccounts(accounts);
-          return createdFaucet;
-        });
+        const newFaucet = await client.newFaucet(
+          storageMode,
+          false, // nonFungible - currently only fungible faucets supported
+          options.tokenSymbol,
+          decimals,
+          options.maxSupply,
+          authScheme
+        );
+        const accounts = await client.getAccounts();
+        setAccounts(accounts);
 
         setFaucet(newFaucet);
 
@@ -99,7 +94,7 @@ export function useCreateFaucet(): UseCreateFaucetResult {
         setIsCreating(false);
       }
     },
-    [client, isReady, runExclusive, setAccounts]
+    [client, isReady, setAccounts]
   );
 
   const reset = useCallback(() => {
