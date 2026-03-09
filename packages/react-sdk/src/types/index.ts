@@ -1,4 +1,5 @@
 import { AuthScheme } from "@miden-sdk/miden-sdk";
+import type { AccountRef } from "../utils/accountParsing";
 import type {
   WasmWebClient as WebClient,
   Account,
@@ -12,7 +13,11 @@ import type {
   TransactionRecord,
   TransactionRequest,
   NoteType,
+  NoteId,
+  Note,
   AccountStorageMode,
+  NoteVisibility,
+  StorageMode,
 } from "@miden-sdk/miden-sdk";
 
 // Re-export SDK types for convenience
@@ -30,8 +35,14 @@ export type {
   TransactionRecord,
   TransactionRequest,
   NoteType,
+  NoteId,
+  Note,
   AccountStorageMode,
+  NoteVisibility,
+  StorageMode,
 };
+
+export type { AccountRef } from "../utils/accountParsing";
 
 // Re-export signer types for external signer providers
 export type {
@@ -152,7 +163,7 @@ export interface AssetBalance {
 // Notes types
 export interface NotesFilter {
   status?: "all" | "consumed" | "committed" | "expected" | "processing";
-  accountId?: string;
+  accountId?: AccountRef;
   /** Only notes from this sender (any format, normalized internally) */
   sender?: string;
   /** Exclude these note IDs */
@@ -215,7 +226,7 @@ export interface NoteSummary {
 // Wallet creation options
 export interface CreateWalletOptions {
   /** Storage mode. Default: private */
-  storageMode?: "private" | "public" | "network";
+  storageMode?: StorageMode;
   /** Whether code can be updated. Default: true */
   mutable?: boolean;
   /** Auth scheme. Default: AuthScheme.AuthRpoFalcon512 */
@@ -233,7 +244,7 @@ export interface CreateFaucetOptions {
   /** Maximum supply */
   maxSupply: bigint | number;
   /** Storage mode. Default: private */
-  storageMode?: "private" | "public" | "network";
+  storageMode?: StorageMode;
   /** Auth scheme. Default: AuthScheme.AuthRpoFalcon512 */
   authScheme?: AuthScheme;
 }
@@ -246,7 +257,7 @@ export type ImportAccountOptions =
     }
   | {
       type: "id";
-      accountId: string | AccountId;
+      accountId: AccountRef;
     }
   | {
       type: "seed";
@@ -258,15 +269,15 @@ export type ImportAccountOptions =
 // Send options
 export interface SendOptions {
   /** Sender account ID */
-  from: string;
+  from: AccountRef;
   /** Recipient account ID */
-  to: string;
+  to: AccountRef;
   /** Asset ID to send (token id) */
-  assetId: string;
+  assetId: AccountRef;
   /** Amount to send (ignored when sendAll is true) */
   amount?: bigint | number;
   /** Note type. Default: private */
-  noteType?: "private" | "public";
+  noteType?: NoteVisibility;
   /** Block height after which sender can reclaim note */
   recallHeight?: number;
   /** Block height after which recipient can consume note */
@@ -277,11 +288,19 @@ export interface SendOptions {
   skipSync?: boolean;
   /** Send the full balance of this asset. When true, amount is ignored. */
   sendAll?: boolean;
+  /** true = build note in JS and return the Note object (e.g. for out-of-band delivery). Default: false */
+  returnNote?: boolean;
+}
+
+// Send result — txId always set; note is non-null only when returnNote is true
+export interface SendResult {
+  txId: string;
+  note: Note | null;
 }
 
 export interface MultiSendRecipient {
   /** Recipient account ID */
-  to: string;
+  to: AccountRef;
   /** Amount to send */
   amount: bigint | number;
   /** Per-recipient note type override */
@@ -292,47 +311,15 @@ export interface MultiSendRecipient {
 
 export interface MultiSendOptions {
   /** Sender account ID */
-  from: string;
+  from: AccountRef;
   /** Asset ID to send (token id) */
-  assetId: string;
+  assetId: AccountRef;
   /** Recipient list */
   recipients: MultiSendRecipient[];
   /** Default note type for all recipients. Default: private */
-  noteType?: "private" | "public";
+  noteType?: NoteVisibility;
   /** Skip auto-sync before send. Default: false */
   skipSync?: boolean;
-}
-
-export interface InternalTransferOptions {
-  /** Sender account ID */
-  from: string;
-  /** Recipient account ID */
-  to: string;
-  /** Asset ID to send (token id) */
-  assetId: string;
-  /** Amount to transfer */
-  amount: bigint | number;
-  /** Note type. Default: private */
-  noteType?: "private" | "public";
-}
-
-export interface InternalTransferChainOptions {
-  /** Initial sender account ID */
-  from: string;
-  /** Ordered list of recipient account IDs */
-  recipients: string[];
-  /** Asset ID to send (token id) */
-  assetId: string;
-  /** Amount to transfer per hop */
-  amount: bigint | number;
-  /** Note type. Default: private */
-  noteType?: "private" | "public";
-}
-
-export interface InternalTransferResult {
-  createTransactionId: string;
-  consumeTransactionId: string;
-  noteId: string;
 }
 
 export interface WaitForCommitOptions {
@@ -344,7 +331,7 @@ export interface WaitForCommitOptions {
 
 export interface WaitForNotesOptions {
   /** Account ID to check for consumable notes */
-  accountId: string;
+  accountId: AccountRef;
   /** Minimum number of notes to wait for. Default: 1 */
   minCount?: number;
   /** Timeout in milliseconds. Default: 10000 */
@@ -356,45 +343,45 @@ export interface WaitForNotesOptions {
 // Mint options
 export interface MintOptions {
   /** Target account to receive minted tokens */
-  targetAccountId: string;
+  targetAccountId: AccountRef;
   /** Faucet account to mint from */
-  faucetId: string;
+  faucetId: AccountRef;
   /** Amount to mint */
   amount: bigint | number;
   /** Note type. Default: private */
-  noteType?: "private" | "public";
+  noteType?: NoteVisibility;
 }
 
 // Consume options
 export interface ConsumeOptions {
   /** Account ID that will consume the notes */
-  accountId: string;
-  /** List of note IDs to consume */
-  noteIds: string[];
+  accountId: AccountRef;
+  /** Notes to consume: strings (hex IDs), NoteId objects, InputNoteRecords, or Note objects. */
+  notes: (string | NoteId | InputNoteRecord | Note)[];
 }
 
 // Swap options
 export interface SwapOptions {
   /** Account initiating the swap */
-  accountId: string;
+  accountId: AccountRef;
   /** Faucet ID of the offered asset */
-  offeredFaucetId: string;
+  offeredFaucetId: AccountRef;
   /** Amount being offered */
   offeredAmount: bigint | number;
   /** Faucet ID of the requested asset */
-  requestedFaucetId: string;
+  requestedFaucetId: AccountRef;
   /** Amount being requested */
   requestedAmount: bigint | number;
   /** Note type for swap note. Default: private */
-  noteType?: "private" | "public";
+  noteType?: NoteVisibility;
   /** Note type for payback note. Default: private */
-  paybackNoteType?: "private" | "public";
+  paybackNoteType?: NoteVisibility;
 }
 
 // Arbitrary transaction options
 export interface ExecuteTransactionOptions {
   /** Account ID the transaction applies to */
-  accountId: string | AccountId;
+  accountId: AccountRef;
   /** Transaction request or builder */
   request:
     | TransactionRequest

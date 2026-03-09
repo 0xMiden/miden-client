@@ -6,6 +6,6 @@
 
 # Type Alias: AccountTypeValue
 
-> **AccountTypeValue** = `"MutableWallet"` \| `"ImmutableWallet"` \| `"FungibleFaucet"`
+> **AccountTypeValue** = `"MutableWallet"` \| `"ImmutableWallet"` \| `"FungibleFaucet"` \| `"ImmutableContract"` \| `"MutableContract"`
 
 Union of valid AccountType string values.
