@@ -11,7 +11,6 @@ This page explains how the TypeScript SDK is structured and how its pieces fit t
 
 The TypeScript SDK is a pure TypeScript package that wraps the [WASM bridge](../index.md) — a separate layer that compiles the [Rust client core](../rust-client/design.md) to WebAssembly and bundles it with browser infrastructure (Web Workers, IndexedDB, JS glue). The SDK itself contains no Rust or WASM code; it consumes the bridge as an npm dependency and provides the idiomatic TypeScript API you interact with.
 
-
 ```mermaid
 flowchart LR
     A["Rust core<br/>(miden-client)"] -->|"compiled to WASM"| B["WASM bridge<br/>(@miden-sdk/wasm-bridge)"]
@@ -19,13 +18,11 @@ flowchart LR
     C --> D["Your application"]
 ```
 
-
 From your perspective, `npm install` is all you need — the WASM binary, Web Worker script, and all bindings are bundled transitively.
 
 ## Runtime architecture
 
 At runtime, the SDK splits work across two threads:
-
 
 ```mermaid
 flowchart TB
@@ -45,7 +42,6 @@ flowchart TB
     RPC <-->|"gRPC-web"| NT["Note transport<br/>network"]
 ```
 
-
 **Why a Web Worker?** Transaction proving and MASM compilation are CPU-intensive. Running them on the main thread would freeze the UI. The Web Worker keeps your application responsive while heavy operations run in the background.
 
 Every `MidenClient` instance owns one Web Worker. The TypeScript API you interact with is a thin proxy that serializes calls to the worker via `postMessage` and returns the results as promises.
@@ -53,7 +49,6 @@ Every `MidenClient` instance owns one Web Worker. The TypeScript API you interac
 ## Client API surface
 
 The `MidenClient` exposes a resource-based API — each domain area is grouped under a namespace:
-
 
 ```mermaid
 flowchart TB
@@ -72,7 +67,6 @@ flowchart TB
     Tags ~~~ TG1["add · remove · list"]
 ```
 
-
 | Namespace | Responsibility |
 |-----------|---------------|
 | **`client.accounts`** | Account lifecycle: create wallets/faucets/contracts, retrieve state, check balances, import/export, manage addresses |
@@ -87,7 +81,6 @@ Top-level methods like `client.exportStore()`, `client.importStore()`, and `clie
 ## Transaction lifecycle
 
 When you call a high-level method like `client.transactions.send()`, the SDK handles the full lifecycle automatically:
-
 
 ```mermaid
 sequenceDiagram
@@ -107,7 +100,6 @@ sequenceDiagram
     Worker-->>API: TransactionId
     API-->>App: TransactionId
 ```
-
 
 Steps 2–3 are the most expensive. For complex transactions, you can offload proving to a remote prover by passing `proverUrl` at client creation or a `prover` per-transaction.
 
