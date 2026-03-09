@@ -241,7 +241,7 @@ export async function upsertAccountCode(dbId, codeRoot, code) {
         logWebStoreError(error, `Error inserting code with root: ${codeRoot}`);
     }
 }
-export async function upsertAccountStorage(dbId, storageSlots) {
+export async function upsertAccountStorage(dbId, storageSlots, tx) {
     try {
         const db = getDatabase(dbId);
         let processedSlots = storageSlots.map((slot) => {
@@ -252,13 +252,13 @@ export async function upsertAccountStorage(dbId, storageSlots) {
                 slotType: slot.slotType,
             };
         });
-        await db.accountStorages.bulkPut(processedSlots);
+        await (tx || db).accountStorages.bulkPut(processedSlots);
     }
     catch (error) {
         logWebStoreError(error, `Error inserting storage slots`);
     }
 }
-export async function upsertStorageMapEntries(dbId, entries) {
+export async function upsertStorageMapEntries(dbId, entries, tx) {
     try {
         const db = getDatabase(dbId);
         let processedEntries = entries.map((entry) => {
@@ -268,13 +268,13 @@ export async function upsertStorageMapEntries(dbId, entries) {
                 value: entry.value,
             };
         });
-        await db.storageMapEntries.bulkPut(processedEntries);
+        await (tx || db).storageMapEntries.bulkPut(processedEntries);
     }
     catch (error) {
         logWebStoreError(error, `Error inserting storage map entries`);
     }
 }
-export async function upsertVaultAssets(dbId, assets) {
+export async function upsertVaultAssets(dbId, assets, tx) {
     try {
         const db = getDatabase(dbId);
         let processedAssets = assets.map((asset) => {
@@ -285,13 +285,13 @@ export async function upsertVaultAssets(dbId, assets) {
                 asset: asset.asset,
             };
         });
-        await db.accountAssets.bulkPut(processedAssets);
+        await (tx || db).accountAssets.bulkPut(processedAssets);
     }
     catch (error) {
         logWebStoreError(error, `Error inserting assets`);
     }
 }
-export async function upsertAccountRecord(dbId, accountId, codeRoot, storageRoot, vaultRoot, nonce, committed, commitment, accountSeed) {
+export async function upsertAccountRecord(dbId, accountId, codeRoot, storageRoot, vaultRoot, nonce, committed, commitment, accountSeed, tx) {
     try {
         const db = getDatabase(dbId);
         const data = {
@@ -305,8 +305,8 @@ export async function upsertAccountRecord(dbId, accountId, codeRoot, storageRoot
             accountCommitment: commitment,
             locked: false,
         };
-        await db.accounts.put(data);
-        await db.trackedAccounts.put({ id: accountId });
+        await (tx || db).accounts.put(data);
+        await (tx || db).trackedAccounts.put({ id: accountId });
     }
     catch (error) {
         logWebStoreError(error, `Error inserting account: ${accountId}`);
