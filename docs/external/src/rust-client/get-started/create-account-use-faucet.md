@@ -3,7 +3,7 @@ title: Create account
 sidebar_position: 2
 ---
 
-In this tutorial, you'll create a Miden client, generate a new account, request tokens from the public faucet, and consume the resulting note — all using the Rust library API.
+In this tutorial, you'll create a Miden Client, generate a new account, request tokens from the public faucet, and consume the resulting note — all using the Rust library API.
 
 ## Set up the project
 
@@ -155,7 +155,7 @@ You should see the faucet tokens in your account's vault.
 
 ## Congratulations!
 
-You've created a Miden client, generated an account, and executed your first client-side zero-knowledge proof using the Rust library. Next, try transferring assets between accounts:
+You've created a Miden Client, generated an account, and executed your first client-side zero-knowledge proof using the Rust library. Next, try transferring assets between accounts:
 
 - [Public peer-to-peer transfer](./p2p-public.md)
 - [Private peer-to-peer transfer](./p2p-private.md)

@@ -1,11 +1,11 @@
 ---
-title: Client
+title: Design
 sidebar_position: 1
 ---
 
-# Miden client
+# Miden Client
 
-The Miden client SDK is organized as a layered stack. The Rust core is the single source of truth for all client logic. Browser-facing SDKs build on top of it through a WASM bridge layer, giving TypeScript and React developers native access to the full protocol without needing a Rust toolchain.
+The Miden Client SDK is organized as a layered stack. The Rust core is the single source of truth for all client logic. Browser-facing SDKs build on top of it through a WASM bridge layer, giving TypeScript and React developers native access to the full protocol without needing a Rust toolchain.
 
 ```mermaid
 graph TB

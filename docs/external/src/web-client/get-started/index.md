@@ -9,7 +9,7 @@ This section shows you how to get started with the Miden Web SDK by creating acc
 
 By the end of these tutorials, you will have:
 
-- Initialized the Miden client in a web application
+- Initialized the Miden Client in a web application
 - Created an account and requested funds from the faucet
 - Transferred assets between accounts using public and private notes
 - Tested SDK workflows locally using the mock client

@@ -5,7 +5,7 @@ sidebar_position: 3
 
 ## Troubleshooting and transaction lifecycle (CLI)
 
-This guide helps you troubleshoot common issues and understand the end-to-end lifecycle of transactions and notes in the Miden client.
+This guide helps you troubleshoot common issues and understand the end-to-end lifecycle of transactions and notes in the Miden Client.
 
 ### TL;DR checklist
 

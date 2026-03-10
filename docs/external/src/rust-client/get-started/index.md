@@ -7,7 +7,7 @@ This section shows you how to build a Rust application that interacts with the M
 
 By the end of these tutorials, you will have:
 
-- Created a Miden client instance connected to testnet.
+- Created a Miden Client instance connected to testnet.
 - Created an account and requested funds from the faucet.
 - Transferred assets between accounts using the Rust API — both public and private notes.
 

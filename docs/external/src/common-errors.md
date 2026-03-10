@@ -4,7 +4,7 @@ title: Common Errors
 
 # Troubleshooting and common errors
 
-This guide helps you troubleshoot common issues when using the Miden client.
+This guide helps you troubleshoot common issues when using the Miden Client.
 
 ## Connection and sync errors
 

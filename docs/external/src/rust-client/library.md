@@ -3,7 +3,7 @@ title: Library
 sidebar_position: 5
 ---
 
-To use the Miden client library in a Rust project, include it as a dependency.
+To use the Miden Client library in a Rust project, include it as a dependency.
 
 In your project's `Cargo.toml`, add:
 
@@ -65,7 +65,7 @@ let client = ClientBuilder::new()
 
 ## Create local account
 
-With the Miden client, you can create and track any number of public and local accounts. For local accounts, the state is tracked locally, and the rollup only keeps commitments to the data, which in turn guarantees privacy.
+With the Miden Client, you can create and track any number of public and local accounts. For local accounts, the state is tracked locally, and the rollup only keeps commitments to the data, which in turn guarantees privacy.
 
 The `AccountBuilder` can be used to create a new account with the specified parameters and components. The following code creates a new local account:
 
