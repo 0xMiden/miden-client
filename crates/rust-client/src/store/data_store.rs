@@ -46,6 +46,8 @@ pub struct ClientDataStore {
     /// Cache of storage map witnesses, keyed by (`map_root`, `map_key`). Avoids redundant RPC
     /// calls when the same map entry is accessed multiple times within a transaction.
     storage_map_cache: RwLock<BTreeMap<(Word, StorageMapKey), StorageMapWitness>>,
+    /// The transaction reference block number.
+    ref_block: RwLock<Option<BlockNumber>>,
     /// RPC client used to lazy-load foreign account data on cache miss.
     rpc_api: Arc<dyn NodeRpcClient>,
 }
@@ -57,6 +59,7 @@ impl ClientDataStore {
             transaction_mast_store: Arc::new(TransactionMastStore::new()),
             foreign_account_inputs: RwLock::new(BTreeMap::new()),
             storage_map_cache: RwLock::new(BTreeMap::new()),
+            ref_block: RwLock::new(None),
             rpc_api,
         }
     }
@@ -244,6 +247,9 @@ impl DataStore for ClientDataStore {
         // Pop last block, used as reference (it does not need to be authenticated manually)
         let ref_block = block_refs.pop_last().ok_or(DataStoreError::other("block set is empty"))?;
 
+        // Cache the reference block so lazy-loading methods can use it
+        *self.ref_block.write() = Some(ref_block);
+
         let partial_account_record = self
             .store
             .get_minimal_partial_account(account_id)
@@ -363,8 +369,12 @@ impl DataStore for ClientDataStore {
 
         // Ensure the account inputs are cached before resolving the slot name.
         if !self.foreign_account_inputs.read().contains_key(&account_id) {
-            self.fetch_and_cache_foreign_account(account_id, AccountStateAt::ChainTip)
-                .await?;
+            let account_state_at = self
+                .ref_block
+                .read()
+                .map(AccountStateAt::Block)
+                .unwrap_or(AccountStateAt::ChainTip);
+            self.fetch_and_cache_foreign_account(account_id, account_state_at).await?;
         }
 
         let (slot_name, known_code) = self.resolve_slot_name_and_code(account_id, map_root)?;
