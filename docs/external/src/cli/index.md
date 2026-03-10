@@ -1,5 +1,6 @@
 ---
 title: CLI
+sidebar_position: 1
 ---
 
 The following document lists the commands that the CLI currently supports.
@@ -65,7 +66,7 @@ miden-client init --remote-prover-endpoint <PROVER_URL>
 miden-client init --note-transport-endpoint <MIDEN_NOTE_TRANSPORT_URL>
 ```
 
-More information on the configuration file can be found in the [configuration section](https://github.com/0xMiden/miden-client/docs/typedoc/rust-client/cli-config.md).
+More information on the configuration file can be found in the [configuration section](./cli-config.md).
 
 ### `account`
 
@@ -322,7 +323,7 @@ miden-client address remove 0x17f13f4f83a8e8100c19d2961dfda2 mlcl1qple0ejnutx8zy
 
 #### Tips
 
-For `send` and `consume-notes`, you can omit the `--sender` and `--account` flags to use the default account defined in the [config](https://github.com/0xMiden/miden-client/docs/typedoc/rust-client/cli-config.md). If you omit the flag but have no default account defined in the config, you'll get an error instead.
+For `send` and `consume-notes`, you can omit the `--sender` and `--account` flags to use the default account defined in the [config](./cli-config.md). If you omit the flag but have no default account defined in the config, you'll get an error instead.
 
 For every command which needs an account ID (either wallet or faucet), you can also provide a partial ID instead of the full ID for each account. So instead of
 
@@ -336,8 +337,9 @@ You can do:
 miden-client send --sender 0x80519 --target 0x8fd4b --asset 100::0xa99c5c8764d4e011
 ```
 
-!!! note
+:::note
 The only exception is for using IDs as part of the asset, those should have the full faucet's account ID.
+:::
 
 #### Transaction confirmation
 

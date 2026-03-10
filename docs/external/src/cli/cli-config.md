@@ -1,9 +1,9 @@
 ---
 title: Config
-sidebar-position: 2
+sidebar_position: 2
 ---
 
-After [installation](../install-and-run.md#install-the-client), use the client by running the following and adding the [relevant commands](index.md#commands):
+After installing the CLI (`cargo install miden-client-cli --locked`), use the client by running the following and adding the [relevant commands](index.md#commands):
 
 ```sh
 miden-client
@@ -188,6 +188,7 @@ A `note-transport` section is used to configure the connection to the Miden Note
 - `endpoint`: The endpoint of the Miden Note Transport node;
 - `timeout-ms`: The timeout employed in client requests to the node.
 
-> [!Note]
-> - Running the node locally for development is encouraged.
-> - However, the endpoint can point to any remote node.
+:::note
+- Running the node locally for development is encouraged.
+- However, the endpoint can point to any remote node.
+:::

@@ -3,20 +3,23 @@ title: Rust
 sidebar_position: 1
 ---
 
-# Overview
+# Rust client library
 
-The Miden client in Rust contains, the Miden client library and the Miden client cli.
+The `miden-client` crate is the core Rust library for interacting with the Miden rollup. It provides a programmatic API for building applications that execute transactions, generate zero-knowledge proofs, manage accounts, and sync state with the network.
 
-### Miden client library
+## Key capabilities
 
-The Miden client library is a Rust library that can be integrated into projects, allowing developers to interact with the Miden rollup.
+- **Transaction execution** — Build and execute transactions using `TransactionRequestBuilder`
+- **Proof generation** — Generate client-side ZK proofs locally or delegate to a remote prover
+- **Account management** — Create and track accounts with `AccountBuilder`, supporting both private and public storage modes
+- **State sync** — Keep local state in sync with the Miden network via gRPC
 
-The library provides a set of APIs and functions for executing transactions, generating proofs, and managing activity on the Miden network.
+The library uses trait-based dependency injection for storage, RPC, proving, and key management, making each component pluggable and testable.
 
-### Miden client CLI
+## Getting started
 
-The Miden client also includes a command-line interface (CLI) that serves as a wrapper around the library, exposing its basic functionality in a user-friendly manner.
-
-The CLI provides commands for interacting with the Miden rollup, such as submitting transactions, syncing with the network, and managing account data.
-
-More information about the CLI can be found in the [CLI section](./cli/index.md).
+1. [Install](./install-and-run.md) the library as a dependency
+2. Follow the [getting started tutorials](./get-started/index.md) to build your first Miden application
+3. Explore the [library reference](./library.md) for detailed API patterns
+4. Review the [design](./design.md) for architectural details
+5. See the full [API documentation on docs.rs](https://docs.rs/miden-client/latest/miden_client/)

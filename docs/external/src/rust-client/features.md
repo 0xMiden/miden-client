@@ -3,24 +3,54 @@ title: Features
 sidebar_position: 3
 ---
 
-The Miden client offers a range of functionality for interacting with the Miden rollup.
+The `miden-client` library provides a comprehensive Rust API for interacting with the Miden rollup.
 
 ### Transaction execution
 
-The Miden client facilitates the execution of transactions on the Miden rollup; allowing users to transfer assets, mint new tokens, and perform various other operations.
+Build and execute transactions programmatically using `TransactionRequestBuilder`. The library supports standard transaction types (pay-to-id, swap, mint) through convenience builders, and custom transactions via arbitrary note scripts and arguments.
+
+```rust
+let tx_request = TransactionRequestBuilder::new()
+    .build_pay_to_id(payment_description, None, NoteType::Private, client.rng())?;
+
+let result = client.new_transaction(sender_id, tx_request).await?;
+client.submit_transaction(result).await?;
+```
 
 ### Proof generation
 
-The Miden rollup supports user-generated proofs which are key to ensuring the validity of transactions on the Miden rollup.
+Generate client-side zero-knowledge proofs that validate transactions without revealing private data. The library supports:
 
-To enable such proofs, the client contains the functionality for executing, proving, and submitting transactions.
+- **Local proving** — Generate proofs on the client machine using `LocalTransactionProver`
+- **Remote proving** — Delegate proof generation to a remote prover via `RemoteTransactionProver`
+- **Prover fallback** — Configure a remote prover as default with automatic fallback to local proving on failure
 
-### Miden network interactivity
+The prover is a pluggable trait, allowing custom implementations.
 
-The Miden client enables users to interact with the Miden network. This includes syncing with the latest blockchain data and managing account information.
+### Network interactivity
 
-__Note transport__ The client also supports connectivity with the Miden Note Transport network for the exchange of private notes (end-to-end encryption coming soon).
+Communicate with the Miden network through a gRPC-based RPC client:
 
-### Account generation and tracking
+- **State sync** — `client.sync_state().await` fetches the latest blockchain state, updating accounts, notes, and transactions
+- **Note transport** — Exchange private notes via the note transport network using `SendNote` and `FetchNotes` gRPC methods
+- **Configurable endpoints** — Connect to testnet, devnet, localhost, or custom network endpoints
 
-The Miden client provides features for generating and tracking accounts within the Miden rollup ecosystem. Users can create accounts and track their transaction status.
+### Account management
+
+Create and manage accounts using `AccountBuilder`:
+
+- **Account types** — `RegularAccountImmutableCode`, `RegularAccountUpdatableCode`, fungible/non-fungible faucets
+- **Storage modes** — `Private` (state tracked locally, only commitments on-chain) or `Public` (state stored on-chain)
+- **Key management** — Trait-based keystore for signing and authentication (filesystem keystore provided)
+- **Components** — Attach `BasicWallet`, `AuthRpoFalcon512`, and custom components to accounts
+
+### Extensibility
+
+The library is designed around trait-based dependency injection:
+
+- **Store** — Pluggable persistence (SQLite implementation provided)
+- **RPC client** — Pluggable network communication
+- **Prover** — Pluggable proof generation
+- **Keystore** — Pluggable key management
+
+This makes every component replaceable for testing, custom backends, or alternative environments.
