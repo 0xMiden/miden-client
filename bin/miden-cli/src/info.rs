@@ -15,7 +15,7 @@ pub async fn print_client_info<AUTH: Keystore + Sync + 'static>(
     client: &Client<AUTH>,
     show_rpc_status: bool,
 ) -> Result<(), CliError> {
-    let config = CliConfig::from_system()?;
+    let config = CliConfig::load()?;
 
     println!("Client version: {}", env!("CARGO_PKG_VERSION"));
 

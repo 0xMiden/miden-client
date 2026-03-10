@@ -7,8 +7,7 @@ use core::error::Error;
 use miden_protocol::asset::{Asset, AssetVault};
 
 use miden_protocol::account::{
-    Account, AccountCode, AccountId, AccountStorage, StorageMap, StorageSlot,
-    StorageSlotType,
+    Account, AccountCode, AccountId, AccountStorage, StorageMap, StorageSlot, StorageSlotType,
 };
 use miden_protocol::address::NetworkId;
 use miden_protocol::block::account_tree::AccountWitness;

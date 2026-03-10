@@ -201,7 +201,6 @@ export const MockNoteFilterTypes = {
 // Mock NoteType enum
 export const MockNoteType = {
   Private: 2,
-  Encrypted: 3,
   Public: 1,
 };
 

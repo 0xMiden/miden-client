@@ -272,6 +272,15 @@ impl StateSync {
                     new_mmr_peaks,
                     new_authentication_nodes,
                 );
+            } else {
+                // Even though this block header is not stored, `apply_mmr_changes` may
+                // produce authentication nodes for already-tracked leaves whose Merkle
+                // paths change as the MMR grows. These must be persisted so that the
+                // `PartialMmr` can be correctly reconstructed from the store after a
+                // client restart.
+                state_sync_update
+                    .block_updates
+                    .extend_authentication_nodes(new_authentication_nodes);
             }
         }
         if self.sync_nullifiers {
@@ -325,7 +334,7 @@ impl StateSync {
                 .sync_transactions(current_block_num, Some(target_block), account_ids.to_vec())
                 .await?;
 
-            let account_updates = derive_latest_commitments(&tx_info.transaction_records);
+            let account_updates = derive_account_commitment_updates(&tx_info.transaction_records);
 
             let tx_inclusions = tx_info
                 .transaction_records
@@ -568,7 +577,7 @@ impl StateSync {
 /// For each unique account, takes the `final_state_commitment` from the transaction with the
 /// highest `block_num`. This replicates the old `SyncState` behavior where the node returned
 /// the latest account commitment per account in the synced range.
-fn derive_latest_commitments(
+fn derive_account_commitment_updates(
     transaction_records: &[rpc_tx::TransactionRecord],
 ) -> Vec<(AccountId, Word)> {
     let mut latest_by_account: BTreeMap<AccountId, &rpc_tx::TransactionRecord> = BTreeMap::new();

@@ -1381,13 +1381,13 @@ fn create_account_with_ecdsa_auth() {
     create_account_cmd.current_dir(&temp_dir).assert().success();
 }
 
-// FROM_SYSTEM_USER_CONFIG TESTS
+// CLICLIENT::NEW TESTS
 // ================================================================================================
-/// Tests that `CliClient::from_system_user_config()` successfully creates a client with the same
+/// Tests that `CliClient::new()` successfully creates a client with the same
 /// configuration as the CLI tool when a local config exists.
 #[tokio::test]
 #[serial_test::file_serial]
-async fn test_from_system_user_config_with_local_config() -> Result<()> {
+async fn test_new_with_local_config() -> Result<()> {
     // Initialize a local CLI configuration
     let (store_path, temp_dir, _endpoint) = init_cli();
 
@@ -1398,9 +1398,8 @@ async fn test_from_system_user_config_with_local_config() -> Result<()> {
     let original_dir = env::current_dir().unwrap();
     env::set_current_dir(&temp_dir)?;
 
-    // Create a client using from_system_user_config - should pick up local config
-    let client_result =
-        miden_client_cli::CliClient::from_system_user_config(DebugMode::Disabled).await;
+    // Create a client using new - should pick up local config
+    let client_result = miden_client_cli::CliClient::new(DebugMode::Disabled).await;
 
     // Restore original directory
     env::set_current_dir(original_dir)?;
@@ -1422,11 +1421,11 @@ async fn test_from_system_user_config_with_local_config() -> Result<()> {
     Ok(())
 }
 
-/// Tests that `CliClient::from_system_user_config()` silently initializes with default config
+/// Tests that `CliClient::new()` silently initializes with default config
 /// when no configuration exists.
 #[tokio::test]
 #[serial_test::file_serial]
-async fn test_from_system_user_config_silent_init() -> Result<()> {
+async fn test_new_silent_init() -> Result<()> {
     // Create a temporary directory with no .miden configuration
     let temp_dir = temp_dir().join(format!("cli-test-silent-init-{}", rand::rng().random::<u64>()));
     std::fs::create_dir_all(&temp_dir)?;
@@ -1443,8 +1442,7 @@ async fn test_from_system_user_config_silent_init() -> Result<()> {
     env::set_current_dir(&temp_dir)?;
 
     // Create a client - should succeed via silent initialization
-    let client_result =
-        miden_client_cli::CliClient::from_system_user_config(DebugMode::Disabled).await;
+    let client_result = miden_client_cli::CliClient::new(DebugMode::Disabled).await;
 
     // Restore original directory
     env::set_current_dir(original_dir)?;
@@ -1465,10 +1463,10 @@ async fn test_from_system_user_config_silent_init() -> Result<()> {
     Ok(())
 }
 
-/// Tests that `CliConfig::from_system()` prioritizes local config over global config.
+/// Tests that `CliConfig::load()` prioritizes local config over global config.
 #[tokio::test]
 #[serial_test::file_serial]
-async fn test_from_system_user_config_local_priority() -> Result<()> {
+async fn test_load_local_priority() -> Result<()> {
     // Use isolated global miden directory
     let _miden_home = set_isolated_miden_home();
 

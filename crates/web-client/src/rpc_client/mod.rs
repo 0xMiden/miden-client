@@ -91,7 +91,7 @@ impl RpcClient {
     /// @returns Promise that resolves to the `NoteScript`.
     #[allow(clippy::doc_markdown)]
     #[wasm_bindgen(js_name = "getNoteScriptByRoot")]
-    pub async fn get_note_script_by_root(&self, script_root: Word) -> Result<NoteScript, JsValue> {
+    pub async fn get_note_script_by_root(&self, script_root: &Word) -> Result<NoteScript, JsValue> {
         let native_script_root = script_root.into();
 
         let note_script = self
@@ -192,7 +192,7 @@ impl RpcClient {
     #[wasm_bindgen(js_name = "getNullifierCommitHeight")]
     pub async fn get_nullifier_commit_height(
         &self,
-        nullifier: Word,
+        nullifier: &Word,
         block_num: u32,
     ) -> Result<Option<u32>, JsValue> {
         let native_word: miden_client::Word = nullifier.into();

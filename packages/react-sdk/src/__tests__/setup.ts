@@ -76,6 +76,7 @@ vi.mock("@miden-sdk/miden-sdk", () => {
       AuthRpoFalcon512: 2,
       AuthEcdsaK256Keccak: 1,
     },
+    WebClient,
     WasmWebClient: WebClient,
     AccountId: {
       fromHex: vi.fn((hex: string) => createMockAccountId(hex)),
@@ -111,8 +112,8 @@ vi.mock("@miden-sdk/miden-sdk", () => {
     },
     NoteType: {
       Private: 2,
-      Encrypted: 3,
       Public: 1,
+      Encrypted: 3,
     },
     Note: {
       createP2IDNote: vi.fn(
@@ -149,7 +150,31 @@ vi.mock("@miden-sdk/miden-sdk", () => {
         this.amount = amount;
       }
     },
-    NoteAttachment: class NoteAttachment {},
+    NoteAttachmentKind: {
+      None: 0,
+      Word: 1,
+      Array: 2,
+    },
+    NoteAttachmentScheme: {
+      none: vi.fn(() => ({ type: "none" })),
+    },
+    Word: class Word {
+      values: BigUint64Array;
+      constructor(values: BigUint64Array) {
+        this.values = values;
+      }
+      toU64s() {
+        return Array.from(this.values);
+      }
+    },
+    NoteAttachment: Object.assign(class NoteAttachment {}, {
+      newWord: vi.fn(
+        (_scheme: unknown, _word: unknown) => new (class NoteAttachment {})()
+      ),
+      newArray: vi.fn(
+        (_scheme: unknown, _words: unknown[]) => new (class NoteAttachment {})()
+      ),
+    }),
     OutputNoteArray: class OutputNoteArray {
       notes: unknown[];
       constructor(notes: unknown[]) {

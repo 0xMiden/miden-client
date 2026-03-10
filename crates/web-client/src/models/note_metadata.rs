@@ -39,6 +39,11 @@ impl NoteMetadata {
         self.0.note_type().into()
     }
 
+    /// Returns the attachment of the note.
+    pub fn attachment(&self) -> NoteAttachment {
+        self.0.attachment().into()
+    }
+
     /// Sets the tag for this metadata and returns the updated metadata.
     #[wasm_bindgen(js_name = "withTag")]
     pub fn with_tag(&self, tag: &NoteTag) -> NoteMetadata {
