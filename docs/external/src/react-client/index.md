@@ -4,7 +4,7 @@ title: React
 
 # Overview
 
-The Miden React SDK (`@miden-sdk/react`) provides React hooks, context providers, and Zustand-based state management for building Miden-powered applications. It follows conventions established by libraries like TanStack Query and wagmi — query hooks for reading data, mutation hooks for transactions, and a provider for client lifecycle.
+The Miden React SDK (`@miden-sdk/react-sdk`) provides React hooks, context providers, and Zustand-based state management for building Miden-powered applications. It follows conventions established by libraries like TanStack Query and wagmi — query hooks for reading data, mutation hooks for transactions, and a provider for client lifecycle.
 
 - [Installation](./install.md) — install the SDK and peer dependencies
 - [Features](./features.md) — what the SDK provides

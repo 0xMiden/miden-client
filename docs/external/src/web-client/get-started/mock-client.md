@@ -14,7 +14,7 @@ The mock client provides the same resource-based API (`client.accounts.*`, `clie
 ## 1. Create the mock client
 
 ```typescript
-import { MidenClient, AccountType } from "@miden-sdk/miden-sdk";
+import { MidenClient, AccountType } from "@miden-sdk/ts-sdk";
 
 const client = await MidenClient.createMock();
 ```
@@ -76,7 +76,7 @@ console.log(`Balance: ${balance}`); // 1000
 ## Complete example
 
 ```typescript
-import { MidenClient, AccountType } from "@miden-sdk/miden-sdk";
+import { MidenClient, AccountType } from "@miden-sdk/ts-sdk";
 
 try {
   const client = await MidenClient.createMock();

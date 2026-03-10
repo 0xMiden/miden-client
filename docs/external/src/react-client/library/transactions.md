@@ -18,7 +18,7 @@ Every mutation hook exposes a `stage` property:
 Send tokens to another account.
 
 ```tsx
-import { useSend } from "@miden-sdk/react";
+import { useSend } from "@miden-sdk/react-sdk";
 
 const { send, result, isLoading, stage, error, reset } = useSend();
 
@@ -43,7 +43,7 @@ await send({
 Send tokens to multiple recipients in a single transaction.
 
 ```tsx
-import { useMultiSend } from "@miden-sdk/react";
+import { useMultiSend } from "@miden-sdk/react-sdk";
 
 const { mutate: multiSend, isLoading, stage, error } = useMultiSend();
 
@@ -62,7 +62,7 @@ await multiSend({
 Transfer tokens between accounts managed by the same client.
 
 ```tsx
-import { useInternalTransfer } from "@miden-sdk/react";
+import { useInternalTransfer } from "@miden-sdk/react-sdk";
 
 const { mutate: transfer, isLoading, stage, error } = useInternalTransfer();
 
@@ -90,7 +90,7 @@ await transfer({
 Consume specific notes to receive their assets.
 
 ```tsx
-import { useConsume } from "@miden-sdk/react";
+import { useConsume } from "@miden-sdk/react-sdk";
 
 const { consume, result, isLoading, stage, error, reset } = useConsume();
 
@@ -105,7 +105,7 @@ await consume({
 Mint tokens from a faucet.
 
 ```tsx
-import { useMint } from "@miden-sdk/react";
+import { useMint } from "@miden-sdk/react-sdk";
 
 const { mint, result, isLoading, stage, error, reset } = useMint();
 
@@ -122,7 +122,7 @@ await mint({
 Swap tokens between two faucets.
 
 ```tsx
-import { useSwap } from "@miden-sdk/react";
+import { useSwap } from "@miden-sdk/react-sdk";
 
 const { swap, result, isLoading, stage, error, reset } = useSwap();
 
@@ -141,7 +141,7 @@ await swap({
 Execute an arbitrary `TransactionRequest` — the escape hatch for custom transactions.
 
 ```tsx
-import { useTransaction } from "@miden-sdk/react";
+import { useTransaction } from "@miden-sdk/react-sdk";
 
 const { execute, result, isLoading, stage, error, reset } = useTransaction();
 
@@ -168,7 +168,7 @@ await execute({
 Query transaction history with optional filtering.
 
 ```tsx
-import { useTransactionHistory } from "@miden-sdk/react";
+import { useTransactionHistory } from "@miden-sdk/react-sdk";
 
 // All transactions
 const { records, isLoading } = useTransactionHistory();

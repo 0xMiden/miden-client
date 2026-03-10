@@ -10,7 +10,7 @@ Every React app using the Miden SDK needs a `MidenProvider` at the root. It init
 ## 1. Wrap your app
 
 ```tsx
-import { MidenProvider } from "@miden-sdk/react";
+import { MidenProvider } from "@miden-sdk/react-sdk";
 
 function App() {
   return (
@@ -32,7 +32,7 @@ The provider initializes the WASM binary, creates a Web Worker, and connects to 
 Use `useMiden()` inside any child component to access the client state:
 
 ```tsx
-import { useMiden, useSyncState } from "@miden-sdk/react";
+import { useMiden, useSyncState } from "@miden-sdk/react-sdk";
 
 function Status() {
   const { isReady } = useMiden();

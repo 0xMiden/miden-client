@@ -15,7 +15,7 @@ In this tutorial, you'll send tokens between two accounts using the `useSend` an
 ## 1. Create a second account
 
 ```tsx
-import { useCreateWallet } from "@miden-sdk/react";
+import { useCreateWallet } from "@miden-sdk/react-sdk";
 
 function CreateRecipient() {
   const { createWallet, wallet, isCreating } = useCreateWallet();
@@ -36,7 +36,7 @@ function CreateRecipient() {
 Use the `useSend` hook. The `stage` property gives real-time feedback on the transaction lifecycle:
 
 ```tsx
-import { useSend } from "@miden-sdk/react";
+import { useSend } from "@miden-sdk/react-sdk";
 
 function SendForm({ from, faucetId }: { from: string; faucetId: string }) {
   const { send, isLoading, stage, error, result } = useSend();
@@ -72,7 +72,7 @@ function SendForm({ from, faucetId }: { from: string; faucetId: string }) {
 After the next sync cycle, the public note appears for the recipient. Consume it:
 
 ```tsx
-import { useNotes, useConsume, formatNoteSummary } from "@miden-sdk/react";
+import { useNotes, useConsume, formatNoteSummary } from "@miden-sdk/react-sdk";
 
 function ReceiveNotes({ accountId }: { accountId: string }) {
   const { consumableNoteSummaries } = useNotes({ accountId });

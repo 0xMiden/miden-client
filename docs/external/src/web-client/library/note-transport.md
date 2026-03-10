@@ -10,7 +10,7 @@ This guide demonstrates how to use the note transport features in the Miden SDK.
 ## Sending Private Notes
 
 ```typescript
-import { MidenClient } from "@miden-sdk/miden-sdk";
+import { MidenClient } from "@miden-sdk/ts-sdk";
 
 try {
     const client = await MidenClient.create();
@@ -30,7 +30,7 @@ try {
 ## Fetching Private Notes
 
 ```typescript
-import { MidenClient } from "@miden-sdk/miden-sdk";
+import { MidenClient } from "@miden-sdk/ts-sdk";
 
 try {
     const client = await MidenClient.create();

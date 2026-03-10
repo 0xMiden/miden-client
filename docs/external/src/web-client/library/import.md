@@ -14,7 +14,7 @@ This guide demonstrates how to import accounts, notes, and store data using the 
 Import a public account by its ID (fetches state from the network):
 
 ```typescript
-import { MidenClient } from "@miden-sdk/miden-sdk";
+import { MidenClient } from "@miden-sdk/ts-sdk";
 
 try {
     const client = await MidenClient.create();
@@ -31,7 +31,7 @@ try {
 Import an account that was previously exported:
 
 ```typescript
-import { MidenClient } from "@miden-sdk/miden-sdk";
+import { MidenClient } from "@miden-sdk/ts-sdk";
 
 try {
     const client = await MidenClient.create();
@@ -53,7 +53,7 @@ Import-by-seed **only works for public accounts** — those originally created w
 Import a public account using an initialization seed:
 
 ```typescript
-import { MidenClient, AccountType, AuthScheme } from "@miden-sdk/miden-sdk";
+import { MidenClient, AccountType, AuthScheme } from "@miden-sdk/ts-sdk";
 
 try {
     const client = await MidenClient.create();
@@ -72,7 +72,7 @@ try {
 ## Importing Notes
 
 ```typescript
-import { MidenClient } from "@miden-sdk/miden-sdk";
+import { MidenClient } from "@miden-sdk/ts-sdk";
 
 try {
     const client = await MidenClient.create();
@@ -98,7 +98,7 @@ There are three types of note files:
 To import an entire store snapshot (overwrites current store):
 
 ```typescript
-import { MidenClient } from "@miden-sdk/miden-sdk";
+import { MidenClient } from "@miden-sdk/ts-sdk";
 
 try {
     const client = await MidenClient.create();

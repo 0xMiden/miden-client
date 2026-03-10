@@ -17,7 +17,7 @@ In this tutorial, you'll send tokens between two accounts using public notes. Pu
 Use the funded wallet from the previous tutorial as the sender, and create a new wallet as the recipient:
 
 ```typescript
-import { MidenClient } from "@miden-sdk/miden-sdk";
+import { MidenClient } from "@miden-sdk/ts-sdk";
 
 const client = await MidenClient.createTestnet();
 
@@ -85,7 +85,7 @@ console.log(`Recipient balance: ${recipientBalance}`);
 ## Complete example
 
 ```typescript
-import { MidenClient } from "@miden-sdk/miden-sdk";
+import { MidenClient } from "@miden-sdk/ts-sdk";
 
 try {
   const client = await MidenClient.createTestnet();

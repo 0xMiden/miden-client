@@ -17,7 +17,7 @@ In this tutorial, you'll create a new Miden wallet using the TypeScript SDK, req
 Create a client connected to the Miden testnet:
 
 ```typescript
-import { MidenClient } from "@miden-sdk/miden-sdk";
+import { MidenClient } from "@miden-sdk/ts-sdk";
 
 // createTestnet() pre-configures the RPC endpoint and enables auto-sync
 const client = await MidenClient.createTestnet();
@@ -96,7 +96,7 @@ console.log(`Balance: ${balance}`);
 ## Complete example
 
 ```typescript
-import { MidenClient } from "@miden-sdk/miden-sdk";
+import { MidenClient } from "@miden-sdk/ts-sdk";
 
 try {
   // Initialize

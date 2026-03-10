@@ -20,7 +20,7 @@ The React SDK supports third-party wallet providers through a `SignerContext`. W
 Wrap `MidenProvider` with the signer provider:
 
 ```tsx
-import { MidenProvider } from "@miden-sdk/react";
+import { MidenProvider } from "@miden-sdk/react-sdk";
 import { ParaSignerProvider } from "@miden-sdk/para";
 
 function App() {
@@ -37,7 +37,7 @@ function App() {
 Inside your components, use the `useSigner` hook to access connection state:
 
 ```tsx
-import { useSigner } from "@miden-sdk/react";
+import { useSigner } from "@miden-sdk/react-sdk";
 
 function ConnectButton() {
   const { isConnected, connect, disconnect, name } = useSigner();
@@ -57,7 +57,7 @@ All other hooks (`useAccounts`, `useSend`, etc.) work the same way — the SDK r
 To integrate a wallet provider that doesn't have a built-in package, provide a `SignerContext` directly:
 
 ```tsx
-import { MidenProvider, SignerContext } from "@miden-sdk/react";
+import { MidenProvider, SignerContext } from "@miden-sdk/react-sdk";
 
 function App() {
   const signerValue = {

@@ -10,7 +10,7 @@ This guide demonstrates how to synchronize your local state with the Miden netwo
 ## Basic Synchronization
 
 ```typescript
-import { MidenClient } from "@miden-sdk/miden-sdk";
+import { MidenClient } from "@miden-sdk/ts-sdk";
 
 try {
     const client = await MidenClient.create();
@@ -29,7 +29,7 @@ try {
 ## Sync with Timeout
 
 ```typescript
-import { MidenClient } from "@miden-sdk/miden-sdk";
+import { MidenClient } from "@miden-sdk/ts-sdk";
 
 try {
     const client = await MidenClient.create();
@@ -46,7 +46,7 @@ try {
 ## Auto-Sync on Creation
 
 ```typescript
-import { MidenClient } from "@miden-sdk/miden-sdk";
+import { MidenClient } from "@miden-sdk/ts-sdk";
 
 // Client syncs automatically before returning
 const client = await MidenClient.create({ autoSync: true });

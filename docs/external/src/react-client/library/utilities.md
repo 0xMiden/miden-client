@@ -8,7 +8,7 @@ sidebar_position: 7
 ## Amount formatting
 
 ```tsx
-import { formatAssetAmount, parseAssetAmount } from "@miden-sdk/react";
+import { formatAssetAmount, parseAssetAmount } from "@miden-sdk/react-sdk";
 
 // bigint + decimals → display string
 formatAssetAmount(1000000n, 8);    // "0.01"
@@ -22,7 +22,7 @@ parseAssetAmount("1.5", 8);       // 150000000n
 ## Note summaries
 
 ```tsx
-import { getNoteSummary, formatNoteSummary } from "@miden-sdk/react";
+import { getNoteSummary, formatNoteSummary } from "@miden-sdk/react-sdk";
 
 // Extract summary from an InputNoteRecord
 const summary = getNoteSummary(note);
@@ -35,7 +35,7 @@ formatNoteSummary(summary);  // "1.5 TOKEN" or "1.5 TOKEN from miden1qy35..."
 ## Note attachments
 
 ```tsx
-import { readNoteAttachment, createNoteAttachment } from "@miden-sdk/react";
+import { readNoteAttachment, createNoteAttachment } from "@miden-sdk/react-sdk";
 
 // Read pre-decoded attachment from a note
 const attachment = readNoteAttachment(note);
@@ -51,7 +51,7 @@ await send({ from, to, assetId, amount: 50n, attachment: [100n, 200n] });
 ## Account ID utilities
 
 ```tsx
-import { normalizeAccountId, accountIdsEqual, toBech32AccountId } from "@miden-sdk/react";
+import { normalizeAccountId, accountIdsEqual, toBech32AccountId } from "@miden-sdk/react-sdk";
 
 // Normalize hex or bech32 to consistent format
 normalizeAccountId("0x1234...");           // normalized bech32
@@ -68,7 +68,7 @@ toBech32AccountId("0x1234...");            // "miden1qy35..."
 The SDK wraps WASM errors into typed `MidenError` objects with actionable error codes.
 
 ```tsx
-import { MidenError, wrapWasmError } from "@miden-sdk/react";
+import { MidenError, wrapWasmError } from "@miden-sdk/react-sdk";
 
 try {
   await send({ from, to, assetId, amount: 50n });
@@ -104,7 +104,7 @@ try {
 ## Storage management
 
 ```tsx
-import { clearMidenStorage, migrateStorage } from "@miden-sdk/react";
+import { clearMidenStorage, migrateStorage } from "@miden-sdk/react-sdk";
 
 // Clear all Miden IndexedDB data
 await clearMidenStorage();

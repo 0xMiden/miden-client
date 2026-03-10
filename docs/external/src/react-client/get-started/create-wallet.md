@@ -16,7 +16,7 @@ Complete the [provider setup](./setup-provider.md) first.
 Use the `useCreateWallet` hook:
 
 ```tsx
-import { useCreateWallet, useAccounts } from "@miden-sdk/react";
+import { useCreateWallet, useAccounts } from "@miden-sdk/react-sdk";
 
 function CreateWallet() {
   const { createWallet, wallet, isCreating, error } = useCreateWallet();
@@ -53,7 +53,7 @@ Use **Send Public Note** — public notes are discoverable via sync, so no file 
 After the faucet sends the note, the next auto-sync cycle will discover it. Use `useNotes` and `useConsume` to claim the tokens:
 
 ```tsx
-import { useNotes, useConsume } from "@miden-sdk/react";
+import { useNotes, useConsume } from "@miden-sdk/react-sdk";
 
 function ClaimNotes({ accountId }: { accountId: string }) {
   const { consumableNoteSummaries } = useNotes({ accountId });
@@ -84,7 +84,7 @@ function ClaimNotes({ accountId }: { accountId: string }) {
 Use `useAccount` to read the wallet's assets:
 
 ```tsx
-import { useAccount, formatAssetAmount } from "@miden-sdk/react";
+import { useAccount, formatAssetAmount } from "@miden-sdk/react-sdk";
 
 function Balance({ accountId }: { accountId: string }) {
   const { account, assets, isLoading } = useAccount(accountId);

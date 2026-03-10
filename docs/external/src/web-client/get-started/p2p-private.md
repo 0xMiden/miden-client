@@ -17,7 +17,7 @@ In this tutorial, you'll send tokens between two accounts using private notes. U
 Use the funded wallet from the previous tutorial as the sender, and create a new recipient wallet:
 
 ```typescript
-import { MidenClient } from "@miden-sdk/miden-sdk";
+import { MidenClient } from "@miden-sdk/ts-sdk";
 
 const client = await MidenClient.createTestnet();
 
@@ -120,7 +120,7 @@ The client fetches notes for tracked note tags. By default, note tags are derive
 ## Complete example
 
 ```typescript
-import { MidenClient } from "@miden-sdk/miden-sdk";
+import { MidenClient } from "@miden-sdk/ts-sdk";
 
 try {
   const client = await MidenClient.createTestnet();

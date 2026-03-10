@@ -14,19 +14,19 @@ sidebar_position: 1
 ## Install the SDK
 
 ```bash
-npm install @miden-sdk/react @miden-sdk/miden-sdk
+npm install @miden-sdk/react-sdk @miden-sdk/wasm-bridge
 # or
-yarn add @miden-sdk/react @miden-sdk/miden-sdk
+yarn add @miden-sdk/react-sdk @miden-sdk/wasm-bridge
 ```
 
-`@miden-sdk/miden-sdk` is a peer dependency that provides the WASM bridge and core bindings.
+`@miden-sdk/wasm-bridge` is a peer dependency that provides the WASM bridge and core bindings.
 
 ## Verify the installation
 
 Wrap your app in `MidenProvider` and check that initialization succeeds:
 
 ```tsx
-import { MidenProvider, useMiden } from "@miden-sdk/react";
+import { MidenProvider, useMiden } from "@miden-sdk/react-sdk";
 
 function Status() {
   const { isReady, isInitializing, error } = useMiden();

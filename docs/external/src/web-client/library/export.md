@@ -12,7 +12,7 @@ This guide demonstrates how to export accounts, notes, and store data using the 
 Export a note with different levels of detail:
 
 ```typescript
-import { MidenClient, NoteExportFormat } from "@miden-sdk/miden-sdk";
+import { MidenClient, NoteExportFormat } from "@miden-sdk/ts-sdk";
 
 try {
     const client = await MidenClient.create();
@@ -39,7 +39,7 @@ Export formats:
 ## Exporting Accounts
 
 ```typescript
-import { MidenClient } from "@miden-sdk/miden-sdk";
+import { MidenClient } from "@miden-sdk/ts-sdk";
 
 try {
     const client = await MidenClient.create();
@@ -58,7 +58,7 @@ Account files include the full account state, code, seed (if new), and tracked s
 Export the entire client store for backup or migration:
 
 ```typescript
-import { MidenClient } from "@miden-sdk/miden-sdk";
+import { MidenClient } from "@miden-sdk/ts-sdk";
 
 try {
     const client = await MidenClient.create();

@@ -9,16 +9,16 @@ This page explains how the React SDK is structured and how its pieces fit togeth
 
 ## How the SDK reaches the browser
 
-The React SDK is a pure TypeScript/React package that wraps the [WASM bridge](../index.md). It consumes `@miden-sdk/miden-sdk` as a peer dependency and adds React-specific patterns — hooks, context providers, and Zustand state management — on top.
+The React SDK is a pure TypeScript/React package that wraps the [WASM bridge](../index.md). It consumes `@miden-sdk/wasm-bridge` as a peer dependency and adds React-specific patterns — hooks, context providers, and Zustand state management — on top.
 
 ```mermaid
 flowchart LR
     A["Rust core<br/>(miden-client)"] -->|"compiled to WASM"| B["WASM bridge<br/>(@miden-sdk/wasm-bridge)"]
-    B -->|"peer dependency"| C["React SDK<br/>(@miden-sdk/react)"]
+    B -->|"peer dependency"| C["React SDK<br/>(@miden-sdk/react-sdk)"]
     C --> D["Your React app"]
 ```
 
-The React SDK contains no Rust or WASM code of its own. From your perspective, `npm install @miden-sdk/react @miden-sdk/miden-sdk` is all you need.
+The React SDK contains no Rust or WASM code of its own. From your perspective, `npm install @miden-sdk/react-sdk @miden-sdk/wasm-bridge` is all you need.
 
 ## Runtime architecture
 
@@ -30,7 +30,7 @@ flowchart TB
         Components["React components"]
     end
 
-    subgraph ReactSDK["@miden-sdk/react"]
+    subgraph ReactSDK["@miden-sdk/react-sdk"]
         Hooks["Hooks layer<br/>query + mutation hooks"]
         Store["Zustand store<br/>accounts · notes · sync<br/>asset metadata · loading states"]
         Provider["MidenProvider<br/>client lifecycle · auto-sync<br/>exclusive WASM access"]
@@ -160,7 +160,7 @@ When an external signer is present, `MidenProvider` automatically adapts its beh
 
 For multi-signer apps, `MultiSignerProvider` maintains a registry of all `SignerSlot` children and forwards the active signer's context to `MidenProvider`. Users switch signers at runtime via `useMultiSigner().connectSigner(name)`. Single-signer apps can skip `MultiSignerProvider` entirely — a signer provider directly above `MidenProvider` still works.
 
-Built-in signer packages: `@miden-sdk/para`, `@miden-sdk/miden-turnkey-react`, `@miden-sdk/wallet-adapter-react`.
+Built-in signer packages: `@miden-sdk/use-miden-para-react`, `@miden-sdk/miden-turnkey-react`, `@miden-sdk/miden-wallet-adapter-react`.
 
 ## Configuration
 

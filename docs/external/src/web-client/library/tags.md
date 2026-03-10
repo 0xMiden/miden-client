@@ -10,7 +10,7 @@ Note tags are used to specify how notes should be executed and who can consume t
 ## Basic Tag Operations
 
 ```typescript
-import { MidenClient } from "@miden-sdk/miden-sdk";
+import { MidenClient } from "@miden-sdk/ts-sdk";
 
 try {
     const client = await MidenClient.create();
@@ -32,7 +32,7 @@ try {
 ## Managing Multiple Tags
 
 ```typescript
-import { MidenClient } from "@miden-sdk/miden-sdk";
+import { MidenClient } from "@miden-sdk/ts-sdk";
 
 try {
     const client = await MidenClient.create();

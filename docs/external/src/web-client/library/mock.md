@@ -13,7 +13,7 @@ The mock client provides the same resource-based API as the real client (`client
 ## Basic Usage
 
 ```typescript
-import { MidenClient, AccountType } from "@miden-sdk/miden-sdk";
+import { MidenClient, AccountType } from "@miden-sdk/ts-sdk";
 
 try {
     // Create a mock client
@@ -69,7 +69,7 @@ try {
 ## Restoring from Snapshot
 
 ```typescript
-import { MidenClient } from "@miden-sdk/miden-sdk";
+import { MidenClient } from "@miden-sdk/ts-sdk";
 
 // Create and use a mock client
 const client = await MidenClient.createMock();
@@ -91,7 +91,7 @@ const restored = await MidenClient.createMock({
 The mock client includes a built-in note transport layer for testing private note delivery:
 
 ```typescript
-import { MidenClient } from "@miden-sdk/miden-sdk";
+import { MidenClient } from "@miden-sdk/ts-sdk";
 
 const client = await MidenClient.createMock();
 

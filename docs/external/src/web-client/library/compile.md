@@ -17,7 +17,7 @@ Each call creates a **fresh `CodeBuilder`**, so libraries linked in one call nev
 ## Compiling an Account Component
 
 ```typescript
-import { MidenClient, StorageSlot } from "@miden-sdk/miden-sdk";
+import { MidenClient, StorageSlot } from "@miden-sdk/ts-sdk";
 
 const contractCode = `
     use miden::protocol::active_account
@@ -159,7 +159,7 @@ try {
 ## Full Example: Compile → Create Contract → Execute Script
 
 ```typescript
-import { MidenClient, AccountType, AuthSecretKey, StorageSlot } from "@miden-sdk/miden-sdk";
+import { MidenClient, AccountType, AuthSecretKey, StorageSlot } from "@miden-sdk/ts-sdk";
 
 try {
     const client = await MidenClient.create();

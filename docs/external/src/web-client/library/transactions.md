@@ -10,7 +10,7 @@ This guide demonstrates how to retrieve and work with transaction history using 
 ## Listing All Transactions
 
 ```typescript
-import { MidenClient } from "@miden-sdk/miden-sdk";
+import { MidenClient } from "@miden-sdk/ts-sdk";
 
 try {
     const client = await MidenClient.create();
@@ -50,7 +50,7 @@ try {
 ## Filtering Transactions
 
 ```typescript
-import { MidenClient } from "@miden-sdk/miden-sdk";
+import { MidenClient } from "@miden-sdk/ts-sdk";
 
 try {
     const client = await MidenClient.create();

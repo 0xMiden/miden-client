@@ -5,14 +5,14 @@ sidebar_position: 0
 
 # Library
 
-The `@miden-sdk/miden-sdk` package provides a resource-based TypeScript API for interacting with the Miden rollup from the browser.
+The `@miden-sdk/ts-sdk` package provides a resource-based TypeScript API for interacting with the Miden rollup from the browser.
 
 ## Client initialization
 
 The SDK provides several factory methods to create a client:
 
 ```typescript
-import { MidenClient } from "@miden-sdk/miden-sdk";
+import { MidenClient } from "@miden-sdk/ts-sdk";
 
 // Default client (connects to localhost)
 const client = await MidenClient.create();

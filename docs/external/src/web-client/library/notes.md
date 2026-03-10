@@ -10,7 +10,7 @@ This guide demonstrates how to work with notes in the Miden SDK. Notes are the p
 ## Listing Notes
 
 ```typescript
-import { MidenClient } from "@miden-sdk/miden-sdk";
+import { MidenClient } from "@miden-sdk/ts-sdk";
 
 try {
     const client = await MidenClient.create();
@@ -39,7 +39,7 @@ try {
 ## Retrieving a Single Note
 
 ```typescript
-import { MidenClient } from "@miden-sdk/miden-sdk";
+import { MidenClient } from "@miden-sdk/ts-sdk";
 
 try {
     const client = await MidenClient.create();
@@ -57,7 +57,7 @@ try {
 ## Listing Sent Notes (Output Notes)
 
 ```typescript
-import { MidenClient } from "@miden-sdk/miden-sdk";
+import { MidenClient } from "@miden-sdk/ts-sdk";
 
 try {
     const client = await MidenClient.create();
@@ -81,7 +81,7 @@ try {
 Consumable notes are notes that can be spent by a specific account:
 
 ```typescript
-import { MidenClient } from "@miden-sdk/miden-sdk";
+import { MidenClient } from "@miden-sdk/ts-sdk";
 
 try {
     const client = await MidenClient.create();
@@ -104,7 +104,7 @@ try {
 ## Importing and Exporting Notes
 
 ```typescript
-import { MidenClient, NoteExportFormat } from "@miden-sdk/miden-sdk";
+import { MidenClient, NoteExportFormat } from "@miden-sdk/ts-sdk";
 
 try {
     const client = await MidenClient.create();

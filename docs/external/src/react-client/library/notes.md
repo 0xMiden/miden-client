@@ -10,7 +10,7 @@ sidebar_position: 4
 List and filter notes with consumability information.
 
 ```tsx
-import { useNotes, formatNoteSummary } from "@miden-sdk/react";
+import { useNotes, formatNoteSummary } from "@miden-sdk/react-sdk";
 
 function NoteList({ accountId }: { accountId: string }) {
   const {
@@ -49,7 +49,7 @@ Smart refetch: the hook only updates the Zustand store if note IDs actually chan
 Temporal note tracking with built-in filtering. Designed for real-time UIs (e.g., payment notifications, trading interfaces) where you need to track when notes arrive and handle them progressively.
 
 ```tsx
-import { useNoteStream } from "@miden-sdk/react";
+import { useNoteStream } from "@miden-sdk/react-sdk";
 
 function NotificationFeed({ accountId }: { accountId: string }) {
   const {

@@ -10,7 +10,7 @@ sidebar_position: 2
 List all tracked accounts, automatically categorized into wallets and faucets.
 
 ```tsx
-import { useAccounts } from "@miden-sdk/react";
+import { useAccounts } from "@miden-sdk/react-sdk";
 
 function AccountList() {
   const { accounts, wallets, faucets, isLoading, error, refetch } = useAccounts();
@@ -37,7 +37,7 @@ Auto-fetches on mount and refreshes after each sync cycle.
 Get full account details including vault assets enriched with metadata (symbol, decimals).
 
 ```tsx
-import { useAccount, formatAssetAmount } from "@miden-sdk/react";
+import { useAccount, formatAssetAmount } from "@miden-sdk/react-sdk";
 
 function AccountDetails({ accountId }: { accountId: string }) {
   const { account, assets, isLoading, getBalance } = useAccount(accountId);
@@ -75,7 +75,7 @@ function AccountDetails({ accountId }: { accountId: string }) {
 Create a new wallet account.
 
 ```tsx
-import { useCreateWallet } from "@miden-sdk/react";
+import { useCreateWallet } from "@miden-sdk/react-sdk";
 
 const { createWallet, wallet, isCreating, error, reset } = useCreateWallet();
 
@@ -92,7 +92,7 @@ const account = await createWallet({
 Create a new faucet account for minting tokens.
 
 ```tsx
-import { useCreateFaucet } from "@miden-sdk/react";
+import { useCreateFaucet } from "@miden-sdk/react-sdk";
 
 const { createFaucet, faucet, isCreating, error, reset } = useCreateFaucet();
 
@@ -109,7 +109,7 @@ const account = await createFaucet({
 Import an account by file, ID, or seed.
 
 ```tsx
-import { useImportAccount } from "@miden-sdk/react";
+import { useImportAccount } from "@miden-sdk/react-sdk";
 
 const { importAccount, account, isImporting, error, reset } = useImportAccount();
 
@@ -128,7 +128,7 @@ await importAccount({ type: "seed", seed: initSeed, mutable: true });
 Fetch token metadata (symbol, decimals) for a list of faucet IDs. Results are cached globally.
 
 ```tsx
-import { useAssetMetadata } from "@miden-sdk/react";
+import { useAssetMetadata } from "@miden-sdk/react-sdk";
 
 function TokenInfo({ assetIds }: { assetIds: string[] }) {
   const { assetMetadata } = useAssetMetadata(assetIds);
