@@ -98,7 +98,7 @@ contract ClaimAssetTestVectorsLocalTx is Test, DepositContractV2, DepositContrac
         address originTokenAddress = _resolveOriginTokenAddress();
         uint32 destinationNetwork = 20;
         address destinationAddress = _resolveDestinationAddress();
-        uint256 amount = 100000000000000000000;
+        uint256 amount = 100000000;
 
         bytes memory metadata = abi.encode("Test Token", "TEST", uint8(18));
         bytes32 metadataHash = keccak256(metadata);
