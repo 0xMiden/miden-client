@@ -140,7 +140,7 @@ pub async fn test_agglayer_bridge_in_out(client_config: ClientConfig) -> Result<
                 generate_claim_data_for_account(destination_account.id(), None);
             let origin_token_address = leaf_data_preview.origin_token_address;
             let origin_network = leaf_data_preview.origin_network;
-            let scale = 10u8;
+            let scale = 0u8;
 
             let agglayer_faucet = create_agglayer_faucet(
                 bridge_admin.client.rng().draw_word(),
