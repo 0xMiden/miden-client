@@ -35,6 +35,7 @@ miden-client              = { default-features = false, path = "crates/rust-clie
 miden-client-sqlite-store = { default-features = false, path = "crates/sqlite-store", version = "0.14.0-alpha.1" }
 
 # Miden protocol dependencies
+miden-agglayer  = { default-features = false, version = "=0.14.0-alpha.1" }
 miden-protocol  = { default-features = false, version = "=0.14.0-alpha.1" }
 miden-standards = { default-features = false, version = "=0.14.0-alpha.1" }
 miden-testing   = { default-features = false, version = "=0.14.0-alpha.1" }
@@ -60,6 +61,7 @@ hex         = { version = "0.4" }
 miette      = { features = ["fancy"], version = "7.6" }
 rand        = { version = "0.9" }
 serde       = { features = ["derive"], version = "1.0" }
+serde_json  = { features = ["arbitrary_precision"], version = "1.0" }
 thiserror   = { default-features = false, version = "2.0" }
 tokio       = { features = ["macros", "rt-multi-thread"], version = "1.48" }
 tracing     = { version = "0.1" }

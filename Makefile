@@ -110,6 +110,10 @@ test-react-sdk: ## Run React SDK unit tests
 start-node: ## Start the testing node server
 	RUST_LOG=info cargo run --release --package node-builder --locked
 
+.PHONY: start-node-agglayer
+start-node-agglayer: ## Start the testing node with agglayer genesis accounts
+	AGGLAYER_GENESIS=1 RUST_LOG=info cargo run --release --package node-builder --locked
+
 .PHONY: start-node-background
 start-node-background: ## Start the testing node server in background
 	./scripts/start-binary-bg.sh node-builder
