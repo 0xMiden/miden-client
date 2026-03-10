@@ -135,12 +135,7 @@ sequenceDiagram
 
 ## WASM concurrency safety
 
-The WASM bridge is single-threaded — concurrent access from multiple React components causes "recursive use of an object detected" errors. The SDK prevents this with two mechanisms:
-
-1. **`AsyncLock`** — `runExclusive()` queues all WASM operations so only one runs at a time
-2. **`isBusyRef`** — mutation hooks use a ref guard to prevent double-invocation (e.g., a user clicking "Send" twice)
-
-WASM object pointers (like `AccountId`) are only valid within the `runExclusive` callback scope. The SDK converts them to stable JavaScript values (strings, numbers) before storing in Zustand.
+The SDK is fully concurrency-safe out of the box. Multiple React components can issue queries and mutations simultaneously — the SDK serializes all WASM operations internally, so you never need to coordinate access yourself. Hooks can be called freely from any component without worrying about race conditions or conflicting operations. The SDK also handles deduplication of rapid user interactions (e.g., double-clicking a button), ensuring each action is processed exactly once.
 
 ## External signer integration
 
@@ -157,12 +152,11 @@ flowchart TB
     MP -.->|"creates client with external keystore"| WASM["Web Worker"]
 ```
 
-When `MidenProvider` detects a `SignerContext` above it in the tree, it:
+When an external signer is present, `MidenProvider` automatically adapts its behavior:
 
-1. Uses `WebClient.createClientWithExternalKeystore()` instead of the default constructor
-2. Routes signing operations to the signer's `signCb` callback
-3. Isolates IndexedDB storage per signer (using the signer's `storeName`)
-4. Binds the signer's account configuration to account creation
+1. **Delegates signing** — transaction signing is handled by the external wallet provider instead of the local keystore
+2. **Isolates storage** — each signer gets its own IndexedDB database, so accounts and state from different wallets never collide
+3. **Configures account creation** — new accounts are created with the signer's key material and storage preferences
 
 For multi-signer apps, `MultiSignerProvider` maintains a registry of all `SignerSlot` children and forwards the active signer's context to `MidenProvider`. Users switch signers at runtime via `useMultiSigner().connectSigner(name)`. Single-signer apps can skip `MultiSignerProvider` entirely — a signer provider directly above `MidenProvider` still works.
 
