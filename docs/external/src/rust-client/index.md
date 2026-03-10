@@ -20,6 +20,6 @@ The library uses trait-based dependency injection for storage, RPC, proving, and
 
 1. [Install](./install-and-run.md) the library as a dependency
 2. Follow the [getting started tutorials](./get-started/index.md) to build your first Miden application
-3. Explore the [library reference](./library.md) for detailed API patterns
+3. Explore the [library reference](./library/index.md) for detailed API patterns
 4. Review the [design](./design.md) for architectural details
 5. See the full [API documentation on docs.rs](https://docs.rs/miden-client/latest/miden_client/)

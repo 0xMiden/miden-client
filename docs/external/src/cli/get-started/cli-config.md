@@ -1,9 +1,9 @@
 ---
 title: Config
-sidebar_position: 2
+sidebar_position: 1
 ---
 
-After installing the CLI (`cargo install miden-client-cli --locked`), use the client by running the following and adding the [relevant commands](index.md#commands):
+After installing the CLI (`cargo install miden-client-cli --locked`), use the client by running the following and adding the [relevant commands](../index.md#commands):
 
 ```sh
 miden-client

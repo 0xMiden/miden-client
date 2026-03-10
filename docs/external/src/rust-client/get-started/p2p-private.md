@@ -141,4 +141,4 @@ You've completed all the getting started tutorials. You can now:
 - Transfer assets via public and private notes
 - Use the note transport network for multi-user scenarios
 
-For more advanced patterns, see the [Library reference](../library.md) and [Examples](../examples.md).
+For more advanced patterns, see the [Library reference](../library/index.md) and [Examples](../examples.md).
