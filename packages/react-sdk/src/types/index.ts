@@ -1,4 +1,5 @@
 import { AuthScheme } from "@miden-sdk/miden-sdk";
+import type { AccountRef } from "../utils/accountParsing";
 import type {
   WasmWebClient as WebClient,
   Account,
