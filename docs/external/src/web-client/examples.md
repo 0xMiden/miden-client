@@ -42,4 +42,4 @@ Each library reference page contains code examples for its topic:
 - [Compiling MASM components and transaction scripts](./library/compile.md)
 - [Synchronizing state](./library/sync.md)
 - [Managing note tags](./library/tags.md)
-- [Working with the mock client](./library/mock.md)
+- [Working with the mock client](./get-started/mock-client.md)
