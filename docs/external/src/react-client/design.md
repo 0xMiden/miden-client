@@ -13,7 +13,7 @@ The React SDK is a pure TypeScript/React package that wraps the [WASM bridge](..
 
 ```mermaid
 flowchart LR
-    A["Rust core<br/>(miden-client)"] -->|"compiled to WASM"| B["WASM bridge<br/>(@miden-sdk/wasm-bridge)"]
+    A["Rust core<br/>(@miden-sdk/rust-sdk)"] -->|"compiled to WASM"| B["WASM bridge<br/>(@miden-sdk/wasm-bridge)"]
     B -->|"peer dependency"| C["React SDK<br/>(@miden-sdk/react-sdk)"]
     C --> D["Your React app"]
 ```
