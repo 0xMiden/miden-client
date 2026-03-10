@@ -635,6 +635,184 @@ async fn account_reader_addresses_access() -> anyhow::Result<()> {
     Ok(())
 }
 
+// ACCOUNT HISTORY PRUNE TESTS
+// ================================================================================================
+
+#[tokio::test]
+async fn prune_account_history_removes_old_committed_states() -> anyhow::Result<()> {
+    let store = create_test_store().await;
+    let map_slot_name = StorageSlotName::new("test::prune::map").expect("valid slot name");
+
+    // Insert account with 5 map entries (nonce 0)
+    let mut account = setup_account_with_map(&store, 5, &map_slot_name).await?;
+    let account_id = account.id();
+
+    // Apply delta 1 (nonce 0→1, delta increment = 1)
+    apply_single_entry_update(&store, &mut account, &map_slot_name, 1).await?;
+
+    // Apply delta 2 (nonce 1→2, delta increment = 1)
+    apply_single_entry_update(&store, &mut account, &map_slot_name, 1).await?;
+
+    // Before prune: 3 historical headers (nonce 0, 1, 2)
+    let m = get_storage_metrics(&store).await;
+    assert_eq!(m.historical_account_headers, 3);
+    assert!(m.historical_storage_map_entries > 0);
+
+    // Prune
+    let deleted = store
+        .interact_with_connection(move |conn| SqliteStore::prune_account_history(conn, account_id))
+        .await?;
+
+    assert!(deleted > 0, "Should have deleted some rows");
+
+    // After prune: only 1 historical header remains (the latest, nonce 2)
+    let m = get_storage_metrics(&store).await;
+    assert_eq!(m.historical_account_headers, 1);
+
+    // Latest tables should be untouched
+    assert_eq!(m.latest_account_headers, 1);
+    assert!(m.latest_storage_map_entries > 0);
+
+    // The remaining historical header should be nonce 2
+    let remaining_nonce: u64 = store
+        .interact_with_connection(move |conn| {
+            conn.query_row(
+                "SELECT nonce FROM historical_account_headers WHERE id = ?",
+                params![account_id.to_hex()],
+                |row| crate::column_value_as_u64(row, 0),
+            )
+            .into_store_error()
+        })
+        .await?;
+    assert_eq!(remaining_nonce, 2);
+
+    // Account data should still be fully readable
+    let account_record = store.get_account(account_id).await?;
+    assert!(account_record.is_some());
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn prune_account_history_noop_with_single_state() -> anyhow::Result<()> {
+    let store = create_test_store().await;
+    let map_slot_name = StorageSlotName::new("test::prune_noop::map").expect("valid slot name");
+
+    // Insert account (nonce 0 only)
+    let account = setup_account_with_map(&store, 3, &map_slot_name).await?;
+    let account_id = account.id();
+
+    let m_before = get_storage_metrics(&store).await;
+
+    let deleted = store
+        .interact_with_connection(move |conn| SqliteStore::prune_account_history(conn, account_id))
+        .await?;
+
+    assert_eq!(deleted, 0, "Nothing to prune with a single state");
+
+    let m_after = get_storage_metrics(&store).await;
+    assert_eq!(m_before.historical_account_headers, m_after.historical_account_headers);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn prune_all_account_history_multiple_accounts() -> anyhow::Result<()> {
+    let store = create_test_store().await;
+    let map_slot_name_a = StorageSlotName::new("test::prune_all::map_a").expect("valid slot name");
+    let map_slot_name_b = StorageSlotName::new("test::prune_all::map_b").expect("valid slot name");
+
+    // Account A: nonce 0 → 1 → 2
+    let mut account_a = setup_account_with_map(&store, 3, &map_slot_name_a).await?;
+    apply_single_entry_update(&store, &mut account_a, &map_slot_name_a, 1).await?;
+    apply_single_entry_update(&store, &mut account_a, &map_slot_name_a, 1).await?;
+
+    // Account B: different seed → different account. We need a different builder seed.
+    let component_b = AccountComponent::new(
+        basic_wallet_library(),
+        vec![StorageSlot::with_empty_map(map_slot_name_b.clone())],
+        AccountComponentMetadata::new("miden::testing::dummy_component").with_supports_all_types(),
+    )?;
+    let account_b = AccountBuilder::new([1; 32])
+        .account_type(AccountType::RegularAccountImmutableCode)
+        .with_auth_component(AuthSingleSig::new(
+            PublicKeyCommitment::from(EMPTY_WORD),
+            AuthSchemeId::Falcon512Rpo,
+        ))
+        .with_component(component_b)
+        .build()?;
+    store.insert_account(&account_b, Address::new(account_b.id())).await?;
+
+    let mut account_b_mut = account_b.clone();
+    apply_single_entry_update(&store, &mut account_b_mut, &map_slot_name_b, 1).await?;
+
+    // Before prune: 3 headers for A + 2 for B = 5
+    let m = get_storage_metrics(&store).await;
+    assert_eq!(m.historical_account_headers, 5);
+
+    let deleted = store.interact_with_connection(SqliteStore::prune_all_account_history).await?;
+
+    assert!(deleted > 0);
+
+    // After prune: 1 header for A (nonce 2) + 1 for B (nonce 1) = 2
+    let m = get_storage_metrics(&store).await;
+    assert_eq!(m.historical_account_headers, 2);
+
+    // Both accounts should still be readable
+    assert!(store.get_account(account_a.id()).await?.is_some());
+    assert!(store.get_account(account_b.id()).await?.is_some());
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn prune_removes_orphaned_account_code() -> anyhow::Result<()> {
+    let store = create_test_store().await;
+    let map_slot_name = StorageSlotName::new("test::prune_code::map").expect("valid slot name");
+
+    // Insert account (nonce 0)
+    let account = setup_account_with_map(&store, 2, &map_slot_name).await?;
+    let account_id = account.id();
+
+    // Insert an orphaned account_code entry that isn't referenced by any header.
+    store
+        .interact_with_connection(|conn| {
+            conn.execute(
+                "INSERT INTO account_code (commitment, code) VALUES (?, ?)",
+                params!["orphaned_commitment_hex", vec![0u8; 16]],
+            )
+            .into_store_error()?;
+            Ok(())
+        })
+        .await?;
+
+    // Verify orphaned entry exists
+    let code_count: usize = store
+        .interact_with_connection(|conn| {
+            conn.query_row("SELECT COUNT(*) FROM account_code", [], |r| r.get(0))
+                .into_store_error()
+        })
+        .await?;
+    assert!(code_count >= 2, "Should have at least the real code + orphaned entry");
+
+    // Prune
+    let deleted = store
+        .interact_with_connection(move |conn| SqliteStore::prune_account_history(conn, account_id))
+        .await?;
+
+    // The orphaned entry should have been removed
+    let code_count_after: usize = store
+        .interact_with_connection(|conn| {
+            conn.query_row("SELECT COUNT(*) FROM account_code", [], |r| r.get(0))
+                .into_store_error()
+        })
+        .await?;
+    assert_eq!(code_count_after, code_count - 1, "Orphaned code entry should be removed");
+    assert!(deleted > 0);
+
+    Ok(())
+}
+
 // TEST HELPERS
 // ================================================================================================
 
@@ -777,7 +955,7 @@ async fn apply_single_entry_update(
     Ok(())
 }
 
-// UNDO & COMMITMENT LOOKUP TESTS (issue #1768)
+// UNDO & COMMITMENT LOOKUP TESTS
 // ================================================================================================
 
 /// Verifies that `undo_account_state` correctly reverts the latest tables to the previous state.

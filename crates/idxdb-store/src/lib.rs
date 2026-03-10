@@ -265,6 +265,14 @@ impl Store for IdxdbStore {
         self.prune_irrelevant_blocks().await
     }
 
+    async fn prune_account_history(&self, account_id: AccountId) -> Result<usize, StoreError> {
+        self.prune_account_history(account_id).await
+    }
+
+    async fn prune_all_account_history(&self) -> Result<usize, StoreError> {
+        self.prune_all_account_history().await
+    }
+
     // ACCOUNTS
     // --------------------------------------------------------------------------------------------
 

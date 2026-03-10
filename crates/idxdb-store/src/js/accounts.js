@@ -657,6 +657,195 @@ export async function lockAccount(dbId, accountId) {
         logWebStoreError(error, `Error locking account: ${accountId}`);
     }
 }
+/**
+ * Rebuilds latest storage slots from historical data.
+ * Groups by slotName, takes the entry with MAX(nonce) per slot.
+ * Slots cannot be removed, so no tombstone filtering needed.
+ */
+async function rebuildLatestStorageSlots(db, accountId) {
+    await db.latestAccountStorages.where("accountId").equals(accountId).delete();
+    const allHist = await db.historicalAccountStorages
+        .where("accountId")
+        .equals(accountId)
+        .toArray();
+    // Group by slotName, take MAX(nonce) per slot
+    const bySlot = new Map();
+    for (const entry of allHist) {
+        const existing = bySlot.get(entry.slotName);
+        if (!existing || BigInt(entry.nonce) > BigInt(existing.nonce)) {
+            bySlot.set(entry.slotName, entry);
+        }
+    }
+    if (bySlot.size > 0) {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const entries = [...bySlot.values()].map(({ nonce, ...rest }) => rest);
+        await db.latestAccountStorages.bulkPut(entries);
+    }
+}
+/**
+ * Rebuilds latest storage map entries from historical data.
+ * Groups by (slotName, key), takes the entry with MAX(nonce) per key.
+ * Filters out tombstones (value === null).
+ */
+async function rebuildLatestStorageMapEntries(db, accountId) {
+    await db.latestStorageMapEntries
+        .where("accountId")
+        .equals(accountId)
+        .delete();
+    const allHist = await db.historicalStorageMapEntries
+        .where("accountId")
+        .equals(accountId)
+        .toArray();
+    // Group by (slotName, key), take MAX(nonce) per key
+    const byKey = new Map();
+    for (const entry of allHist) {
+        const compositeKey = `${entry.slotName}\0${entry.key}`;
+        const existing = byKey.get(compositeKey);
+        if (!existing || BigInt(entry.nonce) > BigInt(existing.nonce)) {
+            byKey.set(compositeKey, entry);
+        }
+    }
+    // Filter out tombstones and strip nonce
+    const entries = [...byKey.values()]
+        .filter((e) => e.value !== null)
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        .map(({ nonce, value, ...rest }) => ({
+        ...rest,
+        value: value,
+    }));
+    if (entries.length > 0) {
+        await db.latestStorageMapEntries.bulkPut(entries);
+    }
+}
+/**
+ * Rebuilds latest vault assets from historical data.
+ * Groups by vaultKey, takes the entry with MAX(nonce) per key.
+ * Filters out tombstones (asset === null).
+ */
+async function rebuildLatestVaultAssets(db, accountId) {
+    await db.latestAccountAssets.where("accountId").equals(accountId).delete();
+    const allHist = await db.historicalAccountAssets
+        .where("accountId")
+        .equals(accountId)
+        .toArray();
+    // Group by vaultKey, take MAX(nonce) per key
+    const byKey = new Map();
+    for (const entry of allHist) {
+        const existing = byKey.get(entry.vaultKey);
+        if (!existing || BigInt(entry.nonce) > BigInt(existing.nonce)) {
+            byKey.set(entry.vaultKey, entry);
+        }
+    }
+    // Filter out tombstones and strip nonce
+    const entries = [...byKey.values()]
+        .filter((e) => e.asset !== null)
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        .map(({ nonce, asset, ...rest }) => ({
+        ...rest,
+        asset: asset,
+    }));
+    if (entries.length > 0) {
+        await db.latestAccountAssets.bulkPut(entries);
+    }
+}
+/**
+ * Prunes old committed historical states for one or all accounts.
+ */
+export async function pruneAccountHistory(dbId, accountId, pendingNoncesJson) {
+    try {
+        const db = getDatabase(dbId);
+        let totalDeleted = 0;
+        // Parse the pending-nonces map supplied by the Rust caller.
+        const pendingMap = JSON.parse(pendingNoncesJson);
+        await db.dexie.transaction("rw", [
+            db.historicalAccountHeaders,
+            db.historicalAccountStorages,
+            db.historicalStorageMapEntries,
+            db.historicalAccountAssets,
+            db.accountCodes,
+            db.latestAccountHeaders,
+            db.foreignAccountCode,
+        ], async () => {
+            // Determine which accounts to prune
+            let accountIds;
+            if (accountId != null) {
+                accountIds = [accountId];
+            }
+            else {
+                const allHeaders = await db.historicalAccountHeaders.toArray();
+                accountIds = [...new Set(allHeaders.map((h) => h.id))];
+            }
+            for (const aid of accountIds) {
+                const headers = await db.historicalAccountHeaders
+                    .where("id")
+                    .equals(aid)
+                    .toArray();
+                if (headers.length <= 1)
+                    continue;
+                // Build set of pending nonces for this account.
+                const pending = new Set((pendingMap[aid] ?? []).map((n) => BigInt(n)));
+                // Collect all nonces, sorted descending.
+                const nonces = headers
+                    .map((h) => BigInt(h.nonce))
+                    .sort((a, b) => (a > b ? -1 : a < b ? 1 : 0));
+                // The boundary is the highest nonce that is NOT pending.
+                const boundaryNonce = nonces.find((n) => !pending.has(n));
+                if (boundaryNonce === undefined)
+                    continue;
+                // Everything below the boundary (and not pending) should be deleted.
+                const toDeleteNonces = nonces.filter((n) => n < boundaryNonce && !pending.has(n));
+                if (toDeleteNonces.length === 0)
+                    continue;
+                // Build a fast lookup from nonce → header for deletion.
+                const headerByNonce = new Map(headers.map((h) => [BigInt(h.nonce), h]));
+                for (const nonce of toDeleteNonces) {
+                    const old = headerByNonce.get(nonce);
+                    const nonceStr = old.nonce;
+                    await db.historicalAccountHeaders
+                        .where("accountCommitment")
+                        .equals(old.accountCommitment)
+                        .delete();
+                    const storageDeleted = await db.historicalAccountStorages
+                        .where("[accountId+nonce]")
+                        .equals([aid, nonceStr])
+                        .delete();
+                    const mapDeleted = await db.historicalStorageMapEntries
+                        .where("[accountId+nonce]")
+                        .equals([aid, nonceStr])
+                        .delete();
+                    const assetDeleted = await db.historicalAccountAssets
+                        .where("[accountId+nonce]")
+                        .equals([aid, nonceStr])
+                        .delete();
+                    totalDeleted += 1 + storageDeleted + mapDeleted + assetDeleted;
+                }
+            }
+            // Prune orphaned account code
+            const latestHeaders = await db.latestAccountHeaders.toArray();
+            const historicalHeaders = await db.historicalAccountHeaders.toArray();
+            const foreignCodes = await db.foreignAccountCode.toArray();
+            const referencedCodeRoots = new Set();
+            for (const h of latestHeaders)
+                referencedCodeRoots.add(h.codeRoot);
+            for (const h of historicalHeaders)
+                referencedCodeRoots.add(h.codeRoot);
+            for (const f of foreignCodes)
+                referencedCodeRoots.add(f.codeRoot);
+            const allCodes = await db.accountCodes.toArray();
+            for (const code of allCodes) {
+                if (!referencedCodeRoots.has(code.root)) {
+                    await db.accountCodes.where("root").equals(code.root).delete();
+                    totalDeleted += 1;
+                }
+            }
+        });
+        return totalDeleted;
+    }
+    catch (error) {
+        logWebStoreError(error, `Error pruning account history for ${accountId ?? "all accounts"}`);
+        return 0;
+    }
+}
 // Undoes discarded account states by restoring old values from historical.
 //
 // Steps:
