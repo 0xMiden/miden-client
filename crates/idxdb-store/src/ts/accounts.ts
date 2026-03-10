@@ -180,14 +180,14 @@ export async function getAccountStorageMaps(dbId: string, accountId: string) {
 export async function getAccountVaultAssets(
   dbId: string,
   accountId: string,
-  faucetIdPrefixes?: string[]
+  faucetIdPrefixes: string[]
 ) {
   try {
     const db = getDatabase(dbId);
     let query = db.latestAccountAssets.where("accountId").equals(accountId);
 
     let records;
-    if (faucetIdPrefixes?.length) {
+    if (faucetIdPrefixes.length) {
       const prefixSet = new Set(faucetIdPrefixes);
       records = await query
         .and((record) => prefixSet.has(record.faucetIdPrefix))

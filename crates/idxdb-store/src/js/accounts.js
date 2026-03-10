@@ -144,7 +144,7 @@ export async function getAccountVaultAssets(dbId, accountId, faucetIdPrefixes) {
         const db = getDatabase(dbId);
         let query = db.latestAccountAssets.where("accountId").equals(accountId);
         let records;
-        if (faucetIdPrefixes?.length) {
+        if (faucetIdPrefixes.length) {
             const prefixSet = new Set(faucetIdPrefixes);
             records = await query
                 .and((record) => prefixSet.has(record.faucetIdPrefix))

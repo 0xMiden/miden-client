@@ -124,7 +124,7 @@ impl IdxdbStore {
                 .map(|(faucet_id, _)| faucet_id.prefix().to_hex())
                 .collect();
             let old_vault_assets = self
-                .get_vault_assets(account_id, Some(faucet_id_prefixes))
+                .get_vault_assets(account_id, faucet_id_prefixes)
                 .await?;
             let old_map_roots = self.get_storage_map_roots(account_id).await?;
 

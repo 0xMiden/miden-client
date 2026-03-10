@@ -47,7 +47,7 @@ extern "C" {
     pub fn idxdb_get_account_vault_assets(
         db_id: &str,
         account_id: String,
-        faucet_id_prefixes: Option<Vec<String>>,
+        faucet_id_prefixes: Vec<String>,
     ) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = getAccountAddresses)]
