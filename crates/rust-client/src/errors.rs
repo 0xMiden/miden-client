@@ -4,6 +4,7 @@ use core::fmt;
 
 use miden_protocol::Word;
 use miden_protocol::account::AccountId;
+use miden_protocol::block::BlockNumber;
 use miden_protocol::crypto::merkle::MerkleError;
 pub use miden_protocol::errors::{AccountError, AccountIdError, AssetError, NetworkIdError};
 use miden_protocol::errors::{
@@ -102,6 +103,22 @@ pub enum ClientError {
         "the chain Merkle Mountain Range (MMR) forest value exceeds the supported range (must fit in a u32)"
     )]
     InvalidPartialMmrForest,
+    #[error(
+        "state sync MMR verification failed: post-delta peaks commitment ({peaks_commitment:?}) does not match block header chain commitment ({chain_commitment:?})"
+    )]
+    StateSyncMmrPeaksMismatch {
+        peaks_commitment: Word,
+        chain_commitment: Word,
+    },
+    #[error(
+        "state sync block range mismatch: expected ({expected_from}..{expected_to}), got ({actual_from}..{actual_to:?})"
+    )]
+    StateSyncBlockRangeMismatch {
+        expected_from: BlockNumber,
+        expected_to: BlockNumber,
+        actual_from: BlockNumber,
+        actual_to: Option<BlockNumber>,
+    },
     #[error(
         "cannot track a new account without its seed; the seed is required to validate the account ID's correctness"
     )]

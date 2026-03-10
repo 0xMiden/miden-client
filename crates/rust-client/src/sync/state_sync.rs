@@ -230,6 +230,7 @@ impl StateSync {
                 chain_tip,
                 block_header,
                 mmr_delta,
+                mmr_path: _, // Available for future verification
                 account_commitment_updates,
                 note_inclusions,
                 transactions,
@@ -319,11 +320,22 @@ impl StateSync {
         }
 
         // Get MMR delta for the same range
-        let mmr_delta = self
-            .rpc_api
-            .sync_chain_mmr(current_block_num, Some(target_block))
-            .await?
-            .mmr_delta;
+        let chain_mmr_info =
+            self.rpc_api.sync_chain_mmr(current_block_num, Some(target_block)).await?;
+
+        // Validate the server returned data for the requested range
+        if let Some((range_from, range_to)) = chain_mmr_info.block_range
+            && (range_from != current_block_num || range_to != Some(target_block))
+        {
+            return Err(ClientError::StateSyncBlockRangeMismatch {
+                expected_from: current_block_num,
+                expected_to: target_block,
+                actual_from: range_from,
+                actual_to: range_to,
+            });
+        }
+
+        let mmr_delta = chain_mmr_info.mmr_delta;
 
         // Gather transactions for tracked accounts (skip if none)
         let (account_commitment_updates, transactions) = if account_ids.is_empty() {
@@ -355,6 +367,7 @@ impl StateSync {
             chain_tip: note_sync.chain_tip,
             block_header: note_sync.block_header,
             mmr_delta,
+            mmr_path: note_sync.mmr_path,
             account_commitment_updates,
             note_inclusions: note_sync.notes,
             transactions,
@@ -615,6 +628,17 @@ fn apply_mmr_changes(
         current_partial_mmr.apply(mmr_delta).map_err(StoreError::MmrError)?;
 
     let new_peaks = current_partial_mmr.peaks();
+
+    // Verify that post-delta peaks match the block header's chain commitment.
+    // chain_commitment is the hash of MMR peaks for blocks 0..block_num-1,
+    // which is exactly the state after applying the delta.
+    let peaks_commitment = new_peaks.hash_peaks();
+    if peaks_commitment != new_block.chain_commitment() {
+        return Err(ClientError::StateSyncMmrPeaksMismatch {
+            peaks_commitment,
+            chain_commitment: new_block.chain_commitment(),
+        });
+    }
 
     new_authentication_nodes
         .append(&mut current_partial_mmr.add(new_block.commitment(), new_block_has_relevant_notes));

@@ -402,7 +402,10 @@ impl NodeRpcClient for MockRpcApi {
             .get_delta(Forest::new(from_forest), Forest::new(target_block.as_usize()))
             .unwrap();
 
-        Ok(ChainMmrInfo { mmr_delta })
+        Ok(ChainMmrInfo {
+            block_range: Some((block_from, block_to)),
+            mmr_delta,
+        })
     }
 
     /// Retrieves the block header for the specified block number. If the block number is not
