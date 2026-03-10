@@ -73,7 +73,7 @@ use crate::tests::config::ClientConfig;
 /// Bridge-out:
 /// 9. Destination account creates B2AGG note with bridged-in assets
 /// 10. B2AGG note is consumed by bridge as a network transaction
-pub async fn test_bridge_in_out(client_config: ClientConfig) -> Result<()> {
+pub async fn test_agglayer_bridge_in_out(client_config: ClientConfig) -> Result<()> {
     let agglayer_config = AgglayerConfig::from_env()?;
     let (mut bridge_admin, mut ger_manager, mut user) =
         create_agglayer_clients(&client_config).await?;

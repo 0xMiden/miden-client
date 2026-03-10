@@ -134,7 +134,7 @@ AggLayer tests support two modes, depending on whether the node has agglayer acc
 make start-node-agglayer
 
 # Run genesis-aware tests
-AGGLAYER_ACCOUNTS_DIR=./data/ miden-client-integration-tests --contains "with_genesis"
+AGGLAYER_ACCOUNTS_DIR=./data/ miden-client-integration-tests --contains "agglayer"
 ```
 
 ### Environment variables
