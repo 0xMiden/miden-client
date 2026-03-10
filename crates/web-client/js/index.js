@@ -75,6 +75,8 @@ const WRITE_METHODS = new Set([
   "importPublicAccountFromSeed",
   "insertAccountAddress",
   "newAccount",
+  "pruneAccountHistory",
+  "pruneAllAccountHistory",
   "removeAccountAddress",
   "removeTag",
   "removeSetting",

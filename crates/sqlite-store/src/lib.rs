@@ -283,6 +283,17 @@ impl Store for SqliteStore {
         self.interact_with_connection(SqliteStore::prune_irrelevant_blocks).await
     }
 
+    async fn prune_account_history(&self, account_id: AccountId) -> Result<usize, StoreError> {
+        self.interact_with_connection(move |conn| {
+            SqliteStore::prune_account_history(conn, account_id)
+        })
+        .await
+    }
+
+    async fn prune_all_accounts_history(&self) -> Result<usize, StoreError> {
+        self.interact_with_connection(SqliteStore::prune_all_accounts_history).await
+    }
+
     async fn get_block_headers(
         &self,
         block_numbers: &BTreeSet<BlockNumber>,
