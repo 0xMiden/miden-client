@@ -29,11 +29,12 @@ use crate::rpc::domain::account::{
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[allow(clippy::large_enum_variant)]
 pub enum ForeignAccount {
-    /// Public account whose state and code will be retrieved from the network at execution time.
-    /// Declaring it upfront lets you specify [`AccountStorageRequirements`] so the correct
-    /// storage map entries are fetched in a single RPC call. If not declared, the account is
-    /// lazily loaded with empty storage requirements, and any storage map accesses will trigger
-    /// additional RPC calls during execution.
+    /// Account with public on-chain state (`Public` or `Network` storage mode) whose state and
+    /// code will be retrieved from the network at execution time. Declaring it upfront lets you
+    /// specify [`AccountStorageRequirements`] so the correct storage map entries are fetched in a
+    /// single RPC call. If not declared, the account is lazily loaded with empty storage
+    /// requirements, and any storage map accesses will trigger additional RPC calls during
+    /// execution.
     Public(AccountId, AccountStorageRequirements),
     /// Private account that requires a [`PartialAccount`] to be provided by the caller. An
     /// account witness will be retrieved from the network at execution time so that it can be
@@ -49,7 +50,7 @@ impl ForeignAccount {
         account_id: AccountId,
         storage_requirements: AccountStorageRequirements,
     ) -> Result<Self, TransactionRequestError> {
-        if !account_id.is_public() {
+        if !account_id.has_public_state() {
             return Err(TransactionRequestError::InvalidForeignAccountId(account_id));
         }
 
@@ -60,7 +61,7 @@ impl ForeignAccount {
     /// retrieved at execution time.
     pub fn private(account: impl Into<PartialAccount>) -> Result<Self, TransactionRequestError> {
         let partial_account: PartialAccount = account.into();
-        if partial_account.id().is_public() {
+        if partial_account.id().has_public_state() {
             return Err(TransactionRequestError::InvalidForeignAccountId(partial_account.id()));
         }
 

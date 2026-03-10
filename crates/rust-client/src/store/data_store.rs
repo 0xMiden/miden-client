@@ -1,4 +1,3 @@
-use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
@@ -30,7 +29,7 @@ use super::{AccountStorageFilter, PartialBlockchainFilter, Store};
 use crate::rpc::domain::account::{AccountStorageRequirements, StorageMapEntries};
 use crate::rpc::{AccountStateAt, NodeRpcClient};
 use crate::store::StoreError;
-use crate::transaction::account_proof_into_inputs;
+use crate::transaction::fetch_public_account_inputs;
 use crate::utils::RwLock;
 
 // DATA STORE
@@ -100,13 +99,9 @@ impl ClientDataStore {
             Ok(account_storage) => {
                 match account_storage.slots().first().map(StorageSlot::content) {
                     Some(StorageSlotContent::Map(map)) => Ok(Some(map.open(&map_key))),
-                    Some(StorageSlotContent::Value(value)) => Err(DataStoreError::Other {
-                        error_msg: format!(
-                            "found StorageSlotContent::Value with {value} as its value."
-                        )
-                        .into(),
-                        source: None,
-                    }),
+                    Some(StorageSlotContent::Value(value)) => Err(DataStoreError::other(format!(
+                        "found StorageSlotContent::Value with {value} as its value."
+                    ))),
                     _ => Ok(None),
                 }
             },
@@ -121,68 +116,32 @@ impl ClientDataStore {
         }
     }
 
-    /// Fetches a public foreign account's inputs from the network, caches them, and returns them.
-    ///
-    /// This calls `get_account_proof` with empty [`AccountStorageRequirements`], so the
-    /// response includes the account header and code but no storage map entries.
+    /// Lazily fetches a foreign account's inputs from the network, loads its code into the MAST
+    /// store, and caches the result in [`Self::foreign_account_inputs`].
     async fn fetch_and_cache_foreign_account(
         &self,
         account_id: AccountId,
         account_state_at: AccountStateAt,
     ) -> Result<AccountInputs, DataStoreError> {
-        let known_account_code = self
-            .store
-            .get_foreign_account_code(vec![account_id])
-            .await
-            .map_err(|err| {
-                DataStoreError::other_with_source("failed to query foreign account code cache", err)
-            })?
-            .into_values()
-            .next();
-
-        let (_, account_proof): (BlockNumber, _) = self
-            .rpc_api
-            .get_account_proof(
-                account_id,
-                AccountStorageRequirements::default(),
-                account_state_at,
-                known_account_code,
-            )
-            .await
-            .map_err(|err| {
-                DataStoreError::other_with_source(
-                    "failed to fetch foreign account proof via RPC",
-                    err,
-                )
-            })?;
-
-        let account_inputs = account_proof_into_inputs(account_proof).map_err(|err| {
-            DataStoreError::other_with_source("failed to convert account proof to inputs", err)
+        let account_inputs = fetch_public_account_inputs(
+            &self.store,
+            &self.rpc_api,
+            account_id,
+            AccountStorageRequirements::default(),
+            account_state_at,
+        )
+        .await
+        .map_err(|err| {
+            DataStoreError::other_with_source("failed to fetch foreign account inputs", err)
         })?;
 
         self.transaction_mast_store.load_account_code(account_inputs.code());
-
-        let _ = self
-            .store
-            .upsert_foreign_account_code(account_id, account_inputs.code().clone())
-            .await
-            .inspect_err(|err| {
-                tracing::warn!(
-                    %account_id,
-                    %err,
-                    "Failed to persist foreign account code to store"
-                );
-            });
-
         self.foreign_account_inputs.write().insert(account_id, account_inputs.clone());
 
         Ok(account_inputs)
     }
 
     /// Fetches storage map entries from the network via RPC.
-    ///
-    /// # Errors
-    /// Returns [`DataStoreError::Other`] if the account is private.
     async fn fetch_storage_map_entries(
         &self,
         account_id: AccountId,
@@ -190,13 +149,6 @@ impl ClientDataStore {
         map_key: StorageMapKey,
         known_code: AccountCode,
     ) -> Result<StorageMapEntries, DataStoreError> {
-        if !account_id.is_public() {
-            return Err(DataStoreError::Other {
-                error_msg: format!("account {account_id} is not public").into(),
-                source: None,
-            });
-        }
-
         let storage_requirements = AccountStorageRequirements::new([(slot_name, &[map_key])]);
         let (_, account_proof): (BlockNumber, _) = self
             .rpc_api
@@ -212,21 +164,17 @@ impl ClientDataStore {
             })?;
 
         let (_, account_details) = account_proof.into_parts();
-        let details = account_details.ok_or_else(|| DataStoreError::Other {
-            error_msg: format!("RPC returned no account details for public account {account_id}")
-                .into(),
-            source: None,
+        let details = account_details.ok_or_else(|| {
+            DataStoreError::other(format!(
+                "RPC returned no account details for account {account_id}"
+            ))
         })?;
 
         let map_detail =
             details.storage_details.map_details.into_iter().next().ok_or_else(|| {
-                DataStoreError::Other {
-                    error_msg: format!(
-                        "RPC returned no storage map details for account {account_id}"
-                    )
-                    .into(),
-                    source: None,
-                }
+                DataStoreError::other(format!(
+                    "RPC returned no storage map details for account {account_id}"
+                ))
             })?;
 
         Ok(map_detail.entries)
@@ -250,12 +198,10 @@ impl ClientDataStore {
             .slots()
             .find(|slot| slot.slot_type().is_map() && slot.value() == map_root)
             .map(|slot| slot.name().clone())
-            .ok_or_else(|| DataStoreError::Other {
-                error_msg: format!(
+            .ok_or_else(|| {
+                DataStoreError::other(format!(
                     "did not find map slot with root {map_root} for foreign account {account_id}"
-                )
-                .into(),
-                source: None,
+                ))
             })?;
 
         Ok((slot_name, inputs.code().clone()))
@@ -368,26 +314,23 @@ impl DataStore for ClientDataStore {
                     let vault = self.store.get_account_vault(account_id).await?;
 
                     if vault.root() != vault_root {
-                        return Err(DataStoreError::Other {
-                            error_msg: "Vault root mismatch".into(),
-                            source: None,
-                        });
+                        return Err(DataStoreError::other("Vault root mismatch"));
                     }
 
                     let asset_witness =
                         AssetWitness::new(vault.open(vault_key).into()).map_err(|err| {
-                            DataStoreError::Other {
-                                error_msg: "Failed to open vault asset tree".into(),
-                                source: Some(Box::new(err)),
-                            }
+                            DataStoreError::other_with_source(
+                                "Failed to open vault asset tree",
+                                err,
+                            )
                         })?;
                     asset_witnesses.push(asset_witness);
                 },
                 Err(err) => {
-                    return Err(DataStoreError::Other {
-                        error_msg: "Failed to get account asset".into(),
-                        source: Some(Box::new(err)),
-                    });
+                    return Err(DataStoreError::other_with_source(
+                        "Failed to get account asset",
+                        err,
+                    ));
                 },
             }
         }
@@ -435,12 +378,8 @@ impl DataStore for ClientDataStore {
         Ok(witness)
     }
 
-    /// Returns the [`AccountInputs`] for the given foreign account from the cache or
-    /// alternatively fetching them from the RPC if not available locally.
-    ///
-    /// # Errors
-    /// Returns [`DataStoreError::AccountNotFound`] if the account is private and has not been
-    /// pre-registered with [`Self::register_foreign_account_inputs`].
+    /// Returns the [`AccountInputs`] for the given foreign account from the cache or alternatively
+    /// fetching them from the RPC if not available locally.
     async fn get_foreign_account_inputs(
         &self,
         foreign_account_id: AccountId,
