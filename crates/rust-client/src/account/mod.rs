@@ -387,6 +387,27 @@ impl<AUTH> Client<AUTH> {
     pub fn account_reader(&self, account_id: AccountId) -> AccountReader {
         AccountReader::new(self.store.clone(), account_id)
     }
+
+    /// Prunes old committed historical account states for the specified account.
+    ///
+    /// Keeps the latest committed state and any pending (uncommitted) states needed for
+    /// transaction rollback. Removes all older committed historical entries and any
+    /// orphaned account code.
+    ///
+    /// Returns the total number of historical rows deleted.
+    pub async fn prune_account_history(&self, account_id: AccountId) -> Result<usize, ClientError> {
+        Ok(self.store.prune_account_history(account_id).await?)
+    }
+
+    /// Prunes old committed historical account states for all accounts.
+    ///
+    /// This is equivalent to calling [`prune_account_history`](Self::prune_account_history)
+    /// for every account, but executes in a single transaction for efficiency.
+    ///
+    /// Returns the total number of historical rows deleted across all accounts.
+    pub async fn prune_all_account_history(&self) -> Result<usize, ClientError> {
+        Ok(self.store.prune_all_account_history().await?)
+    }
 }
 
 // UTILITY FUNCTIONS

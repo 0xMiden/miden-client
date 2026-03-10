@@ -211,6 +211,34 @@ impl WebClient {
         }
     }
 
+    #[wasm_bindgen(js_name = "pruneAccountHistory")]
+    #[allow(clippy::cast_possible_truncation)]
+    pub async fn prune_account_history(&mut self, account_id: &AccountId) -> Result<u32, JsValue> {
+        if let Some(client) = self.get_mut_inner() {
+            let deleted = client
+                .prune_account_history(account_id.into())
+                .await
+                .map_err(|err| js_error_with_context(err, "failed to prune account history"))?;
+            Ok(deleted as u32)
+        } else {
+            Err(JsValue::from_str("Client not initialized"))
+        }
+    }
+
+    #[wasm_bindgen(js_name = "pruneAllAccountHistory")]
+    #[allow(clippy::cast_possible_truncation)]
+    pub async fn prune_all_account_history(&mut self) -> Result<u32, JsValue> {
+        if let Some(client) = self.get_mut_inner() {
+            let deleted = client
+                .prune_all_account_history()
+                .await
+                .map_err(|err| js_error_with_context(err, "failed to prune all account history"))?;
+            Ok(deleted as u32)
+        } else {
+            Err(JsValue::from_str("Client not initialized"))
+        }
+    }
+
     /// Retrieves the full account data for the account associated with the given public key
     /// commitment, returning `null` if no account is found.
     #[wasm_bindgen(js_name = "getAccountByKeyCommitment")]

@@ -37,7 +37,9 @@ use miden_client::store::{
     AccountStatus,
     AccountStorageFilter,
     StoreError,
+    TransactionFilter,
 };
+use miden_client::transaction::TransactionStatus;
 use miden_client::utils::Serializable;
 use miden_client::{AccountError, Word};
 
@@ -64,6 +66,7 @@ use js_bindings::{
     idxdb_get_account_vault_assets,
     idxdb_get_foreign_account_code,
     idxdb_lock_account,
+    idxdb_prune_account_history,
     idxdb_undo_account_states,
     idxdb_upsert_foreign_account_code,
 };
@@ -638,5 +641,80 @@ impl IdxdbStore {
         remove_account_address(self.db_id(), address).await.map_err(|js_error| {
             StoreError::DatabaseError(format!("failed to remove account address: {js_error:?}"))
         })
+    }
+
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    pub(crate) async fn prune_account_history(
+        &self,
+        account_id: AccountId,
+    ) -> Result<usize, StoreError> {
+        let pending_json = self.get_pending_nonces_json(Some(account_id)).await?;
+        let account_id_str = Some(account_id.to_string());
+        let promise = idxdb_prune_account_history(self.db_id(), account_id_str, pending_json);
+        let deleted: f64 = await_js(promise, "failed to prune account history").await?;
+        Ok(deleted as usize)
+    }
+
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    pub(crate) async fn prune_all_account_history(&self) -> Result<usize, StoreError> {
+        let pending_json = self.get_pending_nonces_json(None).await?;
+        let promise = idxdb_prune_account_history(self.db_id(), None, pending_json);
+        let deleted: f64 = await_js(promise, "failed to prune all account history").await?;
+        Ok(deleted as usize)
+    }
+
+    /// Returns a JSON-encoded `Record<accountId, nonce[]>` of nonces from pending
+    /// transactions.  When `filter_account` is `Some`, only that account is included.
+    async fn get_pending_nonces_json(
+        &self,
+        filter_account: Option<AccountId>,
+    ) -> Result<String, StoreError> {
+        let pending_txs = self.get_transactions(TransactionFilter::Uncommitted).await?;
+
+        let mut map: BTreeMap<String, Vec<String>> = BTreeMap::new();
+
+        for tx in &pending_txs {
+            if !matches!(tx.status, TransactionStatus::Pending) {
+                continue;
+            }
+
+            let tx_account_id = tx.details.account_id;
+            if let Some(filter) = filter_account
+                && tx_account_id != filter
+            {
+                continue;
+            }
+
+            // Resolve the commitment to a nonce via historical headers.
+            if let Some(header) =
+                self.get_account_header_by_commitment(tx.details.final_account_state).await?
+            {
+                map.entry(tx_account_id.to_string())
+                    .or_default()
+                    .push(header.nonce().as_int().to_string());
+            }
+        }
+
+        // Serialize to JSON manually (no serde_json dependency).
+        let mut json = String::from("{");
+        for (i, (account_id_str, nonces)) in map.iter().enumerate() {
+            if i > 0 {
+                json.push(',');
+            }
+            json.push('"');
+            json.push_str(account_id_str);
+            json.push_str("\":[");
+            for (j, nonce) in nonces.iter().enumerate() {
+                if j > 0 {
+                    json.push(',');
+                }
+                json.push('"');
+                json.push_str(nonce);
+                json.push('"');
+            }
+            json.push(']');
+        }
+        json.push('}');
+        Ok(json)
     }
 }

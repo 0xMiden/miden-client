@@ -154,6 +154,13 @@ extern "C" {
 
     #[wasm_bindgen(js_name = undoAccountStates)]
     pub fn idxdb_undo_account_states(db_id: &str, account_hashes: Vec<String>) -> js_sys::Promise;
+
+    #[wasm_bindgen(js_name = pruneAccountHistory)]
+    pub fn idxdb_prune_account_history(
+        db_id: &str,
+        account_id: Option<String>,
+        pending_nonces_json: String,
+    ) -> js_sys::Promise;
 }
 
 // VAULT ASSET

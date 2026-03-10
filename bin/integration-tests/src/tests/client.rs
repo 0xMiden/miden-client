@@ -1552,3 +1552,55 @@ pub async fn test_output_only_note(client_config: ClientConfig) -> Result<()> {
     assert!(output_note.is_some());
     Ok(())
 }
+
+pub async fn test_prune_account_history(client_config: ClientConfig) -> Result<()> {
+    let (mut client, authenticator) = client_config.into_client().await?;
+    wait_for_node(&mut client).await;
+
+    let (basic_account, faucet_account) = setup_wallet_and_faucet(
+        &mut client,
+        AccountStorageMode::Private,
+        &authenticator,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
+
+    let faucet_id = faucet_account.id();
+    let wallet_id = basic_account.id();
+
+    // Mint twice — each mint advances the faucet nonce, creating historical entries.
+    let (tx_id_1, _) = mint_note(&mut client, wallet_id, faucet_id, NoteType::Public).await;
+    wait_for_tx(&mut client, tx_id_1).await?;
+
+    let (tx_id_2, _) = mint_note(&mut client, wallet_id, faucet_id, NoteType::Public).await;
+    wait_for_tx(&mut client, tx_id_2).await?;
+
+    // Record faucet state before pruning.
+    let faucet_before = client.get_account(faucet_id).await?.unwrap();
+
+    // Prune faucet history — should remove old committed states.
+    let deleted = client.prune_account_history(faucet_id).await?;
+    assert!(deleted > 0, "Should have pruned old committed states");
+
+    // Account should still be fully readable and unchanged.
+    let faucet_after = client.get_account(faucet_id).await?.unwrap();
+    assert_eq!(
+        faucet_before.to_commitment(),
+        faucet_after.to_commitment(),
+        "Account state should be identical after pruning"
+    );
+
+    // Prune all — should be a no-op for already-pruned faucet, but exercises the code path.
+    let deleted_all = client.prune_all_account_history().await?;
+    // Both accounts should still be readable.
+    assert!(client.get_account(wallet_id).await?.is_some());
+    assert!(client.get_account(faucet_id).await?.is_some());
+
+    info!(
+        deleted_single = deleted,
+        deleted_all = deleted_all,
+        "Prune account history test completed"
+    );
+
+    Ok(())
+}
