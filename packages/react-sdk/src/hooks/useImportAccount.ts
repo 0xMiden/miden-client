@@ -12,6 +12,7 @@ import type { ImportAccountOptions } from "../types";
 import { DEFAULTS } from "../types";
 import { parseAccountId } from "../utils/accountParsing";
 import { ensureAccountBech32 } from "../utils/accountBech32";
+import { assertSignerConnected } from "../utils/errors";
 
 export interface UseImportAccountResult {
   /** Import an existing account into the client */
@@ -56,7 +57,7 @@ type AccountFileWithAccount = AccountFileType & {
  * ```
  */
 export function useImportAccount(): UseImportAccountResult {
-  const { client, isReady } = useMiden();
+  const { client, isReady, signerConnected } = useMiden();
   const setAccounts = useMidenStore((state) => state.setAccounts);
 
   const [account, setAccount] = useState<Account | null>(null);
@@ -68,6 +69,8 @@ export function useImportAccount(): UseImportAccountResult {
       if (!client || !isReady) {
         throw new Error("Miden client is not ready");
       }
+
+      assertSignerConnected(signerConnected);
 
       setIsImporting(true);
       setError(null);
@@ -177,7 +180,7 @@ export function useImportAccount(): UseImportAccountResult {
         setIsImporting(false);
       }
     },
-    [client, isReady, setAccounts]
+    [client, isReady, setAccounts, signerConnected]
   );
 
   const reset = useCallback(() => {

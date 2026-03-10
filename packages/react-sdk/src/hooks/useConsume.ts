@@ -7,6 +7,7 @@ import type {
   TransactionResult,
 } from "../types";
 import { parseAccountId } from "../utils/accountParsing";
+import { assertSignerConnected } from "../utils/errors";
 
 export interface UseConsumeResult {
   /** Consume one or more notes */
@@ -52,7 +53,7 @@ export interface UseConsumeResult {
  * ```
  */
 export function useConsume(): UseConsumeResult {
-  const { client, isReady, sync, prover } = useMiden();
+  const { client, isReady, sync, prover, signerConnected } = useMiden();
 
   const [result, setResult] = useState<TransactionResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -64,6 +65,8 @@ export function useConsume(): UseConsumeResult {
       if (!client || !isReady) {
         throw new Error("Miden client is not ready");
       }
+
+      assertSignerConnected(signerConnected);
 
       if (options.noteIds.length === 0) {
         throw new Error("No note IDs provided");
@@ -116,7 +119,7 @@ export function useConsume(): UseConsumeResult {
         setIsLoading(false);
       }
     },
-    [client, isReady, prover, sync]
+    [client, isReady, prover, signerConnected, sync]
   );
 
   const reset = useCallback(() => {

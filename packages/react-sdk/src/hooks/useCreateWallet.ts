@@ -6,6 +6,7 @@ import type { Account } from "@miden-sdk/miden-sdk";
 import type { CreateWalletOptions } from "../types";
 import { DEFAULTS } from "../types";
 import { ensureAccountBech32 } from "../utils/accountBech32";
+import { assertSignerConnected } from "../utils/errors";
 
 export interface UseCreateWalletResult {
   /** Create a new wallet with optional configuration */
@@ -49,7 +50,7 @@ export interface UseCreateWalletResult {
  * ```
  */
 export function useCreateWallet(): UseCreateWalletResult {
-  const { client, isReady, sync } = useMiden();
+  const { client, isReady, sync, signerConnected } = useMiden();
   const setAccounts = useMidenStore((state) => state.setAccounts);
 
   const [wallet, setWallet] = useState<Account | null>(null);
@@ -61,6 +62,8 @@ export function useCreateWallet(): UseCreateWalletResult {
       if (!client || !isReady) {
         throw new Error("Miden client is not ready");
       }
+
+      assertSignerConnected(signerConnected);
 
       await sync();
 
@@ -96,7 +99,7 @@ export function useCreateWallet(): UseCreateWalletResult {
         setIsCreating(false);
       }
     },
-    [client, isReady, setAccounts]
+    [client, isReady, setAccounts, signerConnected]
   );
 
   const reset = useCallback(() => {

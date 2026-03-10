@@ -18,6 +18,7 @@ import type {
   TransactionStage,
 } from "../types";
 import { DEFAULTS } from "../types";
+import { assertSignerConnected } from "../utils/errors";
 import { parseAccountId } from "../utils/accountParsing";
 import { getNoteType } from "../utils/noteFilters";
 
@@ -69,7 +70,7 @@ export interface UseInternalTransferResult {
  * ```
  */
 export function useInternalTransfer(): UseInternalTransferResult {
-  const { client, isReady, sync, prover } = useMiden();
+  const { client, isReady, sync, prover, signerConnected } = useMiden();
 
   const [result, setResult] = useState<
     InternalTransferResult | InternalTransferResult[] | null
@@ -85,6 +86,8 @@ export function useInternalTransfer(): UseInternalTransferResult {
       if (!client || !isReady) {
         throw new Error("Miden client is not ready");
       }
+
+      assertSignerConnected(signerConnected);
 
       const noteType = getNoteType(options.noteType ?? DEFAULTS.NOTE_TYPE);
       const senderId = parseAccountId(options.from);
@@ -133,7 +136,7 @@ export function useInternalTransfer(): UseInternalTransferResult {
         noteId,
       };
     },
-    [client, isReady, prover]
+    [client, isReady, prover, signerConnected]
   );
 
   const transfer = useCallback(

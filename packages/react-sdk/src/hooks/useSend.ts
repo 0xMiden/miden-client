@@ -17,7 +17,7 @@ import type {
 import { DEFAULTS } from "../types";
 import { parseAccountId, parseAddress } from "../utils/accountParsing";
 import { createNoteAttachment } from "../utils/noteAttachment";
-import { MidenError } from "../utils/errors";
+import { MidenError, assertSignerConnected } from "../utils/errors";
 import { getNoteType, waitForTransactionCommit } from "../utils/noteFilters";
 import type { ClientWithTransactions } from "../utils/noteFilters";
 
@@ -67,7 +67,7 @@ export interface UseSendResult {
  * ```
  */
 export function useSend(): UseSendResult {
-  const { client, isReady, sync, prover } = useMiden();
+  const { client, isReady, sync, prover, signerConnected } = useMiden();
   const isBusyRef = useRef(false);
 
   const [result, setResult] = useState<TransactionResult | null>(null);
@@ -80,6 +80,8 @@ export function useSend(): UseSendResult {
       if (!client || !isReady) {
         throw new Error("Miden client is not ready");
       }
+
+      assertSignerConnected(signerConnected);
 
       if (isBusyRef.current) {
         throw new MidenError(
@@ -247,7 +249,7 @@ export function useSend(): UseSendResult {
         isBusyRef.current = false;
       }
     },
-    [client, isReady, prover, sync]
+    [client, isReady, prover, signerConnected, sync]
   );
 
   const reset = useCallback(() => {
