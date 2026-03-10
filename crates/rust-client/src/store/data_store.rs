@@ -13,8 +13,8 @@ use miden_protocol::account::{
 };
 use miden_protocol::asset::{AssetVaultKey, AssetWitness};
 use miden_protocol::block::{BlockHeader, BlockNumber};
-use miden_protocol::crypto::merkle::MerklePath;
 use miden_protocol::crypto::merkle::mmr::{InOrderIndex, PartialMmr};
+use miden_protocol::crypto::merkle::{MerkleError, MerklePath};
 use miden_protocol::note::NoteScript;
 use miden_protocol::transaction::{AccountInputs, PartialBlockchain};
 use miden_protocol::vm::FutureMaybeSend;
@@ -141,23 +141,10 @@ impl DataStore for ClientDataStore {
                 Ok(Some((_, asset_witness))) => {
                     asset_witnesses.push(asset_witness);
                 },
-                Ok(_) => {
-                    let vault = self.store.get_account_vault(account_id).await?;
-
-                    if vault.root() != vault_root {
-                        return Err(DataStoreError::Other {
-                            error_msg: "Vault root mismatch".into(),
-                            source: None,
-                        });
-                    }
-
+                Ok(None) | Err(StoreError::MerkleStoreError(MerkleError::RootNotInStore(_))) => {
                     let asset_witness =
-                        AssetWitness::new(vault.open(vault_key).into()).map_err(|err| {
-                            DataStoreError::Other {
-                                error_msg: "Failed to open vault asset tree".into(),
-                                source: Some(Box::new(err)),
-                            }
-                        })?;
+                        vault_fallback_witness(&self.store, account_id, vault_root, vault_key)
+                            .await?;
                     asset_witnesses.push(asset_witness);
                 },
                 Err(err) => {
@@ -247,6 +234,31 @@ impl MastForestStore for ClientDataStore {
 
 // HELPER FUNCTIONS
 // ================================================================================================
+
+/// Loads the full vault from the database and generates an [`AssetWitness`] for the given key.
+///
+/// This is used as a fallback when the forest-based proof is unavailable (e.g. the asset was not
+/// found in the forest or the forest root is stale).
+async fn vault_fallback_witness(
+    store: &Arc<dyn Store>,
+    account_id: AccountId,
+    vault_root: Word,
+    vault_key: AssetVaultKey,
+) -> Result<AssetWitness, DataStoreError> {
+    let vault = store.get_account_vault(account_id).await?;
+
+    if vault.root() != vault_root {
+        return Err(DataStoreError::Other {
+            error_msg: "Vault root mismatch".into(),
+            source: None,
+        });
+    }
+
+    AssetWitness::new(vault.open(vault_key).into()).map_err(|err| DataStoreError::Other {
+        error_msg: "Failed to open vault asset tree".into(),
+        source: Some(Box::new(err)),
+    })
+}
 
 /// Builds a [`PartialMmr`] with a specified forest number and a list of blocks that should be
 /// authenticated.
