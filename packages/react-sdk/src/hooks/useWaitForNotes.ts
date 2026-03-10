@@ -1,9 +1,6 @@
 import { useCallback } from "react";
 import { useMiden } from "../context/MidenProvider";
-import type {
-  ConsumableNoteRecord,
-  InputNoteRecord,
-} from "@miden-sdk/miden-sdk";
+import type { ConsumableNoteRecord } from "@miden-sdk/miden-sdk";
 import type { WaitForNotesOptions } from "../types";
 import { parseAccountId } from "../utils/accountParsing";
 import { runExclusiveDirect } from "../utils/runExclusive";
@@ -12,7 +9,7 @@ export interface UseWaitForNotesResult {
   /** Wait until an account has consumable notes */
   waitForConsumableNotes: (
     options: WaitForNotesOptions
-  ) => Promise<InputNoteRecord[]>;
+  ) => Promise<ConsumableNoteRecord[]>;
 }
 
 type ClientWithNotes = {
@@ -25,7 +22,7 @@ export function useWaitForNotes(): UseWaitForNotesResult {
   const runExclusiveSafe = runExclusive ?? runExclusiveDirect;
 
   const waitForConsumableNotes = useCallback(
-    async (options: WaitForNotesOptions): Promise<InputNoteRecord[]> => {
+    async (options: WaitForNotesOptions): Promise<ConsumableNoteRecord[]> => {
       if (!client || !isReady) {
         throw new Error("Miden client is not ready");
       }

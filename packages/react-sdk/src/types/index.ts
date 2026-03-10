@@ -1,5 +1,4 @@
 import { AuthScheme } from "@miden-sdk/miden-sdk";
-import type { AccountRef } from "../utils/accountParsing";
 import type {
   WasmWebClient as WebClient,
   Account,
@@ -19,9 +18,6 @@ import type {
   NoteVisibility,
   StorageMode,
 } from "@miden-sdk/miden-sdk";
-
-/** Flexible account reference — hex string, bech32 string, or WASM AccountId */
-export type AccountRef = string | AccountId;
 
 // Re-export SDK types for convenience
 export { AuthScheme };

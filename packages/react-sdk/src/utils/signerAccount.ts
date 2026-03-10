@@ -83,9 +83,6 @@ export async function initializeSignerAccount(
     return config.importAccountId;
   }
 
-  const { AccountBuilder, AccountComponent, Word } =
-    await import("@miden-sdk/miden-sdk");
-
   // Convert Uint8Array commitment to Word (required by SDK)
   const commitmentWord = Word.deserialize(config.publicKeyCommitment);
 
