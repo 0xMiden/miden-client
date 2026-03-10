@@ -123,10 +123,11 @@ impl IdxdbStore {
                 .iter()
                 .map(|(faucet_id, _)| faucet_id.prefix().to_hex())
                 .collect();
-            let old_vault_assets = self
-                .get_vault_assets(account_id, fungible_faucet_prefixes)
-                .await?;
-            let old_map_roots = self.get_storage_map_roots(account_id).await?;
+            let old_vault_assets =
+                self.get_vault_assets(account_id, fungible_faucet_prefixes).await?;
+            let map_slot_names: Vec<String> =
+                delta.storage().maps().map(|(slot_name, _)| slot_name.to_string()).collect();
+            let old_map_roots = self.get_storage_map_roots(account_id, map_slot_names).await?;
 
             let final_header = executed_tx.final_account();
 

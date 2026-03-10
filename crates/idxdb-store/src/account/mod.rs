@@ -267,7 +267,7 @@ impl IdxdbStore {
     ) -> Result<Vec<(StorageSlotName, StorageSlotType, Word)>, StoreError> {
         let account_id_str = account_id.to_string();
 
-        let promise = idxdb_get_account_storage(self.db_id(), account_id_str);
+        let promise = idxdb_get_account_storage(self.db_id(), account_id_str, vec![]);
         let account_storage_idxdb: Vec<AccountStorageIdxdbObject> =
             await_js(promise, "failed to fetch account storage").await?;
 
@@ -298,7 +298,7 @@ impl IdxdbStore {
     ) -> Result<AccountStorage, StoreError> {
         let account_id_str = account_id.to_string();
 
-        let promise = idxdb_get_account_storage(self.db_id(), account_id_str.clone());
+        let promise = idxdb_get_account_storage(self.db_id(), account_id_str.clone(), vec![]);
         let account_storage_idxdb: Vec<AccountStorageIdxdbObject> =
             await_js(promise, "failed to fetch account storage").await?;
 
@@ -405,13 +405,15 @@ impl IdxdbStore {
         Ok(assets)
     }
 
-    /// Returns a map from slot name to map root for all Map-type storage slots.
+    /// Returns a map from slot name to map root for Map-type storage slots.
+    /// When `slot_names` is non-empty, only loads the specified slots.
     /// Only loads slot metadata — does NOT load map entries.
     pub(crate) async fn get_storage_map_roots(
         &self,
         account_id: AccountId,
+        slot_names: Vec<String>,
     ) -> Result<BTreeMap<StorageSlotName, Word>, StoreError> {
-        let promise = idxdb_get_account_storage(self.db_id(), account_id.to_string());
+        let promise = idxdb_get_account_storage(self.db_id(), account_id.to_string(), slot_names);
         let slots: Vec<AccountStorageIdxdbObject> =
             await_js(promise, "failed to fetch account storage").await?;
 

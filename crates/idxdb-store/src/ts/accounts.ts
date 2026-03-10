@@ -136,22 +136,30 @@ export async function getAccountCode(dbId: string, codeRoot: string) {
   }
 }
 
-export async function getAccountStorage(dbId: string, accountId: string) {
+export async function getAccountStorage(
+  dbId: string,
+  accountId: string,
+  slotNames: string[]
+) {
   try {
     const db = getDatabase(dbId);
-    const allMatchingRecords = await db.latestAccountStorages
-      .where("accountId")
-      .equals(accountId)
-      .toArray();
+    let query = db.latestAccountStorages.where("accountId").equals(accountId);
 
-    const slots = allMatchingRecords.map((record) => {
-      return {
-        slotName: record.slotName,
-        slotValue: record.slotValue,
-        slotType: record.slotType,
-      };
-    });
-    return slots;
+    let allMatchingRecords;
+    if (slotNames.length) {
+      const nameSet = new Set(slotNames);
+      allMatchingRecords = await query
+        .and((record) => nameSet.has(record.slotName))
+        .toArray();
+    } else {
+      allMatchingRecords = await query.toArray();
+    }
+
+    return allMatchingRecords.map((record) => ({
+      slotName: record.slotName,
+      slotValue: record.slotValue,
+      slotType: record.slotType,
+    }));
   } catch (error) {
     logWebStoreError(
       error,

@@ -106,21 +106,25 @@ export async function getAccountCode(dbId, codeRoot) {
         logWebStoreError(error, `Error fetching account code for root ${codeRoot}`);
     }
 }
-export async function getAccountStorage(dbId, accountId) {
+export async function getAccountStorage(dbId, accountId, slotNames) {
     try {
         const db = getDatabase(dbId);
-        const allMatchingRecords = await db.latestAccountStorages
-            .where("accountId")
-            .equals(accountId)
-            .toArray();
-        const slots = allMatchingRecords.map((record) => {
-            return {
-                slotName: record.slotName,
-                slotValue: record.slotValue,
-                slotType: record.slotType,
-            };
-        });
-        return slots;
+        let query = db.latestAccountStorages.where("accountId").equals(accountId);
+        let allMatchingRecords;
+        if (slotNames.length) {
+            const nameSet = new Set(slotNames);
+            allMatchingRecords = await query
+                .and((record) => nameSet.has(record.slotName))
+                .toArray();
+        }
+        else {
+            allMatchingRecords = await query.toArray();
+        }
+        return allMatchingRecords.map((record) => ({
+            slotName: record.slotName,
+            slotValue: record.slotValue,
+            slotType: record.slotType,
+        }));
     }
     catch (error) {
         logWebStoreError(error, `Error fetching account storage for account ${accountId}`);
