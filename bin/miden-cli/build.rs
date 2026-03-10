@@ -97,7 +97,8 @@ fn main() {
     // ECDSA auth (same component, different package name for discoverability)
     build_package("ecdsa-auth", singlesig_library(), &singlesig_metadata, Some("auth"));
 
-    // No auth
+    // No authentication component. Nonce is incremented on first transaction and when the account
+    // state is changed. Provides no cryptographic authentication.
     let no_auth_metadata = AccountComponentMetadata::new(NoAuth::NAME)
         .with_description("No authentication component")
         .with_supports_all_types();
@@ -110,7 +111,7 @@ fn main() {
     // `SchemaType::auth_scheme()` (a felt type), but the type registry expects
     // felt-types-as-words in the format `[0, 0, 0, <felt>]` while the actual
     // storage uses `[felt, 0, 0, 0]`. Using `native_word()` avoids this
-    // validation mismatch. See: https://github.com/0xMiden/miden-base/issues/XXX
+    // validation mismatch.
     let approver_schemes_schema = (
         AuthMultisig::approver_scheme_ids_slot().clone(),
         StorageSlotSchema::map("Approver scheme IDs", SchemaType::u32(), SchemaType::native_word()),
