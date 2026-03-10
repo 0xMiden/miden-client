@@ -1,15 +1,29 @@
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
+use miden_protocol::account::AccountId;
 use miden_protocol::Word;
-use miden_protocol::block::{BlockHeader, BlockNumber};
+use miden_protocol::block::{
+    BlockHeader,
+    BlockNoteTree,
+    BlockNumber,
+    Blockchain,
+    FeeParameters,
+    account_tree::AccountTree,
+    nullifier_tree::NullifierTree,
+};
+use miden_protocol::crypto::dsa::ecdsa_k256_keccak::SecretKey;
 use miden_protocol::crypto::merkle::MerklePath;
 use miden_protocol::crypto::merkle::mmr::{Forest, InOrderIndex, MmrPeaks, PartialMmr};
+use miden_protocol::crypto::merkle::smt::Smt;
+use miden_protocol::transaction::{OrderedTransactionHeaders, TransactionKernel};
 use tracing::warn;
 
 use crate::rpc::NodeRpcClient;
 use crate::store::{BlockRelevance, StoreError};
 use crate::{Client, ClientError};
+
+const OFFLINE_NATIVE_ASSET_FAUCET_ID: u128 = 0xab0000000000cd200000ac000000de00;
 
 /// Network information management methods.
 impl<AUTH> Client<AUTH> {
@@ -36,6 +50,30 @@ impl<AUTH> Client<AUTH> {
             .get_block_header_by_number(Some(BlockNumber::GENESIS), false)
             .await?;
 
+        let blank_mmr_peaks = MmrPeaks::new(Forest::empty(), vec![])
+            .expect("Blank MmrPeaks should not fail to instantiate");
+        self.store.insert_block_header(&genesis, blank_mmr_peaks, false).await?;
+        self.rpc_api.set_genesis_commitment(genesis.commitment()).await?;
+        Ok(())
+    }
+
+    /// Seeds the local client state needed to create accounts and execute programs without a node.
+    ///
+    /// This stores default RPC limits and inserts a synthetic genesis header if one is not
+    /// already present in the store. The synthetic header is only intended for local-only
+    /// execution and debugging.
+    pub async fn prepare_offline_bootstrap(&mut self) -> Result<(), ClientError> {
+        let limits = self.store.get_rpc_limits().await?.unwrap_or_default();
+        self.store.set_rpc_limits(limits).await?;
+        self.rpc_api.set_rpc_limits(limits).await;
+
+        if let Some((genesis, _)) = self.store.get_block_header_by_num(BlockNumber::GENESIS).await?
+        {
+            self.rpc_api.set_genesis_commitment(genesis.commitment()).await?;
+            return Ok(());
+        }
+
+        let genesis = synthetic_offline_genesis_header();
         let blank_mmr_peaks = MmrPeaks::new(Forest::empty(), vec![])
             .expect("Blank MmrPeaks should not fail to instantiate");
         self.store.insert_block_header(&genesis, blank_mmr_peaks, false).await?;
@@ -84,6 +122,30 @@ impl<AUTH> Client<AUTH> {
 
         Ok(block_header)
     }
+}
+
+fn synthetic_offline_genesis_header() -> BlockHeader {
+    let native_asset_id = AccountId::try_from(OFFLINE_NATIVE_ASSET_FAUCET_ID)
+        .expect("offline native asset faucet ID should be valid");
+    let fee_parameters =
+        FeeParameters::new(native_asset_id, 500).expect("offline fee params should be valid");
+    let validator_key = SecretKey::new().public_key();
+    let transactions = OrderedTransactionHeaders::new_unchecked(Vec::new());
+
+    BlockHeader::new(
+        0,
+        Word::empty(),
+        BlockNumber::GENESIS,
+        Blockchain::new().commitment(),
+        AccountTree::<Smt>::default().root(),
+        NullifierTree::<Smt>::default().root(),
+        BlockNoteTree::empty().root(),
+        transactions.commitment(),
+        TransactionKernel.to_commitment(),
+        validator_key,
+        fee_parameters,
+        0,
+    )
 }
 
 // UTILS
@@ -156,13 +218,21 @@ pub(crate) async fn fetch_block_header(
 
 #[cfg(test)]
 mod tests {
-    use miden_protocol::block::{BlockHeader, BlockNumber};
+    use alloc::vec::Vec;
+
+    use miden_protocol::block::{
+        BlockHeader, BlockNoteTree, BlockNumber, Blockchain, account_tree::AccountTree,
+        nullifier_tree::NullifierTree,
+    };
     use miden_protocol::crypto::merkle::MerklePath;
     use miden_protocol::crypto::merkle::mmr::{Forest, InOrderIndex, Mmr, PartialMmr};
-    use miden_protocol::transaction::TransactionKernel;
+    use miden_protocol::crypto::merkle::smt::Smt;
+    use miden_protocol::transaction::{OrderedTransactionHeaders, TransactionKernel};
     use miden_protocol::{Felt, Word};
 
-    use super::{adjust_merkle_path_for_forest, authenticated_block_nodes};
+    use super::{
+        adjust_merkle_path_for_forest, authenticated_block_nodes, synthetic_offline_genesis_header,
+    };
 
     fn word(n: u64) -> Word {
         Word::new([Felt::new(n), Felt::new(0), Felt::new(0), Felt::new(0)])
@@ -261,7 +331,11 @@ mod tests {
         assert!(proof.merkle_path().depth() as usize > expected_depth);
 
         let adjusted = adjust_merkle_path_for_forest(
+<<<<<<< HEAD
             proof.merkle_path(),
+=======
+            &proof.merkle_path(),
+>>>>>>> e5513f0d (Add offline bootstrap mode for local exec)
             BlockNumber::from(u32::try_from(leaf_pos).unwrap()),
             small_forest,
         );
@@ -280,5 +354,22 @@ mod tests {
 
         assert_eq!(nodes[0], (InOrderIndex::from_leaf_pos(4), block_header.commitment()));
         assert_eq!(&nodes[1..], path_nodes.as_slice());
+    }
+
+    #[test]
+    fn synthetic_offline_genesis_header_matches_empty_chain_state() {
+        let genesis = synthetic_offline_genesis_header();
+
+        assert_eq!(genesis.block_num(), BlockNumber::GENESIS);
+        assert_eq!(genesis.prev_block_commitment(), Word::empty());
+        assert_eq!(genesis.chain_commitment(), Blockchain::new().commitment());
+        assert_eq!(genesis.account_root(), AccountTree::<Smt>::default().root());
+        assert_eq!(genesis.nullifier_root(), NullifierTree::<Smt>::default().root());
+        assert_eq!(genesis.note_root(), BlockNoteTree::empty().root());
+        assert_eq!(
+            genesis.tx_commitment(),
+            OrderedTransactionHeaders::new_unchecked(Vec::new()).commitment()
+        );
+        assert_eq!(genesis.tx_kernel_commitment(), TransactionKernel.to_commitment());
     }
 }
