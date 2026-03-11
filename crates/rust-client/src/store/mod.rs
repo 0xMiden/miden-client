@@ -96,6 +96,13 @@ pub use note_record::{
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 pub trait Store: Send + Sync {
+    /// Returns an identifier for this store (e.g. `IndexedDB` database name, `SQLite` file path).
+    ///
+    /// This allows callers to retrieve store-specific identity information (such as the `IndexedDB`
+    /// database name) for standalone operations like `exportStore`/`importStore`, without making
+    /// import/export a responsibility of the client.
+    fn identifier(&self) -> &str;
+
     /// Returns the current timestamp tracked by the store, measured in non-leap seconds since
     /// Unix epoch. If the store implementation is incapable of tracking time, it should return
     /// `None`.
@@ -591,18 +598,6 @@ pub trait Store: Send + Sync {
         &self,
         account_id: AccountId,
     ) -> Result<Option<AccountRecord>, StoreError>;
-}
-
-/// Extension trait for [`Store`] implementations that support export/import of the full store
-/// contents as a serialized string. This is primarily used by web-based stores (e.g. `IndexedDB`).
-#[cfg(target_arch = "wasm32")]
-#[async_trait::async_trait(?Send)]
-pub trait WebStore: Store {
-    /// Exports the entire store contents as a serialized string.
-    async fn export_store(&self) -> Result<String, StoreError>;
-
-    /// Imports store contents from a serialized string, replacing all existing data.
-    async fn import_store(&self, data: String) -> Result<(), StoreError>;
 }
 
 // PARTIAL BLOCKCHAIN NODE FILTER

@@ -17,8 +17,7 @@ import {
 
 const exportDb = async (page: Page) => {
   return await page.evaluate(async () => {
-    const client = window.client;
-    const db = await client.exportStore();
+    const db = await window.exportStore(window.storeName);
     const serialized = JSON.stringify(db);
     return serialized;
   });
@@ -26,8 +25,7 @@ const exportDb = async (page: Page) => {
 
 const importDb = async (db: any, page: Page) => {
   return await page.evaluate(async (_db) => {
-    const client = window.client;
-    await client.forceImportStore(_db, "ImportedStore");
+    await window.importStore(window.storeName, _db);
   }, db);
 };
 

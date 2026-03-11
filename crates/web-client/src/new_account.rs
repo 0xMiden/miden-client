@@ -45,7 +45,7 @@ impl WebClient {
         init_seed: Option<Vec<u8>>,
     ) -> Result<Account, JsValue> {
         self.maybe_sync_before_account_creation().await;
-        let keystore = self.keystore.clone();
+        let keystore = self.keystore()?.clone();
         if let Some(client) = self.get_mut_inner() {
             let (new_account, key_pair) =
                 generate_wallet(storage_mode, mutable, init_seed, auth_scheme).await?;
@@ -56,7 +56,6 @@ impl WebClient {
                 .map_err(|err| js_error_with_context(err, "failed to insert new wallet"))?;
 
             keystore
-                .expect("KeyStore should be initialized")
                 .add_key(&key_pair, new_account.id())
                 .await
                 .map_err(|err| err.to_string())?;
@@ -82,7 +81,7 @@ impl WebClient {
             return Err(JsValue::from_str("Non-fungible faucets are not supported yet"));
         }
 
-        let keystore = self.keystore.clone();
+        let keystore = self.keystore()?.clone();
 
         if let Some(client) = self.get_mut_inner() {
             let mut seed = [0u8; 32];
@@ -142,7 +141,6 @@ impl WebClient {
             };
 
             keystore
-                .expect("KeyStore should be initialized")
                 .add_key(&key_pair, new_account.id())
                 .await
                 .map_err(|err| err.to_string())?;
@@ -195,7 +193,7 @@ impl WebClient {
                 .await
                 .map_err(|err| js_error_with_context(err, "failed to insert new account"))?;
 
-            let keystore = self.keystore.as_ref().expect("KeyStore should be initialized");
+            let keystore = self.keystore()?;
             let native_secret_key: AuthSecretKey = secret_key.into();
 
             keystore
@@ -215,7 +213,7 @@ impl WebClient {
         account_id: &AccountId,
         secret_key: &WebAuthSecretKey,
     ) -> Result<(), JsValue> {
-        let keystore = self.keystore.as_ref().expect("KeyStore should be initialized");
+        let keystore = self.keystore()?;
         let native_secret_key: AuthSecretKey = secret_key.into();
         let native_account_id = account_id.into();
 

@@ -180,30 +180,13 @@ export class MidenClient {
   }
 
   /**
-   * Exports the client store as a versioned snapshot.
+   * Returns the identifier of the underlying store (e.g. IndexedDB database name, file path).
    *
-   * @returns {Promise<StoreSnapshot>} The store snapshot.
+   * @returns {string} The store identifier.
    */
-  async exportStore() {
+  storeIdentifier() {
     this.assertNotTerminated();
-    const data = await this.#inner.exportStore();
-    return { version: 1, data };
-  }
-
-  /**
-   * Imports a previously exported store snapshot.
-   *
-   * @param {StoreSnapshot} snapshot - The store snapshot to import.
-   */
-  async importStore(snapshot) {
-    this.assertNotTerminated();
-    if (!snapshot || snapshot.version !== 1) {
-      throw new Error(
-        `Unsupported store snapshot version: ${snapshot?.version}. Expected version 1.`
-      );
-    }
-    // Second arg is the store password (empty string = no encryption)
-    await this.#inner.forceImportStore(snapshot.data, "");
+    return this.#inner.storeIdentifier();
   }
 
   // ── Mock-only methods ──
