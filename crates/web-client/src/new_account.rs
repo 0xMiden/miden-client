@@ -193,7 +193,7 @@ impl WebClient {
                 .await
                 .map_err(|err| js_error_with_context(err, "failed to insert new account"))?;
 
-            let keystore = self.keystore.as_ref().expect("KeyStore should be initialized");
+            let keystore = self.keystore()?;
             let native_secret_key: AuthSecretKey = secret_key.into();
 
             keystore
