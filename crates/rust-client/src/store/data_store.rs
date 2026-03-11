@@ -373,7 +373,7 @@ impl DataStore for ClientDataStore {
                 .ref_block
                 .read()
                 .map(AccountStateAt::Block)
-                .unwrap_or(AccountStateAt::ChainTip);
+                .expect("reference block should be set");
             self.fetch_and_cache_foreign_account(account_id, account_state_at).await?;
         }
 
