@@ -63,7 +63,6 @@ extern "C" {
     pub fn idxdb_upsert_account_storage(
         db_id: &str,
         account_id: String,
-        nonce: String,
         storage_slots: Vec<JsStorageSlot>,
     ) -> js_sys::Promise;
 
@@ -71,7 +70,6 @@ extern "C" {
     pub fn idxdb_upsert_storage_map_entries(
         db_id: &str,
         account_id: String,
-        nonce: String,
         entries: Vec<JsStorageMapEntry>,
     ) -> js_sys::Promise;
 
@@ -79,7 +77,6 @@ extern "C" {
     pub fn idxdb_upsert_vault_assets(
         db_id: &str,
         account_id: String,
-        nonce: String,
         assets: Vec<JsVaultAsset>,
     ) -> js_sys::Promise;
 

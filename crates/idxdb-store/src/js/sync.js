@@ -1,7 +1,7 @@
 import { getDatabase, } from "./schema.js";
 import { upsertTransactionRecord, insertTransactionScript, } from "./transactions.js";
 import { upsertInputNote, upsertOutputNote } from "./notes.js";
-import { upsertAccountStorage, upsertAccountRecord, upsertVaultAssets, upsertStorageMapEntries, } from "./accounts.js";
+import { applyFullAccountState } from "./accounts.js";
 import { logWebStoreError, uint8ArrayToBase64 } from "./utils.js";
 export async function getNoteTags(dbId) {
     try {
@@ -111,14 +111,19 @@ export async function applyStateSync(dbId, stateUpdate) {
                 }
                 return Promise.all(promises);
             })),
-            Promise.all(accountUpdates.flatMap((accountUpdate) => {
-                return [
-                    upsertAccountStorage(dbId, accountUpdate.accountId, accountUpdate.nonce, accountUpdate.storageSlots),
-                    upsertStorageMapEntries(dbId, accountUpdate.accountId, accountUpdate.nonce, accountUpdate.storageMapEntries),
-                    upsertVaultAssets(dbId, accountUpdate.accountId, accountUpdate.nonce, accountUpdate.assets),
-                    upsertAccountRecord(dbId, accountUpdate.accountId, accountUpdate.codeRoot, accountUpdate.storageRoot, accountUpdate.vaultRoot, accountUpdate.nonce, accountUpdate.committed, accountUpdate.accountCommitment, accountUpdate.accountSeed),
-                ];
-            })),
+            Promise.all(accountUpdates.map((accountUpdate) => applyFullAccountState(dbId, {
+                accountId: accountUpdate.accountId,
+                nonce: accountUpdate.nonce,
+                storageSlots: accountUpdate.storageSlots,
+                storageMapEntries: accountUpdate.storageMapEntries,
+                assets: accountUpdate.assets,
+                codeRoot: accountUpdate.codeRoot,
+                storageRoot: accountUpdate.storageRoot,
+                vaultRoot: accountUpdate.vaultRoot,
+                committed: accountUpdate.committed,
+                accountCommitment: accountUpdate.accountCommitment,
+                accountSeed: accountUpdate.accountSeed,
+            }))),
             updateSyncHeight(tx, blockNum),
             updatePartialBlockchainNodes(tx, serializedNodeIds, serializedNodes),
             updateCommittedNoteTags(tx, committedNoteIds),

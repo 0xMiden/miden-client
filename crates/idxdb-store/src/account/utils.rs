@@ -48,7 +48,6 @@ pub async fn upsert_account_code(db_id: &str, account_code: &AccountCode) -> Res
 pub async fn upsert_account_storage(
     db_id: &str,
     account_id: &AccountId,
-    nonce: u64,
     account_storage: &AccountStorage,
 ) -> Result<(), JsValue> {
     let mut slots = vec![];
@@ -61,15 +60,13 @@ pub async fn upsert_account_storage(
     }
 
     let account_id_str = account_id.to_string();
-    let nonce_str = nonce.to_string();
     JsFuture::from(idxdb_upsert_account_storage(
         db_id,
         account_id_str.clone(),
-        nonce_str.clone(),
         slots,
     ))
     .await?;
-    JsFuture::from(idxdb_upsert_storage_map_entries(db_id, account_id_str, nonce_str, maps))
+    JsFuture::from(idxdb_upsert_storage_map_entries(db_id, account_id_str, maps))
         .await?;
 
     Ok(())
@@ -78,14 +75,12 @@ pub async fn upsert_account_storage(
 pub async fn upsert_account_asset_vault(
     db_id: &str,
     account_id: &AccountId,
-    nonce: u64,
     asset_vault: &AssetVault,
 ) -> Result<(), JsValue> {
     let js_assets: Vec<JsVaultAsset> =
         asset_vault.assets().map(|asset| JsVaultAsset::from_asset(&asset)).collect();
 
-    let promise =
-        idxdb_upsert_vault_assets(db_id, account_id.to_string(), nonce.to_string(), js_assets);
+    let promise = idxdb_upsert_vault_assets(db_id, account_id.to_string(), js_assets);
     JsFuture::from(promise).await?;
 
     Ok(())

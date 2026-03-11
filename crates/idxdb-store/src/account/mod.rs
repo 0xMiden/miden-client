@@ -409,14 +409,13 @@ impl IdxdbStore {
             StoreError::DatabaseError(format!("failed to insert account code: {js_error:?}",))
         })?;
 
-        let nonce = account.nonce().as_int();
-        upsert_account_storage(self.db_id(), &account.id(), nonce, account.storage())
+        upsert_account_storage(self.db_id(), &account.id(), account.storage())
             .await
             .map_err(|js_error| {
                 StoreError::DatabaseError(format!("failed to insert account storage:{js_error:?}",))
             })?;
 
-        upsert_account_asset_vault(self.db_id(), &account.id(), nonce, account.vault())
+        upsert_account_asset_vault(self.db_id(), &account.id(), account.vault())
             .await
             .map_err(|js_error| {
                 StoreError::DatabaseError(format!("failed to insert account vault:{js_error:?}",))
