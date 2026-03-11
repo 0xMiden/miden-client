@@ -674,8 +674,15 @@ impl From<AccountStorageRequirements> for Vec<account_detail_request::StorageMap
         use account_detail_request::{self, storage_map_detail_request};
         let request_map = value.0;
         let mut requests = Vec::with_capacity(request_map.len());
-        for (slot_name, _map_keys) in request_map {
-            let slot_data = Some(storage_map_detail_request::SlotData::AllEntries(true));
+        for (slot_name, map_keys) in request_map {
+            let slot_data = if map_keys.is_empty() {
+                Some(storage_map_detail_request::SlotData::AllEntries(true))
+            } else {
+                let keys = map_keys.into_iter().map(|key| Word::from(key).into()).collect();
+                Some(storage_map_detail_request::SlotData::MapKeys(
+                    storage_map_detail_request::MapKeys { map_keys: keys },
+                ))
+            };
             requests.push(account_detail_request::StorageMapDetailRequest {
                 slot_name: slot_name.to_string(),
                 slot_data,
