@@ -1,13 +1,10 @@
-use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use miden_client::account::{
-    AccountId as NativeAccountId,
     AccountReader as NativeAccountReader,
     StorageMapKey,
     StorageSlotName,
 };
-use miden_client::store::Store;
 use wasm_bindgen::prelude::*;
 
 use super::account_header::AccountHeader;
@@ -25,13 +22,14 @@ use crate::js_error_with_context;
 #[wasm_bindgen]
 pub struct AccountReader(NativeAccountReader);
 
+impl From<NativeAccountReader> for AccountReader {
+    fn from(reader: NativeAccountReader) -> Self {
+        Self(reader)
+    }
+}
+
 #[wasm_bindgen]
 impl AccountReader {
-    /// Creates a new `AccountReader` for the given account.
-    pub(crate) fn new(store: Arc<dyn Store>, account_id: NativeAccountId) -> Self {
-        let inner = NativeAccountReader::new(store, account_id);
-        Self(inner)
-    }
 
     /// Returns the account ID.
     #[wasm_bindgen(js_name = "accountId")]

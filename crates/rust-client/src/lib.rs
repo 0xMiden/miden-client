@@ -432,8 +432,10 @@ where
 }
 
 impl<AUTH> Client<AUTH> {
-    pub fn store(&self) -> &Arc<dyn Store> {
-        &self.store
+    /// Returns the identifier of the underlying store (e.g. IndexedDB database name, SQLite
+    /// file path).
+    pub fn store_identifier(&self) -> &str {
+        self.store.identifier()
     }
 
     // LIMITS

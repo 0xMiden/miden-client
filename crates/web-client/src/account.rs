@@ -122,7 +122,7 @@ impl WebClient {
     /// ```
     #[wasm_bindgen(js_name = "accountReader")]
     pub fn account_reader(&self, account_id: &AccountId) -> Result<AccountReader, JsValue> {
-        Ok(AccountReader::new(self.store()?.clone(), account_id.into()))
+        Ok(AccountReader::from(self.get_inner()?.account_reader(account_id.into())))
     }
 
     /// Retrieves an authentication secret key from the keystore given a public key commitment.

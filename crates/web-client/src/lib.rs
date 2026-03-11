@@ -110,18 +110,17 @@ impl WebClient {
     /// Returns the identifier of the underlying store (e.g. `IndexedDB` database name, file path).
     #[wasm_bindgen(js_name = "storeIdentifier")]
     pub fn store_identifier(&self) -> Result<String, JsValue> {
-        Ok(self.store()?.identifier().to_string())
+        Ok(self.get_inner()?.store_identifier().to_string())
+    }
+
+    pub(crate) fn get_inner(&self) -> Result<&Client<ClientAuth>, JsValue> {
+        self.inner
+            .as_ref()
+            .ok_or_else(|| JsValue::from_str("Client not initialized"))
     }
 
     pub(crate) fn get_mut_inner(&mut self) -> Option<&mut Client<ClientAuth>> {
         self.inner.as_mut()
-    }
-
-    pub(crate) fn store(&self) -> Result<&Arc<dyn Store>, JsValue> {
-        self.inner
-            .as_ref()
-            .map(Client::store)
-            .ok_or_else(|| JsValue::from_str("Client not initialized"))
     }
 
     pub(crate) fn keystore(&self) -> Result<&Arc<ClientAuth>, JsValue> {
