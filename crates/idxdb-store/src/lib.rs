@@ -41,7 +41,6 @@ use miden_client::store::{
     Store,
     StoreError,
     TransactionFilter,
-    WebStore,
 };
 use miden_client::sync::{NoteTagRecord, StateSyncUpdate};
 use miden_client::transaction::{TransactionRecord, TransactionStoreUpdate};
@@ -147,6 +146,10 @@ impl IdxdbStore {
 
 #[async_trait::async_trait(?Send)]
 impl Store for IdxdbStore {
+    fn identifier(&self) -> &str {
+        &self.database_id
+    }
+
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     fn get_current_timestamp(&self) -> Option<u64> {
         Some(current_timestamp_u64())
@@ -423,17 +426,6 @@ impl Store for IdxdbStore {
 
     async fn list_setting_keys(&self) -> Result<Vec<String>, StoreError> {
         self.list_setting_keys().await
-    }
-}
-
-#[async_trait::async_trait(?Send)]
-impl WebStore for IdxdbStore {
-    async fn export_store(&self) -> Result<String, StoreError> {
-        self.export_store().await
-    }
-
-    async fn import_store(&self, data: String) -> Result<(), StoreError> {
-        self.import_store(data).await
     }
 }
 

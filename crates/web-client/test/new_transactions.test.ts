@@ -937,7 +937,7 @@ export const discardedTransaction = async (
       .withInputNotes(noteAndArgsArray)
       .build();
 
-    let preConsumeStore = await client.exportStore();
+    let preConsumeStore = await window.exportStore(window.storeName);
 
     // Sender retrieves the note
 
@@ -961,7 +961,7 @@ export const discardedTransaction = async (
       senderTxResult.executedTransaction().id().toHex()
     );
 
-    await client.forceImportStore(preConsumeStore, window.storeName);
+    await window.importStore(window.storeName, preConsumeStore);
 
     // Get the account state before the transaction is applied
     const accountStateBeforeTx = (await client.getAccount(
