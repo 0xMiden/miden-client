@@ -813,6 +813,80 @@ async fn prune_removes_orphaned_account_code() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Demonstrates a bug: after pruning, map entries that were only written at account
+/// creation (nonce 0) and never modified are lost from historical tables.
+///
+/// Scenario:
+///   - Account created with 5 map entries at nonce 0
+///   - Two deltas only touch key=1 (nonces 1 and 2)
+///   - Prune removes nonces 0 and 1 → historical loses keys 2–5
+///
+/// Any code path that rebuilds latest from historical (e.g. `undo_account_state`)
+/// would lose those 4 entries.
+#[tokio::test]
+async fn prune_loses_entries_only_written_at_creation() -> anyhow::Result<()> {
+    let store = create_test_store().await;
+    let map_slot_name = StorageSlotName::new("test::prune_bug::map").expect("valid slot name");
+
+    // Create account with 5 map entries at nonce 0.
+    // All 5 entries are written to historical_storage_map_entries with nonce=0.
+    let mut account = setup_account_with_map(&store, 5, &map_slot_name).await?;
+    let account_id = account.id();
+
+    // Nonce 0 → 1 → 2: only key=1 is modified each time.
+    // Keys 2–5 are never touched, so they only exist in historical at nonce 0.
+    apply_single_entry_update(&store, &mut account, &map_slot_name, 1).await?;
+    apply_single_entry_update(&store, &mut account, &map_slot_name, 1).await?;
+
+    // Prune: boundary=2, deletes nonces 0 and 1.
+    store
+        .interact_with_connection(move |conn| SqliteStore::prune_account_history(conn, account_id))
+        .await?;
+
+    let m = get_storage_metrics(&store).await;
+
+    // Latest is untouched — prune doesn't modify it.
+    assert_eq!(m.latest_storage_map_entries, 5);
+
+    // BUG: historical only retains the 1 entry from nonce 2 (key=1).
+    // Keys 2–5 were only recorded at nonce 0, which was pruned.
+    assert_eq!(
+        m.historical_storage_map_entries, 1,
+        "Keys 2–5 lost from historical: they were only written at nonce 0 which got pruned"
+    );
+
+    // Now undo nonce 2 to demonstrate the actual data loss.
+    // undo_account_state deletes nonce 2 from historical (the only remaining entry),
+    // then rebuilds latest from historical — which is now empty.
+    let nonce2_commitment = account.to_commitment();
+    let smt_forest = store.smt_forest.clone();
+    store
+        .interact_with_connection(move |conn| {
+            let tx = conn.transaction().into_store_error()?;
+            let mut smt_forest = smt_forest.write().expect("smt_forest write lock not poisoned");
+            SqliteStore::undo_account_state(
+                &tx,
+                &mut smt_forest,
+                &[(account_id, nonce2_commitment)],
+            )?;
+            tx.commit().into_store_error()?;
+            Ok(())
+        })
+        .await?;
+
+    let m = get_storage_metrics(&store).await;
+
+    // After undo, latest should have been restored to nonce 1 state (5 map entries).
+    // Instead, rebuild found nothing in historical → everything is gone.
+    assert_eq!(
+        m.latest_storage_map_entries, 5,
+        "DATA LOSS: expected 5 map entries after undo, got {}",
+        m.latest_storage_map_entries
+    );
+
+    Ok(())
+}
+
 // TEST HELPERS
 // ================================================================================================
 
