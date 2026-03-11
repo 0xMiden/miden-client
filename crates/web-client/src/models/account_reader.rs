@@ -1,10 +1,6 @@
 use alloc::vec::Vec;
 
-use miden_client::account::{
-    AccountReader as NativeAccountReader,
-    StorageMapKey,
-    StorageSlotName,
-};
+use miden_client::account::{AccountReader as NativeAccountReader, StorageMapKey, StorageSlotName};
 use wasm_bindgen::prelude::*;
 
 use super::account_header::AccountHeader;
@@ -30,7 +26,6 @@ impl From<NativeAccountReader> for AccountReader {
 
 #[wasm_bindgen]
 impl AccountReader {
-
     /// Returns the account ID.
     #[wasm_bindgen(js_name = "accountId")]
     pub fn account_id(&self) -> AccountId {

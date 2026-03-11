@@ -436,7 +436,7 @@ where
 }
 
 impl<AUTH> Client<AUTH> {
-    /// Returns the identifier of the underlying store (e.g. IndexedDB database name, SQLite
+    /// Returns the identifier of the underlying store (e.g. `IndexedDB` database name, `SQLite`
     /// file path).
     pub fn store_identifier(&self) -> &str {
         self.store.identifier()

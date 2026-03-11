@@ -114,9 +114,7 @@ impl WebClient {
     }
 
     pub(crate) fn get_inner(&self) -> Result<&Client<ClientAuth>, JsValue> {
-        self.inner
-            .as_ref()
-            .ok_or_else(|| JsValue::from_str("Client not initialized"))
+        self.inner.as_ref().ok_or_else(|| JsValue::from_str("Client not initialized"))
     }
 
     pub(crate) fn get_mut_inner(&mut self) -> Option<&mut Client<ClientAuth>> {
