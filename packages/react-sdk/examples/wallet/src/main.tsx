@@ -10,6 +10,8 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
       config={{
         rpcUrl: "testnet",
         prover: "testnet",
+        passkeyEncryption: true,
+        storeName: "wallet-example",
       }}
     >
       <App />
