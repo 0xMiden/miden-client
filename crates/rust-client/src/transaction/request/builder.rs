@@ -368,6 +368,100 @@ impl TransactionRequestBuilder {
             .build()
     }
 
+    // PSWAP BUILDERS
+    // --------------------------------------------------------------------------------------------
+
+    /// Consumes the builder and returns a [`TransactionRequest`] for creating a partial swap
+    /// (PSWAP) note.
+    ///
+    /// - `creator_account_id` is the account creating the swap.
+    /// - `offered_asset` is the asset being offered.
+    /// - `requested_asset` is the asset being requested.
+    /// - `note_type` determines the visibility of the created swap note.
+    /// - `note_attachment` is optional attachment data for the note.
+    /// - `rng` is the random number generator used to generate the serial number.
+    pub fn build_pswap_create(
+        self,
+        creator_account_id: AccountId,
+        offered_asset: Asset,
+        requested_asset: Asset,
+        note_type: NoteType,
+        note_attachment: NoteAttachment,
+        rng: &mut ClientRng,
+    ) -> Result<TransactionRequest, TransactionRequestError> {
+        let pswap_note = pswap::PswapNote::create(
+            creator_account_id,
+            offered_asset,
+            requested_asset,
+            note_type,
+            note_attachment,
+            rng,
+        )
+        .map_err(TransactionRequestError::NoteCreationError)?;
+
+        self.own_output_notes(vec![OutputNote::Full(pswap_note)]).build()
+    }
+
+    /// Consumes the builder and returns a [`TransactionRequest`] for consuming (filling) a
+    /// partial swap (PSWAP) note.
+    ///
+    /// - `pswap_note` is the swap note being consumed.
+    /// - `consumer_account_id` is the account consuming the swap.
+    /// - `fill_amount` is the amount of the requested asset being provided.
+    /// - `inflight_amount` is any additional in-flight amount being provided.
+    pub fn build_pswap_consume(
+        self,
+        pswap_note: &Note,
+        consumer_account_id: AccountId,
+        fill_amount: u64,
+        inflight_amount: u64,
+    ) -> Result<TransactionRequest, TransactionRequestError> {
+        let (p2id_note, remainder_note) = pswap::PswapNote::create_output_notes(
+            pswap_note,
+            consumer_account_id,
+            fill_amount,
+            inflight_amount,
+        )
+        .map_err(TransactionRequestError::NoteCreationError)?;
+
+        // Note args: [0, 0, inflight_amount, fill_amount]
+        let note_args = Word::from([
+            Felt::new(0),
+            Felt::new(0),
+            Felt::new(inflight_amount),
+            Felt::new(fill_amount),
+        ]);
+
+        // Register output notes as expected future notes (created by the script, not the account)
+        let p2id_details = NoteDetails::from(&p2id_note);
+        let p2id_tag = p2id_note.metadata().tag();
+        let p2id_recipient = p2id_note.recipient().clone();
+
+        let mut expected_future_notes = vec![(p2id_details, p2id_tag)];
+        let mut expected_recipients = vec![p2id_recipient];
+
+        if let Some(ref remainder) = remainder_note {
+            expected_future_notes.push((NoteDetails::from(remainder), remainder.metadata().tag()));
+            expected_recipients.push(remainder.recipient().clone());
+        }
+
+        self.input_notes(vec![(pswap_note.clone(), Some(note_args))])
+            .expected_future_notes(expected_future_notes)
+            .expected_output_recipients(expected_recipients)
+            .build()
+    }
+
+    /// Consumes the builder and returns a [`TransactionRequest`] for canceling a partial swap
+    /// (PSWAP) note.
+    ///
+    /// - `pswap_note` is the swap note to cancel. The caller must be the creator of the note.
+    pub fn build_pswap_cancel(
+        self,
+        pswap_note: Note,
+    ) -> Result<TransactionRequest, TransactionRequestError> {
+        self.input_notes(vec![(pswap_note, None)]).build()
+    }
+
     // FINALIZE BUILDER
     // --------------------------------------------------------------------------------------------
 

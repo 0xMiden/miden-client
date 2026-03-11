@@ -57,7 +57,7 @@ export async function getTransactions(dbId, filter) {
                 scriptMap.set(script.scriptRoot, script.txScript);
             }
         });
-        const processedTransactions = await Promise.all(transactionRecords.map((transactionRecord) => {
+        const processedTransactions = transactionRecords.map((transactionRecord) => {
             let txScriptBase64 = undefined;
             if (transactionRecord.scriptRoot) {
                 const txScript = scriptMap.get(transactionRecord.scriptRoot);
@@ -77,7 +77,7 @@ export async function getTransactions(dbId, filter) {
                 status: statusBase64,
             };
             return data;
-        }));
+        });
         return processedTransactions;
     }
     catch (err) {

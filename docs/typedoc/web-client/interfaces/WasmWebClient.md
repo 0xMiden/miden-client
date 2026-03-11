@@ -104,7 +104,7 @@ Creates a new `WebClient` instance with the specified configuration.
 
 ##### seed?
 
-`Uint8Array`
+`Uint8Array`\<`ArrayBufferLike`\>
 
 ##### store\_name?
 
@@ -145,7 +145,7 @@ Creates a new `WebClient` instance with external keystore callbacks.
 
 ##### seed?
 
-`Uint8Array`
+`Uint8Array`\<`ArrayBufferLike`\>
 
 ##### store\_name?
 
@@ -190,15 +190,15 @@ applications as it uses a mock chain that simulates the behavior of a real node.
 
 ##### seed?
 
-`Uint8Array`
+`Uint8Array`\<`ArrayBufferLike`\>
 
 ##### serialized\_mock\_chain?
 
-`Uint8Array`
+`Uint8Array`\<`ArrayBufferLike`\>
 
 ##### serialized\_mock\_note\_transport\_node?
 
-`Uint8Array`
+`Uint8Array`\<`ArrayBufferLike`\>
 
 #### Returns
 
@@ -780,6 +780,86 @@ Returns all the existing setting keys from the store.
 
 ***
 
+### newPswapCancelTransactionRequest()
+
+> **newPswapCancelTransactionRequest**(`pswap_note`): [`TransactionRequest`](../classes/TransactionRequest.md)
+
+#### Parameters
+
+##### pswap\_note
+
+[`Note`](../classes/Note.md)
+
+#### Returns
+
+[`TransactionRequest`](../classes/TransactionRequest.md)
+
+***
+
+### newPswapConsumeTransactionRequest()
+
+> **newPswapConsumeTransactionRequest**(`pswap_note`, `consumer_account_id`, `fill_amount`, `inflight_amount`): [`TransactionRequest`](../classes/TransactionRequest.md)
+
+#### Parameters
+
+##### pswap\_note
+
+[`Note`](../classes/Note.md)
+
+##### consumer\_account\_id
+
+[`AccountId`](../classes/AccountId.md)
+
+##### fill\_amount
+
+`bigint`
+
+##### inflight\_amount
+
+`bigint`
+
+#### Returns
+
+[`TransactionRequest`](../classes/TransactionRequest.md)
+
+***
+
+### newPswapCreateTransactionRequest()
+
+> **newPswapCreateTransactionRequest**(`creator_account_id`, `offered_asset_faucet_id`, `offered_asset_amount`, `requested_asset_faucet_id`, `requested_asset_amount`, `note_type`): [`TransactionRequest`](../classes/TransactionRequest.md)
+
+#### Parameters
+
+##### creator\_account\_id
+
+[`AccountId`](../classes/AccountId.md)
+
+##### offered\_asset\_faucet\_id
+
+[`AccountId`](../classes/AccountId.md)
+
+##### offered\_asset\_amount
+
+`bigint`
+
+##### requested\_asset\_faucet\_id
+
+[`AccountId`](../classes/AccountId.md)
+
+##### requested\_asset\_amount
+
+`bigint`
+
+##### note\_type
+
+[`NoteType`](../enumerations/NoteType.md)
+
+#### Returns
+
+[`TransactionRequest`](../classes/TransactionRequest.md)
+
+***
+
 ### newSendTransactionRequest()
 
 > **newSendTransactionRequest**(`sender_account_id`, `target_account_id`, `faucet_id`, `note_type`, `amount`, `recall_height?`, `timelock_height?`): [`TransactionRequest`](../classes/TransactionRequest.md)
@@ -880,7 +960,7 @@ Returns all the existing setting keys from the store.
 
 ##### init\_seed?
 
-`Uint8Array`
+`Uint8Array`\<`ArrayBufferLike`\>
 
 #### Returns
 

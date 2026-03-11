@@ -9,7 +9,7 @@ export async function getOutputNotes(dbId, states) {
                 .where("stateDiscriminant")
                 .anyOf(states)
                 .toArray();
-        return await processOutputNotes(notes);
+        return processOutputNotes(notes);
     }
     catch (err) {
         logWebStoreError(err, "Failed to get output notes");
@@ -64,7 +64,7 @@ export async function getOutputNotesFromNullifiers(dbId, nullifiers) {
             .where("nullifier")
             .anyOf(nullifiers)
             .toArray();
-        return await processOutputNotes(notes);
+        return processOutputNotes(notes);
     }
     catch (err) {
         logWebStoreError(err, "Failed to get output notes from nullifiers");
@@ -74,7 +74,7 @@ export async function getOutputNotesFromIds(dbId, noteIds) {
     try {
         const db = getDatabase(dbId);
         let notes = await db.outputNotes.where("noteId").anyOf(noteIds).toArray();
-        return await processOutputNotes(notes);
+        return processOutputNotes(notes);
     }
     catch (err) {
         logWebStoreError(err, "Failed to get output notes from IDs");
@@ -184,8 +184,8 @@ async function processInputNotes(dbId, notes) {
         };
     }));
 }
-async function processOutputNotes(notes) {
-    return await Promise.all(notes.map((note) => {
+function processOutputNotes(notes) {
+    return notes.map((note) => {
         const assetsBase64 = uint8ArrayToBase64(note.assets);
         const metadataBase64 = uint8ArrayToBase64(note.metadata);
         const stateBase64 = uint8ArrayToBase64(note.state);
@@ -196,7 +196,7 @@ async function processOutputNotes(notes) {
             expectedHeight: note.expectedHeight,
             state: stateBase64,
         };
-    }));
+    });
 }
 export async function upsertNoteScript(dbId, scriptRoot, serializedNoteScript) {
     const db = getDatabase(dbId);

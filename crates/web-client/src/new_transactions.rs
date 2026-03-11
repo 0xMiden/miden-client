@@ -1,6 +1,6 @@
 use miden_client::ClientError;
 use miden_client::asset::FungibleAsset;
-use miden_client::note::{BlockNumber, Note as NativeNote};
+use miden_client::note::{BlockNumber, Note as NativeNote, NoteAttachment as NativeNoteAttachment};
 use miden_client::transaction::{
     PaymentNoteDescription,
     ProvenTransaction as NativeProvenTransaction,
@@ -361,5 +361,91 @@ impl WebClient {
         };
 
         Ok(swap_transaction_request.into())
+    }
+
+    #[wasm_bindgen(js_name = "newPswapCreateTransactionRequest")]
+    pub fn new_pswap_create_transaction_request(
+        &mut self,
+        creator_account_id: &AccountId,
+        offered_asset_faucet_id: &AccountId,
+        offered_asset_amount: u64,
+        requested_asset_faucet_id: &AccountId,
+        requested_asset_amount: u64,
+        note_type: NoteType,
+    ) -> Result<TransactionRequest, JsValue> {
+        let offered_asset =
+            FungibleAsset::new(offered_asset_faucet_id.into(), offered_asset_amount)
+                .map_err(|err| {
+                    js_error_with_context(err, "failed to create offered fungible asset")
+                })?
+                .into();
+
+        let requested_asset =
+            FungibleAsset::new(requested_asset_faucet_id.into(), requested_asset_amount)
+                .map_err(|err| {
+                    js_error_with_context(err, "failed to create requested fungible asset")
+                })?
+                .into();
+
+        let pswap_create_request = {
+            let client = self.get_mut_inner().ok_or_else(|| {
+                JsValue::from_str("Client not initialized while generating transaction request")
+            })?;
+
+            NativeTransactionRequestBuilder::new()
+                .build_pswap_create(
+                    creator_account_id.into(),
+                    offered_asset,
+                    requested_asset,
+                    note_type.into(),
+                    NativeNoteAttachment::default(),
+                    client.rng(),
+                )
+                .map_err(|err| {
+                    js_error_with_context(err, "failed to create pswap create transaction request")
+                })?
+        };
+
+        Ok(pswap_create_request.into())
+    }
+
+    #[wasm_bindgen(js_name = "newPswapConsumeTransactionRequest")]
+    pub fn new_pswap_consume_transaction_request(
+        &mut self,
+        pswap_note: &Note,
+        consumer_account_id: &AccountId,
+        fill_amount: u64,
+        inflight_amount: u64,
+    ) -> Result<TransactionRequest, JsValue> {
+        let native_note = NativeNote::from(pswap_note);
+
+        let pswap_consume_request = NativeTransactionRequestBuilder::new()
+            .build_pswap_consume(
+                &native_note,
+                consumer_account_id.into(),
+                fill_amount,
+                inflight_amount,
+            )
+            .map_err(|err| {
+                js_error_with_context(err, "failed to create pswap consume transaction request")
+            })?;
+
+        Ok(pswap_consume_request.into())
+    }
+
+    #[wasm_bindgen(js_name = "newPswapCancelTransactionRequest")]
+    pub fn new_pswap_cancel_transaction_request(
+        &mut self,
+        pswap_note: &Note,
+    ) -> Result<TransactionRequest, JsValue> {
+        let native_note = NativeNote::from(pswap_note);
+
+        let pswap_cancel_request = NativeTransactionRequestBuilder::new()
+            .build_pswap_cancel(native_note)
+            .map_err(|err| {
+                js_error_with_context(err, "failed to create pswap cancel transaction request")
+            })?;
+
+        Ok(pswap_cancel_request.into())
     }
 }

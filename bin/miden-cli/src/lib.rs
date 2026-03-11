@@ -1,3 +1,5 @@
+mod commands;
+
 use std::env;
 use std::ffi::OsString;
 use std::ops::{Deref, DerefMut};
@@ -14,22 +16,20 @@ use miden_client::note_transport::grpc::GrpcNoteTransportClient;
 use miden_client::store::{NoteFilter as ClientNoteFilter, OutputNoteRecord};
 use miden_client_sqlite_store::ClientBuilderSqliteExt;
 
-mod commands;
-use commands::account::AccountCmd;
-use commands::clear_config::ClearConfigCmd;
-use commands::exec::ExecCmd;
-use commands::export::ExportCmd;
-use commands::import::ImportCmd;
-use commands::init::InitCmd;
-use commands::new_account::{NewAccountCmd, NewWalletCmd};
-use commands::new_transactions::{ConsumeNotesCmd, MintCmd, SendCmd, SwapCmd};
-use commands::notes::NotesCmd;
-use commands::sync::SyncCmd;
-use commands::tags::TagsCmd;
-use commands::transactions::TransactionCmd;
-
+use self::commands::account::AccountCmd;
+use self::commands::address::AddressCmd;
+use self::commands::clear_config::ClearConfigCmd;
+use self::commands::exec::ExecCmd;
+use self::commands::export::ExportCmd;
+use self::commands::import::ImportCmd;
+use self::commands::init::InitCmd;
+use self::commands::new_account::{NewAccountCmd, NewWalletCmd};
+use self::commands::new_transactions::{ConsumeNotesCmd, MintCmd, PswapCmd, SendCmd, SwapCmd};
+use self::commands::notes::NotesCmd;
+use self::commands::sync::SyncCmd;
+use self::commands::tags::TagsCmd;
+use self::commands::transactions::TransactionCmd;
 use self::utils::config_file_exists;
-use crate::commands::address::AddressCmd;
 
 pub type CliKeyStore = FilesystemKeyStore;
 
@@ -396,6 +396,7 @@ pub enum Command {
     Transaction(TransactionCmd),
     Mint(MintCmd),
     Send(SendCmd),
+    Pswap(PswapCmd),
     Swap(SwapCmd),
     ConsumeNotes(ConsumeNotesCmd),
     Exec(ExecCmd),
@@ -451,7 +452,7 @@ impl Cli {
                 Box::pin(new_account.execute(client, keystore)).await
             },
             Command::Import(import) => import.execute(client, keystore).await,
-            Command::Init(_) | Command::ClearConfig(_) => Ok(()), // Already handled earlier
+            Command::Init(_) | Command::ClearConfig(_) => Ok(()),
             Command::Info => info::print_client_info(&client).await,
             Command::Notes(notes) => Box::pin(notes.execute(client)).await,
             Command::Sync(sync) => sync.execute(client).await,
@@ -463,6 +464,7 @@ impl Cli {
             Command::Mint(mint) => Box::pin(mint.execute(client)).await,
             Command::Send(send) => Box::pin(send.execute(client)).await,
             Command::Swap(swap) => Box::pin(swap.execute(client)).await,
+            Command::Pswap(pswap) => Box::pin(pswap.execute(client)).await,
             Command::ConsumeNotes(consume_notes) => Box::pin(consume_notes.execute(client)).await,
         }
     }

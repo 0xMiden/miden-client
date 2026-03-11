@@ -1,0 +1,22 @@
+[package]
+edition                = "2024"
+name                   = "pswap"
+rust-version.workspace = true
+version                = "0.1.0"
+
+[dependencies]
+miden-core         = { default-features = false, version = "0.20" }
+miden-crypto       = { default-features = false, version = "0.19" }
+miden-mast-package = { default-features = false, version = "0.20" }
+miden-protocol     = { default-features = false, version = "0.13" }
+miden-standards    = { default-features = false, version = "0.13" }
+
+[dev-dependencies]
+anyhow         = "1"
+miden-protocol = { features = ["testing"], version = "0.13" }
+miden-testing  = "0.13.3"
+tokio          = { features = ["fs", "macros", "net", "rt-multi-thread"], version = "1.40" }
+
+[features]
+default = []
+std     = ["miden-protocol/std", "miden-standards/std"]

@@ -14,7 +14,7 @@ export async function getOutputNotes(dbId: string, states: Uint8Array) {
             .anyOf(states)
             .toArray();
 
-    return await processOutputNotes(notes);
+    return processOutputNotes(notes);
   } catch (err) {
     logWebStoreError(err, "Failed to get output notes");
   }
@@ -76,7 +76,7 @@ export async function getOutputNotesFromNullifiers(
       .where("nullifier")
       .anyOf(nullifiers)
       .toArray();
-    return await processOutputNotes(notes);
+    return processOutputNotes(notes);
   } catch (err) {
     logWebStoreError(err, "Failed to get output notes from nullifiers");
   }
@@ -86,7 +86,7 @@ export async function getOutputNotesFromIds(dbId: string, noteIds: string[]) {
   try {
     const db = getDatabase(dbId);
     let notes = await db.outputNotes.where("noteId").anyOf(noteIds).toArray();
-    return await processOutputNotes(notes);
+    return processOutputNotes(notes);
   } catch (err) {
     logWebStoreError(err, "Failed to get output notes from IDs");
   }
@@ -232,24 +232,22 @@ async function processInputNotes(dbId: string, notes: IInputNote[]) {
   );
 }
 
-async function processOutputNotes(notes: IOutputNote[]) {
-  return await Promise.all(
-    notes.map((note) => {
-      const assetsBase64 = uint8ArrayToBase64(note.assets);
+function processOutputNotes(notes: IOutputNote[]) {
+  return notes.map((note) => {
+    const assetsBase64 = uint8ArrayToBase64(note.assets);
 
-      const metadataBase64 = uint8ArrayToBase64(note.metadata);
+    const metadataBase64 = uint8ArrayToBase64(note.metadata);
 
-      const stateBase64 = uint8ArrayToBase64(note.state);
+    const stateBase64 = uint8ArrayToBase64(note.state);
 
-      return {
-        assets: assetsBase64,
-        recipientDigest: note.recipientDigest,
-        metadata: metadataBase64,
-        expectedHeight: note.expectedHeight,
-        state: stateBase64,
-      };
-    })
-  );
+    return {
+      assets: assetsBase64,
+      recipientDigest: note.recipientDigest,
+      metadata: metadataBase64,
+      expectedHeight: note.expectedHeight,
+      state: stateBase64,
+    };
+  });
 }
 
 export async function upsertNoteScript(

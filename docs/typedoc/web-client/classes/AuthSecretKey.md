@@ -136,7 +136,7 @@ Returns the ECDSA k256 Keccak secret key bytes encoded as felts.
 
 ##### seed?
 
-`Uint8Array`
+`Uint8Array`\<`ArrayBufferLike`\>
 
 #### Returns
 
@@ -152,7 +152,7 @@ Returns the ECDSA k256 Keccak secret key bytes encoded as felts.
 
 ##### seed?
 
-`Uint8Array`
+`Uint8Array`\<`ArrayBufferLike`\>
 
 #### Returns
 

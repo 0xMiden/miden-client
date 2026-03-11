@@ -10,6 +10,7 @@ miden-client              = { features = ["std", "testing"], workspace = true }
 miden-client-sqlite-store = { workspace = true }
 miden-protocol            = { default-features = false, features = ["testing"], workspace = true }
 miden-standards           = { features = ["testing"], workspace = true }
+pswap                     = { workspace = true }
 miden-testing             = { default-features = false, workspace = true }
 rand                      = { workspace = true }
 tokio                     = { workspace = true }

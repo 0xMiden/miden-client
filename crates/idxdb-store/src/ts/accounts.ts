@@ -41,29 +41,27 @@ export async function getAllAccountHeaders(dbId: string) {
 
     const latestRecords = Array.from(latestRecordsMap.values());
 
-    const resultObject = await Promise.all(
-      latestRecords.map((record) => {
-        let accountSeedBase64: string | undefined = undefined;
-        if (record.accountSeed) {
-          const seedAsBytes = new Uint8Array(record.accountSeed);
-          if (seedAsBytes.length > 0) {
-            accountSeedBase64 = uint8ArrayToBase64(seedAsBytes);
-          }
+    const resultObject = latestRecords.map((record) => {
+      let accountSeedBase64: string | undefined = undefined;
+      if (record.accountSeed) {
+        const seedAsBytes = new Uint8Array(record.accountSeed);
+        if (seedAsBytes.length > 0) {
+          accountSeedBase64 = uint8ArrayToBase64(seedAsBytes);
         }
+      }
 
-        return {
-          id: record.id,
-          nonce: record.nonce,
-          vaultRoot: record.vaultRoot,
-          storageRoot: record.storageRoot || "",
-          codeRoot: record.codeRoot || "",
-          accountSeed: accountSeedBase64,
-          locked: record.locked,
-          committed: record.committed,
-          accountCommitment: record.accountCommitment || "",
-        };
-      })
-    );
+      return {
+        id: record.id,
+        nonce: record.nonce,
+        vaultRoot: record.vaultRoot,
+        storageRoot: record.storageRoot || "",
+        codeRoot: record.codeRoot || "",
+        accountSeed: accountSeedBase64,
+        locked: record.locked,
+        committed: record.committed,
+        accountCommitment: record.accountCommitment || "",
+      };
+    });
 
     return resultObject;
   } catch (error) {

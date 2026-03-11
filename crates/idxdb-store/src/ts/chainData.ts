@@ -54,25 +54,23 @@ export async function getBlockHeaders(dbId: string, blockNumbers: number[]) {
     const db = getDatabase(dbId);
     const results = await db.blockHeaders.bulkGet(blockNumbers);
 
-    const processedResults = await Promise.all(
-      results.map((result) => {
-        if (result === undefined) {
-          return null;
-        } else {
-          const headerBase64 = uint8ArrayToBase64(result.header);
-          const partialBlockchainPeaksBase64 = uint8ArrayToBase64(
-            result.partialBlockchainPeaks
-          );
+    const processedResults = results.map((result) => {
+      if (result === undefined) {
+        return null;
+      } else {
+        const headerBase64 = uint8ArrayToBase64(result.header);
+        const partialBlockchainPeaksBase64 = uint8ArrayToBase64(
+          result.partialBlockchainPeaks
+        );
 
-          return {
-            blockNum: result.blockNum,
-            header: headerBase64,
-            partialBlockchainPeaks: partialBlockchainPeaksBase64,
-            hasClientNotes: result.hasClientNotes === "true",
-          };
-        }
-      })
-    );
+        return {
+          blockNum: result.blockNum,
+          header: headerBase64,
+          partialBlockchainPeaks: partialBlockchainPeaksBase64,
+          hasClientNotes: result.hasClientNotes === "true",
+        };
+      }
+    });
 
     return processedResults;
   } catch (err) {
@@ -88,22 +86,20 @@ export async function getTrackedBlockHeaders(dbId: string) {
       .equals("true")
       .toArray();
 
-    const processedRecords = await Promise.all(
-      allMatchingRecords.map((record) => {
-        const headerBase64 = uint8ArrayToBase64(record.header);
+    const processedRecords = allMatchingRecords.map((record) => {
+      const headerBase64 = uint8ArrayToBase64(record.header);
 
-        const partialBlockchainPeaksBase64 = uint8ArrayToBase64(
-          record.partialBlockchainPeaks
-        );
+      const partialBlockchainPeaksBase64 = uint8ArrayToBase64(
+        record.partialBlockchainPeaks
+      );
 
-        return {
-          blockNum: record.blockNum,
-          header: headerBase64,
-          partialBlockchainPeaks: partialBlockchainPeaksBase64,
-          hasClientNotes: record.hasClientNotes === "true",
-        };
-      })
-    );
+      return {
+        blockNum: record.blockNum,
+        header: headerBase64,
+        partialBlockchainPeaks: partialBlockchainPeaksBase64,
+        hasClientNotes: record.hasClientNotes === "true",
+      };
+    });
 
     return processedRecords;
   } catch (err) {
