@@ -147,7 +147,7 @@ Sync again to confirm the transaction, then check your account balance:
 ```rust
 client.sync_state().await?;
 
-let (account, _) = client.get_account(new_account.id()).await?;
+let account = client.account_reader(new_account.id()).await?;
 println!("Account vault: {:?}", account.vault());
 ```
 
