@@ -14,7 +14,10 @@ import { runExclusiveDirect } from "../utils/runExclusive";
 import { MidenError } from "../utils/errors";
 import { proveWithFallback } from "../utils/prover";
 import { useMidenStore } from "../store/MidenStore";
-import { waitForTransactionCommit, extractFullNotes } from "../utils/transactions";
+import {
+  waitForTransactionCommit,
+  extractFullNotes,
+} from "../utils/transactions";
 
 export interface UseTransactionResult {
   /** Execute a transaction request end-to-end */
