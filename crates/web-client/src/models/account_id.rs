@@ -103,7 +103,7 @@ impl AccountId {
     /// Builds an account ID from its prefix and suffix field elements.
     ///
     /// This is useful when the account ID components are stored separately (e.g., in storage
-    /// maps) and need to be recombined into an AccountId.
+    /// maps) and need to be recombined into an `AccountId`.
     ///
     /// Returns an error if the provided felts do not form a valid account ID.
     #[wasm_bindgen(js_name = "fromPrefixSuffix")]
