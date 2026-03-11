@@ -40,22 +40,24 @@ CREATE TABLE latest_account_headers (
     FOREIGN KEY (code_commitment) REFERENCES account_code(commitment)
 );
 
--- Historical account headers: all state transitions (one row per nonce).
+-- Historical account headers: stores old headers that were replaced by newer states.
+-- Each row represents a previous account state that was superseded at replaced_at_nonce.
 CREATE TABLE historical_account_headers (
     id UNSIGNED BIG INT NOT NULL,            -- account ID
-    account_commitment TEXT NOT NULL UNIQUE,  -- account state commitment
-    code_commitment TEXT NOT NULL,            -- commitment to the account code
-    storage_commitment TEXT NOT NULL,         -- commitment to the account storage
-    vault_root TEXT NOT NULL,                 -- root of the account vault Merkle tree
-    nonce BIGINT NOT NULL,                   -- account nonce
+    account_commitment TEXT NOT NULL UNIQUE,  -- commitment of this old state
+    code_commitment TEXT NOT NULL,            -- commitment to the old account code
+    storage_commitment TEXT NOT NULL,         -- commitment to the old account storage
+    vault_root TEXT NOT NULL,                 -- root of the old account vault Merkle tree
+    nonce BIGINT NOT NULL,                   -- nonce of this old state
     account_seed BLOB NULL,                  -- seed used to generate the ID; NULL for non-new accounts
-    locked BOOLEAN NOT NULL,                 -- whether the account is locked
+    locked BOOLEAN NOT NULL,                 -- whether the account was locked
+    replaced_at_nonce BIGINT NOT NULL,       -- nonce of the new state that replaced this one
     PRIMARY KEY (account_commitment),
     FOREIGN KEY (code_commitment) REFERENCES account_code(commitment),
 
     CONSTRAINT check_seed_nonzero CHECK (NOT (nonce = 0 AND account_seed IS NULL))
 );
-CREATE INDEX idx_historical_account_headers_id_nonce ON historical_account_headers(id, nonce DESC);
+CREATE INDEX idx_historical_account_headers_id_replaced_at ON historical_account_headers(id, replaced_at_nonce DESC);
 
 -- ── Account storage (latest + historical) ────────────────────────────────
 
@@ -67,13 +69,15 @@ CREATE TABLE latest_account_storage (
     PRIMARY KEY (account_id, slot_name)
 ) WITHOUT ROWID;
 
+-- Historical account storage: stores old slot values that were replaced.
+-- NULL old_slot_value means the slot didn't exist before (was created at replaced_at_nonce).
 CREATE TABLE historical_account_storage (
-    account_id TEXT NOT NULL,     -- account ID
-    nonce BIGINT NOT NULL,        -- nonce at which this slot was written
-    slot_name TEXT NOT NULL,      -- name of the storage slot
-    slot_value TEXT NULL,         -- top-level value of the slot (for maps, contains the root)
-    slot_type INTEGER NOT NULL,   -- type of the slot (0 = Value, 1 = Map)
-    PRIMARY KEY (account_id, nonce, slot_name)
+    account_id TEXT NOT NULL,           -- account ID
+    replaced_at_nonce BIGINT NOT NULL,  -- nonce at which this old value was replaced
+    slot_name TEXT NOT NULL,            -- name of the storage slot
+    old_slot_value TEXT NULL,           -- old top-level value (NULL = slot was new)
+    slot_type INTEGER NOT NULL,         -- type of the slot (0 = Value, 1 = Map)
+    PRIMARY KEY (account_id, replaced_at_nonce, slot_name)
 ) WITHOUT ROWID;
 
 -- ── Storage map entries (latest + historical) ────────────────────────────
@@ -86,13 +90,15 @@ CREATE TABLE latest_storage_map_entries (
     PRIMARY KEY (account_id, slot_name, key)
 ) WITHOUT ROWID;
 
+-- Historical storage map entries: stores old map entry values that were replaced.
+-- NULL old_value means the entry didn't exist before (was created at replaced_at_nonce).
 CREATE TABLE historical_storage_map_entries (
-    account_id TEXT NOT NULL,   -- account ID
-    nonce BIGINT NOT NULL,      -- nonce at which this entry was written
-    slot_name TEXT NOT NULL,    -- name of the storage slot this entry belongs to
-    key TEXT NOT NULL,          -- map entry key
-    value TEXT NULL,            -- map entry value; NULL marks a removed entry (tombstone)
-    PRIMARY KEY (account_id, nonce, slot_name, key)
+    account_id TEXT NOT NULL,           -- account ID
+    replaced_at_nonce BIGINT NOT NULL,  -- nonce at which this old entry was replaced
+    slot_name TEXT NOT NULL,            -- name of the storage slot this entry belongs to
+    key TEXT NOT NULL,                  -- map entry key
+    old_value TEXT NULL,                -- old map entry value (NULL = entry was new)
+    PRIMARY KEY (account_id, replaced_at_nonce, slot_name, key)
 ) WITHOUT ROWID;
 
 -- ── Account assets (latest + historical) ─────────────────────────────────
@@ -105,13 +111,15 @@ CREATE TABLE latest_account_assets (
     PRIMARY KEY (account_id, vault_key)
 ) WITHOUT ROWID;
 
+-- Historical account assets: stores old assets that were replaced.
+-- NULL old_asset means the asset didn't exist before (was created at replaced_at_nonce).
 CREATE TABLE historical_account_assets (
-    account_id TEXT NOT NULL,        -- account ID
-    nonce BIGINT NOT NULL,           -- nonce at which this asset was written
-    vault_key TEXT NOT NULL,         -- asset's vault key
-    faucet_id_prefix TEXT NOT NULL,  -- prefix of the faucet ID, used to filter by faucet
-    asset TEXT NULL,                 -- serialized asset value; NULL marks a removed asset (tombstone)
-    PRIMARY KEY (account_id, nonce, vault_key)
+    account_id TEXT NOT NULL,           -- account ID
+    replaced_at_nonce BIGINT NOT NULL,  -- nonce at which this old asset was replaced
+    vault_key TEXT NOT NULL,            -- asset's vault key
+    faucet_id_prefix TEXT NOT NULL,     -- prefix of the faucet ID, used to filter by faucet
+    old_asset TEXT NULL,                -- old serialized asset value (NULL = asset was new)
+    PRIMARY KEY (account_id, replaced_at_nonce, vault_key)
 ) WITHOUT ROWID;
 
 -- ── Foreign account code ─────────────────────────────────────────────────

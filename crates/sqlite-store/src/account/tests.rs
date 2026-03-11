@@ -781,7 +781,6 @@ async fn apply_single_entry_update(
 // ================================================================================================
 
 /// Verifies that `undo_account_state` correctly reverts the latest tables to the previous state.
-/// Exercises `undo_account_state` + `rebuild_latest_for_account`.
 ///
 /// The delta includes both storage and vault changes so that the vault root changes between
 /// nonce 0 and nonce 1. This is required because `undo_account_state` pops SMT roots from the
@@ -841,9 +840,9 @@ async fn undo_account_state_restores_previous_latest() -> anyhow::Result<()> {
         })
         .await?;
 
-    // Pre-undo: 2 historical headers (nonce 0 + nonce 1), 1 latest
+    // Pre-undo: 1 historical header (old nonce-0 header, replaced_at_nonce=1), 1 latest
     let m = get_storage_metrics(&store).await;
-    assert_eq!(m.historical_account_headers, 2);
+    assert_eq!(m.historical_account_headers, 1);
     assert_eq!(m.latest_account_headers, 1);
     assert_eq!(m.latest_account_assets, 1);
 
@@ -863,12 +862,12 @@ async fn undo_account_state_restores_previous_latest() -> anyhow::Result<()> {
         })
         .await?;
 
-    // After undo: only nonce-0 state remains in historical, latest rebuilt from it
+    // After undo: historical entries consumed by undo (deleted), latest restored to nonce 0
     let m = get_storage_metrics(&store).await;
-    assert_eq!(m.historical_account_headers, 1);
+    assert_eq!(m.historical_account_headers, 0);
     assert_eq!(m.latest_account_headers, 1);
     assert_eq!(m.latest_storage_map_entries, 5);
-    assert_eq!(m.historical_storage_map_entries, 5);
+    assert_eq!(m.historical_storage_map_entries, 0);
     assert_eq!(m.latest_account_assets, 0, "Vault should be empty after undo to nonce 0");
 
     // Latest header should reflect nonce 0 with the initial commitment
@@ -883,8 +882,7 @@ async fn undo_account_state_restores_previous_latest() -> anyhow::Result<()> {
 }
 
 /// Verifies that undoing the only state (nonce 0) of an account removes it entirely from both
-/// latest and historical tables. This exercises the `rebuild_latest_for_account` early-return
-/// path when `MAX(nonce)` is None.
+/// latest and historical tables.
 ///
 /// The account is created with assets so the vault root is non-trivial — the SMT forest
 /// only ref-counts non-empty roots, so `pop_roots` after undo would underflow on an empty vault.
@@ -924,10 +922,10 @@ async fn undo_account_state_deletes_account_entirely() -> anyhow::Result<()> {
     let commitment = account.to_commitment();
     store.insert_account(&account, Address::new(account_id)).await?;
 
-    // Pre-undo: 1 latest header, 1 historical header, storage/map/asset entries exist
+    // Pre-undo: 1 latest header, 0 historical headers (initial insert has no old state)
     let m = get_storage_metrics(&store).await;
     assert_eq!(m.latest_account_headers, 1);
-    assert_eq!(m.historical_account_headers, 1);
+    assert_eq!(m.historical_account_headers, 0);
     assert!(m.latest_storage_map_entries > 0);
     assert_eq!(m.latest_account_assets, 1);
 
@@ -1015,9 +1013,9 @@ async fn lock_account_affects_latest_and_historical() -> anyhow::Result<()> {
         })
         .await?;
 
-    // Pre-lock: 2 historical headers (nonce 0 + nonce 1), both unlocked
+    // Pre-lock: 1 historical header (old nonce-0 header, replaced_at_nonce=1)
     let m = get_storage_metrics(&store).await;
-    assert_eq!(m.historical_account_headers, 2);
+    assert_eq!(m.historical_account_headers, 1);
 
     // Lock the account with a fake mismatched digest (not matching any historical commitment)
     let fake_digest = [Felt::new(999), Felt::new(888), Felt::new(777), Felt::new(666)].into();
@@ -1053,16 +1051,14 @@ async fn lock_account_affects_latest_and_historical() -> anyhow::Result<()> {
             Ok(rows)
         })
         .await?;
-    assert_eq!(historical_locked.len(), 2, "Should have 2 historical entries");
+    assert_eq!(historical_locked.len(), 1, "Should have 1 historical entry (old nonce-0 state)");
     assert!(historical_locked[0], "Historical nonce-0 should be locked");
-    assert!(historical_locked[1], "Historical nonce-1 should be locked");
 
     Ok(())
 }
 
 /// Verifies that undoing a delta after `update_account_state` does not resurrect entries that
-/// were removed by the update. This exercises the tombstone-writing logic in
-/// `update_account_state`.
+/// were removed by the update. This exercises the archival logic in `update_account_state`.
 ///
 /// Flow:
 /// 1. Insert account with map entries {A, B, C} and an asset X at nonce 0
@@ -1294,16 +1290,15 @@ async fn get_account_header_by_commitment_returns_historical() -> anyhow::Result
     assert_eq!(header.nonce().as_int(), 0);
     assert_eq!(header.to_commitment(), initial_commitment);
 
-    // Look up the post-delta commitment — should find the nonce-1 state in historical
+    // Look up the post-delta commitment — should NOT be in historical (it's the current
+    // latest state, not an old one that was replaced)
     let lookup = post_delta_commitment;
-    let header = store
+    let result = store
         .interact_with_connection(move |conn| {
             SqliteStore::get_account_header_by_commitment(conn, lookup)
         })
-        .await?
-        .expect("Post-delta commitment should exist in historical");
-    assert_eq!(header.nonce().as_int(), 1);
-    assert_eq!(header.to_commitment(), post_delta_commitment);
+        .await?;
+    assert!(result.is_none(), "Post-delta commitment should not be in historical");
 
     Ok(())
 }
