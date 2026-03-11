@@ -71,7 +71,7 @@ function resolveProverTarget(
 ): TransactionProver | null {
   if (typeof target === "string") {
     const normalized = target.trim().toLowerCase();
-    if (normalized === "local") {
+    if (normalized === "local" || normalized === "localhost") {
       return TransactionProver.newLocalProver();
     }
     if (normalized === "devnet" || normalized === "testnet") {

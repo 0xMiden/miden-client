@@ -64,6 +64,7 @@ export type RpcUrlConfig =
 /** Single prover target — a well-known name, custom URL, or object with URL + timeout. */
 export type ProverTarget =
   | "local"
+  | "localhost"
   | "devnet"
   | "testnet"
   | string
