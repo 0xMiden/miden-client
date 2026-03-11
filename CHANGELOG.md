@@ -47,6 +47,7 @@
 ### Fixes
 
 * [FIX][rust] Replaced `.expect()` panics on RPC response data with proper error propagation ([#1833](https://github.com/0xMiden/miden-client/pull/1833)).
+* [FIX][rust] Added verification of MMR responses during state sync: validated the returned block range matches the requested range and checked that post-delta MMR peaks match the block header's chain commitment ([#1887](https://github.com/0xMiden/miden-client/pull/1887)).
 
 ## 0.13.2 (2026-02-26)
 

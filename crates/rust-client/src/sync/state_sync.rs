@@ -327,12 +327,9 @@ impl StateSync {
         if let Some((range_from, range_to)) = chain_mmr_info.block_range
             && (range_from != current_block_num || range_to != Some(target_block))
         {
-            return Err(ClientError::StateSyncBlockRangeMismatch {
-                expected_from: current_block_num,
-                expected_to: target_block,
-                actual_from: range_from,
-                actual_to: range_to,
-            });
+            return Err(ClientError::ChainValidationError(format!(
+                "block range mismatch: expected ({current_block_num}..{target_block}), got ({range_from}..{range_to:?})"
+            )));
         }
 
         let mmr_delta = chain_mmr_info.mmr_delta;
@@ -634,10 +631,10 @@ fn apply_mmr_changes(
     // which is exactly the state after applying the delta.
     let peaks_commitment = new_peaks.hash_peaks();
     if peaks_commitment != new_block.chain_commitment() {
-        return Err(ClientError::StateSyncMmrPeaksMismatch {
-            peaks_commitment,
-            chain_commitment: new_block.chain_commitment(),
-        });
+        return Err(ClientError::ChainValidationError(format!(
+            "MMR peaks commitment is {:?} and does not match block header chain commitment {:?}",
+            peaks_commitment, new_block.chain_commitment()
+        )));
     }
 
     new_authentication_nodes
