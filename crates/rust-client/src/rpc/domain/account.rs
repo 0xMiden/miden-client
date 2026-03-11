@@ -5,17 +5,8 @@ use core::fmt::{self, Debug, Display, Formatter};
 
 use miden_protocol::Word;
 use miden_protocol::account::{
-    Account,
-    AccountCode,
-    AccountHeader,
-    AccountId,
-    AccountStorageHeader,
-    StorageMap,
-    StorageMapKey,
-    StorageMapWitness,
-    StorageSlotHeader,
-    StorageSlotName,
-    StorageSlotType,
+    Account, AccountCode, AccountHeader, AccountId, AccountStorageHeader, StorageMap,
+    StorageMapKey, StorageMapWitness, StorageSlotHeader, StorageSlotName, StorageSlotType,
 };
 use miden_protocol::asset::Asset;
 use miden_protocol::block::BlockNumber;
@@ -30,7 +21,8 @@ use crate::alloc::string::ToString;
 use crate::rpc::RpcError;
 use crate::rpc::domain::MissingFieldHelper;
 use crate::rpc::errors::RpcConversionError;
-use crate::rpc::generated::rpc::account_request::account_detail_request;
+use crate::rpc::generated::rpc::account_request::account_detail_request::{StorageMapDetailRequest};
+use crate::rpc::generated::rpc::account_request::account_detail_request::storage_map_detail_request::{MapKeys, SlotData};
 use crate::rpc::generated::{self as proto};
 
 // FETCHED ACCOUNT
@@ -667,23 +659,18 @@ impl AccountStorageRequirements {
     }
 }
 
-impl From<AccountStorageRequirements> for Vec<account_detail_request::StorageMapDetailRequest> {
-    fn from(
-        value: AccountStorageRequirements,
-    ) -> Vec<account_detail_request::StorageMapDetailRequest> {
-        use account_detail_request::{self, storage_map_detail_request};
+impl From<AccountStorageRequirements> for Vec<StorageMapDetailRequest> {
+    fn from(value: AccountStorageRequirements) -> Vec<StorageMapDetailRequest> {
         let request_map = value.0;
         let mut requests = Vec::with_capacity(request_map.len());
         for (slot_name, map_keys) in request_map {
             let slot_data = if map_keys.is_empty() {
-                Some(storage_map_detail_request::SlotData::AllEntries(true))
+                Some(SlotData::AllEntries(true))
             } else {
                 let keys = map_keys.into_iter().map(|key| Word::from(key).into()).collect();
-                Some(storage_map_detail_request::SlotData::MapKeys(
-                    storage_map_detail_request::MapKeys { map_keys: keys },
-                ))
+                Some(SlotData::MapKeys(MapKeys { map_keys: keys }))
             };
-            requests.push(account_detail_request::StorageMapDetailRequest {
+            requests.push(StorageMapDetailRequest {
                 slot_name: slot_name.to_string(),
                 slot_data,
             });
