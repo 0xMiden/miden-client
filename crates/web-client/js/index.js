@@ -19,11 +19,24 @@ export const AccountType = Object.freeze({
   MutableWallet: "MutableWallet",
   ImmutableWallet: "ImmutableWallet",
   FungibleFaucet: "FungibleFaucet",
+  ImmutableContract: "ImmutableContract",
+  MutableContract: "MutableContract",
 });
 
 export const AuthScheme = Object.freeze({
   Falcon: "falcon",
   ECDSA: "ecdsa",
+});
+
+export const NoteVisibility = Object.freeze({
+  Public: "public",
+  Private: "private",
+});
+
+export const StorageMode = Object.freeze({
+  Public: "public",
+  Private: "private",
+  Network: "network",
 });
 
 export { MidenClient };
@@ -501,6 +514,30 @@ class WebClient {
         decimals,
         maxSupply,
         authSchemeId
+      );
+    });
+  }
+
+  async newAccount(account, overwrite) {
+    return this._serializeWasmCall(async () => {
+      const wasmWebClient = await this.getWasmWebClient();
+      return await wasmWebClient.newAccount(account, overwrite);
+    });
+  }
+
+  async newAccountWithSecretKey(account, secretKey) {
+    return this._serializeWasmCall(async () => {
+      const wasmWebClient = await this.getWasmWebClient();
+      return await wasmWebClient.newAccountWithSecretKey(account, secretKey);
+    });
+  }
+
+  async addAccountSecretKeyToWebStore(accountId, secretKey) {
+    return this._serializeWasmCall(async () => {
+      const wasmWebClient = await this.getWasmWebClient();
+      return await wasmWebClient.addAccountSecretKeyToWebStore(
+        accountId,
+        secretKey
       );
     });
   }

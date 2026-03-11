@@ -93,8 +93,8 @@ describe("useSend", () => {
         });
       });
 
-      expect(txResult).toEqual({ transactionId: "0xtx123" });
-      expect(result.current.result).toEqual({ transactionId: "0xtx123" });
+      expect(txResult).toEqual({ txId: "0xtx123", note: null });
+      expect(result.current.result).toEqual({ txId: "0xtx123", note: null });
       expect(result.current.stage).toBe("complete");
       expect(result.current.isLoading).toBe(false);
       expect(mockSync).toHaveBeenCalled();

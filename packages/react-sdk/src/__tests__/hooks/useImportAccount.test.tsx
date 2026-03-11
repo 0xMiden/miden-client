@@ -169,7 +169,7 @@ describe("useImportAccount", () => {
           type: "seed",
           seed: new Uint8Array([1, 2, 3]),
           mutable: true,
-          authScheme: 2,
+          authScheme: 2 as unknown as import("../../types").AuthScheme,
         });
       });
 

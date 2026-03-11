@@ -3,7 +3,6 @@ import { useMiden } from "../context/MidenProvider";
 import type {
   TransactionRequest,
   WasmWebClient as WebClient,
-  AccountId as AccountIdType,
 } from "@miden-sdk/miden-sdk";
 import type {
   TransactionStage,
@@ -108,7 +107,7 @@ export function useTransaction(): UseTransactionResult {
           // Create fresh AccountId inside the closure — WASM objects created
           // outside may become stale if another runExclusiveSafe call runs
           // between creation and consumption.
-          const accountIdObj = resolveAccountId(options.accountId);
+          const accountIdObj = parseAccountId(options.accountId);
           const txId = prover
             ? await client.submitNewTransactionWithProver(
                 accountIdObj,
@@ -153,10 +152,6 @@ export function useTransaction(): UseTransactionResult {
     error,
     reset,
   };
-}
-
-function resolveAccountId(accountId: string | AccountIdType): AccountIdType {
-  return parseAccountId(accountId);
 }
 
 async function resolveRequest(

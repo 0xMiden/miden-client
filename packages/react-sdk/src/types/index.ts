@@ -12,8 +12,13 @@ import type {
   TransactionRecord,
   TransactionRequest,
   NoteType,
+  NoteId,
   AccountStorageMode,
+  Note,
 } from "@miden-sdk/miden-sdk";
+
+/** Flexible account reference — hex string, bech32 string, or WASM AccountId */
+export type AccountRef = string | AccountId;
 
 // Re-export SDK types for convenience
 export { AuthScheme };
@@ -31,6 +36,7 @@ export type {
   TransactionRequest,
   NoteType,
   AccountStorageMode,
+  Note,
 };
 
 // Re-export signer types for external signer providers
@@ -40,6 +46,9 @@ export type {
   SignerAccountConfig,
   SignerContextValue,
 } from "../context/SignerContext";
+
+export type StorageMode = "private" | "public" | "network";
+export type NoteVisibility = "private" | "public";
 
 export type RpcUrlConfig =
   | string
@@ -152,7 +161,7 @@ export interface AssetBalance {
 // Notes types
 export interface NotesFilter {
   status?: "all" | "consumed" | "committed" | "expected" | "processing";
-  accountId?: string;
+  accountId?: AccountRef;
   /** Only notes from this sender (any format, normalized internally) */
   sender?: string;
   /** Exclude these note IDs */
@@ -231,9 +240,9 @@ export interface CreateFaucetOptions {
   /** Number of decimals. Default: 8 */
   decimals?: number;
   /** Maximum supply */
-  maxSupply: bigint;
+  maxSupply: bigint | number;
   /** Storage mode. Default: private */
-  storageMode?: "private" | "public" | "network";
+  storageMode?: StorageMode;
   /** Auth scheme. Default: AuthScheme.AuthRpoFalcon512 */
   authScheme?: AuthScheme;
 }
@@ -262,9 +271,9 @@ export interface SendOptions {
   /** Recipient account ID */
   to: string;
   /** Asset ID to send (token id) */
-  assetId: string;
+  assetId: AccountRef;
   /** Amount to send (ignored when sendAll is true) */
-  amount?: bigint;
+  amount?: bigint | number;
   /** Note type. Default: private */
   noteType?: "private" | "public";
   /** Block height after which sender can reclaim note */
@@ -277,13 +286,21 @@ export interface SendOptions {
   skipSync?: boolean;
   /** Send the full balance of this asset. When true, amount is ignored. */
   sendAll?: boolean;
+  /** true = build note in JS and return the Note object (e.g. for out-of-band delivery). Default: false */
+  returnNote?: boolean;
+}
+
+// Send result — txId always set; note is non-null only when returnNote is true
+export interface SendResult {
+  txId: string;
+  note: Note | null;
 }
 
 export interface MultiSendRecipient {
   /** Recipient account ID */
   to: string;
   /** Amount to send */
-  amount: bigint;
+  amount: bigint | number;
   /** Per-recipient note type override */
   noteType?: "private" | "public";
   /** Per-recipient attachment */
@@ -298,7 +315,7 @@ export interface MultiSendOptions {
   /** Recipient list */
   recipients: MultiSendRecipient[];
   /** Default note type for all recipients. Default: private */
-  noteType?: "private" | "public";
+  noteType?: NoteVisibility;
   /** Skip auto-sync before send. Default: false */
   skipSync?: boolean;
 }
@@ -360,7 +377,7 @@ export interface MintOptions {
   /** Faucet account to mint from */
   faucetId: string;
   /** Amount to mint */
-  amount: bigint;
+  amount: bigint | number;
   /** Note type. Default: private */
   noteType?: "private" | "public";
 }
@@ -369,8 +386,8 @@ export interface MintOptions {
 export interface ConsumeOptions {
   /** Account ID that will consume the notes */
   accountId: string;
-  /** List of note IDs to consume */
-  noteIds: string[];
+  /** Notes to consume — accepts note IDs (hex strings), NoteId objects, InputNoteRecord, or Note objects */
+  notes: (string | NoteId | InputNoteRecord | Note)[];
 }
 
 // Swap options
@@ -380,11 +397,11 @@ export interface SwapOptions {
   /** Faucet ID of the offered asset */
   offeredFaucetId: string;
   /** Amount being offered */
-  offeredAmount: bigint;
+  offeredAmount: bigint | number;
   /** Faucet ID of the requested asset */
   requestedFaucetId: string;
   /** Amount being requested */
-  requestedAmount: bigint;
+  requestedAmount: bigint | number;
   /** Note type for swap note. Default: private */
   noteType?: "private" | "public";
   /** Note type for payback note. Default: private */

@@ -599,9 +599,9 @@ impl NodeRpcClient for GrpcClient {
 
         let storage_maps: Vec<StorageMapDetailRequest> = storage_requirements.clone().into();
 
-        // Only request details for public accounts; include known code commitment for this
-        // account when available
-        let account_details = if account_id.is_public() {
+        // Only request details for accounts with public state (Public or Network);
+        // include known code commitment for this account when available
+        let account_details = if account_id.has_public_state() {
             Some(AccountDetailRequest {
                 code_commitment: Some(EMPTY_WORD.into()),
                 // TODO: implement a way to request asset vaults
@@ -635,8 +635,8 @@ impl NodeRpcClient for GrpcClient {
             .ok_or(RpcError::ExpectedDataMissing("AccountWitness".to_string()))?
             .try_into()?;
 
-        // For public accounts, details should be present when requested
-        let headers = if account_witness.id().is_public() {
+        // For accounts with public state, details should be present when requested
+        let headers = if account_witness.id().has_public_state() {
             Some(
                 response
                     .details

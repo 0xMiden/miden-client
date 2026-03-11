@@ -4,16 +4,13 @@ import {
   FungibleAsset,
   Note,
   NoteAssets,
+  NoteAttachment,
   NoteType,
   OutputNote,
   OutputNoteArray,
   TransactionRequestBuilder,
 } from "@miden-sdk/miden-sdk";
-import type {
-  SendOptions,
-  TransactionStage,
-  TransactionResult,
-} from "../types";
+import type { SendOptions, SendResult, TransactionStage } from "../types";
 import { DEFAULTS } from "../types";
 import { parseAccountId, parseAddress } from "../utils/accountParsing";
 import { runExclusiveDirect } from "../utils/runExclusive";
@@ -24,9 +21,9 @@ import type { ClientWithTransactions } from "../utils/noteFilters";
 
 export interface UseSendResult {
   /** Send tokens from one account to another */
-  send: (options: SendOptions) => Promise<TransactionResult>;
+  send: (options: SendOptions) => Promise<SendResult>;
   /** The transaction result */
-  result: TransactionResult | null;
+  result: SendResult | null;
   /** Whether the transaction is in progress */
   isLoading: boolean;
   /** Current stage of the transaction */
@@ -72,13 +69,13 @@ export function useSend(): UseSendResult {
   const runExclusiveSafe = runExclusive ?? runExclusiveDirect;
   const isBusyRef = useRef(false);
 
-  const [result, setResult] = useState<TransactionResult | null>(null);
+  const [result, setResult] = useState<SendResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [stage, setStage] = useState<TransactionStage>("idle");
   const [error, setError] = useState<Error | null>(null);
 
   const send = useCallback(
-    async (options: SendOptions): Promise<TransactionResult> => {
+    async (options: SendOptions): Promise<SendResult> => {
       if (!client || !isReady) {
         throw new Error("Miden client is not ready");
       }
@@ -127,6 +124,7 @@ export function useSend(): UseSendResult {
         if (amount === undefined || amount === null) {
           throw new Error("Amount is required (provide amount or sendAll)");
         }
+        amount = BigInt(amount);
 
         const assetId =
           options.assetId ??
@@ -149,6 +147,50 @@ export function useSend(): UseSendResult {
           );
         }
 
+        // returnNote path: build note in JS, submit as output note, return Note object
+        if (options.returnNote === true) {
+          const returnResult = await runExclusiveSafe(async () => {
+            const fromId = parseAccountId(options.from);
+            const toId = parseAccountId(options.to);
+            const assetObj = parseAccountId(assetId);
+
+            const assets = new NoteAssets([
+              new FungibleAsset(assetObj, BigInt(amount!)),
+            ]);
+            const p2idNote = Note.createP2IDNote(
+              fromId,
+              toId,
+              assets,
+              noteType,
+              new NoteAttachment()
+            );
+
+            const txRequest = new TransactionRequestBuilder()
+              .withOwnOutputNotes(
+                new OutputNoteArray([OutputNote.full(p2idNote)])
+              )
+              .build();
+
+            const execFromId = parseAccountId(options.from);
+            const txId = prover
+              ? await client.submitNewTransactionWithProver(
+                  execFromId,
+                  txRequest,
+                  prover
+                )
+              : await client.submitNewTransaction(execFromId, txRequest);
+
+            return { txId: txId.toString(), note: p2idNote } as SendResult;
+          });
+
+          setStage("complete");
+          setResult(returnResult);
+          await sync();
+
+          return returnResult;
+        }
+
+        // On-chain path (default)
         const txResult = await runExclusiveSafe(async () => {
           // Create all WASM AccountId objects inside runExclusiveSafe to
           // avoid stale pointers if another exclusive operation runs between
@@ -239,14 +281,17 @@ export function useSend(): UseSendResult {
           );
         }
 
-        const txSummary = { transactionId: txIdString };
+        const sendResult: SendResult = {
+          txId: txIdString,
+          note: null,
+        };
 
         setStage("complete");
-        setResult(txSummary);
+        setResult(sendResult);
 
         await sync();
 
-        return txSummary;
+        return sendResult;
       } catch (err) {
         const error = err instanceof Error ? err : new Error(String(err));
         setError(error);

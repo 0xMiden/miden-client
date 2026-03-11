@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.13.4 (TBD)
+
+### Features
+* [FEATURE][web] All user-facing amount fields (`amount`, `maxSupply`, `offeredAmount`, `requestedAmount`) now accept `number` in addition to `bigint`, removing the need for `n` suffixes or `BigInt()` wrappers. Values are coerced to `bigint` internally before passing to WASM. Output types (balances, note assets) remain `bigint`.
+* [FEATURE][web] `formatAssetAmount()` now accepts `number | bigint` for convenience.
+
 ## 0.13.3 (2026-02-25)
 
 ### Features

@@ -83,6 +83,7 @@ export type {
   UseSessionAccountOptions,
   UseSessionAccountReturn,
   SessionAccountStep,
+  AccountRef,
   // Signer types (for external signer providers)
   SignCallback,
   SignerAccountType,

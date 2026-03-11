@@ -38,11 +38,11 @@ export function useWaitForNotes(): UseWaitForNotesResult {
         await runExclusiveSafe(() =>
           (client as unknown as ClientWithNotes).syncState()
         );
-        const notes = await runExclusiveSafe(() =>
+        const consumable = await runExclusiveSafe(() =>
           (client as unknown as ClientWithNotes).getConsumableNotes(accountId)
         );
-        if (notes.length >= minCount) {
-          return notes;
+        if (consumable.length >= minCount) {
+          return consumable;
         }
 
         await new Promise((resolve) => setTimeout(resolve, intervalMs));

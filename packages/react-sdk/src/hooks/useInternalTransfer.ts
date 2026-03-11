@@ -7,6 +7,7 @@ import {
   NoteAndArgsArray,
   NoteAssets,
   NoteAttachment,
+  NoteType,
   OutputNote,
   OutputNoteArray,
   TransactionRequestBuilder,
@@ -20,7 +21,6 @@ import type {
 import { DEFAULTS } from "../types";
 import { parseAccountId } from "../utils/accountParsing";
 import { runExclusiveDirect } from "../utils/runExclusive";
-import { getNoteType } from "../utils/noteFilters";
 
 export interface UseInternalTransferResult {
   /** Create a P2ID note and immediately consume it with another account */
@@ -241,4 +241,15 @@ export function useInternalTransfer(): UseInternalTransferResult {
     error,
     reset,
   };
+}
+
+function getNoteType(type: "private" | "public"): NoteType {
+  switch (type) {
+    case "private":
+      return NoteType.Private;
+    case "public":
+      return NoteType.Public;
+    default:
+      return NoteType.Private;
+  }
 }
