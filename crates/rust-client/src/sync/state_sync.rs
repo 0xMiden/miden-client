@@ -633,7 +633,8 @@ fn apply_mmr_changes(
     if peaks_commitment != new_block.chain_commitment() {
         return Err(ClientError::ChainValidationError(format!(
             "MMR peaks commitment is {:?} and does not match block header chain commitment {:?}",
-            peaks_commitment, new_block.chain_commitment()
+            peaks_commitment,
+            new_block.chain_commitment()
         )));
     }
 
