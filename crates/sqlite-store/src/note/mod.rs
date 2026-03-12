@@ -1,5 +1,6 @@
 #![allow(clippy::items_after_statements)]
 
+use std::collections::BTreeMap;
 use std::rc::Rc;
 use std::string::{String, ToString};
 use std::vec::Vec;
@@ -13,6 +14,7 @@ use miden_client::note::{
     NoteRecipient,
     NoteScript,
     NoteUpdateTracker,
+    NoteUpdateType,
     Nullifier,
 };
 use miden_client::store::{
@@ -35,6 +37,13 @@ use crate::sql_error::SqlResultExt;
 use crate::{insert_sql, subst};
 
 mod filters;
+
+// BATCH SIZE CONSTANTS
+// ================================================================================================
+
+const INPUT_NOTE_BATCH_SIZE: usize = 50;
+const OUTPUT_NOTE_BATCH_SIZE: usize = 80;
+const SCRIPT_BATCH_SIZE: usize = 200;
 
 // TYPES
 // ================================================================================================
@@ -81,6 +90,13 @@ struct SerializedOutputNoteParts {
     pub metadata: Vec<u8>,
     pub recipient_digest: String,
     pub expected_height: u32,
+    pub state: Vec<u8>,
+}
+
+/// Represents the fields needed to update an existing note's state without rewriting all columns.
+struct SerializedNoteStateUpdate {
+    pub id: String,
+    pub state_discriminant: u8,
     pub state: Vec<u8>,
 }
 
@@ -229,7 +245,10 @@ pub(super) fn upsert_input_note_tx(
 
     const SCRIPT_QUERY: &str =
         insert_sql!(notes_scripts { script_root, serialized_note_script } | REPLACE);
-    tx.execute(SCRIPT_QUERY, params![script_root, script,]).into_store_error()?;
+    tx.prepare_cached(SCRIPT_QUERY)
+        .into_store_error()?
+        .execute(params![script_root, script])
+        .into_store_error()?;
 
     const NOTE_QUERY: &str = insert_sql!(
         input_notes {
@@ -245,9 +264,9 @@ pub(super) fn upsert_input_note_tx(
         } | REPLACE
     );
 
-    tx.execute(
-        NOTE_QUERY,
-        params![
+    tx.prepare_cached(NOTE_QUERY)
+        .into_store_error()?
+        .execute(params![
             id,
             assets,
             serial_number,
@@ -257,13 +276,15 @@ pub(super) fn upsert_input_note_tx(
             state_discriminant,
             state,
             created_at,
-        ],
-    )
-    .map_err(|err| StoreError::QueryError(err.to_string()))
-    .map(|_| ())
+        ])
+        .into_store_error()?;
+
+    Ok(())
 }
 
-/// Inserts the provided input note into the database.
+/// Inserts the provided output note into the database, if the note already exists, it will be
+/// replaced.
+#[allow(dead_code)]
 pub fn upsert_output_note_tx(
     tx: &Transaction<'_>,
     note: &OutputNoteRecord,
@@ -292,9 +313,9 @@ pub fn upsert_output_note_tx(
         state,
     } = serialize_output_note(note);
 
-    tx.execute(
-        NOTE_QUERY,
-        params![
+    tx.prepare_cached(NOTE_QUERY)
+        .into_store_error()?
+        .execute(params![
             id,
             assets,
             recipient_digest,
@@ -303,9 +324,8 @@ pub fn upsert_output_note_tx(
             expected_height,
             state_discriminant,
             state,
-        ],
-    )
-    .into_store_error()?;
+        ])
+        .into_store_error()?;
 
     Ok(())
 }
@@ -436,6 +456,24 @@ fn parse_output_note(
     ))
 }
 
+/// Serialize the provided input note state into a lightweight state-only update.
+fn serialize_input_note_state(note: &InputNoteRecord) -> SerializedNoteStateUpdate {
+    SerializedNoteStateUpdate {
+        id: note.id().as_word().to_string(),
+        state_discriminant: note.state().discriminant(),
+        state: note.state().to_bytes(),
+    }
+}
+
+/// Serialize the provided output note state into a lightweight state-only update.
+fn serialize_output_note_state(note: &OutputNoteRecord) -> SerializedNoteStateUpdate {
+    SerializedNoteStateUpdate {
+        id: note.id().as_word().to_string(),
+        state_discriminant: note.state().discriminant(),
+        state: note.state().to_bytes(),
+    }
+}
+
 /// Serialize the provided output note into database compatible types.
 fn serialize_output_note(note: &OutputNoteRecord) -> SerializedOutputNoteData {
     let id = note.id().as_word().to_string();
@@ -464,12 +502,198 @@ pub(crate) fn apply_note_updates_tx(
     tx: &Transaction,
     note_updates: &NoteUpdateTracker,
 ) -> Result<(), StoreError> {
+    // Split input notes into inserts and updates, collecting scripts from new notes.
+    let mut input_inserts = Vec::new();
+    let mut input_updates = Vec::new();
+    let mut scripts: BTreeMap<String, Vec<u8>> = BTreeMap::new();
+
     for input_note in note_updates.updated_input_notes() {
-        upsert_input_note_tx(tx, input_note.inner())?;
+        match input_note.update_type() {
+            NoteUpdateType::Insert => {
+                let serialized = serialize_input_note(input_note.inner());
+                scripts.insert(serialized.script_root.clone(), serialized.script.clone());
+                input_inserts.push(serialized);
+            },
+            NoteUpdateType::Update => {
+                input_updates.push(serialize_input_note_state(input_note.inner()));
+            },
+            NoteUpdateType::None => {},
+        }
     }
 
+    batch_upsert_scripts(tx, &scripts)?;
+    batch_insert_input_notes(tx, &input_inserts)?;
+    batch_update_input_note_states(tx, &input_updates)?;
+
+    // Split output notes into inserts and updates.
+    let mut output_inserts = Vec::new();
+    let mut output_updates = Vec::new();
+
     for output_note in note_updates.updated_output_notes() {
-        upsert_output_note_tx(tx, output_note.inner())?;
+        match output_note.update_type() {
+            NoteUpdateType::Insert => {
+                output_inserts.push(serialize_output_note(output_note.inner()));
+            },
+            NoteUpdateType::Update => {
+                output_updates.push(serialize_output_note_state(output_note.inner()));
+            },
+            NoteUpdateType::None => {},
+        }
+    }
+
+    batch_insert_output_notes(tx, &output_inserts)?;
+    batch_update_output_note_states(tx, &output_updates)?;
+
+    Ok(())
+}
+
+/// Batch-insert note scripts using multi-row INSERT OR REPLACE.
+/// Multi-row inserts reduce per-statement overhead and show faster insertion times than
+/// individual inserts.
+fn batch_upsert_scripts(
+    tx: &Transaction,
+    scripts: &BTreeMap<String, Vec<u8>>,
+) -> Result<(), StoreError> {
+    if scripts.is_empty() {
+        return Ok(());
+    }
+
+    let entries: Vec<_> = scripts.iter().collect();
+    for chunk in entries.chunks(SCRIPT_BATCH_SIZE) {
+        let placeholders = vec!["(?, ?)"; chunk.len()].join(", ");
+        let query = format!(
+            "INSERT OR REPLACE INTO `notes_scripts` (`script_root`, `serialized_note_script`) \
+             VALUES {placeholders}"
+        );
+        let mut param_values: Vec<Value> = Vec::with_capacity(chunk.len() * 2);
+        for (root, script) in chunk {
+            param_values.push(Value::Text((*root).clone()));
+            param_values.push(Value::Blob((*script).clone()));
+        }
+        tx.execute(&query, params_from_iter(param_values)).into_store_error()?;
+    }
+
+    Ok(())
+}
+
+/// Batch-insert new input notes using multi-row INSERT OR REPLACE.
+/// Multi-row inserts reduce per-statement overhead and show faster insertion times than
+/// individual inserts.
+fn batch_insert_input_notes(
+    tx: &Transaction,
+    notes: &[SerializedInputNoteData],
+) -> Result<(), StoreError> {
+    if notes.is_empty() {
+        return Ok(());
+    }
+
+    for chunk in notes.chunks(INPUT_NOTE_BATCH_SIZE) {
+        let placeholders = vec!["(?, ?, ?, ?, ?, ?, ?, ?, ?)"; chunk.len()].join(", ");
+        let query = format!(
+            "INSERT OR REPLACE INTO `input_notes` \
+             (`note_id`, `assets`, `serial_number`, `inputs`, `script_root`, \
+              `nullifier`, `state_discriminant`, `state`, `created_at`) \
+             VALUES {placeholders}"
+        );
+        let mut param_values: Vec<Value> = Vec::with_capacity(chunk.len() * 9);
+        for note in chunk {
+            param_values.push(Value::Text(note.id.clone()));
+            param_values.push(Value::Blob(note.assets.clone()));
+            param_values.push(Value::Blob(note.serial_number.clone()));
+            param_values.push(Value::Blob(note.inputs.clone()));
+            param_values.push(Value::Text(note.script_root.clone()));
+            param_values.push(Value::Text(note.nullifier.clone()));
+            param_values.push(Value::Integer(i64::from(note.state_discriminant)));
+            param_values.push(Value::Blob(note.state.clone()));
+            #[allow(clippy::cast_possible_wrap)]
+            param_values.push(Value::Integer(note.created_at as i64));
+        }
+        tx.execute(&query, params_from_iter(param_values)).into_store_error()?;
+    }
+
+    Ok(())
+}
+
+/// Batch-update input note states using a prepared cached statement.
+fn batch_update_input_note_states(
+    tx: &Transaction,
+    updates: &[SerializedNoteStateUpdate],
+) -> Result<(), StoreError> {
+    if updates.is_empty() {
+        return Ok(());
+    }
+
+    let mut stmt = tx
+        .prepare_cached(
+            "UPDATE `input_notes` SET state_discriminant = ?, state = ? WHERE note_id = ?",
+        )
+        .into_store_error()?;
+
+    for update in updates {
+        stmt.execute(params![update.state_discriminant, update.state, update.id])
+            .into_store_error()?;
+    }
+
+    Ok(())
+}
+
+/// Batch-update output note states using a prepared cached statement.
+fn batch_update_output_note_states(
+    tx: &Transaction,
+    updates: &[SerializedNoteStateUpdate],
+) -> Result<(), StoreError> {
+    if updates.is_empty() {
+        return Ok(());
+    }
+
+    let mut stmt = tx
+        .prepare_cached(
+            "UPDATE `output_notes` SET state_discriminant = ?, state = ? WHERE note_id = ?",
+        )
+        .into_store_error()?;
+
+    for update in updates {
+        stmt.execute(params![update.state_discriminant, update.state, update.id])
+            .into_store_error()?;
+    }
+
+    Ok(())
+}
+
+/// Batch-insert new output notes using multi-row INSERT OR REPLACE.
+/// Multi-row inserts reduce per-statement overhead and show faster insertion times than
+/// individual inserts.
+fn batch_insert_output_notes(
+    tx: &Transaction,
+    notes: &[SerializedOutputNoteData],
+) -> Result<(), StoreError> {
+    if notes.is_empty() {
+        return Ok(());
+    }
+
+    for chunk in notes.chunks(OUTPUT_NOTE_BATCH_SIZE) {
+        let placeholders = vec!["(?, ?, ?, ?, ?, ?, ?, ?)"; chunk.len()].join(", ");
+        let query = format!(
+            "INSERT OR REPLACE INTO `output_notes` \
+             (`note_id`, `assets`, `recipient_digest`, `metadata`, \
+              `nullifier`, `expected_height`, `state_discriminant`, `state`) \
+             VALUES {placeholders}"
+        );
+        let mut param_values: Vec<Value> = Vec::with_capacity(chunk.len() * 8);
+        for note in chunk {
+            param_values.push(Value::Text(note.id.clone()));
+            param_values.push(Value::Blob(note.assets.clone()));
+            param_values.push(Value::Text(note.recipient_digest.clone()));
+            param_values.push(Value::Blob(note.metadata.clone()));
+            match &note.nullifier {
+                Some(n) => param_values.push(Value::Text(n.clone())),
+                None => param_values.push(Value::Null),
+            }
+            param_values.push(Value::Integer(i64::from(note.expected_height)));
+            param_values.push(Value::Integer(i64::from(note.state_discriminant)));
+            param_values.push(Value::Blob(note.state.clone()));
+        }
+        tx.execute(&query, params_from_iter(param_values)).into_store_error()?;
     }
 
     Ok(())
@@ -483,7 +707,9 @@ pub(super) fn upsert_note_script_tx(
 ) -> Result<(), StoreError> {
     const QUERY: &str =
         insert_sql!(notes_scripts { script_root, serialized_note_script } | REPLACE);
-    tx.execute(QUERY, params![note_script.root().to_hex(), note_script.to_bytes(),])
+    tx.prepare_cached(QUERY)
+        .into_store_error()?
+        .execute(params![note_script.root().to_hex(), note_script.to_bytes()])
         .into_store_error()?;
 
     Ok(())
