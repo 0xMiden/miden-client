@@ -96,8 +96,9 @@ impl SqliteStore {
     /// Applies vault delta changes to the account state, updating fungible and non-fungible assets.
     ///
     /// The function updates the SMT forest with all asset changes and verifies that the resulting
-    /// vault root matches the expected final state. It deletes removed assets from latest and
-    /// writes tombstones to historical, then inserts updated assets.
+    /// vault root matches the expected final state. It archives old values from latest to
+    /// historical with `replaced_at_nonce`, deletes removed assets from latest, then inserts
+    /// updated assets.
     pub(crate) fn apply_account_vault_delta(
         tx: &Transaction<'_>,
         smt_forest: &mut AccountSmtForest,

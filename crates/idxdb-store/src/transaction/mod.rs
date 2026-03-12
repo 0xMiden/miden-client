@@ -107,7 +107,7 @@ impl IdxdbStore {
         if delta.is_full_state() {
             account =
                 delta.try_into().expect("casting account from full state delta should not fail");
-            // Full-state path: writes all entries and tombstones for removed ones
+            // Full-state path: writes all entries, archiving old values with replaced_at_nonce
             apply_full_account_state(self.db_id(), &account).await.map_err(|err| {
                 StoreError::DatabaseError(format!("failed to apply full account state: {err:?}"))
             })?;

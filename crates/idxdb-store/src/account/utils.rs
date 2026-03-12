@@ -202,8 +202,8 @@ pub async fn apply_transaction_delta(
         // Extract changed map entries from the delta
         for (key, value) in map_delta.entries() {
             let value_str = if *value == EMPTY_WORD {
-                // Removal sentinel — the JS side interprets "" as "remove from latest,
-                // write null tombstone to historical"
+                // Removal sentinel — the JS side interprets "" as "archive old value
+                // to historical with replaced_at_nonce, then remove from latest"
                 String::new()
             } else {
                 value.to_hex()

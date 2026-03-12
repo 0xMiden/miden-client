@@ -69,8 +69,6 @@ impl SqliteStore {
     // MUTATOR/WRITER METHODS
     // --------------------------------------------------------------------------------------------
 
-    /// Inserts storage slots into both latest and historical tables for a given
-    /// (`account_id`, `nonce`).
     /// Inserts storage slots into the latest tables only.
     ///
     /// Historical archival is handled separately by the caller when needed.
