@@ -899,8 +899,8 @@ export async function undoAccountStates(
 
         // Step 2: Process each account, nonces in reverse order
         for (const [accountId, nonces] of accountNonces) {
-          const sortedNonces = [...nonces].sort(
-            (a, b) => Number(BigInt(b) - BigInt(a))
+          const sortedNonces = [...nonces].sort((a, b) =>
+            Number(BigInt(b) - BigInt(a))
           );
 
           for (const nonce of sortedNonces) {

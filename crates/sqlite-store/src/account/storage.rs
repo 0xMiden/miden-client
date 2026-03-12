@@ -153,11 +153,16 @@ impl SqliteStore {
         const LATEST_MAP_ENTRY_QUERY: &str =
             insert_sql!(latest_storage_map_entries { account_id, slot_name, key, value } | REPLACE);
         const HISTORICAL_MAP_ENTRY_QUERY: &str = insert_sql!(
-            historical_storage_map_entries { account_id, replaced_at_nonce, slot_name, key, old_value } | REPLACE
+            historical_storage_map_entries {
+                account_id,
+                replaced_at_nonce,
+                slot_name,
+                key,
+                old_value
+            } | REPLACE
         );
-        const DELETE_LATEST_MAP_ENTRY: &str = "DELETE FROM latest_storage_map_entries WHERE account_id = ? AND slot_name = ? AND key = ?";
-        const READ_OLD_SLOT: &str = "SELECT slot_value FROM latest_account_storage WHERE account_id = ? AND slot_name = ?";
-        const READ_OLD_MAP_ENTRY: &str = "SELECT value FROM latest_storage_map_entries WHERE account_id = ? AND slot_name = ? AND key = ?";
+        const READ_OLD_SLOT: &str =
+            "SELECT slot_value FROM latest_account_storage WHERE account_id = ? AND slot_name = ?";
 
         let mut latest_slot_stmt = tx.prepare_cached(LATEST_SLOT_QUERY).into_store_error()?;
         let mut hist_slot_stmt = tx.prepare_cached(HISTORICAL_SLOT_QUERY).into_store_error()?;
@@ -211,49 +216,70 @@ impl SqliteStore {
                 .into_store_error()?;
 
             if let Some(changed_entries) = delta_map_entries.get(slot_name) {
-                for (key, value) in changed_entries {
-                    let key_hex = key.to_hex();
+                Self::write_map_entry_delta(
+                    tx,
+                    &mut latest_map_stmt,
+                    &mut hist_map_stmt,
+                    &account_id_hex,
+                    &nonce_val,
+                    &slot_name_str,
+                    changed_entries,
+                )?;
+            }
+        }
 
-                    // Read old map entry value from latest (NULL if entry is new)
-                    let old_entry_value: Option<String> = tx
-                        .query_row(
-                            READ_OLD_MAP_ENTRY,
-                            params![&account_id_hex, &slot_name_str, &key_hex],
-                            |row| row.get(0),
-                        )
-                        .optional()
-                        .into_store_error()?
-                        .flatten();
+        Ok(())
+    }
 
-                    // Archive old value to historical (NULL = entry was new)
-                    hist_map_stmt
-                        .execute(params![
-                            &account_id_hex,
-                            &nonce_val,
-                            &slot_name_str,
-                            &key_hex,
-                            old_entry_value,
-                        ])
-                        .into_store_error()?;
+    /// Archives old map entry values to historical and updates latest for each changed entry.
+    fn write_map_entry_delta(
+        tx: &Transaction<'_>,
+        latest_map_stmt: &mut rusqlite::CachedStatement<'_>,
+        hist_map_stmt: &mut rusqlite::CachedStatement<'_>,
+        account_id_hex: &str,
+        nonce_val: &rusqlite::types::Value,
+        slot_name_str: &str,
+        changed_entries: &[(Word, Word)],
+    ) -> Result<(), StoreError> {
+        const READ_OLD_MAP_ENTRY: &str = "SELECT value FROM latest_storage_map_entries WHERE account_id = ? AND slot_name = ? AND key = ?";
+        const DELETE_LATEST_MAP_ENTRY: &str = "DELETE FROM latest_storage_map_entries WHERE account_id = ? AND slot_name = ? AND key = ?";
 
-                    // Update latest: delete for removals, replace for updates
-                    if *value == EMPTY_WORD {
-                        tx.execute(
-                            DELETE_LATEST_MAP_ENTRY,
-                            params![&account_id_hex, &slot_name_str, &key_hex],
-                        )
-                        .into_store_error()?;
-                    } else {
-                        latest_map_stmt
-                            .execute(params![
-                                &account_id_hex,
-                                &slot_name_str,
-                                &key_hex,
-                                value.to_hex(),
-                            ])
-                            .into_store_error()?;
-                    }
-                }
+        for (key, value) in changed_entries {
+            let key_hex = key.to_hex();
+
+            // Read old map entry value from latest (NULL if entry is new)
+            let old_entry_value: Option<String> = tx
+                .query_row(
+                    READ_OLD_MAP_ENTRY,
+                    params![account_id_hex, slot_name_str, &key_hex],
+                    |row| row.get(0),
+                )
+                .optional()
+                .into_store_error()?
+                .flatten();
+
+            // Archive old value to historical (NULL = entry was new)
+            hist_map_stmt
+                .execute(params![
+                    account_id_hex,
+                    nonce_val,
+                    slot_name_str,
+                    &key_hex,
+                    old_entry_value,
+                ])
+                .into_store_error()?;
+
+            // Update latest: delete for removals, replace for updates
+            if *value == EMPTY_WORD {
+                tx.execute(
+                    DELETE_LATEST_MAP_ENTRY,
+                    params![account_id_hex, slot_name_str, &key_hex],
+                )
+                .into_store_error()?;
+            } else {
+                latest_map_stmt
+                    .execute(params![account_id_hex, slot_name_str, &key_hex, value.to_hex(),])
+                    .into_store_error()?;
             }
         }
 

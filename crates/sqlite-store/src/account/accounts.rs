@@ -558,91 +558,89 @@ impl SqliteStore {
         }
 
         for (account_id_hex, nonces) in &nonces_by_account {
-            // Undo each nonce in reverse order: restore old values, delete new entries
-            for &nonce in nonces {
-                let nonce_val = u64_to_value(nonce);
-                Self::restore_old_values_for_nonce(tx, account_id_hex, &nonce_val)?;
-            }
-
-            // Restore old header from the earliest discarded nonce
-            let min_nonce = *nonces.last().unwrap();
-            let min_nonce_val = u64_to_value(min_nonce);
-
-            let old_header_exists: bool = tx
-                .query_row(
-                    "SELECT COUNT(*) FROM historical_account_headers \
-                     WHERE id = ? AND replaced_at_nonce = ?",
-                    params![account_id_hex, &min_nonce_val],
-                    |row| row.get::<_, i64>(0),
-                )
-                .into_store_error()?
-                > 0;
-
-            if old_header_exists {
-                tx.execute(
-                    "INSERT OR REPLACE INTO latest_account_headers \
-                     (id, account_commitment, code_commitment, storage_commitment, \
-                      vault_root, nonce, account_seed, locked) \
-                     SELECT id, account_commitment, code_commitment, storage_commitment, \
-                            vault_root, nonce, account_seed, locked \
-                     FROM historical_account_headers \
-                     WHERE id = ? AND replaced_at_nonce = ?",
-                    params![account_id_hex, &min_nonce_val],
-                )
-                .into_store_error()?;
-            } else {
-                // No previous state — delete the account entirely
-                tx.execute(
-                    "DELETE FROM latest_account_headers WHERE id = ?",
-                    params![account_id_hex],
-                )
-                .into_store_error()?;
-                tx.execute(
-                    "DELETE FROM latest_account_storage WHERE account_id = ?",
-                    params![account_id_hex],
-                )
-                .into_store_error()?;
-                tx.execute(
-                    "DELETE FROM latest_storage_map_entries WHERE account_id = ?",
-                    params![account_id_hex],
-                )
-                .into_store_error()?;
-                tx.execute(
-                    "DELETE FROM latest_account_assets WHERE account_id = ?",
-                    params![account_id_hex],
-                )
-                .into_store_error()?;
-            }
-
-            // Delete all consumed historical entries at the discarded nonces
-            let nonce_params = Rc::new(
-                nonces.iter().map(|n| u64_to_value(*n)).collect::<Vec<_>>(),
-            );
-            for table in [
-                "historical_account_storage",
-                "historical_storage_map_entries",
-                "historical_account_assets",
-            ] {
-                tx.execute(
-                    &format!(
-                        "DELETE FROM {table} WHERE account_id = ? AND replaced_at_nonce IN rarray(?)"
-                    ),
-                    params![account_id_hex, nonce_params.clone()],
-                )
-                .into_store_error()?;
-            }
-            tx.execute(
-                "DELETE FROM historical_account_headers \
-                 WHERE id = ? AND replaced_at_nonce IN rarray(?)",
-                params![account_id_hex, nonce_params],
-            )
-            .into_store_error()?;
+            Self::undo_account_nonces(tx, account_id_hex, nonces)?;
         }
 
         // Discard each rolled-back state from the in-memory forest
         for (account_id, _) in discarded_states {
             smt_forest.discard_roots(*account_id);
         }
+
+        Ok(())
+    }
+
+    /// Undoes all nonces for a single account: restores old values, restores old header,
+    /// and cleans up consumed historical entries.
+    fn undo_account_nonces(
+        tx: &Transaction<'_>,
+        account_id_hex: &str,
+        nonces: &[u64],
+    ) -> Result<(), StoreError> {
+        // Undo each nonce in reverse order: restore old values, delete new entries
+        for &nonce in nonces {
+            let nonce_val = u64_to_value(nonce);
+            Self::restore_old_values_for_nonce(tx, account_id_hex, &nonce_val)?;
+        }
+
+        // Restore old header from the earliest discarded nonce
+        let min_nonce = *nonces.last().unwrap();
+        let min_nonce_val = u64_to_value(min_nonce);
+
+        let old_header_exists: bool = tx
+            .query_row(
+                "SELECT COUNT(*) FROM historical_account_headers \
+                 WHERE id = ? AND replaced_at_nonce = ?",
+                params![account_id_hex, &min_nonce_val],
+                |row| row.get::<_, i64>(0),
+            )
+            .into_store_error()?
+            > 0;
+
+        if old_header_exists {
+            tx.execute(
+                "INSERT OR REPLACE INTO latest_account_headers \
+                 (id, account_commitment, code_commitment, storage_commitment, \
+                  vault_root, nonce, account_seed, locked) \
+                 SELECT id, account_commitment, code_commitment, storage_commitment, \
+                        vault_root, nonce, account_seed, locked \
+                 FROM historical_account_headers \
+                 WHERE id = ? AND replaced_at_nonce = ?",
+                params![account_id_hex, &min_nonce_val],
+            )
+            .into_store_error()?;
+        } else {
+            // No previous state — delete the account entirely
+            for table in [
+                "DELETE FROM latest_account_headers WHERE id = ?",
+                "DELETE FROM latest_account_storage WHERE account_id = ?",
+                "DELETE FROM latest_storage_map_entries WHERE account_id = ?",
+                "DELETE FROM latest_account_assets WHERE account_id = ?",
+            ] {
+                tx.execute(table, params![account_id_hex]).into_store_error()?;
+            }
+        }
+
+        // Delete all consumed historical entries at the discarded nonces
+        let nonce_params = Rc::new(nonces.iter().map(|n| u64_to_value(*n)).collect::<Vec<_>>());
+        for table in [
+            "historical_account_storage",
+            "historical_storage_map_entries",
+            "historical_account_assets",
+        ] {
+            tx.execute(
+                &format!(
+                    "DELETE FROM {table} WHERE account_id = ? AND replaced_at_nonce IN rarray(?)"
+                ),
+                params![account_id_hex, nonce_params.clone()],
+            )
+            .into_store_error()?;
+        }
+        tx.execute(
+            "DELETE FROM historical_account_headers \
+             WHERE id = ? AND replaced_at_nonce IN rarray(?)",
+            params![account_id_hex, nonce_params],
+        )
+        .into_store_error()?;
 
         Ok(())
     }
@@ -796,11 +794,7 @@ impl SqliteStore {
         .into_store_error()?;
 
         // Insert all new entries into latest only
-        Self::insert_storage_slots(
-            tx,
-            account_id,
-            new_account_state.storage().slots().iter(),
-        )?;
+        Self::insert_storage_slots(tx, account_id, new_account_state.storage().slots().iter())?;
         Self::insert_assets(tx, account_id, new_account_state.vault().assets())?;
 
         // Write NULL historical entries for genuinely new entries that didn't exist
@@ -831,12 +825,7 @@ impl SqliteStore {
         .into_store_error()?;
 
         // Insert account header (archives old header to historical)
-        Self::insert_account_header(
-            tx,
-            &new_account_state.into(),
-            None,
-            old_header.as_ref(),
-        )?;
+        Self::insert_account_header(tx, &new_account_state.into(), None, old_header.as_ref())?;
 
         Ok(())
     }
@@ -959,7 +948,16 @@ impl SqliteStore {
 
         tx.execute(
             LATEST_QUERY,
-            params![id, code_commitment, storage_commitment, vault_root, nonce, account_seed, commitment, false,],
+            params![
+                id,
+                code_commitment,
+                storage_commitment,
+                vault_root,
+                nonce,
+                account_seed,
+                commitment,
+                false,
+            ],
         )
         .into_store_error()?;
 

@@ -60,14 +60,8 @@ pub async fn upsert_account_storage(
     }
 
     let account_id_str = account_id.to_string();
-    JsFuture::from(idxdb_upsert_account_storage(
-        db_id,
-        account_id_str.clone(),
-        slots,
-    ))
-    .await?;
-    JsFuture::from(idxdb_upsert_storage_map_entries(db_id, account_id_str, maps))
-        .await?;
+    JsFuture::from(idxdb_upsert_account_storage(db_id, account_id_str.clone(), slots)).await?;
+    JsFuture::from(idxdb_upsert_storage_map_entries(db_id, account_id_str, maps)).await?;
 
     Ok(())
 }
