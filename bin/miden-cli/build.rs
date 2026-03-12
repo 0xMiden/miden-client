@@ -41,8 +41,9 @@ const PACKAGE_DIR: &str = "packages";
 
 fn main() {
     // Basic wallet (no storage schema)
-    let basic_wallet_metadata = AccountComponentMetadata::new(BasicWallet::NAME, AccountType::all())
-        .with_description("Basic wallet component for receiving and sending assets");
+    let basic_wallet_metadata =
+        AccountComponentMetadata::new(BasicWallet::NAME, AccountType::all())
+            .with_description("Basic wallet component for receiving and sending assets");
     build_package("basic-wallet", basic_wallet_library(), &basic_wallet_metadata, None);
 
     // Basic fungible faucet
@@ -67,9 +68,10 @@ fn main() {
     let basic_faucet_metadata =
         AccountComponentMetadata::new(BasicFungibleFaucet::NAME, [AccountType::FungibleFaucet])
             .with_description("Basic fungible faucet component for minting and burning tokens")
-        .with_storage_schema(
-            StorageSchema::new([faucet_metadata_schema]).expect("storage schema should be valid"),
-        );
+            .with_storage_schema(
+                StorageSchema::new([faucet_metadata_schema])
+                    .expect("storage schema should be valid"),
+            );
     build_package(
         "basic-fungible-faucet",
         basic_fungible_faucet_library(),
