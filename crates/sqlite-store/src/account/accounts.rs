@@ -503,11 +503,17 @@ impl SqliteStore {
         Ok(())
     }
 
-    /// Undoes discarded account states by directly restoring old values from historical.
+    /// Undoes discarded account states by restoring old values from historical.
     ///
-    /// For each discarded state, the old values from historical are restored to latest.
-    /// Entries with NULL old values (genuinely new entries) are deleted from latest.
-    /// Multiple nonces per account are undone in reverse order (most recent first).
+    /// Steps:
+    /// 1. Resolve which (account_id, nonce) pairs correspond to the discarded commitments,
+    ///    searching both latest and historical headers.
+    /// 2. Group nonces by account and process them in descending order (most recent first).
+    /// 3. For each nonce, restore old values from historical to latest: non-NULL old values
+    ///    overwrite latest, NULL old values (genuinely new entries) cause deletion from latest.
+    /// 4. Restore the old header from the earliest discarded nonce.
+    /// 5. Clean up consumed historical entries.
+    /// 6. Discard rolled-back states from the in-memory SMT forest.
     pub(crate) fn undo_account_state(
         tx: &Transaction<'_>,
         smt_forest: &mut AccountSmtForest,
@@ -524,9 +530,8 @@ impl SqliteStore {
                 .collect::<Vec<_>>(),
         );
 
-        // Resolve (account_id, nonce) pairs for the discarded states.
-        // Old headers are in historical and the most recent discarded state is in
-        // latest, so we query both tables.
+        // Step 1: Resolve (account_id, nonce) pairs from both latest and historical headers.
+        // The most recent discarded state is in latest, older ones are in historical.
         let mut id_nonce_pairs: Vec<(String, u64)> = Vec::new();
         for query in [
             "SELECT id, nonce FROM latest_account_headers WHERE account_commitment IN rarray(?)",
@@ -545,7 +550,10 @@ impl SqliteStore {
             );
         }
 
-        // Group nonces by account and sort descending (undo most recent first)
+        // Step 2: Group nonces by account, sort descending (undo most recent first).
+        // Descending order is needed because each nonce's old value is the state before
+        // that nonce — processing most recent first lets earlier nonces overwrite with
+        // the correct final value.
         let mut nonces_by_account: BTreeMap<String, Vec<u64>> = BTreeMap::new();
         for (id, nonce) in &id_nonce_pairs {
             nonces_by_account.entry(id.clone()).or_default().push(*nonce);
@@ -556,11 +564,12 @@ impl SqliteStore {
             nonces.reverse();
         }
 
+        // Steps 3-5
         for (account_id_hex, nonces) in &nonces_by_account {
             Self::undo_account_nonces(tx, account_id_hex, nonces)?;
         }
 
-        // Discard each rolled-back state from the in-memory forest
+        // Step 6: Discard rolled-back states from the in-memory forest
         for (account_id, _) in discarded_states {
             smt_forest.discard_roots(*account_id);
         }
@@ -575,13 +584,13 @@ impl SqliteStore {
         account_id_hex: &str,
         nonces: &[u64],
     ) -> Result<(), StoreError> {
-        // Undo each nonce in reverse order: restore old values, delete new entries
+        // Step 3: Undo each nonce in descending order
         for &nonce in nonces {
             let nonce_val = u64_to_value(nonce);
             Self::restore_old_values_for_nonce(tx, account_id_hex, &nonce_val)?;
         }
 
-        // Restore old header from the earliest discarded nonce
+        // Step 4: Restore old header from the earliest discarded nonce
         let min_nonce = *nonces.last().unwrap();
         let min_nonce_val = u64_to_value(min_nonce);
 
@@ -619,7 +628,7 @@ impl SqliteStore {
             }
         }
 
-        // Delete all consumed historical entries at the discarded nonces
+        // Step 5: Delete all consumed historical entries at the discarded nonces
         let nonce_params = Rc::new(nonces.iter().map(|n| u64_to_value(*n)).collect::<Vec<_>>());
         for table in [
             "historical_account_storage",
@@ -644,8 +653,8 @@ impl SqliteStore {
         Ok(())
     }
 
-    /// Restores old values from historical entries for a given nonce,
-    /// undoing the changes made when that nonce was written.
+    /// Restores old values from historical entries for a given nonce.
+    /// Non-NULL old values overwrite latest, NULL old values (new entries) are deleted.
     fn restore_old_values_for_nonce(
         tx: &Transaction<'_>,
         account_id_hex: &str,
