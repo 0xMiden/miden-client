@@ -2,15 +2,8 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
 use miden_client::account::{
-    Account,
-    AccountCode,
-    AccountDelta,
-    AccountHeader,
-    AccountId,
-    AccountStorage,
-    Address,
-    StorageSlotContent,
-    StorageSlotType,
+    Account, AccountCode, AccountDelta, AccountHeader, AccountId, AccountStorage, Address,
+    StorageSlotContent, StorageSlotType,
 };
 use miden_client::asset::{Asset, AssetVault, FungibleAsset};
 use miden_client::store::{AccountStatus, StoreError};
@@ -20,16 +13,9 @@ use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::JsFuture;
 
 use super::js_bindings::{
-    JsStorageMapEntry,
-    JsStorageSlot,
-    JsVaultAsset,
-    idxdb_apply_full_account_state,
-    idxdb_apply_transaction_delta,
-    idxdb_upsert_account_code,
-    idxdb_upsert_account_record,
-    idxdb_upsert_account_storage,
-    idxdb_upsert_storage_map_entries,
-    idxdb_upsert_vault_assets,
+    JsStorageMapEntry, JsStorageSlot, JsVaultAsset, idxdb_apply_full_account_state,
+    idxdb_apply_transaction_delta, idxdb_upsert_account_code, idxdb_upsert_account_record,
+    idxdb_upsert_account_storage, idxdb_upsert_storage_map_entries, idxdb_upsert_vault_assets,
 };
 use crate::account::js_bindings::idxdb_insert_account_address;
 use crate::account::models::{AccountRecordIdxdbObject, AddressIdxdbObject};
@@ -202,8 +188,6 @@ pub async fn apply_transaction_delta(
         // Extract changed map entries from the delta
         for (key, value) in map_delta.entries() {
             let value_str = if *value == EMPTY_WORD {
-                // value="" means removal — the JS side archives the old value
-                // to historical, then removes from latest
                 String::new()
             } else {
                 value.to_hex()

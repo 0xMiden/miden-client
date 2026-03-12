@@ -370,7 +370,7 @@ export async function applyTransactionDelta(
           });
         }
 
-        // Process map entries: value="" means removal
+        // Process map entries: read old → archive → update latest
         for (const entry of changedMapEntries) {
           const oldEntry = await db.latestStorageMapEntries
             .where("[accountId+slotName+key]")
@@ -385,6 +385,7 @@ export async function applyTransactionDelta(
             oldValue: oldEntry?.value ?? null,
           });
 
+          // "" means removal
           if (entry.value === "") {
             await db.latestStorageMapEntries
               .where("[accountId+slotName+key]")
@@ -415,6 +416,7 @@ export async function applyTransactionDelta(
             oldAsset: oldAsset?.asset ?? null,
           });
 
+          // "" means removal
           if (entry.asset === "") {
             await db.latestAccountAssets
               .where("[accountId+vaultKey]")
