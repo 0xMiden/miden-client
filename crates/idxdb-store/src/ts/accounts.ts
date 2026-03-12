@@ -370,7 +370,7 @@ export async function applyTransactionDelta(
           });
         }
 
-        // Process map entries: read old → archive → update latest
+        // Process map entries: value="" means removal
         for (const entry of changedMapEntries) {
           const oldEntry = await db.latestStorageMapEntries
             .where("[accountId+slotName+key]")
