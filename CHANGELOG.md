@@ -36,6 +36,7 @@
 * [BREAKING][type][web] `AuthSecretKey.getRpoFalcon512SecretKeyAsFelts()` and `getEcdsaK256KeccakSecretKeyAsFelts()` now return `Result<Vec<Felt>, JsValue>` instead of panicking on key type mismatch ([#1833](https://github.com/0xMiden/miden-client/pull/1833)).
 * [BREAKING][rename][cli] Renamed `CliConfig::from_system()` to `CliConfig::load()` and `CliClient::from_system_user_config()` to `CliClient::new()` for better discoverability ([#1848](https://github.com/0xMiden/miden-client/pull/1848)).
 * Removed `SmtForest` empty-root workaround in `AccountSmtForest::safe_pop_smts`, now that the upstream fix has landed in miden-crypto v0.19.7 ([#1864](https://github.com/0xMiden/miden-client/pull/1864)).
+* Removed miden-cli template TOMLs in favor of direct serialization into packages ([#1879](https://github.com/0xMiden/miden-client/pull/1879)).
 
 ### Features
 
