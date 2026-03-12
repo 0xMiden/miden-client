@@ -293,6 +293,7 @@ export async function applyTransactionDelta(dbId, accountId, nonce, updatedSlots
                     key: entry.key,
                     oldValue: oldEntry?.value ?? null,
                 });
+                // "" means removal
                 if (entry.value === "") {
                     await db.latestStorageMapEntries
                         .where("[accountId+slotName+key]")
@@ -321,6 +322,7 @@ export async function applyTransactionDelta(dbId, accountId, nonce, updatedSlots
                     faucetIdPrefix: entry.faucetIdPrefix,
                     oldAsset: oldAsset?.asset ?? null,
                 });
+                // "" means removal
                 if (entry.asset === "") {
                     await db.latestAccountAssets
                         .where("[accountId+vaultKey]")
@@ -438,6 +440,8 @@ export async function applyFullAccountState(dbId, accountState) {
             const oldMapKeys = new Set(oldMapEntries.map((e) => `${e.slotName}\0${e.key}`));
             const oldAssetKeys = new Set(oldAssets.map((a) => a.vaultKey));
             // Delete all latest entries and insert new
+            // Note: We could be more efficient by diffing old vs new and skipping unchanged entries,
+            // but replacing everything is simpler. Optimize only if needed.
             await db.latestAccountStorages
                 .where("accountId")
                 .equals(accountId)
@@ -653,6 +657,16 @@ export async function lockAccount(dbId, accountId) {
         logWebStoreError(error, `Error locking account: ${accountId}`);
     }
 }
+// Undoes discarded account states by restoring old values from historical.
+//
+// Steps:
+// 1. Resolve which (accountId, nonce) pairs correspond to the discarded commitments,
+//    searching both latest and historical headers.
+// 2. Group nonces by account and sort descending (most recent first).
+// 3. For each nonce, restore old values from historical to latest: non-null old values
+//    overwrite latest, null old values (genuinely new entries) cause deletion from latest.
+// 4. Restore the old header from the earliest discarded nonce.
+// 5. Clean up consumed historical entries.
 export async function undoAccountStates(dbId, accountCommitments) {
     try {
         const db = getDatabase(dbId);
@@ -691,9 +705,13 @@ export async function undoAccountStates(dbId, accountCommitments) {
                     accountNonces.get(histRecord.id).add(histRecord.nonce);
                 }
             }
-            // Step 2: Process each account, nonces in reverse order
+            // Step 2: Group nonces by account, sort descending (undo most recent first).
+            // Descending order is needed because each nonce's old value is the state before
+            // that nonce — processing most recent first lets earlier nonces overwrite with
+            // the correct final value.
             for (const [accountId, nonces] of accountNonces) {
                 const sortedNonces = [...nonces].sort((a, b) => Number(BigInt(b) - BigInt(a)));
+                // Step 3: Undo each nonce in descending order
                 for (const nonce of sortedNonces) {
                     // Restore old storage slots
                     const oldSlots = await db.historicalAccountStorages
@@ -758,43 +776,47 @@ export async function undoAccountStates(dbId, accountCommitments) {
                                 .delete();
                         }
                     }
-                    // Restore old header or delete account if no old header exists
-                    const oldHeader = await db.historicalAccountHeaders
-                        .where("[id+replacedAtNonce]")
-                        .equals([accountId, nonce])
-                        .first();
-                    if (oldHeader) {
-                        await db.latestAccountHeaders.put({
-                            id: oldHeader.id,
-                            codeRoot: oldHeader.codeRoot,
-                            storageRoot: oldHeader.storageRoot,
-                            vaultRoot: oldHeader.vaultRoot,
-                            nonce: oldHeader.nonce,
-                            committed: oldHeader.committed,
-                            accountSeed: oldHeader.accountSeed,
-                            accountCommitment: oldHeader.accountCommitment,
-                            locked: oldHeader.locked,
-                        });
-                    }
-                    else {
-                        await db.latestAccountHeaders
-                            .where("id")
-                            .equals(accountId)
-                            .delete();
-                        await db.latestAccountStorages
-                            .where("accountId")
-                            .equals(accountId)
-                            .delete();
-                        await db.latestStorageMapEntries
-                            .where("accountId")
-                            .equals(accountId)
-                            .delete();
-                        await db.latestAccountAssets
-                            .where("accountId")
-                            .equals(accountId)
-                            .delete();
-                    }
-                    // Delete consumed historical entries for this nonce
+                }
+                // Step 4: Restore old header from the earliest discarded nonce
+                const minNonce = sortedNonces[sortedNonces.length - 1];
+                const oldHeader = await db.historicalAccountHeaders
+                    .where("[id+replacedAtNonce]")
+                    .equals([accountId, minNonce])
+                    .first();
+                if (oldHeader) {
+                    await db.latestAccountHeaders.put({
+                        id: oldHeader.id,
+                        codeRoot: oldHeader.codeRoot,
+                        storageRoot: oldHeader.storageRoot,
+                        vaultRoot: oldHeader.vaultRoot,
+                        nonce: oldHeader.nonce,
+                        committed: oldHeader.committed,
+                        accountSeed: oldHeader.accountSeed,
+                        accountCommitment: oldHeader.accountCommitment,
+                        locked: oldHeader.locked,
+                    });
+                }
+                else {
+                    // No previous state — delete the account entirely
+                    await db.latestAccountHeaders
+                        .where("id")
+                        .equals(accountId)
+                        .delete();
+                    await db.latestAccountStorages
+                        .where("accountId")
+                        .equals(accountId)
+                        .delete();
+                    await db.latestStorageMapEntries
+                        .where("accountId")
+                        .equals(accountId)
+                        .delete();
+                    await db.latestAccountAssets
+                        .where("accountId")
+                        .equals(accountId)
+                        .delete();
+                }
+                // Step 5: Delete consumed historical entries at discarded nonces
+                for (const nonce of sortedNonces) {
                     await db.historicalAccountStorages
                         .where("[accountId+replacedAtNonce]")
                         .equals([accountId, nonce])
