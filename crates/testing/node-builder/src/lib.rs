@@ -18,6 +18,7 @@ use miden_node_block_producer::{
 use miden_node_ntx_builder::NtxBuilderConfig;
 use miden_node_rpc::Rpc;
 use miden_node_store::{GenesisState, Store};
+use miden_node_utils::clap::{GrpcOptionsExternal, GrpcOptionsInternal};
 use miden_node_utils::crypto::get_rpo_random_coin;
 use miden_node_validator::{Validator, ValidatorSigner};
 use miden_protocol::account::auth::{AuthScheme, AuthSecretKey};
@@ -27,6 +28,7 @@ use miden_protocol::account::{
     AccountComponent,
     AccountComponentMetadata,
     AccountFile,
+    AccountType,
     StorageMap,
     StorageMapKey,
 };
@@ -34,7 +36,7 @@ use miden_protocol::asset::{Asset, FungibleAsset, TokenSymbol};
 use miden_protocol::block::FeeParameters;
 use miden_protocol::crypto::dsa::ecdsa_k256_keccak;
 use miden_protocol::testing::account_id::ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET;
-use miden_protocol::utils::Serializable;
+use miden_protocol::utils::serde::Serializable;
 use miden_protocol::{Felt, ONE, Word};
 use miden_standards::AuthMethod;
 use miden_standards::account::auth::AuthSingleSig;
@@ -50,7 +52,6 @@ pub const DEFAULT_BLOCK_INTERVAL: u64 = 5_000;
 pub const DEFAULT_BATCH_INTERVAL: u64 = 2_000;
 pub const DEFAULT_RPC_PORT: u16 = 57_291;
 pub const GENESIS_ACCOUNT_FILE: &str = "account.mac";
-const DEFAULT_TIMEOUT_DURATION: Duration = Duration::from_secs(10);
 
 /// Builder for configuring and starting a Miden node with all components.
 pub struct NodeBuilder {
@@ -138,8 +139,12 @@ impl NodeBuilder {
         );
 
         // Bootstrap the store database
-        Store::bootstrap(genesis_state, &self.data_directory)
+        let genesis_block = genesis_state
+            .into_block()
             .await
+            .with_context(|| "failed to create genesis block")?;
+
+        Store::bootstrap(&genesis_block, &self.data_directory)
             .with_context(|| "failed to bootstrap store")?;
 
         // Start listening on all gRPC urls so that inter-component connections can be created
@@ -207,7 +212,7 @@ impl NodeBuilder {
                 async move {
                     Validator {
                         address: validator_address,
-                        grpc_timeout: DEFAULT_TIMEOUT_DURATION,
+                        grpc_options: GrpcOptionsInternal::default(),
                         signer: ValidatorSigner::Local(validator_signer),
                         data_directory: self.data_directory,
                     }
@@ -234,7 +239,7 @@ impl NodeBuilder {
                     store_url,
                     block_producer_url,
                     validator_url,
-                    grpc_timeout: DEFAULT_TIMEOUT_DURATION,
+                    grpc_options: GrpcOptionsExternal::default(),
                 }
                 .serve()
                 .await
@@ -290,7 +295,7 @@ impl NodeBuilder {
                         block_producer_listener,
                         ntx_builder_listener,
                         block_prover_url: None,
-                        grpc_timeout: DEFAULT_TIMEOUT_DURATION,
+                        grpc_options: GrpcOptionsInternal::default(),
                     }
                     .serve()
                     .await
@@ -321,7 +326,7 @@ impl NodeBuilder {
                 BlockProducer {
                     block_producer_address,
                     store_url,
-                    grpc_timeout: DEFAULT_TIMEOUT_DURATION,
+                    grpc_options: GrpcOptionsInternal::default(),
                     batch_prover_url: None,
                     validator_url,
                     batch_interval,
@@ -408,10 +413,11 @@ impl NodeHandle {
 
 fn generate_genesis_account() -> anyhow::Result<AccountFile> {
     let mut rng = ChaCha20Rng::from_seed(random());
-    let secret = AuthSecretKey::new_falcon512_rpo_with_rng(&mut get_rpo_random_coin(&mut rng));
+    let secret =
+        AuthSecretKey::new_falcon512_poseidon2_with_rng(&mut get_rpo_random_coin(&mut rng));
 
     let auth_method = AuthMethod::SingleSig {
-        approver: (secret.public_key().to_commitment(), AuthScheme::Falcon512Rpo),
+        approver: (secret.public_key().to_commitment(), AuthScheme::Falcon512Poseidon2),
     };
 
     let account = create_basic_fungible_faucet(
@@ -466,7 +472,8 @@ const ASSET_AMOUNT_PER_FAUCET: u64 = 100;
 /// retrieval and asset handling.
 fn build_test_faucets_and_account() -> anyhow::Result<Vec<Account>> {
     let mut rng = ChaCha20Rng::from_seed(random());
-    let secret = AuthSecretKey::new_falcon512_rpo_with_rng(&mut get_rpo_random_coin(&mut rng));
+    let secret =
+        AuthSecretKey::new_falcon512_poseidon2_with_rng(&mut get_rpo_random_coin(&mut rng));
 
     let faucets = create_test_faucets(&secret)?;
     let account = create_test_account_with_many_assets(&faucets)?;
@@ -498,7 +505,7 @@ fn create_single_test_faucet(index: u128, secret: &AuthSecretKey) -> anyhow::Res
         .expect("concatenating two 16-byte arrays yields exactly 32 bytes");
 
     let auth_scheme = AuthMethod::SingleSig {
-        approver: (secret.public_key().to_commitment(), AuthScheme::Falcon512Rpo),
+        approver: (secret.public_key().to_commitment(), AuthScheme::Falcon512Poseidon2),
     };
 
     let faucet = create_basic_fungible_faucet(
@@ -518,14 +525,15 @@ fn create_single_test_faucet(index: u128, secret: &AuthSecretKey) -> anyhow::Res
 /// Creates a test account holding assets from all provided faucets.
 /// The account also includes a large storage map to test storage capacity limits.
 fn create_test_account_with_many_assets(faucets: &[Account]) -> anyhow::Result<Account> {
-    let sk =
-        AuthSecretKey::new_falcon512_rpo_with_rng(&mut ChaCha20Rng::from_seed(TEST_ACCOUNT_SEED));
+    let sk = AuthSecretKey::new_falcon512_poseidon2_with_rng(&mut ChaCha20Rng::from_seed(
+        TEST_ACCOUNT_SEED,
+    ));
 
     let storage_map = create_large_storage_map();
     let acc_component = AccountComponent::new(
         basic_wallet_library(),
         vec![storage_map],
-        AccountComponentMetadata::new("miden::testing::basic_wallet").with_supports_all_types(),
+        AccountComponentMetadata::new("miden::testing::basic_wallet", AccountType::all()),
     )
     .expect("basic wallet component should satisfy account component requirements");
 
@@ -539,7 +547,7 @@ fn create_test_account_with_many_assets(faucets: &[Account]) -> anyhow::Result<A
     let account = AccountBuilder::new(TEST_ACCOUNT_SEED)
         .with_auth_component(AuthSingleSig::new(
             sk.public_key().to_commitment(),
-            AuthScheme::Falcon512Rpo,
+            AuthScheme::Falcon512Poseidon2,
         ))
         .account_type(miden_protocol::account::AccountType::RegularAccountUpdatableCode)
         .with_component(acc_component)

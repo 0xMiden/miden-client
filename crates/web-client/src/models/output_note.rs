@@ -7,7 +7,7 @@ use super::note_assets::NoteAssets;
 use super::note_id::NoteId;
 use super::note_metadata::NoteMetadata;
 use super::word::Word;
-use crate::models::miden_arrays::RawOutputNoteArray;
+use crate::models::miden_arrays::OutputNoteArray;
 
 /// Representation of a note produced by a transaction (full or partial).
 #[derive(Clone)]
@@ -87,14 +87,14 @@ impl From<&OutputNote> for RawOutputNote {
 // CONVERSIONS
 // ================================================================================================
 
-impl From<RawOutputNoteArray> for Vec<RawOutputNote> {
-    fn from(output_notes_array: RawOutputNoteArray) -> Self {
+impl From<OutputNoteArray> for Vec<RawOutputNote> {
+    fn from(output_notes_array: OutputNoteArray) -> Self {
         output_notes_array.__inner.into_iter().map(Into::into).collect()
     }
 }
 
-impl From<&RawOutputNoteArray> for Vec<RawOutputNote> {
-    fn from(output_notes_array: &RawOutputNoteArray) -> Self {
+impl From<&OutputNoteArray> for Vec<RawOutputNote> {
+    fn from(output_notes_array: &OutputNoteArray) -> Self {
         output_notes_array.__inner.iter().cloned().map(Into::into).collect()
     }
 }

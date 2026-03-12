@@ -21,7 +21,7 @@ use crate::models::miden_arrays::{
     NoteAndArgsArray,
     NoteDetailsAndTagArray,
     NoteRecipientArray,
-    RawOutputNoteArray,
+    OutputNoteArray,
 };
 use crate::models::transaction_request::TransactionRequest;
 use crate::models::transaction_script::TransactionScript;
@@ -54,7 +54,7 @@ impl TransactionRequestBuilder {
 
     /// Adds notes created by the sender that should be emitted by the transaction.
     #[wasm_bindgen(js_name = "withOwnOutputNotes")]
-    pub fn with_own_output_notes(mut self, notes: &RawOutputNoteArray) -> Result<Self, JsValue> {
+    pub fn with_own_output_notes(mut self, notes: &OutputNoteArray) -> Result<Self, JsValue> {
         let raw_output_notes: Vec<miden_client::transaction::RawOutputNote> = notes.into();
         let native_proven_notes: Result<Vec<NativeProvenOutputNote>, _> =
             raw_output_notes.into_iter().map(|raw_note| raw_note.to_output_note()).collect();

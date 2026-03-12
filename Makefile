@@ -14,16 +14,13 @@ WEB_CLIENT_DIR=crates/web-client
 RUST_CLIENT_DIR=crates/rust-client
 
 EXCLUDE_WASM_PACKAGES=--exclude miden-client-web --exclude miden-idxdb-store
-# node-builder is excluded because its transitive dependency (miden-large-smt-backend-rocksdb)
-# has upstream compile errors in the current node branch. Remove this once the node is fixed.
-EXCLUDE_NODE_BUILDER=--exclude node-builder
 NOTE_TRANSPORT_ENDPOINT=http://127.0.0.1:57292
 
 # --- Linting -------------------------------------------------------------------------------------
 
 .PHONY: clippy
 clippy: ## Run Clippy with configs. We need two separate commands because the `testing-remote-prover` cannot be built along with the rest of the workspace. This is because they use different versions of the `miden-tx` crate which aren't compatible with each other.
-	cargo clippy --workspace $(EXCLUDE_WASM_PACKAGES) $(EXCLUDE_NODE_BUILDER) --exclude testing-remote-prover --all-targets -- -D warnings
+	cargo clippy --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --all-targets -- -D warnings
 	cargo clippy --package testing-remote-prover --all-targets -- -D warnings
 
 .PHONY: clippy-wasm
@@ -33,7 +30,7 @@ clippy-wasm: rust-client-ts-build ## Run Clippy for the wasm packages (web clien
 
 .PHONY: fix
 fix: ## Run Fix with configs, building tests with proper features to avoid type split.
-	cargo +nightly fix --workspace $(EXCLUDE_WASM_PACKAGES) $(EXCLUDE_NODE_BUILDER) --exclude testing-remote-prover --features "testing std" --all-targets --allow-staged --allow-dirty
+	cargo +nightly fix --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --features "testing std" --all-targets --allow-staged --allow-dirty
 	cargo +nightly fix --package testing-remote-prover --all-targets --allow-staged --allow-dirty
 
 .PHONY: fix-wasm

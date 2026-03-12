@@ -2967,9 +2967,9 @@ dependencies = [
 
 [[package]]
 name = "miden-crypto"
-version = "0.22.4"
+version = "0.22.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4b8fc3ec2033d3e17a40611f3ab7c20b0578ccf5e6ddcc9a1df9f26599e6ebdd"
+checksum = "e66531081b0cee8b83d5eacc4e557b36b94de9ba844c69f0266b97fc815a4f80"
 dependencies = [
  "blake3",
  "cc",
@@ -3087,7 +3087,7 @@ dependencies = [
 [[package]]
 name = "miden-large-smt-backend-rocksdb"
 version = "0.14.0-beta.1"
-source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-claude%2Fupdate-base-to-beta#765169bf31045a766b00b12f2b27cf65566d849c"
+source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-claude%2Fupdate-base-to-beta#4d5399127d1e65354c2d1c80d92acfb9e492f5fb"
 dependencies = [
  "miden-crypto",
  "miden-node-rocksdb-cxx-linkage-fix",
@@ -3148,7 +3148,7 @@ dependencies = [
 [[package]]
 name = "miden-node-block-producer"
 version = "0.14.0-beta.1"
-source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-claude%2Fupdate-base-to-beta#765169bf31045a766b00b12f2b27cf65566d849c"
+source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-claude%2Fupdate-base-to-beta#4d5399127d1e65354c2d1c80d92acfb9e492f5fb"
 dependencies = [
  "anyhow",
  "futures",
@@ -3174,7 +3174,7 @@ dependencies = [
 [[package]]
 name = "miden-node-db"
 version = "0.14.0-beta.1"
-source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-claude%2Fupdate-base-to-beta#765169bf31045a766b00b12f2b27cf65566d849c"
+source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-claude%2Fupdate-base-to-beta#4d5399127d1e65354c2d1c80d92acfb9e492f5fb"
 dependencies = [
  "deadpool",
  "deadpool-diesel",
@@ -3188,7 +3188,7 @@ dependencies = [
 [[package]]
 name = "miden-node-grpc-error-macro"
 version = "0.14.0-beta.1"
-source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-claude%2Fupdate-base-to-beta#765169bf31045a766b00b12f2b27cf65566d849c"
+source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-claude%2Fupdate-base-to-beta#4d5399127d1e65354c2d1c80d92acfb9e492f5fb"
 dependencies = [
  "quote",
  "syn 2.0.117",
@@ -3197,7 +3197,7 @@ dependencies = [
 [[package]]
 name = "miden-node-ntx-builder"
 version = "0.14.0-beta.1"
-source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-claude%2Fupdate-base-to-beta#765169bf31045a766b00b12f2b27cf65566d849c"
+source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-claude%2Fupdate-base-to-beta#4d5399127d1e65354c2d1c80d92acfb9e492f5fb"
 dependencies = [
  "anyhow",
  "build-rs",
@@ -3224,7 +3224,7 @@ dependencies = [
 [[package]]
 name = "miden-node-proto"
 version = "0.14.0-beta.1"
-source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-claude%2Fupdate-base-to-beta#765169bf31045a766b00b12f2b27cf65566d849c"
+source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-claude%2Fupdate-base-to-beta#4d5399127d1e65354c2d1c80d92acfb9e492f5fb"
 dependencies = [
  "anyhow",
  "build-rs",
@@ -3248,7 +3248,7 @@ dependencies = [
 [[package]]
 name = "miden-node-proto-build"
 version = "0.14.0-beta.1"
-source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-claude%2Fupdate-base-to-beta#765169bf31045a766b00b12f2b27cf65566d849c"
+source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-claude%2Fupdate-base-to-beta#4d5399127d1e65354c2d1c80d92acfb9e492f5fb"
 dependencies = [
  "build-rs",
  "fs-err",
@@ -3260,12 +3260,12 @@ dependencies = [
 [[package]]
 name = "miden-node-rocksdb-cxx-linkage-fix"
 version = "0.14.0-beta.1"
-source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-claude%2Fupdate-base-to-beta#765169bf31045a766b00b12f2b27cf65566d849c"
+source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-claude%2Fupdate-base-to-beta#4d5399127d1e65354c2d1c80d92acfb9e492f5fb"
 
 [[package]]
 name = "miden-node-rpc"
 version = "0.14.0-beta.1"
-source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-claude%2Fupdate-base-to-beta#765169bf31045a766b00b12f2b27cf65566d849c"
+source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-claude%2Fupdate-base-to-beta#4d5399127d1e65354c2d1c80d92acfb9e492f5fb"
 dependencies = [
  "anyhow",
  "futures",
@@ -3292,7 +3292,7 @@ dependencies = [
 [[package]]
 name = "miden-node-store"
 version = "0.14.0-beta.1"
-source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-claude%2Fupdate-base-to-beta#765169bf31045a766b00b12f2b27cf65566d849c"
+source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-claude%2Fupdate-base-to-beta#4d5399127d1e65354c2d1c80d92acfb9e492f5fb"
 dependencies = [
  "anyhow",
  "build-rs",
@@ -3334,11 +3334,12 @@ dependencies = [
 [[package]]
 name = "miden-node-utils"
 version = "0.14.0-beta.1"
-source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-claude%2Fupdate-base-to-beta#765169bf31045a766b00b12f2b27cf65566d849c"
+source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-claude%2Fupdate-base-to-beta#4d5399127d1e65354c2d1c80d92acfb9e492f5fb"
 dependencies = [
  "anyhow",
  "bytes",
  "clap",
+ "fs-err",
  "governor",
  "http 1.4.0",
  "http-body-util",
@@ -3366,7 +3367,7 @@ dependencies = [
 [[package]]
 name = "miden-node-validator"
 version = "0.14.0-beta.1"
-source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-claude%2Fupdate-base-to-beta#765169bf31045a766b00b12f2b27cf65566d849c"
+source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-claude%2Fupdate-base-to-beta#4d5399127d1e65354c2d1c80d92acfb9e492f5fb"
 dependencies = [
  "anyhow",
  "aws-config",
@@ -3481,7 +3482,7 @@ dependencies = [
 [[package]]
 name = "miden-remote-prover-client"
 version = "0.14.0-beta.1"
-source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-claude%2Fupdate-base-to-beta#765169bf31045a766b00b12f2b27cf65566d849c"
+source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-claude%2Fupdate-base-to-beta#4d5399127d1e65354c2d1c80d92acfb9e492f5fb"
 dependencies = [
  "build-rs",
  "fs-err",
@@ -4667,7 +4668,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "343d3bd7056eda839b03204e68deff7d1b13aba7af2b2fd16890697274262ee7"
 dependencies = [
  "heck",
- "itertools 0.14.0",
+ "itertools 0.13.0",
  "log",
  "multimap",
  "petgraph 0.8.3",
@@ -4688,7 +4689,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "27c6023962132f4b30eb4c172c91ce92d933da334c59c23cddee82358ddafb0b"
 dependencies = [
  "anyhow",
- "itertools 0.14.0",
+ "itertools 0.13.0",
  "proc-macro2",
  "quote",
  "syn 2.0.117",
