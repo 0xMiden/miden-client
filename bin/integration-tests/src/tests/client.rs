@@ -37,7 +37,7 @@ use miden_client::transaction::{
     TransactionRequestBuilder,
     TransactionStatus,
 };
-use miden_client::{ClientError, Deserializable, Felt, Serializable};
+use miden_client::{ClientError, Felt};
 use miden_client_sqlite_store::ClientBuilderSqliteExt;
 use tracing::info;
 
