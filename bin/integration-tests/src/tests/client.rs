@@ -11,19 +11,12 @@ use miden_client::account::{
     StorageSlot,
     StorageSlotName,
 };
-use miden_client::assembly::{
-    CodeBuilder,
-    DefaultSourceManager,
-    MastForest,
-    Module,
-    ModuleKind,
-    Path,
-};
+use miden_client::assembly::{CodeBuilder, DefaultSourceManager, Module, ModuleKind, Path};
 use miden_client::asset::{Asset, FungibleAsset};
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
 use miden_client::builder::ClientBuilder;
 use miden_client::keystore::FilesystemKeyStore;
-use miden_client::note::{NoteFile, NoteScript, NoteType};
+use miden_client::note::{NoteFile, NoteType};
 use miden_client::rpc::domain::account::FetchedAccount;
 use miden_client::store::{
     InputNoteRecord,
@@ -1449,17 +1442,9 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
         .await
         .unwrap();
 
-    // Remove debug decorators from original note script, as they are not persisted on submission
-    // (https://github.com/0xMiden/miden-base/issues/1812)
-    // normalize CSR storage to match deserialized form
-    let mast = (*note.script().mast()).clone();
-    let mast_bytes = mast.to_bytes();
-    let mast = MastForest::read_from_bytes(&mast_bytes)?;
-    let note_script = NoteScript::from_parts(Arc::new(mast), note.script().entrypoint());
-
     assert_eq!(node_nullifier.nullifier, nullifier);
     assert_eq!(node_nullifier_proof.leaf().entries().first().unwrap().0, nullifier.as_word());
-    assert_eq!(note_script, retrieved_note_script);
+    assert_eq!(*note.script(), retrieved_note_script);
     assert!(!sync_storage_maps.updates.is_empty());
     assert!(!account_vault_info.updates.is_empty());
     assert!(!transactions_info.transaction_records.is_empty());
