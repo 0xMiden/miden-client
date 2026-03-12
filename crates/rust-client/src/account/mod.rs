@@ -89,7 +89,10 @@ pub mod component {
 
     pub use miden_protocol::account::auth::*;
     pub use miden_protocol::account::component::{
+        FeltSchema,
         InitStorageData,
+        SchemaType,
+        StorageSchema,
         StorageSlotSchema,
         StorageValueName,
     };

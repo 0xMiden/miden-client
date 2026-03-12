@@ -1103,7 +1103,7 @@ fn new_faucet_cli(cli_path: &Path, storage_mode: AccountStorageMode) -> String {
         ["miden::standards::fungible_faucets::metadata"]
         decimals="10"
         max_supply="10000000"
-        ticker="BTC"
+        symbol="BTC"
         "#;
     let file_path = cli_path.join(INIT_DATA_FILENAME);
     fs::write(&file_path, init_storage_data_toml).unwrap();
@@ -1321,7 +1321,7 @@ fn create_account_with_acl_auth() {
     let init_storage_data_toml = r#"
         "miden::standards::auth::singlesig_acl::pub_key" = "0x0000000000000000000000000000000000000000000000000000000000000001"
         "miden::standards::auth::singlesig_acl::scheme" = "Falcon512Rpo"
-        "miden::standards::auth::singlesig_acl::config.num_tracked_procs" = "1"
+        "miden::standards::auth::singlesig_acl::config.num_trigger_procs" = "1"
         "miden::standards::auth::singlesig_acl::config.allow_unauthorized_output_notes" = "0"
         "miden::standards::auth::singlesig_acl::config.allow_unauthorized_input_notes" = "0"
 
