@@ -434,8 +434,7 @@ impl SqliteStore {
 
     /// Applies the account delta to the account state, updating the vault and storage maps.
     ///
-    /// Archives old values from latest to historical (at `replaced_at_nonce`) and updates
-    /// latest via INSERT OR REPLACE.
+    /// Archives old values from latest to historical and updates latest via INSERT OR REPLACE.
     pub(crate) fn apply_account_delta(
         tx: &Transaction<'_>,
         smt_forest: &mut AccountSmtForest,
@@ -506,8 +505,8 @@ impl SqliteStore {
 
     /// Undoes discarded account states by directly restoring old values from historical.
     ///
-    /// For each discarded state, the old values archived at `replaced_at_nonce` are restored
-    /// to latest. Entries with NULL old values (genuinely new entries) are deleted from latest.
+    /// For each discarded state, the old values from historical are restored to latest.
+    /// Entries with NULL old values (genuinely new entries) are deleted from latest.
     /// Multiple nonces per account are undone in reverse order (most recent first).
     pub(crate) fn undo_account_state(
         tx: &Transaction<'_>,
@@ -526,8 +525,8 @@ impl SqliteStore {
         );
 
         // Resolve (account_id, nonce) pairs for the discarded states.
-        // In the replaced_at_nonce schema, old headers are in historical and the most
-        // recent discarded state is in latest, so we query both tables.
+        // Old headers are in historical and the most recent discarded state is in
+        // latest, so we query both tables.
         let mut id_nonce_pairs: Vec<(String, u64)> = Vec::new();
         for query in [
             "SELECT id, nonce FROM latest_account_headers WHERE account_commitment IN rarray(?)",
@@ -750,7 +749,7 @@ impl SqliteStore {
             .next()
             .map(|(header, _)| header);
 
-        // Archive all old entries from latest → historical with replaced_at_nonce
+        // Archive all old entries from latest → historical
         tx.execute(
             "INSERT OR REPLACE INTO historical_account_storage \
              (account_id, replaced_at_nonce, slot_name, old_slot_value, slot_type) \
@@ -863,9 +862,8 @@ impl SqliteStore {
 
     /// Inserts a new account header into the latest table.
     ///
-    /// If `old_header` is provided, the old header is archived to the historical table
-    /// with `replaced_at_nonce` set to the new header's nonce. For initial inserts
-    /// (no previous state), pass `None` for `old_header`.
+    /// If `old_header` is provided, the old header is archived to the historical table.
+    /// For initial inserts (no previous state), pass `None` for `old_header`.
     fn insert_account_header(
         tx: &Transaction<'_>,
         new_header: &AccountHeader,

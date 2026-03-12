@@ -121,9 +121,9 @@ impl SqliteStore {
     /// Writes only the changed storage slots, archiving old values from latest to historical
     /// before overwriting.
     ///
-    /// For each changed slot, the old value is read from latest and archived to historical
-    /// with `replaced_at_nonce`. NULL `old_slot_value` means the slot was new. For map entries,
-    /// the old entry value is similarly archived before updating latest.
+    /// For each changed slot, the old value is read from latest and archived to historical.
+    /// NULL `old_slot_value` means the slot was new. For map entries, the old entry value is
+    /// similarly archived before updating latest.
     pub(crate) fn write_storage_delta(
         tx: &Transaction<'_>,
         account_id: AccountId,

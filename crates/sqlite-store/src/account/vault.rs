@@ -97,8 +97,7 @@ impl SqliteStore {
     ///
     /// The function updates the SMT forest with all asset changes and verifies that the resulting
     /// vault root matches the expected final state. It archives old values from latest to
-    /// historical with `replaced_at_nonce`, deletes removed assets from latest, then inserts
-    /// updated assets.
+    /// historical, deletes removed assets from latest, then inserts updated assets.
     pub(crate) fn apply_account_vault_delta(
         tx: &Transaction<'_>,
         smt_forest: &mut AccountSmtForest,

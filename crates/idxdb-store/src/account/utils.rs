@@ -203,7 +203,7 @@ pub async fn apply_transaction_delta(
         for (key, value) in map_delta.entries() {
             let value_str = if *value == EMPTY_WORD {
                 // value="" means removal — the JS side archives the old value
-                // to historical with replaced_at_nonce, then removes from latest
+                // to historical, then removes from latest
                 String::new()
             } else {
                 value.to_hex()
