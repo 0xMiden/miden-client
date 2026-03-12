@@ -41,9 +41,8 @@ const PACKAGE_DIR: &str = "packages";
 
 fn main() {
     // Basic wallet (no storage schema)
-    let basic_wallet_metadata = AccountComponentMetadata::new(BasicWallet::NAME)
-        .with_description("Basic wallet component for receiving and sending assets")
-        .with_supports_all_types();
+    let basic_wallet_metadata = AccountComponentMetadata::new(BasicWallet::NAME, AccountType::all())
+        .with_description("Basic wallet component for receiving and sending assets");
     build_package("basic-wallet", basic_wallet_library(), &basic_wallet_metadata, None);
 
     // Basic fungible faucet
@@ -65,9 +64,9 @@ fn main() {
             ],
         ),
     );
-    let basic_faucet_metadata = AccountComponentMetadata::new(BasicFungibleFaucet::NAME)
-        .with_description("Basic fungible faucet component for minting and burning tokens")
-        .with_supported_type(AccountType::FungibleFaucet)
+    let basic_faucet_metadata =
+        AccountComponentMetadata::new(BasicFungibleFaucet::NAME, [AccountType::FungibleFaucet])
+            .with_description("Basic fungible faucet component for minting and burning tokens")
         .with_storage_schema(
             StorageSchema::new([faucet_metadata_schema]).expect("storage schema should be valid"),
         );
@@ -79,11 +78,10 @@ fn main() {
     );
 
     // Basic auth (singlesig - supports both RPO Falcon and ECDSA)
-    let singlesig_metadata = AccountComponentMetadata::new(AuthSingleSig::NAME)
+    let singlesig_metadata = AccountComponentMetadata::new(AuthSingleSig::NAME, AccountType::all())
         .with_description(
             "Authentication component using ECDSA K256 Keccak or Rpo Falcon 512 signature scheme",
         )
-        .with_supports_all_types()
         .with_storage_schema(
             StorageSchema::new([
                 AuthSingleSig::public_key_slot_schema(),
@@ -99,9 +97,8 @@ fn main() {
 
     // No authentication component. Nonce is incremented on first transaction and when the account
     // state is changed. Provides no cryptographic authentication.
-    let no_auth_metadata = AccountComponentMetadata::new(NoAuth::NAME)
-        .with_description("No authentication component")
-        .with_supports_all_types();
+    let no_auth_metadata = AccountComponentMetadata::new(NoAuth::NAME, AccountType::all())
+        .with_description("No authentication component");
     build_package("no-auth", no_auth_library(), &no_auth_metadata, Some("auth"));
 
     // Multisig auth
@@ -116,9 +113,8 @@ fn main() {
         AuthMultisig::approver_scheme_ids_slot().clone(),
         StorageSlotSchema::map("Approver scheme IDs", SchemaType::u32(), SchemaType::native_word()),
     );
-    let multisig_metadata = AccountComponentMetadata::new(AuthMultisig::NAME)
+    let multisig_metadata = AccountComponentMetadata::new(AuthMultisig::NAME, AccountType::all())
         .with_description("Multisig authentication component using hybrid signature schemes")
-        .with_supports_all_types()
         .with_storage_schema(
             StorageSchema::new([
                 AuthMultisig::threshold_config_slot_schema(),
@@ -133,11 +129,10 @@ fn main() {
 
     // ACL auth
     let acl_metadata =
-        AccountComponentMetadata::new(AuthSingleSigAcl::NAME)
+        AccountComponentMetadata::new(AuthSingleSigAcl::NAME, AccountType::all())
             .with_description(
                 "Authentication component with procedure-based ACL using ECDSA K256 Keccak or Rpo Falcon 512 signature scheme",
             )
-            .with_supports_all_types()
             .with_storage_schema(
                 StorageSchema::new([
                     AuthSingleSigAcl::public_key_slot_schema(),
