@@ -644,7 +644,7 @@ impl SqliteStore {
         Ok(())
     }
 
-    /// Restores old values from historical entries at a specific `replaced_at_nonce`,
+    /// Restores old values from historical entries for a given nonce,
     /// undoing the changes made when that nonce was written.
     fn restore_old_values_for_nonce(
         tx: &Transaction<'_>,
