@@ -506,7 +506,7 @@ impl SqliteStore {
     /// Undoes discarded account states by restoring old values from historical.
     ///
     /// Steps:
-    /// 1. Resolve which (account_id, nonce) pairs correspond to the discarded commitments,
+    /// 1. Resolve which (`account_id`, nonce) pairs correspond to the discarded commitments,
     ///    searching both latest and historical headers.
     /// 2. Group nonces by account and process them in descending order (most recent first).
     /// 3. For each nonce, restore old values from historical to latest: non-NULL old values
