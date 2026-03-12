@@ -33,7 +33,7 @@ use miden_client::testing::common::{
     execute_tx_and_sync,
     insert_new_wallet,
 };
-use miden_client::transaction::{OutputNote, PublicOutputNote, TransactionRequestBuilder};
+use miden_client::transaction::TransactionRequestBuilder;
 use miden_client::utils::Serializable;
 use miden_client::{self, Client, DebugMode, Felt};
 use miden_client_cli::MIDEN_DIR;
@@ -713,9 +713,8 @@ async fn debug_mode_outputs_logs() -> Result<()> {
 
     // Send transaction and wait for it to be committed
     client.sync_state().await?;
-    let transaction_request = TransactionRequestBuilder::new()
-        .own_output_notes(vec![OutputNote::Public(PublicOutputNote::new(note.clone()).unwrap())])
-        .build()?;
+    let transaction_request =
+        TransactionRequestBuilder::new().own_output_notes(vec![note.clone()]).build()?;
     execute_tx_and_sync(&mut client, account.id(), transaction_request).await?;
 
     // Export the note

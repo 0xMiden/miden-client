@@ -40,12 +40,7 @@ use miden_client::testing::common::{
     wait_for_blocks,
     wait_for_tx,
 };
-use miden_client::transaction::{
-    OutputNote,
-    PublicOutputNote,
-    TransactionKernel,
-    TransactionRequestBuilder,
-};
+use miden_client::transaction::{TransactionKernel, TransactionRequestBuilder};
 use miden_client::{Felt, Word, ZERO};
 use rand::{Rng, RngCore};
 
@@ -190,7 +185,7 @@ pub async fn test_counter_contract_ntx(client_config: ClientConfig) -> Result<()
     for _ in 0..BUMP_NOTE_NUMBER {
         let network_note =
             get_network_note(native_account.id(), network_account.id(), &mut client.rng())?;
-        network_notes.push(OutputNote::Public(PublicOutputNote::new(network_note)?));
+        network_notes.push(network_note);
     }
 
     let tx_request = TransactionRequestBuilder::new().own_output_notes(network_notes).build()?;
@@ -242,7 +237,7 @@ pub async fn test_recall_note_before_ntx_consumes_it(client_config: ClientConfig
     let network_note = get_network_note(wallet.id(), network_account.id(), &mut client.rng())?;
     // Prepare both transactions
     let tx_request = TransactionRequestBuilder::new()
-        .own_output_notes(vec![OutputNote::Public(PublicOutputNote::new(network_note.clone())?)])
+        .own_output_notes(vec![network_note.clone()])
         .build()?;
 
     let bump_result = client.execute_transaction(wallet.id(), tx_request).await?;

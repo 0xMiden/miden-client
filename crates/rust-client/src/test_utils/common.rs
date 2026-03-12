@@ -14,7 +14,7 @@ use miden_protocol::account::{Account, AccountComponentMetadata, AccountId, Acco
 use miden_protocol::asset::{FungibleAsset, TokenSymbol};
 use miden_protocol::note::NoteType;
 use miden_protocol::testing::account_id::ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE;
-use miden_protocol::transaction::{OutputNote, PublicOutputNote, TransactionId};
+use miden_protocol::transaction::TransactionId;
 use miden_standards::account::auth::AuthSingleSig;
 use miden_standards::code_builder::CodeBuilder;
 use rand::RngCore;
@@ -490,22 +490,17 @@ pub fn mint_multiple_fungible_asset(
     let notes = target_id
         .iter()
         .map(|account_id| {
-            OutputNote::Public(
-                PublicOutputNote::new(
-                    P2idNote::create(
-                        asset.faucet_id(),
-                        *account_id,
-                        vec![asset.into()],
-                        note_type,
-                        NoteAttachment::default(),
-                        rng,
-                    )
-                    .unwrap(),
-                )
-                .unwrap(),
+            P2idNote::create(
+                asset.faucet_id(),
+                *account_id,
+                vec![asset.into()],
+                note_type,
+                NoteAttachment::default(),
+                rng,
             )
+            .unwrap()
         })
-        .collect::<Vec<OutputNote>>();
+        .collect::<Vec<Note>>();
 
     TransactionRequestBuilder::new().own_output_notes(notes).build().unwrap()
 }

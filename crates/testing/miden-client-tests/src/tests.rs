@@ -104,7 +104,7 @@ use miden_protocol::testing::account_id::{
     ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
     ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_UPDATABLE_CODE,
 };
-use miden_protocol::transaction::{OutputNote, PublicOutputNote, RawOutputNote, TransactionKernel};
+use miden_protocol::transaction::{RawOutputNote, TransactionKernel};
 use miden_protocol::vm::AdviceInputs;
 use miden_protocol::{EMPTY_WORD, Felt, ONE, Word};
 use miden_standards::account::faucets::BasicFungibleFaucet;
@@ -826,10 +826,8 @@ async fn note_without_asset() {
     let note = Note::new(vault.clone(), metadata, recipient.clone());
 
     // Create and execute transaction
-    let transaction_request = TransactionRequestBuilder::new()
-        .own_output_notes(vec![OutputNote::Public(PublicOutputNote::new(note).unwrap())])
-        .build()
-        .unwrap();
+    let transaction_request =
+        TransactionRequestBuilder::new().own_output_notes(vec![note]).build().unwrap();
 
     let transaction =
         Box::pin(client.execute_transaction(wallet.id(), transaction_request.clone())).await;
@@ -840,10 +838,8 @@ async fn note_without_asset() {
     let metadata = NoteMetadata::new(faucet.id(), NoteType::Private).with_tag(tag);
     let note = Note::new(vault, metadata, recipient);
 
-    let transaction_request = TransactionRequestBuilder::new()
-        .own_output_notes(vec![OutputNote::Public(PublicOutputNote::new(note).unwrap())])
-        .build()
-        .unwrap();
+    let transaction_request =
+        TransactionRequestBuilder::new().own_output_notes(vec![note]).build().unwrap();
 
     let error = Box::pin(client.submit_new_transaction(faucet.id(), transaction_request))
         .await
@@ -2641,9 +2637,7 @@ async fn consume_note_with_custom_script() {
     assert!(client.test_store().get_note_script(note_script.root()).await.is_err());
 
     let tx_request = TransactionRequestBuilder::new()
-        .own_output_notes(vec![OutputNote::Public(
-            PublicOutputNote::new(custom_note.clone()).unwrap(),
-        )])
+        .own_output_notes(vec![custom_note.clone()])
         .build()
         .unwrap();
     let _tx_id = Box::pin(client.submit_new_transaction(sender_id, tx_request)).await.unwrap();

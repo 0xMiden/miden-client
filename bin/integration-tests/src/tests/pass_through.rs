@@ -26,7 +26,7 @@ use miden_client::note::{
 };
 use miden_client::store::{InputNoteState, TransactionFilter};
 use miden_client::testing::common::*;
-use miden_client::transaction::{OutputNote, PublicOutputNote, TransactionRequestBuilder};
+use miden_client::transaction::TransactionRequestBuilder;
 use miden_client::{Client, ClientRng, Word};
 use rand::RngCore;
 use tracing::info;
@@ -100,10 +100,7 @@ pub async fn test_pass_through(client_config: ClientConfig) -> Result<()> {
         create_pass_through_note(sender.id(), target.id(), asset.into(), client.rng())?;
 
     let tx_request = TransactionRequestBuilder::new()
-        .own_output_notes(vec![
-            OutputNote::Public(PublicOutputNote::new(pass_through_note_1.clone())?),
-            OutputNote::Public(PublicOutputNote::new(pass_through_note_2.clone())?),
-        ])
+        .own_output_notes(vec![pass_through_note_1.clone(), pass_through_note_2.clone()])
         .build()?;
 
     execute_tx_and_sync(&mut client, sender.id(), tx_request).await?;

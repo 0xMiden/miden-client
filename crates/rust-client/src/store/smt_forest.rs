@@ -13,22 +13,8 @@ use miden_protocol::asset::{Asset, AssetVault, AssetVaultKey, AssetWitness};
 use miden_protocol::crypto::merkle::smt::{SMT_DEPTH, Smt, SmtForest};
 use miden_protocol::crypto::merkle::{EmptySubtreeRoots, MerkleError};
 use miden_protocol::{EMPTY_WORD, Word};
-use miden_tx::utils::serde::{Deserializable, Serializable};
 
 use super::StoreError;
-
-/// Converts an Asset to a Word by serializing and reading back as 4 u64 values (LE).
-fn asset_to_word(asset: &Asset) -> Word {
-    let bytes = asset.to_bytes();
-    // Asset serializes as 32 bytes (4 Felts * 8 bytes each)
-    let mut word = [miden_protocol::Felt::ZERO; 4];
-    for (i, chunk) in bytes.chunks(8).enumerate().take(4) {
-        let mut buf = [0u8; 8];
-        buf[..chunk.len()].copy_from_slice(chunk);
-        word[i] = miden_protocol::Felt::new(u64::from_le_bytes(buf));
-    }
-    Word::new(word)
-}
 
 /// Thin wrapper around `SmtForest` for account vault/storage proofs and updates.
 ///
@@ -73,11 +59,7 @@ impl AccountSmtForest {
             return Err(MerkleError::UntrackedKey(vault_key_word).into());
         }
 
-        let asset_bytes: Vec<u8> = asset_word
-            .iter()
-            .flat_map(|felt| felt.as_canonical_u64().to_le_bytes())
-            .collect();
-        let asset = Asset::read_from_bytes(&asset_bytes)?;
+        let asset = Asset::from_key_value_words(vault_key_word, asset_word)?;
         let witness = AssetWitness::new(proof)?;
         Ok((asset, witness))
     }
@@ -176,7 +158,7 @@ impl AccountSmtForest {
         let entries: Vec<(Word, Word)> = new_assets
             .map(|asset| {
                 let key: Word = asset.vault_key().into();
-                let value = asset_to_word(&asset);
+                let value = asset.to_value_word();
                 (key, value)
             })
             .chain(removed_vault_keys.map(|vault_key| (vault_key.into(), EMPTY_WORD)))
@@ -211,7 +193,7 @@ impl AccountSmtForest {
     pub fn insert_asset_nodes(&mut self, vault: &AssetVault) -> Result<(), StoreError> {
         let smt = Smt::with_entries(vault.assets().map(|asset| {
             let key: Word = asset.vault_key().into();
-            let value = asset_to_word(&asset);
+            let value = asset.to_value_word();
             (key, value)
         }))
         .map_err(StoreError::from)?;

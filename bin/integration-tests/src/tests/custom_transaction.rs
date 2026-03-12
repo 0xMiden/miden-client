@@ -17,8 +17,6 @@ use miden_client::testing::common::*;
 use miden_client::transaction::{
     AdviceMap,
     InputNote,
-    OutputNote,
-    PublicOutputNote,
     TransactionRequest,
     TransactionRequestBuilder,
 };
@@ -298,9 +296,8 @@ pub async fn test_onchain_notes_sync_with_tag(client_config: ClientConfig) -> Re
     let note = Note::new(note_assets, note_metadata, note_recipient);
 
     // Send transaction and wait for it to be committed
-    let tx_request = TransactionRequestBuilder::new()
-        .own_output_notes(vec![OutputNote::Public(PublicOutputNote::new(note.clone())?)])
-        .build()?;
+    let tx_request =
+        TransactionRequestBuilder::new().own_output_notes(vec![note.clone()]).build()?;
 
     let note = tx_request
         .expected_output_own_notes()
@@ -338,9 +335,8 @@ async fn mint_custom_note(
     let mut random_coin = RpoRandomCoin::new(Default::default());
     let note = create_custom_note(client, faucet_account_id, target_account_id, &mut random_coin)?;
 
-    let transaction_request = TransactionRequestBuilder::new()
-        .own_output_notes(vec![OutputNote::Public(PublicOutputNote::new(note.clone())?)])
-        .build()?;
+    let transaction_request =
+        TransactionRequestBuilder::new().own_output_notes(vec![note.clone()]).build()?;
 
     execute_tx_and_sync(client, faucet_account_id, transaction_request).await?;
     Ok(note)

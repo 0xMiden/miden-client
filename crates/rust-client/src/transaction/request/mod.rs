@@ -14,7 +14,6 @@ use miden_protocol::errors::{
     AccountError,
     AssetVaultError,
     NoteError,
-    OutputNoteError,
     StorageMapError,
     TransactionInputError,
     TransactionScriptError,
@@ -457,8 +456,6 @@ pub enum TransactionRequestError {
     InputNoteNotAuthenticated(NoteId),
     #[error("note {0} has already been consumed")]
     InputNoteAlreadyConsumed(NoteId),
-    #[error("internal error: own notes must contain full note data, not just a header")]
-    InvalidNoteVariant,
     #[error("sender account {0} is not tracked by this client or does not exist")]
     InvalidSenderAccount(AccountId),
     #[error("invalid transaction script")]
@@ -471,8 +468,6 @@ pub enum TransactionRequestError {
     NoteNotFound(String),
     #[error("failed to create note")]
     NoteCreationError(#[from] NoteError),
-    #[error("failed to create output note")]
-    OutputNoteCreationError(#[from] OutputNoteError),
     #[error("pay-to-ID note must contain at least one asset to transfer")]
     P2IDNoteWithoutAsset,
     #[error("error building script")]
@@ -517,7 +512,6 @@ mod tests {
         ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
         ACCOUNT_ID_SENDER,
     };
-    use miden_protocol::transaction::{OutputNote, PublicOutputNote};
     use miden_protocol::{EMPTY_WORD, Felt, Word};
     use miden_standards::account::auth::AuthSingleSig;
     use miden_standards::note::P2idNote;
@@ -604,10 +598,7 @@ mod tests {
                 .unwrap(),
                 ForeignAccount::private(&account).unwrap(),
             ])
-            .own_output_notes(vec![
-                OutputNote::Public(PublicOutputNote::new(notes.pop().unwrap()).unwrap()),
-                OutputNote::Public(PublicOutputNote::new(notes.pop().unwrap()).unwrap()),
-            ])
+            .own_output_notes(vec![notes.pop().unwrap(), notes.pop().unwrap()])
             .script_arg(rng.draw_word())
             .auth_arg(rng.draw_word())
             .build()

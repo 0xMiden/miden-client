@@ -28,6 +28,11 @@ version      = "0.14.0-beta.1"
 inherits  = "dev"
 opt-level = 1
 
+[profile.release]
+codegen-units = 1
+lto           = true
+strip         = true
+
 [workspace.dependencies]
 # Workspace crates
 idxdb-store               = { default-features = false, package = "miden-idxdb-store", path = "crates/idxdb-store", version = "0.14.0-beta.1" }
