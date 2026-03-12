@@ -8,6 +8,7 @@ use miden_client::account::{
     AccountBuilder,
     AccountId,
     AccountStorageMode,
+    AccountType,
     StorageSlot,
     StorageSlotName,
 };
@@ -39,7 +40,12 @@ use miden_client::testing::common::{
     wait_for_blocks,
     wait_for_tx,
 };
-use miden_client::transaction::{OutputNote, TransactionKernel, TransactionRequestBuilder};
+use miden_client::transaction::{
+    OutputNote,
+    PublicOutputNote,
+    TransactionKernel,
+    TransactionRequestBuilder,
+};
 use miden_client::{Felt, Word, ZERO};
 use rand::{Rng, RngCore};
 
@@ -129,8 +135,7 @@ async fn get_counter_contract_account(
     let counter_component = AccountComponent::new(
         counter_code,
         vec![counter_slot],
-        AccountComponentMetadata::new("miden::testing::counter_component")
-            .with_supports_all_types(),
+        AccountComponentMetadata::new("miden::testing::counter_component", AccountType::all()),
     )
     .map_err(|err| anyhow::anyhow!(err))
     .context("failed to create counter contract component")?;
@@ -141,7 +146,7 @@ async fn get_counter_contract_account(
     let incr_nonce_auth = AccountComponent::new(
         incr_nonce_auth_code,
         vec![],
-        AccountComponentMetadata::new("miden::testing::incr_nonce_auth").with_supports_all_types(),
+        AccountComponentMetadata::new("miden::testing::incr_nonce_auth", AccountType::all()),
     )
     .map_err(|err| anyhow::anyhow!(err))
     .context("failed to create increment nonce auth component")?;
@@ -185,7 +190,7 @@ pub async fn test_counter_contract_ntx(client_config: ClientConfig) -> Result<()
     for _ in 0..BUMP_NOTE_NUMBER {
         let network_note =
             get_network_note(native_account.id(), network_account.id(), &mut client.rng())?;
-        network_notes.push(OutputNote::Full(network_note));
+        network_notes.push(OutputNote::Public(PublicOutputNote::new(network_note)?));
     }
 
     let tx_request = TransactionRequestBuilder::new().own_output_notes(network_notes).build()?;
@@ -237,7 +242,7 @@ pub async fn test_recall_note_before_ntx_consumes_it(client_config: ClientConfig
     let network_note = get_network_note(wallet.id(), network_account.id(), &mut client.rng())?;
     // Prepare both transactions
     let tx_request = TransactionRequestBuilder::new()
-        .own_output_notes(vec![OutputNote::Full(network_note.clone())])
+        .own_output_notes(vec![OutputNote::Public(PublicOutputNote::new(network_note.clone())?)])
         .build()?;
 
     let bump_result = client.execute_transaction(wallet.id(), tx_request).await?;

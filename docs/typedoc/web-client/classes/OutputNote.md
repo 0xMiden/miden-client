@@ -6,7 +6,7 @@
 
 # Class: OutputNote
 
-Representation of a note produced by a transaction (full, partial, or header-only).
+Representation of a note produced by a transaction (full or partial).
 
 ## Methods
 
@@ -82,23 +82,11 @@ Returns the metadata that accompanies this output.
 
 > **recipientDigest**(): [`Word`](Word.md)
 
-Returns the recipient digest if the recipient is known.
+Returns the recipient digest.
 
 #### Returns
 
 [`Word`](Word.md)
-
-***
-
-### shrink()
-
-> **shrink**(): `OutputNote`
-
-Returns a more compact representation if possible (e.g. dropping details).
-
-#### Returns
-
-`OutputNote`
 
 ***
 
@@ -113,42 +101,6 @@ Wraps a full note output.
 ##### note
 
 [`Note`](Note.md)
-
-#### Returns
-
-`OutputNote`
-
-***
-
-### header()
-
-> `static` **header**(`note_header`): `OutputNote`
-
-Wraps only the header of a note.
-
-#### Parameters
-
-##### note\_header
-
-`NoteHeader`
-
-#### Returns
-
-`OutputNote`
-
-***
-
-### partial()
-
-> `static` **partial**(`partial_note`): `OutputNote`
-
-Wraps a partial note containing assets and recipient only.
-
-#### Parameters
-
-##### partial\_note
-
-`PartialNote`
 
 #### Returns
 

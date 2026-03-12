@@ -18,6 +18,7 @@ use miden_client::transaction::{
     AdviceMap,
     InputNote,
     OutputNote,
+    PublicOutputNote,
     TransactionRequest,
     TransactionRequestBuilder,
 };
@@ -298,7 +299,7 @@ pub async fn test_onchain_notes_sync_with_tag(client_config: ClientConfig) -> Re
 
     // Send transaction and wait for it to be committed
     let tx_request = TransactionRequestBuilder::new()
-        .own_output_notes(vec![OutputNote::Full(note.clone())])
+        .own_output_notes(vec![OutputNote::Public(PublicOutputNote::new(note.clone())?)])
         .build()?;
 
     let note = tx_request
@@ -338,7 +339,7 @@ async fn mint_custom_note(
     let note = create_custom_note(client, faucet_account_id, target_account_id, &mut random_coin)?;
 
     let transaction_request = TransactionRequestBuilder::new()
-        .own_output_notes(vec![OutputNote::Full(note.clone())])
+        .own_output_notes(vec![OutputNote::Public(PublicOutputNote::new(note.clone())?)])
         .build()?;
 
     execute_tx_and_sync(client, faucet_account_id, transaction_request).await?;
@@ -354,7 +355,8 @@ fn create_custom_note(
     target_account_id: AccountId,
     rng: &mut RpoRandomCoin,
 ) -> Result<Note> {
-    let expected_note_args = NOTE_ARGS.iter().map(|x| x.as_int().to_string()).collect::<Vec<_>>();
+    let expected_note_args =
+        NOTE_ARGS.iter().map(|x| x.as_canonical_u64().to_string()).collect::<Vec<_>>();
 
     let mem_addr: u32 = 1000;
 

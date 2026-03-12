@@ -1,4 +1,4 @@
-use miden_client::transaction::OutputNotes as NativeOutputNotes;
+use miden_client::transaction::RawOutputNotes;
 use wasm_bindgen::prelude::*;
 
 use super::output_note::OutputNote;
@@ -8,7 +8,7 @@ use super::word::Word;
 /// not produce any notes.
 #[derive(Clone)]
 #[wasm_bindgen]
-pub struct OutputNotes(pub(crate) NativeOutputNotes);
+pub struct OutputNotes(pub(crate) RawOutputNotes);
 
 #[wasm_bindgen]
 impl OutputNotes {
@@ -45,14 +45,14 @@ impl OutputNotes {
 // CONVERSIONS
 // ================================================================================================
 
-impl From<NativeOutputNotes> for OutputNotes {
-    fn from(native_notes: NativeOutputNotes) -> Self {
+impl From<RawOutputNotes> for OutputNotes {
+    fn from(native_notes: RawOutputNotes) -> Self {
         OutputNotes(native_notes)
     }
 }
 
-impl From<&NativeOutputNotes> for OutputNotes {
-    fn from(native_notes: &NativeOutputNotes) -> Self {
+impl From<&RawOutputNotes> for OutputNotes {
+    fn from(native_notes: &RawOutputNotes) -> Self {
         OutputNotes(native_notes.clone())
     }
 }

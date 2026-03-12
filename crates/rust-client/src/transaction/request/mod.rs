@@ -14,6 +14,7 @@ use miden_protocol::errors::{
     AccountError,
     AssetVaultError,
     NoteError,
+    OutputNoteError,
     StorageMapError,
     TransactionInputError,
     TransactionScriptError,
@@ -24,7 +25,13 @@ use miden_protocol::vm::AdviceMap;
 use miden_standards::account::interface::{AccountInterface, AccountInterfaceError};
 use miden_standards::code_builder::CodeBuilder;
 use miden_standards::errors::CodeBuilderError;
-use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
+use miden_tx::utils::serde::{
+    ByteReader,
+    ByteWriter,
+    Deserializable,
+    DeserializationError,
+    Serializable,
+};
 use thiserror::Error;
 
 mod builder;
@@ -119,7 +126,7 @@ impl TransactionRequest {
     }
 
     /// Returns the assets held by the transaction's input notes.
-    pub fn incoming_assets(&self) -> (BTreeMap<AccountId, u64>, BTreeSet<NonFungibleAsset>) {
+    pub fn incoming_assets(&self) -> (BTreeMap<AccountId, u64>, Vec<NonFungibleAsset>) {
         collect_assets(self.input_notes.iter().flat_map(|note| note.assets().iter()))
     }
 
@@ -187,6 +194,7 @@ impl TransactionRequest {
     }
 
     /// Returns the IDs of the required foreign accounts for the transaction request.
+    #[allow(clippy::mutable_key_type)]
     pub fn foreign_accounts(&self) -> &BTreeSet<ForeignAccount> {
         &self.foreign_accounts
     }
@@ -340,6 +348,7 @@ impl Serializable for TransactionRequest {
 }
 
 impl Deserializable for TransactionRequest {
+    #[allow(clippy::mutable_key_type)]
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         let input_notes = Vec::<Note>::read_from(source)?;
         let input_notes_args = Vec::<(NoteId, Option<NoteArgs>)>::read_from(source)?;
@@ -395,9 +404,9 @@ impl Deserializable for TransactionRequest {
 /// Accumulates fungible totals and collectable non-fungible assets from an iterator of assets.
 pub(crate) fn collect_assets<'a>(
     assets: impl Iterator<Item = &'a Asset>,
-) -> (BTreeMap<AccountId, u64>, BTreeSet<NonFungibleAsset>) {
+) -> (BTreeMap<AccountId, u64>, Vec<NonFungibleAsset>) {
     let mut fungible_balance_map = BTreeMap::new();
-    let mut non_fungible_set = BTreeSet::new();
+    let mut non_fungible_set = Vec::new();
 
     assets.for_each(|asset| match asset {
         Asset::Fungible(fungible) => {
@@ -407,7 +416,9 @@ pub(crate) fn collect_assets<'a>(
                 .or_insert(fungible.amount());
         },
         Asset::NonFungible(non_fungible) => {
-            non_fungible_set.insert(*non_fungible);
+            if !non_fungible_set.contains(non_fungible) {
+                non_fungible_set.push(*non_fungible);
+            }
         },
     });
 
@@ -460,6 +471,8 @@ pub enum TransactionRequestError {
     NoteNotFound(String),
     #[error("failed to create note")]
     NoteCreationError(#[from] NoteError),
+    #[error("failed to create output note")]
+    OutputNoteCreationError(#[from] OutputNoteError),
     #[error("pay-to-ID note must contain at least one asset to transfer")]
     P2IDNoteWithoutAsset,
     #[error("error building script")]
@@ -504,12 +517,12 @@ mod tests {
         ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
         ACCOUNT_ID_SENDER,
     };
-    use miden_protocol::transaction::OutputNote;
+    use miden_protocol::transaction::{OutputNote, PublicOutputNote};
     use miden_protocol::{EMPTY_WORD, Felt, Word};
     use miden_standards::account::auth::AuthSingleSig;
     use miden_standards::note::P2idNote;
     use miden_standards::testing::account_component::MockAccountComponent;
-    use miden_tx::utils::{Deserializable, Serializable};
+    use miden_tx::utils::serde::{Deserializable, Serializable};
 
     use super::{TransactionRequest, TransactionRequestBuilder};
     use crate::rpc::domain::account::AccountStorageRequirements;
@@ -518,8 +531,11 @@ mod tests {
     #[test]
     fn transaction_request_serialization() {
         assert_transaction_request_serialization_with(|| {
-            AuthSingleSig::new(PublicKeyCommitment::from(EMPTY_WORD), AuthScheme::Falcon512Rpo)
-                .into()
+            AuthSingleSig::new(
+                PublicKeyCommitment::from(EMPTY_WORD),
+                AuthScheme::Falcon512Poseidon2,
+            )
+            .into()
         });
     }
 
@@ -589,8 +605,8 @@ mod tests {
                 ForeignAccount::private(&account).unwrap(),
             ])
             .own_output_notes(vec![
-                OutputNote::Full(notes.pop().unwrap()),
-                OutputNote::Partial(notes.pop().unwrap().into()),
+                OutputNote::Public(PublicOutputNote::new(notes.pop().unwrap()).unwrap()),
+                OutputNote::Public(PublicOutputNote::new(notes.pop().unwrap()).unwrap()),
             ])
             .script_arg(rng.draw_word())
             .auth_arg(rng.draw_word())

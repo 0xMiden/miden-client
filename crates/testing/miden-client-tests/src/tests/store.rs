@@ -16,10 +16,10 @@ use crate::tests::create_test_client;
 fn create_account_data(account_id: u128) -> AccountFile {
     let account = Account::mock(
         account_id,
-        AuthSingleSig::new(PublicKeyCommitment::from(EMPTY_WORD), AuthSchemeId::Falcon512Rpo),
+        AuthSingleSig::new(PublicKeyCommitment::from(EMPTY_WORD), AuthSchemeId::Falcon512Poseidon2),
     );
 
-    AccountFile::new(account.clone(), vec![AuthSecretKey::new_falcon512_rpo()])
+    AccountFile::new(account.clone(), vec![AuthSecretKey::new_falcon512_poseidon2()])
 }
 
 fn create_ecdsa_account_data(account_id: u128) -> AccountFile {
@@ -28,7 +28,7 @@ fn create_ecdsa_account_data(account_id: u128) -> AccountFile {
         AuthSingleSig::new(PublicKeyCommitment::from(EMPTY_WORD), AuthSchemeId::EcdsaK256Keccak),
     );
 
-    AccountFile::new(account.clone(), vec![AuthSecretKey::new_falcon512_rpo()])
+    AccountFile::new(account.clone(), vec![AuthSecretKey::new_falcon512_poseidon2()])
 }
 
 pub fn create_initial_accounts_data() -> Vec<AccountFile> {
@@ -60,7 +60,7 @@ pub async fn try_add_account() {
 
     let account = Account::mock(
         ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
-        AuthSingleSig::new(PublicKeyCommitment::from(EMPTY_WORD), AuthSchemeId::Falcon512Rpo),
+        AuthSingleSig::new(PublicKeyCommitment::from(EMPTY_WORD), AuthSchemeId::Falcon512Poseidon2),
     );
 
     // The mock account has nonce 1, we need it to be 0 for the test.

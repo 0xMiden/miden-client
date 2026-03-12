@@ -148,6 +148,7 @@ export async function getAccountVaultAssets(dbId, accountId) {
             .toArray();
         const assets = allMatchingRecords.map((record) => {
             return {
+                vaultKey: record.vaultKey,
                 asset: record.asset,
             };
         });

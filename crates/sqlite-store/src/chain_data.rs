@@ -481,7 +481,7 @@ mod test {
 
             let proof = mmr.open(block_num).expect("valid proof");
             let mut idx = InOrderIndex::from_leaf_pos(block_num);
-            for node in proof.merkle_path.nodes() {
+            for node in proof.merkle_path().nodes() {
                 tracked_nodes.insert(idx.sibling(), *node);
                 idx = idx.parent();
             }
@@ -566,7 +566,10 @@ mod test {
         for block_num in tracked_blocks {
             let partial_proof = partial_mmr.open(block_num).expect("partial mmr query succeeds");
             assert!(partial_proof.is_some());
-            assert_eq!(partial_proof.unwrap(), mmr.open(block_num).unwrap());
+            assert_eq!(
+                partial_proof.unwrap().merkle_path(),
+                mmr.open(block_num).unwrap().merkle_path()
+            );
         }
     }
 }

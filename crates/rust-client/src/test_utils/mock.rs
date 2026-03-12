@@ -378,7 +378,7 @@ impl NodeRpcClient for MockRpcApi {
         Ok(NoteSyncInfo {
             chain_tip: self.get_chain_tip_block_num(),
             block_header: next_block,
-            mmr_path: self.get_mmr().open(block_num.as_usize()).unwrap().merkle_path,
+            mmr_path: self.get_mmr().open(block_num.as_usize()).unwrap().merkle_path().clone(),
             notes,
         })
     }

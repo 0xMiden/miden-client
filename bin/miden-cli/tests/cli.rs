@@ -33,7 +33,7 @@ use miden_client::testing::common::{
     execute_tx_and_sync,
     insert_new_wallet,
 };
-use miden_client::transaction::{OutputNote, TransactionRequestBuilder};
+use miden_client::transaction::{OutputNote, PublicOutputNote, TransactionRequestBuilder};
 use miden_client::utils::Serializable;
 use miden_client::{self, Client, DebugMode, Felt};
 use miden_client_cli::MIDEN_DIR;
@@ -714,7 +714,7 @@ async fn debug_mode_outputs_logs() -> Result<()> {
     // Send transaction and wait for it to be committed
     client.sync_state().await?;
     let transaction_request = TransactionRequestBuilder::new()
-        .own_output_notes(vec![OutputNote::Full(note.clone())])
+        .own_output_notes(vec![OutputNote::Public(PublicOutputNote::new(note.clone()).unwrap())])
         .build()?;
     execute_tx_and_sync(&mut client, account.id(), transaction_request).await?;
 
@@ -906,7 +906,7 @@ async fn new_wallet_with_deploy_flag() -> Result<()> {
     // Verify that the nonce is non-zero (account was deployed)
     // By convention, a nonce of 0 indicates an undeployed account
     assert!(
-        nonce.as_int() > 0,
+        nonce.as_canonical_u64() > 0,
         "Account nonce should be non-zero after deployment, but got: {nonce}"
     );
 

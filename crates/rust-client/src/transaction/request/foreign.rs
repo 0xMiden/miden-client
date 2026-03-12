@@ -12,7 +12,7 @@ use miden_protocol::account::{
 };
 use miden_protocol::asset::{AssetVault, PartialVault};
 use miden_protocol::transaction::AccountInputs;
-use miden_tx::utils::{Deserializable, DeserializationError, Serializable};
+use miden_tx::utils::serde::{Deserializable, DeserializationError, Serializable};
 
 use super::TransactionRequestError;
 use crate::rpc::domain::account::{
@@ -99,7 +99,7 @@ impl PartialOrd for ForeignAccount {
 }
 
 impl Serializable for ForeignAccount {
-    fn write_into<W: miden_tx::utils::ByteWriter>(&self, target: &mut W) {
+    fn write_into<W: miden_tx::utils::serde::ByteWriter>(&self, target: &mut W) {
         match self {
             ForeignAccount::Public(account_id, storage_requirements) => {
                 target.write(0u8);
@@ -115,9 +115,9 @@ impl Serializable for ForeignAccount {
 }
 
 impl Deserializable for ForeignAccount {
-    fn read_from<R: miden_tx::utils::ByteReader>(
+    fn read_from<R: miden_tx::utils::serde::ByteReader>(
         source: &mut R,
-    ) -> Result<Self, miden_tx::utils::DeserializationError> {
+    ) -> Result<Self, miden_tx::utils::serde::DeserializationError> {
         let account_type: u8 = source.read_u8()?;
         match account_type {
             0 => {

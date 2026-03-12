@@ -14,7 +14,7 @@ use miden_protocol::account::{Account, AccountComponentMetadata, AccountId, Acco
 use miden_protocol::asset::{FungibleAsset, TokenSymbol};
 use miden_protocol::note::NoteType;
 use miden_protocol::testing::account_id::ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE;
-use miden_protocol::transaction::{OutputNote, TransactionId};
+use miden_protocol::transaction::{OutputNote, PublicOutputNote, TransactionId};
 use miden_standards::account::auth::AuthSingleSig;
 use miden_standards::code_builder::CodeBuilder;
 use rand::RngCore;
@@ -77,11 +77,11 @@ pub async fn insert_new_wallet_with_seed(
     auth_scheme: AuthSchemeId,
 ) -> Result<(Account, AuthSecretKey), ClientError> {
     let (key_pair, auth_component) = match auth_scheme {
-        AuthSchemeId::Falcon512Rpo => {
-            let key_pair = AuthSecretKey::new_falcon512_rpo();
+        AuthSchemeId::Falcon512Poseidon2 => {
+            let key_pair = AuthSecretKey::new_falcon512_poseidon2();
             let auth_component = AuthSingleSig::new(
                 key_pair.public_key().to_commitment(),
-                AuthSchemeId::Falcon512Rpo,
+                AuthSchemeId::Falcon512Poseidon2,
             );
             (key_pair, auth_component)
         },
@@ -125,11 +125,11 @@ pub async fn insert_new_fungible_faucet(
     auth_scheme: AuthSchemeId,
 ) -> Result<(Account, AuthSecretKey), ClientError> {
     let (key_pair, auth_component) = match auth_scheme {
-        AuthSchemeId::Falcon512Rpo => {
-            let key_pair = AuthSecretKey::new_falcon512_rpo();
+        AuthSchemeId::Falcon512Poseidon2 => {
+            let key_pair = AuthSecretKey::new_falcon512_poseidon2();
             let auth_component = AuthSingleSig::new(
                 key_pair.public_key().to_commitment(),
-                AuthSchemeId::Falcon512Rpo,
+                AuthSchemeId::Falcon512Poseidon2,
             );
             (key_pair, auth_component)
         },
@@ -153,8 +153,7 @@ pub async fn insert_new_fungible_faucet(
     client.rng().fill_bytes(&mut init_seed);
 
     let symbol = TokenSymbol::new("TEST").unwrap();
-    let max_supply = Felt::try_from(9_999_999_u64.to_le_bytes().as_slice())
-        .expect("u64 can be safely converted to a field element");
+    let max_supply = Felt::new(9_999_999_u64);
 
     let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::FungibleFaucet)
@@ -491,14 +490,17 @@ pub fn mint_multiple_fungible_asset(
     let notes = target_id
         .iter()
         .map(|account_id| {
-            OutputNote::Full(
-                P2idNote::create(
-                    asset.faucet_id(),
-                    *account_id,
-                    vec![asset.into()],
-                    note_type,
-                    NoteAttachment::default(),
-                    rng,
+            OutputNote::Public(
+                PublicOutputNote::new(
+                    P2idNote::create(
+                        asset.faucet_id(),
+                        *account_id,
+                        vec![asset.into()],
+                        note_type,
+                        NoteAttachment::default(),
+                        rng,
+                    )
+                    .unwrap(),
                 )
                 .unwrap(),
             )
@@ -576,14 +578,14 @@ pub async fn insert_account_with_custom_component(
     let custom_component = AccountComponent::new(
         component_code,
         storage_slots,
-        AccountComponentMetadata::new("miden::testing::custom_component").with_supports_all_types(),
+        AccountComponentMetadata::new("miden::testing::custom_component", AccountType::all()),
     )
     .map_err(ClientError::AccountError)?;
 
     let mut init_seed = [0u8; 32];
     client.rng().fill_bytes(&mut init_seed);
 
-    let key_pair = AuthSecretKey::new_falcon512_rpo_with_rng(client.rng());
+    let key_pair = AuthSecretKey::new_falcon512_poseidon2_with_rng(client.rng());
     let pub_key = key_pair.public_key();
 
     let account = AccountBuilder::new(init_seed)
@@ -591,7 +593,7 @@ pub async fn insert_account_with_custom_component(
         .storage_mode(storage_mode)
         .with_auth_component(AuthSingleSig::new(
             pub_key.to_commitment(),
-            AuthSchemeId::Falcon512Rpo,
+            AuthSchemeId::Falcon512Poseidon2,
         ))
         .with_component(BasicWallet)
         .with_component(custom_component)

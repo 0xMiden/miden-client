@@ -22,7 +22,8 @@ use miden_protocol::block::BlockNumber;
 use miden_protocol::block::account_tree::AccountWitness;
 use miden_protocol::crypto::merkle::SparseMerklePath;
 use miden_protocol::crypto::merkle::smt::SmtProof;
-use miden_tx::utils::{Deserializable, Serializable, ToHex};
+use miden_tx::utils::ToHex;
+use miden_tx::utils::serde::{Deserializable, Serializable};
 use thiserror::Error;
 
 use crate::alloc::borrow::ToOwned;
@@ -489,12 +490,15 @@ impl TryFrom<proto::rpc::AccountVaultDetails> for AccountVaultDetails {
             .into_iter()
             .map(|asset| {
                 let native_digest: Word = asset
-                    .asset
-                    .ok_or(proto::rpc::AccountVaultDetails::missing_field(stringify!(assets)))?
+                    .value
+                    .ok_or(proto::rpc::AccountVaultDetails::missing_field(stringify!(value)))?
                     .try_into()?;
-                native_digest
-                    .try_into()
-                    .map_err(|_| RpcError::DeserializationError("asset".to_string()))
+                let bytes: Vec<u8> = native_digest
+                    .iter()
+                    .flat_map(|felt| felt.as_canonical_u64().to_le_bytes())
+                    .collect();
+                Asset::read_from_bytes(&bytes)
+                    .map_err(|e| RpcError::DeserializationError(e.to_string()))
             })
             .collect::<Result<Vec<Asset>, RpcError>>()?;
 
@@ -686,15 +690,15 @@ impl From<AccountStorageRequirements> for Vec<account_detail_request::StorageMap
 }
 
 impl Serializable for AccountStorageRequirements {
-    fn write_into<W: miden_tx::utils::ByteWriter>(&self, target: &mut W) {
+    fn write_into<W: miden_tx::utils::serde::ByteWriter>(&self, target: &mut W) {
         target.write(&self.0);
     }
 }
 
 impl Deserializable for AccountStorageRequirements {
-    fn read_from<R: miden_tx::utils::ByteReader>(
+    fn read_from<R: miden_tx::utils::serde::ByteReader>(
         source: &mut R,
-    ) -> Result<Self, miden_tx::utils::DeserializationError> {
+    ) -> Result<Self, miden_tx::utils::serde::DeserializationError> {
         Ok(AccountStorageRequirements(source.read()?))
     }
 }

@@ -19,7 +19,7 @@ use miden_protocol::note::{
     NoteType,
     PartialNote,
 };
-use miden_protocol::transaction::{OutputNote, TransactionScript};
+use miden_protocol::transaction::{OutputNote, PublicOutputNote, TransactionScript};
 use miden_protocol::vm::AdviceMap;
 use miden_protocol::{Felt, Word};
 use miden_standards::note::{P2idNote, P2ideNote, P2ideNoteStorage, SwapNote};
@@ -130,9 +130,10 @@ impl TransactionRequestBuilder {
     #[must_use]
     pub fn own_output_notes(mut self, notes: impl IntoIterator<Item = OutputNote>) -> Self {
         for note in notes {
-            if let OutputNote::Full(note) = &note {
+            if let OutputNote::Public(ref public_note) = note {
+                let inner_note = public_note.as_note();
                 self.expected_output_recipients
-                    .insert(note.recipient().digest(), note.recipient().clone());
+                    .insert(inner_note.recipient().digest(), inner_note.recipient().clone());
             }
 
             self.own_output_notes.push(note);
@@ -300,7 +301,11 @@ impl TransactionRequestBuilder {
             rng,
         )?;
 
-        self.own_output_notes(vec![OutputNote::Full(created_note)]).build()
+        self.own_output_notes(vec![OutputNote::Public(
+            PublicOutputNote::new(created_note)
+                .map_err(TransactionRequestError::OutputNoteCreationError)?,
+        )])
+        .build()
     }
 
     /// Consumes the builder and returns a [`TransactionRequest`] for a transaction to send a P2ID
@@ -330,7 +335,11 @@ impl TransactionRequestBuilder {
 
         let created_note = payment_data.into_note(note_type, rng)?;
 
-        self.own_output_notes(vec![OutputNote::Full(created_note)]).build()
+        self.own_output_notes(vec![OutputNote::Public(
+            PublicOutputNote::new(created_note)
+                .map_err(TransactionRequestError::OutputNoteCreationError)?,
+        )])
+        .build()
     }
 
     /// Consumes the builder and returns a [`TransactionRequest`] for a transaction to send a SWAP
@@ -367,7 +376,10 @@ impl TransactionRequestBuilder {
         let payback_tag = NoteTag::with_account_target(swap_data.account_id());
 
         self.expected_future_notes(vec![(payback_note_details, payback_tag)])
-            .own_output_notes(vec![OutputNote::Full(created_note)])
+            .own_output_notes(vec![OutputNote::Public(
+                PublicOutputNote::new(created_note)
+                    .map_err(TransactionRequestError::OutputNoteCreationError)?,
+            )])
             .build()
     }
 
@@ -408,9 +420,8 @@ impl TransactionRequestBuilder {
                     .own_output_notes
                     .into_iter()
                     .map(|note| match note {
-                        OutputNote::Header(_) => Err(TransactionRequestError::InvalidNoteVariant),
-                        OutputNote::Partial(note) => Ok(note),
-                        OutputNote::Full(note) => Ok(note.into()),
+                        OutputNote::Public(public_note) => Ok(public_note.into_note().into()),
+                        OutputNote::Private(_) => Err(TransactionRequestError::InvalidNoteVariant),
                     })
                     .collect::<Result<Vec<PartialNote>, _>>()?;
 

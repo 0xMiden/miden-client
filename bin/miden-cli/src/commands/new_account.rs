@@ -390,10 +390,10 @@ async fn create_client_account<AUTH: Keystore + Sync + 'static>(
         None
     } else {
         debug!("Adding default Falcon auth component");
-        let kp = AuthSecretKey::new_falcon512_rpo_with_rng(client.rng());
+        let kp = AuthSecretKey::new_falcon512_poseidon2_with_rng(client.rng());
         builder = builder.with_auth_component(AuthSingleSig::new(
             kp.public_key().to_commitment(),
-            AuthSchemeId::Falcon512Rpo,
+            AuthSchemeId::Falcon512Poseidon2,
         ));
         Some(kp)
     };

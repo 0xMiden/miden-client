@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use miden_client::account::AccountStorageMode;
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
 use miden_client::testing::common::{execute_tx_and_sync, insert_new_wallet, wait_for_blocks};
-use miden_client::transaction::{OutputNote, TransactionRequestBuilder};
+use miden_client::transaction::{OutputNote, PublicOutputNote, TransactionRequestBuilder};
 use miden_client::{Felt, Word, ZERO};
 
 use super::fpi::{FPI_STORAGE_VALUE, MAP_KEY, MAP_SLOT_NAME, deploy_foreign_account};
@@ -126,7 +126,7 @@ pub async fn test_network_fpi(client_config: ClientConfig) -> Result<()> {
     )?;
 
     let tx_request = TransactionRequestBuilder::new()
-        .own_output_notes([OutputNote::Full(network_note)])
+        .own_output_notes([OutputNote::Public(PublicOutputNote::new(network_note)?)])
         .build()?;
 
     execute_tx_and_sync(&mut client2, sender_account.id(), tx_request).await?;

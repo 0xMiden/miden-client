@@ -10,9 +10,15 @@ use alloc::vec::Vec;
 use futures::Stream;
 use miden_protocol::address::Address;
 use miden_protocol::note::{Note, NoteDetails, NoteFile, NoteHeader, NoteTag};
-use miden_protocol::utils::Serializable;
+use miden_protocol::utils::serde::Serializable;
 use miden_tx::auth::TransactionAuthenticator;
-use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, SliceReader};
+use miden_tx::utils::serde::{
+    ByteReader,
+    ByteWriter,
+    Deserializable,
+    DeserializationError,
+    SliceReader,
+};
 
 pub use self::errors::NoteTransportError;
 use crate::{Client, ClientError};

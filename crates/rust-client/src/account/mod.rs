@@ -189,7 +189,7 @@ impl<AUTH> Client<AUTH> {
                     return Err(ClientError::AccountAlreadyTracked(account.id()));
                 }
 
-                if tracked_account.nonce().as_int() > account.nonce().as_int() {
+                if tracked_account.nonce().as_canonical_u64() > account.nonce().as_canonical_u64() {
                     // If the new account is older than the one being tracked, return an error
                     return Err(ClientError::AccountNonceTooLow);
                 }
@@ -422,9 +422,10 @@ pub fn build_wallet_id(
 
     let auth_scheme = public_key.auth_scheme();
     let auth_component = match auth_scheme {
-        AuthSchemeId::Falcon512Rpo => {
+        AuthSchemeId::Falcon512Poseidon2 => {
             let auth_component: AccountComponent =
-                AuthSingleSig::new(public_key.to_commitment(), AuthSchemeId::Falcon512Rpo).into();
+                AuthSingleSig::new(public_key.to_commitment(), AuthSchemeId::Falcon512Poseidon2)
+                    .into();
             auth_component
         },
         AuthSchemeId::EcdsaK256Keccak => {

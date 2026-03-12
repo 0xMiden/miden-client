@@ -8,7 +8,7 @@ use miden_client::note::{
 use miden_client::transaction::{
     ForeignAccount as NativeForeignAccount,
     NoteArgs as NativeNoteArgs,
-    OutputNote as NativeOutputNote,
+    OutputNote as NativeProvenOutputNote,
     TransactionRequestBuilder as NativeTransactionRequestBuilder,
     TransactionScript as NativeTransactionScript,
 };
@@ -21,7 +21,7 @@ use crate::models::miden_arrays::{
     NoteAndArgsArray,
     NoteDetailsAndTagArray,
     NoteRecipientArray,
-    OutputNoteArray,
+    RawOutputNoteArray,
 };
 use crate::models::transaction_request::TransactionRequest;
 use crate::models::transaction_script::TransactionScript;
@@ -54,10 +54,14 @@ impl TransactionRequestBuilder {
 
     /// Adds notes created by the sender that should be emitted by the transaction.
     #[wasm_bindgen(js_name = "withOwnOutputNotes")]
-    pub fn with_own_output_notes(mut self, notes: &OutputNoteArray) -> Self {
-        let native_output_notes: Vec<NativeOutputNote> = notes.into();
-        self.0 = self.0.own_output_notes(native_output_notes);
-        self
+    pub fn with_own_output_notes(mut self, notes: &RawOutputNoteArray) -> Result<Self, JsValue> {
+        let raw_output_notes: Vec<miden_client::transaction::RawOutputNote> = notes.into();
+        let native_proven_notes: Result<Vec<NativeProvenOutputNote>, _> =
+            raw_output_notes.into_iter().map(|raw_note| raw_note.to_output_note()).collect();
+        let proven_notes = native_proven_notes
+            .map_err(|e| JsValue::from_str(&format!("Failed to convert output note: {e}")))?;
+        self.0 = self.0.own_output_notes(proven_notes);
+        Ok(self)
     }
 
     /// Attaches a custom transaction script.

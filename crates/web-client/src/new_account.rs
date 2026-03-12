@@ -91,11 +91,11 @@ impl WebClient {
 
             let native_scheme: NativeAuthScheme = auth_scheme.try_into()?;
             let (key_pair, auth_component) = match native_scheme {
-                NativeAuthScheme::Falcon512Rpo => {
-                    let key_pair = AuthSecretKey::new_falcon512_rpo_with_rng(&mut faucet_rng);
+                NativeAuthScheme::Falcon512Poseidon2 => {
+                    let key_pair = AuthSecretKey::new_falcon512_poseidon2_with_rng(&mut faucet_rng);
                     let auth_component: AccountComponent = AuthSingleSig::new(
                         key_pair.public_key().to_commitment(),
-                        NativeAuthScheme::Falcon512Rpo,
+                        NativeAuthScheme::Falcon512Poseidon2,
                     )
                     .into();
                     (key_pair, auth_component)
@@ -117,8 +117,7 @@ impl WebClient {
 
             let symbol =
                 TokenSymbol::new(token_symbol).map_err(|e| JsValue::from_str(&e.to_string()))?;
-            let max_supply = Felt::try_from(max_supply.to_le_bytes().as_slice())
-                .expect("u64 can be safely converted to a field element");
+            let max_supply = Felt::new(max_supply);
 
             let mut init_seed = [0u8; 32];
             faucet_rng.fill_bytes(&mut init_seed);

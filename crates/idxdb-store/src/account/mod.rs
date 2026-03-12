@@ -391,9 +391,10 @@ impl IdxdbStore {
 
         let assets = vault_assets_idxdb
             .into_iter()
-            .map(|asset| {
-                let word = Word::try_from(&asset.asset)?;
-                Ok(Asset::try_from(word)?)
+            .map(|entry| {
+                let key_word = Word::try_from(&entry.vault_key)?;
+                let value_word = Word::try_from(&entry.asset)?;
+                Ok(Asset::from_key_value_words(key_word, value_word)?)
             })
             .collect::<Result<Vec<_>, StoreError>>()?;
 
@@ -409,7 +410,7 @@ impl IdxdbStore {
             StoreError::DatabaseError(format!("failed to insert account code: {js_error:?}",))
         })?;
 
-        let nonce = account.nonce().as_int();
+        let nonce = account.nonce().as_canonical_u64();
         upsert_account_storage(self.db_id(), &account.id(), nonce, account.storage())
             .await
             .map_err(|js_error| {

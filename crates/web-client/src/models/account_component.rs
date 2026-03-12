@@ -5,6 +5,7 @@ use miden_client::account::component::{
 };
 use miden_client::account::{
     AccountComponentCode as NativeAccountComponentCode,
+    AccountType,
     StorageSlot as NativeStorageSlot,
 };
 use miden_client::assembly::{Library as NativeLibrary, MastNodeExt};
@@ -78,7 +79,7 @@ impl AccountComponent {
         NativeAccountComponent::new(
             native_account_code,
             native_slots,
-            AccountComponentMetadata::new("custom"),
+            AccountComponentMetadata::new("custom", AccountType::all()),
         )
         .map(AccountComponent)
         .map_err(|e| js_error_with_context(e, "Failed to compile account component"))
@@ -87,9 +88,10 @@ impl AccountComponent {
     /// Marks the component as supporting all account types.
     #[wasm_bindgen(js_name = "withSupportsAllTypes")]
     pub fn with_supports_all_types(self) -> Self {
-        let metadata = self.0.metadata().clone().with_supports_all_types();
         let code = self.0.component_code().clone();
         let slots = self.0.storage_slots().to_vec();
+        let name = self.0.metadata().name();
+        let metadata = AccountComponentMetadata::new(name, AccountType::all());
         AccountComponent(
             NativeAccountComponent::new(code, slots, metadata)
                 .expect("reconstructing component with updated metadata should not fail"),
@@ -149,7 +151,7 @@ impl AccountComponent {
     ) -> AccountComponent {
         match auth_scheme {
             AuthScheme::AuthRpoFalcon512 => {
-                let auth = NativeSingleSig::new(commitment, NativeAuthSchemeId::Falcon512Rpo);
+                let auth = NativeSingleSig::new(commitment, NativeAuthSchemeId::Falcon512Poseidon2);
                 AccountComponent(auth.into())
             },
             AuthScheme::AuthEcdsaK256Keccak => {
@@ -169,7 +171,7 @@ impl AccountComponent {
 
         let auth_scheme = match native_secret_key {
             NativeSecretKey::EcdsaK256Keccak(_) => AuthScheme::AuthEcdsaK256Keccak,
-            NativeSecretKey::Falcon512Rpo(_) => AuthScheme::AuthRpoFalcon512,
+            NativeSecretKey::Falcon512Poseidon2(_) => AuthScheme::AuthRpoFalcon512,
             // This is because the definition of NativeSecretKey has the
             // '#[non_exhaustive]' attribute, without this catch-all clause,
             // this is a compiler error.
@@ -211,7 +213,7 @@ impl AccountComponent {
         NativeAccountComponent::new(
             native_library,
             native_slots,
-            AccountComponentMetadata::new("custom"),
+            AccountComponentMetadata::new("custom", AccountType::all()),
         )
         .map(AccountComponent)
         .map_err(|e| js_error_with_context(e, "Failed to create account component from package"))
@@ -230,7 +232,7 @@ impl AccountComponent {
         NativeAccountComponent::new(
             native_library,
             native_slots,
-            AccountComponentMetadata::new("custom"),
+            AccountComponentMetadata::new("custom", AccountType::all()),
         )
         .map(AccountComponent)
         .map_err(|e| js_error_with_context(e, "Failed to create account component from library"))

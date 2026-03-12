@@ -14,7 +14,7 @@ use miden_protocol::note::{
     Nullifier,
 };
 use miden_protocol::transaction::{InputNote, TransactionId};
-use miden_protocol::utils::{
+use miden_protocol::utils::serde::{
     ByteReader,
     ByteWriter,
     Deserializable,

@@ -22,10 +22,10 @@ fn write_read_op_instructions(script: &mut String, op: &ReadOp) {
     writeln!(
         script,
         "    push.{}.{}.{}.{}",
-        key[3].as_int(),
-        key[2].as_int(),
-        key[1].as_int(),
-        key[0].as_int()
+        key[3].as_canonical_u64(),
+        key[2].as_canonical_u64(),
+        key[1].as_canonical_u64(),
+        key[0].as_canonical_u64()
     )
     .expect("write to string should not fail");
 
@@ -140,8 +140,8 @@ pub fn generate_expansion_tx_script(slot_idx: usize, entries: &[([Felt; 4], [Fel
         write!(
             script,
             "    push.{}.{}.{}.{}\n    push.{}.{}.{}.{}\n    call.storage_expander::{procedure_name}\n    dropw dropw dropw dropw\n\n",
-            value[3].as_int(), value[2].as_int(), value[1].as_int(), value[0].as_int(),
-            key[3].as_int(), key[2].as_int(), key[1].as_int(), key[0].as_int(),
+            value[3].as_canonical_u64(), value[2].as_canonical_u64(), value[1].as_canonical_u64(), value[0].as_canonical_u64(),
+            key[3].as_canonical_u64(), key[2].as_canonical_u64(), key[1].as_canonical_u64(), key[0].as_canonical_u64(),
         )
         .expect("write to string should not fail");
     }

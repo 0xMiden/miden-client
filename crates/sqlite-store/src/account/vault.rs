@@ -34,25 +34,27 @@ impl SqliteStore {
             .map(|(faucet_id, _)| Value::Text(faucet_id.prefix().to_hex()))
             .collect::<Vec<Value>>();
 
-        const QUERY: &str = "SELECT asset FROM latest_account_assets WHERE account_id = ? AND faucet_id_prefix IN rarray(?)";
+        const QUERY: &str = "SELECT vault_key, asset FROM latest_account_assets WHERE account_id = ? AND faucet_id_prefix IN rarray(?)";
 
         Ok(conn
             .prepare(QUERY)
             .into_store_error()?
             .query_map(params![account_id.to_hex(), Rc::new(fungible_faucet_prefixes)], |row| {
-                let asset: String = row.get(0)?;
-                Ok(asset)
+                let vault_key: String = row.get(0)?;
+                let asset: String = row.get(1)?;
+                Ok((vault_key, asset))
             })
             .into_store_error()?
             .map(|result| {
-                let asset_str: String = result.into_store_error()?;
-                let word = Word::try_from(asset_str)?;
-                Ok(Asset::try_from(word)?)
+                let (vault_key_str, asset_str): (String, String) = result.into_store_error()?;
+                let key_word = Word::try_from(vault_key_str)?;
+                let value_word = Word::try_from(asset_str)?;
+                Ok(Asset::from_key_value_words(key_word, value_word)?)
             })
             .collect::<Result<Vec<Asset>, StoreError>>()?
             .into_iter()
             // SAFETY: all retrieved assets should be fungible
-            .map(|asset| (asset.faucet_id_prefix(), asset.unwrap_fungible()))
+            .map(|asset| (asset.faucet_id().prefix(), asset.unwrap_fungible()))
             .collect())
     }
 
@@ -93,8 +95,8 @@ impl SqliteStore {
         for asset in assets {
             let vault_key_word: Word = asset.vault_key().into();
             let vault_key_hex = vault_key_word.to_hex();
-            let faucet_prefix_hex = asset.faucet_id_prefix().to_hex();
-            let asset_hex = Word::from(asset).to_hex();
+            let faucet_prefix_hex = asset.faucet_id().prefix().to_hex();
+            let asset_hex = asset.to_value_word().to_hex();
 
             latest_stmt
                 .execute(params![&account_id_hex, &vault_key_hex, &faucet_prefix_hex, &asset_hex])
@@ -128,7 +130,7 @@ impl SqliteStore {
         mut updated_fungible_assets: BTreeMap<AccountIdPrefix, FungibleAsset>,
         delta: &AccountDelta,
     ) -> Result<(), StoreError> {
-        let nonce = final_account_state.nonce().as_int();
+        let nonce = final_account_state.nonce().as_canonical_u64();
         let account_id_hex = account_id.to_hex();
         let nonce_val = u64_to_value(nonce);
 
@@ -238,7 +240,7 @@ impl SqliteStore {
             tx.prepare_cached(HISTORICAL_TOMBSTONE_QUERY).into_store_error()?;
         for vault_key in removed_vault_keys {
             let vault_key_word: Word = (*vault_key).into();
-            let faucet_prefix_hex = vault_key.faucet_id_prefix().to_hex();
+            let faucet_prefix_hex = vault_key.faucet_id().prefix().to_hex();
             tombstone_stmt
                 .execute(params![
                     account_id_hex,
@@ -274,8 +276,8 @@ impl SqliteStore {
         for asset in updated_assets {
             let vault_key_word: Word = asset.vault_key().into();
             let vault_key_hex = vault_key_word.to_hex();
-            let faucet_prefix_hex = asset.faucet_id_prefix().to_hex();
-            let asset_hex = Word::from(*asset).to_hex();
+            let faucet_prefix_hex = asset.faucet_id().prefix().to_hex();
+            let asset_hex = asset.to_value_word().to_hex();
 
             latest_stmt
                 .execute(params![account_id_hex, &vault_key_hex, &faucet_prefix_hex, &asset_hex])

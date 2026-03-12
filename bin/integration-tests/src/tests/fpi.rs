@@ -4,6 +4,7 @@ use miden_client::account::{
     Account,
     AccountBuilder,
     AccountStorageMode,
+    AccountType,
     PartialAccount,
     PartialStorage,
     StorageMap,
@@ -608,17 +609,17 @@ fn foreign_account_with_code(
     let get_item_component = AccountComponent::new(
         component_code,
         vec![map_slot],
-        AccountComponentMetadata::new("miden::testing::fpi_component").with_supports_all_types(),
+        AccountComponentMetadata::new("miden::testing::fpi_component", AccountType::all()),
     )
     .map_err(|err| anyhow::anyhow!(err))
     .context("failed to create foreign account component")?;
 
     let (key_pair, auth_component) = match auth_scheme {
-        AuthSchemeId::Falcon512Rpo => {
-            let key_pair = AuthSecretKey::new_falcon512_rpo();
+        AuthSchemeId::Falcon512Poseidon2 => {
+            let key_pair = AuthSecretKey::new_falcon512_poseidon2();
             let auth_component: AccountComponent = AuthSingleSig::new(
                 key_pair.public_key().to_commitment(),
-                AuthSchemeId::Falcon512Rpo,
+                AuthSchemeId::Falcon512Poseidon2,
             )
             .into();
             (key_pair, auth_component)

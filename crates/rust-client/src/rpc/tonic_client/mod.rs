@@ -13,13 +13,13 @@ use miden_protocol::address::NetworkId;
 use miden_protocol::block::account_tree::AccountWitness;
 use miden_protocol::block::{BlockHeader, BlockNumber, ProvenBlock};
 use miden_protocol::crypto::merkle::MerklePath;
-use miden_protocol::crypto::merkle::mmr::{Forest, MmrProof};
+use miden_protocol::crypto::merkle::mmr::{Forest, MmrPath, MmrProof};
 use miden_protocol::crypto::merkle::smt::SmtProof;
 use miden_protocol::note::{NoteId, NoteScript, NoteTag, Nullifier};
 use miden_protocol::transaction::{ProvenTransaction, TransactionInputs};
-use miden_protocol::utils::Deserializable;
+use miden_protocol::utils::serde::Deserializable;
 use miden_protocol::{EMPTY_WORD, Word};
-use miden_tx::utils::Serializable;
+use miden_tx::utils::serde::Serializable;
 use miden_tx::utils::sync::RwLock;
 use tonic::Status;
 use tracing::info;
@@ -447,11 +447,14 @@ impl NodeRpcClient for GrpcClient {
                 .ok_or(RpcError::ExpectedDataMissing("MmrPath".into()))?
                 .try_into()?;
 
-            Some(MmrProof {
-                forest: Forest::new(usize::try_from(forest).expect("u64 should fit in usize")),
-                position: block_header.block_num().as_usize(),
-                merkle_path,
-            })
+            Some(MmrProof::new(
+                MmrPath::new(
+                    Forest::new(usize::try_from(forest).expect("u64 should fit in usize")),
+                    block_header.block_num().as_usize(),
+                    merkle_path,
+                ),
+                block_header.commitment(),
+            ))
         } else {
             None
         };

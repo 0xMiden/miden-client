@@ -7,12 +7,18 @@ use miden_protocol::transaction::{
     ExecutedTransaction,
     InputNote,
     InputNotes,
-    OutputNotes,
+    RawOutputNotes,
     TransactionArgs,
     TransactionId,
     TransactionInputs,
 };
-use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
+use miden_tx::utils::serde::{
+    ByteReader,
+    ByteWriter,
+    Deserializable,
+    DeserializationError,
+    Serializable,
+};
 
 use crate::ClientError;
 
@@ -50,7 +56,7 @@ impl TransactionResult {
     }
 
     /// Returns the output notes that were generated as a result of the transaction execution.
-    pub fn created_notes(&self) -> &OutputNotes {
+    pub fn created_notes(&self) -> &RawOutputNotes {
         self.transaction.output_notes()
     }
 

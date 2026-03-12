@@ -18,7 +18,8 @@ use miden_standards::account::interface::AccountInterfaceError;
 // ================================================================================================
 pub use miden_standards::errors::CodeBuilderError;
 pub use miden_tx::AuthenticationError;
-use miden_tx::utils::{DeserializationError, HexParseError};
+use miden_tx::utils::HexParseError;
+use miden_tx::utils::serde::DeserializationError;
 use miden_tx::{NoteCheckerError, TransactionExecutorError, TransactionProverError};
 use thiserror::Error;
 

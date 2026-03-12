@@ -1451,10 +1451,8 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
 
     // Remove debug decorators from original note script, as they are not persisted on submission
     // (https://github.com/0xMiden/miden-base/issues/1812)
-    let mut mast = (*note.script().mast()).clone();
-    mast.strip_decorators();
-
     // normalize CSR storage to match deserialized form
+    let mast = (*note.script().mast()).clone();
     let mast_bytes = mast.to_bytes();
     let mast = MastForest::read_from_bytes(&mast_bytes)?;
     let note_script = NoteScript::from_parts(Arc::new(mast), note.script().entrypoint());

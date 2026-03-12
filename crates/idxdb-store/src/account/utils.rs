@@ -246,7 +246,7 @@ pub async fn apply_transaction_delta(
                 FungibleAsset::new(*faucet_id, 1).expect("faucet_id from delta should be valid");
             changed_assets.push(JsVaultAsset {
                 vault_key: Word::from(dummy.vault_key()).to_hex(),
-                faucet_id_prefix: dummy.faucet_id_prefix().to_hex(),
+                faucet_id_prefix: dummy.faucet_id().prefix().to_hex(),
                 asset: String::new(),
             });
         }
@@ -261,7 +261,7 @@ pub async fn apply_transaction_delta(
             NonFungibleDeltaAction::Remove => {
                 changed_assets.push(JsVaultAsset {
                     vault_key: Word::from(nft.vault_key()).to_hex(),
-                    faucet_id_prefix: nft.faucet_id_prefix().to_hex(),
+                    faucet_id_prefix: nft.faucet_id().prefix().to_hex(),
                     asset: String::new(),
                 });
             },

@@ -126,7 +126,7 @@ pub(crate) async fn fetch_block_header(
     // Trim merkle path to keep nodes relevant to our current PartialMmr since the node's MMR
     // might be of a forest arbitrarily higher
     let path_nodes = adjust_merkle_path_for_forest(
-        &mmr_proof.merkle_path,
+        mmr_proof.merkle_path(),
         block_num,
         current_partial_mmr.forest(),
     );
@@ -181,7 +181,7 @@ mod tests {
 
         let proof = mmr.open_at(leaf_pos, large_forest).expect("valid proof");
         let adjusted_nodes =
-            adjust_merkle_path_for_forest(&proof.merkle_path, block_num, small_forest);
+            adjust_merkle_path_for_forest(proof.merkle_path(), block_num, small_forest);
         let adjusted_path = MerklePath::new(adjusted_nodes.iter().map(|(_, n)| *n).collect());
 
         let peaks = mmr.peaks_at(small_forest).unwrap();
@@ -243,10 +243,10 @@ mod tests {
         let next_sibling = idx.sibling();
         let rightmost = InOrderIndex::from_leaf_pos(small_leaves - 1);
         assert!(next_sibling <= rightmost);
-        assert!(proof.merkle_path.depth() as usize > expected_depth);
+        assert!(proof.merkle_path().depth() as usize > expected_depth);
 
         let adjusted = adjust_merkle_path_for_forest(
-            &proof.merkle_path,
+            proof.merkle_path(),
             BlockNumber::from(u32::try_from(leaf_pos).unwrap()),
             small_forest,
         );

@@ -468,6 +468,7 @@ where
             exec_options: ExecutionOptions::new(
                 Some(MAX_TX_EXECUTION_CYCLES),
                 MIN_TX_EXECUTION_CYCLES,
+                ExecutionOptions::DEFAULT_CORE_TRACE_FRAGMENT_SIZE,
                 false,
                 self.in_debug_mode.into(),
             )

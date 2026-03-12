@@ -15,8 +15,8 @@ use miden_client::store::NoteRecordError;
 use miden_client::transaction::{
     ExecutedTransaction,
     InputNote,
-    OutputNote,
     PaymentNoteDescription,
+    RawOutputNote,
     SwapTransactionData,
     TransactionRequest,
     TransactionRequestBuilder,
@@ -401,7 +401,7 @@ async fn execute_transaction<AUTH: Keystore + Sync + 'static>(
     let output_notes = executed_transaction
         .output_notes()
         .iter()
-        .map(OutputNote::id)
+        .map(RawOutputNote::id)
         .collect::<Vec<_>>();
 
     println!("Proving transaction...");
@@ -516,14 +516,14 @@ fn print_transaction_details(executed_tx: &ExecutedTransaction) -> Result<(), Cl
                 NonFungibleDeltaAction::Add => {
                     table.add_row(vec![
                         "Non Fungible Asset",
-                        &asset.faucet_id_prefix().to_hex(),
+                        &asset.faucet_id().prefix().to_hex(),
                         "1",
                     ]);
                 },
                 NonFungibleDeltaAction::Remove => {
                     table.add_row(vec![
                         "Non Fungible Asset",
-                        &asset.faucet_id_prefix().to_hex(),
+                        &asset.faucet_id().prefix().to_hex(),
                         "-1",
                     ]);
                 },

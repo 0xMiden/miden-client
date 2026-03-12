@@ -4,10 +4,15 @@ use alloc::vec::Vec;
 use miden_protocol::Word;
 use miden_protocol::asset::{Asset, AssetVaultKey};
 use miden_protocol::block::BlockNumber;
-use miden_protocol::errors::AssetError;
+use miden_tx::utils::serde::Deserializable;
 
 use crate::rpc::domain::MissingFieldHelper;
 use crate::rpc::{RpcError, generated as proto};
+
+/// Converts a Word (4 Felts) into a byte representation for deserialization.
+fn word_to_bytes(word: Word) -> Vec<u8> {
+    word.iter().flat_map(|felt| felt.as_canonical_u64().to_le_bytes()).collect()
+}
 
 // ACCOUNT VAULT INFO
 // ================================================================================================
@@ -75,11 +80,11 @@ impl TryFrom<proto::primitives::Asset> for Asset {
 
     fn try_from(value: proto::primitives::Asset) -> Result<Self, Self::Error> {
         let word: Word = value
-            .asset
-            .ok_or(proto::rpc::SyncAccountVaultResponse::missing_field(stringify!(asset)))?
+            .value
+            .ok_or(proto::rpc::SyncAccountVaultResponse::missing_field(stringify!(value)))?
             .try_into()?;
-        word.try_into()
-            .map_err(|e: AssetError| RpcError::InvalidResponse(e.to_string()))
+        Asset::read_from_bytes(&word_to_bytes(word))
+            .map_err(|e| RpcError::DeserializationError(e.to_string()))
     }
 }
 
@@ -95,7 +100,8 @@ impl TryFrom<proto::rpc::AccountVaultUpdate> for AccountVaultUpdate {
             .vault_key
             .ok_or(proto::rpc::SyncAccountVaultResponse::missing_field(stringify!(vault_key)))?
             .try_into()?;
-        let vault_key = AssetVaultKey::new_unchecked(vault_key_inner);
+        let vault_key = AssetVaultKey::try_from(vault_key_inner)
+            .map_err(|e| RpcError::InvalidResponse(e.to_string()))?;
 
         Ok(Self {
             block_num: block_num.into(),
