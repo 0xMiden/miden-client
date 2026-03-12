@@ -7,8 +7,6 @@ use miden_protocol::account::{
     AccountCode,
     AccountId,
     PartialAccount,
-    PartialStorageMap,
-    StorageMap,
     StorageMapKey,
     StorageMapWitness,
     StorageSlot,
@@ -144,9 +142,7 @@ impl ClientDataStore {
         Ok(account_inputs)
     }
 
-    /// Fetches a storage map from the network via RPC and caches witnesses for all received
-    /// entries so that subsequent lookups for different keys in the same map avoid additional
-    /// RPC calls.
+    /// Fetches a storage map witness for a specific key from the network via RPC and caches it.
     async fn fetch_and_cache_storage_map_witness(
         &self,
         account_id: AccountId,
@@ -183,42 +179,25 @@ impl ClientDataStore {
                 ))
             })?;
 
-        match map_detail.entries {
-            StorageMapEntries::AllEntries(entries) => {
-                let map = StorageMap::with_entries(entries.iter().map(|e| (e.key, e.value)))
-                    .map_err(|err| {
-                        DataStoreError::other_with_source(
-                            "failed to build storage map from entries",
-                            err,
-                        )
-                    })?;
-
-                // Cache witnesses for all received keys.
-                let mut cache = self.storage_map_cache.write();
-                for entry in &entries {
-                    let witness = map.open(&entry.key);
-                    cache.insert((map_root, entry.key), witness);
-                }
-
-                let witness = map.open(&map_key);
-                // If the requested key is not among the entries, cache the non-inclusion proof.
-                cache.entry((map_root, map_key)).or_insert_with(|| witness.clone());
-                Ok(witness)
+        let proof = match map_detail.entries {
+            StorageMapEntries::EntriesWithProofs(proofs) => {
+                // We requested a single key, so we expect a single proof.
+                proofs.into_iter().next().ok_or_else(|| {
+                    DataStoreError::other("RPC returned no proofs for the requested key")
+                })?
             },
-            StorageMapEntries::EntriesWithProofs(witnesses) => {
-                let partial_map = PartialStorageMap::with_witnesses(witnesses).map_err(|err| {
-                    DataStoreError::other_with_source(
-                        "failed to build partial storage map from witnesses",
-                        err,
-                    )
-                })?;
-                let witness = partial_map.open(&map_key).map_err(|err| {
-                    DataStoreError::other_with_source("failed to open storage map witness", err)
-                })?;
-                self.storage_map_cache.write().insert((map_root, map_key), witness.clone());
-                Ok(witness)
+            StorageMapEntries::AllEntries(_) => {
+                return Err(DataStoreError::other(
+                    "unexpected AllEntries response; specific keys were requested",
+                ));
             },
-        }
+        };
+
+        let witness = StorageMapWitness::new(proof, [map_key]).map_err(|err| {
+            DataStoreError::other_with_source("failed to create storage map witness", err)
+        })?;
+        self.storage_map_cache.write().insert((map_root, map_key), witness.clone());
+        Ok(witness)
     }
 
     /// Resolves the slot name and account code for a map root from the cached foreign account

@@ -839,10 +839,15 @@ pub(crate) async fn fetch_public_account_inputs(
         store.get_foreign_account_code(vec![account_id]).await?.into_values().next();
 
     let (_, account_proof) = rpc_api
-        .get_account_proof(account_id, storage_requirements, account_state_at, known_account_code)
+        .get_account_proof(
+            account_id,
+            storage_requirements.clone(),
+            account_state_at,
+            known_account_code,
+        )
         .await?;
 
-    let account_inputs = request::account_proof_into_inputs(account_proof)?;
+    let account_inputs = request::account_proof_into_inputs(account_proof, &storage_requirements)?;
 
     let _ = store
         .upsert_foreign_account_code(account_id, account_inputs.code().clone())

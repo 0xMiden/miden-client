@@ -6,7 +6,7 @@ use core::fmt::{self, Debug, Display, Formatter};
 use miden_protocol::Word;
 use miden_protocol::account::{
     Account, AccountCode, AccountHeader, AccountId, AccountStorageHeader, StorageMap,
-    StorageMapKey, StorageMapWitness, StorageSlotHeader, StorageSlotName, StorageSlotType,
+    StorageMapKey, StorageSlotHeader, StorageSlotName, StorageSlotType,
 };
 use miden_protocol::asset::Asset;
 use miden_protocol::block::BlockNumber;
@@ -21,8 +21,8 @@ use crate::alloc::string::ToString;
 use crate::rpc::RpcError;
 use crate::rpc::domain::MissingFieldHelper;
 use crate::rpc::errors::RpcConversionError;
-use crate::rpc::generated::rpc::account_request::account_detail_request::{StorageMapDetailRequest};
 use crate::rpc::generated::rpc::account_request::account_detail_request::storage_map_detail_request::{MapKeys, SlotData};
+use crate::rpc::generated::rpc::account_request::account_detail_request::StorageMapDetailRequest;
 use crate::rpc::generated::{self as proto};
 
 // FETCHED ACCOUNT
@@ -380,23 +380,21 @@ impl TryFrom<proto::rpc::account_storage_details::AccountStorageMapDetails>
                 StorageMapEntries::AllEntries(entries)
             },
             Some(Entries::EntriesWithProofs(entries_with_proofs)) => {
-                let witnesses = entries_with_proofs
+                // TODO: We cannot reconstruct `StorageMapWitness` here because the
+                // node only returns hashed leaf keys in the proto response, not the
+                // original raw `StorageMapKey`s.
+                let proofs = entries_with_proofs
                     .entries
                     .into_iter()
                     .map(|entry| {
-                        let key: Word = entry
-                            .key
-                            .ok_or(RpcError::ExpectedDataMissing("key".into()))?
-                            .try_into()?;
                         let proof: SmtProof = entry
                             .proof
                             .ok_or(RpcError::ExpectedDataMissing("proof".into()))?
                             .try_into()?;
-                        StorageMapWitness::new(proof, [StorageMapKey::new(key)])
-                            .map_err(|e| RpcError::InvalidResponse(e.to_string()))
+                        Ok(proof)
                     })
-                    .collect::<Result<Vec<StorageMapWitness>, RpcError>>()?;
-                StorageMapEntries::EntriesWithProofs(witnesses)
+                    .collect::<Result<Vec<SmtProof>, RpcError>>()?;
+                StorageMapEntries::EntriesWithProofs(proofs)
             },
             None => StorageMapEntries::AllEntries(Vec::new()),
         };
@@ -431,28 +429,29 @@ impl TryFrom<proto::rpc::account_storage_details::account_storage_map_details::a
 // STORAGE MAP ENTRIES
 // ================================================================================================
 
-/// Storage map entries, either all entries (for small/full maps) or entries with proofs
-/// (for partial maps).
+/// Storage map entries, either all entries (for small/full maps) or raw SMT proofs
+/// (for specific key queries).
 #[derive(Clone, Debug)]
 pub enum StorageMapEntries {
     /// All entries in the storage map (no proofs needed as the full map is available).
     AllEntries(Vec<StorageMapEntry>),
     /// Specific entries with their SMT proofs (for partial maps).
-    EntriesWithProofs(Vec<StorageMapWitness>),
+    EntriesWithProofs(Vec<SmtProof>),
 }
 
 impl StorageMapEntries {
     /// Converts the entries into a [`StorageMap`].
-    pub fn into_storage_map(self) -> Result<StorageMap, miden_protocol::errors::StorageMapError> {
+    ///
+    /// Returns `None` for the [`EntriesWithProofs`](Self::EntriesWithProofs) variant because it
+    /// contains partial data (SMT proofs) that cannot produce a complete [`StorageMap`].
+    pub fn into_storage_map(
+        self,
+    ) -> Option<Result<StorageMap, miden_protocol::errors::StorageMapError>> {
         match self {
             StorageMapEntries::AllEntries(entries) => {
-                StorageMap::with_entries(entries.into_iter().map(|e| (e.key, e.value)))
+                Some(StorageMap::with_entries(entries.into_iter().map(|e| (e.key, e.value))))
             },
-            StorageMapEntries::EntriesWithProofs(witnesses) => {
-                let entries: Vec<_> =
-                    witnesses.iter().flat_map(|w| w.entries().map(|(k, v)| (*k, *v))).collect();
-                StorageMap::with_entries(entries)
-            },
+            StorageMapEntries::EntriesWithProofs(_) => None,
         }
     }
 }
@@ -656,6 +655,11 @@ impl AccountStorageRequirements {
 
     pub fn inner(&self) -> &BTreeMap<StorageSlotName, Vec<StorageMapKey>> {
         &self.0
+    }
+
+    /// Returns the keys requested for a given slot, or an empty slice if none were specified.
+    pub fn keys_for_slot(&self, slot_name: &StorageSlotName) -> &[StorageMapKey] {
+        self.0.get(slot_name).map_or(&[], Vec::as_slice)
     }
 }
 
