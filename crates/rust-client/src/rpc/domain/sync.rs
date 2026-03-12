@@ -1,9 +1,11 @@
+use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 
 use miden_protocol::Word;
 use miden_protocol::account::AccountId;
 use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::crypto::merkle::mmr::MmrDelta;
+use miden_protocol::note::Nullifier;
 
 use super::note::CommittedNote;
 use super::transaction::TransactionInclusion;
@@ -30,6 +32,9 @@ pub struct StateSyncInfo {
     /// `response.block_num-1`) along with the account the tx was executed against and the block
     /// number the transaction was included in.
     pub transactions: Vec<TransactionInclusion>,
+    /// Mapping from nullifier to the consuming transaction's position in the account's state
+    /// chain within a block. Built from `sync_transactions` response headers.
+    pub nullifier_tx_order: BTreeMap<Nullifier, u16>,
 }
 
 // CHAIN MMR INFO
