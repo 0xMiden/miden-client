@@ -19,8 +19,8 @@ const mockUseMiden = useMiden as ReturnType<typeof vi.fn>;
 
 type NoteLike = { id: () => { toString: () => string } };
 
-const createNoteRecords = (notes: string[]) =>
-  notes.map((noteId) => createMockInputNoteRecord(noteId));
+const createNoteRecords = (noteIds: string[]) =>
+  noteIds.map((noteId) => createMockInputNoteRecord(noteId));
 
 const extractNoteIds = (notes: NoteLike[]) =>
   notes.map((note) => note.id().toString());
@@ -68,7 +68,7 @@ describe("useConsume", () => {
       ).rejects.toThrow("Miden client is not ready");
     });
 
-    it("should throw error when no notes provided", async () => {
+    it("should throw error when no note IDs provided", async () => {
       const mockClient = createMockWebClient();
 
       mockUseMiden.mockReturnValue({
@@ -90,8 +90,8 @@ describe("useConsume", () => {
     it("should execute consume transaction", async () => {
       const mockTxId = createMockTransactionId("0xtx789");
       const mockSync = vi.fn().mockResolvedValue(undefined);
-      const inputIds = ["0xnote1", "0xnote2"];
-      const noteRecords = createNoteRecords(inputIds);
+      const noteIds = ["0xnote1", "0xnote2"];
+      const noteRecords = createNoteRecords(noteIds);
       const mockClient = createMockWebClient({
         getInputNotes: vi.fn().mockResolvedValue(noteRecords),
         newConsumeTransactionRequest: vi
@@ -112,7 +112,7 @@ describe("useConsume", () => {
       await act(async () => {
         txResult = await result.current.consume({
           accountId: "0xaccount",
-          notes: inputIds,
+          notes: noteIds,
         });
       });
 
@@ -122,15 +122,16 @@ describe("useConsume", () => {
       expect(mockSync).toHaveBeenCalled();
 
       // Verify notes were passed
-      const passedNotes = mockClient.newConsumeTransactionRequest.mock
-        .calls[0][0] as NoteLike[] | undefined;
-      expect(extractNoteIds(passedNotes ?? [])).toEqual(inputIds);
+      const notes = mockClient.newConsumeTransactionRequest.mock.calls[0][0] as
+        | NoteLike[]
+        | undefined;
+      expect(extractNoteIds(notes ?? [])).toEqual(noteIds);
     });
 
     it("should consume single note", async () => {
       const mockTxId = createMockTransactionId();
-      const inputIds = ["0xsinglenote"];
-      const noteRecords = createNoteRecords(inputIds);
+      const noteIds = ["0xsinglenote"];
+      const noteRecords = createNoteRecords(noteIds);
       const mockClient = createMockWebClient({
         getInputNotes: vi.fn().mockResolvedValue(noteRecords),
         newConsumeTransactionRequest: vi
@@ -150,19 +151,20 @@ describe("useConsume", () => {
       await act(async () => {
         await result.current.consume({
           accountId: "0xaccount",
-          notes: inputIds,
+          notes: noteIds,
         });
       });
 
-      const passedNotes = mockClient.newConsumeTransactionRequest.mock
-        .calls[0][0] as NoteLike[] | undefined;
-      expect(extractNoteIds(passedNotes ?? [])).toEqual(inputIds);
+      const notes = mockClient.newConsumeTransactionRequest.mock.calls[0][0] as
+        | NoteLike[]
+        | undefined;
+      expect(extractNoteIds(notes ?? [])).toEqual(noteIds);
     });
 
     it("should consume multiple notes in one transaction", async () => {
       const mockTxId = createMockTransactionId();
-      const inputIds = ["0xnote1", "0xnote2", "0xnote3", "0xnote4", "0xnote5"];
-      const noteRecords = createNoteRecords(inputIds);
+      const noteIds = ["0xnote1", "0xnote2", "0xnote3", "0xnote4", "0xnote5"];
+      const noteRecords = createNoteRecords(noteIds);
       const mockClient = createMockWebClient({
         getInputNotes: vi.fn().mockResolvedValue(noteRecords),
         newConsumeTransactionRequest: vi
@@ -182,13 +184,14 @@ describe("useConsume", () => {
       await act(async () => {
         await result.current.consume({
           accountId: "0xaccount",
-          notes: inputIds,
+          notes: noteIds,
         });
       });
 
-      const passedNotes = mockClient.newConsumeTransactionRequest.mock
-        .calls[0][0] as NoteLike[] | undefined;
-      expect(extractNoteIds(passedNotes ?? [])).toEqual(inputIds);
+      const notes = mockClient.newConsumeTransactionRequest.mock.calls[0][0] as
+        | NoteLike[]
+        | undefined;
+      expect(extractNoteIds(notes ?? [])).toEqual(noteIds);
     });
   });
 

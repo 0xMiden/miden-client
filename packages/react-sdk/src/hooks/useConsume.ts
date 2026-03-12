@@ -30,14 +30,14 @@ export interface UseConsumeResult {
  *
  * @example
  * ```tsx
- * function ConsumeNotesButton({ accountId, notes }: Props) {
+ * function ConsumeNotesButton({ accountId, noteIds }: Props) {
  *   const { consume, isLoading, stage, error } = useConsume();
  *
  *   const handleConsume = async () => {
  *     try {
  *       const result = await consume({
  *         accountId,
- *         notes,
+ *         noteIds,
  *       });
  *       console.log('Consumed! TX:', result.transactionId);
  *     } catch (err) {
@@ -141,6 +141,10 @@ export function useConsume(): UseConsumeResult {
 
           if (notes.length === 0) {
             throw new Error("No notes found for provided IDs");
+          }
+
+          if (notes.length !== options.notes.length) {
+            throw new Error("Some notes could not be found for provided IDs");
           }
 
           const txRequest = client.newConsumeTransactionRequest(notes);

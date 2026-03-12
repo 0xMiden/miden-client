@@ -100,6 +100,23 @@ impl AccountId {
         Ok(AccountId(native_account_id))
     }
 
+    /// Builds an account ID from its prefix and suffix field elements.
+    ///
+    /// This is useful when the account ID components are stored separately (e.g., in storage
+    /// maps) and need to be recombined into an `AccountId`.
+    ///
+    /// Returns an error if the provided felts do not form a valid account ID.
+    #[wasm_bindgen(js_name = "fromPrefixSuffix")]
+    pub fn from_prefix_suffix(prefix: &Felt, suffix: &Felt) -> Result<AccountId, JsValue> {
+        let prefix_felt: NativeFelt = (*prefix).into();
+        let suffix_felt: NativeFelt = (*suffix).into();
+        let native_account_id =
+            NativeAccountId::try_from([prefix_felt, suffix_felt]).map_err(|err| {
+                js_error_with_context(err, "error instantiating AccountId from prefix and suffix")
+            })?;
+        Ok(AccountId(native_account_id))
+    }
+
     /// Returns true if the ID refers to a faucet.
     #[wasm_bindgen(js_name = "isFaucet")]
     pub fn is_faucet(&self) -> bool {

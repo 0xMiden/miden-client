@@ -55,12 +55,10 @@ export class MidenClient {
 
     const seed = options?.seed ? await hashSeed(options.seed) : undefined;
 
-    const rpcUrl = resolveRpcUrl(options?.rpcUrl);
-
     let inner;
     if (options?.keystore) {
       inner = await WebClientClass.createClientWithExternalKeystore(
-        rpcUrl,
+        options?.rpcUrl,
         options?.noteTransportUrl,
         seed,
         options?.storeName,
@@ -70,7 +68,7 @@ export class MidenClient {
       );
     } else {
       inner = await WebClientClass.createClient(
-        rpcUrl,
+        options?.rpcUrl,
         options?.noteTransportUrl,
         seed,
         options?.storeName
@@ -80,7 +78,10 @@ export class MidenClient {
     let defaultProver = null;
     if (options?.proverUrl) {
       const wasm = await getWasm();
-      defaultProver = resolveProver(options.proverUrl, wasm);
+      defaultProver = wasm.TransactionProver.newRemoteProver(
+        options.proverUrl,
+        undefined
+      );
     }
 
     const client = new MidenClient(inner, getWasm, defaultProver);
@@ -179,30 +180,13 @@ export class MidenClient {
   }
 
   /**
-   * Exports the client store as a versioned snapshot.
+   * Returns the identifier of the underlying store (e.g. IndexedDB database name, file path).
    *
-   * @returns {Promise<StoreSnapshot>} The store snapshot.
+   * @returns {string} The store identifier.
    */
-  async exportStore() {
+  storeIdentifier() {
     this.assertNotTerminated();
-    const data = await this.#inner.exportStore();
-    return { version: 1, data };
-  }
-
-  /**
-   * Imports a previously exported store snapshot.
-   *
-   * @param {StoreSnapshot} snapshot - The store snapshot to import.
-   */
-  async importStore(snapshot) {
-    this.assertNotTerminated();
-    if (!snapshot || snapshot.version !== 1) {
-      throw new Error(
-        `Unsupported store snapshot version: ${snapshot?.version}. Expected version 1.`
-      );
-    }
-    // Second arg is the store password (empty string = no encryption)
-    await this.#inner.forceImportStore(snapshot.data, "");
+    return this.#inner.storeIdentifier();
   }
 
   // ── Mock-only methods ──
@@ -247,43 +231,4 @@ export class MidenClient {
       throw new Error(`${method}() is only available on mock clients`);
     }
   }
-}
-
-const RPC_URLS = {
-  testnet: "https://rpc.testnet.miden.io",
-  devnet: "https://rpc.devnet.miden.io",
-  localhost: "http://localhost:57291",
-  local: "http://localhost:57291",
-};
-
-/**
- * Resolves an rpcUrl shorthand or raw URL into a concrete endpoint string.
- *
- * @param {string | undefined} rpcUrl - "testnet", "devnet", "localhost", "local", or a raw URL.
- * @returns {string | undefined} A fully qualified URL, or undefined to use the SDK default.
- */
-function resolveRpcUrl(rpcUrl) {
-  if (!rpcUrl) return undefined;
-  return RPC_URLS[rpcUrl.trim().toLowerCase()] ?? rpcUrl;
-}
-
-const PROVER_URLS = {
-  devnet: "https://tx-prover.devnet.miden.io",
-  testnet: "https://tx-prover.testnet.miden.io",
-};
-
-/**
- * Resolves a proverUrl shorthand or raw URL into a TransactionProver.
- *
- * @param {string} proverUrl - "local", "devnet", "testnet", or a raw URL.
- * @param {object} wasm - Loaded WASM module.
- * @returns {object} A TransactionProver instance.
- */
-function resolveProver(proverUrl, wasm) {
-  const normalized = proverUrl.trim().toLowerCase();
-  if (normalized === "local") {
-    return wasm.TransactionProver.newLocalProver();
-  }
-  const remoteUrl = PROVER_URLS[normalized] ?? proverUrl;
-  return wasm.TransactionProver.newRemoteProver(remoteUrl, undefined);
 }

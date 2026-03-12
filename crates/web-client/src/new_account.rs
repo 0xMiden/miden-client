@@ -45,7 +45,7 @@ impl WebClient {
         init_seed: Option<Vec<u8>>,
     ) -> Result<Account, JsValue> {
         self.maybe_sync_before_account_creation().await;
-        let keystore = self.keystore.clone();
+        let keystore = self.keystore()?.clone();
         if let Some(client) = self.get_mut_inner() {
             let (new_account, key_pair) =
                 generate_wallet(storage_mode, mutable, init_seed, auth_scheme).await?;
@@ -56,7 +56,6 @@ impl WebClient {
                 .map_err(|err| js_error_with_context(err, "failed to insert new wallet"))?;
 
             keystore
-                .expect("KeyStore should be initialized")
                 .add_key(&key_pair, new_account.id())
                 .await
                 .map_err(|err| err.to_string())?;
@@ -82,7 +81,7 @@ impl WebClient {
             return Err(JsValue::from_str("Non-fungible faucets are not supported yet"));
         }
 
-        let keystore = self.keystore.clone();
+        let keystore = self.keystore()?.clone();
 
         if let Some(client) = self.get_mut_inner() {
             let mut seed = [0u8; 32];
@@ -142,7 +141,6 @@ impl WebClient {
             };
 
             keystore
-                .expect("KeyStore should be initialized")
                 .add_key(&key_pair, new_account.id())
                 .await
                 .map_err(|err| err.to_string())?;
@@ -175,13 +173,47 @@ impl WebClient {
         }
     }
 
+    /// Inserts an account and its secret key in one call, matching how
+    /// `newWallet` / `newFaucet` already work internally.  If the key
+    /// insertion fails the account is still persisted (same as wallet/faucet),
+    /// but callers only need a single await instead of two.
+    #[wasm_bindgen(js_name = "newAccountWithSecretKey")]
+    pub async fn new_account_with_secret_key(
+        &mut self,
+        account: &Account,
+        secret_key: &WebAuthSecretKey,
+    ) -> Result<(), JsValue> {
+        self.maybe_sync_before_account_creation().await;
+        if let Some(client) = self.get_mut_inner() {
+            let native_account: miden_client::account::Account = account.into();
+            let account_id = native_account.id();
+
+            client
+                .add_account(&native_account, false)
+                .await
+                .map_err(|err| js_error_with_context(err, "failed to insert new account"))?;
+
+            let keystore = self.keystore()?;
+            let native_secret_key: AuthSecretKey = secret_key.into();
+
+            keystore
+                .add_key(&native_secret_key, account_id)
+                .await
+                .map_err(|err| js_error_with_context(err, "failed to add secret key"))?;
+
+            Ok(())
+        } else {
+            Err(JsValue::from_str("Client not initialized"))
+        }
+    }
+
     #[wasm_bindgen(js_name = "addAccountSecretKeyToWebStore")]
     pub async fn add_account_secret_key_to_web_store(
         &mut self,
         account_id: &AccountId,
         secret_key: &WebAuthSecretKey,
     ) -> Result<(), JsValue> {
-        let keystore = self.keystore.as_ref().expect("KeyStore should be initialized");
+        let keystore = self.keystore()?;
         let native_secret_key: AuthSecretKey = secret_key.into();
         let native_account_id = account_id.into();
 

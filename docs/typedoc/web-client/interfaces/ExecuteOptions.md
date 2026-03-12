@@ -16,11 +16,15 @@
 
 > **account**: [`AccountRef`](../type-aliases/AccountRef.md)
 
+Account executing the custom script.
+
 ***
 
 ### foreignAccounts?
 
 > `optional` **foreignAccounts**: ([`AccountRef`](../type-aliases/AccountRef.md) \| \{ `id`: [`AccountRef`](../type-aliases/AccountRef.md); `storage?`: `AccountStorageRequirements`; \})[]
+
+Foreign accounts referenced by the script.
 
 ***
 
@@ -39,6 +43,8 @@ Override default prover.
 ### script
 
 > **script**: `TransactionScript`
+
+Compiled TransactionScript.
 
 ***
 

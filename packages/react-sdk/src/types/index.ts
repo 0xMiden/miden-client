@@ -1,5 +1,4 @@
 import { AuthScheme } from "@miden-sdk/miden-sdk";
-import type { AccountRef } from "../utils/accountParsing";
 import type {
   WasmWebClient as WebClient,
   Account,
@@ -14,11 +13,12 @@ import type {
   TransactionRequest,
   NoteType,
   NoteId,
-  Note,
   AccountStorageMode,
-  NoteVisibility,
-  StorageMode,
+  Note,
 } from "@miden-sdk/miden-sdk";
+
+/** Flexible account reference — hex string, bech32 string, or WASM AccountId */
+export type AccountRef = string | AccountId;
 
 // Re-export SDK types for convenience
 export { AuthScheme };
@@ -35,14 +35,9 @@ export type {
   TransactionRecord,
   TransactionRequest,
   NoteType,
-  NoteId,
-  Note,
   AccountStorageMode,
-  NoteVisibility,
-  StorageMode,
+  Note,
 };
-
-export type { AccountRef } from "../utils/accountParsing";
 
 // Re-export signer types for external signer providers
 export type {
@@ -51,6 +46,9 @@ export type {
   SignerAccountConfig,
   SignerContextValue,
 } from "../context/SignerContext";
+
+export type StorageMode = "private" | "public" | "network";
+export type NoteVisibility = "private" | "public";
 
 export type RpcUrlConfig =
   | string
@@ -226,7 +224,7 @@ export interface NoteSummary {
 // Wallet creation options
 export interface CreateWalletOptions {
   /** Storage mode. Default: private */
-  storageMode?: StorageMode;
+  storageMode?: "private" | "public" | "network";
   /** Whether code can be updated. Default: true */
   mutable?: boolean;
   /** Auth scheme. Default: AuthScheme.AuthRpoFalcon512 */
@@ -257,7 +255,7 @@ export type ImportAccountOptions =
     }
   | {
       type: "id";
-      accountId: AccountRef;
+      accountId: string | AccountId;
     }
   | {
       type: "seed";
@@ -269,15 +267,15 @@ export type ImportAccountOptions =
 // Send options
 export interface SendOptions {
   /** Sender account ID */
-  from: AccountRef;
+  from: string;
   /** Recipient account ID */
-  to: AccountRef;
+  to: string;
   /** Asset ID to send (token id) */
   assetId: AccountRef;
   /** Amount to send (ignored when sendAll is true) */
   amount?: bigint | number;
   /** Note type. Default: private */
-  noteType?: NoteVisibility;
+  noteType?: "private" | "public";
   /** Block height after which sender can reclaim note */
   recallHeight?: number;
   /** Block height after which recipient can consume note */
@@ -300,7 +298,7 @@ export interface SendResult {
 
 export interface MultiSendRecipient {
   /** Recipient account ID */
-  to: AccountRef;
+  to: string;
   /** Amount to send */
   amount: bigint | number;
   /** Per-recipient note type override */
@@ -311,15 +309,47 @@ export interface MultiSendRecipient {
 
 export interface MultiSendOptions {
   /** Sender account ID */
-  from: AccountRef;
+  from: string;
   /** Asset ID to send (token id) */
-  assetId: AccountRef;
+  assetId: string;
   /** Recipient list */
   recipients: MultiSendRecipient[];
   /** Default note type for all recipients. Default: private */
   noteType?: NoteVisibility;
   /** Skip auto-sync before send. Default: false */
   skipSync?: boolean;
+}
+
+export interface InternalTransferOptions {
+  /** Sender account ID */
+  from: string;
+  /** Recipient account ID */
+  to: string;
+  /** Asset ID to send (token id) */
+  assetId: string;
+  /** Amount to transfer */
+  amount: bigint;
+  /** Note type. Default: private */
+  noteType?: "private" | "public";
+}
+
+export interface InternalTransferChainOptions {
+  /** Initial sender account ID */
+  from: string;
+  /** Ordered list of recipient account IDs */
+  recipients: string[];
+  /** Asset ID to send (token id) */
+  assetId: string;
+  /** Amount to transfer per hop */
+  amount: bigint;
+  /** Note type. Default: private */
+  noteType?: "private" | "public";
+}
+
+export interface InternalTransferResult {
+  createTransactionId: string;
+  consumeTransactionId: string;
+  noteId: string;
 }
 
 export interface WaitForCommitOptions {
@@ -331,7 +361,7 @@ export interface WaitForCommitOptions {
 
 export interface WaitForNotesOptions {
   /** Account ID to check for consumable notes */
-  accountId: AccountRef;
+  accountId: string;
   /** Minimum number of notes to wait for. Default: 1 */
   minCount?: number;
   /** Timeout in milliseconds. Default: 10000 */
@@ -343,45 +373,45 @@ export interface WaitForNotesOptions {
 // Mint options
 export interface MintOptions {
   /** Target account to receive minted tokens */
-  targetAccountId: AccountRef;
+  targetAccountId: string;
   /** Faucet account to mint from */
-  faucetId: AccountRef;
+  faucetId: string;
   /** Amount to mint */
   amount: bigint | number;
   /** Note type. Default: private */
-  noteType?: NoteVisibility;
+  noteType?: "private" | "public";
 }
 
 // Consume options
 export interface ConsumeOptions {
   /** Account ID that will consume the notes */
-  accountId: AccountRef;
-  /** Notes to consume: strings (hex IDs), NoteId objects, InputNoteRecords, or Note objects. */
+  accountId: string;
+  /** Notes to consume — accepts note IDs (hex strings), NoteId objects, InputNoteRecord, or Note objects */
   notes: (string | NoteId | InputNoteRecord | Note)[];
 }
 
 // Swap options
 export interface SwapOptions {
   /** Account initiating the swap */
-  accountId: AccountRef;
+  accountId: string;
   /** Faucet ID of the offered asset */
-  offeredFaucetId: AccountRef;
+  offeredFaucetId: string;
   /** Amount being offered */
   offeredAmount: bigint | number;
   /** Faucet ID of the requested asset */
-  requestedFaucetId: AccountRef;
+  requestedFaucetId: string;
   /** Amount being requested */
   requestedAmount: bigint | number;
   /** Note type for swap note. Default: private */
-  noteType?: NoteVisibility;
+  noteType?: "private" | "public";
   /** Note type for payback note. Default: private */
-  paybackNoteType?: NoteVisibility;
+  paybackNoteType?: "private" | "public";
 }
 
 // Arbitrary transaction options
 export interface ExecuteTransactionOptions {
   /** Account ID the transaction applies to */
-  accountId: AccountRef;
+  accountId: string | AccountId;
   /** Transaction request or builder */
   request:
     | TransactionRequest

@@ -144,40 +144,6 @@ describe("useSend", () => {
       );
     });
 
-    it("should execute send with returnNote=true via submitNewTransaction", async () => {
-      const mockSync = vi.fn().mockResolvedValue(undefined);
-      const mockTxId = { toString: vi.fn(() => "0xtx456") };
-      const mockClient = createMockWebClient({
-        submitNewTransaction: vi.fn().mockResolvedValue(mockTxId),
-      });
-
-      mockUseMiden.mockReturnValue({
-        client: mockClient,
-        isReady: true,
-        sync: mockSync,
-      });
-
-      const { result } = renderHook(() => useSend());
-
-      let txResult: any;
-      await act(async () => {
-        txResult = await result.current.send({
-          from: "0xsender",
-          to: "0xrecipient",
-          assetId: "0xfaucet",
-          amount: 100n,
-          returnNote: true,
-        });
-      });
-
-      expect(txResult.txId).toBe("0xtx456");
-      expect(txResult.note).not.toBeNull();
-      expect(result.current.stage).toBe("complete");
-      expect(mockClient.submitNewTransaction).toHaveBeenCalled();
-      expect(mockClient.executeTransaction).not.toHaveBeenCalled();
-      expect(mockSync).toHaveBeenCalled();
-    });
-
     it("should handle different note types", async () => {
       const mockTxResult = createMockTransactionResult();
       const mockSync = vi.fn().mockResolvedValue(undefined);

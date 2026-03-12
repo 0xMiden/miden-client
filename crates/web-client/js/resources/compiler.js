@@ -15,7 +15,7 @@ export class CompilerResource {
    * @param {{ code: string, slots: StorageSlot[], supportAllTypes?: boolean }} opts
    * @returns {Promise<AccountComponent>}
    */
-  async component({ code, slots, supportAllTypes = true }) {
+  async component({ code, slots = [], supportAllTypes = true }) {
     this.#client.assertNotTerminated();
     const wasm = await this.#getWasm();
     const builder = this.#inner.createCodeBuilder();

@@ -1,8 +1,4 @@
-import {
-  resolveAccountRef,
-  resolveAddress,
-  resolveNoteIdHex,
-} from "../utils.js";
+import { resolveAccountRef, resolveAddress } from "../utils.js";
 
 export class NotesResource {
   #inner;
@@ -24,7 +20,7 @@ export class NotesResource {
 
   async get(noteId) {
     this.#client.assertNotTerminated();
-    const result = await this.#inner.getInputNote(resolveNoteIdHex(noteId));
+    const result = await this.#inner.getInputNote(noteId);
     return result ?? null;
   }
 
@@ -39,8 +35,7 @@ export class NotesResource {
     this.#client.assertNotTerminated();
     const wasm = await this.#getWasm();
     const accountId = resolveAccountRef(opts.account, wasm);
-    const consumable = await this.#inner.getConsumableNotes(accountId);
-    return consumable.map((c) => c.inputNoteRecord());
+    return await this.#inner.getConsumableNotes(accountId);
   }
 
   async import(noteFile) {
@@ -52,7 +47,7 @@ export class NotesResource {
     this.#client.assertNotTerminated();
     const wasm = await this.#getWasm();
     const format = opts?.format ?? wasm.NoteExportFormat.Full;
-    return await this.#inner.exportNoteFile(resolveNoteIdHex(noteId), format);
+    return await this.#inner.exportNoteFile(noteId, format);
   }
 
   async fetchPrivate(opts) {
@@ -67,10 +62,9 @@ export class NotesResource {
   async sendPrivate(opts) {
     this.#client.assertNotTerminated();
     const wasm = await this.#getWasm();
-    const noteHex = resolveNoteIdHex(opts.noteId);
-    const noteRecord = await this.#inner.getInputNote(noteHex);
+    const noteRecord = await this.#inner.getInputNote(opts.noteId);
     if (!noteRecord) {
-      throw new Error(`Note not found: ${noteHex}`);
+      throw new Error(`Note not found: ${opts.noteId}`);
     }
     const note = noteRecord.toNote();
     const address = resolveAddress(opts.to, wasm);
@@ -84,9 +78,7 @@ function buildNoteFilter(query, wasm) {
   }
 
   if (query.ids) {
-    const noteIds = query.ids.map((id) =>
-      wasm.NoteId.fromHex(resolveNoteIdHex(id))
-    );
+    const noteIds = query.ids.map((id) => wasm.NoteId.fromHex(id));
     return new wasm.NoteFilter(wasm.NoteFilterTypes.List, noteIds);
   }
 

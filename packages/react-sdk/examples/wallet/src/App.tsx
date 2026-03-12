@@ -63,7 +63,7 @@ function Wallet({ accountId }: { accountId: string }) {
     }
   };
 
-  const claimNote = (id: string) => () => consume({ accountId, notes: [id] });
+  const claimNote = (id: string) => () => consume({ accountId, noteIds: [id] });
   const onAssetChange = (event: ChangeEvent<HTMLSelectElement>) => setAssetId(event.target.value);
   const onNoteTypeChange = (event: ChangeEvent<HTMLSelectElement>) => setNoteType(event.target.value as "private" | "public");
   const onToChange = (event: ChangeEvent<HTMLInputElement>) => setTo(event.target.value);
