@@ -504,16 +504,6 @@ impl SqliteStore {
     }
 
     /// Undoes discarded account states by restoring old values from historical.
-    ///
-    /// Steps:
-    /// 1. Resolve which (`account_id`, nonce) pairs correspond to the discarded commitments,
-    ///    searching both latest and historical headers.
-    /// 2. Group nonces by account and process them in descending order (most recent first).
-    /// 3. For each nonce, restore old values from historical to latest: non-NULL old values
-    ///    overwrite latest, NULL old values (genuinely new entries) cause deletion from latest.
-    /// 4. Restore the old header from the earliest discarded nonce.
-    /// 5. Clean up consumed historical entries.
-    /// 6. Discard rolled-back states from the in-memory SMT forest.
     pub(crate) fn undo_account_state(
         tx: &Transaction<'_>,
         smt_forest: &mut AccountSmtForest,
@@ -889,16 +879,17 @@ impl SqliteStore {
             let old_commitment = old.to_commitment().to_string();
             let replaced_at_nonce = u64_to_value(new_header.nonce().as_int());
 
-            // Read the old seed from latest (if any)
-            let old_seed: Option<Vec<u8>> = tx
+            // Read the old seed and locked status from latest (if any)
+            let (old_seed, old_locked): (Option<Vec<u8>>, bool) = tx
                 .query_row(
-                    "SELECT account_seed FROM latest_account_headers WHERE id = ?",
+                    "SELECT account_seed, locked FROM latest_account_headers WHERE id = ?",
                     params![&old_id],
-                    |row| row.get(0),
+                    |row| Ok((row.get(0)?, row.get(1)?)),
                 )
                 .optional()
                 .into_store_error()?
-                .flatten();
+                .map(|(seed, locked)| (seed, locked))
+                .unwrap_or((None, false));
 
             const HISTORICAL_QUERY: &str = insert_sql!(
                 historical_account_headers {
@@ -924,7 +915,7 @@ impl SqliteStore {
                     old_nonce,
                     old_seed,
                     old_commitment,
-                    false,
+                    old_locked,
                     replaced_at_nonce,
                 ],
             )
