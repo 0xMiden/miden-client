@@ -1,11 +1,11 @@
+use js_export_macro::js_export;
 use miden_client::note::{NoteDetails as NativeNoteDetails, NoteId as NativeNoteId};
 use miden_client::notes::NoteFile as NativeNoteFile;
 use miden_client::{Deserializable, Serializable};
-use js_export_macro::js_export;
-#[cfg(feature = "browser")]
-use wasm_bindgen::prelude::*;
 #[cfg(feature = "nodejs")]
 use napi_derive::napi;
+#[cfg(feature = "browser")]
+use wasm_bindgen::prelude::*;
 
 use super::input_note::InputNote;
 use super::note::Note;

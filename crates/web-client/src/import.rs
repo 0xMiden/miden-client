@@ -1,7 +1,6 @@
+use js_export_macro::js_export;
 use miden_client::account::{AccountFile as NativeAccountFile, AccountId as NativeAccountId};
 use miden_client::keystore::Keystore;
-
-use js_export_macro::js_export;
 #[cfg(feature = "browser")]
 use wasm_bindgen::prelude::*;
 
@@ -19,10 +18,7 @@ use crate::{WebClient, js_error_with_context};
 #[js_export]
 impl WebClient {
     #[js_export(js_name = "importAccountFile")]
-    pub async fn import_account_file(
-        &self,
-        account_file: AccountFile,
-    ) -> Result<String, JsErr> {
+    pub async fn import_account_file(&self, account_file: AccountFile) -> Result<String, JsErr> {
         let keystore = self.keystore().await?;
         let mut guard = self.get_mut_inner().await;
         let client = guard.as_mut().ok_or_else(|| from_str_err("Client not initialized"))?;
@@ -37,7 +33,10 @@ impl WebClient {
             .map_err(|err| js_error_with_context(err, "failed to import account"))?;
 
         for key in &auth_secret_keys {
-            keystore.add_key(key, account.id()).await.map_err(|err| from_str_err(&err.to_string()))?;
+            keystore
+                .add_key(key, account.id())
+                .await
+                .map_err(|err| from_str_err(&err.to_string()))?;
         }
 
         Ok(format!("Imported account with ID: {account_id}"))
@@ -67,16 +66,16 @@ impl WebClient {
                 .map_err(|err| js_error_with_context(err, "failed to import public account"))?;
         }
 
-        keystore.add_key(&key_pair, native_id).await.map_err(|err| from_str_err(&err.to_string()))?;
+        keystore
+            .add_key(&key_pair, native_id)
+            .await
+            .map_err(|err| from_str_err(&err.to_string()))?;
 
         Ok(Account::from(generated_acct))
     }
 
     #[js_export(js_name = "importAccountById")]
-    pub async fn import_account_by_id(
-        &self,
-        account_id: &JsAccountId,
-    ) -> Result<(), JsErr> {
+    pub async fn import_account_by_id(&self, account_id: &JsAccountId) -> Result<(), JsErr> {
         let mut guard = self.get_mut_inner().await;
         let client = guard.as_mut().ok_or_else(|| from_str_err("Client not initialized"))?;
 

@@ -1,5 +1,5 @@
-use miden_client::transaction::{InputNote as NativeInputNote, InputNotes as NativeInputNotes};
 use js_export_macro::js_export;
+use miden_client::transaction::{InputNote as NativeInputNote, InputNotes as NativeInputNotes};
 
 use super::input_note::InputNote;
 use super::word::Word;

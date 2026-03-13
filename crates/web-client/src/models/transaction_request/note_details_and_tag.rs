@@ -1,5 +1,5 @@
-use miden_client::note::{NoteDetails as NativeNoteDetails, NoteTag as NativeNoteTag};
 use js_export_macro::js_export;
+use miden_client::note::{NoteDetails as NativeNoteDetails, NoteTag as NativeNoteTag};
 
 use crate::models::NoteTag;
 use crate::models::miden_arrays::NoteDetailsAndTagArray;

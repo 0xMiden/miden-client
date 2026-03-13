@@ -1,6 +1,5 @@
-use miden_client::transaction::TransactionRecord as NativeTransactionRecord;
-
 use js_export_macro::js_export;
+use miden_client::transaction::TransactionRecord as NativeTransactionRecord;
 
 use super::models::transaction_filter::TransactionFilter;
 use super::models::transaction_record::TransactionRecord;

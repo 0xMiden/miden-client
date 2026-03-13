@@ -1,9 +1,9 @@
+use js_export_macro::js_export;
 use miden_client::note::{
     NoteConsumability as NativeNoteConsumability,
     NoteConsumptionStatus as NativeNoteConsumptionStatus,
 };
 use miden_client::store::InputNoteRecord as NativeInputNoteRecord;
-use js_export_macro::js_export;
 
 use super::account_id::AccountId;
 use super::input_note_record::InputNoteRecord;

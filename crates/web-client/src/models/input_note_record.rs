@@ -1,7 +1,7 @@
+use js_export_macro::js_export;
 use miden_client::note::Note as NativeNote;
 use miden_client::store::InputNoteRecord as NativeInputNoteRecord;
 use miden_client::transaction::InputNote as NativeInputNote;
-use js_export_macro::js_export;
 
 use super::input_note_state::InputNoteState;
 use super::note_details::NoteDetails;

@@ -123,8 +123,14 @@ impl AuthFalcon512RpoMultisigConfig {
 }
 
 /// Create an auth component for `Falcon512Rpo` multisig.
-#[cfg_attr(feature = "browser", wasm_bindgen::prelude::wasm_bindgen(js_name = "createAuthFalcon512RpoMultisig"))]
-#[cfg_attr(feature = "nodejs", napi_derive::napi(js_name = "createAuthFalcon512RpoMultisig"))]
+#[cfg_attr(
+    feature = "browser",
+    wasm_bindgen::prelude::wasm_bindgen(js_name = "createAuthFalcon512RpoMultisig")
+)]
+#[cfg_attr(
+    feature = "nodejs",
+    napi_derive::napi(js_name = "createAuthFalcon512RpoMultisig")
+)]
 pub fn create_auth_falcon512_rpo_multisig(
     config: AuthFalcon512RpoMultisigConfig,
 ) -> Result<AccountComponent, JsErr> {

@@ -6,14 +6,13 @@ use alloc::collections::BTreeSet;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
+use js_export_macro::js_export;
 use miden_client::block::BlockNumber;
 use miden_client::note::{NoteId as NativeNoteId, Nullifier};
 use miden_client::rpc::domain::account::AccountStorageRequirements as NativeAccountStorageRequirements;
 use miden_client::rpc::domain::note::FetchedNote as NativeFetchedNote;
 use miden_client::rpc::{AccountStateAt, GrpcClient, NodeRpcClient};
 use note::FetchedNote;
-
-use js_export_macro::js_export;
 
 use crate::js_error_with_context;
 use crate::models::account_id::AccountId;
@@ -57,10 +56,7 @@ impl RpcClient {
     /// - Public notes: Returns the full `note` with `inclusionProof`, alongside its header.
     #[allow(clippy::doc_markdown)]
     #[js_export(js_name = "getNotesById")]
-    pub async fn get_notes_by_id(
-        &self,
-        note_ids: Vec<NoteId>,
-    ) -> Result<Vec<FetchedNote>, JsErr> {
+    pub async fn get_notes_by_id(&self, note_ids: Vec<NoteId>) -> Result<Vec<FetchedNote>, JsErr> {
         let native_note_ids: Vec<NativeNoteId> =
             note_ids.into_iter().map(NativeNoteId::from).collect();
 

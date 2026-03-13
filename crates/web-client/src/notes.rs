@@ -1,7 +1,6 @@
+use js_export_macro::js_export;
 use miden_client::Word;
 use miden_client::note::NoteId;
-
-use js_export_macro::js_export;
 
 use crate::models::account_id::AccountId;
 use crate::models::consumable_note_record::ConsumableNoteRecord;
@@ -14,10 +13,7 @@ use crate::{WebClient, js_error_with_context};
 #[js_export]
 impl WebClient {
     #[js_export(js_name = "getInputNotes")]
-    pub async fn get_input_notes(
-        &self,
-        filter: NoteFilter,
-    ) -> Result<Vec<InputNoteRecord>, JsErr> {
+    pub async fn get_input_notes(&self, filter: NoteFilter) -> Result<Vec<InputNoteRecord>, JsErr> {
         let mut guard = self.get_mut_inner().await;
         let client = guard.as_mut().ok_or_else(|| from_str_err("Client not initialized"))?;
         let result = client
@@ -28,10 +24,7 @@ impl WebClient {
     }
 
     #[js_export(js_name = "getInputNote")]
-    pub async fn get_input_note(
-        &self,
-        note_id: String,
-    ) -> Result<Option<InputNoteRecord>, JsErr> {
+    pub async fn get_input_note(&self, note_id: String) -> Result<Option<InputNoteRecord>, JsErr> {
         let mut guard = self.get_mut_inner().await;
         let client = guard.as_mut().ok_or_else(|| from_str_err("Client not initialized"))?;
         let note_id: NoteId = NoteId::from_raw(

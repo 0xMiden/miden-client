@@ -1,8 +1,8 @@
 use core::convert::TryFrom;
 use core::fmt::Debug;
 
-use miden_client::auth::AuthSchemeId as NativeAuthSchemeId;
 use js_export_macro::js_export;
+use miden_client::auth::AuthSchemeId as NativeAuthSchemeId;
 
 use crate::platform::{JsErr, from_str_err};
 

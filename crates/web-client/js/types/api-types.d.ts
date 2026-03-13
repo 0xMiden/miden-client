@@ -595,7 +595,6 @@ export declare class MidenClient {
   /** Returns the identifier of the underlying store (e.g. IndexedDB database name, file path). */
   storeIdentifier(): string;
 
-
   /** Advances the mock chain by one block. Only available on mock clients. */
   proveBlock(): void;
   /** Returns true if this client uses a mock chain. */

@@ -1,15 +1,15 @@
+use js_export_macro::js_export;
 use miden_client::account::AccountBuilder as NativeAccountBuilder;
 use miden_client::account::component::BasicWallet;
 use miden_client::auth::NoAuth;
-use js_export_macro::js_export;
 
 use crate::js_error_with_context;
-use crate::platform::{JsErr, from_str_err};
 use crate::models::account::Account;
 use crate::models::account_component::AccountComponent;
 use crate::models::account_storage_mode::AccountStorageMode;
 use crate::models::account_type::AccountType;
 use crate::models::word::Word;
+use crate::platform::{JsErr, from_str_err};
 
 #[js_export]
 pub struct AccountBuilderResult {

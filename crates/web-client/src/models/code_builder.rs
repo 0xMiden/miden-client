@@ -1,10 +1,6 @@
 use alloc::sync::Arc;
 
 use js_export_macro::js_export;
-#[cfg(feature = "browser")]
-use wasm_bindgen::prelude::*;
-#[cfg(feature = "nodejs")]
-use napi_derive::napi;
 use miden_client::account::AccountComponentCode as NativeAccountComponentCode;
 use miden_client::assembly::{
     Assembler,
@@ -17,6 +13,10 @@ use miden_client::assembly::{
     Report,
     SourceManagerSync,
 };
+#[cfg(feature = "nodejs")]
+use napi_derive::napi;
+#[cfg(feature = "browser")]
+use wasm_bindgen::prelude::*;
 
 use crate::js_error_with_context;
 use crate::models::account_component_code::AccountComponentCode;
@@ -126,7 +126,11 @@ impl CodeBuilder {
     /// this can be used from another script with an import statement, following the
     /// previous example: `use miden::my_contract'.
     #[js_export(js_name = "buildLibrary")]
-    pub fn build_library(&self, library_path: String, source_code: String) -> Result<Library, JsErr> {
+    pub fn build_library(
+        &self,
+        library_path: String,
+        source_code: String,
+    ) -> Result<Library, JsErr> {
         let library_path = Path::validate(&library_path).map_err(|e| {
             js_error_with_context(
                 e,

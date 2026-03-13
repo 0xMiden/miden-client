@@ -1,5 +1,5 @@
-use miden_client::account::AccountCode as NativeAccountCode;
 use js_export_macro::js_export;
+use miden_client::account::AccountCode as NativeAccountCode;
 
 use super::word::Word;
 

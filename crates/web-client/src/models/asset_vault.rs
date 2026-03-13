@@ -1,5 +1,5 @@
-use miden_client::asset::AssetVault as NativeAssetVault;
 use js_export_macro::js_export;
+use miden_client::asset::AssetVault as NativeAssetVault;
 
 use super::account_id::AccountId;
 use super::fungible_asset::FungibleAsset;

@@ -1,5 +1,5 @@
-use miden_client::transaction::TransactionResult as NativeTransactionResult;
 use js_export_macro::js_export;
+use miden_client::transaction::TransactionResult as NativeTransactionResult;
 
 use crate::models::executed_transaction::ExecutedTransaction;
 use crate::models::transaction_id::TransactionId;

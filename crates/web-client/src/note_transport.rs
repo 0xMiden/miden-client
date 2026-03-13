@@ -13,9 +13,9 @@ impl WebClient {
         address: crate::models::address::Address,
     ) -> Result<(), JsErr> {
         let mut guard = self.get_mut_inner().await;
-        let client = guard.as_mut().ok_or_else(|| {
-            from_str_err("Client not initialized. Call createClient() first.")
-        })?;
+        let client = guard
+            .as_mut()
+            .ok_or_else(|| from_str_err("Client not initialized. Call createClient() first."))?;
 
         client
             .send_private_note(note.into(), &address.into())
@@ -31,9 +31,9 @@ impl WebClient {
     #[js_export(js_name = "fetchPrivateNotes")]
     pub async fn fetch_private_notes(&self) -> Result<(), JsErr> {
         let mut guard = self.get_mut_inner().await;
-        let client = guard.as_mut().ok_or_else(|| {
-            from_str_err("Client not initialized. Call createClient() first.")
-        })?;
+        let client = guard
+            .as_mut()
+            .ok_or_else(|| from_str_err("Client not initialized. Call createClient() first."))?;
 
         client
             .fetch_private_notes()
@@ -51,9 +51,9 @@ impl WebClient {
     #[js_export(js_name = "fetchAllPrivateNotes")]
     pub async fn fetch_all_private_notes(&self) -> Result<(), JsErr> {
         let mut guard = self.get_mut_inner().await;
-        let client = guard.as_mut().ok_or_else(|| {
-            from_str_err("Client not initialized. Call createClient() first.")
-        })?;
+        let client = guard
+            .as_mut()
+            .ok_or_else(|| from_str_err("Client not initialized. Call createClient() first."))?;
 
         client
             .fetch_all_private_notes()

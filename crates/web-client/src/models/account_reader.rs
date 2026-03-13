@@ -1,7 +1,7 @@
 use alloc::vec::Vec;
 
-use miden_client::account::{AccountReader as NativeAccountReader, StorageMapKey, StorageSlotName};
 use js_export_macro::js_export;
+use miden_client::account::{AccountReader as NativeAccountReader, StorageMapKey, StorageSlotName};
 
 use super::account_header::AccountHeader;
 use super::account_id::AccountId;
@@ -161,4 +161,3 @@ impl AccountReader {
             .map_err(|err| js_error_with_context(err, "failed to get storage map item"))
     }
 }
-

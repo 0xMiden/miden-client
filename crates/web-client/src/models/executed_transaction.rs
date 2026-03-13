@@ -1,6 +1,6 @@
+use js_export_macro::js_export;
 use miden_client::account::AccountHeader as NativeAccountHeader;
 use miden_client::transaction::ExecutedTransaction as NativeExecutedTransaction;
-use js_export_macro::js_export;
 
 use super::account_delta::AccountDelta;
 use super::account_header::AccountHeader;

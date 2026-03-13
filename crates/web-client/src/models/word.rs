@@ -14,12 +14,8 @@ impl Word {
     /// Creates a word from four numeric values.
     #[js_export(constructor)]
     pub fn new(u64_vec: Vec<JsU64>) -> Word {
-        let fixed_array_u64: [u64; 4] = u64_vec
-            .iter()
-            .map(|v| *v as u64)
-            .collect::<Vec<u64>>()
-            .try_into()
-            .unwrap();
+        let fixed_array_u64: [u64; 4] =
+            u64_vec.iter().map(|v| *v as u64).collect::<Vec<u64>>().try_into().unwrap();
         let native_felt_vec: [NativeFelt; 4] = fixed_array_u64
             .iter()
             .map(|&v| NativeFelt::new(v))
@@ -38,9 +34,8 @@ impl Word {
     /// Creates a Word from a hex string.
     #[js_export(js_name = "fromHex")]
     pub fn from_hex(hex: String) -> Result<Word, JsErr> {
-        let native_word = NativeWord::try_from(hex.as_str()).map_err(|err| {
-            from_str_err(&format!("Error instantiating Word from hex: {err}"))
-        })?;
+        let native_word = NativeWord::try_from(hex.as_str())
+            .map_err(|err| from_str_err(&format!("Error instantiating Word from hex: {err}")))?;
         Ok(Word(native_word))
     }
 
@@ -79,7 +74,6 @@ impl Word {
     pub fn to_felts(&self) -> Vec<Felt> {
         self.0.iter().map(|felt| Felt::from(*felt)).collect::<Vec<Felt>>()
     }
-
 }
 
 impl Word {

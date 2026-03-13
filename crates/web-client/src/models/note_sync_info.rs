@@ -1,5 +1,5 @@
-use miden_client::rpc::domain::note::NoteSyncInfo as NativeNoteSyncInfo;
 use js_export_macro::js_export;
+use miden_client::rpc::domain::note::NoteSyncInfo as NativeNoteSyncInfo;
 
 use super::block_header::BlockHeader;
 use super::committed_note::CommittedNote;

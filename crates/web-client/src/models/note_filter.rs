@@ -1,5 +1,5 @@
-use miden_client::store::NoteFilter as NativeNoteFilter;
 use js_export_macro::js_export;
+use miden_client::store::NoteFilter as NativeNoteFilter;
 
 use super::note_id::NoteId;
 

@@ -1,3 +1,4 @@
+use js_export_macro::js_export;
 use miden_client::account::AccountId as NativeAccountId;
 use miden_client::note::{
     NetworkAccountTarget as NativeNetworkAccountTarget,
@@ -6,7 +7,6 @@ use miden_client::note::{
 };
 use miden_client::{Felt as NativeFelt, Word as NativeWord};
 use miden_protocol::note::NoteAttachmentContent;
-use js_export_macro::js_export;
 
 use super::account_id::AccountId;
 use super::felt::Felt;

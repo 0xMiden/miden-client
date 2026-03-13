@@ -1,3 +1,4 @@
+use js_export_macro::js_export;
 use miden_client::Word as NativeWord;
 use miden_client::note::{
     Note as NativeNote,
@@ -13,7 +14,6 @@ use miden_client::transaction::{
     TransactionScript as NativeTransactionScript,
 };
 use miden_client::vm::AdviceMap as NativeAdviceMap;
-use js_export_macro::js_export;
 
 use crate::models::advice_map::AdviceMap;
 use crate::models::foreign_account::ForeignAccount;

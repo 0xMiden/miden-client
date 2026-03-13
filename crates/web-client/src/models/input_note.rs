@@ -1,6 +1,6 @@
+use js_export_macro::js_export;
 use miden_client::note::{Note as NativeNote, NoteInclusionProof as NativeNoteInclusionProof};
 use miden_client::transaction::InputNote as NativeInputNote;
-use js_export_macro::js_export;
 
 use super::note::Note;
 use super::note_id::NoteId;

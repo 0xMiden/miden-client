@@ -1,5 +1,5 @@
-use miden_client::transaction::TransactionSummary as NativeTransactionSummary;
 use js_export_macro::js_export;
+use miden_client::transaction::TransactionSummary as NativeTransactionSummary;
 
 use super::account_delta::AccountDelta;
 use super::input_notes::InputNotes;

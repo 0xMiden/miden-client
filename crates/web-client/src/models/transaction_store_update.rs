@@ -1,5 +1,5 @@
-use miden_client::transaction::TransactionStoreUpdate as NativeTransactionStoreUpdate;
 use js_export_macro::js_export;
+use miden_client::transaction::TransactionStoreUpdate as NativeTransactionStoreUpdate;
 
 use crate::models::account_delta::AccountDelta;
 use crate::models::executed_transaction::ExecutedTransaction;
@@ -58,8 +58,7 @@ impl TransactionStoreUpdate {
 
     /// Deserializes an update from bytes.
     pub fn deserialize(bytes: JsBytes) -> Result<TransactionStoreUpdate, JsErr> {
-        deserialize_from_bytes::<NativeTransactionStoreUpdate>(&bytes)
-            .map(TransactionStoreUpdate)
+        deserialize_from_bytes::<NativeTransactionStoreUpdate>(&bytes).map(TransactionStoreUpdate)
     }
 }
 

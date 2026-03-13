@@ -1,7 +1,6 @@
+use js_export_macro::js_export;
 #[cfg(feature = "browser")]
 use wasm_bindgen::prelude::*;
-
-use js_export_macro::js_export;
 
 use crate::platform::{JsErr, from_str_err};
 use crate::{WebClient, js_error_with_context};
@@ -21,10 +20,7 @@ impl WebClient {
         let deserialized_result = result
             .map(|bytes| {
                 serde_wasm_bindgen::to_value(&bytes).map_err(|err| {
-                    js_error_with_context(
-                        err,
-                        "failed to deserialize setting value into a JsValue",
-                    )
+                    js_error_with_context(err, "failed to deserialize setting value into a JsValue")
                 })
             })
             .transpose()?;
@@ -55,9 +51,10 @@ impl WebClient {
     pub async fn get_setting(&self, key: String) -> Result<Option<Vec<u8>>, JsErr> {
         let mut guard = self.get_mut_inner().await;
         let client = guard.as_mut().ok_or_else(|| from_str_err("Client not initialized"))?;
-        client.get_setting(key).await.map_err(|err| {
-            js_error_with_context(err, "failed to get setting value from the store")
-        })
+        client
+            .get_setting(key)
+            .await
+            .map_err(|err| js_error_with_context(err, "failed to get setting value from the store"))
     }
 
     /// Sets a setting key-value in the store.
@@ -91,8 +88,9 @@ impl WebClient {
     pub async fn list_setting_keys(&self) -> Result<Vec<String>, JsErr> {
         let mut guard = self.get_mut_inner().await;
         let client = guard.as_mut().ok_or_else(|| from_str_err("Client not initialized"))?;
-        client.list_setting_keys().await.map_err(|err| {
-            js_error_with_context(err, "failed to list setting keys in the store")
-        })
+        client
+            .list_setting_keys()
+            .await
+            .map_err(|err| js_error_with_context(err, "failed to list setting keys in the store"))
     }
 }

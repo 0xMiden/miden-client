@@ -1,5 +1,5 @@
-use miden_client::account::AccountDelta as NativeAccountDelta;
 use js_export_macro::js_export;
+use miden_client::account::AccountDelta as NativeAccountDelta;
 
 use crate::models::account_id::AccountId;
 use crate::models::felt::Felt;

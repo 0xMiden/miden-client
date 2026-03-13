@@ -1,6 +1,6 @@
+use js_export_macro::js_export;
 use miden_client::crypto::MerklePath as NativeMerklePath;
 use miden_client::note::NoteInclusionProof as NativeNoteInclusionProof;
-use js_export_macro::js_export;
 
 use super::merkle_path::MerklePath;
 use super::note_location::NoteLocation;

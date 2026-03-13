@@ -1,5 +1,5 @@
-use miden_client::note::NoteHeader as NativeNoteHeader;
 use js_export_macro::js_export;
+use miden_client::note::NoteHeader as NativeNoteHeader;
 
 use super::note_id::NoteId;
 use super::note_metadata::NoteMetadata;

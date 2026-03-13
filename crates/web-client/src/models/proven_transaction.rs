@@ -1,6 +1,6 @@
+use js_export_macro::js_export;
 use miden_client::account::AccountId as NativeAccountId;
 use miden_client::transaction::ProvenTransaction as NativeProvenTransaction;
-use js_export_macro::js_export;
 
 use crate::models::account_id::AccountId;
 use crate::models::output_notes::OutputNotes;

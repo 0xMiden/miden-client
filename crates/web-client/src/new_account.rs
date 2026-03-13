@@ -27,7 +27,9 @@ impl WebClient {
         let should_sync = {
             let mut guard = self.get_mut_inner().await;
             match guard.as_mut() {
-                Some(client) => client.get_sync_height().await.is_ok_and(|h| h == BlockNumber::GENESIS),
+                Some(client) => {
+                    client.get_sync_height().await.is_ok_and(|h| h == BlockNumber::GENESIS)
+                },
                 None => false,
             }
         };
@@ -95,8 +97,7 @@ impl WebClient {
             },
         };
 
-        let symbol =
-            TokenSymbol::new(&token_symbol).map_err(|e| from_str_err(&e.to_string()))?;
+        let symbol = TokenSymbol::new(&token_symbol).map_err(|e| from_str_err(&e.to_string()))?;
         let max_supply = Felt::try_from(max_supply.to_le_bytes().as_slice())
             .expect("u64 can be safely converted to a field element");
 

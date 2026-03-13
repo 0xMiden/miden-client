@@ -1,5 +1,5 @@
-use miden_client::account::AccountComponentCode as NativeAccountComponentCode;
 use js_export_macro::js_export;
+use miden_client::account::AccountComponentCode as NativeAccountComponentCode;
 
 use crate::models::library::Library;
 use crate::platform::JsErr;

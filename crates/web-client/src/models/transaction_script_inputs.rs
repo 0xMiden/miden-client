@@ -1,5 +1,5 @@
-use miden_client::{Felt as NativeFelt, Word as NativeWord};
 use js_export_macro::js_export;
+use miden_client::{Felt as NativeFelt, Word as NativeWord};
 
 use super::miden_arrays::FeltArray;
 use super::word::Word;
@@ -45,8 +45,7 @@ impl From<&TransactionScriptInputPair> for (NativeWord, Vec<NativeFelt>) {
     fn from(transaction_script_input_pair: &TransactionScriptInputPair) -> Self {
         let native_word: NativeWord = transaction_script_input_pair.word.clone().into();
         let felts = &transaction_script_input_pair.felts;
-        let native_felts: Vec<NativeFelt> =
-            Vec::from(felts).into_iter().map(Into::into).collect();
+        let native_felts: Vec<NativeFelt> = Vec::from(felts).into_iter().map(Into::into).collect();
         (native_word, native_felts)
     }
 }

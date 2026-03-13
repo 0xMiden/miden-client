@@ -1,5 +1,5 @@
-use miden_client::note::PartialNote as NativePartialNote;
 use js_export_macro::js_export;
+use miden_client::note::PartialNote as NativePartialNote;
 
 use super::note_assets::NoteAssets;
 use super::note_id::NoteId;

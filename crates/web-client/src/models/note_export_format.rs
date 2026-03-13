@@ -1,5 +1,5 @@
-use miden_client::store::NoteExportType;
 use js_export_macro::js_export;
+use miden_client::store::NoteExportType;
 
 #[js_export]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

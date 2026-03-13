@@ -1,5 +1,5 @@
-use miden_client::note::NoteMetadata as NativeNoteMetadata;
 use js_export_macro::js_export;
+use miden_client::note::NoteMetadata as NativeNoteMetadata;
 
 use super::account_id::AccountId;
 use super::note_attachment::NoteAttachment;

@@ -151,7 +151,6 @@ impl Store for IdxdbStore {
         &self.database_id
     }
 
-
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     fn get_current_timestamp(&self) -> Option<u64> {
         Some(current_timestamp_u64())

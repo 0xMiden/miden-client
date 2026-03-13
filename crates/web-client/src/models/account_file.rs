@@ -1,5 +1,5 @@
-use miden_client::account::AccountFile as NativeAccountFile;
 use js_export_macro::js_export;
+use miden_client::account::AccountFile as NativeAccountFile;
 
 use crate::models::account::Account;
 use crate::models::account_id::AccountId;

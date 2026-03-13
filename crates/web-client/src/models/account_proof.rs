@@ -1,8 +1,8 @@
+use js_export_macro::js_export;
 use miden_client::account::StorageSlotName;
 use miden_client::block::BlockNumber;
 use miden_client::rpc::domain::account::AccountProof as NativeAccountProof;
 use miden_protocol::account::AccountStorageHeader;
-use js_export_macro::js_export;
 
 use super::account_code::AccountCode;
 use super::account_header::AccountHeader;

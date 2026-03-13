@@ -1,6 +1,6 @@
+use js_export_macro::js_export;
 use miden_client::note::Note as NativeNote;
 use miden_client::transaction::TransactionRequest as NativeTransactionRequest;
-use js_export_macro::js_export;
 
 use crate::models::note::Note;
 use crate::models::word::Word;

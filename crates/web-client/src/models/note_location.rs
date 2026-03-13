@@ -1,5 +1,5 @@
-use miden_client::note::NoteLocation as NativeNoteLocation;
 use js_export_macro::js_export;
+use miden_client::note::NoteLocation as NativeNoteLocation;
 
 /// Contains information about the location of a note.
 #[derive(Clone)]

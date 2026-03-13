@@ -1,27 +1,24 @@
 use alloc::sync::Arc;
 
-use miden_client::testing::mock::MockRpcApi;
-use miden_client::testing::note_transport::MockNoteTransportApi;
-use miden_client::utils::Serializable;
-
 #[cfg(feature = "browser")]
 use idxdb_store::IdxdbStore;
+use js_export_macro::js_export;
 #[cfg(feature = "browser")]
 use miden_client::store::Store;
 #[cfg(feature = "browser")]
 use miden_client::testing::MockChain;
+use miden_client::testing::mock::MockRpcApi;
+use miden_client::testing::note_transport::MockNoteTransportApi;
 #[cfg(feature = "browser")]
 use miden_client::testing::note_transport::MockNoteTransportNode;
+use miden_client::utils::Serializable;
 #[cfg(feature = "browser")]
 use miden_client::utils::{Deserializable, RwLock};
 #[cfg(feature = "browser")]
 use wasm_bindgen::prelude::*;
 
-use js_export_macro::js_export;
-
 use crate::platform::{JsErr, from_str_err};
 use crate::{WebClient, js_error_with_context};
-
 #[cfg(feature = "browser")]
 use crate::{WebKeyStore, create_rng};
 

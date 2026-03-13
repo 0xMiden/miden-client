@@ -1,6 +1,6 @@
+use js_export_macro::js_export;
 use miden_client::account::Account as NativeAccount;
 use miden_client::account::component::BasicFungibleFaucet as NativeBasicFungibleFaucet;
-use js_export_macro::js_export;
 
 use super::account::Account;
 use super::felt::Felt;

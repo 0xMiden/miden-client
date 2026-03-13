@@ -1,5 +1,5 @@
-use miden_client::note::NoteType as NativeNoteType;
 use js_export_macro::js_export;
+use miden_client::note::NoteType as NativeNoteType;
 
 /// Visibility level for note contents when published to the network.
 // Keep these masks in sync with `miden-protocol/src/note/note_type.rs`

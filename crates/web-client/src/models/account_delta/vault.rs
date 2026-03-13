@@ -1,9 +1,9 @@
+use js_export_macro::js_export;
 use miden_client::account::AccountId as NativeAccountId;
 use miden_client::asset::{
     AccountVaultDelta as NativeAccountVaultDelta,
     FungibleAssetDelta as NativeFungibleAssetDelta,
 };
-use js_export_macro::js_export;
 
 use crate::models::account_id::AccountId;
 use crate::models::fungible_asset::FungibleAsset;
@@ -50,7 +50,9 @@ impl AccountVaultDelta {
             .fungible()
             .iter()
             .filter(|&(_, &value)| value > 0)
-            .map(|(faucet_id, &diff)| FungibleAsset::new_inner(&faucet_id.into(), diff.unsigned_abs()))
+            .map(|(faucet_id, &diff)| {
+                FungibleAsset::new_inner(&faucet_id.into(), diff.unsigned_abs())
+            })
             .collect()
     }
 
@@ -61,7 +63,9 @@ impl AccountVaultDelta {
             .fungible()
             .iter()
             .filter(|&(_, &value)| value < 0)
-            .map(|(faucet_id, &diff)| FungibleAsset::new_inner(&faucet_id.into(), diff.unsigned_abs()))
+            .map(|(faucet_id, &diff)| {
+                FungibleAsset::new_inner(&faucet_id.into(), diff.unsigned_abs())
+            })
             .collect()
     }
 }

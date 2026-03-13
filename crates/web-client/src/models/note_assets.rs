@@ -1,6 +1,6 @@
+use js_export_macro::js_export;
 use miden_client::asset::Asset as NativeAsset;
 use miden_client::note::NoteAssets as NativeNoteAssets;
-use js_export_macro::js_export;
 
 use super::fungible_asset::FungibleAsset;
 

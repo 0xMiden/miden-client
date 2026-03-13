@@ -10,9 +10,15 @@ use alloc::sync::Arc;
 use core::error::Error;
 use core::fmt::Write;
 
+#[cfg(feature = "browser")]
+use idxdb_store::IdxdbStore;
 use js_export_macro::js_export;
+#[cfg(feature = "browser")]
+use js_sys::{Function, Reflect};
 use miden_client::builder::ClientBuilder;
 use miden_client::crypto::RpoRandomCoin;
+#[cfg(feature = "nodejs")]
+use miden_client::keystore::FilesystemKeyStore;
 use miden_client::note_transport::NoteTransportClient;
 use miden_client::note_transport::grpc::GrpcNoteTransportClient;
 use miden_client::rpc::{Endpoint, GrpcClient, NodeRpcClient};
@@ -21,27 +27,19 @@ use miden_client::testing::mock::MockRpcApi;
 use miden_client::testing::note_transport::MockNoteTransportApi;
 use miden_client::{Client, ClientError, DebugMode, ErrorHint, Felt};
 use models::code_builder::CodeBuilder;
-use platform::{AsyncCell, ClientAuth, JsErr, from_str_err};
+#[cfg(feature = "nodejs")]
+use napi_derive::napi;
 #[cfg(feature = "nodejs")]
 use platform::maybe_wrap_send;
+use platform::{AsyncCell, ClientAuth, JsErr, from_str_err};
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
-
-#[cfg(feature = "browser")]
-use idxdb_store::IdxdbStore;
-#[cfg(feature = "browser")]
-use js_sys::{Function, Reflect};
 #[cfg(feature = "browser")]
 use tracing::Level;
 #[cfg(feature = "browser")]
 use tracing_subscriber::layer::SubscriberExt;
 #[cfg(feature = "browser")]
 use wasm_bindgen::prelude::*;
-
-#[cfg(feature = "nodejs")]
-use miden_client::keystore::FilesystemKeyStore;
-#[cfg(feature = "nodejs")]
-use napi_derive::napi;
 
 pub mod account;
 pub mod export;
@@ -158,9 +156,7 @@ impl WebClient {
         let client = guard.as_ref().ok_or_else(|| {
             from_str_err("client was not initialized before instancing CodeBuilder")
         })?;
-        Ok(CodeBuilder::from_source_manager(
-            client.code_builder().source_manager().clone(),
-        ))
+        Ok(CodeBuilder::from_source_manager(client.code_builder().source_manager().clone()))
     }
 }
 
@@ -225,8 +221,7 @@ impl WebClient {
                 .await
                 .map_err(|_| JsValue::from_str("Failed to initialize IdxdbStore"))?,
         );
-        let keystore =
-            WebKeyStore::new_with_callbacks(rng, store_name.clone(), None, None, None);
+        let keystore = WebKeyStore::new_with_callbacks(rng, store_name.clone(), None, None, None);
 
         self.setup_client(web_rpc_client, store, keystore, rng, note_transport_client, debug_mode)
             .await?;
@@ -460,8 +455,7 @@ where
     {
         let js_error: JsValue = JsError::new(&error_message).into();
         if let Some(help) = help {
-            let _ =
-                Reflect::set(&js_error, &JsValue::from_str("help"), &JsValue::from_str(&help));
+            let _ = Reflect::set(&js_error, &JsValue::from_str("help"), &JsValue::from_str(&help));
         }
         js_error
     }

@@ -1,3 +1,4 @@
+use js_export_macro::js_export;
 use miden_client::ClientError;
 use miden_client::asset::FungibleAsset;
 use miden_client::note::{BlockNumber, Note as NativeNote};
@@ -11,8 +12,6 @@ use miden_client::transaction::{
     TransactionStoreUpdate as NativeTransactionStoreUpdate,
     TransactionSummary as NativeTransactionSummary,
 };
-
-use js_export_macro::js_export;
 
 use crate::models::NoteType;
 use crate::models::account_id::AccountId;
@@ -231,8 +230,10 @@ impl WebClient {
     ) -> Result<TransactionResult, JsErr> {
         let mut guard = self.get_mut_inner().await;
         let client = guard.as_mut().ok_or_else(|| from_str_err("Client not initialized"))?;
-        let fut = Box::pin(client.execute_transaction(account_id.into(), transaction_request.into()));
-        maybe_wrap_send(fut).await
+        let fut =
+            Box::pin(client.execute_transaction(account_id.into(), transaction_request.into()));
+        maybe_wrap_send(fut)
+            .await
             .map(TransactionResult::from)
             .map_err(|err| js_error_with_context(err, "failed to execute transaction"))
     }
@@ -273,9 +274,9 @@ impl WebClient {
                 );
                 Ok(TransactionSummary::from(summary))
             },
-            Err(ClientError::TransactionExecutorError(
-                TransactionExecutorError::Unauthorized(summary),
-            )) => Ok(TransactionSummary::from(*summary)),
+            Err(ClientError::TransactionExecutorError(TransactionExecutorError::Unauthorized(
+                summary,
+            ))) => Ok(TransactionSummary::from(*summary)),
             Err(err) => Err(js_error_with_context(err, "failed to execute transaction")),
         }
     }
@@ -294,7 +295,8 @@ impl WebClient {
             prover.map_or_else(|| client.prover(), |custom_prover| custom_prover.get_prover());
 
         let fut = Box::pin(client.prove_transaction_with(transaction_result.native(), prover_arc));
-        maybe_wrap_send(fut).await
+        maybe_wrap_send(fut)
+            .await
             .map(Into::into)
             .map_err(|err| js_error_with_context(err, "failed to prove transaction"))
     }
@@ -327,7 +329,8 @@ impl WebClient {
             transaction_result.native(),
             BlockNumber::from(submission_height),
         ));
-        let update = maybe_wrap_send(fut).await
+        let update = maybe_wrap_send(fut)
+            .await
             .map(TransactionStoreUpdate::from)
             .map_err(|err| js_error_with_context(err, "failed to build transaction update"))?;
 
@@ -357,9 +360,7 @@ impl WebClient {
             NativeTransactionRequestBuilder::new()
                 .build_consume_notes(native_notes)
                 .map_err(|err| {
-                    from_str_err(&format!(
-                        "Failed to create Consume Transaction Request: {err}"
-                    ))
+                    from_str_err(&format!("Failed to create Consume Transaction Request: {err}"))
                 })?
         };
 

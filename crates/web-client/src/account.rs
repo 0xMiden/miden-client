@@ -1,7 +1,6 @@
+use js_export_macro::js_export;
 use miden_client::Word as NativeWord;
 use miden_client::keystore::Keystore;
-
-use js_export_macro::js_export;
 
 use crate::models::account::Account;
 use crate::models::account_code::AccountCode;
@@ -34,10 +33,7 @@ impl WebClient {
     ///
     /// This method loads the complete account state including vault, storage, and code.
     #[js_export(js_name = "getAccount")]
-    pub async fn get_account(
-        &self,
-        account_id: &AccountId,
-    ) -> Result<Option<Account>, JsErr> {
+    pub async fn get_account(&self, account_id: &AccountId) -> Result<Option<Account>, JsErr> {
         let mut guard = self.get_mut_inner().await;
         let client = guard.as_mut().ok_or_else(|| from_str_err("Client not initialized"))?;
         client
@@ -51,10 +47,7 @@ impl WebClient {
     ///
     /// To check the balance for a single asset, use `accountReader` instead.
     #[js_export(js_name = "getAccountVault")]
-    pub async fn get_account_vault(
-        &self,
-        account_id: &AccountId,
-    ) -> Result<AssetVault, JsErr> {
+    pub async fn get_account_vault(&self, account_id: &AccountId) -> Result<AssetVault, JsErr> {
         let mut guard = self.get_mut_inner().await;
         let client = guard.as_mut().ok_or_else(|| from_str_err("Client not initialized"))?;
         client
@@ -190,9 +183,10 @@ impl WebClient {
     ) -> Result<(), JsErr> {
         let mut guard = self.get_mut_inner().await;
         let client = guard.as_mut().ok_or_else(|| from_str_err("Client not initialized"))?;
-        client.remove_address(address.into(), account_id.into()).await.map_err(|err| {
-            js_error_with_context(err, "failed to remove address from account")
-        })?;
+        client
+            .remove_address(address.into(), account_id.into())
+            .await
+            .map_err(|err| js_error_with_context(err, "failed to remove address from account"))?;
         Ok(())
     }
 

@@ -1,6 +1,5 @@
-use miden_client::note::NoteTag;
-
 use js_export_macro::js_export;
+use miden_client::note::NoteTag;
 
 use crate::platform::{JsErr, from_str_err};
 use crate::{WebClient, js_error_with_context};

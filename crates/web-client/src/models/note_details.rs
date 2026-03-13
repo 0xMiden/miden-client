@@ -1,6 +1,6 @@
+use js_export_macro::js_export;
 use miden_client::Word as NativeWord;
 use miden_client::note::NoteDetails as NativeNoteDetails;
-use js_export_macro::js_export;
 
 use super::note_assets::NoteAssets;
 use super::note_id::NoteId;

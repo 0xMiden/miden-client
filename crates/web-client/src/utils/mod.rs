@@ -22,7 +22,6 @@ pub fn deserialize_from_bytes<T: Deserializable>(bytes: &JsBytes) -> Result<T, J
     T::read_from(&mut reader).map_err(|e| js_error_with_context(e, &context))
 }
 
-
 #[cfg(test)]
 mod tests {
     use miden_client::utils::{ByteReader, DeserializationError};

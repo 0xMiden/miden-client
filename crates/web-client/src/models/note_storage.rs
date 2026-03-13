@@ -1,5 +1,5 @@
-use miden_client::note::NoteStorage as NativeNoteStorage;
 use js_export_macro::js_export;
+use miden_client::note::NoteStorage as NativeNoteStorage;
 
 use super::felt::Felt;
 use crate::models::miden_arrays::FeltArray;

@@ -191,7 +191,6 @@ export class MidenClient {
     return this.#inner.storeIdentifier();
   }
 
-
   // ── Mock-only methods ──
 
   /** Advances the mock chain by one block. Only available on mock clients. */

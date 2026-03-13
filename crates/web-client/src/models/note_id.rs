@@ -1,5 +1,5 @@
-use miden_client::note::NoteId as NativeNoteId;
 use js_export_macro::js_export;
+use miden_client::note::NoteId as NativeNoteId;
 
 use super::word::Word;
 use crate::js_error_with_context;

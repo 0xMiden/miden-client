@@ -1,5 +1,5 @@
-use miden_client::note::NoteExecutionHint as NativeNoteExecutionHint;
 use js_export_macro::js_export;
+use miden_client::note::NoteExecutionHint as NativeNoteExecutionHint;
 
 /// Hint describing when a note can be consumed.
 #[derive(Clone, Copy)]

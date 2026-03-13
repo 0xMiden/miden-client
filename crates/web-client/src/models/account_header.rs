@@ -1,5 +1,5 @@
-use miden_client::account::AccountHeader as NativeAccountHeader;
 use js_export_macro::js_export;
+use miden_client::account::AccountHeader as NativeAccountHeader;
 
 use super::account_id::AccountId;
 use super::felt::Felt;

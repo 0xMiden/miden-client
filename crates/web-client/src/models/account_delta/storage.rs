@@ -1,5 +1,5 @@
-use miden_client::asset::AccountStorageDelta as NativeAccountStorageDelta;
 use js_export_macro::js_export;
+use miden_client::asset::AccountStorageDelta as NativeAccountStorageDelta;
 
 use crate::models::word::Word;
 use crate::platform::{JsBytes, JsErr};

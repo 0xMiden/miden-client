@@ -1,13 +1,13 @@
+use js_export_macro::js_export;
 use miden_client::account::{
     AccountStorage as NativeAccountStorage,
     StorageSlotContent,
     StorageSlotName,
 };
-use js_export_macro::js_export;
-#[cfg(feature = "browser")]
-use wasm_bindgen::prelude::*;
 #[cfg(feature = "nodejs")]
 use napi_derive::napi;
+#[cfg(feature = "browser")]
+use wasm_bindgen::prelude::*;
 
 use crate::models::word::Word;
 

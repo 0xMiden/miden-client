@@ -16,7 +16,7 @@ use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 use syn::visit_mut::VisitMut;
-use syn::{parse_macro_input, Ident, ImplItem, ImplItemFn, Item, ItemEnum, ItemImpl, ItemStruct};
+use syn::{Ident, ImplItem, ImplItemFn, Item, ItemEnum, ItemImpl, ItemStruct, parse_macro_input};
 
 // ================================================================================================
 // Entry point
@@ -35,7 +35,7 @@ pub fn js_export(attr: TokenStream, item: TokenStream) -> TokenStream {
             return syn::Error::new_spanned(other, "#[js_export] only supports struct, enum, impl")
                 .to_compile_error()
                 .into();
-        }
+        },
     };
 
     output.into()
@@ -92,9 +92,7 @@ fn handle_impl(outer_attr: &TokenStream2, mut item: ItemImpl) -> TokenStream2 {
 
                 if has_jsu64(&method) {
                     // Tag the method with its js_export args for later.
-                    method
-                        .attrs
-                        .push(syn::parse_quote!(#[__js_export_args(#method_attr_tokens)]));
+                    method.attrs.push(syn::parse_quote!(#[__js_export_args(#method_attr_tokens)]));
                     jsu64_methods.push(method);
                 } else {
                     // Annotate the method inline with dual cfg_attr.
@@ -104,7 +102,7 @@ fn handle_impl(outer_attr: &TokenStream2, mut item: ItemImpl) -> TokenStream2 {
                     method.attrs.push(syn::parse_quote!(#napi));
                     shared_methods.push(method);
                 }
-            }
+            },
             other => other_items.push(other),
         }
     }
@@ -127,10 +125,14 @@ fn handle_impl(outer_attr: &TokenStream2, mut item: ItemImpl) -> TokenStream2 {
 
     // --- Platform-specific impl blocks (methods with JsU64) ---
     if !jsu64_methods.is_empty() {
-        let browser_methods: Vec<ImplItemFn> =
-            jsu64_methods.iter().map(|m| make_platform_method(m, Platform::Browser)).collect();
-        let nodejs_methods: Vec<ImplItemFn> =
-            jsu64_methods.iter().map(|m| make_platform_method(m, Platform::Nodejs)).collect();
+        let browser_methods: Vec<ImplItemFn> = jsu64_methods
+            .iter()
+            .map(|m| make_platform_method(m, Platform::Browser))
+            .collect();
+        let nodejs_methods: Vec<ImplItemFn> = jsu64_methods
+            .iter()
+            .map(|m| make_platform_method(m, Platform::Nodejs))
+            .collect();
 
         output.extend(quote! {
             #[cfg(feature = "browser")]
@@ -174,14 +176,14 @@ fn make_platform_method(method: &ImplItemFn, platform: Platform) -> ImplItemFn {
                     .attrs
                     .push(syn::parse_quote!(#[::wasm_bindgen::prelude::wasm_bindgen(#args)]));
             }
-        }
+        },
         Platform::Nodejs => {
             if args.is_empty() {
                 method.attrs.push(syn::parse_quote!(#[::napi_derive::napi]));
             } else {
                 method.attrs.push(syn::parse_quote!(#[::napi_derive::napi(#args)]));
             }
-        }
+        },
     }
 
     // Replace JsU64 in signature.
@@ -311,4 +313,3 @@ fn extract_js_export_attr(method: &mut ImplItemFn) -> Option<TokenStream2> {
     });
     extracted
 }
-

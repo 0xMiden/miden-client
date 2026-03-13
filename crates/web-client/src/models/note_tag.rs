@@ -1,6 +1,6 @@
+use js_export_macro::js_export;
 use miden_client::account::AccountId as NativeAccountId;
 use miden_client::note::NoteTag as NativeNoteTag;
-use js_export_macro::js_export;
 
 use super::account_id::AccountId;
 use crate::platform::{JsErr, from_str_err};

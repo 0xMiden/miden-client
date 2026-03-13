@@ -1,3 +1,4 @@
+use js_export_macro::js_export;
 use miden_client::asset::Asset as NativeAsset;
 use miden_client::block::BlockNumber as NativeBlockNumber;
 use miden_client::crypto::RpoRandomCoin;
@@ -6,7 +7,6 @@ use miden_client::{Felt as NativeFelt, Word as NativeWord};
 use miden_standards::note::{P2ideNote, P2ideNoteStorage};
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
-use js_export_macro::js_export;
 
 use super::NoteType;
 use super::account_id::AccountId;

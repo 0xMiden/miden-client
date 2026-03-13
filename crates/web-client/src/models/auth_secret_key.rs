@@ -1,9 +1,9 @@
+use js_export_macro::js_export;
 use miden_client::auth::AuthSecretKey as NativeAuthSecretKey;
 use miden_client::utils::Serializable;
 use miden_client::{Felt as NativeFelt, Word as NativeWord};
 use rand::SeedableRng;
 use rand::rngs::StdRng;
-use js_export_macro::js_export;
 
 use super::felt::Felt;
 use super::public_key::PublicKey;

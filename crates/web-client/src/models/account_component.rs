@@ -1,3 +1,4 @@
+use js_export_macro::js_export;
 use miden_client::Word as NativeWord;
 use miden_client::account::component::{
     AccountComponent as NativeAccountComponent,
@@ -15,10 +16,8 @@ use miden_client::auth::{
     PublicKeyCommitment,
 };
 use miden_client::vm::Package as NativePackage;
-use js_export_macro::js_export;
 
 use crate::js_error_with_context;
-use crate::platform::{JsErr, from_str_err};
 use crate::models::account_component_code::AccountComponentCode;
 use crate::models::auth::AuthScheme;
 use crate::models::auth_secret_key::AuthSecretKey;
@@ -27,6 +26,7 @@ use crate::models::miden_arrays::StorageSlotArray;
 use crate::models::package::Package;
 use crate::models::storage_slot::StorageSlot;
 use crate::models::word::Word;
+use crate::platform::{JsErr, from_str_err};
 
 /// Procedure digest paired with whether it is an auth procedure.
 #[derive(Clone)]
@@ -116,7 +116,9 @@ impl AccountComponent {
                 let path_str = export_path.as_ref().as_str();
                 path_str == procedure_name.as_str()
                     || export_path.as_ref().to_relative().as_str() == procedure_name.as_str()
-                    || path_str.rsplit_once("::").is_some_and(|(_, local)| local == procedure_name.as_str())
+                    || path_str
+                        .rsplit_once("::")
+                        .is_some_and(|(_, local)| local == procedure_name.as_str())
             })
             .ok_or_else(|| {
                 from_str_err(&format!(
@@ -197,9 +199,7 @@ impl AccountComponent {
             AccountComponentMetadata::new("custom"),
         )
         .map(AccountComponent)
-        .map_err(|e| {
-            js_error_with_context(e, "Failed to create account component from package")
-        })
+        .map_err(|e| js_error_with_context(e, "Failed to create account component from package"))
     }
 
     /// Creates an account component from a compiled library and storage slots.
@@ -218,9 +218,7 @@ impl AccountComponent {
             AccountComponentMetadata::new("custom"),
         )
         .map(AccountComponent)
-        .map_err(|e| {
-            js_error_with_context(e, "Failed to create account component from library")
-        })
+        .map_err(|e| js_error_with_context(e, "Failed to create account component from library"))
     }
 }
 

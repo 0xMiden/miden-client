@@ -1,6 +1,6 @@
+use js_export_macro::js_export;
 use miden_client::store::TransactionFilter as NativeTransactionFilter;
 use miden_client::transaction::TransactionId as NativeTransactionId;
-use js_export_macro::js_export;
 
 use super::transaction_id::TransactionId;
 

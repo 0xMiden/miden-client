@@ -29,10 +29,7 @@ impl TransactionProver {
     /// - `timeout_ms`: The timeout in milliseconds for the remote prover.
     #[js_export(js_name = "newRemoteProver")]
     pub fn new_remote_prover(endpoint: String, timeout_ms: Option<JsU64>) -> TransactionProver {
-        TransactionProver::new_remote_prover_inner(
-            endpoint,
-            timeout_ms.map(|v| v as u64),
-        )
+        TransactionProver::new_remote_prover_inner(endpoint, timeout_ms.map(|v| v as u64))
     }
 
     /// Creates a prover that uses the local proving backend.
@@ -89,7 +86,10 @@ impl TransactionProver {
 
                 // Check if the suffix is a valid integer (timeout)
                 if let Ok(timeout_ms) = timeout_str.parse::<u64>() {
-                    return Ok(TransactionProver::new_remote_prover_inner(endpoint.to_string(), Some(timeout_ms)));
+                    return Ok(TransactionProver::new_remote_prover_inner(
+                        endpoint.to_string(),
+                        Some(timeout_ms),
+                    ));
                 }
             }
 
@@ -108,7 +108,10 @@ impl TransactionProver {
 
 impl TransactionProver {
     /// Internal constructor for remote prover, usable from both platforms.
-    pub(crate) fn new_remote_prover_inner(endpoint: String, timeout_ms: Option<u64>) -> TransactionProver {
+    pub(crate) fn new_remote_prover_inner(
+        endpoint: String,
+        timeout_ms: Option<u64>,
+    ) -> TransactionProver {
         let mut remote_prover = RemoteTransactionProver::new(&endpoint);
 
         let timeout = if let Some(timeout) = timeout_ms {

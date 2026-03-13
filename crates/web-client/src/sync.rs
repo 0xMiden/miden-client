@@ -56,7 +56,8 @@ impl WebClient {
         let mut guard = self.get_mut_inner().await;
         let client = guard.as_mut().ok_or_else(|| from_str_err("Client not initialized"))?;
 
-        let sync_summary = maybe_wrap_send(client.sync_state()).await
+        let sync_summary = maybe_wrap_send(client.sync_state())
+            .await
             .map_err(|err| js_error_with_context(err, "failed to sync state"))?;
 
         Ok(sync_summary.into())

@@ -324,7 +324,6 @@ test.describe("MidenClient API - Mock Chain", () => {
     expect(result.foundInImport).toBe(true);
   });
 
-
   test("usesMockChain and proveBlock", async ({ page }) => {
     const result = await page.evaluate(async () => {
       const client = await window.MidenClient.createMock();

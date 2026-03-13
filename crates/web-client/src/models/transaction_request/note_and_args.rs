@@ -1,6 +1,6 @@
+use js_export_macro::js_export;
 use miden_client::note::Note as NativeNote;
 use miden_client::transaction::NoteArgs as NativeNoteArgs;
-use js_export_macro::js_export;
 
 use crate::models::miden_arrays::NoteAndArgsArray;
 use crate::models::note::Note;

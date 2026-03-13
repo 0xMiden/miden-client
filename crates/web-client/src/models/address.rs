@@ -1,3 +1,4 @@
+use js_export_macro::js_export;
 use miden_client::account::AccountId as NativeAccountId;
 use miden_client::address::{
     Address as NativeAddress,
@@ -6,11 +7,10 @@ use miden_client::address::{
     NetworkId as NativeNetworkId,
     RoutingParameters,
 };
-use js_export_macro::js_export;
-#[cfg(feature = "browser")]
-use wasm_bindgen::prelude::*;
 #[cfg(feature = "nodejs")]
 use napi_derive::napi;
+#[cfg(feature = "browser")]
+use wasm_bindgen::prelude::*;
 
 use super::NoteTag;
 use super::account_id::{AccountId, NetworkId};
@@ -156,9 +156,9 @@ impl TryFrom<NativeAddressInterface> for AddressInterface {
     fn try_from(value: NativeAddressInterface) -> Result<Self, Self::Error> {
         match value {
             NativeAddressInterface::BasicWallet => Ok(AddressInterface::BasicWallet),
-            _other => {
-                Err(from_str_err("AddressInterface from miden-protocol crate was instantiated with an unsupported value"))
-            },
+            _other => Err(from_str_err(
+                "AddressInterface from miden-protocol crate was instantiated with an unsupported value",
+            )),
         }
     }
 }

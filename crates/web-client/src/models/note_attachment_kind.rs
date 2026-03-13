@@ -1,5 +1,5 @@
-use miden_client::note::NoteAttachmentKind as NativeNoteAttachmentKind;
 use js_export_macro::js_export;
+use miden_client::note::NoteAttachmentKind as NativeNoteAttachmentKind;
 
 /// Defines the payload shape of a note attachment.
 #[js_export]

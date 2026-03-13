@@ -1,7 +1,7 @@
 use core::str::FromStr;
 
-use miden_client::account::AccountStorageMode as NativeAccountStorageMode;
 use js_export_macro::js_export;
+use miden_client::account::AccountStorageMode as NativeAccountStorageMode;
 
 use crate::platform::{JsErr, from_str_err};
 

@@ -1,5 +1,5 @@
-use miden_client::transaction::TransactionArgs as NativeTransactionArgs;
 use js_export_macro::js_export;
+use miden_client::transaction::TransactionArgs as NativeTransactionArgs;
 
 use super::advice_inputs::AdviceInputs;
 use super::note_id::NoteId;

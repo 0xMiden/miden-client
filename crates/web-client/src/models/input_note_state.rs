@@ -1,5 +1,5 @@
-use miden_client::store::InputNoteState as NativeNoteState;
 use js_export_macro::js_export;
+use miden_client::store::InputNoteState as NativeNoteState;
 
 #[derive(Clone)]
 #[js_export]

@@ -1,10 +1,10 @@
+use js_export_macro::js_export;
 use miden_client::Word as NativeWord;
 use miden_client::note::{
     NoteRecipient as NativeNoteRecipient,
     NoteScript as NativeNoteScript,
     NoteStorage as NativeNoteStorage,
 };
-use js_export_macro::js_export;
 
 use super::note_script::NoteScript;
 use super::note_storage::NoteStorage;

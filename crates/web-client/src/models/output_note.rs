@@ -1,10 +1,10 @@
+use js_export_macro::js_export;
 use miden_client::note::{
     Note as NativeNote,
     NoteHeader as NativeNoteHeader,
     PartialNote as NativePartialNote,
 };
 use miden_client::transaction::OutputNote as NativeOutputNote;
-use js_export_macro::js_export;
 
 use super::note::Note;
 use super::note_assets::NoteAssets;

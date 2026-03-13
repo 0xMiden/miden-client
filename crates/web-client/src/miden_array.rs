@@ -18,8 +18,9 @@ macro_rules! impl_napi_from_value {
                 env: napi::bindgen_prelude::sys::napi_env,
                 napi_val: napi::bindgen_prelude::sys::napi_value,
             ) -> napi::Result<Self> {
-                let ref_val =
-                    unsafe { <$t as napi::bindgen_prelude::FromNapiRef>::from_napi_ref(env, napi_val)? };
+                let ref_val = unsafe {
+                    <$t as napi::bindgen_prelude::FromNapiRef>::from_napi_ref(env, napi_val)?
+                };
                 Ok(ref_val.clone())
             }
         }

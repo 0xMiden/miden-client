@@ -1,5 +1,5 @@
-use miden_client::transaction::TransactionScript as NativeTransactionScript;
 use js_export_macro::js_export;
+use miden_client::transaction::TransactionScript as NativeTransactionScript;
 
 use crate::models::package::Package;
 use crate::models::word::Word;
