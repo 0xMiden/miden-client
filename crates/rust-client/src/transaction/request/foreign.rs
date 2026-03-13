@@ -174,7 +174,7 @@ pub(crate) fn account_proof_into_inputs(
                 account_header.id(),
                 account_header.nonce(),
                 code,
-                PartialStorage::new(storage_details.header, storage_map_proofs.into_iter())?,
+                PartialStorage::new(storage_details.header, storage_map_proofs)?,
                 PartialVault::new_full(vault),
                 None,
             )?,

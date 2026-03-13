@@ -234,7 +234,7 @@ impl fmt::Display for TransactionStatus {
             TransactionStatus::Committed { block_number, .. } => {
                 write!(f, "Committed (Block: {block_number})")
             },
-            TransactionStatus::Discarded(cause) => write!(f, "Discarded ({cause})",),
+            TransactionStatus::Discarded(cause) => write!(f, "Discarded ({cause})"),
         }
     }
 }
