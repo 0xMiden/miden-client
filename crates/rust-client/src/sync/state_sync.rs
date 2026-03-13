@@ -177,11 +177,9 @@ impl StateSync {
             output_notes,
             uncommitted_transactions,
         } = input;
-        let block_num = u32::try_from(
-            current_partial_mmr.forest().num_leaves().saturating_sub(1),
-        )
-        .map_err(|_| ClientError::InvalidPartialMmrForest)?
-        .into();
+        let block_num = u32::try_from(current_partial_mmr.forest().num_leaves().saturating_sub(1))
+            .map_err(|_| ClientError::InvalidPartialMmrForest)?
+            .into();
 
         let mut state_sync_update = StateSyncUpdate {
             block_num,

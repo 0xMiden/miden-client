@@ -80,10 +80,10 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
-      - name: Install Rust with clippy
+      - name: Install Rust with nightly clippy
         run: |
-          rustup update --no-self-update
-          rustup component add clippy
+          rustup update --no-self-update nightly
+          rustup +nightly component add clippy
       - name: make - clippy
         run: make clippy
 
@@ -92,11 +92,11 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
-      - name: Install Rust with clippy
+      - name: Install Rust with nightly clippy
         run: |
-          rustup update --no-self-update
-          rustup target add wasm32-unknown-unknown
-          rustup component add clippy
+          rustup update --no-self-update nightly
+          rustup target add --toolchain nightly wasm32-unknown-unknown
+          rustup +nightly component add clippy
       - name: make - clippy-wasm
         run: make clippy-wasm
 
