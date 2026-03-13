@@ -11,6 +11,7 @@ use miden_client::store::{AccountSmtForest, StoreError, TransactionFilter};
 use miden_client::transaction::{
     TransactionDetails,
     TransactionId,
+    OutputNotes,
     TransactionRecord,
     TransactionScript,
     TransactionStatus,
@@ -132,14 +133,21 @@ impl SqliteStore {
             .map(|x| x.nullifier().as_word())
             .collect();
 
-        let output_notes = executed_transaction.output_notes();
+        let output_notes = OutputNotes::new(
+            executed_transaction
+                .output_notes()
+                .iter()
+                .map(|note| note.to_output_note().map_err(|err| StoreError::ParsingError(err.to_string())))
+                .collect::<Result<Vec<_>, _>>()?,
+        )
+        .map_err(|err| StoreError::ParsingError(err.to_string()))?;
 
         let details = TransactionDetails {
             account_id: executed_transaction.account_id(),
             init_account_state: executed_transaction.initial_account().initial_commitment(),
             final_account_state: executed_transaction.final_account().to_commitment(),
             input_note_nullifiers: nullifiers,
-            output_notes: output_notes.clone(),
+            output_notes,
             block_num: executed_transaction.block_header().block_num(),
             submission_height: tx_update.submission_height(),
             expiration_block_num: executed_transaction.expiration_block_num(),
