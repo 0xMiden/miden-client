@@ -101,8 +101,8 @@ pub async fn test_network_fpi(client_config: ClientConfig) -> Result<()> {
             push.{proc_root}
 
             # push the foreign account id
-            push.{account_id_suffix} push.{account_id_prefix}
-            # => [foreign_id_prefix, foreign_id_suffix, FOREIGN_PROC_ROOT, pad(16)]
+            push.{account_id_prefix} push.{account_id_suffix}
+            # => [foreign_id_suffix, foreign_id_prefix, FOREIGN_PROC_ROOT, pad(16)]
 
             exec.tx::execute_foreign_procedure
 

@@ -290,7 +290,7 @@ async fn lazy_foreign_account_loading() {
             use miden::protocol::tx
             begin
                 push.{proc_root}
-                push.{suffix} push.{prefix}
+                push.{prefix} push.{suffix}
                 exec.tx::execute_foreign_procedure
                 push.{map_value} assert_eqw
             end

@@ -79,8 +79,8 @@ pub async fn test_fpi_execute_program(client_config: ClientConfig) -> Result<()>
             push.{proc_root}
 
             # push the foreign account id
-            push.{account_id_suffix} push.{account_id_prefix}
-            # => [foreign_id_prefix, foreign_id_suffix, FOREIGN_PROC_ROOT,
+            push.{account_id_prefix} push.{account_id_suffix}
+            # => [foreign_id_suffix, foreign_id_prefix, FOREIGN_PROC_ROOT,
             #     slot_id_prefix, slot_id_suffix, KEY, pad(10)]
 
             exec.tx::execute_foreign_procedure
@@ -183,8 +183,8 @@ pub async fn test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
                 push.{inner_proc_root}
 
                 # push the foreign account id
-                push.{account_id_suffix} push.{account_id_prefix}
-                # => [foreign_id_prefix, foreign_id_suffix, FOREIGN_PROC_ROOT,
+                push.{account_id_prefix} push.{account_id_suffix}
+                # => [foreign_id_suffix, foreign_id_prefix, FOREIGN_PROC_ROOT,
                 #     slot_id_prefix, slot_id_suffix, KEY, pad(10)]
 
                 exec.tx::execute_foreign_procedure
@@ -220,8 +220,8 @@ pub async fn test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
             push.{outer_proc_root}
 
             # push the foreign account id
-            push.{account_id_suffix} push.{account_id_prefix}
-            # => [foreign_id_prefix, foreign_id_suffix, FOREIGN_PROC_ROOT, pad(16)]
+            push.{account_id_prefix} push.{account_id_suffix}
+            # => [foreign_id_suffix, foreign_id_prefix, FOREIGN_PROC_ROOT, pad(16)]
 
             exec.tx::execute_foreign_procedure
             # => [result(16)]
@@ -304,7 +304,7 @@ pub async fn test_lazy_fpi_loading(client_config: ClientConfig) -> Result<()> {
         use miden::protocol::tx
         begin
             push.{proc_root}
-            push.{account_id_suffix} push.{account_id_prefix}
+            push.{account_id_prefix} push.{account_id_suffix}
             exec.tx::execute_foreign_procedure
             push.{constant_value} assert_eqw
         end
@@ -386,7 +386,7 @@ pub async fn test_lazy_fpi_loading_with_storage_map(client_config: ClientConfig)
         use miden::protocol::tx
         begin
             push.{proc_root}
-            push.{account_id_suffix} push.{account_id_prefix}
+            push.{account_id_prefix} push.{account_id_suffix}
             exec.tx::execute_foreign_procedure
             push.{fpi_value} assert_eqw
         end
@@ -480,8 +480,8 @@ async fn standard_fpi(
             push.{proc_root}
 
             # push the foreign account id
-            push.{account_id_suffix} push.{account_id_prefix}
-            # => [foreign_id_prefix, foreign_id_suffix, FOREIGN_PROC_ROOT,
+            push.{account_id_prefix} push.{account_id_suffix}
+            # => [foreign_id_suffix, foreign_id_prefix, FOREIGN_PROC_ROOT,
             #     slot_id_prefix, slot_id_suffix, KEY, pad(10)]
 
             exec.tx::execute_foreign_procedure

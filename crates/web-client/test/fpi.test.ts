@@ -96,8 +96,8 @@ export const testStandardFpi = async (page: Page): Promise<string> => {
                 procref.::miden::testing::fpi_component::get_fpi_map_item
 
                 # push the foreign account id
-                push.{account_id_suffix} push.{account_id_prefix}
-                # => [foreign_id_prefix, foreign_id_suffix, FOREIGN_PROC_ROOT, storage_item_index]
+                push.{account_id_prefix} push.{account_id_suffix}
+                # => [foreign_id_suffix, foreign_id_prefix, FOREIGN_PROC_ROOT, storage_item_index]
 
                 exec.tx::execute_foreign_procedure
                 push.9.12.18.30 assert_eqw
