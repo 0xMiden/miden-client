@@ -888,7 +888,6 @@ impl SqliteStore {
                 )
                 .optional()
                 .into_store_error()?
-                .map(|(seed, locked)| (seed, locked))
                 .unwrap_or((None, false));
 
             const HISTORICAL_QUERY: &str = insert_sql!(
@@ -991,10 +990,10 @@ impl SqliteStore {
     ) -> Result<usize, StoreError> {
         let account_id_hex = account_id.to_hex();
 
-        // Find all historical nonces for this account, ordered descending.
+        // Find all historical replaced_at_nonce values for this account, ordered descending.
         let all_nonces: Vec<u64> = tx
             .prepare(
-                "SELECT nonce FROM historical_account_headers WHERE id = ? ORDER BY nonce DESC",
+                "SELECT replaced_at_nonce FROM historical_account_headers WHERE id = ? ORDER BY replaced_at_nonce DESC",
             )
             .into_store_error()?
             .query_map(params![&account_id_hex], |row| crate::column_value_as_u64(row, 0))
@@ -1028,28 +1027,28 @@ impl SqliteStore {
 
             total_deleted += tx
                 .execute(
-                    "DELETE FROM historical_account_headers WHERE id = ? AND nonce = ?",
+                    "DELETE FROM historical_account_headers WHERE id = ? AND replaced_at_nonce = ?",
                     params![&account_id_hex, &nonce_val],
                 )
                 .into_store_error()?;
 
             total_deleted += tx
                 .execute(
-                    "DELETE FROM historical_account_storage WHERE account_id = ? AND nonce = ?",
+                    "DELETE FROM historical_account_storage WHERE account_id = ? AND replaced_at_nonce = ?",
                     params![&account_id_hex, &nonce_val],
                 )
                 .into_store_error()?;
 
             total_deleted += tx
                 .execute(
-                    "DELETE FROM historical_storage_map_entries WHERE account_id = ? AND nonce = ?",
+                    "DELETE FROM historical_storage_map_entries WHERE account_id = ? AND replaced_at_nonce = ?",
                     params![&account_id_hex, &nonce_val],
                 )
                 .into_store_error()?;
 
             total_deleted += tx
                 .execute(
-                    "DELETE FROM historical_account_assets WHERE account_id = ? AND nonce = ?",
+                    "DELETE FROM historical_account_assets WHERE account_id = ? AND replaced_at_nonce = ?",
                     params![&account_id_hex, &nonce_val],
                 )
                 .into_store_error()?;
@@ -1168,7 +1167,7 @@ impl SqliteStore {
             let commitment_hex = commitment.to_hex();
             let nonce: Option<u64> = conn
                 .query_row(
-                    "SELECT nonce FROM historical_account_headers WHERE account_commitment = ?",
+                    "SELECT replaced_at_nonce FROM historical_account_headers WHERE account_commitment = ?",
                     params![&commitment_hex],
                     |row| crate::column_value_as_u64(row, 0),
                 )

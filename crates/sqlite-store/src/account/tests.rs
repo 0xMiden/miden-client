@@ -653,9 +653,9 @@ async fn prune_account_history_removes_old_committed_states() -> anyhow::Result<
     // Apply delta 2 (nonce 1→2, delta increment = 1)
     apply_single_entry_update(&store, &mut account, &map_slot_name, 1).await?;
 
-    // Before prune: 3 historical headers (nonce 0, 1, 2)
+    // Before prune: 2 historical headers (nonce 0 and 1; nonce 2 is in latest)
     let m = get_storage_metrics(&store).await;
-    assert_eq!(m.historical_account_headers, 3);
+    assert_eq!(m.historical_account_headers, 2);
     assert!(m.historical_storage_map_entries > 0);
 
     // Prune
@@ -673,7 +673,7 @@ async fn prune_account_history_removes_old_committed_states() -> anyhow::Result<
     assert_eq!(m.latest_account_headers, 1);
     assert!(m.latest_storage_map_entries > 0);
 
-    // The remaining historical header should be nonce 2
+    // The remaining historical header should be the nonce-1 state (replaced_at_nonce=2)
     let remaining_nonce: u64 = store
         .interact_with_connection(move |conn| {
             conn.query_row(
@@ -684,7 +684,7 @@ async fn prune_account_history_removes_old_committed_states() -> anyhow::Result<
             .into_store_error()
         })
         .await?;
-    assert_eq!(remaining_nonce, 2);
+    assert_eq!(remaining_nonce, 1);
 
     // Account data should still be fully readable
     let account_record = store.get_account(account_id).await?;
@@ -746,9 +746,9 @@ async fn prune_all_account_history_multiple_accounts() -> anyhow::Result<()> {
     let mut account_b_mut = account_b.clone();
     apply_single_entry_update(&store, &mut account_b_mut, &map_slot_name_b, 1).await?;
 
-    // Before prune: 3 headers for A + 2 for B = 5
+    // Before prune: 2 headers for A + 1 for B = 3
     let m = get_storage_metrics(&store).await;
-    assert_eq!(m.historical_account_headers, 5);
+    assert_eq!(m.historical_account_headers, 3);
 
     let deleted = store.interact_with_connection(SqliteStore::prune_all_account_history).await?;
 

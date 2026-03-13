@@ -662,23 +662,29 @@ export async function lockAccount(dbId, accountId) {
  * Groups by slotName, takes the entry with MAX(nonce) per slot.
  * Slots cannot be removed, so no tombstone filtering needed.
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function rebuildLatestStorageSlots(db, accountId) {
     await db.latestAccountStorages.where("accountId").equals(accountId).delete();
     const allHist = await db.historicalAccountStorages
         .where("accountId")
         .equals(accountId)
         .toArray();
-    // Group by slotName, take MAX(nonce) per slot
+    // Group by slotName, take MAX(replacedAtNonce) per slot
     const bySlot = new Map();
     for (const entry of allHist) {
         const existing = bySlot.get(entry.slotName);
-        if (!existing || BigInt(entry.nonce) > BigInt(existing.nonce)) {
+        if (!existing ||
+            BigInt(entry.replacedAtNonce) > BigInt(existing.replacedAtNonce)) {
             bySlot.set(entry.slotName, entry);
         }
     }
     if (bySlot.size > 0) {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const entries = [...bySlot.values()].map(({ nonce, ...rest }) => rest);
+        const entries = [...bySlot.values()].map((entry) => ({
+            accountId: entry.accountId,
+            slotName: entry.slotName,
+            slotValue: entry.oldSlotValue ?? "",
+            slotType: entry.slotType,
+        }));
         await db.latestAccountStorages.bulkPut(entries);
     }
 }
@@ -687,6 +693,7 @@ async function rebuildLatestStorageSlots(db, accountId) {
  * Groups by (slotName, key), takes the entry with MAX(nonce) per key.
  * Filters out tombstones (value === null).
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function rebuildLatestStorageMapEntries(db, accountId) {
     await db.latestStorageMapEntries
         .where("accountId")
@@ -696,22 +703,24 @@ async function rebuildLatestStorageMapEntries(db, accountId) {
         .where("accountId")
         .equals(accountId)
         .toArray();
-    // Group by (slotName, key), take MAX(nonce) per key
+    // Group by (slotName, key), take MAX(replacedAtNonce) per key
     const byKey = new Map();
     for (const entry of allHist) {
         const compositeKey = `${entry.slotName}\0${entry.key}`;
         const existing = byKey.get(compositeKey);
-        if (!existing || BigInt(entry.nonce) > BigInt(existing.nonce)) {
+        if (!existing ||
+            BigInt(entry.replacedAtNonce) > BigInt(existing.replacedAtNonce)) {
             byKey.set(compositeKey, entry);
         }
     }
-    // Filter out tombstones and strip nonce
+    // Filter out tombstones (oldValue === null means the entry was new, i.e. didn't exist before)
     const entries = [...byKey.values()]
-        .filter((e) => e.value !== null)
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        .map(({ nonce, value, ...rest }) => ({
-        ...rest,
-        value: value,
+        .filter((e) => e.oldValue !== null)
+        .map((entry) => ({
+        accountId: entry.accountId,
+        slotName: entry.slotName,
+        key: entry.key,
+        value: entry.oldValue,
     }));
     if (entries.length > 0) {
         await db.latestStorageMapEntries.bulkPut(entries);
@@ -722,27 +731,30 @@ async function rebuildLatestStorageMapEntries(db, accountId) {
  * Groups by vaultKey, takes the entry with MAX(nonce) per key.
  * Filters out tombstones (asset === null).
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function rebuildLatestVaultAssets(db, accountId) {
     await db.latestAccountAssets.where("accountId").equals(accountId).delete();
     const allHist = await db.historicalAccountAssets
         .where("accountId")
         .equals(accountId)
         .toArray();
-    // Group by vaultKey, take MAX(nonce) per key
+    // Group by vaultKey, take MAX(replacedAtNonce) per key
     const byKey = new Map();
     for (const entry of allHist) {
         const existing = byKey.get(entry.vaultKey);
-        if (!existing || BigInt(entry.nonce) > BigInt(existing.nonce)) {
+        if (!existing ||
+            BigInt(entry.replacedAtNonce) > BigInt(existing.replacedAtNonce)) {
             byKey.set(entry.vaultKey, entry);
         }
     }
-    // Filter out tombstones and strip nonce
+    // Filter out tombstones (oldAsset === null means the asset was new, i.e. didn't exist before)
     const entries = [...byKey.values()]
-        .filter((e) => e.asset !== null)
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        .map(({ nonce, asset, ...rest }) => ({
-        ...rest,
-        asset: asset,
+        .filter((e) => e.oldAsset !== null)
+        .map((entry) => ({
+        accountId: entry.accountId,
+        vaultKey: entry.vaultKey,
+        faucetIdPrefix: entry.faucetIdPrefix,
+        asset: entry.oldAsset,
     }));
     if (entries.length > 0) {
         await db.latestAccountAssets.bulkPut(entries);
@@ -806,15 +818,15 @@ export async function pruneAccountHistory(dbId, accountId, pendingNoncesJson) {
                         .equals(old.accountCommitment)
                         .delete();
                     const storageDeleted = await db.historicalAccountStorages
-                        .where("[accountId+nonce]")
+                        .where("[accountId+replacedAtNonce]")
                         .equals([aid, nonceStr])
                         .delete();
                     const mapDeleted = await db.historicalStorageMapEntries
-                        .where("[accountId+nonce]")
+                        .where("[accountId+replacedAtNonce]")
                         .equals([aid, nonceStr])
                         .delete();
                     const assetDeleted = await db.historicalAccountAssets
-                        .where("[accountId+nonce]")
+                        .where("[accountId+replacedAtNonce]")
                         .equals([aid, nonceStr])
                         .delete();
                     totalDeleted += 1 + storageDeleted + mapDeleted + assetDeleted;

@@ -233,12 +233,22 @@ async fn prune_all_account_history_through_client() {
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
 
-    // Mint and commit — creates historical entries for faucet
+    // Mint twice and commit — creates 2 historical entries for faucet so pruning can remove the
+    // older one.
     let fungible_asset = FungibleAsset::new(faucet_id, 100).unwrap();
     let tx_request = TransactionRequestBuilder::new()
         .build_mint_fungible_asset(fungible_asset, wallet.id(), NoteType::Public, client.rng())
         .unwrap();
     Box::pin(client.submit_new_transaction(faucet_id, tx_request)).await.unwrap();
+
+    mock_rpc_api.prove_block();
+    client.sync_state().await.unwrap();
+
+    let fungible_asset_2 = FungibleAsset::new(faucet_id, 200).unwrap();
+    let tx_request_2 = TransactionRequestBuilder::new()
+        .build_mint_fungible_asset(fungible_asset_2, wallet.id(), NoteType::Public, client.rng())
+        .unwrap();
+    Box::pin(client.submit_new_transaction(faucet_id, tx_request_2)).await.unwrap();
 
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
