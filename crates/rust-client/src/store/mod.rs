@@ -137,6 +137,11 @@ pub trait Store: Send + Sync {
     // --------------------------------------------------------------------------------------------
 
     /// Retrieves the input notes from the store.
+    ///
+    /// When `filter` is [`NoteFilter::Consumed`], results should be sorted by
+    /// `(consumed_block_height ASC, consumed_tx_order ASC, note_id ASC)` with `NULL`
+    /// values last, so that consumers iterating over the returned list observe notes in
+    /// on-chain execution order.
     async fn get_input_notes(&self, filter: NoteFilter)
     -> Result<Vec<InputNoteRecord>, StoreError>;
 
@@ -152,9 +157,19 @@ pub trait Store: Send + Sync {
     /// toward the offset. Optionally restricts to a block range via `block_start` and
     /// `block_end`. Returns `None` when the offset is past the end of the matching notes.
     ///
+    /// # Ordering
+    ///
+    /// Results **must** be sorted by `(consumed_block_height ASC, consumed_tx_order ASC,
+    /// note_id ASC)`, with `NULL` values last, so that the [`InputNoteReader`] iterates
+    /// notes in on-chain execution order. `consumed_block_height` and `consumed_tx_order`
+    /// are populated during sync and stored alongside each consumed note.
+    ///
+    /// # Default implementation
+    ///
     /// The default implementation loads all matching notes via [`Store::get_input_notes`],
     /// filters by consumer and block range in memory, and picks the element at `offset`.
-    /// Store implementations may override this with a more efficient query.
+    /// It does **not** guarantee the required ordering. Store implementations should
+    /// override this method to provide correct ordering and efficient pagination.
     async fn get_input_note_by_offset(
         &self,
         filter: NoteFilter,
@@ -421,7 +436,10 @@ pub trait Store: Send + Sync {
     /// Applies the state sync update to the store. An update involves:
     ///
     /// - Inserting the new block header to the store alongside new MMR peaks information.
-    /// - Updating the corresponding tracked input/output notes.
+    /// - Updating the corresponding tracked input/output notes. Note updates for consumed notes
+    ///   carry consumption metadata — `consumed_block_height`, `consumed_tx_order`, and
+    ///   `consumer_account_id` — via [`InputNoteUpdate`]. Implementations must persist these fields
+    ///   so that ordered queries (see [`Store::get_input_note_by_offset`]) work correctly.
     /// - Removing note tags that are no longer relevant.
     /// - Updating transactions in the store, marking as `committed` or `discarded`.
     ///   - In turn, validating private account's state transitions. If a private account's
