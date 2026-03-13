@@ -263,13 +263,7 @@ describe("getInputNoteByOffset block range filtering", () => {
     });
 
     // Block range 3..=5
-    const ids = await collectAllNoteIds(
-      dbId,
-      CONSUMED_STATES,
-      undefined,
-      3,
-      5
-    );
+    const ids = await collectAllNoteIds(dbId, CONSUMED_STATES, undefined, 3, 5);
     expect(ids).toEqual(["note-b3", "note-b5"]);
   });
 
@@ -297,13 +291,7 @@ describe("getInputNoteByOffset block range filtering", () => {
       consumerAccountId: "0xalice",
     });
 
-    const ids = await collectAllNoteIds(
-      dbId,
-      CONSUMED_STATES,
-      "0xalice",
-      3,
-      5
-    );
+    const ids = await collectAllNoteIds(dbId, CONSUMED_STATES, "0xalice", 3, 5);
     expect(ids).toEqual(["alice-b3", "alice-b5"]);
   });
 });

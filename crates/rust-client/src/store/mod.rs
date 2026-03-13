@@ -409,8 +409,9 @@ pub trait Store: Send + Sync {
     /// - Inserting the new block header to the store alongside new MMR peaks information.
     /// - Updating the corresponding tracked input/output notes. Note updates for consumed notes
     ///   carry consumption metadata — `consumed_block_height`, `consumed_tx_order`, and
-    ///   `consumer_account_id` — via [`InputNoteUpdate`]. Implementations must persist these fields
-    ///   so that ordered queries (see [`Store::get_input_note_by_offset`]) work correctly.
+    ///   `consumer_account_id` — via [`InputNoteUpdate`](crate::note::InputNoteUpdate).
+    ///   Implementations must persist these fields so that ordered queries
+    ///   (see [`Store::get_input_note_by_offset`]) work correctly.
     /// - Removing note tags that are no longer relevant.
     /// - Updating transactions in the store, marking as `committed` or `discarded`.
     ///   - In turn, validating private account's state transitions. If a private account's
