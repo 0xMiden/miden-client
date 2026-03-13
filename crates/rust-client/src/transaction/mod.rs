@@ -858,12 +858,12 @@ where
             'auth,
             STORE,
             AUTH,
-            miden_debug::DapExecutorFactory,
+            miden_debug::DapExecutor,
         >,
         TransactionExecutorError,
     > {
         let mut executor = TransactionExecutor::new(data_store)
-            .with_executor_factory::<miden_debug::DapExecutorFactory>()
+            .with_program_executor::<miden_debug::DapExecutor>()
             .with_options(self.exec_options)?;
         if let Some(authenticator) = self.authenticator.as_deref() {
             executor = executor.with_authenticator(authenticator);
