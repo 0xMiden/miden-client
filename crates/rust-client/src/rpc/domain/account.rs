@@ -380,9 +380,6 @@ impl TryFrom<proto::rpc::account_storage_details::AccountStorageMapDetails>
                 StorageMapEntries::AllEntries(entries)
             },
             Some(Entries::EntriesWithProofs(entries_with_proofs)) => {
-                // TODO: We cannot reconstruct `StorageMapWitness` here because the
-                // node only returns hashed leaf keys in the proto response, not the
-                // original raw `StorageMapKey`s.
                 let proofs = entries_with_proofs
                     .entries
                     .into_iter()
