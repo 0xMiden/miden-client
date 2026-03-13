@@ -1139,6 +1139,79 @@ async fn undo_account_state_deletes_account_entirely() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[tokio::test]
+async fn prune_then_undo_preserves_untouched_entries() -> anyhow::Result<()> {
+    let store = create_test_store().await;
+    let map_slot_name = StorageSlotName::new("test::prune_undo::map").expect("valid slot name");
+
+    // Insert account with 5 map entries (nonce 0)
+    let mut account = setup_account_with_map(&store, 5, &map_slot_name).await?;
+    let account_id = account.id();
+
+    // Apply delta 1 (nonce 0→1): only touches key=1
+    apply_single_entry_update(&store, &mut account, &map_slot_name, 1).await?;
+
+    // Apply delta 2 (nonce 1→2): only touches key=1 again
+    apply_single_entry_update(&store, &mut account, &map_slot_name, 1).await?;
+
+    let nonce_2_commitment = account.to_commitment();
+
+    // Before prune: 2 historical headers (replaced_at_nonce=1 and replaced_at_nonce=2)
+    let m = get_storage_metrics(&store).await;
+    assert_eq!(m.historical_account_headers, 2);
+
+    // Prune — removes all but the most recent historical entry
+    let deleted = store
+        .interact_with_connection(move |conn| SqliteStore::prune_account_history(conn, account_id))
+        .await?;
+    assert!(deleted > 0, "Should have pruned old historical entries");
+
+    // After prune: 1 historical header remains (replaced_at_nonce=2)
+    let m = get_storage_metrics(&store).await;
+    assert_eq!(m.historical_account_headers, 1);
+    // Latest should still have all 5 map entries
+    assert_eq!(m.latest_storage_map_entries, 5);
+
+    // Undo nonce 2 — restore to nonce 1 state
+    let smt_forest = store.smt_forest.clone();
+    store
+        .interact_with_connection(move |conn| {
+            let tx = conn.transaction().into_store_error()?;
+            let mut smt_forest = smt_forest.write().expect("smt_forest write lock not poisoned");
+            SqliteStore::undo_account_state(
+                &tx,
+                &mut smt_forest,
+                &[(account_id, nonce_2_commitment)],
+            )?;
+            tx.commit().into_store_error()?;
+            Ok(())
+        })
+        .await?;
+
+    // After prune + undo: all 5 map entries must still be present.
+    // Keys 2..5 were never modified, so they have no historical records and must
+    // survive both pruning and undo unscathed.
+    let m = get_storage_metrics(&store).await;
+    assert_eq!(
+        m.latest_storage_map_entries, 5,
+        "All 5 map entries must survive prune + undo (untouched entries must not be lost)"
+    );
+    assert_eq!(m.latest_account_headers, 1, "Account should still exist after undo");
+    assert_eq!(
+        m.historical_account_headers, 0,
+        "Consumed historical entry should be deleted by undo"
+    );
+
+    // Verify the restored header is at nonce 1
+    let (header, _status) = store
+        .interact_with_connection(move |conn| SqliteStore::get_account_header(conn, account_id))
+        .await?
+        .expect("account should exist after prune + undo");
+    assert_eq!(header.nonce().as_int(), 1, "Undo should restore to nonce 1");
+
+    Ok(())
+}
+
 /// Verifies that `lock_account_on_unexpected_commitment` sets `locked = true` in both the
 /// latest and historical tables so that the lock survives undo/rebuild.
 #[tokio::test]
