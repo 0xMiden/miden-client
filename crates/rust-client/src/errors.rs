@@ -111,12 +111,12 @@ pub enum ClientError {
         chain_commitment: Word,
     },
     #[error(
-        "state sync block range mismatch: expected ({expected_from}..{expected_to}), got ({actual_from}..{actual_to:?})"
+        "state sync block range mismatch: expected ({expected_from}..{expected_to}), got ({actual_from:?}..{actual_to:?})"
     )]
     StateSyncBlockRangeMismatch {
         expected_from: BlockNumber,
         expected_to: BlockNumber,
-        actual_from: BlockNumber,
+        actual_from: Option<BlockNumber>,
         actual_to: Option<BlockNumber>,
     },
     #[error(

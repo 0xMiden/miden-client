@@ -7,6 +7,7 @@ use async_trait::async_trait;
 use miden_protocol::Word;
 use miden_protocol::account::{Account, AccountHeader, AccountId};
 use miden_protocol::block::{BlockHeader, BlockNumber};
+use miden_protocol::crypto::merkle::MerklePath;
 use miden_protocol::crypto::merkle::mmr::{InOrderIndex, MmrDelta, MmrPeaks, PartialMmr};
 use miden_protocol::note::{NoteId, NoteTag};
 use tracing::info;
@@ -230,7 +231,7 @@ impl StateSync {
                 chain_tip,
                 block_header,
                 mmr_delta,
-                mmr_path: _, // Available for future verification
+                mmr_path,
                 account_commitment_updates,
                 note_inclusions,
                 transactions,
@@ -263,6 +264,7 @@ impl StateSync {
                 found_relevant_note,
                 current_partial_mmr,
                 mmr_delta,
+                &mmr_path,
             )?;
 
             let include_block = found_relevant_note || chain_tip == block_header.block_num();
@@ -324,14 +326,12 @@ impl StateSync {
             self.rpc_api.sync_chain_mmr(current_block_num, Some(target_block)).await?;
 
         // Validate the server returned data for the requested range
-        if let Some((range_from, range_to)) = chain_mmr_info.block_range
-            && (range_from != current_block_num || range_to != Some(target_block))
-        {
+        if chain_mmr_info.block_range != Some((current_block_num, Some(target_block))) {
             return Err(ClientError::StateSyncBlockRangeMismatch {
                 expected_from: current_block_num,
                 expected_to: target_block,
-                actual_from: range_from,
-                actual_to: range_to,
+                actual_from: chain_mmr_info.block_range.map(|(from, _)| from),
+                actual_to: chain_mmr_info.block_range.and_then(|(_, to)| to),
             });
         }
 
@@ -617,11 +617,16 @@ fn derive_account_commitment_updates(
 
 /// Applies changes to the current MMR structure, returns the updated [`MmrPeaks`] and the
 /// authentication nodes for leaves we track.
+///
+/// The `mmr_path` is the Merkle proof for the new block header as returned by the node. It is
+/// verified against the local MMR state to anchor the block header to the client's trusted
+/// chain state.
 fn apply_mmr_changes(
     new_block: &BlockHeader,
     new_block_has_relevant_notes: bool,
     current_partial_mmr: &mut PartialMmr,
     mmr_delta: MmrDelta,
+    mmr_path: &MerklePath,
 ) -> Result<(MmrPeaks, Vec<(InOrderIndex, Word)>), ClientError> {
     // Apply the MMR delta to bring MMR to forest equal to chain tip
     let mut new_authentication_nodes: Vec<(InOrderIndex, Word)> =
@@ -642,6 +647,23 @@ fn apply_mmr_changes(
 
     new_authentication_nodes
         .append(&mut current_partial_mmr.add(new_block.commitment(), new_block_has_relevant_notes));
+
+    // Verify the MMR path anchors the block header to the client's trusted chain state.
+    // The path is provided by the node with respect to forest = chain_tip + 1, so we adjust
+    // it to our current (smaller or equal) forest.
+    let block_num = new_block.block_num();
+    let adjusted_path_nodes = super::block_header::adjust_merkle_path_for_forest(
+        mmr_path,
+        block_num,
+        current_partial_mmr.forest(),
+    );
+    let adjusted_path = MerklePath::new(adjusted_path_nodes.iter().map(|(_, n)| *n).collect());
+
+    current_partial_mmr
+        .track(block_num.as_usize(), new_block.commitment(), &adjusted_path)
+        .map_err(StoreError::MmrError)?;
+
+    new_authentication_nodes.extend(adjusted_path_nodes);
 
     Ok((new_peaks, new_authentication_nodes))
 }
