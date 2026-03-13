@@ -888,7 +888,6 @@ impl SqliteStore {
                 )
                 .optional()
                 .into_store_error()?
-                .map(|(seed, locked)| (seed, locked))
                 .unwrap_or((None, false));
 
             const HISTORICAL_QUERY: &str = insert_sql!(
