@@ -49,6 +49,7 @@
 
 ### Fixes
 
+* [FIX][rust] Fixed `get_vault_asset_witnesses` failing with `MerkleError::RootNotInStore` when the vault root is missing from the `AccountSmtForest`. The error is now caught and falls back to loading the full vault from the store ([#1890](https://github.com/0xMiden/miden-client/pull/1890)).
 * [FIX][rust] Replaced `.expect()` panics on RPC response data with proper error propagation ([#1833](https://github.com/0xMiden/miden-client/pull/1833)).
 
 ## 0.13.2 (2026-02-26)
