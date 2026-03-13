@@ -64,6 +64,8 @@ pub struct TransactionInclusion {
     pub block_num: BlockNumber,
     /// The account that the transaction was executed against.
     pub account_id: AccountId,
+    /// The initial account state commitment before the transaction was executed.
+    pub initial_state_commitment: Word,
 }
 
 // TRANSACTIONS INFO
@@ -169,11 +171,12 @@ impl TryFrom<proto::transaction::TransactionHeader> for TransactionHeader {
             .nullifiers
             .into_iter()
             .map(|d| {
-                Nullifier::from_hex(&d.to_string())
-                    .map(InputNoteCommitment::from)
-                    .map_err(|e| RpcError::InvalidResponse(e.to_string()))
+                let word: Word = d
+                    .try_into()
+                    .map_err(|e: RpcConversionError| RpcError::InvalidResponse(e.to_string()))?;
+                Ok(InputNoteCommitment::from(Nullifier::from_raw(word)))
             })
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect::<Result<Vec<_>, RpcError>>()?;
         let input_notes = InputNotes::new_unchecked(note_commitments);
 
         let output_notes = value

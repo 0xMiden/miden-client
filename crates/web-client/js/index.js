@@ -19,11 +19,24 @@ export const AccountType = Object.freeze({
   MutableWallet: "MutableWallet",
   ImmutableWallet: "ImmutableWallet",
   FungibleFaucet: "FungibleFaucet",
+  ImmutableContract: "ImmutableContract",
+  MutableContract: "MutableContract",
 });
 
 export const AuthScheme = Object.freeze({
   Falcon: "falcon",
   ECDSA: "ecdsa",
+});
+
+export const NoteVisibility = Object.freeze({
+  Public: "public",
+  Private: "private",
+});
+
+export const StorageMode = Object.freeze({
+  Public: "public",
+  Private: "private",
+  Network: "network",
 });
 
 export { MidenClient };
@@ -170,6 +183,9 @@ class WebClient {
    *   serialized public key, and `signingInputs` is a `Uint8Array` produced by
    *   `SigningInputs.serialize()`. Must return a `Uint8Array` containing the serialized
    *   signature, either directly or wrapped in a `Promise`.
+   * @param {string | undefined} [logLevel] - Optional log verbosity level
+   *   ("error", "warn", "info", "debug", "trace", "off", or "none").
+   *   When set, Rust tracing output is routed to the browser console.
    */
   constructor(
     rpcUrl,
@@ -178,7 +194,8 @@ class WebClient {
     storeName,
     getKeyCb,
     insertKeyCb,
-    signCb
+    signCb,
+    logLevel
   ) {
     this.rpcUrl = rpcUrl;
     this.noteTransportUrl = noteTransportUrl;
@@ -187,6 +204,7 @@ class WebClient {
     this.getKeyCb = getKeyCb;
     this.insertKeyCb = insertKeyCb;
     this.signCb = signCb;
+    this.logLevel = logLevel;
 
     // Check if Web Workers are available.
     if (typeof Worker !== "undefined") {
@@ -324,6 +342,7 @@ class WebClient {
         !!this.getKeyCb,
         !!this.insertKeyCb,
         !!this.signCb,
+        this.logLevel,
       ],
     });
   }
@@ -351,11 +370,27 @@ class WebClient {
    * @param {string} noteTransportUrl - The note transport URL (optional).
    * @param {string} seed - The seed for the account.
    * @param {string | undefined} network - Optional name for the store. Setting this allows multiple clients to be used in the same browser.
+   * @param {string | undefined} logLevel - Optional log verbosity level ("error", "warn", "info", "debug", "trace", "off", or "none").
    * @returns {Promise<WebClient>} The fully initialized WebClient.
    */
-  static async createClient(rpcUrl, noteTransportUrl, seed, network) {
+  static async createClient(rpcUrl, noteTransportUrl, seed, network, logLevel) {
     // Construct the instance (synchronously).
-    const instance = new WebClient(rpcUrl, noteTransportUrl, seed, network);
+    const instance = new WebClient(
+      rpcUrl,
+      noteTransportUrl,
+      seed,
+      network,
+      undefined,
+      undefined,
+      undefined,
+      logLevel
+    );
+
+    // Set up logging on the main thread before creating the client.
+    if (logLevel) {
+      const wasm = await getWasmOrThrow();
+      wasm.setupLogging(logLevel);
+    }
 
     // Wait for the underlying wasmWebClient to be initialized.
     const wasmWebClient = await instance.getWasmWebClient();
@@ -378,6 +413,7 @@ class WebClient {
    * @param {Function | undefined} getKeyCb - The get key callback.
    * @param {Function | undefined} insertKeyCb - The insert key callback.
    * @param {Function | undefined} signCb - The sign callback.
+   * @param {string | undefined} logLevel - Optional log verbosity level ("error", "warn", "info", "debug", "trace", "off", or "none").
    * @returns {Promise<WebClient>} The fully initialized WebClient.
    */
   static async createClientWithExternalKeystore(
@@ -387,7 +423,8 @@ class WebClient {
     storeName,
     getKeyCb,
     insertKeyCb,
-    signCb
+    signCb,
+    logLevel
   ) {
     // Construct the instance (synchronously).
     const instance = new WebClient(
@@ -397,8 +434,16 @@ class WebClient {
       storeName,
       getKeyCb,
       insertKeyCb,
-      signCb
+      signCb,
+      logLevel
     );
+
+    // Set up logging on the main thread before creating the client.
+    if (logLevel) {
+      const wasm = await getWasmOrThrow();
+      wasm.setupLogging(logLevel);
+    }
+
     // Wait for the underlying wasmWebClient to be initialized.
     const wasmWebClient = await instance.getWasmWebClient();
     await wasmWebClient.createClientWithExternalKeystore(
@@ -469,6 +514,30 @@ class WebClient {
         decimals,
         maxSupply,
         authSchemeId
+      );
+    });
+  }
+
+  async newAccount(account, overwrite) {
+    return this._serializeWasmCall(async () => {
+      const wasmWebClient = await this.getWasmWebClient();
+      return await wasmWebClient.newAccount(account, overwrite);
+    });
+  }
+
+  async newAccountWithSecretKey(account, secretKey) {
+    return this._serializeWasmCall(async () => {
+      const wasmWebClient = await this.getWasmWebClient();
+      return await wasmWebClient.newAccountWithSecretKey(account, secretKey);
+    });
+  }
+
+  async addAccountSecretKeyToWebStore(accountId, secretKey) {
+    return this._serializeWasmCall(async () => {
+      const wasmWebClient = await this.getWasmWebClient();
+      return await wasmWebClient.addAccountSecretKeyToWebStore(
+        accountId,
+        secretKey
       );
     });
   }
@@ -590,6 +659,33 @@ class WebClient {
     }
   }
 
+  async applyTransaction(transactionResult, submissionHeight) {
+    try {
+      if (!this.worker) {
+        const wasmWebClient = await this.getWasmWebClient();
+        return await wasmWebClient.applyTransaction(
+          transactionResult,
+          submissionHeight
+        );
+      }
+
+      const wasm = await getWasmOrThrow();
+      const serializedTransactionResult = transactionResult.serialize();
+      const serializedUpdateBytes = await this.callMethodWithWorker(
+        MethodName.APPLY_TRANSACTION,
+        serializedTransactionResult,
+        submissionHeight
+      );
+
+      return wasm.TransactionStoreUpdate.deserialize(
+        new Uint8Array(serializedUpdateBytes)
+      );
+    } catch (error) {
+      console.error("INDEX.JS: Error in applyTransaction:", error);
+      throw error;
+    }
+  }
+
   /**
    * Syncs the client state with the node.
    *
@@ -673,14 +769,14 @@ class WebClient {
 }
 
 class MockWebClient extends WebClient {
-  constructor(seed) {
-    super(null, null, seed, "mock");
+  constructor(seed, logLevel) {
+    super(null, null, seed, "mock", undefined, undefined, undefined, logLevel);
   }
 
   initializeWorker() {
     this.worker.postMessage({
       action: WorkerAction.INIT_MOCK,
-      args: [this.seed],
+      args: [this.seed, this.logLevel],
     });
   }
 
@@ -695,10 +791,17 @@ class MockWebClient extends WebClient {
   static async createClient(
     serializedMockChain,
     serializedMockNoteTransportNode,
-    seed
+    seed,
+    logLevel
   ) {
     // Construct the instance (synchronously).
-    const instance = new MockWebClient(seed);
+    const instance = new MockWebClient(seed, logLevel);
+
+    // Set up logging on the main thread before creating the client.
+    if (logLevel) {
+      const wasm = await getWasmOrThrow();
+      wasm.setupLogging(logLevel);
+    }
 
     // Wait for the underlying wasmWebClient to be initialized.
     const wasmWebClient = await instance.getWasmWebClient();

@@ -66,7 +66,7 @@ use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
-use miden_protocol::account::{Account, AccountId};
+use miden_protocol::account::{Account, AccountCode, AccountId};
 use miden_protocol::asset::NonFungibleAsset;
 use miden_protocol::block::BlockNumber;
 use miden_protocol::errors::AssetError;
@@ -80,7 +80,8 @@ use tracing::info;
 use super::Client;
 use crate::ClientError;
 use crate::note::NoteUpdateTracker;
-use crate::rpc::AccountStateAt;
+use crate::rpc::domain::account::AccountStorageRequirements;
+use crate::rpc::{AccountStateAt, NodeRpcClient};
 use crate::store::data_store::ClientDataStore;
 use crate::store::input_note_states::ExpectedNoteState;
 use crate::store::{
@@ -88,6 +89,7 @@ use crate::store::{
     InputNoteState,
     NoteFilter,
     OutputNoteRecord,
+    Store,
     TransactionFilter,
 };
 use crate::sync::NoteTagRecord;
@@ -108,7 +110,6 @@ mod store_update;
 pub use store_update::TransactionStoreUpdate;
 
 mod request;
-use request::account_proof_into_inputs;
 pub use request::{
     ForeignAccount,
     NoteArgs,
@@ -290,7 +291,7 @@ where
 
         let ignore_invalid_notes = transaction_request.ignore_invalid_input_notes();
 
-        let data_store = ClientDataStore::new(self.store.clone());
+        let data_store = ClientDataStore::new(self.store.clone(), self.rpc_api.clone());
         data_store.register_foreign_account_inputs(foreign_account_inputs.iter().cloned());
         for fpi_account in &foreign_account_inputs {
             data_store.mast_store().load_account_code(fpi_account.code());
@@ -471,7 +472,7 @@ where
 
         let account: Account = account_record.try_into()?;
 
-        let data_store = ClientDataStore::new(self.store.clone());
+        let data_store = ClientDataStore::new(self.store.clone(), self.rpc_api.clone());
 
         data_store.register_foreign_account_inputs(foreign_account_inputs.iter().cloned());
 
@@ -623,7 +624,7 @@ where
         tx_args: TransactionArgs,
     ) -> Result<InputNotes<InputNote>, ClientError> {
         loop {
-            let data_store = ClientDataStore::new(self.store.clone());
+            let data_store = ClientDataStore::new(self.store.clone(), self.rpc_api.clone());
 
             data_store.mast_store().load_account_code(account.code());
             let execution = NoteConsumptionChecker::new(&self.build_executor(&data_store)?)
@@ -686,42 +687,29 @@ where
         let mut return_foreign_account_inputs = Vec::with_capacity(foreign_accounts.len());
 
         for foreign_account in foreign_accounts {
-            let account_id = foreign_account.account_id();
-            let storage_requirements = foreign_account.storage_slot_requirements();
-            let known_account_code = self
-                .store
-                .get_foreign_account_code(vec![account_id])
-                .await?
-                .pop_first()
-                .map(|(_, code)| code);
-
-            let (_, account_proof) = self
-                .rpc_api
-                .get_account_proof(
-                    account_id,
-                    storage_requirements,
-                    AccountStateAt::Block(block_num),
-                    known_account_code,
-                )
-                .await?;
             let foreign_account_inputs = match foreign_account {
-                ForeignAccount::Public(account_id, ..) => {
-                    let foreign_account_inputs: AccountInputs =
-                        account_proof_into_inputs(account_proof)?;
-
-                    // Update our foreign account code cache
-                    self.store
-                        .upsert_foreign_account_code(
-                            account_id,
-                            foreign_account_inputs.code().clone(),
-                        )
-                        .await?;
-
-                    foreign_account_inputs
+                ForeignAccount::Public(account_id, storage_requirements) => {
+                    fetch_public_account_inputs(
+                        &self.store,
+                        &self.rpc_api,
+                        account_id,
+                        storage_requirements,
+                        AccountStateAt::Block(block_num),
+                    )
+                    .await?
                 },
                 ForeignAccount::Private(partial_account) => {
+                    let account_id = partial_account.id();
+                    let (_, account_proof) = self
+                        .rpc_api
+                        .get_account_proof(
+                            account_id,
+                            AccountStorageRequirements::default(),
+                            AccountStateAt::Block(block_num),
+                            None,
+                        )
+                        .await?;
                     let (witness, _) = account_proof.into_parts();
-
                     AccountInputs::new(partial_account, witness)
                 },
             };
@@ -834,22 +822,51 @@ fn validate_basic_account_request(
     Ok(())
 }
 
+/// Fetches a foreign account's proof and details from the network, converts them into
+/// [`AccountInputs`], and caches the returned code in the store for future requests.
+///
+/// # Errors
+/// Fails if the account is private: the RPC does not return account details for them, causing
+/// [`TransactionRequestError::ForeignAccountDataMissing`].
+pub(crate) async fn fetch_public_account_inputs(
+    store: &Arc<dyn Store>,
+    rpc_api: &Arc<dyn NodeRpcClient>,
+    account_id: AccountId,
+    storage_requirements: AccountStorageRequirements,
+    account_state_at: AccountStateAt,
+) -> Result<AccountInputs, ClientError> {
+    let known_account_code: Option<AccountCode> =
+        store.get_foreign_account_code(vec![account_id]).await?.into_values().next();
+
+    let (_, account_proof) = rpc_api
+        .get_account_proof(account_id, storage_requirements, account_state_at, known_account_code)
+        .await?;
+
+    let account_inputs = request::account_proof_into_inputs(account_proof)?;
+
+    let _ = store
+        .upsert_foreign_account_code(account_id, account_inputs.code().clone())
+        .await
+        .inspect_err(|err| {
+            tracing::warn!(
+                %account_id,
+                %err,
+                "Failed to persist foreign account code to store"
+            );
+        });
+
+    Ok(account_inputs)
+}
+
 /// Extracts notes from [`OutputNotes`].
 /// Used for:
 /// - Checking the relevance of notes to save them as input notes.
 /// - Validate hashes versus expected output notes after a transaction is executed.
 pub fn notes_from_output(output_notes: &OutputNotes) -> impl Iterator<Item = &Note> {
-    output_notes
-        .iter()
-        .filter(|n| matches!(n, OutputNote::Full(_)))
-        .map(|n| match n {
-            OutputNote::Full(n) => n,
-            // The following todo!() applies until we have a way to support flows where we have
-            // partial details of the note
-            OutputNote::Header(_) | OutputNote::Partial(_) => {
-                todo!("For now, all details should be held in OutputNote::Fulls")
-            },
-        })
+    output_notes.iter().filter_map(|n| match n {
+        OutputNote::Full(n) => Some(n),
+        OutputNote::Header(_) | OutputNote::Partial(_) => None,
+    })
 }
 
 /// Validates that the executed transaction's output recipients match what was expected in the

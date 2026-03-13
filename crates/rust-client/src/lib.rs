@@ -171,13 +171,21 @@ pub mod asset {
         NonFungibleAssetDelta,
         NonFungibleDeltaAction,
     };
+    pub use miden_protocol::account::{
+        AccountStorageHeader,
+        StorageMapWitness,
+        StorageSlotContent,
+        StorageSlotHeader,
+    };
     pub use miden_protocol::asset::{
         Asset,
         AssetVault,
+        AssetVaultKey,
         AssetWitness,
         FungibleAsset,
         NonFungibleAsset,
         NonFungibleAssetDetails,
+        PartialVault,
         TokenSymbol,
     };
 }
@@ -192,9 +200,17 @@ pub mod auth {
         PublicKeyCommitment,
         Signature,
     };
-    pub use miden_standards::AuthScheme;
-    pub use miden_standards::account::auth::{AuthEcdsaK256Keccak, AuthFalcon512Rpo, NoAuth};
+    pub use miden_standards::account::auth::{
+        AuthMultisig,
+        AuthMultisigConfig,
+        AuthSingleSig,
+        AuthSingleSigAcl,
+        AuthSingleSigAclConfig,
+        NoAuth,
+    };
     pub use miden_tx::auth::{BasicAuthenticator, SigningInputs, TransactionAuthenticator};
+
+    pub use crate::account::component::AuthScheme;
 
     pub const RPO_FALCON_SCHEME_ID: AuthSchemeId = AuthSchemeId::Falcon512Rpo;
     pub const ECDSA_K256_KECCAK_SCHEME_ID: AuthSchemeId = AuthSchemeId::EcdsaK256Keccak;
@@ -222,9 +238,23 @@ pub mod crypto {
         MmrProof,
         PartialMmr,
     };
-    pub use miden_protocol::crypto::merkle::smt::{LeafIndex, SMT_DEPTH, SmtLeaf, SmtProof};
+    pub use miden_protocol::crypto::merkle::smt::{
+        LeafIndex,
+        SMT_DEPTH,
+        Smt,
+        SmtForest,
+        SmtLeaf,
+        SmtProof,
+    };
     pub use miden_protocol::crypto::merkle::store::MerkleStore;
-    pub use miden_protocol::crypto::merkle::{MerklePath, MerkleTree, NodeIndex, SparseMerklePath};
+    pub use miden_protocol::crypto::merkle::{
+        EmptySubtreeRoots,
+        MerkleError,
+        MerklePath,
+        MerkleTree,
+        NodeIndex,
+        SparseMerklePath,
+    };
     pub use miden_protocol::crypto::rand::{FeltRng, RpoRandomCoin};
 }
 
@@ -383,7 +413,11 @@ where
     where
         AUTH: Sync,
     {
-        note::NoteScreener::new(self.store.clone(), self.authenticator.clone())
+        note::NoteScreener::new(
+            self.store.clone(),
+            self.authenticator.clone(),
+            self.rpc_api.clone(),
+        )
     }
 
     /// Returns a reference to the client's random number generator. This can be used to generate
@@ -396,18 +430,18 @@ where
         self.tx_prover.clone()
     }
 
-    /// Returns a reference to the authenticator, if configured.
     pub fn authenticator(&self) -> Option<&Arc<AUTH>> {
         self.authenticator.as_ref()
-    }
-
-    /// Returns a reference to the client's store.
-    pub fn store(&self) -> &Arc<dyn Store> {
-        &self.store
     }
 }
 
 impl<AUTH> Client<AUTH> {
+    /// Returns the identifier of the underlying store (e.g. `IndexedDB` database name, `SQLite`
+    /// file path).
+    pub fn store_identifier(&self) -> &str {
+        self.store.identifier()
+    }
+
     // LIMITS
     // --------------------------------------------------------------------------------------------
 

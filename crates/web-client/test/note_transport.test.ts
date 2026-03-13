@@ -13,13 +13,13 @@ test("transport basic", async ({ page }) => {
     const senderAccount = await client.newWallet(
       window.AccountStorageMode.private(),
       true,
-      0,
+      window.AuthScheme.AuthRpoFalcon512,
       senderSeed
     );
     const recipientAccount = await client.newWallet(
       window.AccountStorageMode.private(),
       true,
-      0,
+      window.AuthScheme.AuthRpoFalcon512,
       recipientSeed
     );
 

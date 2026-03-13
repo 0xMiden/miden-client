@@ -3,6 +3,7 @@ import { TransactionsResource } from "./resources/transactions.js";
 import { NotesResource } from "./resources/notes.js";
 import { TagsResource } from "./resources/tags.js";
 import { SettingsResource } from "./resources/settings.js";
+import { CompilerResource } from "./resources/compiler.js";
 import { hashSeed } from "./utils.js";
 
 /**
@@ -33,6 +34,7 @@ export class MidenClient {
     this.notes = new NotesResource(inner, getWasm, this);
     this.tags = new TagsResource(inner, getWasm, this);
     this.settings = new SettingsResource(inner, getWasm, this);
+    this.compile = new CompilerResource(inner, getWasm, this);
   }
 
   /**
@@ -178,6 +180,17 @@ export class MidenClient {
   async [Symbol.asyncDispose]() {
     this.terminate();
   }
+
+  /**
+   * Returns the identifier of the underlying store (e.g. IndexedDB database name, file path).
+   *
+   * @returns {string} The store identifier.
+   */
+  storeIdentifier() {
+    this.assertNotTerminated();
+    return this.#inner.storeIdentifier();
+  }
+
 
   // ── Mock-only methods ──
 

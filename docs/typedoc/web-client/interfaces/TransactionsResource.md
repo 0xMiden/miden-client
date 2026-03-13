@@ -40,6 +40,24 @@
 
 ***
 
+### execute()
+
+> **execute**(`options`): `Promise`\<[`TransactionId`](../classes/TransactionId.md)\>
+
+Execute a custom transaction script, optionally referencing foreign accounts (FPI).
+
+#### Parameters
+
+##### options
+
+[`ExecuteOptions`](ExecuteOptions.md)
+
+#### Returns
+
+`Promise`\<[`TransactionId`](../classes/TransactionId.md)\>
+
+***
+
 ### list()
 
 > **list**(`query?`): `Promise`\<[`TransactionRecord`](../classes/TransactionRecord.md)[]\>

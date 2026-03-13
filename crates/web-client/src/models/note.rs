@@ -1,13 +1,9 @@
 use miden_client::asset::Asset as NativeAsset;
 use miden_client::block::BlockNumber as NativeBlockNumber;
 use miden_client::crypto::RpoRandomCoin;
-use miden_client::note::{
-    Note as NativeNote,
-    NoteAssets as NativeNoteAssets,
-    create_p2id_note,
-    create_p2ide_note,
-};
+use miden_client::note::{Note as NativeNote, NoteAssets as NativeNoteAssets, P2idNote};
 use miden_client::{Felt as NativeFelt, Word as NativeWord};
+use miden_standards::note::{P2ideNote, P2ideNoteStorage};
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use js_export_macro::js_export;
@@ -111,7 +107,7 @@ impl Note {
         let native_note_assets: NativeNoteAssets = assets.into();
         let native_assets: Vec<NativeAsset> = native_note_assets.iter().copied().collect();
 
-        let native_note = create_p2id_note(
+        let native_note = P2idNote::create(
             sender.into(),
             target.into(),
             native_assets,
@@ -142,12 +138,16 @@ impl Note {
         let native_note_assets: NativeNoteAssets = assets.into();
         let native_assets: Vec<NativeAsset> = native_note_assets.iter().copied().collect();
 
-        let native_note = create_p2ide_note(
-            sender.into(),
+        let storage = P2ideNoteStorage::new(
             target.into(),
-            native_assets,
             reclaim_height.map(NativeBlockNumber::from),
             timelock_height.map(NativeBlockNumber::from),
+        );
+
+        let native_note = P2ideNote::create(
+            sender.into(),
+            storage,
+            native_assets,
             note_type.into(),
             attachment.into(),
             &mut rng,

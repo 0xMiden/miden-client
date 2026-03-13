@@ -92,21 +92,20 @@ impl WebClient {
     }
 }
 
-/// Exports the contents of an IndexedDB store as a JSON string.
+/// Exports the entire contents of an `IndexedDB` store as a JSON string.
 ///
-/// This is a standalone utility function, not a WebClient method, because store
-/// export/import is an IndexedDB concern handled externally from the client.
+/// Use together with [`import_store`].
 #[cfg(feature = "browser")]
 #[wasm_bindgen(js_name = "exportStore")]
-pub async fn export_store(store_name: String) -> Result<JsValue, JsValue> {
-    let store = idxdb_store::IdxdbStore::new(store_name)
+pub async fn export_store(store_name: &str) -> Result<JsValue, JsValue> {
+    let store = idxdb_store::IdxdbStore::new(store_name.into())
         .await
-        .map_err(|_| JsValue::from_str("Failed to open store"))?;
+        .map_err(|err| JsValue::from_str(&format!("failed to open store: {err:?}")))?;
 
     let json_string = store
         .export_store()
         .await
-        .map_err(|err| js_error_with_context(err, "failed to export store"))?;
+        .map_err(|err| JsValue::from_str(&format!("failed to export store: {err:?}")))?;
 
     Ok(JsValue::from_str(&json_string))
 }

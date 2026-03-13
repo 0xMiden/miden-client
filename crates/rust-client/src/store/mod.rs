@@ -33,6 +33,7 @@ use miden_protocol::account::{
     AccountHeader,
     AccountId,
     AccountStorage,
+    StorageMapKey,
     StorageMapWitness,
     StorageSlot,
     StorageSlotContent,
@@ -63,6 +64,9 @@ pub(crate) mod data_store;
 mod errors;
 pub use errors::*;
 
+mod smt_forest;
+pub use smt_forest::AccountSmtForest;
+
 mod account;
 pub use account::{AccountRecord, AccountRecordData, AccountStatus, AccountUpdates};
 mod note_record;
@@ -92,6 +96,13 @@ pub use note_record::{
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 pub trait Store: Send + Sync {
+    /// Returns an identifier for this store (e.g. `IndexedDB` database name, `SQLite` file path).
+    ///
+    /// This allows callers to retrieve store-specific identity information (such as the `IndexedDB`
+    /// database name) for standalone operations like `exportStore`/`importStore`, without making
+    /// import/export a responsibility of the client.
+    fn identifier(&self) -> &str;
+
     /// Returns the current timestamp tracked by the store, measured in non-leap seconds since
     /// Unix epoch. If the store implementation is incapable of tracking time, it should return
     /// `None`.
@@ -539,7 +550,7 @@ pub trait Store: Send + Sync {
         &self,
         account_id: AccountId,
         slot_name: StorageSlotName,
-        key: Word,
+        key: StorageMapKey,
     ) -> Result<(Word, StorageMapWitness), StoreError> {
         let storage = self
             .get_account_storage(account_id, AccountStorageFilter::SlotName(slot_name.clone()))

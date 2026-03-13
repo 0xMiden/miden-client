@@ -116,7 +116,7 @@ impl WebClient {
     pub async fn account_reader(&self, account_id: &AccountId) -> Result<AccountReader, JsErr> {
         let guard = self.inner.lock().await;
         let client = guard.as_ref().ok_or_else(|| from_str_err("Client not initialized"))?;
-        Ok(AccountReader::new(client.store().clone(), account_id.into()))
+        Ok(AccountReader::from(client.account_reader(account_id.into())))
     }
 
     /// Retrieves an authentication secret key from the keystore given a public key commitment.

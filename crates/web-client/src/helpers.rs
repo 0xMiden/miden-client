@@ -1,11 +1,6 @@
 use miden_client::account::component::{AccountComponent, BasicWallet};
 use miden_client::account::{Account, AccountBuilder, AccountType};
-use miden_client::auth::{
-    AuthEcdsaK256Keccak,
-    AuthFalcon512Rpo,
-    AuthSchemeId as NativeAuthScheme,
-    AuthSecretKey,
-};
+use miden_client::auth::{AuthSchemeId as NativeAuthScheme, AuthSecretKey, AuthSingleSig};
 use rand::rngs::StdRng;
 use rand::{RngCore, SeedableRng};
 
@@ -44,14 +39,20 @@ pub(crate) async fn generate_wallet(
     let (key_pair, auth_component) = match native_scheme {
         NativeAuthScheme::Falcon512Rpo => {
             let key_pair = AuthSecretKey::new_falcon512_rpo_with_rng(&mut rng);
-            let auth_component: AccountComponent =
-                AuthFalcon512Rpo::new(key_pair.public_key().to_commitment()).into();
+            let auth_component: AccountComponent = AuthSingleSig::new(
+                key_pair.public_key().to_commitment(),
+                NativeAuthScheme::Falcon512Rpo,
+            )
+            .into();
             (key_pair, auth_component)
         },
         NativeAuthScheme::EcdsaK256Keccak => {
             let key_pair = AuthSecretKey::new_ecdsa_k256_keccak_with_rng(&mut rng);
-            let auth_component: AccountComponent =
-                AuthEcdsaK256Keccak::new(key_pair.public_key().to_commitment()).into();
+            let auth_component: AccountComponent = AuthSingleSig::new(
+                key_pair.public_key().to_commitment(),
+                NativeAuthScheme::EcdsaK256Keccak,
+            )
+            .into();
             (key_pair, auth_component)
         },
         _ => {

@@ -11,8 +11,8 @@ use crate::platform::{JsErr, from_str_err};
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[js_export]
 pub enum AuthScheme {
-    AuthRpoFalcon512 = 0,
     AuthEcdsaK256Keccak = 1,
+    AuthRpoFalcon512 = 2,
 }
 
 // Compile-time check to ensure both enums stay aligned.

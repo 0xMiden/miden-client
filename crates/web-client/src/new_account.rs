@@ -3,12 +3,7 @@ use miden_client::Felt;
 use miden_client::account::component::BasicFungibleFaucet;
 use miden_client::account::{AccountBuilder, AccountComponent, AccountType};
 use miden_client::asset::TokenSymbol;
-use miden_client::auth::{
-    AuthEcdsaK256Keccak,
-    AuthFalcon512Rpo,
-    AuthSchemeId as NativeAuthScheme,
-    AuthSecretKey,
-};
+use miden_client::auth::{AuthSchemeId as NativeAuthScheme, AuthSecretKey, AuthSingleSig};
 use miden_client::block::BlockNumber;
 use miden_client::keystore::Keystore;
 use rand::rngs::StdRng;
@@ -78,14 +73,20 @@ impl WebClient {
         let (key_pair, auth_component) = match native_scheme {
             NativeAuthScheme::Falcon512Rpo => {
                 let key_pair = AuthSecretKey::new_falcon512_rpo_with_rng(&mut faucet_rng);
-                let auth_component: AccountComponent =
-                    AuthFalcon512Rpo::new(key_pair.public_key().to_commitment()).into();
+                let auth_component: AccountComponent = AuthSingleSig::new(
+                    key_pair.public_key().to_commitment(),
+                    NativeAuthScheme::Falcon512Rpo,
+                )
+                .into();
                 (key_pair, auth_component)
             },
             NativeAuthScheme::EcdsaK256Keccak => {
                 let key_pair = AuthSecretKey::new_ecdsa_k256_keccak_with_rng(&mut faucet_rng);
-                let auth_component: AccountComponent =
-                    AuthEcdsaK256Keccak::new(key_pair.public_key().to_commitment()).into();
+                let auth_component: AccountComponent = AuthSingleSig::new(
+                    key_pair.public_key().to_commitment(),
+                    NativeAuthScheme::EcdsaK256Keccak,
+                )
+                .into();
                 (key_pair, auth_component)
             },
             _ => {
@@ -175,6 +176,40 @@ impl WebClient {
             .add_account(&native_account, overwrite)
             .await
             .map_err(|err| js_error_with_context(err, "failed to insert new account"))?;
+        Ok(())
+    }
+
+    /// Inserts an account and its secret key in one call, matching how
+    /// `newWallet` / `newFaucet` already work internally.  If the key
+    /// insertion fails the account is still persisted (same as wallet/faucet),
+    /// but callers only need a single await instead of two.
+    #[js_export(js_name = "newAccountWithSecretKey")]
+    pub async fn new_account_with_secret_key(
+        &self,
+        account: &Account,
+        secret_key: &WebAuthSecretKey,
+    ) -> Result<(), JsErr> {
+        self.maybe_sync_before_account_creation().await;
+        let native_account: miden_client::account::Account = account.into();
+        let account_id = native_account.id();
+
+        {
+            let mut guard = self.get_mut_inner().await;
+            let client = guard.as_mut().ok_or_else(|| from_str_err("Client not initialized"))?;
+            client
+                .add_account(&native_account, false)
+                .await
+                .map_err(|err| js_error_with_context(err, "failed to insert new account"))?;
+        }
+
+        let keystore = self.keystore().await?;
+        let native_secret_key: AuthSecretKey = secret_key.into();
+
+        keystore
+            .add_key(&native_secret_key, account_id)
+            .await
+            .map_err(|err| js_error_with_context(err, "failed to add secret key"))?;
+
         Ok(())
     }
 

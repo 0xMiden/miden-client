@@ -1,12 +1,6 @@
-use alloc::sync::Arc;
 use alloc::vec::Vec;
 
-use miden_client::account::{
-    AccountId as NativeAccountId,
-    AccountReader as NativeAccountReader,
-    StorageSlotName,
-};
-use miden_client::store::Store;
+use miden_client::account::{AccountReader as NativeAccountReader, StorageMapKey, StorageSlotName};
 use js_export_macro::js_export;
 
 use super::account_header::AccountHeader;
@@ -24,6 +18,12 @@ use crate::platform::JsErr;
 /// from storage, ensuring you always see the current state.
 #[js_export]
 pub struct AccountReader(NativeAccountReader);
+
+impl From<NativeAccountReader> for AccountReader {
+    fn from(reader: NativeAccountReader) -> Self {
+        Self(reader)
+    }
+}
 
 #[js_export]
 impl AccountReader {
@@ -155,17 +155,10 @@ impl AccountReader {
             .map_err(|err| js_error_with_context(err, "invalid slot name"))?;
 
         self.0
-            .get_storage_map_item(slot_name, *key.as_native())
+            .get_storage_map_item(slot_name, StorageMapKey::new(*key.as_native()))
             .await
             .map(Into::into)
             .map_err(|err| js_error_with_context(err, "failed to get storage map item"))
     }
 }
 
-impl AccountReader {
-    /// Creates a new `AccountReader` for the given account.
-    pub(crate) fn new(store: Arc<dyn Store>, account_id: NativeAccountId) -> Self {
-        let inner = NativeAccountReader::new(store, account_id);
-        Self(inner)
-    }
-}

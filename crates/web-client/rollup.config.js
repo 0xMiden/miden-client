@@ -7,21 +7,29 @@ import copy from "rollup-plugin-copy";
 // If true, wasm-opt is not applied.
 const devMode = process.env.MIDEN_WEB_DEV === "true";
 
-// Arguments to tell cargo to add debug symbols
-// to the generated .wasm file.
-const cargoArgsUseDebugSymbols = [
-  // Generate debug symbols for the release cargo profile.
+// Arguments to tell cargo to add full debug symbols
+// to the generated .wasm file (dev mode only).
+// Note: strip='none' is already set by cargoArgsLineTablesDebug.
+const cargoArgsUseDebugSymbols = ["--config", "profile.release.debug='full'"];
+
+// Lightweight debug info for readable stack traces (always applied).
+// Produces function names and line numbers with minimal size overhead.
+const cargoArgsLineTablesDebug = [
   "--config",
-  "profile.release.debug='full'",
-  // Do not remove debug symbols from the final binary,
+  "profile.release.debug='line-tables-only'",
   "--config",
   "profile.release.strip='none'",
 ];
 
 const wasmOptArgs = [
+  // Strip DWARF sections before optimization to avoid binaryen crashes on
+  // unsupported DWARF versions. The name section (function names) is kept.
+  "--strip-dwarf",
   devMode ? "-O0" : "-O3",
   "--enable-bulk-memory",
   "--enable-nontrapping-float-to-int",
+  // Preserve the name section through optimization passes.
+  "--debuginfo",
 ];
 
 // Base cargo arguments
@@ -31,6 +39,11 @@ const baseCargoArgs = [
   "--config",
   `build.rustflags=["-C", "target-feature=+atomics,+bulk-memory,+mutable-globals", "-C", "link-arg=--max-memory=4294967296", "-C", "panic=abort"]`,
   "--no-default-features",
+  // Always include line-tables-only debug info for readable stack traces.
+  ...cargoArgsLineTablesDebug,
+  // In dev mode, append full debug symbols AFTER line-tables-only.
+  // Cargo uses last-wins semantics for repeated --config keys,
+  // so debug='full' overrides debug='line-tables-only'.
 ].concat(devMode ? cargoArgsUseDebugSymbols : []);
 
 /**
@@ -71,8 +84,7 @@ export default [
         extraArgs: {
           cargo: [...baseCargoArgs],
           wasmOpt: wasmOptArgs,
-          // Keep debug symbols if in dev mode.
-          wasmBindgen: devMode ? ["--keep-debug"] : [],
+          wasmBindgen: ["--keep-debug"],
         },
         experimental: {
           typescriptDeclarationDir: "dist/crates",

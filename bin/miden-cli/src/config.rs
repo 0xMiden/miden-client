@@ -112,7 +112,7 @@ impl Provider for CliConfig {
 /// (see [`CliConfig::data()`]) to provide default values during configuration merging.
 /// The paths returned are relative and intended to be resolved against a `.miden` directory.
 ///
-/// For loading configuration from the filesystem, use [`CliConfig::from_system()`] instead.
+/// For loading configuration from the filesystem, use [`CliConfig::load()`] instead.
 impl Default for CliConfig {
     fn default() -> Self {
         // Create paths relative to the config file location (which is in .miden directory)
@@ -136,7 +136,7 @@ impl CliConfig {
     /// Returns `true` when this config was loaded from the local `.miden` directory.
     ///
     /// This is typically set when loading via [`CliConfig::from_local_dir`] or
-    /// [`CliConfig::from_system`] (when local takes precedence).
+    /// [`CliConfig::load`] (when local takes precedence).
     pub fn is_local(&self) -> bool {
         matches!(&self.config_dir, Some(ConfigDir { kind: ConfigKind::Local, .. }))
     }
@@ -144,7 +144,7 @@ impl CliConfig {
     /// Returns `true` when this config was loaded from the global `.miden` directory.
     ///
     /// This is typically set when loading via [`CliConfig::from_global_dir`] or
-    /// [`CliConfig::from_system`] (when local config is not available).
+    /// [`CliConfig::load`] (when local config is not available).
     pub fn is_global(&self) -> bool {
         matches!(&self.config_dir, Some(ConfigDir { kind: ConfigKind::Global, .. }))
     }
@@ -164,12 +164,12 @@ impl CliConfig {
     ///
     /// For standard CLI-like configuration loading, use:
     /// ```ignore
-    /// CliConfig::from_system()  // Respects local → global priority
+    /// CliConfig::load()  // Respects local → global priority
     /// ```
     ///
     /// Or for client initialization:
     /// ```ignore
-    /// CliClient::from_system_user_config(debug_mode).await?
+    /// CliClient::new(debug_mode).await?
     /// ```
     ///
     /// ## When to use this method
@@ -204,7 +204,7 @@ impl CliConfig {
     /// let config = CliConfig::from_dir(&PathBuf::from("/path/to/.miden"))?;
     ///
     /// // ✅ Prefer this for CLI-like behavior:
-    /// let config = CliConfig::from_system()?;
+    /// let config = CliConfig::load()?;
     /// # Ok(())
     /// # }
     /// ```
@@ -242,8 +242,8 @@ impl CliConfig {
     ///
     /// For standard CLI-like behavior:
     /// ```ignore
-    /// CliConfig::from_system()  // Respects local → global fallback
-    /// CliClient::from_system_user_config(debug_mode).await?
+    /// CliConfig::load()  // Respects local → global fallback
+    /// CliClient::new(debug_mode).await?
     /// ```
     ///
     /// ## When to use this method
@@ -284,8 +284,8 @@ impl CliConfig {
     ///
     /// For standard CLI-like behavior:
     /// ```ignore
-    /// CliConfig::from_system()  // Respects local → global priority
-    /// CliClient::from_system_user_config(debug_mode).await?
+    /// CliConfig::load()  // Respects local → global priority
+    /// CliClient::new(debug_mode).await?
     /// ```
     ///
     /// ## When to use this method
@@ -328,8 +328,8 @@ impl CliConfig {
     /// 2. Global `.miden/miden-client.toml` in the home directory (fallback)
     ///
     /// This matches the CLI's configuration priority logic. For most use cases, you should
-    /// use [`CliClient::from_system_user_config()`](crate::CliClient::from_system_user_config)
-    /// instead, which uses this method internally.
+    /// use [`CliClient::new()`](crate::CliClient::new) instead, which uses this method
+    /// internally.
     ///
     /// # Returns
     ///
@@ -352,14 +352,14 @@ impl CliConfig {
     ///
     /// # fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// // ✅ Recommended: Loads from local .miden dir if it exists, otherwise from global
-    /// let config = CliConfig::from_system()?;
+    /// let config = CliConfig::load()?;
     ///
     /// // Or even better, use CliClient directly:
-    /// // let client = CliClient::from_system_user_config(DebugMode::Disabled).await?;
+    /// // let client = CliClient::new(DebugMode::Disabled).await?;
     /// # Ok(())
     /// # }
     /// ```
-    pub fn from_system() -> Result<Self, CliError> {
+    pub fn load() -> Result<Self, CliError> {
         // Try local first
         match Self::from_local_dir() {
             Ok(config) => Ok(config),

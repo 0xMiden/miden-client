@@ -10,11 +10,14 @@ version.workspace      = true
 
 [dependencies]
 # Miden dependencies
-miden-node-utils    = { workspace = true }
-miden-remote-prover = { features = ["concurrent"], workspace = true }
+miden-node-proto = { workspace = true }
+miden-node-utils = { workspace = true }
+miden-protocol   = { features = ["std"], workspace = true }
+miden-tx         = { features = ["concurrent", "std"], workspace = true }
 
 # External dependencies
 anyhow             = { workspace = true }
+async-trait        = { workspace = true }
 tokio              = { features = ["net"], workspace = true }
 tokio-stream       = { features = ["net"], version = "0.1" }
 tonic              = { default-features = false, features = ["router", "transport"], version = "0.14" }

@@ -102,28 +102,20 @@ impl WebClient {
     }
 }
 
-/// Imports store contents from a JSON string into an IndexedDB store, replacing all existing data.
+/// Imports store contents from a JSON string, replacing all existing data.
 ///
-/// This is a standalone utility function, not a WebClient method, because store
-/// export/import is an IndexedDB concern handled externally from the client.
+/// Use together with [`export_store`].
 #[cfg(feature = "browser")]
-#[wasm_bindgen(js_name = "forceImportStore")]
-pub async fn force_import_store(
-    store_dump: JsValue,
-    store_name: String,
-) -> Result<JsValue, JsValue> {
-    let json_string = store_dump
-        .as_string()
-        .ok_or(JsValue::from_str("Store dump must be a string"))?;
-
-    let store = idxdb_store::IdxdbStore::new(store_name)
+#[wasm_bindgen(js_name = "importStore")]
+pub async fn import_store(store_name: &str, store_dump: &str) -> Result<(), JsValue> {
+    let store = idxdb_store::IdxdbStore::new(store_name.into())
         .await
-        .map_err(|_| JsValue::from_str("Failed to open store"))?;
+        .map_err(|err| JsValue::from_str(&format!("failed to open store: {err:?}")))?;
 
     store
-        .import_store(json_string)
+        .import_store(store_dump.to_string())
         .await
-        .map_err(|err| js_error_with_context(err, "failed to import store"))?;
+        .map_err(|err| JsValue::from_str(&format!("failed to import store: {err:?}")))?;
 
-    Ok(JsValue::from_str("Store imported successfully"))
+    Ok(())
 }

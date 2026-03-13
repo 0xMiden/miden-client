@@ -19,7 +19,7 @@ impl NoteMetadata {
     #[js_export(constructor)]
     pub fn new(sender: &AccountId, note_type: NoteType, note_tag: &NoteTag) -> NoteMetadata {
         let native_note_metadata =
-            NativeNoteMetadata::new(sender.into(), note_type.into(), note_tag.into());
+            NativeNoteMetadata::new(sender.into(), note_type.into()).with_tag(note_tag.into());
         NoteMetadata(native_note_metadata)
     }
 
@@ -37,6 +37,17 @@ impl NoteMetadata {
     #[js_export(js_name = "noteType")]
     pub fn note_type(&self) -> NoteType {
         self.0.note_type().into()
+    }
+
+    /// Returns the attachment of the note.
+    pub fn attachment(&self) -> NoteAttachment {
+        self.0.attachment().into()
+    }
+
+    /// Sets the tag for this metadata and returns the updated metadata.
+    #[wasm_bindgen(js_name = "withTag")]
+    pub fn with_tag(&self, tag: &NoteTag) -> NoteMetadata {
+        NoteMetadata(self.clone().0.with_tag(tag.into()))
     }
 
     /// Adds an attachment to this metadata and returns the updated metadata.

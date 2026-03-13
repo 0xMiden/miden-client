@@ -125,6 +125,23 @@ impl AccountId {
         Ok(AccountId(native_account_id))
     }
 
+    /// Builds an account ID from its prefix and suffix field elements.
+    ///
+    /// This is useful when the account ID components are stored separately (e.g., in storage
+    /// maps) and need to be recombined into an `AccountId`.
+    ///
+    /// Returns an error if the provided felts do not form a valid account ID.
+    #[js_export(js_name = "fromPrefixSuffix")]
+    pub fn from_prefix_suffix(prefix: &Felt, suffix: &Felt) -> Result<AccountId, JsErr> {
+        let prefix_felt: NativeFelt = (*prefix).into();
+        let suffix_felt: NativeFelt = (*suffix).into();
+        let native_account_id =
+            NativeAccountId::try_from([prefix_felt, suffix_felt]).map_err(|err| {
+                js_error_with_context(err, "error instantiating AccountId from prefix and suffix")
+            })?;
+        Ok(AccountId(native_account_id))
+    }
+
     /// Returns true if the ID refers to a faucet.
     #[js_export(js_name = "isFaucet")]
     pub fn is_faucet(&self) -> bool {
@@ -172,9 +189,7 @@ impl AccountId {
         let network_id: NativeNetworkId = network_id.into();
 
         let routing_params = RoutingParameters::new(account_interface.into());
-        let address = Address::new(self.0)
-            .with_routing_parameters(routing_params)
-            .map_err(|err| js_error_with_context(err, "failed to set routing parameters"))?;
+        let address = Address::new(self.0).with_routing_parameters(routing_params);
         Ok(address.encode(network_id))
     }
 

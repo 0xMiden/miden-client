@@ -61,10 +61,10 @@ impl AuthSecretKey {
     }
 
     #[js_export(js_name = "getRpoFalcon512SecretKeyAsFelts")]
-    pub fn get_rpo_falcon_512_secret_key_as_felts(&self) -> Vec<Felt> {
+    pub fn get_rpo_falcon_512_secret_key_as_felts(&self) -> Result<Vec<Felt>, JsErr> {
         let secret_key_as_bytes = match &self.0 {
             NativeAuthSecretKey::Falcon512Rpo(key) => key.to_bytes(),
-            _ => todo!(), // TODO: what to do with other cases
+            _ => return Err(from_str_err("Key is not an RPO Falcon 512 key")),
         };
 
         let secret_key_as_native_felts = secret_key_as_bytes
@@ -72,15 +72,15 @@ impl AuthSecretKey {
             .map(|a| NativeFelt::new(u64::from(*a)))
             .collect::<Vec<NativeFelt>>();
 
-        secret_key_as_native_felts.into_iter().map(Into::into).collect()
+        Ok(secret_key_as_native_felts.into_iter().map(Into::into).collect())
     }
 
     /// Returns the ECDSA k256 Keccak secret key bytes encoded as felts.
     #[js_export(js_name = "getEcdsaK256KeccakSecretKeyAsFelts")]
-    pub fn get_ecdsa_k256_keccak_secret_key_as_felts(&self) -> Vec<Felt> {
+    pub fn get_ecdsa_k256_keccak_secret_key_as_felts(&self) -> Result<Vec<Felt>, JsErr> {
         let secret_key_as_bytes = match &self.0 {
             NativeAuthSecretKey::EcdsaK256Keccak(key) => key.to_bytes(),
-            _ => todo!(), // TODO: what to do with other cases
+            _ => return Err(from_str_err("Key is not an ECDSA K256 Keccak key")),
         };
 
         let secret_key_as_native_felts = secret_key_as_bytes
@@ -88,7 +88,7 @@ impl AuthSecretKey {
             .map(|a| NativeFelt::new(u64::from(*a)))
             .collect::<Vec<NativeFelt>>();
 
-        secret_key_as_native_felts.into_iter().map(Into::into).collect()
+        Ok(secret_key_as_native_felts.into_iter().map(Into::into).collect())
     }
 }
 
@@ -107,11 +107,7 @@ impl AuthSecretKey {
     }
 
     fn public_key_commitment(&self) -> NativeWord {
-        match &self.0 {
-            NativeAuthSecretKey::Falcon512Rpo(key) => key.public_key().to_commitment(),
-            NativeAuthSecretKey::EcdsaK256Keccak(key) => key.public_key().to_commitment(),
-            _ => todo!("auth scheme currently not supported"),
-        }
+        self.0.public_key().to_commitment().into()
     }
 }
 

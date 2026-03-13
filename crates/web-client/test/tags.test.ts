@@ -83,14 +83,15 @@ test.describe("remove_tag tests", () => {
       const wallet = await client.newWallet(
         window.AccountStorageMode.private(),
         true,
-        0
+        window.AuthScheme.AuthRpoFalcon512
       );
       const faucet = await client.newFaucet(
         window.AccountStorageMode.private(),
         false,
         "DAG",
         8,
-        BigInt(10000000)
+        BigInt(10000000),
+        window.AuthScheme.AuthRpoFalcon512
       );
 
       // Mint a note (adds a tag with sourceNoteId for the output note)

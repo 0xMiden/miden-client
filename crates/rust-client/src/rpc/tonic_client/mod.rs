@@ -30,8 +30,9 @@ use super::generated::rpc::account_request::AccountDetailRequest;
 use super::generated::rpc::AccountRequest;
 use super::{
     Endpoint, FetchedAccount, NodeRpcClient, RpcEndpoint, NoteSyncInfo, RpcError,
-    RpcStatusInfo, StateSyncInfo,
+    RpcStatusInfo,
 };
+use crate::rpc::domain::sync::ChainMmrInfo;
 use crate::rpc::domain::account_vault::{AccountVaultInfo, AccountVaultUpdate};
 use crate::rpc::domain::storage_map::{StorageMapInfo, StorageMapUpdate};
 use crate::rpc::domain::transaction::TransactionsInfo;
@@ -485,30 +486,25 @@ impl NodeRpcClient for GrpcClient {
         Ok(notes)
     }
 
-    /// Sends a sync state request to the Miden node, validates and converts the response
-    /// into a [`StateSyncInfo`] struct.
-    async fn sync_state(
+    async fn sync_chain_mmr(
         &self,
-        block_num: BlockNumber,
-        account_ids: &[AccountId],
-        note_tags: &BTreeSet<NoteTag>,
-    ) -> Result<StateSyncInfo, RpcError> {
-        let account_ids = account_ids.iter().map(|acc| (*acc).into()).collect();
+        block_from: BlockNumber,
+        block_to: Option<BlockNumber>,
+    ) -> Result<ChainMmrInfo, RpcError> {
+        let block_range = Some(BlockRange {
+            block_from: block_from.as_u32(),
+            block_to: block_to.map(|b| b.as_u32()),
+        });
 
-        let note_tags = note_tags.iter().map(|&note_tag| note_tag.into()).collect();
-
-        let request = proto::rpc::SyncStateRequest {
-            block_num: block_num.as_u32(),
-            account_ids,
-            note_tags,
-        };
+        let request = proto::rpc::SyncChainMmrRequest { block_range };
 
         let mut rpc_api = self.ensure_connected().await?;
 
         let response = rpc_api
-            .sync_state(request)
+            .sync_chain_mmr(request)
             .await
-            .map_err(|status| self.rpc_error_from_status(RpcEndpoint::SyncState, status))?;
+            .map_err(|status| self.rpc_error_from_status(RpcEndpoint::SyncChainMmr, status))?;
+
         response.into_inner().try_into()
     }
 
@@ -603,9 +599,9 @@ impl NodeRpcClient for GrpcClient {
 
         let storage_maps: Vec<StorageMapDetailRequest> = storage_requirements.clone().into();
 
-        // Only request details for public accounts; include known code commitment for this
-        // account when available
-        let account_details = if account_id.is_public() {
+        // Only request details for accounts with public state (Public or Network);
+        // include known code commitment for this account when available
+        let account_details = if account_id.has_public_state() {
             Some(AccountDetailRequest {
                 code_commitment: Some(EMPTY_WORD.into()),
                 // TODO: implement a way to request asset vaults
@@ -639,8 +635,8 @@ impl NodeRpcClient for GrpcClient {
             .ok_or(RpcError::ExpectedDataMissing("AccountWitness".to_string()))?
             .try_into()?;
 
-        // For public accounts, details should be present when requested
-        let headers = if account_witness.id().is_public() {
+        // For accounts with public state, details should be present when requested
+        let headers = if account_witness.id().has_public_state() {
             Some(
                 response
                     .details
@@ -807,7 +803,7 @@ impl NodeRpcClient for GrpcClient {
     }
 
     async fn get_note_script_by_root(&self, root: Word) -> Result<NoteScript, RpcError> {
-        let request = proto::note::NoteRoot { root: Some(root.into()) };
+        let request = proto::note::NoteScriptRoot { root: Some(root.into()) };
 
         let mut rpc_api = self.ensure_connected().await?;
 

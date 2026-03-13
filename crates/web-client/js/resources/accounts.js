@@ -32,14 +32,59 @@ export class AccountsResource {
         BigInt(opts.maxSupply),
         authScheme
       );
+    } else if (
+      opts?.type === "ImmutableContract" ||
+      opts?.type === "MutableContract"
+    ) {
+      return await this.#createContract(opts, wasm);
+    } else {
+      // Default: wallet (mutable or immutable based on type)
+      const mutable = resolveAccountMutability(opts?.type);
+      const storageMode = resolveStorageMode(opts?.storage ?? "private", wasm);
+      const authScheme = resolveAuthScheme(opts?.auth, wasm);
+      const seed = opts?.seed ? await hashSeed(opts.seed) : undefined;
+      return await this.#inner.newWallet(
+        storageMode,
+        mutable,
+        authScheme,
+        seed
+      );
+    }
+  }
+
+  async #createContract(opts, wasm) {
+    if (!opts.seed)
+      throw new Error("Contract creation requires a 'seed' (Uint8Array)");
+    if (!opts.auth)
+      throw new Error("Contract creation requires an 'auth' (AuthSecretKey)");
+
+    const mutable = opts.type === "MutableContract";
+    const accountTypeEnum = mutable
+      ? wasm.AccountType.RegularAccountUpdatableCode
+      : wasm.AccountType.RegularAccountImmutableCode;
+    const storageMode = resolveStorageMode(opts.storage ?? "public", wasm);
+    const authComponent =
+      wasm.AccountComponent.createAuthComponentFromSecretKey(opts.auth);
+
+    let builder = new wasm.AccountBuilder(opts.seed)
+      .accountType(accountTypeEnum)
+      .storageMode(storageMode)
+      .withAuthComponent(authComponent);
+
+    for (const component of opts.components ?? []) {
+      builder = builder.withComponent(component);
     }
 
-    // Default: wallet (mutable or immutable based on type)
-    const mutable = resolveAccountMutability(opts?.type);
-    const storageMode = resolveStorageMode(opts?.storage ?? "private", wasm);
-    const authScheme = resolveAuthScheme(opts?.auth, wasm);
-    const seed = opts?.seed ? await hashSeed(opts.seed) : undefined;
-    return await this.#inner.newWallet(storageMode, mutable, authScheme, seed);
+    const built = builder.build();
+    const account = built.account;
+
+    await this.#inner.newAccountWithSecretKey(account, opts.auth);
+    return account;
+  }
+
+  async getOrImport(ref) {
+    this.#client.assertNotTerminated();
+    return (await this.get(ref)) ?? (await this.import(ref));
   }
 
   async get(ref) {
