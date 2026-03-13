@@ -42,7 +42,11 @@ const CONSUMED_STATES = new Uint8Array([
 const DUMMY_BYTES = new Uint8Array([1, 2, 3]);
 const DUMMY_SCRIPT_ROOT = "script-root-1";
 
-/** Insert a minimal input note with consumption metadata. */
+/**
+ * Insert a minimal input note with consumption metadata.
+ * The noteId is stored in the `createdAt` field so we can recover it from the
+ * processed (base64-encoded) output of `getInputNoteByOffset`.
+ */
 async function insertNote(
   dbId: string,
   noteId: string,
@@ -62,13 +66,47 @@ async function insertNote(
     DUMMY_SCRIPT_ROOT,
     DUMMY_BYTES,
     `nullifier-${noteId}`,
-    "0",
+    noteId, // store noteId as createdAt so we can read it back from processed output
     opts.stateDiscriminant ?? STATE_CONSUMED_EXTERNAL,
     DUMMY_BYTES,
     opts.consumedBlockHeight,
     opts.consumedTxOrder,
     opts.consumerAccountId
   );
+}
+
+/**
+ * Iterate through all notes using `getInputNoteByOffset`, collecting noteIds
+ * from the actual function output. The noteId is recovered from the `createdAt`
+ * field of the processed result (where we stored it during insertion).
+ */
+async function collectAllNoteIds(
+  dbId: string,
+  states: Uint8Array,
+  consumer?: string,
+  blockStart?: number,
+  blockEnd?: number
+): Promise<string[]> {
+  const ids: string[] = [];
+  let offset = 0;
+
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const result = await getInputNoteByOffset(
+      dbId,
+      states,
+      consumer,
+      blockStart,
+      blockEnd,
+      offset
+    );
+    if (!result || result.length === 0) break;
+    // createdAt holds the noteId (see insertNote)
+    ids.push(result[0].createdAt);
+    offset++;
+  }
+
+  return ids;
 }
 
 // ORDERING TESTS
@@ -225,7 +263,13 @@ describe("getInputNoteByOffset block range filtering", () => {
     });
 
     // Block range 3..=5
-    const ids = await collectAllNoteIds(dbId, CONSUMED_STATES, undefined, 3, 5);
+    const ids = await collectAllNoteIds(
+      dbId,
+      CONSUMED_STATES,
+      undefined,
+      3,
+      5
+    );
     expect(ids).toEqual(["note-b3", "note-b5"]);
   });
 
@@ -253,7 +297,13 @@ describe("getInputNoteByOffset block range filtering", () => {
       consumerAccountId: "0xalice",
     });
 
-    const ids = await collectAllNoteIds(dbId, CONSUMED_STATES, "0xalice", 3, 5);
+    const ids = await collectAllNoteIds(
+      dbId,
+      CONSUMED_STATES,
+      "0xalice",
+      3,
+      5
+    );
     expect(ids).toEqual(["alice-b3", "alice-b5"]);
   });
 });
@@ -292,123 +342,3 @@ describe("getInputNoteByOffset state filtering", () => {
     expect(result).toEqual([]);
   });
 });
-
-// HELPERS
-// ================================================================================================
-
-/** Iterate through all notes using getInputNoteByOffset, collecting noteIds in order. */
-async function collectAllNoteIds(
-  dbId: string,
-  states: Uint8Array,
-  consumer?: string,
-  blockStart?: number,
-  blockEnd?: number
-): Promise<string[]> {
-  const ids: string[] = [];
-  let offset = 0;
-
-  // eslint-disable-next-line no-constant-condition
-  while (true) {
-    const result = await getInputNoteByOffset(
-      dbId,
-      states,
-      consumer,
-      blockStart,
-      blockEnd,
-      offset
-    );
-    if (!result || result.length === 0) break;
-    // getInputNoteByOffset returns processed notes (base64-encoded), but we
-    // need the raw noteId. Read it directly from the store instead.
-    const db = getDatabase(dbId);
-    const allNotes = await db.inputNotes.toArray();
-    // Match by offset position: the result was at position `offset` in the
-    // ordered set. We can't easily recover noteId from the processed output,
-    // so re-query the raw note. Since these are small test sets, just use
-    // the ordering logic directly.
-    ids.push(
-      await getNoteIdAtOffset(
-        dbId,
-        states,
-        consumer,
-        blockStart,
-        blockEnd,
-        offset
-      )
-    );
-    offset++;
-  }
-
-  return ids;
-}
-
-/** Get the noteId of the note at the given offset by querying the raw store. */
-async function getNoteIdAtOffset(
-  dbId: string,
-  states: Uint8Array,
-  consumer?: string,
-  blockStart?: number,
-  blockEnd?: number,
-  offset?: number
-): Promise<string> {
-  const db = getDatabase(dbId);
-
-  if (consumer != null) {
-    // Cursor path: matches getInputNoteByOffset's consumer-set behavior
-    const results = await db.inputNotes
-      .orderBy("[consumedBlockHeight+consumedTxOrder+noteId]")
-      .filter((n) => {
-        if (states.length > 0 && !states.includes(n.stateDiscriminant))
-          return false;
-        if (n.consumerAccountId !== consumer) return false;
-        if (
-          blockStart != null &&
-          (n.consumedBlockHeight == null || n.consumedBlockHeight < blockStart)
-        )
-          return false;
-        if (
-          blockEnd != null &&
-          (n.consumedBlockHeight == null || n.consumedBlockHeight > blockEnd)
-        )
-          return false;
-        return true;
-      })
-      .offset(offset ?? 0)
-      .limit(1)
-      .toArray();
-    return results[0].noteId;
-  }
-
-  // Fallback path
-  let notes = await db.inputNotes.toArray();
-  if (states.length > 0) {
-    notes = notes.filter((n) => states.includes(n.stateDiscriminant));
-  }
-  if (blockStart != null) {
-    notes = notes.filter(
-      (n) =>
-        n.consumedBlockHeight != null && n.consumedBlockHeight >= blockStart
-    );
-  }
-  if (blockEnd != null) {
-    notes = notes.filter(
-      (n) => n.consumedBlockHeight != null && n.consumedBlockHeight <= blockEnd
-    );
-  }
-  notes.sort((a, b) => {
-    const aH = a.consumedBlockHeight;
-    const bH = b.consumedBlockHeight;
-    if (aH == null && bH != null) return 1;
-    if (aH != null && bH == null) return -1;
-    if (aH != null && bH != null && aH !== bH) return aH - bH;
-    const aO = a.consumedTxOrder;
-    const bO = b.consumedTxOrder;
-    if (aO == null && bO != null) return 1;
-    if (aO != null && bO == null) return -1;
-    if (aO != null && bO != null && aO !== bO) return aO - bO;
-    if (a.noteId < b.noteId) return -1;
-    if (a.noteId > b.noteId) return 1;
-    return 0;
-  });
-  return notes[offset ?? 0].noteId;
-}
