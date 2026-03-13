@@ -321,20 +321,13 @@ impl StateSync {
             return Ok(None);
         }
 
-        // Get MMR delta for the same range
-        let chain_mmr_info =
-            self.rpc_api.sync_chain_mmr(current_block_num, Some(target_block)).await?;
-
-        // Validate the server returned data for the requested range
-        if let Some((range_from, range_to)) = chain_mmr_info.block_range
-            && (range_from != current_block_num || range_to != Some(target_block))
-        {
-            return Err(ClientError::ChainValidationError(format!(
-                "block range mismatch: expected ({current_block_num}..{target_block}), got ({range_from}..{range_to:?})"
-            )));
-        }
-
-        let mmr_delta = chain_mmr_info.mmr_delta;
+        // Get MMR delta for the same range. Correctness of this delta is verified
+        // cryptographically in `apply_mmr_changes` (peaks commitment check).
+        let mmr_delta = self
+            .rpc_api
+            .sync_chain_mmr(current_block_num, Some(target_block))
+            .await?
+            .mmr_delta;
 
         // Gather transactions for tracked accounts (skip if none)
         let (account_commitment_updates, transactions) = if account_ids.is_empty() {
@@ -651,19 +644,12 @@ fn apply_mmr_changes(
     // Verify the MMR path anchors the block header to the client's trusted chain state.
     // The path is provided by the node with respect to forest = chain_tip + 1, so we adjust
     // it to our current (smaller or equal) forest.
-    let block_num = new_block.block_num();
-    let adjusted_path_nodes = super::block_header::adjust_merkle_path_for_forest(
+    new_authentication_nodes.extend(super::block_header::track_block_in_mmr(
+        current_partial_mmr,
+        new_block.block_num(),
+        new_block.commitment(),
         mmr_path,
-        block_num,
-        current_partial_mmr.forest(),
-    );
-    let adjusted_path = MerklePath::new(adjusted_path_nodes.iter().map(|(_, n)| *n).collect());
-
-    current_partial_mmr
-        .track(block_num.as_usize(), new_block.commitment(), &adjusted_path)
-        .map_err(StoreError::MmrError)?;
-
-    new_authentication_nodes.extend(adjusted_path_nodes);
+    )?);
 
     Ok((new_peaks, new_authentication_nodes))
 }

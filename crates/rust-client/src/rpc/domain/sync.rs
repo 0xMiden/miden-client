@@ -45,8 +45,6 @@ pub struct StateSyncInfo {
 
 /// Represents the result of a `SyncChainMmr` RPC call, with fields converted into domain types.
 pub struct ChainMmrInfo {
-    /// The block range the server claims this delta covers.
-    pub block_range: Option<(BlockNumber, Option<BlockNumber>)>,
     /// The MMR delta for the requested block range.
     pub mmr_delta: MmrDelta,
 }
@@ -55,15 +53,11 @@ impl TryFrom<proto::rpc::SyncChainMmrResponse> for ChainMmrInfo {
     type Error = RpcError;
 
     fn try_from(value: proto::rpc::SyncChainMmrResponse) -> Result<Self, Self::Error> {
-        let block_range = value
-            .block_range
-            .map(|br| (BlockNumber::from(br.block_from), br.block_to.map(BlockNumber::from)));
-
         let mmr_delta = value
             .mmr_delta
             .ok_or(proto::rpc::SyncChainMmrResponse::missing_field(stringify!(mmr_delta)))?
             .try_into()?;
 
-        Ok(Self { block_range, mmr_delta })
+        Ok(Self { mmr_delta })
     }
 }
