@@ -45,7 +45,7 @@ impl NoteMetadata {
     }
 
     /// Sets the tag for this metadata and returns the updated metadata.
-    #[wasm_bindgen(js_name = "withTag")]
+    #[js_export(js_name = "withTag")]
     pub fn with_tag(&self, tag: &NoteTag) -> NoteMetadata {
         NoteMetadata(self.clone().0.with_tag(tag.into()))
     }

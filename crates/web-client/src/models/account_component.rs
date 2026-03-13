@@ -87,7 +87,7 @@ impl AccountComponent {
 
     /// Marks the component as supporting all account types.
     #[js_export(js_name = "withSupportsAllTypes")]
-    pub fn with_supports_all_types(self) -> Self {
+    pub fn with_supports_all_types(&self) -> Self {
         let metadata = self.0.metadata().clone().with_supports_all_types();
         let code = self.0.component_code().clone();
         let slots = self.0.storage_slots().to_vec();

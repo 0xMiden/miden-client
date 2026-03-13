@@ -4,7 +4,7 @@ use miden_client::utils::{Deserializable, Serializable};
 use crate::js_error_with_context;
 use crate::platform::{JsBytes, JsErr, bytes_to_js};
 
-#[cfg(feature = "testing")]
+#[cfg(all(feature = "testing", feature = "browser"))]
 pub mod test_utils;
 
 /// Serializes any value that implements `Serializable` into the platform byte type.
