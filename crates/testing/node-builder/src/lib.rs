@@ -18,7 +18,7 @@ use miden_node_block_producer::{
 use miden_node_ntx_builder::NtxBuilderConfig;
 use miden_node_rpc::Rpc;
 use miden_node_store::{GenesisState, Store};
-use miden_node_utils::clap::{GrpcOptionsExternal, GrpcOptionsInternal};
+use miden_node_utils::clap::{GrpcOptionsExternal, GrpcOptionsInternal, StorageOptions};
 use miden_node_utils::crypto::get_rpo_random_coin;
 use miden_node_validator::{Validator, ValidatorSigner};
 use miden_protocol::account::auth::{AuthScheme, AuthSecretKey};
@@ -295,6 +295,7 @@ impl NodeBuilder {
                         block_producer_listener,
                         ntx_builder_listener,
                         block_prover_url: None,
+                        storage_options: StorageOptions::default(),
                         grpc_options: GrpcOptionsInternal::default(),
                     }
                     .serve()

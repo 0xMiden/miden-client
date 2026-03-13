@@ -40,10 +40,10 @@ miden-client              = { default-features = false, path = "crates/rust-clie
 miden-client-sqlite-store = { default-features = false, path = "crates/sqlite-store", version = "0.14.0-beta.1" }
 
 # Miden protocol dependencies
-miden-protocol  = { default-features = false, branch = "igamigo-fix-partial-smt", git = "https://github.com/0xMiden/miden-base" }
-miden-standards = { default-features = false, branch = "igamigo-fix-partial-smt", git = "https://github.com/0xMiden/miden-base" }
-miden-testing   = { default-features = false, branch = "igamigo-fix-partial-smt", git = "https://github.com/0xMiden/miden-base" }
-miden-tx        = { default-features = false, branch = "igamigo-fix-partial-smt", git = "https://github.com/0xMiden/miden-base" }
+miden-protocol  = { branch = "igamigo-fix-partial-smt", default-features = false, git = "https://github.com/0xMiden/miden-base" }
+miden-standards = { branch = "igamigo-fix-partial-smt", default-features = false, git = "https://github.com/0xMiden/miden-base" }
+miden-testing   = { branch = "igamigo-fix-partial-smt", default-features = false, git = "https://github.com/0xMiden/miden-base" }
+miden-tx        = { branch = "igamigo-fix-partial-smt", default-features = false, git = "https://github.com/0xMiden/miden-base" }
 
 # Miden node dependencies (from git branch until compatible crates.io release)
 miden-node-block-producer = { branch = "mmagician-claude/update-base-to-beta", git = "https://github.com/0xMiden/miden-node" }
