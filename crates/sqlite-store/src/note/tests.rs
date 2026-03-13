@@ -184,12 +184,14 @@ async fn input_note_reader_filters_by_consumer() {
         AccountId::try_from(ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE).unwrap();
     let consumer_b = AccountId::try_from(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET).unwrap();
 
-    // Insert 2 consumed notes with consumer_a and 1 with consumer_b.
+    // Two notes for consumer_a with tx_order, one for consumer_b with tx_order.
     let note_a1 = create_consumed_input_note_with_consumer(consumer_a, 10, 1);
     let note_b = create_consumed_input_note_with_consumer(consumer_b, 11, 1);
     let note_a2 = create_consumed_input_note_with_consumer(consumer_a, 12, 1);
 
-    store.upsert_input_notes(&[note_a1, note_b, note_a2]).await.unwrap();
+    insert_input_notes_with_tx_order(&store, std::slice::from_ref(&note_a1), Some(0)).await;
+    insert_input_notes_with_tx_order(&store, std::slice::from_ref(&note_b), Some(0)).await;
+    insert_input_notes_with_tx_order(&store, std::slice::from_ref(&note_a2), Some(1)).await;
 
     let store: Arc<dyn Store> = Arc::new(store);
     let mut reader = InputNoteReader::new(store).for_consumer(consumer_a);
@@ -203,6 +205,31 @@ async fn input_note_reader_filters_by_consumer() {
     for note in &collected {
         assert_eq!(note.consumer_account(), Some(consumer_a));
     }
+}
+
+#[tokio::test]
+async fn input_note_reader_excludes_notes_without_tx_order_when_consumer_is_set() {
+    let store = create_test_store().await;
+    let consumer = AccountId::try_from(ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE).unwrap();
+
+    // Insert two notes for the same consumer: one with tx_order, one without.
+    let note_with_order = create_consumed_input_note_with_consumer(consumer, 30, 1);
+    let note_without_order = create_consumed_input_note_with_consumer(consumer, 31, 1);
+
+    insert_input_notes_with_tx_order(&store, std::slice::from_ref(&note_with_order), Some(0)).await;
+    insert_input_notes_with_tx_order(&store, std::slice::from_ref(&note_without_order), None).await;
+
+    let store: Arc<dyn Store> = Arc::new(store);
+    let mut reader = InputNoteReader::new(store).for_consumer(consumer);
+
+    let mut collected = Vec::new();
+    while let Some(note) = reader.next().await.unwrap() {
+        collected.push(note);
+    }
+
+    // Only the note with tx_order should be returned.
+    assert_eq!(collected.len(), 1);
+    assert_eq!(collected[0].id(), note_with_order.id());
 }
 
 #[tokio::test]
@@ -249,10 +276,10 @@ async fn input_note_reader_filters_by_consumer_and_block_range() {
     let bob_at_3 = create_consumed_input_note_with_consumer(consumer_b, 22, 3);
     let alice_at_5 = create_consumed_input_note_with_consumer(consumer_a, 23, 5);
 
-    store
-        .upsert_input_notes(&[alice_at_1, alice_at_3.clone(), bob_at_3, alice_at_5.clone()])
-        .await
-        .unwrap();
+    insert_input_notes_with_tx_order(&store, std::slice::from_ref(&alice_at_1), Some(0)).await;
+    insert_input_notes_with_tx_order(&store, std::slice::from_ref(&alice_at_3), Some(0)).await;
+    insert_input_notes_with_tx_order(&store, std::slice::from_ref(&bob_at_3), Some(1)).await;
+    insert_input_notes_with_tx_order(&store, std::slice::from_ref(&alice_at_5), Some(0)).await;
 
     let store: Arc<dyn Store> = Arc::new(store);
 

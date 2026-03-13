@@ -129,6 +129,7 @@ pub(super) fn note_filter_to_query_input_note_by_offset(
     if let Some(consumer) = consumer {
         params.push(Rc::new(vec![Value::Text(consumer.to_string())]));
         condition.push_str(" AND note.consumer_account_id IN rarray(?)");
+        condition.push_str(" AND note.consumed_tx_order IS NOT NULL");
     }
     if let Some(start) = block_start {
         let _ = write!(condition, " AND note.consumed_block_height >= {}", start.as_u32());

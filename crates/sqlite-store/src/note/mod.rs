@@ -133,8 +133,8 @@ impl SqliteStore {
         Ok(notes)
     }
 
-    /// Retrieves a single input note at the given offset from the filtered set,
-    /// optionally restricted to a consumer account and/or block range.
+    /// Retrieves a single input note at the given offset from the filtered set, optionally
+    /// restricted to a consumer account and/or block range.
     pub(crate) fn get_input_note_by_offset(
         conn: &mut Connection,
         filter: &NoteFilter,
