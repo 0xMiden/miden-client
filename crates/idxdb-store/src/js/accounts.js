@@ -403,10 +403,7 @@ async function archiveAndReplaceStorageSlots(db, accountId, nonce, newSlots) {
         }
     }
     // Replace latest
-    await db.latestAccountStorages
-        .where("accountId")
-        .equals(accountId)
-        .delete();
+    await db.latestAccountStorages.where("accountId").equals(accountId).delete();
     if (newSlots.length > 0) {
         await db.latestAccountStorages.bulkPut(newSlots.map((slot) => ({
             accountId,
@@ -560,7 +557,7 @@ async function restoreAssetsFromHistorical(db, accountId, nonce) {
 /**
  * Replaces an account's full state (storage, map entries, vault assets, header)
  * with a new snapshot. Before overwriting, all current latest values are archived
- * to historical so they can be restored on undo.
+ * to historical.
  */
 export async function applyFullAccountState(dbId, accountState) {
     try {

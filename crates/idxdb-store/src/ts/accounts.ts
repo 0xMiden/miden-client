@@ -509,10 +509,7 @@ async function archiveAndReplaceStorageSlots(
   }
 
   // Replace latest
-  await db.latestAccountStorages
-    .where("accountId")
-    .equals(accountId)
-    .delete();
+  await db.latestAccountStorages.where("accountId").equals(accountId).delete();
   if (newSlots.length > 0) {
     await db.latestAccountStorages.bulkPut(
       newSlots.map((slot) => ({
@@ -756,7 +753,12 @@ export async function applyFullAccountState(
         // Archive: save current latest values to historical (so they can be
         // restored on undo), then replace latest with the new state.
         await archiveAndReplaceStorageSlots(db, accountId, nonce, storageSlots);
-        await archiveAndReplaceMapEntries(db, accountId, nonce, storageMapEntries);
+        await archiveAndReplaceMapEntries(
+          db,
+          accountId,
+          nonce,
+          storageMapEntries
+        );
         await archiveAndReplaceVaultAssets(db, accountId, nonce, assets);
 
         // Archive old header and write new header
