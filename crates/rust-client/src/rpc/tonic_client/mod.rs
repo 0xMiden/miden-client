@@ -228,11 +228,29 @@ impl GrpcClient {
                                 self.sync_storage_maps(0_u32.into(), None, account_id).await?;
                             map_cache.insert(fetched_data)
                         };
-                        let map_entries: Vec<_> = map_info
+                        // The sync endpoint may return multiple updates for the same key
+                        // across different blocks. We must keep only the latest value per
+                        // key (highest block_num).
+                        let mut latest_by_key: BTreeMap<Word, (BlockNumber, Word)> =
+                            BTreeMap::new();
+                        for update in map_info
                             .updates
                             .iter()
                             .filter(|slot_info| slot_info.slot_name == *slot_header.name())
-                            .map(|slot_info| (slot_info.key, slot_info.value))
+                        {
+                            latest_by_key
+                                .entry(update.key)
+                                .and_modify(|(block, val)| {
+                                    if update.block_num > *block {
+                                        *block = update.block_num;
+                                        *val = update.value;
+                                    }
+                                })
+                                .or_insert((update.block_num, update.value));
+                        }
+                        let map_entries: Vec<_> = latest_by_key
+                            .into_iter()
+                            .map(|(key, (_, value))| (key, value))
                             .collect();
                         StorageMap::with_entries(map_entries)
                     } else {
