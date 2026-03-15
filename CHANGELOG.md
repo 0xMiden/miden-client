@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.13.3
+
+* [FIX] Deduplicated storage map entries returned by the `SyncAccountStorageMaps` RPC endpoint, keeping only the latest value per key. Previously, accounts with storage map keys updated across multiple blocks would fail to load ([#1902](https://github.com/0xMiden/miden-client/pull/1902)).
+
 ## 0.13.2 (2026-02-26)
 
 * Updated to `miden-crypto` v0.19.5 ([#1813](https://github.com/0xMiden/miden-client/pull/1813)).
