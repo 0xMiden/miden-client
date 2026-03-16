@@ -606,6 +606,77 @@ const customTxWithMultipleNotes = async (
   );
 };
 
+const submitExpiredTransaction = async (
+  testingPage: Page,
+  senderAccountId: string,
+  targetAccountId: string,
+  faucetAccountId: string
+): Promise<void> => {
+  return await testingPage.evaluate(
+    async ({ _senderAccountId, _targetAccountId, _faucetAccountId }) => {
+      const client = window.client;
+      const senderAccountId = window.AccountId.fromHex(_senderAccountId);
+      const targetAccountId = window.AccountId.fromHex(_targetAccountId);
+      const faucetAccountId = window.AccountId.fromHex(_faucetAccountId);
+
+      const noteAssets = new window.NoteAssets([
+        new window.FungibleAsset(faucetAccountId, BigInt(10)),
+      ]);
+      const outputNote = window.OutputNote.full(
+        window.Note.createP2IDNote(
+          senderAccountId,
+          targetAccountId,
+          noteAssets,
+          window.NoteType.Public,
+          new window.Felt(0n)
+        )
+      );
+
+      const transactionRequest = new window.TransactionRequestBuilder()
+        .withOwnOutputNotes(new window.OutputNotesArray([outputNote]))
+        .withExpirationDelta(2)
+        .build();
+
+      const transactionResult = await client.newTransaction(
+        senderAccountId,
+        transactionRequest
+      );
+
+      await window.helpers.waitForBlocks(3);
+      await client.submitTransaction(transactionResult);
+    },
+    {
+      _senderAccountId: senderAccountId,
+      _targetAccountId: targetAccountId,
+      _faucetAccountId: faucetAccountId,
+    }
+  );
+};
+
+const buildCustomScriptRequestWithExpiration = async (
+  testingPage: Page
+): Promise<void> => {
+  return await testingPage.evaluate(async () => {
+    const client = window.client;
+    const builder = client.createScriptBuilder();
+    const txScript = builder.compileTxScript(`
+            use.miden::contracts::auth::basic->auth_tx
+            use.miden::kernels::tx::prologue
+            use.miden::kernels::tx::memory
+
+            begin
+                push.0 push.0
+                assert_eq
+            end
+        `);
+
+    new window.TransactionRequestBuilder()
+      .withCustomScript(txScript)
+      .withExpirationDelta(2)
+      .build();
+  });
+};
+
 test.describe("custom transaction tests", () => {
   test("custom transaction completes successfully", async ({ page }) => {
     await expect(customTransaction(page, "0", false)).resolves.toBeUndefined();
@@ -621,6 +692,34 @@ test.describe("custom transaction tests", () => {
     // TODO: hotfix CI failure, we should investigate slow prover tests further.
     test.slow();
     await expect(customTransaction(page, "0", true)).resolves.toBeUndefined();
+  });
+});
+
+test.describe("transaction request builder expiration delta tests", () => {
+  test("submitting an expired transaction fails", async ({
+    page,
+  }) => {
+    const { accountId: senderId, faucetId } = await setupWalletAndFaucet(page);
+    const { accountId: targetId } = await setupWalletAndFaucet(page);
+
+    const { createdNoteId } = await mintTransaction(
+      page,
+      senderId,
+      faucetId,
+      false,
+      true
+    );
+    await consumeTransaction(page, senderId, faucetId, createdNoteId, false);
+
+    await expect(
+      submitExpiredTransaction(page, senderId, targetId, faucetId)
+    ).rejects.toThrow();
+  });
+
+  test("rejects expiration delta when custom script is set", async ({
+    page,
+  }) => {
+    await expect(buildCustomScriptRequestWithExpiration(page)).rejects.toThrow();
   });
 });
 
