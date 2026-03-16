@@ -83,6 +83,14 @@ patchPrototype(sdk.Account, { to_commitment: "toCommitment" });
 // eslint-disable-next-line camelcase
 patchPrototype(sdk.AccountHeader, { to_commitment: "toCommitment" });
 
+// Patch static methods (snake_case aliases for camelCase)
+if (sdk.NoteScript) {
+  if (!sdk.NoteScript.p2id && sdk.NoteScript.p2Id)
+    sdk.NoteScript.p2id = sdk.NoteScript.p2Id;
+  if (!sdk.NoteScript.p2ide && sdk.NoteScript.p2Ide)
+    sdk.NoteScript.p2ide = sdk.NoteScript.p2Ide;
+}
+
 // ── BigInt → Number conversion ────────────────────────────────────────
 
 /**
@@ -610,12 +618,14 @@ export async function setupNodeGlobals(
 
     // Standalone helper functions
     const standalone = await import(path.join(jsDir, "standalone.js"));
+    // Wire the standalone module's internal references
+    if (standalone._setWasm)
+      standalone._setWasm(await globals.getWasmOrThrow());
+    if (standalone._setWebClient) standalone._setWebClient(WasmWebClient);
     if (standalone.createP2IDNote) w.createP2IDNote = standalone.createP2IDNote;
     if (standalone.createP2IDENote)
       w.createP2IDENote = standalone.createP2IDENote;
     if (standalone.buildSwapTag) w.buildSwapTag = standalone.buildSwapTag;
-    // Wire the standalone module's internal reference to the WASM client
-    if (standalone._setWebClient) standalone._setWebClient(WasmWebClient);
   } catch (e) {
     // If import fails, MidenClient and standalone tests will skip
     console.warn("Failed to load JS wrapper modules:", e);
