@@ -459,7 +459,6 @@ pub(crate) fn apply_note_updates_tx(
     let mut input_updates = Vec::new();
     let mut scripts: BTreeMap<String, Vec<u8>> = BTreeMap::new();
 
-    // updated_input_notes() only yields Insert and Update variants.
     for input_note in note_updates.updated_input_notes() {
         match input_note.update_type() {
             NoteUpdateType::Insert => {
@@ -482,7 +481,6 @@ pub(crate) fn apply_note_updates_tx(
     let mut output_inserts = Vec::new();
     let mut output_updates = Vec::new();
 
-    // updated_output_notes() only yields Insert and Update variants.
     for output_note in note_updates.updated_output_notes() {
         match output_note.update_type() {
             NoteUpdateType::Insert => {
