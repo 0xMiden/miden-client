@@ -316,6 +316,10 @@ export const MockWasmWebClient = {
  * Matches the browser's `window.WasmWebClient` interface.
  */
 export const WasmWebClient = {
+  // Static method used by standalone.js buildSwapTag
+  buildSwapTag: (...args: any[]) =>
+    sdk.WebClient.buildSwapTag(...args.map(normalizeArg)),
+
   createClient: async (
     rpcUrl?: string,
     noteTransportUrl?: any,
@@ -663,11 +667,7 @@ function nullToUndefined(val: any): any {
 
 export function createFakePage() {
   return {
-    evaluate: async (fn: Function, args?: any) => {
-      const result = await fn(args);
-      // Normalize null→undefined in return values to match browser behavior
-      return nullToUndefined(result);
-    },
+    evaluate: async (fn: Function, args?: any) => fn(args),
     goto: async () => {},
     on: (..._args: any[]) => {},
   };
