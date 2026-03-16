@@ -5,8 +5,8 @@ import { AccountStorageMode } from "@miden-sdk/miden-sdk";
 import type { Account } from "@miden-sdk/miden-sdk";
 import type { CreateWalletOptions } from "../types";
 import { DEFAULTS } from "../types";
-import { runExclusiveDirect } from "../utils/runExclusive";
 import { ensureAccountBech32 } from "../utils/accountBech32";
+import { assertSignerConnected } from "../utils/errors";
 
 export interface UseCreateWalletResult {
   /** Create a new wallet with optional configuration */
@@ -50,8 +50,7 @@ export interface UseCreateWalletResult {
  * ```
  */
 export function useCreateWallet(): UseCreateWalletResult {
-  const { client, isReady, sync, runExclusive } = useMiden();
-  const runExclusiveSafe = runExclusive ?? runExclusiveDirect;
+  const { client, isReady, sync, signerConnected } = useMiden();
   const setAccounts = useMidenStore((state) => state.setAccounts);
 
   const [wallet, setWallet] = useState<Account | null>(null);
@@ -63,6 +62,8 @@ export function useCreateWallet(): UseCreateWalletResult {
       if (!client || !isReady) {
         throw new Error("Miden client is not ready");
       }
+
+      assertSignerConnected(signerConnected);
 
       await sync();
 
@@ -76,18 +77,16 @@ export function useCreateWallet(): UseCreateWalletResult {
         const mutable = options.mutable ?? DEFAULTS.WALLET_MUTABLE;
         const authScheme = options.authScheme ?? DEFAULTS.AUTH_SCHEME;
 
-        const newWallet = await runExclusiveSafe(async () => {
-          const createdWallet = await client.newWallet(
-            storageMode,
-            mutable,
-            authScheme,
-            options.initSeed
-          );
-          ensureAccountBech32(createdWallet);
-          const accounts = await client.getAccounts();
-          setAccounts(accounts);
-          return createdWallet;
-        });
+        const createdWallet = await client.newWallet(
+          storageMode,
+          mutable,
+          authScheme,
+          options.initSeed
+        );
+        ensureAccountBech32(createdWallet);
+        const accounts = await client.getAccounts();
+        setAccounts(accounts);
+        const newWallet = createdWallet;
 
         setWallet(newWallet);
 
@@ -100,7 +99,7 @@ export function useCreateWallet(): UseCreateWalletResult {
         setIsCreating(false);
       }
     },
-    [client, isReady, runExclusive, setAccounts]
+    [client, isReady, setAccounts, signerConnected]
   );
 
   const reset = useCallback(() => {

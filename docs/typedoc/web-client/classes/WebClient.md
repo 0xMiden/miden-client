@@ -1090,6 +1090,37 @@ Returns all the existing setting keys from the store.
 
 ***
 
+### onStateChanged()
+
+> **onStateChanged**(`callback`): () => `void`
+
+Register a listener that fires when another browser tab mutates the same
+IndexedDB database (cross-tab BroadcastChannel notification, Layer 3).
+
+The WebClient automatically calls `syncState()` on cross-tab changes,
+so in-memory state is already refreshed when your callback runs. Use
+this for additional work like re-fetching accounts or updating UI.
+
+#### Parameters
+
+##### callback
+
+(`event`) => `void`
+
+Invoked with a [StateChangedEvent](../interfaces/StateChangedEvent.md) payload.
+
+#### Returns
+
+An unsubscribe function — call it to remove the listener.
+
+> (): `void`
+
+##### Returns
+
+`void`
+
+***
+
 ### proveBlock()
 
 > **proveBlock**(): `void`
@@ -1309,6 +1340,25 @@ Sets a setting key-value in the store. It can then be retrieved using `get_setti
 
 ***
 
+### setSignCb()
+
+> **setSignCb**(`signCb`): `void`
+
+Replace the sign callback on a live client instance.
+This allows hot-swapping the signer without recreating the client.
+
+#### Parameters
+
+##### signCb
+
+[`SignCallback`](../type-aliases/SignCallback.md)
+
+#### Returns
+
+`void`
+
+***
+
 ### submitNewTransaction()
 
 > **submitNewTransaction**(`account_id`, `transaction_request`): `Promise`\<[`TransactionId`](TransactionId.md)\>
@@ -1472,7 +1522,7 @@ A promise that resolves to a SyncSummary with the sync results.
 
 > **terminate**(): `void`
 
-Terminates the underlying worker.
+Terminates the underlying worker and cleans up the BroadcastChannel.
 
 #### Returns
 

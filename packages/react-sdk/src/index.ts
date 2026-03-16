@@ -13,6 +13,14 @@ export {
 // Signer Context (for external signer providers)
 export { SignerContext, useSigner } from "./context/SignerContext";
 
+// Multi-Signer Context (for apps with multiple signer providers)
+export {
+  MultiSignerProvider,
+  SignerSlot,
+  useMultiSigner,
+} from "./context/MultiSignerProvider";
+export type { MultiSignerContextValue } from "./context/MultiSignerProvider";
+
 // Query Hooks
 export { useAccounts } from "./hooks/useAccounts";
 export { useAccount } from "./hooks/useAccount";

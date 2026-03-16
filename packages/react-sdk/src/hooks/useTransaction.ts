@@ -11,8 +11,7 @@ import type {
   ExecuteTransactionOptions,
 } from "../types";
 import { parseAccountId } from "../utils/accountParsing";
-import { runExclusiveDirect } from "../utils/runExclusive";
-import { MidenError } from "../utils/errors";
+import { MidenError, assertSignerConnected } from "../utils/errors";
 
 export interface UseTransactionResult {
   /** Execute a transaction request end-to-end */
@@ -66,8 +65,7 @@ type TransactionRequestFactory = (
  * ```
  */
 export function useTransaction(): UseTransactionResult {
-  const { client, isReady, sync, runExclusive, prover } = useMiden();
-  const runExclusiveSafe = runExclusive ?? runExclusiveDirect;
+  const { client, isReady, sync, prover, signerConnected } = useMiden();
   const isBusyRef = useRef(false);
 
   const [result, setResult] = useState<TransactionResult | null>(null);
@@ -80,6 +78,8 @@ export function useTransaction(): UseTransactionResult {
       if (!client || !isReady) {
         throw new Error("Miden client is not ready");
       }
+
+      assertSignerConnected(signerConnected);
 
       if (isBusyRef.current) {
         throw new MidenError(
@@ -99,25 +99,20 @@ export function useTransaction(): UseTransactionResult {
           await sync();
         }
 
-        // Resolve request outside runExclusiveSafe so the "executing" stage
-        // is observable before transitioning to "proving"
+        // Resolve request so the "executing" stage is observable before
+        // transitioning to "proving"
         const txRequest = await resolveRequest(options.request, client);
 
         setStage("proving");
-        const txResult = await runExclusiveSafe(async () => {
-          // Create fresh AccountId inside the closure — WASM objects created
-          // outside may become stale if another runExclusiveSafe call runs
-          // between creation and consumption.
-          const accountIdObj = resolveAccountId(options.accountId);
-          const txId = prover
-            ? await client.submitNewTransactionWithProver(
-                accountIdObj,
-                txRequest,
-                prover
-              )
-            : await client.submitNewTransaction(accountIdObj, txRequest);
-          return { transactionId: txId.toString() };
-        });
+        const accountIdObj = resolveAccountId(options.accountId);
+        const txId = prover
+          ? await client.submitNewTransactionWithProver(
+              accountIdObj,
+              txRequest,
+              prover
+            )
+          : await client.submitNewTransaction(accountIdObj, txRequest);
+        const txResult = { transactionId: txId.toString() };
 
         setStage("complete");
         setResult(txResult);
@@ -135,7 +130,7 @@ export function useTransaction(): UseTransactionResult {
         isBusyRef.current = false;
       }
     },
-    [client, isReady, prover, runExclusive, sync]
+    [client, isReady, prover, signerConnected, sync]
   );
 
   const reset = useCallback(() => {

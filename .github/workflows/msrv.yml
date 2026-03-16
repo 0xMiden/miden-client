@@ -28,8 +28,10 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Ensure stable toolchain is installed
         run: rustup toolchain install stable --profile minimal
+      - name: Install binstall
+        uses: cargo-bins/cargo-binstall@main
       - name: Install cargo-msrv
-        run: cargo install cargo-msrv --locked
+        run: cargo binstall --no-confirm cargo-msrv
       - name: Check MSRV for each workspace member
         run: |
           ./scripts/check-msrv.sh
