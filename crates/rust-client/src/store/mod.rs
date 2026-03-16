@@ -138,10 +138,8 @@ pub trait Store: Send + Sync {
 
     /// Retrieves the input notes from the store.
     ///
-    /// When `filter` is [`NoteFilter::Consumed`], results should be sorted by
-    /// `(consumed_block_height ASC, consumed_tx_order ASC, note_id ASC)` with `NULL`
-    /// values last, so that consumers iterating over the returned list observe notes in
-    /// on-chain execution order.
+    /// When `filter` is [`NoteFilter::Consumed`], notes are sorted by their on-chain execution
+    /// order.
     async fn get_input_notes(&self, filter: NoteFilter)
     -> Result<Vec<InputNoteRecord>, StoreError>;
 
@@ -159,12 +157,7 @@ pub trait Store: Send + Sync {
     ///
     /// # Ordering
     ///
-    /// Results **must** be sorted by `(consumed_block_height ASC, consumed_tx_order ASC,
-    /// note_id ASC)`, with `NULL` values last, so that the [`InputNoteReader`] iterates
-    /// notes in on-chain execution order. `consumed_block_height` and `consumed_tx_order`
-    /// are populated during sync and stored alongside each consumed note.
-    ///
-    /// [`InputNoteReader`]: crate::note::InputNoteReader
+    /// Notes are sorted by their on-chain execution order.
     async fn get_input_note_by_offset(
         &self,
         filter: NoteFilter,

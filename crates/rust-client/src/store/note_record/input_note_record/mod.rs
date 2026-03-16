@@ -137,7 +137,8 @@ impl InputNoteRecord {
     ///
     /// This is available for notes in processing or consumed-local states, where the
     /// submission data contains the consumer account. Returns `None` for externally
-    /// consumed notes or notes that haven't been submitted for consumption.
+    /// consumed notes, invalid notes, or notes that haven't been submitted for
+    /// consumption.
     pub fn consumer_account(&self) -> Option<AccountId> {
         match &self.state {
             InputNoteState::ProcessingAuthenticated(s) => Some(s.submission_data.consumer_account),
