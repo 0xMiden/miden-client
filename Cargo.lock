@@ -2718,9 +2718,9 @@ checksum = "f8ca58f447f06ed17d5fc4043ce1b10dd205e060fb3ce5b979b8ed8e59ff3f79"
 
 [[package]]
 name = "miden-agglayer"
-version = "0.14.0-beta.1"
+version = "0.14.0-beta.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8141fcf37987fabf0cbb80c27a34a9cccc4255df16c3a2131787a5d93fe6723c"
+checksum = "5f1a7383dfd32d47002f72e63976576312f9928632d845f74623393a60da5eb2"
 dependencies = [
  "fs-err",
  "miden-assembly",
@@ -2738,8 +2738,8 @@ dependencies = [
 
 [[package]]
 name = "miden-agglayer"
-version = "0.14.0-beta.1"
-source = "git+https://github.com/0xMiden/miden-base?branch=igamigo-fix-partial-smt#ff82cb7e28d0de39bf8ca8daa2350b7516b0e7d9"
+version = "0.14.0-beta.2"
+source = "git+https://github.com/0xMiden/miden-base?tag=v0.14.0-beta.2#94b54158f662d68072665ed542e0b4ff00d5ca42"
 dependencies = [
  "fs-err",
  "miden-assembly",
@@ -2809,9 +2809,9 @@ dependencies = [
 
 [[package]]
 name = "miden-block-prover"
-version = "0.14.0-beta.1"
+version = "0.14.0-beta.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ed58b050df5203c8bd848afccb1b6539d743da76891076349539d1a5de4f10cc"
+checksum = "6cbc5de67dea7cfb63e9927191fc2bc77a81b4e3eebaa6777dc6c6a630855a5b"
 dependencies = [
  "miden-protocol",
  "thiserror 2.0.18",
@@ -2819,8 +2819,8 @@ dependencies = [
 
 [[package]]
 name = "miden-block-prover"
-version = "0.14.0-beta.1"
-source = "git+https://github.com/0xMiden/miden-base?branch=igamigo-fix-partial-smt#ff82cb7e28d0de39bf8ca8daa2350b7516b0e7d9"
+version = "0.14.0-beta.2"
+source = "git+https://github.com/0xMiden/miden-base?tag=v0.14.0-beta.2#94b54158f662d68072665ed542e0b4ff00d5ca42"
 dependencies = [
  "miden-protocol",
  "thiserror 2.0.18",
@@ -3139,7 +3139,7 @@ dependencies = [
 [[package]]
 name = "miden-large-smt-backend-rocksdb"
 version = "0.14.0-beta.1"
-source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-claude%2Fupdate-base-to-beta#b6b3af017d92a63b49aa17a76d8c7e313d7c5bc5"
+source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-claude%2Fupdate-base-to-beta#683c3d0d8fc9b62c46f209e3d8167a72aa816687"
 dependencies = [
  "miden-crypto",
  "miden-node-rocksdb-cxx-linkage-fix",
@@ -3200,7 +3200,7 @@ dependencies = [
 [[package]]
 name = "miden-node-block-producer"
 version = "0.14.0-beta.1"
-source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-claude%2Fupdate-base-to-beta#b6b3af017d92a63b49aa17a76d8c7e313d7c5bc5"
+source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-claude%2Fupdate-base-to-beta#683c3d0d8fc9b62c46f209e3d8167a72aa816687"
 dependencies = [
  "anyhow",
  "futures",
@@ -3211,7 +3211,7 @@ dependencies = [
  "miden-protocol",
  "miden-remote-prover-client",
  "miden-standards",
- "miden-tx-batch-prover 0.14.0-beta.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "miden-tx-batch-prover 0.14.0-beta.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand",
  "thiserror 2.0.18",
  "tokio",
@@ -3226,7 +3226,7 @@ dependencies = [
 [[package]]
 name = "miden-node-db"
 version = "0.14.0-beta.1"
-source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-claude%2Fupdate-base-to-beta#b6b3af017d92a63b49aa17a76d8c7e313d7c5bc5"
+source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-claude%2Fupdate-base-to-beta#683c3d0d8fc9b62c46f209e3d8167a72aa816687"
 dependencies = [
  "deadpool",
  "deadpool-diesel",
@@ -3240,7 +3240,7 @@ dependencies = [
 [[package]]
 name = "miden-node-grpc-error-macro"
 version = "0.14.0-beta.1"
-source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-claude%2Fupdate-base-to-beta#b6b3af017d92a63b49aa17a76d8c7e313d7c5bc5"
+source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-claude%2Fupdate-base-to-beta#683c3d0d8fc9b62c46f209e3d8167a72aa816687"
 dependencies = [
  "quote",
  "syn 2.0.117",
@@ -3249,7 +3249,7 @@ dependencies = [
 [[package]]
 name = "miden-node-ntx-builder"
 version = "0.14.0-beta.1"
-source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-claude%2Fupdate-base-to-beta#b6b3af017d92a63b49aa17a76d8c7e313d7c5bc5"
+source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-claude%2Fupdate-base-to-beta#683c3d0d8fc9b62c46f209e3d8167a72aa816687"
 dependencies = [
  "anyhow",
  "build-rs",
@@ -3276,7 +3276,7 @@ dependencies = [
 [[package]]
 name = "miden-node-proto"
 version = "0.14.0-beta.1"
-source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-claude%2Fupdate-base-to-beta#b6b3af017d92a63b49aa17a76d8c7e313d7c5bc5"
+source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-claude%2Fupdate-base-to-beta#683c3d0d8fc9b62c46f209e3d8167a72aa816687"
 dependencies = [
  "anyhow",
  "build-rs",
@@ -3300,7 +3300,7 @@ dependencies = [
 [[package]]
 name = "miden-node-proto-build"
 version = "0.14.0-beta.1"
-source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-claude%2Fupdate-base-to-beta#b6b3af017d92a63b49aa17a76d8c7e313d7c5bc5"
+source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-claude%2Fupdate-base-to-beta#683c3d0d8fc9b62c46f209e3d8167a72aa816687"
 dependencies = [
  "build-rs",
  "fs-err",
@@ -3312,12 +3312,12 @@ dependencies = [
 [[package]]
 name = "miden-node-rocksdb-cxx-linkage-fix"
 version = "0.14.0-beta.1"
-source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-claude%2Fupdate-base-to-beta#b6b3af017d92a63b49aa17a76d8c7e313d7c5bc5"
+source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-claude%2Fupdate-base-to-beta#683c3d0d8fc9b62c46f209e3d8167a72aa816687"
 
 [[package]]
 name = "miden-node-rpc"
 version = "0.14.0-beta.1"
-source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-claude%2Fupdate-base-to-beta#b6b3af017d92a63b49aa17a76d8c7e313d7c5bc5"
+source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-claude%2Fupdate-base-to-beta#683c3d0d8fc9b62c46f209e3d8167a72aa816687"
 dependencies = [
  "anyhow",
  "futures",
@@ -3344,7 +3344,7 @@ dependencies = [
 [[package]]
 name = "miden-node-store"
 version = "0.14.0-beta.1"
-source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-claude%2Fupdate-base-to-beta#b6b3af017d92a63b49aa17a76d8c7e313d7c5bc5"
+source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-claude%2Fupdate-base-to-beta#683c3d0d8fc9b62c46f209e3d8167a72aa816687"
 dependencies = [
  "anyhow",
  "build-rs",
@@ -3357,8 +3357,8 @@ dependencies = [
  "hex",
  "indexmap",
  "libsqlite3-sys",
- "miden-agglayer 0.14.0-beta.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "miden-block-prover 0.14.0-beta.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "miden-agglayer 0.14.0-beta.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "miden-block-prover 0.14.0-beta.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "miden-crypto",
  "miden-large-smt-backend-rocksdb",
  "miden-node-db",
@@ -3386,7 +3386,7 @@ dependencies = [
 [[package]]
 name = "miden-node-utils"
 version = "0.14.0-beta.1"
-source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-claude%2Fupdate-base-to-beta#b6b3af017d92a63b49aa17a76d8c7e313d7c5bc5"
+source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-claude%2Fupdate-base-to-beta#683c3d0d8fc9b62c46f209e3d8167a72aa816687"
 dependencies = [
  "anyhow",
  "bytes",
@@ -3420,7 +3420,7 @@ dependencies = [
 [[package]]
 name = "miden-node-validator"
 version = "0.14.0-beta.1"
-source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-claude%2Fupdate-base-to-beta#b6b3af017d92a63b49aa17a76d8c7e313d7c5bc5"
+source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-claude%2Fupdate-base-to-beta#683c3d0d8fc9b62c46f209e3d8167a72aa816687"
 dependencies = [
  "anyhow",
  "aws-config",
@@ -3476,8 +3476,8 @@ dependencies = [
 
 [[package]]
 name = "miden-protocol"
-version = "0.14.0-beta.1"
-source = "git+https://github.com/0xMiden/miden-base?branch=igamigo-fix-partial-smt#ff82cb7e28d0de39bf8ca8daa2350b7516b0e7d9"
+version = "0.14.0-beta.2"
+source = "git+https://github.com/0xMiden/miden-base?tag=v0.14.0-beta.2#94b54158f662d68072665ed542e0b4ff00d5ca42"
 dependencies = [
  "bech32",
  "fs-err",
@@ -3505,8 +3505,8 @@ dependencies = [
 
 [[package]]
 name = "miden-protocol-macros"
-version = "0.14.0-beta.1"
-source = "git+https://github.com/0xMiden/miden-base?branch=igamigo-fix-partial-smt#ff82cb7e28d0de39bf8ca8daa2350b7516b0e7d9"
+version = "0.14.0-beta.2"
+source = "git+https://github.com/0xMiden/miden-base?tag=v0.14.0-beta.2#94b54158f662d68072665ed542e0b4ff00d5ca42"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3533,7 +3533,7 @@ dependencies = [
 [[package]]
 name = "miden-remote-prover-client"
 version = "0.14.0-beta.1"
-source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-claude%2Fupdate-base-to-beta#b6b3af017d92a63b49aa17a76d8c7e313d7c5bc5"
+source = "git+https://github.com/0xMiden/miden-node?branch=mmagician-claude%2Fupdate-base-to-beta#683c3d0d8fc9b62c46f209e3d8167a72aa816687"
 dependencies = [
  "build-rs",
  "fs-err",
@@ -3563,8 +3563,8 @@ dependencies = [
 
 [[package]]
 name = "miden-standards"
-version = "0.14.0-beta.1"
-source = "git+https://github.com/0xMiden/miden-base?branch=igamigo-fix-partial-smt#ff82cb7e28d0de39bf8ca8daa2350b7516b0e7d9"
+version = "0.14.0-beta.2"
+source = "git+https://github.com/0xMiden/miden-base?tag=v0.14.0-beta.2#94b54158f662d68072665ed542e0b4ff00d5ca42"
 dependencies = [
  "fs-err",
  "miden-assembly",
@@ -3580,21 +3580,21 @@ dependencies = [
 
 [[package]]
 name = "miden-testing"
-version = "0.14.0-beta.1"
-source = "git+https://github.com/0xMiden/miden-base?branch=igamigo-fix-partial-smt#ff82cb7e28d0de39bf8ca8daa2350b7516b0e7d9"
+version = "0.14.0-beta.2"
+source = "git+https://github.com/0xMiden/miden-base?tag=v0.14.0-beta.2#94b54158f662d68072665ed542e0b4ff00d5ca42"
 dependencies = [
  "anyhow",
  "itertools 0.14.0",
- "miden-agglayer 0.14.0-beta.1 (git+https://github.com/0xMiden/miden-base?branch=igamigo-fix-partial-smt)",
+ "miden-agglayer 0.14.0-beta.2 (git+https://github.com/0xMiden/miden-base?tag=v0.14.0-beta.2)",
  "miden-assembly",
- "miden-block-prover 0.14.0-beta.1 (git+https://github.com/0xMiden/miden-base?branch=igamigo-fix-partial-smt)",
+ "miden-block-prover 0.14.0-beta.2 (git+https://github.com/0xMiden/miden-base?tag=v0.14.0-beta.2)",
  "miden-core-lib",
  "miden-crypto",
  "miden-processor",
  "miden-protocol",
  "miden-standards",
  "miden-tx",
- "miden-tx-batch-prover 0.14.0-beta.1 (git+https://github.com/0xMiden/miden-base?branch=igamigo-fix-partial-smt)",
+ "miden-tx-batch-prover 0.14.0-beta.2 (git+https://github.com/0xMiden/miden-base?tag=v0.14.0-beta.2)",
  "rand",
  "rand_chacha",
  "thiserror 2.0.18",
@@ -3602,8 +3602,8 @@ dependencies = [
 
 [[package]]
 name = "miden-tx"
-version = "0.14.0-beta.1"
-source = "git+https://github.com/0xMiden/miden-base?branch=igamigo-fix-partial-smt#ff82cb7e28d0de39bf8ca8daa2350b7516b0e7d9"
+version = "0.14.0-beta.2"
+source = "git+https://github.com/0xMiden/miden-base?tag=v0.14.0-beta.2#94b54158f662d68072665ed542e0b4ff00d5ca42"
 dependencies = [
  "miden-processor",
  "miden-protocol",
@@ -3615,9 +3615,9 @@ dependencies = [
 
 [[package]]
 name = "miden-tx-batch-prover"
-version = "0.14.0-beta.1"
+version = "0.14.0-beta.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6f298662bcf40ae025ef7c0ffa4e2ac5515985fd23c962e359bf578824b52ed6"
+checksum = "278dc4968b63494fee1216460ec34f91eb5aa2039f9163452dcdf2260f245c8c"
 dependencies = [
  "miden-protocol",
  "miden-tx",
@@ -3625,8 +3625,8 @@ dependencies = [
 
 [[package]]
 name = "miden-tx-batch-prover"
-version = "0.14.0-beta.1"
-source = "git+https://github.com/0xMiden/miden-base?branch=igamigo-fix-partial-smt#ff82cb7e28d0de39bf8ca8daa2350b7516b0e7d9"
+version = "0.14.0-beta.2"
+source = "git+https://github.com/0xMiden/miden-base?tag=v0.14.0-beta.2#94b54158f662d68072665ed542e0b4ff00d5ca42"
 dependencies = [
  "miden-protocol",
  "miden-tx",

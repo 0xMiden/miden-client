@@ -40,10 +40,10 @@ miden-client              = { default-features = false, path = "crates/rust-clie
 miden-client-sqlite-store = { default-features = false, path = "crates/sqlite-store", version = "0.14.0-beta.1" }
 
 # Miden protocol dependencies
-miden-protocol  = { branch = "igamigo-fix-partial-smt", default-features = false, git = "https://github.com/0xMiden/miden-base" }
-miden-standards = { branch = "igamigo-fix-partial-smt", default-features = false, git = "https://github.com/0xMiden/miden-base" }
-miden-testing   = { branch = "igamigo-fix-partial-smt", default-features = false, git = "https://github.com/0xMiden/miden-base" }
-miden-tx        = { branch = "igamigo-fix-partial-smt", default-features = false, git = "https://github.com/0xMiden/miden-base" }
+miden-protocol  = { tag = "v0.14.0-beta.2", default-features = false, git = "https://github.com/0xMiden/miden-base" }
+miden-standards = { tag = "v0.14.0-beta.2", default-features = false, git = "https://github.com/0xMiden/miden-base" }
+miden-testing   = { tag = "v0.14.0-beta.2", default-features = false, git = "https://github.com/0xMiden/miden-base" }
+miden-tx        = { tag = "v0.14.0-beta.2", default-features = false, git = "https://github.com/0xMiden/miden-base" }
 
 # Miden node dependencies (from git branch until compatible crates.io release)
 miden-node-block-producer = { branch = "mmagician-claude/update-base-to-beta", git = "https://github.com/0xMiden/miden-node" }
@@ -85,6 +85,6 @@ should_panic_without_expect = "allow" # We don't care about the specific panic m
 # End of pedantic lints.
 
 [patch.crates-io]
-miden-protocol  = { branch = "igamigo-fix-partial-smt", git = "https://github.com/0xMiden/miden-base" }
-miden-standards = { branch = "igamigo-fix-partial-smt", git = "https://github.com/0xMiden/miden-base" }
-miden-tx        = { branch = "igamigo-fix-partial-smt", git = "https://github.com/0xMiden/miden-base" }
+miden-protocol  = { tag = "v0.14.0-beta.2", git = "https://github.com/0xMiden/miden-base" }
+miden-standards = { tag = "v0.14.0-beta.2", git = "https://github.com/0xMiden/miden-base" }
+miden-tx        = { tag = "v0.14.0-beta.2", git = "https://github.com/0xMiden/miden-base" }
