@@ -58,13 +58,17 @@ export default defineConfig({
       name: "nodejs",
       testDir: "./test",
       testMatch: "**/*.test.ts",
-      // Skip browser-only tests
+      // Skip browser-only and WASM-specific tests
       testIgnore: [
         "test/store_isolation*",
         "test/sync_lock*",
         "test/import_export*",
         "test/remote_keystore*",
+        "test/package*", // TestUtils (createMockSerialized*) is browser-only
+        "test/miden_array*", // WASM array .length() method not available in Node.js
       ],
+      // Skip specific browser-only tests by name
+      grepInvert: /exportStore|importStore/,
     },
 
     /* Test against mobile viewports. */
