@@ -8,7 +8,6 @@ use miden_protocol::errors::{AccountError, AssetError};
 use miden_protocol::note::{Note, NoteId};
 use miden_standards::account::interface::{AccountInterface, AccountInterfaceExt};
 use miden_standards::note::NoteConsumptionStatus;
-use miden_tx::auth::TransactionAuthenticator;
 use miden_tx::{NoteCheckerError, NoteConsumptionChecker, TransactionExecutor};
 use thiserror::Error;
 
@@ -27,24 +26,20 @@ pub type NoteConsumability = (AccountId, NoteConsumptionStatus);
 
 /// Provides functionality for testing whether a note is relevant to the client or not.
 ///
-/// Here, relevance is based on whether the note is able to be consumed by an account that is
-/// tracked in the provided `store`. This can be derived in a number of ways, such as looking
-/// at the combination of script root and note inputs. For example, a P2ID note is relevant
-/// for a specific account ID if this ID is its first note input.
+/// Relevance is based on whether the note is able to be consumed by an account tracked in
+/// the provided `store`. The screener trial-executes a consume transaction **without** an
+/// authenticator so that external signers (e.g. wallet extensions) are never invoked during
+/// screening. For accounts that require authentication the checker returns
+/// [`NoteConsumptionStatus::ConsumableWithAuthorization`].
 #[derive(Clone)]
-pub struct NoteScreener<AUTH> {
+pub struct NoteScreener {
     /// A reference to the client's store, used to fetch necessary data to check consumability.
     store: Arc<dyn Store>,
-    /// A reference to the transaction authenticator
-    authenticator: Option<Arc<AUTH>>,
 }
 
-impl<AUTH> NoteScreener<AUTH>
-where
-    AUTH: TransactionAuthenticator + Sync,
-{
-    pub fn new(store: Arc<dyn Store>, authenticator: Option<Arc<AUTH>>) -> Self {
-        Self { store, authenticator }
+impl NoteScreener {
+    pub fn new(store: Arc<dyn Store>) -> Self {
+        Self { store }
     }
 
     /// Returns a vector of tuples describing the relevance of the provided note to the
@@ -124,10 +119,7 @@ where
 // ================================================================================================
 
 #[async_trait(?Send)]
-impl<AUTH> OnNoteReceived for NoteScreener<AUTH>
-where
-    AUTH: TransactionAuthenticator + Sync,
-{
+impl OnNoteReceived for NoteScreener {
     /// Default implementation of the [`OnNoteReceived`] callback. It queries the store for the
     /// committed note to check if it's relevant. If the note wasn't being tracked but it came in
     /// the sync response it may be a new public note, in that case we use the [`NoteScreener`]
