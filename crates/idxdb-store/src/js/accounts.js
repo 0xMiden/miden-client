@@ -700,7 +700,8 @@ export async function undoAccountStates(dbId, accountCommitments) {
                         .equals([accountId, nonce])
                         .toArray();
                     for (const entry of storageEntries) {
-                        if (entry.slotType === STORAGE_SLOT_TYPE_MAP && entry.slotValue != null) {
+                        if (entry.slotType === STORAGE_SLOT_TYPE_MAP &&
+                            entry.slotValue != null) {
                             roots.push(entry.slotValue);
                         }
                     }
