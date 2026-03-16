@@ -347,6 +347,26 @@ jobs:
         if: always()
         run: make stop-node
 
+  test-web-client-nodejs:
+    name: Web client tests (Node.js)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install Rust
+        run: rustup update --no-self-update
+      - name: Add Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: rust-release
+          prefix-key: ${{ env.RUST_CACHE_KEY }}
+          save-if: false
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Run Node.js web client tests
+        run: make test-web-client-nodejs
+
   integration-tests-remote-prover-web-client:
     name: Integration tests for remote prover
     runs-on: ubuntu-24.04

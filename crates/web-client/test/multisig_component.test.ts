@@ -1,76 +1,56 @@
-import test from "./playwright.global.setup";
-import { expect } from "@playwright/test";
+// @ts-nocheck
+import { test, expect } from "./test-setup";
 
 test.describe("multisig auth component", () => {
   test("creates a multisig component with default threshold", async ({
-    page,
+    client,
+    sdk,
   }) => {
-    const result = await page.evaluate(() => {
-      const commitments = [
-        new window.Word(new BigUint64Array([1n, 0n, 0n, 0n])),
-        new window.Word(new BigUint64Array([2n, 0n, 0n, 0n])),
-        new window.Word(new BigUint64Array([3n, 0n, 0n, 0n])),
-      ];
+    const commitments = [
+      new sdk.Word(sdk.u64Array([1, 0, 0, 0])),
+      new sdk.Word(sdk.u64Array([2, 0, 0, 0])),
+      new sdk.Word(sdk.u64Array([3, 0, 0, 0])),
+    ];
 
-      const config = new window.AuthFalcon512RpoMultisigConfig(commitments, 2);
-      const defaultThreshold = config.defaultThreshold;
-      const approvers = config.approvers.length;
-      window.createAuthFalcon512RpoMultisig(config);
+    const config = new sdk.AuthFalcon512RpoMultisigConfig(commitments, 2);
+    const defaultThreshold = config.defaultThreshold;
+    const approvers = config.approvers.length;
+    sdk.createAuthFalcon512RpoMultisig(config);
 
-      return {
-        ok: true,
-        defaultThreshold,
-        approvers,
-      };
-    });
-    expect(result.defaultThreshold).toBe(2);
-    expect(result.approvers).toBe(3);
+    expect(defaultThreshold).toBe(2);
+    expect(approvers).toBe(3);
   });
 
-  test("allows per-procedure thresholds", async ({ page }) => {
-    const ok = await page.evaluate(() => {
-      const commitments = [
-        new window.Word(new BigUint64Array([10n, 0n, 0n, 0n])),
-        new window.Word(new BigUint64Array([11n, 0n, 0n, 0n])),
-      ];
-      const procRoot = new window.Word(new BigUint64Array([10n, 0n, 0n, 0n]));
+  test("allows per-procedure thresholds", async ({ client, sdk }) => {
+    const commitments = [
+      new sdk.Word(sdk.u64Array([10, 0, 0, 0])),
+      new sdk.Word(sdk.u64Array([11, 0, 0, 0])),
+    ];
+    const procRoot = new sdk.Word(sdk.u64Array([10, 0, 0, 0]));
 
-      const config = new window.AuthFalcon512RpoMultisigConfig(
-        commitments,
-        2
-      ).withProcThresholds([new window.ProcedureThreshold(procRoot, 1)]);
+    const config = new sdk.AuthFalcon512RpoMultisigConfig(
+      commitments,
+      2
+    ).withProcThresholds([new sdk.ProcedureThreshold(procRoot, 1)]);
 
-      const procThresholds = config.getProcThresholds();
+    const procThresholds = config.getProcThresholds();
 
-      window.createAuthFalcon512RpoMultisig(config);
-      return {
-        ok: true,
-        procThresholds:
-          procThresholds?.map((p: any) => ({
-            threshold: p.threshold,
-            procRoot: p.procRoot.toHex(),
-          })) ?? [],
-      };
-    });
+    sdk.createAuthFalcon512RpoMultisig(config);
 
-    expect(ok.ok).toBe(true);
-    expect(ok.procThresholds.length).toBe(1);
-    expect(ok.procThresholds[0].threshold).toBe(1);
+    const mapped =
+      procThresholds?.map((p: any) => ({
+        threshold: p.threshold,
+        procRoot: p.procRoot.toHex(),
+      })) ?? [];
+
+    expect(mapped.length).toBe(1);
+    expect(mapped[0].threshold).toBe(1);
   });
 
-  test("rejects invalid threshold", async ({ page }) => {
-    const throws = await page.evaluate(() => {
-      try {
-        const commitments = [
-          new window.Word(new BigUint64Array([7n, 0n, 0n, 0n])),
-        ];
-        new window.AuthFalcon512RpoMultisigConfig(commitments, 2);
-        return false;
-      } catch (err) {
-        return true;
-      }
-    });
-
-    expect(throws).toBe(true);
+  test("rejects invalid threshold", async ({ client, sdk }) => {
+    expect(() => {
+      const commitments = [new sdk.Word(sdk.u64Array([7, 0, 0, 0]))];
+      new sdk.AuthFalcon512RpoMultisigConfig(commitments, 2);
+    }).toThrow();
   });
 });

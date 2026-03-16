@@ -27,7 +27,7 @@ function generateStoreName(testInfo: TestInfo): string {
 
 let _nodeSdk: any = null;
 
-function loadNodeSdk(): any {
+export function loadNodeSdk(): any {
   if (_nodeSdk) return _nodeSdk;
 
   const repoRoot = path.resolve(import.meta.dirname, "..", "..", "..");
@@ -70,7 +70,10 @@ function loadNodeSdk(): any {
 
 let _nodeTestCounter = 0;
 
-async function createNodeMockClient(): Promise<{ client: any; sdk: any }> {
+export async function createNodeMockClient(): Promise<{
+  client: any;
+  sdk: any;
+}> {
   const rawSdk = loadNodeSdk();
   const tmpDir = path.join(
     os.tmpdir(),
@@ -126,7 +129,7 @@ async function createNodeIntegrationClient(
  * - syncState() → syncStateImpl()
  * - null → undefined for Option<T> returns
  */
-function wrapNodeClient(rawClient: any, rawSdk: any): any {
+export function wrapNodeClient(rawClient: any, rawSdk: any): any {
   return new Proxy(rawClient, {
     get(target, prop) {
       if (prop === "syncState") {
@@ -159,7 +162,7 @@ function wrapNodeClient(rawClient: any, rawSdk: any): any {
  * Provides the same interface as the browser's window.* types,
  * plus a `u64()` helper for platform-aware integer handling.
  */
-function createNodeSdkWrapper(rawSdk: any): any {
+export function createNodeSdkWrapper(rawSdk: any): any {
   return {
     ...rawSdk,
     // u64: converts to the platform-appropriate type

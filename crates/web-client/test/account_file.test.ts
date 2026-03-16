@@ -1,43 +1,28 @@
-import test from "./playwright.global.setup";
-import { expect } from "@playwright/test";
-import {
-  setupWalletAndFaucet,
-  clearStore,
-  getAccount,
-} from "./webClientTestUtils";
+// @ts-nocheck
+import { test, expect } from "./test-setup";
+import { setupWalletAndFaucet, createFreshMockClient } from "./test-helpers";
 
 test.describe("AccountFile", () => {
-  test("it serializes and deserializes an account file", async ({ page }) => {
-    const { accountId } = await setupWalletAndFaucet(page);
+  test("it serializes and deserializes an account file", async ({
+    client,
+    sdk,
+  }) => {
+    const { walletId } = await setupWalletAndFaucet(client, sdk);
 
-    const accountFileBytes = await page.evaluate(async (accountId) => {
-      const client = window.client;
-      const accountIdObj = window.AccountId.fromHex(accountId);
-      const accountFile = await client.exportAccountFile(accountIdObj);
-      const bytes = Array.from(accountFile.serialize());
-      return bytes;
-    }, accountId);
+    const accountIdObj = sdk.AccountId.fromHex(walletId);
+    const accountFile = await client.exportAccountFile(accountIdObj);
+    const bytes = accountFile.serialize();
 
-    const reserializedBytes = await page.evaluate(async (bytes) => {
-      const byteArray = new Uint8Array(bytes);
-      const accountFile = window.AccountFile.deserialize(byteArray);
-      const reserialized = Array.from(accountFile.serialize());
-      return reserialized;
-    }, accountFileBytes);
+    const deserialized = sdk.AccountFile.deserialize(new Uint8Array(bytes));
+    const reserialized = deserialized.serialize();
+    expect(Array.from(reserialized)).toEqual(Array.from(bytes));
 
-    expect(reserializedBytes).toEqual(accountFileBytes);
+    // Import into a fresh client
+    const client2 = await createFreshMockClient(sdk);
+    await client2.importAccountFile(deserialized);
 
-    await clearStore(page);
-
-    await page.evaluate(async (bytes) => {
-      const client = window.client;
-      const accountFile = window.AccountFile.deserialize(new Uint8Array(bytes));
-      await client.importAccountFile(accountFile);
-    }, reserializedBytes);
-
-    const account = await getAccount(page, accountId);
-
-    expect(account).not.toBeNull();
-    expect(account!.id).toBe(accountId);
+    const account = await client2.getAccount(accountIdObj);
+    expect(account).toBeDefined();
+    expect(account.id().toString()).toBe(walletId);
   });
 });
