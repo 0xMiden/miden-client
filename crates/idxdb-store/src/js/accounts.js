@@ -1,4 +1,4 @@
-import { getDatabase, } from "./schema.js";
+import { getDatabase, STORAGE_SLOT_TYPE_MAP, } from "./schema.js";
 import { logWebStoreError, uint8ArrayToBase64 } from "./utils.js";
 function seedToBase64(seed) {
     return seed ? uint8ArrayToBase64(seed) : undefined;
@@ -693,8 +693,6 @@ export async function undoAccountStates(dbId, accountCommitments) {
             for (const record of affectedRecords) {
                 roots.push(record.vaultRoot);
             }
-            // StorageSlotType::Map = 1
-            const MAP_SLOT_TYPE = 1;
             for (const [accountId, nonces] of accountNonces) {
                 for (const nonce of nonces) {
                     const storageEntries = await db.historicalAccountStorages
@@ -702,7 +700,7 @@ export async function undoAccountStates(dbId, accountCommitments) {
                         .equals([accountId, nonce])
                         .toArray();
                     for (const entry of storageEntries) {
-                        if (entry.slotType === MAP_SLOT_TYPE && entry.slotValue != null) {
+                        if (entry.slotType === STORAGE_SLOT_TYPE_MAP && entry.slotValue != null) {
                             roots.push(entry.slotValue);
                         }
                     }

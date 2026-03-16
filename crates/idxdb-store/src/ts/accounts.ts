@@ -7,6 +7,7 @@ import {
   JsStorageSlot,
   JsVaultAsset,
   MidenDatabase,
+  STORAGE_SLOT_TYPE_MAP,
 } from "./schema.js";
 import { logWebStoreError, uint8ArrayToBase64 } from "./utils.js";
 
@@ -906,8 +907,6 @@ export async function undoAccountStates(
         for (const record of affectedRecords) {
           roots.push(record.vaultRoot);
         }
-        // StorageSlotType::Map = 1
-        const MAP_SLOT_TYPE = 1;
         for (const [accountId, nonces] of accountNonces) {
           for (const nonce of nonces) {
             const storageEntries = await db.historicalAccountStorages
@@ -915,7 +914,10 @@ export async function undoAccountStates(
               .equals([accountId, nonce])
               .toArray();
             for (const entry of storageEntries) {
-              if (entry.slotType === MAP_SLOT_TYPE && entry.slotValue != null) {
+              if (
+                entry.slotType === STORAGE_SLOT_TYPE_MAP &&
+                entry.slotValue != null
+              ) {
                 roots.push(entry.slotValue);
               }
             }

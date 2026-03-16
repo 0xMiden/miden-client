@@ -3,6 +3,10 @@ import * as semver from "semver";
 import { logWebStoreError } from "./utils.js";
 
 export const CLIENT_VERSION_SETTING_KEY = "clientVersion";
+
+/** Mirrors `StorageSlotType::Map`, originally defined in miden-protocol. */
+export const STORAGE_SLOT_TYPE_MAP = 1;
+
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 
