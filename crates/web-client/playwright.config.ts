@@ -40,6 +40,7 @@ export default defineConfig({
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
       testMatch: "*.test.ts",
+      testIgnore: "test/node/**",
     },
 
     // {
@@ -50,6 +51,20 @@ export default defineConfig({
     {
       name: "webkit",
       use: { ...devices["Desktop Safari"] },
+      testIgnore: "test/node/**",
+    },
+
+    {
+      name: "nodejs",
+      testDir: "./test",
+      testMatch: "**/*.test.ts",
+      // Skip browser-only tests
+      testIgnore: [
+        "test/store_isolation*",
+        "test/sync_lock*",
+        "test/import_export*",
+        "test/remote_keystore*",
+      ],
     },
 
     /* Test against mobile viewports. */

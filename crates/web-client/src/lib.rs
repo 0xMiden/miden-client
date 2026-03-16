@@ -107,8 +107,8 @@ pub fn setup_logging(log_level: &str) {
 #[js_export]
 pub struct WebClient {
     inner: AsyncCell<Option<Client<ClientAuth>>>,
-    mock_rpc_api: Option<Arc<MockRpcApi>>,
-    mock_note_transport_api: Option<Arc<MockNoteTransportApi>>,
+    mock_rpc_api: AsyncCell<Option<Arc<MockRpcApi>>>,
+    mock_note_transport_api: AsyncCell<Option<Arc<MockNoteTransportApi>>>,
 }
 
 // SAFETY: WebClient is only used from JavaScript's single-threaded runtime (Node.js).
@@ -120,6 +120,21 @@ pub struct WebClient {
 unsafe impl Send for WebClient {}
 #[cfg(feature = "nodejs")]
 unsafe impl Sync for WebClient {}
+
+// Prevent deadpool's Drop from panicking on Node.js process exit.
+// When napi's Tokio runtime shuts down, the SQLite connection pool tries to
+// spawn_blocking during Drop, but the runtime is already gone. This causes a
+// panic-in-panic (SIGABRT). Since the OS reclaims all resources on exit anyway,
+// we intentionally leak the client to avoid the crash.
+#[cfg(feature = "nodejs")]
+impl Drop for WebClient {
+    fn drop(&mut self) {
+        // Take ownership of the inner Mutex contents and forget them,
+        // preventing the deadpool Drop chain from running.
+        let inner = std::mem::replace(&mut self.inner, AsyncCell::new(None));
+        std::mem::forget(inner);
+    }
+}
 
 impl Default for WebClient {
     fn default() -> Self {
@@ -137,8 +152,8 @@ impl WebClient {
 
         WebClient {
             inner: AsyncCell::new(None),
-            mock_rpc_api: None,
-            mock_note_transport_api: None,
+            mock_rpc_api: AsyncCell::new(None),
+            mock_note_transport_api: AsyncCell::new(None),
         }
     }
 
