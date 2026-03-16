@@ -7,8 +7,8 @@ import type {
 } from "../types";
 import { DEFAULTS } from "../types";
 import { parseAccountId } from "../utils/accountParsing";
-import { runExclusiveDirect } from "../utils/runExclusive";
 import { getNoteType } from "../utils/noteFilters";
+import { assertSignerConnected } from "../utils/errors";
 
 export interface UseSwapResult {
   /** Create an atomic swap offer */
@@ -57,8 +57,7 @@ export interface UseSwapResult {
  * ```
  */
 export function useSwap(): UseSwapResult {
-  const { client, isReady, sync, runExclusive, prover } = useMiden();
-  const runExclusiveSafe = runExclusive ?? runExclusiveDirect;
+  const { client, isReady, sync, prover, signerConnected } = useMiden();
 
   const [result, setResult] = useState<TransactionResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -70,6 +69,8 @@ export function useSwap(): UseSwapResult {
       if (!client || !isReady) {
         throw new Error("Miden client is not ready");
       }
+
+      assertSignerConnected(signerConnected);
 
       setIsLoading(true);
       setStage("executing");
@@ -87,27 +88,25 @@ export function useSwap(): UseSwapResult {
         const requestedFaucetIdObj = parseAccountId(options.requestedFaucetId);
 
         setStage("proving");
-        const txResult = await runExclusiveSafe(async () => {
-          const txRequest = client.newSwapTransactionRequest(
-            accountIdObj,
-            offeredFaucetIdObj,
-            options.offeredAmount,
-            requestedFaucetIdObj,
-            options.requestedAmount,
-            noteType,
-            paybackNoteType
-          );
+        const txRequest = client.newSwapTransactionRequest(
+          accountIdObj,
+          offeredFaucetIdObj,
+          options.offeredAmount,
+          requestedFaucetIdObj,
+          options.requestedAmount,
+          noteType,
+          paybackNoteType
+        );
 
-          const txId = prover
-            ? await client.submitNewTransactionWithProver(
-                accountIdObj,
-                txRequest,
-                prover
-              )
-            : await client.submitNewTransaction(accountIdObj, txRequest);
+        const txId = prover
+          ? await client.submitNewTransactionWithProver(
+              accountIdObj,
+              txRequest,
+              prover
+            )
+          : await client.submitNewTransaction(accountIdObj, txRequest);
 
-          return { transactionId: txId.toString() };
-        });
+        const txResult = { transactionId: txId.toString() };
 
         setStage("complete");
         setResult(txResult);
@@ -124,7 +123,7 @@ export function useSwap(): UseSwapResult {
         setIsLoading(false);
       }
     },
-    [client, isReady, prover, runExclusive, sync]
+    [client, isReady, prover, signerConnected, sync]
   );
 
   const reset = useCallback(() => {

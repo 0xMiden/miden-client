@@ -3,7 +3,6 @@ import { useMiden } from "../context/MidenProvider";
 import type { ConsumableNoteRecord } from "@miden-sdk/miden-sdk";
 import type { WaitForNotesOptions } from "../types";
 import { parseAccountId } from "../utils/accountParsing";
-import { runExclusiveDirect } from "../utils/runExclusive";
 
 export interface UseWaitForNotesResult {
   /** Wait until an account has consumable notes */
@@ -18,8 +17,7 @@ type ClientWithNotes = {
 };
 
 export function useWaitForNotes(): UseWaitForNotesResult {
-  const { client, isReady, runExclusive } = useMiden();
-  const runExclusiveSafe = runExclusive ?? runExclusiveDirect;
+  const { client, isReady } = useMiden();
 
   const waitForConsumableNotes = useCallback(
     async (options: WaitForNotesOptions): Promise<ConsumableNoteRecord[]> => {
@@ -35,12 +33,10 @@ export function useWaitForNotes(): UseWaitForNotesResult {
       let waited = 0;
 
       while (waited < timeoutMs) {
-        await runExclusiveSafe(() =>
-          (client as unknown as ClientWithNotes).syncState()
-        );
-        const notes = await runExclusiveSafe(() =>
-          (client as unknown as ClientWithNotes).getConsumableNotes(accountId)
-        );
+        await (client as unknown as ClientWithNotes).syncState();
+        const notes = await (
+          client as unknown as ClientWithNotes
+        ).getConsumableNotes(accountId);
         if (notes.length >= minCount) {
           return notes;
         }
@@ -51,7 +47,7 @@ export function useWaitForNotes(): UseWaitForNotesResult {
 
       throw new Error("Timeout waiting for consumable notes");
     },
-    [client, isReady, runExclusiveSafe]
+    [client, isReady]
   );
 
   return { waitForConsumableNotes };

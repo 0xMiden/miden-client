@@ -52,7 +52,7 @@ format-check: ## Run format using nightly toolchain but only in check mode
 	cargo +nightly fmt --all --check && yarn prettier . --check && yarn eslint .
 
 .PHONY: lint
-lint: format fix toml clippy fix-wasm clippy-wasm typos-check rust-client-ts-lint ## Run all linting tasks at once (clippy, fixing, formatting, typos)
+lint: format fix toml clippy fix-wasm clippy-wasm typos-check rust-client-ts-lint web-client-check-methods ## Run all linting tasks at once (clippy, fixing, formatting, typos)
 
 .PHONY: toml
 toml: ## Runs Format for all TOML files
@@ -69,6 +69,10 @@ typos-check: ## Run typos to check for spelling mistakes
 .PHONY: rust-client-ts-lint
 rust-client-ts-lint:
 	cd crates/idxdb-store/src && yarn && yarn lint
+
+.PHONY: web-client-check-methods
+web-client-check-methods: ## Check that all WASM methods are classified in the web client proxy
+	cd $(WEB_CLIENT_DIR) && yarn check:method-classification
 
 .PHONY: react-sdk-lint
 react-sdk-lint: ## Run lint for the React SDK

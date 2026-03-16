@@ -7,7 +7,7 @@ import type {
   TransactionResult,
 } from "../types";
 import { parseAccountId } from "../utils/accountParsing";
-import { runExclusiveDirect } from "../utils/runExclusive";
+import { assertSignerConnected } from "../utils/errors";
 
 export interface UseConsumeResult {
   /** Consume one or more notes */
@@ -53,8 +53,7 @@ export interface UseConsumeResult {
  * ```
  */
 export function useConsume(): UseConsumeResult {
-  const { client, isReady, sync, runExclusive, prover } = useMiden();
-  const runExclusiveSafe = runExclusive ?? runExclusiveDirect;
+  const { client, isReady, sync, prover, signerConnected } = useMiden();
 
   const [result, setResult] = useState<TransactionResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -66,6 +65,8 @@ export function useConsume(): UseConsumeResult {
       if (!client || !isReady) {
         throw new Error("Miden client is not ready");
       }
+
+      assertSignerConnected(signerConnected);
 
       if (options.noteIds.length === 0) {
         throw new Error("No note IDs provided");
@@ -80,32 +81,28 @@ export function useConsume(): UseConsumeResult {
         const accountIdObj = parseAccountId(options.accountId);
 
         setStage("proving");
-        const txResult = await runExclusiveSafe(async () => {
-          const noteIds = options.noteIds.map((noteId) =>
-            NoteId.fromHex(noteId)
-          );
-          const filter = new NoteFilter(NoteFilterTypes.List, noteIds);
-          const noteRecords = await client.getInputNotes(filter);
-          const notes = noteRecords.map((record) => record.toNote());
+        const noteIds = options.noteIds.map((noteId) => NoteId.fromHex(noteId));
+        const filter = new NoteFilter(NoteFilterTypes.List, noteIds);
+        const noteRecords = await client.getInputNotes(filter);
+        const notes = noteRecords.map((record) => record.toNote());
 
-          if (notes.length === 0) {
-            throw new Error("No notes found for provided IDs");
-          }
+        if (notes.length === 0) {
+          throw new Error("No notes found for provided IDs");
+        }
 
-          if (notes.length !== options.noteIds.length) {
-            throw new Error("Some notes could not be found for provided IDs");
-          }
+        if (notes.length !== options.noteIds.length) {
+          throw new Error("Some notes could not be found for provided IDs");
+        }
 
-          const txRequest = client.newConsumeTransactionRequest(notes);
-          const txId = prover
-            ? await client.submitNewTransactionWithProver(
-                accountIdObj,
-                txRequest,
-                prover
-              )
-            : await client.submitNewTransaction(accountIdObj, txRequest);
-          return { transactionId: txId.toString() };
-        });
+        const txRequest = client.newConsumeTransactionRequest(notes);
+        const txId = prover
+          ? await client.submitNewTransactionWithProver(
+              accountIdObj,
+              txRequest,
+              prover
+            )
+          : await client.submitNewTransaction(accountIdObj, txRequest);
+        const txResult = { transactionId: txId.toString() };
 
         setStage("complete");
         setResult(txResult);
@@ -122,7 +119,7 @@ export function useConsume(): UseConsumeResult {
         setIsLoading(false);
       }
     },
-    [client, isReady, prover, runExclusive, sync]
+    [client, isReady, prover, signerConnected, sync]
   );
 
   const reset = useCallback(() => {

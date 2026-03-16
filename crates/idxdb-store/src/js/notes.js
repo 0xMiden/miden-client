@@ -106,9 +106,9 @@ export async function getNoteScript(dbId, scriptRoot) {
         logWebStoreError(err, "Failed to get note script from root");
     }
 }
-export async function upsertInputNote(dbId, noteId, assets, serialNumber, inputs, scriptRoot, serializedNoteScript, nullifier, serializedCreatedAt, stateDiscriminant, state) {
+export async function upsertInputNote(dbId, noteId, assets, serialNumber, inputs, scriptRoot, serializedNoteScript, nullifier, serializedCreatedAt, stateDiscriminant, state, tx) {
     const db = getDatabase(dbId);
-    return db.dexie.transaction("rw", db.inputNotes, db.notesScripts, async (tx) => {
+    const doWork = async (t) => {
         try {
             const data = {
                 noteId,
@@ -121,21 +121,24 @@ export async function upsertInputNote(dbId, noteId, assets, serialNumber, inputs
                 stateDiscriminant,
                 serializedCreatedAt,
             };
-            await tx.inputNotes.put(data);
+            await t.inputNotes.put(data);
             const noteScriptData = {
                 scriptRoot,
                 serializedNoteScript,
             };
-            await tx.notesScripts.put(noteScriptData);
+            await t.notesScripts.put(noteScriptData);
         }
         catch (error) {
             logWebStoreError(error, `Error inserting note: ${noteId}`);
         }
-    });
+    };
+    if (tx)
+        return doWork(tx);
+    return db.dexie.transaction("rw", db.inputNotes, db.notesScripts, doWork);
 }
-export async function upsertOutputNote(dbId, noteId, assets, recipientDigest, metadata, nullifier, expectedHeight, stateDiscriminant, state) {
+export async function upsertOutputNote(dbId, noteId, assets, recipientDigest, metadata, nullifier, expectedHeight, stateDiscriminant, state, tx) {
     const db = getDatabase(dbId);
-    return db.dexie.transaction("rw", db.outputNotes, db.notesScripts, async (tx) => {
+    const doWork = async (t) => {
         try {
             const data = {
                 noteId,
@@ -147,12 +150,15 @@ export async function upsertOutputNote(dbId, noteId, assets, recipientDigest, me
                 stateDiscriminant,
                 state,
             };
-            await tx.outputNotes.put(data);
+            await t.outputNotes.put(data);
         }
         catch (error) {
             logWebStoreError(error, `Error inserting note: ${noteId}`);
         }
-    });
+    };
+    if (tx)
+        return doWork(tx);
+    return db.dexie.transaction("rw", db.outputNotes, db.notesScripts, doWork);
 }
 async function processInputNotes(dbId, notes) {
     const db = getDatabase(dbId);

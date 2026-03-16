@@ -60,18 +60,10 @@ describe("waitForTransactionCommit", () => {
     };
   };
 
-  const mockRunExclusive = async <T>(fn: () => Promise<T>): Promise<T> => fn();
-
   it("should resolve when transaction is committed on first check", async () => {
     const client = createMockClient(["committed"]);
 
-    await waitForTransactionCommit(
-      client as never,
-      mockRunExclusive,
-      TX_HEX,
-      5000,
-      10
-    );
+    await waitForTransactionCommit(client as never, TX_HEX, 5000, 10);
 
     expect(client.syncState).toHaveBeenCalledTimes(1);
     expect(client.getTransactions).toHaveBeenCalledTimes(1);
@@ -80,13 +72,7 @@ describe("waitForTransactionCommit", () => {
   it("should poll until transaction is committed", async () => {
     const client = createMockClient(["pending", "pending", "committed"]);
 
-    await waitForTransactionCommit(
-      client as never,
-      mockRunExclusive,
-      TX_HEX,
-      5000,
-      10
-    );
+    await waitForTransactionCommit(client as never, TX_HEX, 5000, 10);
 
     expect(client.syncState).toHaveBeenCalledTimes(3);
     expect(client.getTransactions).toHaveBeenCalledTimes(3);
@@ -96,13 +82,7 @@ describe("waitForTransactionCommit", () => {
     const client = createMockClient(["discarded"]);
 
     await expect(
-      waitForTransactionCommit(
-        client as never,
-        mockRunExclusive,
-        TX_HEX,
-        5000,
-        10
-      )
+      waitForTransactionCommit(client as never, TX_HEX, 5000, 10)
     ).rejects.toThrow("Transaction was discarded before commit");
   });
 
@@ -121,13 +101,7 @@ describe("waitForTransactionCommit", () => {
     ]);
 
     await expect(
-      waitForTransactionCommit(
-        client as never,
-        mockRunExclusive,
-        TX_HEX,
-        100,
-        10
-      )
+      waitForTransactionCommit(client as never, TX_HEX, 100, 10)
     ).rejects.toThrow("Timeout waiting for transaction commit");
   });
 
@@ -135,13 +109,7 @@ describe("waitForTransactionCommit", () => {
     const client = createMockClient(["committed"]);
 
     // Pass uppercase hex without 0x prefix — should still match "0xtx123"
-    await waitForTransactionCommit(
-      client as never,
-      mockRunExclusive,
-      "TX123",
-      5000,
-      10
-    );
+    await waitForTransactionCommit(client as never, "TX123", 5000, 10);
 
     expect(client.getTransactions).toHaveBeenCalledTimes(1);
   });
@@ -166,13 +134,7 @@ describe("waitForTransactionCommit", () => {
     };
 
     await expect(
-      waitForTransactionCommit(
-        client as never,
-        mockRunExclusive,
-        TX_HEX,
-        150,
-        10
-      )
+      waitForTransactionCommit(client as never, TX_HEX, 150, 10)
     ).rejects.toThrow("Timeout waiting for transaction commit");
 
     // Each iteration takes ~40ms (30ms sync + 10ms delay), so with wall-clock
