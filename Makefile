@@ -245,8 +245,8 @@ install-tools: ## Installs Rust + Node tools required by the Makefile
 		rustup component add --toolchain $$RUST_TC clippy rust-src rustfmt >/dev/null
 	# Rust-related
 	cargo install mdbook --locked
-	cargo install typos-cli --locked
-	cargo install cargo-nextest --locked
+	cargo install typos-cli@1.42.3 --locked
+	cargo install cargo-nextest@0.9.128 --locked
 	cargo install taplo-cli --locked
 	# Binaryen (wasm-opt) – needed by web-client build
 	@command -v wasm-opt >/dev/null 2>&1 && echo "wasm-opt already installed" || { \

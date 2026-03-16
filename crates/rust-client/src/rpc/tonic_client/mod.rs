@@ -462,7 +462,7 @@ impl NodeRpcClient for GrpcClient {
                             .and_modify(|(block, asset)| {
                                 if update.block_num > *block {
                                     *block = update.block_num;
-                                    *asset = update.asset.clone();
+                                    *asset = update.asset;
                                 }
                             })
                             .or_insert((update.block_num, update.asset));
