@@ -1,7 +1,7 @@
-import test from "./playwright.global.setup";
-import { expect } from "@playwright/test";
+// @ts-nocheck
+import { test, expect } from "./test-setup";
 
-// WASM AuthScheme enum: 2 = AuthRpoFalcon512 (Falcon), 1 = AuthEcdsaK256Keccak (ECDSA)
+// AuthScheme enum: 2 = AuthRpoFalcon512 (Falcon), 1 = AuthEcdsaK256Keccak (ECDSA)
 const SCHEMES = [
   ["rpoFalconWithRNG", 2],
   ["ecdsaWithRNG", 1],
@@ -16,36 +16,22 @@ const proceduresFromComponent = (component: any) =>
 test.describe("account component auth constructors", () => {
   SCHEMES.forEach(([secretKeyFn, authSchemeValue]) => {
     test(`createAuthComponentFromCommitment matches secret-key variant (${authSchemeValue})`, async ({
-      page,
+      sdk,
     }) => {
-      const digestsMatch = await page.evaluate(
-        ({ _secretKeyFn, _authSchemeValue }) => {
-          const secretKey = window.AuthSecretKey[_secretKeyFn]();
-          const commitment = secretKey.publicKey().toCommitment();
+      const secretKey = sdk.AuthSecretKey[secretKeyFn]();
+      const commitment = secretKey.publicKey().toCommitment();
 
-          const fromSecret =
-            window.AccountComponent.createAuthComponentFromSecretKey(secretKey);
-          const fromCommitment =
-            window.AccountComponent.createAuthComponentFromCommitment(
-              commitment,
-              _authSchemeValue
-            );
+      const fromSecret =
+        sdk.AccountComponent.createAuthComponentFromSecretKey(secretKey);
+      const fromCommitment =
+        sdk.AccountComponent.createAuthComponentFromCommitment(
+          commitment,
+          authSchemeValue
+        );
 
-          const toHexList = (component: any) =>
-            component
-              .getProcedures()
-              .map((procedure: any) => procedure.digest.toHex())
-              .sort();
-
-          return (
-            JSON.stringify(toHexList(fromSecret)) ===
-            JSON.stringify(toHexList(fromCommitment))
-          );
-        },
-        { _secretKeyFn: secretKeyFn, _authSchemeValue: authSchemeValue }
+      expect(JSON.stringify(proceduresFromComponent(fromSecret))).toEqual(
+        JSON.stringify(proceduresFromComponent(fromCommitment))
       );
-
-      expect(digestsMatch).toBe(true);
     });
   });
 });

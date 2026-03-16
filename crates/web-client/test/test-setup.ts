@@ -172,6 +172,51 @@ function createNodeSdkWrapper(rawSdk: any): any {
   };
 }
 
+// ── Test helpers ──────────────────────────────────────────────────────
+
+/**
+ * Executes a transaction: execute → prove → submit → apply.
+ * Works identically on both platforms.
+ */
+export async function executeAndApplyTransaction(
+  client: any,
+  sdk: any,
+  accountId: any,
+  transactionRequest: any,
+  prover?: any
+) {
+  const result = await client.executeTransaction(accountId, transactionRequest);
+  const proverToUse = prover ?? sdk.TransactionProver.newLocalProver();
+  const proven = await client.proveTransaction(result, proverToUse);
+  const submissionHeight = await client.submitProvenTransaction(proven, result);
+  return await client.applyTransaction(result, submissionHeight);
+}
+
+/**
+ * Waits for a transaction to be committed by polling syncState.
+ */
+export async function waitForTransaction(
+  client: any,
+  sdk: any,
+  transactionId: string,
+  maxWaitTime = 10000,
+  delayInterval = 1000
+) {
+  let timeWaited = 0;
+  while (true) {
+    if (timeWaited >= maxWaitTime)
+      throw new Error("Timeout waiting for transaction");
+    await client.syncState();
+    const uncommitted = await client.getTransactions(
+      sdk.TransactionFilter.uncommitted()
+    );
+    const ids = uncommitted.map((tx: any) => tx.id().toHex());
+    if (!ids.includes(transactionId)) break;
+    await new Promise((r) => setTimeout(r, delayInterval));
+    timeWaited += delayInterval;
+  }
+}
+
 // ── Fixtures ──────────────────────────────────────────────────────────
 
 export const test = base.extend<{
