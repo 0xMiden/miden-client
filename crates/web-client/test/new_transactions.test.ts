@@ -696,9 +696,7 @@ test.describe("custom transaction tests", () => {
 });
 
 test.describe("transaction request builder expiration delta tests", () => {
-  test("submitting an expired transaction fails", async ({
-    page,
-  }) => {
+  test("submitting an expired transaction fails", async ({ page }) => {
     const { accountId: senderId, faucetId } = await setupWalletAndFaucet(page);
     const { accountId: targetId } = await setupWalletAndFaucet(page);
 
@@ -719,7 +717,9 @@ test.describe("transaction request builder expiration delta tests", () => {
   test("rejects expiration delta when custom script is set", async ({
     page,
   }) => {
-    await expect(buildCustomScriptRequestWithExpiration(page)).rejects.toThrow();
+    await expect(
+      buildCustomScriptRequestWithExpiration(page)
+    ).rejects.toThrow();
   });
 });
 
