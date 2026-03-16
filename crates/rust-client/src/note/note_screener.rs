@@ -95,10 +95,14 @@ where
         let tx_args = transaction_request.clone().into_transaction_args(tx_script);
 
         let data_store = ClientDataStore::new(self.store.clone());
-        let mut transaction_executor = TransactionExecutor::new(&data_store);
-        if let Some(authenticator) = &self.authenticator {
-            transaction_executor = transaction_executor.with_authenticator(authenticator.as_ref());
-        }
+        // Don't attach the real authenticator for consumability checks. The
+        // NoteConsumptionChecker gracefully handles a missing authenticator by
+        // returning `ConsumableWithAuthorization` instead of calling
+        // `get_signature()`. Attaching the real authenticator here causes the
+        // external signer (e.g. wallet extension) to be invoked during
+        // sync_state, producing unwanted confirmation popups on every sync.
+        let transaction_executor: TransactionExecutor<'_, '_, _, ()> =
+            TransactionExecutor::new(&data_store);
 
         let consumption_checker = NoteConsumptionChecker::new(&transaction_executor);
 
