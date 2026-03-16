@@ -83,6 +83,27 @@ patchPrototype(sdk.Account, { to_commitment: "toCommitment" });
 // eslint-disable-next-line camelcase
 patchPrototype(sdk.AccountHeader, { to_commitment: "toCommitment" });
 
+// Patch methods that return Option<T> (napi returns null, wasm-bindgen returns undefined)
+function patchNullToUndefined(cls: any, methods: string[]) {
+  if (!cls?.prototype) return;
+  for (const method of methods) {
+    const original = cls.prototype[method];
+    if (typeof original === "function") {
+      cls.prototype[method] = function (...args: any[]) {
+        const result = original.apply(this, args);
+        return result === null ? undefined : result;
+      };
+    }
+  }
+}
+
+patchNullToUndefined(sdk.AccountStorage, [
+  "getItem",
+  "getMapEntries",
+  "getMapItem",
+]);
+patchNullToUndefined(sdk.NoteConsumability, ["consumableAfterBlock"]);
+
 // Patch static methods (snake_case aliases for camelCase)
 if (sdk.NoteScript) {
   if (!sdk.NoteScript.p2id && sdk.NoteScript.p2Id)
@@ -297,16 +318,14 @@ export const MockWasmWebClient = {
     const dir = tmpTestDir();
     const client = new sdk.WebClient();
     // Convert Uint8Array/Buffer to plain Array for napi's Vec<u8>
-    const normSeed =
-      seed instanceof Uint8Array || Buffer.isBuffer(seed)
-        ? Array.from(seed)
-        : seed;
+    const norm = (v: any) =>
+      v instanceof Uint8Array || Buffer.isBuffer(v) ? Array.from(v) : v;
     await client.createMockClient(
       path.join(dir, "store.db"),
       path.join(dir, "keystore"),
-      normSeed ?? null,
-      serializedMockChain ?? null,
-      serializedMockNoteTransportNode ?? null
+      norm(seed) ?? null,
+      norm(serializedMockChain) ?? null,
+      norm(serializedMockNoteTransportNode) ?? null
     );
     return wrapClient(client, "mock");
   },
@@ -487,6 +506,7 @@ export async function setupNodeGlobals(
     WasmWebClient,
 
     // SDK types
+    Account: sdk.Account,
     AccountStorageMode: sdk.AccountStorageMode,
     AuthScheme: sdk.AuthScheme,
     NoteType: sdk.NoteType,
