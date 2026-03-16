@@ -112,19 +112,31 @@ function normalizeArg(val: any): any {
  * Wraps a class so that constructor args and static method args are normalized.
  * Returns a Proxy that intercepts `new` and static calls.
  */
+/**
+ * Wraps a class so that constructor and static method args are normalized.
+ * Copies all static methods/properties, wrapping functions to normalize args.
+ */
 function wrapClass(Cls: any): any {
-  return new Proxy(Cls, {
-    construct(_target, args) {
-      return new Cls(...args.map(normalizeArg));
-    },
-    get(target, prop) {
-      const val = target[prop];
-      if (typeof val === "function") {
-        return (...args: any[]) => val.apply(target, args.map(normalizeArg));
+  const Wrapper: any = function (...args: any[]) {
+    return new Cls(...args.map(normalizeArg));
+  };
+  Wrapper.prototype = Cls.prototype;
+  // Copy static methods with arg normalization
+  for (const key of Object.getOwnPropertyNames(Cls)) {
+    if (key === "prototype" || key === "length" || key === "name") continue;
+    const desc = Object.getOwnPropertyDescriptor(Cls, key);
+    if (desc && typeof desc.value === "function") {
+      Wrapper[key] = (...args: any[]) =>
+        desc.value.apply(Cls, args.map(normalizeArg));
+    } else if (desc) {
+      try {
+        Object.defineProperty(Wrapper, key, desc);
+      } catch {
+        /* skip non-configurable */
       }
-      return val;
-    },
-  });
+    }
+  }
+  return Wrapper;
 }
 
 // ── Client wrapper ────────────────────────────────────────────────────
@@ -484,14 +496,14 @@ export async function setupNodeGlobals(
       RegularAccountImmutableCode: sdk.AccountType?.RegularAccountImmutableCode,
     },
     AccountInterface: sdk.AccountInterface,
-    AccountBuilder: sdk.AccountBuilder,
-    AccountComponent: sdk.AccountComponent,
+    AccountBuilder: wrapClass(sdk.AccountBuilder),
+    AccountComponent: wrapClass(sdk.AccountComponent),
     AccountFile: sdk.AccountFile,
     AccountHeader: sdk.AccountHeader,
     AccountStorageRequirements: sdk.AccountStorageRequirements,
     Address: sdk.Address,
     AdviceMap: sdk.AdviceMap,
-    AuthSecretKey: sdk.AuthSecretKey,
+    AuthSecretKey: wrapClass(sdk.AuthSecretKey),
     AuthFalcon512RpoMultisigConfig: sdk.AuthFalcon512RpoMultisigConfig,
     createAuthFalcon512RpoMultisig: sdk.createAuthFalcon512RpoMultisig,
     BasicFungibleFaucetComponent: sdk.BasicFungibleFaucetComponent,
@@ -561,6 +573,9 @@ export async function setupNodeGlobals(
     getWasmOrThrow: async () => ({
       ...sdk,
       ...arrayPolyfills,
+      AccountBuilder: wrapClass(sdk.AccountBuilder),
+      AccountComponent: wrapClass(sdk.AccountComponent),
+      AuthSecretKey: wrapClass(sdk.AuthSecretKey),
       Felt: wrapClass(sdk.Felt),
       FungibleAsset: wrapClass(sdk.FungibleAsset),
       Word: wrapClass(sdk.Word),
@@ -590,14 +605,7 @@ export async function setupNodeGlobals(
     const { MidenClient } = await import(path.join(jsDir, "client.js"));
     MidenClient._WasmWebClient = WasmWebClient;
     MidenClient._MockWasmWebClient = MockWasmWebClient;
-    MidenClient._getWasmOrThrow = async () => ({
-      ...sdk,
-      ...arrayPolyfills,
-      Felt: wrapClass(sdk.Felt),
-      FungibleAsset: wrapClass(sdk.FungibleAsset),
-      Word: wrapClass(sdk.Word),
-      NoteTag: wrapClass(sdk.NoteTag),
-    });
+    MidenClient._getWasmOrThrow = globals.getWasmOrThrow;
     w.MidenClient = MidenClient;
 
     // Standalone helper functions
