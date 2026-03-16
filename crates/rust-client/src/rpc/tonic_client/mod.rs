@@ -448,12 +448,26 @@ impl NodeRpcClient for GrpcClient {
             let nonce = details.header.nonce();
             let assets: Vec<Asset> = {
                 if details.vault_details.too_many_assets {
-                    self.sync_account_vault(BlockNumber::from(0), None, account_id)
-                        .await?
-                        .updates
-                        .into_iter()
-                        .filter_map(|update| update.asset)
-                        .collect()
+                    let vault_info =
+                        self.sync_account_vault(BlockNumber::from(0), None, account_id).await?;
+                    // The sync endpoint may return multiple updates for the same vault key
+                    // across different blocks. We must keep only the latest value per
+                    // key (highest block_num).
+                    let mut latest_by_key: BTreeMap<Word, (BlockNumber, Option<Asset>)> =
+                        BTreeMap::new();
+                    for update in vault_info.updates {
+                        let key: Word = update.vault_key.into();
+                        latest_by_key
+                            .entry(key)
+                            .and_modify(|(block, asset)| {
+                                if update.block_num > *block {
+                                    *block = update.block_num;
+                                    *asset = update.asset.clone();
+                                }
+                            })
+                            .or_insert((update.block_num, update.asset));
+                    }
+                    latest_by_key.into_values().filter_map(|(_, asset)| asset).collect()
                 } else {
                     details.vault_details.assets
                 }
