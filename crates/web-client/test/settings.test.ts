@@ -1,47 +1,30 @@
-import { expect } from "@playwright/test";
-import test from "./playwright.global.setup";
+// @ts-nocheck
+import { test, expect } from "./test-setup";
 
 test.describe("settings tests", () => {
-  test("set and get setting", async ({ page }) => {
-    const isValid = await page.evaluate(async () => {
-      const client = window.client;
-      const testValue: number[] = [1, 2, 3, 4];
-      await client.setSetting("test", testValue);
-
-      const value = await client.getSetting("test");
-
-      return JSON.stringify(value) === JSON.stringify(testValue);
-    });
-    expect(isValid).toEqual(true);
+  test("set and get setting", async ({ client }) => {
+    const testValue = [1, 2, 3, 4];
+    await client.setSetting("test", testValue);
+    const value = await client.getSetting("test");
+    expect(JSON.stringify(value)).toEqual(JSON.stringify(testValue));
   });
 
-  test("set and list settings", async ({ page }) => {
-    const isValid = await page.evaluate(async () => {
-      const client = window.client;
-      const testKey: string = "test";
-      await client.setSetting(testKey, [1, 2, 3, 4]);
-
-      const keys = await client.listSettingKeys();
-
-      return keys.includes(testKey);
-    });
-    expect(isValid).toEqual(true);
+  test("set and list settings", async ({ client }) => {
+    const testKey = "test";
+    await client.setSetting(testKey, [1, 2, 3, 4]);
+    const keys = await client.listSettingKeys();
+    expect(keys.includes(testKey)).toBe(true);
   });
 
-  test("remove setting", async ({ page }) => {
-    const isValid = await page.evaluate(async () => {
-      const client = window.client;
-      const testValue: number[] = [5, 6, 7, 8];
-      await client.setSetting("test", testValue);
-      await client.removeSetting("test");
+  test("remove setting", async ({ client }) => {
+    const testValue = [5, 6, 7, 8];
+    await client.setSetting("test", testValue);
+    await client.removeSetting("test");
 
-      const resultAfterDelete = await client.getSetting("test");
-      const listAfterDelete = await client.listSettingKeys();
+    const resultAfterDelete = await client.getSetting("test");
+    const listAfterDelete = await client.listSettingKeys();
 
-      return (
-        resultAfterDelete === undefined && !listAfterDelete.includes("test")
-      );
-    });
-    expect(isValid).toEqual(true);
+    expect(resultAfterDelete).toBeUndefined();
+    expect(listAfterDelete.includes("test")).toBe(false);
   });
 });

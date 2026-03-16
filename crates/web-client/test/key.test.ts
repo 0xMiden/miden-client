@@ -1,5 +1,5 @@
-import test from "./playwright.global.setup";
-import { expect } from "@playwright/test";
+// @ts-nocheck
+import { test, expect } from "./test-setup";
 
 test.describe("signature", () => {
   [
@@ -7,84 +7,54 @@ test.describe("signature", () => {
     ["ecdsaWithRNG", "ECDSA Scheme"],
   ].forEach(([signatureFunction, signatureScheme]) => {
     test(`should produce a valid signature: ${signatureScheme}`, async ({
-      page,
+      sdk,
     }) => {
-      const isValid = await page.evaluate(
-        ({ _signatureScheme }) => {
-          const sig = "ecdsaWithRNG";
-          const secretKey = window.AuthSecretKey[_signatureScheme]();
-          const message = new window.Word(new BigUint64Array([1n, 2n, 3n, 4n]));
-          const signature = secretKey.sign(message);
-          const isValid = secretKey.publicKey().verify(message, signature);
-
-          return isValid;
-        },
-        { _signatureScheme: signatureFunction }
-      );
+      const secretKey = sdk.AuthSecretKey[signatureFunction]();
+      const message = new sdk.Word(sdk.u64Array([1, 2, 3, 4]));
+      const signature = secretKey.sign(message);
+      const isValid = secretKey.publicKey().verify(message, signature);
 
       expect(isValid).toEqual(true);
     });
 
     test(`should not verify the wrong message: ${signatureScheme}`, async ({
-      page,
+      sdk,
     }) => {
-      const isValid = await page.evaluate(
-        ({ _signatureScheme }) => {
-          const secretKey = window.AuthSecretKey[_signatureScheme]();
-          const message = new window.Word(new BigUint64Array([1n, 2n, 3n, 4n]));
-          const wrongMessage = new window.Word(
-            new BigUint64Array([5n, 6n, 7n, 8n])
-          );
-          const signature = secretKey.sign(message);
-          const isValid = secretKey.publicKey().verify(wrongMessage, signature);
+      const secretKey = sdk.AuthSecretKey[signatureFunction]();
+      const message = new sdk.Word(sdk.u64Array([1, 2, 3, 4]));
+      const wrongMessage = new sdk.Word(sdk.u64Array([5, 6, 7, 8]));
+      const signature = secretKey.sign(message);
+      const isValid = secretKey.publicKey().verify(wrongMessage, signature);
 
-          return isValid;
-        },
-        { _signatureScheme: signatureFunction }
-      );
       expect(isValid).toEqual(false);
     });
 
     test(`should not verify the signature of a different key: ${signatureScheme}`, async ({
-      page,
+      sdk,
     }) => {
-      const isValid = await page.evaluate(
-        ({ _signatureScheme }) => {
-          const secretKey = window.AuthSecretKey[_signatureScheme]();
-          const message = new window.Word(new BigUint64Array([1n, 2n, 3n, 4n]));
-          const signature = secretKey.sign(message);
-          const differentSecretKey = window.AuthSecretKey[_signatureScheme]();
-          const isValid = differentSecretKey
-            .publicKey()
-            .verify(message, signature);
+      const secretKey = sdk.AuthSecretKey[signatureFunction]();
+      const message = new sdk.Word(sdk.u64Array([1, 2, 3, 4]));
+      const signature = secretKey.sign(message);
+      const differentSecretKey = sdk.AuthSecretKey[signatureFunction]();
+      const isValid = differentSecretKey.publicKey().verify(message, signature);
 
-          return isValid;
-        },
-        { _signatureScheme: signatureFunction }
-      );
       expect(isValid).toEqual(false);
     });
 
     test(`should be able to serialize and deserialize a signature: ${signatureScheme}`, async ({
-      page,
+      sdk,
     }) => {
-      const isValid = await page.evaluate(
-        ({ _signatureScheme }) => {
-          const secretKey = window.AuthSecretKey[_signatureScheme]();
-          const message = new window.Word(new BigUint64Array([1n, 2n, 3n, 4n]));
-          const signature = secretKey.sign(message);
-          const serializedSignature = signature.serialize();
-          const deserializedSignature =
-            window.Signature.deserialize(serializedSignature);
+      const secretKey = sdk.AuthSecretKey[signatureFunction]();
+      const message = new sdk.Word(sdk.u64Array([1, 2, 3, 4]));
+      const signature = secretKey.sign(message);
+      const serializedSignature = signature.serialize();
+      const deserializedSignature =
+        sdk.Signature.deserialize(serializedSignature);
 
-          const isValid = secretKey
-            .publicKey()
-            .verify(message, deserializedSignature);
+      const isValid = secretKey
+        .publicKey()
+        .verify(message, deserializedSignature);
 
-          return isValid;
-        },
-        { _signatureScheme: signatureFunction }
-      );
       expect(isValid).toEqual(true);
     });
   });
@@ -96,25 +66,18 @@ test.describe("public key", () => {
     ["ecdsaWithRNG", "ECDSA Scheme"],
   ].forEach(([signatureFunction, signatureScheme]) => {
     test(`should be able to serialize and deserialize a public key: ${signatureScheme}`, async ({
-      page,
+      sdk,
     }) => {
-      const isValid = await page.evaluate(
-        ({ _signatureScheme }) => {
-          const secretKey = window.AuthSecretKey[_signatureScheme]();
-          const publicKey = secretKey.publicKey();
-          const serializedPublicKey = publicKey.serialize();
-          const deserializedPublicKey =
-            window.PublicKey.deserialize(serializedPublicKey);
-          const serializedDeserializedPublicKey =
-            deserializedPublicKey.serialize();
-          return (
-            serializedPublicKey.toString() ===
-            serializedDeserializedPublicKey.toString()
-          );
-        },
-        { _signatureScheme: signatureFunction }
+      const secretKey = sdk.AuthSecretKey[signatureFunction]();
+      const publicKey = secretKey.publicKey();
+      const serializedPublicKey = publicKey.serialize();
+      const deserializedPublicKey =
+        sdk.PublicKey.deserialize(serializedPublicKey);
+      const serializedDeserializedPublicKey = deserializedPublicKey.serialize();
+
+      expect(serializedPublicKey.toString()).toEqual(
+        serializedDeserializedPublicKey.toString()
       );
-      expect(isValid).toEqual(true);
     });
   });
 });
@@ -125,54 +88,42 @@ test.describe("signing inputs", () => {
     ["ecdsaWithRNG", "ECDSA Scheme"],
   ].forEach(([signatureFunction, signatureScheme]) => {
     test(`should be able to sign and verify an arbitrary array of felts: ${signatureScheme}`, async ({
-      page,
+      sdk,
     }) => {
-      const { isValid, isValidOther } = await page.evaluate(
-        ({ _signatureScheme }) => {
-          const secretKey = window.AuthSecretKey[_signatureScheme]();
-          const otherSecretKey = window.AuthSecretKey[_signatureScheme]();
-          const message = Array.from(
-            { length: 128 },
-            (_, i) => new window.Felt(BigInt(i))
-          );
-          const signingInputs = window.SigningInputs.newArbitrary(message);
-          const signature = secretKey.signData(signingInputs);
-          const isValid = secretKey
-            .publicKey()
-            .verifyData(signingInputs, signature);
-          const isValidOther = otherSecretKey
-            .publicKey()
-            .verifyData(signingInputs, signature);
-
-          return { isValid, isValidOther };
-        },
-        { _signatureScheme: signatureFunction }
+      const secretKey = sdk.AuthSecretKey[signatureFunction]();
+      const otherSecretKey = sdk.AuthSecretKey[signatureFunction]();
+      const message = Array.from(
+        { length: 128 },
+        (_, i) => new sdk.Felt(sdk.u64(i))
       );
+      const signingInputs = sdk.SigningInputs.newArbitrary(message);
+      const signature = secretKey.signData(signingInputs);
+      const isValid = secretKey
+        .publicKey()
+        .verifyData(signingInputs, signature);
+      const isValidOther = otherSecretKey
+        .publicKey()
+        .verifyData(signingInputs, signature);
+
       expect(isValid).toBe(true);
       expect(isValidOther).toBe(false);
     });
 
     test(`should be able to sign and verify a blind word: ${signatureScheme}`, async ({
-      page,
+      sdk,
     }) => {
-      const { isValid, isValidOther } = await page.evaluate(
-        ({ _signatureScheme }) => {
-          const secretKey = window.AuthSecretKey[_signatureScheme]();
-          const otherSecretKey = window.AuthSecretKey[_signatureScheme]();
-          const message = new window.Word(new BigUint64Array([1n, 2n, 3n, 4n]));
-          const signingInputs = window.SigningInputs.newBlind(message);
-          const signature = secretKey.signData(signingInputs);
-          const isValid = secretKey
-            .publicKey()
-            .verifyData(signingInputs, signature);
-          const isValidOther = otherSecretKey
-            .publicKey()
-            .verifyData(signingInputs, signature);
+      const secretKey = sdk.AuthSecretKey[signatureFunction]();
+      const otherSecretKey = sdk.AuthSecretKey[signatureFunction]();
+      const message = new sdk.Word(sdk.u64Array([1, 2, 3, 4]));
+      const signingInputs = sdk.SigningInputs.newBlind(message);
+      const signature = secretKey.signData(signingInputs);
+      const isValid = secretKey
+        .publicKey()
+        .verifyData(signingInputs, signature);
+      const isValidOther = otherSecretKey
+        .publicKey()
+        .verifyData(signingInputs, signature);
 
-          return { isValid, isValidOther };
-        },
-        { _signatureScheme: signatureFunction }
-      );
       expect(isValid).toBe(true);
       expect(isValidOther).toBe(false);
     });

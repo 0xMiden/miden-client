@@ -1,31 +1,32 @@
 // @ts-nocheck
-import test from "./playwright.global.setup";
-import { Page, expect } from "@playwright/test";
+import { test, expect } from "./test-setup";
 
-const mockChainTest = async (testingPage: Page) => {
-  return await testingPage.evaluate(async () => {
-    const client = await window.MockWasmWebClient.createClient();
+test.describe("mock chain tests", () => {
+  test("send transaction with mock chain completes successfully", async ({
+    client,
+    sdk,
+  }) => {
     await client.syncState();
 
     const account = await client.newWallet(
-      window.AccountStorageMode.private(),
+      sdk.AccountStorageMode.private(),
       true,
-      window.AuthScheme.AuthRpoFalcon512
+      sdk.AuthScheme.AuthRpoFalcon512
     );
     const faucetAccount = await client.newFaucet(
-      window.AccountStorageMode.private(),
+      sdk.AccountStorageMode.private(),
       false,
       "DAG",
       8,
-      BigInt(10000000),
-      window.AuthScheme.AuthRpoFalcon512
+      sdk.u64(10000000),
+      sdk.AuthScheme.AuthRpoFalcon512
     );
 
     const mintTransactionRequest = await client.newMintTransactionRequest(
       account.id(),
       faucetAccount.id(),
-      window.NoteType.Public,
-      BigInt(1000)
+      sdk.NoteType.Public,
+      sdk.u64(1000)
     );
 
     const mintTransactionId = await client.submitNewTransaction(
@@ -36,11 +37,9 @@ const mockChainTest = async (testingPage: Page) => {
     await client.syncState();
 
     const [mintTransactionRecord] = await client.getTransactions(
-      window.TransactionFilter.ids([mintTransactionId])
+      sdk.TransactionFilter.ids([mintTransactionId])
     );
-    if (!mintTransactionRecord) {
-      throw new Error("Mint transaction record not found");
-    }
+    expect(mintTransactionRecord).toBeDefined();
 
     const mintedNoteId = mintTransactionRecord
       .outputNotes()
@@ -49,9 +48,7 @@ const mockChainTest = async (testingPage: Page) => {
       .toString();
 
     const mintedNoteRecord = await client.getInputNote(mintedNoteId);
-    if (!mintedNoteRecord) {
-      throw new Error(`Note with ID ${mintedNoteId} not found`);
-    }
+    expect(mintedNoteRecord).toBeDefined();
 
     const mintedNote = mintedNoteRecord.toNote();
     const consumeTransactionRequest = client.newConsumeTransactionRequest([
@@ -63,18 +60,11 @@ const mockChainTest = async (testingPage: Page) => {
 
     const changedTargetAccount = await client.getAccount(account.id());
 
-    return changedTargetAccount
+    const finalBalance = changedTargetAccount
       .vault()
       .getBalance(faucetAccount.id())
       .toString();
-  });
-};
 
-test.describe("mock chain tests", () => {
-  test("send transaction with mock chain completes successfully", async ({
-    page,
-  }) => {
-    let finalBalance = await mockChainTest(page);
     expect(finalBalance).toEqual("1000");
   });
 });
