@@ -507,6 +507,7 @@ pub(crate) fn apply_note_updates_tx(
     let mut input_updates = Vec::new();
     let mut scripts: BTreeMap<String, Vec<u8>> = BTreeMap::new();
 
+    // updated_input_notes() only yields Insert and Update variants.
     for input_note in note_updates.updated_input_notes() {
         match input_note.update_type() {
             NoteUpdateType::Insert => {
@@ -529,6 +530,7 @@ pub(crate) fn apply_note_updates_tx(
     let mut output_inserts = Vec::new();
     let mut output_updates = Vec::new();
 
+    // updated_output_notes() only yields Insert and Update variants.
     for output_note in note_updates.updated_output_notes() {
         match output_note.update_type() {
             NoteUpdateType::Insert => {
@@ -577,8 +579,6 @@ fn batch_upsert_scripts(
 }
 
 /// Batch-insert new input notes using multi-row INSERT OR REPLACE.
-/// Multi-row inserts reduce per-statement overhead and show faster insertion times than
-/// individual inserts.
 fn batch_insert_input_notes(
     tx: &Transaction,
     notes: &[SerializedInputNoteData],
@@ -637,32 +637,7 @@ fn batch_update_input_note_states(
     Ok(())
 }
 
-/// Batch-update output note states using a prepared cached statement.
-fn batch_update_output_note_states(
-    tx: &Transaction,
-    updates: &[SerializedNoteStateUpdate],
-) -> Result<(), StoreError> {
-    if updates.is_empty() {
-        return Ok(());
-    }
-
-    let mut stmt = tx
-        .prepare_cached(
-            "UPDATE `output_notes` SET state_discriminant = ?, state = ? WHERE note_id = ?",
-        )
-        .into_store_error()?;
-
-    for update in updates {
-        stmt.execute(params![update.state_discriminant, update.state, update.id])
-            .into_store_error()?;
-    }
-
-    Ok(())
-}
-
 /// Batch-insert new output notes using multi-row INSERT OR REPLACE.
-/// Multi-row inserts reduce per-statement overhead and show faster insertion times than
-/// individual inserts.
 fn batch_insert_output_notes(
     tx: &Transaction,
     notes: &[SerializedOutputNoteData],
@@ -694,6 +669,29 @@ fn batch_insert_output_notes(
             param_values.push(Value::Blob(note.state.clone()));
         }
         tx.execute(&query, params_from_iter(param_values)).into_store_error()?;
+    }
+
+    Ok(())
+}
+
+/// Batch-update output note states using a prepared cached statement.
+fn batch_update_output_note_states(
+    tx: &Transaction,
+    updates: &[SerializedNoteStateUpdate],
+) -> Result<(), StoreError> {
+    if updates.is_empty() {
+        return Ok(());
+    }
+
+    let mut stmt = tx
+        .prepare_cached(
+            "UPDATE `output_notes` SET state_discriminant = ?, state = ? WHERE note_id = ?",
+        )
+        .into_store_error()?;
+
+    for update in updates {
+        stmt.execute(params![update.state_discriminant, update.state, update.id])
+            .into_store_error()?;
     }
 
     Ok(())
