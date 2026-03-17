@@ -87,7 +87,7 @@ fn handle_impl(outer_attr: &TokenStream2, mut item: ItemImpl) -> TokenStream2 {
             ImplItem::Fn(mut method) => {
                 // Strip #[js_export(...)] from the method — we'll re-emit it.
                 let method_attr = extract_js_export_attr(&mut method);
-                let method_attr_tokens = method_attr.map(TokenStream2::from).unwrap_or_default();
+                let method_attr_tokens = method_attr.unwrap_or_default();
 
                 if has_jsu64(&method) {
                     // Tag the method with its js_export args for later.

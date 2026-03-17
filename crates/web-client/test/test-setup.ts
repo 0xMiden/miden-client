@@ -226,20 +226,18 @@ export const test = base.extend<{
   client: any;
   sdk: any;
 }>({
-  client: async ({ page }, use, testInfo) => {
+  client: async ({}, use, testInfo) => {
     const isNode = testInfo.project.name === "nodejs";
 
     if (isNode) {
-      // For mock chain tests, create a mock client
-      // For integration tests, create a real client
-      // TODO: distinguish based on test tags or configuration
       const { client } = await createNodeMockClient();
       await use(client);
     } else {
-      // Browser: use the page.evaluate-based proxy
-      // For now, fall back to the old forEachTest pattern
-      // TODO: implement browser client proxy properly
-      await use(createBrowserClientProxy(page));
+      // Browser tests don't use this fixture — they use the old
+      // forEachTest pattern from playwright.global.setup.ts.
+      // This branch exists only to avoid errors if a ported test
+      // accidentally runs on the browser project.
+      await use(null);
     }
   },
 
