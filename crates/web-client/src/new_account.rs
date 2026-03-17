@@ -15,7 +15,7 @@ use super::models::auth::AuthScheme;
 use super::models::auth_secret_key::AuthSecretKey as WebAuthSecretKey;
 use crate::helpers::generate_wallet;
 use crate::models::account_id::AccountId;
-use crate::platform::{JsErr, from_str_err, maybe_wrap_send};
+use crate::platform::{JsErr, from_str_err, js_u64_to_u64, maybe_wrap_send};
 use crate::{WebClient, js_error_with_context};
 
 impl WebClient {
@@ -97,6 +97,7 @@ impl WebClient {
         };
 
         let symbol = TokenSymbol::new(&token_symbol).map_err(|e| from_str_err(&e.to_string()))?;
+        let max_supply = js_u64_to_u64(max_supply);
         let max_supply = Felt::try_from(max_supply.to_le_bytes().as_slice())
             .expect("u64 can be safely converted to a field element");
 

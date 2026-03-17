@@ -5,7 +5,7 @@ use miden_client::asset::{Asset as NativeAsset, FungibleAsset as FungibleAssetNa
 
 use super::account_id::AccountId;
 use super::word::Word;
-use crate::platform::JsU64;
+use crate::platform::{JsU64, js_u64_to_u64};
 
 /// A fungible asset.
 ///
@@ -20,7 +20,7 @@ impl FungibleAsset {
     /// Creates a fungible asset for the given faucet and amount.
     #[js_export(constructor)]
     pub fn new(faucet_id: &AccountId, amount: JsU64) -> FungibleAsset {
-        FungibleAsset::new_inner(faucet_id, amount)
+        FungibleAsset::new_inner(faucet_id, js_u64_to_u64(amount))
     }
 
     /// Returns the amount of fungible units.

@@ -9,7 +9,7 @@ use miden_client::transaction::{
     TransactionProver as TransactionProverTrait,
 };
 
-use crate::platform::{JsErr, from_str_err};
+use crate::platform::{JsErr, from_str_err, js_u64_to_u64};
 
 /// Wrapper over local or remote transaction proving backends.
 #[js_export]
@@ -29,7 +29,7 @@ impl TransactionProver {
     /// - `timeout_ms`: The timeout in milliseconds for the remote prover.
     #[js_export(js_name = "newRemoteProver")]
     pub fn new_remote_prover(endpoint: String, timeout_ms: Option<JsU64>) -> TransactionProver {
-        TransactionProver::new_remote_prover_inner(endpoint, timeout_ms)
+        TransactionProver::new_remote_prover_inner(endpoint, timeout_ms.map(js_u64_to_u64))
     }
 
     /// Creates a prover that uses the local proving backend.

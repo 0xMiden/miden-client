@@ -117,6 +117,16 @@ pub type JsU64 = u64;
 #[cfg(feature = "nodejs")]
 pub type JsU64 = f64;
 
+/// Converts a [`JsU64`] to `u64`.
+///
+/// On browser this is a no-op (`JsU64` is already `u64`).
+/// On Node.js this casts `f64` → `u64`.
+#[inline]
+#[allow(clippy::unnecessary_cast)]
+pub fn js_u64_to_u64(val: JsU64) -> u64 {
+    val as u64
+}
+
 // FUTURE SEND WRAPPER
 // ================================================================================================
 

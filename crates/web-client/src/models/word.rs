@@ -2,7 +2,7 @@ use js_export_macro::js_export;
 use miden_client::{Felt as NativeFelt, Word as NativeWord};
 
 use super::felt::Felt;
-use crate::platform::{JsBytes, JsErr, JsU64, from_str_err};
+use crate::platform::{JsBytes, JsErr, JsU64, from_str_err, js_u64_to_u64};
 use crate::utils::{deserialize_from_bytes, serialize_to_bytes};
 
 #[derive(Clone)]
@@ -14,7 +14,12 @@ impl Word {
     /// Creates a word from four numeric values.
     #[js_export(constructor)]
     pub fn new(u64_vec: Vec<JsU64>) -> Word {
-        let fixed_array_u64: [u64; 4] = u64_vec.try_into().unwrap();
+        let fixed_array_u64: [u64; 4] = u64_vec
+            .iter()
+            .map(|&v| js_u64_to_u64(v))
+            .collect::<Vec<u64>>()
+            .try_into()
+            .unwrap();
         let native_felt_vec: [NativeFelt; 4] = fixed_array_u64
             .iter()
             .map(|&v| NativeFelt::new(v))

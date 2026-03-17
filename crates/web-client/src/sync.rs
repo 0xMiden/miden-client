@@ -5,7 +5,7 @@ use miden_client::note::SwapNote;
 use crate::models::account_id::AccountId;
 use crate::models::sync_summary::SyncSummary;
 use crate::models::{NoteTag, NoteType};
-use crate::platform::{JsErr, from_str_err, maybe_wrap_send};
+use crate::platform::{JsErr, from_str_err, js_u64_to_u64, maybe_wrap_send};
 use crate::{WebClient, js_error_with_context};
 
 #[js_export]
@@ -18,6 +18,7 @@ impl WebClient {
         requested_asset_faucet_id: &AccountId,
         requested_asset_amount: JsU64,
     ) -> Result<NoteTag, JsErr> {
+        let offered_asset_amount = js_u64_to_u64(offered_asset_amount);
         let offered_fungible_asset: NativeAsset =
             NativeFungibleAsset::new(offered_asset_faucet_id.into(), offered_asset_amount)
                 .map_err(|err| {
@@ -25,6 +26,7 @@ impl WebClient {
                 })?
                 .into();
 
+        let requested_asset_amount = js_u64_to_u64(requested_asset_amount);
         let requested_fungible_asset: NativeAsset =
             NativeFungibleAsset::new(requested_asset_faucet_id.into(), requested_asset_amount)
                 .map_err(|err| {
