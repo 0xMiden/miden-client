@@ -2,7 +2,6 @@ use js_export_macro::js_export;
 use miden_client::crypto::MerklePath as NativeMerklePath;
 
 use super::word::Word;
-use crate::platform::JsU64;
 
 /// Represents a Merkle path.
 #[derive(Clone)]
@@ -14,12 +13,12 @@ impl MerklePath {
     /// Computes the root given a leaf index and value.
     #[js_export(js_name = "computeRoot")]
     pub fn compute_root(&self, index: JsU64, node: &Word) -> Word {
-        self.0.compute_root(index as u64, node.clone().into()).unwrap().into()
+        self.0.compute_root(index, node.clone().into()).unwrap().into()
     }
 
     /// Verifies the path against a root.
     pub fn verify(&self, index: JsU64, node: &Word, root: &Word) -> bool {
-        self.0.verify(index as u64, node.clone().into(), &root.clone().into()).is_ok()
+        self.0.verify(index, node.clone().into(), &root.clone().into()).is_ok()
     }
 
     /// Returns the depth of the path.

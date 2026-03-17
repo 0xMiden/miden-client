@@ -23,7 +23,7 @@ use crate::models::transaction_request::TransactionRequest;
 use crate::models::transaction_result::TransactionResult;
 use crate::models::transaction_store_update::TransactionStoreUpdate;
 use crate::models::transaction_summary::TransactionSummary;
-use crate::platform::{JsErr, JsU64, from_str_err, maybe_wrap_send};
+use crate::platform::{JsErr, from_str_err, maybe_wrap_send};
 use crate::{WebClient, js_error_with_context};
 
 #[js_export]
@@ -36,7 +36,6 @@ impl WebClient {
         note_type: NoteType,
         amount: JsU64,
     ) -> Result<TransactionRequest, JsErr> {
-        let amount = amount as u64;
         let fungible_asset = FungibleAsset::new(faucet_id.into(), amount)
             .map_err(|err| js_error_with_context(err, "failed to create fungible asset"))?;
 
@@ -72,7 +71,6 @@ impl WebClient {
         recall_height: Option<u32>,
         timelock_height: Option<u32>,
     ) -> Result<TransactionRequest, JsErr> {
-        let amount = amount as u64;
         let mut guard = self.get_mut_inner().await;
         let client = guard.as_mut().ok_or_else(|| {
             from_str_err("Client not initialized while generating transaction request")
@@ -117,9 +115,6 @@ impl WebClient {
         note_type: NoteType,
         payback_note_type: NoteType,
     ) -> Result<TransactionRequest, JsErr> {
-        let offered_asset_amount = offered_asset_amount as u64;
-        let requested_asset_amount = requested_asset_amount as u64;
-
         let offered_fungible_asset =
             FungibleAsset::new(offered_asset_faucet_id.into(), offered_asset_amount)
                 .map_err(|err| {

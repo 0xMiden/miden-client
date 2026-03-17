@@ -26,21 +26,6 @@ pub struct FetchedNote {
 
 // Internal methods accessible from Rust code (not processed by napi/wasm_bindgen).
 impl FetchedNote {
-    /// The unique identifier of the note (internal Rust access).
-    pub(crate) fn note_id(&self) -> NoteId {
-        self.header.id()
-    }
-
-    /// The note's inclusion proof (internal Rust access).
-    pub(crate) fn inclusion_proof(&self) -> NoteInclusionProof {
-        self.inclusion_proof.clone()
-    }
-
-    /// Returns whether the note is private, encrypted, or public (internal Rust access).
-    pub(crate) fn note_type(&self) -> NoteType {
-        self.header.metadata().note_type()
-    }
-
     /// The full note data (internal Rust access).
     pub(crate) fn note(&self) -> Option<Note> {
         self.note.clone()

@@ -19,7 +19,7 @@ impl TransactionStatus {
     pub fn committed(block_num: u32, commit_timestamp: JsU64) -> TransactionStatus {
         TransactionStatus(NativeTransactionStatus::Committed {
             block_number: block_num.into(),
-            commit_timestamp: commit_timestamp as u64,
+            commit_timestamp,
         })
     }
 

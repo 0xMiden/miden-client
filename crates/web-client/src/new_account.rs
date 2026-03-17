@@ -15,7 +15,7 @@ use super::models::auth::AuthScheme;
 use super::models::auth_secret_key::AuthSecretKey as WebAuthSecretKey;
 use crate::helpers::generate_wallet;
 use crate::models::account_id::AccountId;
-use crate::platform::{JsErr, JsU64, from_str_err, maybe_wrap_send};
+use crate::platform::{JsErr, from_str_err, maybe_wrap_send};
 use crate::{WebClient, js_error_with_context};
 
 impl WebClient {
@@ -55,7 +55,6 @@ impl WebClient {
         max_supply: JsU64,
         auth_scheme: AuthScheme,
     ) -> Result<Account, JsErr> {
-        let max_supply = max_supply as u64;
         self.maybe_sync_before_account_creation().await;
         if non_fungible {
             return Err(from_str_err("Non-fungible faucets are not supported yet"));

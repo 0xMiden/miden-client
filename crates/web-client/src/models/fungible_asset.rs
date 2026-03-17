@@ -20,7 +20,7 @@ impl FungibleAsset {
     /// Creates a fungible asset for the given faucet and amount.
     #[js_export(constructor)]
     pub fn new(faucet_id: &AccountId, amount: JsU64) -> FungibleAsset {
-        FungibleAsset::new_inner(faucet_id, amount as u64)
+        FungibleAsset::new_inner(faucet_id, amount)
     }
 
     /// Returns the amount of fungible units.

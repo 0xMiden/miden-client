@@ -14,8 +14,7 @@ impl Word {
     /// Creates a word from four numeric values.
     #[js_export(constructor)]
     pub fn new(u64_vec: Vec<JsU64>) -> Word {
-        let fixed_array_u64: [u64; 4] =
-            u64_vec.iter().map(|v| *v as u64).collect::<Vec<u64>>().try_into().unwrap();
+        let fixed_array_u64: [u64; 4] = u64_vec.try_into().unwrap();
         let native_felt_vec: [NativeFelt; 4] = fixed_array_u64
             .iter()
             .map(|&v| NativeFelt::new(v))

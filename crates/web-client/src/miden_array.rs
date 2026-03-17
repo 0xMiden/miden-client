@@ -33,7 +33,7 @@ macro_rules! impl_napi_from_value {
     ($t:ty) => {};
 }
 
-/// Browser variant: Generates JS-exportable array wrapper types using wasm_bindgen.
+/// Browser variant: Generates JS-exportable array wrapper types using `wasm_bindgen`.
 #[cfg(feature = "browser")]
 macro_rules! declare_js_miden_arrays {
     ($(($miden_type_name:path) -> $miden_type_array_name:ident),+ $(,)?) => {

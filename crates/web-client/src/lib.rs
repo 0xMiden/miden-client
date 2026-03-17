@@ -1,3 +1,8 @@
+// All `#[js_export]` methods must accept arguments by value (not by reference) because
+// wasm_bindgen and napi-rs require owned parameters for JS interop. Suppress the lint
+// crate-wide rather than annotating every individual function.
+#![allow(clippy::needless_pass_by_value)]
+
 extern crate alloc;
 
 #[cfg(all(feature = "browser", feature = "nodejs"))]

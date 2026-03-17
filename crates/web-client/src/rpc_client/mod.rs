@@ -25,7 +25,7 @@ use crate::models::note_script::NoteScript;
 use crate::models::note_sync_info::NoteSyncInfo;
 use crate::models::note_tag::NoteTag;
 use crate::models::word::Word;
-use crate::platform::{JsErr, from_str_err};
+use crate::platform::JsErr;
 
 mod note;
 

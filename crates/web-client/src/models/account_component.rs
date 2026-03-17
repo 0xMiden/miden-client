@@ -191,7 +191,7 @@ impl AccountComponent {
         let native_library = native_package.unwrap_library().as_ref().clone();
         let items: Vec<StorageSlot> = storage_slots.into();
         let native_slots: Vec<NativeStorageSlot> =
-            items.into_iter().map(|storage_slot| storage_slot.into()).collect();
+            items.into_iter().map(std::convert::Into::into).collect();
 
         NativeAccountComponent::new(
             native_library,

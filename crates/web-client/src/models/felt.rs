@@ -14,7 +14,7 @@ impl Felt {
     /// Creates a new field element.
     #[js_export(constructor)]
     pub fn new(value: JsU64) -> Felt {
-        Felt(NativeFelt::new(value as u64))
+        Felt(NativeFelt::new(value))
     }
 
     /// Returns the integer representation of the field element.
@@ -61,7 +61,7 @@ impl From<&Felt> for NativeFelt {
 // CONVERSIONS
 // ================================================================================================
 
-/// Converts a FeltArray reference to a Vec of native Felt values.
+/// Converts a `FeltArray` reference to a Vec of native Felt values.
 pub(crate) fn felt_array_to_native_vec(felt_array: &FeltArray) -> Vec<NativeFelt> {
     Vec::from(felt_array).into_iter().map(Into::into).collect()
 }

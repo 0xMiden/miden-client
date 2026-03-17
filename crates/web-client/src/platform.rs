@@ -73,6 +73,7 @@ impl<T> AsyncCell<T> {
         Self(std::cell::RefCell::new(val))
     }
 
+    #[allow(clippy::unused_async)]
     pub async fn lock(&self) -> std::cell::RefMut<'_, T> {
         self.0.borrow_mut()
     }
@@ -108,7 +109,7 @@ unsafe impl<T> Sync for SendWrapper<T> {}
 
 /// Platform-specific unsigned 64-bit integer type for JS interop.
 ///
-/// - Browser (wasm_bindgen): `u64` maps to JavaScript `BigInt`.
+/// - Browser (`wasm_bindgen)`: `u64` maps to JavaScript `BigInt`.
 /// - Node.js (napi-rs): `f64` maps to JavaScript `number` (safe for values up to 2^53).
 #[cfg(feature = "browser")]
 pub type JsU64 = u64;
