@@ -97,9 +97,14 @@ export default defineConfig({
 
   /* Run your local dev server before starting the tests */
   // FIXME: Modularise test server constants (localhost, port)
-  webServer: {
-    command: "npx http-server ./dist -p 8080",
-    url: "http://127.0.0.1:8080",
-    reuseExistingServer: true,
-  },
+  // Skip webServer when running only Node.js tests (no browser/dist needed)
+  ...(process.env.SKIP_WEB_SERVER
+    ? {}
+    : {
+        webServer: {
+          command: "npx http-server ./dist -p 8080",
+          url: "http://127.0.0.1:8080",
+          reuseExistingServer: true,
+        },
+      }),
 });

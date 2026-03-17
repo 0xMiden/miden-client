@@ -13,31 +13,31 @@ rust-version.workspace = true
 version.workspace      = true
 
 [package.metadata.cargo-machete]
-ignored = ["wasm-bindgen-futures"]
+ignored = ["wasm-bindgen-futures", "web-sys"]
 
 [lib]
 crate-type = ["cdylib"]
 
 [features]
-default = ["browser"]
 browser = [
+  "dep:console_error_panic_hook",
   "dep:idxdb-store",
-  "dep:wasm-bindgen",
-  "dep:wasm-bindgen-futures",
   "dep:js-sys",
   "dep:serde-wasm-bindgen",
-  "dep:console_error_panic_hook",
   "dep:tracing",
   "dep:tracing-subscriber",
   "dep:tracing-wasm",
+  "dep:wasm-bindgen",
+  "dep:wasm-bindgen-futures",
   "dep:web-sys",
   "miden-client/tonic",
 ]
+default = ["browser"]
 nodejs = [
-  "dep:napi",
-  "dep:napi-derive",
-  "dep:napi-build",
   "dep:miden-client-sqlite-store",
+  "dep:napi",
+  "dep:napi-build",
+  "dep:napi-derive",
   "dep:tokio",
   "miden-client/std",
   "miden-client/tonic",
@@ -54,36 +54,34 @@ miden-standards = { workspace = true }
 js-export-macro = { path = "../js-export-macro" }
 
 # Common external dependencies
-async-trait = { workspace = true }
-hex = { version = "0.4" }
-rand = { workspace = true }
-serde = { features = ["derive"], workspace = true }
+async-trait         = { workspace = true }
+hex                 = { version = "0.4" }
+rand                = { workspace = true }
+serde               = { features = ["derive"], workspace = true }
 thiserror.workspace = true
 
 # Browser-only dependencies (wasm_bindgen)
-idxdb-store             = { workspace = true, optional = true }
-console_error_panic_hook = { version = "0.1.7", optional = true }
-js-sys                  = { version = "0.3", optional = true }
-serde-wasm-bindgen      = { version = "0.6", optional = true }
-tracing                 = { workspace = true, optional = true }
-tracing-subscriber      = { default-features = false, features = ["registry"], version = "0.3", optional = true }
-tracing-wasm            = { version = "0.2", optional = true }
-wasm-bindgen = { features = [
-  "serde-serialize",
-], version = "=0.2.108", optional = true }
-wasm-bindgen-futures    = { version = "0.4", optional = true }
+console_error_panic_hook = { optional = true, version = "0.1.7" }
+idxdb-store              = { optional = true, workspace = true }
+js-sys                   = { optional = true, version = "0.3" }
+serde-wasm-bindgen       = { optional = true, version = "0.6" }
+tracing                  = { optional = true, workspace = true }
+tracing-subscriber       = { default-features = false, features = ["registry"], optional = true, version = "0.3" }
+tracing-wasm             = { optional = true, version = "0.2" }
+wasm-bindgen             = { features = ["serde-serialize"], optional = true, version = "=0.2.108" }
+wasm-bindgen-futures     = { optional = true, version = "0.4" }
 
 # Node.js-only dependencies (napi-rs)
-napi        = { workspace = true, features = ["tokio_rt"], optional = true }
-napi-derive = { workspace = true, optional = true }
-miden-client-sqlite-store = { workspace = true, optional = true }
-tokio       = { workspace = true, optional = true }
+miden-client-sqlite-store = { optional = true, workspace = true }
+napi                      = { features = ["tokio_rt"], optional = true, workspace = true }
+napi-derive               = { optional = true, workspace = true }
+tokio                     = { optional = true, workspace = true }
 
 # web-sys is a browser-only dependency used for console logging
-web-sys = { features = ["console"], version = "0.3", optional = true }
+web-sys = { features = ["console"], optional = true, version = "0.3" }
 
 [build-dependencies]
-napi-build = { workspace = true, optional = true }
+napi-build = { optional = true, workspace = true }
 
 [lints]
 workspace = true

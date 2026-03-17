@@ -147,7 +147,7 @@ integration-test-web-client-webkit: ## Run integration tests for the web client 
 .PHONY: test-web-client-nodejs
 test-web-client-nodejs: ## Run web client tests on Node.js (mock chain, no browser needed)
 	cargo build -p miden-client-web --no-default-features --features nodejs,testing --release
-	cd ./crates/web-client && yarn install && npx playwright test --project=nodejs --workers=1
+	cd ./crates/web-client && yarn install && SKIP_WEB_SERVER=1 npx playwright test --project=nodejs --workers=1
 
 .PHONY: integration-test-remote-prover-web-client
 integration-test-remote-prover-web-client: ## Run integration tests for the web client with remote prover
