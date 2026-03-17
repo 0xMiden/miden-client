@@ -1,72 +1,15 @@
 ---
-title: Typescript
+title: TypeScript
 ---
 
-## Miden Web SDK (@miden-sdk/miden-sdk)
+# Overview
 
-The `@miden-sdk/miden-sdk` is a browser-focused toolkit designed to enable full-featured interaction with the Miden blockchain directly from web applications. It wraps core functionality provided by the Miden Rust client and compiles to WebAssembly (WASM) with TypeScript bindings, making it ideal for use in wallets, dApps, or browser-based dev tools.
+The Miden Web SDK (`@miden-sdk/ts-sdk`) is a browser-focused toolkit for interacting with the Miden blockchain from web applications. It wraps core functionality from the Miden Rust client and compiles to WebAssembly with TypeScript bindings, making it ideal for wallets, dApps, and browser-based developer tools.
 
-## Capabilities
-
-The SDK provides APIs to:
-
-- Interact with the Miden chain (e.g., syncing accounts, submitting transactions)
-- Build and manage Miden transactions
-- Execute programs in the Miden Virtual Machine (VM)
-- Generate zero-knowledge proofs via the Miden Prover
-- Support delegated proving setups
-- Run entirely in the browser using WASM and web workers
-
-## Architecture
-
-The SDK is built from the `web-client` crate, which:
-
-- Is implemented in Rust and compiled to WebAssembly
-- Uses `wasm-bindgen` to expose JavaScript-compatible bindings
-- Depends on the rust-client crate, which contains core logic for blockchain interaction
-
-A custom `rollup.config.js` bundles the WASM module, JS bindings, and web worker into a distributable NPM package.
-
-## Installation & Usage
-
-The SDK is published to NPM and can be installed via:
-
-```
-npm install @miden-sdk/miden-sdk
-# or
-yarn add @miden-sdk/miden-sdk
-```
-
-See the [README](https://github.com/0xMiden/miden-client/blob/main/crates/web-client/README) for full installation instructions and some usage instructions, including code examples for wallet creation, transaction execution, and syncing state.
-
-## API Reference
-
-For complete API documentation, see the [TypeDoc API Reference](https://github.com/0xMiden/miden-client/blob/main/docs/typedoc/web-client/README.md).
-
-## Resource Management
-
-The MidenClient uses a dedicated [Web Worker](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API) to offload computationally intensive operations like wallet creation, transaction proving, and state synchronization. This keeps the main thread responsive.
-
-When building applications that create multiple MidenClient instances (e.g., multi-wallet apps or when switching between networks), it's important to properly clean up instances you no longer need:
-
-```typescript
-import { MidenClient } from "@miden-sdk/miden-sdk";
-
-// Create client
-const client = await MidenClient.create({ rpcUrl });
-
-// ... use the client ...
-
-// Clean up when done to free the worker thread
-client.terminate();
-
-// Or use explicit resource management (TC39 proposal):
-{
-  using client = await MidenClient.create();
-  // ... client.terminate() called automatically at end of scope
-}
-```
-
-Each active MidenClient holds a Web Worker thread. Calling `terminate()` releases this resource. Failure to terminate unused clients may lead to memory leaks in long-running applications.
-
-**Note:** After calling `terminate()`, all subsequent method calls will throw `Error("Client terminated")`.
+- [Installation](./install.md) — install the SDK via NPM
+- [Getting started](./get-started/index.md) — step-by-step tutorials
+- [Features](./features.md) — what the SDK can do
+- [Design](./design.md) — architecture and components
+- [Library reference](./library/index.md) — detailed API usage by topic
+- [Examples](./examples.md) — practical code examples
+- [API reference](./api-docs.md) — TypeDoc API documentation

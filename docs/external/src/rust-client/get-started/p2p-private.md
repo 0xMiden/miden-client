@@ -1,128 +1,144 @@
 ---
 title: Private peer-to-peer transfer
-sidebar_position: 3
+sidebar_position: 4
 ---
 
-In this section, we show you how to make private transactions and send funds to another account using the Miden client.
+In this tutorial, you'll transfer assets between two accounts using private notes and the Rust library API.
 
-:::info Important: Prerequisite steps
-
-- You should have already followed the [prerequisite steps](index.md#prerequisites) and [create account](create-account-use-faucet) documents.
-- You should _not_ have reset the state of your local client.
-  :::
+:::info Prerequisite
+Complete the [Create account](./create-account-use-faucet.md) tutorial first. You should have a funded account (Account A) and a working client.
+:::
 
 ## Create a second account
 
-:::tip
-Remember to use the [Miden client documentation](https://0xMiden.github.io/miden-docs/miden-client/cli-reference.html) for clarifications.
-:::
+Create a private account (Account B) within the same client:
 
-1. Create a second account to send funds with. Previously, we created a type `mutable` account (`Account A`). Now, create another `mutable` (`Account B`) using the following command:
+```rust
+use miden_client::account::{AccountBuilder, AccountStorageMode, AccountType};
+use miden_client::auth::AuthSecretKey;
+use miden_client::crypto::SecretKey;
+use miden_objects::account::auth::AuthRpoFalcon512;
+use miden_objects::account::component::BasicWallet;
 
-   ```sh
-   miden-client new-wallet --mutable
-   ```
+let key_pair = SecretKey::with_rng(client.rng());
+let init_seed: [u8; 32] = rand::random();
 
-2. List and view the newly created accounts with the following command:
+let account_b = AccountBuilder::new(init_seed)
+    .account_type(AccountType::RegularAccountImmutableCode)
+    .storage_mode(AccountStorageMode::Private)
+    .with_auth_component(AuthRpoFalcon512::new(key_pair.public_key()))
+    .with_component(BasicWallet)
+    .build()?;
 
-   ```sh
-   miden-client account -l
-   ```
+let keystore = client.keystore();
+keystore.add_key(&AuthSecretKey::RpoFalcon512(key_pair), account_b.id()).await?;
+client.add_account(&account_b, false).await?;
 
-3. You should see two accounts:
+println!("Account B created: {:?}", account_b.id());
+```
 
-  <!-- ![Result of listing miden accounts](../img/get-started/two-accounts.png) -->
+## Send assets with a private note
 
-## Transfer assets between accounts
+Build and submit a pay-to-id transaction from Account A to Account B using a private note:
 
-1. Now we can transfer some of the tokens we received from the faucet to our second `Account B`.
+```rust
+use miden_client::transaction::{TransactionRequestBuilder, PaymentNoteDescription};
+use miden_objects::note::NoteType;
+use miden_objects::asset::FungibleAsset;
+use miden_objects::account::AccountId;
 
-   To do this, run:
+// Define the asset to send
+let faucet_id = AccountId::from_hex("0x<your-faucet-id>")?;
+let asset = FungibleAsset::new(faucet_id, 50)?.into();
 
-   ```sh
-   miden-client send --sender <regular-account-id-A> --target <regular-account-id-B> --asset 50::<faucet-account-id> --note-type private
-   ```
+// Build the payment request
+let payment = PaymentNoteDescription::new(
+    vec![asset],
+    account_a_id,   // sender
+    account_b.id(), // target
+);
 
-   :::note
-   The faucet account ID can be found on the [Miden faucet website](https://testnet.miden.io/) under the title **Miden faucet**.
-   :::
+let tx_request = TransactionRequestBuilder::new().build_pay_to_id(
+    payment,
+    None,
+    NoteType::Private, // Private note — details not publicly visible
+    client.rng(),
+)?;
 
-   This generates a private Pay-to-ID (`P2ID`) note containing `50` assets, transferred from one account to the other.
+// Execute and submit
+let tx_result = client.new_transaction(account_a_id, tx_request).await?;
+client.submit_transaction(tx_result).await?;
 
-2. First, sync the accounts.
+println!("Private P2ID note sent!");
+```
 
-   ```sh
-   miden-client sync
-   ```
+## Consume the private note
 
-3. Get the second note id.
+Since both accounts are in the same client, Account B can discover the note by syncing:
 
-   ```sh
-   miden-client notes
-   ```
+```rust
+// Sync to update note state
+client.sync_state().await?;
 
-4. Have the second account consume the note.
+// Get consumable notes for Account B
+let consumable = client.get_consumable_notes(Some(account_b.id())).await?;
+let note_ids: Vec<_> = consumable.iter().map(|n| n.note.id()).collect();
 
-   ```sh
-   miden-client consume-notes --account <regular-account-ID-B> <input-note-id>
-   ```
+if !note_ids.is_empty() {
+    let tx_request = TransactionRequestBuilder::new()
+        .build_consume_notes(account_b.id(), note_ids)?;
 
-   :::tip
-   It's possible to use a short version of the note id: 7 characters after the `0x` is sufficient, e.g. `0x6ae613a`.
-   :::
+    let tx_result = client.new_transaction(account_b.id(), tx_request).await?;
+    client.submit_transaction(tx_result).await?;
 
-   You should now see both accounts containing faucet assets with amounts transferred from `Account A` to `Account B`.
+    println!("Notes consumed by Account B!");
+}
+```
 
-5. Check the second account:
+## Verify
 
-   ```sh
-   miden-client account --show <regular-account-ID-B>
-   ```
+Sync and check both accounts:
 
-   <!-- ![Result of listing miden accounts](../img/get-started/account-b.png) -->
+```rust
+client.sync_state().await?;
 
-6. Check the original account:
+let (acct_a, _) = client.get_account(account_a_id).await?;
+let (acct_b, _) = client.get_account(account_b.id()).await?;
 
-   ```sh
-   miden-client account --show <regular-account-ID-A>
-   ```
-
-   <!-- ![Result of listing miden accounts](../img/get-started/account-a.png) -->
-
-Wanna do more? [Sending public notes](p2p-public)
+println!("Account A vault: {:?}", acct_a.vault());
+println!("Account B vault: {:?}", acct_b.vault());
+```
 
 ## Using the note transport network
 
-The steps above assume that the client owns both accounts. To exchange notes with other users, the note transport network can be used.
-For this the sender (`Account A`) will need the address (bech32 string) of the recipient (`Account B`).
-After creating the note (step 1 above), get the created note ID with `miden-client notes --list`. Then send that note through the note transport network,
-```sh
-miden-client notes --send <note-id> <address-B>
+When accounts belong to different users (separate clients), use the note transport network to exchange private notes:
+
+```rust
+// Sender: after creating the note, get the output note ID
+let output_notes = client.get_output_notes().await?;
+let note_id = output_notes.last().unwrap().id();
+
+// Send the note via the transport network (requires recipient's bech32 address)
+client.send_note_via_transport(note_id, recipient_address).await?;
+
+// Recipient: fetch notes from the transport network
+client.fetch_notes_from_transport().await?;
+
+// Then sync and consume as normal
+client.sync_state().await?;
 ```
-Then the recipient can fetch that note using `miden-client sync`, or more specifically,
-```sh
-miden-client notes --fetch
-```
-The note will then be available to be consumed.
 
 :::note
-
-The client will fetch notes for tracked note tags.
-By default, note tags are derived from the recipient's account ID. However these can also be random to increase privacy.
-In this case, to track a specific tag, run `miden-client tags --add <tag>`.
-
+The client fetches notes for tracked note tags. By default, tags are derived from the recipient's account ID. For increased privacy, use random tags and track them explicitly.
 :::
 
 ## Congratulations!
 
-You have successfully configured and used the Miden client to interact with a Miden rollup and faucet.
+You've completed all the getting started tutorials. You can now:
 
-You have performed basic Miden rollup operations like submitting proofs of transactions, generating and consuming notes.
+- Create accounts (private and public)
+- Execute transactions with ZK proofs
+- Transfer assets via public and private notes
+- Use the note transport network for multi-user scenarios
 
-For more information on the Miden client, refer to the [Miden client documentation](https://0xMiden.github.io/miden-docs/miden-client/index.html).
-
-## Clear data
-
-All state is maintained in `store.sqlite3`, located in the directory defined in the `miden-client.toml` file.
-
-To clear all state, delete this file. It recreates on any command execution.
+For more advanced patterns, see the [Library reference](../library/index.md) and [Examples](../examples.md).

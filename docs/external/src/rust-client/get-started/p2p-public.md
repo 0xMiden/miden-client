@@ -1,97 +1,111 @@
 ---
 title: Peer-to-peer transfer
-sidebar_position: 2
+sidebar_position: 3
 ---
 
-In this section, we show you how to execute transactions and send funds to another account using the Miden client and [public notes](https://0xMiden.github.io/miden-docs/miden-base/architecture/notes.html#note-storage-mode).
+In this tutorial, you'll transfer assets between two accounts using public notes and the Rust library API.
 
-:::info Important: Prerequisite steps
-- You should have already followed the [prerequisite steps](index.md#prerequisites) and [create account](create-account-use-faucet) documents.
-- You should have *not* reset the state of your local client.
+:::info Prerequisite
+Complete the [Create account](./create-account-use-faucet.md) tutorial first. You should have a funded account (Account A) and a working client.
 :::
 
-## Create a second client
+## Create a second account
 
-:::tip
-Remember to use the [Miden client documentation](https://0xMiden.github.io/miden-docs/miden-client/cli-reference.html) for clarifications.
-:::
+Create a public account (Account C) so its state can be retrieved from the network:
 
-This is an alternative to the [private P2P transactions](p2p-private) process.
+```rust
+use miden_client::account::{AccountBuilder, AccountStorageMode, AccountType};
+use miden_client::auth::AuthSecretKey;
+use miden_client::crypto::SecretKey;
+use miden_objects::account::auth::AuthRpoFalcon512;
+use miden_objects::account::component::BasicWallet;
 
-In this tutorial, we use two different clients to simulate two different remote users who don't share local state.
+let key_pair = SecretKey::with_rng(client.rng());
+let anchor_block = client.get_latest_epoch_block().await?;
+let init_seed: [u8; 32] = rand::random();
 
-To do this, we use two terminals with their own state (using their own `miden-client.toml`).
+let account_c = AccountBuilder::new(init_seed)
+    .anchor((&anchor_block).try_into()?)
+    .account_type(AccountType::RegularAccountImmutableCode)
+    .storage_mode(AccountStorageMode::Public)
+    .with_auth_component(AuthRpoFalcon512::new(key_pair.public_key()))
+    .with_component(BasicWallet)
+    .build()?;
 
-1. Create a new directory to store the new client.
+let keystore = client.keystore();
+keystore.add_key(&AuthSecretKey::RpoFalcon512(key_pair), account_c.id()).await?;
+client.add_account(&account_c, false).await?;
 
-    ```sh
-    mkdir miden-client-2
-    cd miden-client-2
-    ```
-2. On the new client, create a new [basic account](https://0xMiden.github.io/miden-docs/miden-base/architecture/accounts.html):
-
-    ```sh
-    miden-client new-wallet --mutable -s public
-    ```
-
-    We refer to this account as _Account C_. Note that we set the account's storage mode to `public`, which means that the account details are public and its latest state can be retrieved from the node.
-
-3. List and view the account with the following command:
-
-      ```sh
-      miden-client account -l
-      ```
-
-## Transfer assets between accounts
-
-1. Now we can transfer some of the tokens we received from the faucet to our new account C. Remember to switch back to `miden-client` directory, since you'll be making the txn from Account ID A.
-
-    To do this, from the first client run:
-
-    ```sh
-    miden-client send --sender <basic-account-id-A> --target <basic-account-id-C> --asset 50::<faucet-account-id> --note-type public
-    ```
-
-    :::note
-    The faucet account ID can be found on the [Miden faucet website](https://testnet.miden.io/) under the title **Miden faucet**.
-    :::
-
-    This generates a Pay-to-ID (`P2ID`) note containing `50` tokens, transferred from one account to the other. As the note is public, the second account can receive the necessary details by syncing with the node.
-
-2. First, sync the account on the new client.
-
-    ```sh
-    miden-client sync
-    ```
-
-3. At this point, we should have received the public note details.
-
-    ```sh
-    miden-client notes --list
-    ```
-
-    Because the note was retrieved from the node, the commit height will be included and displayed.
-
-4. Have account C consume the note.
-
-    ```sh
-    miden-client consume-notes --account <regular-account-ID-C> <input-note-id>
-    ```
-
-    :::tip
-    It's possible to use a short version of the note id: 7 characters after the `0x` is sufficient, e.g. `0x6ae613a`.
-    :::
-
-That's it!
-
-Account C has now consumed the note and there should be new assets in the account:
-
-```sh
-miden-client account --show <account-ID>
+println!("Account C created: {:?}", account_c.id());
 ```
 
-## Clear state
+## Send assets with a public note
 
-All state is maintained in `store.sqlite3`, located in the directory defined in the `miden-client.toml` file.
+Build and submit a pay-to-id transaction from Account A to Account C using a public note:
 
-To clear all state, delete this file. It recreates on any command execution.
+```rust
+use miden_client::transaction::{TransactionRequestBuilder, PaymentNoteDescription};
+use miden_objects::note::NoteType;
+use miden_objects::asset::FungibleAsset;
+use miden_objects::account::AccountId;
+
+// Define the asset to send
+let faucet_id = AccountId::from_hex("0x<your-faucet-id>")?;
+let asset = FungibleAsset::new(faucet_id, 50)?.into();
+
+// Build the payment request
+let payment = PaymentNoteDescription::new(
+    vec![asset],
+    account_a_id,  // sender
+    account_c.id(), // target
+);
+
+let tx_request = TransactionRequestBuilder::new().build_pay_to_id(
+    payment,
+    None,
+    NoteType::Public, // Public note — recipient can discover it by syncing
+    client.rng(),
+)?;
+
+// Execute and submit
+let tx_result = client.new_transaction(account_a_id, tx_request).await?;
+client.submit_transaction(tx_result).await?;
+
+println!("Public P2ID note sent!");
+```
+
+## Receive and consume the note
+
+Since the note is public, Account C can discover it by syncing with the network:
+
+```rust
+// Sync to discover the public note
+client.sync_state().await?;
+
+// Get consumable notes for Account C
+let consumable = client.get_consumable_notes(Some(account_c.id())).await?;
+let note_ids: Vec<_> = consumable.iter().map(|n| n.note.id()).collect();
+
+if !note_ids.is_empty() {
+    let tx_request = TransactionRequestBuilder::new()
+        .build_consume_notes(account_c.id(), note_ids)?;
+
+    let tx_result = client.new_transaction(account_c.id(), tx_request).await?;
+    client.submit_transaction(tx_result).await?;
+
+    println!("Notes consumed by Account C!");
+}
+```
+
+## Verify
+
+Sync and check Account C's balance:
+
+```rust
+client.sync_state().await?;
+
+let (account, _) = client.get_account(account_c.id()).await?;
+println!("Account C vault: {:?}", account.vault());
+```
+
+Account C should now hold the transferred tokens.

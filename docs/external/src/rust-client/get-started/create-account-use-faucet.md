@@ -1,202 +1,166 @@
 ---
 title: Create account
-sidebar_position: 1
+sidebar_position: 2
 ---
 
-In this section, we show you how to create a new local Miden account and how to receive funds from the public Miden faucet website.
+In this tutorial, you'll create a Miden Client, generate a new account, request tokens from the public faucet, and consume the resulting note — all using the Rust library API.
 
-## Configure the Miden client
+## Set up the project
 
-The Miden client facilitates interaction with the Miden rollup and provides a way to execute and prove transactions.
-
-:::tip
-Check the [Miden client documentation](https://0xMiden.github.io/miden-docs/miden-client/cli-reference.html) for more information.
-:::
-
-1. If you haven't already done so as part of another tutorial, open your terminal and create a new directory to store the Miden client.
+1. Create a new Rust project:
 
    ```sh
-   mkdir miden-client
-   cd miden-client
+   cargo new miden-getting-started
+   cd miden-getting-started
    ```
 
-2. Install the Miden client.
+2. Add dependencies to `Cargo.toml`:
 
-   ```sh
-   cargo install miden-client-cli --locked
+   ```toml
+   [dependencies]
+   miden-client = { version = "0.14", features = ["tonic"] }
+   miden-client-sqlite-store = { version = "0.14" }
+   tokio = { version = "1", features = ["full"] }
+   rand = "0.8"
    ```
 
-   You can now use the `miden-client --version` command, and you should see `Miden 0.10.0`.
+## Create the client
 
-## Create a new Miden account
+Instantiate a client connected to the Miden testnet:
 
-1. Create a new account of type `mutable` using the following command:
+```rust
+use std::sync::Arc;
+use miden_client::builder::ClientBuilder;
+use miden_client_sqlite_store::SqliteStore;
 
-   ```sh
-   miden-client new-wallet --mutable
-   ```
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Create a SQLite store for local state persistence
+    let sqlite_store = SqliteStore::new("store.sqlite3".try_into()?).await?;
+    let store = Arc::new(sqlite_store);
 
-2. List all created accounts by running the following command:
+    // Build a client pre-configured for testnet
+    let mut client = ClientBuilder::for_testnet()
+        .store(store)
+        .filesystem_keystore("keystore")?
+        .build()
+        .await?;
 
-   ```sh
-   miden-client account -l
-   ```
+    Ok(())
+}
+```
 
-   You should see something like this:
+## Create a new account
 
-     <!-- ![Result of listing miden accounts](../img/get-started/miden-account-list.png) -->
+Use `AccountBuilder` to create a private wallet account:
 
-Save the account ID for a future step.
+```rust
+use miden_client::account::{AccountBuilder, AccountStorageMode, AccountType};
+use miden_client::auth::AuthSecretKey;
+use miden_client::crypto::SecretKey;
+use miden_objects::account::auth::AuthRpoFalcon512;
+use miden_objects::account::component::BasicWallet;
+
+// Generate a key pair for the account
+let key_pair = SecretKey::with_rng(client.rng());
+
+// Generate a random seed for the account
+let init_seed: [u8; 32] = rand::random();
+
+// Build the account
+let new_account = AccountBuilder::new(init_seed)
+    .account_type(AccountType::RegularAccountImmutableCode)
+    .storage_mode(AccountStorageMode::Private)
+    .with_auth_component(AuthRpoFalcon512::new(key_pair.public_key()))
+    .with_component(BasicWallet)
+    .build()?;
+
+// Store the key and register the account with the client
+let keystore = client.keystore();
+keystore.add_key(&AuthSecretKey::RpoFalcon512(key_pair), new_account.id()).await?;
+client.add_account(&new_account, false).await?;
+
+println!("Account created: {:?}", new_account.id());
+```
+
+Save the printed account ID — you'll need it for the faucet step.
 
 ## Request tokens from the public faucet
 
-1. To request funds from the faucet navigate to the following website: [Miden faucet website](https://faucet.testnet.miden.io/).
-
-2. Copy the **Account ID** printed by the `miden account -l` command in the previous step. Feel free to change the amount of tokens to issue.
-
-3. Paste this ID into the **Request test tokens** input field on the faucet website and click **Send Private Note**.
-
-:::tip
-You can also click **Send Public Note**. If you do this, the note's details will be public and you will not need to download and import it, so you can skip to [Sync the client](#sync-the-client).
-:::
-
-4. After a few seconds your browser should download - or prompt you to download - a file called `note.mno` (mno = Miden note). It contains the funds the faucet sent to your address.
-
-5. Save this file on your computer, you will need it for the next step.
-
-## Import the note into the Miden client
-
-1. Import the private note that you have received using the following commands:
-
-   ```sh
-   miden-client import <path-to-note>/note.mno
-   ```
-
-2. You should see something like this:
-
-   ```sh
-   Successfully imported note 0x0ff340133840d35e95e0dc2e62c88ed75ab2e383dc6673ce0341bd486fed8cb6
-   ```
-
-3. Now that the note has been successfully imported, you can view the note's information using the following command:
-
-   ```sh
-   miden-client notes
-   ```
-
-4. You should see something like this:
-
-  <!-- ![Result of viewing miden notes](../img/get-started/note-view.png) -->
-
-:::tip The importance of syncing
-
-- As you can see, the note is listed as `Expected`.
-- This is because you have received a private note but have not yet synced your view of the rollup to check that the note is the result of a valid transaction.
-- Hence, before consuming the note we will need to update our view of the rollup by syncing.
-- Many users could have received the same private note, but only one user can consume the note in a transaction that gets verified by the Miden operator.
-  :::
-
-### Sync the client
-
-Do this periodically to keep informed about any updates on the node by running the `sync` command:
-
-```sh
-miden-client sync
-```
-
-You will see something like this as output:
-
-```sh
-State synced to block 179672
-New public notes: 0
-Committed notes: 1
-Tracked notes consumed: 0
-Tracked accounts updated: 0
-Locked accounts: 0
-Committed transactions: 0
-```
-
-## Consume the note & receive the funds
-
-1. Now that we have synced the client, the input-note imported from the faucet should have a `Committed` status, confirming it exists at the rollup level:
-
-   ```sh
-   miden-client notes
-   ```
-
-2. You should see something like this:
-
-  <!-- ![Viewing commit height info](../img/get-started/commit-height.png) -->
-
-3. Find your account and note id by listing both `accounts` and `notes`:
-
-   ```sh
-   miden-client account
-   miden-client notes
-   ```
-
-4. Consume the note and add the funds from its vault to our account using the following command:
-
-   ```sh
-   miden-client consume-notes --account <Account-Id> <Note-Id>
-   ```
-
-5. You should see a confirmation message like this:
-
-  <!-- ![Transaction confirmation message](../img/get-started/transaction-confirmation.png) -->
-
-6. After confirming you can view the new note status by running the following command:
-
-   ```sh
-   miden-client notes
-   ```
-
-7. You should see something like this:
-
-  <!-- ![Viewing process info](../img/get-started/processing-note.png) -->
-
-8. The note is `Processing`. This means that the proof of the transaction was sent, but there is no network confirmation yet. You can update your view of the rollup by syncing again:
-
-   ```sh
-   miden-client sync
-   ```
-
-9. After syncing, you should have received confirmation of the consumed note. You should see the note as `Consumed` after listing the notes:
-
-   ```sh
-   miden-client notes
-   ```
-
-     <!-- ![Viewing consumed note](../img/get-started/consumed-note.png) -->
-
-Amazing! You just have created a client-side zero-knowledge proof locally on your machine and submitted it to the Miden rollup.
+1. Navigate to the [Miden faucet website](https://faucet.testnet.miden.io/).
+2. Paste your account ID into the **Request test tokens** field.
+3. Choose an amount and click **Send Private Note**.
+4. Download the `note.mno` file.
 
 :::tip
-You only need to copy the top line of characters of the Note ID.
+You can also click **Send Public Note**. If you do, the note details will be public and you can skip the import step — just sync the client directly.
 :::
 
-## View confirmations
+## Import and sync
 
-5. View your updated account's vault containing the tokens sent by the faucet by running the following command:
+If you received a private note file, import it:
 
-   ```sh
-   miden-client account --show <Account-Id>
-   ```
+```rust
+use std::path::Path;
 
-6. You should now see your accounts vault containing the funds sent by the faucet.
+// Import the note from the downloaded file
+client.import_note_from_file(Path::new("path/to/note.mno")).await?;
+```
 
-  <!-- ![Viewing account vault with funds](../img/get-started/view-account-vault.png) -->
+Sync the client to confirm the note exists on-chain:
+
+```rust
+let sync_summary = client.sync_state().await?;
+println!("Synced to block {}", sync_summary.block_num);
+```
+
+After syncing, the note's status changes from `Expected` to `Committed`, confirming it is the result of a valid on-chain transaction.
+
+## Consume the note
+
+Consume all available notes for your account to receive the faucet tokens:
+
+```rust
+use miden_client::transaction::TransactionRequestBuilder;
+
+// Get consumable notes for the account
+let consumable_notes = client.get_consumable_notes(Some(new_account.id())).await?;
+let note_ids: Vec<_> = consumable_notes.iter().map(|n| n.note.id()).collect();
+
+if !note_ids.is_empty() {
+    // Build a consume-notes transaction
+    let tx_request = TransactionRequestBuilder::new()
+        .build_consume_notes(new_account.id(), note_ids)?;
+
+    // Execute and submit the transaction (this generates a ZK proof)
+    let tx_result = client.new_transaction(new_account.id(), tx_request).await?;
+    client.submit_transaction(tx_result).await?;
+
+    println!("Notes consumed — ZK proof generated and submitted!");
+}
+```
+
+## Verify the balance
+
+Sync again to confirm the transaction, then check your account balance:
+
+```rust
+client.sync_state().await?;
+
+let account = client.account_reader(new_account.id()).await?;
+println!("Account vault: {:?}", account.vault());
+```
+
+You should see the faucet tokens in your account's vault.
 
 ## Congratulations!
 
-You have successfully configured and used the Miden client to interact with a Miden rollup and faucet.
+You've created a Miden Client, generated an account, and executed your first client-side zero-knowledge proof using the Rust library. Next, try transferring assets between accounts:
 
-You have performed basic Miden rollup operations like submitting proofs of transactions, generating and consuming notes.
+- [Public peer-to-peer transfer](./p2p-public.md)
+- [Private peer-to-peer transfer](./p2p-private.md)
 
-For more information on the Miden client, refer to the [Miden client documentation](https://0xMiden.github.io/miden-docs/miden-client/index.html).
+## Debugging tips
 
-## Debugging tips (clear state and folder)
-
-- Need a fresh start? All state is maintained in `store.sqlite3`, located in the directory defined in the `miden-client.toml` file. If you want to clear all state, delete this file. It recreates on any command execution.
-
-- Getting an error? Only execute the `miden-client` command in the folder where your `miden-client.toml` is located.
+- All local state is stored in the SQLite database (the path you passed to `SqliteStore::new`). Delete the file for a fresh start.
+- Enable debug mode when building the client: `.in_debug_mode(DebugMode::Enabled)` on `ClientBuilder`.
