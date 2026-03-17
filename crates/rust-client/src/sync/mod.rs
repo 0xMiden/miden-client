@@ -137,6 +137,15 @@ where
 
         let note_tags: BTreeSet<NoteTag> = self.store.get_unique_note_tags().await?;
 
+        // Snapshot Expected note IDs before NTL fetch to detect newly-arrived notes
+        let expected_before: BTreeSet<NoteId> = self
+            .store
+            .get_input_notes(NoteFilter::Expected)
+            .await?
+            .into_iter()
+            .map(|n| n.id())
+            .collect();
+
         // Note Transport update
         // TODO We can run both sync_state, fetch_transport_notes futures in parallel
         if self.is_note_transport_enabled() {
@@ -176,10 +185,9 @@ where
             .map_err(ClientError::StoreError)?;
 
         // Verify stale Expected notes BEFORE pruning block headers.
-        // Notes that arrived via NTL after their commitment block was synced are stuck
-        // as Expected. Transition them and mark their blocks as having client notes
-        // so they survive pruning.
-        self.verify_stale_expected_notes().await?;
+        // Only checks notes that arrived via NTL in THIS sync cycle (not all Expected
+        // notes) to avoid unbounded RPC calls as Expected notes accumulate.
+        self.verify_stale_expected_notes(&expected_before).await?;
 
         // Remove irrelevant block headers
         self.store.prune_irrelevant_blocks().await?;
@@ -187,24 +195,34 @@ where
         Ok(sync_summary)
     }
 
-    /// Checks for Expected notes that should already be committed (their `after_block_num` is
-    /// behind the current sync height) and fetches their inclusion proofs from the node.
+    /// Checks for Expected notes that arrived via NTL in the current sync cycle and whose
+    /// commitment block has already been synced. Fetches their inclusion proofs from the node
+    /// and transitions them to Committed.
     ///
-    /// This handles the race condition where the NTL delivers note data after the on-chain
-    /// commitment was already synced. Without this, such notes stay Expected forever.
-    async fn verify_stale_expected_notes(&mut self) -> Result<(), ClientError> {
+    /// Only checks newly-arrived notes (not in `expected_before`) to avoid unbounded RPC calls
+    /// as Expected notes accumulate over time from other sources (manual imports, etc.).
+    async fn verify_stale_expected_notes(
+        &mut self,
+        expected_before: &BTreeSet<NoteId>,
+    ) -> Result<(), ClientError> {
         use crate::rpc::domain::note::FetchedNote;
         use crate::store::InputNoteState;
 
         let sync_height = self.store.get_sync_height().await?;
         let expected_notes = self.store.get_input_notes(NoteFilter::Expected).await?;
 
-        // Find Expected notes whose commitment block has already been synced
+        // Only check notes that are NEW (arrived via NTL this cycle) and stale
         let stale_note_ids: Vec<NoteId> = expected_notes
             .iter()
-            .filter(|note| match note.state() {
-                InputNoteState::Expected(state) => state.after_block_num < sync_height,
-                _ => false,
+            .filter(|note| {
+                // Skip notes that existed before NTL fetch — only check newly-arrived ones
+                if expected_before.contains(&note.id()) {
+                    return false;
+                }
+                match note.state() {
+                    InputNoteState::Expected(state) => state.after_block_num < sync_height,
+                    _ => false,
+                }
             })
             .map(|note| note.id())
             .collect();
