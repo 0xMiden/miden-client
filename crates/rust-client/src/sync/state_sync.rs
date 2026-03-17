@@ -548,7 +548,7 @@ impl StateSync {
             .nullifiers
             .iter()
             .enumerate()
-            .map(|(i, n)| (*n, i as u16))
+            .map(|(i, n)| (*n, i.try_into().unwrap()))
             .collect();
 
         // Check for new nullifiers for input notes that were updated
