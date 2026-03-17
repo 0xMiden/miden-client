@@ -301,7 +301,7 @@ impl StateSync {
                 })
                 .collect();
 
-            let nullifiers = compute_nullifiers(&tx_info.transaction_records);
+            let nullifiers = compute_ordered_nullifiers(&tx_info.transaction_records);
 
             (account_updates, tx_inclusions, nullifiers)
         };
@@ -670,7 +670,7 @@ fn apply_mmr_changes(
 /// `initial_state_commitment` / `final_state_commitment`, and collects each transaction's
 /// input note nullifiers in execution order. Nullifiers from the same account are in execution
 /// order; ordering across different accounts is arbitrary.
-fn compute_nullifiers(transaction_records: &[RpcTransactionRecord]) -> Vec<Nullifier> {
+fn compute_ordered_nullifiers(transaction_records: &[RpcTransactionRecord]) -> Vec<Nullifier> {
     // Group transactions by (account_id, block_num).
     let mut groups: BTreeMap<(AccountId, BlockNumber), Vec<&RpcTransactionRecord>> =
         BTreeMap::new();
@@ -832,7 +832,7 @@ mod tests {
             let tx_b = make_rpc_tx(2, 3, &[20], 5);
             let tx_c = make_rpc_tx(3, 4, &[30], 5);
 
-            let result = super::super::compute_nullifiers(&[tx_c, tx_a, tx_b]);
+            let result = super::super::compute_ordered_nullifiers(&[tx_c, tx_a, tx_b]);
 
             assert_eq!(result[0], Nullifier::from_raw(word(10)));
             assert_eq!(result[1], Nullifier::from_raw(word(20)));
@@ -872,7 +872,7 @@ mod tests {
                 ),
             };
 
-            let result = super::super::compute_nullifiers(&[tx_a2, tx_b1, tx_a3, tx_a1]);
+            let result = super::super::compute_ordered_nullifiers(&[tx_a2, tx_b1, tx_a3, tx_a1]);
 
             // Nullifiers are ordered by chain position within each (account, block) group.
             // The exact global indices depend on BTreeMap iteration order of the groups.
@@ -892,7 +892,7 @@ mod tests {
             // Single tx consuming 3 notes — all should appear consecutively.
             let tx = make_rpc_tx(1, 2, &[10, 20, 30], 5);
 
-            let result = super::super::compute_nullifiers(&[tx]);
+            let result = super::super::compute_ordered_nullifiers(&[tx]);
 
             assert_eq!(result.len(), 3);
             assert!(result.contains(&Nullifier::from_raw(word(10))));
@@ -902,7 +902,7 @@ mod tests {
 
         #[test]
         fn empty_input_returns_empty_vec() {
-            let result = super::super::compute_nullifiers(&[]);
+            let result = super::super::compute_ordered_nullifiers(&[]);
             assert!(result.is_empty());
         }
     }
