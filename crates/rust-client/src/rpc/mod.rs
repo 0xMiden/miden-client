@@ -40,19 +40,28 @@
 //! For further details and examples, see the documentation for the individual methods in the
 //! [`NodeRpcClient`] trait.
 
+use alloc::borrow::ToOwned;
 use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::fmt;
 
-use domain::account::{AccountProof, FetchedAccount};
+use domain::account::{AccountDetails, AccountProof, FetchedAccount};
 use domain::note::{FetchedNote, NoteSyncInfo};
 use domain::nullifier::NullifierUpdate;
 use domain::sync::ChainMmrInfo;
 use miden_protocol::Word;
-use miden_protocol::account::{Account, AccountCode, AccountHeader, AccountId};
+use miden_protocol::account::{
+    Account,
+    AccountCode,
+    AccountId,
+    AccountStorage,
+    StorageMap,
+    StorageSlotType,
+};
 use miden_protocol::address::NetworkId;
+use miden_protocol::asset::{Asset, AssetVault};
 use miden_protocol::block::{BlockHeader, BlockNumber, ProvenBlock};
 use miden_protocol::crypto::merkle::mmr::MmrProof;
 use miden_protocol::crypto::merkle::smt::SmtProof;
@@ -281,32 +290,109 @@ pub trait NodeRpcClient: Send + Sync {
         Ok(public_notes)
     }
 
-    /// Fetches the public accounts that have been updated since the last known state of the
-    /// accounts.
+    /// Fetches the full state of a public account, including oversized maps and vaults.
     ///
-    /// The `local_accounts` parameter is a list of account headers that the client has
-    /// stored locally and that it wants to check for updates. If an account is private or didn't
-    /// change, it is ignored and will not be included in the returned list.
-    /// The default implementation of this method uses [`NodeRpcClient::get_account_details`].
-    async fn get_updated_public_accounts(
+    /// This method always downloads the complete account state, using `SyncAccountVault` and
+    /// `SyncAccountStorageMaps` for data that exceeds the `GetAccount` response thresholds.
+    /// Use this for initial imports where no local baseline exists.
+    async fn get_full_public_account(&self, account_id: AccountId) -> Result<Account, RpcError> {
+        let response = self.get_account_details(account_id).await?;
+        match response {
+            FetchedAccount::Public(account, _) => Ok(*account),
+            FetchedAccount::PublicOversize { details, .. } => {
+                self.build_full_account_from_details(*details).await
+            },
+            FetchedAccount::Private(..) => Err(RpcError::ExpectedDataMissing(
+                "expected public account but got private".to_owned(),
+            )),
+        }
+    }
+
+    /// Builds a full [`Account`] from [`AccountDetails`] by fetching oversized data via
+    /// sync endpoints. This is the fallback path when `get_account_details` returns
+    /// `PublicOversize`.
+    async fn build_full_account_from_details(
         &self,
-        local_accounts: &[&AccountHeader],
-    ) -> Result<Vec<Account>, RpcError> {
-        let mut public_accounts = vec![];
+        details: AccountDetails,
+    ) -> Result<Account, RpcError> {
+        let account_id = details.header.id();
+        let nonce = details.header.nonce();
 
-        for local_account in local_accounts {
-            let response = self.get_account_details(local_account.id()).await?;
+        let assets: Vec<Asset> = if details.vault_details.too_many_assets {
+            self.sync_account_vault(BlockNumber::from(0), None, account_id)
+                .await?
+                .updates
+                .into_iter()
+                .filter_map(|update| update.asset)
+                .collect()
+        } else {
+            details.vault_details.assets
+        };
 
-            if let FetchedAccount::Public(account, _) = response {
-                let account = *account;
-                // We should only return an account if it's newer, otherwise we ignore it
-                if account.nonce().as_int() > local_account.nonce().as_int() {
-                    public_accounts.push(account);
-                }
+        let mut slots = vec![];
+        let mut map_cache: Option<StorageMapInfo> = None;
+        for slot_header in details.storage_details.header.slots() {
+            match slot_header.slot_type() {
+                StorageSlotType::Value => {
+                    slots.push(miden_protocol::account::StorageSlot::with_value(
+                        slot_header.name().clone(),
+                        slot_header.value(),
+                    ));
+                },
+                StorageSlotType::Map => {
+                    let map_details = details
+                        .storage_details
+                        .find_map_details(slot_header.name())
+                        .ok_or(RpcError::ExpectedDataMissing(format!(
+                            "slot named '{}' was reported as a map, but has no matching map_detail",
+                            slot_header.name(),
+                        )))?;
+
+                    let storage_map = if map_details.too_many_entries {
+                        let map_info = if let Some(ref info) = map_cache {
+                            info
+                        } else {
+                            let fetched_data =
+                                self.sync_storage_maps(0_u32.into(), None, account_id).await?;
+                            map_cache.insert(fetched_data)
+                        };
+                        let map_entries: Vec<_> = map_info
+                            .updates
+                            .iter()
+                            .filter(|slot_info| slot_info.slot_name == *slot_header.name())
+                            .map(|slot_info| (slot_info.key, slot_info.value))
+                            .collect();
+                        StorageMap::with_entries(map_entries)
+                    } else {
+                        map_details.entries.clone().into_storage_map()
+                    }
+                    .map_err(|err| {
+                        RpcError::InvalidResponse(format!(
+                            "the rpc api returned a non-valid map entry: {err}"
+                        ))
+                    })?;
+
+                    slots.push(miden_protocol::account::StorageSlot::with_map(
+                        slot_header.name().clone(),
+                        storage_map,
+                    ));
+                },
             }
         }
 
-        Ok(public_accounts)
+        let asset_vault = AssetVault::new(&assets).map_err(|err| {
+            RpcError::InvalidResponse(format!("api rpc returned non-valid assets: {err}"))
+        })?;
+        let account_storage = AccountStorage::new(slots).map_err(|err| {
+            RpcError::InvalidResponse(format!("api rpc returned non-valid storage slots: {err}"))
+        })?;
+        Account::new(account_id, asset_vault, account_storage, details.code, nonce, None).map_err(
+            |err| {
+                RpcError::InvalidResponse(format!(
+                    "failed to instance an account from the rpc api response: {err}"
+                ))
+            },
+        )
     }
 
     /// Given a block number, fetches the block header corresponding to that height from the node

@@ -652,6 +652,167 @@ impl SqliteStore {
         Ok(())
     }
 
+    /// Applies incremental delta changes to a large public account that exceeded size thresholds
+    /// during sync.
+    ///
+    /// Unlike `update_account_state` which does a full wipe-and-reinsert, this method applies
+    /// only the changes received from the node's delta sync endpoints:
+    ///
+    /// NOTE: As the SMT forest holds full account state, this method internally reconstructs
+    /// the full state from the DB to update the SMT forest.
+    pub(crate) fn apply_sync_account_delta(
+        tx: &Transaction<'_>,
+        smt_forest: &mut AccountSmtForest,
+        delta: &miden_client::sync::AccountDeltaUpdate,
+    ) -> Result<(), StoreError> {
+        let account_id = delta.account_id();
+        let account_id_hex = account_id.to_hex();
+        let nonce = delta.header.nonce().as_int();
+        let nonce_val = u64_to_value(nonce);
+
+        Self::apply_vault_updates(tx, &account_id_hex, &nonce_val, &delta.vault_updates)?;
+        Self::apply_storage_map_updates(
+            tx,
+            &account_id_hex,
+            &nonce_val,
+            &delta.storage_map_updates,
+        )?;
+
+        // Replace non-oversized storage slots (value slots + small maps).
+        for slot in &delta.non_oversized_slots {
+            tx.execute(
+                "DELETE FROM latest_storage_map_entries \
+                 WHERE account_id = ? AND slot_name = ?",
+                params![&account_id_hex, slot.name().to_string()],
+            )
+            .into_store_error()?;
+        }
+        Self::insert_storage_slots(tx, account_id, nonce, delta.non_oversized_slots.iter())?;
+
+        // Update the account header and code.
+        Self::insert_account_header(tx, &delta.header, None)?;
+        Self::insert_account_code(tx, &delta.code)?;
+
+        // Reconstruct the full account state from the DB to update the SMT forest.
+        let assets = query_vault_assets(tx, account_id)?;
+        let vault = AssetVault::new(&assets).map_err(StoreError::AssetVaultError)?;
+
+        let slots: Vec<_> = query_storage_slots(tx, account_id, &AccountStorageFilter::All)?
+            .into_values()
+            .collect();
+        let storage = AccountStorage::new(slots).map_err(StoreError::AccountError)?;
+
+        smt_forest.insert_and_register_account_state(account_id, &vault, &storage)?;
+
+        Ok(())
+    }
+
+    /// Applies individual vault asset updates (upserts and removals) to the database.
+    fn apply_vault_updates(
+        tx: &Transaction<'_>,
+        account_id_hex: &str,
+        nonce_val: &Value,
+        vault_updates: &[miden_client::rpc::domain::account_vault::AccountVaultUpdate],
+    ) -> Result<(), StoreError> {
+        for vault_update in vault_updates {
+            let vault_key_word: Word = vault_update.vault_key.into();
+            let vault_key_hex = vault_key_word.to_hex();
+
+            if let Some(asset) = &vault_update.asset {
+                let faucet_prefix_hex = asset.faucet_id_prefix().to_hex();
+                let asset_hex = Word::from(*asset).to_hex();
+
+                tx.execute(
+                    "INSERT OR REPLACE INTO latest_account_assets \
+                     (account_id, vault_key, faucet_id_prefix, asset) \
+                     VALUES (?, ?, ?, ?)",
+                    params![account_id_hex, &vault_key_hex, &faucet_prefix_hex, &asset_hex],
+                )
+                .into_store_error()?;
+
+                tx.execute(
+                    "INSERT OR REPLACE INTO historical_account_assets \
+                     (account_id, nonce, vault_key, faucet_id_prefix, asset) \
+                     VALUES (?, ?, ?, ?, ?)",
+                    params![
+                        account_id_hex,
+                        nonce_val,
+                        &vault_key_hex,
+                        &faucet_prefix_hex,
+                        &asset_hex,
+                    ],
+                )
+                .into_store_error()?;
+            } else {
+                tx.execute(
+                    "DELETE FROM latest_account_assets \
+                     WHERE account_id = ? AND vault_key = ?",
+                    params![account_id_hex, &vault_key_hex],
+                )
+                .into_store_error()?;
+
+                tx.execute(
+                    "INSERT OR REPLACE INTO historical_account_assets \
+                     (account_id, nonce, vault_key, faucet_id_prefix, asset) \
+                     VALUES (?, ?, ?, '', NULL)",
+                    params![account_id_hex, nonce_val, &vault_key_hex],
+                )
+                .into_store_error()?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Applies individual storage map entry updates (upserts and removals) to the database.
+    fn apply_storage_map_updates(
+        tx: &Transaction<'_>,
+        account_id_hex: &str,
+        nonce_val: &Value,
+        storage_map_updates: &[miden_client::rpc::domain::storage_map::StorageMapUpdate],
+    ) -> Result<(), StoreError> {
+        let empty_word = Word::default();
+        for map_update in storage_map_updates {
+            let slot_name_str = map_update.slot_name.to_string();
+            let key_hex = map_update.key.to_hex();
+
+            if map_update.value == empty_word {
+                tx.execute(
+                    "DELETE FROM latest_storage_map_entries \
+                     WHERE account_id = ? AND slot_name = ? AND key = ?",
+                    params![account_id_hex, &slot_name_str, &key_hex],
+                )
+                .into_store_error()?;
+
+                tx.execute(
+                    "INSERT OR REPLACE INTO historical_storage_map_entries \
+                     (account_id, nonce, slot_name, key, value) \
+                     VALUES (?, ?, ?, ?, NULL)",
+                    params![account_id_hex, nonce_val, &slot_name_str, &key_hex],
+                )
+                .into_store_error()?;
+            } else {
+                let value_hex = map_update.value.to_hex();
+
+                tx.execute(
+                    "INSERT OR REPLACE INTO latest_storage_map_entries \
+                     (account_id, slot_name, key, value) \
+                     VALUES (?, ?, ?, ?)",
+                    params![account_id_hex, &slot_name_str, &key_hex, &value_hex],
+                )
+                .into_store_error()?;
+
+                tx.execute(
+                    "INSERT OR REPLACE INTO historical_storage_map_entries \
+                     (account_id, nonce, slot_name, key, value) \
+                     VALUES (?, ?, ?, ?, ?)",
+                    params![account_id_hex, nonce_val, &slot_name_str, &key_hex, &value_hex],
+                )
+                .into_store_error()?;
+            }
+        }
+        Ok(())
+    }
+
     /// Locks the account if the mismatched digest doesn't belong to a previous account state (stale
     /// data).
     pub(crate) fn lock_account_on_unexpected_commitment(

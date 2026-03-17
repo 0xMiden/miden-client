@@ -193,6 +193,8 @@ impl IdxdbStore {
             }
         }
 
+        let delta_js_account_updates = self.apply_delta_updates(&account_updates).await?;
+
         let state_update = JsStateSyncUpdate {
             block_num: block_num.as_u32(),
             flattened_new_block_headers: flatten_nested_u8_vec(block_headers_as_bytes),
@@ -208,6 +210,7 @@ impl IdxdbStore {
                 .updated_public_accounts()
                 .iter()
                 .map(|account| JsAccountUpdate::from_account(account, None))
+                .chain(delta_js_account_updates)
                 .collect(),
             transaction_updates,
         };
@@ -215,6 +218,51 @@ impl IdxdbStore {
         await_js_value(promise, "failed to apply state sync").await?;
 
         Ok(())
+    }
+
+    /// Applies delta updates for large public accounts by reconstructing the full account
+    /// state from the local store, applying the deltas, and returning `JsAccountUpdate` entries.
+    async fn apply_delta_updates(
+        &self,
+        account_updates: &miden_client::sync::AccountUpdates,
+    ) -> Result<Vec<JsAccountUpdate>, StoreError> {
+        let mut delta_js_account_updates = Vec::new();
+        for delta in account_updates.delta_updated_accounts() {
+            let account = self.apply_delta_and_rebuild(delta).await?;
+            {
+                let mut smt_forest = self.smt_forest.write();
+                smt_forest.insert_and_register_account_state(
+                    account.id(),
+                    account.vault(),
+                    account.storage(),
+                )?;
+            }
+            delta_js_account_updates.push(JsAccountUpdate::from_account(&account, None));
+        }
+        Ok(delta_js_account_updates)
+    }
+
+    /// Applies an [`AccountDeltaUpdate`] to the locally-stored account and returns the
+    /// rebuilt full [`Account`].
+    ///
+    /// Reads the current vault and storage from `IndexedDB`, applies the delta changes
+    /// (vault upserts/removals, storage map upserts/removals, non-oversized slot replacements),
+    /// and constructs a new [`Account`] with the updated header, code, and state.
+    async fn apply_delta_and_rebuild(
+        &self,
+        delta: &miden_client::sync::AccountDeltaUpdate,
+    ) -> Result<miden_client::account::Account, StoreError> {
+        use miden_client::asset::Asset;
+
+        let account_id = delta.account_id();
+        let assets: Vec<Asset> = self.get_vault_assets(account_id, vec![]).await?;
+        let current_storage = self
+            .get_storage(account_id, miden_client::store::AccountStorageFilter::All)
+            .await?;
+
+        delta
+            .rebuild_account(assets, &current_storage)
+            .map_err(|err| StoreError::DatabaseError(err.to_string()))
     }
 
     /// Rolls back account states by removing them from the DB.

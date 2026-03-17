@@ -4,7 +4,7 @@ use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::error::Error;
-use miden_protocol::asset::{Asset, AssetVault};
+use miden_protocol::asset::AssetVault;
 
 use miden_protocol::account::{
     Account, AccountCode, AccountId, AccountStorage, StorageMap, StorageSlot, StorageSlotType,
@@ -529,30 +529,26 @@ impl NodeRpcClient for GrpcClient {
         if account_id.is_private() {
             Ok(FetchedAccount::new_private(account_id, update_summary))
         } else {
-            // An account with public state has to fetch all of its state.
-            // Even more so, an account with a large state will have to do
-            // a couple of extra requests to fetch all of its data.
             let details =
                 full_account_proof.into_parts().1.ok_or(RpcError::ExpectedDataMissing(
                     "GetAccountDetails returned a public account without details".to_owned(),
                 ))?;
+
+            // Check if any storage maps or the vault exceed size thresholds. If so,
+            // return the details without downloading the oversized data — the caller
+            // can decide whether to do a full download or a delta sync.
+            let is_oversize = details.vault_details.too_many_assets
+                || details.storage_details.map_details.iter().any(|m| m.too_many_entries);
+
+            if is_oversize {
+                return Ok(FetchedAccount::new_public_oversize(update_summary, details));
+            }
+
+            // Small account: build the full Account directly.
             let account_id = details.header.id();
             let nonce = details.header.nonce();
-            let assets: Vec<Asset> = {
-                if details.vault_details.too_many_assets {
-                    self.sync_account_vault(BlockNumber::from(0), None, account_id)
-                        .await?
-                        .updates
-                        .into_iter()
-                        .filter_map(|update| update.asset)
-                        .collect()
-                } else {
-                    details.vault_details.assets
-                }
-            };
-
+            let assets = details.vault_details.assets;
             let slots = self.build_storage_slots(account_id, &details.storage_details).await?;
-            let seed = None;
             let asset_vault = AssetVault::new(&assets).map_err(|err| {
                 RpcError::InvalidResponse(format!("api rpc returned non-valid assets: {err}"))
             })?;
@@ -562,7 +558,7 @@ impl NodeRpcClient for GrpcClient {
                 ))
             })?;
             let account =
-                Account::new(account_id, asset_vault, account_storage, details.code, nonce, seed)
+                Account::new(account_id, asset_vault, account_storage, details.code, nonce, None)
                     .map_err(|err| {
                     RpcError::InvalidResponse(format!(
                         "failed to instance an account from the rpc api response: {err}"

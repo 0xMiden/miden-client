@@ -54,6 +54,7 @@ impl TryFrom<proto::rpc::SyncAccountStorageMapsResponse> for StorageMapInfo {
 // ================================================================================================
 
 /// Represents a `proto::rpc::StorageMapUpdate`
+#[derive(Debug, Clone)]
 pub struct StorageMapUpdate {
     /// Block number in which the slot was updated.
     pub block_num: BlockNumber,

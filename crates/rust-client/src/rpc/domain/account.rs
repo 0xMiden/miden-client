@@ -44,6 +44,16 @@ pub enum FetchedAccount {
     /// Public accounts are recorded on-chain. As such, its state is shared with the network and
     /// can always be retrieved through the appropriate RPC method.
     Public(Box<Account>, AccountUpdateSummary),
+    /// Public account that exceeded size thresholds (`too_many_entries` or `too_many_assets`).
+    /// Contains the account's metadata but not the full vault/storage data. The caller should
+    /// use delta sync endpoints (`SyncAccountVault`, `SyncAccountStorageMaps`) to update local
+    /// state incrementally.
+    PublicOversize {
+        summary: AccountUpdateSummary,
+        /// Account details as returned by the node (header, code, storage details, vault
+        /// details). The oversized maps/vault are not fully populated.
+        details: Box<AccountDetails>,
+    },
 }
 
 impl FetchedAccount {
@@ -58,25 +68,33 @@ impl FetchedAccount {
         Self::Public(Box::new(account), summary)
     }
 
+    /// Creates a [`FetchedAccount`] for a public account that exceeded size thresholds.
+    pub fn new_public_oversize(summary: AccountUpdateSummary, details: AccountDetails) -> Self {
+        Self::PublicOversize { summary, details: Box::new(details) }
+    }
+
     /// Returns the account ID.
     pub fn account_id(&self) -> AccountId {
         match self {
             Self::Private(account_id, _) => *account_id,
             Self::Public(account, _) => account.id(),
+            Self::PublicOversize { details, .. } => details.header.id(),
         }
     }
 
     // Returns the account update summary commitment
     pub fn commitment(&self) -> Word {
         match self {
-            Self::Private(_, summary) | Self::Public(_, summary) => summary.commitment,
+            Self::Private(_, summary)
+            | Self::Public(_, summary)
+            | Self::PublicOversize { summary, .. } => summary.commitment,
         }
     }
 
     // Returns the associated account if the account is public, otherwise none
     pub fn account(&self) -> Option<&Account> {
         match self {
-            Self::Private(..) => None,
+            Self::Private(..) | Self::PublicOversize { .. } => None,
             Self::Public(account, _) => Some(account.as_ref()),
         }
     }
@@ -85,7 +103,7 @@ impl FetchedAccount {
 impl From<FetchedAccount> for Option<Account> {
     fn from(acc: FetchedAccount) -> Self {
         match acc {
-            FetchedAccount::Private(..) => None,
+            FetchedAccount::Private(..) | FetchedAccount::PublicOversize { .. } => None,
             FetchedAccount::Public(account, _) => Some(*account),
         }
     }
