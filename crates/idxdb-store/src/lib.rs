@@ -31,6 +31,7 @@ use miden_client::crypto::{InOrderIndex, MmrPeaks};
 use miden_client::note::{BlockNumber, NoteScript, Nullifier};
 use miden_client::store::{
     AccountRecord,
+    AccountSmtForest,
     AccountStatus,
     AccountStorageFilter,
     BlockRelevance,
@@ -41,7 +42,6 @@ use miden_client::store::{
     Store,
     StoreError,
     TransactionFilter,
-    WebStore,
 };
 use miden_client::sync::{NoteTagRecord, StateSyncUpdate};
 use miden_client::transaction::{TransactionRecord, TransactionStoreUpdate};
@@ -86,7 +86,7 @@ extern "C" {
 /// which would prevent the struct from being Send + Sync.
 pub struct IdxdbStore {
     database_id: String,
-    smt_forest: RwLock<miden_client::store::AccountSmtForest>,
+    smt_forest: RwLock<AccountSmtForest>,
 }
 
 impl IdxdbStore {
@@ -96,7 +96,7 @@ impl IdxdbStore {
 
         let store = IdxdbStore {
             database_id: database_name,
-            smt_forest: RwLock::new(miden_client::store::AccountSmtForest::new()),
+            smt_forest: RwLock::new(AccountSmtForest::new()),
         };
 
         // Initialize SMT forest
@@ -129,11 +129,14 @@ impl IdxdbStore {
                     ))
                 })?;
 
-            self.smt_forest.write().insert_account_state(&vault, &storage).map_err(|e| {
-                JsValue::from_str(&format!(
-                    "Failed to insert account state for {account_id}: {e:?}"
-                ))
-            })?;
+            self.smt_forest
+                .write()
+                .insert_and_register_account_state(account_id, &vault, &storage)
+                .map_err(|e| {
+                    JsValue::from_str(&format!(
+                        "Failed to insert account state for {account_id}: {e:?}"
+                    ))
+                })?;
         }
 
         Ok(())
@@ -147,6 +150,10 @@ impl IdxdbStore {
 
 #[async_trait::async_trait(?Send)]
 impl Store for IdxdbStore {
+    fn identifier(&self) -> &str {
+        &self.database_id
+    }
+
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     fn get_current_timestamp(&self) -> Option<u64> {
         Some(current_timestamp_u64())
@@ -423,17 +430,6 @@ impl Store for IdxdbStore {
 
     async fn list_setting_keys(&self) -> Result<Vec<String>, StoreError> {
         self.list_setting_keys().await
-    }
-}
-
-#[async_trait::async_trait(?Send)]
-impl WebStore for IdxdbStore {
-    async fn export_store(&self) -> Result<String, StoreError> {
-        self.export_store().await
-    }
-
-    async fn import_store(&self, data: String) -> Result<(), StoreError> {
-        self.import_store(data).await
     }
 }
 

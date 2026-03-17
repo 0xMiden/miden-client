@@ -82,18 +82,6 @@ Returns the client-level default prover.
 
 ***
 
-### exportStore()
-
-> **exportStore**(): `Promise`\<[`StoreSnapshot`](../interfaces/StoreSnapshot.md)\>
-
-Exports the client store as a versioned snapshot.
-
-#### Returns
-
-`Promise`\<[`StoreSnapshot`](../interfaces/StoreSnapshot.md)\>
-
-***
-
 ### getSyncHeight()
 
 > **getSyncHeight**(): `Promise`\<`number`\>
@@ -103,24 +91,6 @@ Returns the current sync height.
 #### Returns
 
 `Promise`\<`number`\>
-
-***
-
-### importStore()
-
-> **importStore**(`snapshot`): `Promise`\<`void`\>
-
-Imports a previously exported store snapshot.
-
-#### Parameters
-
-##### snapshot
-
-[`StoreSnapshot`](../interfaces/StoreSnapshot.md)
-
-#### Returns
-
-`Promise`\<`void`\>
 
 ***
 
@@ -157,6 +127,18 @@ Serializes the mock note transport node state.
 #### Returns
 
 `Uint8Array`
+
+***
+
+### storeIdentifier()
+
+> **storeIdentifier**(): `string`
+
+Returns the identifier of the underlying store (e.g. IndexedDB database name, file path).
+
+#### Returns
+
+`string`
 
 ***
 

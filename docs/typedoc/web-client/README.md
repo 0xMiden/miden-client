@@ -111,4 +111,6 @@
 - [buildSwapTag](functions/buildSwapTag.md)
 - [createP2IDENote](functions/createP2IDENote.md)
 - [createP2IDNote](functions/createP2IDNote.md)
+- [exportStore](functions/exportStore.md)
 - [getWasmOrThrow](functions/getWasmOrThrow.md)
+- [importStore](functions/importStore.md)
