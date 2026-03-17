@@ -11,8 +11,14 @@ use crate::store::{InputNoteRecord, NoteFilter, Store};
 /// A lazy iterator over consumed input notes.
 ///
 /// Each call to [`InputNoteReader::next`] executes a store query and returns the
-/// next matching note. Use builder methods to configure filters before
-/// iterating.
+/// next matching note. Use builder methods to configure filters before iterating.
+///
+/// # Ordering
+///
+/// Notes are returned in on-chain consumption order: first by block number, then by
+/// transaction order within the block. Within a block, ordering is only guaranteed
+/// among notes consumed by the same account; ordering across different accounts is
+/// not guaranteed.
 pub struct InputNoteReader {
     store: Arc<dyn Store>,
     consumer: Option<AccountId>,

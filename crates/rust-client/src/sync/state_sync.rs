@@ -280,10 +280,9 @@ impl StateSync {
             .mmr_delta;
 
         // Gather transactions for tracked accounts (skip if none)
-        let (account_commitment_updates, transactions, nullifier_tx_order) =
-            if account_ids.is_empty() {
-                (vec![], vec![], BTreeMap::new())
-            } else {
+        let (account_commitment_updates, transactions, nullifiers) = if account_ids.is_empty() {
+            (vec![], vec![], vec![])
+        } else {
             let tx_info = self
                 .rpc_api
                 .sync_transactions(current_block_num, Some(target_block), account_ids.to_vec())
@@ -302,9 +301,9 @@ impl StateSync {
                 })
                 .collect();
 
-            let nullifier_tx_order = compute_nullifier_tx_order(&tx_info.transaction_records);
+            let nullifiers = compute_nullifiers(&tx_info.transaction_records);
 
-            (account_updates, tx_inclusions, nullifier_tx_order)
+            (account_updates, tx_inclusions, nullifiers)
         };
 
         // Compose StateSyncInfo with sync results
@@ -315,7 +314,7 @@ impl StateSync {
             account_commitment_updates,
             note_inclusions: note_sync.notes,
             transactions,
-            nullifier_tx_order,
+            nullifiers,
         }))
     }
 
@@ -339,10 +338,10 @@ impl StateSync {
                 account_commitment_updates,
                 note_inclusions,
                 transactions,
-                nullifier_tx_order,
+                nullifiers,
             } = sync_step;
 
-            state_sync_update.nullifier_tx_order.extend(nullifier_tx_order);
+            state_sync_update.nullifiers.extend(nullifiers);
 
             self.account_state_sync(
                 &mut state_sync_update.account_updates,
@@ -544,6 +543,14 @@ impl StateSync {
         // (it only returns nullifiers from current_block_num until
         // response.block_header.block_num())
 
+        // Build a position map from the ordered nullifiers to match the sync_nullifiers response.
+        let nullifier_order: BTreeMap<Nullifier, u16> = state_sync_update
+            .nullifiers
+            .iter()
+            .enumerate()
+            .map(|(i, n)| (*n, i as u16))
+            .collect();
+
         // Check for new nullifiers for input notes that were updated
         let nullifiers_tags: Vec<u16> = state_sync_update
             .note_updates
@@ -561,8 +568,7 @@ impl StateSync {
         new_nullifiers.retain(|update| update.block_num <= state_sync_update.block_num);
 
         for nullifier_update in new_nullifiers {
-            let order =
-                state_sync_update.nullifier_tx_order.get(&nullifier_update.nullifier).copied();
+            let order = nullifier_order.get(&nullifier_update.nullifier).copied();
 
             state_sync_update.note_updates.apply_nullifiers_state_transitions(
                 &nullifier_update,
@@ -658,16 +664,13 @@ fn apply_mmr_changes(
     Ok((new_peaks, new_authentication_nodes))
 }
 
-/// Builds a map from nullifier to the order of the consuming transaction within the block.
+/// Returns nullifiers ordered by consuming transaction position, per account.
 ///
 /// Groups RPC transaction records by (`account_id`, `block_num`), chains them using
-/// `initial_state_commitment` / `final_state_commitment`, and maps each transaction's input
-/// note nullifiers to the transaction's position in the chain.
-fn compute_nullifier_tx_order(
-    transaction_records: &[RpcTransactionRecord],
-) -> BTreeMap<Nullifier, u16> {
-    use alloc::collections::btree_map::Entry;
-
+/// `initial_state_commitment` / `final_state_commitment`, and collects each transaction's
+/// input note nullifiers in execution order. Nullifiers from the same account are in execution
+/// order; ordering across different accounts is arbitrary.
+fn compute_nullifiers(transaction_records: &[RpcTransactionRecord]) -> Vec<Nullifier> {
     // Group transactions by (account_id, block_num).
     let mut groups: BTreeMap<(AccountId, BlockNumber), Vec<&RpcTransactionRecord>> =
         BTreeMap::new();
@@ -677,7 +680,8 @@ fn compute_nullifier_tx_order(
         groups.entry((account_id, record.block_num)).or_default().push(record);
     }
 
-    let mut result = BTreeMap::new();
+    let mut result = Vec::new();
+    let mut seen = BTreeSet::new();
 
     for txs in groups.values() {
         // Build a lookup from initial_state_commitment -> transaction record.
@@ -702,13 +706,13 @@ fn compute_nullifier_tx_order(
 
         // Follow the chain: current.final_state_commitment == next.initial_state_commitment.
         let mut current = *start_tx;
-        let mut position: u16 = 0;
 
         loop {
-            // Map all input note nullifiers of this transaction to the current position.
+            // Collect all input note nullifiers of this transaction in chain order.
             for commitment in current.transaction_header.input_notes().iter() {
-                if let Entry::Vacant(e) = result.entry(commitment.nullifier()) {
-                    e.insert(position);
+                let nullifier = commitment.nullifier();
+                if seen.insert(nullifier) {
+                    result.push(nullifier);
                 }
             }
 
@@ -720,7 +724,6 @@ fn compute_nullifier_tx_order(
                     break;
                 }
                 current = next_tx;
-                position += 1;
             } else {
                 break;
             }
@@ -768,7 +771,7 @@ mod tests {
     // COMPUTE NULLIFIER TX ORDER TESTS
     // --------------------------------------------------------------------------------------------
 
-    mod compute_nullifier_tx_order_tests {
+    mod compute_nullifiers_tests {
         use alloc::vec;
 
         use miden_protocol::asset::FungibleAsset;
@@ -829,11 +832,11 @@ mod tests {
             let tx_b = make_rpc_tx(2, 3, &[20], 5);
             let tx_c = make_rpc_tx(3, 4, &[30], 5);
 
-            let result = super::super::compute_nullifier_tx_order(&[tx_c, tx_a, tx_b]);
+            let result = super::super::compute_nullifiers(&[tx_c, tx_a, tx_b]);
 
-            assert_eq!(result[&Nullifier::from_raw(word(10))], 0);
-            assert_eq!(result[&Nullifier::from_raw(word(20))], 1);
-            assert_eq!(result[&Nullifier::from_raw(word(30))], 2);
+            assert_eq!(result[0], Nullifier::from_raw(word(10)));
+            assert_eq!(result[1], Nullifier::from_raw(word(20)));
+            assert_eq!(result[2], Nullifier::from_raw(word(30)));
         }
 
         #[test]
@@ -869,29 +872,37 @@ mod tests {
                 ),
             };
 
-            let result = super::super::compute_nullifier_tx_order(&[tx_a2, tx_b1, tx_a3, tx_a1]);
+            let result = super::super::compute_nullifiers(&[tx_a2, tx_b1, tx_a3, tx_a1]);
 
-            assert_eq!(result[&Nullifier::from_raw(word(10))], 0); // A, block 5, pos 0
-            assert_eq!(result[&Nullifier::from_raw(word(20))], 1); // A, block 5, pos 1
-            assert_eq!(result[&Nullifier::from_raw(word(30))], 0); // A, block 6, pos 0
-            assert_eq!(result[&Nullifier::from_raw(word(40))], 0); // B, block 5, pos 0
+            // Nullifiers are ordered by chain position within each (account, block) group.
+            // The exact global indices depend on BTreeMap iteration order of the groups.
+            let pos = |val: u64| -> usize {
+                result.iter().position(|n| *n == Nullifier::from_raw(word(val))).unwrap()
+            };
+
+            // Within the same group, chain order is preserved.
+            assert!(pos(10) < pos(20)); // A, block 5: pos 0 < pos 1
+            // Nullifiers from different groups are all present.
+            assert!(result.contains(&Nullifier::from_raw(word(30)))); // A, block 6
+            assert!(result.contains(&Nullifier::from_raw(word(40)))); // B, block 5
         }
 
         #[test]
-        fn multiple_nullifiers_per_transaction_share_position() {
-            // Single tx consuming 3 notes — all should get position 0.
+        fn multiple_nullifiers_per_transaction_are_consecutive() {
+            // Single tx consuming 3 notes — all should appear consecutively.
             let tx = make_rpc_tx(1, 2, &[10, 20, 30], 5);
 
-            let result = super::super::compute_nullifier_tx_order(&[tx]);
+            let result = super::super::compute_nullifiers(&[tx]);
 
-            assert_eq!(result[&Nullifier::from_raw(word(10))], 0);
-            assert_eq!(result[&Nullifier::from_raw(word(20))], 0);
-            assert_eq!(result[&Nullifier::from_raw(word(30))], 0);
+            assert_eq!(result.len(), 3);
+            assert!(result.contains(&Nullifier::from_raw(word(10))));
+            assert!(result.contains(&Nullifier::from_raw(word(20))));
+            assert!(result.contains(&Nullifier::from_raw(word(30))));
         }
 
         #[test]
-        fn empty_input_returns_empty_map() {
-            let result = super::super::compute_nullifier_tx_order(&[]);
+        fn empty_input_returns_empty_vec() {
+            let result = super::super::compute_nullifiers(&[]);
             assert!(result.is_empty());
         }
     }

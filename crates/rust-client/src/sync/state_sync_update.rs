@@ -30,8 +30,9 @@ pub struct StateSyncUpdate {
     pub transaction_updates: TransactionUpdateTracker,
     /// Public account updates and mismatched private accounts after the sync.
     pub account_updates: AccountUpdates,
-    /// Mapping from nullifier to the order of the consuming transaction within the block.
-    pub nullifier_tx_order: BTreeMap<Nullifier, u16>,
+    /// Nullifiers ordered by consuming transaction position, per account. Nullifiers from the
+    /// same account are in execution order; ordering across different accounts is not guaranteed.
+    pub nullifiers: Vec<Nullifier>,
 }
 
 impl From<&StateSyncUpdate> for SyncSummary {

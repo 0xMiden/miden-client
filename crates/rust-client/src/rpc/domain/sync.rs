@@ -1,4 +1,3 @@
-use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 
 use miden_protocol::Word;
@@ -32,8 +31,9 @@ pub struct StateSyncInfo {
     /// `response.block_num-1`) along with the account the tx was executed against and the block
     /// number the transaction was included in.
     pub transactions: Vec<TransactionInclusion>,
-    /// Mapping from nullifier to the order of the consuming transaction within the block.
-    pub nullifier_tx_order: BTreeMap<Nullifier, u16>,
+    /// Nullifiers ordered by consuming transaction position, per account. Nullifiers from the
+    /// same account are in execution order; ordering across different accounts is not guaranteed.
+    pub nullifiers: Vec<Nullifier>,
 }
 
 // CHAIN MMR INFO
