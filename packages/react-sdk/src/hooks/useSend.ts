@@ -218,7 +218,7 @@ export function useSend(): UseSendResult {
               .withOwnOutputNotes(new OutputNoteArray([OutputNote.full(note)]))
               .build();
           } else {
-            txRequest = client.newSendTransactionRequest(
+            txRequest = await client.newSendTransactionRequest(
               fromAccountId,
               toAccountId,
               assetIdObj,
