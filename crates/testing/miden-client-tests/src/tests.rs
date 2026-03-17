@@ -2752,6 +2752,119 @@ async fn sync_storage_maps_pagination_from_middle() {
     assert_eq!(result.block_number, chain_tip);
 }
 
+/// Tests that `verify_stale_expected_notes` correctly transitions private notes from Expected
+/// to Committed when the commitment block has already been synced, and that the transition
+/// is reflected in `SyncSummary.committed_notes`.
+///
+/// This exercises the NTL/sync race fix: a private note is committed on-chain, then the client
+/// syncs (discarding the note because it doesn't have the details). Later the note is imported
+/// as Expected (simulating NTL delivery). On the next sync, `verify_stale_expected_notes`
+/// detects the stale Expected note, fetches its inclusion proof, and transitions it to Committed.
+#[tokio::test]
+async fn verify_stale_expected_notes_transitions_private_notes() {
+    // 1. Build a custom mock chain with one account and one private note committed in block 1.
+    let mut mock_chain_builder = MockChainBuilder::new();
+    let mock_account = mock_chain_builder
+        .add_existing_mock_account(miden_testing::Auth::IncrNonce)
+        .unwrap();
+
+    let private_note =
+        NoteBuilder::new(mock_account.id(), RpoRandomCoin::new([1, 2, 3, 4].map(Felt::new).into()))
+            .note_type(NoteType::Private)
+            .tag(NoteTag::new(0).into())
+            .build()
+            .unwrap();
+
+    let spawn_note =
+        mock_chain_builder.add_spawn_note(std::slice::from_ref(&private_note)).unwrap();
+    let mut mock_chain = mock_chain_builder.build().unwrap();
+
+    // Block 1: commit the private note (chain tip = 1).
+    let tx = Box::pin(
+        mock_chain
+            .build_tx_context(TxContextInput::AccountId(mock_account.id()), &[], &[spawn_note])
+            .unwrap()
+            .extend_expected_output_notes(vec![OutputNote::Full(private_note.clone())])
+            .build()
+            .unwrap()
+            .execute(),
+    )
+    .await
+    .unwrap();
+    mock_chain.add_pending_executed_transaction(&tx).unwrap();
+    mock_chain.prove_next_block().unwrap();
+
+    // 2. Create a test client from this chain.
+    let mut rng = rand::rng();
+    let coin_seed: [u64; 4] = rng.random();
+    let rng = RpoRandomCoin::new(coin_seed.map(Felt::new).into());
+
+    let keystore_path = temp_dir();
+    let _keystore = FilesystemKeyStore::new(keystore_path.clone()).unwrap();
+
+    let rpc_api = MockRpcApi::new(mock_chain);
+    let arc_rpc_api = Arc::new(rpc_api.clone());
+
+    let builder: ClientBuilder<FilesystemKeyStore> = ClientBuilder::new()
+        .rpc(arc_rpc_api)
+        .rng(Box::new(rng))
+        .sqlite_store(create_test_store_path())
+        .filesystem_keystore(keystore_path.to_str().unwrap())
+        .in_debug_mode(DebugMode::Enabled)
+        .tx_graceful_blocks(None);
+
+    let mut client = builder.build().await.unwrap();
+    client.ensure_genesis_in_place().await.unwrap();
+
+    // 3. Register tag 0 so that sync sees the note's block.
+    client.add_note_tag(NoteTag::new(0)).await.unwrap();
+
+    // 4. Sync to chain tip (block 1). The screener will discard the private note (no details
+    //    known), but block 1's header is stored. Since block 1 IS the sync height, it won't be
+    //    pruned.
+    client.sync_state().await.unwrap();
+
+    // 5. Import the note as Expected (simulates NTL delivery after sync). Use tag: None so that
+    //    check_expected_notes doesn't find the note during import (the real-world equivalent is a
+    //    note imported without tag metadata). verify_stale_expected_notes uses get_notes_by_id
+    //    which doesn't rely on tags.
+    let note_record: InputNoteRecord = private_note.clone().into();
+    let note_id = note_record.id();
+    client
+        .import_notes(&[NoteFile::NoteDetails {
+            details: note_record.into(),
+            tag: None,
+            after_block_num: 0.into(),
+        }])
+        .await
+        .unwrap();
+
+    // Verify the note is in Expected state.
+    let notes = client.get_input_notes(NoteFilter::Expected).await.unwrap();
+    assert!(notes.iter().any(|n| n.id() == note_id), "note should be in Expected state");
+
+    // 6. Advance the mock chain to block 2 so there is a new block to sync to.
+    rpc_api.prove_block();
+
+    // 7. Sync again — verify_stale_expected_notes should find the stale Expected note
+    //    (after_block_num=0 < sync_height=2), fetch the inclusion proof from block 1, and
+    //    transition it to Committed.
+    let sync_summary = client.sync_state().await.unwrap();
+
+    // 8. Assert: note is now Committed in the store.
+    let committed_notes = client.get_input_notes(NoteFilter::Committed).await.unwrap();
+    assert!(
+        committed_notes.iter().any(|n| n.id() == note_id),
+        "note should have transitioned to Committed"
+    );
+
+    // 9. Assert: SyncSummary.committed_notes contains the note ID.
+    assert!(
+        sync_summary.committed_notes.contains(&note_id),
+        "SyncSummary.committed_notes should contain the stale note ID"
+    );
+}
+
 // HELPERS
 // ================================================================================================
 

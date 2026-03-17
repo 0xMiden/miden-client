@@ -69,7 +69,8 @@ use miden_tx::utils::{Deserializable, DeserializationError, Serializable};
 use tracing::{debug, info};
 
 use crate::note::NoteScreener;
-use crate::store::{NoteFilter, TransactionFilter};
+use crate::rpc::domain::note::FetchedNote;
+use crate::store::{InputNoteState, NoteFilter, TransactionFilter};
 use crate::{Client, ClientError};
 mod block_header;
 
@@ -165,7 +166,7 @@ where
             )
             .await?;
 
-        let sync_summary: SyncSummary = (&state_sync_update).into();
+        let mut sync_summary: SyncSummary = (&state_sync_update).into();
         debug!(sync_summary = ?sync_summary, "Sync summary computed");
         info!("Applying changes to the store.");
 
@@ -178,7 +179,8 @@ where
         // Verify stale Expected notes BEFORE pruning block headers.
         // Checks all Expected notes whose commitment block has already been synced.
         // This is a single get_notes_by_id RPC call regardless of note count.
-        self.verify_stale_expected_notes().await?;
+        let newly_committed = self.verify_stale_expected_notes().await?;
+        sync_summary.committed_notes.extend(newly_committed);
 
         // Remove irrelevant block headers
         self.store.prune_irrelevant_blocks().await?;
@@ -192,10 +194,7 @@ where
     /// This handles the race condition where NTL delivers note data after the on-chain
     /// commitment was already synced. Uses a single `get_notes_by_id` RPC call for all
     /// stale notes regardless of count.
-    async fn verify_stale_expected_notes(&mut self) -> Result<(), ClientError> {
-        use crate::rpc::domain::note::FetchedNote;
-        use crate::store::InputNoteState;
-
+    async fn verify_stale_expected_notes(&mut self) -> Result<Vec<NoteId>, ClientError> {
         let sync_height = self.store.get_sync_height().await?;
         let expected_notes = self.store.get_input_notes(NoteFilter::Expected).await?;
 
@@ -210,7 +209,7 @@ where
             .collect();
 
         if stale_note_ids.is_empty() {
-            return Ok(());
+            return Ok(vec![]);
         }
 
         info!(
@@ -224,9 +223,12 @@ where
             Ok(notes) => notes,
             Err(e) => {
                 info!("Failed to fetch inclusion proofs for stale notes: {}", e);
-                return Ok(());
+                return Ok(vec![]);
             },
         };
+
+        let mut newly_committed: Vec<NoteId> = Vec::new();
+        let current_partial_mmr = self.store.get_current_partial_mmr().await?;
 
         for fetched_note in fetched_notes {
             let (note_id, inclusion_proof, metadata) = match &fetched_note {
@@ -240,8 +242,7 @@ where
 
             // Get the block header for verification
             let block_num = inclusion_proof.location().block_num();
-            let block_headers =
-                self.store.get_block_headers(&BTreeSet::from([block_num])).await?;
+            let block_headers = self.store.get_block_headers(&BTreeSet::from([block_num])).await?;
 
             let Some((block_header, _)) = block_headers.into_iter().next() else {
                 debug!(
@@ -252,8 +253,7 @@ where
             };
 
             // Re-read the note from the store
-            let mut notes =
-                self.store.get_input_notes(NoteFilter::List(vec![note_id])).await?;
+            let mut notes = self.store.get_input_notes(NoteFilter::List(vec![note_id])).await?;
             let Some(mut note_record) = notes.pop() else {
                 continue;
             };
@@ -274,15 +274,15 @@ where
 
             // Mark the block as having client notes so it survives pruning
             // and is available in the partial MMR for transaction execution.
-            let current_partial_mmr = self.store.get_current_partial_mmr().await?;
             self.store
                 .insert_block_header(&block_header, current_partial_mmr.peaks(), true)
                 .await?;
 
             info!("Transitioned stale Expected note {} to Committed", note_id);
+            newly_committed.push(note_id);
         }
 
-        Ok(())
+        Ok(newly_committed)
     }
 
     /// Applies the state sync update to the store.
