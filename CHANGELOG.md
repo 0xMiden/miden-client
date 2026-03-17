@@ -46,6 +46,7 @@
 * [BREAKING][FEATURE][web] Custom contract support: `accounts.create()` with `ImmutableContract`/`MutableContract` types, new `client.compile` resource (`compile.component()`, `compile.txScript()` with `"dynamic"`/`"static"` linking), and `transactions.execute({ account, script, foreignAccounts? })` for custom script execution with FPI. `transactions.send()` return type changed. ([#1828](https://github.com/0xMiden/miden-client/pull/1828))
 * [FEATURE][web] Account import improvements: `accounts.getOrImport(ref)` convenience method, and `accounts.import()` now accepts full `AccountRef` (string, `AccountId`, `Account`, `AccountHeader`) in addition to `{ file }` and `{ seed }` forms. ([#1828](https://github.com/0xMiden/miden-client/pull/1828))
 * [FEATURE][web] Added `AccountId.fromPrefixSuffix(prefix, suffix)` constructor for building an `AccountId` from its two felt components, useful when prefix/suffix are stored separately in storage maps. ([#1889](https://github.com/0xMiden/miden-client/pull/1889))
+* [FEATURE][web] Added `TransactionRequestBuilder.withExpirationDelta()` for expiring manual transaction requests ([#1904](https://github.com/0xMiden/miden-client/pull/1904))
 
 ### Fixes
 
