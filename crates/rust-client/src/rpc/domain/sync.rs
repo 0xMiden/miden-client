@@ -3,6 +3,7 @@ use alloc::vec::Vec;
 use miden_protocol::Word;
 use miden_protocol::account::AccountId;
 use miden_protocol::block::{BlockHeader, BlockNumber};
+use miden_protocol::crypto::merkle::MerklePath;
 use miden_protocol::crypto::merkle::mmr::MmrDelta;
 
 use super::note::CommittedNote;
@@ -22,6 +23,13 @@ pub struct StateSyncInfo {
     pub block_header: BlockHeader,
     /// MMR delta that contains data for (`current_block.num`, `incoming_block_header.num-1`).
     pub mmr_delta: MmrDelta,
+    /// MMR proof for `block_header` with respect to the chain tip.
+    ///
+    /// The full proof consists of `forest`, `position` and `path` components.
+    /// This value constitutes the `path`. The other two components can be obtained as follows:
+    ///    - `position` is `block_header.block_num`.
+    ///    - `forest` is `chain_tip + 1`.
+    pub mmr_path: MerklePath,
     /// Tuples of `AccountId` alongside their new account commitments.
     pub account_commitment_updates: Vec<(AccountId, Word)>,
     /// List of tuples of Note ID, Note Index and Merkle Path for all new notes.

@@ -7,6 +7,7 @@ use async_trait::async_trait;
 use miden_protocol::Word;
 use miden_protocol::account::{Account, AccountHeader, AccountId};
 use miden_protocol::block::{BlockHeader, BlockNumber};
+use miden_protocol::crypto::merkle::MerklePath;
 use miden_protocol::crypto::merkle::mmr::{InOrderIndex, MmrDelta, MmrPeaks, PartialMmr};
 use miden_protocol::note::{NoteId, NoteTag};
 use tracing::info;
@@ -230,6 +231,7 @@ impl StateSync {
                 chain_tip,
                 block_header,
                 mmr_delta,
+                mmr_path,
                 account_commitment_updates,
                 note_inclusions,
                 transactions,
@@ -262,6 +264,7 @@ impl StateSync {
                 found_relevant_note,
                 current_partial_mmr,
                 mmr_delta,
+                &mmr_path,
             )?;
 
             let include_block = found_relevant_note || chain_tip == block_header.block_num();
@@ -318,7 +321,8 @@ impl StateSync {
             return Ok(None);
         }
 
-        // Get MMR delta for the same range
+        // Get MMR delta for the same range. Correctness of this delta is verified
+        // cryptographically in `apply_mmr_changes` (peaks commitment check).
         let mmr_delta = self
             .rpc_api
             .sync_chain_mmr(current_block_num, Some(target_block))
@@ -355,6 +359,7 @@ impl StateSync {
             chain_tip: note_sync.chain_tip,
             block_header: note_sync.block_header,
             mmr_delta,
+            mmr_path: note_sync.mmr_path,
             account_commitment_updates,
             note_inclusions: note_sync.notes,
             transactions,
@@ -604,11 +609,16 @@ fn derive_account_commitment_updates(
 
 /// Applies changes to the current MMR structure, returns the updated [`MmrPeaks`] and the
 /// authentication nodes for leaves we track.
+///
+/// The `mmr_path` is the Merkle proof for the new block header as returned by the node. It is
+/// verified against the local MMR state to anchor the block header to the client's trusted
+/// chain state.
 fn apply_mmr_changes(
     new_block: &BlockHeader,
     new_block_has_relevant_notes: bool,
     current_partial_mmr: &mut PartialMmr,
     mmr_delta: MmrDelta,
+    mmr_path: &MerklePath,
 ) -> Result<(MmrPeaks, Vec<(InOrderIndex, Word)>), ClientError> {
     // Apply the MMR delta to bring MMR to forest equal to chain tip
     let mut new_authentication_nodes: Vec<(InOrderIndex, Word)> =
@@ -616,8 +626,30 @@ fn apply_mmr_changes(
 
     let new_peaks = current_partial_mmr.peaks();
 
+    // Verify that post-delta peaks match the block header's chain commitment.
+    // chain_commitment is the hash of MMR peaks for blocks 0..block_num-1,
+    // which is exactly the state after applying the delta.
+    let peaks_commitment = new_peaks.hash_peaks();
+    if peaks_commitment != new_block.chain_commitment() {
+        return Err(ClientError::ChainValidationError(format!(
+            "MMR peaks commitment is {:?} and does not match block header chain commitment {:?}",
+            peaks_commitment,
+            new_block.chain_commitment()
+        )));
+    }
+
     new_authentication_nodes
         .append(&mut current_partial_mmr.add(new_block.commitment(), new_block_has_relevant_notes));
+
+    // Verify the MMR path anchors the block header to the client's trusted chain state.
+    // The path is provided by the node with respect to forest = chain_tip + 1, so we adjust
+    // it to our current (smaller or equal) forest.
+    new_authentication_nodes.extend(super::block_header::track_block_in_mmr(
+        current_partial_mmr,
+        new_block.block_num(),
+        new_block.commitment(),
+        mmr_path,
+    )?);
 
     Ok((new_peaks, new_authentication_nodes))
 }

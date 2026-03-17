@@ -102,6 +102,8 @@ pub enum ClientError {
         "the chain Merkle Mountain Range (MMR) forest value exceeds the supported range (must fit in a u32)"
     )]
     InvalidPartialMmrForest,
+    #[error("chain validation error: {0}")]
+    ChainValidationError(String),
     #[error(
         "cannot track a new account without its seed; the seed is required to validate the account ID's correctness"
     )]
