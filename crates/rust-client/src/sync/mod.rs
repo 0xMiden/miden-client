@@ -70,7 +70,7 @@ use tracing::{debug, info};
 
 use crate::note::NoteScreener;
 use crate::rpc::domain::note::FetchedNote;
-use crate::store::{InputNoteState, NoteFilter, TransactionFilter};
+use crate::store::{InputNoteRecord, InputNoteState, NoteFilter, TransactionFilter};
 use crate::{Client, ClientError};
 mod block_header;
 
@@ -205,7 +205,7 @@ where
                 InputNoteState::Expected(state) => state.after_block_num < sync_height,
                 _ => false,
             })
-            .map(|note| note.id())
+            .map(InputNoteRecord::id)
             .collect();
 
         if stale_note_ids.is_empty() {
