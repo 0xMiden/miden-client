@@ -175,10 +175,114 @@ where
             .await
             .map_err(ClientError::StoreError)?;
 
+        // Verify stale Expected notes BEFORE pruning block headers.
+        // Notes that arrived via NTL after their commitment block was synced are stuck
+        // as Expected. Transition them and mark their blocks as having client notes
+        // so they survive pruning.
+        self.verify_stale_expected_notes().await?;
+
         // Remove irrelevant block headers
         self.store.prune_irrelevant_blocks().await?;
 
         Ok(sync_summary)
+    }
+
+    /// Checks for Expected notes that should already be committed (their `after_block_num` is
+    /// behind the current sync height) and fetches their inclusion proofs from the node.
+    ///
+    /// This handles the race condition where the NTL delivers note data after the on-chain
+    /// commitment was already synced. Without this, such notes stay Expected forever.
+    async fn verify_stale_expected_notes(&mut self) -> Result<(), ClientError> {
+        use crate::rpc::domain::note::FetchedNote;
+        use crate::store::InputNoteState;
+
+        let sync_height = self.store.get_sync_height().await?;
+        let expected_notes = self.store.get_input_notes(NoteFilter::Expected).await?;
+
+        // Find Expected notes whose commitment block has already been synced
+        let stale_note_ids: Vec<NoteId> = expected_notes
+            .iter()
+            .filter(|note| match note.state() {
+                InputNoteState::Expected(state) => state.after_block_num < sync_height,
+                _ => false,
+            })
+            .map(|note| note.id())
+            .collect();
+
+        if stale_note_ids.is_empty() {
+            return Ok(());
+        }
+
+        info!(
+            "Found {} stale Expected notes behind sync height {}, fetching inclusion proofs...",
+            stale_note_ids.len(),
+            sync_height
+        );
+
+        // Fetch inclusion proofs from the node
+        let fetched_notes = match self.rpc_api.get_notes_by_id(&stale_note_ids).await {
+            Ok(notes) => notes,
+            Err(e) => {
+                info!("Failed to fetch inclusion proofs for stale notes: {}", e);
+                return Ok(());
+            },
+        };
+
+        for fetched_note in fetched_notes {
+            let (note_id, inclusion_proof, metadata) = match &fetched_note {
+                FetchedNote::Private(header, proof) => {
+                    (header.id(), proof.clone(), header.metadata().clone())
+                },
+                FetchedNote::Public(note, proof) => {
+                    (note.id(), proof.clone(), note.metadata().clone())
+                },
+            };
+
+            // Get the block header for verification
+            let block_num = inclusion_proof.location().block_num();
+            let block_headers =
+                self.store.get_block_headers(&BTreeSet::from([block_num])).await?;
+
+            let Some((block_header, _)) = block_headers.into_iter().next() else {
+                debug!(
+                    "Block header {} not stored locally for note {}, will retry on next sync",
+                    block_num, note_id
+                );
+                continue;
+            };
+
+            // Re-read the note from the store
+            let mut notes =
+                self.store.get_input_notes(NoteFilter::List(vec![note_id])).await?;
+            let Some(mut note_record) = notes.pop() else {
+                continue;
+            };
+
+            // Transition the note: Expected → Unverified → Committed
+            if let Err(e) = note_record.inclusion_proof_received(inclusion_proof, metadata) {
+                info!("Failed to apply inclusion proof for note {}: {}", note_id, e);
+                continue;
+            }
+
+            if let Err(e) = note_record.block_header_received(&block_header) {
+                info!("Failed to verify note {} against block header: {}", note_id, e);
+                continue;
+            }
+
+            // Persist the updated note state
+            self.store.upsert_input_notes(&[note_record]).await?;
+
+            // Mark the block as having client notes so it survives pruning
+            // and is available in the partial MMR for transaction execution.
+            let current_partial_mmr = self.store.get_current_partial_mmr().await?;
+            self.store
+                .insert_block_header(&block_header, current_partial_mmr.peaks(), true)
+                .await?;
+
+            info!("Transitioned stale Expected note {} to Committed", note_id);
+        }
+
+        Ok(())
     }
 
     /// Applies the state sync update to the store.

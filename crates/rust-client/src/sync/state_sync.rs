@@ -373,7 +373,8 @@ impl StateSync {
         let mut found_relevant_note = false;
 
         for committed_note in note_inclusions {
-            let public_note = (!committed_note.metadata().is_private())
+            let is_private = committed_note.metadata().is_private();
+            let public_note = (!is_private)
                 .then(|| public_notes.get(committed_note.note_id()))
                 .flatten()
                 .cloned();
@@ -391,7 +392,16 @@ impl StateSync {
 
                     note_updates.apply_new_public_note(public_note, block_header)?;
                 },
-                NoteUpdateAction::Discard => {},
+                NoteUpdateAction::Discard => {
+                    // Preserve this block's header and MMR authentication nodes for
+                    // private notes matching our tags. The note screener discards them
+                    // because the full note data hasn't arrived yet (pending NTL delivery).
+                    // When the NTL delivers the data in a later sync cycle, we'll need
+                    // the block's MMR auth nodes to transition and consume the note.
+                    if is_private {
+                        found_relevant_note = true;
+                    }
+                },
             }
         }
 
