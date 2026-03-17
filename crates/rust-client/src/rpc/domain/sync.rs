@@ -32,8 +32,7 @@ pub struct StateSyncInfo {
     /// `response.block_num-1`) along with the account the tx was executed against and the block
     /// number the transaction was included in.
     pub transactions: Vec<TransactionInclusion>,
-    /// Mapping from nullifier to the consuming transaction's position in the account's state
-    /// chain within a block. Built from `sync_transactions` response headers.
+    /// Mapping from nullifier to the order of the consuming transaction within the block.
     pub nullifier_tx_order: BTreeMap<Nullifier, u16>,
 }
 

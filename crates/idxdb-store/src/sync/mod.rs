@@ -118,6 +118,7 @@ impl IdxdbStore {
             note_updates,
             transaction_updates,
             account_updates,
+            nullifier_tx_order: _,
         } = state_sync_update;
 
         let (

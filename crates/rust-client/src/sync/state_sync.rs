@@ -18,7 +18,10 @@ use crate::note::NoteUpdateTracker;
 use crate::rpc::NodeRpcClient;
 use crate::rpc::domain::note::CommittedNote;
 use crate::rpc::domain::sync::StateSyncInfo;
-use crate::rpc::domain::transaction::{self as rpc_tx, TransactionInclusion};
+use crate::rpc::domain::transaction::{
+    TransactionInclusion,
+    TransactionRecord as RpcTransactionRecord,
+};
 use crate::store::{InputNoteRecord, OutputNoteRecord, StoreError};
 use crate::transaction::TransactionRecord;
 
@@ -225,20 +228,18 @@ impl StateSync {
         // to notes based on the received information.
         info!("Applying state transitions locally.");
 
-        let all_nullifier_tx_order = self
-            .apply_sync_steps(
-                state_sync_steps,
-                &accounts,
-                &public_note_records,
-                &mut state_sync_update,
-                current_partial_mmr,
-            )
-            .await?;
+        self.apply_sync_steps(
+            state_sync_steps,
+            &accounts,
+            &public_note_records,
+            &mut state_sync_update,
+            current_partial_mmr,
+        )
+        .await?;
 
         if self.sync_nullifiers {
             info!("Syncing nullifiers.");
-            self.nullifiers_state_sync(&mut state_sync_update, block_num, &all_nullifier_tx_order)
-                .await?;
+            self.nullifiers_state_sync(&mut state_sync_update, block_num).await?;
         }
 
         Ok(state_sync_update)
@@ -279,11 +280,10 @@ impl StateSync {
             .mmr_delta;
 
         // Gather transactions for tracked accounts (skip if none)
-        let (account_commitment_updates, transactions, nullifier_tx_order) = if account_ids
-            .is_empty()
-        {
-            (vec![], vec![], BTreeMap::new())
-        } else {
+        let (account_commitment_updates, transactions, nullifier_tx_order) =
+            if account_ids.is_empty() {
+                (vec![], vec![], BTreeMap::new())
+            } else {
             let tx_info = self
                 .rpc_api
                 .sync_transactions(current_block_num, Some(target_block), account_ids.to_vec())
@@ -322,7 +322,7 @@ impl StateSync {
     // HELPERS
     // --------------------------------------------------------------------------------------------
 
-    /// Applies each sync step to the update, returning accumulated nullifier tx order.
+    /// Applies each sync step to the update.
     async fn apply_sync_steps(
         &self,
         sync_steps: Vec<StateSyncInfo>,
@@ -330,9 +330,7 @@ impl StateSync {
         public_note_records: &BTreeMap<NoteId, InputNoteRecord>,
         state_sync_update: &mut StateSyncUpdate,
         current_partial_mmr: &mut PartialMmr,
-    ) -> Result<BTreeMap<Nullifier, u16>, ClientError> {
-        let mut all_nullifier_tx_order = BTreeMap::new();
-
+    ) -> Result<(), ClientError> {
         for sync_step in sync_steps {
             let StateSyncInfo {
                 chain_tip,
@@ -344,7 +342,7 @@ impl StateSync {
                 nullifier_tx_order,
             } = sync_step;
 
-            all_nullifier_tx_order.extend(nullifier_tx_order);
+            state_sync_update.nullifier_tx_order.extend(nullifier_tx_order);
 
             self.account_state_sync(
                 &mut state_sync_update.account_updates,
@@ -395,7 +393,7 @@ impl StateSync {
             }
         }
 
-        Ok(all_nullifier_tx_order)
+        Ok(())
     }
 
     /// Compares the state of tracked accounts with the updates received from the node. The method
@@ -540,7 +538,6 @@ impl StateSync {
         &self,
         state_sync_update: &mut StateSyncUpdate,
         current_block_num: BlockNumber,
-        external_nullifier_tx_order: &BTreeMap<Nullifier, u16>,
     ) -> Result<(), ClientError> {
         // To receive information about added nullifiers, we reduce them to the higher 16 bits
         // Note that besides filtering by nullifier prefixes, the node also filters by block number
@@ -564,7 +561,8 @@ impl StateSync {
         new_nullifiers.retain(|update| update.block_num <= state_sync_update.block_num);
 
         for nullifier_update in new_nullifiers {
-            let order = external_nullifier_tx_order.get(&nullifier_update.nullifier).copied();
+            let order =
+                state_sync_update.nullifier_tx_order.get(&nullifier_update.nullifier).copied();
 
             state_sync_update.note_updates.apply_nullifiers_state_transitions(
                 &nullifier_update,
@@ -616,9 +614,9 @@ impl StateSync {
 /// highest `block_num`. This replicates the old `SyncState` behavior where the node returned
 /// the latest account commitment per account in the synced range.
 fn derive_account_commitment_updates(
-    transaction_records: &[rpc_tx::TransactionRecord],
+    transaction_records: &[RpcTransactionRecord],
 ) -> Vec<(AccountId, Word)> {
-    let mut latest_by_account: BTreeMap<AccountId, &rpc_tx::TransactionRecord> = BTreeMap::new();
+    let mut latest_by_account: BTreeMap<AccountId, &RpcTransactionRecord> = BTreeMap::new();
 
     for record in transaction_records {
         let account_id = record.transaction_header.account_id();
@@ -660,18 +658,18 @@ fn apply_mmr_changes(
     Ok((new_peaks, new_authentication_nodes))
 }
 
-/// Builds a map from nullifier to transaction order within a block.
+/// Builds a map from nullifier to the order of the consuming transaction within the block.
 ///
 /// Groups RPC transaction records by (`account_id`, `block_num`), chains them using
 /// `initial_state_commitment` / `final_state_commitment`, and maps each transaction's input
 /// note nullifiers to the transaction's position in the chain.
 fn compute_nullifier_tx_order(
-    transaction_records: &[rpc_tx::TransactionRecord],
+    transaction_records: &[RpcTransactionRecord],
 ) -> BTreeMap<Nullifier, u16> {
     use alloc::collections::btree_map::Entry;
 
     // Group transactions by (account_id, block_num).
-    let mut groups: BTreeMap<(AccountId, BlockNumber), Vec<&rpc_tx::TransactionRecord>> =
+    let mut groups: BTreeMap<(AccountId, BlockNumber), Vec<&RpcTransactionRecord>> =
         BTreeMap::new();
 
     for record in transaction_records {
@@ -683,7 +681,7 @@ fn compute_nullifier_tx_order(
 
     for txs in groups.values() {
         // Build a lookup from initial_state_commitment -> transaction record.
-        let mut init_to_tx: BTreeMap<Word, &rpc_tx::TransactionRecord> = BTreeMap::new();
+        let mut init_to_tx: BTreeMap<Word, &RpcTransactionRecord> = BTreeMap::new();
         for tx in txs {
             init_to_tx.insert(tx.transaction_header.initial_state_commitment(), tx);
         }
@@ -779,7 +777,10 @@ mod tests {
         use miden_protocol::transaction::{InputNoteCommitment, InputNotes, TransactionHeader};
         use miden_protocol::{Felt, ZERO};
 
-        use crate::rpc::domain::transaction::{self as rpc_tx, ACCOUNT_ID_NATIVE_ASSET_FAUCET};
+        use crate::rpc::domain::transaction::{
+            ACCOUNT_ID_NATIVE_ASSET_FAUCET,
+            TransactionRecord as RpcTransactionRecord,
+        };
 
         fn word(n: u64) -> miden_protocol::Word {
             [Felt::new(n), ZERO, ZERO, ZERO].into()
@@ -790,7 +791,7 @@ mod tests {
             final_state: u64,
             nullifier_vals: &[u64],
             block_number: u32,
-        ) -> rpc_tx::TransactionRecord {
+        ) -> RpcTransactionRecord {
             let account_id = miden_protocol::account::AccountId::try_from(
                 miden_protocol::testing::account_id::ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE,
             )
@@ -807,7 +808,7 @@ mod tests {
                 FungibleAsset::new(ACCOUNT_ID_NATIVE_ASSET_FAUCET.try_into().expect("valid"), 0u64)
                     .unwrap();
 
-            rpc_tx::TransactionRecord {
+            RpcTransactionRecord {
                 block_num: BlockNumber::from(block_number),
                 transaction_header: TransactionHeader::new(
                     account_id,
@@ -854,7 +855,7 @@ mod tests {
                 FungibleAsset::new(ACCOUNT_ID_NATIVE_ASSET_FAUCET.try_into().expect("valid"), 0u64)
                     .unwrap();
 
-            let tx_b1 = rpc_tx::TransactionRecord {
+            let tx_b1 = RpcTransactionRecord {
                 block_num: BlockNumber::from(5u32),
                 transaction_header: TransactionHeader::new(
                     account_b,

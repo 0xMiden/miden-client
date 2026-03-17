@@ -31,8 +31,8 @@ pub struct InputNoteUpdate {
     note: InputNoteRecord,
     /// Type of the note update.
     update_type: NoteUpdateType,
-    /// Position of the consuming transaction in the account's state chain within the block.
-    /// `None` for non-consumed notes or notes consumed by external (non-client) transactions.
+    /// Position of the consuming transaction in the account's state chain within the block. `None`
+    /// for non-consumed notes or notes consumed by external (non-client) transactions.
     consumed_tx_order: Option<u16>,
 }
 
@@ -90,8 +90,8 @@ impl InputNoteUpdate {
         self.note.id()
     }
 
-    /// Returns the position of the consuming transaction in the account's state chain within the
-    /// block. `None` for non-consumed notes or notes consumed by external transactions.
+    /// Returns the position within the block of the transaction that consumed this note.
+    /// `None` for non-consumed notes or notes consumed by external transactions.
     pub fn consumed_tx_order(&self) -> Option<u16> {
         self.consumed_tx_order
     }
