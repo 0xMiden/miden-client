@@ -367,6 +367,15 @@ impl DataStore for ClientDataStore {
             self.fetch_and_cache_foreign_account(account_id, account_state_at).await?;
         }
 
+        // Try to get the witness from the cached account inputs. It will miss if the account's
+        // storage is too big.
+        if let Some(inputs) = self.foreign_account_inputs.read().get(&account_id)
+            && let Some(partial_map) = inputs.storage().maps().find(|m| m.root() == map_root)
+            && let Ok(witness) = partial_map.open(&map_key)
+        {
+            return Ok(witness);
+        }
+
         let (slot_name, known_code) = self.resolve_slot_name_and_code(account_id, map_root)?;
 
         self.fetch_and_cache_storage_map_witness(
