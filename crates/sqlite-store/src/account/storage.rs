@@ -1,6 +1,6 @@
 //! Storage-related database operations for accounts.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::rc::Rc;
 use std::string::ToString;
 use std::vec::Vec;
@@ -128,6 +128,10 @@ impl SqliteStore {
             .map(|(slot_name, slot)| StorageSlot::with_value(slot_name.clone(), *slot))
             .collect();
 
+        // Track which root indices have already been updated, so that two map slots
+        // sharing the same old root each get their own entry updated.
+        let mut updated_indices = BTreeSet::new();
+
         // For storage map deltas, we only updated the keys in the delta, this is why we need the
         // previously retrieved storage maps.
         for (slot_name, map_delta) in delta.storage().maps() {
@@ -149,11 +153,13 @@ impl SqliteStore {
                 }));
             }
 
-            let root = account_roots
+            let (idx, root) = account_roots
                 .iter_mut()
-                .find(|r| **r == old_root)
+                .enumerate()
+                .find(|(i, r)| **r == old_root && !updated_indices.contains(i))
                 .ok_or(StoreError::AccountStorageRootNotFound(old_root))?;
             *root = expected_root;
+            updated_indices.insert(idx);
 
             updated_storage_slots.push(StorageSlot::with_map(slot_name.clone(), map));
         }
