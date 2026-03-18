@@ -61,7 +61,17 @@ function loadSdk(): any {
   );
 }
 
-export const sdk = loadSdk();
+// Lazy-load: only initialize when actually used (avoids crash on browser-only CI)
+let _sdk: any = null;
+export const sdk = new Proxy(
+  {},
+  {
+    get(_target, prop) {
+      if (!_sdk) _sdk = loadSdk();
+      return _sdk[prop];
+    },
+  }
+) as any;
 
 // ── Patch napi prototypes for browser compatibility ───────────────────
 // wasm-bindgen uses snake_case method names, napi uses camelCase.
