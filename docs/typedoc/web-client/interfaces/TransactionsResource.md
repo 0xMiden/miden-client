@@ -58,6 +58,24 @@ Execute a custom transaction script, optionally referencing foreign accounts (FP
 
 ***
 
+### executeProgram()
+
+> **executeProgram**(`options`): `Promise`\<`FeltArray`\>
+
+Execute a program (view call) and return the resulting stack output.
+
+#### Parameters
+
+##### options
+
+[`ExecuteProgramOptions`](ExecuteProgramOptions.md)
+
+#### Returns
+
+`Promise`\<`FeltArray`\>
+
+***
+
 ### list()
 
 > **list**(`query?`): `Promise`\<[`TransactionRecord`](../classes/TransactionRecord.md)[]\>

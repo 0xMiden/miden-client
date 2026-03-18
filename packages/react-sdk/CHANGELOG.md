@@ -5,6 +5,7 @@
 ### Features
 * [FEATURE][web] All user-facing amount fields (`amount`, `maxSupply`, `offeredAmount`, `requestedAmount`) now accept `number` in addition to `bigint`, removing the need for `n` suffixes or `BigInt()` wrappers. Values are coerced to `bigint` internally before passing to WASM. Output types (balances, note assets) remain `bigint`.
 * [FEATURE][web] `formatAssetAmount()` now accepts `number | bigint` for convenience.
+* [FEATURE][web] Added `useExecuteProgram()` hook for local-only "view call" execution. Runs a compiled `TransactionScript` against an account and returns the 16-element stack output as `bigint[]`. Supports optional `adviceInputs`, `foreignAccounts`, `skipSync`, and includes a concurrency guard. ([#1859](https://github.com/0xMiden/miden-client/issues/1859))
 
 ## 0.13.3 (2026-02-25)
 

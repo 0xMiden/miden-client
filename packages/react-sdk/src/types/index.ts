@@ -11,6 +11,9 @@ import type {
   TransactionId,
   TransactionRecord,
   TransactionRequest,
+  TransactionScript,
+  AdviceInputs,
+  AccountStorageRequirements,
   NoteType,
   NoteId,
   AccountStorageMode,
@@ -423,6 +426,30 @@ export interface ExecuteTransactionOptions {
 // Transaction result
 export interface TransactionResult {
   transactionId: string;
+}
+
+// Execute program (view call) options
+export interface ExecuteProgramOptions {
+  /** Account to execute the program against */
+  accountId: string | AccountId;
+  /** Compiled TransactionScript */
+  script: TransactionScript;
+  /** Advice inputs (defaults to empty) */
+  adviceInputs?: AdviceInputs;
+  /** Foreign accounts referenced by the script */
+  foreignAccounts?: (
+    | string
+    | AccountId
+    | { id: string | AccountId; storage?: AccountStorageRequirements }
+  )[];
+  /** Skip auto-sync before execution. Default: false */
+  skipSync?: boolean;
+}
+
+// Execute program result
+export interface ExecuteProgramResult {
+  /** The 16-element stack output as bigint array */
+  stack: bigint[];
 }
 
 // --- useNoteStream types ---

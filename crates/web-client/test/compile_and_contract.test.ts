@@ -679,3 +679,143 @@ test.describe("transactions.execute()", () => {
     expect(result.txHex.length).toBeGreaterThan(0);
   });
 });
+
+// ════════════════════════════════════════════════════════════════
+// transactions.executeProgram()
+// ════════════════════════════════════════════════════════════════
+
+test.describe("transactions.executeProgram()", () => {
+  test("returns a 16-element stack output from a view call", async ({
+    page,
+  }) => {
+    const result = await page.evaluate(
+      async ({ code, slotName }) => {
+        const client = await window.MidenClient.createMock();
+
+        // Create the counter contract
+        const component = await client.compile.component({
+          code,
+          slots: [window.StorageSlot.emptyValue(slotName)],
+        });
+
+        const seed = new Uint8Array(32);
+        seed.fill(0x50);
+        const auth = window.AuthSecretKey.rpoFalconWithRNG(seed);
+
+        const account = await client.accounts.create({
+          type: "ImmutableContract",
+          storage: "public",
+          seed,
+          auth,
+          components: [component],
+        });
+
+        client.proveBlock();
+        await client.sync();
+
+        // Compile a script that reads the count (currently 0)
+        const script = await client.compile.txScript({
+          code: `
+            use external_contract::counter_contract
+            begin
+              call.counter_contract::get_count
+            end
+          `,
+          libraries: [
+            { namespace: "external_contract::counter_contract", code },
+          ],
+        });
+
+        // executeProgram is a local-only view call — returns FeltArray
+        const feltArray = await client.transactions.executeProgram({
+          account: account.id(),
+          script,
+        });
+
+        const stackLength = feltArray.length();
+        const firstValue = feltArray.get(0).asInt();
+
+        return { stackLength, firstValue: firstValue.toString() };
+      },
+      { code: COUNTER_CODE, slotName: COUNTER_SLOT_NAME }
+    );
+
+    expect(result.stackLength).toBe(16);
+    // Counter starts at 0
+    expect(result.firstValue).toBe("0");
+  });
+
+  test("reads updated state after a mutating transaction", async ({ page }) => {
+    const result = await page.evaluate(
+      async ({ code, slotName }) => {
+        const client = await window.MidenClient.createMock();
+
+        const component = await client.compile.component({
+          code,
+          slots: [window.StorageSlot.emptyValue(slotName)],
+        });
+
+        const seed = new Uint8Array(32);
+        seed.fill(0x60);
+        const auth = window.AuthSecretKey.rpoFalconWithRNG(seed);
+
+        const account = await client.accounts.create({
+          type: "ImmutableContract",
+          storage: "public",
+          seed,
+          auth,
+          components: [component],
+        });
+
+        client.proveBlock();
+        await client.sync();
+
+        // Increment the counter
+        const incrScript = await client.compile.txScript({
+          code: `
+            use external_contract::counter_contract
+            begin
+              call.counter_contract::increment_count
+            end
+          `,
+          libraries: [
+            { namespace: "external_contract::counter_contract", code },
+          ],
+        });
+
+        await client.transactions.execute({
+          account: account.id(),
+          script: incrScript,
+        });
+
+        client.proveBlock();
+        await client.sync();
+
+        // Now read the count via executeProgram — should be 1
+        const readScript = await client.compile.txScript({
+          code: `
+            use external_contract::counter_contract
+            begin
+              call.counter_contract::get_count
+            end
+          `,
+          libraries: [
+            { namespace: "external_contract::counter_contract", code },
+          ],
+        });
+
+        const feltArray = await client.transactions.executeProgram({
+          account: account.id(),
+          script: readScript,
+        });
+
+        const count = feltArray.get(0).asInt();
+
+        return { count: count.toString() };
+      },
+      { code: COUNTER_CODE, slotName: COUNTER_SLOT_NAME }
+    );
+
+    expect(result.count).toBe("1");
+  });
+});
