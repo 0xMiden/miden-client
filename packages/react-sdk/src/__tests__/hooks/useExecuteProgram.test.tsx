@@ -1,9 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, act, waitFor } from "@testing-library/react";
+import type { TransactionScript } from "@miden-sdk/miden-sdk";
 import { useExecuteProgram } from "../../hooks/useExecuteProgram";
 import { useMiden } from "../../context/MidenProvider";
 import { useMidenStore } from "../../store/MidenStore";
 import { createMockWebClient, createMockFeltArray } from "../mocks/miden-sdk";
+
+const mockScript = {} as TransactionScript;
 
 // Mock useMiden
 vi.mock("../../context/MidenProvider", () => ({
@@ -49,7 +52,7 @@ describe("useExecuteProgram", () => {
       await expect(
         result.current.execute({
           accountId: "0xaccount",
-          script: {},
+          script: mockScript,
         })
       ).rejects.toThrow("Miden client is not ready");
     });
@@ -73,7 +76,7 @@ describe("useExecuteProgram", () => {
       await act(async () => {
         execResult = await result.current.execute({
           accountId: "0xaccount",
-          script: {},
+          script: mockScript,
         });
       });
 
@@ -85,7 +88,7 @@ describe("useExecuteProgram", () => {
       expect(result.current.result).toEqual(execResult);
       expect(mockClient.executeProgram).toHaveBeenCalledWith(
         expect.anything(),
-        {},
+        mockScript,
         expect.anything(),
         expect.anything()
       );
@@ -113,7 +116,7 @@ describe("useExecuteProgram", () => {
       await act(async () => {
         await result.current.execute({
           accountId: "0xaccount",
-          script: {},
+          script: mockScript,
           adviceInputs: mockAdviceInputs as any,
           foreignAccounts: mockForeignAccounts,
         });
@@ -147,7 +150,7 @@ describe("useExecuteProgram", () => {
         await expect(
           result.current.execute({
             accountId: "0x1",
-            script: {},
+            script: mockScript,
           })
         ).rejects.toThrow("Execution failed");
       });
@@ -182,14 +185,14 @@ describe("useExecuteProgram", () => {
       act(() => {
         firstExec = result.current.execute({
           accountId: "0x1",
-          script: {},
+          script: mockScript,
         });
       });
 
       await expect(
         result.current.execute({
           accountId: "0x1",
-          script: {},
+          script: mockScript,
         })
       ).rejects.toThrow("A program execution is already in progress");
 
@@ -219,7 +222,7 @@ describe("useExecuteProgram", () => {
       await act(async () => {
         await result.current.execute({
           accountId: "0x1",
-          script: {},
+          script: mockScript,
         });
       });
 
@@ -244,7 +247,7 @@ describe("useExecuteProgram", () => {
       await act(async () => {
         await result.current.execute({
           accountId: "0x1",
-          script: {},
+          script: mockScript,
           skipSync: true,
         });
       });
@@ -271,7 +274,7 @@ describe("useExecuteProgram", () => {
       await act(async () => {
         await result.current.execute({
           accountId: "0x1",
-          script: {},
+          script: mockScript,
         });
       });
 
