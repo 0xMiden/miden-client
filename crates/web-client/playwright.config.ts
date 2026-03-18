@@ -123,6 +123,7 @@ export default defineConfig({
         "test/import.test*", // Integration: needs running node
         "test/shared/**", // Old format duplicates (ported to root test/)
         "test/node/**", // Old format duplicates (ported to root test/)
+        "test/remote_prover_transactions*", // Old browser format for chromium CI
       ],
       // Skip specific browser-only tests by name
       grepInvert: /exportStore|importStore/,
