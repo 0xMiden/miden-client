@@ -49,6 +49,7 @@ test.describe("compile.component()", () => {
     sdk,
   }) => {
     const MidenClient = await createMidenClient(sdk);
+    test.skip(!MidenClient, "requires napi binary (Node.js only)");
     const client = await MidenClient.createMock();
     const component = await client.compile.component({
       code: COUNTER_CODE,
@@ -71,6 +72,7 @@ test.describe("compile.component()", () => {
     // If withSupportsAllTypes() weren't called, building the account below would
     // fail because the component wouldn't be compatible with the account type.
     const MidenClient = await createMidenClient(sdk);
+    test.skip(!MidenClient, "requires napi binary (Node.js only)");
     const client = await MidenClient.createMock();
     const component = await client.compile.component({
       code: COUNTER_CODE,
@@ -98,6 +100,7 @@ test.describe("compile.component()", () => {
   }) => {
     // Two compile.component() calls with different slots must not merge.
     const MidenClient = await createMidenClient(sdk);
+    test.skip(!MidenClient, "requires napi binary (Node.js only)");
     const client = await MidenClient.createMock();
 
     const slotA = "miden::tutorials::counter";
@@ -125,6 +128,7 @@ test.describe("compile.component()", () => {
 test.describe("compile.txScript()", () => {
   test("compiles a script without libraries", async ({ sdk }) => {
     const MidenClient = await createMidenClient(sdk);
+    test.skip(!MidenClient, "requires napi binary (Node.js only)");
     const client = await MidenClient.createMock();
     const script = await client.compile.txScript({
       code: `
@@ -139,6 +143,7 @@ test.describe("compile.txScript()", () => {
 
   test("compiles a script with a dynamic library", async ({ sdk }) => {
     const MidenClient = await createMidenClient(sdk);
+    test.skip(!MidenClient, "requires napi binary (Node.js only)");
     const client = await MidenClient.createMock();
     const script = await client.compile.txScript({
       code: `
@@ -165,6 +170,7 @@ test.describe("compile.txScript()", () => {
     // first call's library and still succeed (or fail in unexpected ways).
     // With fresh builders the second call compiles cleanly in isolation.
     const MidenClient = await createMidenClient(sdk);
+    test.skip(!MidenClient, "requires napi binary (Node.js only)");
     const client = await MidenClient.createMock();
 
     // First call: link counter_contract library
@@ -208,6 +214,7 @@ test.describe("accounts.create() — ImmutableContract / MutableContract", () =>
     sdk,
   }) => {
     const MidenClient = await createMidenClient(sdk);
+    test.skip(!MidenClient, "requires napi binary (Node.js only)");
     const client = await MidenClient.createMock();
 
     const component = await client.compile.component({
@@ -236,6 +243,7 @@ test.describe("accounts.create() — ImmutableContract / MutableContract", () =>
 
   test("MutableContract: isUpdatable=true, isPublic=true", async ({ sdk }) => {
     const MidenClient = await createMidenClient(sdk);
+    test.skip(!MidenClient, "requires napi binary (Node.js only)");
     const client = await MidenClient.createMock();
 
     const component = await client.compile.component({
@@ -264,6 +272,7 @@ test.describe("accounts.create() — ImmutableContract / MutableContract", () =>
     sdk,
   }) => {
     const MidenClient = await createMidenClient(sdk);
+    test.skip(!MidenClient, "requires napi binary (Node.js only)");
     const client = await MidenClient.createMock();
 
     const component = await client.compile.component({
@@ -292,6 +301,7 @@ test.describe("accounts.create() — ImmutableContract / MutableContract", () =>
     // The Miden protocol requires at least one non-auth procedure in contract
     // accounts, so creating a contract with only the auth component must fail.
     const MidenClient = await createMidenClient(sdk);
+    test.skip(!MidenClient, "requires napi binary (Node.js only)");
     const client = await MidenClient.createMock();
 
     const seed = new Uint8Array(32);
@@ -317,6 +327,7 @@ test.describe("accounts.create() — ImmutableContract / MutableContract", () =>
     sdk,
   }) => {
     const MidenClient = await createMidenClient(sdk);
+    test.skip(!MidenClient, "requires napi binary (Node.js only)");
 
     const seed = new Uint8Array(32);
     seed.fill(0x77);
@@ -367,6 +378,7 @@ test.describe("transactions.execute()", () => {
     sdk,
   }) => {
     const MidenClient = await createMidenClient(sdk);
+    test.skip(!MidenClient, "requires napi binary (Node.js only)");
     const client = await MidenClient.createMock();
 
     // Create the counter contract
@@ -419,6 +431,7 @@ test.describe("transactions.execute()", () => {
 
   test("execute() increments storage slot on the contract", async ({ sdk }) => {
     const MidenClient = await createMidenClient(sdk);
+    test.skip(!MidenClient, "requires napi binary (Node.js only)");
     const client = await MidenClient.createMock();
 
     const component = await client.compile.component({
@@ -484,6 +497,7 @@ test.describe("transactions.execute()", () => {
     // Verifies that the wrapper-vs-WASM discrimination logic in execute() works:
     // passing { id: accountId } (plain object) correctly resolves the account ref.
     const MidenClient = await createMidenClient(sdk);
+    test.skip(!MidenClient, "requires napi binary (Node.js only)");
     const client = await MidenClient.createMock();
 
     // Create a target contract (the "foreign" account)
@@ -536,6 +550,7 @@ test.describe("transactions.execute()", () => {
     sdk,
   }) => {
     const MidenClient = await createMidenClient(sdk);
+    test.skip(!MidenClient, "requires napi binary (Node.js only)");
     const client = await MidenClient.createMock();
 
     const component = await client.compile.component({

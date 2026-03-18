@@ -342,8 +342,13 @@ export function parseNetworkId(sdk: any, networkId: string): any {
  * Creates a fresh mock client (separate from the test fixture's client).
  * Useful for tests that need multiple independent clients.
  */
-export async function createFreshMockClient(sdk: any): Promise<any> {
-  const rawSdk = loadNodeSdk();
+export async function createFreshMockClient(sdk: any): Promise<any | null> {
+  let rawSdk;
+  try {
+    rawSdk = loadNodeSdk();
+  } catch {
+    return null;
+  }
   const dir = tmpDir();
 
   const rawClient = new rawSdk.WebClient();
@@ -510,7 +515,13 @@ function wrapClientForMidenClient(
 export async function createMidenClient(sdk: any): Promise<any> {
   if (_midenClientClass) return _midenClientClass;
 
-  const rawSdk = loadNodeSdk();
+  let rawSdk;
+  try {
+    rawSdk = loadNodeSdk();
+  } catch {
+    // napi binary not available (browser CI) — return null
+    return null;
+  }
   const jsDir = path.resolve(import.meta.dirname, "..", "js");
 
   const arrayPolyfills: Record<string, any> = {};

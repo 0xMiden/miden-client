@@ -12,6 +12,7 @@ test.describe("MidenClient API - Mock Chain", () => {
     sdk,
   }) => {
     const MidenClient = await createMidenClient(sdk);
+    test.skip(!MidenClient, "requires napi binary (Node.js only)");
     const client = await MidenClient.createMock();
 
     const wallet = await client.accounts.create();
@@ -62,6 +63,7 @@ test.describe("MidenClient API - Mock Chain", () => {
     sdk,
   }) => {
     const MidenClient = await createMidenClient(sdk);
+    test.skip(!MidenClient, "requires napi binary (Node.js only)");
     const client = await MidenClient.createMock();
 
     const wallet = await client.accounts.create();
@@ -73,6 +75,7 @@ test.describe("MidenClient API - Mock Chain", () => {
 
   test("accounts.create faucet", async ({ sdk }) => {
     const MidenClient = await createMidenClient(sdk);
+    test.skip(!MidenClient, "requires napi binary (Node.js only)");
     const client = await MidenClient.createMock();
 
     const faucet = await client.accounts.create({
@@ -89,6 +92,7 @@ test.describe("MidenClient API - Mock Chain", () => {
 
   test("accounts.list returns created accounts", async ({ sdk }) => {
     const MidenClient = await createMidenClient(sdk);
+    test.skip(!MidenClient, "requires napi binary (Node.js only)");
     const client = await MidenClient.createMock();
 
     await client.accounts.create();
@@ -100,6 +104,7 @@ test.describe("MidenClient API - Mock Chain", () => {
 
   test("accounts.get returns account by hex string", async ({ sdk }) => {
     const MidenClient = await createMidenClient(sdk);
+    test.skip(!MidenClient, "requires napi binary (Node.js only)");
     const client = await MidenClient.createMock();
     const wallet = await client.accounts.create();
     const hexId = wallet.id().toString();
@@ -110,6 +115,7 @@ test.describe("MidenClient API - Mock Chain", () => {
 
   test("accounts.get returns null for nonexistent account", async ({ sdk }) => {
     const MidenClient = await createMidenClient(sdk);
+    test.skip(!MidenClient, "requires napi binary (Node.js only)");
     const client = await MidenClient.createMock();
     // Create a wallet to get a valid-looking hex ID, then look up it
     const wallet = await client.accounts.create();
@@ -121,6 +127,7 @@ test.describe("MidenClient API - Mock Chain", () => {
 
   test("transactions.list with no query returns all", async ({ sdk }) => {
     const MidenClient = await createMidenClient(sdk);
+    test.skip(!MidenClient, "requires napi binary (Node.js only)");
     const client = await MidenClient.createMock();
     const wallet = await client.accounts.create();
     const faucet = await client.accounts.create({
@@ -142,6 +149,7 @@ test.describe("MidenClient API - Mock Chain", () => {
 
   test("transactions.list with uncommitted query", async ({ sdk }) => {
     const MidenClient = await createMidenClient(sdk);
+    test.skip(!MidenClient, "requires napi binary (Node.js only)");
     const client = await MidenClient.createMock();
     const wallet = await client.accounts.create();
     const faucet = await client.accounts.create({
@@ -177,6 +185,7 @@ test.describe("MidenClient API - Mock Chain", () => {
 
   test("notes.list and notes.get", async ({ sdk }) => {
     const MidenClient = await createMidenClient(sdk);
+    test.skip(!MidenClient, "requires napi binary (Node.js only)");
     const client = await MidenClient.createMock();
     const wallet = await client.accounts.create();
     const faucet = await client.accounts.create({
@@ -219,6 +228,7 @@ test.describe("MidenClient API - Mock Chain", () => {
 
   test("usesMockChain and proveBlock", async ({ sdk }) => {
     const MidenClient = await createMidenClient(sdk);
+    test.skip(!MidenClient, "requires napi binary (Node.js only)");
     const client = await MidenClient.createMock();
     const isMock = client.usesMockChain();
 
@@ -230,6 +240,7 @@ test.describe("MidenClient API - Mock Chain", () => {
 
   test("terminate prevents further operations", async ({ sdk }) => {
     const MidenClient = await createMidenClient(sdk);
+    test.skip(!MidenClient, "requires napi binary (Node.js only)");
     const client = await MidenClient.createMock();
     client.terminate();
 
@@ -243,6 +254,7 @@ test.describe("MidenClient API - Mock Chain", () => {
 
   test("consumeAll consumes all available notes", async ({ sdk }) => {
     const MidenClient = await createMidenClient(sdk);
+    test.skip(!MidenClient, "requires napi binary (Node.js only)");
     const client = await MidenClient.createMock();
     const wallet = await client.accounts.create();
     const faucet = await client.accounts.create({
@@ -277,6 +289,7 @@ test.describe("MidenClient API - Mock Chain", () => {
 
   test("consumeAll with maxNotes limits consumption", async ({ sdk }) => {
     const MidenClient = await createMidenClient(sdk);
+    test.skip(!MidenClient, "requires napi binary (Node.js only)");
     const client = await MidenClient.createMock();
     const wallet = await client.accounts.create();
     const faucet = await client.accounts.create({
@@ -311,6 +324,7 @@ test.describe("MidenClient API - Mock Chain", () => {
 
   test("consumeAll with maxNotes: 0 returns early", async ({ sdk }) => {
     const MidenClient = await createMidenClient(sdk);
+    test.skip(!MidenClient, "requires napi binary (Node.js only)");
     const client = await MidenClient.createMock();
     const wallet = await client.accounts.create();
     const faucet = await client.accounts.create({
@@ -340,6 +354,7 @@ test.describe("MidenClient API - Mock Chain", () => {
 
   test("consumeAll with no consumable notes returns early", async ({ sdk }) => {
     const MidenClient = await createMidenClient(sdk);
+    test.skip(!MidenClient, "requires napi binary (Node.js only)");
     const client = await MidenClient.createMock();
     const wallet = await client.accounts.create();
 
@@ -354,6 +369,7 @@ test.describe("MidenClient API - Mock Chain", () => {
 
   test("accounts.getDetails returns full account info", async ({ sdk }) => {
     const MidenClient = await createMidenClient(sdk);
+    test.skip(!MidenClient, "requires napi binary (Node.js only)");
     const client = await MidenClient.createMock();
     const wallet = await client.accounts.create();
 
@@ -367,6 +383,7 @@ test.describe("MidenClient API - Mock Chain", () => {
 
   test("notes.listSent returns output notes after mint", async ({ sdk }) => {
     const MidenClient = await createMidenClient(sdk);
+    test.skip(!MidenClient, "requires napi binary (Node.js only)");
     const client = await MidenClient.createMock();
     const wallet = await client.accounts.create();
     const faucet = await client.accounts.create({
@@ -390,6 +407,7 @@ test.describe("MidenClient API - Mock Chain", () => {
 
   test("notes.listAvailable returns consumable notes", async ({ sdk }) => {
     const MidenClient = await createMidenClient(sdk);
+    test.skip(!MidenClient, "requires napi binary (Node.js only)");
     const client = await MidenClient.createMock();
     const wallet = await client.accounts.create();
     const faucet = await client.accounts.create({
@@ -413,6 +431,7 @@ test.describe("MidenClient API - Mock Chain", () => {
 
   test("terminate prevents resource operations", async ({ sdk }) => {
     const MidenClient = await createMidenClient(sdk);
+    test.skip(!MidenClient, "requires napi binary (Node.js only)");
     const client = await MidenClient.createMock();
     client.terminate();
 
@@ -441,6 +460,7 @@ test.describe("MidenClient API - Mock Chain", () => {
 
   test("error on invalid note type string", async ({ sdk }) => {
     const MidenClient = await createMidenClient(sdk);
+    test.skip(!MidenClient, "requires napi binary (Node.js only)");
     const client = await MidenClient.createMock();
     const wallet = await client.accounts.create();
     const faucet = await client.accounts.create({
@@ -465,6 +485,7 @@ test.describe("MidenClient API - Mock Chain", () => {
 
   test("error on invalid storage mode string", async ({ sdk }) => {
     const MidenClient = await createMidenClient(sdk);
+    test.skip(!MidenClient, "requires napi binary (Node.js only)");
     const client = await MidenClient.createMock();
 
     try {
@@ -479,6 +500,7 @@ test.describe("MidenClient API - Mock Chain", () => {
 
   test("error on null account reference", async ({ sdk }) => {
     const MidenClient = await createMidenClient(sdk);
+    test.skip(!MidenClient, "requires napi binary (Node.js only)");
     const client = await MidenClient.createMock();
 
     try {
@@ -491,6 +513,7 @@ test.describe("MidenClient API - Mock Chain", () => {
 
   test("accounts.export returns a valid AccountFile", async ({ sdk }) => {
     const MidenClient = await createMidenClient(sdk);
+    test.skip(!MidenClient, "requires napi binary (Node.js only)");
     const client = await MidenClient.createMock();
     const wallet = await client.accounts.create({ storage: "public" });
 
@@ -503,6 +526,7 @@ test.describe("MidenClient API - Mock Chain", () => {
 
   test("notes.export returns a valid NoteFile", async ({ sdk }) => {
     const MidenClient = await createMidenClient(sdk);
+    test.skip(!MidenClient, "requires napi binary (Node.js only)");
     const client = await MidenClient.createMock();
     const wallet = await client.accounts.create();
     const faucet = await client.accounts.create({
@@ -537,6 +561,7 @@ test.describe("MidenClient API - Mock Chain", () => {
 
   test("notes.export with id format", async ({ sdk }) => {
     const MidenClient = await createMidenClient(sdk);
+    test.skip(!MidenClient, "requires napi binary (Node.js only)");
     const client = await MidenClient.createMock();
     const wallet = await client.accounts.create();
     const faucet = await client.accounts.create({
@@ -566,6 +591,7 @@ test.describe("MidenClient API - Mock Chain", () => {
 
   test("transactions.preview returns a TransactionSummary", async ({ sdk }) => {
     const MidenClient = await createMidenClient(sdk);
+    test.skip(!MidenClient, "requires napi binary (Node.js only)");
     const client = await MidenClient.createMock();
     const wallet = await client.accounts.create();
     const faucet = await client.accounts.create({
@@ -590,6 +616,7 @@ test.describe("MidenClient API - Mock Chain", () => {
 
   test("standalone createP2IDNote creates a valid note", async ({ sdk }) => {
     const MidenClient = await createMidenClient(sdk);
+    test.skip(!MidenClient, "requires napi binary (Node.js only)");
     const client = await MidenClient.createMock();
     const wallet = await client.accounts.create();
     const faucet = await client.accounts.create({
@@ -615,6 +642,7 @@ test.describe("MidenClient API - Mock Chain", () => {
 
   test("standalone buildSwapTag returns a NoteTag", async ({ sdk }) => {
     const MidenClient = await createMidenClient(sdk);
+    test.skip(!MidenClient, "requires napi binary (Node.js only)");
     const client = await MidenClient.createMock();
     const faucetA = await client.accounts.create({
       type: "FungibleFaucet",
@@ -649,6 +677,7 @@ test.describe("MidenClient API - Mock Chain", () => {
     sdk,
   }) => {
     const MidenClient = await createMidenClient(sdk);
+    test.skip(!MidenClient, "requires napi binary (Node.js only)");
     const client = await MidenClient.createMock();
     const wallet = await client.accounts.create({ storage: "public" });
     const walletId = wallet.id().toString();
@@ -671,6 +700,7 @@ test.describe("MidenClient API - Mock Chain", () => {
     );
 
     const MidenClient = await createMidenClient(sdk);
+    test.skip(!MidenClient, "requires napi binary (Node.js only)");
     const client = await MidenClient.createMock();
     const wallet = await client.accounts.create({ storage: "public" });
     const walletId = wallet.id().toString();
@@ -691,6 +721,7 @@ test.describe("MidenClient API - Mock Chain", () => {
 
   test("serializeMockChain and restore", async ({ sdk }) => {
     const MidenClient = await createMidenClient(sdk);
+    test.skip(!MidenClient, "requires napi binary (Node.js only)");
     const client = await MidenClient.createMock();
 
     const wallet = await client.accounts.create();
