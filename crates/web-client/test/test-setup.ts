@@ -297,11 +297,8 @@ export const test = base.extend<{
       const { client } = await createNodeMockClient();
       await use(client);
     } else {
-      // Browser tests don't use this fixture — they use the old
-      // forEachTest pattern from playwright.global.setup.ts.
-      // This branch exists only to avoid errors if a ported test
-      // accidentally runs on the browser project.
-      await use(null);
+      // Browser: client is set up by forEachTest on window.client
+      await use((globalThis as any).client);
     }
   },
 
@@ -312,12 +309,21 @@ export const test = base.extend<{
       const rawSdk = loadNodeSdk();
       await use(createNodeSdkWrapper(rawSdk));
     } else {
-      // Browser: SDK types are on window.* via forEachTest
-      // TODO: provide a proper browser SDK wrapper
-      await use({
-        u64: (val: number | bigint) => BigInt(val),
-        u64Array: (vals: number[]) => new BigUint64Array(vals.map(BigInt)),
-      });
+      // Browser: proxy to window.* (SDK types are set up by forEachTest)
+      await use(
+        new Proxy(
+          {
+            u64: (val: number | bigint) => BigInt(val),
+            u64Array: (vals: number[]) => new BigUint64Array(vals.map(BigInt)),
+          },
+          {
+            get(target, prop) {
+              if (prop in target) return target[prop];
+              return (globalThis as any)[prop];
+            },
+          }
+        )
+      );
     }
   },
 });
