@@ -285,7 +285,8 @@ impl NoteUpdateTracker {
     /// accounts is not guaranteed.
     pub fn extend_nullifiers(&mut self, nullifiers: impl IntoIterator<Item = Nullifier>) {
         for nullifier in nullifiers {
-            let next_pos = self.nullifier_order.len() as u16;
+            let next_pos =
+                u16::try_from(self.nullifier_order.len()).expect("nullifier count exceeds u16");
             self.nullifier_order.entry(nullifier).or_insert(next_pos);
         }
     }
