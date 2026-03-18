@@ -35,6 +35,7 @@ export { useMint } from "./hooks/useMint";
 export { useConsume } from "./hooks/useConsume";
 export { useSwap } from "./hooks/useSwap";
 export { useTransaction } from "./hooks/useTransaction";
+export { useExecuteProgram } from "./hooks/useExecuteProgram";
 export { useSessionAccount } from "./hooks/useSessionAccount";
 
 // Types
@@ -75,6 +76,8 @@ export type {
   SwapOptions,
   ExecuteTransactionOptions,
   TransactionResult,
+  ExecuteProgramOptions,
+  ExecuteProgramResult,
   // Note stream types
   StreamedNote,
   UseNoteStreamOptions,
@@ -146,5 +149,6 @@ export type { UseMintResult } from "./hooks/useMint";
 export type { UseConsumeResult } from "./hooks/useConsume";
 export type { UseSwapResult } from "./hooks/useSwap";
 export type { UseTransactionResult } from "./hooks/useTransaction";
+export type { UseExecuteProgramResult } from "./hooks/useExecuteProgram";
 export type { UseSyncStateResult } from "./hooks/useSyncState";
 export type { UseTransactionHistoryResult } from "./hooks/useTransactionHistory";

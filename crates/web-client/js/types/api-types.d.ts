@@ -29,6 +29,8 @@ import type {
   AuthSecretKey,
   AccountStorageRequirements,
   TransactionScript,
+  AdviceInputs,
+  FeltArray,
 } from "./crates/miden_client_web";
 
 // Import the full namespace for the MidenArrayConstructors type
@@ -309,6 +311,20 @@ export interface ExecuteOptions extends TransactionOptions {
   )[];
 }
 
+export interface ExecuteProgramOptions {
+  /** Account to execute the program against. */
+  account: AccountRef;
+  /** Compiled TransactionScript to execute. */
+  script: TransactionScript;
+  /** Advice inputs for the execution. Defaults to empty. */
+  adviceInputs?: AdviceInputs;
+  /** Foreign accounts referenced by the script. */
+  foreignAccounts?: (
+    | AccountRef
+    | { id: AccountRef; storage?: AccountStorageRequirements }
+  )[];
+}
+
 export interface PreviewSendOptions {
   operation: "send";
   account: AccountRef;
@@ -485,6 +501,9 @@ export interface TransactionsResource {
 
   /** Execute a custom transaction script, optionally referencing foreign accounts (FPI). */
   execute(options: ExecuteOptions): Promise<TransactionId>;
+
+  /** Execute a program (view call) and return the resulting stack output. */
+  executeProgram(options: ExecuteProgramOptions): Promise<FeltArray>;
 
   list(query?: TransactionQuery): Promise<TransactionRecord[]>;
 

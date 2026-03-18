@@ -203,6 +203,16 @@ vi.mock("@miden-sdk/miden-sdk", () => {
       withInputNotes = vi.fn(() => this);
       build = vi.fn(() => ({}));
     },
+    AdviceInputs: class AdviceInputs {},
+    ForeignAccount: Object.assign(class ForeignAccount {}, {
+      public: vi.fn(
+        (_id: unknown, _storage: unknown) => new (class ForeignAccount {})()
+      ),
+    }),
+    ForeignAccountArray: class ForeignAccountArray {
+      constructor(_accounts?: unknown[]) {}
+    },
+    AccountStorageRequirements: class AccountStorageRequirements {},
     NoteFilter: vi.fn().mockImplementation(() => ({
       free: vi.fn(),
     })),

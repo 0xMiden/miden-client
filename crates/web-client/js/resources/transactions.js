@@ -201,6 +201,37 @@ export class TransactionsResource {
     return txId;
   }
 
+  async executeProgram(opts) {
+    this.#client.assertNotTerminated();
+    const wasm = await this.#getWasm();
+    const accountId = resolveAccountRef(opts.account, wasm);
+
+    let foreignAccountsArray = new wasm.ForeignAccountArray();
+    if (opts.foreignAccounts?.length) {
+      const accounts = opts.foreignAccounts.map((fa) => {
+        const isWrapper =
+          fa !== null &&
+          typeof fa === "object" &&
+          "id" in fa &&
+          typeof fa.id !== "function";
+        const id = resolveAccountRef(isWrapper ? fa.id : fa, wasm);
+        const storage =
+          isWrapper && fa.storage
+            ? fa.storage
+            : new wasm.AccountStorageRequirements();
+        return wasm.ForeignAccount.public(id, storage);
+      });
+      foreignAccountsArray = new wasm.ForeignAccountArray(accounts);
+    }
+
+    return await this.#inner.executeProgram(
+      accountId,
+      opts.script,
+      opts.adviceInputs ?? new wasm.AdviceInputs(),
+      foreignAccountsArray
+    );
+  }
+
   async submit(account, request, opts) {
     this.#client.assertNotTerminated();
     const wasm = await this.#getWasm();
