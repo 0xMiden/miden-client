@@ -86,10 +86,10 @@ impl TransactionRequestBuilder {
     }
 
     /// Sets the maximum number of blocks until the transaction request expires.
-    #[wasm_bindgen(js_name = "withExpirationDelta")]
-    pub fn with_expiration_delta(mut self, expiration_delta: u16) -> Self {
-        self.0 = self.0.expiration_delta(expiration_delta);
-        self
+    #[js_export(js_name = "withExpirationDelta")]
+    pub fn with_expiration_delta(&mut self, expiration_delta: u16) -> Self {
+        self.0 = self.0.clone().expiration_delta(expiration_delta);
+        self.clone()
     }
 
     /// Declares expected output recipients (used for verification).
