@@ -17,8 +17,8 @@ use miden_protocol::account::{
 };
 use miden_protocol::asset::{AssetVaultKey, AssetWitness};
 use miden_protocol::block::{BlockHeader, BlockNumber};
-use miden_protocol::crypto::merkle::MerklePath;
 use miden_protocol::crypto::merkle::mmr::{InOrderIndex, PartialMmr};
+use miden_protocol::crypto::merkle::{MerkleError, MerklePath};
 use miden_protocol::note::NoteScript;
 use miden_protocol::transaction::{AccountInputs, PartialBlockchain};
 use miden_protocol::vm::FutureMaybeSend;
@@ -313,10 +313,8 @@ impl DataStore for ClientDataStore {
         let mut asset_witnesses = vec![];
         for vault_key in vault_keys {
             match self.store.get_account_asset(account_id, vault_key).await {
-                Ok(Some((_, asset_witness))) => {
-                    asset_witnesses.push(asset_witness);
-                },
-                Ok(_) => {
+                Ok(Some((_, asset_witness))) => asset_witnesses.push(asset_witness),
+                Ok(None) | Err(StoreError::MerkleStoreError(MerkleError::RootNotInStore(_))) => {
                     let vault = self.store.get_account_vault(account_id).await?;
 
                     if vault.root() != vault_root {

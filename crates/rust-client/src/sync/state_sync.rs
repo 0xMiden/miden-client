@@ -168,6 +168,7 @@ impl StateSync {
     /// 6. Transactions are updated with their new states. Transactions might be committed or
     ///    discarded.
     /// 7. The MMR is updated with the new peaks and authentication nodes.
+    #[allow(clippy::too_many_lines)]
     pub async fn sync_state(
         &self,
         current_partial_mmr: &mut PartialMmr,
@@ -224,13 +225,29 @@ impl StateSync {
 
         let public_note_records = self.fetch_public_note_details(&public_note_ids).await?;
 
+        // Collect account commitment updates across all sync steps. Each account only needs
+        // to be checked once since GetAccount always returns the latest state.
+        let merged_commitment_updates: Vec<(AccountId, Word)> = state_sync_steps
+            .iter()
+            .flat_map(|s| s.account_commitment_updates.iter())
+            .map(|(id, w)| (*id, *w))
+            .collect::<BTreeMap<_, _>>()
+            .into_iter()
+            .collect();
+
+        self.account_state_sync(
+            &mut state_sync_update.account_updates,
+            &accounts,
+            &merged_commitment_updates,
+        )
+        .await?;
+
         // Apply local changes. These involve updating the MMR and applying state transitions
         // to notes based on the received information.
         info!("Applying state transitions locally.");
 
         self.apply_sync_steps(
             state_sync_steps,
-            &accounts,
             &public_note_records,
             &mut state_sync_update,
             current_partial_mmr,
@@ -325,7 +342,6 @@ impl StateSync {
     async fn apply_sync_steps(
         &self,
         sync_steps: Vec<StateSyncInfo>,
-        accounts: &[AccountHeader],
         public_note_records: &BTreeMap<NoteId, InputNoteRecord>,
         state_sync_update: &mut StateSyncUpdate,
         current_partial_mmr: &mut PartialMmr,
@@ -335,20 +351,13 @@ impl StateSync {
                 chain_tip,
                 block_header,
                 mmr_delta,
-                account_commitment_updates,
                 note_inclusions,
                 transactions,
                 nullifiers,
+                ..
             } = sync_step;
 
             state_sync_update.note_updates.extend_nullifiers(nullifiers);
-
-            self.account_state_sync(
-                &mut state_sync_update.account_updates,
-                accounts,
-                &account_commitment_updates,
-            )
-            .await?;
 
             self.transaction_state_sync(
                 &mut state_sync_update.transaction_updates,

@@ -288,7 +288,7 @@ const { client, account, setAccount } = useTurnkeySigner();
 ```tsx
 import { MidenFiSignerProvider } from "@miden-sdk/wallet-adapter-react";
 
-<MidenFiSignerProvider network="Testnet">
+<MidenFiSignerProvider network="testnet">
   <MidenProvider config={{ rpcUrl: "testnet" }}>
     <App />
   </MidenProvider>
