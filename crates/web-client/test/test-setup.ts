@@ -97,7 +97,7 @@ export async function createNodeMockClient(): Promise<{
   return { client, sdk };
 }
 
-async function createNodeIntegrationClient(
+export async function createNodeIntegrationClient(
   rpcUrl: string,
   storeName: string
 ): Promise<{ client: any; sdk: any }> {

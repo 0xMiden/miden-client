@@ -1,172 +1,156 @@
-import test from "./playwright.global.setup";
-import { Page, expect } from "@playwright/test";
+// @ts-nocheck
+import { test, expect } from "./test-setup";
 import {
-  createNewFaucet,
-  createNewWallet,
-  fundAccountFromFaucet,
-  getAccount,
-  getAccountBalance,
-  StorageMode,
-} from "./webClientTestUtils";
-
-const importWalletFromSeed = async (
-  page: Page,
-  walletSeed: Uint8Array,
-  mutable: boolean,
-  authSchemeId: number
-) => {
-  return await page.evaluate(
-    async ({ _walletSeed, mutable, authSchemeId }) => {
-      const client = window.client;
-      await client.syncState();
-      const account = await client.importPublicAccountFromSeed(
-        _walletSeed,
-        mutable,
-        authSchemeId
-      );
-      return {
-        accountId: account.id().toString(),
-        accountCommitment: account.to_commitment().toHex(),
-      };
-    },
-    {
-      _walletSeed: walletSeed,
-      mutable,
-      authSchemeId,
-    }
-  );
-};
-
-// Creates a new WebClient with a fresh IndexedDB store, simulating a clean
-// start. This ensures both the store and the RPC client cache are empty.
-const createFreshClient = async (page: Page) => {
-  await page.evaluate(async () => {
-    const freshStoreName = `test_fresh_${crypto.randomUUID().slice(0, 8)}`;
-    const client = await window.WasmWebClient.createClient(
-      window.rpcUrl,
-      undefined,
-      undefined,
-      freshStoreName
-    );
-    window.client = client;
-  });
-};
-
-const importAccountById = async (page: Page, accountId: string) => {
-  return await page.evaluate(async (id) => {
-    const client = window.client;
-    const _accountId = window.AccountId.fromHex(id);
-    await client.importAccountById(_accountId);
-    const account = await client.getAccount(_accountId);
-    return {
-      accountId: account?.id().toString(),
-      accountCommitment: account?.to_commitment().toHex(),
-    };
-  }, accountId);
-};
+  createIntegrationClient,
+  integrationMint,
+  integrationConsume,
+} from "./test-helpers";
 
 test.describe("import from seed", () => {
-  test("should import same public account from seed", async ({ page }) => {
+  test("should import same public account from seed", async ({ sdk }) => {
+    test.slow();
+    const result = await createIntegrationClient();
+    test.skip(!result, "requires running node");
+    const { client } = result;
+
     const walletSeed = new Uint8Array(32);
     crypto.getRandomValues(walletSeed);
 
     const mutable = false;
-    const storageMode = StorageMode.PUBLIC;
-    const authSchemeId = 2;
 
-    const initialWallet = await createNewWallet(page, {
-      storageMode,
+    const initialWallet = await client.newWallet(
+      sdk.AccountStorageMode.public(),
       mutable,
-      authSchemeId,
-      walletSeed,
-    });
-
-    const faucet = await createNewFaucet(page);
-
-    const result = await fundAccountFromFaucet(
-      page,
-      initialWallet.id,
-      faucet.id
+      sdk.AuthScheme.AuthRpoFalcon512,
+      walletSeed
     );
-    const initialBalance = result.targetAccountBalance;
+    const initialWalletId = initialWallet.id();
 
-    const { commitment: initialCommitment } = await getAccount(
-      page,
-      initialWallet.id
+    const faucet = await client.newFaucet(
+      sdk.AccountStorageMode.public(),
+      false,
+      "DAG",
+      8,
+      sdk.u64(10000000),
+      sdk.AuthScheme.AuthRpoFalcon512
+    );
+    const faucetId = faucet.id();
+
+    // Mint and consume to fund the wallet
+    const { createdNoteId } = await integrationMint(
+      client,
+      sdk,
+      initialWalletId,
+      faucetId
+    );
+    const { targetAccountBalance: initialBalance } = await integrationConsume(
+      client,
+      sdk,
+      initialWalletId,
+      faucetId,
+      createdNoteId
     );
 
-    // Deleting the account
-    await createFreshClient(page);
+    const initialAccount = await client.getAccount(initialWalletId);
+    const initialCommitment = initialAccount.to_commitment().toHex();
 
-    const { accountId: restoredAccountId } = await importWalletFromSeed(
-      page,
+    // Create a fresh client (separate store) and import the wallet from seed
+    const result2 = await createIntegrationClient();
+    test.skip(!result2, "requires running node");
+    const { client: freshClient } = result2;
+
+    await freshClient.syncState();
+    const restoredAccount = await freshClient.importPublicAccountFromSeed(
       walletSeed,
       mutable,
-      authSchemeId
+      sdk.AuthScheme.AuthRpoFalcon512
     );
 
-    expect(restoredAccountId).toEqual(initialWallet.id);
+    const restoredAccountId = restoredAccount.id().toString();
+    expect(restoredAccountId).toEqual(initialWalletId.toString());
 
-    const { commitment: restoredAccountCommitment } = await getAccount(
-      page,
-      initialWallet.id
+    const restoredAccountObj = await freshClient.getAccount(
+      sdk.AccountId.fromHex(restoredAccountId)
     );
+    const restoredAccountCommitment = restoredAccountObj
+      .to_commitment()
+      .toHex();
 
-    const restoredBalance = await getAccountBalance(
-      page,
-      initialWallet.id,
-      faucet.id
-    );
+    const restoredBalance = restoredAccountObj
+      .vault()
+      .getBalance(sdk.AccountId.fromHex(faucetId.toString()));
 
-    expect(restoredBalance!.toString()).toEqual(initialBalance);
+    expect(restoredBalance.toString()).toEqual(initialBalance);
     expect(restoredAccountCommitment).toEqual(initialCommitment);
   });
 });
 
 test.describe("import public account by id", () => {
-  test("should import public account from id", async ({ page }) => {
+  test("should import public account from id", async ({ sdk }) => {
+    test.slow();
+    const result = await createIntegrationClient();
+    test.skip(!result, "requires running node");
+    const { client } = result;
+
     const walletSeed = new Uint8Array(32);
     crypto.getRandomValues(walletSeed);
 
     const mutable = false;
-    const storageMode = StorageMode.PUBLIC;
-    const authSchemeId = 2;
 
-    const initialWallet = await createNewWallet(page, {
-      storageMode,
+    const initialWallet = await client.newWallet(
+      sdk.AccountStorageMode.public(),
       mutable,
-      authSchemeId,
-      walletSeed,
-    });
+      sdk.AuthScheme.AuthRpoFalcon512,
+      walletSeed
+    );
+    const initialWalletId = initialWallet.id();
 
-    const faucet = await createNewFaucet(page);
+    const faucet = await client.newFaucet(
+      sdk.AccountStorageMode.public(),
+      false,
+      "DAG",
+      8,
+      sdk.u64(10000000),
+      sdk.AuthScheme.AuthRpoFalcon512
+    );
+    const faucetId = faucet.id();
 
-    const { targetAccountBalance: initialBalance } =
-      await fundAccountFromFaucet(page, initialWallet.id, faucet.id);
-    const { commitment: initialCommitment } = await getAccount(
-      page,
-      initialWallet.id
+    // Mint and consume to fund the wallet
+    const { createdNoteId } = await integrationMint(
+      client,
+      sdk,
+      initialWalletId,
+      faucetId
+    );
+    const { targetAccountBalance: initialBalance } = await integrationConsume(
+      client,
+      sdk,
+      initialWalletId,
+      faucetId,
+      createdNoteId
     );
 
-    await createFreshClient(page);
+    const initialAccount = await client.getAccount(initialWalletId);
+    const initialCommitment = initialAccount.to_commitment().toHex();
 
-    const { accountId: restoredAccountId } = await importAccountById(
-      page,
-      initialWallet.id
-    );
-    expect(restoredAccountId).toEqual(initialWallet.id);
+    // Create a fresh client (separate store) and import by account ID
+    const result2 = await createIntegrationClient();
+    test.skip(!result2, "requires running node");
+    const { client: freshClient } = result2;
 
-    const { commitment: restoredAccountCommitment } = await getAccount(
-      page,
-      initialWallet.id
-    );
-    const restoredBalance = await getAccountBalance(
-      page,
-      initialWallet.id,
-      faucet.id
-    );
+    const accountIdObj = sdk.AccountId.fromHex(initialWalletId.toString());
+    await freshClient.importAccountById(accountIdObj);
+    const restoredAccount = await freshClient.getAccount(accountIdObj);
 
-    expect(restoredBalance!.toString()).toEqual(initialBalance);
+    const restoredAccountId = restoredAccount.id().toString();
+    expect(restoredAccountId).toEqual(initialWalletId.toString());
+
+    const restoredAccountCommitment = restoredAccount.to_commitment().toHex();
+    const restoredBalance = restoredAccount
+      .vault()
+      .getBalance(sdk.AccountId.fromHex(faucetId.toString()));
+
+    expect(restoredBalance.toString()).toEqual(initialBalance);
     expect(restoredAccountCommitment).toEqual(initialCommitment);
   });
 });

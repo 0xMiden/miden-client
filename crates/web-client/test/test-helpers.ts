@@ -7,9 +7,12 @@
 // @ts-nocheck
 import {
   executeAndApplyTransaction,
+  waitForTransaction,
   loadNodeSdk,
   wrapNodeClient,
+  createNodeIntegrationClient,
 } from "./test-setup";
+import { getRpcUrl, RUN_ID } from "./playwright.global.setup";
 import path from "path";
 import fs from "fs";
 import os from "os";
@@ -602,4 +605,105 @@ export async function createMidenClient(sdk: any): Promise<any> {
 
   _midenClientClass = MidenClient;
   return MidenClient;
+}
+
+// ── Integration test helpers ─────────────────────────────────────────
+
+let _integrationCounter = 0;
+
+/**
+ * Creates an integration client connected to a real node.
+ * Returns { client, sdk } or null if no node is reachable.
+ */
+export async function createIntegrationClient(): Promise<{
+  client: any;
+  sdk: any;
+} | null> {
+  const rpcUrl = getRpcUrl();
+  const storeName = `integration_${RUN_ID}_${++_integrationCounter}`;
+  try {
+    return await createNodeIntegrationClient(rpcUrl, storeName);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Mints tokens using integration flow (executeAndApplyTransaction + waitForTransaction).
+ * Requires a running node.
+ */
+export async function integrationMint(
+  client: any,
+  sdk: any,
+  targetId: any,
+  faucetId: any,
+  opts?: { amount?: number; publicNote?: boolean; sync?: boolean }
+): Promise<{
+  transactionId: string;
+  createdNoteId: string;
+  numOutputNotesCreated: number;
+}> {
+  const amount = opts?.amount ?? 1000;
+  const noteType = opts?.publicNote
+    ? sdk.NoteType.Public
+    : sdk.NoteType.Private;
+  const shouldSync = opts?.sync !== false;
+
+  await client.syncState();
+
+  const mintRequest = await client.newMintTransactionRequest(
+    targetId,
+    faucetId,
+    noteType,
+    sdk.u64(amount)
+  );
+  const result = await executeAndApplyTransaction(
+    client,
+    sdk,
+    faucetId,
+    mintRequest
+  );
+
+  const transactionId = result.executedTransaction().id().toHex();
+  const createdNoteId = result.createdNotes().notes()[0].id().toString();
+  const numOutputNotesCreated = result.createdNotes().numNotes();
+
+  if (shouldSync) {
+    await waitForTransaction(client, sdk, transactionId);
+  }
+
+  return { transactionId, createdNoteId, numOutputNotesCreated };
+}
+
+/**
+ * Consumes a note using integration flow.
+ */
+export async function integrationConsume(
+  client: any,
+  sdk: any,
+  accountId: any,
+  faucetId: any,
+  noteId: string
+): Promise<{ transactionId: string; targetAccountBalance: string }> {
+  await client.syncState();
+
+  const inputNoteRecord = await client.getInputNote(noteId);
+  if (!inputNoteRecord) throw new Error(`Note ${noteId} not found`);
+
+  const note = inputNoteRecord.toNote();
+  const consumeRequest = client.newConsumeTransactionRequest([note]);
+  const result = await executeAndApplyTransaction(
+    client,
+    sdk,
+    accountId,
+    consumeRequest
+  );
+
+  const transactionId = result.executedTransaction().id().toHex();
+  await waitForTransaction(client, sdk, transactionId);
+
+  const account = await client.getAccount(accountId);
+  const balance = account.vault().getBalance(faucetId).toString();
+
+  return { transactionId, targetAccountBalance: balance };
 }
