@@ -206,7 +206,7 @@ pub(crate) fn query_storage_slots(
             StorageSlotType::Value => StorageSlot::with_value(slot_name, value),
             StorageSlotType::Map => StorageSlot::with_map(
                 slot_name,
-                storage_maps.remove(&value).unwrap_or(StorageMap::new()),
+                storage_maps.get(&value).cloned().unwrap_or_default(),
             ),
         })
         .collect())
