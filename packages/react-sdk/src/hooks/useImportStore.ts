@@ -1,9 +1,10 @@
 import { useCallback, useState } from "react";
+import { importStore as sdkImportStore } from "@miden-sdk/miden-sdk";
 import { useMiden } from "../context/MidenProvider";
 
 export interface UseImportStoreResult {
-  /** Import a previously exported store snapshot */
-  importStore: (dump: unknown, storeName: string) => Promise<void>;
+  /** Import a previously exported store dump */
+  importStore: (storeDump: string, storeName: string) => Promise<void>;
   /** Whether the import is in progress */
   isImporting: boolean;
   /** Error if import failed */
@@ -17,7 +18,7 @@ export interface UseImportStoreResult {
  *
  * @example
  * ```tsx
- * function RestoreButton({ snapshot }: { snapshot: unknown }) {
+ * function RestoreButton({ snapshot }: { snapshot: string }) {
  *   const { importStore, isImporting, error } = useImportStore();
  *
  *   const handleRestore = async () => {
@@ -40,7 +41,7 @@ export function useImportStore(): UseImportStoreResult {
   const [error, setError] = useState<Error | null>(null);
 
   const importStore = useCallback(
-    async (dump: unknown, storeName: string): Promise<void> => {
+    async (storeDump: string, storeName: string): Promise<void> => {
       if (!client || !isReady) {
         throw new Error("Miden client is not ready");
       }
@@ -49,7 +50,7 @@ export function useImportStore(): UseImportStoreResult {
       setError(null);
 
       try {
-        await runExclusive(() => client.forceImportStore(dump, storeName));
+        await runExclusive(() => sdkImportStore(storeName, storeDump));
         await sync();
       } catch (err) {
         const error = err instanceof Error ? err : new Error(String(err));

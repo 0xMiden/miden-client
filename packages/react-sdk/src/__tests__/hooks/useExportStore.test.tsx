@@ -3,12 +3,18 @@ import { renderHook, act, waitFor } from "@testing-library/react";
 import { useExportStore } from "../../hooks/useExportStore";
 import { useMiden } from "../../context/MidenProvider";
 import { createMockWebClient } from "../mocks/miden-sdk";
+import { exportStore as sdkExportStore } from "@miden-sdk/miden-sdk";
 
 vi.mock("../../context/MidenProvider", () => ({
   useMiden: vi.fn(),
 }));
 
+vi.mock("@miden-sdk/miden-sdk", () => ({
+  exportStore: vi.fn(),
+}));
+
 const mockUseMiden = useMiden as ReturnType<typeof vi.fn>;
+const mockSdkExportStore = sdkExportStore as ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -48,11 +54,12 @@ describe("useExportStore", () => {
     });
 
     it("should export store successfully", async () => {
-      const snapshot = { tables: { accounts: [] } };
+      const storeData = '{"tables":{}}';
       const mockClient = createMockWebClient({
-        exportStore: vi.fn().mockResolvedValue(snapshot),
+        storeIdentifier: vi.fn().mockReturnValue("MyStore"),
       });
       const runExclusive = vi.fn((fn: () => unknown) => fn());
+      mockSdkExportStore.mockResolvedValue(storeData);
 
       mockUseMiden.mockReturnValue({
         client: mockClient,
@@ -67,17 +74,18 @@ describe("useExportStore", () => {
         exportResult = await result.current.exportStore();
       });
 
-      expect(exportResult).toBe(snapshot);
-      expect(mockClient.exportStore).toHaveBeenCalled();
+      expect(exportResult).toBe(storeData);
+      expect(mockSdkExportStore).toHaveBeenCalledWith("MyStore");
       expect(result.current.isExporting).toBe(false);
       expect(result.current.error).toBeNull();
     });
 
     it("should set error on failure", async () => {
       const mockClient = createMockWebClient({
-        exportStore: vi.fn().mockRejectedValue(new Error("Export failed")),
+        storeIdentifier: vi.fn().mockReturnValue("MyStore"),
       });
       const runExclusive = vi.fn((fn: () => unknown) => fn());
+      mockSdkExportStore.mockRejectedValue(new Error("Export failed"));
 
       mockUseMiden.mockReturnValue({
         client: mockClient,
@@ -100,15 +108,16 @@ describe("useExportStore", () => {
     });
 
     it("should set isExporting during operation", async () => {
-      let resolveExport: (value: unknown) => void;
-      const exportPromise = new Promise((resolve) => {
+      let resolveExport: (value: string) => void;
+      const exportPromise = new Promise<string>((resolve) => {
         resolveExport = resolve;
       });
 
       const mockClient = createMockWebClient({
-        exportStore: vi.fn().mockReturnValue(exportPromise),
+        storeIdentifier: vi.fn().mockReturnValue("MyStore"),
       });
       const runExclusive = vi.fn((fn: () => unknown) => fn());
+      mockSdkExportStore.mockReturnValue(exportPromise);
 
       mockUseMiden.mockReturnValue({
         client: mockClient,
@@ -128,7 +137,7 @@ describe("useExportStore", () => {
       });
 
       await act(async () => {
-        resolveExport!({});
+        resolveExport!("{}");
         await promise;
       });
 
@@ -139,9 +148,10 @@ describe("useExportStore", () => {
   describe("reset", () => {
     it("should reset error state", async () => {
       const mockClient = createMockWebClient({
-        exportStore: vi.fn().mockRejectedValue(new Error("fail")),
+        storeIdentifier: vi.fn().mockReturnValue("MyStore"),
       });
       const runExclusive = vi.fn((fn: () => unknown) => fn());
+      mockSdkExportStore.mockRejectedValue(new Error("fail"));
 
       mockUseMiden.mockReturnValue({
         client: mockClient,

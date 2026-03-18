@@ -1,9 +1,10 @@
 import { useCallback, useState } from "react";
+import { exportStore as sdkExportStore } from "@miden-sdk/miden-sdk";
 import { useMiden } from "../context/MidenProvider";
 
 export interface UseExportStoreResult {
-  /** Export the IndexedDB store as a serializable snapshot */
-  exportStore: () => Promise<unknown>;
+  /** Export the IndexedDB store as a JSON string */
+  exportStore: () => Promise<string>;
   /** Whether the export is in progress */
   isExporting: boolean;
   /** Error if export failed */
@@ -39,7 +40,7 @@ export function useExportStore(): UseExportStoreResult {
   const [isExporting, setIsExporting] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
-  const exportStore = useCallback(async (): Promise<unknown> => {
+  const exportStore = useCallback(async (): Promise<string> => {
     if (!client || !isReady) {
       throw new Error("Miden client is not ready");
     }
@@ -48,7 +49,8 @@ export function useExportStore(): UseExportStoreResult {
     setError(null);
 
     try {
-      const snapshot = await runExclusive(() => client.exportStore());
+      const storeName = client.storeIdentifier();
+      const snapshot = await runExclusive(() => sdkExportStore(storeName));
       return snapshot;
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));

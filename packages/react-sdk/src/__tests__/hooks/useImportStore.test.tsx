@@ -3,12 +3,18 @@ import { renderHook, act, waitFor } from "@testing-library/react";
 import { useImportStore } from "../../hooks/useImportStore";
 import { useMiden } from "../../context/MidenProvider";
 import { createMockWebClient } from "../mocks/miden-sdk";
+import { importStore as sdkImportStore } from "@miden-sdk/miden-sdk";
 
 vi.mock("../../context/MidenProvider", () => ({
   useMiden: vi.fn(),
 }));
 
+vi.mock("@miden-sdk/miden-sdk", () => ({
+  importStore: vi.fn(),
+}));
+
 const mockUseMiden = useMiden as ReturnType<typeof vi.fn>;
+const mockSdkImportStore = sdkImportStore as ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -44,17 +50,16 @@ describe("useImportStore", () => {
 
       const { result } = renderHook(() => useImportStore());
 
-      await expect(result.current.importStore({}, "TestStore")).rejects.toThrow(
-        "Miden client is not ready"
-      );
+      await expect(
+        result.current.importStore("{}", "TestStore")
+      ).rejects.toThrow("Miden client is not ready");
     });
 
     it("should import store successfully", async () => {
       const mockSync = vi.fn().mockResolvedValue(undefined);
-      const mockClient = createMockWebClient({
-        forceImportStore: vi.fn().mockResolvedValue(undefined),
-      });
+      const mockClient = createMockWebClient();
       const runExclusive = vi.fn((fn: () => unknown) => fn());
+      mockSdkImportStore.mockResolvedValue(undefined);
 
       mockUseMiden.mockReturnValue({
         client: mockClient,
@@ -64,26 +69,22 @@ describe("useImportStore", () => {
       });
 
       const { result } = renderHook(() => useImportStore());
-      const dump = { tables: { accounts: [] } };
+      const dump = '{"tables":{"accounts":[]}}';
 
       await act(async () => {
         await result.current.importStore(dump, "RestoredStore");
       });
 
-      expect(mockClient.forceImportStore).toHaveBeenCalledWith(
-        dump,
-        "RestoredStore"
-      );
+      expect(mockSdkImportStore).toHaveBeenCalledWith("RestoredStore", dump);
       expect(result.current.isImporting).toBe(false);
       expect(result.current.error).toBeNull();
     });
 
     it("should call sync after successful import", async () => {
       const mockSync = vi.fn().mockResolvedValue(undefined);
-      const mockClient = createMockWebClient({
-        forceImportStore: vi.fn().mockResolvedValue(undefined),
-      });
+      const mockClient = createMockWebClient();
       const runExclusive = vi.fn((fn: () => unknown) => fn());
+      mockSdkImportStore.mockResolvedValue(undefined);
 
       mockUseMiden.mockReturnValue({
         client: mockClient,
@@ -95,17 +96,16 @@ describe("useImportStore", () => {
       const { result } = renderHook(() => useImportStore());
 
       await act(async () => {
-        await result.current.importStore({}, "Store");
+        await result.current.importStore("{}", "Store");
       });
 
       expect(mockSync).toHaveBeenCalled();
     });
 
     it("should set error on failure", async () => {
-      const mockClient = createMockWebClient({
-        forceImportStore: vi.fn().mockRejectedValue(new Error("Import failed")),
-      });
+      const mockClient = createMockWebClient();
       const runExclusive = vi.fn((fn: () => unknown) => fn());
+      mockSdkImportStore.mockRejectedValue(new Error("Import failed"));
 
       mockUseMiden.mockReturnValue({
         client: mockClient,
@@ -117,9 +117,9 @@ describe("useImportStore", () => {
       const { result } = renderHook(() => useImportStore());
 
       await act(async () => {
-        await expect(result.current.importStore({}, "Store")).rejects.toThrow(
-          "Import failed"
-        );
+        await expect(
+          result.current.importStore("{}", "Store")
+        ).rejects.toThrow("Import failed");
       });
 
       await waitFor(() => {
@@ -130,10 +130,9 @@ describe("useImportStore", () => {
 
     it("should not call sync on failure", async () => {
       const mockSync = vi.fn();
-      const mockClient = createMockWebClient({
-        forceImportStore: vi.fn().mockRejectedValue(new Error("Import failed")),
-      });
+      const mockClient = createMockWebClient();
       const runExclusive = vi.fn((fn: () => unknown) => fn());
+      mockSdkImportStore.mockRejectedValue(new Error("Import failed"));
 
       mockUseMiden.mockReturnValue({
         client: mockClient,
@@ -145,7 +144,7 @@ describe("useImportStore", () => {
       const { result } = renderHook(() => useImportStore());
 
       await act(async () => {
-        await result.current.importStore({}, "Store").catch(() => {});
+        await result.current.importStore("{}", "Store").catch(() => {});
       });
 
       expect(mockSync).not.toHaveBeenCalled();
@@ -154,10 +153,9 @@ describe("useImportStore", () => {
 
   describe("reset", () => {
     it("should reset error state", async () => {
-      const mockClient = createMockWebClient({
-        forceImportStore: vi.fn().mockRejectedValue(new Error("fail")),
-      });
+      const mockClient = createMockWebClient();
       const runExclusive = vi.fn((fn: () => unknown) => fn());
+      mockSdkImportStore.mockRejectedValue(new Error("fail"));
 
       mockUseMiden.mockReturnValue({
         client: mockClient,
@@ -169,7 +167,7 @@ describe("useImportStore", () => {
       const { result } = renderHook(() => useImportStore());
 
       await act(async () => {
-        await result.current.importStore({}, "S").catch(() => {});
+        await result.current.importStore("{}", "S").catch(() => {});
       });
 
       expect(result.current.error).not.toBeNull();
