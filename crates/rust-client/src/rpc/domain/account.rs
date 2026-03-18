@@ -559,6 +559,21 @@ impl AccountProof {
             .map(|account_details| &account_details.storage_details.header)
     }
 
+    /// Returns the full storage details, if available (public accounts only).
+    pub fn storage_details(&self) -> Option<&AccountStorageDetails> {
+        self.state_headers.as_ref().map(|d| &d.storage_details)
+    }
+
+    /// Returns the storage map details for a specific slot, if available.
+    pub fn find_map_details(
+        &self,
+        slot_name: &StorageSlotName,
+    ) -> Option<&AccountStorageMapDetails> {
+        self.state_headers
+            .as_ref()
+            .and_then(|details| details.storage_details.find_map_details(slot_name))
+    }
+
     /// Returns the account code, if present.
     pub fn account_code(&self) -> Option<&AccountCode> {
         self.state_headers.as_ref().map(|headers| &headers.code)
