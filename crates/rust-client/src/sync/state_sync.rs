@@ -341,7 +341,7 @@ impl StateSync {
                 nullifiers,
             } = sync_step;
 
-            state_sync_update.nullifiers.extend(nullifiers);
+            state_sync_update.note_updates.extend_nullifiers(nullifiers);
 
             self.account_state_sync(
                 &mut state_sync_update.account_updates,
@@ -543,14 +543,6 @@ impl StateSync {
         // (it only returns nullifiers from current_block_num until
         // response.block_header.block_num())
 
-        // Build a position map from the ordered nullifiers to match the sync_nullifiers response.
-        let nullifier_order: BTreeMap<Nullifier, u16> = state_sync_update
-            .nullifiers
-            .iter()
-            .enumerate()
-            .map(|(i, n)| (*n, i.try_into().unwrap()))
-            .collect();
-
         // Check for new nullifiers for input notes that were updated
         let nullifiers_tags: Vec<u16> = state_sync_update
             .note_updates
@@ -568,12 +560,9 @@ impl StateSync {
         new_nullifiers.retain(|update| update.block_num <= state_sync_update.block_num);
 
         for nullifier_update in new_nullifiers {
-            let order = nullifier_order.get(&nullifier_update.nullifier).copied();
-
             state_sync_update.note_updates.apply_nullifiers_state_transitions(
                 &nullifier_update,
                 state_sync_update.transaction_updates.committed_transactions(),
-                order,
             )?;
 
             // Process nullifiers and track the updates of local tracked transactions that were

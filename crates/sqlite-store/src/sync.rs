@@ -108,7 +108,6 @@ impl SqliteStore {
             note_updates,
             transaction_updates,
             account_updates,
-            nullifiers: _,
         } = state_sync_update;
 
         let tx = conn.transaction().into_store_error()?;
