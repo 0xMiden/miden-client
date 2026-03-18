@@ -63,19 +63,7 @@ function loadSdk(): any {
 
 // Lazy-load: only initialize when actually used (avoids crash on browser-only CI)
 let _sdk: any = null;
-export const sdk = new Proxy(
-  {},
-  {
-    get(_target, prop) {
-      if (!_sdk) _sdk = loadSdk();
-      return _sdk[prop];
-    },
-  }
-) as any;
 
-// ── Patch napi prototypes for browser compatibility ───────────────────
-// wasm-bindgen uses snake_case method names, napi uses camelCase.
-// Add snake_case aliases so browser test code works unchanged.
 function patchPrototype(cls: any, aliases: Record<string, string>) {
   if (!cls?.prototype) return;
   for (const [snakeCase, camelCase] of Object.entries(aliases)) {
@@ -88,12 +76,6 @@ function patchPrototype(cls: any, aliases: Record<string, string>) {
   }
 }
 
-// eslint-disable-next-line camelcase
-patchPrototype(sdk.Account, { to_commitment: "toCommitment" });
-// eslint-disable-next-line camelcase
-patchPrototype(sdk.AccountHeader, { to_commitment: "toCommitment" });
-
-// Patch methods that return Option<T> (napi returns null, wasm-bindgen returns undefined)
 function patchNullToUndefined(cls: any, methods: string[]) {
   if (!cls?.prototype) return;
   for (const method of methods) {
@@ -107,20 +89,42 @@ function patchNullToUndefined(cls: any, methods: string[]) {
   }
 }
 
-patchNullToUndefined(sdk.AccountStorage, [
-  "getItem",
-  "getMapEntries",
-  "getMapItem",
-]);
-patchNullToUndefined(sdk.NoteConsumability, ["consumableAfterBlock"]);
+function initSdk(): any {
+  const rawSdk = loadSdk();
 
-// Patch static methods (snake_case aliases for camelCase)
-if (sdk.NoteScript) {
-  if (!sdk.NoteScript.p2id && sdk.NoteScript.p2Id)
-    sdk.NoteScript.p2id = sdk.NoteScript.p2Id;
-  if (!sdk.NoteScript.p2ide && sdk.NoteScript.p2Ide)
-    sdk.NoteScript.p2ide = sdk.NoteScript.p2Ide;
+  // Patch napi prototypes for browser compatibility
+  // eslint-disable-next-line camelcase
+  patchPrototype(rawSdk.Account, { to_commitment: "toCommitment" });
+  // eslint-disable-next-line camelcase
+  patchPrototype(rawSdk.AccountHeader, { to_commitment: "toCommitment" });
+
+  patchNullToUndefined(rawSdk.AccountStorage, [
+    "getItem",
+    "getMapEntries",
+    "getMapItem",
+  ]);
+  patchNullToUndefined(rawSdk.NoteConsumability, ["consumableAfterBlock"]);
+
+  // Patch static methods (snake_case aliases for camelCase)
+  if (rawSdk.NoteScript) {
+    if (!rawSdk.NoteScript.p2id && rawSdk.NoteScript.p2Id)
+      rawSdk.NoteScript.p2id = rawSdk.NoteScript.p2Id;
+    if (!rawSdk.NoteScript.p2ide && rawSdk.NoteScript.p2Ide)
+      rawSdk.NoteScript.p2ide = rawSdk.NoteScript.p2Ide;
+  }
+
+  return rawSdk;
 }
+
+export const sdk = new Proxy(
+  {},
+  {
+    get(_target, prop) {
+      if (!_sdk) _sdk = initSdk();
+      return _sdk[prop];
+    },
+  }
+) as any;
 
 // ── BigInt → Number conversion ────────────────────────────────────────
 
