@@ -5,17 +5,16 @@ use super::felt::Felt;
 use super::word::Word;
 
 /// Advice inputs provided to a transaction or note script.
-#[derive(Clone)]
+#[derive(Clone, Default)]
 #[wasm_bindgen]
 pub struct AdviceInputs(NativeAdviceInputs);
 
 #[wasm_bindgen]
 impl AdviceInputs {
-    // TODO: Constructors
-
-    // TODO: Public Mutators
-
-    // TODO: Destructors
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> AdviceInputs {
+        AdviceInputs(NativeAdviceInputs::default())
+    }
 
     /// Returns the stack inputs as a vector of felts.
     pub fn stack(&self) -> Vec<Felt> {
@@ -47,5 +46,17 @@ impl From<NativeAdviceInputs> for AdviceInputs {
 impl From<&NativeAdviceInputs> for AdviceInputs {
     fn from(native_advice_inputs: &NativeAdviceInputs) -> Self {
         AdviceInputs(native_advice_inputs.clone())
+    }
+}
+
+impl From<AdviceInputs> for NativeAdviceInputs {
+    fn from(advice_inputs: AdviceInputs) -> Self {
+        advice_inputs.0
+    }
+}
+
+impl From<&AdviceInputs> for NativeAdviceInputs {
+    fn from(advice_inputs: &AdviceInputs) -> Self {
+        advice_inputs.0.clone()
     }
 }

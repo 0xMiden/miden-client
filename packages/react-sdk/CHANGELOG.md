@@ -25,6 +25,7 @@
 * [FEATURE][web] `midenVitePlugin()` `crossOriginIsolation` option now defaults to `false`, avoiding breakage of OAuth popup flows (e.g. Para) that rely on `window.opener`. ([#1872](https://github.com/0xMiden/miden-client/pull/1872))
 * [FEATURE][web] Exposed `getAccountProof` in the `RpcClient`, accepting optional `AccountStorageRequirements` and block number parameters to fetch specific storage maps without full account reconstruction ([#1917](https://github.com/0xMiden/miden-client/pull/1917)).
 * [FEATURE][web] Exposed `syncStorageMaps` in the `RpcClient` for paginated retrieval of large storage maps ([#1917](https://github.com/0xMiden/miden-client/pull/1917)).
+* [FEATURE][web] Added `useExecuteProgram()` hook for local-only "view call" execution. Runs a compiled `TransactionScript` against an account and returns the 16-element stack output as `bigint[]`. Supports optional `adviceInputs`, `foreignAccounts`, `skipSync`, and includes a concurrency guard. ([#1859](https://github.com/0xMiden/miden-client/issues/1859))
 
 ### Fixes
 * [FIX][web] Fixed signer disconnect destroying WebClient and wiping cached state. The client now stays alive for reads on disconnect, hot-swaps `signCb` on same-identity reconnect (no WASM reinit), and only creates a new client when a different identity connects. All mutation hooks block with a clear error while disconnected ([#1842](https://github.com/0xMiden/miden-client/pull/1842)).
