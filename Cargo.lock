@@ -1123,15 +1123,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "dap"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_json",
- "thiserror 1.0.69",
-]
-
-[[package]]
 name = "darling"
 version = "0.21.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2636,24 +2627,6 @@ checksum = "f8ca58f447f06ed17d5fc4043ce1b10dd205e060fb3ce5b979b8ed8e59ff3f79"
 [[package]]
 name = "miden-agglayer"
 version = "0.14.0-alpha.1"
-dependencies = [
- "fs-err",
- "miden-assembly 0.21.1",
- "miden-core 0.21.1",
- "miden-core-lib 0.21.2",
- "miden-crypto 0.22.3",
- "miden-protocol",
- "miden-standards",
- "miden-utils-sync 0.21.2",
- "primitive-types",
- "regex",
- "thiserror 2.0.18",
- "walkdir",
-]
-
-[[package]]
-name = "miden-agglayer"
-version = "0.14.0-alpha.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e492a6044cf8875a64d7eec130d260f2eda1c783795261f00d5d52837ed027bd"
 dependencies = [
@@ -2665,6 +2638,25 @@ dependencies = [
  "miden-protocol",
  "miden-standards",
  "miden-utils-sync 0.20.6",
+ "primitive-types",
+ "regex",
+ "thiserror 2.0.18",
+ "walkdir",
+]
+
+[[package]]
+name = "miden-agglayer"
+version = "0.14.0-alpha.1"
+source = "git+https://github.com/0xMiden/protocol?rev=163c54951daadb2b801e7e3b5c004821dc02e4b7#163c54951daadb2b801e7e3b5c004821dc02e4b7"
+dependencies = [
+ "fs-err",
+ "miden-assembly 0.22.0-alpha.1",
+ "miden-core 0.22.0-alpha.1",
+ "miden-core-lib 0.22.0-alpha.1",
+ "miden-crypto 0.23.0",
+ "miden-protocol",
+ "miden-standards",
+ "miden-utils-sync 0.22.0-alpha.1",
  "primitive-types",
  "regex",
  "thiserror 2.0.18",
@@ -2686,13 +2678,13 @@ dependencies = [
 
 [[package]]
 name = "miden-air"
-version = "0.21.2"
+version = "0.22.0-alpha.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d8aa2b3bc95d9eece8b47edbc6621b5742e212b359ff6b82ebb813b3d9b28985"
+checksum = "83652c180e83509ff7b58c8306f1ddee1ab4adf0b0f14a00acd32bbb24876ea4"
 dependencies = [
- "miden-core 0.21.1",
- "miden-crypto 0.22.3",
- "miden-utils-indexing 0.21.2",
+ "miden-core 0.22.0-alpha.1",
+ "miden-crypto 0.23.0",
+ "miden-utils-indexing 0.22.0-alpha.1",
  "thiserror 2.0.18",
  "tracing",
 ]
@@ -2713,15 +2705,15 @@ dependencies = [
 
 [[package]]
 name = "miden-assembly"
-version = "0.21.1"
+version = "0.22.0-alpha.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0204034c9424d52669677eeacd408cd59483d7a87a66489ad9ae716b5bda9a6e"
+checksum = "8f5b9b55d2519c3ac7e6a11ee2de03d26cbea4ed0a185a436ea73961253baa06"
 dependencies = [
  "env_logger",
  "log",
- "miden-assembly-syntax 0.21.1",
- "miden-core 0.21.1",
- "miden-mast-package 0.21.1",
+ "miden-assembly-syntax 0.22.0-alpha.1",
+ "miden-core 0.22.0-alpha.1",
+ "miden-mast-package 0.22.0-alpha.1",
  "smallvec",
  "thiserror 2.0.18",
 ]
@@ -2750,18 +2742,18 @@ dependencies = [
 
 [[package]]
 name = "miden-assembly-syntax"
-version = "0.21.1"
+version = "0.22.0-alpha.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a73ed7c463e68374f6eb595b6286f8d5d116a97004eeaee39e89cdc694dd5be1"
+checksum = "f64ed77720c45f0d8d3e4bed3a92bf0e6f5c0dfe94d08f804eea05f6d0d30ee3"
 dependencies = [
  "aho-corasick",
  "env_logger",
  "lalrpop",
  "lalrpop-util",
  "log",
- "miden-core 0.21.1",
- "miden-debug-types 0.21.1",
- "miden-utils-diagnostics 0.21.2",
+ "miden-core 0.22.0-alpha.1",
+ "miden-debug-types 0.22.0-alpha.1",
+ "miden-utils-diagnostics 0.22.0-alpha.1",
  "midenc-hir-type",
  "proptest",
  "proptest-derive",
@@ -2775,6 +2767,8 @@ dependencies = [
 [[package]]
 name = "miden-block-prover"
 version = "0.14.0-alpha.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b9564dfb23c529aad68369845b6897a6f62bacdeab7c00db432a5f16670764d4"
 dependencies = [
  "miden-protocol",
  "thiserror 2.0.18",
@@ -2783,8 +2777,7 @@ dependencies = [
 [[package]]
 name = "miden-block-prover"
 version = "0.14.0-alpha.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b9564dfb23c529aad68369845b6897a6f62bacdeab7c00db432a5f16670764d4"
+source = "git+https://github.com/0xMiden/protocol?rev=163c54951daadb2b801e7e3b5c004821dc02e4b7#163c54951daadb2b801e7e3b5c004821dc02e4b7"
 dependencies = [
  "miden-protocol",
  "thiserror 2.0.18",
@@ -2811,7 +2804,7 @@ dependencies = [
  "miette",
  "prost",
  "prost-types",
- "rand",
+ "rand 0.9.2",
  "serde",
  "serde_json",
  "thiserror 2.0.18",
@@ -2837,7 +2830,7 @@ dependencies = [
  "miden-client",
  "miden-client-sqlite-store",
  "predicates",
- "rand",
+ "rand 0.9.2",
  "rand_chacha",
  "serial_test",
  "tokio",
@@ -2858,7 +2851,7 @@ dependencies = [
  "miden-debug",
  "miette",
  "predicates",
- "rand",
+ "rand 0.9.2",
  "regex",
  "serde",
  "serial_test",
@@ -2880,7 +2873,7 @@ dependencies = [
  "miden-client",
  "miden-client-sqlite-store",
  "num_cpus",
- "rand",
+ "rand 0.9.2",
  "regex",
  "serde",
  "serde_json",
@@ -2918,7 +2911,7 @@ dependencies = [
  "miden-protocol",
  "miden-standards",
  "miden-testing",
- "rand",
+ "rand 0.9.2",
  "tokio",
 ]
 
@@ -2934,7 +2927,7 @@ dependencies = [
  "miden-idxdb-store",
  "miden-protocol",
  "miden-standards",
- "rand",
+ "rand 0.9.2",
  "serde",
  "serde-wasm-bindgen",
  "thiserror 2.0.18",
@@ -2968,18 +2961,18 @@ dependencies = [
 
 [[package]]
 name = "miden-core"
-version = "0.21.1"
+version = "0.22.0-alpha.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f53957feff616a43cd4ad5be9efeaeb7c3adfb589115e67a19eaf518f5c5e53a"
+checksum = "ac378567a4eae809651a623693dcbda03ea7cea0d5256d75ea969a31fb56c6ac"
 dependencies = [
  "derive_more",
  "itertools 0.14.0",
- "miden-crypto 0.22.3",
- "miden-debug-types 0.21.1",
+ "miden-crypto 0.23.0",
+ "miden-debug-types 0.22.0-alpha.1",
  "miden-formatting",
- "miden-utils-core-derive 0.21.2",
- "miden-utils-indexing 0.21.2",
- "miden-utils-sync 0.21.2",
+ "miden-utils-core-derive 0.22.0-alpha.1",
+ "miden-utils-indexing 0.22.0-alpha.1",
+ "miden-utils-sync 0.22.0-alpha.1",
  "num-derive",
  "num-traits",
  "proptest",
@@ -3006,17 +2999,17 @@ dependencies = [
 
 [[package]]
 name = "miden-core-lib"
-version = "0.21.2"
+version = "0.22.0-alpha.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fa496b3a7546c0022e8d5a92d88726907e380074f1fb634859b5e2094270dacf"
+checksum = "a3ac5f9a70a41d43b399f0918672c3a25170335420ac888123fd3b90b473919f"
 dependencies = [
  "env_logger",
  "fs-err",
- "miden-assembly 0.21.1",
- "miden-core 0.21.1",
- "miden-crypto 0.22.3",
- "miden-processor 0.21.1",
- "miden-utils-sync 0.21.2",
+ "miden-assembly 0.22.0-alpha.1",
+ "miden-core 0.22.0-alpha.1",
+ "miden-crypto 0.23.0",
+ "miden-processor 0.22.0-alpha.1",
+ "miden-utils-sync 0.22.0-alpha.1",
  "thiserror 2.0.18",
 ]
 
@@ -3039,7 +3032,7 @@ dependencies = [
  "miden-crypto-derive 0.19.8",
  "num",
  "num-complex",
- "rand",
+ "rand 0.9.2",
  "rand_chacha",
  "rand_core 0.9.5",
  "rand_hc",
@@ -3056,9 +3049,9 @@ dependencies = [
 
 [[package]]
 name = "miden-crypto"
-version = "0.22.3"
+version = "0.23.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3cfbecd3d91ece4489b78ca2ea67b31a7b635164285c1a828b7386d691c7ec72"
+checksum = "0ed0a034a460e27723dcfdf25effffab84331c3b46b13e7a1bd674197cc71bfe"
 dependencies = [
  "blake3",
  "cc",
@@ -3067,35 +3060,29 @@ dependencies = [
  "ed25519-dalek",
  "flume",
  "glob",
- "hashbrown 0.16.1",
  "hkdf",
  "k256",
- "miden-crypto-derive 0.22.4",
+ "miden-crypto-derive 0.23.0",
  "miden-field",
  "miden-serde-utils",
  "num",
  "num-complex",
- "p3-air",
  "p3-blake3",
  "p3-challenger",
- "p3-commit",
  "p3-dft",
- "p3-field",
  "p3-goldilocks",
  "p3-keccak",
  "p3-matrix",
  "p3-maybe-rayon",
- "p3-merkle-tree",
- "p3-miden-air",
- "p3-miden-fri",
- "p3-miden-prover",
+ "p3-miden-lifted-stark",
  "p3-symmetric",
  "p3-util",
- "rand",
+ "rand 0.9.2",
  "rand_chacha",
  "rand_core 0.9.5",
  "rand_hc",
  "rayon",
+ "serde",
  "sha2",
  "sha3",
  "subtle",
@@ -3115,9 +3102,9 @@ dependencies = [
 
 [[package]]
 name = "miden-crypto-derive"
-version = "0.22.4"
+version = "0.23.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "207828f24e358b4e1e0641c37802816b8730816ff92ddb4d271ef3a00f8696bb"
+checksum = "e8bf6ebde028e79bcc61a3632d2f375a5cc64caa17d014459f75015238cb1e08"
 dependencies = [
  "quote",
  "syn 2.0.117",
@@ -3125,22 +3112,24 @@ dependencies = [
 
 [[package]]
 name = "miden-debug"
-version = "0.4.6"
+version = "0.5.0"
 dependencies = [
  "clap",
- "dap",
  "futures",
  "glob",
  "log",
- "miden-assembly 0.21.1",
- "miden-assembly-syntax 0.21.1",
- "miden-core 0.21.1",
- "miden-crypto 0.22.3",
- "miden-debug-types 0.21.1",
- "miden-mast-package 0.21.1",
- "miden-processor 0.21.1",
+ "miden-assembly 0.22.0-alpha.1",
+ "miden-assembly-syntax 0.22.0-alpha.1",
+ "miden-core 0.22.0-alpha.1",
+ "miden-crypto 0.23.0",
+ "miden-debug-dap",
+ "miden-debug-engine",
+ "miden-debug-types 0.22.0-alpha.1",
+ "miden-mast-package 0.22.0-alpha.1",
+ "miden-processor 0.22.0-alpha.1",
  "miden-protocol",
  "miden-thiserror",
+ "miden-tx",
  "num-traits",
  "rustc-demangle",
  "serde",
@@ -3148,6 +3137,39 @@ dependencies = [
  "smallvec",
  "tokio",
  "tokio-util",
+ "toml 0.8.23",
+]
+
+[[package]]
+name = "miden-debug-dap"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "miden-debug-engine"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "glob",
+ "log",
+ "miden-assembly 0.22.0-alpha.1",
+ "miden-assembly-syntax 0.22.0-alpha.1",
+ "miden-core 0.22.0-alpha.1",
+ "miden-debug-dap",
+ "miden-debug-types 0.22.0-alpha.1",
+ "miden-mast-package 0.22.0-alpha.1",
+ "miden-processor 0.22.0-alpha.1",
+ "miden-thiserror",
+ "miden-tx",
+ "num-traits",
+ "rustc-demangle",
+ "serde",
+ "serde_json",
+ "smallvec",
  "toml 0.8.23",
 ]
 
@@ -3171,16 +3193,16 @@ dependencies = [
 
 [[package]]
 name = "miden-debug-types"
-version = "0.21.1"
+version = "0.22.0-alpha.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8d76def09875650d6d2ea568015ae99c892aa34c3393a0c3ba43891c8c4bd5ba"
+checksum = "b2bf4c564055a45088773b7c3658d152d397a79d1837c651cbf0d6ce38adad27"
 dependencies = [
  "memchr",
- "miden-crypto 0.22.3",
+ "miden-crypto 0.23.0",
  "miden-formatting",
  "miden-miette",
- "miden-utils-indexing 0.21.2",
- "miden-utils-sync 0.21.2",
+ "miden-utils-indexing 0.22.0-alpha.1",
+ "miden-utils-sync 0.22.0-alpha.1",
  "paste",
  "serde",
  "serde_spanned 1.0.4",
@@ -3189,9 +3211,9 @@ dependencies = [
 
 [[package]]
 name = "miden-field"
-version = "0.22.4"
+version = "0.23.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f821a07c16cfa6e500d5a56d05c11523984e3cd562cfc80ef657e4264d708067"
+checksum = "38011348f4fb4c9e5ce1f471203d024721c00e3b60a91aa91aaefe6738d8b5ea"
 dependencies = [
  "miden-serde-utils",
  "num-bigint",
@@ -3199,8 +3221,9 @@ dependencies = [
  "p3-field",
  "p3-goldilocks",
  "paste",
- "rand",
+ "rand 0.10.0",
  "serde",
+ "subtle",
  "thiserror 2.0.18",
 ]
 
@@ -3256,14 +3279,14 @@ dependencies = [
 
 [[package]]
 name = "miden-mast-package"
-version = "0.21.1"
+version = "0.22.0-alpha.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e23d0cf5de7df1273c14614fef84cb5fb464f2f0f354018228b0355ecbcb4206"
+checksum = "00b23f22bf9e2a4b144565ff87a2c3e70e08bb364613b2d8d7ccf17237e6a6a3"
 dependencies = [
  "derive_more",
- "miden-assembly-syntax 0.21.1",
- "miden-core 0.21.1",
- "miden-debug-types 0.21.1",
+ "miden-assembly-syntax 0.22.0-alpha.1",
+ "miden-core 0.22.0-alpha.1",
+ "miden-debug-types 0.22.0-alpha.1",
  "thiserror 2.0.18",
 ]
 
@@ -3325,7 +3348,7 @@ dependencies = [
  "miden-remote-prover-client 0.14.0-alpha.4",
  "miden-standards",
  "miden-tx-batch-prover 0.14.0-alpha.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "rand",
+ "rand 0.9.2",
  "thiserror 2.0.18",
  "tokio",
  "tokio-stream",
@@ -3503,7 +3526,7 @@ dependencies = [
  "miden-remote-prover-client 0.14.0-alpha.4",
  "miden-standards",
  "pretty_assertions",
- "rand",
+ "rand 0.9.2",
  "rand_chacha",
  "serde",
  "thiserror 2.0.18",
@@ -3534,7 +3557,7 @@ dependencies = [
  "opentelemetry",
  "opentelemetry-otlp",
  "opentelemetry_sdk",
- "rand",
+ "rand 0.9.2",
  "thiserror 2.0.18",
  "tokio",
  "tonic",
@@ -3607,16 +3630,16 @@ dependencies = [
 
 [[package]]
 name = "miden-processor"
-version = "0.21.1"
+version = "0.22.0-alpha.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e173de74f1085c66aa269c817f3340c33d5f03221ce9bdf1fff3cf53d910016e"
+checksum = "54ec6e0719a39a8125d7fe9d41ad7c22fb086bdcda3f938fb379a78a40285b21"
 dependencies = [
  "itertools 0.14.0",
- "miden-air 0.21.2",
- "miden-core 0.21.1",
- "miden-debug-types 0.21.1",
- "miden-utils-diagnostics 0.21.2",
- "miden-utils-indexing 0.21.2",
+ "miden-air 0.22.0-alpha.1",
+ "miden-core 0.22.0-alpha.1",
+ "miden-debug-types 0.22.0-alpha.1",
+ "miden-utils-diagnostics 0.22.0-alpha.1",
+ "miden-utils-indexing 0.22.0-alpha.1",
  "paste",
  "rayon",
  "thiserror 2.0.18",
@@ -3627,21 +3650,22 @@ dependencies = [
 [[package]]
 name = "miden-protocol"
 version = "0.14.0-alpha.1"
+source = "git+https://github.com/0xMiden/protocol?rev=163c54951daadb2b801e7e3b5c004821dc02e4b7#163c54951daadb2b801e7e3b5c004821dc02e4b7"
 dependencies = [
  "bech32",
  "fs-err",
  "getrandom 0.3.4",
- "miden-assembly 0.21.1",
- "miden-assembly-syntax 0.21.1",
- "miden-core 0.21.1",
- "miden-core-lib 0.21.2",
- "miden-crypto 0.22.3",
- "miden-mast-package 0.21.1",
- "miden-processor 0.21.1",
+ "miden-assembly 0.22.0-alpha.1",
+ "miden-assembly-syntax 0.22.0-alpha.1",
+ "miden-core 0.22.0-alpha.1",
+ "miden-core-lib 0.22.0-alpha.1",
+ "miden-crypto 0.23.0",
+ "miden-mast-package 0.22.0-alpha.1",
+ "miden-processor 0.22.0-alpha.1",
  "miden-protocol-macros",
- "miden-utils-sync 0.21.2",
+ "miden-utils-sync 0.22.0-alpha.1",
  "miden-verifier",
- "rand",
+ "rand 0.9.2",
  "rand_chacha",
  "rand_xoshiro",
  "regex",
@@ -3655,6 +3679,7 @@ dependencies = [
 [[package]]
 name = "miden-protocol-macros"
 version = "0.14.0-alpha.1"
+source = "git+https://github.com/0xMiden/protocol?rev=163c54951daadb2b801e7e3b5c004821dc02e4b7#163c54951daadb2b801e7e3b5c004821dc02e4b7"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3663,17 +3688,18 @@ dependencies = [
 
 [[package]]
 name = "miden-prover"
-version = "0.21.2"
+version = "0.22.0-alpha.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d0fe4c03cc2a5c0404596f10c076e8e265d87fb7a9c5fbe21b15bc12874f7855"
+checksum = "a204a0228c9c3c24387f0096ad35c2c3e0da79d8a8e4d5c293a263c01f9b0479"
 dependencies = [
  "bincode",
- "miden-air 0.21.2",
- "miden-core 0.21.1",
- "miden-crypto 0.22.3",
- "miden-debug-types 0.21.1",
- "miden-processor 0.21.1",
+ "miden-air 0.22.0-alpha.1",
+ "miden-core 0.22.0-alpha.1",
+ "miden-crypto 0.23.0",
+ "miden-debug-types 0.22.0-alpha.1",
+ "miden-processor 0.22.0-alpha.1",
  "serde",
+ "thiserror 2.0.18",
  "tokio",
  "tracing",
 ]
@@ -3722,9 +3748,9 @@ dependencies = [
 
 [[package]]
 name = "miden-serde-utils"
-version = "0.22.4"
+version = "0.23.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1fe74c2e7d8a8b8758e067de10665816928222c1d0561d95c12ac4bcaefc2a2a"
+checksum = "ff78082e9b4ca89863e68da01b35f8a4029ee6fd912e39fa41fde4273a7debab"
 dependencies = [
  "p3-field",
  "p3-goldilocks",
@@ -3733,14 +3759,15 @@ dependencies = [
 [[package]]
 name = "miden-standards"
 version = "0.14.0-alpha.1"
+source = "git+https://github.com/0xMiden/protocol?rev=163c54951daadb2b801e7e3b5c004821dc02e4b7#163c54951daadb2b801e7e3b5c004821dc02e4b7"
 dependencies = [
  "fs-err",
- "miden-assembly 0.21.1",
- "miden-core 0.21.1",
- "miden-core-lib 0.21.2",
- "miden-processor 0.21.1",
+ "miden-assembly 0.22.0-alpha.1",
+ "miden-core 0.22.0-alpha.1",
+ "miden-core-lib 0.22.0-alpha.1",
+ "miden-processor 0.22.0-alpha.1",
  "miden-protocol",
- "rand",
+ "rand 0.9.2",
  "regex",
  "thiserror 2.0.18",
  "walkdir",
@@ -3749,20 +3776,21 @@ dependencies = [
 [[package]]
 name = "miden-testing"
 version = "0.14.0-alpha.1"
+source = "git+https://github.com/0xMiden/protocol?rev=163c54951daadb2b801e7e3b5c004821dc02e4b7#163c54951daadb2b801e7e3b5c004821dc02e4b7"
 dependencies = [
  "anyhow",
  "itertools 0.14.0",
- "miden-agglayer 0.14.0-alpha.1",
- "miden-assembly 0.21.1",
- "miden-block-prover 0.14.0-alpha.1",
- "miden-core-lib 0.21.2",
- "miden-crypto 0.22.3",
- "miden-processor 0.21.1",
+ "miden-agglayer 0.14.0-alpha.1 (git+https://github.com/0xMiden/protocol?rev=163c54951daadb2b801e7e3b5c004821dc02e4b7)",
+ "miden-assembly 0.22.0-alpha.1",
+ "miden-block-prover 0.14.0-alpha.1 (git+https://github.com/0xMiden/protocol?rev=163c54951daadb2b801e7e3b5c004821dc02e4b7)",
+ "miden-core-lib 0.22.0-alpha.1",
+ "miden-crypto 0.23.0",
+ "miden-processor 0.22.0-alpha.1",
  "miden-protocol",
  "miden-standards",
  "miden-tx",
- "miden-tx-batch-prover 0.14.0-alpha.1",
- "rand",
+ "miden-tx-batch-prover 0.14.0-alpha.1 (git+https://github.com/0xMiden/protocol?rev=163c54951daadb2b801e7e3b5c004821dc02e4b7)",
+ "rand 0.9.2",
  "rand_chacha",
  "thiserror 2.0.18",
 ]
@@ -3790,8 +3818,9 @@ dependencies = [
 [[package]]
 name = "miden-tx"
 version = "0.14.0-alpha.1"
+source = "git+https://github.com/0xMiden/protocol?rev=163c54951daadb2b801e7e3b5c004821dc02e4b7#163c54951daadb2b801e7e3b5c004821dc02e4b7"
 dependencies = [
- "miden-processor 0.21.1",
+ "miden-processor 0.22.0-alpha.1",
  "miden-protocol",
  "miden-prover",
  "miden-standards",
@@ -3802,6 +3831,8 @@ dependencies = [
 [[package]]
 name = "miden-tx-batch-prover"
 version = "0.14.0-alpha.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ba29f8f6ecae671eff8b52b4c19eca8db5964c0b45b5d68c3ce38a57a8367931"
 dependencies = [
  "miden-protocol",
  "miden-tx",
@@ -3810,8 +3841,7 @@ dependencies = [
 [[package]]
 name = "miden-tx-batch-prover"
 version = "0.14.0-alpha.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ba29f8f6ecae671eff8b52b4c19eca8db5964c0b45b5d68c3ce38a57a8367931"
+source = "git+https://github.com/0xMiden/protocol?rev=163c54951daadb2b801e7e3b5c004821dc02e4b7#163c54951daadb2b801e7e3b5c004821dc02e4b7"
 dependencies = [
  "miden-protocol",
  "miden-tx",
@@ -3830,9 +3860,9 @@ dependencies = [
 
 [[package]]
 name = "miden-utils-core-derive"
-version = "0.21.2"
+version = "0.22.0-alpha.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ad5c364abe484d43d171afc320e7560db37ece00fe625569068c1053ed186540"
+checksum = "51b1d849d8323e0b51a097f26a0107cbdae460e8fc3c1ed96041bbf672eb5f7f"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3854,12 +3884,12 @@ dependencies = [
 
 [[package]]
 name = "miden-utils-diagnostics"
-version = "0.21.2"
+version = "0.22.0-alpha.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "467d8eafd735ab1e0db7bf6a6a8b5bcf4c31a56c0cd7f80cba1932d4bb984b12"
+checksum = "8ce06859f28eadf39c2999c777131e045556b64a30f618fcc979ee99754addde"
 dependencies = [
- "miden-crypto 0.22.3",
- "miden-debug-types 0.21.1",
+ "miden-crypto 0.23.0",
+ "miden-debug-types 0.22.0-alpha.1",
  "miden-miette",
  "paste",
  "tracing",
@@ -3876,11 +3906,11 @@ dependencies = [
 
 [[package]]
 name = "miden-utils-indexing"
-version = "0.21.2"
+version = "0.22.0-alpha.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bc42cfa3aef68d21238b3ce4c2db00a1278f8075ef492c23c035ab6c75774790"
+checksum = "e9d6aa77acea20310b00a6860c0bd0959dfc75c50dd68a0e9ae018eb1a27e547"
 dependencies = [
- "miden-crypto 0.22.3",
+ "miden-crypto 0.23.0",
  "thiserror 2.0.18",
 ]
 
@@ -3897,9 +3927,9 @@ dependencies = [
 
 [[package]]
 name = "miden-utils-sync"
-version = "0.21.2"
+version = "0.22.0-alpha.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b7e09bb239449e63e9a81f9b4ca5db1762327f44fb50777527fdba6fdbcab890"
+checksum = "8abb5ebc62c3bc613717c02095420d7a5794580aa9d8739169e934db75f31020"
 dependencies = [
  "lock_api",
  "loom",
@@ -3909,14 +3939,15 @@ dependencies = [
 
 [[package]]
 name = "miden-verifier"
-version = "0.21.2"
+version = "0.22.0-alpha.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fbb4d3120e2c9cce41b5dac7507cd86154951938b9effbc322c57983065bfa4a"
+checksum = "a2b74dfe94ba5cc15b09ec1fc9fe9a253170961667af00257fd86633028a8542"
 dependencies = [
  "bincode",
- "miden-air 0.21.2",
- "miden-core 0.21.1",
- "miden-crypto 0.22.3",
+ "miden-air 0.22.0-alpha.1",
+ "miden-core 0.22.0-alpha.1",
+ "miden-crypto 0.23.0",
+ "serde",
  "thiserror 2.0.18",
  "tracing",
 ]
@@ -4049,7 +4080,7 @@ dependencies = [
  "miden-node-validator",
  "miden-protocol",
  "miden-standards",
- "rand",
+ "rand 0.9.2",
  "rand_chacha",
  "tempfile",
  "tokio",
@@ -4269,7 +4300,7 @@ dependencies = [
  "futures-util",
  "opentelemetry",
  "percent-encoding",
- "rand",
+ "rand 0.9.2",
  "thiserror 2.0.18",
  "tokio",
  "tokio-stream",
@@ -4295,19 +4326,20 @@ checksum = "d211803b9b6b570f68772237e415a029d5a50c65d382910b879fb19d3271f94d"
 
 [[package]]
 name = "p3-air"
-version = "0.4.2"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0141a56ed9924ce0265e7e91cd29bbcd230262744b7a7f0c448bfbf212f73182"
+checksum = "9ebc58ec27a174420348b3f04dba836fa2e5b5fe8df74601087417352757c643"
 dependencies = [
  "p3-field",
  "p3-matrix",
+ "tracing",
 ]
 
 [[package]]
 name = "p3-blake3"
-version = "0.4.2"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "006330bae15fdda0d460e73e03e7ebf06e8848dfda8355f9d568a7fed7c37719"
+checksum = "b3cacb38c29fbee71fe3e5c6c0a1073632e46dc3e93fbdc50ab4e4fac137b525"
 dependencies = [
  "blake3",
  "p3-symmetric",
@@ -4316,9 +4348,9 @@ dependencies = [
 
 [[package]]
 name = "p3-challenger"
-version = "0.4.2"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "20e42ba74a49c08c6e99f74cd9b343bfa31aa5721fea55079b18e3fd65f1dcbc"
+checksum = "af9bbcb18fe90271668259aacfc43455e328673c2b5c926cff0663edc8653e4d"
 dependencies = [
  "p3-field",
  "p3-maybe-rayon",
@@ -4330,13 +4362,11 @@ dependencies = [
 
 [[package]]
 name = "p3-commit"
-version = "0.4.2"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "498211e7b9a0f8366b410b4a9283ae82ff2fc91f473b1c5816aa6e90e74b125d"
+checksum = "14d07b50c6f6d3bc89ed7c54ae0c569fb4caaa58263fd389dc02fb1b0a6378fa"
 dependencies = [
  "itertools 0.14.0",
- "p3-challenger",
- "p3-dft",
  "p3-field",
  "p3-matrix",
  "p3-util",
@@ -4345,9 +4375,9 @@ dependencies = [
 
 [[package]]
 name = "p3-dft"
-version = "0.4.2"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e63fa5eb1bd12a240089e72ae3fe10350944d9c166d00a3bfd2a1794db65cf5c"
+checksum = "17e7ba0dc20be075eab3f88f0cb820a0901f86218a1c46134e7c817d41597989"
 dependencies = [
  "itertools 0.14.0",
  "p3-field",
@@ -4360,58 +4390,46 @@ dependencies = [
 
 [[package]]
 name = "p3-field"
-version = "0.4.2"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2ebfdb6ef992ae64e9e8f449ac46516ffa584f11afbdf9ee244288c2a633cdf4"
+checksum = "9b8533e6c2f4d0cc61fd2ae5299bb83316898e535f47291808d37e4d666ba088"
 dependencies = [
  "itertools 0.14.0",
  "num-bigint",
  "p3-maybe-rayon",
  "p3-util",
  "paste",
- "rand",
+ "rand 0.10.0",
  "serde",
  "tracing",
 ]
 
 [[package]]
 name = "p3-goldilocks"
-version = "0.4.2"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "64716244b5612622d4e78a4f48b74f6d3bb7b4085b7b6b25364b1dfca7198c66"
+checksum = "d8102a8c85acee1f896c3764bef5fac908e6026dadfc557c185294970cce0746"
 dependencies = [
  "num-bigint",
  "p3-challenger",
  "p3-dft",
  "p3-field",
  "p3-mds",
+ "p3-poseidon1",
  "p3-poseidon2",
  "p3-symmetric",
  "p3-util",
  "paste",
- "rand",
+ "rand 0.10.0",
  "serde",
 ]
 
 [[package]]
-name = "p3-interpolation"
-version = "0.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1d877565a94a527c89459fc8ccb0eb58769d8c86456575d1315a1651bd24616d"
-dependencies = [
- "p3-field",
- "p3-matrix",
- "p3-maybe-rayon",
- "p3-util",
-]
-
-[[package]]
 name = "p3-keccak"
-version = "0.4.2"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1d57334537d10316e0f1cda622f0a5b3239f219a5dcd2a95ea87e41e00df6a92"
+checksum = "b65d30dd586d2855906a01c3414c155c2d564f6677d1b51f04186dcac080f757"
 dependencies = [
- "p3-field",
  "p3-symmetric",
  "p3-util",
  "tiny-keccak",
@@ -4419,139 +4437,142 @@ dependencies = [
 
 [[package]]
 name = "p3-matrix"
-version = "0.4.2"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5542f96504dae8100c91398fb1e3f5ec669eb9c73d9e0b018a93b5fe32bad230"
+checksum = "72bb78444459155c2e4711d71abbfef7b04cc2ba1fa83751ccab241b01957095"
 dependencies = [
  "itertools 0.14.0",
  "p3-field",
  "p3-maybe-rayon",
  "p3-util",
- "rand",
+ "rand 0.10.0",
  "serde",
  "tracing",
- "transpose",
 ]
 
 [[package]]
 name = "p3-maybe-rayon"
-version = "0.4.2"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0e5669ca75645f99cd001e9d0289a4eeff2bc2cd9dc3c6c3aaf22643966e83df"
+checksum = "70a0a54345917f500130a9986fa5ff9ecbc26f0c6313080b35b713e26ddc8053"
 dependencies = [
  "rayon",
 ]
 
 [[package]]
 name = "p3-mds"
-version = "0.4.2"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "038763af23df9da653065867fd85b38626079031576c86fd537097e5be6a0da0"
+checksum = "3cd514bf3e9bf9f1b7db2db96e5bd2972d9963dd62430de1e193d74522ae96a6"
 dependencies = [
  "p3-dft",
  "p3-field",
  "p3-symmetric",
  "p3-util",
- "rand",
+ "rand 0.10.0",
 ]
 
 [[package]]
-name = "p3-merkle-tree"
-version = "0.4.2"
+name = "p3-miden-lifted-air"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8d93625a3041effddc72ee2511c919f710b7f91fd0f9931ab8a70aeba586fd6e"
+checksum = "c5c31c65fdc88952d7b301546add9670676e5b878aa0066dd929f107c203b006"
 dependencies = [
- "itertools 0.14.0",
+ "p3-air",
+ "p3-field",
+ "p3-matrix",
+ "p3-util",
+ "thiserror 2.0.18",
+]
+
+[[package]]
+name = "p3-miden-lifted-fri"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ab9932f1b0a16609a45cd4ee10a4d35412728bc4b38837c7979d7c85d8dcc9fc"
+dependencies = [
+ "p3-challenger",
+ "p3-commit",
+ "p3-dft",
+ "p3-field",
+ "p3-matrix",
+ "p3-maybe-rayon",
+ "p3-miden-lmcs",
+ "p3-miden-transcript",
+ "p3-util",
+ "rand 0.10.0",
+ "thiserror 2.0.18",
+ "tracing",
+]
+
+[[package]]
+name = "p3-miden-lifted-stark"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8c3956ab7270c3cdd53ca9796d39ae1821984eb977415b0672110f9666bff5d8"
+dependencies = [
+ "p3-challenger",
+ "p3-dft",
+ "p3-field",
+ "p3-matrix",
+ "p3-maybe-rayon",
+ "p3-miden-lifted-air",
+ "p3-miden-lifted-fri",
+ "p3-miden-lmcs",
+ "p3-miden-stateful-hasher",
+ "p3-miden-transcript",
+ "p3-util",
+ "thiserror 2.0.18",
+ "tracing",
+]
+
+[[package]]
+name = "p3-miden-lmcs"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "48c46791c983e772136db3d48f102431457451447abb9087deb6c8ce3c1efc86"
+dependencies = [
  "p3-commit",
  "p3-field",
  "p3-matrix",
  "p3-maybe-rayon",
+ "p3-miden-stateful-hasher",
+ "p3-miden-transcript",
  "p3-symmetric",
  "p3-util",
- "rand",
+ "rand 0.10.0",
  "serde",
  "thiserror 2.0.18",
  "tracing",
 ]
 
 [[package]]
-name = "p3-miden-air"
-version = "0.4.2"
+name = "p3-miden-stateful-hasher"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "45a88e6ee9c92ff6c0b64f1ec0d61eda72fb432bda45337d876c46bd43748508"
+checksum = "ec47a9d9615eb3d9d2a59b00d19751d9ad85384b55886827913d680d912eac6a"
 dependencies = [
- "p3-air",
  "p3-field",
- "p3-matrix",
+ "p3-symmetric",
 ]
 
 [[package]]
-name = "p3-miden-fri"
-version = "0.4.2"
+name = "p3-miden-transcript"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e282998bc1d12dceaa0ed8979fa507b8369d663fa377da695d578f5f3a035935"
+checksum = "40c565647487e4a949f67e6f115b0391d6cb82ac8e561165789939bab23d0ae7"
 dependencies = [
- "itertools 0.14.0",
  "p3-challenger",
- "p3-commit",
- "p3-dft",
  "p3-field",
- "p3-interpolation",
- "p3-matrix",
- "p3-maybe-rayon",
- "p3-util",
- "rand",
- "serde",
- "tracing",
-]
-
-[[package]]
-name = "p3-miden-prover"
-version = "0.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f05a61c10cc2d6a73e192ac34a9884e4f26bd877f3eaea441d7b7ebfdffdf6c7"
-dependencies = [
- "itertools 0.14.0",
- "p3-challenger",
- "p3-commit",
- "p3-dft",
- "p3-field",
- "p3-interpolation",
- "p3-matrix",
- "p3-maybe-rayon",
- "p3-miden-air",
- "p3-miden-uni-stark",
- "p3-util",
- "serde",
- "tracing",
-]
-
-[[package]]
-name = "p3-miden-uni-stark"
-version = "0.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0a78b6a5b5f6bdc55439d343d2a0a2a8e7cb6544b03296f54d2214a84e91e130"
-dependencies = [
- "itertools 0.14.0",
- "p3-air",
- "p3-challenger",
- "p3-commit",
- "p3-dft",
- "p3-field",
- "p3-matrix",
- "p3-maybe-rayon",
- "p3-uni-stark",
- "p3-util",
  "serde",
  "thiserror 2.0.18",
- "tracing",
 ]
 
 [[package]]
 name = "p3-monty-31"
-version = "0.4.2"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "57a981d60da3d8cbf8561014e2c186068578405fd69098fa75b43d4afb364a47"
+checksum = "0d9340a650f07a6cd42a4e877017ba7b206df87fe50dfc3cf110f01a3c370bd1"
 dependencies = [
  "itertools 0.14.0",
  "num-bigint",
@@ -4560,69 +4581,62 @@ dependencies = [
  "p3-matrix",
  "p3-maybe-rayon",
  "p3-mds",
+ "p3-poseidon1",
  "p3-poseidon2",
  "p3-symmetric",
  "p3-util",
  "paste",
- "rand",
+ "rand 0.10.0",
  "serde",
  "spin 0.10.0",
  "tracing",
- "transpose",
+]
+
+[[package]]
+name = "p3-poseidon1"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6dd56ae3a51ded1b77f7b1b21d0b157ae82b9d5ca8f2cba347c0b821fe771a79"
+dependencies = [
+ "p3-field",
+ "p3-symmetric",
+ "rand 0.10.0",
 ]
 
 [[package]]
 name = "p3-poseidon2"
-version = "0.4.2"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "903b73e4f9a7781a18561c74dc169cf03333497b57a8dd02aaeb130c0f386599"
+checksum = "858aa1c33ec983dfbb8cfc553a213de19d8fde96485e54e6e952b9ac5e70bd4e"
 dependencies = [
  "p3-field",
  "p3-mds",
  "p3-symmetric",
  "p3-util",
- "rand",
+ "rand 0.10.0",
 ]
 
 [[package]]
 name = "p3-symmetric"
-version = "0.4.2"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3cd788f04e86dd5c35dd87cad29eefdb6371d2fd5f7664451382eeacae3c3ed0"
+checksum = "1a9a3b20bb8104e52d45219a78d80654c8ac6a4781be0eaa3f3e999f5ae4b9b2"
 dependencies = [
  "itertools 0.14.0",
  "p3-field",
- "serde",
-]
-
-[[package]]
-name = "p3-uni-stark"
-version = "0.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "68d409704a8cbdb6c77f6b83a05c6b16a3c8a2c00d880146fa34181977a0d3ac"
-dependencies = [
- "itertools 0.14.0",
- "p3-air",
- "p3-challenger",
- "p3-commit",
- "p3-dft",
- "p3-field",
- "p3-matrix",
- "p3-maybe-rayon",
  "p3-util",
  "serde",
- "thiserror 2.0.18",
- "tracing",
 ]
 
 [[package]]
 name = "p3-util"
-version = "0.4.2"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "663b16021930bc600ecada915c6c3965730a3b9d6a6c23434ccf70bfc29d6881"
+checksum = "9f24495d9cd64693165a9f1b3da0758395ad6d25d2d44dd740bdb34c2bce0c53"
 dependencies = [
  "rayon",
  "serde",
+ "transpose",
 ]
 
 [[package]]
@@ -4907,7 +4921,7 @@ checksum = "37566cb3fdacef14c0737f9546df7cfeadbfbc9fef10991038bf5015d0c80532"
 dependencies = [
  "bitflags",
  "num-traits",
- "rand",
+ "rand 0.9.2",
  "rand_chacha",
  "rand_xorshift",
  "regex-syntax",
@@ -5069,6 +5083,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "rand"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bc266eb313df6c5c09c1c7b1fbe2510961e5bcd3add930c1e31f7ed9da0feff8"
+dependencies = [
+ "rand_core 0.10.0",
+]
+
+[[package]]
 name = "rand_chacha"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5095,6 +5118,12 @@ checksum = "76afc826de14238e6e8c374ddcc1fa19e374fd8dd986b0d2af0d02377261d83c"
 dependencies = [
  "getrandom 0.3.4",
 ]
+
+[[package]]
+name = "rand_core"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0c8d0fd677905edcbeedbf2edb6494d676f0e98d54d5cf9bda0b061cb8fb8aba"
 
 [[package]]
 name = "rand_hc"
