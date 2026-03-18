@@ -305,6 +305,37 @@ const V1_STORES: Record<string, string> = {
   [Table.Settings]: indexes("key"),
 };
 
+// Dexie dynamically adds table accessors to Transaction objects at runtime,
+// but the Transaction type doesn't declare them. This augmentation bridges that gap
+// so that code passing a Transaction (e.g. `await t.inputNotes.put(...)`) type-checks.
+declare module "dexie" {
+  interface Transaction {
+    inputNotes: Table<IInputNote, string>;
+    outputNotes: Table<IOutputNote, string>;
+    notesScripts: Table<INotesScript, string>;
+    transactions: Table<ITransaction, string>;
+    transactionScripts: Table<ITransactionScript, string>;
+    tags: Table<ITag, number>;
+    latestAccountHeaders: Table<IAccount, string>;
+    historicalAccountHeaders: Table<IAccount, string>;
+    latestAccountStorages: Table<ILatestAccountStorage, string>;
+    historicalAccountStorages: Table<IHistoricalAccountStorage, string>;
+    latestStorageMapEntries: Table<ILatestStorageMapEntry, string>;
+    historicalStorageMapEntries: Table<IHistoricalStorageMapEntry, string>;
+    latestAccountAssets: Table<ILatestAccountAsset, string>;
+    historicalAccountAssets: Table<IHistoricalAccountAsset, string>;
+    accountCodes: Table<IAccountCode, string>;
+    accountAuths: Table<IAccountAuth, string>;
+    accountKeyMappings: Table<IAccountKeyMapping, string>;
+    addresses: Table<IAddress, string>;
+    stateSync: Table<IStateSync, number>;
+    blockHeaders: Table<IBlockHeader, number>;
+    partialBlockchainNodes: Table<IPartialBlockchainNode, number>;
+    foreignAccountCode: Table<IForeignAccountCode, string>;
+    settings: Table<ISetting, string>;
+  }
+}
+
 export type MidenDexie = Dexie & {
   accountCodes: Dexie.Table<IAccountCode, string>;
   latestAccountStorages: Dexie.Table<ILatestAccountStorage, string>;
