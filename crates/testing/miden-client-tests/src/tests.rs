@@ -551,6 +551,77 @@ async fn sync_persists_auth_nodes_for_skipped_blocks() {
     );
 }
 
+/// Tests that a public account modified across multiple sync steps only triggers a single
+/// `/GetAccount` RPC call, not one per sync step.
+#[tokio::test]
+async fn sync_state_no_redundant_get_account_calls() {
+    use miden_client::async_trait;
+    use miden_client::rpc::domain::note::CommittedNote;
+    use miden_client::store::InputNoteRecord;
+    use miden_client::sync::{NoteUpdateAction, OnNoteReceived, StateSync, StateSyncInput};
+    use miden_protocol::crypto::merkle::mmr::{Forest, MmrPeaks, PartialMmr};
+
+    struct DiscardAllNotes;
+
+    #[async_trait(?Send)]
+    impl OnNoteReceived for DiscardAllNotes {
+        async fn on_note_received(
+            &self,
+            _committed_note: CommittedNote,
+            _public_note: Option<InputNoteRecord>,
+        ) -> Result<NoteUpdateAction, ClientError> {
+            Ok(NoteUpdateAction::Discard)
+        }
+    }
+
+    // Set up the mock chain (blocks 0-5, account modified in blocks 1, 4, 5)
+    let (_client, rpc_api, _) = Box::pin(create_test_client()).await;
+
+    // Find the public account ID from the mock chain's proven blocks
+    let account_id = {
+        let mock_chain = rpc_api.mock_chain.read();
+        mock_chain
+            .proven_blocks()
+            .iter()
+            .flat_map(|b| b.body().updated_accounts().iter())
+            .map(miden_protocol::block::BlockAccountUpdate::account_id)
+            .find(|id| !id.is_private())
+            .expect("prebuilt mock chain should have a public account")
+    };
+
+    // Create an AccountHeader with stale state (nonce 0, dummy commitments).
+    // This ensures every sync step's reported commitment differs from our local header,
+    // which would trigger a fetch in every step without the fix.
+    let account_header =
+        AccountHeader::new(account_id, Felt::new(0), EMPTY_WORD, EMPTY_WORD, EMPTY_WORD);
+
+    // Build a PartialMmr starting from genesis
+    let genesis = rpc_api.get_block_header_by_number(Some(0.into()), false).await.unwrap().0;
+    let mut partial_mmr = PartialMmr::from_peaks(MmrPeaks::new(Forest::empty(), vec![]).unwrap());
+    partial_mmr.add(genesis.commitment(), true);
+
+    let state_sync = StateSync::new(Arc::new(rpc_api.clone()), Arc::new(DiscardAllNotes), None);
+
+    // Use tag 0 to force multiple sync steps (notes exist in blocks 1 and 4)
+    let note_tags = BTreeSet::from([NoteTag::new(0)]);
+
+    let input = StateSyncInput {
+        accounts: vec![account_header],
+        note_tags,
+        input_notes: vec![],
+        output_notes: vec![],
+        uncommitted_transactions: vec![],
+    };
+    let state_sync_update = state_sync.sync_state(&mut partial_mmr, input).await.unwrap();
+
+    // Only 1 updated public account entry, not N duplicates
+    assert_eq!(
+        state_sync_update.account_updates.updated_public_accounts().len(),
+        1,
+        "expected exactly 1 updated public account"
+    );
+}
+
 #[tokio::test]
 async fn sync_state_tags() {
     // generate test client with a random store name
