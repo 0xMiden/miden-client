@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.13.4 (2026-03-18)
+
+* [FIX][rust,web] Fixed storage map slots with duplicate roots losing their entries after a store round-trip, which corrupted the storage commitment ([#1915](https://github.com/0xMiden/miden-client/pull/1915)).
+
 ## 0.13.3 (2026-03-16)
 
 * [FIX][rust,web] Fixed `sync_state()` invoking the external signer (e.g. wallet extension) during note consumability checks, causing repeated confirmation popups on every sync cycle. `NoteScreener` no longer attaches the `TransactionAuthenticator` when trial-executing consume transactions; accounts requiring auth now return `ConsumableWithAuthorization` instead ([#1905](https://github.com/0xMiden/miden-client/pull/1905)).
