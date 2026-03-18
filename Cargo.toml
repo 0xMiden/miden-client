@@ -85,8 +85,14 @@ must_use_candidate          = "allow" # This marks many fn's which isn't helpful
 should_panic_without_expect = "allow" # We don't care about the specific panic message.
 # End of pedantic lints.
 
+[patch.crates-io]
+miden-protocol = { git = "https://github.com/0xMiden/protocol", rev = "163c54951daadb2b801e7e3b5c004821dc02e4b7" }
+miden-standards = { git = "https://github.com/0xMiden/protocol", rev = "163c54951daadb2b801e7e3b5c004821dc02e4b7" }
+miden-testing = { git = "https://github.com/0xMiden/protocol", rev = "163c54951daadb2b801e7e3b5c004821dc02e4b7" }
+miden-tx = { git = "https://github.com/0xMiden/protocol", rev = "163c54951daadb2b801e7e3b5c004821dc02e4b7" }
+
 [patch."https://github.com/0xMiden/miden-base"]
-miden-protocol = { path = "../protocol/crates/miden-protocol" }
-miden-standards = { path = "../protocol/crates/miden-standards" }
-miden-testing = { path = "../protocol/crates/miden-testing" }
-miden-tx = { path = "../protocol/crates/miden-tx" }
+miden-protocol = { git = "https://github.com/0xMiden/protocol", rev = "163c54951daadb2b801e7e3b5c004821dc02e4b7" }
+miden-standards = { git = "https://github.com/0xMiden/protocol", rev = "163c54951daadb2b801e7e3b5c004821dc02e4b7" }
+miden-testing = { git = "https://github.com/0xMiden/protocol", rev = "163c54951daadb2b801e7e3b5c004821dc02e4b7" }
+miden-tx = { git = "https://github.com/0xMiden/protocol", rev = "163c54951daadb2b801e7e3b5c004821dc02e4b7" }
