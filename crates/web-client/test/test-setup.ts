@@ -220,6 +220,7 @@ function wrapNapiClass(Cls: any): any {
 
 function patchNapiPrototypes(rawSdk: any) {
   // snake_case aliases for camelCase methods (browser uses snake_case via wasm_bindgen)
+  /* eslint-disable camelcase */
   for (const [cls, aliases] of [
     [rawSdk.Account, { to_commitment: "toCommitment" }],
     [rawSdk.AccountHeader, { to_commitment: "toCommitment" }],
@@ -231,6 +232,7 @@ function patchNapiPrototypes(rawSdk: any) {
       }
     }
   }
+  /* eslint-enable camelcase */
 
   // Patch null → undefined for Option<T> returns
   for (const [cls, methods] of [
