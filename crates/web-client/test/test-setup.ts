@@ -218,7 +218,49 @@ function wrapNapiClass(Cls: any): any {
   return Wrapper;
 }
 
+function patchNapiPrototypes(rawSdk: any) {
+  // snake_case aliases for camelCase methods (browser uses snake_case via wasm_bindgen)
+  for (const [cls, aliases] of [
+    [rawSdk.Account, { to_commitment: "toCommitment" }],
+    [rawSdk.AccountHeader, { to_commitment: "toCommitment" }],
+  ] as [any, Record<string, string>][]) {
+    if (!cls?.prototype) continue;
+    for (const [snake, camel] of Object.entries(aliases)) {
+      if (typeof cls.prototype[camel] === "function" && !cls.prototype[snake]) {
+        cls.prototype[snake] = cls.prototype[camel];
+      }
+    }
+  }
+
+  // Patch null → undefined for Option<T> returns
+  for (const [cls, methods] of [
+    [rawSdk.AccountStorage, ["getItem", "getMapEntries", "getMapItem"]],
+    [rawSdk.NoteConsumability, ["consumableAfterBlock"]],
+  ] as [any, string[]][]) {
+    if (!cls?.prototype) continue;
+    for (const method of methods) {
+      const original = cls.prototype[method];
+      if (typeof original === "function") {
+        cls.prototype[method] = function (...args: any[]) {
+          const result = original.apply(this, args);
+          return result === null ? undefined : result;
+        };
+      }
+    }
+  }
+
+  // snake_case aliases for static methods
+  if (rawSdk.NoteScript) {
+    if (!rawSdk.NoteScript.p2id && rawSdk.NoteScript.p2Id)
+      rawSdk.NoteScript.p2id = rawSdk.NoteScript.p2Id;
+    if (!rawSdk.NoteScript.p2ide && rawSdk.NoteScript.p2Ide)
+      rawSdk.NoteScript.p2ide = rawSdk.NoteScript.p2Ide;
+  }
+}
+
 export function createNodeSdkWrapper(rawSdk: any): any {
+  patchNapiPrototypes(rawSdk);
+
   return {
     ...rawSdk,
     // Wrap classes whose constructors/static methods accept Uint8Array or BigInt args
