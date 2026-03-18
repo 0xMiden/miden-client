@@ -168,13 +168,19 @@ impl TryFrom<proto::transaction::TransactionHeader> for TransactionHeader {
         )?;
 
         let note_commitments = value
-            .nullifiers
+            .input_notes
             .into_iter()
-            .map(|d| {
-                let word: Word = d
+            .map(|inc| {
+                let nullifier_word: Word = inc
+                    .nullifier
+                    .ok_or_else(|| {
+                        RpcError::InvalidResponse(
+                            "missing nullifier in InputNoteCommitment".to_string(),
+                        )
+                    })?
                     .try_into()
                     .map_err(|e: RpcConversionError| RpcError::InvalidResponse(e.to_string()))?;
-                Ok(InputNoteCommitment::from(Nullifier::from_raw(word)))
+                Ok(InputNoteCommitment::from(Nullifier::from_raw(nullifier_word)))
             })
             .collect::<Result<Vec<_>, RpcError>>()?;
         let input_notes = InputNotes::new_unchecked(note_commitments);
@@ -182,7 +188,28 @@ impl TryFrom<proto::transaction::TransactionHeader> for TransactionHeader {
         let output_notes = value
             .output_notes
             .into_iter()
-            .map(TryInto::try_into)
+            .map(|nh| {
+                let note_id_digest = nh
+                    .note_id
+                    .and_then(|nid| nid.id)
+                    .ok_or_else(|| {
+                        RpcError::InvalidResponse("missing note_id in NoteHeader".to_string())
+                    })?;
+                let note_id_word: Word = note_id_digest
+                    .try_into()
+                    .map_err(|e: RpcConversionError| RpcError::InvalidResponse(e.to_string()))?;
+                let metadata = nh
+                    .metadata
+                    .ok_or_else(|| {
+                        RpcError::InvalidResponse("missing metadata in NoteHeader".to_string())
+                    })?
+                    .try_into()
+                    .map_err(|e: RpcConversionError| RpcError::InvalidResponse(e.to_string()))?;
+                Ok(NoteHeader::new(
+                    miden_protocol::note::NoteId::from_raw(note_id_word),
+                    metadata,
+                ))
+            })
             .collect::<Result<Vec<NoteHeader>, RpcError>>()?;
 
         let transaction_header = TransactionHeader::new(
