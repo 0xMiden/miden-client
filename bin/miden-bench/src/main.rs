@@ -46,6 +46,8 @@ enum Command {
     Deploy(StorageArgs),
     /// Expand storage: fill entries in a specific map of a deployed account (requires node)
     Expand(ExpandArgs),
+    /// Benchmark sync: import an account and sync from genesis to chain tip
+    Sync(SyncArgs),
 }
 
 /// Storage configuration options for benchmarks
@@ -73,6 +75,19 @@ struct TransactionArgs {
     /// Number of benchmark iterations
     #[arg(short, long, default_value_t = DEFAULT_ITERATION_COUNT)]
     iterations: usize,
+}
+
+/// Sync benchmark options
+#[derive(Args, Clone)]
+struct SyncArgs {
+    /// Public account ID to import before syncing (hex format, e.g., 0x...)
+    #[arg(short, long)]
+    account_id: String,
+
+    /// Number of benchmark iterations
+    #[arg(short, long, default_value_t = 1)]
+    iterations: usize,
+
 }
 
 /// Expand storage: fill entries in a specific map of a deployed account
@@ -171,6 +186,25 @@ async fn main() {
     println!("Network: {endpoint}");
     println!("Store directory: {}", store_path.display());
 
+    // Sync benchmark manages its own client instances, skip shared client setup
+    if let Command::Sync(ref sync_args) = args.command {
+        let results = Box::pin(benchmarks::sync::run_sync_benchmark(
+            &endpoint,
+            &store_path,
+            &sync_args.account_id,
+            sync_args.iterations,
+        ))
+        .await;
+
+        match results {
+            Ok(()) => {},
+            Err(e) => {
+                panic!("Sync benchmark failed: {e:?}");
+            },
+        }
+        return;
+    }
+
     let mut client = config::create_client(&endpoint, &store_path)
         .await
         .expect("Failed to create client");
@@ -181,6 +215,7 @@ async fn main() {
     println!("Connected successfully. Chain height: {chain_height}");
 
     match args.command {
+        Command::Sync(_) => unreachable!(),
         Command::Deploy(deploy_args) => {
             let result =
                 Box::pin(deploy::deploy_account(&mut client, &store_path, deploy_args.maps)).await;
