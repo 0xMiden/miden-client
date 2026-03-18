@@ -196,8 +196,10 @@ pub(crate) fn account_proof_into_inputs(
 
 /// Pairs each [`SmtProof`] with its corresponding key to produce [`StorageMapWitness`]es.
 ///
-/// Each proof is matched with a single key by position. The keys come from the client's
-/// original request and are needed because the node only sends hashed leaf keys.
+/// Proofs and keys are matched by position (the node returns proofs in the same order as
+/// the requested keys). [`StorageMapWitness::new`] validates each pair by hashing the key
+/// and checking that the proof's leaf covers it, so a mismatch will surface as a
+/// `StorageMapError::MissingKey` error.
 fn proofs_to_witnesses(
     proofs: Vec<SmtProof>,
     keys: &[StorageMapKey],
