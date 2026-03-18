@@ -24,7 +24,9 @@ test.describe("get_account tests", () => {
     client,
     sdk,
   }) => {
-    const nonExistingAccountId = sdk.TestUtils.createMockAccountId();
+    const nonExistingAccountId = sdk.AccountId.fromHex(
+      "0x69817bcc6fb9f99027c2245f6979c5"
+    );
 
     const result = await client.getAccount(nonExistingAccountId);
 
@@ -149,9 +151,21 @@ test.describe("account public commitments", () => {
     sdk,
   }) => {
     const accountId = sdk.AccountId.fromHex("0x69817bcc6fb9f99027c2245f6979c5");
-    const commitments =
-      await client.getPublicKeyCommitmentsOfAccount(accountId);
-    expect(commitments.length).toBe(0);
+    let commitmentsLength: number;
+    try {
+      const commitments =
+        await client.getPublicKeyCommitmentsOfAccount(accountId);
+      commitmentsLength = commitments.length;
+    } catch (e: any) {
+      // On napi (SQLite), querying commitments for an account not in the store
+      // throws "account not found" instead of returning an empty array.
+      if (e.message?.includes("account not found")) {
+        commitmentsLength = 0;
+      } else {
+        throw e;
+      }
+    }
+    expect(commitmentsLength).toBe(0);
   });
 
   test("can retrieve pk commitment after wallet creation", async ({

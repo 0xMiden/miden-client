@@ -141,6 +141,24 @@ export function wrapNodeClient(rawClient: any, rawSdk: any): any {
           return guard;
         };
       }
+      if (prop === "newWallet") {
+        return (mode: any, mutable: any, authScheme: any, seed?: any) => {
+          const normSeed =
+            seed instanceof Uint8Array || Buffer.isBuffer(seed)
+              ? Array.from(seed)
+              : seed;
+          const result = target.newWallet(
+            mode,
+            mutable,
+            authScheme,
+            normSeed ?? null
+          );
+          if (result && typeof result.then === "function") {
+            return result.then((v: any) => (v === null ? undefined : v));
+          }
+          return result === null ? undefined : result;
+        };
+      }
       const val = target[prop];
       if (typeof val === "function") {
         const bound = val.bind(target);
@@ -162,9 +180,55 @@ export function wrapNodeClient(rawClient: any, rawSdk: any): any {
  * Provides the same interface as the browser's window.* types,
  * plus a `u64()` helper for platform-aware integer handling.
  */
+/**
+ * Normalizes a single argument for napi:
+ * - BigInt → Number, BigUint64Array → number[], Uint8Array/Buffer → number[]
+ */
+function normalizeNapiArg(val: any): any {
+  if (typeof val === "bigint") return Number(val);
+  if (val instanceof BigUint64Array) return Array.from(val, (v) => Number(v));
+  if (val instanceof BigInt64Array) return Array.from(val, (v) => Number(v));
+  if (val instanceof Uint8Array || Buffer.isBuffer(val)) return Array.from(val);
+  return val;
+}
+
+/**
+ * Wraps a napi class so that constructor and static method args are normalized
+ * (Uint8Array → Array, BigInt → Number, etc.).
+ */
+function wrapNapiClass(Cls: any): any {
+  const Wrapper: any = function (...args: any[]) {
+    return new Cls(...args.map(normalizeNapiArg));
+  };
+  Wrapper.prototype = Cls.prototype;
+  for (const key of Object.getOwnPropertyNames(Cls)) {
+    if (key === "prototype" || key === "length" || key === "name") continue;
+    const desc = Object.getOwnPropertyDescriptor(Cls, key);
+    if (desc && typeof desc.value === "function") {
+      Wrapper[key] = (...args: any[]) =>
+        desc.value.apply(Cls, args.map(normalizeNapiArg));
+    } else if (desc) {
+      try {
+        Object.defineProperty(Wrapper, key, desc);
+      } catch {
+        /* skip non-configurable */
+      }
+    }
+  }
+  return Wrapper;
+}
+
 export function createNodeSdkWrapper(rawSdk: any): any {
   return {
     ...rawSdk,
+    // Wrap classes whose constructors/static methods accept Uint8Array or BigInt args
+    AccountBuilder: wrapNapiClass(rawSdk.AccountBuilder),
+    AccountComponent: wrapNapiClass(rawSdk.AccountComponent),
+    AuthSecretKey: wrapNapiClass(rawSdk.AuthSecretKey),
+    Felt: wrapNapiClass(rawSdk.Felt),
+    FungibleAsset: wrapNapiClass(rawSdk.FungibleAsset),
+    Word: wrapNapiClass(rawSdk.Word),
+    NoteTag: wrapNapiClass(rawSdk.NoteTag),
     // u64: converts to the platform-appropriate type
     // Node.js napi uses f64 (number), browser uses BigInt
     u64: (val: number | bigint) =>

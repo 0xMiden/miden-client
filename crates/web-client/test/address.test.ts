@@ -35,7 +35,8 @@ test.describe("Address instantiation tests", () => {
       sdk.AuthScheme.AuthRpoFalcon512
     );
     const address = sdk.Address.fromAccountId(newAccount.id(), "BasicWallet");
-    expect(address.interface()).toBe("BasicWallet");
+    // napi returns numeric enum (0), browser returns string ("BasicWallet")
+    expect(address.interface()).toBe(sdk.AccountInterface.BasicWallet);
   });
 });
 

@@ -69,6 +69,8 @@ export default defineConfig({
         "test/notes*", // Integration: needs running node
         "test/fpi*", // Integration: needs running node
         "test/import.test*", // Integration: needs running node + browser importAccountFile
+        "test/shared/**", // Old format duplicates (ported to root test/)
+        "test/node/**", // Old format duplicates (ported to root test/)
       ],
       // Skip specific browser-only tests by name
       grepInvert: /exportStore|importStore/,

@@ -1,10 +1,5 @@
 // @ts-nocheck
-import {
-  test,
-  expect,
-  executeAndApplyTransaction,
-  waitForTransaction,
-} from "./test-setup";
+import { test, expect, executeAndApplyTransaction } from "./test-setup";
 
 // ADD_TAG TESTS
 // =======================================================================================================
@@ -62,12 +57,9 @@ test.describe("remove_tag tests", () => {
     // After applying locally, a note-source tag exists
     const tagsAfterMint = await client.listTags();
 
-    // Wait for transaction to be committed
-    await waitForTransaction(
-      client,
-      sdk,
-      mintResult.executedTransaction().id().toHex()
-    );
+    // Commit the block and sync so the transaction is no longer uncommitted
+    await client.proveBlock();
+    await client.syncState();
 
     const tagsAfterSync = await client.listTags();
 

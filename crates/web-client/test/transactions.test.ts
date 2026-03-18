@@ -128,7 +128,9 @@ test.describe("get_transactions tests", () => {
       sdk.TransactionFilter.all()
     );
     const allTransactionIds = allTransactions.map((tx) => tx.id().toHex());
-    const currentBlockNum = allTransactions[0].blockNum();
+    // Use the committed transaction's blockNum (the one with blockNum > 0)
+    const committedTx = allTransactions.find((tx) => tx.blockNum() > 0);
+    const currentBlockNum = committedTx.blockNum();
 
     const futureBlockNum = currentBlockNum + 10;
     const futureExpiredTransactions = await client.getTransactions(
@@ -138,7 +140,9 @@ test.describe("get_transactions tests", () => {
       tx.id().toHex()
     );
 
-    const pastBlockNum = currentBlockNum - 10;
+    // Ensure pastBlockNum doesn't go negative — on mock chain, block numbers
+    // start low (e.g. 1) and negative values overflow to large unsigned ints.
+    const pastBlockNum = Math.max(0, currentBlockNum - 10);
     const pastExpiredTransactions = await client.getTransactions(
       sdk.TransactionFilter.expiredBefore(pastBlockNum)
     );

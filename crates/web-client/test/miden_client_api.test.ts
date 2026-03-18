@@ -661,14 +661,22 @@ test.describe("MidenClient API - Mock Chain", () => {
 
   test("accounts.getOrImport works across serialized mock chain", async ({
     sdk,
-  }) => {
+  }, testInfo) => {
+    // On napi, MockRpcApi.get_account_details panics when the account wasn't
+    // created on this client instance — the serialized mock chain only preserves
+    // block data, not the mock RPC's account registry.
+    test.skip(
+      testInfo.project.name === "nodejs",
+      "mock RPC doesn't support cross-client getOrImport on napi"
+    );
+
     const MidenClient = await createMidenClient(sdk);
     const client = await MidenClient.createMock();
     const wallet = await client.accounts.create({ storage: "public" });
     const walletId = wallet.id().toString();
 
     // Serialize chain so the second client sees the same blocks
-    const chain = client.serializeMockChain();
+    const chain = await client.serializeMockChain();
 
     // Create a fresh mock client with the same chain
     const client2 = await MidenClient.createMock({
@@ -702,7 +710,7 @@ test.describe("MidenClient API - Mock Chain", () => {
     await client.sync();
 
     // Serialize the mock chain
-    const serializedChain = client.serializeMockChain();
+    const serializedChain = await client.serializeMockChain();
 
     // Create a new client from the serialized chain
     const client2 = await MidenClient.createMock({
