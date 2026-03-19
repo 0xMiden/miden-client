@@ -96,6 +96,8 @@ export async function mockMint(
     sdk.u64(amount)
   );
   const txId = await client.submitNewTransaction(faucetId, mintRequest);
+  // Save hex before TransactionFilter.ids() consumes the WASM object
+  const txIdHex = txId.toHex();
 
   if (!opts?.skipSync) {
     await client.proveBlock();
@@ -109,7 +111,7 @@ export async function mockMint(
   const createdNoteId = notes[0].id().toString();
 
   return {
-    transactionId: txId.toHex(),
+    transactionId: txIdHex,
     createdNoteId,
     numOutputNotesCreated: notes.length,
   };

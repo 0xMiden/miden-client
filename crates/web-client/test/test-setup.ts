@@ -428,6 +428,8 @@ async function setupBrowserPage(page: any, testInfo: TestInfo) {
             BigInt(amount)
           );
           const txId = await c.submitNewTransaction(faucetId, mintRequest);
+          // Save hex before TransactionFilter.ids() consumes the object
+          const txIdHex = txId.toHex();
           if (!opts?.skipSync) {
             await c.proveBlock();
             await c.syncState();
@@ -437,7 +439,7 @@ async function setupBrowserPage(page: any, testInfo: TestInfo) {
           );
           const notes = txRecord.outputNotes().notes();
           return {
-            transactionId: txId.toHex(),
+            transactionId: txIdHex,
             createdNoteId: notes[0].id().toString(),
             numOutputNotesCreated: notes.length,
           };
