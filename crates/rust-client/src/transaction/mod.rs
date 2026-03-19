@@ -132,7 +132,6 @@ pub use miden_protocol::transaction::{
     OutputNote,
     OutputNotes,
     ProvenTransaction,
-    PublicOutputNote,
     RawOutputNote,
     RawOutputNotes,
     TransactionArgs,
@@ -531,7 +530,7 @@ where
 
         let account: Account = account_record.try_into()?;
 
-        let data_store = ClientDataStore::new(self.store.clone());
+        let data_store = ClientDataStore::new(self.store.clone(), self.rpc_api.clone());
 
         data_store.register_foreign_account_inputs(foreign_account_inputs.iter().cloned());
 
