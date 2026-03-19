@@ -42,7 +42,7 @@ impl RpcClient {
     /// @param endpoint - Endpoint to connect to.
     #[js_export(constructor)]
     pub fn new(endpoint: Endpoint) -> Result<RpcClient, JsErr> {
-        let rpc_client = Arc::new(GrpcClient::new(&endpoint.into(), 0));
+        let rpc_client = Arc::new(GrpcClient::new(&endpoint.into(), 30_000));
 
         Ok(RpcClient { inner: rpc_client })
     }
