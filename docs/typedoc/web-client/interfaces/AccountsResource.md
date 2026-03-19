@@ -190,24 +190,18 @@ Account reference, file, or seed-based import options.
 
 ### insert()
 
-> **insert**(`account`, `overwrite?`): `Promise`\<`void`\>
+> **insert**(`options`): `Promise`\<`void`\>
 
 Insert a pre-built account into the local store. Useful for external signer
 integrations that construct accounts via `AccountBuilder` with custom auth commitments.
 
 #### Parameters
 
-##### account
+##### options
 
-[`Account`](../classes/Account.md)
+[`InsertAccountOptions`](InsertAccountOptions.md)
 
-The account to insert.
-
-##### overwrite?
-
-`boolean`
-
-Whether to overwrite an existing account with the same ID. Defaults to `false`.
+Insert options.
 
 #### Returns
 

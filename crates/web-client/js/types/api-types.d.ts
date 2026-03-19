@@ -254,6 +254,13 @@ export type ImportAccountInput =
       auth?: AuthSchemeType;
     };
 
+export interface InsertAccountOptions {
+  /** The pre-built account to insert. */
+  account: Account;
+  /** Whether to overwrite an existing account with the same ID. Defaults to `false`. */
+  overwrite?: boolean;
+}
+
 /** Options for accounts.export(). Exists for forward-compatible extensibility. */
 export interface ExportAccountOptions {}
 
@@ -501,10 +508,9 @@ export interface AccountsResource {
    * Insert a pre-built account into the local store. Useful for external signer
    * integrations that construct accounts via `AccountBuilder` with custom auth commitments.
    *
-   * @param account - The account to insert.
-   * @param overwrite - Whether to overwrite an existing account with the same ID. Defaults to `false`.
+   * @param options - Insert options.
    */
-  insert(account: Account, overwrite?: boolean): Promise<void>;
+  insert(options: InsertAccountOptions): Promise<void>;
   /**
    * Retrieve an account by ID. Returns `null` if not found in the local store.
    *

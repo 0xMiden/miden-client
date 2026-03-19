@@ -128,7 +128,7 @@ try {
         .withBasicWalletComponent()
         .build().account;
 
-    await client.accounts.insert(account);
+    await client.accounts.insert({ account });
 
     console.log("Inserted account:", account.id().toString());
 } catch (error) {

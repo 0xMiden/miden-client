@@ -82,7 +82,7 @@ export class AccountsResource {
     return account;
   }
 
-  async insert(account, overwrite = false) {
+  async insert({ account, overwrite = false }) {
     this.#client.assertNotTerminated();
     await this.#inner.newAccount(account, overwrite);
   }
