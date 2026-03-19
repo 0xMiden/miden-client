@@ -5,7 +5,6 @@ import {
   JsStorageSlot,
   JsVaultAsset,
   MidenDatabase,
-  STORAGE_SLOT_TYPE_MAP,
 } from "./schema.js";
 import { logWebStoreError, uint8ArrayToBase64 } from "./utils.js";
 
@@ -1099,7 +1098,6 @@ export async function undoAccountStates(
               .delete();
           }
         }
-
       }
     );
   } catch (error) {
