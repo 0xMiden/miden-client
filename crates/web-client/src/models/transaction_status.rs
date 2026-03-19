@@ -24,10 +24,11 @@ impl TransactionStatus {
     }
 
     /// Creates a discarded status from a discard cause string.
-    pub fn discarded(cause: String) -> TransactionStatus {
-        let native_cause = DiscardCause::from_string(&cause).expect("Invalid discard cause");
+    pub fn discarded(cause: &str) -> Result<TransactionStatus, JsValue> {
+        let native_cause = DiscardCause::from_string(cause)
+            .map_err(|err| JsValue::from_str(&format!("Invalid discard cause: {err}")))?;
 
-        TransactionStatus(NativeTransactionStatus::Discarded(native_cause))
+        Ok(TransactionStatus(NativeTransactionStatus::Discarded(native_cause)))
     }
 
     /// Returns true if the transaction is still pending.

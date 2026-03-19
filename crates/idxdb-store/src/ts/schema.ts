@@ -170,6 +170,9 @@ export interface IInputNote {
   nullifier: string;
   serializedCreatedAt: string;
   state: Uint8Array;
+  consumedBlockHeight?: number;
+  consumedTxOrder?: number;
+  consumerAccountId?: string;
 }
 
 export interface IOutputNote {
@@ -289,7 +292,12 @@ const V1_STORES: Record<string, string> = {
   [Table.Addresses]: indexes("address", "id"),
   [Table.Transactions]: indexes("id", "statusVariant"),
   [Table.TransactionScripts]: indexes("scriptRoot"),
-  [Table.InputNotes]: indexes("noteId", "nullifier", "stateDiscriminant"),
+  [Table.InputNotes]: indexes(
+    "noteId",
+    "nullifier",
+    "stateDiscriminant",
+    "[consumedBlockHeight+consumedTxOrder+noteId]"
+  ),
   [Table.OutputNotes]: indexes(
     "noteId",
     "recipientDigest",

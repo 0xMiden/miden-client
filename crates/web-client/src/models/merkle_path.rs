@@ -33,6 +33,20 @@ impl MerklePath {
     pub fn nodes(&self) -> Vec<Word> {
         self.0.nodes().iter().map(Into::into).collect()
     }
+
+    /// Computes the root given a leaf index and value.
+    #[wasm_bindgen(js_name = "computeRoot")]
+    pub fn compute_root(&self, index: u64, node: &Word) -> Result<Word, JsValue> {
+        self.0
+            .compute_root(index, node.clone().into())
+            .map(Into::into)
+            .map_err(|err| JsValue::from_str(&format!("Invalid Merkle path index: {err}")))
+    }
+
+    /// Verifies the path against a root.
+    pub fn verify(&self, index: u64, node: &Word, root: &Word) -> bool {
+        self.0.verify(index, node.clone().into(), &root.clone().into()).is_ok()
+    }
 }
 
 // CONVERSIONS

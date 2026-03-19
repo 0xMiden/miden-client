@@ -15,6 +15,7 @@
 * Added `NoteScreener` constructor via `Client::note_screener()` and improved note consumability checks with batch note screening support ([#1803](https://github.com/0xMiden/miden-client/pull/1803), [#1814](https://github.com/0xMiden/miden-client/pull/1814)).
 * [FEATURE][web] Added `getAccountProof` method to the web client's `RpcClient`, allowing lightweight retrieval of account header, storage slot values, and code via a single RPC call. Refactored the `NodeRpcClient::get_account_proof` signature to allow requesting just private account proofs ([#1794](https://github.com/0xMiden/miden-client/pull/1794), [#1814](https://github.com/0xMiden/miden-client/pull/1814)).
 * Added `getAccountByKeyCommitment` method to `WebClient` for retrieving accounts by public key commitment ([#1729](https://github.com/0xMiden/miden-client/pull/1729)).
+* Added automatic registration of note scripts required by network transactions (NTX). The client now checks the node's script registry before submitting a transaction and registers any missing scripts via a separate registration transaction ([#1840](https://github.com/0xMiden/miden-client/pull/1840)).
 
 ### Changes
 
@@ -35,6 +36,7 @@
 * [BREAKING][type][web] `AuthSecretKey.getRpoFalcon512SecretKeyAsFelts()` and `getEcdsaK256KeccakSecretKeyAsFelts()` now return `Result<Vec<Felt>, JsValue>` instead of panicking on key type mismatch ([#1833](https://github.com/0xMiden/miden-client/pull/1833)).
 * [BREAKING][rename][cli] Renamed `CliConfig::from_system()` to `CliConfig::load()` and `CliClient::from_system_user_config()` to `CliClient::new()` for better discoverability ([#1848](https://github.com/0xMiden/miden-client/pull/1848)).
 * Removed `SmtForest` empty-root workaround in `AccountSmtForest::safe_pop_smts`, now that the upstream fix has landed in miden-crypto v0.19.7 ([#1864](https://github.com/0xMiden/miden-client/pull/1864)).
+* Added an `InputNoteReader` accessible through `client.input_note_reader()` that allows for lazy iterator over all the consumed input notes ([#1843](https://github.com/0xMiden/miden-client/pull/1843)).
 * Removed miden-cli template TOMLs in favor of direct serialization into packages ([#1879](https://github.com/0xMiden/miden-client/pull/1879)).
 
 ### Features
@@ -50,6 +52,7 @@
 
 ### Fixes
 
+* [FIX][web] Replaced `.unwrap()` panics with proper `Result` returns in `MerklePath.computeRoot()`, `NoteExecutionHint.fromParts()`, `NoteExecutionHint.canBeConsumed()`, `NoteStorage` constructor, and `TransactionStatus.discarded()` WASM bindings ([#1870](https://github.com/0xMiden/miden-client/pull/1870)).
 * [FIX][rust] Fixed `get_vault_asset_witnesses` failing with `MerkleError::RootNotInStore` when the vault root is missing from the `AccountSmtForest`. The error is now caught and falls back to loading the full vault from the store ([#1890](https://github.com/0xMiden/miden-client/pull/1890)).
 * [FIX][rust] Replaced `.expect()` panics on RPC response data with proper error propagation ([#1833](https://github.com/0xMiden/miden-client/pull/1833)).
 
