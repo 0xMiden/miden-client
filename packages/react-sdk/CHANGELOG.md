@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.13.4 (2026-03-19)
+
+* [FEATURE][web] Exposed `getAccountProof` in the `RpcClient`, accepting optional `AccountStorageRequirements` and block number parameters to fetch specific storage maps without full account reconstruction ([#TBD](https://github.com/0xMiden/miden-client/pull/TBD)).
+* [FEATURE][web] Exposed `syncStorageMaps` in the `RpcClient` for paginated retrieval of large storage maps ([#TBD](https://github.com/0xMiden/miden-client/pull/TBD)).
+
 ## 0.13.3 (2026-02-25)
 
 ### Features

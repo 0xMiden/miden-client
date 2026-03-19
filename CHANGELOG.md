@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.13.3 (2026-03-19)
+
+* [FEATURE][web] Exposed `getAccountProof` in the `RpcClient`, accepting optional `AccountStorageRequirements` and block number parameters to fetch specific storage maps without full account reconstruction ([#1917](https://github.com/0xMiden/miden-client/pull/1917)).
+* [FEATURE][web] Exposed `syncStorageMaps` in the `RpcClient` for paginated retrieval of large storage maps ([#1917](https://github.com/0xMiden/miden-client/pull/1917)).
+* [FEATURE][rust] Added `storage_details()` and `find_map_details()` accessors to `AccountProof` for direct access to storage map data without `into_parts()` ([#1917](https://github.com/0xMiden/miden-client/pull/1917)).
+
 ## 0.13.2 (2026-02-26)
 
 * Updated to `miden-crypto` v0.19.5 ([#1813](https://github.com/0xMiden/miden-client/pull/1813)).
