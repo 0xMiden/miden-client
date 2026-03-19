@@ -2,9 +2,18 @@ import { useCallback, useState } from "react";
 import { importStore as sdkImportStore } from "@miden-sdk/miden-sdk";
 import { useMiden } from "../context/MidenProvider";
 
+export interface ImportStoreOptions {
+  /** Skip auto-sync after import. Default: false */
+  skipSync?: boolean;
+}
+
 export interface UseImportStoreResult {
   /** Import a previously exported store dump */
-  importStore: (storeDump: string, storeName: string) => Promise<void>;
+  importStore: (
+    storeDump: string,
+    storeName: string,
+    options?: ImportStoreOptions
+  ) => Promise<void>;
   /** Whether the import is in progress */
   isImporting: boolean;
   /** Error if import failed */
@@ -41,7 +50,11 @@ export function useImportStore(): UseImportStoreResult {
   const [error, setError] = useState<Error | null>(null);
 
   const importStore = useCallback(
-    async (storeDump: string, storeName: string): Promise<void> => {
+    async (
+      storeDump: string,
+      storeName: string,
+      options?: ImportStoreOptions
+    ): Promise<void> => {
       if (!client || !isReady) {
         throw new Error("Miden client is not ready");
       }
@@ -51,7 +64,9 @@ export function useImportStore(): UseImportStoreResult {
 
       try {
         await runExclusive(() => sdkImportStore(storeName, storeDump));
-        await sync();
+        if (!options?.skipSync) {
+          await sync();
+        }
       } catch (err) {
         const error = err instanceof Error ? err : new Error(String(err));
         setError(error);

@@ -158,7 +158,10 @@ export type { UseConsumeResult } from "./hooks/useConsume";
 export type { UseSwapResult } from "./hooks/useSwap";
 export type { UseTransactionResult } from "./hooks/useTransaction";
 export type { UseExportStoreResult } from "./hooks/useExportStore";
-export type { UseImportStoreResult } from "./hooks/useImportStore";
+export type {
+  UseImportStoreResult,
+  ImportStoreOptions,
+} from "./hooks/useImportStore";
 export type { UseImportNoteResult } from "./hooks/useImportNote";
 export type { UseExportNoteResult } from "./hooks/useExportNote";
 export type { UseSyncControlResult } from "./hooks/useSyncControl";

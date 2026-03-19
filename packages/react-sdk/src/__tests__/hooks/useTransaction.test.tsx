@@ -313,7 +313,7 @@ describe("useTransaction", () => {
     });
   });
 
-  describe("privateNoteRecipient (private note delivery)", () => {
+  describe("privateNoteTarget (private note delivery)", () => {
     const createMockTxResultWithPrivateNotes = (
       id: string = "0xtx_private"
     ) => {
@@ -334,7 +334,7 @@ describe("useTransaction", () => {
       };
     };
 
-    it("should deliver private notes when privateNoteRecipient is set", async () => {
+    it("should deliver private notes when privateNoteTarget is set", async () => {
       const mockTxResult = createMockTxResultWithPrivateNotes("0xtx_4step");
       const mockSync = vi.fn().mockResolvedValue(undefined);
       const record = {
@@ -367,7 +367,7 @@ describe("useTransaction", () => {
         txResult = await result.current.execute({
           accountId: "0xaccount",
           request: createMockTransactionRequest(),
-          privateNoteRecipient: "0xrecipient",
+          privateNoteTarget: "0xrecipient",
         });
       });
 
@@ -426,7 +426,7 @@ describe("useTransaction", () => {
         await result.current.execute({
           accountId: "0xaccount",
           request: createMockTransactionRequest(),
-          privateNoteRecipient: "0xrecipient",
+          privateNoteTarget: "0xrecipient",
         });
       });
 
@@ -453,7 +453,7 @@ describe("useTransaction", () => {
           result.current.execute({
             accountId: "0x1",
             request: createMockTransactionRequest(),
-            privateNoteRecipient: "0xrecipient",
+            privateNoteTarget: "0xrecipient",
           })
         ).rejects.toThrow("Execute failed");
       });

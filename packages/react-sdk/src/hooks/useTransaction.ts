@@ -42,7 +42,7 @@ type TransactionRequestFactory = (
  * Hook to execute arbitrary transaction requests.
  *
  * Always uses the 4-step pipeline (execute → prove → submit → apply)
- * with prover fallback support. When `privateNoteRecipient` is set,
+ * with prover fallback support. When `privateNoteTarget` is set,
  * additionally waits for commit and delivers private output notes.
  *
  * @example
@@ -63,7 +63,7 @@ type TransactionRequestFactory = (
  *           NoteType.Private,
  *           NoteType.Private
  *         ),
- *       privateNoteRecipient: "0xrecipient...",
+ *       privateNoteTarget: "0xrecipient...",
  *     });
  *   };
  *
@@ -143,14 +143,14 @@ export function useTransaction(): UseTransactionResult {
 
         // Deliver private notes if requested
         const txId = txResult.id();
-        if (options.privateNoteRecipient != null) {
+        if (options.privateNoteTarget != null) {
           await waitForTransactionCommit(client, runExclusiveSafe, txId);
 
-          const recipientAddress = parseAddress(options.privateNoteRecipient);
+          const targetAddress = parseAddress(options.privateNoteTarget);
           const fullNotes = extractFullNotes(txResult);
           for (const note of fullNotes) {
             await runExclusiveSafe(() =>
-              client.sendPrivateNote(note, recipientAddress)
+              client.sendPrivateNote(note, targetAddress)
             );
           }
         }

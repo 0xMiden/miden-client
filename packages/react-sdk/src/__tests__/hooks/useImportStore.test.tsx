@@ -102,6 +102,29 @@ describe("useImportStore", () => {
       expect(mockSync).toHaveBeenCalled();
     });
 
+    it("should skip sync when skipSync option is true", async () => {
+      const mockSync = vi.fn().mockResolvedValue(undefined);
+      const mockClient = createMockWebClient();
+      const runExclusive = vi.fn((fn: () => unknown) => fn());
+      mockSdkImportStore.mockResolvedValue(undefined);
+
+      mockUseMiden.mockReturnValue({
+        client: mockClient,
+        isReady: true,
+        runExclusive,
+        sync: mockSync,
+      });
+
+      const { result } = renderHook(() => useImportStore());
+
+      await act(async () => {
+        await result.current.importStore("{}", "Store", { skipSync: true });
+      });
+
+      expect(mockSdkImportStore).toHaveBeenCalledWith("Store", "{}");
+      expect(mockSync).not.toHaveBeenCalled();
+    });
+
     it("should set error on failure", async () => {
       const mockClient = createMockWebClient();
       const runExclusive = vi.fn((fn: () => unknown) => fn());

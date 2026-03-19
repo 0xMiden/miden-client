@@ -339,38 +339,6 @@ export interface MultiSendOptions {
   skipSync?: boolean;
 }
 
-export interface InternalTransferOptions {
-  /** Sender account ID */
-  from: string;
-  /** Recipient account ID */
-  to: string;
-  /** Asset ID to send (token id) */
-  assetId: string;
-  /** Amount to transfer */
-  amount: bigint;
-  /** Note type. Default: private */
-  noteType?: "private" | "public";
-}
-
-export interface InternalTransferChainOptions {
-  /** Initial sender account ID */
-  from: string;
-  /** Ordered list of recipient account IDs */
-  recipients: string[];
-  /** Asset ID to send (token id) */
-  assetId: string;
-  /** Amount to transfer per hop */
-  amount: bigint;
-  /** Note type. Default: private */
-  noteType?: "private" | "public";
-}
-
-export interface InternalTransferResult {
-  createTransactionId: string;
-  consumeTransactionId: string;
-  noteId: string;
-}
-
 export interface WaitForCommitOptions {
   /** Timeout in milliseconds. Default: 10000 */
   timeoutMs?: number;
@@ -439,10 +407,10 @@ export interface ExecuteTransactionOptions {
   skipSync?: boolean;
   /**
    * When set, private output notes from this transaction are delivered to the
-   * given recipient after the transaction is committed. Accepts any AccountRef
-   * form (hex string, bech32, AccountId, Account, AccountHeader).
+   * given target account after the transaction is committed. Accepts any
+   * AccountRef form (hex string, bech32, AccountId, Account, AccountHeader).
    */
-  privateNoteRecipient?: AccountRef;
+  privateNoteTarget?: AccountRef;
 }
 
 // Transaction result
