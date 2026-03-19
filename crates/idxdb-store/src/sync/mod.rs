@@ -133,7 +133,10 @@ impl IdxdbStore {
             let input_notes = note_updates.updated_input_notes();
             let output_notes = note_updates.updated_output_notes();
             (
-                input_notes.into_iter().map(|note| serialize_input_note(note.inner())).collect(),
+                input_notes
+                    .into_iter()
+                    .map(|note| serialize_input_note(note.inner(), note.consumed_tx_order()))
+                    .collect(),
                 output_notes
                     .into_iter()
                     .map(|note| serialize_output_note(note.inner()))

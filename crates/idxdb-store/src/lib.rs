@@ -211,6 +211,18 @@ impl Store for IdxdbStore {
         self.get_output_notes(note_filter).await
     }
 
+    async fn get_input_note_by_offset(
+        &self,
+        filter: NoteFilter,
+        consumer: Option<AccountId>,
+        block_start: Option<BlockNumber>,
+        block_end: Option<BlockNumber>,
+        offset: u32,
+    ) -> Result<Option<InputNoteRecord>, StoreError> {
+        self.get_input_note_by_offset(filter, consumer, block_start, block_end, offset)
+            .await
+    }
+
     async fn upsert_input_notes(&self, notes: &[InputNoteRecord]) -> Result<(), StoreError> {
         self.upsert_input_notes(notes).await
     }

@@ -8,7 +8,12 @@ use miden_client::note::{NoteFile, NoteType};
 use miden_client::rpc::{AcceptHeaderError, RpcError};
 use miden_client::store::{InputNoteState, NoteFilter};
 use miden_client::testing::common::*;
-use miden_client::transaction::{InputNote, PaymentNoteDescription, TransactionRequestBuilder};
+use miden_client::transaction::{
+    InputNote,
+    PaymentNoteDescription,
+    TransactionRequestBuilder,
+    TransactionStatus,
+};
 use rand::RngCore;
 use tracing::info;
 
@@ -434,4 +439,173 @@ pub async fn test_incorrect_genesis(client_config: ClientConfig) -> Result<()> {
         Ok(_) => anyhow::bail!("grpc request was unexpectedly successful"),
         _ => anyhow::bail!("expected accept header error"),
     }
+}
+
+/// Tests that consumed notes are returned in the correct transaction order when multiple
+/// consume transactions for the same account are included in the same block.
+///
+/// The test mints 3 notes, then submits 3 separate consume transactions rapidly so they
+/// are likely included in the same block. After syncing, it verifies that the
+/// `InputNoteReader` returns the notes ordered by their consumption order.
+pub async fn test_consumed_note_ordering(client_config: ClientConfig) -> Result<()> {
+    let (mut client, keystore) = client_config.clone().into_client().await?;
+    wait_for_node(&mut client).await;
+
+    // Create faucet and wallet
+    let (faucet_account, _) = insert_new_fungible_faucet(
+        &mut client,
+        AccountStorageMode::Private,
+        &keystore,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
+
+    let (wallet_account, ..) = insert_new_wallet(
+        &mut client,
+        AccountStorageMode::Private,
+        &keystore,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
+
+    client.sync_state().await?;
+
+    // Mint 3 notes, each in a separate transaction
+    let mut minted_notes = Vec::new();
+    for i in 0..3 {
+        let (tx_id, note) =
+            mint_note(&mut client, wallet_account.id(), faucet_account.id(), NoteType::Private)
+                .await;
+        info!(tx_id = %tx_id, note_id = %note.id(), index = i, "Minted note");
+        wait_for_tx(&mut client, tx_id).await?;
+        minted_notes.push(note);
+    }
+
+    // Sync to pick up the minted notes
+    client.sync_state().await?;
+
+    // Submit 3 separate consume transactions without waiting between them.
+    // This makes it likely they will be included in the same block, which tests
+    // the consumed_tx_order field within a single block.
+    let mut consume_tx_ids = Vec::new();
+    for (i, note) in minted_notes.iter().enumerate() {
+        let tx_id =
+            consume_notes(&mut client, wallet_account.id(), core::slice::from_ref(note)).await;
+        info!(tx_id = %tx_id, note_id = %note.id(), index = i, "Submitted consume transaction");
+        consume_tx_ids.push(tx_id);
+    }
+
+    // Wait for all consume transactions to be committed
+    for tx_id in &consume_tx_ids {
+        wait_for_tx(&mut client, *tx_id).await?;
+    }
+
+    // Sync to apply the state updates
+    client.sync_state().await?;
+
+    // Verify all notes are consumed
+    let consumed_notes = client.get_input_notes(NoteFilter::Consumed).await?;
+    assert!(
+        consumed_notes.len() >= 3,
+        "Expected at least 3 consumed notes, got {}",
+        consumed_notes.len()
+    );
+
+    // Check if all consume transactions landed in the same block
+    let tx_records = client.get_transactions(miden_client::store::TransactionFilter::All).await?;
+    let consume_blocks: Vec<_> = consume_tx_ids
+        .iter()
+        .filter_map(|tx_id| {
+            tx_records.iter().find(|t| t.id == *tx_id).and_then(|t| {
+                if let TransactionStatus::Committed { block_number, .. } = t.status {
+                    Some(block_number)
+                } else {
+                    None
+                }
+            })
+        })
+        .collect();
+
+    info!(?consume_blocks, "Consume transaction block numbers");
+
+    // Use InputNoteReader to iterate consumed notes for this wallet
+    let mut reader = client.input_note_reader().for_consumer(wallet_account.id());
+    let mut reader_notes = Vec::new();
+    while let Some(note) = reader.next().await? {
+        reader_notes.push(note);
+    }
+
+    assert!(
+        reader_notes.len() >= 3,
+        "Expected at least 3 notes from reader, got {}",
+        reader_notes.len()
+    );
+
+    // Extract the nullifier block height from a consumed note state
+    let consumed_block_height = |note: &miden_client::store::InputNoteRecord| -> Option<u32> {
+        match note.state() {
+            InputNoteState::ConsumedAuthenticatedLocal(s) => {
+                Some(s.nullifier_block_height.as_u32())
+            },
+            InputNoteState::ConsumedUnauthenticatedLocal(s) => {
+                Some(s.nullifier_block_height.as_u32())
+            },
+            InputNoteState::ConsumedExternal(s) => Some(s.nullifier_block_height.as_u32()),
+            _ => None,
+        }
+    };
+
+    // Verify the notes are ordered by block height, then by tx_order within a block
+    for window in reader_notes.windows(2) {
+        let a = &window[0];
+        let b = &window[1];
+
+        let a_block = consumed_block_height(a).expect("consumed note should have block height");
+        let b_block = consumed_block_height(b).expect("consumed note should have block height");
+
+        assert!(
+            a_block <= b_block,
+            "Notes should be ordered by block height: note {} at block {} came before note {} at block {}",
+            a.id(),
+            a_block,
+            b.id(),
+            b_block,
+        );
+    }
+
+    // If all transactions landed in the same block, additionally verify the note IDs
+    // match the order we submitted them in
+    let all_same_block =
+        consume_blocks.len() == 3 && consume_blocks.iter().all(|b| *b == consume_blocks[0]);
+
+    if all_same_block {
+        info!("All consume transactions in the same block - verifying tx_order");
+        let reader_note_ids: Vec<_> = reader_notes.iter().map(|n| n.id()).collect();
+        for (i, note) in minted_notes.iter().enumerate() {
+            let pos = reader_note_ids
+                .iter()
+                .position(|id| *id == note.id())
+                .with_context(|| format!("Minted note {} not found in reader output", note.id()))?;
+            info!(note_id = %note.id(), expected_order = i, actual_pos = pos, "Note position");
+        }
+
+        // Verify that the relative order of our 3 notes matches submission order
+        let positions: Vec<_> = minted_notes
+            .iter()
+            .filter_map(|note| reader_note_ids.iter().position(|id| *id == note.id()))
+            .collect();
+
+        assert_eq!(positions.len(), 3, "All 3 minted notes should be in the reader output");
+        assert!(
+            positions.windows(2).all(|w| w[0] < w[1]),
+            "Notes should appear in submission order, but got positions: {:?}",
+            positions
+        );
+    } else {
+        info!(
+            "Consume transactions spread across multiple blocks - order verified by block height"
+        );
+    }
+
+    Ok(())
 }
