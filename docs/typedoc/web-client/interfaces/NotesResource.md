@@ -20,9 +20,13 @@ Export a note to a [NoteFile](../classes/NoteFile.md) for transfer or backup.
 
 [`NoteInput`](../type-aliases/NoteInput.md)
 
+The note to export.
+
 ##### options?
 
 [`ExportNoteOptions`](ExportNoteOptions.md)
+
+Optional export format options.
 
 #### Returns
 
@@ -42,6 +46,8 @@ Fetch private notes from the note transport service.
 
 [`FetchPrivateNotesOptions`](FetchPrivateNotesOptions.md)
 
+Optional fetch mode: `"incremental"` (default) or `"all"`.
+
 #### Returns
 
 `Promise`\<`void`\>
@@ -59,6 +65,8 @@ Retrieve a note by ID. Returns `null` if not found.
 ##### noteId
 
 [`NoteInput`](../type-aliases/NoteInput.md)
+
+The note to retrieve.
 
 #### Returns
 
@@ -78,6 +86,8 @@ Import a note from a [NoteFile](../classes/NoteFile.md).
 
 [`NoteFile`](../classes/NoteFile.md)
 
+The note file to import.
+
 #### Returns
 
 `Promise`\<[`NoteId`](../classes/NoteId.md)\>
@@ -96,6 +106,8 @@ List received (input) notes, optionally filtered by status or IDs.
 
 [`NoteQuery`](../type-aliases/NoteQuery.md)
 
+Optional filter by note status or note IDs.
+
 #### Returns
 
 `Promise`\<[`InputNoteRecord`](../classes/InputNoteRecord.md)[]\>
@@ -111,6 +123,8 @@ List notes that are available for consumption by a specific account.
 #### Parameters
 
 ##### options
+
+Options containing the account to check availability for.
 
 ###### account
 
@@ -134,6 +148,8 @@ List sent (output) notes, optionally filtered by status or IDs.
 
 [`NoteQuery`](../type-aliases/NoteQuery.md)
 
+Optional filter by note status or note IDs.
+
 #### Returns
 
 `Promise`\<[`OutputNoteRecord`](../classes/OutputNoteRecord.md)[]\>
@@ -151,6 +167,8 @@ Send a private note to a recipient via the note transport service.
 ##### options
 
 [`SendPrivateOptions`](SendPrivateOptions.md)
+
+Options including the note and the recipient.
 
 #### Returns
 

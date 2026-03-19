@@ -26,6 +26,8 @@ Get a setting value by key. Returns `null` if not found.
 
 `string`
 
+The setting key.
+
 #### Returns
 
 `Promise`\<`T`\>
@@ -56,6 +58,8 @@ Remove a setting.
 
 `string`
 
+The setting key to remove.
+
 #### Returns
 
 `Promise`\<`void`\>
@@ -74,9 +78,13 @@ Set a setting value.
 
 `string`
 
+The setting key.
+
 ##### value
 
 `unknown`
+
+The value to store.
 
 #### Returns
 

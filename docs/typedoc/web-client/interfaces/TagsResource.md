@@ -20,6 +20,8 @@ Add a note tag to listen for during sync.
 
 `number`
 
+The numeric note tag to register.
+
 #### Returns
 
 `Promise`\<`void`\>
@@ -49,6 +51,8 @@ Remove a note tag so it is no longer tracked during sync.
 ##### tag
 
 `number`
+
+The numeric note tag to unregister.
 
 #### Returns
 

@@ -490,7 +490,12 @@ export interface BuildSwapTagOptions {
 // ════════════════════════════════════════════════════════════════
 
 export interface AccountsResource {
-  /** Create a new wallet, faucet, or contract account. Defaults to a mutable wallet if no options are provided. */
+  /**
+   * Create a new wallet, faucet, or contract account. Defaults to a mutable
+   * wallet if no options are provided.
+   *
+   * @param options - Account creation options discriminated by `type` field.
+   */
   create(options?: CreateAccountOptions): Promise<Account>;
   /**
    * Insert a pre-built account into the local store. Useful for external signer
@@ -500,33 +505,77 @@ export interface AccountsResource {
    * @param overwrite - Whether to overwrite an existing account with the same ID. Defaults to `false`.
    */
   insert(account: Account, overwrite?: boolean): Promise<void>;
-  /** Retrieve an account by ID. Returns `null` if not found in the local store. */
+  /**
+   * Retrieve an account by ID. Returns `null` if not found in the local store.
+   *
+   * @param accountId - The account to retrieve.
+   */
   get(accountId: AccountRef): Promise<Account | null>;
-  /** Retrieve an account locally, or import it from the network if not found. */
+  /**
+   * Retrieve an account locally, or import it from the network if not found.
+   *
+   * @param accountId - The account to retrieve or import.
+   */
   getOrImport(accountId: AccountRef): Promise<Account>;
-  /** List all accounts in the local store. */
+  /**
+   * List all accounts in the local store.
+   */
   list(): Promise<AccountHeader[]>;
-  /** Retrieve detailed account information including vault, storage, code, and keys. */
+  /**
+   * Retrieve detailed account information including vault, storage, code, and keys.
+   *
+   * @param accountId - The account to retrieve details for.
+   */
   getDetails(accountId: AccountRef): Promise<AccountDetails>;
-  /** Get the balance of a specific token for an account. */
+  /**
+   * Get the balance of a specific token for an account.
+   *
+   * @param accountId - The account to check.
+   * @param tokenId - The faucet account that identifies the token.
+   */
   getBalance(accountId: AccountRef, tokenId: AccountRef): Promise<bigint>;
 
-  /** Import an account from the network by ID, from an exported file, or reconstruct from a seed. */
+  /**
+   * Import an account from the network by ID, from an exported file, or
+   * reconstruct from a seed.
+   *
+   * @param input - Account reference, file, or seed-based import options.
+   */
   import(input: ImportAccountInput): Promise<Account>;
-  /** Export an account to an {@link AccountFile} for backup or transfer. */
+  /**
+   * Export an account to an {@link AccountFile} for backup or transfer.
+   *
+   * @param accountId - The account to export.
+   * @param options - Export options (reserved for future use).
+   */
   export(
     accountId: AccountRef,
     options?: ExportAccountOptions
   ): Promise<AccountFile>;
 
-  /** Associate a Bech32 address with an account. */
+  /**
+   * Associate a Bech32 address with an account.
+   *
+   * @param accountId - The account to add the address to.
+   * @param address - The Bech32 address string.
+   */
   addAddress(accountId: AccountRef, address: string): Promise<void>;
-  /** Remove a Bech32 address from an account. */
+  /**
+   * Remove a Bech32 address from an account.
+   *
+   * @param accountId - The account to remove the address from.
+   * @param address - The Bech32 address string to remove.
+   */
   removeAddress(accountId: AccountRef, address: string): Promise<void>;
 }
 
 export interface TransactionsResource {
-  /** Send tokens to another account by creating a pay-to-ID note. Set `returnNote: true` to get the created note back. */
+  /**
+   * Send tokens to another account by creating a pay-to-ID note. Set
+   * `returnNote: true` to get the created note back.
+   *
+   * @param options - Send options including sender, recipient, token, and amount.
+   */
   send(
     options: SendOptionsDefault
   ): Promise<{ txId: TransactionId; note: null; result: TransactionResult }>;
@@ -534,23 +583,53 @@ export interface TransactionsResource {
     options: SendOptionsReturnNote
   ): Promise<{ txId: TransactionId; note: Note; result: TransactionResult }>;
   send(options: SendOptions): Promise<SendResult>;
-  /** Mint new tokens from a faucet account. */
+  /**
+   * Mint new tokens from a faucet account.
+   *
+   * @param options - Mint options including the faucet, recipient, and amount.
+   */
   mint(options: MintOptions): Promise<TransactionSubmitResult>;
-  /** Consume one or more notes for an account. */
+  /**
+   * Consume one or more notes for an account.
+   *
+   * @param options - Consume options including the account and notes to consume.
+   */
   consume(options: ConsumeOptions): Promise<TransactionSubmitResult>;
-  /** Execute an atomic swap between two assets. */
+  /**
+   * Execute an atomic swap between two assets.
+   *
+   * @param options - Swap options including the account, offered asset, and requested asset.
+   */
   swap(options: SwapOptions): Promise<TransactionSubmitResult>;
-  /** Consume all available notes for an account, up to an optional limit. Returns the count of remaining notes. */
+  /**
+   * Consume all available notes for an account, up to an optional limit.
+   * Returns the count of remaining notes for pagination.
+   *
+   * @param options - Options including the account and optional max notes limit.
+   */
   consumeAll(options: ConsumeAllOptions): Promise<ConsumeAllResult>;
-  /** Execute a custom transaction script with optional foreign account references. */
+  /**
+   * Execute a custom transaction script with optional foreign account references.
+   *
+   * @param options - Execute options including the account, compiled script, and foreign accounts.
+   */
   execute(options: ExecuteOptions): Promise<TransactionSubmitResult>;
 
-  /** Dry-run a transaction to preview its effects without submitting it to the network. */
+  /**
+   * Dry-run a transaction to preview its effects without submitting it to
+   * the network.
+   *
+   * @param options - Preview options discriminated by `operation` field.
+   */
   preview(options: PreviewOptions): Promise<TransactionSummary>;
 
   /**
-   * Submit a pre-built TransactionRequest.
-   * Note: WASM requires accountId separately, so `account` is the first argument.
+   * Submit a pre-built TransactionRequest. Note: WASM requires accountId
+   * separately, so `account` is the first argument.
+   *
+   * @param account - The account executing the transaction.
+   * @param request - The pre-built transaction request.
+   * @param options - Optional transaction options (prover, confirmation).
    */
   submit(
     account: AccountRef,
@@ -558,33 +637,76 @@ export interface TransactionsResource {
     options?: TransactionOptions
   ): Promise<TransactionSubmitResult>;
 
-  /** List transactions, optionally filtered by status, IDs, or expiration. */
+  /**
+   * List transactions, optionally filtered by status, IDs, or expiration.
+   *
+   * @param query - Optional filter for transaction status, IDs, or expiration.
+   */
   list(query?: TransactionQuery): Promise<TransactionRecord[]>;
 
-  /** Poll until a transaction is confirmed on-chain. Throws on rejection or timeout. */
+  /**
+   * Poll until a transaction is confirmed on-chain. Throws on rejection
+   * or timeout.
+   *
+   * @param txId - The transaction ID to wait for.
+   * @param options - Optional polling timeout, interval, and progress callback.
+   */
   waitFor(txId: string | TransactionId, options?: WaitOptions): Promise<void>;
 }
 
 export interface NotesResource {
-  /** List received (input) notes, optionally filtered by status or IDs. */
+  /**
+   * List received (input) notes, optionally filtered by status or IDs.
+   *
+   * @param query - Optional filter by note status or note IDs.
+   */
   list(query?: NoteQuery): Promise<InputNoteRecord[]>;
-  /** Retrieve a note by ID. Returns `null` if not found. */
+  /**
+   * Retrieve a note by ID. Returns `null` if not found.
+   *
+   * @param noteId - The note to retrieve.
+   */
   get(noteId: NoteInput): Promise<InputNoteRecord | null>;
 
-  /** List sent (output) notes, optionally filtered by status or IDs. */
+  /**
+   * List sent (output) notes, optionally filtered by status or IDs.
+   *
+   * @param query - Optional filter by note status or note IDs.
+   */
   listSent(query?: NoteQuery): Promise<OutputNoteRecord[]>;
 
-  /** List notes that are available for consumption by a specific account. */
+  /**
+   * List notes that are available for consumption by a specific account.
+   *
+   * @param options - Options containing the account to check availability for.
+   */
   listAvailable(options: { account: AccountRef }): Promise<InputNoteRecord[]>;
 
-  /** Import a note from a {@link NoteFile}. */
+  /**
+   * Import a note from a {@link NoteFile}.
+   *
+   * @param noteFile - The note file to import.
+   */
   import(noteFile: NoteFile): Promise<NoteId>;
-  /** Export a note to a {@link NoteFile} for transfer or backup. */
+  /**
+   * Export a note to a {@link NoteFile} for transfer or backup.
+   *
+   * @param noteId - The note to export.
+   * @param options - Optional export format options.
+   */
   export(noteId: NoteInput, options?: ExportNoteOptions): Promise<NoteFile>;
 
-  /** Fetch private notes from the note transport service. */
+  /**
+   * Fetch private notes from the note transport service.
+   *
+   * @param options - Optional fetch mode: `"incremental"` (default) or `"all"`.
+   */
   fetchPrivate(options?: FetchPrivateNotesOptions): Promise<void>;
-  /** Send a private note to a recipient via the note transport service. */
+  /**
+   * Send a private note to a recipient via the note transport service.
+   *
+   * @param options - Options including the note and the recipient.
+   */
   sendPrivate(options: SendPrivateOptions): Promise<void>;
 }
 
@@ -629,29 +751,62 @@ export interface CompileTxScriptOptions {
 }
 
 export interface CompilerResource {
-  /** Compile MASM source into an AccountComponent. */
+  /**
+   * Compile MASM source into an AccountComponent.
+   *
+   * @param options - Component source code, storage slots, and auth options.
+   */
   component(options: CompileComponentOptions): Promise<AccountComponent>;
-  /** Compile MASM source into a TransactionScript. */
+  /**
+   * Compile MASM source into a TransactionScript.
+   *
+   * @param options - Script source code and optional libraries to link.
+   */
   txScript(options: CompileTxScriptOptions): Promise<TransactionScript>;
 }
 
 export interface TagsResource {
-  /** Add a note tag to listen for during sync. */
+  /**
+   * Add a note tag to listen for during sync.
+   *
+   * @param tag - The numeric note tag to register.
+   */
   add(tag: number): Promise<void>;
-  /** Remove a note tag so it is no longer tracked during sync. */
+  /**
+   * Remove a note tag so it is no longer tracked during sync.
+   *
+   * @param tag - The numeric note tag to unregister.
+   */
   remove(tag: number): Promise<void>;
-  /** List all registered note tags. */
+  /**
+   * List all registered note tags.
+   */
   list(): Promise<number[]>;
 }
 
 export interface SettingsResource {
-  /** Get a setting value by key. Returns `null` if not found. */
+  /**
+   * Get a setting value by key. Returns `null` if not found.
+   *
+   * @param key - The setting key.
+   */
   get<T = unknown>(key: string): Promise<T | null>;
-  /** Set a setting value. */
+  /**
+   * Set a setting value.
+   *
+   * @param key - The setting key.
+   * @param value - The value to store.
+   */
   set(key: string, value: unknown): Promise<void>;
-  /** Remove a setting. */
+  /**
+   * Remove a setting.
+   *
+   * @param key - The setting key to remove.
+   */
   remove(key: string): Promise<void>;
-  /** List all setting keys. */
+  /**
+   * List all setting keys.
+   */
   listKeys(): Promise<string[]>;
 }
 

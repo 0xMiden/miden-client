@@ -20,9 +20,13 @@ Associate a Bech32 address with an account.
 
 [`AccountRef`](../type-aliases/AccountRef.md)
 
+The account to add the address to.
+
 ##### address
 
 `string`
+
+The Bech32 address string.
 
 #### Returns
 
@@ -34,13 +38,16 @@ Associate a Bech32 address with an account.
 
 > **create**(`options?`): `Promise`\<[`Account`](../classes/Account.md)\>
 
-Create a new wallet, faucet, or contract account. Defaults to a mutable wallet if no options are provided.
+Create a new wallet, faucet, or contract account. Defaults to a mutable
+wallet if no options are provided.
 
 #### Parameters
 
 ##### options?
 
 [`CreateAccountOptions`](../type-aliases/CreateAccountOptions.md)
+
+Account creation options discriminated by `type` field.
 
 #### Returns
 
@@ -60,9 +67,13 @@ Export an account to an [AccountFile](../classes/AccountFile.md) for backup or t
 
 [`AccountRef`](../type-aliases/AccountRef.md)
 
+The account to export.
+
 ##### options?
 
 [`ExportAccountOptions`](ExportAccountOptions.md)
+
+Export options (reserved for future use).
 
 #### Returns
 
@@ -82,6 +93,8 @@ Retrieve an account by ID. Returns `null` if not found in the local store.
 
 [`AccountRef`](../type-aliases/AccountRef.md)
 
+The account to retrieve.
+
 #### Returns
 
 `Promise`\<[`Account`](../classes/Account.md)\>
@@ -100,9 +113,13 @@ Get the balance of a specific token for an account.
 
 [`AccountRef`](../type-aliases/AccountRef.md)
 
+The account to check.
+
 ##### tokenId
 
 [`AccountRef`](../type-aliases/AccountRef.md)
+
+The faucet account that identifies the token.
 
 #### Returns
 
@@ -122,6 +139,8 @@ Retrieve detailed account information including vault, storage, code, and keys.
 
 [`AccountRef`](../type-aliases/AccountRef.md)
 
+The account to retrieve details for.
+
 #### Returns
 
 `Promise`\<[`AccountDetails`](AccountDetails.md)\>
@@ -140,6 +159,8 @@ Retrieve an account locally, or import it from the network if not found.
 
 [`AccountRef`](../type-aliases/AccountRef.md)
 
+The account to retrieve or import.
+
 #### Returns
 
 `Promise`\<[`Account`](../classes/Account.md)\>
@@ -150,13 +171,16 @@ Retrieve an account locally, or import it from the network if not found.
 
 > **import**(`input`): `Promise`\<[`Account`](../classes/Account.md)\>
 
-Import an account from the network by ID, from an exported file, or reconstruct from a seed.
+Import an account from the network by ID, from an exported file, or
+reconstruct from a seed.
 
 #### Parameters
 
 ##### input
 
 [`ImportAccountInput`](../type-aliases/ImportAccountInput.md)
+
+Account reference, file, or seed-based import options.
 
 #### Returns
 
@@ -215,9 +239,13 @@ Remove a Bech32 address from an account.
 
 [`AccountRef`](../type-aliases/AccountRef.md)
 
+The account to remove the address from.
+
 ##### address
 
 `string`
+
+The Bech32 address string to remove.
 
 #### Returns
 
