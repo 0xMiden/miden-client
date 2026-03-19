@@ -68,6 +68,42 @@ Fetches account details for a specific account ID.
 
 ***
 
+### getAccountProof()
+
+> **getAccountProof**(`account_id`, `storage_requirements?`, `block_num?`): `Promise`\<[`AccountProof`](AccountProof.md)\>
+
+Fetches an account proof for a public account from the node.
+
+This is a lighter-weight alternative to `getAccountDetails` that makes a single RPC call
+and returns the account proof alongside the account header, storage slot values, and
+account code without reconstructing the full account state.
+
+Only public accounts are supported. For private accounts, use `getAccountDetails` instead.
+
+Useful for reading storage slot values (e.g., faucet metadata) or specific storage map
+entries without the overhead of fetching the complete account with all vault assets and
+storage map entries.
+
+#### Parameters
+
+##### account\_id
+
+[`AccountId`](AccountId.md)
+
+##### storage\_requirements?
+
+[`AccountStorageRequirements`](AccountStorageRequirements.md)
+
+##### block\_num?
+
+`number`
+
+#### Returns
+
+`Promise`\<[`AccountProof`](AccountProof.md)\>
+
+***
+
 ### getBlockHeaderByNumber()
 
 > **getBlockHeaderByNumber**(`block_num?`): `Promise`\<[`BlockHeader`](BlockHeader.md)\>
@@ -178,3 +214,33 @@ Fetches notes matching the provided tags from the node.
 #### Returns
 
 `Promise`\<[`NoteSyncInfo`](NoteSyncInfo.md)\>
+
+***
+
+### syncStorageMaps()
+
+> **syncStorageMaps**(`block_from`, `block_to`, `account_id`): `Promise`\<[`StorageMapInfo`](StorageMapInfo.md)\>
+
+Syncs storage map updates for an account within a block range.
+
+This is used when `AccountProof.hasStorageMapTooManyEntries()` returns `true` for a
+slot, indicating the storage map was too large to return inline. This endpoint fetches
+the full storage map data with pagination support.
+
+#### Parameters
+
+##### block\_from
+
+`number`
+
+##### block\_to
+
+`number`
+
+##### account\_id
+
+[`AccountId`](AccountId.md)
+
+#### Returns
+
+`Promise`\<[`StorageMapInfo`](StorageMapInfo.md)\>
