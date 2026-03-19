@@ -1,571 +1,1361 @@
 // @ts-nocheck
-import {
-  test,
-  expect,
-  executeAndApplyTransaction,
-  waitForTransaction,
-} from "./test-setup";
-import {
-  createIntegrationClient,
-  integrationMint,
-  integrationConsume,
-} from "./test-helpers";
-import { getRpcUrl } from "./playwright.global.setup";
-
-const badHexId =
-  "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
-
-async function setupIntegrationWalletAndFaucet(
-  client: any,
-  sdk: any
-): Promise<{ walletId: any; faucetId: any }> {
-  const wallet = await client.newWallet(
-    sdk.AccountStorageMode.private(),
-    true,
-    sdk.AuthScheme.AuthRpoFalcon512
-  );
-  const faucet = await client.newFaucet(
-    sdk.AccountStorageMode.private(),
-    false,
-    "DAG",
-    8,
-    sdk.u64(10000000),
-    sdk.AuthScheme.AuthRpoFalcon512
-  );
-  return { walletId: wallet.id(), faucetId: faucet.id() };
-}
-
-async function setupMintedNote(
-  client: any,
-  sdk: any,
-  opts?: { publicNote?: boolean }
-): Promise<{ createdNoteId: string; walletId: any; faucetId: any }> {
-  const { walletId, faucetId } = await setupIntegrationWalletAndFaucet(
-    client,
-    sdk
-  );
-  const { createdNoteId } = await integrationMint(
-    client,
-    sdk,
-    walletId,
-    faucetId,
-    { publicNote: opts?.publicNote }
-  );
-  return { createdNoteId, walletId, faucetId };
-}
-
-async function setupConsumedNote(
-  client: any,
-  sdk: any,
-  opts?: { publicNote?: boolean }
-): Promise<{ consumedNoteId: string; walletId: any; faucetId: any }> {
-  const { createdNoteId, walletId, faucetId } = await setupMintedNote(
-    client,
-    sdk,
-    opts
-  );
-  await integrationConsume(client, sdk, walletId, faucetId, createdNoteId);
-  return { consumedNoteId: createdNoteId, walletId, faucetId };
-}
-
-async function getConsumableNotes(
-  client: any,
-  sdk: any,
-  accountId?: any
-): Promise<
-  {
-    noteId: string;
-    consumability: {
-      accountId: string;
-      consumableAfterBlock: number | undefined;
-    }[];
-  }[]
-> {
-  let records;
-  if (accountId) {
-    records = await client.getConsumableNotes(accountId);
-  } else {
-    records = await client.getConsumableNotes();
-  }
-
-  return records.map((record: any) => ({
-    noteId: record.inputNoteRecord().id().toString(),
-    consumability: record.noteConsumability().map((c: any) => ({
-      accountId: c.accountId().toString(),
-      consumableAfterBlock: c.consumptionStatus()?.consumableAfterBlock(),
-    })),
-  }));
-}
+import { test, expect } from "./test-setup";
 
 test.describe("get_input_note", () => {
-  test("retrieve input note that does not exist", async ({ sdk }) => {
-    const result = await createIntegrationClient();
-    test.skip(!result, "requires running node");
-    const { client } = result;
+  test("retrieve input note that does not exist", async ({ run }) => {
+    const result = await run(async ({ sdk, helpers }) => {
+      const integration = await helpers.createIntegrationClient();
+      if (!integration) return { skip: true };
+      const { client: intClient } = integration;
 
-    await setupIntegrationWalletAndFaucet(client, sdk);
-    const note = await client.getInputNote(badHexId);
-    expect(note).toBeUndefined();
-  });
+      const badHexId =
+        "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
 
-  test("retrieve an input note that does exist", async ({ sdk }) => {
-    const result = await createIntegrationClient();
-    test.skip(!result, "requires running node");
-    const { client } = result;
-
-    const { consumedNoteId } = await setupConsumedNote(client, sdk);
-
-    // Test both the existing client method and new RpcClient
-    const note = await client.getInputNote(consumedNoteId);
-    expect(note).toBeTruthy();
-    expect(note.id().toString()).toEqual(consumedNoteId);
-
-    // Test RpcClient.getNotesById
-    const endpoint = new sdk.Endpoint(getRpcUrl());
-    const rpcClient = new sdk.RpcClient(endpoint);
-
-    const noteId = sdk.NoteId.fromHex(consumedNoteId);
-    const fetchedNotes = await rpcClient.getNotesById([noteId]);
-
-    const rpcResult = fetchedNotes.map((fetchedNote: any) => ({
-      noteId: fetchedNote.noteId.toString(),
-      hasMetadata: !!fetchedNote.metadata,
-      noteType: fetchedNote.noteType,
-      hasNote: !!fetchedNote.note,
-    }));
-
-    // Assert on FetchedNote properties
-    expect(rpcResult).toHaveLength(1);
-    expect(rpcResult[0].noteId).toEqual(consumedNoteId);
-    expect(rpcResult[0].hasMetadata).toBe(true);
-    expect(rpcResult[0].hasNote).toBe(false); // Private notes don't include note
-  });
-
-  test("get note script by root", async ({ sdk }) => {
-    const result = await createIntegrationClient();
-    test.skip(!result, "requires running node");
-    const { client } = result;
-
-    await setupIntegrationWalletAndFaucet(client, sdk);
-
-    // First, we need to get a note script root from an existing note
-    const { consumedNoteId } = await setupConsumedNote(client, sdk, {
-      publicNote: true,
+      const wallet = await intClient.newWallet(
+        sdk.AccountStorageMode.private(),
+        true,
+        sdk.AuthScheme.AuthRpoFalcon512
+      );
+      const faucet = await intClient.newFaucet(
+        sdk.AccountStorageMode.private(),
+        false,
+        "DAG",
+        8,
+        sdk.u64(10000000),
+        sdk.AuthScheme.AuthRpoFalcon512
+      );
+      const note = await intClient.getInputNote(badHexId);
+      return { skip: false, noteExists: note !== undefined && note !== null };
     });
-
-    // Get the note to extract its script root
-    const endpoint = new sdk.Endpoint(getRpcUrl());
-    const rpcClient = new sdk.RpcClient(endpoint);
-
-    const noteIdObj = sdk.NoteId.fromHex(consumedNoteId);
-    const fetchedNotes = await rpcClient.getNotesById([noteIdObj]);
-
-    let scriptRootHex = "";
-    let hasScript = false;
-
-    if (fetchedNotes.length > 0 && fetchedNotes[0].note) {
-      const scriptRoot = fetchedNotes[0].note.script().root();
-      scriptRootHex = scriptRoot.toHex();
-      hasScript = true;
+    if (result.skip) {
+      test.skip(true, "requires running node");
+      return;
     }
+    expect(result.noteExists).toBe(false);
+  });
 
-    // Test GetNoteScriptByRoot endpoint
-    const scriptRoot = sdk.Word.fromHex(scriptRootHex);
-    const noteScript = await rpcClient.getNoteScriptByRoot(scriptRoot);
+  test("retrieve an input note that does exist", async ({ run }) => {
+    const result = await run(async ({ sdk, helpers }) => {
+      const integration = await helpers.createIntegrationClient();
+      if (!integration) return { skip: true };
+      const { client: intClient } = integration;
 
-    expect(!!noteScript).toBe(true);
-    expect(noteScript ? noteScript.root().toHex() : null).toEqual(
-      scriptRootHex
-    );
+      // Setup wallet and faucet
+      const wallet = await intClient.newWallet(
+        sdk.AccountStorageMode.private(),
+        true,
+        sdk.AuthScheme.AuthRpoFalcon512
+      );
+      const faucet = await intClient.newFaucet(
+        sdk.AccountStorageMode.private(),
+        false,
+        "DAG",
+        8,
+        sdk.u64(10000000),
+        sdk.AuthScheme.AuthRpoFalcon512
+      );
+      const walletId = wallet.id();
+      const faucetId = faucet.id();
+
+      // Mint
+      await intClient.syncState();
+      const mintRequest = await intClient.newMintTransactionRequest(
+        walletId,
+        faucetId,
+        sdk.NoteType.Private,
+        sdk.u64(1000)
+      );
+      const mintResult = await intClient.executeTransaction(
+        faucetId,
+        mintRequest
+      );
+      const prover = sdk.TransactionProver.newLocalProver();
+      const mintProven = await intClient.proveTransaction(mintResult, prover);
+      const mintHeight = await intClient.submitProvenTransaction(
+        mintProven,
+        mintResult
+      );
+      const mintUpdate = await intClient.applyTransaction(
+        mintResult,
+        mintHeight
+      );
+      const mintTxId = mintUpdate.executedTransaction().id().toHex();
+      const createdNoteId = mintUpdate
+        .createdNotes()
+        .notes()[0]
+        .id()
+        .toString();
+
+      // Wait for mint tx
+      let timeWaited = 0;
+      while (timeWaited < 10000) {
+        await intClient.syncState();
+        const uncommitted = await intClient.getTransactions(
+          sdk.TransactionFilter.uncommitted()
+        );
+        const ids = uncommitted.map((tx) => tx.id().toHex());
+        if (!ids.includes(mintTxId)) break;
+        await new Promise((r) => setTimeout(r, 1000));
+        timeWaited += 1000;
+      }
+
+      // Consume
+      await intClient.syncState();
+      const inputNoteRecord = await intClient.getInputNote(createdNoteId);
+      const note = inputNoteRecord.toNote();
+      const consumeRequest = intClient.newConsumeTransactionRequest([note]);
+      const consumeResult = await intClient.executeTransaction(
+        walletId,
+        consumeRequest
+      );
+      const consumeProver = sdk.TransactionProver.newLocalProver();
+      const consumeProven = await intClient.proveTransaction(
+        consumeResult,
+        consumeProver
+      );
+      const consumeHeight = await intClient.submitProvenTransaction(
+        consumeProven,
+        consumeResult
+      );
+      const consumeUpdate = await intClient.applyTransaction(
+        consumeResult,
+        consumeHeight
+      );
+      const consumeTxId = consumeUpdate.executedTransaction().id().toHex();
+
+      // Wait for consume tx
+      timeWaited = 0;
+      while (timeWaited < 10000) {
+        await intClient.syncState();
+        const uncommitted = await intClient.getTransactions(
+          sdk.TransactionFilter.uncommitted()
+        );
+        const ids = uncommitted.map((tx) => tx.id().toHex());
+        if (!ids.includes(consumeTxId)) break;
+        await new Promise((r) => setTimeout(r, 1000));
+        timeWaited += 1000;
+      }
+
+      // Test getInputNote
+      const retrievedNote = await intClient.getInputNote(createdNoteId);
+      const noteExists = !!retrievedNote;
+      const noteIdStr = retrievedNote ? retrievedNote.id().toString() : null;
+
+      // Test RpcClient.getNotesById
+      const rpcUrl = helpers.getRpcUrl();
+      const endpoint = new sdk.Endpoint(rpcUrl);
+      const rpcClient = new sdk.RpcClient(endpoint);
+
+      const noteIdObj = sdk.NoteId.fromHex(createdNoteId);
+      const fetchedNotes = await rpcClient.getNotesById([noteIdObj]);
+
+      const rpcResult = fetchedNotes.map((fetchedNote) => ({
+        noteId: fetchedNote.noteId.toString(),
+        hasMetadata: !!fetchedNote.metadata,
+        noteType: fetchedNote.noteType,
+        hasNote: !!fetchedNote.note,
+      }));
+
+      return {
+        skip: false,
+        noteExists,
+        noteIdStr,
+        consumedNoteId: createdNoteId,
+        rpcResult,
+      };
+    });
+    if (result.skip) {
+      test.skip(true, "requires running node");
+      return;
+    }
+    expect(result.noteExists).toBe(true);
+    expect(result.noteIdStr).toEqual(result.consumedNoteId);
+    expect(result.rpcResult).toHaveLength(1);
+    expect(result.rpcResult[0].noteId).toEqual(result.consumedNoteId);
+    expect(result.rpcResult[0].hasMetadata).toBe(true);
+    expect(result.rpcResult[0].hasNote).toBe(false); // Private notes don't include note
+  });
+
+  test("get note script by root", async ({ run }) => {
+    const result = await run(async ({ sdk, helpers }) => {
+      const integration = await helpers.createIntegrationClient();
+      if (!integration) return { skip: true };
+      const { client: intClient } = integration;
+
+      // Setup wallet and faucet
+      const wallet = await intClient.newWallet(
+        sdk.AccountStorageMode.private(),
+        true,
+        sdk.AuthScheme.AuthRpoFalcon512
+      );
+      const faucet = await intClient.newFaucet(
+        sdk.AccountStorageMode.private(),
+        false,
+        "DAG",
+        8,
+        sdk.u64(10000000),
+        sdk.AuthScheme.AuthRpoFalcon512
+      );
+      const walletId = wallet.id();
+      const faucetId = faucet.id();
+
+      // Mint (public note)
+      await intClient.syncState();
+      const mintRequest = await intClient.newMintTransactionRequest(
+        walletId,
+        faucetId,
+        sdk.NoteType.Public,
+        sdk.u64(1000)
+      );
+      const mintResult = await intClient.executeTransaction(
+        faucetId,
+        mintRequest
+      );
+      const prover = sdk.TransactionProver.newLocalProver();
+      const mintProven = await intClient.proveTransaction(mintResult, prover);
+      const mintHeight = await intClient.submitProvenTransaction(
+        mintProven,
+        mintResult
+      );
+      const mintUpdate = await intClient.applyTransaction(
+        mintResult,
+        mintHeight
+      );
+      const mintTxId = mintUpdate.executedTransaction().id().toHex();
+      const createdNoteId = mintUpdate
+        .createdNotes()
+        .notes()[0]
+        .id()
+        .toString();
+
+      // Wait for mint tx
+      let timeWaited = 0;
+      while (timeWaited < 10000) {
+        await intClient.syncState();
+        const uncommitted = await intClient.getTransactions(
+          sdk.TransactionFilter.uncommitted()
+        );
+        const ids = uncommitted.map((tx) => tx.id().toHex());
+        if (!ids.includes(mintTxId)) break;
+        await new Promise((r) => setTimeout(r, 1000));
+        timeWaited += 1000;
+      }
+
+      // Consume (public note)
+      await intClient.syncState();
+      const inputNoteRecord = await intClient.getInputNote(createdNoteId);
+      const note = inputNoteRecord.toNote();
+      const consumeRequest = intClient.newConsumeTransactionRequest([note]);
+      const consumeResult = await intClient.executeTransaction(
+        walletId,
+        consumeRequest
+      );
+      const consumeProver = sdk.TransactionProver.newLocalProver();
+      const consumeProven = await intClient.proveTransaction(
+        consumeResult,
+        consumeProver
+      );
+      const consumeHeight = await intClient.submitProvenTransaction(
+        consumeProven,
+        consumeResult
+      );
+      const consumeUpdate = await intClient.applyTransaction(
+        consumeResult,
+        consumeHeight
+      );
+      const consumeTxId = consumeUpdate.executedTransaction().id().toHex();
+
+      // Wait for consume tx
+      timeWaited = 0;
+      while (timeWaited < 10000) {
+        await intClient.syncState();
+        const uncommitted = await intClient.getTransactions(
+          sdk.TransactionFilter.uncommitted()
+        );
+        const ids = uncommitted.map((tx) => tx.id().toHex());
+        if (!ids.includes(consumeTxId)) break;
+        await new Promise((r) => setTimeout(r, 1000));
+        timeWaited += 1000;
+      }
+
+      // Get the note via RPC to extract its script root
+      const rpcUrl = helpers.getRpcUrl();
+      const endpoint = new sdk.Endpoint(rpcUrl);
+      const rpcClient = new sdk.RpcClient(endpoint);
+
+      const noteIdObj = sdk.NoteId.fromHex(createdNoteId);
+      const fetchedNotes = await rpcClient.getNotesById([noteIdObj]);
+
+      let scriptRootHex = "";
+
+      if (fetchedNotes.length > 0 && fetchedNotes[0].note) {
+        const scriptRoot = fetchedNotes[0].note.script().root();
+        scriptRootHex = scriptRoot.toHex();
+      }
+
+      // Test GetNoteScriptByRoot endpoint
+      const scriptRoot = sdk.Word.fromHex(scriptRootHex);
+      const noteScript = await rpcClient.getNoteScriptByRoot(scriptRoot);
+
+      return {
+        skip: false,
+        hasNoteScript: !!noteScript,
+        noteScriptRootHex: noteScript ? noteScript.root().toHex() : null,
+        scriptRootHex,
+      };
+    });
+    if (result.skip) {
+      test.skip(true, "requires running node");
+      return;
+    }
+    expect(result.hasNoteScript).toBe(true);
+    expect(result.noteScriptRootHex).toEqual(result.scriptRootHex);
   });
 
   test("sync notes by tag and check nullifier commit height", async ({
-    sdk,
+    run,
   }) => {
-    const result = await createIntegrationClient();
-    test.skip(!result, "requires running node");
-    const { client } = result;
+    const result = await run(async ({ sdk, helpers }) => {
+      const integration = await helpers.createIntegrationClient();
+      if (!integration) return { skip: true };
+      const { client: intClient } = integration;
 
-    const { consumedNoteId } = await setupConsumedNote(client, sdk, {
-      publicNote: true,
+      // Setup wallet and faucet
+      const wallet = await intClient.newWallet(
+        sdk.AccountStorageMode.private(),
+        true,
+        sdk.AuthScheme.AuthRpoFalcon512
+      );
+      const faucet = await intClient.newFaucet(
+        sdk.AccountStorageMode.private(),
+        false,
+        "DAG",
+        8,
+        sdk.u64(10000000),
+        sdk.AuthScheme.AuthRpoFalcon512
+      );
+      const walletId = wallet.id();
+      const faucetId = faucet.id();
+
+      // Mint (public note)
+      await intClient.syncState();
+      const mintRequest = await intClient.newMintTransactionRequest(
+        walletId,
+        faucetId,
+        sdk.NoteType.Public,
+        sdk.u64(1000)
+      );
+      const mintResult = await intClient.executeTransaction(
+        faucetId,
+        mintRequest
+      );
+      const prover = sdk.TransactionProver.newLocalProver();
+      const mintProven = await intClient.proveTransaction(mintResult, prover);
+      const mintHeight = await intClient.submitProvenTransaction(
+        mintProven,
+        mintResult
+      );
+      const mintUpdate = await intClient.applyTransaction(
+        mintResult,
+        mintHeight
+      );
+      const mintTxId = mintUpdate.executedTransaction().id().toHex();
+      const createdNoteId = mintUpdate
+        .createdNotes()
+        .notes()[0]
+        .id()
+        .toString();
+
+      // Wait for mint tx
+      let timeWaited = 0;
+      while (timeWaited < 10000) {
+        await intClient.syncState();
+        const uncommitted = await intClient.getTransactions(
+          sdk.TransactionFilter.uncommitted()
+        );
+        const ids = uncommitted.map((tx) => tx.id().toHex());
+        if (!ids.includes(mintTxId)) break;
+        await new Promise((r) => setTimeout(r, 1000));
+        timeWaited += 1000;
+      }
+
+      // Consume (public note)
+      await intClient.syncState();
+      const inputNoteRecord = await intClient.getInputNote(createdNoteId);
+      const note = inputNoteRecord.toNote();
+      const consumeRequest = intClient.newConsumeTransactionRequest([note]);
+      const consumeResult = await intClient.executeTransaction(
+        walletId,
+        consumeRequest
+      );
+      const consumeProver = sdk.TransactionProver.newLocalProver();
+      const consumeProven = await intClient.proveTransaction(
+        consumeResult,
+        consumeProver
+      );
+      const consumeHeight = await intClient.submitProvenTransaction(
+        consumeProven,
+        consumeResult
+      );
+      const consumeUpdate = await intClient.applyTransaction(
+        consumeResult,
+        consumeHeight
+      );
+      const consumeTxId = consumeUpdate.executedTransaction().id().toHex();
+
+      // Wait for consume tx
+      timeWaited = 0;
+      while (timeWaited < 10000) {
+        await intClient.syncState();
+        const uncommitted = await intClient.getTransactions(
+          sdk.TransactionFilter.uncommitted()
+        );
+        const ids = uncommitted.map((tx) => tx.id().toHex());
+        if (!ids.includes(consumeTxId)) break;
+        await new Promise((r) => setTimeout(r, 1000));
+        timeWaited += 1000;
+      }
+
+      const rpcUrl = helpers.getRpcUrl();
+      const endpoint = new sdk.Endpoint(rpcUrl);
+      const rpcClient = new sdk.RpcClient(endpoint);
+
+      const noteIdObj = sdk.NoteId.fromHex(createdNoteId);
+      const fetchedNotes = await rpcClient.getNotesById([noteIdObj]);
+
+      if (fetchedNotes.length === 0) {
+        return { skip: false, fetchedNotesEmpty: true };
+      }
+
+      const fetchedNote = fetchedNotes[0].note;
+      const tag = fetchedNotes[0].metadata.tag();
+
+      const syncInfo = await rpcClient.syncNotes(0, undefined, [tag]);
+      const syncedNoteIds = syncInfo
+        .notes()
+        .map((synced) => synced.noteId().toString());
+
+      const retrievedInputNote = await intClient.getInputNote(createdNoteId);
+      const nullifierWord = fetchedNote
+        ? fetchedNote.nullifier()
+        : retrievedInputNote
+          ? sdk.Word.fromHex(retrievedInputNote.nullifier())
+          : undefined;
+      const commitHeight = nullifierWord
+        ? await rpcClient.getNullifierCommitHeight(nullifierWord, 0)
+        : undefined;
+
+      const nullifierHex = fetchedNote
+        ? fetchedNote.nullifier().toHex()
+        : undefined;
+
+      return {
+        skip: false,
+        fetchedNotesEmpty: false,
+        syncedNoteIds,
+        consumedNoteId: createdNoteId,
+        nullifierHex,
+        commitHeightDefined: commitHeight !== undefined,
+      };
     });
-
-    const endpoint = new sdk.Endpoint(getRpcUrl());
-    const rpcClient = new sdk.RpcClient(endpoint);
-
-    const noteIdObj = sdk.NoteId.fromHex(consumedNoteId);
-    const fetchedNotes = await rpcClient.getNotesById([noteIdObj]);
-
-    if (fetchedNotes.length === 0) {
+    if (result.skip) {
+      test.skip(true, "requires running node");
+      return;
+    }
+    if (result.fetchedNotesEmpty) {
       expect(false).toBe(true); // Should not happen
       return;
     }
-
-    const note = fetchedNotes[0].note;
-    const tag = fetchedNotes[0].metadata.tag();
-
-    const syncInfo = await rpcClient.syncNotes(0, undefined, [tag]);
-    const syncedNoteIds = syncInfo
-      .notes()
-      .map((synced: any) => synced.noteId().toString());
-
-    const inputNote = await client.getInputNote(consumedNoteId);
-    const nullifierWord = note
-      ? note.nullifier()
-      : inputNote
-        ? sdk.Word.fromHex(inputNote.nullifier())
-        : undefined;
-    const commitHeight = nullifierWord
-      ? await rpcClient.getNullifierCommitHeight(nullifierWord, 0)
-      : undefined;
-
-    expect(syncedNoteIds).toContain(consumedNoteId);
-    expect(note ? note.nullifier().toHex() : undefined).toMatch(
-      /^0x[0-9a-fA-F]+$/
-    );
-    expect(commitHeight).not.toBeUndefined();
+    expect(result.syncedNoteIds).toContain(result.consumedNoteId);
+    expect(result.nullifierHex).toMatch(/^0x[0-9a-fA-F]+$/);
+    expect(result.commitHeightDefined).toBe(true);
   });
 });
 
 test.describe("get_input_notes", () => {
-  test("note exists, note filter all", async ({ sdk }) => {
-    const result = await createIntegrationClient();
-    test.skip(!result, "requires running node");
-    const { client } = result;
+  test("note exists, note filter all", async ({ run }) => {
+    const result = await run(async ({ sdk, helpers }) => {
+      const integration = await helpers.createIntegrationClient();
+      if (!integration) return { skip: true };
+      const { client: intClient } = integration;
 
-    const { consumedNoteId } = await setupConsumedNote(client, sdk);
-    const filter = new sdk.NoteFilter(sdk.NoteFilterTypes.All);
-    const notes = await client.getInputNotes(filter);
-    const noteIds = notes.map((note: any) => note.id().toString());
-    expect(noteIds.length).toBeGreaterThanOrEqual(1);
-    expect(noteIds).toContain(consumedNoteId);
+      // Setup wallet and faucet
+      const wallet = await intClient.newWallet(
+        sdk.AccountStorageMode.private(),
+        true,
+        sdk.AuthScheme.AuthRpoFalcon512
+      );
+      const faucet = await intClient.newFaucet(
+        sdk.AccountStorageMode.private(),
+        false,
+        "DAG",
+        8,
+        sdk.u64(10000000),
+        sdk.AuthScheme.AuthRpoFalcon512
+      );
+      const walletId = wallet.id();
+      const faucetId = faucet.id();
+
+      // Mint
+      await intClient.syncState();
+      const mintRequest = await intClient.newMintTransactionRequest(
+        walletId,
+        faucetId,
+        sdk.NoteType.Private,
+        sdk.u64(1000)
+      );
+      const mintResult = await intClient.executeTransaction(
+        faucetId,
+        mintRequest
+      );
+      const prover = sdk.TransactionProver.newLocalProver();
+      const mintProven = await intClient.proveTransaction(mintResult, prover);
+      const mintHeight = await intClient.submitProvenTransaction(
+        mintProven,
+        mintResult
+      );
+      const mintUpdate = await intClient.applyTransaction(
+        mintResult,
+        mintHeight
+      );
+      const mintTxId = mintUpdate.executedTransaction().id().toHex();
+      const createdNoteId = mintUpdate
+        .createdNotes()
+        .notes()[0]
+        .id()
+        .toString();
+
+      // Wait for mint tx
+      let timeWaited = 0;
+      while (timeWaited < 10000) {
+        await intClient.syncState();
+        const uncommitted = await intClient.getTransactions(
+          sdk.TransactionFilter.uncommitted()
+        );
+        const ids = uncommitted.map((tx) => tx.id().toHex());
+        if (!ids.includes(mintTxId)) break;
+        await new Promise((r) => setTimeout(r, 1000));
+        timeWaited += 1000;
+      }
+
+      // Consume
+      await intClient.syncState();
+      const inputNoteRecord = await intClient.getInputNote(createdNoteId);
+      const note = inputNoteRecord.toNote();
+      const consumeRequest = intClient.newConsumeTransactionRequest([note]);
+      const consumeResult = await intClient.executeTransaction(
+        walletId,
+        consumeRequest
+      );
+      const consumeProver = sdk.TransactionProver.newLocalProver();
+      const consumeProven = await intClient.proveTransaction(
+        consumeResult,
+        consumeProver
+      );
+      const consumeHeight = await intClient.submitProvenTransaction(
+        consumeProven,
+        consumeResult
+      );
+      const consumeUpdate = await intClient.applyTransaction(
+        consumeResult,
+        consumeHeight
+      );
+      const consumeTxId = consumeUpdate.executedTransaction().id().toHex();
+
+      // Wait for consume tx
+      timeWaited = 0;
+      while (timeWaited < 10000) {
+        await intClient.syncState();
+        const uncommitted = await intClient.getTransactions(
+          sdk.TransactionFilter.uncommitted()
+        );
+        const ids = uncommitted.map((tx) => tx.id().toHex());
+        if (!ids.includes(consumeTxId)) break;
+        await new Promise((r) => setTimeout(r, 1000));
+        timeWaited += 1000;
+      }
+
+      const filter = new sdk.NoteFilter(sdk.NoteFilterTypes.All);
+      const notes = await intClient.getInputNotes(filter);
+      const noteIds = notes.map((n) => n.id().toString());
+
+      return {
+        skip: false,
+        noteIdsLength: noteIds.length,
+        containsConsumedNote: noteIds.includes(createdNoteId),
+        consumedNoteId: createdNoteId,
+      };
+    });
+    if (result.skip) {
+      test.skip(true, "requires running node");
+      return;
+    }
+    expect(result.noteIdsLength).toBeGreaterThanOrEqual(1);
+    expect(result.containsConsumedNote).toBe(true);
   });
 });
 
 test.describe("get_consumable_notes", () => {
-  test("filter by account", async ({ sdk }) => {
-    const result = await createIntegrationClient();
-    test.skip(!result, "requires running node");
-    const { client } = result;
+  test("filter by account", async ({ run }) => {
+    const result = await run(async ({ sdk, helpers }) => {
+      const integration = await helpers.createIntegrationClient();
+      if (!integration) return { skip: true };
+      const { client: intClient } = integration;
 
-    const { createdNoteId: noteId1, walletId: walletId1 } =
-      await setupMintedNote(client, sdk);
-    const accountId1 = walletId1;
+      // Setup wallet and faucet
+      const wallet = await intClient.newWallet(
+        sdk.AccountStorageMode.private(),
+        true,
+        sdk.AuthScheme.AuthRpoFalcon512
+      );
+      const faucet = await intClient.newFaucet(
+        sdk.AccountStorageMode.private(),
+        false,
+        "DAG",
+        8,
+        sdk.u64(10000000),
+        sdk.AuthScheme.AuthRpoFalcon512
+      );
+      const walletId = wallet.id();
+      const faucetId = faucet.id();
 
-    const consumableResult = await getConsumableNotes(client, sdk, accountId1);
-    expect(consumableResult).toHaveLength(1);
-    consumableResult.forEach((record: any) => {
+      // Mint
+      await intClient.syncState();
+      const mintRequest = await intClient.newMintTransactionRequest(
+        walletId,
+        faucetId,
+        sdk.NoteType.Private,
+        sdk.u64(1000)
+      );
+      const mintResult = await intClient.executeTransaction(
+        faucetId,
+        mintRequest
+      );
+      const prover = sdk.TransactionProver.newLocalProver();
+      const mintProven = await intClient.proveTransaction(mintResult, prover);
+      const mintHeight = await intClient.submitProvenTransaction(
+        mintProven,
+        mintResult
+      );
+      const mintUpdate = await intClient.applyTransaction(
+        mintResult,
+        mintHeight
+      );
+      const mintTxId = mintUpdate.executedTransaction().id().toHex();
+      const createdNoteId = mintUpdate
+        .createdNotes()
+        .notes()[0]
+        .id()
+        .toString();
+
+      // Wait for mint tx
+      let timeWaited = 0;
+      while (timeWaited < 10000) {
+        await intClient.syncState();
+        const uncommitted = await intClient.getTransactions(
+          sdk.TransactionFilter.uncommitted()
+        );
+        const ids = uncommitted.map((tx) => tx.id().toHex());
+        if (!ids.includes(mintTxId)) break;
+        await new Promise((r) => setTimeout(r, 1000));
+        timeWaited += 1000;
+      }
+
+      const records = await intClient.getConsumableNotes(walletId);
+      const consumableResult = records.map((record) => ({
+        noteId: record.inputNoteRecord().id().toString(),
+        consumability: record.noteConsumability().map((c) => ({
+          accountId: c.accountId().toString(),
+          consumableAfterBlock: c.consumptionStatus()?.consumableAfterBlock(),
+        })),
+      }));
+
+      return {
+        skip: false,
+        consumableResult,
+        walletIdStr: walletId.toString(),
+        createdNoteId,
+      };
+    });
+    if (result.skip) {
+      test.skip(true, "requires running node");
+      return;
+    }
+    expect(result.consumableResult).toHaveLength(1);
+    result.consumableResult.forEach((record) => {
       expect(record.consumability).toHaveLength(1);
-      expect(record.consumability[0].accountId).toBe(accountId1.toString());
-      expect(record.noteId).toBe(noteId1);
+      expect(record.consumability[0].accountId).toBe(result.walletIdStr);
+      expect(record.noteId).toBe(result.createdNoteId);
       // napi returns null, browser returns undefined for Option::None
       expect(record.consumability[0].consumableAfterBlock).toBeFalsy();
     });
   });
 
-  test("no filter by account", async ({ sdk }) => {
-    const result = await createIntegrationClient();
-    test.skip(!result, "requires running node");
-    const { client } = result;
+  test("no filter by account", async ({ run }) => {
+    const result = await run(async ({ sdk, helpers }) => {
+      const integration = await helpers.createIntegrationClient();
+      if (!integration) return { skip: true };
+      const { client: intClient } = integration;
 
-    const { createdNoteId: noteId1, walletId: walletId1 } =
-      await setupMintedNote(client, sdk);
-    const { createdNoteId: noteId2, walletId: walletId2 } =
-      await setupMintedNote(client, sdk);
-    const accountId1 = walletId1.toString();
-    const accountId2 = walletId2.toString();
+      // Helper to mint a note for a fresh wallet
+      async function mintNote() {
+        const wallet = await intClient.newWallet(
+          sdk.AccountStorageMode.private(),
+          true,
+          sdk.AuthScheme.AuthRpoFalcon512
+        );
+        const faucet = await intClient.newFaucet(
+          sdk.AccountStorageMode.private(),
+          false,
+          "DAG",
+          8,
+          sdk.u64(10000000),
+          sdk.AuthScheme.AuthRpoFalcon512
+        );
+        const walletId = wallet.id();
+        const faucetId = faucet.id();
 
-    const noteIds = new Set([noteId1, noteId2]);
-    const accountIds = new Set([accountId1, accountId2]);
-    const consumableResult = await getConsumableNotes(client, sdk);
+        await intClient.syncState();
+        const mintRequest = await intClient.newMintTransactionRequest(
+          walletId,
+          faucetId,
+          sdk.NoteType.Private,
+          sdk.u64(1000)
+        );
+        const mintResult = await intClient.executeTransaction(
+          faucetId,
+          mintRequest
+        );
+        const prover = sdk.TransactionProver.newLocalProver();
+        const mintProven = await intClient.proveTransaction(mintResult, prover);
+        const mintHeight = await intClient.submitProvenTransaction(
+          mintProven,
+          mintResult
+        );
+        const mintUpdate = await intClient.applyTransaction(
+          mintResult,
+          mintHeight
+        );
+        const mintTxId = mintUpdate.executedTransaction().id().toHex();
+        const createdNoteId = mintUpdate
+          .createdNotes()
+          .notes()[0]
+          .id()
+          .toString();
+
+        // Wait for mint tx
+        let timeWaited = 0;
+        while (timeWaited < 10000) {
+          await intClient.syncState();
+          const uncommitted = await intClient.getTransactions(
+            sdk.TransactionFilter.uncommitted()
+          );
+          const ids = uncommitted.map((tx) => tx.id().toHex());
+          if (!ids.includes(mintTxId)) break;
+          await new Promise((r) => setTimeout(r, 1000));
+          timeWaited += 1000;
+        }
+
+        return {
+          createdNoteId,
+          walletIdStr: walletId.toString(),
+        };
+      }
+
+      const mint1 = await mintNote();
+      const mint2 = await mintNote();
+
+      const records = await intClient.getConsumableNotes();
+      const consumableResult = records.map((record) => ({
+        noteId: record.inputNoteRecord().id().toString(),
+        consumability: record.noteConsumability().map((c) => ({
+          accountId: c.accountId().toString(),
+          consumableAfterBlock: c.consumptionStatus()?.consumableAfterBlock(),
+        })),
+      }));
+
+      return {
+        skip: false,
+        consumableResult,
+        noteId1: mint1.createdNoteId,
+        noteId2: mint2.createdNoteId,
+        accountId1: mint1.walletIdStr,
+        accountId2: mint2.walletIdStr,
+      };
+    });
+    if (result.skip) {
+      test.skip(true, "requires running node");
+      return;
+    }
+    const noteIds = new Set([result.noteId1, result.noteId2]);
+    const accountIds = new Set([result.accountId1, result.accountId2]);
     expect(noteIds).toEqual(
-      new Set(consumableResult.map((r: any) => r.noteId))
+      new Set(result.consumableResult.map((r) => r.noteId))
     );
     expect(accountIds).toEqual(
-      new Set(consumableResult.map((r: any) => r.consumability[0].accountId))
+      new Set(result.consumableResult.map((r) => r.consumability[0].accountId))
     );
-    expect(consumableResult.length).toBeGreaterThanOrEqual(2);
-    const consumableRecord1 = consumableResult.find(
-      (r: any) => r.noteId === noteId1
+    expect(result.consumableResult.length).toBeGreaterThanOrEqual(2);
+    const consumableRecord1 = result.consumableResult.find(
+      (r) => r.noteId === result.noteId1
     );
-    const consumableRecord2 = consumableResult.find(
-      (r: any) => r.noteId === noteId2
+    const consumableRecord2 = result.consumableResult.find(
+      (r) => r.noteId === result.noteId2
     );
 
-    consumableRecord1!!.consumability.forEach((c: any) => {
-      expect(c.accountId).toEqual(accountId1);
+    consumableRecord1.consumability.forEach((c) => {
+      expect(c.accountId).toEqual(result.accountId1);
     });
 
-    consumableRecord2!!.consumability.forEach((c: any) => {
-      expect(c.accountId).toEqual(accountId2);
+    consumableRecord2.consumability.forEach((c) => {
+      expect(c.accountId).toEqual(result.accountId2);
     });
   });
 
-  test("p2ide consume after block", async ({ sdk }) => {
-    const result = await createIntegrationClient();
-    test.skip(!result, "requires running node");
-    const { client } = result;
+  test("p2ide consume after block", async ({ run }) => {
+    const result = await run(async ({ sdk, helpers }) => {
+      const integration = await helpers.createIntegrationClient();
+      if (!integration) return { skip: true };
+      const { client: intClient } = integration;
 
-    const { walletId: senderWalletId, faucetId: senderFaucetId } =
-      await setupIntegrationWalletAndFaucet(client, sdk);
-    const { walletId: targetWalletId } = await setupIntegrationWalletAndFaucet(
-      client,
-      sdk
-    );
+      // Setup sender wallet and faucet
+      const senderWallet = await intClient.newWallet(
+        sdk.AccountStorageMode.private(),
+        true,
+        sdk.AuthScheme.AuthRpoFalcon512
+      );
+      const senderFaucet = await intClient.newFaucet(
+        sdk.AccountStorageMode.private(),
+        false,
+        "DAG",
+        8,
+        sdk.u64(10000000),
+        sdk.AuthScheme.AuthRpoFalcon512
+      );
+      const senderWalletId = senderWallet.id();
+      const senderFaucetId = senderFaucet.id();
 
-    // Mint and consume to fund sender
-    const { createdNoteId: mintedNoteId } = await integrationMint(
-      client,
-      sdk,
-      senderWalletId,
-      senderFaucetId
-    );
-    await integrationConsume(
-      client,
-      sdk,
-      senderWalletId,
-      senderFaucetId,
-      mintedNoteId
-    );
+      // Setup target wallet
+      const targetWallet = await intClient.newWallet(
+        sdk.AccountStorageMode.private(),
+        true,
+        sdk.AuthScheme.AuthRpoFalcon512
+      );
+      const targetWalletId = targetWallet.id();
 
-    // Get sync height
-    const summary = await client.syncState();
-    const recallHeight = summary.blockNum() + 30;
+      // Mint
+      await intClient.syncState();
+      const mintRequest = await intClient.newMintTransactionRequest(
+        senderWalletId,
+        senderFaucetId,
+        sdk.NoteType.Private,
+        sdk.u64(1000)
+      );
+      let mintResult = await intClient.executeTransaction(
+        senderFaucetId,
+        mintRequest
+      );
+      let prover = sdk.TransactionProver.newLocalProver();
+      let proven = await intClient.proveTransaction(mintResult, prover);
+      let height = await intClient.submitProvenTransaction(proven, mintResult);
+      const mintUpdate = await intClient.applyTransaction(mintResult, height);
+      const mintTxId = mintUpdate.executedTransaction().id().toHex();
+      const mintedNoteId = mintUpdate.createdNotes().notes()[0].id().toString();
 
-    // Send transaction
-    const sendRequest = await client.newSendTransactionRequest(
-      senderWalletId,
-      targetWalletId,
-      senderFaucetId,
-      sdk.NoteType.Public,
-      sdk.u64(100),
-      recallHeight,
-      null
-    );
-    const sendResult = await executeAndApplyTransaction(
-      client,
-      sdk,
-      senderWalletId,
-      sendRequest
-    );
-    await waitForTransaction(
-      client,
-      sdk,
-      sendResult.executedTransaction().id().toHex()
-    );
+      // Wait for mint tx
+      let timeWaited = 0;
+      while (timeWaited < 10000) {
+        await intClient.syncState();
+        const uncommitted = await intClient.getTransactions(
+          sdk.TransactionFilter.uncommitted()
+        );
+        const ids = uncommitted.map((tx) => tx.id().toHex());
+        if (!ids.includes(mintTxId)) break;
+        await new Promise((r) => setTimeout(r, 1000));
+        timeWaited += 1000;
+      }
 
-    const consumableRecipient = await getConsumableNotes(
-      client,
-      sdk,
-      targetWalletId
-    );
-    const consumableSender = await getConsumableNotes(
-      client,
-      sdk,
-      senderWalletId
-    );
-    expect(consumableSender.length).toBe(1);
-    expect(consumableSender[0].consumability[0].consumableAfterBlock).toBe(
-      recallHeight
-    );
-    expect(consumableRecipient.length).toBe(1);
+      // Consume
+      await intClient.syncState();
+      const inputNoteRecord = await intClient.getInputNote(mintedNoteId);
+      const note = inputNoteRecord.toNote();
+      const consumeRequest = intClient.newConsumeTransactionRequest([note]);
+      let consumeResult = await intClient.executeTransaction(
+        senderWalletId,
+        consumeRequest
+      );
+      prover = sdk.TransactionProver.newLocalProver();
+      proven = await intClient.proveTransaction(consumeResult, prover);
+      height = await intClient.submitProvenTransaction(proven, consumeResult);
+      const consumeUpdate = await intClient.applyTransaction(
+        consumeResult,
+        height
+      );
+      const consumeTxId = consumeUpdate.executedTransaction().id().toHex();
+
+      // Wait for consume tx
+      timeWaited = 0;
+      while (timeWaited < 10000) {
+        await intClient.syncState();
+        const uncommitted = await intClient.getTransactions(
+          sdk.TransactionFilter.uncommitted()
+        );
+        const ids = uncommitted.map((tx) => tx.id().toHex());
+        if (!ids.includes(consumeTxId)) break;
+        await new Promise((r) => setTimeout(r, 1000));
+        timeWaited += 1000;
+      }
+
+      // Get sync height
+      const summary = await intClient.syncState();
+      const recallHeight = summary.blockNum() + 30;
+
+      // Send transaction
+      const sendRequest = await intClient.newSendTransactionRequest(
+        senderWalletId,
+        targetWalletId,
+        senderFaucetId,
+        sdk.NoteType.Public,
+        sdk.u64(100),
+        recallHeight,
+        null
+      );
+      let sendResult = await intClient.executeTransaction(
+        senderWalletId,
+        sendRequest
+      );
+      prover = sdk.TransactionProver.newLocalProver();
+      proven = await intClient.proveTransaction(sendResult, prover);
+      height = await intClient.submitProvenTransaction(proven, sendResult);
+      const sendUpdate = await intClient.applyTransaction(sendResult, height);
+      const sendTxId = sendUpdate.executedTransaction().id().toHex();
+
+      // Wait for send tx
+      timeWaited = 0;
+      while (timeWaited < 10000) {
+        await intClient.syncState();
+        const uncommitted = await intClient.getTransactions(
+          sdk.TransactionFilter.uncommitted()
+        );
+        const ids = uncommitted.map((tx) => tx.id().toHex());
+        if (!ids.includes(sendTxId)) break;
+        await new Promise((r) => setTimeout(r, 1000));
+        timeWaited += 1000;
+      }
+
+      // Get consumable notes
+      const recipientRecords =
+        await intClient.getConsumableNotes(targetWalletId);
+      const consumableRecipient = recipientRecords.map((record) => ({
+        noteId: record.inputNoteRecord().id().toString(),
+        consumability: record.noteConsumability().map((c) => ({
+          accountId: c.accountId().toString(),
+          consumableAfterBlock: c.consumptionStatus()?.consumableAfterBlock(),
+        })),
+      }));
+
+      const senderRecords = await intClient.getConsumableNotes(senderWalletId);
+      const consumableSender = senderRecords.map((record) => ({
+        noteId: record.inputNoteRecord().id().toString(),
+        consumability: record.noteConsumability().map((c) => ({
+          accountId: c.accountId().toString(),
+          consumableAfterBlock: c.consumptionStatus()?.consumableAfterBlock(),
+        })),
+      }));
+
+      return {
+        skip: false,
+        consumableSender,
+        consumableRecipient,
+        recallHeight,
+      };
+    });
+    if (result.skip) {
+      test.skip(true, "requires running node");
+      return;
+    }
+    expect(result.consumableSender.length).toBe(1);
+    expect(
+      result.consumableSender[0].consumability[0].consumableAfterBlock
+    ).toBe(result.recallHeight);
+    expect(result.consumableRecipient.length).toBe(1);
     // napi returns null, browser returns undefined for Option::None
     expect(
-      consumableRecipient[0].consumability[0].consumableAfterBlock
+      result.consumableRecipient[0].consumability[0].consumableAfterBlock
     ).toBeFalsy();
   });
 });
 
 test.describe("createP2IDNote and createP2IDENote", () => {
   test("should create a proper consumable p2id note from the createP2IDNote function", async ({
-    sdk,
+    run,
   }) => {
-    const result = await createIntegrationClient();
-    test.skip(!result, "requires running node");
-    const { client } = result;
+    const result = await run(async ({ sdk, helpers }) => {
+      const integration = await helpers.createIntegrationClient();
+      if (!integration) return { skip: true };
+      const { client: intClient } = integration;
 
-    const { walletId: senderId, faucetId } =
-      await setupIntegrationWalletAndFaucet(client, sdk);
-    const { walletId: targetId } = await setupIntegrationWalletAndFaucet(
-      client,
-      sdk
-    );
+      // Setup sender
+      const sender = await intClient.newWallet(
+        sdk.AccountStorageMode.private(),
+        true,
+        sdk.AuthScheme.AuthRpoFalcon512
+      );
+      const faucet = await intClient.newFaucet(
+        sdk.AccountStorageMode.private(),
+        false,
+        "DAG",
+        8,
+        sdk.u64(10000000),
+        sdk.AuthScheme.AuthRpoFalcon512
+      );
+      const senderId = sender.id();
+      const faucetId = faucet.id();
 
-    // Mint and consume to fund sender
-    const { createdNoteId: mintedNoteId } = await integrationMint(
-      client,
-      sdk,
-      senderId,
-      faucetId,
-      { publicNote: true }
-    );
-    await integrationConsume(client, sdk, senderId, faucetId, mintedNoteId);
+      // Setup target
+      const target = await intClient.newWallet(
+        sdk.AccountStorageMode.private(),
+        true,
+        sdk.AuthScheme.AuthRpoFalcon512
+      );
+      const targetId = target.id();
 
-    let fungibleAsset = new sdk.FungibleAsset(faucetId, sdk.u64(10));
-    let noteAssets = new sdk.NoteAssets([fungibleAsset]);
-    let p2IdNote = sdk.Note.createP2IDNote(
-      senderId,
-      targetId,
-      noteAssets,
-      sdk.NoteType.Public,
-      new sdk.NoteAttachment()
-    );
+      // Mint (public note) and wait
+      await intClient.syncState();
+      const mintRequest = await intClient.newMintTransactionRequest(
+        senderId,
+        faucetId,
+        sdk.NoteType.Public,
+        sdk.u64(1000)
+      );
+      let execResult = await intClient.executeTransaction(
+        faucetId,
+        mintRequest
+      );
+      let prover = sdk.TransactionProver.newLocalProver();
+      let proven = await intClient.proveTransaction(execResult, prover);
+      let height = await intClient.submitProvenTransaction(proven, execResult);
+      let execUpdate = await intClient.applyTransaction(execResult, height);
+      let txId = execUpdate.executedTransaction().id().toHex();
+      const mintedNoteId = execUpdate.createdNotes().notes()[0].id().toString();
 
-    let outputNote = sdk.OutputNote.full(p2IdNote);
+      let timeWaited = 0;
+      while (timeWaited < 10000) {
+        await intClient.syncState();
+        const uncommitted = await intClient.getTransactions(
+          sdk.TransactionFilter.uncommitted()
+        );
+        const ids = uncommitted.map((tx) => tx.id().toHex());
+        if (!ids.includes(txId)) break;
+        await new Promise((r) => setTimeout(r, 1000));
+        timeWaited += 1000;
+      }
 
-    let transactionRequest = new sdk.TransactionRequestBuilder()
-      .withOwnOutputNotes([outputNote])
-      .build();
+      // Consume minted note to fund sender
+      await intClient.syncState();
+      let inputNoteRecord = await intClient.getInputNote(mintedNoteId);
+      let note = inputNoteRecord.toNote();
+      let consumeRequest = intClient.newConsumeTransactionRequest([note]);
+      execResult = await intClient.executeTransaction(senderId, consumeRequest);
+      prover = sdk.TransactionProver.newLocalProver();
+      proven = await intClient.proveTransaction(execResult, prover);
+      height = await intClient.submitProvenTransaction(proven, execResult);
+      execUpdate = await intClient.applyTransaction(execResult, height);
+      txId = execUpdate.executedTransaction().id().toHex();
 
-    let transactionUpdate = await executeAndApplyTransaction(
-      client,
-      sdk,
-      senderId,
-      transactionRequest
-    );
+      timeWaited = 0;
+      while (timeWaited < 10000) {
+        await intClient.syncState();
+        const uncommitted = await intClient.getTransactions(
+          sdk.TransactionFilter.uncommitted()
+        );
+        const ids = uncommitted.map((tx) => tx.id().toHex());
+        if (!ids.includes(txId)) break;
+        await new Promise((r) => setTimeout(r, 1000));
+        timeWaited += 1000;
+      }
 
-    await waitForTransaction(
-      client,
-      sdk,
-      transactionUpdate.executedTransaction().id().toHex()
-    );
+      // Create P2ID note
+      let fungibleAsset = new sdk.FungibleAsset(faucetId, sdk.u64(10));
+      let noteAssets = new sdk.NoteAssets([fungibleAsset]);
+      let p2IdNote = sdk.Note.createP2IDNote(
+        senderId,
+        targetId,
+        noteAssets,
+        sdk.NoteType.Public,
+        new sdk.NoteAttachment()
+      );
 
-    let createdNoteId = transactionUpdate
-      .executedTransaction()
-      .outputNotes()
-      .notes()[0]
-      .id()
-      .toString();
+      let outputNote = sdk.OutputNote.full(p2IdNote);
+      let transactionRequest = new sdk.TransactionRequestBuilder()
+        .withOwnOutputNotes([outputNote])
+        .build();
 
-    const inputNoteRecord = await client.getInputNote(createdNoteId);
-    if (!inputNoteRecord) {
-      throw new Error(`Note with ID ${createdNoteId} not found`);
+      execResult = await intClient.executeTransaction(
+        senderId,
+        transactionRequest
+      );
+      prover = sdk.TransactionProver.newLocalProver();
+      proven = await intClient.proveTransaction(execResult, prover);
+      height = await intClient.submitProvenTransaction(proven, execResult);
+      execUpdate = await intClient.applyTransaction(execResult, height);
+      txId = execUpdate.executedTransaction().id().toHex();
+
+      timeWaited = 0;
+      while (timeWaited < 10000) {
+        await intClient.syncState();
+        const uncommitted = await intClient.getTransactions(
+          sdk.TransactionFilter.uncommitted()
+        );
+        const ids = uncommitted.map((tx) => tx.id().toHex());
+        if (!ids.includes(txId)) break;
+        await new Promise((r) => setTimeout(r, 1000));
+        timeWaited += 1000;
+      }
+
+      let createdNoteId = execUpdate
+        .executedTransaction()
+        .outputNotes()
+        .notes()[0]
+        .id()
+        .toString();
+
+      // Consume P2ID note by target
+      inputNoteRecord = await intClient.getInputNote(createdNoteId);
+      if (!inputNoteRecord) {
+        throw new Error(`Note with ID ${createdNoteId} not found`);
+      }
+
+      note = inputNoteRecord.toNote();
+      consumeRequest = intClient.newConsumeTransactionRequest([note]);
+
+      execResult = await intClient.executeTransaction(targetId, consumeRequest);
+      prover = sdk.TransactionProver.newLocalProver();
+      proven = await intClient.proveTransaction(execResult, prover);
+      height = await intClient.submitProvenTransaction(proven, execResult);
+      execUpdate = await intClient.applyTransaction(execResult, height);
+      txId = execUpdate.executedTransaction().id().toHex();
+
+      timeWaited = 0;
+      while (timeWaited < 10000) {
+        await intClient.syncState();
+        const uncommitted = await intClient.getTransactions(
+          sdk.TransactionFilter.uncommitted()
+        );
+        const ids = uncommitted.map((tx) => tx.id().toHex());
+        if (!ids.includes(txId)) break;
+        await new Promise((r) => setTimeout(r, 1000));
+        timeWaited += 1000;
+      }
+
+      let senderAccountBalance = (await intClient.getAccount(senderId))
+        ?.vault()
+        .getBalance(faucetId)
+        .toString();
+      let targetAccountBalance = (await intClient.getAccount(targetId))
+        ?.vault()
+        .getBalance(faucetId)
+        .toString();
+
+      return {
+        skip: false,
+        senderAccountBalance,
+        targetAccountBalance,
+      };
+    });
+    if (result.skip) {
+      test.skip(true, "requires running node");
+      return;
     }
-
-    const note = inputNoteRecord.toNote();
-    let consumeTransactionRequest = client.newConsumeTransactionRequest([note]);
-
-    let consumeTransactionUpdate = await executeAndApplyTransaction(
-      client,
-      sdk,
-      targetId,
-      consumeTransactionRequest
-    );
-
-    await waitForTransaction(
-      client,
-      sdk,
-      consumeTransactionUpdate.executedTransaction().id().toHex()
-    );
-
-    let senderAccountBalance = (await client.getAccount(senderId))
-      ?.vault()
-      .getBalance(faucetId)
-      .toString();
-    let targetAccountBalance = (await client.getAccount(targetId))
-      ?.vault()
-      .getBalance(faucetId)
-      .toString();
-
-    expect(senderAccountBalance).toEqual("990");
-    expect(targetAccountBalance).toEqual("10");
+    expect(result.senderAccountBalance).toEqual("990");
+    expect(result.targetAccountBalance).toEqual("10");
   });
 
   test("should create a proper consumable p2ide note from the createP2IDENote function", async ({
-    sdk,
+    run,
   }) => {
     test.slow();
-    const result = await createIntegrationClient();
-    test.skip(!result, "requires running node");
-    const { client } = result;
+    const result = await run(async ({ sdk, helpers }) => {
+      const integration = await helpers.createIntegrationClient();
+      if (!integration) return { skip: true };
+      const { client: intClient } = integration;
 
-    const { walletId: senderId, faucetId } =
-      await setupIntegrationWalletAndFaucet(client, sdk);
-    const { walletId: targetId } = await setupIntegrationWalletAndFaucet(
-      client,
-      sdk
-    );
+      // Setup sender
+      const sender = await intClient.newWallet(
+        sdk.AccountStorageMode.private(),
+        true,
+        sdk.AuthScheme.AuthRpoFalcon512
+      );
+      const faucet = await intClient.newFaucet(
+        sdk.AccountStorageMode.private(),
+        false,
+        "DAG",
+        8,
+        sdk.u64(10000000),
+        sdk.AuthScheme.AuthRpoFalcon512
+      );
+      const senderId = sender.id();
+      const faucetId = faucet.id();
 
-    // Mint and consume to fund sender
-    const { createdNoteId: mintedNoteId } = await integrationMint(
-      client,
-      sdk,
-      senderId,
-      faucetId,
-      { publicNote: true }
-    );
-    await integrationConsume(client, sdk, senderId, faucetId, mintedNoteId);
+      // Setup target
+      const target = await intClient.newWallet(
+        sdk.AccountStorageMode.private(),
+        true,
+        sdk.AuthScheme.AuthRpoFalcon512
+      );
+      const targetId = target.id();
 
-    let fungibleAsset = new sdk.FungibleAsset(faucetId, sdk.u64(10));
-    let noteAssets = new sdk.NoteAssets([fungibleAsset]);
-    let p2IdeNote = sdk.Note.createP2IDENote(
-      senderId,
-      targetId,
-      noteAssets,
-      null,
-      null,
-      sdk.NoteType.Public,
-      new sdk.NoteAttachment()
-    );
+      // Mint (public note) and wait
+      await intClient.syncState();
+      const mintRequest = await intClient.newMintTransactionRequest(
+        senderId,
+        faucetId,
+        sdk.NoteType.Public,
+        sdk.u64(1000)
+      );
+      let execResult = await intClient.executeTransaction(
+        faucetId,
+        mintRequest
+      );
+      let prover = sdk.TransactionProver.newLocalProver();
+      let proven = await intClient.proveTransaction(execResult, prover);
+      let height = await intClient.submitProvenTransaction(proven, execResult);
+      let execUpdate = await intClient.applyTransaction(execResult, height);
+      let txId = execUpdate.executedTransaction().id().toHex();
+      const mintedNoteId = execUpdate.createdNotes().notes()[0].id().toString();
 
-    let outputNote = sdk.OutputNote.full(p2IdeNote);
+      let timeWaited = 0;
+      while (timeWaited < 10000) {
+        await intClient.syncState();
+        const uncommitted = await intClient.getTransactions(
+          sdk.TransactionFilter.uncommitted()
+        );
+        const ids = uncommitted.map((tx) => tx.id().toHex());
+        if (!ids.includes(txId)) break;
+        await new Promise((r) => setTimeout(r, 1000));
+        timeWaited += 1000;
+      }
 
-    let transactionRequest = new sdk.TransactionRequestBuilder()
-      .withOwnOutputNotes([outputNote])
-      .build();
+      // Consume minted note to fund sender
+      await intClient.syncState();
+      let inputNoteRecord = await intClient.getInputNote(mintedNoteId);
+      let note = inputNoteRecord.toNote();
+      let consumeRequest = intClient.newConsumeTransactionRequest([note]);
+      execResult = await intClient.executeTransaction(senderId, consumeRequest);
+      prover = sdk.TransactionProver.newLocalProver();
+      proven = await intClient.proveTransaction(execResult, prover);
+      height = await intClient.submitProvenTransaction(proven, execResult);
+      execUpdate = await intClient.applyTransaction(execResult, height);
+      txId = execUpdate.executedTransaction().id().toHex();
 
-    let transactionUpdate = await executeAndApplyTransaction(
-      client,
-      sdk,
-      senderId,
-      transactionRequest
-    );
+      timeWaited = 0;
+      while (timeWaited < 10000) {
+        await intClient.syncState();
+        const uncommitted = await intClient.getTransactions(
+          sdk.TransactionFilter.uncommitted()
+        );
+        const ids = uncommitted.map((tx) => tx.id().toHex());
+        if (!ids.includes(txId)) break;
+        await new Promise((r) => setTimeout(r, 1000));
+        timeWaited += 1000;
+      }
 
-    await waitForTransaction(
-      client,
-      sdk,
-      transactionUpdate.executedTransaction().id().toHex()
-    );
+      // Create P2IDE note
+      let fungibleAsset = new sdk.FungibleAsset(faucetId, sdk.u64(10));
+      let noteAssets = new sdk.NoteAssets([fungibleAsset]);
+      let p2IdeNote = sdk.Note.createP2IDENote(
+        senderId,
+        targetId,
+        noteAssets,
+        null,
+        null,
+        sdk.NoteType.Public,
+        new sdk.NoteAttachment()
+      );
 
-    let createdNoteId = transactionUpdate
-      .executedTransaction()
-      .outputNotes()
-      .notes()[0]
-      .id()
-      .toString();
+      let outputNote = sdk.OutputNote.full(p2IdeNote);
+      let transactionRequest = new sdk.TransactionRequestBuilder()
+        .withOwnOutputNotes([outputNote])
+        .build();
 
-    const inputNoteRecord = await client.getInputNote(createdNoteId);
-    if (!inputNoteRecord) {
-      throw new Error(`Note with ID ${createdNoteId} not found`);
+      execResult = await intClient.executeTransaction(
+        senderId,
+        transactionRequest
+      );
+      prover = sdk.TransactionProver.newLocalProver();
+      proven = await intClient.proveTransaction(execResult, prover);
+      height = await intClient.submitProvenTransaction(proven, execResult);
+      execUpdate = await intClient.applyTransaction(execResult, height);
+      txId = execUpdate.executedTransaction().id().toHex();
+
+      timeWaited = 0;
+      while (timeWaited < 10000) {
+        await intClient.syncState();
+        const uncommitted = await intClient.getTransactions(
+          sdk.TransactionFilter.uncommitted()
+        );
+        const ids = uncommitted.map((tx) => tx.id().toHex());
+        if (!ids.includes(txId)) break;
+        await new Promise((r) => setTimeout(r, 1000));
+        timeWaited += 1000;
+      }
+
+      let createdNoteId = execUpdate
+        .executedTransaction()
+        .outputNotes()
+        .notes()[0]
+        .id()
+        .toString();
+
+      // Consume P2IDE note by target
+      inputNoteRecord = await intClient.getInputNote(createdNoteId);
+      if (!inputNoteRecord) {
+        throw new Error(`Note with ID ${createdNoteId} not found`);
+      }
+
+      note = inputNoteRecord.toNote();
+      consumeRequest = intClient.newConsumeTransactionRequest([note]);
+
+      execResult = await intClient.executeTransaction(targetId, consumeRequest);
+      prover = sdk.TransactionProver.newLocalProver();
+      proven = await intClient.proveTransaction(execResult, prover);
+      height = await intClient.submitProvenTransaction(proven, execResult);
+      execUpdate = await intClient.applyTransaction(execResult, height);
+      txId = execUpdate.executedTransaction().id().toHex();
+
+      timeWaited = 0;
+      while (timeWaited < 10000) {
+        await intClient.syncState();
+        const uncommitted = await intClient.getTransactions(
+          sdk.TransactionFilter.uncommitted()
+        );
+        const ids = uncommitted.map((tx) => tx.id().toHex());
+        if (!ids.includes(txId)) break;
+        await new Promise((r) => setTimeout(r, 1000));
+        timeWaited += 1000;
+      }
+
+      let senderAccountBalance = (await intClient.getAccount(senderId))
+        ?.vault()
+        .getBalance(faucetId)
+        .toString();
+      let targetAccountBalance = (await intClient.getAccount(targetId))
+        ?.vault()
+        .getBalance(faucetId)
+        .toString();
+
+      return {
+        skip: false,
+        senderAccountBalance,
+        targetAccountBalance,
+      };
+    });
+    if (result.skip) {
+      test.skip(true, "requires running node");
+      return;
     }
-
-    const note = inputNoteRecord.toNote();
-    let consumeTransactionRequest = client.newConsumeTransactionRequest([note]);
-
-    let consumeTransactionUpdate = await executeAndApplyTransaction(
-      client,
-      sdk,
-      targetId,
-      consumeTransactionRequest
-    );
-
-    await waitForTransaction(
-      client,
-      sdk,
-      consumeTransactionUpdate.executedTransaction().id().toHex()
-    );
-
-    let senderAccountBalance = (await client.getAccount(senderId))
-      ?.vault()
-      .getBalance(faucetId)
-      .toString();
-    let targetAccountBalance = (await client.getAccount(targetId))
-      ?.vault()
-      .getBalance(faucetId)
-      .toString();
-
-    expect(senderAccountBalance).toEqual("990");
-    expect(targetAccountBalance).toEqual("10");
+    expect(result.senderAccountBalance).toEqual("990");
+    expect(result.targetAccountBalance).toEqual("10");
   });
 });
 

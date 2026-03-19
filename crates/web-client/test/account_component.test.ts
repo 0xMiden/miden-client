@@ -1,37 +1,60 @@
 // @ts-nocheck
 import { test, expect } from "./test-setup";
 
-// AuthScheme enum: 2 = AuthRpoFalcon512 (Falcon), 1 = AuthEcdsaK256Keccak (ECDSA)
-const SCHEMES = [
-  ["rpoFalconWithRNG", 2],
-  ["ecdsaWithRNG", 1],
-] as const;
-
-const proceduresFromComponent = (component: any) =>
-  component
-    .getProcedures()
-    .map((procedure: any) => procedure.digest.toHex())
-    .sort();
-
 test.describe("account component auth constructors", () => {
-  SCHEMES.forEach(([secretKeyFn, authSchemeValue]) => {
-    test(`createAuthComponentFromCommitment matches secret-key variant (${authSchemeValue})`, async ({
-      sdk,
-    }) => {
-      const secretKey = sdk.AuthSecretKey[secretKeyFn]();
+  test("createAuthComponentFromCommitment matches secret-key variant (Falcon, authScheme=2)", async ({
+    run,
+  }) => {
+    const result = await run(async ({ sdk }) => {
+      const secretKey = sdk.AuthSecretKey.rpoFalconWithRNG();
       const commitment = secretKey.publicKey().toCommitment();
 
       const fromSecret =
         sdk.AccountComponent.createAuthComponentFromSecretKey(secretKey);
       const fromCommitment =
-        sdk.AccountComponent.createAuthComponentFromCommitment(
-          commitment,
-          authSchemeValue
-        );
+        sdk.AccountComponent.createAuthComponentFromCommitment(commitment, 2);
 
-      expect(JSON.stringify(proceduresFromComponent(fromSecret))).toEqual(
-        JSON.stringify(proceduresFromComponent(fromCommitment))
-      );
+      const proceduresFromComponent = (component) =>
+        component
+          .getProcedures()
+          .map((procedure) => procedure.digest.toHex())
+          .sort();
+
+      return {
+        fromSecretProcs: JSON.stringify(proceduresFromComponent(fromSecret)),
+        fromCommitmentProcs: JSON.stringify(
+          proceduresFromComponent(fromCommitment)
+        ),
+      };
     });
+    expect(result.fromSecretProcs).toEqual(result.fromCommitmentProcs);
+  });
+
+  test("createAuthComponentFromCommitment matches secret-key variant (ECDSA, authScheme=1)", async ({
+    run,
+  }) => {
+    const result = await run(async ({ sdk }) => {
+      const secretKey = sdk.AuthSecretKey.ecdsaWithRNG();
+      const commitment = secretKey.publicKey().toCommitment();
+
+      const fromSecret =
+        sdk.AccountComponent.createAuthComponentFromSecretKey(secretKey);
+      const fromCommitment =
+        sdk.AccountComponent.createAuthComponentFromCommitment(commitment, 1);
+
+      const proceduresFromComponent = (component) =>
+        component
+          .getProcedures()
+          .map((procedure) => procedure.digest.toHex())
+          .sort();
+
+      return {
+        fromSecretProcs: JSON.stringify(proceduresFromComponent(fromSecret)),
+        fromCommitmentProcs: JSON.stringify(
+          proceduresFromComponent(fromCommitment)
+        ),
+      };
+    });
+    expect(result.fromSecretProcs).toEqual(result.fromCommitmentProcs);
   });
 });

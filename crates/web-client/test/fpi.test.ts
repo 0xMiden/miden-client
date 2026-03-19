@@ -1,41 +1,35 @@
 // @ts-nocheck
-import {
-  test,
-  expect,
-  executeAndApplyTransaction,
-  waitForTransaction,
-} from "./test-setup";
-import { createIntegrationClient } from "./test-helpers";
-import { getRpcUrl } from "./playwright.global.setup";
+import { test, expect } from "./test-setup";
 
 test.describe("fpi test", () => {
   test("runs the standard fpi test successfully and verifies account proof", async ({
-    sdk,
+    run,
   }) => {
     test.slow();
-    const result = await createIntegrationClient();
-    test.skip(!result, "requires running node");
-    const { client } = result;
+    const result = await run(async ({ sdk, helpers }) => {
+      const integration = await helpers.createIntegrationClient();
+      if (!integration) return { skip: true };
+      const { client: intClient } = integration;
 
-    await client.syncState();
+      await intClient.syncState();
 
-    const MAP_SLOT_NAME = "miden::testing::fpi::map_slot";
-    const COMPONENT_LIB_PATH = "miden::testing::fpi_component";
+      const MAP_SLOT_NAME = "miden::testing::fpi::map_slot";
+      const COMPONENT_LIB_PATH = "miden::testing::fpi_component";
 
-    // BUILD FOREIGN ACCOUNT WITH CUSTOM COMPONENT
-    // --------------------------------------------------------------------------
+      // BUILD FOREIGN ACCOUNT WITH CUSTOM COMPONENT
+      // --------------------------------------------------------------------------
 
-    let felt1 = new sdk.Felt(sdk.u64(15));
-    let felt2 = new sdk.Felt(sdk.u64(15));
-    let felt3 = new sdk.Felt(sdk.u64(15));
-    let felt4 = new sdk.Felt(sdk.u64(15));
-    const MAP_KEY = sdk.Word.newFromFelts([felt1, felt2, felt3, felt4]);
-    const FPI_STORAGE_VALUE = new sdk.Word(sdk.u64Array([9, 12, 18, 30]));
+      let felt1 = new sdk.Felt(sdk.u64(15));
+      let felt2 = new sdk.Felt(sdk.u64(15));
+      let felt3 = new sdk.Felt(sdk.u64(15));
+      let felt4 = new sdk.Felt(sdk.u64(15));
+      const MAP_KEY = sdk.Word.newFromFelts([felt1, felt2, felt3, felt4]);
+      const FPI_STORAGE_VALUE = new sdk.Word(sdk.u64Array([9, 12, 18, 30]));
 
-    let storageMap = new sdk.StorageMap();
-    storageMap.insert(MAP_KEY, FPI_STORAGE_VALUE);
+      let storageMap = new sdk.StorageMap();
+      storageMap.insert(MAP_KEY, FPI_STORAGE_VALUE);
 
-    const code = `
+      const code = `
             use miden::core::word
 
             const MAP_SLOT = word("${MAP_SLOT_NAME}")
@@ -48,60 +42,77 @@ test.describe("fpi test", () => {
                 swapw dropw
             end
         `;
-    let builder = await client.createCodeBuilder();
-    let componentLibrary = builder.buildLibrary(COMPONENT_LIB_PATH, code);
-    let getItemComponent = sdk.AccountComponent.fromLibrary(componentLibrary, [
-      sdk.StorageSlot.map(MAP_SLOT_NAME, storageMap),
-    ]).withSupportsAllTypes();
+      let builder = await intClient.createCodeBuilder();
+      let componentLibrary = builder.buildLibrary(COMPONENT_LIB_PATH, code);
+      let getItemComponent = sdk.AccountComponent.fromLibrary(
+        componentLibrary,
+        [sdk.StorageSlot.map(MAP_SLOT_NAME, storageMap)]
+      ).withSupportsAllTypes();
 
-    const walletSeed = new Uint8Array(32);
-    crypto.getRandomValues(walletSeed);
+      const walletSeed = new Uint8Array(32);
+      crypto.getRandomValues(walletSeed);
 
-    let secretKey = sdk.AuthSecretKey.rpoFalconWithRNG(walletSeed);
+      let secretKey = sdk.AuthSecretKey.rpoFalconWithRNG(walletSeed);
 
-    let authComponent =
-      sdk.AccountComponent.createAuthComponentFromSecretKey(secretKey);
+      let authComponent =
+        sdk.AccountComponent.createAuthComponentFromSecretKey(secretKey);
 
-    let getItemAccountBuilderResult = new sdk.AccountBuilder(walletSeed)
-      .withAuthComponent(authComponent)
-      .withComponent(getItemComponent)
-      .storageMode(sdk.AccountStorageMode.public())
-      .build();
+      let getItemAccountBuilderResult = new sdk.AccountBuilder(walletSeed)
+        .withAuthComponent(authComponent)
+        .withComponent(getItemComponent)
+        .storageMode(sdk.AccountStorageMode.public())
+        .build();
 
-    builder.linkDynamicLibrary(componentLibrary);
+      builder.linkDynamicLibrary(componentLibrary);
 
-    // DEPLOY FOREIGN ACCOUNT
-    // --------------------------------------------------------------------------
+      // DEPLOY FOREIGN ACCOUNT
+      // --------------------------------------------------------------------------
 
-    let foreignAccountId = getItemAccountBuilderResult.account.id();
+      let foreignAccountId = getItemAccountBuilderResult.account.id();
 
-    await client.addAccountSecretKeyToWebStore(foreignAccountId, secretKey);
-    await client.newAccount(getItemAccountBuilderResult.account, false);
-    await client.syncState();
+      await intClient.addAccountSecretKeyToWebStore(
+        foreignAccountId,
+        secretKey
+      );
+      await intClient.newAccount(getItemAccountBuilderResult.account, false);
+      await intClient.syncState();
 
-    let txRequest = new sdk.TransactionRequestBuilder().build();
+      let txRequest = new sdk.TransactionRequestBuilder().build();
 
-    let txResult = await executeAndApplyTransaction(
-      client,
-      sdk,
-      foreignAccountId,
-      txRequest
-    );
+      let txResult = await intClient.executeTransaction(
+        foreignAccountId,
+        txRequest
+      );
+      let prover = sdk.TransactionProver.newLocalProver();
+      let proven = await intClient.proveTransaction(txResult, prover);
+      let height = await intClient.submitProvenTransaction(proven, txResult);
+      await intClient.applyTransaction(txResult, height);
 
-    let txId = txResult.executedTransaction().id();
+      let txId = txResult.executedTransaction().id().toHex();
 
-    await waitForTransaction(client, sdk, txId.toHex());
+      // Wait for deploy tx
+      let timeWaited = 0;
+      while (timeWaited < 10000) {
+        await intClient.syncState();
+        const uncommitted = await intClient.getTransactions(
+          sdk.TransactionFilter.uncommitted()
+        );
+        const ids = uncommitted.map((tx) => tx.id().toHex());
+        if (!ids.includes(txId)) break;
+        await new Promise((r) => setTimeout(r, 1000));
+        timeWaited += 1000;
+      }
 
-    // CREATE NATIVE ACCOUNT AND CALL FOREIGN ACCOUNT PROCEDURE VIA FPI
-    // --------------------------------------------------------------------------
+      // CREATE NATIVE ACCOUNT AND CALL FOREIGN ACCOUNT PROCEDURE VIA FPI
+      // --------------------------------------------------------------------------
 
-    let newAccount = await client.newWallet(
-      sdk.AccountStorageMode.public(),
-      false,
-      sdk.AuthScheme.AuthRpoFalcon512
-    );
+      let newAccount = await intClient.newWallet(
+        sdk.AccountStorageMode.public(),
+        false,
+        sdk.AuthScheme.AuthRpoFalcon512
+      );
 
-    let txScript = `
+      let txScript = `
             use miden::protocol::tx
             begin
                 # push the hash of the component procedure
@@ -116,61 +127,78 @@ test.describe("fpi test", () => {
             end
         `;
 
-    txScript = txScript
-      .replace("{account_id_suffix}", foreignAccountId.suffix().toString())
-      .replace("{account_id_prefix}", foreignAccountId.prefix().toString());
+      txScript = txScript
+        .replace("{account_id_suffix}", foreignAccountId.suffix().toString())
+        .replace("{account_id_prefix}", foreignAccountId.prefix().toString());
 
-    let compiledTxScript = builder.compileTxScript(txScript);
+      let compiledTxScript = builder.compileTxScript(txScript);
 
-    await client.syncState();
+      await intClient.syncState();
 
-    // Wait for 2 blocks
-    const startBlock = await client.getSyncHeight();
-    while (true) {
-      const summary = await client.syncState();
-      if (summary.blockNum() >= startBlock + 2) break;
-      await new Promise((r) => setTimeout(r, 1000));
+      // Wait for 2 blocks
+      const startBlock = await intClient.getSyncHeight();
+      while (true) {
+        const summary = await intClient.syncState();
+        if (summary.blockNum() >= startBlock + 2) break;
+        await new Promise((r) => setTimeout(r, 1000));
+      }
+
+      let slotAndKeys = new sdk.SlotAndKeys(MAP_SLOT_NAME, [MAP_KEY]);
+      let storageRequirements =
+        sdk.AccountStorageRequirements.fromSlotAndKeysArray([slotAndKeys]);
+
+      let foreignAccount = sdk.ForeignAccount.public(
+        foreignAccountId,
+        storageRequirements
+      );
+
+      let txRequest2 = new sdk.TransactionRequestBuilder()
+        .withCustomScript(compiledTxScript)
+        .withForeignAccounts([foreignAccount])
+        .build();
+
+      let txResult2 = await intClient.executeTransaction(
+        newAccount.id(),
+        txRequest2
+      );
+      prover = sdk.TransactionProver.newLocalProver();
+      proven = await intClient.proveTransaction(txResult2, prover);
+      height = await intClient.submitProvenTransaction(proven, txResult2);
+      await intClient.applyTransaction(txResult2, height);
+
+      const foreignAccountIdStr = foreignAccountId.toString();
+
+      // Test RpcClient.getAccountProof on the deployed public account
+      const rpcUrl = helpers.getRpcUrl();
+      const endpoint = new sdk.Endpoint(rpcUrl);
+      const rpcClient = new sdk.RpcClient(endpoint);
+
+      const accountId = sdk.AccountId.fromHex(foreignAccountIdStr);
+      const accountProof = await rpcClient.getAccountProof(accountId);
+
+      return {
+        skip: false,
+        foreignAccountIdStr,
+        proofAccountId: accountProof.accountId().toString(),
+        proofBlockNum: accountProof.blockNum(),
+        proofCommitmentHex: accountProof.accountCommitment().toHex(),
+        hasAccountHeader: !!accountProof.accountHeader(),
+        hasAccountCode: !!accountProof.accountCode(),
+        numStorageSlots: accountProof.numStorageSlots(),
+        headerNonceDefined:
+          accountProof.accountHeader()?.nonce().toString() !== undefined,
+      };
+    });
+    if (result.skip) {
+      test.skip(true, "requires running node");
+      return;
     }
-
-    let slotAndKeys = new sdk.SlotAndKeys(MAP_SLOT_NAME, [MAP_KEY]);
-    let storageRequirements =
-      sdk.AccountStorageRequirements.fromSlotAndKeysArray([slotAndKeys]);
-
-    let foreignAccount = sdk.ForeignAccount.public(
-      foreignAccountId,
-      storageRequirements
-    );
-
-    let txRequest2 = new sdk.TransactionRequestBuilder()
-      .withCustomScript(compiledTxScript)
-      .withForeignAccounts([foreignAccount])
-      .build();
-
-    let txResult2 = await executeAndApplyTransaction(
-      client,
-      sdk,
-      newAccount.id(),
-      txRequest2
-    );
-
-    const foreignAccountIdStr = foreignAccountId.toString();
-
-    // Test RpcClient.getAccountProof on the deployed public account
-    const rpcUrl = getRpcUrl();
-    const endpoint = new sdk.Endpoint(rpcUrl);
-    const rpcClient = new sdk.RpcClient(endpoint);
-
-    const accountId = sdk.AccountId.fromHex(foreignAccountIdStr);
-    const accountProof = await rpcClient.getAccountProof(accountId);
-
-    expect(accountProof.accountId().toString()).toEqual(foreignAccountIdStr);
-    expect(accountProof.blockNum()).toBeGreaterThan(0);
-    expect(accountProof.accountCommitment().toHex()).toMatch(
-      /^0x[0-9a-fA-F]+$/
-    );
-    expect(!!accountProof.accountHeader()).toBe(true);
-    expect(!!accountProof.accountCode()).toBe(true);
-    expect(accountProof.numStorageSlots()).toBeGreaterThan(0);
-    expect(accountProof.accountHeader()?.nonce().toString()).toBeDefined();
+    expect(result.proofAccountId).toEqual(result.foreignAccountIdStr);
+    expect(result.proofBlockNum).toBeGreaterThan(0);
+    expect(result.proofCommitmentHex).toMatch(/^0x[0-9a-fA-F]+$/);
+    expect(result.hasAccountHeader).toBe(true);
+    expect(result.hasAccountCode).toBe(true);
+    expect(result.numStorageSlots).toBeGreaterThan(0);
+    expect(result.headerNonceDefined).toBeDefined();
   });
 });

@@ -1,15 +1,26 @@
 /**
  * Platform-agnostic test setup for both browser (Playwright) and Node.js (napi).
  *
- * Provides `client` and `sdk` fixtures that abstract the platform difference:
- * - Browser: SDK operations run inside a browser page via page.evaluate()
+ * Provides a `run` fixture that abstracts the platform difference:
  * - Node.js: SDK operations run directly in the test process
+ * - Browser: SDK operations run inside a browser page via page.evaluate()
  *
- * Tests import { test, expect } from "./test-setup" and use `client` and `sdk`
- * without knowing which platform they're on.
+ * Tests import { test, expect } from "./test-setup" and use `run` to execute
+ * SDK code that works on both platforms. Assertions stay outside `run`.
+ *
+ * Example:
+ *   test("creates a wallet", async ({ run }) => {
+ *     const result = await run(async ({ client, sdk }) => {
+ *       const wallet = await client.newWallet(
+ *         sdk.AccountStorageMode.private(), true, sdk.AuthScheme.AuthRpoFalcon512
+ *       );
+ *       return { id: wallet.id().toString() };
+ *     });
+ *     expect(result.id).toMatch(/^0x/);
+ *   });
  */
 // @ts-nocheck
-import { test as base, expect } from "@playwright/test";
+import { test as base, expect, chromium, webkit } from "@playwright/test";
 import type { TestInfo } from "@playwright/test";
 import { createRequire } from "module";
 import path from "path";
@@ -177,11 +188,6 @@ export function wrapNodeClient(rawClient: any, rawSdk: any): any {
 }
 
 /**
- * Creates a platform-agnostic SDK wrapper for Node.js.
- * Provides the same interface as the browser's window.* types,
- * plus a `u64()` helper for platform-aware integer handling.
- */
-/**
  * Normalizes a single argument for napi:
  * - BigInt → Number, BigUint64Array → number[], Uint8Array/Buffer → number[]
  */
@@ -329,12 +335,392 @@ export async function waitForTransaction(
   }
 }
 
+// ── Browser run() support ─────────────────────────────────────────────
+
+/**
+ * Standalone browser instance for browser-side run() calls.
+ * Created lazily on first browser test, shared across all tests in the worker.
+ * This avoids depending on Playwright's `page` fixture (which would trigger
+ * browser launch even for nodejs tests).
+ */
+let _runBrowser: any = null;
+
+async function getRunBrowser(projectName: string): Promise<any> {
+  if (_runBrowser) return _runBrowser;
+  const launcher = projectName === "webkit" ? webkit : chromium;
+  _runBrowser = await launcher.launch();
+  return _runBrowser;
+}
+
+/**
+ * Sets up a browser page with the SDK, a mock client, and helpers.
+ */
+async function setupBrowserPage(page: any, testInfo: TestInfo) {
+  const rpcUrl = getRpcUrl();
+  const storeName = generateStoreName(testInfo);
+
+  await page.goto("http://localhost:8080");
+
+  await page.evaluate(
+    async ({ rpcUrl, storeName }) => {
+      // Import all SDK exports and attach to window
+      const sdkExports = await import("./index.js");
+      for (const [key, value] of Object.entries(sdkExports)) {
+        window[key] = value;
+      }
+      // Restore the WASM AuthScheme enum (JS API shadows it)
+      const wasm = await window.getWasmOrThrow();
+      window.AuthScheme = wasm.AuthScheme;
+
+      // Create mock client
+      const client = await window.MockWasmWebClient.createClient();
+      window.client = client;
+      window.rpcUrl = rpcUrl;
+      window.storeName = storeName;
+
+      // ── Register helpers on window ──────────────────────────────
+
+      window.helpers = {
+        setupWalletAndFaucet: async () => {
+          const c = window.client;
+          const wallet = await c.newWallet(
+            window.AccountStorageMode.private(),
+            true,
+            window.AuthScheme.AuthRpoFalcon512
+          );
+          const faucet = await c.newFaucet(
+            window.AccountStorageMode.private(),
+            false,
+            "DAG",
+            8,
+            BigInt(10000000),
+            window.AuthScheme.AuthRpoFalcon512
+          );
+          return {
+            walletId: wallet.id().toString(),
+            faucetId: faucet.id().toString(),
+            walletCommitment: wallet.to_commitment().toHex(),
+            wallet,
+            faucet,
+          };
+        },
+
+        mockMint: async (targetId, faucetId, opts) => {
+          const c = window.client;
+          const amount = opts?.amount ?? 1000;
+          const noteType = opts?.publicNote
+            ? window.NoteType.Public
+            : window.NoteType.Private;
+          const mintRequest = await c.newMintTransactionRequest(
+            targetId,
+            faucetId,
+            noteType,
+            BigInt(amount)
+          );
+          const txId = await c.submitNewTransaction(faucetId, mintRequest);
+          if (!opts?.skipSync) {
+            await c.proveBlock();
+            await c.syncState();
+          }
+          const [txRecord] = await c.getTransactions(
+            window.TransactionFilter.ids([txId])
+          );
+          const notes = txRecord.outputNotes().notes();
+          return {
+            transactionId: txId.toHex(),
+            createdNoteId: notes[0].id().toString(),
+            numOutputNotesCreated: notes.length,
+          };
+        },
+
+        mockConsume: async (accountId, noteId) => {
+          const c = window.client;
+          const inputNoteRecord = await c.getInputNote(noteId);
+          if (!inputNoteRecord) throw new Error(`Note ${noteId} not found`);
+          const note = inputNoteRecord.toNote();
+          const consumeRequest = c.newConsumeTransactionRequest([note]);
+          const txId = await c.submitNewTransaction(accountId, consumeRequest);
+          await c.proveBlock();
+          await c.syncState();
+          return { transactionId: txId.toHex() };
+        },
+
+        mockMintAndConsume: async (accountId, faucetId, opts) => {
+          const h = window.helpers;
+          const { transactionId: mintTxId, createdNoteId } = await h.mockMint(
+            accountId,
+            faucetId,
+            opts
+          );
+          const { transactionId: consumeTxId } = await h.mockConsume(
+            accountId,
+            createdNoteId
+          );
+          const c = window.client;
+          const account = await c.getAccount(accountId);
+          const balance = account.vault().getBalance(faucetId).toString();
+          return {
+            mintTransactionId: mintTxId,
+            consumeTransactionId: consumeTxId,
+            createdNoteId,
+            targetAccountBalance: balance,
+          };
+        },
+
+        mockSend: async (senderId, targetId, faucetId, opts) => {
+          const h = window.helpers;
+          const c = window.client;
+          const { createdNoteId: mintedNoteId } = await h.mockMint(
+            senderId,
+            faucetId
+          );
+          await h.mockConsume(senderId, mintedNoteId);
+          const sendAmount = opts?.amount ?? 100;
+          const sendRequest = await c.newSendTransactionRequest(
+            senderId,
+            targetId,
+            faucetId,
+            window.NoteType.Public,
+            BigInt(sendAmount),
+            opts?.recallHeight ?? null,
+            null
+          );
+          const sendTxId = await c.submitNewTransaction(senderId, sendRequest);
+          await c.proveBlock();
+          await c.syncState();
+          const [sendTxRecord] = await c.getTransactions(
+            window.TransactionFilter.ids([sendTxId])
+          );
+          const sendNotes = sendTxRecord.outputNotes().notes();
+          return {
+            sendCreatedNoteIds: sendNotes.map((n) => n.id().toString()),
+          };
+        },
+
+        mockSwap: async (
+          accountAId,
+          accountBId,
+          assetAFaucetId,
+          assetAAmount,
+          assetBFaucetId,
+          assetBAmount,
+          swapNoteType,
+          paybackNoteType
+        ) => {
+          const c = window.client;
+          const noteTypeA =
+            swapNoteType === "public"
+              ? window.NoteType.Public
+              : window.NoteType.Private;
+          const noteTypeB =
+            paybackNoteType === "public"
+              ? window.NoteType.Public
+              : window.NoteType.Private;
+          const swapRequest = await c.newSwapTransactionRequest(
+            accountAId,
+            assetAFaucetId,
+            BigInt(assetAAmount),
+            assetBFaucetId,
+            BigInt(assetBAmount),
+            noteTypeA,
+            noteTypeB
+          );
+          const expectedOutputNotes = swapRequest.expectedOutputOwnNotes();
+          const expectedPaybackNoteDetails = swapRequest
+            .expectedFutureNotes()
+            .map((fn) => fn.noteDetails);
+          const swapTxId = await c.submitNewTransaction(
+            accountAId,
+            swapRequest
+          );
+          await c.proveBlock();
+          await c.syncState();
+
+          // Consume swap note for account B
+          const swapNoteId = expectedOutputNotes[0].id().toString();
+          const swapNoteRecord = await c.getInputNote(swapNoteId);
+          if (!swapNoteRecord)
+            throw new Error(`Swap note ${swapNoteId} not found`);
+          const swapNote = swapNoteRecord.toNote();
+          const consumeReq1 = c.newConsumeTransactionRequest([swapNote]);
+          await c.submitNewTransaction(accountBId, consumeReq1);
+          await c.proveBlock();
+          await c.syncState();
+
+          // Consume payback note for account A
+          const paybackNoteId = expectedPaybackNoteDetails[0].id().toString();
+          const paybackNoteRecord = await c.getInputNote(paybackNoteId);
+          if (!paybackNoteRecord)
+            throw new Error(`Payback note ${paybackNoteId} not found`);
+          const paybackNote = paybackNoteRecord.toNote();
+          const consumeReq2 = c.newConsumeTransactionRequest([paybackNote]);
+          await c.submitNewTransaction(accountAId, consumeReq2);
+          await c.proveBlock();
+          await c.syncState();
+
+          // Fetch final assets
+          const accountA = await c.getAccount(accountAId);
+          const accountAAssets = accountA
+            ?.vault()
+            .fungibleAssets()
+            .map((asset) => ({
+              assetId: asset.faucetId().toString(),
+              amount: asset.amount().toString(),
+            }));
+          const accountB = await c.getAccount(accountBId);
+          const accountBAssets = accountB
+            ?.vault()
+            .fungibleAssets()
+            .map((asset) => ({
+              assetId: asset.faucetId().toString(),
+              amount: asset.amount().toString(),
+            }));
+          return { accountAAssets, accountBAssets };
+        },
+
+        executeAndApplyTransaction: async (
+          accountId,
+          transactionRequest,
+          prover
+        ) => {
+          const c = window.client;
+          const result = await c.executeTransaction(
+            accountId,
+            transactionRequest
+          );
+          const proverToUse =
+            prover ?? window.TransactionProver.newLocalProver();
+          const proven = await c.proveTransaction(result, proverToUse);
+          const submissionHeight = await c.submitProvenTransaction(
+            proven,
+            result
+          );
+          return await c.applyTransaction(result, submissionHeight);
+        },
+
+        waitForTransaction: async (
+          transactionId,
+          maxWaitTime = 10000,
+          delayInterval = 1000
+        ) => {
+          const c = window.client;
+          let timeWaited = 0;
+          while (true) {
+            if (timeWaited >= maxWaitTime)
+              throw new Error("Timeout waiting for transaction");
+            await c.syncState();
+            const uncommitted = await c.getTransactions(
+              window.TransactionFilter.uncommitted()
+            );
+            const ids = uncommitted.map((tx) => tx.id().toHex());
+            if (!ids.includes(transactionId)) break;
+            await new Promise((r) => setTimeout(r, delayInterval));
+            timeWaited += delayInterval;
+          }
+        },
+
+        parseNetworkId: (networkId) => {
+          const map = {
+            mm: window.NetworkId.mainnet(),
+            mtst: window.NetworkId.testnet(),
+            mdev: window.NetworkId.devnet(),
+          };
+          let parsed = map[networkId];
+          if (parsed === undefined) {
+            try {
+              parsed = window.NetworkId.custom(networkId);
+            } catch {
+              throw new Error(`Invalid network ID: ${networkId}`);
+            }
+          }
+          return parsed;
+        },
+
+        createFreshMockClient: async () => {
+          return await window.MockWasmWebClient.createClient();
+        },
+
+        createIntegrationClient: async () => {
+          try {
+            const uniqueName = `int_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+            const client = await window.WasmWebClient.createClient(
+              window.rpcUrl,
+              undefined,
+              undefined,
+              uniqueName
+            );
+            return { client };
+          } catch {
+            return null;
+          }
+        },
+
+        getRpcUrl: () => window.rpcUrl,
+      };
+    },
+    { rpcUrl, storeName }
+  );
+}
+
+/**
+ * Creates helpers for the Node.js run() context.
+ * Uses async import to avoid circular dependency with test-helpers.ts.
+ */
+async function createNodeRunHelpers(client: any, sdk: any): Promise<any> {
+  const h = await import("./test-helpers");
+  return {
+    setupWalletAndFaucet: () => h.setupWalletAndFaucet(client, sdk),
+    mockMint: (targetId: any, faucetId: any, opts?: any) =>
+      h.mockMint(client, sdk, targetId, faucetId, opts),
+    mockConsume: (accountId: any, noteId: string) =>
+      h.mockConsume(client, sdk, accountId, noteId),
+    mockMintAndConsume: (accountId: any, faucetId: any, opts?: any) =>
+      h.mockMintAndConsume(client, sdk, accountId, faucetId, opts),
+    mockSend: (senderId: any, targetId: any, faucetId: any, opts?: any) =>
+      h.mockSend(client, sdk, senderId, targetId, faucetId, opts),
+    mockSwap: (
+      accountAId: any,
+      accountBId: any,
+      assetAFaucetId: any,
+      assetAAmount: number,
+      assetBFaucetId: any,
+      assetBAmount: number,
+      swapNoteType?: string,
+      paybackNoteType?: string
+    ) =>
+      h.mockSwap(
+        client,
+        sdk,
+        accountAId,
+        accountBId,
+        assetAFaucetId,
+        assetAAmount,
+        assetBFaucetId,
+        assetBAmount,
+        swapNoteType,
+        paybackNoteType
+      ),
+    executeAndApplyTransaction: (accountId: any, req: any, prover?: any) =>
+      executeAndApplyTransaction(client, sdk, accountId, req, prover),
+    waitForTransaction: (txId: string, maxWait?: number, interval?: number) =>
+      waitForTransaction(client, sdk, txId, maxWait, interval),
+    parseNetworkId: (networkId: string) => h.parseNetworkId(sdk, networkId),
+    createFreshMockClient: () => h.createFreshMockClient(sdk),
+    createIntegrationClient: () => h.createIntegrationClient(),
+    getRpcUrl: () => getRpcUrl(),
+  };
+}
+
 // ── Fixtures ──────────────────────────────────────────────────────────
 
 export const test = base.extend<{
   client: any;
   sdk: any;
+  run: <T>(
+    fn: (ctx: { client: any; sdk: any; helpers: any }) => Promise<T>
+  ) => Promise<T>;
 }>({
+  // Keep client/sdk fixtures for backward compat with tests that don't use run
   client: async ({}, use, testInfo) => {
     const isNode = testInfo.project.name === "nodejs";
 
@@ -369,6 +755,62 @@ export const test = base.extend<{
           }
         )
       );
+    }
+  },
+
+  /**
+   * The `run` fixture: executes SDK code on both Node.js and browser.
+   *
+   * - Node.js: calls the callback directly with napi client/sdk
+   * - Browser: stringifies the callback, sends it to page.evaluate(),
+   *   where it runs with window.client and window.* SDK types
+   *
+   * IMPORTANT: The callback must be self-contained — it cannot reference
+   * imports or variables from the test file scope (browser serializes
+   * the function body). Use only { client, sdk, helpers } from the context.
+   */
+  run: async ({}, use, testInfo) => {
+    const isNode = testInfo.project.name === "nodejs";
+
+    if (isNode) {
+      // ── Node.js: create mock client, call callback directly ──
+      const { client, sdk } = await createNodeMockClient();
+      const helpers = await createNodeRunHelpers(client, sdk);
+
+      await use(async (fn) => fn({ client, sdk, helpers }));
+    } else {
+      // ── Browser: create a standalone page, use page.evaluate() ──
+      const browser = await getRunBrowser(testInfo.project.name);
+      const context = await browser.newContext();
+      const page = await context.newPage();
+
+      await setupBrowserPage(page, testInfo);
+
+      await use(async (fn) => {
+        return page.evaluate(async (fnStr) => {
+          const fn = new Function("return " + fnStr)();
+          const sdk = new Proxy(
+            {
+              u64: (v) => BigInt(v),
+              u64Array: (v) => new BigUint64Array(v.map(BigInt)),
+            },
+            {
+              get(target, prop) {
+                if (prop in target) return target[prop];
+                return window[prop];
+              },
+            }
+          );
+          return fn({
+            client: window.client,
+            sdk,
+            helpers: window.helpers,
+          });
+        }, fn.toString());
+      });
+
+      await page.close();
+      await context.close();
     }
   },
 });

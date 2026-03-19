@@ -1,28 +1,34 @@
 // @ts-nocheck
 import { test, expect } from "./test-setup";
-import { setupWalletAndFaucet, createFreshMockClient } from "./test-helpers";
 
 test.describe("AccountFile", () => {
-  test("it serializes and deserializes an account file", async ({
-    client,
-    sdk,
-  }) => {
-    const { walletId } = await setupWalletAndFaucet(client, sdk);
+  test("it serializes and deserializes an account file", async ({ run }) => {
+    const result = await run(async ({ client, sdk, helpers }) => {
+      const { walletId } = await helpers.setupWalletAndFaucet();
 
-    const accountIdObj = sdk.AccountId.fromHex(walletId);
-    const accountFile = await client.exportAccountFile(accountIdObj);
-    const bytes = accountFile.serialize();
+      const accountIdObj = sdk.AccountId.fromHex(walletId);
+      const accountFile = await client.exportAccountFile(accountIdObj);
+      const bytes = accountFile.serialize();
 
-    const deserialized = sdk.AccountFile.deserialize(new Uint8Array(bytes));
-    const reserialized = deserialized.serialize();
-    expect(Array.from(reserialized)).toEqual(Array.from(bytes));
+      const deserialized = sdk.AccountFile.deserialize(new Uint8Array(bytes));
+      const reserialized = deserialized.serialize();
 
-    // Import into a fresh client
-    const client2 = await createFreshMockClient(sdk);
-    await client2.importAccountFile(deserialized);
+      const bytesMatch =
+        Array.from(reserialized).toString() === Array.from(bytes).toString();
 
-    const account = await client2.getAccount(accountIdObj);
-    expect(account).toBeDefined();
-    expect(account.id().toString()).toBe(walletId);
+      // Import into a fresh client
+      const client2 = await helpers.createFreshMockClient();
+      await client2.importAccountFile(deserialized);
+
+      const account = await client2.getAccount(accountIdObj);
+      const isDefined = account !== undefined && account !== null;
+      const accountIdStr = account.id().toString();
+
+      return { bytesMatch, isDefined, accountIdStr, walletId };
+    });
+
+    expect(result.bytesMatch).toBe(true);
+    expect(result.isDefined).toBe(true);
+    expect(result.accountIdStr).toBe(result.walletId);
   });
 });
