@@ -649,7 +649,14 @@ async function setupBrowserPage(page: any, testInfo: TestInfo) {
         },
 
         createFreshMockClient: async () => {
-          return await window.MockWasmWebClient.createClient();
+          const freshClient = await window.MockWasmWebClient.createClient();
+          // Disable worker (same as main client) to avoid mock chain
+          // serialization bug and reduce memory pressure
+          if (freshClient.worker) {
+            freshClient.worker.terminate();
+            freshClient.worker = null;
+          }
+          return freshClient;
         },
 
         createIntegrationClient: async () => {

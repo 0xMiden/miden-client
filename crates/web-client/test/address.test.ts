@@ -43,14 +43,13 @@ test.describe("Address instantiation tests", () => {
         sdk.AuthScheme.AuthRpoFalcon512
       );
       const address = sdk.Address.fromAccountId(newAccount.id(), "BasicWallet");
-      // napi returns numeric enum (0), browser returns string ("BasicWallet")
-      // Compare inside run where both values are on the same platform
+      // Compare as strings — browser WASM enum instances don't compare with ===
       return {
-        interfacesMatch:
-          address.interface() === sdk.AccountInterface.BasicWallet,
+        addressInterface: String(address.interface()),
+        expectedInterface: String(sdk.AccountInterface.BasicWallet),
       };
     });
-    expect(result.interfacesMatch).toBe(true);
+    expect(result.addressInterface).toBe(result.expectedInterface);
   });
 });
 
