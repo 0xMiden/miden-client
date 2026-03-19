@@ -2,7 +2,9 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use clap::Parser;
+use miden_client::account::AccountId;
 use miden_client::keystore::Keystore;
+use miden_client::transaction::{ForeignAccount, TransactionScript};
 use miden_client::vm::AdviceInputs;
 use miden_client::{Client, Felt, Word};
 use serde::{Deserialize, Deserializer, Serialize, de};
@@ -50,7 +52,8 @@ pub struct ExecCmd {
 
     /// Start a DAP debug adapter server on the given address (e.g. "127.0.0.1:4711")
     /// and wait for a DAP client to connect before executing.
-    #[cfg(feature = "dap")]
+    ///
+    /// If this binary was built without DAP support, using this flag returns an error.
     #[arg(long = "start-debug-adapter")]
     start_debug_adapter: Option<String>,
 }
@@ -93,34 +96,13 @@ impl ExecCmd {
 
         let tx_script = client.code_builder().compile_tx_script(&program)?;
 
-        #[cfg(feature = "dap")]
-        let result = if let Some(ref addr) = self.start_debug_adapter {
-            miden_debug::DapConfig::set_global(miden_debug::DapConfig {
-                listen_addr: addr.clone(),
-            });
-            client
-                .execute_program_with_dap(account_id, tx_script, advice_inputs, BTreeSet::new())
-                .await
-        } else {
-            client
-                .execute_program(account_id, tx_script, advice_inputs, BTreeSet::new())
-                .await
-        };
+        let output_stack =
+            self.execute_program(&mut client, account_id, tx_script, advice_inputs).await?;
 
-        #[cfg(not(feature = "dap"))]
-        let result = client
-            .execute_program(account_id, tx_script, advice_inputs, BTreeMap::new())
-            .await;
-
-        match result {
-            Ok(output_stack) => {
-                println!("Program executed successfully");
-                println!("Output stack:");
-                self.print_stack(output_stack);
-                Ok(())
-            },
-            Err(err) => Err(CliError::Exec(err.into(), "error executing the program".to_string())),
-        }
+        println!("Program executed successfully");
+        println!("Output stack:");
+        self.print_stack(output_stack);
+        Ok(())
     }
 
     /// Print the output stack in a human-readable format
@@ -150,6 +132,43 @@ impl ExecCmd {
                 }
             }
         }
+    }
+
+    async fn execute_program<AUTH: Keystore + Sync + 'static>(
+        &self,
+        client: &mut Client<AUTH>,
+        account_id: AccountId,
+        tx_script: TransactionScript,
+        advice_inputs: AdviceInputs,
+    ) -> Result<[Felt; 16], CliError> {
+        let foreign_accounts = BTreeSet::<ForeignAccount>::new();
+
+        #[cfg(feature = "dap")]
+        if let Some(addr) = self.start_debug_adapter.as_ref() {
+            miden_debug::DapConfig::set_global(miden_debug::DapConfig {
+                listen_addr: addr.clone(),
+            });
+
+            return client
+                .execute_program_with_dap(account_id, tx_script, advice_inputs, foreign_accounts)
+                .await
+                .map_err(|err| {
+                    CliError::Exec(err.into(), "error executing the program".to_string())
+                });
+        }
+
+        #[cfg(not(feature = "dap"))]
+        if self.start_debug_adapter.is_some() {
+            return Err(CliError::InvalidArgument(
+                "--start-debug-adapter requires a CLI build with the `dap` feature enabled"
+                    .to_string(),
+            ));
+        }
+
+        client
+            .execute_program(account_id, tx_script, advice_inputs, foreign_accounts)
+            .await
+            .map_err(|err| CliError::Exec(err.into(), "error executing the program".to_string()))
     }
 }
 

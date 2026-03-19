@@ -23,7 +23,9 @@ use crate::rpc::NodeRpcClient;
 use crate::store::{BlockRelevance, StoreError};
 use crate::{Client, ClientError};
 
-const OFFLINE_NATIVE_ASSET_FAUCET_ID: u128 = 0xab0000000000cd200000ac000000de00;
+/// Synthetic faucet account ID used only by the offline bootstrap genesis header so fee
+/// parameters can reference a stable native-asset faucet without requiring node state.
+const OFFLINE_NATIVE_ASSET_FAUCET_ID: u128 = 0xab00_0000_0000_cd20_0000_ac00_0000_de00;
 
 /// Network information management methods.
 impl<AUTH> Client<AUTH> {
@@ -331,11 +333,7 @@ mod tests {
         assert!(proof.merkle_path().depth() as usize > expected_depth);
 
         let adjusted = adjust_merkle_path_for_forest(
-<<<<<<< HEAD
             proof.merkle_path(),
-=======
-            &proof.merkle_path(),
->>>>>>> e5513f0d (Add offline bootstrap mode for local exec)
             BlockNumber::from(u32::try_from(leaf_pos).unwrap()),
             small_forest,
         );
