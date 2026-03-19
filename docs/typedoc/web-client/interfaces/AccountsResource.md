@@ -64,6 +64,30 @@
 
 ***
 
+### insert()
+
+> **insert**(`account`, `overwrite?`): `Promise`\<`void`\>
+
+Insert a pre-built `Account` object into the local store. Useful for external signer integrations that construct accounts via `AccountBuilder` with custom auth commitments.
+
+#### Parameters
+
+##### account
+
+[`Account`](../classes/Account.md)
+
+##### overwrite?
+
+`boolean`
+
+Whether to overwrite an existing account with the same ID. Defaults to `false`.
+
+#### Returns
+
+`Promise`\<`void`\>
+
+***
+
 ### get()
 
 > **get**(`accountId`): `Promise`\<[`Account`](../classes/Account.md)\>

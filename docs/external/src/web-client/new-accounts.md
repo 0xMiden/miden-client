@@ -108,6 +108,38 @@ Unlike wallets (which default to `"private"`), contracts default to `"public"` s
 
 `auth` must be a concrete `AuthSecretKey` object (not a string scheme). The caller must retain it — the client uses it for signing during `transactions.execute()`.
 
+## Inserting a Pre-Built Account
+
+If you need full control over account construction — for example, to set a custom auth commitment from an external signer — you can build the account manually with `AccountBuilder` and insert it directly:
+
+```typescript
+import { MidenClient, AccountBuilder, AccountComponent, AccountStorageMode } from "@miden-sdk/miden-sdk";
+
+try {
+    const client = await MidenClient.create();
+
+    const seed = new Uint8Array(32); // your deterministic seed
+    const account = new AccountBuilder(seed)
+        .withAuthComponent(
+            AccountComponent.createAuthComponentFromCommitment(commitment, 1)
+        )
+        .accountType("RegularAccountImmutableCode")
+        .storageMode(AccountStorageMode.public())
+        .withBasicWalletComponent()
+        .build().account;
+
+    await client.accounts.insert(account);
+
+    console.log("Inserted account:", account.id().toString());
+} catch (error) {
+    console.error("Failed to insert account:", error.message);
+}
+```
+
+:::tip
+`accounts.insert()` stores the account locally without any network call. Use this when you have already constructed a valid `Account` object and just need to persist it in the client's store.
+:::
+
 ## Creating a Faucet Account
 
 ```typescript
