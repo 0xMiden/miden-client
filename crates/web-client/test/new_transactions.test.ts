@@ -301,7 +301,7 @@ test.describe("custom transaction tests", () => {
       // Creating First Custom Transaction Request to Mint the Custom Note
       const outputNote = sdk.OutputNote.full(customNote);
       const transactionRequest = new sdk.TransactionRequestBuilder()
-        .withOwnOutputNotes([outputNote])
+        .withOwnOutputNotes(new sdk.OutputNoteArray([outputNote]))
         .build();
 
       // Execute and Submit Transaction
@@ -334,7 +334,7 @@ test.describe("custom transaction tests", () => {
       adviceMap.insert(noteArgsCommitment2, noteArgs);
 
       const transactionRequest2 = new sdk.TransactionRequestBuilder()
-        .withInputNotes([noteAndArgs])
+        .withInputNotes(new sdk.NoteAndArgsArray([noteAndArgs]))
         .withCustomScript(transactionScript)
         .extendAdviceMap(adviceMap)
         .build();
@@ -436,7 +436,7 @@ test.describe("custom transaction tests", () => {
 
       const outputNote = sdk.OutputNote.full(customNote);
       const transactionRequest = new sdk.TransactionRequestBuilder()
-        .withOwnOutputNotes([outputNote])
+        .withOwnOutputNotes(new sdk.OutputNoteArray([outputNote]))
         .build();
 
       await client.submitNewTransaction(faucet.id(), transactionRequest);
@@ -462,7 +462,7 @@ test.describe("custom transaction tests", () => {
       adviceMap.insert(noteArgsCommitment2, noteArgs);
 
       const transactionRequest2 = new sdk.TransactionRequestBuilder()
-        .withInputNotes([noteAndArgs])
+        .withInputNotes(new sdk.NoteAndArgsArray([noteAndArgs]))
         .withCustomScript(transactionScript)
         .extendAdviceMap(adviceMap)
         .build();
@@ -539,7 +539,7 @@ test.describe("custom transaction with multiple output notes", () => {
       ];
 
       const transactionRequest = new sdk.TransactionRequestBuilder()
-        .withOwnOutputNotes(outputNotes)
+        .withOwnOutputNotes(new sdk.OutputNoteArray(outputNotes))
         .build();
 
       await client.submitNewTransaction(sender.id(), transactionRequest);
@@ -607,7 +607,7 @@ test.describe("custom transaction with multiple output notes", () => {
       ];
 
       const transactionRequest = new sdk.TransactionRequestBuilder()
-        .withOwnOutputNotes(outputNotes)
+        .withOwnOutputNotes(new sdk.OutputNoteArray(outputNotes))
         .build();
 
       let threw = false;

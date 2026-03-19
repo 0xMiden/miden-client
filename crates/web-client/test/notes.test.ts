@@ -1088,7 +1088,7 @@ test.describe("createP2IDNote and createP2IDENote", () => {
 
       let outputNote = sdk.OutputNote.full(p2IdNote);
       let transactionRequest = new sdk.TransactionRequestBuilder()
-        .withOwnOutputNotes([outputNote])
+        .withOwnOutputNotes(new sdk.OutputNoteArray([outputNote]))
         .build();
 
       execResult = await intClient.executeTransaction(
@@ -1275,7 +1275,7 @@ test.describe("createP2IDNote and createP2IDENote", () => {
 
       let outputNote = sdk.OutputNote.full(p2IdeNote);
       let transactionRequest = new sdk.TransactionRequestBuilder()
-        .withOwnOutputNotes([outputNote])
+        .withOwnOutputNotes(new sdk.OutputNoteArray([outputNote]))
         .build();
 
       execResult = await intClient.executeTransaction(

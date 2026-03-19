@@ -154,7 +154,7 @@ test.describe("fpi test", () => {
 
       let txRequest2 = new sdk.TransactionRequestBuilder()
         .withCustomScript(compiledTxScript)
-        .withForeignAccounts([foreignAccount])
+        .withForeignAccounts(new sdk.ForeignAccountArray([foreignAccount]))
         .build();
 
       let txResult2 = await intClient.executeTransaction(
