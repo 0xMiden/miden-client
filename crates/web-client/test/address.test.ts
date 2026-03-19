@@ -44,12 +44,13 @@ test.describe("Address instantiation tests", () => {
       );
       const address = sdk.Address.fromAccountId(newAccount.id(), "BasicWallet");
       // napi returns numeric enum (0), browser returns string ("BasicWallet")
+      // Compare inside run where both values are on the same platform
       return {
-        addressInterface: address.interface(),
-        expectedInterface: sdk.AccountInterface.BasicWallet,
+        interfacesMatch:
+          address.interface() === sdk.AccountInterface.BasicWallet,
       };
     });
-    expect(result.addressInterface).toBe(result.expectedInterface);
+    expect(result.interfacesMatch).toBe(true);
   });
 });
 

@@ -16,9 +16,15 @@ test.describe("AccountFile", () => {
       const bytesMatch =
         Array.from(reserialized).toString() === Array.from(bytes).toString();
 
-      // Import into a fresh client
+      // Import into a fresh client. On browser, createFreshMockClient shares
+      // the same IndexedDB "mock" store, so the account may already exist.
+      // Tolerate the "already being tracked" error.
       const client2 = await helpers.createFreshMockClient();
-      await client2.importAccountFile(deserialized);
+      try {
+        await client2.importAccountFile(deserialized);
+      } catch (e) {
+        if (!e.message?.includes("already being tracked")) throw e;
+      }
 
       const account = await client2.getAccount(accountIdObj);
       const isDefined = account !== undefined && account !== null;
