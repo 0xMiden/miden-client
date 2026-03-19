@@ -12,6 +12,8 @@
 
 > **get**\<`T`\>(`key`): `Promise`\<`T`\>
 
+Get a setting value by key. Returns `null` if not found.
+
 #### Type Parameters
 
 ##### T
@@ -34,6 +36,8 @@
 
 > **listKeys**(): `Promise`\<`string`[]\>
 
+List all setting keys.
+
 #### Returns
 
 `Promise`\<`string`[]\>
@@ -43,6 +47,8 @@
 ### remove()
 
 > **remove**(`key`): `Promise`\<`void`\>
+
+Remove a setting.
 
 #### Parameters
 
@@ -59,6 +65,8 @@
 ### set()
 
 > **set**(`key`, `value`): `Promise`\<`void`\>
+
+Set a setting value.
 
 #### Parameters
 

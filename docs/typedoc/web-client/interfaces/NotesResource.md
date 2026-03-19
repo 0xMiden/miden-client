@@ -12,6 +12,8 @@
 
 > **export**(`noteId`, `options?`): `Promise`\<[`NoteFile`](../classes/NoteFile.md)\>
 
+Export a note to a [NoteFile](../classes/NoteFile.md) for transfer or backup.
+
 #### Parameters
 
 ##### noteId
@@ -32,6 +34,8 @@
 
 > **fetchPrivate**(`options?`): `Promise`\<`void`\>
 
+Fetch private notes from the note transport service.
+
 #### Parameters
 
 ##### options?
@@ -47,6 +51,8 @@
 ### get()
 
 > **get**(`noteId`): `Promise`\<[`InputNoteRecord`](../classes/InputNoteRecord.md)\>
+
+Retrieve a note by ID. Returns `null` if not found.
 
 #### Parameters
 
@@ -64,6 +70,8 @@
 
 > **import**(`noteFile`): `Promise`\<[`NoteId`](../classes/NoteId.md)\>
 
+Import a note from a [NoteFile](../classes/NoteFile.md).
+
 #### Parameters
 
 ##### noteFile
@@ -80,6 +88,8 @@
 
 > **list**(`query?`): `Promise`\<[`InputNoteRecord`](../classes/InputNoteRecord.md)[]\>
 
+List received (input) notes, optionally filtered by status or IDs.
+
 #### Parameters
 
 ##### query?
@@ -95,6 +105,8 @@
 ### listAvailable()
 
 > **listAvailable**(`options`): `Promise`\<[`InputNoteRecord`](../classes/InputNoteRecord.md)[]\>
+
+List notes that are available for consumption by a specific account.
 
 #### Parameters
 
@@ -114,6 +126,8 @@
 
 > **listSent**(`query?`): `Promise`\<[`OutputNoteRecord`](../classes/OutputNoteRecord.md)[]\>
 
+List sent (output) notes, optionally filtered by status or IDs.
+
 #### Parameters
 
 ##### query?
@@ -129,6 +143,8 @@
 ### sendPrivate()
 
 > **sendPrivate**(`options`): `Promise`\<`void`\>
+
+Send a private note to a recipient via the note transport service.
 
 #### Parameters
 

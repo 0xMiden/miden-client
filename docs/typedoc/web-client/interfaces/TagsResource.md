@@ -12,6 +12,8 @@
 
 > **add**(`tag`): `Promise`\<`void`\>
 
+Add a note tag to listen for during sync.
+
 #### Parameters
 
 ##### tag
@@ -28,6 +30,8 @@
 
 > **list**(): `Promise`\<`number`[]\>
 
+List all registered note tags.
+
 #### Returns
 
 `Promise`\<`number`[]\>
@@ -37,6 +41,8 @@
 ### remove()
 
 > **remove**(`tag`): `Promise`\<`void`\>
+
+Remove a note tag so it is no longer tracked during sync.
 
 #### Parameters
 
