@@ -491,6 +491,7 @@ export interface BuildSwapTagOptions {
 
 export interface AccountsResource {
   create(options?: CreateAccountOptions): Promise<Account>;
+  insert(account: Account, overwrite?: boolean): Promise<void>;
   get(accountId: AccountRef): Promise<Account | null>;
   getOrImport(accountId: AccountRef): Promise<Account>;
   list(): Promise<AccountHeader[]>;
