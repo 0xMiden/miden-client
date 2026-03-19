@@ -1340,6 +1340,25 @@ Sets a setting key-value in the store. It can then be retrieved using `get_setti
 
 ***
 
+### setSignCb()
+
+> **setSignCb**(`signCb`): `void`
+
+Replace the sign callback on a live client instance.
+This allows hot-swapping the signer without recreating the client.
+
+#### Parameters
+
+##### signCb
+
+[`SignCallback`](../type-aliases/SignCallback.md)
+
+#### Returns
+
+`void`
+
+***
+
 ### submitNewTransaction()
 
 > **submitNewTransaction**(`account_id`, `transaction_request`): `Promise`\<[`TransactionId`](TransactionId.md)\>

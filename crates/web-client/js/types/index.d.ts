@@ -134,6 +134,12 @@ export declare class WebClient extends WasmWebClient {
   syncStateWithTimeout(timeoutMs?: number): Promise<SyncSummary>;
 
   /**
+   * Replace the sign callback on a live client instance.
+   * This allows hot-swapping the signer without recreating the client.
+   */
+  setSignCb(signCb: SignCallback | null | undefined): void;
+
+  /**
    * Register a listener that fires when another browser tab mutates the same
    * IndexedDB database (cross-tab BroadcastChannel notification, Layer 3).
    *

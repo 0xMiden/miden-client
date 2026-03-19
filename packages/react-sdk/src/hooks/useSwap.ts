@@ -8,6 +8,7 @@ import type {
 import { DEFAULTS } from "../types";
 import { parseAccountId } from "../utils/accountParsing";
 import { getNoteType } from "../utils/noteFilters";
+import { assertSignerConnected } from "../utils/errors";
 
 export interface UseSwapResult {
   /** Create an atomic swap offer */
@@ -56,7 +57,7 @@ export interface UseSwapResult {
  * ```
  */
 export function useSwap(): UseSwapResult {
-  const { client, isReady, sync, prover } = useMiden();
+  const { client, isReady, sync, prover, signerConnected } = useMiden();
 
   const [result, setResult] = useState<TransactionResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -68,6 +69,8 @@ export function useSwap(): UseSwapResult {
       if (!client || !isReady) {
         throw new Error("Miden client is not ready");
       }
+
+      assertSignerConnected(signerConnected);
 
       setIsLoading(true);
       setStage("executing");
@@ -120,7 +123,7 @@ export function useSwap(): UseSwapResult {
         setIsLoading(false);
       }
     },
-    [client, isReady, prover, sync]
+    [client, isReady, prover, signerConnected, sync]
   );
 
   const reset = useCallback(() => {

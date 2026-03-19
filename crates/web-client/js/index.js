@@ -1045,6 +1045,17 @@ export class WebClient {
     }
   }
 
+  /**
+   * Replace the sign callback on a live client instance.
+   * This allows hot-swapping the signer without recreating the client.
+   *
+   * @param {(pubKey: Uint8Array, signingInputs: Uint8Array) => Promise<Uint8Array> | Uint8Array} signCb
+   *   - The new sign callback, or null/undefined to clear it.
+   */
+  setSignCb(signCb) {
+    this.signCb = signCb ?? null;
+  }
+
   // LIFECYCLE
   // ================================================================================================
 

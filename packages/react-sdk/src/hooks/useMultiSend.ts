@@ -18,7 +18,7 @@ import type {
 import { DEFAULTS } from "../types";
 import { parseAccountId, parseAddress } from "../utils/accountParsing";
 import { createNoteAttachment } from "../utils/noteAttachment";
-import { MidenError } from "../utils/errors";
+import { MidenError, assertSignerConnected } from "../utils/errors";
 import { getNoteType, waitForTransactionCommit } from "../utils/noteFilters";
 import type { ClientWithTransactions } from "../utils/noteFilters";
 
@@ -66,7 +66,7 @@ export interface UseMultiSendResult {
  * ```
  */
 export function useMultiSend(): UseMultiSendResult {
-  const { client, isReady, sync, prover } = useMiden();
+  const { client, isReady, sync, prover, signerConnected } = useMiden();
   const isBusyRef = useRef(false);
 
   const [result, setResult] = useState<TransactionResult | null>(null);
@@ -79,6 +79,8 @@ export function useMultiSend(): UseMultiSendResult {
       if (!client || !isReady) {
         throw new Error("Miden client is not ready");
       }
+
+      assertSignerConnected(signerConnected);
 
       if (options.recipients.length === 0) {
         throw new Error("No recipients provided");
@@ -201,7 +203,7 @@ export function useMultiSend(): UseMultiSendResult {
         isBusyRef.current = false;
       }
     },
-    [client, isReady, prover, sync]
+    [client, isReady, prover, signerConnected, sync]
   );
 
   const reset = useCallback(() => {

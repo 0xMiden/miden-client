@@ -5,6 +5,7 @@ import { AccountStorageMode } from "@miden-sdk/miden-sdk";
 import type { Account } from "@miden-sdk/miden-sdk";
 import type { CreateFaucetOptions } from "../types";
 import { DEFAULTS } from "../types";
+import { assertSignerConnected } from "../utils/errors";
 
 export interface UseCreateFaucetResult {
   /** Create a new faucet with the specified options */
@@ -49,7 +50,7 @@ export interface UseCreateFaucetResult {
  * ```
  */
 export function useCreateFaucet(): UseCreateFaucetResult {
-  const { client, isReady } = useMiden();
+  const { client, isReady, signerConnected } = useMiden();
   const setAccounts = useMidenStore((state) => state.setAccounts);
 
   const [faucet, setFaucet] = useState<Account | null>(null);
@@ -61,6 +62,8 @@ export function useCreateFaucet(): UseCreateFaucetResult {
       if (!client || !isReady) {
         throw new Error("Miden client is not ready");
       }
+
+      assertSignerConnected(signerConnected);
 
       setIsCreating(true);
       setError(null);
@@ -94,7 +97,7 @@ export function useCreateFaucet(): UseCreateFaucetResult {
         setIsCreating(false);
       }
     },
-    [client, isReady, setAccounts]
+    [client, isReady, setAccounts, signerConnected]
   );
 
   const reset = useCallback(() => {
