@@ -5,6 +5,7 @@ import {
   JsStorageSlot,
   JsVaultAsset,
   MidenDatabase,
+  STORAGE_SLOT_TYPE_MAP,
 } from "./schema.js";
 import { logWebStoreError, uint8ArrayToBase64 } from "./utils.js";
 
@@ -134,22 +135,30 @@ export async function getAccountCode(dbId: string, codeRoot: string) {
   }
 }
 
-export async function getAccountStorage(dbId: string, accountId: string) {
+export async function getAccountStorage(
+  dbId: string,
+  accountId: string,
+  slotNames: string[]
+) {
   try {
     const db = getDatabase(dbId);
-    const allMatchingRecords = await db.latestAccountStorages
-      .where("accountId")
-      .equals(accountId)
-      .toArray();
+    let query = db.latestAccountStorages.where("accountId").equals(accountId);
 
-    const slots = allMatchingRecords.map((record) => {
-      return {
-        slotName: record.slotName,
-        slotValue: record.slotValue,
-        slotType: record.slotType,
-      };
-    });
-    return slots;
+    let allMatchingRecords;
+    if (slotNames.length) {
+      const nameSet = new Set(slotNames);
+      allMatchingRecords = await query
+        .and((record) => nameSet.has(record.slotName))
+        .toArray();
+    } else {
+      allMatchingRecords = await query.toArray();
+    }
+
+    return allMatchingRecords.map((record) => ({
+      slotName: record.slotName,
+      slotValue: record.slotValue,
+      slotType: record.slotType,
+    }));
   } catch (error) {
     logWebStoreError(
       error,
@@ -175,21 +184,28 @@ export async function getAccountStorageMaps(dbId: string, accountId: string) {
   }
 }
 
-export async function getAccountVaultAssets(dbId: string, accountId: string) {
+export async function getAccountVaultAssets(
+  dbId: string,
+  accountId: string,
+  faucetIdPrefixes: string[]
+) {
   try {
     const db = getDatabase(dbId);
-    const allMatchingRecords = await db.latestAccountAssets
-      .where("accountId")
-      .equals(accountId)
-      .toArray();
+    let query = db.latestAccountAssets.where("accountId").equals(accountId);
 
-    const assets = allMatchingRecords.map((record) => {
-      return {
-        asset: record.asset,
-      };
-    });
+    let records;
+    if (faucetIdPrefixes.length) {
+      const prefixSet = new Set(faucetIdPrefixes);
+      records = await query
+        .and((record) => prefixSet.has(record.faucetIdPrefix))
+        .toArray();
+    } else {
+      records = await query.toArray();
+    }
 
-    return assets;
+    return records.map((record) => ({
+      asset: record.asset,
+    }));
   } catch (error: unknown) {
     logWebStoreError(
       error,
@@ -329,8 +345,7 @@ export async function applyTransactionDelta(
   storageRoot: string,
   vaultRoot: string,
   committed: boolean,
-  commitment: string,
-  accountSeed: Uint8Array | undefined
+  commitment: string
 ) {
   try {
     const db = getDatabase(dbId);
@@ -461,7 +476,7 @@ export async function applyTransactionDelta(
           vaultRoot,
           nonce,
           committed,
-          accountSeed,
+          accountSeed: undefined,
           accountCommitment: commitment,
           locked: false,
         } as IAccount);
@@ -960,7 +975,7 @@ export async function lockAccount(dbId: string, accountId: string) {
 export async function undoAccountStates(
   dbId: string,
   accountCommitments: string[]
-) {
+): Promise<void> {
   try {
     const db = getDatabase(dbId);
 
@@ -1084,6 +1099,7 @@ export async function undoAccountStates(
               .delete();
           }
         }
+
       }
     );
   } catch (error) {
@@ -1091,5 +1107,6 @@ export async function undoAccountStates(
       error,
       `Error undoing account states: ${accountCommitments.join(",")}`
     );
+    throw error;
   }
 }

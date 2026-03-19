@@ -2,7 +2,7 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
 use miden_client::Word;
-use miden_client::account::Account;
+use miden_client::account::{Account, StorageMap, StorageSlotType};
 use miden_client::store::{StoreError, TransactionFilter};
 use miden_client::transaction::{
     TransactionDetails,
@@ -15,7 +15,12 @@ use miden_client::transaction::{
 use miden_client::utils::Deserializable;
 
 use super::IdxdbStore;
-use super::account::utils::{apply_full_account_state, apply_transaction_delta};
+use super::account::utils::{
+    apply_full_account_state,
+    apply_transaction_delta,
+    compute_storage_delta,
+    compute_vault_delta,
+};
 use super::note::utils::apply_note_updates_tx;
 use crate::promise::await_js;
 
@@ -87,42 +92,114 @@ impl IdxdbStore {
         &self,
         tx_update: TransactionStoreUpdate,
     ) -> Result<(), StoreError> {
-        // Transaction Data
-        insert_proven_transaction_data(
-            self.db_id(),
-            tx_update.executed_transaction(),
-            tx_update.submission_height(),
-        )
-        .await?;
+        let executed_tx = tx_update.executed_transaction();
 
-        // Account Data
-        let delta = tx_update.executed_transaction().account_delta();
-        let mut account: Account = self
-            .get_account(delta.id())
-            .await?
-            .ok_or(StoreError::AccountDataNotFound(delta.id()))?
-            .try_into()
-            .map_err(|_| StoreError::AccountDataNotFound(delta.id()))?;
+        // Transaction Data
+        insert_proven_transaction_data(self.db_id(), executed_tx, tx_update.submission_height())
+            .await?;
+
+        let delta = executed_tx.account_delta();
+        let account_id = executed_tx.account_id();
 
         if delta.is_full_state() {
-            account =
+            // Full-state path: the delta contains the complete account state.
+            let account: Account =
                 delta.try_into().expect("casting account from full state delta should not fail");
-            // Full-state path: archives old values to historical, then writes new entries
             apply_full_account_state(self.db_id(), &account).await.map_err(|err| {
                 StoreError::DatabaseError(format!("failed to apply full account state: {err:?}"))
             })?;
+
+            let mut smt_forest = self.smt_forest.write();
+            smt_forest.insert_and_stage_account_state(
+                account.id(),
+                account.vault(),
+                account.storage(),
+            )?;
         } else {
-            account.apply_delta(delta)?;
-            // Delta path: write only changed entries (single Dexie transaction)
-            apply_transaction_delta(self.db_id(), &account, delta).await.map_err(|err| {
+            // Delta path: load only targeted data, avoid loading full Account.
+            let fungible_faucet_prefixes: Vec<String> = delta
+                .vault()
+                .fungible()
+                .iter()
+                .map(|(faucet_id, _)| faucet_id.prefix().to_hex())
+                .collect();
+            let old_vault_assets =
+                self.get_vault_assets(account_id, fungible_faucet_prefixes).await?;
+            let map_slot_names: Vec<String> =
+                delta.storage().maps().map(|(slot_name, _)| slot_name.to_string()).collect();
+            let old_map_roots = self.get_storage_map_roots(account_id, map_slot_names).await?;
+
+            let final_header = executed_tx.final_account();
+
+            // Compute storage and vault changes using SMT forest, then stage new roots.
+            let (updated_storage_slots, updated_assets, removed_vault_keys) = {
+                let mut smt_forest = self.smt_forest.write();
+
+                // Get current tracked roots to build the final roots from
+                let mut final_roots = smt_forest
+                    .get_roots(&account_id)
+                    .cloned()
+                    .ok_or(StoreError::AccountDataNotFound(account_id))?;
+
+                // Storage: compute new map roots via SMT forest
+                let updated_storage_slots =
+                    compute_storage_delta(&mut smt_forest, &old_map_roots, delta)?;
+
+                // Update map roots in final_roots with new values from the delta
+                let default_map_root = StorageMap::default().root();
+                for (slot_name, (new_root, slot_type)) in &updated_storage_slots {
+                    if *slot_type == StorageSlotType::Map {
+                        let old_root =
+                            old_map_roots.get(slot_name).copied().unwrap_or(default_map_root);
+                        if let Some(root) = final_roots.iter_mut().find(|r| **r == old_root) {
+                            *root = *new_root;
+                        } else {
+                            // New map slot not in the old roots — append it
+                            final_roots.push(*new_root);
+                        }
+                    }
+                }
+
+                // Vault: compute new asset values and update SMT forest
+                let old_vault_root = final_roots[0];
+                let (updated_assets, removed_vault_keys) =
+                    compute_vault_delta(&old_vault_assets, delta)?;
+                let new_vault_root = smt_forest.update_asset_nodes(
+                    old_vault_root,
+                    updated_assets.iter().copied(),
+                    removed_vault_keys.iter().copied(),
+                )?;
+
+                if new_vault_root != final_header.vault_root() {
+                    return Err(StoreError::DatabaseError(format!(
+                        "computed vault root {} does not match final account header {}",
+                        new_vault_root.to_hex(),
+                        final_header.vault_root().to_hex(),
+                    )));
+                }
+
+                // Update vault root in final_roots (first element is always vault root)
+                final_roots[0] = new_vault_root;
+
+                // Stage the new roots for later commit/discard during sync
+                smt_forest.stage_roots(account_id, final_roots);
+
+                (updated_storage_slots, updated_assets, removed_vault_keys)
+            };
+
+            apply_transaction_delta(
+                self.db_id(),
+                account_id,
+                final_header,
+                &updated_storage_slots,
+                &updated_assets,
+                &removed_vault_keys,
+                delta,
+            )
+            .await
+            .map_err(|err| {
                 StoreError::DatabaseError(format!("failed to apply transaction delta: {err:?}"))
             })?;
-        }
-
-        {
-            // Use a separate scope to prevent holding the `MutexGuard` across an await point
-            let mut smt_forest = self.smt_forest.write();
-            smt_forest.insert_account_state(account.vault(), account.storage())?;
         }
 
         // Updates for notes

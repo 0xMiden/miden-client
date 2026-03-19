@@ -186,3 +186,30 @@ Returns an error if the provided string is not a valid hex-encoded account ID.
 #### Returns
 
 `AccountId`
+
+***
+
+### fromPrefixSuffix()
+
+> `static` **fromPrefixSuffix**(`prefix`, `suffix`): `AccountId`
+
+Builds an account ID from its prefix and suffix field elements.
+
+This is useful when the account ID components are stored separately (e.g., in storage
+maps) and need to be recombined into an `AccountId`.
+
+Returns an error if the provided felts do not form a valid account ID.
+
+#### Parameters
+
+##### prefix
+
+[`Felt`](Felt.md)
+
+##### suffix
+
+[`Felt`](Felt.md)
+
+#### Returns
+
+`AccountId`

@@ -331,3 +331,29 @@ try {
 :::note
 Custom transactions require understanding of the Miden VM and its instruction set. See the integration tests in [`new_transactions.test.ts`](https://github.com/0xMiden/miden-client/blob/main/crates/web-client/test/new_transactions.test.ts) for examples.
 :::
+
+### Expiring a Manual Transaction Request
+
+For short-lived transaction requests, set an expiration delta on the builder:
+
+```typescript
+import { MidenClient, TransactionRequestBuilder } from "@miden-sdk/miden-sdk";
+
+try {
+    const client = await MidenClient.create();
+
+    const request = new TransactionRequestBuilder()
+        .withOwnOutputNotes(outputNotes)
+        .withExpirationDelta(10)
+        .build();
+
+    const txId = await client.transactions.submit(wallet, request);
+    console.log("Expiring transaction:", txId.toString());
+} catch (error) {
+    console.error("Expiring transaction failed:", error.message);
+}
+```
+
+:::note
+`withExpirationDelta()` is intended for builder flows that derive the transaction script from the request. It cannot be combined with `withCustomScript()`.
+:::

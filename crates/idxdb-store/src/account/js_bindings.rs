@@ -38,13 +38,21 @@ extern "C" {
     pub fn idxdb_get_account_code(db_id: &str, code_root: String) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = getAccountStorage)]
-    pub fn idxdb_get_account_storage(db_id: &str, account_id: String) -> js_sys::Promise;
+    pub fn idxdb_get_account_storage(
+        db_id: &str,
+        account_id: String,
+        slot_names: Vec<String>,
+    ) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = getAccountStorageMaps)]
     pub fn idxdb_get_account_storage_maps(db_id: &str, account_id: String) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = getAccountVaultAssets)]
-    pub fn idxdb_get_account_vault_assets(db_id: &str, account_id: String) -> js_sys::Promise;
+    pub fn idxdb_get_account_vault_assets(
+        db_id: &str,
+        account_id: String,
+        faucet_id_prefixes: Vec<String>,
+    ) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = getAccountAddresses)]
     pub fn idxdb_get_account_addresses(db_id: &str, account_id: String) -> js_sys::Promise;
@@ -131,7 +139,6 @@ extern "C" {
         vault_root: String,
         committed: bool,
         commitment: String,
-        account_seed: Option<Vec<u8>>,
     ) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = applyFullAccountState)]

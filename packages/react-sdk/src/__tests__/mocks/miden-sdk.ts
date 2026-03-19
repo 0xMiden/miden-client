@@ -350,6 +350,9 @@ export const createMockWebClient = (
     importPublicAccountFromSeed: vi.fn().mockResolvedValue(createMockAccount()),
     exportAccountFile: vi.fn().mockResolvedValue(createMockAccountFile()),
 
+    // Signer
+    setSignCb: vi.fn(),
+
     // Cleanup
     free: vi.fn(),
   };
@@ -384,6 +387,7 @@ export type MockWebClientType = {
   importAccountById: ReturnType<typeof vi.fn>;
   importPublicAccountFromSeed: ReturnType<typeof vi.fn>;
   exportAccountFile: ReturnType<typeof vi.fn>;
+  setSignCb: ReturnType<typeof vi.fn>;
   free: ReturnType<typeof vi.fn>;
 };
 

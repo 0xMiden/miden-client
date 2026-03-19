@@ -106,21 +106,25 @@ export async function getAccountCode(dbId, codeRoot) {
         logWebStoreError(error, `Error fetching account code for root ${codeRoot}`);
     }
 }
-export async function getAccountStorage(dbId, accountId) {
+export async function getAccountStorage(dbId, accountId, slotNames) {
     try {
         const db = getDatabase(dbId);
-        const allMatchingRecords = await db.latestAccountStorages
-            .where("accountId")
-            .equals(accountId)
-            .toArray();
-        const slots = allMatchingRecords.map((record) => {
-            return {
-                slotName: record.slotName,
-                slotValue: record.slotValue,
-                slotType: record.slotType,
-            };
-        });
-        return slots;
+        let query = db.latestAccountStorages.where("accountId").equals(accountId);
+        let allMatchingRecords;
+        if (slotNames.length) {
+            const nameSet = new Set(slotNames);
+            allMatchingRecords = await query
+                .and((record) => nameSet.has(record.slotName))
+                .toArray();
+        }
+        else {
+            allMatchingRecords = await query.toArray();
+        }
+        return allMatchingRecords.map((record) => ({
+            slotName: record.slotName,
+            slotValue: record.slotValue,
+            slotType: record.slotType,
+        }));
     }
     catch (error) {
         logWebStoreError(error, `Error fetching account storage for account ${accountId}`);
@@ -139,19 +143,23 @@ export async function getAccountStorageMaps(dbId, accountId) {
         logWebStoreError(error, `Error fetching account storage maps for account ${accountId}`);
     }
 }
-export async function getAccountVaultAssets(dbId, accountId) {
+export async function getAccountVaultAssets(dbId, accountId, faucetIdPrefixes) {
     try {
         const db = getDatabase(dbId);
-        const allMatchingRecords = await db.latestAccountAssets
-            .where("accountId")
-            .equals(accountId)
-            .toArray();
-        const assets = allMatchingRecords.map((record) => {
-            return {
-                asset: record.asset,
-            };
-        });
-        return assets;
+        let query = db.latestAccountAssets.where("accountId").equals(accountId);
+        let records;
+        if (faucetIdPrefixes.length) {
+            const prefixSet = new Set(faucetIdPrefixes);
+            records = await query
+                .and((record) => prefixSet.has(record.faucetIdPrefix))
+                .toArray();
+        }
+        else {
+            records = await query.toArray();
+        }
+        return records.map((record) => ({
+            asset: record.asset,
+        }));
     }
     catch (error) {
         logWebStoreError(error, `Error fetching account vault for account ${accountId}`);
@@ -247,7 +255,7 @@ export async function upsertVaultAssets(dbId, accountId, assets) {
         logWebStoreError(error, `Error inserting assets`);
     }
 }
-export async function applyTransactionDelta(dbId, accountId, nonce, updatedSlots, changedMapEntries, changedAssets, codeRoot, storageRoot, vaultRoot, committed, commitment, accountSeed) {
+export async function applyTransactionDelta(dbId, accountId, nonce, updatedSlots, changedMapEntries, changedAssets, codeRoot, storageRoot, vaultRoot, committed, commitment) {
     try {
         const db = getDatabase(dbId);
         await db.dexie.transaction("rw", [
@@ -364,7 +372,7 @@ export async function applyTransactionDelta(dbId, accountId, nonce, updatedSlots
                 vaultRoot,
                 nonce,
                 committed,
-                accountSeed,
+                accountSeed: undefined,
                 accountCommitment: commitment,
                 locked: false,
             });
@@ -841,5 +849,6 @@ export async function undoAccountStates(dbId, accountCommitments) {
     }
     catch (error) {
         logWebStoreError(error, `Error undoing account states: ${accountCommitments.join(",")}`);
+        throw error;
     }
 }
