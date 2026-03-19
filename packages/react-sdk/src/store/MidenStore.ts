@@ -21,6 +21,7 @@ interface MidenStoreState {
 
   // Sync state
   sync: SyncState;
+  syncPaused: boolean;
 
   // Cached data
   accounts: AccountHeader[];
@@ -44,6 +45,7 @@ interface MidenStoreState {
   setSignerConnected: (connected: boolean | null) => void;
 
   setSyncState: (sync: Partial<SyncState>) => void;
+  setSyncPaused: (paused: boolean) => void;
 
   setAccounts: (accounts: AccountHeader[]) => void;
   setAccountDetails: (accountId: string, account: Account) => void;
@@ -71,6 +73,8 @@ const initialSyncState: SyncState = {
 function freshCachedState() {
   return {
     sync: { ...initialSyncState },
+
+    syncPaused: false,
 
     accounts: [] as AccountHeader[],
     accountDetails: new Map<string, Account>(),
@@ -125,6 +129,8 @@ export const useMidenStore = create<MidenStoreState>()((set) => ({
     set((state) => ({
       sync: { ...state.sync, ...sync },
     })),
+
+  setSyncPaused: (syncPaused) => set({ syncPaused }),
 
   setAccounts: (accounts) => set({ accounts }),
 

@@ -21,6 +21,8 @@ import { createNoteAttachment } from "../utils/noteAttachment";
 import { MidenError, assertSignerConnected } from "../utils/errors";
 import { getNoteType, waitForTransactionCommit } from "../utils/noteFilters";
 import type { ClientWithTransactions } from "../utils/noteFilters";
+import { proveWithFallback } from "../utils/prover";
+import { useMidenStore } from "../store/MidenStore";
 import { runExclusiveDirect } from "../utils/runExclusive";
 
 export interface UseMultiSendResult {
@@ -150,9 +152,13 @@ export function useMultiSend(): UseMultiSendResult {
         const txResult = await client.executeTransaction(txSenderId, txRequest);
 
         setStage("proving");
-        const provenTransaction = await client.proveTransaction(
-          txResult,
-          prover ?? undefined
+        const proverConfig = useMidenStore.getState().config;
+        const provenTransaction = await proveWithFallback(
+          (resolvedProver) =>
+            runExclusiveDirect(() =>
+              client.proveTransaction(txResult, resolvedProver)
+            ),
+          proverConfig
         );
 
         setStage("submitting");

@@ -43,6 +43,14 @@ vi.mock("@miden-sdk/miden-sdk", () => {
     submitProvenTransaction: vi.fn().mockResolvedValue(0),
     applyTransaction: vi.fn().mockResolvedValue({}),
     sendPrivateNote: vi.fn().mockResolvedValue(undefined),
+    exportStore: vi.fn().mockResolvedValue({ tables: {} }),
+    forceImportStore: vi.fn().mockResolvedValue(undefined),
+    exportNoteFile: vi
+      .fn()
+      .mockResolvedValue({ serialize: () => new Uint8Array([1, 2, 3]) }),
+    importNoteFile: vi
+      .fn()
+      .mockResolvedValue({ toString: () => "0xnote_imported" }),
     importAccountFile: vi.fn().mockResolvedValue("Imported account"),
     importAccountById: vi.fn().mockResolvedValue(undefined),
     importPublicAccountFromSeed: vi.fn().mockResolvedValue({}),
@@ -218,6 +226,21 @@ vi.mock("@miden-sdk/miden-sdk", () => {
       withInputNotes = vi.fn(() => this);
       build = vi.fn(() => ({}));
     },
+    NoteFile: {
+      deserialize: vi.fn(() => ({ noteId: "0xnote_deserialized" })),
+    },
+    NoteExportFormat: {
+      Full: "Full",
+      Partial: "Partial",
+    },
+    TransactionProver: {
+      newLocalProver: vi.fn(() => ({ type: "local" })),
+      newRemoteProver: vi.fn((url: string, timeout: unknown) => ({
+        type: "remote",
+        url,
+        timeout,
+      })),
+    },
     NoteFilter: vi.fn().mockImplementation(() => ({
       free: vi.fn(),
     })),
@@ -231,6 +254,13 @@ vi.mock("@miden-sdk/miden-sdk", () => {
       Unique: 6,
       Nullifiers: 7,
       Unverified: 8,
+    },
+    TransactionId: {
+      fromHex: vi.fn((hex: string) => ({
+        toString: vi.fn(() => hex),
+        toHex: vi.fn(() => hex),
+        free: vi.fn(),
+      })),
     },
     TransactionFilter: {
       all: vi.fn(() => ({})),

@@ -1,4 +1,8 @@
-import { resolveAccountRef, resolveNoteType } from "../utils.js";
+import {
+  resolveAccountRef,
+  resolveNoteType,
+  resolveTransactionIdHex,
+} from "../utils.js";
 
 export class TransactionsResource {
   #inner;
@@ -14,9 +18,53 @@ export class TransactionsResource {
   async send(opts) {
     this.#client.assertNotTerminated();
     const wasm = await this.#getWasm();
-    const { accountId, request } = await this.#buildSendRequest(opts, wasm);
 
-    const txId = await this.#submitOrSubmitWithProver(
+    if (opts.returnNote === true) {
+      // returnNote path — build the P2ID note in JS so we can return the Note
+      // object to the caller (e.g. for out-of-band delivery to the recipient).
+      if (opts.reclaimAfter != null || opts.timelockUntil != null) {
+        throw new Error(
+          "reclaimAfter and timelockUntil are not supported when returnNote is true"
+        );
+      }
+
+      const senderId = resolveAccountRef(opts.account, wasm);
+      const receiverId = resolveAccountRef(opts.to, wasm);
+      const faucetId = resolveAccountRef(opts.token, wasm);
+      const noteType = resolveNoteType(opts.type, wasm);
+
+      const note = wasm.Note.createP2IDNote(
+        senderId,
+        receiverId,
+        new wasm.NoteAssets([
+          new wasm.FungibleAsset(faucetId, BigInt(opts.amount)),
+        ]),
+        noteType,
+        new wasm.NoteAttachment()
+      );
+
+      const request = new wasm.TransactionRequestBuilder()
+        .withOwnOutputNotes(
+          new wasm.OutputNoteArray([wasm.OutputNote.full(note)])
+        )
+        .build();
+
+      const { txId, result } = await this.#submitOrSubmitWithProver(
+        senderId,
+        request,
+        opts.prover
+      );
+
+      if (opts.waitForConfirmation) {
+        await this.waitFor(txId.toHex(), { timeout: opts.timeout });
+      }
+
+      return { txId, note, result };
+    }
+
+    // Default path — note built in WASM with optional reclaim/timelock
+    const { accountId, request } = await this.#buildSendRequest(opts, wasm);
+    const { txId, result } = await this.#submitOrSubmitWithProver(
       accountId,
       request,
       opts.prover
@@ -26,7 +74,7 @@ export class TransactionsResource {
       await this.waitFor(txId.toHex(), { timeout: opts.timeout });
     }
 
-    return txId;
+    return { txId, note: null, result };
   }
 
   async mint(opts) {
@@ -34,7 +82,7 @@ export class TransactionsResource {
     const wasm = await this.#getWasm();
     const { accountId, request } = await this.#buildMintRequest(opts, wasm);
 
-    const txId = await this.#submitOrSubmitWithProver(
+    const { txId, result } = await this.#submitOrSubmitWithProver(
       accountId,
       request,
       opts.prover
@@ -44,7 +92,7 @@ export class TransactionsResource {
       await this.waitFor(txId.toHex(), { timeout: opts.timeout });
     }
 
-    return txId;
+    return { txId, result };
   }
 
   async consume(opts) {
@@ -52,7 +100,7 @@ export class TransactionsResource {
     const wasm = await this.#getWasm();
     const { accountId, request } = await this.#buildConsumeRequest(opts, wasm);
 
-    const txId = await this.#submitOrSubmitWithProver(
+    const { txId, result } = await this.#submitOrSubmitWithProver(
       accountId,
       request,
       opts.prover
@@ -62,7 +110,7 @@ export class TransactionsResource {
       await this.waitFor(txId.toHex(), { timeout: opts.timeout });
     }
 
-    return txId;
+    return { txId, result };
   }
 
   async consumeAll(opts) {
@@ -91,7 +139,7 @@ export class TransactionsResource {
 
     const request = await this.#inner.newConsumeTransactionRequest(notes);
 
-    const txId = await this.#submitOrSubmitWithProver(
+    const { txId, result } = await this.#submitOrSubmitWithProver(
       wasm.AccountId.fromHex(accountIdHex),
       request,
       opts.prover
@@ -105,6 +153,7 @@ export class TransactionsResource {
       txId,
       consumed: toConsume.length,
       remaining: total - toConsume.length,
+      result,
     };
   }
 
@@ -113,7 +162,7 @@ export class TransactionsResource {
     const wasm = await this.#getWasm();
     const { accountId, request } = await this.#buildSwapRequest(opts, wasm);
 
-    const txId = await this.#submitOrSubmitWithProver(
+    const { txId, result } = await this.#submitOrSubmitWithProver(
       accountId,
       request,
       opts.prover
@@ -123,7 +172,7 @@ export class TransactionsResource {
       await this.waitFor(txId.toHex(), { timeout: opts.timeout });
     }
 
-    return txId;
+    return { txId, result };
   }
 
   async preview(opts) {
@@ -188,7 +237,7 @@ export class TransactionsResource {
     }
 
     const request = builder.build();
-    const txId = await this.#submitOrSubmitWithProver(
+    const { txId, result } = await this.#submitOrSubmitWithProver(
       accountId,
       request,
       opts.prover
@@ -198,7 +247,7 @@ export class TransactionsResource {
       await this.waitFor(txId.toHex(), { timeout: opts.timeout });
     }
 
-    return txId;
+    return { txId, result };
   }
 
   async submit(account, request, opts) {
@@ -222,7 +271,9 @@ export class TransactionsResource {
     } else if (query.status === "uncommitted") {
       filter = wasm.TransactionFilter.uncommitted();
     } else if (query.ids) {
-      const txIds = query.ids.map((id) => wasm.TransactionId.fromHex(id));
+      const txIds = query.ids.map((id) =>
+        wasm.TransactionId.fromHex(resolveTransactionIdHex(id))
+      );
       filter = wasm.TransactionFilter.ids(txIds);
     } else if (query.expiredBefore !== undefined) {
       filter = wasm.TransactionFilter.expiredBefore(query.expiredBefore);
@@ -236,7 +287,7 @@ export class TransactionsResource {
   /**
    * Polls for transaction confirmation.
    *
-   * @param {string} txId - Transaction ID hex string.
+   * @param {string | TransactionId} txId - Transaction ID hex string or TransactionId object.
    * @param {WaitOptions} [opts] - Polling options.
    * @param {number} [opts.timeout=60000] - Wall-clock polling timeout in
    *   milliseconds. This is NOT a block height — it controls how long the
@@ -248,6 +299,7 @@ export class TransactionsResource {
    */
   async waitFor(txId, opts) {
     this.#client.assertNotTerminated();
+    const hex = resolveTransactionIdHex(txId);
     const timeout = opts?.timeout ?? 60_000;
     const interval = opts?.interval ?? 5_000;
     const start = Date.now();
@@ -270,7 +322,7 @@ export class TransactionsResource {
 
       // Recreate filter each iteration — WASM consumes it by value
       const filter = wasm.TransactionFilter.ids([
-        wasm.TransactionId.fromHex(txId),
+        wasm.TransactionId.fromHex(hex),
       ]);
       const txs = await this.#inner.getTransactions(filter);
 
@@ -284,7 +336,7 @@ export class TransactionsResource {
             return;
           }
           if (status.isDiscarded()) {
-            throw new Error(`Transaction rejected: ${txId}`);
+            throw new Error(`Transaction rejected: ${hex}`);
           }
         }
 
@@ -337,6 +389,37 @@ export class TransactionsResource {
   async #buildConsumeRequest(opts, wasm) {
     const accountId = resolveAccountRef(opts.account, wasm);
     const noteInputs = Array.isArray(opts.notes) ? opts.notes : [opts.notes];
+
+    const isDirectNote = (input) =>
+      input !== null &&
+      typeof input === "object" &&
+      typeof input.id === "function" &&
+      typeof input.toNote !== "function";
+
+    const hasDirectNotes = noteInputs.some(isDirectNote);
+
+    if (hasDirectNotes) {
+      // At least one raw Note object — use NoteAndArgs builder path
+      // (the only WASM path that accepts unauthenticated notes not in the store).
+      const resolvedNotes = await Promise.all(
+        noteInputs.map(async (input) => {
+          if (isDirectNote(input)) return input;
+          if (input && typeof input.toNote === "function")
+            return input.toNote();
+          return await this.#resolveNoteInput(input);
+        })
+      );
+
+      const noteAndArgsArr = resolvedNotes.map(
+        (note) => new wasm.NoteAndArgs(note, null)
+      );
+      const request = new wasm.TransactionRequestBuilder()
+        .withInputNotes(new wasm.NoteAndArgsArray(noteAndArgsArr))
+        .build();
+      return { accountId, request };
+    }
+
+    // Standard path: all inputs are IDs or records — look up from store.
     const notes = await Promise.all(
       noteInputs.map((input) => this.#resolveNoteInput(input))
     );
@@ -378,8 +461,15 @@ export class TransactionsResource {
     if (input && typeof input.toNote === "function") {
       return input.toNote();
     }
-    // NoteId — look up the note by its hex ID
-    if (input && input.constructor?.name === "NoteId") {
+    // NoteId — has toString() but not toNote() or id() (unlike InputNoteRecord/Note).
+    // Check for constructor.fromHex to distinguish from plain objects.
+    if (
+      input &&
+      typeof input.toString === "function" &&
+      typeof input.toNote !== "function" &&
+      typeof input.id !== "function" &&
+      input.constructor?.fromHex !== undefined
+    ) {
       const hex = input.toString();
       const record = await this.#inner.getInputNote(hex);
       if (!record) {
@@ -392,14 +482,14 @@ export class TransactionsResource {
   }
 
   async #submitOrSubmitWithProver(accountId, request, perCallProver) {
+    const result = await this.#inner.executeTransaction(accountId, request);
     const prover = perCallProver ?? this.#client.defaultProver;
-    if (prover) {
-      return await this.#inner.submitNewTransactionWithProver(
-        accountId,
-        request,
-        prover
-      );
-    }
-    return await this.#inner.submitNewTransaction(accountId, request);
+    const proven = prover
+      ? await this.#inner.proveTransaction(result, prover)
+      : await this.#inner.proveTransaction(result);
+    const txId = result.id();
+    const height = await this.#inner.submitProvenTransaction(proven, result);
+    await this.#inner.applyTransaction(result, height);
+    return { txId, result };
   }
 }
