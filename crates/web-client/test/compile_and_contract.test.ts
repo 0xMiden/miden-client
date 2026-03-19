@@ -420,7 +420,7 @@ test.describe("transactions.execute()", () => {
     });
 
     // Execute the transaction
-    const txId = await client.transactions.execute({
+    const { txId } = await client.transactions.execute({
       account: account.id(),
       script,
     });
@@ -534,7 +534,7 @@ test.describe("transactions.execute()", () => {
     });
 
     // The key assertion: passing { id: foreignContract.id() } works
-    const txId = await client.transactions.execute({
+    const { txId } = await client.transactions.execute({
       account: wallet.id(),
       script,
       foreignAccounts: [{ id: foreignContract.id() }],
@@ -583,7 +583,7 @@ test.describe("transactions.execute()", () => {
     });
 
     // Pass the AccountId directly (not wrapped in { id })
-    const txId = await client.transactions.execute({
+    const { txId } = await client.transactions.execute({
       account: wallet.id(),
       script,
       foreignAccounts: [foreignContract.id()],

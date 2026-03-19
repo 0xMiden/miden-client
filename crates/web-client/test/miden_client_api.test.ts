@@ -24,7 +24,7 @@ test.describe("MidenClient API - Mock Chain", () => {
     });
 
     // Mint tokens to the wallet
-    const mintTxId = await client.transactions.mint({
+    const { txId: mintTxId } = await client.transactions.mint({
       account: faucet,
       to: wallet,
       amount: sdk.u64(1000),
@@ -40,7 +40,7 @@ test.describe("MidenClient API - Mock Chain", () => {
     const mintedNoteId = txRecords[0].outputNotes().notes()[0].id().toString();
 
     // Consume the minted note
-    const consumeTxId = await client.transactions.consume({
+    const { txId: consumeTxId } = await client.transactions.consume({
       account: wallet,
       notes: mintedNoteId,
     });

@@ -45,6 +45,74 @@ export { createP2IDNote, createP2IDENote, buildSwapTag };
 // Internal exports — used by integration tests that need direct access to the low-level WebClient proxy.
 export { WebClient as WasmWebClient, MockWebClient as MockWasmWebClient };
 
+// Method classification sets — used by scripts/check-method-classification.js to ensure
+// every WASM export is explicitly categorised. Update when adding new WASM methods.
+const SYNC_METHODS = new Set([
+  "buildSwapTag",
+  "createCodeBuilder",
+  "newConsumeTransactionRequest",
+  "newMintTransactionRequest",
+  "newSendTransactionRequest",
+  "newSwapTransactionRequest",
+  "proveBlock",
+  "serializeMockChain",
+  "serializeMockNoteTransportNode",
+  "setDebugMode",
+  "storeIdentifier",
+  "usesMockChain",
+]);
+
+const WRITE_METHODS = new Set([
+  "addAccountSecretKeyToWebStore",
+  "addTag",
+  "executeForSummary",
+  "fetchAllPrivateNotes",
+  "fetchPrivateNotes",
+  "forceImportStore",
+  "importAccountById",
+  "importAccountFile",
+  "importNoteFile",
+  "importPublicAccountFromSeed",
+  "insertAccountAddress",
+  "newAccount",
+  "removeAccountAddress",
+  "removeTag",
+  "removeSetting",
+  "sendPrivateNote",
+  "setSetting",
+  "submitProvenTransaction",
+]);
+
+const READ_METHODS = new Set([
+  "accountReader",
+  "exportAccountFile",
+  "exportNoteFile",
+  "exportStore",
+  "getAccount",
+  "getAccountAuthByPubKeyCommitment",
+  "getAccountByKeyCommitment",
+  "getAccountCode",
+  "getAccountStorage",
+  "getAccountVault",
+  "getAccounts",
+  "getConsumableNotes",
+  "getInputNote",
+  "getInputNotes",
+  "getOutputNote",
+  "getOutputNotes",
+  "getPublicKeyCommitmentsOfAccount",
+  "getSetting",
+  "getSyncHeight",
+  "getTransactions",
+  "listSettingKeys",
+  "listTags",
+]);
+
+// Suppress unused-variable warnings — these sets exist solely for the CI lint check.
+void SYNC_METHODS;
+void WRITE_METHODS;
+void READ_METHODS;
+
 const buildTypedArraysExport = (exportObject) => {
   return Object.entries(exportObject).reduce(
     (exports, [exportName, _export]) => {
