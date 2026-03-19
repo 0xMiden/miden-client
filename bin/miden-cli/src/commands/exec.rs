@@ -145,16 +145,34 @@ impl ExecCmd {
 
         #[cfg(feature = "dap")]
         if let Some(addr) = self.start_debug_adapter.as_ref() {
-            miden_debug::DapConfig::set_global(miden_debug::DapConfig {
-                listen_addr: addr.clone(),
-            });
+            let config = miden_debug::DapConfig::new(addr.clone());
+            let config_handle = config.clone();
+            miden_debug::DapConfig::set_global(config);
 
-            return client
-                .execute_program_with_dap(account_id, tx_script, advice_inputs, foreign_accounts)
-                .await
-                .map_err(|err| {
+            let script_path = PathBuf::from(&self.script_path);
+            loop {
+                let program = std::fs::read_to_string(&script_path)?;
+                let tx_script = client.code_builder().compile_tx_script(&program)?;
+
+                let result = client
+                    .execute_program_with_dap(
+                        account_id,
+                        tx_script,
+                        advice_inputs.clone(),
+                        foreign_accounts.clone(),
+                    )
+                    .await;
+
+                if config_handle.restart_requested() {
+                    config_handle.reset_restart();
+                    eprintln!("Recompiling from source and restarting debug session...");
+                    continue;
+                }
+
+                return result.map_err(|err| {
                     CliError::Exec(err.into(), "error executing the program".to_string())
                 });
+            }
         }
 
         #[cfg(not(feature = "dap"))]
