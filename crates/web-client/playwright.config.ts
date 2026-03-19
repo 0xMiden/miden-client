@@ -118,9 +118,6 @@ export default defineConfig({
         "test/remote_keystore*",
         "test/package*", // TestUtils (createMockSerialized*) is browser-only
         "test/miden_array*", // WASM array .length() method not available in Node.js
-        "test/notes*", // Integration: needs running node
-        "test/fpi*", // Integration: needs running node
-        "test/import.test*", // Integration: needs running node
         "test/shared/**", // Old format duplicates (ported to root test/)
         "test/node/**", // Old format duplicates (ported to root test/)
         "test/remote_prover_transactions*", // Old browser format for chromium CI
