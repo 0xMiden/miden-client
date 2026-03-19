@@ -283,10 +283,9 @@ test.describe("custom transaction tests", () => {
 
       const builder = await client.createCodeBuilder();
       const compiledNoteScript = builder.compileNoteScript(noteScript);
-      const noteStorage = new sdk.NoteStorage([
-        wallet.id().suffix(),
-        wallet.id().prefix(),
-      ]);
+      const noteStorage = new sdk.NoteStorage(
+        new sdk.FeltArray([wallet.id().suffix(), wallet.id().prefix()])
+      );
 
       const serialNum = new sdk.Word(sdk.u64Array([1, 2, 3, 4]));
 
@@ -325,13 +324,14 @@ test.describe("custom transaction tests", () => {
       // Creating Second Custom Transaction Request to Consume Custom Note
       // with Valid Transaction Script
       const transactionScript = await builder.compileTxScript(txScript);
-      const noteArgsCommitment = sdk.Rpo256.hashElements(noteArgs);
+      const noteArgsFeltArray = new sdk.FeltArray(noteArgs);
+      const noteArgsCommitment = sdk.Rpo256.hashElements(noteArgsFeltArray);
 
       const noteAndArgs = new sdk.NoteAndArgs(customNote, noteArgsCommitment);
 
       const adviceMap = new sdk.AdviceMap();
-      const noteArgsCommitment2 = sdk.Rpo256.hashElements(noteArgs);
-      adviceMap.insert(noteArgsCommitment2, noteArgs);
+      const noteArgsCommitment2 = sdk.Rpo256.hashElements(noteArgsFeltArray);
+      adviceMap.insert(noteArgsCommitment2, noteArgsFeltArray);
 
       const transactionRequest2 = new sdk.TransactionRequestBuilder()
         .withInputNotes(new sdk.NoteAndArgsArray([noteAndArgs]))
@@ -421,10 +421,9 @@ test.describe("custom transaction tests", () => {
 
       const builder = await client.createCodeBuilder();
       const compiledNoteScript = builder.compileNoteScript(noteScript);
-      const noteStorage = new sdk.NoteStorage([
-        wallet.id().suffix(),
-        wallet.id().prefix(),
-      ]);
+      const noteStorage = new sdk.NoteStorage(
+        new sdk.FeltArray([wallet.id().suffix(), wallet.id().prefix()])
+      );
 
       const serialNum = new sdk.Word(sdk.u64Array([1, 2, 3, 4]));
       const noteRecipient = new sdk.NoteRecipient(
@@ -453,13 +452,14 @@ test.describe("custom transaction tests", () => {
       `;
 
       const transactionScript = await builder.compileTxScript(txScript);
-      const noteArgsCommitment = sdk.Rpo256.hashElements(noteArgs);
+      const noteArgsFeltArray = new sdk.FeltArray(noteArgs);
+      const noteArgsCommitment = sdk.Rpo256.hashElements(noteArgsFeltArray);
 
       const noteAndArgs = new sdk.NoteAndArgs(customNote, noteArgsCommitment);
 
       const adviceMap = new sdk.AdviceMap();
-      const noteArgsCommitment2 = sdk.Rpo256.hashElements(noteArgs);
-      adviceMap.insert(noteArgsCommitment2, noteArgs);
+      const noteArgsCommitment2 = sdk.Rpo256.hashElements(noteArgsFeltArray);
+      adviceMap.insert(noteArgsCommitment2, noteArgsFeltArray);
 
       const transactionRequest2 = new sdk.TransactionRequestBuilder()
         .withInputNotes(new sdk.NoteAndArgsArray([noteAndArgs]))
@@ -514,10 +514,9 @@ test.describe("custom transaction with multiple output notes", () => {
 
       const p2idScript = sdk.NoteScript.p2id();
 
-      const noteStorage = new sdk.NoteStorage([
-        target.id().suffix(),
-        target.id().prefix(),
-      ]);
+      const noteStorage = new sdk.NoteStorage(
+        new sdk.FeltArray([target.id().suffix(), target.id().prefix()])
+      );
 
       const noteRecipient1 = new sdk.NoteRecipient(
         serialNum1,
@@ -581,10 +580,9 @@ test.describe("custom transaction with multiple output notes", () => {
 
       const p2idScript = sdk.NoteScript.p2id();
 
-      const noteStorage = new sdk.NoteStorage([
-        target.id().suffix(),
-        target.id().prefix(),
-      ]);
+      const noteStorage = new sdk.NoteStorage(
+        new sdk.FeltArray([target.id().suffix(), target.id().prefix()])
+      );
 
       const noteRecipient1 = new sdk.NoteRecipient(
         serialNum1,

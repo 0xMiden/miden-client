@@ -200,6 +200,38 @@ function normalizeNapiArg(val: any): any {
 }
 
 /**
+ * Creates polyfills for WASM typed array types.
+ * napi accepts plain JS arrays, so `new XArray([a, b])` just returns a plain Array.
+ */
+function makeArrayPolyfills(): Record<string, any> {
+  // Must be a regular function (not arrow) so it can be called with `new`
+  function polyfill(items: any[]) {
+    const arr = Array.isArray(items) ? [...items] : [items];
+    (arr as any).get = (i: number) => arr[i];
+    return arr;
+  }
+  const names = [
+    "AccountArray",
+    "AccountIdArray",
+    "FeltArray",
+    "ForeignAccountArray",
+    "NoteAndArgsArray",
+    "NoteDetailsAndTagArray",
+    "NoteIdAndArgsArray",
+    "NoteRecipientArray",
+    "OutputNoteArray",
+    "OutputNotesArray",
+    "StorageSlotArray",
+    "TransactionScriptInputPairArray",
+  ];
+  const result: Record<string, any> = {};
+  for (const name of names) {
+    result[name] = polyfill;
+  }
+  return result;
+}
+
+/**
  * Wraps a napi class so that constructor and static method args are normalized
  * (Uint8Array → Array, BigInt → Number, etc.).
  */
@@ -280,6 +312,10 @@ export function createNodeSdkWrapper(rawSdk: any): any {
     FungibleAsset: wrapNapiClass(rawSdk.FungibleAsset),
     Word: wrapNapiClass(rawSdk.Word),
     NoteTag: wrapNapiClass(rawSdk.NoteTag),
+    // Array type polyfills — napi accepts plain arrays directly, but browser
+    // WASM needs typed array wrappers. These make `new sdk.XArray([...])` work
+    // on both platforms.
+    ...makeArrayPolyfills(),
     // u64: converts to the platform-appropriate type
     // Node.js napi uses f64 (number), browser uses BigInt
     u64: (val: number | bigint) =>
