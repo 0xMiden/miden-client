@@ -88,8 +88,8 @@ impl From<NativeStorageMapInfo> for StorageMapInfo {
             .map(|u| StorageMapUpdate {
                 block_num: u.block_num.as_u32(),
                 slot_name: u.slot_name.to_string(),
-                key: miden_protocol::Word::from(u.key).into(),
-                value: u.value.into(),
+                key: Word::from(u.key),
+                value: Word::from(u.value),
             })
             .collect();
 

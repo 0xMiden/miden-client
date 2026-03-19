@@ -148,10 +148,10 @@ impl RpcClient {
     /// entries without the overhead of fetching the complete account with all vault assets and
     /// storage map entries.
     ///
-    /// @param account_id - The public account to fetch the proof for.
-    /// @param storage_requirements - Optional storage requirements specifying which storage
+    /// @param `account_id` - The public account to fetch the proof for.
+    /// @param `storage_requirements` - Optional storage requirements specifying which storage
     ///   maps and keys to include. When `undefined`, no storage map data is requested.
-    /// @param block_num - Optional block number to fetch the account state at. When `undefined`,
+    /// @param `block_num` - Optional block number to fetch the account state at. When `undefined`,
     ///   fetches the latest state (chain tip).
     #[wasm_bindgen(js_name = "getAccountProof")]
     pub async fn get_account_proof(
@@ -162,9 +162,8 @@ impl RpcClient {
     ) -> Result<AccountProof, JsValue> {
         let native_id: miden_client::account::AccountId = account_id.into();
 
-        let native_requirements: NativeAccountStorageRequirements = storage_requirements
-            .map(Into::into)
-            .unwrap_or_default();
+        let native_requirements: NativeAccountStorageRequirements =
+            storage_requirements.map(Into::into).unwrap_or_default();
 
         let account_state = match block_num {
             Some(num) => AccountStateAt::Block(BlockNumber::from(num)),
@@ -189,9 +188,9 @@ impl RpcClient {
     /// slot, indicating the storage map was too large to return inline. This endpoint fetches
     /// the full storage map data with pagination support.
     ///
-    /// @param block_from - The starting block number.
-    /// @param block_to - Optional ending block number. When `undefined`, syncs to chain tip.
-    /// @param account_id - The account to sync storage maps for.
+    /// @param `block_from` - The starting block number.
+    /// @param `block_to` - Optional ending block number. When `undefined`, syncs to chain tip.
+    /// @param `account_id` - The account to sync storage maps for.
     #[wasm_bindgen(js_name = "syncStorageMaps")]
     pub async fn sync_storage_maps(
         &self,

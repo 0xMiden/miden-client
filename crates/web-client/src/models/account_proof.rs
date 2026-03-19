@@ -3,9 +3,7 @@ use alloc::vec::Vec;
 
 use miden_client::account::StorageSlotName;
 use miden_client::block::BlockNumber;
-use miden_client::rpc::domain::account::{
-    AccountProof as NativeAccountProof, StorageMapEntries,
-};
+use miden_client::rpc::domain::account::{AccountProof as NativeAccountProof, StorageMapEntries};
 use miden_protocol::account::AccountStorageHeader;
 use wasm_bindgen::prelude::*;
 
@@ -107,16 +105,16 @@ impl AccountProof {
             StorageMapEntries::AllEntries(entries) => entries
                 .iter()
                 .map(|e| StorageMapEntryJs {
-                    key: miden_protocol::Word::from(e.key).into(),
-                    value: e.value.into(),
+                    key: Word::from(e.key),
+                    value: Word::from(e.value),
                 })
                 .collect(),
             StorageMapEntries::EntriesWithProofs(witnesses) => witnesses
                 .iter()
                 .flat_map(|w| {
                     w.entries().map(|(k, v)| StorageMapEntryJs {
-                        key: miden_protocol::Word::from(*k).into(),
-                        value: (*v).into(),
+                        key: Word::from(*k),
+                        value: Word::from(*v),
                     })
                 })
                 .collect(),
@@ -148,13 +146,9 @@ impl AccountProof {
     /// Returns `undefined` if the account is private.
     #[wasm_bindgen(js_name = "getStorageMapSlotNames")]
     pub fn get_storage_map_slot_names(&self) -> Option<Vec<String>> {
-        self.inner.storage_details().map(|details| {
-            details
-                .map_details
-                .iter()
-                .map(|d| d.slot_name.to_string())
-                .collect()
-        })
+        self.inner
+            .storage_details()
+            .map(|details| details.map_details.iter().map(|d| d.slot_name.to_string()).collect())
     }
 }
 
