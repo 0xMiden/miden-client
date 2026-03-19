@@ -7,7 +7,6 @@ use async_trait::async_trait;
 use miden_protocol::account::{AccountCode, AccountId};
 use miden_protocol::note::{Note, NoteId};
 use miden_standards::note::NoteConsumptionStatus;
-use miden_tx::auth::TransactionAuthenticator;
 use miden_tx::{
     NoteCheckerError,
     NoteConsumptionChecker,
@@ -17,6 +16,7 @@ use miden_tx::{
 use thiserror::Error;
 
 use crate::ClientError;
+use crate::rpc::NodeRpcClient;
 use crate::rpc::domain::note::CommittedNote;
 use crate::store::data_store::ClientDataStore;
 use crate::store::{InputNoteRecord, NoteFilter, Store, StoreError};
@@ -46,21 +46,18 @@ fn is_relevant(consumption_status: &NoteConsumptionStatus) -> bool {
 /// at the combination of script root and note inputs. For example, a P2ID note is relevant
 /// for a specific account ID if this ID is its first note input.
 #[derive(Clone)]
-pub struct NoteScreener<AUTH> {
+pub struct NoteScreener {
     /// A reference to the client's store, used to fetch necessary data to check consumability.
     store: Arc<dyn Store>,
-    /// A reference to the transaction authenticator
-    authenticator: Option<Arc<AUTH>>,
     /// Optional transaction arguments to use when checking consumability.
     tx_args: Option<TransactionArgs>,
+    /// RPC client used for lazy-loading foreign account data during note screening.
+    rpc_api: Arc<dyn NodeRpcClient>,
 }
 
-impl<AUTH> NoteScreener<AUTH>
-where
-    AUTH: TransactionAuthenticator + Sync,
-{
-    pub fn new(store: Arc<dyn Store>, authenticator: Option<Arc<AUTH>>) -> Self {
-        Self { store, authenticator, tx_args: None }
+impl NoteScreener {
+    pub fn new(store: Arc<dyn Store>, rpc_api: Arc<dyn NodeRpcClient>) -> Self {
+        Self { store, tx_args: None, rpc_api }
     }
 
     /// Sets the transaction arguments to use when checking note consumability.
@@ -110,11 +107,15 @@ where
         let mut relevant_notes: BTreeMap<NoteId, Vec<NoteConsumability>> = BTreeMap::new();
         let tx_args = self.tx_args();
 
-        let data_store = ClientDataStore::new(self.store.clone());
-        let mut transaction_executor = TransactionExecutor::new(&data_store);
-        if let Some(authenticator) = &self.authenticator {
-            transaction_executor = transaction_executor.with_authenticator(authenticator.as_ref());
-        }
+        let data_store = ClientDataStore::new(self.store.clone(), self.rpc_api.clone());
+        // Don't attach the real authenticator for consumability checks. The
+        // NoteConsumptionChecker gracefully handles a missing authenticator by
+        // returning `ConsumableWithAuthorization` instead of calling
+        // `get_signature()`. Attaching the real authenticator here causes the
+        // external signer (e.g. wallet extension) to be invoked during
+        // sync_state, producing unwanted confirmation popups on every sync.
+        let transaction_executor: TransactionExecutor<'_, '_, _, ()> =
+            TransactionExecutor::new(&data_store);
         let consumption_checker = NoteConsumptionChecker::new(&transaction_executor);
 
         for account_id in account_ids {
@@ -158,11 +159,9 @@ where
         let tx_args = self.tx_args();
         let account_code = self.get_account_code(account_id).await?;
 
-        let data_store = ClientDataStore::new(self.store.clone());
-        let mut transaction_executor = TransactionExecutor::new(&data_store);
-        if let Some(authenticator) = &self.authenticator {
-            transaction_executor = transaction_executor.with_authenticator(authenticator.as_ref());
-        }
+        let data_store = ClientDataStore::new(self.store.clone(), self.rpc_api.clone());
+        let transaction_executor: TransactionExecutor<'_, '_, _, ()> =
+            TransactionExecutor::new(&data_store);
 
         let consumption_checker = NoteConsumptionChecker::new(&transaction_executor);
 
@@ -189,10 +188,7 @@ where
 // ================================================================================================
 
 #[async_trait(?Send)]
-impl<AUTH> OnNoteReceived for NoteScreener<AUTH>
-where
-    AUTH: TransactionAuthenticator + Sync,
-{
+impl OnNoteReceived for NoteScreener {
     /// Default implementation of the [`OnNoteReceived`] callback. It queries the store for the
     /// committed note to check if it's relevant. If the note wasn't being tracked but it came in
     /// the sync response it may be a new public note, in that case we use the [`NoteScreener`]

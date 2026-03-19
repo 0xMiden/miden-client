@@ -5,6 +5,12 @@
 ### Features
 * [FEATURE][web] All user-facing amount fields (`amount`, `maxSupply`, `offeredAmount`, `requestedAmount`) now accept `number` in addition to `bigint`, removing the need for `n` suffixes or `BigInt()` wrappers. Values are coerced to `bigint` internally before passing to WASM. Output types (balances, note assets) remain `bigint`.
 * [FEATURE][web] `formatAssetAmount()` now accepts `number | bigint` for convenience.
+* [FEATURE][web] Added `MultiSignerProvider` and `SignerSlot` components for dapps that support multiple external signers (Para, Turnkey, MidenFi). Users can switch between signers at runtime via `useMultiSigner()`. ([#1872](https://github.com/0xMiden/miden-client/pull/1872))
+* [FEATURE][web] `midenVitePlugin()` now handles esbuild externalization of `@miden-sdk/react`, React deduplication, and `esnext` esbuild target automatically — consuming apps no longer need manual config for these. ([#1872](https://github.com/0xMiden/miden-client/pull/1872))
+* [FEATURE][web] `midenVitePlugin()` `crossOriginIsolation` option now defaults to `false`, avoiding breakage of OAuth popup flows (e.g. Para) that rely on `window.opener`. ([#1872](https://github.com/0xMiden/miden-client/pull/1872))
+
+### Fixes
+* [FIX][web] Fixed signer disconnect destroying WebClient and wiping cached state. The client now stays alive for reads on disconnect, hot-swaps `signCb` on same-identity reconnect (no WASM reinit), and only creates a new client when a different identity connects. All mutation hooks block with a clear error while disconnected ([#1842](https://github.com/0xMiden/miden-client/pull/1842)).
 
 ## 0.13.3 (2026-02-25)
 
