@@ -633,7 +633,7 @@ where
     ///
     /// `account_id` is the account that will execute the registration transaction.
     ///
-    /// This method is called automatically by [`submit_new_transaction_with_prover`] when the
+    /// This method is called automatically by [`Self::submit_new_transaction_with_prover`] when the
     /// [`TransactionRequest`] contains expected NTX scripts. It can also be called directly if
     /// you want to register scripts ahead of time.
     pub async fn ensure_ntx_scripts_registered(
