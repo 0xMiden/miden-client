@@ -2,7 +2,7 @@ use js_export_macro::js_export;
 use miden_client::crypto::MerklePath as NativeMerklePath;
 
 use super::word::Word;
-use crate::platform::js_u64_to_u64;
+use crate::platform::{JsErr, from_str_err, js_u64_to_u64};
 
 /// Represents a Merkle path.
 #[derive(Clone)]
@@ -13,8 +13,11 @@ pub struct MerklePath(NativeMerklePath);
 impl MerklePath {
     /// Computes the root given a leaf index and value.
     #[js_export(js_name = "computeRoot")]
-    pub fn compute_root(&self, index: JsU64, node: &Word) -> Word {
-        self.0.compute_root(js_u64_to_u64(index), node.clone().into()).unwrap().into()
+    pub fn compute_root(&self, index: JsU64, node: &Word) -> Result<Word, JsErr> {
+        self.0
+            .compute_root(js_u64_to_u64(index), node.clone().into())
+            .map(Into::into)
+            .map_err(|err| from_str_err(&format!("Invalid Merkle path index: {err}")))
     }
 
     /// Verifies the path against a root.
@@ -32,20 +35,6 @@ impl MerklePath {
     /// Returns the nodes that make up the path.
     pub fn nodes(&self) -> Vec<Word> {
         self.0.nodes().iter().map(Into::into).collect()
-    }
-
-    /// Computes the root given a leaf index and value.
-    #[wasm_bindgen(js_name = "computeRoot")]
-    pub fn compute_root(&self, index: u64, node: &Word) -> Result<Word, JsValue> {
-        self.0
-            .compute_root(index, node.clone().into())
-            .map(Into::into)
-            .map_err(|err| JsValue::from_str(&format!("Invalid Merkle path index: {err}")))
-    }
-
-    /// Verifies the path against a root.
-    pub fn verify(&self, index: u64, node: &Word, root: &Word) -> bool {
-        self.0.verify(index, node.clone().into(), &root.clone().into()).is_ok()
     }
 }
 

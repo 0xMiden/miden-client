@@ -3,6 +3,7 @@ use miden_client::note::NoteStorage as NativeNoteStorage;
 
 use super::felt::Felt;
 use crate::models::miden_arrays::FeltArray;
+use crate::platform::{JsErr, from_str_err};
 
 /// A container for note storage items.
 ///
@@ -18,11 +19,11 @@ pub struct NoteStorage(NativeNoteStorage);
 #[js_export]
 impl NoteStorage {
     /// Creates note storage from a list of field elements.
-    #[wasm_bindgen(constructor)]
-    pub fn new(felt_array: &FeltArray) -> Result<NoteStorage, JsValue> {
-        let native_felts = felt_array.into();
+    #[js_export(constructor)]
+    pub fn new(felt_array: FeltArray) -> Result<NoteStorage, JsErr> {
+        let native_felts = super::felt::felt_array_to_native_vec(&felt_array);
         let native_note_storage = NativeNoteStorage::new(native_felts)
-            .map_err(|err| JsValue::from_str(&format!("Invalid note storage: {err}")))?;
+            .map_err(|err| from_str_err(&format!("Invalid note storage: {err}")))?;
         Ok(NoteStorage(native_note_storage))
     }
 

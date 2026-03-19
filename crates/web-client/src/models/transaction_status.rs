@@ -1,7 +1,7 @@
 use js_export_macro::js_export;
 use miden_client::transaction::{DiscardCause, TransactionStatus as NativeTransactionStatus};
 
-use crate::platform::{JsU64, js_u64_to_u64};
+use crate::platform::{JsErr, JsU64, from_str_err, js_u64_to_u64};
 
 /// Status of a transaction in the node or store.
 #[derive(Clone)]
@@ -24,9 +24,9 @@ impl TransactionStatus {
     }
 
     /// Creates a discarded status from a discard cause string.
-    pub fn discarded(cause: &str) -> Result<TransactionStatus, JsValue> {
-        let native_cause = DiscardCause::from_string(cause)
-            .map_err(|err| JsValue::from_str(&format!("Invalid discard cause: {err}")))?;
+    pub fn discarded(cause: String) -> Result<TransactionStatus, JsErr> {
+        let native_cause = DiscardCause::from_string(&cause)
+            .map_err(|err| from_str_err(&format!("Invalid discard cause: {err}")))?;
 
         Ok(TransactionStatus(NativeTransactionStatus::Discarded(native_cause)))
     }

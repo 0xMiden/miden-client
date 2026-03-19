@@ -1,6 +1,8 @@
 use js_export_macro::js_export;
 use miden_client::note::NoteExecutionHint as NativeNoteExecutionHint;
 
+use crate::platform::{JsErr, from_str_err};
+
 /// Hint describing when a note can be consumed.
 #[derive(Clone, Copy)]
 #[js_export]
@@ -31,19 +33,19 @@ impl NoteExecutionHint {
     }
 
     /// Reconstructs a hint from its encoded tag and payload.
-    #[wasm_bindgen(js_name = "fromParts")]
-    pub fn from_parts(tag: u8, payload: u32) -> Result<NoteExecutionHint, JsValue> {
+    #[js_export(js_name = "fromParts")]
+    pub fn from_parts(tag: u8, payload: u32) -> Result<NoteExecutionHint, JsErr> {
         let hint = NativeNoteExecutionHint::from_parts(tag, payload)
-            .map_err(|err| JsValue::from_str(&format!("Invalid execution hint: {err}")))?;
+            .map_err(|err| from_str_err(&format!("Invalid execution hint: {err}")))?;
         Ok(NoteExecutionHint(hint))
     }
 
     /// Returns whether the note can be consumed at the provided block height.
-    #[wasm_bindgen(js_name = "canBeConsumed")]
-    pub fn can_be_consumed(&self, block_num: u32) -> Result<bool, JsValue> {
+    #[js_export(js_name = "canBeConsumed")]
+    pub fn can_be_consumed(&self, block_num: u32) -> Result<bool, JsErr> {
         self.0
             .can_be_consumed(block_num.into())
-            .ok_or_else(|| JsValue::from_str("Cannot determine consumability for this hint type"))
+            .ok_or_else(|| from_str_err("Cannot determine consumability for this hint type"))
     }
 }
 
