@@ -163,7 +163,8 @@ export function wrapNodeClient(rawClient: any, rawSdk: any): any {
       if (typeof val === "function") {
         const bound = val.bind(target);
         return (...args: any[]) => {
-          const result = bound(...args);
+          const normalizedArgs = args.map(normalizeNapiArg);
+          const result = bound(...normalizedArgs);
           if (result && typeof result.then === "function") {
             return result.then((v: any) => (v === null ? undefined : v));
           }

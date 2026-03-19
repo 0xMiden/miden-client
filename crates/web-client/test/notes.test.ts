@@ -258,7 +258,8 @@ test.describe("get_consumable_notes", () => {
       expect(record.consumability).toHaveLength(1);
       expect(record.consumability[0].accountId).toBe(accountId1.toString());
       expect(record.noteId).toBe(noteId1);
-      expect(record.consumability[0].consumableAfterBlock).toBeUndefined();
+      // napi returns null, browser returns undefined for Option::None
+      expect(record.consumability[0].consumableAfterBlock).toBeFalsy();
     });
   });
 
@@ -368,9 +369,10 @@ test.describe("get_consumable_notes", () => {
       recallHeight
     );
     expect(consumableRecipient.length).toBe(1);
+    // napi returns null, browser returns undefined for Option::None
     expect(
       consumableRecipient[0].consumability[0].consumableAfterBlock
-    ).toBeUndefined();
+    ).toBeFalsy();
   });
 });
 
