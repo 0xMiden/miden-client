@@ -372,8 +372,18 @@ async function setupBrowserPage(page: any, testInfo: TestInfo) {
       const wasm = await window.getWasmOrThrow();
       window.AuthScheme = wasm.AuthScheme;
 
-      // Create mock client
+      // Create mock client.
+      // Disable the web worker so all operations run on the main thread.
+      // The browser MockWebClient serializes the entire mock chain for every
+      // worker-delegated operation (submitNewTransaction, syncState, etc.).
+      // This serialization roundtrip has a bug that produces invalid bytes,
+      // causing "failed to deserialize mock chain: unexpected EOF".
+      // Without a worker, the fallback paths call the WASM client directly.
       const client = await window.MockWasmWebClient.createClient();
+      if (client.worker) {
+        client.worker.terminate();
+        client.worker = null;
+      }
       window.client = client;
       window.rpcUrl = rpcUrl;
       window.storeName = storeName;
