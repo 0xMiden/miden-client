@@ -118,10 +118,7 @@ test.describe("fpi test", () => {
 
     txScript = txScript
       .replace("{account_id_suffix}", foreignAccountId.suffix().toString())
-      .replace(
-        "{account_id_prefix}",
-        foreignAccountId.prefix().asInt().toString()
-      );
+      .replace("{account_id_prefix}", foreignAccountId.prefix().toString());
 
     let compiledTxScript = builder.compileTxScript(txScript);
 
