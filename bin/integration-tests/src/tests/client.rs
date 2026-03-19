@@ -2,8 +2,10 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
+use miden_client::account::component::AccountComponent;
 use miden_client::account::{
     Account,
+    AccountBuilder,
     AccountId,
     AccountStorageMode,
     StorageMap,
@@ -19,11 +21,14 @@ use miden_client::assembly::{
     Path,
 };
 use miden_client::asset::{Asset, FungibleAsset};
-use miden_client::auth::RPO_FALCON_SCHEME_ID;
+use miden_client::auth::{AuthFalcon512Rpo, AuthSecretKey, RPO_FALCON_SCHEME_ID};
 use miden_client::builder::ClientBuilder;
 use miden_client::keystore::FilesystemKeyStore;
 use miden_client::note::{NoteFile, NoteScript, NoteType};
-use miden_client::rpc::domain::account::FetchedAccount;
+use miden_client::rpc::domain::account::{
+    AccountStorageRequirements, FetchedAccount, StorageMapEntries, StorageMapKey,
+};
+use miden_client::rpc::AccountStateAt;
 use miden_client::store::{
     InputNoteRecord,
     InputNoteState,
@@ -34,6 +39,7 @@ use miden_client::store::{
 use miden_client::testing::common::*;
 use miden_client::transaction::{
     DiscardCause,
+    ForeignAccount,
     PaymentNoteDescription,
     ProvenTransaction,
     TransactionInputs,
@@ -43,7 +49,7 @@ use miden_client::transaction::{
     TransactionRequestBuilder,
     TransactionStatus,
 };
-use miden_client::{ClientError, Deserializable, Felt, Serializable};
+use miden_client::{ClientError, Deserializable, Felt, Serializable, Word};
 use miden_client_sqlite_store::ClientBuilderSqliteExt;
 
 use crate::tests::config::ClientConfig;
@@ -1560,5 +1566,102 @@ pub async fn test_output_only_note(client_config: ClientConfig) -> Result<()> {
 
     let output_note = client.get_output_note(note_id).await.unwrap();
     assert!(output_note.is_some());
+    Ok(())
+}
+
+/// Tests that `get_account` with `AccountStorageRequirements` correctly filters storage map
+/// entries by key.
+///
+/// Creates a public account with a map slot containing 2 entries, then verifies:
+/// - Requesting with empty keys returns `AllEntries` with both entries.
+/// - Requesting with one specific key returns `EntriesWithProofs` with just that entry.
+pub async fn test_get_account_storage_map_key_filtering(
+    client_config: ClientConfig,
+) -> Result<()> {
+    let (mut client, keystore) = client_config.into_client().await?;
+    wait_for_node(&mut client).await;
+
+    let map_slot_name = StorageSlotName::new("miden::testing::client::map").expect("valid slot name");
+    let map_key_1 = StorageMapKey::from([Felt::new(15), Felt::new(15), Felt::new(15), Felt::new(15)]);
+    let map_value_1 = Word::from([Felt::new(9), Felt::new(12), Felt::new(18), Felt::new(30)]);
+    let map_key_2 = StorageMapKey::from([Felt::new(20), Felt::new(20), Felt::new(20), Felt::new(20)]);
+    let map_value_2 = Word::from([Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)]);
+
+    let mut storage_map = StorageMap::new();
+    storage_map.insert(map_key_1.into(), map_value_1)?;
+    storage_map.insert(map_key_2.into(), map_value_2)?;
+
+    let map_slot = StorageSlot::with_map(map_slot_name.clone(), storage_map);
+    let component_code = CodeBuilder::default()
+        .compile_component_code(
+            "miden::testing::map_key_filtering",
+            "pub proc dummy\n push.1\n end".to_string(),
+        )
+        .context("failed to compile component code")?;
+    let component = AccountComponent::new(component_code, vec![map_slot])
+        .map_err(|err| anyhow::anyhow!(err))?
+        .with_supports_all_types();
+
+    let key_pair = AuthSecretKey::new_falcon512_rpo();
+    let auth_component: AccountComponent =
+        AuthFalcon512Rpo::new(key_pair.public_key().to_commitment()).into();
+
+    let account = AccountBuilder::new(Default::default())
+        .with_component(component)
+        .with_auth_component(auth_component)
+        .storage_mode(AccountStorageMode::Public)
+        .build()
+        .context("failed to build account")?;
+    let account_id = account.id();
+
+    keystore.add_key(&key_pair).context("failed to add key")?;
+    client.add_account(&account, false).await?;
+
+    // Deploy the account (first tx updates nonce)
+    let tx_id = client
+        .submit_new_transaction(account_id, TransactionRequestBuilder::new().build()?)
+        .await?;
+    wait_for_tx(&mut client, tx_id).await?;
+
+    let rpc = client.test_rpc_api();
+
+    // Request all entries (empty keys)
+    let requirements_all = AccountStorageRequirements::new([(map_slot_name.clone(), [].iter())]);
+    let foreign_all = ForeignAccount::public(account_id, requirements_all)?;
+    let (_, proof_all) = rpc.get_account(foreign_all, AccountStateAt::ChainTip, None).await?;
+    let (_, details_all) = proof_all.into_parts();
+    let map_all = details_all
+        .as_ref()
+        .and_then(|d| d.storage_details.find_map_details(&map_slot_name))
+        .context("expected storage map details")?;
+
+    assert!(
+        matches!(map_all.entries, StorageMapEntries::AllEntries(ref e) if e.len() == 2),
+        "expected AllEntries with 2 entries, got {:?}",
+        map_all.entries,
+    );
+
+    // Request one specific key
+    let requirements_one = AccountStorageRequirements::new([(map_slot_name.clone(), [&map_key_1])]);
+    let foreign_one = ForeignAccount::public(account_id, requirements_one)?;
+    let (_, proof_one) = rpc.get_account(foreign_one, AccountStateAt::ChainTip, None).await?;
+    let (_, details_one) = proof_one.into_parts();
+    let map_one = details_one
+        .as_ref()
+        .and_then(|d| d.storage_details.find_map_details(&map_slot_name))
+        .context("expected storage map details")?;
+
+    match &map_one.entries {
+        StorageMapEntries::EntriesWithProofs(witnesses) => {
+            assert_eq!(witnesses.len(), 1, "expected 1 witness");
+            let (_, value) = witnesses[0]
+                .entries()
+                .next()
+                .context("expected at least one entry in witness")?;
+            assert_eq!(*value, map_value_1, "value should match the requested key's value");
+        },
+        other => anyhow::bail!("expected EntriesWithProofs, got {:?}", other),
+    }
+
     Ok(())
 }

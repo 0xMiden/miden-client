@@ -391,7 +391,8 @@ impl TryFrom<proto::rpc::account_storage_details::AccountStorageMapDetails>
                     .entries
                     .into_iter()
                     .map(|entry| {
-                        let key: Word = entry
+                        // The node returns the hashed key, not the raw map key.
+                        let hashed_key: Word = entry
                             .key
                             .ok_or(RpcError::ExpectedDataMissing("key".into()))?
                             .try_into()?;
@@ -399,8 +400,9 @@ impl TryFrom<proto::rpc::account_storage_details::AccountStorageMapDetails>
                             .proof
                             .ok_or(RpcError::ExpectedDataMissing("proof".into()))?
                             .try_into()?;
-                        StorageMapWitness::new(proof, [key])
-                            .map_err(|e| RpcError::InvalidResponse(e.to_string()))
+
+                        let value = proof.get(&hashed_key).unwrap_or_default();
+                        Ok(StorageMapWitness::new_unchecked(proof, [(hashed_key, value)]))
                     })
                     .collect::<Result<Vec<StorageMapWitness>, RpcError>>()?;
                 StorageMapEntries::EntriesWithProofs(witnesses)
@@ -671,11 +673,17 @@ impl From<AccountStorageRequirements> for Vec<account_detail_request::StorageMap
     fn from(
         value: AccountStorageRequirements,
     ) -> Vec<account_detail_request::StorageMapDetailRequest> {
-        use account_detail_request::{self, storage_map_detail_request};
+        use account_detail_request::storage_map_detail_request::{MapKeys, SlotData};
         let request_map = value.0;
         let mut requests = Vec::with_capacity(request_map.len());
-        for (slot_name, _map_keys) in request_map {
-            let slot_data = Some(storage_map_detail_request::SlotData::AllEntries(true));
+        for (slot_name, map_keys) in request_map {
+            let slot_data = if map_keys.is_empty() {
+                Some(SlotData::AllEntries(true))
+            } else {
+                Some(SlotData::MapKeys(MapKeys {
+                    map_keys: map_keys.into_iter().map(Into::into).collect(),
+                }))
+            };
             requests.push(account_detail_request::StorageMapDetailRequest {
                 slot_name: slot_name.to_string(),
                 slot_data,
