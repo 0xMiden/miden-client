@@ -19,6 +19,8 @@ export const AccountType = Object.freeze({
   MutableWallet: "MutableWallet",
   ImmutableWallet: "ImmutableWallet",
   FungibleFaucet: "FungibleFaucet",
+  ImmutableContract: "ImmutableContract",
+  MutableContract: "MutableContract",
 });
 
 export const AuthScheme = Object.freeze({
@@ -26,11 +28,90 @@ export const AuthScheme = Object.freeze({
   ECDSA: "ecdsa",
 });
 
+export const NoteVisibility = Object.freeze({
+  Public: "public",
+  Private: "private",
+});
+
+export const StorageMode = Object.freeze({
+  Public: "public",
+  Private: "private",
+  Network: "network",
+});
+
 export { MidenClient };
 export { createP2IDNote, createP2IDENote, buildSwapTag };
 
 // Internal exports — used by integration tests that need direct access to the low-level WebClient proxy.
 export { WebClient as WasmWebClient, MockWebClient as MockWasmWebClient };
+
+// Method classification sets — used by scripts/check-method-classification.js to ensure
+// every WASM export is explicitly categorised. Update when adding new WASM methods.
+const SYNC_METHODS = new Set([
+  "buildSwapTag",
+  "createCodeBuilder",
+  "newConsumeTransactionRequest",
+  "newMintTransactionRequest",
+  "newSendTransactionRequest",
+  "newSwapTransactionRequest",
+  "proveBlock",
+  "serializeMockChain",
+  "serializeMockNoteTransportNode",
+  "setDebugMode",
+  "storeIdentifier",
+  "usesMockChain",
+]);
+
+const WRITE_METHODS = new Set([
+  "addAccountSecretKeyToWebStore",
+  "addTag",
+  "executeForSummary",
+  "fetchAllPrivateNotes",
+  "fetchPrivateNotes",
+  "forceImportStore",
+  "importAccountById",
+  "importAccountFile",
+  "importNoteFile",
+  "importPublicAccountFromSeed",
+  "insertAccountAddress",
+  "newAccount",
+  "removeAccountAddress",
+  "removeTag",
+  "removeSetting",
+  "sendPrivateNote",
+  "setSetting",
+  "submitProvenTransaction",
+]);
+
+const READ_METHODS = new Set([
+  "accountReader",
+  "exportAccountFile",
+  "exportNoteFile",
+  "exportStore",
+  "getAccount",
+  "getAccountAuthByPubKeyCommitment",
+  "getAccountByKeyCommitment",
+  "getAccountCode",
+  "getAccountStorage",
+  "getAccountVault",
+  "getAccounts",
+  "getConsumableNotes",
+  "getInputNote",
+  "getInputNotes",
+  "getOutputNote",
+  "getOutputNotes",
+  "getPublicKeyCommitmentsOfAccount",
+  "getSetting",
+  "getSyncHeight",
+  "getTransactions",
+  "listSettingKeys",
+  "listTags",
+]);
+
+// Suppress unused-variable warnings — these sets exist solely for the CI lint check.
+void SYNC_METHODS;
+void WRITE_METHODS;
+void READ_METHODS;
 
 const buildTypedArraysExport = (exportObject) => {
   return Object.entries(exportObject).reduce(
@@ -501,6 +582,30 @@ class WebClient {
         decimals,
         maxSupply,
         authSchemeId
+      );
+    });
+  }
+
+  async newAccount(account, overwrite) {
+    return this._serializeWasmCall(async () => {
+      const wasmWebClient = await this.getWasmWebClient();
+      return await wasmWebClient.newAccount(account, overwrite);
+    });
+  }
+
+  async newAccountWithSecretKey(account, secretKey) {
+    return this._serializeWasmCall(async () => {
+      const wasmWebClient = await this.getWasmWebClient();
+      return await wasmWebClient.newAccountWithSecretKey(account, secretKey);
+    });
+  }
+
+  async addAccountSecretKeyToWebStore(accountId, secretKey) {
+    return this._serializeWasmCall(async () => {
+      const wasmWebClient = await this.getWasmWebClient();
+      return await wasmWebClient.addAccountSecretKeyToWebStore(
+        accountId,
+        secretKey
       );
     });
   }

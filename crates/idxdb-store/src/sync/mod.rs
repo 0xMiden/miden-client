@@ -133,7 +133,10 @@ impl IdxdbStore {
             let input_notes = note_updates.updated_input_notes();
             let output_notes = note_updates.updated_output_notes();
             (
-                input_notes.into_iter().map(|note| serialize_input_note(note.inner())).collect(),
+                input_notes
+                    .into_iter()
+                    .map(|note| serialize_input_note(note.inner(), note.consumed_tx_order()))
+                    .collect(),
                 output_notes
                     .into_iter()
                     .map(|note| serialize_output_note(note.inner()))
@@ -141,17 +144,10 @@ impl IdxdbStore {
             )
         };
 
-        // Tags to remove
         let committed_note_ids: Vec<String> = note_updates
             .updated_input_notes()
-            .filter_map(|note_update| {
-                let note = note_update.inner();
-                if note.is_committed() {
-                    Some(note.id().to_string())
-                } else {
-                    None
-                }
-            })
+            .filter(|update| update.inner().is_committed())
+            .map(|update| update.inner().id().to_string())
             .collect();
 
         for (account_id, digest) in account_updates.mismatched_private_accounts() {

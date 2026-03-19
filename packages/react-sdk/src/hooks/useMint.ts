@@ -86,7 +86,7 @@ export function useMint(): UseMintResult {
             targetAccountIdObj,
             faucetIdObj,
             noteType,
-            options.amount
+            BigInt(options.amount)
           );
 
           const txId = prover

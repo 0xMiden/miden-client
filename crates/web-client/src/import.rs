@@ -1,3 +1,4 @@
+use idxdb_store::IdxdbStore;
 use miden_client::account::{AccountFile as NativeAccountFile, AccountId as NativeAccountId};
 use miden_client::keystore::Keystore;
 use wasm_bindgen::prelude::*;
@@ -19,7 +20,7 @@ impl WebClient {
         &mut self,
         account_file: AccountFile,
     ) -> Result<JsValue, JsValue> {
-        let keystore = self.keystore.clone().expect("Keystore should be initialized");
+        let keystore = self.keystore()?.clone();
         if let Some(client) = self.get_mut_inner() {
             let account_data: NativeAccountFile = account_file.into();
             let account_id = account_data.account.id().to_string();
@@ -48,7 +49,7 @@ impl WebClient {
         mutable: bool,
         auth_scheme: AuthScheme,
     ) -> Result<Account, JsValue> {
-        let keystore = self.keystore.clone();
+        let keystore = self.keystore()?.clone();
         let client = self.get_mut_inner().ok_or(JsValue::from_str("Client not initialized"))?;
 
         let (generated_acct, key_pair) =
@@ -61,11 +62,7 @@ impl WebClient {
             .await
             .map_err(|err| js_error_with_context(err, "failed to import public account"))?;
 
-        keystore
-            .expect("KeyStore should be initialized")
-            .add_key(&key_pair, native_id)
-            .await
-            .map_err(|err| err.to_string())?;
+        keystore.add_key(&key_pair, native_id).await.map_err(|err| err.to_string())?;
 
         Ok(Account::from(generated_acct))
     }
@@ -100,23 +97,21 @@ impl WebClient {
             Err(JsValue::from_str("Client not initialized"))
         }
     }
+}
 
-    #[wasm_bindgen(js_name = "forceImportStore")]
-    pub async fn force_import_store(
-        &mut self,
-        store_dump: JsValue,
-        _store_name: &str,
-    ) -> Result<JsValue, JsValue> {
-        let store = self.store.as_ref().ok_or(JsValue::from_str("Store not initialized"))?;
+/// Imports store contents from a JSON string, replacing all existing data.
+///
+/// Use together with [`export_store`].
+#[wasm_bindgen(js_name = "importStore")]
+pub async fn import_store(store_name: &str, store_dump: &str) -> Result<(), JsValue> {
+    let store = IdxdbStore::new(store_name.into())
+        .await
+        .map_err(|err| JsValue::from_str(&format!("failed to open store: {err:?}")))?;
 
-        let json_string =
-            store_dump.as_string().ok_or(JsValue::from_str("Store dump must be a string"))?;
+    store
+        .import_store(store_dump.to_string())
+        .await
+        .map_err(|err| JsValue::from_str(&format!("failed to import store: {err:?}")))?;
 
-        store
-            .import_store(json_string)
-            .await
-            .map_err(|err| js_error_with_context(err, "failed to import store"))?;
-
-        Ok(JsValue::from_str("Store imported successfully"))
-    }
+    Ok(())
 }

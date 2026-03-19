@@ -76,6 +76,7 @@ pub use builder::ClientBuilderSqliteExt;
 /// Current table definitions can be found at `store.sql` migration file.
 pub struct SqliteStore {
     pub(crate) pool: Pool,
+    database_filepath: String,
     smt_forest: Arc<RwLock<AccountSmtForest>>,
 }
 
@@ -85,6 +86,7 @@ impl SqliteStore {
 
     /// Returns a new instance of [Store] instantiated with the specified configuration options.
     pub async fn new(database_filepath: PathBuf) -> Result<Self, StoreError> {
+        let database_filepath_str = database_filepath.to_string_lossy().into_owned();
         let sqlite_pool_manager = SqlitePoolManager::new(database_filepath);
         let pool = Pool::builder(sqlite_pool_manager)
             .build()
@@ -99,6 +101,7 @@ impl SqliteStore {
 
         let store = SqliteStore {
             pool,
+            database_filepath: database_filepath_str,
             smt_forest: Arc::new(RwLock::new(AccountSmtForest::new())),
         };
 
@@ -146,6 +149,10 @@ impl SqliteStore {
 // This way, the actual implementations are grouped by entity types in their own sub-modules
 #[async_trait::async_trait]
 impl Store for SqliteStore {
+    fn identifier(&self) -> &str {
+        &self.database_filepath
+    }
+
     fn get_current_timestamp(&self) -> Option<u64> {
         Some(current_timestamp_u64())
     }
@@ -212,6 +219,27 @@ impl Store for SqliteStore {
     ) -> Result<Vec<OutputNoteRecord>, StoreError> {
         self.interact_with_connection(move |conn| SqliteStore::get_output_notes(conn, &note_filter))
             .await
+    }
+
+    async fn get_input_note_by_offset(
+        &self,
+        filter: NoteFilter,
+        consumer: Option<AccountId>,
+        block_start: Option<BlockNumber>,
+        block_end: Option<BlockNumber>,
+        offset: u32,
+    ) -> Result<Option<InputNoteRecord>, StoreError> {
+        self.interact_with_connection(move |conn| {
+            SqliteStore::get_input_note_by_offset(
+                conn,
+                &filter,
+                consumer,
+                block_start,
+                block_end,
+                offset,
+            )
+        })
+        .await
     }
 
     async fn upsert_input_notes(&self, notes: &[InputNoteRecord]) -> Result<(), StoreError> {

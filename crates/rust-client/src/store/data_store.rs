@@ -1,20 +1,24 @@
-use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use miden_protocol::account::{
     Account,
+    AccountCode,
     AccountId,
     PartialAccount,
+    PartialStorageMap,
+    StorageMap,
     StorageMapKey,
+    StorageMapWitness,
     StorageSlot,
     StorageSlotContent,
+    StorageSlotName,
 };
 use miden_protocol::asset::{AssetVaultKey, AssetWitness};
 use miden_protocol::block::{BlockHeader, BlockNumber};
-use miden_protocol::crypto::merkle::MerklePath;
 use miden_protocol::crypto::merkle::mmr::{InOrderIndex, PartialMmr};
+use miden_protocol::crypto::merkle::{MerkleError, MerklePath};
 use miden_protocol::note::NoteScript;
 use miden_protocol::transaction::{AccountInputs, PartialBlockchain};
 use miden_protocol::vm::FutureMaybeSend;
@@ -22,7 +26,10 @@ use miden_protocol::{MastForest, Word, ZERO};
 use miden_tx::{DataStore, DataStoreError, MastForestStore, TransactionMastStore};
 
 use super::{AccountStorageFilter, PartialBlockchainFilter, Store};
+use crate::rpc::domain::account::{AccountStorageRequirements, StorageMapEntries};
+use crate::rpc::{AccountStateAt, NodeRpcClient};
 use crate::store::StoreError;
+use crate::transaction::fetch_public_account_inputs;
 use crate::utils::RwLock;
 
 // DATA STORE
@@ -36,14 +43,24 @@ pub struct ClientDataStore {
     transaction_mast_store: Arc<TransactionMastStore>,
     /// Cache of foreign account inputs that should be returned to the executor on demand.
     foreign_account_inputs: RwLock<BTreeMap<AccountId, AccountInputs>>,
+    /// Cache of storage map witnesses, keyed by (`map_root`, `map_key`). Avoids redundant RPC
+    /// calls when the same map entry is accessed multiple times within a transaction.
+    storage_map_cache: RwLock<BTreeMap<(Word, StorageMapKey), StorageMapWitness>>,
+    /// The transaction reference block number.
+    ref_block: RwLock<Option<BlockNumber>>,
+    /// RPC client used to lazy-load foreign account data on cache miss.
+    rpc_api: Arc<dyn NodeRpcClient>,
 }
 
 impl ClientDataStore {
-    pub fn new(store: alloc::sync::Arc<dyn Store>) -> Self {
+    pub fn new(store: alloc::sync::Arc<dyn Store>, rpc_api: Arc<dyn NodeRpcClient>) -> Self {
         Self {
             store,
             transaction_mast_store: Arc::new(TransactionMastStore::new()),
             foreign_account_inputs: RwLock::new(BTreeMap::new()),
+            storage_map_cache: RwLock::new(BTreeMap::new()),
+            ref_block: RwLock::new(None),
+            rpc_api,
         }
     }
 
@@ -64,6 +81,161 @@ impl ClientDataStore {
             cache.insert(account_inputs.id(), account_inputs);
         }
     }
+
+    /// Attempts to resolve a storage map witness from the local store.
+    ///
+    /// This covers any account present in the store (local or foreign) as well as any
+    /// foreign account previously cached in `foreign_account_inputs`.
+    ///
+    /// Returns `Ok(None)` when the map is not found locally.
+    async fn get_local_storage_map_witness(
+        &self,
+        account_id: AccountId,
+        map_root: Word,
+        map_key: StorageMapKey,
+    ) -> Result<Option<StorageMapWitness>, DataStoreError> {
+        match self
+            .store
+            .get_account_storage(account_id, AccountStorageFilter::Root(map_root))
+            .await
+        {
+            Ok(account_storage) => {
+                match account_storage.slots().first().map(StorageSlot::content) {
+                    Some(StorageSlotContent::Map(map)) => Ok(Some(map.open(&map_key))),
+                    Some(StorageSlotContent::Value(value)) => Err(DataStoreError::other(format!(
+                        "found StorageSlotContent::Value with {value} as its value."
+                    ))),
+                    _ => Ok(None),
+                }
+            },
+            Err(err) => {
+                tracing::debug!(
+                    %account_id,
+                    %err,
+                    "storage map not found locally, will try remote fetch"
+                );
+                Ok(None)
+            },
+        }
+    }
+
+    /// Lazily fetches a foreign account's inputs from the network, loads its code into the MAST
+    /// store, and caches the result in [`Self::foreign_account_inputs`].
+    async fn fetch_and_cache_foreign_account(
+        &self,
+        account_id: AccountId,
+        account_state_at: AccountStateAt,
+    ) -> Result<AccountInputs, DataStoreError> {
+        let account_inputs = fetch_public_account_inputs(
+            &self.store,
+            &self.rpc_api,
+            account_id,
+            AccountStorageRequirements::default(),
+            account_state_at,
+        )
+        .await
+        .map_err(|err| {
+            DataStoreError::other_with_source("failed to fetch foreign account inputs", err)
+        })?;
+
+        self.transaction_mast_store.load_account_code(account_inputs.code());
+        self.foreign_account_inputs.write().insert(account_id, account_inputs.clone());
+
+        Ok(account_inputs)
+    }
+
+    /// Fetches storage map entries from the network via RPC.
+    async fn fetch_storage_map_entries(
+        &self,
+        account_id: AccountId,
+        slot_name: StorageSlotName,
+        map_key: StorageMapKey,
+        known_code: AccountCode,
+    ) -> Result<StorageMapEntries, DataStoreError> {
+        let storage_requirements = AccountStorageRequirements::new([(slot_name, &[map_key])]);
+        let (_, account_proof): (BlockNumber, _) = self
+            .rpc_api
+            .get_account_proof(
+                account_id,
+                storage_requirements,
+                AccountStateAt::ChainTip,
+                Some(known_code),
+            )
+            .await
+            .map_err(|err| {
+                DataStoreError::other_with_source("failed to fetch storage map via RPC", err)
+            })?;
+
+        let (_, account_details) = account_proof.into_parts();
+        let details = account_details.ok_or_else(|| {
+            DataStoreError::other(format!(
+                "RPC returned no account details for account {account_id}"
+            ))
+        })?;
+
+        let map_detail =
+            details.storage_details.map_details.into_iter().next().ok_or_else(|| {
+                DataStoreError::other(format!(
+                    "RPC returned no storage map details for account {account_id}"
+                ))
+            })?;
+
+        Ok(map_detail.entries)
+    }
+
+    /// Resolves the slot name and account code for a map root from the cached foreign account
+    /// inputs.
+    fn resolve_slot_name_and_code(
+        &self,
+        account_id: AccountId,
+        map_root: Word,
+    ) -> Result<(StorageSlotName, AccountCode), DataStoreError> {
+        let cache = self.foreign_account_inputs.read();
+        let inputs = cache
+            .get(&account_id)
+            .ok_or_else(|| DataStoreError::AccountNotFound(account_id))?;
+
+        let slot_name = inputs
+            .storage()
+            .header()
+            .slots()
+            .find(|slot| slot.slot_type().is_map() && slot.value() == map_root)
+            .map(|slot| slot.name().clone())
+            .ok_or_else(|| {
+                DataStoreError::other(format!(
+                    "did not find map slot with root {map_root} for foreign account {account_id}"
+                ))
+            })?;
+
+        Ok((slot_name, inputs.code().clone()))
+    }
+}
+
+/// Converts [`StorageMapEntries`] into a [`StorageMapWitness`] for the given key.
+fn storage_map_entries_into_witness(
+    entries: StorageMapEntries,
+    map_key: StorageMapKey,
+) -> Result<StorageMapWitness, DataStoreError> {
+    match entries {
+        StorageMapEntries::AllEntries(entries) => {
+            let storage_entries_iter = entries.iter().map(|e| (e.key, e.value));
+            let map = StorageMap::with_entries(storage_entries_iter).map_err(|err| {
+                DataStoreError::other_with_source("failed to build storage map from entries", err)
+            })?;
+            Ok(map.open(&map_key))
+        },
+        StorageMapEntries::EntriesWithProofs(witnesses) => {
+            let partial_map = PartialStorageMap::with_witnesses(witnesses).map_err(|err| {
+                DataStoreError::other_with_source(
+                    "failed to build partial storage map from witnesses",
+                    err,
+                )
+            })?;
+            partial_map.open(&map_key).map_err(|err| {
+                DataStoreError::other_with_source("failed to open storage map witness", err)
+            })
+        },
+    }
 }
 
 impl DataStore for ClientDataStore {
@@ -74,6 +246,9 @@ impl DataStore for ClientDataStore {
     ) -> Result<(PartialAccount, BlockHeader, PartialBlockchain), DataStoreError> {
         // Pop last block, used as reference (it does not need to be authenticated manually)
         let ref_block = block_refs.pop_last().ok_or(DataStoreError::other("block set is empty"))?;
+
+        // Cache the reference block so lazy-loading methods can use it
+        *self.ref_block.write() = Some(ref_block);
 
         let partial_account_record = self
             .store
@@ -138,100 +313,135 @@ impl DataStore for ClientDataStore {
         let mut asset_witnesses = vec![];
         for vault_key in vault_keys {
             match self.store.get_account_asset(account_id, vault_key).await {
-                Ok(Some((_, asset_witness))) => {
-                    asset_witnesses.push(asset_witness);
-                },
-                Ok(_) => {
+                Ok(Some((_, asset_witness))) => asset_witnesses.push(asset_witness),
+                Ok(None) | Err(StoreError::MerkleStoreError(MerkleError::RootNotInStore(_))) => {
                     let vault = self.store.get_account_vault(account_id).await?;
 
                     if vault.root() != vault_root {
-                        return Err(DataStoreError::Other {
-                            error_msg: "Vault root mismatch".into(),
-                            source: None,
-                        });
+                        return Err(DataStoreError::other("Vault root mismatch"));
                     }
 
                     let asset_witness =
                         AssetWitness::new(vault.open(vault_key).into()).map_err(|err| {
-                            DataStoreError::Other {
-                                error_msg: "Failed to open vault asset tree".into(),
-                                source: Some(Box::new(err)),
-                            }
+                            DataStoreError::other_with_source(
+                                "Failed to open vault asset tree",
+                                err,
+                            )
                         })?;
                     asset_witnesses.push(asset_witness);
                 },
                 Err(err) => {
-                    return Err(DataStoreError::Other {
-                        error_msg: "Failed to get account asset".into(),
-                        source: Some(Box::new(err)),
-                    });
+                    return Err(DataStoreError::other_with_source(
+                        "Failed to get account asset",
+                        err,
+                    ));
                 },
             }
         }
         Ok(asset_witnesses)
     }
 
+    /// Retrieves the [`StorageMapWitness`] requested from the store. Alternatively fetching it
+    /// from the RPC if not available locally. Witnesses fetched via RPC are cached in memory so
+    /// that repeated accesses to the same map entry within a transaction avoid additional RPC
+    /// calls.
     async fn get_storage_map_witness(
         &self,
         account_id: AccountId,
         map_root: Word,
         map_key: StorageMapKey,
-    ) -> Result<miden_protocol::account::StorageMapWitness, DataStoreError> {
-        let account_storage = self
-            .store
-            .get_account_storage(account_id, AccountStorageFilter::Root(map_root))
+    ) -> Result<StorageMapWitness, DataStoreError> {
+        let cache_key = (map_root, map_key);
+
+        // Check the in-memory witness cache first.
+        if let Some(witness) = self.storage_map_cache.read().get(&cache_key).cloned() {
+            return Ok(witness);
+        }
+
+        // Try the local store.
+        if let Some(witness) =
+            self.get_local_storage_map_witness(account_id, map_root, map_key).await?
+        {
+            return Ok(witness);
+        }
+
+        // Ensure the account inputs are cached before resolving the slot name.
+        if !self.foreign_account_inputs.read().contains_key(&account_id) {
+            let account_state_at = self
+                .ref_block
+                .read()
+                .map(AccountStateAt::Block)
+                .unwrap_or(AccountStateAt::ChainTip);
+            self.fetch_and_cache_foreign_account(account_id, account_state_at).await?;
+        }
+
+        let (slot_name, known_code) = self.resolve_slot_name_and_code(account_id, map_root)?;
+
+        let map_entries = self
+            .fetch_storage_map_entries(account_id, slot_name, map_key, known_code)
             .await?;
 
-        match account_storage.slots().first().map(StorageSlot::content) {
-            Some(StorageSlotContent::Map(map)) => {
-                let witness = map.open(&map_key);
-                Ok(witness)
-            },
-            Some(StorageSlotContent::Value(value)) => Err(DataStoreError::Other {
-                error_msg: format!("found StorageSlotContent::Value with {value} as its value.")
-                    .into(),
-                source: None,
-            }),
-            _ => Err(DataStoreError::Other {
-                error_msg: format!("did not find map with {map_root} as a root for {account_id}")
-                    .into(),
-                source: None,
-            }),
-        }
+        let witness = storage_map_entries_into_witness(map_entries, map_key)?;
+        self.storage_map_cache.write().insert(cache_key, witness.clone());
+        Ok(witness)
     }
 
+    /// Returns the [`AccountInputs`] for the given foreign account from the cache or alternatively
+    /// fetching them from the RPC if not available locally.
     async fn get_foreign_account_inputs(
         &self,
         foreign_account_id: AccountId,
-        _ref_block: BlockNumber,
+        ref_block: BlockNumber,
     ) -> Result<AccountInputs, DataStoreError> {
-        let cache = self.foreign_account_inputs.read();
+        // Fast path: check the cache first (drop the read guard before any async work).
+        {
+            let cache = self.foreign_account_inputs.read();
+            if let Some(inputs) = cache.get(&foreign_account_id).cloned() {
+                return Ok(inputs);
+            }
+        }
 
-        let inputs = cache
-            .get(&foreign_account_id)
-            .cloned()
-            .ok_or(DataStoreError::AccountNotFound(foreign_account_id))?;
-
-        Ok(inputs)
+        self.fetch_and_cache_foreign_account(foreign_account_id, AccountStateAt::Block(ref_block))
+            .await
     }
 
+    /// Returns the [`NoteScript`] for the given script root from the store or alternatively
+    /// fetching it from the RPC if not available locally.
     fn get_note_script(
         &self,
         script_root: Word,
     ) -> impl FutureMaybeSend<Result<Option<NoteScript>, DataStoreError>> {
         let store = self.store.clone();
+        let rpc_api = self.rpc_api.clone();
 
         async move {
-            if let Ok(note_script) = store.get_note_script(script_root).await {
-                Ok(Some(note_script))
-            } else {
-                // If no matching note found, return an error
-                // TODO: refactor to make RPC call to `GetNoteScriptByRoot` in case notes are not
-                // found https://github.com/0xMiden/miden-client/issues/1410
-                Err(DataStoreError::other(
-                    format!("Note script with root {script_root} not found",),
-                ))
+            // Fast path: check the local store first.
+            match store.get_note_script(script_root).await {
+                Ok(note_script) => return Ok(Some(note_script)),
+                Err(StoreError::NoteScriptNotFound(_)) => {},
+                Err(err) => {
+                    return Err(DataStoreError::other_with_source(
+                        format!("failed to get note script {script_root} from store"),
+                        err,
+                    ));
+                },
             }
+
+            // Store miss, fetch from the network via RPC.
+            let note_script: NoteScript =
+                rpc_api.get_note_script_by_root(script_root).await.map_err(|err| {
+                    DataStoreError::other_with_source("failed to fetch note script via RPC", err)
+                })?;
+
+            // Persist for future lookups.
+            if let Err(err) = store.upsert_note_scripts(core::slice::from_ref(&note_script)).await {
+                tracing::warn!(
+                    %err,
+                    "Failed to persist fetched note script to store"
+                );
+            }
+
+            Ok(Some(note_script))
         }
     }
 }

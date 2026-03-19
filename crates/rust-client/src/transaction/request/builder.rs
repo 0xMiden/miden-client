@@ -8,13 +8,18 @@ use miden_protocol::asset::{Asset, FungibleAsset};
 use miden_protocol::block::BlockNumber;
 use miden_protocol::crypto::merkle::InnerNodeInfo;
 use miden_protocol::crypto::merkle::store::MerkleStore;
+use miden_protocol::crypto::rand::FeltRng;
 use miden_protocol::errors::NoteError;
 use miden_protocol::note::{
     Note,
+    NoteAssets,
     NoteAttachment,
     NoteDetails,
     NoteId,
+    NoteMetadata,
     NoteRecipient,
+    NoteScript,
+    NoteStorage,
     NoteTag,
     NoteType,
     PartialNote,
@@ -83,6 +88,10 @@ pub struct TransactionRequestBuilder {
     /// Optional [`Word`] that will be pushed to the stack for the authentication procedure
     /// during transaction execution.
     auth_arg: Option<Word>,
+    /// Note scripts that the node's NTX builder will need in its script registry.
+    ///
+    /// See [`TransactionRequestBuilder::expected_ntx_scripts`] for details.
+    expected_ntx_scripts: Vec<NoteScript>,
 }
 
 impl TransactionRequestBuilder {
@@ -105,6 +114,7 @@ impl TransactionRequestBuilder {
             ignore_invalid_input_notes: false,
             script_arg: None,
             auth_arg: None,
+            expected_ntx_scripts: vec![],
         }
     }
 
@@ -158,9 +168,12 @@ impl TransactionRequestBuilder {
     /// depending on whether each foreign account is public or private:
     ///
     /// - **Public accounts**: the node retrieves the state and code for the account and injects
-    ///   them as advice inputs.
+    ///   them as advice inputs. Public accounts can be omitted here, as they will be lazily loaded
+    ///   through RPC calls. Undeclared accounts may trigger additional RPC calls for storage map
+    ///   accesses during execution.
     /// - **Private accounts**: the node retrieves a proof of the account's existence and injects
-    ///   that as advice inputs.
+    ///   that as advice inputs. Private accounts must always be declared here with their
+    ///   [`PartialAccount`](miden_protocol::account::PartialAccount) state.
     #[must_use]
     pub fn foreign_accounts(
         mut self,
@@ -253,6 +266,23 @@ impl TransactionRequestBuilder {
     #[must_use]
     pub fn auth_arg(mut self, auth_arg: Word) -> Self {
         self.auth_arg = Some(auth_arg);
+        self
+    }
+
+    /// Specifies note scripts that the node's network transaction (NTX) builder will need in
+    /// its script registry.
+    ///
+    /// When a transaction creates notes destined for a network account, the node's NTX builder
+    /// must have the scripts of any public output notes in its registry. If a required script
+    /// is missing, the NTX will silently fail on the node side.
+    ///
+    /// When this field is set, the client will check each script against the node before
+    /// executing the main transaction. For any script not yet registered, the client
+    /// automatically creates and submits a separate registration transaction (a public note
+    /// carrying that script) so the node's registry is populated before the NTX executes.
+    #[must_use]
+    pub fn expected_ntx_scripts(mut self, scripts: Vec<NoteScript>) -> Self {
+        self.expected_ntx_scripts = scripts;
         self
     }
 
@@ -368,6 +398,39 @@ impl TransactionRequestBuilder {
             .build()
     }
 
+    /// Consumes the builder and returns a [`TransactionRequest`] for a transaction that registers
+    /// note scripts in the node's script registry.
+    ///
+    /// This creates one public output note per script, each with empty assets and storage. The
+    /// node indexes the script of every public note it processes, so submitting this transaction
+    /// makes the scripts available for future network transactions (NTX).
+    ///
+    /// - `sender_account_id` is the account executing the transaction.
+    /// - `scripts` is the list of note scripts to register.
+    /// - `rng` is used to generate serial numbers for the registration notes.
+    ///
+    /// This function cannot be used with a previously set custom script.
+    pub fn build_register_note_scripts(
+        self,
+        sender_account_id: AccountId,
+        scripts: Vec<NoteScript>,
+        rng: &mut ClientRng,
+    ) -> Result<TransactionRequest, TransactionRequestError> {
+        let registration_notes: Vec<OutputNote> = scripts
+            .into_iter()
+            .map(|script| {
+                let serial_num = rng.draw_word();
+                let note_storage = NoteStorage::new(vec![])?;
+                let recipient = NoteRecipient::new(serial_num, script, note_storage);
+                let note_assets = NoteAssets::new(vec![])?;
+                let metadata = NoteMetadata::new(sender_account_id, NoteType::Public);
+                Ok(OutputNote::Full(Note::new(note_assets, metadata, recipient)))
+            })
+            .collect::<Result<_, NoteError>>()?;
+
+        self.own_output_notes(registration_notes).build()
+    }
+
     // FINALIZE BUILDER
     // --------------------------------------------------------------------------------------------
 
@@ -429,6 +492,7 @@ impl TransactionRequestBuilder {
             ignore_invalid_input_notes: self.ignore_invalid_input_notes,
             script_arg: self.script_arg,
             auth_arg: self.auth_arg,
+            expected_ntx_scripts: self.expected_ntx_scripts,
         })
     }
 }

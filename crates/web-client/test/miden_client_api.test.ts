@@ -22,7 +22,7 @@ test.describe("MidenClient API - Mock Chain", () => {
       });
 
       // Mint tokens to the wallet
-      const mintTxId = await client.transactions.mint({
+      const { txId: mintTxId } = await client.transactions.mint({
         account: faucet,
         to: wallet,
         amount: 1000n,
@@ -42,7 +42,7 @@ test.describe("MidenClient API - Mock Chain", () => {
         .toString();
 
       // Consume the minted note
-      const consumeTxId = await client.transactions.consume({
+      const { txId: consumeTxId } = await client.transactions.consume({
         account: wallet,
         notes: mintedNoteId,
       });
@@ -285,7 +285,7 @@ test.describe("MidenClient API - Mock Chain", () => {
       );
 
       // Submit the pre-built request through the high-level API
-      const txId = await client.transactions.submit(faucet, mintRequest);
+      const { txId } = await client.transactions.submit(faucet, mintRequest);
 
       return {
         txId: txId.toHex(),
@@ -305,24 +305,22 @@ test.describe("MidenClient API - Mock Chain", () => {
       const walletId = wallet.id().toString();
 
       // Export the store
-      const snapshot = await client.exportStore();
+      const storeData = await window.exportStore(client.storeIdentifier());
 
       // Create a new mock client and import the store
       const client2 = await window.MidenClient.createMock();
-      await client2.importStore(snapshot);
+      await window.importStore(client2.storeIdentifier(), storeData);
 
       // Check the account exists in the new client
       const accounts = await client2.accounts.list();
       const accountIds = accounts.map((a) => a.id().toString());
 
       return {
-        version: snapshot.version,
         walletId,
         foundInImport: accountIds.includes(walletId),
       };
     });
 
-    expect(result.version).toBe(1);
     expect(result.foundInImport).toBe(true);
   });
 
@@ -658,22 +656,6 @@ test.describe("MidenClient API - Mock Chain", () => {
     expect(result.message).toContain("null or undefined");
   });
 
-  test("importStore rejects invalid version", async ({ page }) => {
-    const result = await page.evaluate(async () => {
-      const client = await window.MidenClient.createMock();
-
-      try {
-        await client.importStore({ version: 99, data: {} });
-        return { threw: false };
-      } catch (e) {
-        return { threw: true, message: e.message };
-      }
-    });
-
-    expect(result.threw).toBe(true);
-    expect(result.message).toContain("Unsupported store snapshot version");
-  });
-
   test("accounts.export returns a valid AccountFile", async ({ page }) => {
     const result = await page.evaluate(async () => {
       const client = await window.MidenClient.createMock();
@@ -869,6 +851,54 @@ test.describe("MidenClient API - Mock Chain", () => {
     expect(result.fitsU32).toBe(true);
   });
 
+  test("accounts.getOrImport returns existing account without importing", async ({
+    page,
+  }) => {
+    const result = await page.evaluate(async () => {
+      const client = await window.MidenClient.createMock();
+      const wallet = await client.accounts.create({ storage: "public" });
+      const walletId = wallet.id().toString();
+
+      // getOrImport should return the already-local account
+      const fetched = await client.accounts.getOrImport(walletId);
+
+      return {
+        fetchedId: fetched.id().toString(),
+        originalId: walletId,
+      };
+    });
+
+    expect(result.fetchedId).toBe(result.originalId);
+  });
+
+  test("accounts.getOrImport works across serialized mock chain", async ({
+    page,
+  }) => {
+    const result = await page.evaluate(async () => {
+      const client = await window.MidenClient.createMock();
+      const wallet = await client.accounts.create({ storage: "public" });
+      const walletId = wallet.id().toString();
+
+      // Serialize chain so the second client sees the same blocks
+      const chain = client.serializeMockChain();
+
+      // Create a fresh mock client with the same chain
+      const client2 = await window.MidenClient.createMock({
+        serializedMockChain: chain,
+      });
+
+      // getOrImport should return the account (either from local store or network)
+      const imported = await client2.accounts.getOrImport(walletId);
+
+      return {
+        importedId: imported.id().toString(),
+        originalId: walletId,
+      };
+    });
+
+    expect(result.importedId).toBe(result.originalId);
+  });
+
   test("serializeMockChain and restore", async ({ page }) => {
     const result = await page.evaluate(async () => {
       const client = await window.MidenClient.createMock();
@@ -985,7 +1015,7 @@ test.describe("MidenClient API - Integration", () => {
       });
 
       // Mint tokens
-      const mintTxId = await client.transactions.mint({
+      const { txId: mintTxId } = await client.transactions.mint({
         account: faucet,
         to: wallet,
         amount: 1000n,
@@ -998,17 +1028,14 @@ test.describe("MidenClient API - Integration", () => {
         interval: 1_000,
       });
 
-      // Consume the minted note
+      // Consume the minted notes
       const consumable = await client.notes.listAvailable({
         account: wallet,
       });
-      const consumeNoteIds = consumable.map((c) =>
-        c.inputNoteRecord().id().toString()
-      );
 
-      const consumeTxId = await client.transactions.consume({
+      const { txId: consumeTxId } = await client.transactions.consume({
         account: wallet,
-        notes: consumeNoteIds,
+        notes: consumable,
       });
 
       await client.transactions.waitFor(consumeTxId.toHex(), {
@@ -1024,7 +1051,7 @@ test.describe("MidenClient API - Integration", () => {
         mintTxId: mintTxId.toHex(),
         consumeTxId: consumeTxId.toHex(),
         balance: balance.toString(),
-        consumedCount: consumeNoteIds.length,
+        consumedCount: consumable.length,
       };
     });
 
@@ -1050,7 +1077,7 @@ test.describe("MidenClient API - Integration", () => {
         maxSupply: 10_000_000n,
       });
 
-      const txId = await client.transactions.mint({
+      const { txId } = await client.transactions.mint({
         account: faucet,
         to: wallet,
         amount: 500n,
@@ -1099,7 +1126,7 @@ test.describe("MidenClient API - Integration", () => {
       });
 
       // Mint to generate a note
-      const txId = await client.transactions.mint({
+      const { txId } = await client.transactions.mint({
         account: faucet,
         to: wallet,
         amount: 500n,

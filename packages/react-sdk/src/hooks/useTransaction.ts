@@ -3,16 +3,21 @@ import { useMiden } from "../context/MidenProvider";
 import type {
   TransactionRequest,
   WasmWebClient as WebClient,
-  AccountId as AccountIdType,
 } from "@miden-sdk/miden-sdk";
 import type {
   TransactionStage,
   TransactionResult,
   ExecuteTransactionOptions,
 } from "../types";
-import { parseAccountId } from "../utils/accountParsing";
+import { parseAccountId, parseAddress } from "../utils/accountParsing";
 import { runExclusiveDirect } from "../utils/runExclusive";
 import { MidenError } from "../utils/errors";
+import { proveWithFallback } from "../utils/prover";
+import { useMidenStore } from "../store/MidenStore";
+import {
+  waitForTransactionCommit,
+  extractFullNotes,
+} from "../utils/transactions";
 
 export interface UseTransactionResult {
   /** Execute a transaction request end-to-end */
@@ -36,6 +41,10 @@ type TransactionRequestFactory = (
 /**
  * Hook to execute arbitrary transaction requests.
  *
+ * Always uses the 4-step pipeline (execute → prove → submit → apply)
+ * with prover fallback support. When `privateNoteTarget` is set,
+ * additionally waits for commit and delivers private output notes.
+ *
  * @example
  * ```tsx
  * function CustomTransactionButton({ accountId }: { accountId: string }) {
@@ -54,6 +63,7 @@ type TransactionRequestFactory = (
  *           NoteType.Private,
  *           NoteType.Private
  *         ),
+ *       privateNoteTarget: "0xrecipient...",
  *     });
  *   };
  *
@@ -66,7 +76,7 @@ type TransactionRequestFactory = (
  * ```
  */
 export function useTransaction(): UseTransactionResult {
-  const { client, isReady, sync, runExclusive, prover } = useMiden();
+  const { client, isReady, sync, runExclusive } = useMiden();
   const runExclusiveSafe = runExclusive ?? runExclusiveDirect;
   const isBusyRef = useRef(false);
 
@@ -103,28 +113,53 @@ export function useTransaction(): UseTransactionResult {
         // is observable before transitioning to "proving"
         const txRequest = await resolveRequest(options.request, client);
 
-        setStage("proving");
-        const txResult = await runExclusiveSafe(async () => {
-          // Create fresh AccountId inside the closure — WASM objects created
-          // outside may become stale if another runExclusiveSafe call runs
-          // between creation and consumption.
-          const accountIdObj = resolveAccountId(options.accountId);
-          const txId = prover
-            ? await client.submitNewTransactionWithProver(
-                accountIdObj,
-                txRequest,
-                prover
-              )
-            : await client.submitNewTransaction(accountIdObj, txRequest);
-          return { transactionId: txId.toString() };
+        // Step 1: Execute
+        const txResult = await runExclusiveSafe(() => {
+          const accountIdObj = parseAccountId(options.accountId);
+          return client.executeTransaction(accountIdObj, txRequest);
         });
 
+        // Step 2: Prove (with fallback)
+        setStage("proving");
+        const proverConfig = useMidenStore.getState().config;
+        const provenTransaction = await proveWithFallback(
+          (resolvedProver) =>
+            runExclusiveSafe(() =>
+              client.proveTransaction(txResult, resolvedProver)
+            ),
+          proverConfig
+        );
+
+        // Step 3: Submit
+        setStage("submitting");
+        const submissionHeight = await runExclusiveSafe(() =>
+          client.submitProvenTransaction(provenTransaction, txResult)
+        );
+
+        // Step 4: Apply
+        await runExclusiveSafe(() =>
+          client.applyTransaction(txResult, submissionHeight)
+        );
+
+        // Deliver private notes if requested
+        const txId = txResult.id();
+        if (options.privateNoteTarget != null) {
+          await waitForTransactionCommit(client, runExclusiveSafe, txId);
+
+          const targetAddress = parseAddress(options.privateNoteTarget);
+          const fullNotes = extractFullNotes(txResult);
+          for (const note of fullNotes) {
+            await runExclusiveSafe(() =>
+              client.sendPrivateNote(note, targetAddress)
+            );
+          }
+        }
+
+        const txSummary = { transactionId: txId.toString() };
         setStage("complete");
-        setResult(txResult);
-
+        setResult(txSummary);
         await sync();
-
-        return txResult;
+        return txSummary;
       } catch (err) {
         const error = err instanceof Error ? err : new Error(String(err));
         setError(error);
@@ -135,7 +170,7 @@ export function useTransaction(): UseTransactionResult {
         isBusyRef.current = false;
       }
     },
-    [client, isReady, prover, runExclusive, sync]
+    [client, isReady, runExclusive, sync]
   );
 
   const reset = useCallback(() => {
@@ -153,10 +188,6 @@ export function useTransaction(): UseTransactionResult {
     error,
     reset,
   };
-}
-
-function resolveAccountId(accountId: string | AccountIdType): AccountIdType {
-  return parseAccountId(accountId);
 }
 
 async function resolveRequest(

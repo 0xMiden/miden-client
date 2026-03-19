@@ -97,7 +97,7 @@ export async function applyStateSync(dbId, stateUpdate) {
     return await db.dexie.transaction("rw", tablesToAccess, async (tx) => {
         await Promise.all([
             Promise.all(serializedInputNotes.map((note) => {
-                return upsertInputNote(dbId, note.noteId, note.noteAssets, note.serialNumber, note.inputs, note.noteScriptRoot, note.noteScript, note.nullifier, note.createdAt, note.stateDiscriminant, note.state);
+                return upsertInputNote(dbId, note.noteId, note.noteAssets, note.serialNumber, note.inputs, note.noteScriptRoot, note.noteScript, note.nullifier, note.createdAt, note.stateDiscriminant, note.state, note.consumedBlockHeight, note.consumedTxOrder, note.consumerAccountId);
             })),
             Promise.all(serializedOutputNotes.map((note) => {
                 return upsertOutputNote(dbId, note.noteId, note.noteAssets, note.recipientDigest, note.metadata, note.nullifier, note.expectedHeight, note.stateDiscriminant, note.state);

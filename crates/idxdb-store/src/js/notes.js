@@ -106,9 +106,9 @@ export async function getNoteScript(dbId, scriptRoot) {
         logWebStoreError(err, "Failed to get note script from root");
     }
 }
-export async function upsertInputNote(dbId, noteId, assets, serialNumber, inputs, scriptRoot, serializedNoteScript, nullifier, serializedCreatedAt, stateDiscriminant, state) {
+export async function upsertInputNote(dbId, noteId, assets, serialNumber, inputs, scriptRoot, serializedNoteScript, nullifier, serializedCreatedAt, stateDiscriminant, state, consumedBlockHeight, consumedTxOrder, consumerAccountId, tx) {
     const db = getDatabase(dbId);
-    return db.dexie.transaction("rw", db.inputNotes, db.notesScripts, async (tx) => {
+    const doWork = async (t) => {
         try {
             const data = {
                 noteId,
@@ -120,22 +120,108 @@ export async function upsertInputNote(dbId, noteId, assets, serialNumber, inputs
                 state,
                 stateDiscriminant,
                 serializedCreatedAt,
+                // Convert null -> undefined so Dexie doesn't index missing values
+                consumedBlockHeight: consumedBlockHeight ?? undefined,
+                consumedTxOrder: consumedTxOrder ?? undefined,
+                consumerAccountId: consumerAccountId ?? undefined,
             };
-            await tx.inputNotes.put(data);
+            await t.inputNotes.put(data);
             const noteScriptData = {
                 scriptRoot,
                 serializedNoteScript,
             };
-            await tx.notesScripts.put(noteScriptData);
+            await t.notesScripts.put(noteScriptData);
         }
         catch (error) {
             logWebStoreError(error, `Error inserting note: ${noteId}`);
         }
-    });
+    };
+    if (tx)
+        return doWork(tx);
+    return db.dexie.transaction("rw", db.inputNotes, db.notesScripts, doWork);
 }
-export async function upsertOutputNote(dbId, noteId, assets, recipientDigest, metadata, nullifier, expectedHeight, stateDiscriminant, state) {
+// When a consumer is set, uses the [consumedBlockHeight+consumedTxOrder+noteId] compound
+// index for cursor-based iteration.
+export async function getInputNoteByOffset(dbId, states, consumerAccountId, blockStart, blockEnd, offset) {
+    try {
+        const db = getDatabase(dbId);
+        if (consumerAccountId != null) {
+            // Cursor-based path: iterate the compound index in order, filter lazily.
+            const results = await db.inputNotes
+                .orderBy("[consumedBlockHeight+consumedTxOrder+noteId]")
+                .filter((n) => {
+                if (states.length > 0 && !states.includes(n.stateDiscriminant))
+                    return false;
+                if (n.consumerAccountId !== consumerAccountId)
+                    return false;
+                if (blockStart != null &&
+                    (n.consumedBlockHeight == null ||
+                        n.consumedBlockHeight < blockStart))
+                    return false;
+                if (blockEnd != null &&
+                    (n.consumedBlockHeight == null || n.consumedBlockHeight > blockEnd))
+                    return false;
+                return true;
+            })
+                .offset(offset)
+                .limit(1)
+                .toArray();
+            if (results.length === 0)
+                return [];
+            return await processInputNotes(dbId, results);
+        }
+        // Fallback: load all matching notes, sort in memory, pick one.
+        let notes;
+        if (states.length === 0) {
+            notes = await db.inputNotes.toArray();
+        }
+        else {
+            notes = await db.inputNotes
+                .where("stateDiscriminant")
+                .anyOf(states)
+                .toArray();
+        }
+        if (blockStart != null) {
+            notes = notes.filter((n) => n.consumedBlockHeight != null && n.consumedBlockHeight >= blockStart);
+        }
+        if (blockEnd != null) {
+            notes = notes.filter((n) => n.consumedBlockHeight != null && n.consumedBlockHeight <= blockEnd);
+        }
+        notes.sort((a, b) => {
+            const aH = a.consumedBlockHeight;
+            const bH = b.consumedBlockHeight;
+            if (aH == null && bH != null)
+                return 1;
+            if (aH != null && bH == null)
+                return -1;
+            if (aH != null && bH != null && aH !== bH)
+                return aH - bH;
+            const aO = a.consumedTxOrder;
+            const bO = b.consumedTxOrder;
+            if (aO == null && bO != null)
+                return 1;
+            if (aO != null && bO == null)
+                return -1;
+            if (aO != null && bO != null && aO !== bO)
+                return aO - bO;
+            if (a.noteId < b.noteId)
+                return -1;
+            if (a.noteId > b.noteId)
+                return 1;
+            return 0;
+        });
+        const note = notes[offset];
+        if (!note)
+            return [];
+        return await processInputNotes(dbId, [note]);
+    }
+    catch (err) {
+        logWebStoreError(err, "Failed to get input note by offset");
+    }
+}
+export async function upsertOutputNote(dbId, noteId, assets, recipientDigest, metadata, nullifier, expectedHeight, stateDiscriminant, state, tx) {
     const db = getDatabase(dbId);
-    return db.dexie.transaction("rw", db.outputNotes, db.notesScripts, async (tx) => {
+    const doWork = async (t) => {
         try {
             const data = {
                 noteId,
@@ -147,12 +233,15 @@ export async function upsertOutputNote(dbId, noteId, assets, recipientDigest, me
                 stateDiscriminant,
                 state,
             };
-            await tx.outputNotes.put(data);
+            await t.outputNotes.put(data);
         }
         catch (error) {
             logWebStoreError(error, `Error inserting note: ${noteId}`);
         }
-    });
+    };
+    if (tx)
+        return doWork(tx);
+    return db.dexie.transaction("rw", db.outputNotes, db.notesScripts, doWork);
 }
 async function processInputNotes(dbId, notes) {
     const db = getDatabase(dbId);

@@ -2,6 +2,8 @@ import Dexie from "dexie";
 import * as semver from "semver";
 import { logWebStoreError } from "./utils.js";
 export const CLIENT_VERSION_SETTING_KEY = "clientVersion";
+/** Mirrors `StorageSlotType::Map`, originally defined in miden-protocol. */
+export const STORAGE_SLOT_TYPE_MAP = 1;
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 // Since we can't have a pointer to a JS Object from rust, we'll
@@ -75,7 +77,7 @@ const V1_STORES = {
     [Table.Addresses]: indexes("address", "id"),
     [Table.Transactions]: indexes("id", "statusVariant"),
     [Table.TransactionScripts]: indexes("scriptRoot"),
-    [Table.InputNotes]: indexes("noteId", "nullifier", "stateDiscriminant"),
+    [Table.InputNotes]: indexes("noteId", "nullifier", "stateDiscriminant", "[consumedBlockHeight+consumedTxOrder+noteId]"),
     [Table.OutputNotes]: indexes("noteId", "recipientDigest", "stateDiscriminant", "nullifier"),
     [Table.NotesScripts]: indexes("scriptRoot"),
     [Table.StateSync]: indexes("id"),

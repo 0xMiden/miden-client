@@ -57,6 +57,19 @@ extern "C" {
         serialized_created_at: String,
         state_discriminant: u8,
         state: Vec<u8>,
+        consumed_block_height: Option<u32>,
+        consumed_tx_order: Option<u16>,
+        consumer_account_id: Option<String>,
+    ) -> js_sys::Promise;
+
+    #[wasm_bindgen(js_name = getInputNoteByOffset)]
+    pub fn idxdb_get_input_note_by_offset(
+        db_id: &str,
+        states: Vec<u8>,
+        consumer_account_id: Option<String>,
+        block_start: Option<u32>,
+        block_end: Option<u32>,
+        offset: u32,
     ) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = upsertOutputNote)]

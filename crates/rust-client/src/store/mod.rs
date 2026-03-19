@@ -96,6 +96,13 @@ pub use note_record::{
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 pub trait Store: Send + Sync {
+    /// Returns an identifier for this store (e.g. `IndexedDB` database name, `SQLite` file path).
+    ///
+    /// This allows callers to retrieve store-specific identity information (such as the `IndexedDB`
+    /// database name) for standalone operations like `exportStore`/`importStore`, without making
+    /// import/export a responsibility of the client.
+    fn identifier(&self) -> &str;
+
     /// Returns the current timestamp tracked by the store, measured in non-leap seconds since
     /// Unix epoch. If the store implementation is incapable of tracking time, it should return
     /// `None`.
@@ -130,6 +137,9 @@ pub trait Store: Send + Sync {
     // --------------------------------------------------------------------------------------------
 
     /// Retrieves the input notes from the store.
+    ///
+    /// When `filter` is [`NoteFilter::Consumed`], notes are sorted by their on-chain execution
+    /// order.
     async fn get_input_notes(&self, filter: NoteFilter)
     -> Result<Vec<InputNoteRecord>, StoreError>;
 
@@ -138,6 +148,24 @@ pub trait Store: Send + Sync {
         &self,
         filter: NoteFilter,
     ) -> Result<Vec<OutputNoteRecord>, StoreError>;
+
+    /// Retrieves a single input note at the given offset from the filtered set.
+    ///
+    /// When `consumer` is `Some`, only notes whose consumer account matches are counted
+    /// toward the offset. Optionally restricts to a block range via `block_start` and
+    /// `block_end`. Returns `None` when the offset is past the end of the matching notes.
+    ///
+    /// # Ordering
+    ///
+    /// Notes are sorted by their on-chain execution order.
+    async fn get_input_note_by_offset(
+        &self,
+        filter: NoteFilter,
+        consumer: Option<AccountId>,
+        block_start: Option<BlockNumber>,
+        block_end: Option<BlockNumber>,
+        offset: u32,
+    ) -> Result<Option<InputNoteRecord>, StoreError>;
 
     /// Returns the nullifiers of all unspent input notes.
     ///
@@ -372,7 +400,11 @@ pub trait Store: Send + Sync {
     /// Applies the state sync update to the store. An update involves:
     ///
     /// - Inserting the new block header to the store alongside new MMR peaks information.
-    /// - Updating the corresponding tracked input/output notes.
+    /// - Updating the corresponding tracked input/output notes. Note updates for consumed notes
+    ///   carry consumption metadata — `consumed_block_height`, `consumed_tx_order`, and
+    ///   `consumer_account_id` — via [`InputNoteUpdate`](crate::note::InputNoteUpdate).
+    ///   Implementations must persist these fields so that ordered queries (see
+    ///   [`Store::get_input_note_by_offset`]) work correctly.
     /// - Removing note tags that are no longer relevant.
     /// - Updating transactions in the store, marking as `committed` or `discarded`.
     ///   - In turn, validating private account's state transitions. If a private account's
@@ -571,18 +603,6 @@ pub trait Store: Send + Sync {
         &self,
         account_id: AccountId,
     ) -> Result<Option<AccountRecord>, StoreError>;
-}
-
-/// Extension trait for [`Store`] implementations that support export/import of the full store
-/// contents as a serialized string. This is primarily used by web-based stores (e.g. `IndexedDB`).
-#[cfg(target_arch = "wasm32")]
-#[async_trait::async_trait(?Send)]
-pub trait WebStore: Store {
-    /// Exports the entire store contents as a serialized string.
-    async fn export_store(&self) -> Result<String, StoreError>;
-
-    /// Imports store contents from a serialized string, replacing all existing data.
-    async fn import_store(&self, data: String) -> Result<(), StoreError>;
 }
 
 // PARTIAL BLOCKCHAIN NODE FILTER

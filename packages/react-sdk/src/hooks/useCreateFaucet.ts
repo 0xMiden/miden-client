@@ -80,7 +80,7 @@ export function useCreateFaucet(): UseCreateFaucetResult {
             false, // nonFungible - currently only fungible faucets supported
             options.tokenSymbol,
             decimals,
-            options.maxSupply,
+            BigInt(options.maxSupply),
             authScheme
           );
           const accounts = await client.getAccounts();

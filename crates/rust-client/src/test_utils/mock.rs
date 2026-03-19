@@ -506,7 +506,7 @@ impl NodeRpcClient for MockRpcApi {
             AccountStateAt::ChainTip => mock_chain.latest_block_header().block_num(),
         };
 
-        let headers = if account_id.is_public() {
+        let headers = if account_id.has_public_state() {
             let account = mock_chain.committed_account(account_id).unwrap();
 
             let mut map_details = vec![];
