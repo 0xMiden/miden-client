@@ -20,8 +20,9 @@ const FALLBACK_RETRY_DELAY_MS: u64 = 250;
 /// Tracks retry attempts for a single RPC call and applies the node-provided cooldown policy.
 ///
 /// The state is intentionally tiny: it only counts how many retries have already been attempted.
-/// Delay selection is derived from the current gRPC [`Status`], preferring the `retry-after`
-/// response metadata when present and falling back to [`FALLBACK_RETRY_DELAY_MS`] otherwise.
+/// Delay selection is derived from the current gRPC [`Status`], preferring a non-zero
+/// `retry-after` response metadata value when present and falling back to
+/// [`FALLBACK_RETRY_DELAY_MS`] otherwise.
 pub(super) struct RetryState {
     attempt: u32,
 }
@@ -42,8 +43,7 @@ impl RetryState {
             return false;
         }
 
-        let delay =
-            extract_retry_after(status).unwrap_or(Duration::from_millis(FALLBACK_RETRY_DELAY_MS));
+        let delay = retry_delay(status);
 
         warn!(
             attempt = self.attempt + 1,
@@ -64,6 +64,12 @@ fn is_retryable(status: &Status) -> bool {
     matches!(status.code(), tonic::Code::ResourceExhausted | tonic::Code::Unavailable)
 }
 
+fn retry_delay(status: &Status) -> Duration {
+    extract_retry_after(status)
+        .filter(|delay| !delay.is_zero())
+        .unwrap_or(Duration::from_millis(FALLBACK_RETRY_DELAY_MS))
+}
+
 fn extract_retry_after(status: &Status) -> Option<Duration> {
     status
         .metadata()
@@ -82,4 +88,28 @@ async fn async_sleep(duration: Duration) {
 #[cfg(target_arch = "wasm32")]
 async fn async_sleep(duration: Duration) {
     gloo_timers::future::sleep(duration).await;
+}
+
+#[cfg(test)]
+mod tests {
+    use core::time::Duration;
+
+    use tonic::metadata::MetadataMap;
+    use tonic::{Code, Status};
+
+    use super::{FALLBACK_RETRY_DELAY_MS, retry_delay};
+
+    fn status_with_retry_after(retry_after: &str) -> Status {
+        let mut metadata = MetadataMap::new();
+        metadata.insert("retry-after", retry_after.parse().unwrap());
+        Status::with_metadata(Code::ResourceExhausted, "Too Many Requests! Wait for 0s", metadata)
+    }
+
+    #[test]
+    fn zero_retry_after_uses_fallback_delay() {
+        assert_eq!(
+            retry_delay(&status_with_retry_after("0")),
+            Duration::from_millis(FALLBACK_RETRY_DELAY_MS)
+        );
+    }
 }
