@@ -1,11 +1,8 @@
 # Changelog
 
-## 0.13.3 (2026-03-16)
+## 0.13.4 (2026-03-20)
 
 * [FIX][rust,web] Fixed `sync_state()` invoking the external signer (e.g. wallet extension) during note consumability checks, causing repeated confirmation popups on every sync cycle. `NoteScreener` no longer attaches the `TransactionAuthenticator` when trial-executing consume transactions; accounts requiring auth now return `ConsumableWithAuthorization` instead ([#1905](https://github.com/0xMiden/miden-client/pull/1905)).
-* [FIX][rust] Fixed redundant `/GetAccount` RPC calls during `sync_state()` — a public account active across N sync steps now triggers exactly 1 fetch instead of N ([#1876](https://github.com/0xMiden/miden-client/pull/1876)).
-* [FIX] Deduplicated storage map entries returned by the `SyncAccountStorageMaps` RPC endpoint, keeping only the latest value per key. Previously, accounts with storage map keys updated across multiple blocks would fail to load ([#1902](https://github.com/0xMiden/miden-client/pull/1902)).
-* [FIX][web] Fixed `PrematureCommitError` crash during `syncState()` by moving all IndexedDB writes into a single Dexie transaction instead of spawning competing inner transactions ([#1876](https://github.com/0xMiden/miden-client/pull/1876)).
 * [FEATURE][web] Exposed `getAccountProof` in the `RpcClient`, accepting optional `AccountStorageRequirements` and block number parameters to fetch specific storage maps without full account reconstruction ([#1917](https://github.com/0xMiden/miden-client/pull/1917)).
 * [FEATURE][web] Exposed `syncStorageMaps` in the `RpcClient` for paginated retrieval of large storage maps ([#1917](https://github.com/0xMiden/miden-client/pull/1917)).
 * [FEATURE][rust] Added `storage_details()` and `find_map_details()` accessors to `AccountProof` for direct access to storage map data ([#1917](https://github.com/0xMiden/miden-client/pull/1917)).
