@@ -6,13 +6,11 @@ use tracing::warn;
 // CONSTS
 // ================================================================================================
 
-// TODO: Make these configurable at the tonic client level
+/// Default maximum number of retry attempts for rate-limited requests.
+pub(super) const DEFAULT_MAX_RETRIES: u32 = 5;
 
-/// Maximum number of retry attempts for rate-limited requests.
-const MAX_RETRIES: u32 = 5;
-
-/// Fallback delay when no `retry-after` header is present.
-const FALLBACK_RETRY_DELAY_MS: u64 = 250;
+/// Default fallback delay (in milliseconds) when no `retry-after` header is present.
+pub(super) const DEFAULT_RETRY_INTERVAL_MS: u64 = 250;
 
 // RETRY STATE
 // ================================================================================================
@@ -21,16 +19,18 @@ const FALLBACK_RETRY_DELAY_MS: u64 = 250;
 ///
 /// The state is intentionally tiny: it only counts how many retries have already been attempted.
 /// Delay selection is derived from the current gRPC [`Status`], preferring a non-zero
-/// `retry-after` response metadata value when present and falling back to
-/// [`FALLBACK_RETRY_DELAY_MS`] otherwise.
+/// `retry-after` response metadata value when present and falling back to the configured
+/// retry interval otherwise.
 pub(super) struct RetryState {
     attempt: u32,
+    max_retries: u32,
+    retry_interval_ms: u64,
 }
 
 impl RetryState {
     /// Creates a new retry state for a fresh RPC call.
-    pub(super) const fn new() -> Self {
-        Self { attempt: 0 }
+    pub(super) const fn new(max_retries: u32, retry_interval_ms: u64) -> Self {
+        Self { attempt: 0, max_retries, retry_interval_ms }
     }
 
     /// Applies retry policy for the provided status.
@@ -39,11 +39,11 @@ impl RetryState {
     /// attempt limit has not been reached. Returns `false` for non-retryable statuses or once the
     /// retry budget is exhausted.
     pub(super) async fn should_retry(&mut self, status: &Status) -> bool {
-        if self.attempt >= MAX_RETRIES || !is_retryable(status) {
+        if self.attempt >= self.max_retries || !is_retryable(status) {
             return false;
         }
 
-        let delay = retry_delay(status);
+        let delay = retry_delay(status, self.retry_interval_ms);
 
         warn!(
             attempt = self.attempt + 1,
@@ -64,10 +64,10 @@ fn is_retryable(status: &Status) -> bool {
     matches!(status.code(), tonic::Code::ResourceExhausted | tonic::Code::Unavailable)
 }
 
-fn retry_delay(status: &Status) -> Duration {
+fn retry_delay(status: &Status, fallback_ms: u64) -> Duration {
     extract_retry_after(status)
         .filter(|delay| !delay.is_zero())
-        .unwrap_or(Duration::from_millis(FALLBACK_RETRY_DELAY_MS))
+        .unwrap_or(Duration::from_millis(fallback_ms))
 }
 
 fn extract_retry_after(status: &Status) -> Option<Duration> {
@@ -97,7 +97,7 @@ mod tests {
     use tonic::metadata::MetadataMap;
     use tonic::{Code, Status};
 
-    use super::{FALLBACK_RETRY_DELAY_MS, retry_delay};
+    use super::{DEFAULT_RETRY_INTERVAL_MS, retry_delay};
 
     fn status_with_retry_after(retry_after: &str) -> Status {
         let mut metadata = MetadataMap::new();
@@ -108,8 +108,8 @@ mod tests {
     #[test]
     fn zero_retry_after_uses_fallback_delay() {
         assert_eq!(
-            retry_delay(&status_with_retry_after("0")),
-            Duration::from_millis(FALLBACK_RETRY_DELAY_MS)
+            retry_delay(&status_with_retry_after("0"), DEFAULT_RETRY_INTERVAL_MS),
+            Duration::from_millis(DEFAULT_RETRY_INTERVAL_MS)
         );
     }
 }

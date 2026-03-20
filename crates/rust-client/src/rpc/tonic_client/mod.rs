@@ -143,6 +143,10 @@ pub struct GrpcClient {
     genesis_commitment: RwLock<Option<Word>>,
     /// Cached RPC limits fetched from the node.
     limits: RwLock<Option<RpcLimits>>,
+    /// Maximum number of retry attempts for rate-limited or transiently unavailable requests.
+    max_retries: u32,
+    /// Fallback retry interval in milliseconds when no `retry-after` header is present.
+    retry_interval_ms: u64,
 }
 
 impl GrpcClient {
@@ -155,7 +159,25 @@ impl GrpcClient {
             timeout_ms,
             genesis_commitment: RwLock::new(None),
             limits: RwLock::new(None),
+            max_retries: retry::DEFAULT_MAX_RETRIES,
+            retry_interval_ms: retry::DEFAULT_RETRY_INTERVAL_MS,
         }
+    }
+
+    /// Sets the maximum number of retry attempts for rate-limited or transiently unavailable
+    /// requests. Defaults to 5.
+    #[must_use]
+    pub fn with_max_retries(mut self, max_retries: u32) -> Self {
+        self.max_retries = max_retries;
+        self
+    }
+
+    /// Sets the fallback retry interval in milliseconds, used when the server does not provide
+    /// a `retry-after` header. Defaults to 250ms.
+    #[must_use]
+    pub fn with_retry_interval_ms(mut self, retry_interval_ms: u64) -> Self {
+        self.retry_interval_ms = retry_interval_ms;
+        self
     }
 
     /// Takes care of establishing the RPC connection if not connected yet. It ensures that the
@@ -213,7 +235,7 @@ impl GrpcClient {
         F: FnMut(ApiClient) -> Fut,
         Fut: FutureMaybeSend<Result<tonic::Response<T>, Status>>,
     {
-        let mut retry_state = retry::RetryState::new();
+        let mut retry_state = retry::RetryState::new(self.max_retries, self.retry_interval_ms);
 
         loop {
             let rpc_api = self.ensure_connected().await?;
