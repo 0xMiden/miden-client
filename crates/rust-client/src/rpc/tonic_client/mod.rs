@@ -46,7 +46,10 @@ use crate::rpc::{AccountStateAt, generated as proto};
 use crate::rpc::domain::account::AccountStorageRequirements;
 
 mod api_client;
+mod retry;
+
 use api_client::api_client_wrapper::ApiClient;
+use retry::RetryState;
 
 /// Tracks the pagination state for block-driven endpoints.
 struct BlockPagination {
@@ -217,7 +220,6 @@ impl GrpcClient {
         &self,
         account_id: AccountId,
     ) -> Result<(BlockNumber, AccountProof), RpcError> {
-        let mut rpc_api = self.ensure_connected().await?;
         let has_public_state = account_id.has_public_state();
         let account_request = {
             AccountRequest {
@@ -240,11 +242,14 @@ impl GrpcClient {
                 },
             }
         };
-        let account_response = rpc_api
-            .get_account(account_request)
-            .await
-            .map_err(|status| self.rpc_error_from_status(RpcEndpoint::GetAccount, status))?
-            .into_inner();
+        let mut retry = RetryState::new(RpcEndpoint::GetAccount);
+        let account_response = loop {
+            let mut rpc_api = self.ensure_connected().await?;
+            match rpc_api.get_account(account_request.clone()).await {
+                Ok(response) => break response.into_inner(),
+                Err(status) => retry.maybe_retry(status, self).await?,
+            }
+        };
         let block_number = account_response.block_num.ok_or(RpcError::ExpectedDataMissing(
             "GetAccountDetails returned an account without a matching block number for the witness"
                 .to_owned(),
@@ -277,15 +282,15 @@ impl GrpcClient {
                             .collect(),
                     }),
                 };
-                match rpc_api.get_account(account_request).await {
-                    Ok(account_proof) => account_proof.into_inner().try_into(),
-                    Err(err) => Err(RpcError::ConnectionError(
-                        format!(
-                            "failed to fetch account proof for account: {account_id}, got: {err}"
-                        )
-                        .into(),
-                    )),
-                }
+                let mut retry = RetryState::new(RpcEndpoint::GetAccount);
+                let response = loop {
+                    let mut rpc_api = self.ensure_connected().await?;
+                    match rpc_api.get_account(account_request.clone()).await {
+                        Ok(response) => break response,
+                        Err(status) => retry.maybe_retry(status, self).await?,
+                    }
+                };
+                response.into_inner().try_into()
             } else {
                 account_response.try_into()
             }
@@ -412,12 +417,14 @@ impl NodeRpcClient for GrpcClient {
             transaction_inputs: Some(transaction_inputs.to_bytes()),
         };
 
-        let mut rpc_api = self.ensure_connected().await?;
-
-        let api_response = rpc_api
-            .submit_proven_transaction(request)
-            .await
-            .map_err(|status| self.rpc_error_from_status(RpcEndpoint::SubmitProvenTx, status))?;
+        let mut retry = RetryState::new(RpcEndpoint::SubmitProvenTx);
+        let api_response = loop {
+            let mut rpc_api = self.ensure_connected().await?;
+            match rpc_api.submit_proven_transaction(request.clone()).await {
+                Ok(response) => break response,
+                Err(status) => retry.maybe_retry(status, self).await?,
+            }
+        };
 
         Ok(BlockNumber::from(api_response.into_inner().block_num))
     }
@@ -434,11 +441,14 @@ impl NodeRpcClient for GrpcClient {
 
         info!("Calling GetBlockHeaderByNumber: {:?}", request);
 
-        let mut rpc_api = self.ensure_connected().await?;
-
-        let api_response = rpc_api.get_block_header_by_number(request).await.map_err(|status| {
-            self.rpc_error_from_status(RpcEndpoint::GetBlockHeaderByNumber, status)
-        })?;
+        let mut retry = RetryState::new(RpcEndpoint::GetBlockHeaderByNumber);
+        let api_response = loop {
+            let mut rpc_api = self.ensure_connected().await?;
+            match rpc_api.get_block_header_by_number(request.clone()).await {
+                Ok(response) => break response,
+                Err(status) => retry.maybe_retry(status, self).await?,
+            }
+        };
 
         let response = api_response.into_inner();
 
@@ -479,12 +489,14 @@ impl NodeRpcClient for GrpcClient {
                 ids: chunk.iter().map(|id| (*id).into()).collect(),
             };
 
-            let mut rpc_api = self.ensure_connected().await?;
-
-            let api_response = rpc_api
-                .get_notes_by_id(request)
-                .await
-                .map_err(|status| self.rpc_error_from_status(RpcEndpoint::GetNotesById, status))?;
+            let mut retry = RetryState::new(RpcEndpoint::GetNotesById);
+            let api_response = loop {
+                let mut rpc_api = self.ensure_connected().await?;
+                match rpc_api.get_notes_by_id(request.clone()).await {
+                    Ok(response) => break response,
+                    Err(status) => retry.maybe_retry(status, self).await?,
+                }
+            };
 
             let response_notes = api_response
                 .into_inner()
@@ -510,12 +522,14 @@ impl NodeRpcClient for GrpcClient {
 
         let request = proto::rpc::SyncChainMmrRequest { block_range };
 
-        let mut rpc_api = self.ensure_connected().await?;
-
-        let response = rpc_api
-            .sync_chain_mmr(request)
-            .await
-            .map_err(|status| self.rpc_error_from_status(RpcEndpoint::SyncChainMmr, status))?;
+        let mut retry = RetryState::new(RpcEndpoint::SyncChainMmr);
+        let response = loop {
+            let mut rpc_api = self.ensure_connected().await?;
+            match rpc_api.sync_chain_mmr(request.clone()).await {
+                Ok(response) => break response,
+                Err(status) => retry.maybe_retry(status, self).await?,
+            }
+        };
 
         response.into_inner().try_into()
     }
@@ -615,8 +629,6 @@ impl NodeRpcClient for GrpcClient {
             known_codes_by_commitment.insert(account_code.commitment(), account_code);
         }
 
-        let mut rpc_api = self.ensure_connected().await?;
-
         let storage_maps: Vec<StorageMapDetailRequest> = storage_requirements.clone().into();
 
         // Only request details for accounts with public state (Public or Network);
@@ -644,11 +656,14 @@ impl NodeRpcClient for GrpcClient {
             details: account_details,
         };
 
-        let response = rpc_api
-            .get_account(request)
-            .await
-            .map_err(|status| self.rpc_error_from_status(RpcEndpoint::GetAccount, status))?
-            .into_inner();
+        let mut retry = RetryState::new(RpcEndpoint::GetAccount);
+        let response = loop {
+            let mut rpc_api = self.ensure_connected().await?;
+            match rpc_api.get_account(request.clone()).await {
+                Ok(response) => break response.into_inner(),
+                Err(status) => retry.maybe_retry(status, self).await?,
+            }
+        };
 
         let account_witness: AccountWitness = response
             .witness
@@ -696,12 +711,14 @@ impl NodeRpcClient for GrpcClient {
 
         let request = proto::rpc::SyncNotesRequest { block_range, note_tags };
 
-        let mut rpc_api = self.ensure_connected().await?;
-
-        let response = rpc_api
-            .sync_notes(request)
-            .await
-            .map_err(|status| self.rpc_error_from_status(RpcEndpoint::SyncNotes, status))?;
+        let mut retry = RetryState::new(RpcEndpoint::SyncNotes);
+        let response = loop {
+            let mut rpc_api = self.ensure_connected().await?;
+            match rpc_api.sync_notes(request.clone()).await {
+                Ok(response) => break response,
+                Err(status) => retry.maybe_retry(status, self).await?,
+            }
+        };
 
         response.into_inner().try_into()
     }
@@ -716,9 +733,6 @@ impl NodeRpcClient for GrpcClient {
 
         let limits = self.get_rpc_limits().await?;
         let mut all_nullifiers = BTreeSet::new();
-
-        // Establish RPC connection once before the loop
-        let mut rpc_api = self.ensure_connected().await?;
 
         // If the prefixes are too many, we need to chunk them into smaller groups to avoid
         // violating the RPC limit.
@@ -735,9 +749,14 @@ impl NodeRpcClient for GrpcClient {
                     }),
                 };
 
-                let response = rpc_api.sync_nullifiers(request).await.map_err(|status| {
-                    self.rpc_error_from_status(RpcEndpoint::SyncNullifiers, status)
-                })?;
+                let mut retry = RetryState::new(RpcEndpoint::SyncNullifiers);
+                let response = loop {
+                    let mut rpc_api = self.ensure_connected().await?;
+                    match rpc_api.sync_nullifiers(request.clone()).await {
+                        Ok(response) => break response,
+                        Err(status) => retry.maybe_retry(status, self).await?,
+                    }
+                };
                 let response = response.into_inner();
 
                 // Convert nullifiers for this batch
@@ -786,11 +805,14 @@ impl NodeRpcClient for GrpcClient {
                 nullifiers: chunk.iter().map(|nul| nul.as_word().into()).collect(),
             };
 
-            let mut rpc_api = self.ensure_connected().await?;
-
-            let response = rpc_api.check_nullifiers(request).await.map_err(|status| {
-                self.rpc_error_from_status(RpcEndpoint::CheckNullifiers, status)
-            })?;
+            let mut retry = RetryState::new(RpcEndpoint::CheckNullifiers);
+            let response = loop {
+                let mut rpc_api = self.ensure_connected().await?;
+                match rpc_api.check_nullifiers(request.clone()).await {
+                    Ok(response) => break response,
+                    Err(status) => retry.maybe_retry(status, self).await?,
+                }
+            };
 
             let mut response = response.into_inner();
             let chunk_proofs = response
@@ -806,12 +828,14 @@ impl NodeRpcClient for GrpcClient {
     async fn get_block_by_number(&self, block_num: BlockNumber) -> Result<ProvenBlock, RpcError> {
         let request = proto::blockchain::BlockNumber { block_num: block_num.as_u32() };
 
-        let mut rpc_api = self.ensure_connected().await?;
-
-        let response = rpc_api
-            .get_block_by_number(request)
-            .await
-            .map_err(|status| self.rpc_error_from_status(RpcEndpoint::GetBlockByNumber, status))?;
+        let mut retry = RetryState::new(RpcEndpoint::GetBlockByNumber);
+        let response = loop {
+            let mut rpc_api = self.ensure_connected().await?;
+            match rpc_api.get_block_by_number(request.clone()).await {
+                Ok(response) => break response,
+                Err(status) => retry.maybe_retry(status, self).await?,
+            }
+        };
 
         let response = response.into_inner();
         let block =
@@ -825,11 +849,14 @@ impl NodeRpcClient for GrpcClient {
     async fn get_note_script_by_root(&self, root: Word) -> Result<NoteScript, RpcError> {
         let request = proto::note::NoteScriptRoot { root: Some(root.into()) };
 
-        let mut rpc_api = self.ensure_connected().await?;
-
-        let response = rpc_api.get_note_script_by_root(request).await.map_err(|status| {
-            self.rpc_error_from_status(RpcEndpoint::GetNoteScriptByRoot, status)
-        })?;
+        let mut retry = RetryState::new(RpcEndpoint::GetNoteScriptByRoot);
+        let response = loop {
+            let mut rpc_api = self.ensure_connected().await?;
+            match rpc_api.get_note_script_by_root(request.clone()).await {
+                Ok(response) => break response,
+                Err(status) => retry.maybe_retry(status, self).await?,
+            }
+        };
 
         let response = response.into_inner();
         let note_script = NoteScript::try_from(
@@ -847,7 +874,6 @@ impl NodeRpcClient for GrpcClient {
         block_to: Option<BlockNumber>,
         account_id: AccountId,
     ) -> Result<StorageMapInfo, RpcError> {
-        let mut rpc_api = self.ensure_connected().await?;
         let mut pagination = BlockPagination::new(block_from, block_to);
         let mut updates = Vec::new();
 
@@ -859,9 +885,14 @@ impl NodeRpcClient for GrpcClient {
                 }),
                 account_id: Some(account_id.into()),
             };
-            let response = rpc_api.sync_account_storage_maps(request).await.map_err(|status| {
-                self.rpc_error_from_status(RpcEndpoint::SyncStorageMaps, status)
-            })?;
+            let mut retry = RetryState::new(RpcEndpoint::SyncStorageMaps);
+            let response = loop {
+                let mut rpc_api = self.ensure_connected().await?;
+                match rpc_api.sync_account_storage_maps(request.clone()).await {
+                    Ok(response) => break response,
+                    Err(status) => retry.maybe_retry(status, self).await?,
+                }
+            };
             let response = response.into_inner();
             let page = response
                 .pagination_info
@@ -893,7 +924,6 @@ impl NodeRpcClient for GrpcClient {
         block_to: Option<BlockNumber>,
         account_id: AccountId,
     ) -> Result<AccountVaultInfo, RpcError> {
-        let mut rpc_api = self.ensure_connected().await?;
         let mut pagination = BlockPagination::new(block_from, block_to);
         let mut updates = Vec::new();
 
@@ -905,9 +935,14 @@ impl NodeRpcClient for GrpcClient {
                 }),
                 account_id: Some(account_id.into()),
             };
-            let response = rpc_api.sync_account_vault(request).await.map_err(|status| {
-                self.rpc_error_from_status(RpcEndpoint::SyncAccountVault, status)
-            })?;
+            let mut retry = RetryState::new(RpcEndpoint::SyncAccountVault);
+            let response = loop {
+                let mut rpc_api = self.ensure_connected().await?;
+                match rpc_api.sync_account_vault(request.clone()).await {
+                    Ok(response) => break response,
+                    Err(status) => retry.maybe_retry(status, self).await?,
+                }
+            };
             let response = response.into_inner();
             let page = response
                 .pagination_info
@@ -948,12 +983,14 @@ impl NodeRpcClient for GrpcClient {
 
         let request = proto::rpc::SyncTransactionsRequest { block_range, account_ids };
 
-        let mut rpc_api = self.ensure_connected().await?;
-
-        let response = rpc_api
-            .sync_transactions(request)
-            .await
-            .map_err(|status| self.rpc_error_from_status(RpcEndpoint::SyncTransactions, status))?;
+        let mut retry = RetryState::new(RpcEndpoint::SyncTransactions);
+        let response = loop {
+            let mut rpc_api = self.ensure_connected().await?;
+            match rpc_api.sync_transactions(request.clone()).await {
+                Ok(response) => break response,
+                Err(status) => retry.maybe_retry(status, self).await?,
+            }
+        };
 
         response.into_inner().try_into()
     }
@@ -971,11 +1008,14 @@ impl NodeRpcClient for GrpcClient {
         }
 
         // Fetch limits from the node
-        let mut rpc_api = self.ensure_connected().await?;
-        let response = rpc_api
-            .get_limits(())
-            .await
-            .map_err(|status| self.rpc_error_from_status(RpcEndpoint::GetLimits, status))?;
+        let mut retry = RetryState::new(RpcEndpoint::GetLimits);
+        let response = loop {
+            let mut rpc_api = self.ensure_connected().await?;
+            match rpc_api.get_limits(()).await {
+                Ok(response) => break response,
+                Err(status) => retry.maybe_retry(status, self).await?,
+            }
+        };
         let limits = RpcLimits::try_from(response.into_inner()).map_err(RpcError::from)?;
 
         // Cache fetched values
