@@ -3,35 +3,47 @@ use core::time::Duration;
 use tonic::Status;
 use tracing::warn;
 
+// CONSTS
+// ================================================================================================
+
+// TODO: Make these configurable at the tonic client level
+
 /// Maximum number of retry attempts for rate-limited requests.
 const MAX_RETRIES: u32 = 5;
 
 /// Fallback delay when no `retry-after` header is present.
-const FALLBACK_RETRY_DELAY_MS: u64 = 500;
+const FALLBACK_RETRY_DELAY_MS: u64 = 250;
 
-/// Minimum retry delay even when `retry-after: 0` is specified,
-/// to avoid a tight retry loop.
-const MIN_RETRY_DELAY_MS: u64 = 100;
+// RETRY STATE
+// ================================================================================================
 
+/// Tracks retry attempts for a single RPC call and applies the node-provided cooldown policy.
+///
+/// The state is intentionally tiny: it only counts how many retries have already been attempted.
+/// Delay selection is derived from the current gRPC [`Status`], preferring the `retry-after`
+/// response metadata when present and falling back to [`FALLBACK_RETRY_DELAY_MS`] otherwise.
 pub(super) struct RetryState {
     attempt: u32,
 }
 
 impl RetryState {
+    /// Creates a new retry state for a fresh RPC call.
     pub(super) const fn new() -> Self {
         Self { attempt: 0 }
     }
 
-    /// If the status is retryable and we haven't exhausted attempts, sleeps and
-    /// returns `true` (caller should retry). Otherwise returns `false`.
+    /// Applies retry policy for the provided status.
+    ///
+    /// Returns `true` after waiting the requested cooldown when the error is retryable and the
+    /// attempt limit has not been reached. Returns `false` for non-retryable statuses or once the
+    /// retry budget is exhausted.
     pub(super) async fn should_retry(&mut self, status: &Status) -> bool {
         if self.attempt >= MAX_RETRIES || !is_retryable(status) {
             return false;
         }
 
-        let delay = extract_retry_after(status)
-            .unwrap_or(Duration::from_millis(FALLBACK_RETRY_DELAY_MS))
-            .max(Duration::from_millis(MIN_RETRY_DELAY_MS));
+        let delay =
+            extract_retry_after(status).unwrap_or(Duration::from_millis(FALLBACK_RETRY_DELAY_MS));
 
         warn!(
             attempt = self.attempt + 1,
@@ -44,6 +56,9 @@ impl RetryState {
         true
     }
 }
+
+// HELPERS
+// ================================================================================================
 
 fn is_retryable(status: &Status) -> bool {
     matches!(status.code(), tonic::Code::ResourceExhausted | tonic::Code::Unavailable)

@@ -197,7 +197,7 @@ impl GrpcClient {
     /// Executes an RPC call and automatically retries transient failures.
     ///
     /// The provided closure is invoked with a freshly connected [`ApiClient`] on each attempt.
-    /// Retries are delegated to [`retry::should_retry`], which currently handles gRPC
+    /// Retries are delegated to [`retry::RetryState`], which currently handles gRPC
     /// [`tonic::Code::ResourceExhausted`] and [`tonic::Code::Unavailable`] responses, including
     /// honoring cooldown delays when the node provides them.
     ///
