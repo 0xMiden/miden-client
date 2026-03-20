@@ -24,7 +24,6 @@ use miden_protocol::crypto::merkle::smt::SmtProof;
 use miden_tx::utils::{Deserializable, Serializable, ToHex};
 use thiserror::Error;
 
-use crate::alloc::borrow::ToOwned;
 use crate::alloc::string::ToString;
 use crate::rpc::RpcError;
 use crate::rpc::domain::MissingFieldHelper;
@@ -268,7 +267,7 @@ impl proto::rpc::account_response::AccountDetails {
             let requested_keys = storage_requirements
                 .inner()
                 .get(&map_detail.slot_name)
-                .map(|keys| keys.as_slice())
+                .map(Vec::as_slice)
                 .unwrap_or_default();
 
             if let StorageMapEntries::EntriesWithProofs(witnesses) = &map_detail.entries {
@@ -364,7 +363,7 @@ impl TryFrom<proto::rpc::AccountStorageDetails> for AccountStorageDetails {
         let map_details = value
             .map_details
             .into_iter()
-            .map(|entry| entry.try_into())
+            .map(core::convert::TryInto::try_into)
             .collect::<Result<Vec<AccountStorageMapDetails>, RpcError>>()?;
 
         Ok(Self { header, map_details })
@@ -636,14 +635,17 @@ impl TryFrom<proto::rpc::AccountResponse> for AccountProof {
     fn try_from(account_proof: proto::rpc::AccountResponse) -> Result<Self, Self::Error> {
         let Some(witness) = account_proof.witness else {
             return Err(RpcError::ExpectedDataMissing(
-                "GetAccountProof returned an account without witness".to_owned(),
+                "GetAccountProof returned an account without witness".to_string(),
             ));
         };
 
         let details: Option<AccountDetails> = {
             match account_proof.details {
                 None => None,
-                Some(details) => Some(details.into_domain(&BTreeMap::new(), &AccountStorageRequirements::default())?),
+                Some(details) => Some(
+                    details
+                        .into_domain(&BTreeMap::new(), &AccountStorageRequirements::default())?,
+                ),
             }
         };
         AccountProof::new(witness.try_into()?, details)
