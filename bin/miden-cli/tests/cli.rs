@@ -1320,7 +1320,7 @@ fn create_account_with_acl_auth() {
     // Create init storage data file for acl-auth with a test public key
     let init_storage_data_toml = r#"
         "miden::standards::auth::singlesig_acl::pub_key" = "0x0000000000000000000000000000000000000000000000000000000000000001"
-        "miden::standards::auth::singlesig_acl::scheme" = "Falcon512Rpo"
+        "miden::standards::auth::singlesig_acl::scheme" = "Falcon512Poseidon2"
         "miden::standards::auth::singlesig_acl::config.num_trigger_procs" = "1"
         "miden::standards::auth::singlesig_acl::config.allow_unauthorized_output_notes" = "0"
         "miden::standards::auth::singlesig_acl::config.allow_unauthorized_input_notes" = "0"

@@ -32,7 +32,7 @@ begin
     # read first word
     push.{mem_address}
     # => [data_mem_address]
-    mem_loadw_be
+    mem_loadw_le
     # => [NOTE_ARG_1]
 
     push.{expected_note_arg_1} assert_eqw.err="First note argument didn't match expected"
@@ -41,7 +41,7 @@ begin
     # read second word
     push.{mem_address_2}
     # => [data_mem_address_2]
-    mem_loadw_be
+    mem_loadw_le
     # => [NOTE_ARG_2]
 
     push.{expected_note_arg_2} assert_eqw.err="Second note argument didn't match expected"
@@ -55,12 +55,14 @@ begin
     eq.2 assert.err="P2ID script expects exactly 2 note storage items"
     # => [storage_ptr, EMPTY_WORD]
 
-    # read the target account id from the note storage
-    mem_loadw_be drop drop
-    # => [target_account_id_prefix, target_account_id_suffix]
+    # read the target account ID from the note storage
+    drop
+    mem_load.1
+    mem_load.0
+    # => [target_account_id_suffix, target_account_id_prefix]
 
     exec.active_account::get_id
-    # => [account_id_prefix, account_id_suffix, target_account_id_prefix, target_account_id_suffix, ...]
+    # => [account_id_suffix, account_id_prefix, target_account_id_suffix, target_account_id_prefix, ...]
 
     # ensure account_id = target_account_id, fails otherwise
     exec.account_id::is_equal assert.err="P2ID's target account address and transaction address do not match"

@@ -143,7 +143,7 @@ pub async fn test_network_fpi(client_config: ClientConfig) -> Result<()> {
 
     assert_eq!(
         updated_network_account.storage().get_item(&COUNTER_SLOT_NAME)?,
-        Word::from([ZERO, ZERO, ZERO, Felt::new(2)])
+        Word::from([Felt::new(2), ZERO, ZERO, ZERO])
     );
 
     Ok(())

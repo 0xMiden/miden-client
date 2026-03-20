@@ -127,10 +127,7 @@ pub async fn test_fpi_execute_program(client_config: ClientConfig) -> Result<()>
         .await?;
 
     let mut expected_stack = [Felt::new(0); 16];
-    expected_stack[3] = FPI_STORAGE_VALUE[0];
-    expected_stack[2] = FPI_STORAGE_VALUE[1];
-    expected_stack[1] = FPI_STORAGE_VALUE[2];
-    expected_stack[0] = FPI_STORAGE_VALUE[3];
+    expected_stack[..4].copy_from_slice(&FPI_STORAGE_VALUE);
 
     assert_eq!(output_stack, expected_stack);
     Ok(())

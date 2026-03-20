@@ -1343,7 +1343,7 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
     let mut storage_map = StorageMap::new();
     storage_map.insert(
         StorageMapKey::new([Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)].into()),
-        [Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(1)].into(),
+        [Felt::new(1), Felt::new(0), Felt::new(0), Felt::new(0)].into(),
     )?;
 
     let map_slot_name =

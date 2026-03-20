@@ -30,10 +30,10 @@ begin
     # => [storage_ptr]
 
     # load ASSET
-    mem_loadw_be
+    mem_loadw_le
     # => [ASSET]
 
-    padw mem_loadw_be.4
+    padw mem_loadw_le.4
     # => [RECIPIENT, ASSET]
 
     # load note_type and tag from memory

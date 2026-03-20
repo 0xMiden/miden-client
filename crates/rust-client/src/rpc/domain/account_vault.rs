@@ -4,15 +4,9 @@ use alloc::vec::Vec;
 use miden_protocol::Word;
 use miden_protocol::asset::{Asset, AssetVaultKey};
 use miden_protocol::block::BlockNumber;
-use miden_tx::utils::serde::Deserializable;
 
 use crate::rpc::domain::MissingFieldHelper;
 use crate::rpc::{RpcError, generated as proto};
-
-/// Converts a Word (4 Felts) into a byte representation for deserialization.
-fn word_to_bytes(word: Word) -> Vec<u8> {
-    word.iter().flat_map(|felt| felt.as_canonical_u64().to_le_bytes()).collect()
-}
 
 // ACCOUNT VAULT INFO
 // ================================================================================================
@@ -75,26 +69,11 @@ pub struct AccountVaultUpdate {
 // ACCOUNT VAULT UPDATE CONVERSION
 // ================================================================================================
 
-impl TryFrom<proto::primitives::Asset> for Asset {
-    type Error = RpcError;
-
-    fn try_from(value: proto::primitives::Asset) -> Result<Self, Self::Error> {
-        let word: Word = value
-            .value
-            .ok_or(proto::rpc::SyncAccountVaultResponse::missing_field(stringify!(value)))?
-            .try_into()?;
-        Asset::read_from_bytes(&word_to_bytes(word))
-            .map_err(|e| RpcError::DeserializationError(e.to_string()))
-    }
-}
-
 impl TryFrom<proto::rpc::AccountVaultUpdate> for AccountVaultUpdate {
     type Error = RpcError;
 
     fn try_from(value: proto::rpc::AccountVaultUpdate) -> Result<Self, Self::Error> {
         let block_num = value.block_num;
-
-        let asset: Option<Asset> = value.asset.map(TryInto::try_into).transpose()?;
 
         let vault_key_inner: Word = value
             .vault_key
@@ -102,6 +81,27 @@ impl TryFrom<proto::rpc::AccountVaultUpdate> for AccountVaultUpdate {
             .try_into()?;
         let vault_key = AssetVaultKey::try_from(vault_key_inner)
             .map_err(|e| RpcError::InvalidResponse(e.to_string()))?;
+
+        let asset = value
+            .asset
+            .map(|asset| {
+                let asset_key: Word = asset
+                    .key
+                    .ok_or(proto::primitives::Asset::missing_field(stringify!(key)))?
+                    .try_into()?;
+                let value_word: Word = asset
+                    .value
+                    .ok_or(proto::primitives::Asset::missing_field(stringify!(value)))?
+                    .try_into()?;
+                if asset_key != vault_key_inner {
+                    return Err(RpcError::InvalidResponse(
+                        "account vault update returned mismatched asset key".to_string(),
+                    ));
+                }
+                Asset::from_key_value_words(vault_key_inner, value_word)
+                    .map_err(|e| RpcError::DeserializationError(e.to_string()))
+            })
+            .transpose()?;
 
         Ok(Self {
             block_num: block_num.into(),
