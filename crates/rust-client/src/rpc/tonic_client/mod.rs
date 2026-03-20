@@ -194,6 +194,16 @@ impl GrpcClient {
         RpcError::from_grpc_error_with_context(endpoint, status, context)
     }
 
+    /// Executes an RPC call and automatically retries transient failures.
+    ///
+    /// The provided closure is invoked with a freshly connected [`ApiClient`] on each attempt.
+    /// Retries are delegated to [`retry::should_retry`], which currently handles gRPC
+    /// [`tonic::Code::ResourceExhausted`] and [`tonic::Code::Unavailable`] responses, including
+    /// honoring cooldown delays when the node provides them.
+    ///
+    /// Returns the first successful gRPC response. If the call keeps failing after retries are
+    /// exhausted, or if the error is not retryable, this returns the corresponding [`RpcError`]
+    /// for the provided [`RpcEndpoint`].
     async fn call_with_retry<T, F, Fut>(
         &self,
         endpoint: RpcEndpoint,
@@ -231,9 +241,6 @@ impl GrpcClient {
             .map(tonic::Response::into_inner)
             .and_then(RpcStatusInfo::try_from)
     }
-
-    // GET ACCOUNT HELPERS
-    // ============================================================================================
 
     /// Given an [`AccountId`], return the proof for the account.
     ///
