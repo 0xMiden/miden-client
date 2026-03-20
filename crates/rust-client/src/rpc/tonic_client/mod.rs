@@ -444,7 +444,7 @@ impl NodeRpcClient for GrpcClient {
         let mut retry = RetryState::new(RpcEndpoint::GetBlockHeaderByNumber);
         let api_response = loop {
             let mut rpc_api = self.ensure_connected().await?;
-            match rpc_api.get_block_header_by_number(request.clone()).await {
+            match rpc_api.get_block_header_by_number(request).await {
                 Ok(response) => break response,
                 Err(status) => retry.maybe_retry(status, self).await?,
             }
@@ -525,7 +525,7 @@ impl NodeRpcClient for GrpcClient {
         let mut retry = RetryState::new(RpcEndpoint::SyncChainMmr);
         let response = loop {
             let mut rpc_api = self.ensure_connected().await?;
-            match rpc_api.sync_chain_mmr(request.clone()).await {
+            match rpc_api.sync_chain_mmr(request).await {
                 Ok(response) => break response,
                 Err(status) => retry.maybe_retry(status, self).await?,
             }
@@ -831,7 +831,7 @@ impl NodeRpcClient for GrpcClient {
         let mut retry = RetryState::new(RpcEndpoint::GetBlockByNumber);
         let response = loop {
             let mut rpc_api = self.ensure_connected().await?;
-            match rpc_api.get_block_by_number(request.clone()).await {
+            match rpc_api.get_block_by_number(request).await {
                 Ok(response) => break response,
                 Err(status) => retry.maybe_retry(status, self).await?,
             }
@@ -852,7 +852,7 @@ impl NodeRpcClient for GrpcClient {
         let mut retry = RetryState::new(RpcEndpoint::GetNoteScriptByRoot);
         let response = loop {
             let mut rpc_api = self.ensure_connected().await?;
-            match rpc_api.get_note_script_by_root(request.clone()).await {
+            match rpc_api.get_note_script_by_root(request).await {
                 Ok(response) => break response,
                 Err(status) => retry.maybe_retry(status, self).await?,
             }

@@ -102,7 +102,7 @@ impl RetryState {
         warn!(
             endpoint = %self.endpoint,
             attempt = self.attempt,
-            delay_ms = delay.as_millis() as u64,
+            delay_ms = u64::try_from(delay.as_millis()).unwrap_or(u64::MAX),
             "rate-limited by node, retrying after delay",
         );
 
