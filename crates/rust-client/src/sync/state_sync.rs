@@ -679,7 +679,6 @@ fn compute_ordered_nullifiers(transaction_records: &[RpcTransactionRecord]) -> V
     }
 
     let mut result = Vec::new();
-    let mut seen = BTreeSet::new();
 
     for txs in groups.values() {
         // Build a lookup from initial_state_commitment -> transaction record.
@@ -693,7 +692,7 @@ fn compute_ordered_nullifiers(transaction_records: &[RpcTransactionRecord]) -> V
             txs.iter().map(|tx| tx.transaction_header.final_state_commitment()).collect();
 
         // Find the chain start: the tx whose initial_state_commitment is not any other tx's
-        // final_state_commitment. Remove it from the map to begin consuming.
+        // final_state_commitment.
         let chain_start = txs
             .iter()
             .find(|tx| !final_states.contains(&tx.transaction_header.initial_state_commitment()));
@@ -702,18 +701,14 @@ fn compute_ordered_nullifiers(transaction_records: &[RpcTransactionRecord]) -> V
             continue;
         };
 
-        // Remove the start from the map and walk the chain, removing each step.
+        // Walk the chain from start, removing each step from the map.
         let mut current =
             init_to_tx.remove(&start_tx.transaction_header.initial_state_commitment());
 
         while let Some(tx) = current {
             for commitment in tx.transaction_header.input_notes().iter() {
-                let nullifier = commitment.nullifier();
-                if seen.insert(nullifier) {
-                    result.push(nullifier);
-                }
+                result.push(commitment.nullifier());
             }
-
             current = init_to_tx.remove(&tx.transaction_header.final_state_commitment());
         }
     }
