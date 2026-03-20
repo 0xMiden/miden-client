@@ -163,6 +163,12 @@ pub enum ClientError {
     AccountRecordNotFull(AccountId),
     #[error("expected partial account data for account {0}, but full data was found")]
     AccountRecordNotPartial(AccountId),
+    #[error("failed to register NTX note script with root {script_root:?}")]
+    NtxScriptRegistrationFailed {
+        script_root: Word,
+        #[source]
+        source: RpcError,
+    },
 }
 
 // CONVERSIONS

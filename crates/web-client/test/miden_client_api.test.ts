@@ -22,7 +22,7 @@ test.describe("MidenClient API - Mock Chain", () => {
       });
 
       // Mint tokens to the wallet
-      const mintTxId = await client.transactions.mint({
+      const { txId: mintTxId } = await client.transactions.mint({
         account: faucet,
         to: wallet,
         amount: 1000n,
@@ -42,7 +42,7 @@ test.describe("MidenClient API - Mock Chain", () => {
         .toString();
 
       // Consume the minted note
-      const consumeTxId = await client.transactions.consume({
+      const { txId: consumeTxId } = await client.transactions.consume({
         account: wallet,
         notes: mintedNoteId,
       });
@@ -285,7 +285,7 @@ test.describe("MidenClient API - Mock Chain", () => {
       );
 
       // Submit the pre-built request through the high-level API
-      const txId = await client.transactions.submit(faucet, mintRequest);
+      const { txId } = await client.transactions.submit(faucet, mintRequest);
 
       return {
         txId: txId.toHex(),
@@ -1015,7 +1015,7 @@ test.describe("MidenClient API - Integration", () => {
       });
 
       // Mint tokens
-      const mintTxId = await client.transactions.mint({
+      const { txId: mintTxId } = await client.transactions.mint({
         account: faucet,
         to: wallet,
         amount: 1000n,
@@ -1028,17 +1028,14 @@ test.describe("MidenClient API - Integration", () => {
         interval: 1_000,
       });
 
-      // Consume the minted note
+      // Consume the minted notes
       const consumable = await client.notes.listAvailable({
         account: wallet,
       });
-      const consumeNoteIds = consumable.map((c) =>
-        c.inputNoteRecord().id().toString()
-      );
 
-      const consumeTxId = await client.transactions.consume({
+      const { txId: consumeTxId } = await client.transactions.consume({
         account: wallet,
-        notes: consumeNoteIds,
+        notes: consumable,
       });
 
       await client.transactions.waitFor(consumeTxId.toHex(), {
@@ -1054,7 +1051,7 @@ test.describe("MidenClient API - Integration", () => {
         mintTxId: mintTxId.toHex(),
         consumeTxId: consumeTxId.toHex(),
         balance: balance.toString(),
-        consumedCount: consumeNoteIds.length,
+        consumedCount: consumable.length,
       };
     });
 
@@ -1080,7 +1077,7 @@ test.describe("MidenClient API - Integration", () => {
         maxSupply: 10_000_000n,
       });
 
-      const txId = await client.transactions.mint({
+      const { txId } = await client.transactions.mint({
         account: faucet,
         to: wallet,
         amount: 500n,
@@ -1129,7 +1126,7 @@ test.describe("MidenClient API - Integration", () => {
       });
 
       // Mint to generate a note
-      const txId = await client.transactions.mint({
+      const { txId } = await client.transactions.mint({
         account: faucet,
         to: wallet,
         amount: 500n,

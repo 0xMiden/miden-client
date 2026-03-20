@@ -1,4 +1,4 @@
-import { getDatabase, } from "./schema.js";
+import { getDatabase, STORAGE_SLOT_TYPE_MAP, } from "./schema.js";
 import { logWebStoreError, uint8ArrayToBase64 } from "./utils.js";
 function seedToBase64(seed) {
     return seed ? uint8ArrayToBase64(seed) : undefined;
@@ -106,21 +106,25 @@ export async function getAccountCode(dbId, codeRoot) {
         logWebStoreError(error, `Error fetching account code for root ${codeRoot}`);
     }
 }
-export async function getAccountStorage(dbId, accountId) {
+export async function getAccountStorage(dbId, accountId, slotNames) {
     try {
         const db = getDatabase(dbId);
-        const allMatchingRecords = await db.latestAccountStorages
-            .where("accountId")
-            .equals(accountId)
-            .toArray();
-        const slots = allMatchingRecords.map((record) => {
-            return {
-                slotName: record.slotName,
-                slotValue: record.slotValue,
-                slotType: record.slotType,
-            };
-        });
-        return slots;
+        let query = db.latestAccountStorages.where("accountId").equals(accountId);
+        let allMatchingRecords;
+        if (slotNames.length) {
+            const nameSet = new Set(slotNames);
+            allMatchingRecords = await query
+                .and((record) => nameSet.has(record.slotName))
+                .toArray();
+        }
+        else {
+            allMatchingRecords = await query.toArray();
+        }
+        return allMatchingRecords.map((record) => ({
+            slotName: record.slotName,
+            slotValue: record.slotValue,
+            slotType: record.slotType,
+        }));
     }
     catch (error) {
         logWebStoreError(error, `Error fetching account storage for account ${accountId}`);
@@ -139,20 +143,23 @@ export async function getAccountStorageMaps(dbId, accountId) {
         logWebStoreError(error, `Error fetching account storage maps for account ${accountId}`);
     }
 }
-export async function getAccountVaultAssets(dbId, accountId) {
+export async function getAccountVaultAssets(dbId, accountId, faucetIdPrefixes) {
     try {
         const db = getDatabase(dbId);
-        const allMatchingRecords = await db.latestAccountAssets
-            .where("accountId")
-            .equals(accountId)
-            .toArray();
-        const assets = allMatchingRecords.map((record) => {
-            return {
-                vaultKey: record.vaultKey,
-                asset: record.asset,
-            };
-        });
-        return assets;
+        let query = db.latestAccountAssets.where("accountId").equals(accountId);
+        let records;
+        if (faucetIdPrefixes.length) {
+            const prefixSet = new Set(faucetIdPrefixes);
+            records = await query
+                .and((record) => prefixSet.has(record.faucetIdPrefix))
+                .toArray();
+        }
+        else {
+            records = await query.toArray();
+        }
+        return records.map((record) => ({
+            asset: record.asset,
+        }));
     }
     catch (error) {
         logWebStoreError(error, `Error fetching account vault for account ${accountId}`);
@@ -301,7 +308,7 @@ export async function upsertVaultAssets(dbId, accountId, nonce, assets) {
         logWebStoreError(error, `Error inserting assets`);
     }
 }
-export async function applyTransactionDelta(dbId, accountId, nonce, updatedSlots, changedMapEntries, changedAssets, codeRoot, storageRoot, vaultRoot, committed, commitment, accountSeed) {
+export async function applyTransactionDelta(dbId, accountId, nonce, updatedSlots, changedMapEntries, changedAssets, codeRoot, storageRoot, vaultRoot, committed, commitment) {
     try {
         const db = getDatabase(dbId);
         await db.dexie.transaction("rw", [
@@ -404,7 +411,7 @@ export async function applyTransactionDelta(dbId, accountId, nonce, updatedSlots
                 vaultRoot,
                 nonce,
                 committed,
-                accountSeed,
+                accountSeed: undefined,
                 accountCommitment: commitment,
                 locked: false,
             };
@@ -658,7 +665,7 @@ async function rebuildLatestVaultAssets(db, accountId) {
 export async function undoAccountStates(dbId, accountCommitments) {
     try {
         const db = getDatabase(dbId);
-        await db.dexie.transaction("rw", [
+        const smtRoots = await db.dexie.transaction("rw", [
             db.latestAccountStorages,
             db.historicalAccountStorages,
             db.latestStorageMapEntries,
@@ -680,6 +687,25 @@ export async function undoAccountStates(dbId, accountCommitments) {
                     accountNonces.set(record.id, new Set());
                 }
                 accountNonces.get(record.id).add(record.nonce);
+            }
+            // Collect SMT roots before deletion so the Rust side can pop them from the forest.
+            const roots = [];
+            for (const record of affectedRecords) {
+                roots.push(record.vaultRoot);
+            }
+            for (const [accountId, nonces] of accountNonces) {
+                for (const nonce of nonces) {
+                    const storageEntries = await db.historicalAccountStorages
+                        .where("[accountId+nonce]")
+                        .equals([accountId, nonce])
+                        .toArray();
+                    for (const entry of storageEntries) {
+                        if (entry.slotType === STORAGE_SLOT_TYPE_MAP &&
+                            entry.slotValue != null) {
+                            roots.push(entry.slotValue);
+                        }
+                    }
+                }
             }
             // Delete matching records from historical account headers
             await db.historicalAccountHeaders
@@ -743,9 +769,12 @@ export async function undoAccountStates(dbId, accountCommitments) {
                     await rebuildLatestVaultAssets(db, accountId);
                 }
             }
+            return roots;
         });
+        return smtRoots;
     }
     catch (error) {
         logWebStoreError(error, `Error undoing account states: ${accountCommitments.join(",")}`);
+        throw error;
     }
 }

@@ -412,15 +412,8 @@ where
     }
 
     /// Returns an instance of [`note::NoteScreener`] configured for this client.
-    pub fn note_screener(&self) -> note::NoteScreener<AUTH>
-    where
-        AUTH: Sync,
-    {
-        note::NoteScreener::new(
-            self.store.clone(),
-            self.authenticator.clone(),
-            self.rpc_api.clone(),
-        )
+    pub fn note_screener(&self) -> note::NoteScreener {
+        note::NoteScreener::new(self.store.clone(), self.rpc_api.clone())
     }
 
     /// Returns a reference to the client's random number generator. This can be used to generate

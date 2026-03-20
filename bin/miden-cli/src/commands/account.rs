@@ -136,7 +136,7 @@ pub async fn show_account<AUTH>(
     let account = if let Some(account) = client.get_account(account_id).await? {
         account
     } else {
-        println!("Account {account_id} is not tracked by the client. Fetching from the network...",);
+        println!("Account {account_id} is not tracked by the client. Fetching from the network...");
 
         let rpc_client =
             GrpcClient::new(&cli_config.rpc.endpoint.clone().into(), cli_config.rpc.timeout_ms);

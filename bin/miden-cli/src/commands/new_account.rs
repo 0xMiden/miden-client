@@ -106,7 +106,7 @@ impl NewWalletCmd {
     ) -> Result<(), CliError> {
         let package_paths: Vec<PathBuf> = [PathBuf::from("basic-wallet")]
             .into_iter()
-            .chain(self.extra_packages.clone().into_iter())
+            .chain(self.extra_packages.clone())
             .collect();
 
         // Choose account type based on mutability.

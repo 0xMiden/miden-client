@@ -313,7 +313,7 @@ async fn token_symbol_mapping() -> Result<()> {
     // Create a token symbol mapping file in the MIDEN_DIR directory
     let token_symbol_map_path = temp_dir.join(MIDEN_DIR).join("token_symbol_map.toml");
     let token_symbol_map_content =
-        format!(r#"BTC = {{ id = "{fungible_faucet_account_id}", decimals = 10 }}"#,);
+        format!(r#"BTC = {{ id = "{fungible_faucet_account_id}", decimals = 10 }}"#);
     fs::write(&token_symbol_map_path, token_symbol_map_content).unwrap();
 
     sync_cli(&temp_dir);
@@ -379,7 +379,7 @@ async fn import_genesis_accounts_can_be_used_for_transactions() -> Result<()> {
 
         let cargo_workspace_dir =
             env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR is not set");
-        let source_path = format!("{cargo_workspace_dir}/../../data/{genesis_account_filename}",);
+        let source_path = format!("{cargo_workspace_dir}/../../data/{genesis_account_filename}");
 
         std::fs::copy(source_path, new_file_path).unwrap();
     }
@@ -1142,8 +1142,9 @@ fn new_wallet_cli(cli_path: &Path, storage_mode: AccountStorageMode) -> String {
         output.status.success(),
         "Failed to create wallet {}",
         String::from_utf8(output.stderr)
-            .map(|err_msg| format!("with error: {err_msg}"))
-            .unwrap_or(". Also failed to access the Command's stderr".to_string())
+            .map_or(". Also failed to access the Command's stderr".to_string(), |err_msg| format!(
+                "with error: {err_msg}"
+            ))
     );
 
     std::str::from_utf8(&output.stdout)

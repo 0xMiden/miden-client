@@ -335,11 +335,20 @@ impl GrpcClient {
                                 self.sync_storage_maps(0_u32.into(), None, account_id).await?;
                             map_cache.insert(fetched_data)
                         };
-                        let map_entries: Vec<_> = map_info
+                        // The sync endpoint may return multiple updates for the same key
+                        // across different blocks. We sort by block number so that
+                        // inserting into the map keeps only the latest value per key.
+                        let mut sorted_updates: Vec<_> = map_info
                             .updates
                             .iter()
                             .filter(|slot_info| slot_info.slot_name == *slot_header.name())
-                            .map(|slot_info| (slot_info.key, slot_info.value))
+                            .collect();
+                        sorted_updates.sort_by_key(|u| u.block_num);
+                        let map_entries: Vec<_> = sorted_updates
+                            .into_iter()
+                            .map(|u| (u.key, u.value))
+                            .collect::<BTreeMap<_, _>>()
+                            .into_iter()
                             .collect();
                         StorageMap::with_entries(map_entries)
                     } else {
@@ -543,11 +552,19 @@ impl NodeRpcClient for GrpcClient {
             let nonce = details.header.nonce();
             let assets: Vec<Asset> = {
                 if details.vault_details.too_many_assets {
-                    self.sync_account_vault(BlockNumber::from(0), None, account_id)
-                        .await?
-                        .updates
+                    let vault_info =
+                        self.sync_account_vault(BlockNumber::from(0), None, account_id).await?;
+                    // The sync endpoint may return multiple updates for the same vault key
+                    // across different blocks. We sort by block number so that
+                    // inserting into the map keeps only the latest value per key.
+                    let mut updates = vault_info.updates;
+                    updates.sort_by_key(|u| u.block_num);
+                    updates
                         .into_iter()
-                        .filter_map(|update| update.asset)
+                        .map(|u| (Word::from(u.vault_key), u.asset))
+                        .collect::<BTreeMap<_, _>>()
+                        .into_values()
+                        .flatten()
                         .collect()
                 } else {
                     details.vault_details.assets
