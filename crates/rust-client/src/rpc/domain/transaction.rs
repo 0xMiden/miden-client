@@ -168,10 +168,16 @@ impl TryFrom<proto::transaction::TransactionHeader> for TransactionHeader {
         )?;
 
         let note_commitments = value
-            .nullifiers
+            .input_notes
             .into_iter()
-            .map(|d| {
-                let word: Word = d
+            .map(|input_note| {
+                let nullifier_digest = input_note.nullifier.ok_or(
+                    RpcConversionError::MissingFieldInProtobufRepresentation {
+                        entity: "InputNoteCommitment",
+                        field_name: "nullifier",
+                    },
+                )?;
+                let word: Word = nullifier_digest
                     .try_into()
                     .map_err(|e: RpcConversionError| RpcError::InvalidResponse(e.to_string()))?;
                 Ok(InputNoteCommitment::from(Nullifier::from_raw(word)))
@@ -182,7 +188,21 @@ impl TryFrom<proto::transaction::TransactionHeader> for TransactionHeader {
         let output_notes = value
             .output_notes
             .into_iter()
-            .map(TryInto::try_into)
+            .map(|note_header| {
+                let note_id = note_header.note_id.ok_or(
+                    RpcConversionError::MissingFieldInProtobufRepresentation {
+                        entity: "NoteHeader",
+                        field_name: "note_id",
+                    },
+                )?;
+                let metadata = note_header.metadata.ok_or(
+                    RpcConversionError::MissingFieldInProtobufRepresentation {
+                        entity: "NoteHeader",
+                        field_name: "metadata",
+                    },
+                )?;
+                Ok(NoteHeader::new(note_id.try_into()?, metadata.try_into()?))
+            })
             .collect::<Result<Vec<NoteHeader>, RpcError>>()?;
 
         let transaction_header = TransactionHeader::new(

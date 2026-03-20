@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
 use std::net::SocketAddr;
+use std::num::{NonZeroU32, NonZeroU64};
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -18,6 +19,7 @@ use miden_node_block_producer::{
 use miden_node_ntx_builder::NtxBuilderConfig;
 use miden_node_rpc::Rpc;
 use miden_node_store::{GenesisState, Store};
+use miden_node_utils::clap::{GrpcOptionsExternal, GrpcOptionsInternal, StorageOptions};
 use miden_node_utils::crypto::get_rpo_random_coin;
 use miden_node_validator::{Validator, ValidatorSigner};
 use miden_protocol::account::auth::{AuthScheme, AuthSecretKey};
@@ -137,10 +139,26 @@ impl NodeBuilder {
             validator_signer.clone(),
         );
 
-        // Bootstrap the store database
-        Store::bootstrap(genesis_state, &self.data_directory)
+        // Bootstrap the store and validator databases
+        let genesis_block = genesis_state
+            .into_block()
             .await
+            .with_context(|| "failed to create genesis block")?;
+        Store::bootstrap(&genesis_block, &self.data_directory)
             .with_context(|| "failed to bootstrap store")?;
+
+        // Initialize the validator database and persist the genesis block header as the chain tip.
+        let (genesis_header, ..) = genesis_block.into_inner().into_parts();
+        let validator_db =
+            miden_node_validator::db::load(self.data_directory.join("validator.sqlite3"))
+                .await
+                .with_context(|| "failed to initialize validator database")?;
+        validator_db
+            .transact("upsert_block_header", move |conn| {
+                miden_node_validator::db::upsert_block_header(conn, &genesis_header)
+            })
+            .await
+            .with_context(|| "failed to persist genesis block header in validator database")?;
 
         // Start listening on all gRPC urls so that inter-component connections can be created
         // before each component is fully started up.
@@ -207,7 +225,9 @@ impl NodeBuilder {
                 async move {
                     Validator {
                         address: validator_address,
-                        grpc_timeout: DEFAULT_TIMEOUT_DURATION,
+                        grpc_options: GrpcOptionsInternal {
+                            request_timeout: DEFAULT_TIMEOUT_DURATION,
+                        },
                         signer: ValidatorSigner::Local(validator_signer),
                         data_directory: self.data_directory,
                     }
@@ -234,7 +254,12 @@ impl NodeBuilder {
                     store_url,
                     block_producer_url,
                     validator_url,
-                    grpc_timeout: DEFAULT_TIMEOUT_DURATION,
+                    ntx_builder_url: None,
+                    grpc_options: GrpcOptionsExternal {
+                        burst_size: NonZeroU32::new(100_000).unwrap(),
+                        replenish_n_per_second_per_ip: NonZeroU64::new(100_000).unwrap(),
+                        ..GrpcOptionsExternal::test()
+                    },
                 }
                 .serve()
                 .await
@@ -290,7 +315,10 @@ impl NodeBuilder {
                         block_producer_listener,
                         ntx_builder_listener,
                         block_prover_url: None,
-                        grpc_timeout: DEFAULT_TIMEOUT_DURATION,
+                        storage_options: StorageOptions::default(),
+                        grpc_options: GrpcOptionsInternal {
+                            request_timeout: DEFAULT_TIMEOUT_DURATION,
+                        },
                     }
                     .serve()
                     .await
@@ -321,13 +349,15 @@ impl NodeBuilder {
                 BlockProducer {
                     block_producer_address,
                     store_url,
-                    grpc_timeout: DEFAULT_TIMEOUT_DURATION,
                     batch_prover_url: None,
                     validator_url,
                     batch_interval,
                     block_interval,
                     max_txs_per_batch: DEFAULT_MAX_TXS_PER_BATCH,
                     max_batches_per_block: DEFAULT_MAX_BATCHES_PER_BLOCK,
+                    grpc_options: GrpcOptionsInternal {
+                        request_timeout: DEFAULT_TIMEOUT_DURATION,
+                    },
                     mempool_tx_capacity: DEFAULT_MEMPOOL_TX_CAPACITY,
                 }
                 .serve()
@@ -369,7 +399,7 @@ impl NodeBuilder {
                 .build()
                 .await
                 .context("failed to build ntx builder")?
-                .run()
+                .run(None)
                 .await
                 .context("failed while serving ntx builder component")
             })
