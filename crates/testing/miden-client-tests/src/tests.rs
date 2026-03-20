@@ -2817,16 +2817,20 @@ async fn import_resolves_committed_notes_behind_sync_height() {
     //    known). Sync height advances past block 1.
     client.sync_state().await.unwrap();
 
-    // 5. Import the note as Expected (simulates NTL delivery after sync). check_expected_notes
-    //    scans back from sync_height via the lookback window, so it finds the note committed in
-    //    block 1 even though sync_height >= 1.
+    // 5. Import the note as Expected (simulates NTL delivery after sync). Use after_block_num =
+    //    sync_height to match the real NTL import path. The lookback in note_transport/mod.rs would
+    //    set this to sync_height - 20, but here we simulate the corrected value directly:
+    //    sync_height - 20 = max(0, 1-20) = 0, which causes check_expected_notes to scan from block
+    //    0 and find the note at block 1.
+    let sync_height = client.get_sync_height().await.unwrap();
+    let after_block_num = BlockNumber::from(sync_height.as_u32().saturating_sub(20));
     let note_record: InputNoteRecord = private_note.clone().into();
     let note_id = note_record.id();
     client
         .import_notes(&[NoteFile::NoteDetails {
             details: note_record.into(),
             tag: Some(NoteTag::new(0)),
-            after_block_num: 0.into(),
+            after_block_num,
         }])
         .await
         .unwrap();

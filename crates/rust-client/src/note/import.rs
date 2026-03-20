@@ -373,27 +373,15 @@ where
     /// Checks if notes with their given `note_tag` and ID are present in the chain between the
     /// `request_block_num` and the current block. If found it returns their metadata and inclusion
     /// proof.
-    ///
-    /// To handle the NTL/sync race (where a note is committed on-chain before the NTL delivers
-    /// its data), the scan starts up to [`NOTE_LOOKBACK_BLOCKS`] before the current sync height.
     async fn check_expected_notes(
         &mut self,
         mut request_block_num: BlockNumber,
         // Expected notes with their tags
         expected_notes: Vec<(NoteId, &NoteTag)>,
     ) -> Result<BTreeMap<NoteId, Option<(NoteMetadata, NoteInclusionProof)>>, ClientError> {
-        // Look back from the current sync height to catch notes committed just before
-        // the client synced past them. This handles the race where NTL delivers note
-        // data after the on-chain commitment was already processed by sync.
-        const NOTE_LOOKBACK_BLOCKS: u32 = 20;
-
         let tracked_tags: BTreeSet<NoteTag> = expected_notes.iter().map(|(_, tag)| **tag).collect();
         let mut retrieved_proofs = BTreeMap::new();
         let current_block_num = self.get_sync_height().await?;
-        let lookback_start =
-            BlockNumber::from(current_block_num.as_u32().saturating_sub(NOTE_LOOKBACK_BLOCKS));
-        request_block_num = core::cmp::min(request_block_num, lookback_start);
-
         loop {
             if request_block_num > current_block_num {
                 break;

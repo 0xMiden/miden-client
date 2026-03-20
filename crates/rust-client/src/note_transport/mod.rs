@@ -9,6 +9,7 @@ use alloc::vec::Vec;
 
 use futures::Stream;
 use miden_protocol::address::Address;
+use miden_protocol::block::BlockNumber;
 use miden_protocol::note::{Note, NoteDetails, NoteFile, NoteHeader, NoteTag};
 use miden_protocol::utils::Serializable;
 use miden_tx::auth::TransactionAuthenticator;
@@ -127,13 +128,22 @@ where
         }
 
         let sync_height = self.get_sync_height().await?;
+
+        // Start scanning from up to 20 blocks before sync height to handle the race
+        // where a note is committed on-chain just before the NTL delivers its data.
+        // Without this, check_expected_notes would scan from sync_height forward and
+        // miss the already-committed note.
+        const NOTE_LOOKBACK_BLOCKS: u32 = 20;
+        let after_block_num =
+            BlockNumber::from(sync_height.as_u32().saturating_sub(NOTE_LOOKBACK_BLOCKS));
+
         // Import fetched notes
         let mut note_requests = Vec::with_capacity(notes.len());
         for note in notes {
             let tag = note.metadata().tag();
             let note_file = NoteFile::NoteDetails {
                 details: note.into(),
-                after_block_num: sync_height,
+                after_block_num,
                 tag: Some(tag),
             };
             note_requests.push(note_file);
