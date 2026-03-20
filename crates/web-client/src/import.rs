@@ -38,7 +38,7 @@ impl WebClient {
 
             Ok(JsValue::from_str(&format!("Imported account with ID: {account_id}")))
         } else {
-            Err(JsValue::from_str("Client not initialized"))
+            Err(JsValue::from_str("Keystore not initialized"))
         }
     }
 
@@ -50,7 +50,7 @@ impl WebClient {
         auth_scheme: AuthScheme,
     ) -> Result<Account, JsValue> {
         let keystore = self.keystore()?.clone();
-        let client = self.get_mut_inner().ok_or(JsValue::from_str("Client not initialized"))?;
+        let client = self.get_mut_inner().ok_or(JsValue::from_str("Keystore not initialized"))?;
 
         let (generated_acct, key_pair) =
             generate_wallet(&AccountStorageMode::public(), mutable, Some(init_seed), auth_scheme)
@@ -74,7 +74,7 @@ impl WebClient {
     ) -> Result<JsValue, JsValue> {
         let client = self
             .get_mut_inner()
-            .ok_or_else(|| JsValue::from_str("Client not initialized"))?;
+            .ok_or_else(|| JsValue::from_str("Keystore not initialized"))?;
 
         let native_id: NativeAccountId = account_id.into();
 
@@ -94,7 +94,7 @@ impl WebClient {
                 .map_err(|err| js_error_with_context(err, "failed to import note"))?[0]
                 .into())
         } else {
-            Err(JsValue::from_str("Client not initialized"))
+            Err(JsValue::from_str("Keystore not initialized"))
         }
     }
 }

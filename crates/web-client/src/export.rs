@@ -46,7 +46,7 @@ impl WebClient {
 
             Ok(note_file.into())
         } else {
-            Err(JsValue::from_str("Client not initialized"))
+            Err(JsValue::from_str("Keystore not initialized"))
         }
     }
 
@@ -88,7 +88,7 @@ impl WebClient {
 
             Ok(AccountFile::from(account_data))
         } else {
-            Err(JsValue::from_str("Client not initialized"))
+            Err(JsValue::from_str("Keystore not initialized"))
         }
     }
 }
