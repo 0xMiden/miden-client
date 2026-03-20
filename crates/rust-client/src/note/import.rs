@@ -382,14 +382,14 @@ where
         // Expected notes with their tags
         expected_notes: Vec<(NoteId, &NoteTag)>,
     ) -> Result<BTreeMap<NoteId, Option<(NoteMetadata, NoteInclusionProof)>>, ClientError> {
-        let tracked_tags: BTreeSet<NoteTag> = expected_notes.iter().map(|(_, tag)| **tag).collect();
-        let mut retrieved_proofs = BTreeMap::new();
-        let current_block_num = self.get_sync_height().await?;
-
         // Look back from the current sync height to catch notes committed just before
         // the client synced past them. This handles the race where NTL delivers note
         // data after the on-chain commitment was already processed by sync.
         const NOTE_LOOKBACK_BLOCKS: u32 = 20;
+
+        let tracked_tags: BTreeSet<NoteTag> = expected_notes.iter().map(|(_, tag)| **tag).collect();
+        let mut retrieved_proofs = BTreeMap::new();
+        let current_block_num = self.get_sync_height().await?;
         let lookback_start =
             BlockNumber::from(current_block_num.as_u32().saturating_sub(NOTE_LOOKBACK_BLOCKS));
         request_block_num = core::cmp::min(request_block_num, lookback_start);
