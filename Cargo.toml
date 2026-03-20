@@ -35,22 +35,22 @@ miden-client              = { default-features = false, path = "crates/rust-clie
 miden-client-sqlite-store = { default-features = false, path = "crates/sqlite-store", version = "0.14.0-alpha.1" }
 
 # Miden protocol dependencies
-miden-protocol  = { default-features = false, version = "=0.14.0-alpha.1" }
-miden-standards = { default-features = false, version = "=0.14.0-alpha.1" }
-miden-testing   = { default-features = false, version = "=0.14.0-alpha.1" }
-miden-tx        = { default-features = false, version = "=0.14.0-alpha.1" }
+miden-protocol  = { default-features = false, version = "=0.14.0-alpha.2" }
+miden-standards = { default-features = false, version = "=0.14.0-alpha.2" }
+miden-testing   = { default-features = false, version = "=0.14.0-alpha.2" }
+miden-tx        = { default-features = false, version = "=0.14.0-alpha.2" }
 
 # Miden node dependencies
-miden-node-block-producer        = { version = "=0.14.0-alpha.4" }
-miden-node-ntx-builder           = { version = "=0.14.0-alpha.4" }
-miden-node-proto                 = { version = "=0.14.0-alpha.4" }
-miden-node-proto-build           = { default-features = false, version = "=0.14.0-alpha.4" }
-miden-node-rpc                   = { version = "=0.14.0-alpha.4" }
-miden-node-store                 = { version = "=0.14.0-alpha.4" }
-miden-node-utils                 = { version = "=0.14.0-alpha.4" }
-miden-node-validator             = { version = "=0.14.0-alpha.4" }
+miden-node-block-producer        = { version = "=0.14.0-alpha.8" }
+miden-node-ntx-builder           = { version = "=0.14.0-alpha.8" }
+miden-node-proto                 = { version = "=0.14.0-alpha.8" }
+miden-node-proto-build           = { default-features = false, version = "=0.14.0-alpha.8" }
+miden-node-rpc                   = { version = "=0.14.0-alpha.8" }
+miden-node-store                 = { version = "=0.14.0-alpha.8" }
+miden-node-utils                 = { version = "=0.14.0-alpha.8" }
+miden-node-validator             = { version = "=0.14.0-alpha.8" }
 miden-note-transport-proto-build = { default-features = false, version = "0.2" }
-miden-remote-prover-client       = { default-features = false, features = ["tx-prover"], version = "=0.14.0-alpha.4" }
+miden-remote-prover-client       = { default-features = false, features = ["tx-prover"], version = "=0.14.0-alpha.8" }
 
 # External dependencies
 anyhow      = { default-features = false, version = "1.0" }
