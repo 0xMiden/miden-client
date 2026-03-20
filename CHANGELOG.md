@@ -6,6 +6,9 @@
 * [FIX][rust] Fixed redundant `/GetAccount` RPC calls during `sync_state()` — a public account active across N sync steps now triggers exactly 1 fetch instead of N ([#1876](https://github.com/0xMiden/miden-client/pull/1876)).
 * [FIX] Deduplicated storage map entries returned by the `SyncAccountStorageMaps` RPC endpoint, keeping only the latest value per key. Previously, accounts with storage map keys updated across multiple blocks would fail to load ([#1902](https://github.com/0xMiden/miden-client/pull/1902)).
 * [FIX][web] Fixed `PrematureCommitError` crash during `syncState()` by moving all IndexedDB writes into a single Dexie transaction instead of spawning competing inner transactions ([#1876](https://github.com/0xMiden/miden-client/pull/1876)).
+* [FEATURE][web] Exposed `getAccountProof` in the `RpcClient`, accepting optional `AccountStorageRequirements` and block number parameters to fetch specific storage maps without full account reconstruction ([#1917](https://github.com/0xMiden/miden-client/pull/1917)).
+* [FEATURE][web] Exposed `syncStorageMaps` in the `RpcClient` for paginated retrieval of large storage maps ([#1917](https://github.com/0xMiden/miden-client/pull/1917)).
+* [FEATURE][rust] Added `storage_details()` and `find_map_details()` accessors to `AccountProof` for direct access to storage map data ([#1917](https://github.com/0xMiden/miden-client/pull/1917)).
 
 ## 0.13.2 (2026-02-26)
 
