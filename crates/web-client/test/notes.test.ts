@@ -616,19 +616,22 @@ test.describe("get_consumable_notes", () => {
         sdk.u64(10000000),
         sdk.AuthScheme.AuthRpoFalcon512
       );
-      const walletId = wallet.id();
-      const faucetId = faucet.id();
+      // Save IDs as strings early — WASM objects may be consumed by methods
+      const walletIdStr = wallet.id().toString();
+      const faucetIdStr = faucet.id().toString();
+      const walletIdObj = wallet.id();
+      const faucetIdObj = faucet.id();
 
       // Mint
       await intClient.syncState();
       const mintRequest = await intClient.newMintTransactionRequest(
-        walletId,
-        faucetId,
+        walletIdObj,
+        faucetIdObj,
         sdk.NoteType.Private,
         sdk.u64(1000)
       );
       const mintResult = await intClient.executeTransaction(
-        faucetId,
+        faucet.id(),
         mintRequest
       );
       const prover = sdk.TransactionProver.newLocalProver();
@@ -661,19 +664,26 @@ test.describe("get_consumable_notes", () => {
         timeWaited += 1000;
       }
 
-      const records = await intClient.getConsumableNotes(walletId);
-      const consumableResult = records.map((record) => ({
-        noteId: record.inputNoteRecord().id().toString(),
-        consumability: record.noteConsumability().map((c) => ({
-          accountId: c.accountId().toString(),
-          consumableAfterBlock: c.consumptionStatus()?.consumableAfterBlock(),
-        })),
-      }));
+      const records = await intClient.getConsumableNotes(wallet.id());
+      const consumableResult = [];
+      for (const record of records) {
+        const noteId = record.inputNoteRecord().id().toString();
+        const consumability = [];
+        for (const c of record.noteConsumability()) {
+          const accId = c.accountId();
+          const accIdStr = accId.toString();
+          consumability.push({
+            accountId: accIdStr,
+            consumableAfterBlock: c.consumptionStatus()?.consumableAfterBlock(),
+          });
+        }
+        consumableResult.push({ noteId, consumability });
+      }
 
       return {
         skip: false,
         consumableResult,
-        walletIdStr: walletId.toString(),
+        walletIdStr,
         createdNoteId,
       };
     });
