@@ -25,10 +25,13 @@ use miden_client::auth::{AuthFalcon512Rpo, AuthSecretKey, RPO_FALCON_SCHEME_ID};
 use miden_client::builder::ClientBuilder;
 use miden_client::keystore::FilesystemKeyStore;
 use miden_client::note::{NoteFile, NoteScript, NoteType};
-use miden_client::rpc::domain::account::{
-    AccountStorageRequirements, FetchedAccount, StorageMapEntries, StorageMapKey,
-};
 use miden_client::rpc::AccountStateAt;
+use miden_client::rpc::domain::account::{
+    AccountStorageRequirements,
+    FetchedAccount,
+    StorageMapEntries,
+    StorageMapKey,
+};
 use miden_client::store::{
     InputNoteRecord,
     InputNoteState,
@@ -1575,21 +1578,22 @@ pub async fn test_output_only_note(client_config: ClientConfig) -> Result<()> {
 /// Creates a public account with a map slot containing 2 entries, then verifies:
 /// - Requesting with empty keys returns `AllEntries` with both entries.
 /// - Requesting with one specific key returns `EntriesWithProofs` with just that entry.
-pub async fn test_get_account_storage_map_key_filtering(
-    client_config: ClientConfig,
-) -> Result<()> {
+pub async fn test_get_account_storage_map_key_filtering(client_config: ClientConfig) -> Result<()> {
     let (mut client, keystore) = client_config.into_client().await?;
     wait_for_node(&mut client).await;
 
-    let map_slot_name = StorageSlotName::new("miden::testing::client::map").expect("valid slot name");
-    let map_key_1 = StorageMapKey::from([Felt::new(15), Felt::new(15), Felt::new(15), Felt::new(15)]);
+    let map_slot_name =
+        StorageSlotName::new("miden::testing::client::map").expect("valid slot name");
+    let map_key_1 =
+        StorageMapKey::from([Felt::new(15), Felt::new(15), Felt::new(15), Felt::new(15)]);
     let map_value_1 = Word::from([Felt::new(9), Felt::new(12), Felt::new(18), Felt::new(30)]);
-    let map_key_2 = StorageMapKey::from([Felt::new(20), Felt::new(20), Felt::new(20), Felt::new(20)]);
+    let map_key_2 =
+        StorageMapKey::from([Felt::new(20), Felt::new(20), Felt::new(20), Felt::new(20)]);
     let map_value_2 = Word::from([Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)]);
 
     let mut storage_map = StorageMap::new();
-    storage_map.insert(map_key_1.into(), map_value_1)?;
-    storage_map.insert(map_key_2.into(), map_value_2)?;
+    storage_map.insert(map_key_1, map_value_1)?;
+    storage_map.insert(map_key_2, map_value_2)?;
 
     let map_slot = StorageSlot::with_map(map_slot_name.clone(), storage_map);
     let component_code = CodeBuilder::default()
