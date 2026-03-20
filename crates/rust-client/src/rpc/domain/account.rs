@@ -5,16 +5,8 @@ use core::fmt::{self, Debug, Display, Formatter};
 
 use miden_protocol::Word;
 use miden_protocol::account::{
-    Account,
-    AccountCode,
-    AccountHeader,
-    AccountId,
-    AccountStorageHeader,
-    StorageMap,
-    StorageMapWitness,
-    StorageSlotHeader,
-    StorageSlotName,
-    StorageSlotType,
+    Account, AccountCode, AccountHeader, AccountId, AccountStorageHeader, StorageMap,
+    StorageMapWitness, StorageSlotHeader, StorageSlotName, StorageSlotType,
 };
 use miden_protocol::asset::Asset;
 use miden_protocol::block::BlockNumber;
@@ -677,6 +669,8 @@ impl From<AccountStorageRequirements> for Vec<account_detail_request::StorageMap
         let request_map = value.0;
         let mut requests = Vec::with_capacity(request_map.len());
         for (slot_name, map_keys) in request_map {
+            // If no specific keys are requested, ask for all entries. Though the node may
+            // respond back with `too_many_entries` if the map exceeds the response limit.
             let slot_data = if map_keys.is_empty() {
                 Some(SlotData::AllEntries(true))
             } else {
