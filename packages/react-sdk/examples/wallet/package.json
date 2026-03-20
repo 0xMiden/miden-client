@@ -9,7 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@miden-sdk/miden-sdk": "^0.14.0",
+    "@miden-sdk/miden-sdk": "^0.14.0-beta.1",
     "@miden-sdk/react": "^0.14.0-beta.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"

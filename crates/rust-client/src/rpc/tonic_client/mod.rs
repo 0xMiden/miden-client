@@ -213,14 +213,14 @@ impl GrpcClient {
         F: FnMut(ApiClient) -> Fut,
         Fut: FutureMaybeSend<Result<tonic::Response<T>, Status>>,
     {
-        let mut attempt = 0u32;
+        let mut retry_state = retry::RetryState::new();
 
         loop {
             let rpc_api = self.ensure_connected().await?;
 
             match call(rpc_api).await {
                 Ok(response) => return Ok(response),
-                Err(status) if retry::should_retry(&status, attempt).await => attempt += 1,
+                Err(status) if retry_state.should_retry(&status).await => {},
                 Err(status) => return Err(self.rpc_error_from_status(endpoint, status)),
             }
         }
@@ -241,6 +241,9 @@ impl GrpcClient {
             .map(tonic::Response::into_inner)
             .and_then(RpcStatusInfo::try_from)
     }
+
+    // GET ACCOUNT HELPERS
+    // ============================================================================================
 
     /// Given an [`AccountId`], return the proof for the account.
     ///
