@@ -172,6 +172,13 @@ impl NodeBuilder {
             .local_addr()
             .with_context(|| "failed to retrieve the store's ntx-builder gRPC address")?;
 
+        let ntx_builder_listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .with_context(|| "failed to bind to ntx-builder gRPC endpoint")?;
+        let ntx_builder_address = ntx_builder_listener
+            .local_addr()
+            .with_context(|| "failed to retrieve the ntx-builder gRPC address")?;
+
         let block_producer_address = available_socket_addr()
             .await
             .with_context(|| "failed to bind to block-producer gRPC endpoint")?;
@@ -197,6 +204,7 @@ impl NodeBuilder {
             store_ntx_builder_address,
             validator_address,
             self.data_directory.join("ntx-builder.sqlite3"),
+            Some(ntx_builder_listener),
             &mut join_set,
         );
 
@@ -234,11 +242,17 @@ impl NodeBuilder {
                 let validator_url = Url::parse(&format!("http://{validator_address}"))
                     .context("Failed to parse URL")?;
 
+                let ntx_builder_url = Some(
+                    Url::parse(&format!("http://{ntx_builder_address}"))
+                        .context("Failed to parse URL")?,
+                );
+
                 Rpc {
                     listener: grpc_rpc,
                     store_url,
                     block_producer_url,
                     validator_url,
+                    ntx_builder_url,
                     grpc_options: GrpcOptionsExternal::default(),
                 }
                 .serve()
@@ -349,6 +363,7 @@ impl NodeBuilder {
         store_address: SocketAddr,
         validator_address: SocketAddr,
         database_filepath: PathBuf,
+        listener: Option<TcpListener>,
         join_set: &mut JoinSet<Result<()>>,
     ) -> Id {
         let store_url =
@@ -375,7 +390,7 @@ impl NodeBuilder {
                 .build()
                 .await
                 .context("failed to build ntx builder")?
-                .run()
+                .run(listener)
                 .await
                 .context("failed while serving ntx builder component")
             })
