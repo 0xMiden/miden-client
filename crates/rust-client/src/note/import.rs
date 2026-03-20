@@ -365,7 +365,7 @@ where
     /// and inclusion proof.
     ///
     /// Uses `get_notes_by_id` to fetch notes directly by ID, which works regardless of block
-    /// height (unlike `sync_notes` which only scans forward from a given block).
+    /// height.
     async fn check_expected_notes(
         &self,
         note_ids: &[NoteId],
