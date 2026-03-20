@@ -43,7 +43,6 @@ pub const DEFAULT_BLOCK_INTERVAL: u64 = 5_000;
 pub const DEFAULT_BATCH_INTERVAL: u64 = 2_000;
 pub const DEFAULT_RPC_PORT: u16 = 57_291;
 pub const GENESIS_ACCOUNT_FILE: &str = "account.mac";
-const DEFAULT_TIMEOUT_DURATION: Duration = Duration::from_secs(10);
 
 /// Relaxed gRPC options for testing, disables all rate limiting and timeouts.
 const GRPC_REQUEST_TIMEOUT: Duration = Duration::from_secs(3600);
