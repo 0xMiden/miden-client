@@ -149,19 +149,17 @@ pub trait Store: Send + Sync {
         filter: NoteFilter,
     ) -> Result<Vec<OutputNoteRecord>, StoreError>;
 
-    /// Retrieves a single input note at the given offset from the filtered set.
-    ///
-    /// When `consumer` is `Some`, only notes whose consumer account matches are counted
-    /// toward the offset. Optionally restricts to a block range via `block_start` and
+    /// Retrieves a single input note at the given offset from the filtered set for the given
+    /// consumer account. Optionally restricts to a block range via `block_start` and
     /// `block_end`. Returns `None` when the offset is past the end of the matching notes.
     ///
     /// # Ordering
     ///
-    /// Notes are sorted by their on-chain execution order.
+    /// Notes are sorted by their per-account on-chain execution order.
     async fn get_input_note_by_offset(
         &self,
         filter: NoteFilter,
-        consumer: Option<AccountId>,
+        consumer: AccountId,
         block_start: Option<BlockNumber>,
         block_end: Option<BlockNumber>,
         offset: u32,

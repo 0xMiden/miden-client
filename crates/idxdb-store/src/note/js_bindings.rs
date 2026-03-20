@@ -66,7 +66,7 @@ extern "C" {
     pub fn idxdb_get_input_note_by_offset(
         db_id: &str,
         states: Vec<u8>,
-        consumer_account_id: Option<String>,
+        consumer_account_id: String,
         block_start: Option<u32>,
         block_end: Option<u32>,
         offset: u32,

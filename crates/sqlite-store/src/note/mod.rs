@@ -133,20 +133,20 @@ impl SqliteStore {
         Ok(notes)
     }
 
-    /// Retrieves a single input note at the given offset from the filtered set, optionally
-    /// restricted to a consumer account and/or block range.
+    /// Retrieves a single input note at the given offset from the filtered set, restricted to a
+    /// consumer account and optionally to a block range.
     pub(crate) fn get_input_note_by_offset(
         conn: &mut Connection,
         filter: &NoteFilter,
-        consumer: Option<AccountId>,
+        consumer: AccountId,
         block_start: Option<BlockNumber>,
         block_end: Option<BlockNumber>,
         offset: u32,
     ) -> Result<Option<InputNoteRecord>, StoreError> {
-        let consumer_hex = consumer.map(AccountId::to_hex);
+        let consumer_hex = consumer.to_hex();
         let (query, params) = filters::note_filter_to_query_input_note_by_offset(
             filter,
-            consumer_hex.as_deref(),
+            &consumer_hex,
             block_start,
             block_end,
             offset,

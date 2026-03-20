@@ -100,7 +100,7 @@ impl IdxdbStore {
     pub(crate) async fn get_input_note_by_offset(
         &self,
         filter: NoteFilter,
-        consumer: Option<AccountId>,
+        consumer: AccountId,
         block_start: Option<BlockNumber>,
         block_end: Option<BlockNumber>,
         offset: u32,
@@ -110,7 +110,7 @@ impl IdxdbStore {
                 "get_input_note_by_offset only supports state-based filters".to_string(),
             )
         })?;
-        let consumer_hex = consumer.map(AccountId::to_hex);
+        let consumer_hex = consumer.to_hex();
         let promise = idxdb_get_input_note_by_offset(
             self.db_id(),
             states,

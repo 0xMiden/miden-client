@@ -66,7 +66,7 @@ impl InputNoteReader {
             .store
             .get_input_note_by_offset(
                 NoteFilter::Consumed,
-                Some(self.consumer),
+                self.consumer,
                 block_start,
                 block_end,
                 self.offset,
