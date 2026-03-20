@@ -131,7 +131,7 @@ impl IdxdbStore {
         notes: &[InputNoteRecord],
     ) -> Result<(), StoreError> {
         for note in notes {
-            upsert_input_note_tx(self.db_id(), note, None).await?;
+            upsert_input_note_tx(self.db_id(), note).await?;
         }
 
         Ok(())

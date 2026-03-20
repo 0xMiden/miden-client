@@ -170,7 +170,7 @@ impl SqliteStore {
         let tx = conn.transaction().into_store_error()?;
 
         for note in notes {
-            upsert_input_note_tx(&tx, note, None)?;
+            upsert_input_note_tx(&tx, note)?;
 
             // Whenever we insert a note, we also update block relevance
             if let Some(inclusion_proof) = note.inclusion_proof() {
@@ -250,7 +250,6 @@ impl SqliteStore {
 pub(super) fn upsert_input_note_tx(
     tx: &Transaction<'_>,
     note: &InputNoteRecord,
-    consumed_tx_order: Option<u32>,
 ) -> Result<(), StoreError> {
     let SerializedInputNoteData {
         id,
@@ -266,7 +265,7 @@ pub(super) fn upsert_input_note_tx(
         consumed_block_height,
         consumed_tx_order,
         consumer_account_id,
-    } = serialize_input_note(note, consumed_tx_order);
+    } = serialize_input_note(note);
 
     const SCRIPT_QUERY: &str =
         insert_sql!(notes_scripts { script_root, serialized_note_script } | REPLACE);
@@ -406,10 +405,7 @@ fn parse_input_note(
 }
 
 /// Serialize the provided input note into database compatible types.
-fn serialize_input_note(
-    note: &InputNoteRecord,
-    consumed_tx_order: Option<u32>,
-) -> SerializedInputNoteData {
+fn serialize_input_note(note: &InputNoteRecord) -> SerializedInputNoteData {
     let id = note.id().as_word().to_string();
     let nullifier = note.nullifier().to_hex();
     let created_at = note.created_at().unwrap_or(0);
@@ -428,7 +424,7 @@ fn serialize_input_note(
     let state = note.state().to_bytes();
 
     let consumed_block_height = note.state().consumed_block_height().map(|h| h.as_u32());
-
+    let consumed_tx_order = note.state().consumed_tx_order();
     let consumer_account_id = note.consumer_account().map(AccountId::to_hex);
 
     SerializedInputNoteData {
@@ -522,7 +518,7 @@ pub(crate) fn apply_note_updates_tx(
     note_updates: &NoteUpdateTracker,
 ) -> Result<(), StoreError> {
     for input_note in note_updates.updated_input_notes() {
-        upsert_input_note_tx(tx, input_note.inner(), input_note.consumed_tx_order())?;
+        upsert_input_note_tx(tx, input_note.inner())?;
     }
 
     for output_note in note_updates.updated_output_notes() {

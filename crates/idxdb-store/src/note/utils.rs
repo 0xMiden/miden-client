@@ -83,10 +83,7 @@ pub struct SerializedOutputNoteData {
 
 // ================================================================================================
 
-pub(crate) fn serialize_input_note(
-    note: &InputNoteRecord,
-    consumed_tx_order: Option<u32>,
-) -> SerializedInputNoteData {
+pub(crate) fn serialize_input_note(note: &InputNoteRecord) -> SerializedInputNoteData {
     let note_id = note.id().to_hex().clone();
     let note_assets = note.assets().to_bytes();
 
@@ -104,7 +101,7 @@ pub(crate) fn serialize_input_note(
     let created_at = Utc::now().timestamp().to_string();
 
     let consumed_block_height = note.state().consumed_block_height().map(|h| h.as_u32());
-
+    let consumed_tx_order = note.state().consumed_tx_order();
     let consumer_account_id = note.consumer_account().map(AccountId::to_hex);
 
     SerializedInputNoteData {
@@ -124,12 +121,8 @@ pub(crate) fn serialize_input_note(
     }
 }
 
-pub async fn upsert_input_note_tx(
-    db_id: &str,
-    note: &InputNoteRecord,
-    consumed_tx_order: Option<u32>,
-) -> Result<(), StoreError> {
-    let serialized_data = serialize_input_note(note, consumed_tx_order);
+pub async fn upsert_input_note_tx(db_id: &str, note: &InputNoteRecord) -> Result<(), StoreError> {
+    let serialized_data = serialize_input_note(note);
 
     let promise = idxdb_upsert_input_note(
         db_id,
@@ -270,7 +263,7 @@ pub(crate) async fn apply_note_updates_tx(
     note_updates: &NoteUpdateTracker,
 ) -> Result<(), StoreError> {
     for input_note in note_updates.updated_input_notes() {
-        upsert_input_note_tx(db_id, input_note.inner(), input_note.consumed_tx_order()).await?;
+        upsert_input_note_tx(db_id, input_note.inner()).await?;
     }
 
     for output_note in note_updates.updated_output_notes() {
