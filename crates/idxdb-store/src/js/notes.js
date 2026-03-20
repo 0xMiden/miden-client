@@ -120,7 +120,8 @@ export async function upsertInputNote(dbId, noteId, assets, serialNumber, inputs
                 state,
                 stateDiscriminant,
                 serializedCreatedAt,
-                // Convert null -> undefined so Dexie doesn't index missing values
+                // These fields are null for non-consumed notes.
+                // Convert null -> undefined so Dexie omits them from compound indexes.
                 consumedBlockHeight: consumedBlockHeight ?? undefined,
                 consumedTxOrder: consumedTxOrder ?? undefined,
                 consumerAccountId: consumerAccountId ?? undefined,
@@ -187,29 +188,7 @@ export async function getInputNoteByOffset(dbId, states, consumerAccountId, bloc
         if (blockEnd != null) {
             notes = notes.filter((n) => n.consumedBlockHeight != null && n.consumedBlockHeight <= blockEnd);
         }
-        notes.sort((a, b) => {
-            const aH = a.consumedBlockHeight;
-            const bH = b.consumedBlockHeight;
-            if (aH == null && bH != null)
-                return 1;
-            if (aH != null && bH == null)
-                return -1;
-            if (aH != null && bH != null && aH !== bH)
-                return aH - bH;
-            const aO = a.consumedTxOrder;
-            const bO = b.consumedTxOrder;
-            if (aO == null && bO != null)
-                return 1;
-            if (aO != null && bO == null)
-                return -1;
-            if (aO != null && bO != null && aO !== bO)
-                return aO - bO;
-            if (a.noteId < b.noteId)
-                return -1;
-            if (a.noteId > b.noteId)
-                return 1;
-            return 0;
-        });
+        notes.sort(compareByConsumptionOrder);
         const note = notes[offset];
         if (!note)
             return [];
@@ -281,6 +260,26 @@ async function processOutputNotes(notes) {
         };
     }));
 }
+// Comparator for sorting notes by consumption order:
+// consumed_block_height ASC (NULLs last), consumed_tx_order ASC (NULLs last), noteId ASC.
+function compareByConsumptionOrder(a, b) {
+    const aH = a.consumedBlockHeight;
+    const bH = b.consumedBlockHeight;
+    if (aH == null && bH != null) return 1;
+    if (aH != null && bH == null) return -1;
+    if (aH != null && bH != null && aH !== bH) return aH - bH;
+
+    const aO = a.consumedTxOrder;
+    const bO = b.consumedTxOrder;
+    if (aO == null && bO != null) return 1;
+    if (aO != null && bO == null) return -1;
+    if (aO != null && bO != null && aO !== bO) return aO - bO;
+
+    if (a.noteId < b.noteId) return -1;
+    if (a.noteId > b.noteId) return 1;
+    return 0;
+}
+
 export async function upsertNoteScript(dbId, scriptRoot, serializedNoteScript) {
     const db = getDatabase(dbId);
     return db.dexie.transaction("rw", db.outputNotes, db.notesScripts, async (tx) => {

@@ -683,17 +683,17 @@ fn compute_ordered_nullifiers(transaction_records: &[RpcTransactionRecord]) -> V
 
     for txs in groups.values() {
         // Build a lookup from initial_state_commitment -> transaction record.
-        let mut init_to_tx: BTreeMap<Word, &RpcTransactionRecord> = BTreeMap::new();
-        for tx in txs {
-            init_to_tx.insert(tx.transaction_header.initial_state_commitment(), tx);
-        }
+        let mut init_to_tx: BTreeMap<Word, &RpcTransactionRecord> = txs
+            .iter()
+            .map(|tx| (tx.transaction_header.initial_state_commitment(), *tx))
+            .collect();
 
         // Build a set of all final states to find the chain start.
         let final_states: BTreeSet<Word> =
             txs.iter().map(|tx| tx.transaction_header.final_state_commitment()).collect();
 
         // Find the chain start: the tx whose initial_state_commitment is not any other tx's
-        // final_state_commitment.
+        // final_state_commitment. Remove it from the map to begin consuming.
         let chain_start = txs
             .iter()
             .find(|tx| !final_states.contains(&tx.transaction_header.initial_state_commitment()));
@@ -702,29 +702,19 @@ fn compute_ordered_nullifiers(transaction_records: &[RpcTransactionRecord]) -> V
             continue;
         };
 
-        // Follow the chain: current.final_state_commitment == next.initial_state_commitment.
-        let mut current = *start_tx;
+        // Remove the start from the map and walk the chain, removing each step.
+        let mut current =
+            init_to_tx.remove(&start_tx.transaction_header.initial_state_commitment());
 
-        loop {
-            // Collect all input note nullifiers of this transaction in chain order.
-            for commitment in current.transaction_header.input_notes().iter() {
+        while let Some(tx) = current {
+            for commitment in tx.transaction_header.input_notes().iter() {
                 let nullifier = commitment.nullifier();
                 if seen.insert(nullifier) {
                     result.push(nullifier);
                 }
             }
 
-            // Follow the chain.
-            if let Some(next_tx) =
-                init_to_tx.get(&current.transaction_header.final_state_commitment())
-            {
-                if core::ptr::eq(*next_tx, current) {
-                    break;
-                }
-                current = next_tx;
-            } else {
-                break;
-            }
+            current = init_to_tx.remove(&tx.transaction_header.final_state_commitment());
         }
     }
 
@@ -1020,7 +1010,7 @@ mod tests {
 
         let updated_notes: Vec<_> = update.note_updates.updated_input_notes().collect();
 
-        let find_order = |note_id: NoteId| -> Option<u16> {
+        let find_order = |note_id: NoteId| -> Option<u32> {
             updated_notes
                 .iter()
                 .find(|n| n.id() == note_id)
