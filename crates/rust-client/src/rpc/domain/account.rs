@@ -659,6 +659,9 @@ pub type StorageMapKey = Word;
 
 /// Describes storage slots indices to be requested, as well as a list of keys for each of those
 /// slots.
+/// 
+/// Note: If no specific keys are provided for a slot, all entries are requested. Though the 
+/// node may respond with `too_many_entries` if the map exceeds the response limit.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct AccountStorageRequirements(BTreeMap<StorageSlotName, Vec<StorageMapKey>>);
 
@@ -692,8 +695,6 @@ impl From<AccountStorageRequirements> for Vec<account_detail_request::StorageMap
         let request_map = value.0;
         let mut requests = Vec::with_capacity(request_map.len());
         for (slot_name, map_keys) in request_map {
-            // If no specific keys are requested, ask for all entries. Though the node may
-            // respond back with `too_many_entries` if the map exceeds the response limit.
             let slot_data = if map_keys.is_empty() {
                 Some(SlotData::AllEntries(true))
             } else {
