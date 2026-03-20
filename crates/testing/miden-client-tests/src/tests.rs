@@ -2817,15 +2817,15 @@ async fn import_resolves_committed_notes_behind_sync_height() {
     //    known). Sync height advances past block 1.
     client.sync_state().await.unwrap();
 
-    // 5. Import the note as Expected (simulates NTL delivery after sync). check_expected_notes uses
-    //    get_notes_by_id which fetches by ID regardless of block height, so it finds the note
-    //    committed in block 1 even though sync_height > 1.
+    // 5. Import the note as Expected (simulates NTL delivery after sync). check_expected_notes
+    //    scans back from sync_height via the lookback window, so it finds the note committed in
+    //    block 1 even though sync_height >= 1.
     let note_record: InputNoteRecord = private_note.clone().into();
     let note_id = note_record.id();
     client
         .import_notes(&[NoteFile::NoteDetails {
             details: note_record.into(),
-            tag: None,
+            tag: Some(NoteTag::new(0)),
             after_block_num: 0.into(),
         }])
         .await

@@ -306,12 +306,21 @@ where
     /// Builds a note record list from note details. If a note with the same ID was already stored
     /// it is passed via `previous_note` so it can be updated.
     async fn import_note_records_by_details(
-        &self,
+        &mut self,
         requested_notes: Vec<(Option<InputNoteRecord>, NoteDetails, BlockNumber, Option<NoteTag>)>,
     ) -> Result<Vec<Option<InputNoteRecord>>, ClientError> {
-        let note_ids: Vec<NoteId> =
-            requested_notes.iter().map(|(_, details, ..)| details.id()).collect();
-        let mut committed_notes_data = self.check_expected_notes(&note_ids).await?;
+        let mut lowest_request_block: BlockNumber = u32::MAX.into();
+        let mut note_requests = vec![];
+        for (_, details, after_block_num, tag) in &requested_notes {
+            if let Some(tag) = tag {
+                note_requests.push((details.id(), tag));
+                if after_block_num < &lowest_request_block {
+                    lowest_request_block = *after_block_num;
+                }
+            }
+        }
+        let mut committed_notes_data =
+            self.check_expected_notes(lowest_request_block, note_requests).await?;
 
         let mut note_records = vec![];
         for (previous_note, details, after_block_num, tag) in requested_notes {
@@ -324,7 +333,7 @@ where
             });
 
             match committed_notes_data.remove(&note_record.id()) {
-                Some((metadata, inclusion_proof)) => {
+                Some(Some((metadata, inclusion_proof))) => {
                     // FIXME: We should be able to build the mmr only once (outside the for loop).
                     // For some reason this leads to error, probably related to:
                     // https://github.com/0xMiden/miden-client/issues/1205
@@ -361,27 +370,74 @@ where
         Ok(note_records)
     }
 
-    /// Checks if expected notes are already committed on chain. If found, returns their metadata
-    /// and inclusion proof.
+    /// Checks if notes with their given `note_tag` and ID are present in the chain between the
+    /// `request_block_num` and the current block. If found it returns their metadata and inclusion
+    /// proof.
     ///
-    /// Uses `get_notes_by_id` to fetch notes directly by ID, which works regardless of block
-    /// height.
+    /// To handle the NTL/sync race (where a note is committed on-chain before the NTL delivers
+    /// its data), the scan starts up to [`NOTE_LOOKBACK_BLOCKS`] before the current sync height.
     async fn check_expected_notes(
-        &self,
-        note_ids: &[NoteId],
-    ) -> Result<BTreeMap<NoteId, (NoteMetadata, NoteInclusionProof)>, ClientError> {
-        if note_ids.is_empty() {
-            return Ok(BTreeMap::new());
-        }
-
-        let fetched_notes = self.rpc_api.get_notes_by_id(note_ids).await?;
-
+        &mut self,
+        mut request_block_num: BlockNumber,
+        // Expected notes with their tags
+        expected_notes: Vec<(NoteId, &NoteTag)>,
+    ) -> Result<BTreeMap<NoteId, Option<(NoteMetadata, NoteInclusionProof)>>, ClientError> {
+        let tracked_tags: BTreeSet<NoteTag> = expected_notes.iter().map(|(_, tag)| **tag).collect();
         let mut retrieved_proofs = BTreeMap::new();
-        for note in fetched_notes {
-            retrieved_proofs
-                .insert(note.id(), (note.metadata().clone(), note.inclusion_proof().clone()));
-        }
+        let current_block_num = self.get_sync_height().await?;
 
+        // Look back from the current sync height to catch notes committed just before
+        // the client synced past them. This handles the race where NTL delivers note
+        // data after the on-chain commitment was already processed by sync.
+        const NOTE_LOOKBACK_BLOCKS: u32 = 20;
+        let lookback_start =
+            BlockNumber::from(current_block_num.as_u32().saturating_sub(NOTE_LOOKBACK_BLOCKS));
+        request_block_num = core::cmp::min(request_block_num, lookback_start);
+
+        loop {
+            if request_block_num > current_block_num {
+                break;
+            }
+
+            let sync_notes =
+                self.rpc_api.sync_notes(request_block_num, None, &tracked_tags).await?;
+
+            for sync_note in sync_notes.notes {
+                if !expected_notes.iter().any(|(id, _)| id == sync_note.note_id()) {
+                    continue;
+                }
+
+                // This means that a note with the same id was found.
+                // Therefore, we should mark the note as committed.
+                let note_block_num = sync_notes.block_header.block_num();
+
+                if note_block_num > current_block_num {
+                    break;
+                }
+
+                let note_inclusion_proof = NoteInclusionProof::new(
+                    note_block_num,
+                    sync_note.note_index(),
+                    sync_note.inclusion_path().clone(),
+                )?;
+
+                retrieved_proofs.insert(
+                    *sync_note.note_id(),
+                    Some((sync_note.metadata(), note_inclusion_proof)),
+                );
+            }
+
+            // We might have reached the chain tip without having found some notes, bail if so
+            if sync_notes.block_header.block_num() == sync_notes.chain_tip {
+                break;
+            }
+
+            // This means that a note with the same id was not found.
+            // Therefore, we should request again for sync_notes with the same note_tag
+            // and with the block_num of the last block header
+            // (sync_notes.block_header.unwrap()).
+            request_block_num = sync_notes.block_header.block_num();
+        }
         Ok(retrieved_proofs)
     }
 }

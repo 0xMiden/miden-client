@@ -2,7 +2,7 @@
 
 ## 0.13.4 (TBD)
 
-* [FIX][all] Fixed private notes delivered via NTL getting stuck as `Expected` when syncing at high frequency (e.g. every 3s). The on-chain commitment could be processed before the NTL delivered the note data, causing the note to never transition to `Committed`. The note import flow now uses `get_notes_by_id` instead of `sync_notes` to detect on-chain commitments, which works regardless of block height and resolves the race at import time.
+* [FIX][all] Fixed private notes delivered via NTL getting stuck as `Expected` when syncing at high frequency (e.g. every 3s). The on-chain commitment could be processed before the NTL delivered the note data, causing the note to never transition to `Committed`. The note import flow now scans back up to 20 blocks from the current sync height when checking for committed notes, so notes committed just before the client synced past them are found during import.
 
 ## 0.13.3 (2026-03-16)
 
