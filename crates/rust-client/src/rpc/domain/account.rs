@@ -659,8 +659,8 @@ pub type StorageMapKey = Word;
 
 /// Describes storage slots indices to be requested, as well as a list of keys for each of those
 /// slots.
-/// 
-/// Note: If no specific keys are provided for a slot, all entries are requested. Though the 
+///
+/// Note: If no specific keys are provided for a slot, all entries are requested. Though the
 /// node may respond with `too_many_entries` if the map exceeds the response limit.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct AccountStorageRequirements(BTreeMap<StorageSlotName, Vec<StorageMapKey>>);
