@@ -69,8 +69,7 @@ use miden_tx::utils::{Deserializable, DeserializationError, Serializable};
 use tracing::{debug, info};
 
 use crate::note::NoteScreener;
-use crate::rpc::domain::note::FetchedNote;
-use crate::store::{InputNoteRecord, InputNoteState, NoteFilter, TransactionFilter};
+use crate::store::{NoteFilter, TransactionFilter};
 use crate::{Client, ClientError};
 mod block_header;
 
@@ -166,7 +165,7 @@ where
             )
             .await?;
 
-        let mut sync_summary: SyncSummary = (&state_sync_update).into();
+        let sync_summary: SyncSummary = (&state_sync_update).into();
         debug!(sync_summary = ?sync_summary, "Sync summary computed");
         info!("Applying changes to the store.");
 
@@ -176,113 +175,10 @@ where
             .await
             .map_err(ClientError::StoreError)?;
 
-        // Verify stale Expected notes BEFORE pruning block headers.
-        // Checks all Expected notes whose commitment block has already been synced.
-        // This is a single get_notes_by_id RPC call regardless of note count.
-        let newly_committed = self.verify_stale_expected_notes().await?;
-        sync_summary.committed_notes.extend(newly_committed);
-
         // Remove irrelevant block headers
         self.store.prune_irrelevant_blocks().await?;
 
         Ok(sync_summary)
-    }
-
-    /// Checks for Expected notes whose commitment block has already been synced and fetches
-    /// their inclusion proofs from the node to transition them to Committed.
-    ///
-    /// This handles the race condition where NTL delivers note data after the on-chain
-    /// commitment was already synced. Uses a single `get_notes_by_id` RPC call for all
-    /// stale notes regardless of count.
-    async fn verify_stale_expected_notes(&mut self) -> Result<Vec<NoteId>, ClientError> {
-        let sync_height = self.store.get_sync_height().await?;
-        let expected_notes = self.store.get_input_notes(NoteFilter::Expected).await?;
-
-        // Find Expected notes whose commitment block has already been synced
-        let stale_note_ids: Vec<NoteId> = expected_notes
-            .iter()
-            .filter(|note| match note.state() {
-                InputNoteState::Expected(state) => state.after_block_num < sync_height,
-                _ => false,
-            })
-            .map(InputNoteRecord::id)
-            .collect();
-
-        if stale_note_ids.is_empty() {
-            return Ok(vec![]);
-        }
-
-        info!(
-            "Found {} stale Expected notes behind sync height {}, fetching inclusion proofs...",
-            stale_note_ids.len(),
-            sync_height
-        );
-
-        // Fetch inclusion proofs from the node
-        let fetched_notes = match self.rpc_api.get_notes_by_id(&stale_note_ids).await {
-            Ok(notes) => notes,
-            Err(e) => {
-                info!("Failed to fetch inclusion proofs for stale notes: {}", e);
-                return Ok(vec![]);
-            },
-        };
-
-        let mut newly_committed: Vec<NoteId> = Vec::new();
-        let current_partial_mmr = self.store.get_current_partial_mmr().await?;
-
-        for fetched_note in fetched_notes {
-            let (note_id, inclusion_proof, metadata) = match &fetched_note {
-                FetchedNote::Private(header, proof) => {
-                    (header.id(), proof.clone(), header.metadata().clone())
-                },
-                FetchedNote::Public(note, proof) => {
-                    (note.id(), proof.clone(), note.metadata().clone())
-                },
-            };
-
-            // Get the block header for verification
-            let block_num = inclusion_proof.location().block_num();
-            let block_headers = self.store.get_block_headers(&BTreeSet::from([block_num])).await?;
-
-            let Some((block_header, _)) = block_headers.into_iter().next() else {
-                debug!(
-                    "Block header {} not stored locally for note {}, will retry on next sync",
-                    block_num, note_id
-                );
-                continue;
-            };
-
-            // Re-read the note from the store
-            let mut notes = self.store.get_input_notes(NoteFilter::List(vec![note_id])).await?;
-            let Some(mut note_record) = notes.pop() else {
-                continue;
-            };
-
-            // Transition the note: Expected → Unverified → Committed
-            if let Err(e) = note_record.inclusion_proof_received(inclusion_proof, metadata) {
-                info!("Failed to apply inclusion proof for note {}: {}", note_id, e);
-                continue;
-            }
-
-            if let Err(e) = note_record.block_header_received(&block_header) {
-                info!("Failed to verify note {} against block header: {}", note_id, e);
-                continue;
-            }
-
-            // Persist the updated note state
-            self.store.upsert_input_notes(&[note_record]).await?;
-
-            // Mark the block as having client notes so it survives pruning
-            // and is available in the partial MMR for transaction execution.
-            self.store
-                .insert_block_header(&block_header, current_partial_mmr.peaks(), true)
-                .await?;
-
-            info!("Transitioned stale Expected note {} to Committed", note_id);
-            newly_committed.push(note_id);
-        }
-
-        Ok(newly_committed)
     }
 
     /// Applies the state sync update to the store.

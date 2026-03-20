@@ -10,18 +10,6 @@ export async function insertBlockHeader(
 ) {
   try {
     const db = getDatabase(dbId);
-
-    // Match SQLite INSERT ... IGNORE semantics: if the block already exists,
-    // only update hasClientNotes (preserve the original peaks). This prevents
-    // overwriting correct peaks when re-inserting a block to mark it as relevant.
-    const existing = await db.blockHeaders.get(blockNum);
-    if (existing) {
-      if (hasClientNotes && existing.hasClientNotes !== "true") {
-        await db.blockHeaders.update(blockNum, { hasClientNotes: "true" });
-      }
-      return;
-    }
-
     const data = {
       blockNum: blockNum,
       header,

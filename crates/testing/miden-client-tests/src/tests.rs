@@ -2752,16 +2752,16 @@ async fn sync_storage_maps_pagination_from_middle() {
     assert_eq!(result.block_number, chain_tip);
 }
 
-/// Tests that `verify_stale_expected_notes` correctly transitions private notes from Expected
-/// to Committed when the commitment block has already been synced, and that the transition
-/// is reflected in `SyncSummary.committed_notes`.
+/// Tests that importing a private note via `NoteFile::NoteDetails` correctly transitions it to
+/// Committed when the note was already committed on-chain before `sync_height`.
 ///
 /// This exercises the NTL/sync race fix: a private note is committed on-chain, then the client
 /// syncs (discarding the note because it doesn't have the details). Later the note is imported
-/// as Expected (simulating NTL delivery). On the next sync, `verify_stale_expected_notes`
-/// detects the stale Expected note, fetches its inclusion proof, and transitions it to Committed.
+/// as Expected (simulating NTL delivery). The import flow uses `get_notes_by_id` to detect the
+/// on-chain commitment regardless of block height, transitioning the note to Committed
+/// immediately.
 #[tokio::test]
-async fn verify_stale_expected_notes_transitions_private_notes() {
+async fn import_resolves_committed_notes_behind_sync_height() {
     // 1. Build a custom mock chain with one account and one private note committed in block 1.
     let mut mock_chain_builder = MockChainBuilder::new();
     let mock_account = mock_chain_builder
@@ -2802,8 +2802,8 @@ async fn verify_stale_expected_notes_transitions_private_notes() {
     let keystore_path = temp_dir();
     let _keystore = FilesystemKeyStore::new(keystore_path.clone()).unwrap();
 
-    let rpc_api = MockRpcApi::new(mock_chain);
-    let arc_rpc_api = Arc::new(rpc_api.clone());
+    let _rpc_api = MockRpcApi::new(mock_chain);
+    let arc_rpc_api = Arc::new(_rpc_api.clone());
 
     let builder: ClientBuilder<FilesystemKeyStore> = ClientBuilder::new()
         .rpc(arc_rpc_api)
@@ -2820,14 +2820,12 @@ async fn verify_stale_expected_notes_transitions_private_notes() {
     client.add_note_tag(NoteTag::new(0)).await.unwrap();
 
     // 4. Sync to chain tip (block 1). The screener will discard the private note (no details
-    //    known), but block 1's header is stored. Since block 1 IS the sync height, it won't be
-    //    pruned.
+    //    known). Sync height advances past block 1.
     client.sync_state().await.unwrap();
 
-    // 5. Import the note as Expected (simulates NTL delivery after sync). Use tag: None so that
-    //    check_expected_notes doesn't find the note during import (the real-world equivalent is a
-    //    note imported without tag metadata). verify_stale_expected_notes uses get_notes_by_id
-    //    which doesn't rely on tags.
+    // 5. Import the note as Expected (simulates NTL delivery after sync).
+    //    check_expected_notes uses get_notes_by_id which fetches by ID regardless of block
+    //    height, so it finds the note committed in block 1 even though sync_height > 1.
     let note_record: InputNoteRecord = private_note.clone().into();
     let note_id = note_record.id();
     client
@@ -2839,29 +2837,11 @@ async fn verify_stale_expected_notes_transitions_private_notes() {
         .await
         .unwrap();
 
-    // Verify the note is in Expected state.
-    let notes = client.get_input_notes(NoteFilter::Expected).await.unwrap();
-    assert!(notes.iter().any(|n| n.id() == note_id), "note should be in Expected state");
-
-    // 6. Advance the mock chain to block 2 so there is a new block to sync to.
-    rpc_api.prove_block();
-
-    // 7. Sync again — verify_stale_expected_notes should find the stale Expected note
-    //    (after_block_num=0 < sync_height=2), fetch the inclusion proof from block 1, and
-    //    transition it to Committed.
-    let sync_summary = client.sync_state().await.unwrap();
-
-    // 8. Assert: note is now Committed in the store.
+    // 6. Assert: note is Committed immediately after import (no second sync needed).
     let committed_notes = client.get_input_notes(NoteFilter::Committed).await.unwrap();
     assert!(
         committed_notes.iter().any(|n| n.id() == note_id),
-        "note should have transitioned to Committed"
-    );
-
-    // 9. Assert: SyncSummary.committed_notes contains the note ID.
-    assert!(
-        sync_summary.committed_notes.contains(&note_id),
-        "SyncSummary.committed_notes should contain the stale note ID"
+        "note should have transitioned to Committed during import"
     );
 }
 

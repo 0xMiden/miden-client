@@ -2,7 +2,7 @@
 
 ## 0.13.4 (TBD)
 
-* [FIX][all] Fixed private notes delivered via NTL getting stuck as `Expected` when syncing at high frequency (e.g. every 3s). The on-chain commitment could be processed before the NTL delivered the note data, causing the note to never transition to `Committed`. Now preserves block headers and MMR auth nodes for private note commitments matching tracked tags, and re-verifies stale Expected notes after each sync by fetching their inclusion proofs from the node.
+* [FIX][all] Fixed private notes delivered via NTL getting stuck as `Expected` when syncing at high frequency (e.g. every 3s). The on-chain commitment could be processed before the NTL delivered the note data, causing the note to never transition to `Committed`. The note import flow now uses `get_notes_by_id` instead of `sync_notes` to detect on-chain commitments, which works regardless of block height and resolves the race at import time.
 
 ## 0.13.3 (2026-03-16)
 
