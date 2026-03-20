@@ -310,7 +310,7 @@ where
         requested_notes: Vec<(Option<InputNoteRecord>, NoteDetails, BlockNumber, Option<NoteTag>)>,
     ) -> Result<Vec<Option<InputNoteRecord>>, ClientError> {
         let note_ids: Vec<NoteId> =
-            requested_notes.iter().map(|(_, details, _, _)| details.id()).collect();
+            requested_notes.iter().map(|(_, details, ..)| details.id()).collect();
         let mut committed_notes_data = self.check_expected_notes(&note_ids).await?;
 
         let mut note_records = vec![];
@@ -378,10 +378,8 @@ where
 
         let mut retrieved_proofs = BTreeMap::new();
         for note in fetched_notes {
-            retrieved_proofs.insert(
-                note.id(),
-                (note.metadata().clone(), note.inclusion_proof().clone()),
-            );
+            retrieved_proofs
+                .insert(note.id(), (note.metadata().clone(), note.inclusion_proof().clone()));
         }
 
         Ok(retrieved_proofs)
