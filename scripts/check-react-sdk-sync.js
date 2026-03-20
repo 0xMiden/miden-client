@@ -46,7 +46,11 @@ if (!versionMatch) {
 
 const major = Number(versionMatch[1]);
 const minor = Number(versionMatch[2]);
-const expectedRange = `^${major}.${minor}.0`;
+const patch = Number(versionMatch[3]);
+const prerelease = versionMatch[4];
+const expectedRange = prerelease
+  ? `^${major}.${minor}.${patch}${prerelease}`
+  : `^${major}.${minor}.0`;
 
 const peerDeps = reactSdkPkg.peerDependencies || {};
 const actualRange = peerDeps["@miden-sdk/miden-sdk"];
