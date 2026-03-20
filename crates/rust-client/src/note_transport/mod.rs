@@ -127,13 +127,12 @@ where
             notes.push(note);
         }
 
-        let sync_height = self.get_sync_height().await?;
-
         // Start scanning from up to 20 blocks before sync height to handle the race
         // where a note is committed on-chain just before the NTL delivers its data.
         // Without this, check_expected_notes would scan from sync_height forward and
         // miss the already-committed note.
         const NOTE_LOOKBACK_BLOCKS: u32 = 20;
+        let sync_height = self.get_sync_height().await?;
         let after_block_num =
             BlockNumber::from(sync_height.as_u32().saturating_sub(NOTE_LOOKBACK_BLOCKS));
 
