@@ -148,7 +148,8 @@ export async function upsertInputNote(
         state,
         stateDiscriminant,
         serializedCreatedAt,
-        // Convert null -> undefined so Dexie doesn't index missing values
+        // These fields are null for non-consumed notes.
+        // Convert null -> undefined so Dexie omits them from compound indexes.
         consumedBlockHeight: consumedBlockHeight ?? undefined,
         consumedTxOrder: consumedTxOrder ?? undefined,
         consumerAccountId: consumerAccountId ?? undefined,
@@ -170,12 +171,12 @@ export async function upsertInputNote(
   return db.dexie.transaction("rw", db.inputNotes, db.notesScripts, doWork);
 }
 
-// When a consumer is set, uses the [consumedBlockHeight+consumedTxOrder+noteId] compound
-// index for cursor-based iteration.
+// Uses the [consumedBlockHeight+consumedTxOrder+noteId] compound index for cursor-based
+// iteration, filtering by consumer account.
 export async function getInputNoteByOffset(
   dbId: string,
   states: Uint8Array,
-  consumerAccountId: string | undefined,
+  consumerAccountId: string,
   blockStart: number | undefined,
   blockEnd: number | undefined,
   offset: number
@@ -183,78 +184,25 @@ export async function getInputNoteByOffset(
   try {
     const db = getDatabase(dbId);
 
-    if (consumerAccountId != null) {
-      // Cursor-based path: iterate the compound index in order, filter lazily.
-      const results = await db.inputNotes
-        .orderBy("[consumedBlockHeight+consumedTxOrder+noteId]")
-        .filter((n: IInputNote) => {
-          if (states.length > 0 && !states.includes(n.stateDiscriminant))
-            return false;
-          if (n.consumerAccountId !== consumerAccountId) return false;
-          if (
-            blockStart != null &&
-            (n.consumedBlockHeight == null ||
-              n.consumedBlockHeight < blockStart)
-          )
-            return false;
-          if (
-            blockEnd != null &&
-            (n.consumedBlockHeight == null || n.consumedBlockHeight > blockEnd)
-          )
-            return false;
-          return true;
-        })
-        .offset(offset)
-        .limit(1)
-        .toArray();
+    // The compound index sorts by consumedBlockHeight, consumedTxOrder, noteId.
+    // Rows without these fields are excluded by the index.
+    const results = await db.inputNotes
+      .orderBy("[consumedBlockHeight+consumedTxOrder+noteId]")
+      .filter((n: IInputNote) => {
+        if (states.length > 0 && !states.includes(n.stateDiscriminant))
+          return false;
+        if (n.consumerAccountId !== consumerAccountId) return false;
+        if (blockStart != null && n.consumedBlockHeight! < blockStart)
+          return false;
+        if (blockEnd != null && n.consumedBlockHeight! > blockEnd) return false;
+        return true;
+      })
+      .offset(offset)
+      .limit(1)
+      .toArray();
 
-      if (results.length === 0) return [];
-      return await processInputNotes(dbId, results);
-    }
-
-    // Fallback: load all matching notes, sort in memory, pick one.
-    let notes: IInputNote[];
-    if (states.length === 0) {
-      notes = await db.inputNotes.toArray();
-    } else {
-      notes = await db.inputNotes
-        .where("stateDiscriminant")
-        .anyOf(states)
-        .toArray();
-    }
-
-    if (blockStart != null) {
-      notes = notes.filter(
-        (n) =>
-          n.consumedBlockHeight != null && n.consumedBlockHeight >= blockStart
-      );
-    }
-    if (blockEnd != null) {
-      notes = notes.filter(
-        (n) =>
-          n.consumedBlockHeight != null && n.consumedBlockHeight <= blockEnd
-      );
-    }
-
-    notes.sort((a, b) => {
-      const aH = a.consumedBlockHeight;
-      const bH = b.consumedBlockHeight;
-      if (aH == null && bH != null) return 1;
-      if (aH != null && bH == null) return -1;
-      if (aH != null && bH != null && aH !== bH) return aH - bH;
-      const aO = a.consumedTxOrder;
-      const bO = b.consumedTxOrder;
-      if (aO == null && bO != null) return 1;
-      if (aO != null && bO == null) return -1;
-      if (aO != null && bO != null && aO !== bO) return aO - bO;
-      if (a.noteId < b.noteId) return -1;
-      if (a.noteId > b.noteId) return 1;
-      return 0;
-    });
-
-    const note = notes[offset];
-    if (!note) return [];
-    return await processInputNotes(dbId, [note]);
+    if (results.length === 0) return [];
+    return await processInputNotes(dbId, results);
   } catch (err) {
     logWebStoreError(err, "Failed to get input note by offset");
   }
