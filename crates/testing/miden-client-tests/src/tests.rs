@@ -2796,8 +2796,8 @@ async fn import_resolves_committed_notes_behind_sync_height() {
     let keystore_path = temp_dir();
     let _keystore = FilesystemKeyStore::new(keystore_path.clone()).unwrap();
 
-    let _rpc_api = MockRpcApi::new(mock_chain);
-    let arc_rpc_api = Arc::new(_rpc_api.clone());
+    let rpc_api = MockRpcApi::new(mock_chain);
+    let arc_rpc_api = Arc::new(rpc_api.clone());
 
     let builder: ClientBuilder<FilesystemKeyStore> = ClientBuilder::new()
         .rpc(arc_rpc_api)
