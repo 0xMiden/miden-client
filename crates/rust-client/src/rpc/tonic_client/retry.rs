@@ -7,7 +7,7 @@ use tracing::warn;
 // ================================================================================================
 
 /// Default maximum number of retry attempts for rate-limited requests.
-pub(super) const DEFAULT_MAX_RETRIES: u32 = 5;
+pub(super) const DEFAULT_MAX_RETRIES: u32 = 6;
 
 /// Default fallback delay (in milliseconds) when no `retry-after` header is present.
 pub(super) const DEFAULT_RETRY_INTERVAL_MS: u64 = 250;
@@ -30,7 +30,11 @@ pub(super) struct RetryState {
 impl RetryState {
     /// Creates a new retry state for a fresh RPC call.
     pub(super) const fn new(max_retries: u32, retry_interval_ms: u64) -> Self {
-        Self { attempt: 0, max_retries, retry_interval_ms }
+        Self {
+            attempt: 0,
+            max_retries,
+            retry_interval_ms,
+        }
     }
 
     /// Applies retry policy for the provided status.

@@ -233,6 +233,7 @@ pub mod crypto {
         };
     }
     pub use miden_protocol::crypto::hash::blake::Blake3Digest;
+    pub use miden_protocol::crypto::hash::poseidon2::Poseidon2;
     pub use miden_protocol::crypto::hash::rpo::Rpo256;
     pub use miden_protocol::crypto::merkle::mmr::{
         Forest,

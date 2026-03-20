@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use miden_client::account::{AccountId, AccountStorageMode};
 use miden_client::asset::FungibleAsset;
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
-use miden_client::crypto::{FeltRng, MerkleStore, MerkleTree, NodeIndex, Rpo256, RpoRandomCoin};
+use miden_client::crypto::{FeltRng, MerkleStore, MerkleTree, NodeIndex, Poseidon2, RpoRandomCoin};
 use miden_client::note::{
     Note,
     NoteAssets,
@@ -82,7 +82,7 @@ pub async fn test_transaction_request(client_config: ClientConfig) -> Result<()>
 
     // If these args were to be modified, the transaction would fail because the note code expects
     // these exact arguments
-    let note_args_commitment = Rpo256::hash_elements(&NOTE_ARGS);
+    let note_args_commitment = Poseidon2::hash_elements(&NOTE_ARGS);
 
     let note_args_map = vec![(note.clone(), Some(note_args_commitment))];
     let mut advice_map = AdviceMap::default();
@@ -118,7 +118,7 @@ pub async fn test_transaction_request(client_config: ClientConfig) -> Result<()>
     let transaction_request = TransactionRequestBuilder::new()
         .input_notes(note_args_map)
         .custom_script(tx_script)
-        .script_arg([Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)].into())
+        .script_arg([Felt::new(4), Felt::new(3), Felt::new(2), Felt::new(1)].into())
         .extend_advice_map(advice_map)
         .build()?;
 
@@ -185,7 +185,7 @@ pub async fn test_merkle_store(client_config: ClientConfig) -> Result<()> {
 
     // If these args were to be modified, the transaction would fail because the note code expects
     // these exact arguments
-    let note_args_commitment = Rpo256::hash_elements(&NOTE_ARGS);
+    let note_args_commitment = Poseidon2::hash_elements(&NOTE_ARGS);
 
     let note_args_map = vec![(note, Some(note_args_commitment))];
     let mut advice_map = AdviceMap::default();
@@ -356,9 +356,13 @@ fn create_custom_note(
 
     let mem_addr: u32 = 1000;
 
+    // Note: push.a.b.c.d puts d on top of the stack, but mem_loadw_le puts Word[0]
+    // on top, so we need to reverse the order for the push to match.
+    let reversed_arg_1: Vec<_> = expected_note_args[0..=3].iter().rev().cloned().collect();
+    let reversed_arg_2: Vec<_> = expected_note_args[4..=7].iter().rev().cloned().collect();
     let note_script = include_str!("../asm/custom_p2id.masm")
-        .replace("{expected_note_arg_1}", &expected_note_args[0..=3].join("."))
-        .replace("{expected_note_arg_2}", &expected_note_args[4..=7].join("."))
+        .replace("{expected_note_arg_1}", &reversed_arg_1.join("."))
+        .replace("{expected_note_arg_2}", &reversed_arg_2.join("."))
         .replace("{mem_address}", &mem_addr.to_string())
         .replace("{mem_address_2}", &(mem_addr + 4).to_string());
     let note_script = client
