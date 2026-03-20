@@ -11,7 +11,9 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use ::rand::{Rng, random};
 use anyhow::{Context, Result};
 use miden_node_block_producer::{
-    BlockProducer, DEFAULT_MAX_BATCHES_PER_BLOCK, DEFAULT_MAX_TXS_PER_BATCH,
+    BlockProducer,
+    DEFAULT_MAX_BATCHES_PER_BLOCK,
+    DEFAULT_MAX_TXS_PER_BATCH,
     DEFAULT_MEMPOOL_TX_CAPACITY,
 };
 use miden_node_ntx_builder::NetworkTransactionBuilder;
@@ -42,6 +44,13 @@ pub const DEFAULT_BATCH_INTERVAL: u64 = 2_000;
 pub const DEFAULT_RPC_PORT: u16 = 57_291;
 pub const GENESIS_ACCOUNT_FILE: &str = "account.mac";
 const DEFAULT_TIMEOUT_DURATION: Duration = Duration::from_secs(10);
+
+/// Relaxed gRPC options for testing, disables all rate limiting and timeouts.
+const GRPC_REQUEST_TIMEOUT: Duration = Duration::from_secs(3600);
+const GRPC_MAX_CONNECTION_AGE: Duration = Duration::from_secs(86400);
+const GRPC_BURST_SIZE: NonZeroU32 = NonZeroU32::MAX;
+const GRPC_REPLENISH_N_PER_SECOND_PER_IP: NonZeroU64 = NonZeroU64::MAX;
+const GRPC_MAX_CONCURRENT_CONNECTIONS: u64 = u64::MAX;
 
 /// Builder for configuring and starting a Miden node with all components.
 pub struct NodeBuilder {
@@ -197,9 +206,7 @@ impl NodeBuilder {
                     Validator {
                         address: validator_address,
                         signer: validator_signer,
-                        grpc_options: GrpcOptionsInternal {
-                            request_timeout: Duration::from_secs(3600),
-                        },
+                        grpc_options: GrpcOptionsInternal { request_timeout: GRPC_REQUEST_TIMEOUT },
                     }
                     .serve()
                     .await
@@ -225,11 +232,11 @@ impl NodeBuilder {
                     block_producer_url,
                     validator_url,
                     grpc_options: GrpcOptionsExternal {
-                        request_timeout: Duration::from_secs(3600),
-                        max_connection_age: Duration::from_secs(86400),
-                        burst_size: NonZeroU32::MAX,
-                        replenish_n_per_second_per_ip: NonZeroU64::MAX,
-                        max_concurrent_connections: u64::MAX,
+                        request_timeout: GRPC_REQUEST_TIMEOUT,
+                        max_connection_age: GRPC_MAX_CONNECTION_AGE,
+                        burst_size: GRPC_BURST_SIZE,
+                        replenish_n_per_second_per_ip: GRPC_REPLENISH_N_PER_SECOND_PER_IP,
+                        max_concurrent_connections: GRPC_MAX_CONCURRENT_CONNECTIONS,
                     },
                 }
                 .serve()
@@ -285,9 +292,7 @@ impl NodeBuilder {
                         rpc_listener,
                         block_producer_listener,
                         ntx_builder_listener,
-                        grpc_options: GrpcOptionsInternal {
-                            request_timeout: Duration::from_secs(3600),
-                        },
+                        grpc_options: GrpcOptionsInternal { request_timeout: GRPC_REQUEST_TIMEOUT },
                     }
                     .serve()
                     .await
