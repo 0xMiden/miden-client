@@ -2754,12 +2754,6 @@ async fn sync_storage_maps_pagination_from_middle() {
 
 /// Tests that importing a private note via `NoteFile::NoteDetails` correctly transitions it to
 /// Committed when the note was already committed on-chain before `sync_height`.
-///
-/// This exercises the NTL/sync race fix: a private note is committed on-chain, then the client
-/// syncs (discarding the note because it doesn't have the details). Later the note is imported
-/// as Expected (simulating NTL delivery). The import flow uses `get_notes_by_id` to detect the
-/// on-chain commitment regardless of block height, transitioning the note to Committed
-/// immediately.
 #[tokio::test]
 async fn import_resolves_committed_notes_behind_sync_height() {
     // 1. Build a custom mock chain with one account and one private note committed in block 1.
