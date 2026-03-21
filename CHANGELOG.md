@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.13.4 (TBD)
+
+* [FIX][all] Fixed private notes delivered via NTL getting stuck as `Expected` when syncing at high frequency (e.g. every 3s). The on-chain commitment could be processed before the NTL delivered the note data, causing the note to never transition to `Committed`. The note import flow now scans back up to 20 blocks from the current sync height when checking for committed notes, so notes committed just before the client synced past them are found during import.
+
 ## 0.13.3 (2026-03-16)
 
 * [FIX][rust,web] Fixed `sync_state()` invoking the external signer (e.g. wallet extension) during note consumability checks, causing repeated confirmation popups on every sync cycle. `NoteScreener` no longer attaches the `TransactionAuthenticator` when trial-executing consume transactions; accounts requiring auth now return `ConsumableWithAuthorization` instead ([#1905](https://github.com/0xMiden/miden-client/pull/1905)).
