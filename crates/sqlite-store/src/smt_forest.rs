@@ -1,7 +1,11 @@
 use std::collections::{BTreeMap, HashMap};
 
 use miden_client::account::{
-    AccountId, AccountStorage, StorageMap, StorageSlotContent, StorageSlotName,
+    AccountId,
+    AccountStorage,
+    StorageMap,
+    StorageSlotContent,
+    StorageSlotName,
 };
 use miden_client::asset::{Asset, AssetVault, AssetWitness};
 use miden_client::crypto::SMT_DEPTH;
@@ -352,19 +356,17 @@ mod tests {
         forest.get_storage_map_item_witness(root, key).is_ok()
     }
 
-    /// Helper to create AccountRoots with just a vault root (no map roots).
+    /// Helper to create `AccountRoots` with just a vault root (no map roots).
     fn vault_only(root: Word) -> AccountRoots {
         AccountRoots::new(root, BTreeMap::new())
     }
 
-    /// Helper to create AccountRoots with a vault root and map roots.
+    /// Helper to create `AccountRoots` with a vault root and map roots.
     fn with_maps(vault: Word, maps: Vec<Word>) -> AccountRoots {
         let map_roots: BTreeMap<StorageSlotName, Word> = maps
             .into_iter()
             .enumerate()
-            .map(|(i, root)| {
-                (StorageSlotName::new(format!("test::slot{i}")).unwrap(), root)
-            })
+            .map(|(i, root)| (StorageSlotName::new(format!("test::slot{i}")).unwrap(), root))
             .collect();
         AccountRoots::new(vault, map_roots)
     }

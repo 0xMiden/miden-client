@@ -298,4 +298,3 @@ async fn apply_account_delta_removals() -> anyhow::Result<()> {
 
     Ok(())
 }
-
