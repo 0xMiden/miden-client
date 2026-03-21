@@ -93,12 +93,17 @@ async fn apply_account_delta_additions() -> anyhow::Result<()> {
         StorageSlotName::new("miden::testing::sqlite_store::value").expect("valid slot name");
     let map_slot_name =
         StorageSlotName::new("miden::testing::sqlite_store::map").expect("valid slot name");
+    // Second map slot starts empty (same root as map_slot_name) to verify that
+    // modifying only one map slot doesn't corrupt the other when roots collide.
+    let map_slot_b_name =
+        StorageSlotName::new("miden::testing::sqlite_store::mapB").expect("valid slot name");
 
     let dummy_component = AccountComponent::new(
         basic_wallet_library(),
         vec![
             StorageSlot::with_empty_value(value_slot_name.clone()),
             StorageSlot::with_empty_map(map_slot_name.clone()),
+            StorageSlot::with_empty_map(map_slot_b_name.clone()),
         ],
     )?
     .with_supports_all_types();
@@ -169,6 +174,19 @@ async fn apply_account_delta_additions() -> anyhow::Result<()> {
         .try_into()?;
 
     assert_eq!(updated_account, account_after_delta);
+
+    // The untouched second map slot must still be empty despite sharing the same
+    // initial root as the modified map slot.
+    let map_b = updated_account
+        .storage()
+        .slots()
+        .iter()
+        .find(|slot| slot.name() == &map_slot_b_name)
+        .expect("storage should contain map B");
+    let StorageSlotContent::Map(map_b) = map_b.content() else {
+        panic!("Expected map slot content");
+    };
+    assert_eq!(map_b.entries().count(), 0);
 
     Ok(())
 }
@@ -280,3 +298,4 @@ async fn apply_account_delta_removals() -> anyhow::Result<()> {
 
     Ok(())
 }
+

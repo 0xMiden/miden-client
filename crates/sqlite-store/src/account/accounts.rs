@@ -535,10 +535,7 @@ impl SqliteStore {
             .cloned()
             .ok_or(StoreError::AccountDataNotFound(init_account_state.id()))?;
 
-        // First element is always the vault root
-        if let Some(vault_root) = final_roots.first_mut() {
-            *vault_root = final_account_state.vault_root();
-        }
+        final_roots.set_vault_root(final_account_state.vault_root());
 
         let updated_storage_slots = Self::apply_account_storage_delta(
             smt_forest,

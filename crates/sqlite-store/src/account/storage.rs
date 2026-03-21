@@ -1,18 +1,13 @@
 //! Storage-related database operations for accounts.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::rc::Rc;
 use std::string::ToString;
 use std::vec::Vec;
 
 use miden_client::Word;
 use miden_client::account::{
-    AccountDelta,
-    AccountHeader,
-    StorageMap,
-    StorageSlot,
-    StorageSlotContent,
-    StorageSlotName,
+    AccountDelta, AccountHeader, StorageMap, StorageSlot, StorageSlotContent, StorageSlotName,
 };
 use miden_client::store::StoreError;
 use miden_protocol::crypto::merkle::MerkleError;
@@ -20,7 +15,7 @@ use rusqlite::types::Value;
 use rusqlite::{Connection, Transaction, params};
 
 use crate::account::helpers::query_storage_slots;
-use crate::smt_forest::AccountSmtForest;
+use crate::smt_forest::{AccountRoots, AccountSmtForest};
 use crate::sql_error::SqlResultExt;
 use crate::{SqliteStore, insert_sql, subst};
 
@@ -112,10 +107,10 @@ impl SqliteStore {
     /// All updated storage map entries are validated against the SMT forest to ensure consistency.
     /// If the computed root doesn't match the expected root, an error is returned.
     ///
-    /// Changed map roots in `account_roots` are replaced in place with their new values.
+    /// Changed map roots in `account_roots` are replaced in place by slot name.
     pub(crate) fn apply_account_storage_delta(
         smt_forest: &mut AccountSmtForest,
-        account_roots: &mut [Word],
+        account_roots: &mut AccountRoots,
         mut updated_storage_maps: BTreeMap<StorageSlotName, StorageMap>,
         delta: &AccountDelta,
     ) -> Result<Vec<StorageSlot>, StoreError> {
@@ -127,10 +122,6 @@ impl SqliteStore {
             .values()
             .map(|(slot_name, slot)| StorageSlot::with_value(slot_name.clone(), *slot))
             .collect();
-
-        // Track which root indices have already been updated, so that two map slots
-        // sharing the same old root each get their own entry updated.
-        let mut updated_indices = BTreeSet::new();
 
         // For storage map deltas, we only updated the keys in the delta, this is why we need the
         // previously retrieved storage maps.
@@ -153,13 +144,11 @@ impl SqliteStore {
                 }));
             }
 
-            let (idx, root) = account_roots
-                .iter_mut()
-                .enumerate()
-                .find(|(i, r)| **r == old_root && !updated_indices.contains(i))
+            let root = account_roots
+                .map_roots_mut()
+                .get_mut(slot_name)
                 .ok_or(StoreError::AccountStorageRootNotFound(old_root))?;
             *root = expected_root;
-            updated_indices.insert(idx);
 
             updated_storage_slots.push(StorageSlot::with_map(slot_name.clone(), map));
         }

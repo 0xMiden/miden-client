@@ -1,6 +1,8 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
-use miden_client::account::{AccountId, AccountStorage, StorageMap, StorageSlotContent};
+use miden_client::account::{
+    AccountId, AccountStorage, StorageMap, StorageSlotContent, StorageSlotName,
+};
 use miden_client::asset::{Asset, AssetVault, AssetWitness};
 use miden_client::crypto::SMT_DEPTH;
 use miden_client::store::StoreError;
@@ -10,6 +12,42 @@ use miden_protocol::asset::AssetVaultKey;
 use miden_protocol::crypto::merkle::smt::{Smt, SmtForest};
 use miden_protocol::crypto::merkle::{EmptySubtreeRoots, MerkleError};
 
+/// SMT roots for an account: vault root + named storage map roots.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct AccountRoots {
+    vault_root: Word,
+    map_roots: BTreeMap<StorageSlotName, Word>,
+}
+
+impl AccountRoots {
+    pub fn new(vault_root: Word, map_roots: BTreeMap<StorageSlotName, Word>) -> Self {
+        Self { vault_root, map_roots }
+    }
+
+    pub fn vault_root(&self) -> Word {
+        self.vault_root
+    }
+
+    pub fn set_vault_root(&mut self, root: Word) {
+        self.vault_root = root;
+    }
+
+    pub fn map_roots(&self) -> &BTreeMap<StorageSlotName, Word> {
+        &self.map_roots
+    }
+
+    pub fn map_roots_mut(&mut self) -> &mut BTreeMap<StorageSlotName, Word> {
+        &mut self.map_roots
+    }
+
+    /// Returns all roots (vault + maps) as a flat list for refcounting.
+    fn all_roots(&self) -> Vec<Word> {
+        let mut roots = vec![self.vault_root];
+        roots.extend(self.map_roots.values());
+        roots
+    }
+}
+
 /// Thin wrapper around `SmtForest` for account vault/storage proofs and updates.
 ///
 /// Tracks current SMT roots per account with reference counting to safely pop
@@ -18,10 +56,10 @@ use miden_protocol::crypto::merkle::{EmptySubtreeRoots, MerkleError};
 #[derive(Debug, Default, Clone, Eq, PartialEq)]
 pub struct AccountSmtForest {
     forest: SmtForest,
-    /// Current roots per account (vault root + storage map roots).
-    account_roots: HashMap<AccountId, Vec<Word>>,
+    /// Current roots per account (vault root + named storage map roots).
+    account_roots: HashMap<AccountId, AccountRoots>,
     /// Stack of old roots saved during staging, awaiting commit or undo.
-    pending_old_roots: HashMap<AccountId, Vec<Vec<Word>>>,
+    pending_old_roots: HashMap<AccountId, Vec<AccountRoots>>,
     /// Reference count for each SMT root across all accounts.
     root_refcounts: HashMap<Word, usize>,
 }
@@ -35,7 +73,7 @@ impl AccountSmtForest {
     // --------------------------------------------------------------------------------------------
 
     /// Returns the current roots for an account.
-    pub fn get_roots(&self, account_id: &AccountId) -> Option<&Vec<Word>> {
+    pub fn get_roots(&self, account_id: &AccountId) -> Option<&AccountRoots> {
         self.account_roots.get(account_id)
     }
 
@@ -77,8 +115,8 @@ impl AccountSmtForest {
     /// The old roots are pushed onto a pending stack and their refcounts are preserved.
     /// Call [`Self::commit_roots`] to release old roots or [`Self::discard_roots`] to
     /// restore them.
-    pub fn stage_roots(&mut self, account_id: AccountId, new_roots: Vec<Word>) {
-        increment_refcounts(&mut self.root_refcounts, &new_roots);
+    pub fn stage_roots(&mut self, account_id: AccountId, new_roots: AccountRoots) {
+        increment_refcounts(&mut self.root_refcounts, &new_roots.all_roots());
         if let Some(old_roots) = self.account_roots.insert(account_id, new_roots) {
             self.pending_old_roots.entry(account_id).or_default().push(old_roots);
         }
@@ -88,7 +126,7 @@ impl AccountSmtForest {
     pub fn commit_roots(&mut self, account_id: AccountId) {
         if let Some(old_roots_stack) = self.pending_old_roots.remove(&account_id) {
             for old_roots in old_roots_stack {
-                let to_pop = decrement_refcounts(&mut self.root_refcounts, &old_roots);
+                let to_pop = decrement_refcounts(&mut self.root_refcounts, &old_roots.all_roots());
                 self.forest.pop_smts(to_pop);
             }
         }
@@ -109,7 +147,7 @@ impl AccountSmtForest {
         };
 
         if let Some(new_roots) = new_roots {
-            let to_pop = decrement_refcounts(&mut self.root_refcounts, &new_roots);
+            let to_pop = decrement_refcounts(&mut self.root_refcounts, &new_roots.all_roots());
             self.forest.pop_smts(to_pop);
         }
 
@@ -127,14 +165,14 @@ impl AccountSmtForest {
     ///
     /// Panics if there are pending staged changes for the account. Use
     /// [`Self::commit_roots`] or [`Self::discard_roots`] first.
-    pub fn replace_roots(&mut self, account_id: AccountId, new_roots: Vec<Word>) {
+    pub fn replace_roots(&mut self, account_id: AccountId, new_roots: AccountRoots) {
         assert!(
             !self.pending_old_roots.contains_key(&account_id),
             "cannot replace roots while staged changes are pending for account {account_id}"
         );
-        increment_refcounts(&mut self.root_refcounts, &new_roots);
+        increment_refcounts(&mut self.root_refcounts, &new_roots.all_roots());
         if let Some(old_roots) = self.account_roots.insert(account_id, new_roots) {
-            let to_pop = decrement_refcounts(&mut self.root_refcounts, &old_roots);
+            let to_pop = decrement_refcounts(&mut self.root_refcounts, &old_roots.all_roots());
             self.forest.pop_smts(to_pop);
         }
     }
@@ -249,15 +287,15 @@ impl AccountSmtForest {
     // HELPERS
     // --------------------------------------------------------------------------------------------
 
-    /// Collects all SMT roots (vault root + storage map roots) for an account's state.
-    fn collect_account_roots(vault: &AssetVault, storage: &AccountStorage) -> Vec<Word> {
-        let mut roots = vec![vault.root()];
+    /// Collects all SMT roots (vault root + named storage map roots) for an account's state.
+    fn collect_account_roots(vault: &AssetVault, storage: &AccountStorage) -> AccountRoots {
+        let mut map_roots = BTreeMap::new();
         for slot in storage.slots() {
             if let StorageSlotContent::Map(map) = slot.content() {
-                roots.push(map.root());
+                map_roots.insert(slot.name().clone(), map.root());
             }
         }
-        roots
+        AccountRoots::new(vault.root(), map_roots)
     }
 }
 
@@ -314,6 +352,23 @@ mod tests {
         forest.get_storage_map_item_witness(root, key).is_ok()
     }
 
+    /// Helper to create AccountRoots with just a vault root (no map roots).
+    fn vault_only(root: Word) -> AccountRoots {
+        AccountRoots::new(root, BTreeMap::new())
+    }
+
+    /// Helper to create AccountRoots with a vault root and map roots.
+    fn with_maps(vault: Word, maps: Vec<Word>) -> AccountRoots {
+        let map_roots: BTreeMap<StorageSlotName, Word> = maps
+            .into_iter()
+            .enumerate()
+            .map(|(i, root)| {
+                (StorageSlotName::new(format!("test::slot{i}")).unwrap(), root)
+            })
+            .collect();
+        AccountRoots::new(vault, map_roots)
+    }
+
     #[test]
     fn stage_then_commit_releases_old_roots() {
         let mut forest = AccountSmtForest::new();
@@ -327,12 +382,12 @@ mod tests {
         let root2 = insert_map(&mut forest, key2, val);
 
         // Initial state
-        forest.replace_roots(id, vec![root1]);
-        assert_eq!(forest.get_roots(&id), Some(&vec![root1]));
+        forest.replace_roots(id, vault_only(root1));
+        assert_eq!(forest.get_roots(&id).unwrap().vault_root(), root1);
 
         // Stage new roots (apply_delta)
-        forest.stage_roots(id, vec![root2]);
-        assert_eq!(forest.get_roots(&id), Some(&vec![root2]));
+        forest.stage_roots(id, vault_only(root2));
+        assert_eq!(forest.get_roots(&id).unwrap().vault_root(), root2);
 
         // Both roots alive during staging (old preserved for rollback)
         assert!(root_is_live(&forest, root1, key1));
@@ -340,7 +395,7 @@ mod tests {
 
         // Commit — old roots released
         forest.commit_roots(id);
-        assert_eq!(forest.get_roots(&id), Some(&vec![root2]));
+        assert_eq!(forest.get_roots(&id).unwrap().vault_root(), root2);
         assert!(!root_is_live(&forest, root1, key1));
         assert!(root_is_live(&forest, root2, key2));
     }
@@ -357,13 +412,13 @@ mod tests {
         let root1 = insert_map(&mut forest, key1, val);
         let root2 = insert_map(&mut forest, key2, val);
 
-        forest.replace_roots(id, vec![root1]);
+        forest.replace_roots(id, vault_only(root1));
 
         // Stage and discard (rollback)
-        forest.stage_roots(id, vec![root2]);
+        forest.stage_roots(id, vault_only(root2));
         forest.discard_roots(id);
 
-        assert_eq!(forest.get_roots(&id), Some(&vec![root1]));
+        assert_eq!(forest.get_roots(&id).unwrap().vault_root(), root1);
         assert!(root_is_live(&forest, root1, key1));
         assert!(!root_is_live(&forest, root2, key2));
     }
@@ -379,19 +434,19 @@ mod tests {
         let shared_root = insert_map(&mut forest, key, val);
 
         // Both accounts reference the same root
-        forest.replace_roots(id1, vec![shared_root]);
-        forest.replace_roots(id2, vec![shared_root]);
+        forest.replace_roots(id1, vault_only(shared_root));
+        forest.replace_roots(id2, vault_only(shared_root));
 
         // Replace id1 with a different root
         let key2: Word = [ZERO, ONE, ZERO, ZERO].into();
         let other_root = insert_map(&mut forest, key2, val);
-        forest.replace_roots(id1, vec![other_root]);
+        forest.replace_roots(id1, vault_only(other_root));
 
         // Shared root still alive (id2 still references it)
         assert!(root_is_live(&forest, shared_root, key));
 
         // Replace id2 too — now shared root should be popped
-        forest.replace_roots(id2, vec![other_root]);
+        forest.replace_roots(id2, vault_only(other_root));
         assert!(!root_is_live(&forest, shared_root, key));
     }
 
@@ -410,21 +465,21 @@ mod tests {
         let root_c = insert_map(&mut forest, key_c, val);
 
         // A -> B -> C
-        forest.replace_roots(id, vec![root_a]);
-        forest.stage_roots(id, vec![root_b]);
-        forest.stage_roots(id, vec![root_c]);
-        assert_eq!(forest.get_roots(&id), Some(&vec![root_c]));
+        forest.replace_roots(id, vault_only(root_a));
+        forest.stage_roots(id, vault_only(root_b));
+        forest.stage_roots(id, vault_only(root_c));
+        assert_eq!(forest.get_roots(&id).unwrap().vault_root(), root_c);
 
         // Discard C -> back to B
         forest.discard_roots(id);
-        assert_eq!(forest.get_roots(&id), Some(&vec![root_b]));
+        assert_eq!(forest.get_roots(&id).unwrap().vault_root(), root_b);
         assert!(!root_is_live(&forest, root_c, key_c));
         assert!(root_is_live(&forest, root_b, key_b));
         assert!(root_is_live(&forest, root_a, key_a));
 
         // Discard B -> back to A
         forest.discard_roots(id);
-        assert_eq!(forest.get_roots(&id), Some(&vec![root_a]));
+        assert_eq!(forest.get_roots(&id).unwrap().vault_root(), root_a);
         assert!(!root_is_live(&forest, root_b, key_b));
         assert!(root_is_live(&forest, root_a, key_a));
     }
@@ -444,13 +499,13 @@ mod tests {
         let root_c = insert_map(&mut forest, key_c, val);
 
         // A -> B -> C, then commit
-        forest.replace_roots(id, vec![root_a]);
-        forest.stage_roots(id, vec![root_b]);
-        forest.stage_roots(id, vec![root_c]);
+        forest.replace_roots(id, vault_only(root_a));
+        forest.stage_roots(id, vault_only(root_b));
+        forest.stage_roots(id, vault_only(root_c));
         forest.commit_roots(id);
 
         // Only C survives
-        assert_eq!(forest.get_roots(&id), Some(&vec![root_c]));
+        assert_eq!(forest.get_roots(&id).unwrap().vault_root(), root_c);
         assert!(!root_is_live(&forest, root_a, key_a));
         assert!(!root_is_live(&forest, root_b, key_b));
         assert!(root_is_live(&forest, root_c, key_c));
@@ -468,13 +523,13 @@ mod tests {
         let shared_root = insert_map(&mut forest, key1, val);
         let changing_root = insert_map(&mut forest, key2, val);
 
-        // Initial: [shared, changing]
-        forest.replace_roots(id, vec![shared_root, changing_root]);
+        // Initial: vault=shared, map=[changing]
+        forest.replace_roots(id, with_maps(shared_root, vec![changing_root]));
 
-        // Delta only changes the second root; shared_root stays
+        // Delta only changes the map root; shared vault root stays
         let key3: Word = [ZERO, ZERO, ONE, ZERO].into();
         let new_root = insert_map(&mut forest, key3, val);
-        forest.stage_roots(id, vec![shared_root, new_root]);
+        forest.stage_roots(id, with_maps(shared_root, vec![new_root]));
         forest.commit_roots(id);
 
         // shared_root must survive (it's in both old and new)
