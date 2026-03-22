@@ -312,7 +312,7 @@ impl WebStore {
                         StorageSlot::with_value(slot_name, Word::try_from(slot.slot_value.as_str())?)
                     },
                     StorageSlotType::Map => {
-                        let map = maps.remove(&slot.slot_value).unwrap_or_else(StorageMap::new);
+                        let map = maps.get(&slot.slot_value).cloned().unwrap_or_default();
                         if map.root().to_hex() != slot.slot_value {
                             return Err(StoreError::DatabaseError(format!(
                                 "incomplete storage map for slot {slot_name} (expected root {}, got {})",

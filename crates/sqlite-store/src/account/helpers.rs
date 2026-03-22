@@ -197,8 +197,7 @@ pub(crate) fn query_storage_slots(
     let possible_roots: Vec<Value> =
         storage_values.iter().map(|(_, value, _)| Value::from(value.to_hex())).collect();
 
-    let mut storage_maps =
-        query_storage_maps(conn, "root IN rarray(?)", [Rc::new(possible_roots)])?;
+    let storage_maps = query_storage_maps(conn, "root IN rarray(?)", [Rc::new(possible_roots)])?;
 
     Ok(storage_values
         .into_iter()
@@ -206,7 +205,7 @@ pub(crate) fn query_storage_slots(
             StorageSlotType::Value => StorageSlot::with_value(slot_name, value),
             StorageSlotType::Map => StorageSlot::with_map(
                 slot_name,
-                storage_maps.remove(&value).unwrap_or(StorageMap::new()),
+                storage_maps.get(&value).cloned().unwrap_or_default(),
             ),
         })
         .collect())

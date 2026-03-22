@@ -24,7 +24,6 @@ use miden_protocol::crypto::merkle::smt::SmtProof;
 use miden_tx::utils::{Deserializable, Serializable, ToHex};
 use thiserror::Error;
 
-use crate::alloc::borrow::ToOwned;
 use crate::alloc::string::ToString;
 use crate::rpc::RpcError;
 use crate::rpc::domain::MissingFieldHelper;
@@ -240,6 +239,7 @@ impl proto::rpc::account_response::AccountDetails {
     pub fn into_domain(
         self,
         known_account_codes: &BTreeMap<Word, AccountCode>,
+        storage_requirements: &AccountStorageRequirements,
     ) -> Result<AccountDetails, crate::rpc::RpcError> {
         use crate::rpc::RpcError;
         use crate::rpc::domain::MissingFieldHelper;
@@ -254,11 +254,34 @@ impl proto::rpc::account_response::AccountDetails {
             .ok_or(proto::rpc::account_response::AccountDetails::missing_field(stringify!(header)))?
             .try_into()?;
 
-        let storage_details = storage_details
+        let storage_details: AccountStorageDetails = storage_details
             .ok_or(proto::rpc::account_response::AccountDetails::missing_field(stringify!(
                 storage_details
             )))?
             .try_into()?;
+
+        // Validate that the returned proofs match the originally requested keys.
+        // The node returns hashed SMT keys, so we hash the raw keys and check
+        // they are present in the corresponding proofs.
+        for map_detail in &storage_details.map_details {
+            let requested_keys = storage_requirements
+                .inner()
+                .get(&map_detail.slot_name)
+                .map(Vec::as_slice)
+                .unwrap_or_default();
+
+            if let StorageMapEntries::EntriesWithProofs(witnesses) = &map_detail.entries {
+                for (witness, raw_key) in witnesses.iter().zip(requested_keys.iter()) {
+                    let hashed_key = StorageMap::hash_key(*raw_key);
+                    if witness.proof().get(&hashed_key).is_none() {
+                        return Err(RpcError::InvalidResponse(format!(
+                            "proof for storage map key {} does not match the requested key",
+                            raw_key.to_hex(),
+                        )));
+                    }
+                }
+            }
+        }
 
         // If an account code was received, it means the previously known account code is no longer
         // valid. If it was not, it means we sent a code commitment that matched and so our code
@@ -339,8 +362,8 @@ impl TryFrom<proto::rpc::AccountStorageDetails> for AccountStorageDetails {
             .try_into()?;
         let map_details = value
             .map_details
-            .iter()
-            .map(|entry| entry.to_owned().try_into())
+            .into_iter()
+            .map(core::convert::TryInto::try_into)
             .collect::<Result<Vec<AccountStorageMapDetails>, RpcError>>()?;
 
         Ok(Self { header, map_details })
@@ -391,7 +414,8 @@ impl TryFrom<proto::rpc::account_storage_details::AccountStorageMapDetails>
                     .entries
                     .into_iter()
                     .map(|entry| {
-                        let key: Word = entry
+                        // The node returns the hashed key, not the raw map key.
+                        let hashed_key: Word = entry
                             .key
                             .ok_or(RpcError::ExpectedDataMissing("key".into()))?
                             .try_into()?;
@@ -399,8 +423,9 @@ impl TryFrom<proto::rpc::account_storage_details::AccountStorageMapDetails>
                             .proof
                             .ok_or(RpcError::ExpectedDataMissing("proof".into()))?
                             .try_into()?;
-                        StorageMapWitness::new(proof, [key])
-                            .map_err(|e| RpcError::InvalidResponse(e.to_string()))
+
+                        let value = proof.get(&hashed_key).unwrap_or_default();
+                        Ok(StorageMapWitness::new_unchecked(proof, [(hashed_key, value)]))
                     })
                     .collect::<Result<Vec<StorageMapWitness>, RpcError>>()?;
                 StorageMapEntries::EntriesWithProofs(witnesses)
@@ -610,14 +635,17 @@ impl TryFrom<proto::rpc::AccountResponse> for AccountProof {
     fn try_from(account_proof: proto::rpc::AccountResponse) -> Result<Self, Self::Error> {
         let Some(witness) = account_proof.witness else {
             return Err(RpcError::ExpectedDataMissing(
-                "GetAccountProof returned an account without witness".to_owned(),
+                "GetAccountProof returned an account without witness".to_string(),
             ));
         };
 
         let details: Option<AccountDetails> = {
             match account_proof.details {
                 None => None,
-                Some(details) => Some(details.into_domain(&BTreeMap::new())?),
+                Some(details) => Some(
+                    details
+                        .into_domain(&BTreeMap::new(), &AccountStorageRequirements::default())?,
+                ),
             }
         };
         AccountProof::new(witness.try_into()?, details)
@@ -657,6 +685,9 @@ pub type StorageMapKey = Word;
 
 /// Describes storage slots indices to be requested, as well as a list of keys for each of those
 /// slots.
+///
+/// Note: If no specific keys are provided for a slot, all entries are requested. Though the
+/// node may respond with `too_many_entries` if the map exceeds the response limit.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct AccountStorageRequirements(BTreeMap<StorageSlotName, Vec<StorageMapKey>>);
 
@@ -686,11 +717,17 @@ impl From<AccountStorageRequirements> for Vec<account_detail_request::StorageMap
     fn from(
         value: AccountStorageRequirements,
     ) -> Vec<account_detail_request::StorageMapDetailRequest> {
-        use account_detail_request::{self, storage_map_detail_request};
+        use account_detail_request::storage_map_detail_request::{MapKeys, SlotData};
         let request_map = value.0;
         let mut requests = Vec::with_capacity(request_map.len());
-        for (slot_name, _map_keys) in request_map {
-            let slot_data = Some(storage_map_detail_request::SlotData::AllEntries(true));
+        for (slot_name, map_keys) in request_map {
+            let slot_data = if map_keys.is_empty() {
+                Some(SlotData::AllEntries(true))
+            } else {
+                Some(SlotData::MapKeys(MapKeys {
+                    map_keys: map_keys.into_iter().map(Into::into).collect(),
+                }))
+            };
             requests.push(account_detail_request::StorageMapDetailRequest {
                 slot_name: slot_name.to_string(),
                 slot_data,
