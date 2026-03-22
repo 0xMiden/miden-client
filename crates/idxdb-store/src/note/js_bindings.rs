@@ -58,7 +58,7 @@ extern "C" {
         state_discriminant: u8,
         state: Vec<u8>,
         consumed_block_height: Option<u32>,
-        consumed_tx_order: Option<u16>,
+        consumed_tx_order: Option<u32>,
         consumer_account_id: Option<String>,
     ) -> js_sys::Promise;
 

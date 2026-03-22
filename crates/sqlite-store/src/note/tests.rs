@@ -97,7 +97,7 @@ fn create_consumed_input_note_with_consumer(
 async fn insert_input_notes_with_tx_order(
     store: &crate::SqliteStore,
     notes: &[InputNoteRecord],
-    consumed_tx_order: Option<u16>,
+    consumed_tx_order: Option<u32>,
 ) {
     let notes = notes.to_vec();
     store

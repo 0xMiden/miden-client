@@ -317,9 +317,7 @@ fn input_note_block_num(note: &InputNoteRecord) -> Option<BlockNumber> {
             Some(state.inclusion_proof.location().block_num())
         },
         InputNoteState::ProcessingUnauthenticated(state) => Some(state.after_block_num),
-        InputNoteState::ConsumedAuthenticatedLocal(state) => Some(state.nullifier_block_height),
-        InputNoteState::ConsumedUnauthenticatedLocal(state) => Some(state.nullifier_block_height),
-        InputNoteState::ConsumedExternal(state) => Some(state.nullifier_block_height),
+        _ => note.state().nullifier_block_height(),
     }
 }
 
