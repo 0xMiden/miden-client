@@ -76,44 +76,22 @@ mod note_update_tracker;
 pub use miden_protocol::block::BlockNumber;
 pub use miden_protocol::errors::NoteError;
 pub use miden_protocol::note::{
-    Note,
-    NoteAssets,
-    NoteAttachment,
-    NoteAttachmentKind,
-    NoteAttachmentScheme,
-    NoteDetails,
-    NoteFile,
-    NoteHeader,
-    NoteId,
-    NoteInclusionProof,
-    NoteLocation,
-    NoteMetadata,
-    NoteRecipient,
-    NoteScript,
-    NoteStorage,
-    NoteTag,
-    NoteType,
-    Nullifier,
-    PartialNote,
+    Note, NoteAssets, NoteAttachment, NoteAttachmentKind, NoteAttachmentScheme, NoteDetails,
+    NoteFile, NoteHeader, NoteId, NoteInclusionProof, NoteLocation, NoteMetadata, NoteRecipient,
+    NoteScript, NoteStorage, NoteTag, NoteType, Nullifier, PartialNote,
 };
 pub use miden_protocol::transaction::ToInputNoteCommitments;
 pub use miden_standards::note::{
-    NetworkAccountTarget,
-    NoteConsumptionStatus,
-    NoteExecutionHint,
-    P2idNote,
-    P2idNoteStorage,
-    StandardNote,
-    SwapNote,
+    NetworkAccountTarget, NoteConsumptionStatus, NoteExecutionHint, P2idNote, P2idNoteStorage,
+    StandardNote, SwapNote,
 };
 pub use miden_tx::{FailedNote, NoteConsumptionInfo};
-pub use note_reader::InputNoteReader;
+pub use note_reader::{
+    InputNoteReader, NoteReader, NoteReaderSource, NoteRecord, OutputNoteReader,
+};
 pub use note_screener::{NoteConsumability, NoteScreener, NoteScreenerError};
 pub use note_update_tracker::{
-    InputNoteUpdate,
-    NoteUpdateTracker,
-    NoteUpdateType,
-    OutputNoteUpdate,
+    InputNoteUpdate, NoteUpdateTracker, NoteUpdateType, OutputNoteUpdate,
 };
 /// Note retrieval methods.
 impl<AUTH> Client<AUTH>
@@ -217,6 +195,15 @@ where
         Ok(self.store.get_output_notes(NoteFilter::Unique(note_id)).await?.pop())
     }
 
+    /// Returns a [`NoteReader`] for the requested note source.
+    ///
+    /// Input readers default to [`NoteFilter::Consumed`] to preserve the behavior of the
+    /// specialized [`Client::input_note_reader`] convenience method. Output readers default to
+    /// [`NoteFilter::All`]. Use [`NoteReader::with_filter`] to override the base filter.
+    pub fn note_reader(&self, source: NoteReaderSource) -> NoteReader {
+        NoteReader::new(self.store.clone(), source)
+    }
+
     /// Returns an [`InputNoteReader`] that lazily iterates over consumed input notes.
     ///
     /// Use the builder methods on [`InputNoteReader`] to further refine the query before
@@ -235,6 +222,14 @@ where
     /// ```
     pub fn input_note_reader(&self) -> InputNoteReader {
         InputNoteReader::new(self.store.clone())
+    }
+
+    /// Returns an [`OutputNoteReader`] that lazily iterates over output notes.
+    ///
+    /// Output readers default to [`NoteFilter::All`]. Use the builder methods on
+    /// [`OutputNoteReader`] to refine the query before iterating.
+    pub fn output_note_reader(&self) -> OutputNoteReader {
+        OutputNoteReader::new(self.store.clone())
     }
 }
 
