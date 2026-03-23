@@ -41,16 +41,16 @@ miden-testing   = { default-features = false, version = "=0.14.0-alpha.2" }
 miden-tx        = { default-features = false, version = "=0.14.0-alpha.2" }
 
 # Miden node dependencies
-miden-node-block-producer        = { version = "=0.14.0-alpha.9" }
-miden-node-ntx-builder           = { version = "=0.14.0-alpha.9" }
-miden-node-proto                 = { version = "=0.14.0-alpha.9" }
-miden-node-proto-build           = { default-features = false, version = "=0.14.0-alpha.9" }
-miden-node-rpc                   = { version = "=0.14.0-alpha.9" }
-miden-node-store                 = { version = "=0.14.0-alpha.9" }
-miden-node-utils                 = { version = "=0.14.0-alpha.9" }
-miden-node-validator             = { version = "=0.14.0-alpha.9" }
+miden-node-block-producer        = { version = "=0.14.0-alpha.10" }
+miden-node-ntx-builder           = { version = "=0.14.0-alpha.10" }
+miden-node-proto                 = { version = "=0.14.0-alpha.10" }
+miden-node-proto-build           = { default-features = false, version = "=0.14.0-alpha.10" }
+miden-node-rpc                   = { version = "=0.14.0-alpha.10" }
+miden-node-store                 = { version = "=0.14.0-alpha.10" }
+miden-node-utils                 = { version = "=0.14.0-alpha.10" }
+miden-node-validator             = { version = "=0.14.0-alpha.10" }
 miden-note-transport-proto-build = { default-features = false, version = "0.3.0-alpha.1" }
-miden-remote-prover-client       = { default-features = false, features = ["tx-prover"], version = "=0.14.0-alpha.9" }
+miden-remote-prover-client       = { default-features = false, features = ["tx-prover"], version = "=0.14.0-alpha.10" }
 
 # External dependencies
 anyhow      = { default-features = false, version = "1.0" }
