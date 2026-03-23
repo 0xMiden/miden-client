@@ -58,6 +58,8 @@ pub async fn test_client_builder_initializes_client_with_endpoint(
 
     assert!(client.in_debug_mode());
 
+    wait_for_node(&mut client).await;
+
     let sync_summary = client.sync_state().await?;
 
     assert!(sync_summary.block_num.as_u32() > 0);
