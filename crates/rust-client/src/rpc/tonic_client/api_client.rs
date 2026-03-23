@@ -8,6 +8,12 @@ use tonic::metadata::AsciiMetadataValue;
 use tonic::metadata::errors::InvalidMetadataValue;
 use tonic::service::Interceptor;
 
+/// Maximum inbound message size for gRPC responses (15 MB).
+///
+/// The default tonic limit (4 MB) is too small for endpoints such as `GetBlockByNumber` which
+/// can return considerably larger payloads.
+const MAX_DECODING_MESSAGE_SIZE: usize = 15 * 1024 * 1024;
+
 // WEB CLIENT
 // ================================================================================================
 
@@ -18,7 +24,7 @@ pub(crate) mod api_client_wrapper {
     use miden_protocol::Word;
     use tonic::service::interceptor::InterceptedService;
 
-    use super::{MetadataInterceptor, accept_header_interceptor};
+    use super::{MAX_DECODING_MESSAGE_SIZE, MetadataInterceptor, accept_header_interceptor};
     use crate::rpc::RpcError;
     use crate::rpc::generated::rpc::api_client::ApiClient as ProtoClient;
 
@@ -43,7 +49,8 @@ pub(crate) mod api_client_wrapper {
         ) -> Result<ApiClient, RpcError> {
             let wasm_client = WasmClient::new(endpoint);
             let interceptor = accept_header_interceptor(genesis_commitment);
-            let client = ProtoClient::with_interceptor(wasm_client.clone(), interceptor);
+            let client = ProtoClient::with_interceptor(wasm_client.clone(), interceptor)
+                .max_decoding_message_size(MAX_DECODING_MESSAGE_SIZE);
             Ok(ApiClient { client, wasm_client })
         }
 
@@ -56,7 +63,8 @@ pub(crate) mod api_client_wrapper {
         ) -> Result<ApiClient, RpcError> {
             let wasm_client = WasmClient::new(endpoint);
             let interceptor = MetadataInterceptor::default();
-            let client = ProtoClient::with_interceptor(wasm_client.clone(), interceptor);
+            let client = ProtoClient::with_interceptor(wasm_client.clone(), interceptor)
+                .max_decoding_message_size(MAX_DECODING_MESSAGE_SIZE);
             Ok(ApiClient { client, wasm_client })
         }
 
@@ -64,7 +72,8 @@ pub(crate) mod api_client_wrapper {
         /// This creates a new client that shares the same underlying channel.
         pub fn set_genesis_commitment(&mut self, genesis_commitment: Word) -> &mut Self {
             let interceptor = accept_header_interceptor(Some(genesis_commitment));
-            self.client = ProtoClient::with_interceptor(self.wasm_client.clone(), interceptor);
+            self.client = ProtoClient::with_interceptor(self.wasm_client.clone(), interceptor)
+                .max_decoding_message_size(MAX_DECODING_MESSAGE_SIZE);
             self
         }
     }
@@ -83,7 +92,7 @@ pub(crate) mod api_client_wrapper {
     use tonic::service::interceptor::InterceptedService;
     use tonic::transport::Channel;
 
-    use super::{MetadataInterceptor, accept_header_interceptor};
+    use super::{MAX_DECODING_MESSAGE_SIZE, MetadataInterceptor, accept_header_interceptor};
     use crate::rpc::RpcError;
     use crate::rpc::generated::rpc::api_client::ApiClient as ProtoClient;
 
@@ -118,7 +127,8 @@ pub(crate) mod api_client_wrapper {
             let interceptor = accept_header_interceptor(genesis_commitment);
 
             // Return the connected client.
-            let client = ProtoClient::with_interceptor(channel.clone(), interceptor);
+            let client = ProtoClient::with_interceptor(channel.clone(), interceptor)
+                .max_decoding_message_size(MAX_DECODING_MESSAGE_SIZE);
             Ok(ApiClient { client, channel })
         }
 
@@ -139,7 +149,8 @@ pub(crate) mod api_client_wrapper {
                 .map_err(|err| RpcError::ConnectionError(Box::new(err)))?;
 
             let interceptor = MetadataInterceptor::default();
-            let client = ProtoClient::with_interceptor(channel.clone(), interceptor);
+            let client = ProtoClient::with_interceptor(channel.clone(), interceptor)
+                .max_decoding_message_size(MAX_DECODING_MESSAGE_SIZE);
             Ok(ApiClient { client, channel })
         }
 
@@ -147,7 +158,8 @@ pub(crate) mod api_client_wrapper {
         /// This creates a new client that shares the same underlying channel.
         pub fn set_genesis_commitment(&mut self, genesis_commitment: Word) -> &mut Self {
             let interceptor = accept_header_interceptor(Some(genesis_commitment));
-            self.client = ProtoClient::with_interceptor(self.channel.clone(), interceptor);
+            self.client = ProtoClient::with_interceptor(self.channel.clone(), interceptor)
+                .max_decoding_message_size(MAX_DECODING_MESSAGE_SIZE);
             self
         }
     }
