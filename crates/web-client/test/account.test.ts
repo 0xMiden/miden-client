@@ -165,13 +165,9 @@ test.describe("get public account with details", () => {
   test("assets and storage with too many assets/entries are retrieved", async ({
     page,
   }) => {
-    // test.skip(
-    //   !isLocalhost(),
-    //   "This test requires a specific account that only exists in localhost genesis"
-    // );
-    test.fixme(
-      "node panics!",
-      "investigate node bug triggered by retrieving account more than 64 storage updates in a single tx"
+    test.skip(
+      !isLocalhost(),
+      "This test requires a specific account that only exists in localhost genesis"
     );
     const [assetCount, balances, mapEntriesCount] = await page.evaluate(
       async () => {
