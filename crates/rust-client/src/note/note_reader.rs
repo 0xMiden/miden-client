@@ -9,7 +9,12 @@ use miden_protocol::block::BlockNumber;
 
 use crate::ClientError;
 use crate::store::{
-    InputNoteRecord, InputNoteState, NoteFilter, OutputNoteRecord, OutputNoteState, Store,
+    InputNoteRecord,
+    InputNoteState,
+    NoteFilter,
+    OutputNoteRecord,
+    OutputNoteState,
+    Store,
 };
 
 /// Selects which kind of notes a [`NoteReader`] iterates over.

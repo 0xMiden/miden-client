@@ -1,11 +1,22 @@
 use std::sync::Arc;
 
 use miden_client::note::{
-    InputNoteReader, NoteAssets, NoteMetadata, NoteReader, NoteReaderSource, NoteRecipient,
-    NoteRecord, NoteStorage, NoteTag, NoteType, OutputNoteReader,
+    InputNoteReader,
+    NoteAssets,
+    NoteMetadata,
+    NoteReader,
+    NoteReaderSource,
+    NoteRecipient,
+    NoteRecord,
+    NoteStorage,
+    NoteTag,
+    NoteType,
+    OutputNoteReader,
 };
 use miden_client::store::input_note_states::{
-    ConsumedExternalNoteState, ConsumedUnauthenticatedLocalNoteState, ExpectedNoteState,
+    ConsumedExternalNoteState,
+    ConsumedUnauthenticatedLocalNoteState,
+    ExpectedNoteState,
     NoteSubmissionData,
 };
 use miden_client::store::{InputNoteRecord, NoteFilter, OutputNoteRecord, OutputNoteState, Store};
@@ -15,7 +26,8 @@ use miden_protocol::account::AccountId;
 use miden_protocol::block::BlockNumber;
 use miden_protocol::note::NoteDetails;
 use miden_protocol::testing::account_id::{
-    ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET, ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE,
+    ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
+    ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE,
 };
 use miden_protocol::transaction::TransactionId;
 use miden_standards::note::StandardNote;

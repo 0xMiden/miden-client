@@ -76,22 +76,50 @@ mod note_update_tracker;
 pub use miden_protocol::block::BlockNumber;
 pub use miden_protocol::errors::NoteError;
 pub use miden_protocol::note::{
-    Note, NoteAssets, NoteAttachment, NoteAttachmentKind, NoteAttachmentScheme, NoteDetails,
-    NoteFile, NoteHeader, NoteId, NoteInclusionProof, NoteLocation, NoteMetadata, NoteRecipient,
-    NoteScript, NoteStorage, NoteTag, NoteType, Nullifier, PartialNote,
+    Note,
+    NoteAssets,
+    NoteAttachment,
+    NoteAttachmentKind,
+    NoteAttachmentScheme,
+    NoteDetails,
+    NoteFile,
+    NoteHeader,
+    NoteId,
+    NoteInclusionProof,
+    NoteLocation,
+    NoteMetadata,
+    NoteRecipient,
+    NoteScript,
+    NoteStorage,
+    NoteTag,
+    NoteType,
+    Nullifier,
+    PartialNote,
 };
 pub use miden_protocol::transaction::ToInputNoteCommitments;
 pub use miden_standards::note::{
-    NetworkAccountTarget, NoteConsumptionStatus, NoteExecutionHint, P2idNote, P2idNoteStorage,
-    StandardNote, SwapNote,
+    NetworkAccountTarget,
+    NoteConsumptionStatus,
+    NoteExecutionHint,
+    P2idNote,
+    P2idNoteStorage,
+    StandardNote,
+    SwapNote,
 };
 pub use miden_tx::{FailedNote, NoteConsumptionInfo};
 pub use note_reader::{
-    InputNoteReader, NoteReader, NoteReaderSource, NoteRecord, OutputNoteReader,
+    InputNoteReader,
+    NoteReader,
+    NoteReaderSource,
+    NoteRecord,
+    OutputNoteReader,
 };
 pub use note_screener::{NoteConsumability, NoteScreener, NoteScreenerError};
 pub use note_update_tracker::{
-    InputNoteUpdate, NoteUpdateTracker, NoteUpdateType, OutputNoteUpdate,
+    InputNoteUpdate,
+    NoteUpdateTracker,
+    NoteUpdateType,
+    OutputNoteUpdate,
 };
 /// Note retrieval methods.
 impl<AUTH> Client<AUTH>
