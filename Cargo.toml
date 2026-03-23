@@ -40,17 +40,17 @@ miden-standards = { default-features = false, version = "=0.14.0-alpha.2" }
 miden-testing   = { default-features = false, version = "=0.14.0-alpha.2" }
 miden-tx        = { default-features = false, version = "=0.14.0-alpha.2" }
 
-# Miden node dependencies
-miden-node-block-producer        = { version = "=0.14.0-alpha.9" }
-miden-node-ntx-builder           = { version = "=0.14.0-alpha.9" }
-miden-node-proto                 = { version = "=0.14.0-alpha.9" }
-miden-node-proto-build           = { default-features = false, version = "=0.14.0-alpha.9" }
-miden-node-rpc                   = { version = "=0.14.0-alpha.9" }
-miden-node-store                 = { version = "=0.14.0-alpha.9" }
-miden-node-utils                 = { version = "=0.14.0-alpha.9" }
-miden-node-validator             = { version = "=0.14.0-alpha.9" }
+# Miden node dependencies — PR https://github.com/0xMiden/node/pull/1824 (branch mmagician-claude/fix-reconstruct-overflow)
+miden-node-block-producer        = { git = "https://github.com/mmagician/miden-node.git", branch = "mmagician-claude/fix-reconstruct-overflow", package = "miden-node-block-producer" }
+miden-node-ntx-builder           = { git = "https://github.com/mmagician/miden-node.git", branch = "mmagician-claude/fix-reconstruct-overflow", package = "miden-node-ntx-builder" }
+miden-node-proto                 = { git = "https://github.com/mmagician/miden-node.git", branch = "mmagician-claude/fix-reconstruct-overflow", package = "miden-node-proto" }
+miden-node-proto-build           = { default-features = false, git = "https://github.com/mmagician/miden-node.git", branch = "mmagician-claude/fix-reconstruct-overflow", package = "miden-node-proto-build" }
+miden-node-rpc                   = { git = "https://github.com/mmagician/miden-node.git", branch = "mmagician-claude/fix-reconstruct-overflow", package = "miden-node-rpc" }
+miden-node-store                 = { git = "https://github.com/mmagician/miden-node.git", branch = "mmagician-claude/fix-reconstruct-overflow", package = "miden-node-store" }
+miden-node-utils                 = { git = "https://github.com/mmagician/miden-node.git", branch = "mmagician-claude/fix-reconstruct-overflow", package = "miden-node-utils" }
+miden-node-validator             = { git = "https://github.com/mmagician/miden-node.git", branch = "mmagician-claude/fix-reconstruct-overflow", package = "miden-node-validator" }
 miden-note-transport-proto-build = { default-features = false, version = "0.3.0-alpha.1" }
-miden-remote-prover-client       = { default-features = false, features = ["tx-prover"], version = "=0.14.0-alpha.9" }
+miden-remote-prover-client       = { default-features = false, features = ["tx-prover"], git = "https://github.com/mmagician/miden-node.git", branch = "mmagician-claude/fix-reconstruct-overflow", package = "miden-remote-prover-client" }
 
 # External dependencies
 anyhow      = { default-features = false, version = "1.0" }
