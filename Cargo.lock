@@ -3381,9 +3381,9 @@ dependencies = [
 
 [[package]]
 name = "miden-note-transport-proto-build"
-version = "0.2.0"
+version = "0.3.0-alpha.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ec23738a2eee393524a849a8dce982ad824050cc54abde145d4fb62b92c84198"
+checksum = "14b66412c3b7b9c6341410a67e2add82a0573c98b47bad166aa73e3c260066f6"
 dependencies = [
  "fs-err",
  "miette",
