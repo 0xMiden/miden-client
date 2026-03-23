@@ -260,7 +260,7 @@ pub mod crypto {
         NodeIndex,
         SparseMerklePath,
     };
-    pub use miden_protocol::crypto::rand::{FeltRng, RpoRandomCoin};
+    pub use miden_protocol::crypto::rand::{FeltRng, RandomCoin};
 }
 
 /// Provides types for working with addresses within the Miden network.

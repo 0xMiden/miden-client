@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use miden_client::account::{AccountId, AccountStorageMode};
 use miden_client::asset::FungibleAsset;
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
-use miden_client::crypto::{FeltRng, MerkleStore, MerkleTree, NodeIndex, Poseidon2, RpoRandomCoin};
+use miden_client::crypto::{FeltRng, MerkleStore, MerkleTree, NodeIndex, Poseidon2, RandomCoin};
 use miden_client::note::{
     Note,
     NoteAssets,
@@ -332,7 +332,7 @@ async fn mint_custom_note(
     target_account_id: AccountId,
 ) -> Result<Note> {
     // Prepare transaction
-    let mut random_coin = RpoRandomCoin::new(Default::default());
+    let mut random_coin = RandomCoin::new(Default::default());
     let note = create_custom_note(client, faucet_account_id, target_account_id, &mut random_coin)?;
 
     let transaction_request =
@@ -349,7 +349,7 @@ fn create_custom_note(
     client: &TestClient,
     faucet_account_id: AccountId,
     target_account_id: AccountId,
-    rng: &mut RpoRandomCoin,
+    rng: &mut RandomCoin,
 ) -> Result<Note> {
     let expected_note_args =
         NOTE_ARGS.iter().map(|x| x.as_canonical_u64().to_string()).collect::<Vec<_>>();

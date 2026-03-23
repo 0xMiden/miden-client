@@ -60,9 +60,9 @@ pub async fn test_client_builder_initializes_client_with_endpoint(
 
     wait_for_node(&mut client).await;
 
-    let sync_summary = client.sync_state().await?;
-
-    assert!(sync_summary.block_num.as_u32() > 0);
+    // After syncing, the client should have stored the genesis block.
+    let genesis_block = client.get_block_header_by_num(0u32.into()).await?;
+    assert!(genesis_block.is_some(), "genesis block should be stored after syncing");
     Ok(())
 }
 

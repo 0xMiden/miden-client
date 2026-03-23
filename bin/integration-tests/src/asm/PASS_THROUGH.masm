@@ -53,8 +53,11 @@ begin
     exec.output_note::create
     # => [note_idx, ASSET_KEY, ASSET_VALUE]
 
+    # rearrange stack for add_asset which expects [ASSET_KEY, ASSET_VALUE, note_idx]
+    movdn.8
+    # => [ASSET_KEY, ASSET_VALUE, note_idx]
+
     # add asset to the note
-    # Inputs: [note_idx, ASSET_KEY, ASSET_VALUE]
     exec.output_note::add_asset
     # => [...]
 

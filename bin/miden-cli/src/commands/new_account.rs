@@ -318,8 +318,7 @@ fn separate_auth_components(
     let mut regular_components = Vec::new();
 
     for component in components {
-        let auth_proc_count =
-            component.get_procedures().into_iter().filter(|(_, is_auth)| *is_auth).count();
+        let auth_proc_count = component.procedures().filter(|(_, is_auth)| *is_auth).count();
 
         match auth_proc_count {
             0 => regular_components.push(component),

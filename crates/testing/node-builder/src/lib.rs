@@ -147,6 +147,19 @@ impl NodeBuilder {
         Store::bootstrap(&genesis_block, &self.data_directory)
             .with_context(|| "failed to bootstrap store")?;
 
+        // Bootstrap the validator database with the genesis block header so that block
+        // validation can find the chain tip.
+        let validator_db =
+            miden_node_validator::db::load(self.data_directory.join("validator.sqlite3"))
+                .await
+                .with_context(|| "failed to initialize validator database")?;
+        validator_db
+            .transact("bootstrap_validator", move |conn| {
+                miden_node_validator::db::upsert_block_header(conn, genesis_block.inner().header())
+            })
+            .await
+            .with_context(|| "failed to bootstrap validator with genesis block header")?;
+
         // Start listening on all gRPC urls so that inter-component connections can be created
         // before each component is fully started up.
         let grpc_rpc = TcpListener::bind(format!("127.0.0.1:{}", self.rpc_port))
@@ -387,6 +400,7 @@ impl NodeBuilder {
                     validator_url,
                     database_filepath,
                 )
+                .with_max_cycles(1 << 18)
                 .build()
                 .await
                 .context("failed to build ntx builder")?

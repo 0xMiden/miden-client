@@ -31,7 +31,7 @@ impl SqliteStore {
             .vault()
             .fungible()
             .iter()
-            .map(|(faucet_id, _)| Value::Text(faucet_id.prefix().to_hex()))
+            .map(|(vault_key, _)| Value::Text(vault_key.faucet_id().prefix().to_hex()))
             .collect::<Vec<Value>>();
 
         const QUERY: &str = "SELECT vault_key, asset FROM latest_account_assets WHERE account_id = ? AND faucet_id_prefix IN rarray(?)";
@@ -141,10 +141,10 @@ impl SqliteStore {
 
         // We first process the fungible assets. Adding or subtracting them from the vault as
         // requested.
-        for (faucet_id, delta) in delta.vault().fungible().iter() {
-            let delta_asset = FungibleAsset::new(*faucet_id, delta.unsigned_abs())?;
+        for (vault_key, delta) in delta.vault().fungible().iter() {
+            let delta_asset = FungibleAsset::new(vault_key.faucet_id(), delta.unsigned_abs())?;
 
-            let asset = match updated_fungible_assets.remove(&faucet_id.prefix()) {
+            let asset = match updated_fungible_assets.remove(&vault_key.faucet_id().prefix()) {
                 Some(asset) => {
                     // If the asset exists, update it accordingly.
                     if *delta >= 0 {

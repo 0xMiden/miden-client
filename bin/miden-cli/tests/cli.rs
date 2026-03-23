@@ -11,7 +11,7 @@ use miden_client::account::{AccountId, AccountStorageMode};
 use miden_client::address::AddressInterface;
 use miden_client::auth::{RPO_FALCON_SCHEME_ID, TransactionAuthenticator};
 use miden_client::builder::ClientBuilder;
-use miden_client::crypto::{FeltRng, RpoRandomCoin};
+use miden_client::crypto::{FeltRng, RandomCoin};
 use miden_client::keystore::Keystore;
 use miden_client::note::{
     Note,
@@ -626,6 +626,9 @@ async fn consume_unauthenticated_note() -> Result<()> {
     // Mint
     let note_id = mint_cli(&temp_dir, &wallet_account_id, &fungible_faucet_account_id);
 
+    // Wait for the mint transaction to be committed on the node
+    sync_until_committed_transaction(&temp_dir);
+
     // Consume the note, internally this checks that the note was consumed correctly
     consume_note_cli(&temp_dir, &wallet_account_id, &[&note_id]);
     Ok(())
@@ -1171,7 +1174,7 @@ async fn create_rust_client_with_store_path(
     let mut rng = rand::rng();
     let coin_seed: [u64; 4] = rng.random();
 
-    let rng = Box::new(RpoRandomCoin::new(coin_seed.map(Felt::new).into()));
+    let rng = Box::new(RandomCoin::new(coin_seed.map(Felt::new).into()));
 
     let keystore = FilesystemKeyStore::new(temp_dir())?;
 

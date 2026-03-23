@@ -83,8 +83,7 @@ use miden_protocol::account::{
     StorageSlotName,
 };
 use miden_protocol::asset::{Asset, AssetVaultKey, AssetWitness, FungibleAsset, TokenSymbol};
-use miden_protocol::crypto::merkle::mmr::MmrProof;
-use miden_protocol::crypto::rand::{FeltRng, RpoRandomCoin};
+use miden_protocol::crypto::rand::{FeltRng, RandomCoin};
 use miden_protocol::note::{
     Note,
     NoteAssets,
@@ -457,19 +456,13 @@ async fn sync_state_mmr() {
     assert!(partial_mmr.open(5).unwrap().is_none());
 
     // // Ensure the proofs are valid
-    let mmr_path = partial_mmr.open(1).unwrap().unwrap();
+    let mmr_proof = partial_mmr.open(1).unwrap().unwrap();
     let (block_1, _) = rpc_api.get_block_header_by_number(Some(1.into()), false).await.unwrap();
-    partial_mmr
-        .peaks()
-        .verify(block_1.commitment(), MmrProof::new(mmr_path, block_1.commitment()))
-        .unwrap();
+    partial_mmr.peaks().verify(block_1.commitment(), mmr_proof).unwrap();
 
-    let mmr_path = partial_mmr.open(4).unwrap().unwrap();
+    let mmr_proof = partial_mmr.open(4).unwrap().unwrap();
     let (block_4, _) = rpc_api.get_block_header_by_number(Some(4.into()), false).await.unwrap();
-    partial_mmr
-        .peaks()
-        .verify(block_4.commitment(), MmrProof::new(mmr_path, block_4.commitment()))
-        .unwrap();
+    partial_mmr.peaks().verify(block_4.commitment(), mmr_proof).unwrap();
 
     // the blocks for both notes should be stored as they are relevant for the client's accounts
     assert_eq!(client.test_store().get_tracked_block_headers().await.unwrap().len(), 2);
@@ -2930,7 +2923,7 @@ pub async fn create_test_client_builder()
     let mut rng = rand::rng();
     let coin_seed: [u64; 4] = rng.random();
 
-    let rng = RpoRandomCoin::new(coin_seed.map(Felt::new).into());
+    let rng = RandomCoin::new(coin_seed.map(Felt::new).into());
 
     let keystore_path = temp_dir();
     let keystore = FilesystemKeyStore::new(keystore_path).unwrap();
@@ -2956,14 +2949,14 @@ pub async fn create_prebuilt_mock_chain() -> MockChain {
         .unwrap();
 
     let note_first =
-        NoteBuilder::new(mock_account.id(), RpoRandomCoin::new([0, 0, 0, 0].map(Felt::new).into()))
+        NoteBuilder::new(mock_account.id(), RandomCoin::new([0, 0, 0, 0].map(Felt::new).into()))
             .note_type(NoteType::Public)
             .tag(NoteTag::new(0).into())
             .build()
             .unwrap();
 
     let note_second =
-        NoteBuilder::new(mock_account.id(), RpoRandomCoin::new([0, 0, 0, 1].map(Felt::new).into()))
+        NoteBuilder::new(mock_account.id(), RandomCoin::new([0, 0, 0, 1].map(Felt::new).into()))
             .note_type(NoteType::Public)
             .tag(NoteTag::new(0).into())
             .build()
