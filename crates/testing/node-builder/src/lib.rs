@@ -50,7 +50,8 @@ const GRPC_MAX_CONNECTION_AGE: Duration = Duration::from_secs(86400);
 const GRPC_BURST_SIZE: NonZeroU32 = NonZeroU32::MAX;
 // Must be <= 1e9 to avoid arithmetic underflow in the rate limiter.
 const GRPC_REPLENISH_N_PER_SECOND_PER_IP: NonZeroU64 = NonZeroU64::new(1_000_000_000).unwrap();
-const GRPC_MAX_CONCURRENT_CONNECTIONS: u64 = u64::MAX;
+// Must not exceed tokio semaphore MAX_PERMITS (2305843009213693951).
+const GRPC_MAX_CONCURRENT_CONNECTIONS: u64 = 1_000_000;
 
 /// Builder for configuring and starting a Miden node with all components.
 pub struct NodeBuilder {
