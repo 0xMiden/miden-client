@@ -6,5 +6,9 @@ slow-timeout   = { period = "3m", terminate-after = 2 }
 status-level   = "skip"
 
 [[profile.default.overrides]]
+filter           = "package(miden-client-unit-tests) | package(miden-client-integration-tests)"
+threads-required = 2
+
+[[profile.default.overrides]]
 filter  = "test(import_genesis_accounts_can_be_used_for_transactions)"
 retries = 0

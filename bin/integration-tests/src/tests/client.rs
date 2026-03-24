@@ -58,9 +58,11 @@ pub async fn test_client_builder_initializes_client_with_endpoint(
 
     assert!(client.in_debug_mode());
 
-    let sync_summary = client.sync_state().await?;
+    wait_for_node(&mut client).await;
 
-    assert!(sync_summary.block_num.as_u32() > 0);
+    // After syncing, the client should have stored the genesis block.
+    let genesis_block = client.get_block_header_by_num(0u32.into()).await?;
+    assert!(genesis_block.is_some(), "genesis block should be stored after syncing");
     Ok(())
 }
 
@@ -1343,7 +1345,7 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
     let mut storage_map = StorageMap::new();
     storage_map.insert(
         StorageMapKey::new([Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)].into()),
-        [Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(1)].into(),
+        [Felt::new(1), Felt::new(0), Felt::new(0), Felt::new(0)].into(),
     )?;
 
     let map_slot_name =
@@ -1444,7 +1446,7 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
 
     assert_eq!(node_nullifier.nullifier, nullifier);
     assert_eq!(node_nullifier_proof.leaf().entries().first().unwrap().0, nullifier.as_word());
-    assert_eq!(*note.script(), retrieved_note_script);
+    assert_eq!(note.script().root(), retrieved_note_script.root());
     assert!(!sync_storage_maps.updates.is_empty());
     assert!(!account_vault_info.updates.is_empty());
     assert!(!transactions_info.transaction_records.is_empty());

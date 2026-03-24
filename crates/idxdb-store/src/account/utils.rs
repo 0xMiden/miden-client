@@ -243,9 +243,9 @@ pub fn compute_vault_delta(
 
     // Process fungible deltas
     for (faucet_id, delta_amount) in delta.vault().fungible().iter() {
-        let delta_asset = FungibleAsset::new(*faucet_id, delta_amount.unsigned_abs())?;
+        let delta_asset = FungibleAsset::new(faucet_id.faucet_id(), delta_amount.unsigned_abs())?;
 
-        let asset = match fungible_map.remove(&faucet_id.prefix()) {
+        let asset = match fungible_map.remove(&faucet_id.faucet_id().prefix()) {
             Some(existing) => {
                 if *delta_amount >= 0 {
                     existing.add(delta_asset)?

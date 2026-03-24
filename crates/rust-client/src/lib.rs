@@ -233,6 +233,7 @@ pub mod crypto {
         };
     }
     pub use miden_protocol::crypto::hash::blake::Blake3Digest;
+    pub use miden_protocol::crypto::hash::poseidon2::Poseidon2;
     pub use miden_protocol::crypto::hash::rpo::Rpo256;
     pub use miden_protocol::crypto::merkle::mmr::{
         Forest,
@@ -259,7 +260,7 @@ pub mod crypto {
         NodeIndex,
         SparseMerklePath,
     };
-    pub use miden_protocol::crypto::rand::{FeltRng, RpoRandomCoin};
+    pub use miden_protocol::crypto::rand::{FeltRng, RandomCoin};
 }
 
 /// Provides types for working with addresses within the Miden network.

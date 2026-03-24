@@ -37,7 +37,7 @@ pub struct ExecCmd {
     ///
     /// The input file should contain a TOML table called `inputs`, as in the following example:
     ///    inputs = [
-    ///        { key = "0x0000001000000000000000000000000000000000000000000000000000000000", values = ["13", "9"]},
+    ///        { key = "0x0000000000000000000000000000000000000000000000000000001000000000", values = ["13", "9"]},
     ///        { key = "0x0000000000000000000000000000000000000000000000000000000000000000" , values = ["1", "2"]},
     ///    ]
     #[arg(long, short)]

@@ -174,7 +174,7 @@ pub async fn test_counter_contract_ntx(client_config: ClientConfig) -> Result<()
         .get_storage_item(COUNTER_SLOT_NAME.clone())
         .await
         .context("failed to find network account after deployment")?;
-    assert_eq!(counter_value, Word::from([ZERO, ZERO, ZERO, Felt::new(1)]));
+    assert_eq!(counter_value, Word::from([Felt::new(1), ZERO, ZERO, ZERO]));
 
     let (native_account, ..) =
         insert_new_wallet(&mut client, AccountStorageMode::Public, &keystore, RPO_FALCON_SCHEME_ID)
@@ -193,7 +193,7 @@ pub async fn test_counter_contract_ntx(client_config: ClientConfig) -> Result<()
     execute_tx_and_sync(&mut client, native_account.id(), tx_request).await?;
 
     // Wait for the node to consume the network notes in subsequent blocks
-    let expected_counter = Word::from([ZERO, ZERO, ZERO, Felt::new(1 + BUMP_NOTE_NUMBER)]);
+    let expected_counter = Word::from([Felt::new(1 + BUMP_NOTE_NUMBER), ZERO, ZERO, ZERO]);
     for _ in 0..10 {
         let a = client
             .test_rpc_api()
@@ -268,7 +268,7 @@ pub async fn test_recall_note_before_ntx_consumes_it(client_config: ClientConfig
         .get_storage_item(COUNTER_SLOT_NAME.clone())
         .await
         .context("failed to find network account after recall test")?;
-    assert_eq!(network_counter, Word::from([ZERO, ZERO, ZERO, Felt::new(1)]));
+    assert_eq!(network_counter, Word::from([Felt::new(1), ZERO, ZERO, ZERO]));
 
     // The native account should have the incremented value
     let native_counter = client
@@ -276,7 +276,7 @@ pub async fn test_recall_note_before_ntx_consumes_it(client_config: ClientConfig
         .get_storage_item(COUNTER_SLOT_NAME.clone())
         .await
         .context("failed to find native account after recall test")?;
-    assert_eq!(native_counter, Word::from([ZERO, ZERO, ZERO, Felt::new(2)]));
+    assert_eq!(native_counter, Word::from([Felt::new(2), ZERO, ZERO, ZERO]));
     Ok(())
 }
 

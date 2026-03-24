@@ -106,9 +106,14 @@ pub mod component {
         no_auth_library,
         singlesig_acl_library,
         singlesig_library,
-        storage_schema_library,
     };
     pub use miden_standards::account::faucets::{BasicFungibleFaucet, NetworkFungibleFaucet};
+    pub use miden_standards::account::mint_policies::{
+        AuthControlled,
+        AuthControlledInitConfig,
+        OwnerControlled,
+        OwnerControlledInitConfig,
+    };
     pub use miden_standards::account::wallets::BasicWallet;
 }
 

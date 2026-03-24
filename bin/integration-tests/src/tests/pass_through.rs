@@ -234,15 +234,20 @@ fn create_pass_through_note(
 ) -> Result<(Note, NoteDetails)> {
     let note_script = get_pass_through_note_script();
 
-    let asset_word: Word = asset.to_value_word();
+    let asset_key: Word = asset.to_key_word();
+    let asset_value: Word = asset.to_value_word();
 
     let target_recipient = P2idNoteStorage::new(target).into_recipient(rng.draw_word());
 
     let inputs = NoteStorage::new(vec![
-        asset_word[0],
-        asset_word[1],
-        asset_word[2],
-        asset_word[3],
+        asset_key[0],
+        asset_key[1],
+        asset_key[2],
+        asset_key[3],
+        asset_value[0],
+        asset_value[1],
+        asset_value[2],
+        asset_value[3],
         target_recipient.digest()[0],
         target_recipient.digest()[1],
         target_recipient.digest()[2],

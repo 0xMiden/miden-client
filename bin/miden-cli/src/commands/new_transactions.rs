@@ -499,9 +499,9 @@ fn print_transaction_details(executed_tx: &ExecutedTransaction) -> Result<(), Cl
         let faucet_details_map = load_faucet_details_map()?;
         let mut table = create_dynamic_table(&["Asset Type", "Faucet ID", "Amount"]);
 
-        for (faucet_id, amount) in account_delta.vault().fungible().iter() {
-            let asset =
-                FungibleAsset::new(*faucet_id, amount.unsigned_abs()).map_err(CliError::Asset)?;
+        for (vault_key, amount) in account_delta.vault().fungible().iter() {
+            let asset = FungibleAsset::new(vault_key.faucet_id(), amount.unsigned_abs())
+                .map_err(CliError::Asset)?;
             let (faucet_fmt, amount_fmt) = faucet_details_map.format_fungible_asset(&asset)?;
 
             if amount.is_positive() {

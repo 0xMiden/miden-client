@@ -147,6 +147,19 @@ impl NodeBuilder {
         Store::bootstrap(&genesis_block, &self.data_directory)
             .with_context(|| "failed to bootstrap store")?;
 
+        // Bootstrap the validator database with the genesis block header so that block
+        // validation can find the chain tip.
+        let validator_db =
+            miden_node_validator::db::load(self.data_directory.join("validator.sqlite3"))
+                .await
+                .with_context(|| "failed to initialize validator database")?;
+        validator_db
+            .transact("bootstrap_validator", move |conn| {
+                miden_node_validator::db::upsert_block_header(conn, genesis_block.inner().header())
+            })
+            .await
+            .with_context(|| "failed to bootstrap validator with genesis block header")?;
+
         // Start listening on all gRPC urls so that inter-component connections can be created
         // before each component is fully started up.
         let grpc_rpc = TcpListener::bind(format!("127.0.0.1:{}", self.rpc_port))
@@ -171,6 +184,13 @@ impl NodeBuilder {
         let store_ntx_builder_address = store_ntx_builder_listener
             .local_addr()
             .with_context(|| "failed to retrieve the store's ntx-builder gRPC address")?;
+
+        let ntx_builder_listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .with_context(|| "failed to bind to ntx-builder gRPC endpoint")?;
+        let ntx_builder_address = ntx_builder_listener
+            .local_addr()
+            .with_context(|| "failed to retrieve the ntx-builder gRPC address")?;
 
         let block_producer_address = available_socket_addr()
             .await
@@ -197,6 +217,7 @@ impl NodeBuilder {
             store_ntx_builder_address,
             validator_address,
             self.data_directory.join("ntx-builder.sqlite3"),
+            Some(ntx_builder_listener),
             &mut join_set,
         );
 
@@ -234,11 +255,17 @@ impl NodeBuilder {
                 let validator_url = Url::parse(&format!("http://{validator_address}"))
                     .context("Failed to parse URL")?;
 
+                let ntx_builder_url = Some(
+                    Url::parse(&format!("http://{ntx_builder_address}"))
+                        .context("Failed to parse URL")?,
+                );
+
                 Rpc {
                     listener: grpc_rpc,
                     store_url,
                     block_producer_url,
                     validator_url,
+                    ntx_builder_url,
                     grpc_options: GrpcOptionsExternal::default(),
                 }
                 .serve()
@@ -349,6 +376,7 @@ impl NodeBuilder {
         store_address: SocketAddr,
         validator_address: SocketAddr,
         database_filepath: PathBuf,
+        listener: Option<TcpListener>,
         join_set: &mut JoinSet<Result<()>>,
     ) -> Id {
         let store_url =
@@ -372,10 +400,11 @@ impl NodeBuilder {
                     validator_url,
                     database_filepath,
                 )
+                .with_max_cycles(1 << 18)
                 .build()
                 .await
                 .context("failed to build ntx builder")?
-                .run()
+                .run(listener)
                 .await
                 .context("failed while serving ntx builder component")
             })

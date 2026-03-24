@@ -21,7 +21,12 @@ use rand::RngCore;
 use tracing::{debug, info};
 use uuid::Uuid;
 
-use crate::account::component::{AccountComponent, BasicFungibleFaucet, BasicWallet};
+use crate::account::component::{
+    AccountComponent,
+    AuthControlled,
+    BasicFungibleFaucet,
+    BasicWallet,
+};
 use crate::account::{AccountBuilder, AccountType, StorageSlot};
 use crate::auth::AuthSchemeId;
 use crate::crypto::FeltRng;
@@ -160,6 +165,7 @@ pub async fn insert_new_fungible_faucet(
         .storage_mode(storage_mode)
         .with_auth_component(auth_component)
         .with_component(BasicFungibleFaucet::new(symbol, 10, max_supply).unwrap())
+        .with_component(AuthControlled::allow_all())
         .build()
         .unwrap();
 
@@ -227,7 +233,9 @@ pub async fn wait_for_tx(client: &mut TestClient, transaction_id: TransactionId)
                 break;
             },
             TransactionStatus::Pending => {
-                std::thread::sleep(Duration::from_secs(1));
+                // Cooldown between polling iterations to reduce pressure on the node's
+                // rate limiter when many integration tests poll concurrently.
+                tokio::time::sleep(Duration::from_secs(2)).await;
             },
             TransactionStatus::Discarded(cause) => {
                 anyhow::bail!("transaction was discarded with cause: {cause:?}");
@@ -270,7 +278,7 @@ pub async fn wait_for_blocks(client: &mut TestClient, amount_of_blocks: u32) -> 
             return summary;
         }
 
-        std::thread::sleep(Duration::from_secs(3));
+        tokio::time::sleep(Duration::from_secs(3)).await;
     }
 }
 
@@ -293,7 +301,7 @@ pub async fn wait_for_blocks_no_sync(client: &mut TestClient, amount_of_blocks: 
             return;
         }
 
-        std::thread::sleep(Duration::from_secs(3));
+        tokio::time::sleep(Duration::from_secs(3)).await;
     }
 }
 
@@ -311,8 +319,10 @@ pub async fn wait_for_node(client: &mut TestClient) {
     );
     for _try_number in 0..NUMBER_OF_NODE_ATTEMPTS {
         match client.sync_state().await {
-            Err(ClientError::RpcError(RpcError::ConnectionError(_))) => {
-                std::thread::sleep(Duration::from_secs(NODE_TIME_BETWEEN_ATTEMPTS));
+            Err(ClientError::RpcError(
+                RpcError::ConnectionError(_) | RpcError::RequestError { .. },
+            )) => {
+                tokio::time::sleep(Duration::from_secs(NODE_TIME_BETWEEN_ATTEMPTS)).await;
             },
             Err(other_error) => {
                 panic!("Unexpected error: {other_error}");
@@ -520,6 +530,10 @@ pub async fn execute_tx_and_consume_output_notes(
         .collect::<Vec<(Note, Option<NoteArgs>)>>();
 
     Box::pin(client.submit_new_transaction(executor, tx_request)).await.unwrap();
+
+    // Brief pause to allow the node to register the first transaction as in-flight before the
+    // second transaction references its output notes.
+    tokio::time::sleep(Duration::from_millis(500)).await;
 
     let tx_request = TransactionRequestBuilder::new().input_notes(output_notes).build().unwrap();
     Box::pin(client.submit_new_transaction(consumer, tx_request)).await.unwrap()

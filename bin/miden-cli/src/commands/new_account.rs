@@ -9,6 +9,8 @@ use miden_client::Client;
 use miden_client::account::component::{
     AccountComponent,
     AccountComponentMetadata,
+    AuthControlled,
+    BasicFungibleFaucet,
     InitStorageData,
     MIDEN_PACKAGE_EXTENSION,
     StorageSlotSchema,
@@ -318,8 +320,7 @@ fn separate_auth_components(
     let mut regular_components = Vec::new();
 
     for component in components {
-        let auth_proc_count =
-            component.get_procedures().into_iter().filter(|(_, is_auth)| *is_auth).count();
+        let auth_proc_count = component.procedures().filter(|(_, is_auth)| *is_auth).count();
 
         match auth_proc_count {
             0 => regular_components.push(component),
@@ -340,6 +341,20 @@ fn separate_auth_components(
     }
 
     Ok((auth_component, regular_components))
+}
+
+fn should_add_implicit_auth_controlled(
+    account_type: AccountType,
+    regular_components: &[AccountComponent],
+) -> bool {
+    let has_basic_fungible_faucet = regular_components
+        .iter()
+        .any(|component| component.metadata().name() == BasicFungibleFaucet::NAME);
+    let has_auth_controlled = regular_components
+        .iter()
+        .any(|component| component.metadata().name() == AuthControlled::NAME);
+
+    account_type == AccountType::FungibleFaucet && has_basic_fungible_faucet && !has_auth_controlled
 }
 
 /// Helper function to create the seed, initialize the account builder, add the given components,
@@ -381,7 +396,15 @@ async fn create_client_account<AUTH: Keystore + Sync + 'static>(
 
     // Process packages and separate auth components from regular components
     let account_components = process_packages(packages, &init_storage_data)?;
-    let (auth_component, regular_components) = separate_auth_components(account_components)?;
+    let (auth_component, mut regular_components) = separate_auth_components(account_components)?;
+
+    // RC faucet accounts require a mint policy manager component. The CLI's standard
+    // `basic-fungible-faucet` package only provides the faucet component itself, so add the
+    // default `allow_all` policy manager implicitly to preserve the pre-RC UX.
+    if should_add_implicit_auth_controlled(account_type, &regular_components) {
+        debug!("Adding implicit AuthControlled mint policy component for fungible faucet");
+        regular_components.push(AuthControlled::allow_all().into());
+    }
 
     // Add the auth component (either from packages or default Falcon)
     let key_pair = if let Some(auth_component) = auth_component {
@@ -516,4 +539,52 @@ fn process_packages(
     }
 
     Ok(account_components)
+}
+
+#[cfg(test)]
+mod tests {
+    use miden_client::Felt;
+    use miden_client::account::component::BasicWallet;
+    use miden_client::asset::TokenSymbol;
+
+    use super::*;
+
+    #[test]
+    fn implicit_auth_controlled_is_added_for_basic_faucet_accounts() {
+        let regular_components = vec![
+            BasicFungibleFaucet::new(TokenSymbol::new("BTC").unwrap(), 10, Felt::new(1_000_000))
+                .unwrap()
+                .into(),
+        ];
+
+        assert!(should_add_implicit_auth_controlled(
+            AccountType::FungibleFaucet,
+            &regular_components
+        ));
+    }
+
+    #[test]
+    fn implicit_auth_controlled_is_skipped_when_component_already_present() {
+        let regular_components = vec![
+            BasicFungibleFaucet::new(TokenSymbol::new("BTC").unwrap(), 10, Felt::new(1_000_000))
+                .unwrap()
+                .into(),
+            AuthControlled::allow_all().into(),
+        ];
+
+        assert!(!should_add_implicit_auth_controlled(
+            AccountType::FungibleFaucet,
+            &regular_components
+        ));
+    }
+
+    #[test]
+    fn implicit_auth_controlled_is_not_added_for_non_faucet_accounts() {
+        let regular_components = vec![AccountComponent::from(BasicWallet)];
+
+        assert!(!should_add_implicit_auth_controlled(
+            AccountType::RegularAccountImmutableCode,
+            &regular_components
+        ));
+    }
 }
