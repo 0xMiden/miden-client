@@ -683,10 +683,10 @@ fn compute_ordered_nullifiers(transaction_records: &[RpcTransactionRecord]) -> V
 
     for txs in groups.values() {
         // Build a lookup from initial_state_commitment -> transaction record.
-        let mut init_to_tx: BTreeMap<Word, &RpcTransactionRecord> = BTreeMap::new();
-        for tx in txs {
-            init_to_tx.insert(tx.transaction_header.initial_state_commitment(), tx);
-        }
+        let mut init_to_tx: BTreeMap<Word, &RpcTransactionRecord> = txs
+            .iter()
+            .map(|tx| (tx.transaction_header.initial_state_commitment(), *tx))
+            .collect();
 
         // Build a set of all final states to find the chain start.
         let final_states: BTreeSet<Word> =
@@ -703,6 +703,7 @@ fn compute_ordered_nullifiers(transaction_records: &[RpcTransactionRecord]) -> V
         };
 
         // Follow the chain: current.final_state_commitment == next.initial_state_commitment.
+        // We remove visited entries to avoid infinite loops.
         let mut current = *start_tx;
 
         loop {
@@ -714,11 +715,11 @@ fn compute_ordered_nullifiers(transaction_records: &[RpcTransactionRecord]) -> V
                 }
             }
 
-            // Follow the chain.
+            // Follow the chain by removing the next tx from the map.
             if let Some(next_tx) =
-                init_to_tx.get(&current.transaction_header.final_state_commitment())
+                init_to_tx.remove(&current.transaction_header.final_state_commitment())
             {
-                if core::ptr::eq(*next_tx, current) {
+                if core::ptr::eq(next_tx, current) {
                     break;
                 }
                 current = next_tx;
@@ -1020,7 +1021,7 @@ mod tests {
 
         let updated_notes: Vec<_> = update.note_updates.updated_input_notes().collect();
 
-        let find_order = |note_id: NoteId| -> Option<u16> {
+        let find_order = |note_id: NoteId| -> Option<u32> {
             updated_notes
                 .iter()
                 .find(|n| n.id() == note_id)

@@ -118,6 +118,20 @@ impl InputNoteState {
         self.inner().consumer_transaction_id()
     }
 
+    /// Returns the block height at which this note was nullified (consumed), if applicable.
+    ///
+    /// This returns `Some` for notes in any consumed state
+    /// (`ConsumedAuthenticatedLocal`, `ConsumedUnauthenticatedLocal`, `ConsumedExternal`),
+    /// and `None` for all other states.
+    pub fn nullifier_block_height(&self) -> Option<BlockNumber> {
+        match self {
+            InputNoteState::ConsumedAuthenticatedLocal(s) => Some(s.nullifier_block_height),
+            InputNoteState::ConsumedUnauthenticatedLocal(s) => Some(s.nullifier_block_height),
+            InputNoteState::ConsumedExternal(s) => Some(s.nullifier_block_height),
+            _ => None,
+        }
+    }
+
     /// Returns a new state to reflect that the note has received an inclusion proof. The proof is
     /// assumed to be unverified until the block header information is received. If the note state
     /// doesn't change, `None` is returned.

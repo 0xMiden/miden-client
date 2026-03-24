@@ -4,10 +4,14 @@ use miden_client::note::{
     InputNoteReader,
     NoteAssets,
     NoteMetadata,
+    NoteReader,
+    NoteReaderSource,
     NoteRecipient,
+    NoteRecord,
     NoteStorage,
     NoteTag,
     NoteType,
+    OutputNoteReader,
 };
 use miden_client::store::input_note_states::{
     ConsumedExternalNoteState,
@@ -15,7 +19,7 @@ use miden_client::store::input_note_states::{
     ExpectedNoteState,
     NoteSubmissionData,
 };
-use miden_client::store::{InputNoteRecord, NoteFilter, Store};
+use miden_client::store::{InputNoteRecord, NoteFilter, OutputNoteRecord, OutputNoteState, Store};
 use miden_client::{Felt, ZERO};
 use miden_protocol::Word;
 use miden_protocol::account::AccountId;
@@ -105,7 +109,7 @@ fn create_consumed_input_note_with_consumer(
 async fn insert_input_notes_with_tx_order(
     store: &crate::SqliteStore,
     notes: &[InputNoteRecord],
-    consumed_tx_order: Option<u16>,
+    consumed_tx_order: Option<u32>,
 ) {
     let notes = notes.to_vec();
     store
@@ -115,6 +119,43 @@ async fn insert_input_notes_with_tx_order(
                 .map_err(|e| miden_client::store::StoreError::QueryError(e.to_string()))?;
             for note in &notes {
                 super::upsert_input_note_tx(&tx, note, consumed_tx_order)?;
+            }
+            tx.commit()
+                .map_err(|e| miden_client::store::StoreError::QueryError(e.to_string()))
+        })
+        .await
+        .unwrap();
+}
+
+fn create_expected_output_note(index: u32, expected_height: u32) -> OutputNoteRecord {
+    let serial_number: Word = [Felt::new(u64::from(index) + 7000), ZERO, ZERO, ZERO].into();
+    let assets = NoteAssets::new(vec![]).unwrap();
+    let recipient = NoteRecipient::new(
+        serial_number,
+        StandardNote::SWAP.script(),
+        NoteStorage::new(vec![]).unwrap(),
+    );
+    let sender = AccountId::try_from(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET).unwrap();
+    let metadata = NoteMetadata::new(sender, NoteType::Public).with_tag(NoteTag::from(index));
+
+    OutputNoteRecord::new(
+        recipient.digest(),
+        assets,
+        metadata,
+        OutputNoteState::ExpectedFull { recipient },
+        BlockNumber::from(expected_height),
+    )
+}
+
+async fn insert_output_notes(store: &crate::SqliteStore, notes: &[OutputNoteRecord]) {
+    let notes = notes.to_vec();
+    store
+        .interact_with_connection(move |conn| {
+            let tx = conn
+                .transaction()
+                .map_err(|e| miden_client::store::StoreError::QueryError(e.to_string()))?;
+            for note in &notes {
+                super::upsert_output_note_tx(&tx, note)?;
             }
             tx.commit()
                 .map_err(|e| miden_client::store::StoreError::QueryError(e.to_string()))
@@ -175,6 +216,69 @@ async fn input_note_reader_skips_non_consumed_notes() {
 
     // Only the 2 consumed notes should be returned.
     assert_eq!(collected.len(), 2);
+}
+
+#[tokio::test]
+async fn input_note_reader_with_filter_iterates_expected_notes() {
+    let store = create_test_store().await;
+
+    let consumed = create_consumed_external_input_note(0, 1);
+    let expected_a = create_expected_input_note(1);
+    let expected_b = create_expected_input_note(2);
+
+    store
+        .upsert_input_notes(&[consumed, expected_a.clone(), expected_b.clone()])
+        .await
+        .unwrap();
+
+    let store: Arc<dyn Store> = Arc::new(store);
+    let mut reader = InputNoteReader::new(store).with_filter(NoteFilter::Expected);
+
+    let mut collected = Vec::new();
+    while let Some(note) = reader.next().await.unwrap() {
+        collected.push(note);
+    }
+
+    assert_eq!(collected.len(), 2);
+    assert_eq!(collected[0].id(), expected_a.id());
+    assert_eq!(collected[1].id(), expected_b.id());
+}
+
+#[tokio::test]
+async fn output_note_reader_iterates_expected_output_notes() {
+    let store = create_test_store().await;
+
+    let note_a = create_expected_output_note(0, 5);
+    let note_b = create_expected_output_note(1, 7);
+    insert_output_notes(&store, &[note_a.clone(), note_b.clone()]).await;
+
+    let store: Arc<dyn Store> = Arc::new(store);
+    let mut reader = OutputNoteReader::new(store).with_filter(NoteFilter::Expected);
+
+    let mut collected = Vec::new();
+    while let Some(note) = reader.next().await.unwrap() {
+        collected.push(note);
+    }
+
+    assert_eq!(collected.len(), 2);
+    assert_eq!(collected[0].id(), note_a.id());
+    assert_eq!(collected[1].id(), note_b.id());
+}
+
+#[tokio::test]
+async fn generic_note_reader_yields_output_record_variants() {
+    let store = create_test_store().await;
+
+    let note = create_expected_output_note(0, 9);
+    insert_output_notes(&store, core::slice::from_ref(&note)).await;
+
+    let store: Arc<dyn Store> = Arc::new(store);
+    let mut reader =
+        NoteReader::new(store, NoteReaderSource::Output).with_filter(NoteFilter::Expected);
+
+    let next = reader.next().await.unwrap();
+
+    assert!(matches!(next, Some(NoteRecord::Output(output)) if output.id() == note.id()));
 }
 
 #[tokio::test]

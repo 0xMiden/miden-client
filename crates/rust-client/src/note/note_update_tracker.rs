@@ -34,7 +34,7 @@ pub struct InputNoteUpdate {
     /// Position of the consuming transaction within the account's execution chain for the block.
     /// Ordering across different accounts is not guaranteed. `None` for non-consumed notes or
     /// notes consumed by external (non-client) transactions.
-    consumed_tx_order: Option<u16>,
+    consumed_tx_order: Option<u32>,
 }
 
 impl InputNoteUpdate {
@@ -94,12 +94,12 @@ impl InputNoteUpdate {
     /// Returns the position of the consuming transaction within the account's execution chain for
     /// the block. Ordering across different accounts is not guaranteed. `None` for non-consumed
     /// notes or notes consumed by external transactions.
-    pub fn consumed_tx_order(&self) -> Option<u16> {
+    pub fn consumed_tx_order(&self) -> Option<u32> {
         self.consumed_tx_order
     }
 
     /// Sets the consumed transaction order for this note update.
-    fn set_consumed_tx_order(&mut self, order: Option<u16>) {
+    fn set_consumed_tx_order(&mut self, order: Option<u32>) {
         self.consumed_tx_order = order;
     }
 }
@@ -180,10 +180,10 @@ pub struct NoteUpdateTracker {
     input_notes_by_nullifier: BTreeMap<Nullifier, NoteId>,
     /// Fast lookup map from nullifier to output note id.
     output_notes_by_nullifier: BTreeMap<Nullifier, NoteId>,
-    /// Map from nullifier to its position in the consuming transaction order. Nullifiers from
-    /// the same account are in execution order; ordering across different accounts is not
-    /// guaranteed.
-    nullifier_order: BTreeMap<Nullifier, u16>,
+    /// Map from nullifier to its position in the consuming transaction order per account.
+    /// Nullifiers from the same account are in execution order; ordering across different
+    /// accounts is not guaranteed.
+    nullifier_order: BTreeMap<Nullifier, u32>,
 }
 
 impl NoteUpdateTracker {
@@ -286,7 +286,7 @@ impl NoteUpdateTracker {
     pub fn extend_nullifiers(&mut self, nullifiers: impl IntoIterator<Item = Nullifier>) {
         for nullifier in nullifiers {
             let next_pos =
-                u16::try_from(self.nullifier_order.len()).expect("nullifier count exceeds u16");
+                u32::try_from(self.nullifier_order.len()).expect("nullifier count exceeds u32");
             self.nullifier_order.entry(nullifier).or_insert(next_pos);
         }
     }
@@ -392,7 +392,7 @@ impl NoteUpdateTracker {
 
     /// Returns the position of the given nullifier in the consuming transaction order, or `None`
     /// if it is not present.
-    fn get_nullifier_order(&self, nullifier: Nullifier) -> Option<u16> {
+    fn get_nullifier_order(&self, nullifier: Nullifier) -> Option<u32> {
         self.nullifier_order.get(&nullifier).copied()
     }
 

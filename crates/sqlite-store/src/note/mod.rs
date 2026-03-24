@@ -56,7 +56,7 @@ struct SerializedInputNoteData {
     pub state: Vec<u8>,
     pub created_at: u64,
     pub consumed_block_height: Option<u32>,
-    pub consumed_tx_order: Option<u16>,
+    pub consumed_tx_order: Option<u32>,
     pub consumer_account_id: Option<String>,
 }
 
@@ -250,7 +250,7 @@ impl SqliteStore {
 pub(super) fn upsert_input_note_tx(
     tx: &Transaction<'_>,
     note: &InputNoteRecord,
-    consumed_tx_order: Option<u16>,
+    consumed_tx_order: Option<u32>,
 ) -> Result<(), StoreError> {
     let SerializedInputNoteData {
         id,
@@ -408,7 +408,7 @@ fn parse_input_note(
 /// Serialize the provided input note into database compatible types.
 fn serialize_input_note(
     note: &InputNoteRecord,
-    consumed_tx_order: Option<u16>,
+    consumed_tx_order: Option<u32>,
 ) -> SerializedInputNoteData {
     let id = note.id().as_word().to_string();
     let nullifier = note.nullifier().to_hex();
@@ -427,12 +427,7 @@ fn serialize_input_note(
     let state_discriminant = note.state().discriminant();
     let state = note.state().to_bytes();
 
-    let consumed_block_height = match note.state() {
-        InputNoteState::ConsumedAuthenticatedLocal(s) => Some(s.nullifier_block_height.as_u32()),
-        InputNoteState::ConsumedUnauthenticatedLocal(s) => Some(s.nullifier_block_height.as_u32()),
-        InputNoteState::ConsumedExternal(s) => Some(s.nullifier_block_height.as_u32()),
-        _ => None,
-    };
+    let consumed_block_height = note.state().nullifier_block_height().map(|h| h.as_u32());
 
     let consumer_account_id = note.consumer_account().map(AccountId::to_hex);
 
