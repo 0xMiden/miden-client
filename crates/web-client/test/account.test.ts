@@ -162,7 +162,8 @@ test.describe("getAccounts tests", () => {
 });
 
 test.describe("get public account with details", () => {
-  test("assets and storage with too many assets/entries are retrieved", async ({
+  // FIXME: Skipped due to node returning internal error for this account's proof
+  test.fixme("assets and storage with too many assets/entries are retrieved", async ({
     page,
   }) => {
     test.skip(
