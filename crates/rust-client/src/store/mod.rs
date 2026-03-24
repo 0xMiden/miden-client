@@ -496,9 +496,15 @@ pub trait Store: Send + Sync {
         let has_client_notes = has_client_notes.into();
         current_partial_mmr.add(current_block.commitment(), has_client_notes);
 
-        // Track the latest leaf if it is relevant (it has client notes) _and_ the forest
-        // actually has a single leaf tree bit.
+        // Build tracked_leaves from blocks that have client notes.
+        let tracked_headers = self.get_tracked_block_headers().await?;
         let mut tracked_leaves = alloc::collections::BTreeSet::new();
+        for header in &tracked_headers {
+            tracked_leaves.insert(header.block_num().as_usize());
+        }
+
+        // Also track the latest leaf if it is relevant (it has client notes) _and_ the forest
+        // actually has a single leaf tree bit.
         if has_client_notes && current_partial_mmr.forest().has_single_leaf_tree() {
             let latest_leaf = current_partial_mmr.forest().num_leaves().saturating_sub(1);
             tracked_leaves.insert(latest_leaf);

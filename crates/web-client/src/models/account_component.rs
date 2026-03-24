@@ -51,10 +51,13 @@ impl GetProceduresResultItem {
     }
 }
 
-impl From<&(NativeWord, bool)> for GetProceduresResultItem {
-    fn from(native_get_procedures_result_item: &(NativeWord, bool)) -> Self {
+impl From<(miden_protocol::account::AccountProcedureRoot, bool)> for GetProceduresResultItem {
+    fn from(
+        native_get_procedures_result_item: (miden_protocol::account::AccountProcedureRoot, bool),
+    ) -> Self {
+        let digest_word: NativeWord = native_get_procedures_result_item.0.into();
         Self {
-            digest: native_get_procedures_result_item.0.into(),
+            digest: digest_word.into(),
             is_auth: native_get_procedures_result_item.1,
         }
     }
@@ -142,7 +145,7 @@ impl AccountComponent {
     /// Returns all procedures exported by this component.
     #[wasm_bindgen(js_name = "getProcedures")]
     pub fn get_procedures(&self) -> Vec<GetProceduresResultItem> {
-        self.0.get_procedures().iter().map(Into::into).collect()
+        self.0.procedures().map(Into::into).collect()
     }
 
     fn create_auth_component(

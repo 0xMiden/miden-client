@@ -21,7 +21,12 @@ use rand::RngCore;
 use tracing::{debug, info};
 use uuid::Uuid;
 
-use crate::account::component::{AccountComponent, BasicFungibleFaucet, BasicWallet};
+use crate::account::component::{
+    AccountComponent,
+    AuthControlled,
+    BasicFungibleFaucet,
+    BasicWallet,
+};
 use crate::account::{AccountBuilder, AccountType, StorageSlot};
 use crate::auth::AuthSchemeId;
 use crate::crypto::FeltRng;
@@ -160,6 +165,7 @@ pub async fn insert_new_fungible_faucet(
         .storage_mode(storage_mode)
         .with_auth_component(auth_component)
         .with_component(BasicFungibleFaucet::new(symbol, 10, max_supply).unwrap())
+        .with_component(AuthControlled::allow_all())
         .build()
         .unwrap();
 

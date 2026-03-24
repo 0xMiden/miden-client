@@ -121,7 +121,7 @@ impl IdxdbStore {
                 .vault()
                 .fungible()
                 .iter()
-                .map(|(faucet_id, _)| faucet_id.prefix().to_hex())
+                .map(|(faucet_id, _)| faucet_id.faucet_id().prefix().to_hex())
                 .collect();
             let old_vault_assets =
                 self.get_vault_assets(account_id, fungible_faucet_prefixes).await?;

@@ -1,6 +1,6 @@
 use miden_client::asset::Asset as NativeAsset;
 use miden_client::block::BlockNumber as NativeBlockNumber;
-use miden_client::crypto::RpoRandomCoin;
+use miden_client::crypto::RandomCoin;
 use miden_client::note::{Note as NativeNote, NoteAssets as NativeNoteAssets, P2idNote};
 use miden_client::{Felt as NativeFelt, Word as NativeWord};
 use miden_standards::note::{P2ideNote, P2ideNoteStorage};
@@ -102,7 +102,7 @@ impl Note {
     ) -> Result<Self, JsValue> {
         let mut rng = StdRng::from_os_rng();
         let coin_seed: [u64; 4] = rng.random();
-        let mut rng = RpoRandomCoin::new(coin_seed.map(NativeFelt::new).into());
+        let mut rng = RandomCoin::new(coin_seed.map(NativeFelt::new).into());
 
         let native_note_assets: NativeNoteAssets = assets.into();
         let native_assets: Vec<NativeAsset> = native_note_assets.iter().copied().collect();
@@ -133,7 +133,7 @@ impl Note {
     ) -> Result<Self, JsValue> {
         let mut rng = StdRng::from_os_rng();
         let coin_seed: [u64; 4] = rng.random();
-        let mut rng = RpoRandomCoin::new(coin_seed.map(NativeFelt::new).into());
+        let mut rng = RandomCoin::new(coin_seed.map(NativeFelt::new).into());
 
         let native_note_assets: NativeNoteAssets = assets.into();
         let native_assets: Vec<NativeAsset> = native_note_assets.iter().copied().collect();

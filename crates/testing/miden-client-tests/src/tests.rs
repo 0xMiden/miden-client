@@ -108,6 +108,7 @@ use miden_protocol::vm::AdviceInputs;
 use miden_protocol::{EMPTY_WORD, Felt, ONE, Word};
 use miden_standards::account::faucets::BasicFungibleFaucet;
 use miden_standards::account::interface::AccountInterfaceError;
+use miden_standards::account::mint_policies::AuthControlled;
 use miden_standards::account::wallets::BasicWallet;
 use miden_standards::note::{NoteConsumptionStatus, P2idNoteStorage, StandardNote};
 use miden_standards::testing::mock_account::MockAccountExt;
@@ -3104,6 +3105,7 @@ async fn insert_new_fungible_faucet(
             AuthSchemeId::Falcon512Poseidon2,
         ))
         .with_component(BasicFungibleFaucet::new(symbol, 10, max_supply).unwrap())
+        .with_component(AuthControlled::allow_all())
         .build()
         .unwrap();
 
@@ -3139,6 +3141,7 @@ async fn insert_new_ecdsa_fungible_faucet(
             AuthSchemeId::EcdsaK256Keccak,
         ))
         .with_component(BasicFungibleFaucet::new(symbol, 10, max_supply).unwrap())
+        .with_component(AuthControlled::allow_all())
         .build()
         .unwrap();
 
