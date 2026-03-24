@@ -140,31 +140,6 @@ export async function upsertInputNote(dbId, noteId, assets, serialNumber, inputs
         return doWork(tx);
     return db.dexie.transaction("rw", db.inputNotes, db.notesScripts, doWork);
 }
-// Compares two input notes by consumption order: first by consumed block height (ascending,
-// nulls last), then by per-account consumed tx order (ascending, nulls last), then by note ID.
-function compareNotesByConsumptionOrder(a, b) {
-    const aH = a.consumedBlockHeight;
-    const bH = b.consumedBlockHeight;
-    if (aH == null && bH != null)
-        return 1;
-    if (aH != null && bH == null)
-        return -1;
-    if (aH != null && bH != null && aH !== bH)
-        return aH - bH;
-    const aO = a.consumedTxOrder;
-    const bO = b.consumedTxOrder;
-    if (aO == null && bO != null)
-        return 1;
-    if (aO != null && bO == null)
-        return -1;
-    if (aO != null && bO != null && aO !== bO)
-        return aO - bO;
-    if (a.noteId < b.noteId)
-        return -1;
-    if (a.noteId > b.noteId)
-        return 1;
-    return 0;
-}
 // When a consumer is set, uses the [consumedBlockHeight+consumedTxOrder+noteId] compound
 // index for cursor-based iteration.
 export async function getInputNoteByOffset(dbId, states, consumerAccountId, blockStart, blockEnd, offset) {
@@ -212,7 +187,29 @@ export async function getInputNoteByOffset(dbId, states, consumerAccountId, bloc
         if (blockEnd != null) {
             notes = notes.filter((n) => n.consumedBlockHeight != null && n.consumedBlockHeight <= blockEnd);
         }
-        notes.sort(compareNotesByConsumptionOrder);
+        notes.sort((a, b) => {
+            const aH = a.consumedBlockHeight;
+            const bH = b.consumedBlockHeight;
+            if (aH == null && bH != null)
+                return 1;
+            if (aH != null && bH == null)
+                return -1;
+            if (aH != null && bH != null && aH !== bH)
+                return aH - bH;
+            const aO = a.consumedTxOrder;
+            const bO = b.consumedTxOrder;
+            if (aO == null && bO != null)
+                return 1;
+            if (aO != null && bO == null)
+                return -1;
+            if (aO != null && bO != null && aO !== bO)
+                return aO - bO;
+            if (a.noteId < b.noteId)
+                return -1;
+            if (a.noteId > b.noteId)
+                return 1;
+            return 0;
+        });
         const note = notes[offset];
         if (!note)
             return [];

@@ -183,7 +183,7 @@ impl NoteReader {
         notes.retain(|note| self.matches_input_note(note));
 
         if !matches!(self.filter, NoteFilter::Consumed) {
-            notes.sort_by_key(|note| input_note_sort_key(note));
+            notes.sort_by_key(input_note_sort_key);
         }
 
         Ok(notes.into_iter().map(NoteRecord::Input).collect())
@@ -197,7 +197,7 @@ impl NoteReader {
             .map_err(ClientError::StoreError)?;
 
         notes.retain(|note| self.matches_output_note(note));
-        notes.sort_by_key(|note| output_note_sort_key(note));
+        notes.sort_by_key(output_note_sort_key);
 
         Ok(notes.into_iter().map(NoteRecord::Output).collect())
     }
@@ -213,7 +213,7 @@ impl NoteReader {
     }
 
     fn matches_output_note(&self, note: &OutputNoteRecord) -> bool {
-        block_matches_range(output_note_block_num(note), self.block_range)
+        block_matches_range(Some(output_note_block_num(note)), self.block_range)
     }
 }
 
@@ -326,16 +326,16 @@ fn input_note_block_num(note: &InputNoteRecord) -> Option<BlockNumber> {
     }
 }
 
-fn output_note_block_num(note: &OutputNoteRecord) -> Option<BlockNumber> {
+fn output_note_block_num(note: &OutputNoteRecord) -> BlockNumber {
     match note.state() {
         OutputNoteState::ExpectedPartial | OutputNoteState::ExpectedFull { .. } => {
-            Some(note.expected_height())
+            note.expected_height()
         },
         OutputNoteState::CommittedPartial { inclusion_proof }
         | OutputNoteState::CommittedFull { inclusion_proof, .. } => {
-            Some(inclusion_proof.location().block_num())
+            inclusion_proof.location().block_num()
         },
-        OutputNoteState::Consumed { block_height, .. } => Some(*block_height),
+        OutputNoteState::Consumed { block_height, .. } => *block_height,
     }
 }
 
@@ -349,10 +349,10 @@ fn input_note_sort_key(note: &InputNoteRecord) -> (bool, u32, String) {
 }
 
 fn output_note_sort_key(note: &OutputNoteRecord) -> (bool, u32, String) {
-    let block_num = output_note_block_num(note).map(|block_num| block_num.as_u32());
+    let block_num = output_note_block_num(note).as_u32();
     (
-        block_num.is_none(),
-        block_num.unwrap_or_default(),
+        false,
+        block_num,
         note.id().as_word().to_string(),
     )
 }
