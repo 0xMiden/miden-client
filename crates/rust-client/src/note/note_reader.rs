@@ -350,9 +350,5 @@ fn input_note_sort_key(note: &InputNoteRecord) -> (bool, u32, String) {
 
 fn output_note_sort_key(note: &OutputNoteRecord) -> (bool, u32, String) {
     let block_num = output_note_block_num(note).as_u32();
-    (
-        false,
-        block_num,
-        note.id().as_word().to_string(),
-    )
+    (false, block_num, note.id().as_word().to_string())
 }
