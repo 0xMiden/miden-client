@@ -74,12 +74,13 @@ impl<AUTH> Client<AUTH> {
         // Fetch the block header and MMR proof from the node
         let (block_header, path_nodes) =
             fetch_block_header(self.rpc_api.clone(), block_num, current_partial_mmr).await?;
+        let tracked_nodes = authenticated_block_nodes(&block_header, path_nodes);
 
         // Insert header and MMR nodes
         self.store
             .insert_block_header(&block_header, current_partial_mmr.peaks(), true)
             .await?;
-        self.store.insert_partial_blockchain_nodes(&path_nodes).await?;
+        self.store.insert_partial_blockchain_nodes(&tracked_nodes).await?;
 
         Ok(block_header)
     }
@@ -116,6 +117,19 @@ pub(crate) fn adjust_merkle_path_for_forest(
     path_nodes
 }
 
+fn authenticated_block_nodes(
+    block_header: &BlockHeader,
+    mut path_nodes: Vec<(InOrderIndex, Word)>,
+) -> Vec<(InOrderIndex, Word)> {
+    let mut nodes = Vec::with_capacity(path_nodes.len() + 1);
+    nodes.push((
+        InOrderIndex::from_leaf_pos(block_header.block_num().as_usize()),
+        block_header.commitment(),
+    ));
+    nodes.append(&mut path_nodes);
+    nodes
+}
+
 pub(crate) async fn fetch_block_header(
     rpc_api: Arc<dyn NodeRpcClient>,
     block_num: BlockNumber,
@@ -142,12 +156,13 @@ pub(crate) async fn fetch_block_header(
 
 #[cfg(test)]
 mod tests {
-    use miden_protocol::block::BlockNumber;
+    use miden_protocol::block::{BlockHeader, BlockNumber};
     use miden_protocol::crypto::merkle::MerklePath;
     use miden_protocol::crypto::merkle::mmr::{Forest, InOrderIndex, Mmr, PartialMmr};
+    use miden_protocol::transaction::TransactionKernel;
     use miden_protocol::{Felt, Word};
 
-    use super::adjust_merkle_path_for_forest;
+    use super::{adjust_merkle_path_for_forest, authenticated_block_nodes};
 
     fn word(n: u64) -> Word {
         Word::new([Felt::new(n), Felt::new(0), Felt::new(0), Felt::new(0)])
@@ -251,5 +266,19 @@ mod tests {
             small_forest,
         );
         assert_eq!(adjusted.len(), expected_depth);
+    }
+
+    #[test]
+    fn authenticated_block_nodes_include_leaf_commitment() {
+        let block_header = BlockHeader::mock(4, None, None, &[], TransactionKernel.to_commitment());
+        let path_nodes = vec![
+            (InOrderIndex::from_leaf_pos(4).sibling(), word(10)),
+            (InOrderIndex::from_leaf_pos(4).parent().sibling(), word(11)),
+        ];
+
+        let nodes = authenticated_block_nodes(&block_header, path_nodes.clone());
+
+        assert_eq!(nodes[0], (InOrderIndex::from_leaf_pos(4), block_header.commitment()));
+        assert_eq!(&nodes[1..], path_nodes.as_slice());
     }
 }
