@@ -262,8 +262,8 @@ test.describe("export and import note", () => {
             window.NoteType.Public,
             new window.NoteAttachment()
           );
-          return window.NoteFile.fromOutputNote(
-            window.OutputNote.full(p2IdNote)
+          return window.NoteFile.fromRawOutputNote(
+            window.RawOutputNote.full(p2IdNote)
           ).noteType();
         },
         { noteId }

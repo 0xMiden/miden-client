@@ -295,11 +295,11 @@ test.describe("createP2IDNote and createP2IDENote", () => {
           new window.NoteAttachment()
         );
 
-        let outputNote = window.OutputNote.full(p2IdNote);
+        let rawOutputNote = window.RawOutputNote.full(p2IdNote);
 
         let transactionRequest = new window.TransactionRequestBuilder()
-          .withOwnOutputNotes(
-            new window.MidenArrays.OutputNoteArray([outputNote])
+          .withOwnRawOutputNotes(
+            new window.MidenArrays.RawOutputNoteArray([rawOutputNote])
           )
           .build();
 
@@ -314,7 +314,7 @@ test.describe("createP2IDNote and createP2IDENote", () => {
 
         let createdNoteId = transactionUpdate
           .executedTransaction()
-          .outputNotes()
+          .rawOutputNotes()
           .notes()[0]
           .id()
           .toString();
@@ -404,11 +404,11 @@ test.describe("createP2IDNote and createP2IDENote", () => {
           new window.NoteAttachment()
         );
 
-        let outputNote = window.OutputNote.full(p2IdeNote);
+        let rawOutputNote = window.RawOutputNote.full(p2IdeNote);
 
         let transactionRequest = new window.TransactionRequestBuilder()
-          .withOwnOutputNotes(
-            new window.MidenArrays.OutputNoteArray([outputNote])
+          .withOwnRawOutputNotes(
+            new window.MidenArrays.RawOutputNoteArray([rawOutputNote])
           )
           .build();
 
@@ -423,7 +423,7 @@ test.describe("createP2IDNote and createP2IDENote", () => {
 
         let createdNoteId = transactionUpdate
           .executedTransaction()
-          .outputNotes()
+          .rawOutputNotes()
           .notes()[0]
           .id()
           .toString();

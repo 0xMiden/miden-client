@@ -43,7 +43,7 @@ const mockChainTest = async (testingPage: Page) => {
     }
 
     const mintedNoteId = mintTransactionRecord
-      .outputNotes()
+      .rawOutputNotes()
       .notes()[0]
       .id()
       .toString();

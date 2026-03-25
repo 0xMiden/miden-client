@@ -36,7 +36,7 @@ test.describe("MidenClient API - Mock Chain", () => {
         ids: [mintTxId.toHex()],
       });
       const mintedNoteId = txRecords[0]
-        .outputNotes()
+        .rawOutputNotes()
         .notes()[0]
         .id()
         .toString();
@@ -773,15 +773,15 @@ test.describe("MidenClient API - Mock Chain", () => {
 
       return {
         hasSummary: summary != null,
-        hasOutputNotes: typeof summary.outputNotes === "function",
-        outputNotesCount: summary.outputNotes().numNotes(),
+        hasRawOutputNotes: typeof summary.rawOutputNotes === "function",
+        rawOutputNotesCount: summary.rawOutputNotes().numNotes(),
         hasAccountDelta: typeof summary.accountDelta === "function",
       };
     });
 
     expect(result.hasSummary).toBe(true);
-    expect(result.hasOutputNotes).toBe(true);
-    expect(result.outputNotesCount).toBeGreaterThan(0);
+    expect(result.hasRawOutputNotes).toBe(true);
+    expect(result.rawOutputNotesCount).toBeGreaterThan(0);
     expect(result.hasAccountDelta).toBe(true);
   });
 
