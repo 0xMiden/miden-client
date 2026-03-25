@@ -8,7 +8,7 @@ use miden_protocol::block::BlockNumber;
 use crate::ClientError;
 use crate::store::{InputNoteRecord, NoteFilter, Store};
 
-/// A lazy iterator over consumed input notes.
+/// A lazy iterator over consumed input notes for a specific consumer account.
 ///
 /// Each call to [`InputNoteReader::next`] executes a store query and returns the
 /// next matching note. Use builder methods to configure filters before iterating.
@@ -16,32 +16,27 @@ use crate::store::{InputNoteRecord, NoteFilter, Store};
 /// # Ordering
 ///
 /// Notes are returned in on-chain consumption order: first by block number, then by
-/// transaction order within the block. Within a block, ordering is only guaranteed
-/// among notes consumed by the same account; ordering across different accounts is
-/// not guaranteed.
+/// per-account transaction order within the block.
 pub struct InputNoteReader {
     store: Arc<dyn Store>,
-    consumer: Option<AccountId>,
+    consumer: AccountId,
     block_range: Option<(BlockNumber, BlockNumber)>,
     offset: u32,
 }
 
 impl InputNoteReader {
-    /// Creates a new `InputNoteReader` that iterates over consumed input notes.
-    pub fn new(store: Arc<dyn Store>) -> Self {
+    /// Creates a new `InputNoteReader` that iterates over consumed input notes
+    /// for the given consumer account.
+    ///
+    /// The consumer is required because ordering is only guaranteed among notes
+    /// consumed by the same account.
+    pub fn new(store: Arc<dyn Store>, consumer: AccountId) -> Self {
         Self {
             store,
-            consumer: None,
+            consumer,
             block_range: None,
             offset: 0,
         }
-    }
-
-    /// Filters notes by consumer account ID.
-    #[must_use]
-    pub fn for_consumer(mut self, account_id: AccountId) -> Self {
-        self.consumer = Some(account_id);
-        self
     }
 
     /// Restricts iteration to notes consumed within the given block range (inclusive).

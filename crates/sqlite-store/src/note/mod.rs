@@ -67,7 +67,7 @@ struct SerializedInputNoteData {
     pub state: Vec<u8>,
     pub created_at: u64,
     pub consumed_block_height: Option<u32>,
-    pub consumed_tx_order: Option<u16>,
+    pub consumed_tx_order: Option<u32>,
     pub consumer_account_id: Option<String>,
 }
 
@@ -108,7 +108,7 @@ struct SerializedInputNoteStateUpdate {
     pub state_discriminant: u8,
     pub state: Vec<u8>,
     pub consumed_block_height: Option<u32>,
-    pub consumed_tx_order: Option<u16>,
+    pub consumed_tx_order: Option<u32>,
     pub consumer_account_id: Option<String>,
 }
 
@@ -161,20 +161,20 @@ impl SqliteStore {
         Ok(notes)
     }
 
-    /// Retrieves a single input note at the given offset from the filtered set, optionally
-    /// restricted to a consumer account and/or block range.
+    /// Retrieves a single input note at the given offset from the filtered set, restricted to a
+    /// consumer account and optionally to a block range.
     pub(crate) fn get_input_note_by_offset(
         conn: &mut Connection,
         filter: &NoteFilter,
-        consumer: Option<AccountId>,
+        consumer: AccountId,
         block_start: Option<BlockNumber>,
         block_end: Option<BlockNumber>,
         offset: u32,
     ) -> Result<Option<InputNoteRecord>, StoreError> {
-        let consumer_hex = consumer.map(AccountId::to_hex);
+        let consumer_hex = consumer.to_hex();
         let (query, params) = filters::note_filter_to_query_input_note_by_offset(
             filter,
-            consumer_hex.as_deref(),
+            &consumer_hex,
             block_start,
             block_end,
             offset,
@@ -198,7 +198,7 @@ impl SqliteStore {
         let tx = conn.transaction().into_store_error()?;
 
         for note in notes {
-            upsert_input_note_tx(&tx, note, None)?;
+            upsert_input_note_tx(&tx, note)?;
 
             // Whenever we insert a note, we also update block relevance
             if let Some(inclusion_proof) = note.inclusion_proof() {
@@ -278,7 +278,6 @@ impl SqliteStore {
 pub(super) fn upsert_input_note_tx(
     tx: &Transaction<'_>,
     note: &InputNoteRecord,
-    consumed_tx_order: Option<u16>,
 ) -> Result<(), StoreError> {
     let SerializedInputNoteData {
         id,
@@ -294,7 +293,7 @@ pub(super) fn upsert_input_note_tx(
         consumed_block_height,
         consumed_tx_order,
         consumer_account_id,
-    } = serialize_input_note(note, consumed_tx_order);
+    } = serialize_input_note(note);
 
     const SCRIPT_QUERY: &str =
         insert_sql!(notes_scripts { script_root, serialized_note_script } | REPLACE);
@@ -390,10 +389,7 @@ fn parse_input_note(
 }
 
 /// Serialize the provided input note into database compatible types.
-fn serialize_input_note(
-    note: &InputNoteRecord,
-    consumed_tx_order: Option<u16>,
-) -> SerializedInputNoteData {
+fn serialize_input_note(note: &InputNoteRecord) -> SerializedInputNoteData {
     let id = note.id().as_word().to_string();
     let nullifier = note.nullifier().to_hex();
     let created_at = note.created_at().unwrap_or(0);
@@ -411,13 +407,8 @@ fn serialize_input_note(
     let state_discriminant = note.state().discriminant();
     let state = note.state().to_bytes();
 
-    let consumed_block_height = match note.state() {
-        InputNoteState::ConsumedAuthenticatedLocal(s) => Some(s.nullifier_block_height.as_u32()),
-        InputNoteState::ConsumedUnauthenticatedLocal(s) => Some(s.nullifier_block_height.as_u32()),
-        InputNoteState::ConsumedExternal(s) => Some(s.nullifier_block_height.as_u32()),
-        _ => None,
-    };
-
+    let consumed_block_height = note.state().consumed_block_height().map(|h| h.as_u32());
+    let consumed_tx_order = note.state().consumed_tx_order();
     let consumer_account_id = note.consumer_account().map(AccountId::to_hex);
 
     SerializedInputNoteData {
@@ -483,16 +474,9 @@ fn parse_output_note(
 }
 
 /// Serialize the provided input note state into a lightweight update.
-fn serialize_input_note_state(
-    note: &InputNoteRecord,
-    consumed_tx_order: Option<u16>,
-) -> SerializedInputNoteStateUpdate {
-    let consumed_block_height = match note.state() {
-        InputNoteState::ConsumedAuthenticatedLocal(s) => Some(s.nullifier_block_height.as_u32()),
-        InputNoteState::ConsumedUnauthenticatedLocal(s) => Some(s.nullifier_block_height.as_u32()),
-        InputNoteState::ConsumedExternal(s) => Some(s.nullifier_block_height.as_u32()),
-        _ => None,
-    };
+fn serialize_input_note_state(note: &InputNoteRecord) -> SerializedInputNoteStateUpdate {
+    let consumed_block_height = note.state().consumed_block_height().map(|h| h.as_u32());
+    let consumed_tx_order = note.state().consumed_tx_order();
     let consumer_account_id = note.consumer_account().map(AccountId::to_hex);
 
     SerializedInputNoteStateUpdate {
@@ -550,13 +534,12 @@ pub(crate) fn apply_note_updates_tx(
     for input_note in note_updates.updated_input_notes() {
         match input_note.update_type() {
             NoteUpdateType::Insert => {
-                let serialized =
-                    serialize_input_note(input_note.inner(), input_note.consumed_tx_order());
+                let serialized = serialize_input_note(input_note.inner());
                 scripts.insert(serialized.script_root.clone(), serialized.script.clone());
                 input_inserts.push(serialized);
             },
             NoteUpdateType::Update => {
-                input_updates.push(serialize_input_note_state(input_note.inner(), input_note.consumed_tx_order()));
+                input_updates.push(serialize_input_note_state(input_note.inner()));
             },
             NoteUpdateType::None => {},
         }

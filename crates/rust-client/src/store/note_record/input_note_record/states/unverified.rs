@@ -38,7 +38,13 @@ impl NoteStateHandler for UnverifiedNoteState {
         &self,
         nullifier_block_height: BlockNumber,
     ) -> Result<Option<InputNoteState>, NoteRecordError> {
-        Ok(Some(ConsumedExternalNoteState { nullifier_block_height }.into()))
+        Ok(Some(
+            ConsumedExternalNoteState {
+                nullifier_block_height,
+                consumed_tx_order: None,
+            }
+            .into(),
+        ))
     }
 
     fn block_header_received(

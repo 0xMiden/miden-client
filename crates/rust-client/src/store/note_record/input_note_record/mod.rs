@@ -191,6 +191,12 @@ impl InputNoteRecord {
         matches!(self.state, InputNoteState::Committed { .. })
     }
 
+    /// Sets the consumed transaction order on the inner note state. No-op if the note is not in
+    /// a consumed state.
+    pub fn set_consumed_tx_order(&mut self, order: Option<u32>) {
+        self.state.set_consumed_tx_order(order);
+    }
+
     // TRANSITIONS
     // ================================================================================================
 

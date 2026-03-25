@@ -529,7 +529,7 @@ pub async fn test_consumed_note_ordering(client_config: ClientConfig) -> Result<
     info!(?consume_blocks, "Consume transaction block numbers");
 
     // Use InputNoteReader to iterate consumed notes for this wallet
-    let mut reader = client.input_note_reader().for_consumer(wallet_account.id());
+    let mut reader = client.input_note_reader(wallet_account.id());
     let mut reader_notes = Vec::new();
     while let Some(note) = reader.next().await? {
         reader_notes.push(note);
