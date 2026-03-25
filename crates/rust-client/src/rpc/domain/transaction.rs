@@ -188,21 +188,7 @@ impl TryFrom<proto::transaction::TransactionHeader> for TransactionHeader {
         let output_notes = value
             .output_notes
             .into_iter()
-            .map(|note_header| {
-                let note_id = note_header.note_id.ok_or(
-                    RpcConversionError::MissingFieldInProtobufRepresentation {
-                        entity: "NoteHeader",
-                        field_name: "note_id",
-                    },
-                )?;
-                let metadata = note_header.metadata.ok_or(
-                    RpcConversionError::MissingFieldInProtobufRepresentation {
-                        entity: "NoteHeader",
-                        field_name: "metadata",
-                    },
-                )?;
-                Ok(NoteHeader::new(note_id.try_into()?, metadata.try_into()?))
-            })
+            .map(NoteHeader::try_from)
             .collect::<Result<Vec<NoteHeader>, RpcError>>()?;
 
         let transaction_header = TransactionHeader::new(
@@ -216,6 +202,30 @@ impl TryFrom<proto::transaction::TransactionHeader> for TransactionHeader {
                 .unwrap(),
         );
         Ok(transaction_header)
+    }
+}
+
+impl TryFrom<proto::note::NoteHeader> for NoteHeader {
+    type Error = RpcError;
+
+    fn try_from(value: proto::note::NoteHeader) -> Result<Self, Self::Error> {
+        let note_id = value
+            .note_id
+            .ok_or(RpcConversionError::MissingFieldInProtobufRepresentation {
+                entity: "NoteHeader",
+                field_name: "note_id",
+            })?
+            .try_into()?;
+
+        let note_metadata = value
+            .metadata
+            .ok_or(RpcConversionError::MissingFieldInProtobufRepresentation {
+                entity: "NoteHeader",
+                field_name: "metadata",
+            })?
+            .try_into()?;
+
+        Ok(Self::new(note_id, note_metadata))
     }
 }
 
