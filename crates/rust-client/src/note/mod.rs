@@ -217,24 +217,23 @@ where
         Ok(self.store.get_output_notes(NoteFilter::Unique(note_id)).await?.pop())
     }
 
-    /// Returns an [`InputNoteReader`] that lazily iterates over consumed input notes.
+    /// Returns an [`InputNoteReader`] that lazily iterates over consumed input notes
+    /// for the given consumer account.
     ///
-    /// Use the builder methods on [`InputNoteReader`] to further refine the query before
-    /// iterating.
+    /// The consumer is required because ordering is only guaranteed among notes
+    /// consumed by the same account.
     ///
     /// # Example
     ///
     /// ```rust,ignore
-    /// let mut reader = client
-    ///     .input_note_reader()
-    ///     .for_consumer(account_id);
+    /// let mut reader = client.input_note_reader(account_id);
     ///
     /// while let Some(note) = reader.next().await? {
     ///     process(note);
     /// }
     /// ```
-    pub fn input_note_reader(&self) -> InputNoteReader {
-        InputNoteReader::new(self.store.clone())
+    pub fn input_note_reader(&self, consumer: AccountId) -> InputNoteReader {
+        InputNoteReader::new(self.store.clone(), consumer)
     }
 }
 

@@ -17,6 +17,9 @@ pub struct ConsumedUnauthenticatedLocalNoteState {
     pub nullifier_block_height: BlockNumber,
     /// Information about the submission of the note.
     pub submission_data: NoteSubmissionData,
+    /// Per-account position of the consuming transaction within the account's execution chain
+    /// for the block. `None` if the order has not been determined yet.
+    pub consumed_tx_order: Option<u32>,
 }
 
 impl NoteStateHandler for ConsumedUnauthenticatedLocalNoteState {
@@ -80,6 +83,7 @@ impl miden_tx::utils::serde::Serializable for ConsumedUnauthenticatedLocalNoteSt
         self.metadata.write_into(target);
         self.nullifier_block_height.write_into(target);
         self.submission_data.write_into(target);
+        self.consumed_tx_order.write_into(target);
     }
 }
 
@@ -90,10 +94,12 @@ impl miden_tx::utils::serde::Deserializable for ConsumedUnauthenticatedLocalNote
         let metadata = NoteMetadata::read_from(source)?;
         let nullifier_block_height = BlockNumber::read_from(source)?;
         let submission_data = NoteSubmissionData::read_from(source)?;
+        let consumed_tx_order = Option::<u32>::read_from(source)?;
         Ok(ConsumedUnauthenticatedLocalNoteState {
             metadata,
             nullifier_block_height,
             submission_data,
+            consumed_tx_order,
         })
     }
 }

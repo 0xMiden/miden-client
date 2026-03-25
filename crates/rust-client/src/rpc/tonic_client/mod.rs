@@ -408,7 +408,12 @@ impl GrpcClient {
                             .collect();
                         StorageMap::with_entries(map_entries)
                     } else {
-                        map_details.entries.clone().into_storage_map()
+                        map_details.entries.clone().into_storage_map().ok_or_else(|| {
+                            RpcError::ExpectedDataMissing(
+                                "expected AllEntries for full account fetch, got EntriesWithProofs"
+                                    .into(),
+                            )
+                        })?
                     }
                     .map_err(|err| {
                         RpcError::InvalidResponse(format!(

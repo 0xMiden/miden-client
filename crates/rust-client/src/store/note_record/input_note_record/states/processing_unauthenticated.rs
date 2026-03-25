@@ -38,7 +38,13 @@ impl NoteStateHandler for ProcessingUnauthenticatedNoteState {
         &self,
         nullifier_block_height: BlockNumber,
     ) -> Result<Option<InputNoteState>, NoteRecordError> {
-        Ok(Some(ConsumedExternalNoteState { nullifier_block_height }.into()))
+        Ok(Some(
+            ConsumedExternalNoteState {
+                nullifier_block_height,
+                consumed_tx_order: None,
+            }
+            .into(),
+        ))
     }
 
     fn block_header_received(
@@ -74,6 +80,7 @@ impl NoteStateHandler for ProcessingUnauthenticatedNoteState {
                 metadata: self.metadata.clone(),
                 nullifier_block_height: block_height,
                 submission_data: self.submission_data,
+                consumed_tx_order: None,
             }
             .into(),
         ))

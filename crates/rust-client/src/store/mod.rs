@@ -149,19 +149,17 @@ pub trait Store: Send + Sync {
         filter: NoteFilter,
     ) -> Result<Vec<OutputNoteRecord>, StoreError>;
 
-    /// Retrieves a single input note at the given offset from the filtered set.
-    ///
-    /// When `consumer` is `Some`, only notes whose consumer account matches are counted
-    /// toward the offset. Optionally restricts to a block range via `block_start` and
+    /// Retrieves a single input note at the given offset from the filtered set for the given
+    /// consumer account. Optionally restricts to a block range via `block_start` and
     /// `block_end`. Returns `None` when the offset is past the end of the matching notes.
     ///
     /// # Ordering
     ///
-    /// Notes are sorted by their on-chain execution order.
+    /// Notes are sorted by their per-account on-chain execution order.
     async fn get_input_note_by_offset(
         &self,
         filter: NoteFilter,
-        consumer: Option<AccountId>,
+        consumer: AccountId,
         block_start: Option<BlockNumber>,
         block_end: Option<BlockNumber>,
         offset: u32,
@@ -400,10 +398,9 @@ pub trait Store: Send + Sync {
     /// Applies the state sync update to the store. An update involves:
     ///
     /// - Inserting the new block header to the store alongside new MMR peaks information.
-    /// - Updating the corresponding tracked input/output notes. Note updates for consumed notes
-    ///   carry consumption metadata — `consumed_block_height`, `consumed_tx_order`, and
-    ///   `consumer_account_id` — via [`InputNoteUpdate`](crate::note::InputNoteUpdate).
-    ///   Implementations must persist these fields so that ordered queries (see
+    /// - Updating the corresponding tracked input/output notes. Consumed notes carry consumption
+    ///   metadata — `consumed_block_height`, `consumed_tx_order`, and `consumer_account_id` — in
+    ///   their note state. Implementations must persist these fields so that ordered queries (see
     ///   [`Store::get_input_note_by_offset`]) work correctly.
     /// - Removing note tags that are no longer relevant.
     /// - Updating transactions in the store, marking as `committed` or `discarded`.
