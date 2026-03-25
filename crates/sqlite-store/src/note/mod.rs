@@ -573,7 +573,8 @@ pub(crate) fn apply_note_updates_tx(
     for input_note in note_updates.updated_input_notes() {
         match input_note.update_type() {
             NoteUpdateType::Insert => {
-                let serialized = serialize_input_note(input_note.inner(), input_note.consumed_tx_order());
+                let serialized =
+                    serialize_input_note(input_note.inner(), input_note.consumed_tx_order());
                 scripts.insert(serialized.script_root.clone(), serialized.script.clone());
                 input_inserts.push(serialized);
             },
