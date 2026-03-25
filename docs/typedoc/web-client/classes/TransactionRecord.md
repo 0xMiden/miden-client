@@ -126,15 +126,15 @@ Returns the nullifiers of the consumed input notes.
 
 ***
 
-### outputNotes()
+### rawOutputNotes()
 
-> **outputNotes**(): `OutputNotes`
+> **rawOutputNotes**(): `RawOutputNotes`
 
-Returns the output notes created by this transaction.
+Returns the raw output notes created by this transaction.
 
 #### Returns
 
-`OutputNotes`
+`RawOutputNotes`
 
 ***
 

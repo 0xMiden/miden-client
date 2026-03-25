@@ -25,7 +25,7 @@ function getWasm() {
  * Creates a P2ID (Pay-to-ID) note.
  *
  * @param {NoteOptions} opts - Note creation options.
- * @returns {OutputNote} The created output note.
+ * @returns {RawOutputNote} The created output note.
  */
 export function createP2IDNote(opts) {
   const wasm = getWasm();
@@ -44,14 +44,14 @@ export function createP2IDNote(opts) {
     noteType,
     attachment
   );
-  return wasm.OutputNote.full(note);
+  return wasm.RawOutputNote.full(note);
 }
 
 /**
  * Creates a P2IDE (Pay-to-ID with Expiration) note.
  *
  * @param {P2IDEOptions} opts - Note creation options with timelock/reclaim.
- * @returns {OutputNote} The created output note.
+ * @returns {RawOutputNote} The created output note.
  */
 export function createP2IDENote(opts) {
   const wasm = getWasm();
@@ -72,7 +72,7 @@ export function createP2IDENote(opts) {
     noteType,
     attachment
   );
-  return wasm.OutputNote.full(note);
+  return wasm.RawOutputNote.full(note);
 }
 
 /**

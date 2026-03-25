@@ -6,7 +6,7 @@
 
 # Function: createP2IDNote()
 
-> **createP2IDNote**(`options`): [`OutputNote`](../classes/OutputNote.md)
+> **createP2IDNote**(`options`): [`RawOutputNote`](../classes/RawOutputNote.md)
 
 Creates a P2ID (Pay-to-ID) note.
 
@@ -18,4 +18,4 @@ Creates a P2ID (Pay-to-ID) note.
 
 ## Returns
 
-[`OutputNote`](../classes/OutputNote.md)
+[`RawOutputNote`](../classes/RawOutputNote.md)

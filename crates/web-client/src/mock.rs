@@ -20,6 +20,7 @@ impl WebClient {
         seed: Option<Vec<u8>>,
         serialized_mock_chain: Option<Vec<u8>>,
         serialized_mock_note_transport_node: Option<Vec<u8>>,
+        store_name: Option<String>,
     ) -> Result<JsValue, JsValue> {
         let mock_rpc_api = match serialized_mock_chain {
             Some(chain) => {
@@ -40,20 +41,16 @@ impl WebClient {
             None => Arc::new(MockNoteTransportApi::default()),
         };
 
+        let store_name = store_name.unwrap_or_else(|| "mock_client_db".to_owned());
+
         let store = Arc::new(
-            IdxdbStore::new("mock_client_db".to_owned())
+            IdxdbStore::new(store_name.clone())
                 .await
                 .map_err(|_| JsValue::from_str("Failed to initialize IdxdbStore"))?,
         );
 
         let rng = create_rng(seed)?;
-        let keystore = Arc::new(WebKeyStore::new_with_callbacks(
-            rng,
-            "mock_client_db".to_owned(),
-            None,
-            None,
-            None,
-        ));
+        let keystore = Arc::new(WebKeyStore::new_with_callbacks(rng, store_name, None, None, None));
 
         self.setup_client(
             mock_rpc_api.clone(),

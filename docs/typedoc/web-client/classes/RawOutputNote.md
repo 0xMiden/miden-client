@@ -2,9 +2,9 @@
 
 ***
 
-[@miden-sdk/miden-sdk](../README.md) / OutputNote
+[@miden-sdk/miden-sdk](../README.md) / RawOutputNote
 
-# Class: OutputNote
+# Class: RawOutputNote
 
 Representation of a note produced by a transaction (full or partial).
 
@@ -92,7 +92,7 @@ Returns the recipient digest.
 
 ### full()
 
-> `static` **full**(`note`): `OutputNote`
+> `static` **full**(`note`): `RawOutputNote`
 
 Wraps a full note output.
 
@@ -104,4 +104,4 @@ Wraps a full note output.
 
 #### Returns
 
-`OutputNote`
+`RawOutputNote`

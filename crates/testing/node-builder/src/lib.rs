@@ -491,11 +491,11 @@ const TEST_ACCOUNT_SEED: [u8; 32] = [0xa; 32];
 /// and trigger the `too_many_assets` flag during testing.
 const NUM_TEST_FAUCETS: u128 = 1501;
 
-const NUM_STORAGE_MAP_ENTRIES: u32 = 2001;
+const NUM_STORAGE_MAP_ENTRIES: u32 = 200;
 
 const FAUCET_DECIMALS: u8 = 12;
 const FAUCET_MAX_SUPPLY: u32 = 1 << 30;
-const ASSET_AMOUNT_PER_FAUCET: u64 = 100;
+const ASSET_AMOUNT_PER_FAUCET: u64 = 75;
 
 /// Builds test faucets and an account that triggers the `too_many_assets` flag
 /// when requested from the node. This is used to test edge cases in account

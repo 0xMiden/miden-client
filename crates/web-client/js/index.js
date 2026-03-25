@@ -230,6 +230,10 @@ function createClientProxy(instance) {
   });
 }
 
+function createMockStoreName() {
+  return `mock_${crypto.randomUUID()}`;
+}
+
 class WebClient {
   /**
    * Create a WebClient wrapper.
@@ -838,13 +842,22 @@ class WebClient {
 
 class MockWebClient extends WebClient {
   constructor(seed, logLevel) {
-    super(null, null, seed, "mock", undefined, undefined, undefined, logLevel);
+    super(
+      null,
+      null,
+      seed,
+      createMockStoreName(),
+      undefined,
+      undefined,
+      undefined,
+      logLevel
+    );
   }
 
   initializeWorker() {
     this.worker.postMessage({
       action: WorkerAction.INIT_MOCK,
-      args: [this.seed, this.logLevel],
+      args: [this.seed, this.storeName, this.logLevel],
     });
   }
 
@@ -876,7 +889,8 @@ class MockWebClient extends WebClient {
     await wasmWebClient.createMockClient(
       seed,
       serializedMockChain,
-      serializedMockNoteTransportNode
+      serializedMockNoteTransportNode,
+      instance.storeName
     );
 
     // Wait for the worker to be ready
@@ -989,7 +1003,8 @@ class MockWebClient extends WebClient {
       await this.wasmWebClient.createMockClient(
         this.seed,
         newMockChain,
-        newMockNoteTransportNode
+        newMockNoteTransportNode,
+        this.storeName
       );
 
       return transactionResult.id();
@@ -1044,7 +1059,8 @@ class MockWebClient extends WebClient {
       await this.wasmWebClient.createMockClient(
         this.seed,
         newMockChain,
-        newMockNoteTransportNode
+        newMockNoteTransportNode,
+        this.storeName
       );
 
       return transactionResult.id();

@@ -44,8 +44,8 @@ export class TransactionsResource {
       );
 
       const request = new wasm.TransactionRequestBuilder()
-        .withOwnOutputNotes(
-          new wasm.OutputNoteArray([wasm.OutputNote.full(note)])
+        .withOwnRawOutputNotes(
+          new wasm.RawOutputNoteArray([wasm.RawOutputNote.full(note)])
         )
         .build();
 
@@ -482,14 +482,33 @@ export class TransactionsResource {
   }
 
   async #submitOrSubmitWithProver(accountId, request, perCallProver) {
+    const t0 = performance.now();
     const result = await this.#inner.executeTransaction(accountId, request);
+    const t1 = performance.now();
+    console.debug(`[timing] executeTransaction: ${(t1 - t0).toFixed(0)}ms`);
+
     const prover = perCallProver ?? this.#client.defaultProver;
+    const t2 = performance.now();
     const proven = prover
       ? await this.#inner.proveTransaction(result, prover)
       : await this.#inner.proveTransaction(result);
+    const t3 = performance.now();
+    console.debug(`[timing] proveTransaction: ${(t3 - t2).toFixed(0)}ms`);
+
     const txId = result.id();
+    const t4 = performance.now();
     const height = await this.#inner.submitProvenTransaction(proven, result);
+    const t5 = performance.now();
+    console.debug(
+      `[timing] submitProvenTransaction: ${(t5 - t4).toFixed(0)}ms`
+    );
+
+    const t6 = performance.now();
     await this.#inner.applyTransaction(result, height);
+    const t7 = performance.now();
+    console.debug(`[timing] applyTransaction: ${(t7 - t6).toFixed(0)}ms`);
+    console.debug(`[timing] total: ${(t7 - t0).toFixed(0)}ms`);
+
     return { txId, result };
   }
 }
