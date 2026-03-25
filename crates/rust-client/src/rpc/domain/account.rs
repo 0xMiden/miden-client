@@ -488,19 +488,8 @@ impl TryFrom<proto::rpc::AccountVaultDetails> for AccountVaultDetails {
         let assets = value
             .assets
             .into_iter()
-            .map(|asset| {
-                let key_word: Word = asset
-                    .key
-                    .ok_or(proto::rpc::AccountVaultDetails::missing_field(stringify!(key)))?
-                    .try_into()?;
-                let value_word: Word = asset
-                    .value
-                    .ok_or(proto::rpc::AccountVaultDetails::missing_field(stringify!(value)))?
-                    .try_into()?;
-                Asset::from_key_value_words(key_word, value_word)
-                    .map_err(|e| RpcError::DeserializationError(e.to_string()))
-            })
-            .collect::<Result<Vec<Asset>, RpcError>>()?;
+            .map(Asset::try_from)
+            .collect::<Result<Vec<Asset>, _>>()?;
 
         Ok(Self { too_many_assets, assets })
     }

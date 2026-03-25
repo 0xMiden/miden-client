@@ -184,24 +184,8 @@ impl TryFrom<proto::transaction::TransactionHeader> for TransactionHeader {
         let output_notes = value
             .output_notes
             .into_iter()
-            .map(|h| {
-                let note_id = h
-                    .note_id
-                    .ok_or(RpcConversionError::MissingFieldInProtobufRepresentation {
-                        entity: "NoteHeader",
-                        field_name: "note_id",
-                    })?
-                    .try_into()?;
-                let metadata = h
-                    .metadata
-                    .ok_or(RpcConversionError::MissingFieldInProtobufRepresentation {
-                        entity: "NoteHeader",
-                        field_name: "metadata",
-                    })?
-                    .try_into()?;
-                Ok(NoteHeader::new(note_id, metadata))
-            })
-            .collect::<Result<Vec<NoteHeader>, RpcError>>()?;
+            .map(NoteHeader::try_from)
+            .collect::<Result<Vec<NoteHeader>, _>>()?;
 
         let transaction_header = TransactionHeader::new(
             account_id.try_into()?,

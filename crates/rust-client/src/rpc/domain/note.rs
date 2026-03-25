@@ -72,6 +72,22 @@ impl From<NoteMetadata> for proto::note::NoteMetadata {
     }
 }
 
+impl TryFrom<proto::note::NoteHeader> for NoteHeader {
+    type Error = RpcConversionError;
+
+    fn try_from(value: proto::note::NoteHeader) -> Result<Self, Self::Error> {
+        let note_id = value
+            .note_id
+            .ok_or(proto::note::NoteHeader::missing_field(stringify!(note_id)))?
+            .try_into()?;
+        let metadata = value
+            .metadata
+            .ok_or(proto::note::NoteHeader::missing_field(stringify!(metadata)))?
+            .try_into()?;
+        Ok(NoteHeader::new(note_id, metadata))
+    }
+}
+
 impl TryFrom<proto::note::NoteInclusionInBlockProof> for NoteInclusionProof {
     type Error = RpcConversionError;
 

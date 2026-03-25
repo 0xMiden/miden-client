@@ -90,30 +90,20 @@ impl WebClient {
             let mut faucet_rng = StdRng::from_seed(seed);
 
             let native_scheme: NativeAuthScheme = auth_scheme.try_into()?;
-            let (key_pair, auth_component) = match native_scheme {
+            let key_pair = match native_scheme {
                 NativeAuthScheme::Falcon512Poseidon2 => {
-                    let key_pair = AuthSecretKey::new_falcon512_poseidon2_with_rng(&mut faucet_rng);
-                    let auth_component: AccountComponent = AuthSingleSig::new(
-                        key_pair.public_key().to_commitment(),
-                        NativeAuthScheme::Falcon512Poseidon2,
-                    )
-                    .into();
-                    (key_pair, auth_component)
+                    AuthSecretKey::new_falcon512_poseidon2_with_rng(&mut faucet_rng)
                 },
                 NativeAuthScheme::EcdsaK256Keccak => {
-                    let key_pair = AuthSecretKey::new_ecdsa_k256_keccak_with_rng(&mut faucet_rng);
-                    let auth_component: AccountComponent = AuthSingleSig::new(
-                        key_pair.public_key().to_commitment(),
-                        NativeAuthScheme::EcdsaK256Keccak,
-                    )
-                    .into();
-                    (key_pair, auth_component)
+                    AuthSecretKey::new_ecdsa_k256_keccak_with_rng(&mut faucet_rng)
                 },
                 _ => {
                     let message = format!("unsupported auth scheme: {native_scheme:?}");
                     return Err(JsValue::from_str(&message));
                 },
             };
+            let auth_component: AccountComponent =
+                AuthSingleSig::new(key_pair.public_key().to_commitment(), native_scheme).into();
 
             let symbol =
                 TokenSymbol::new(token_symbol).map_err(|e| JsValue::from_str(&e.to_string()))?;

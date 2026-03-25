@@ -77,7 +77,6 @@ pub use miden_standards::account::interface::AccountInterfaceExt;
 use miden_standards::account::wallets::BasicWallet;
 
 use super::Client;
-use crate::auth::AuthSchemeId;
 use crate::errors::ClientError;
 use crate::rpc::domain::account::FetchedAccount;
 use crate::rpc::node::{EndpointError, GetAccountError};
@@ -429,23 +428,8 @@ pub fn build_wallet_id(
     };
 
     let auth_scheme = public_key.auth_scheme();
-    let auth_component = match auth_scheme {
-        AuthSchemeId::Falcon512Poseidon2 => {
-            let auth_component: AccountComponent =
-                AuthSingleSig::new(public_key.to_commitment(), AuthSchemeId::Falcon512Poseidon2)
-                    .into();
-            auth_component
-        },
-        AuthSchemeId::EcdsaK256Keccak => {
-            let auth_component: AccountComponent =
-                AuthSingleSig::new(public_key.to_commitment(), AuthSchemeId::EcdsaK256Keccak)
-                    .into();
-            auth_component
-        },
-        auth_scheme => {
-            return Err(ClientError::UnsupportedAuthSchemeId(auth_scheme.as_u8()));
-        },
-    };
+    let auth_component: AccountComponent =
+        AuthSingleSig::new(public_key.to_commitment(), auth_scheme).into();
 
     let account = AccountBuilder::new(init_seed)
         .account_type(account_type)

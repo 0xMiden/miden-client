@@ -11,6 +11,7 @@ function generateStoreName(testInfo: TestInfo): string {
 const TEST_SERVER_PORT = 8080;
 const MIDEN_NODE_PORT = 57291;
 const REMOTE_TX_PROVER_PORT = 50051;
+const REMOTE_PROVER_TIMEOUT_MS = 120_000;
 
 // Check if running against localhost (vs devnet/testnet)
 export function isLocalhost(): boolean {
@@ -83,7 +84,7 @@ export const test = base.extend<{ forEachTest: void }>({
       await page.goto("http://localhost:8080");
 
       await page.evaluate(
-        async ({ rpcUrl, proverUrl, storeName }) => {
+        async ({ rpcUrl, proverUrl, storeName, remoteProverTimeoutMs }) => {
           // Import the sdk classes and attach them
           // to the window object for testing
           const sdkExports = await import("./index.js");
@@ -114,7 +115,7 @@ export const test = base.extend<{ forEachTest: void }>({
             window.remoteProverInstance =
               window.TransactionProver.newRemoteProver(
                 window.remoteProverUrl,
-                BigInt(20_000)
+                BigInt(remoteProverTimeoutMs)
               );
           }
 
@@ -155,14 +156,8 @@ export const test = base.extend<{ forEachTest: void }>({
               transactionRequest
             );
 
-            const useRemoteProver =
-              prover != null && window.remoteProverUrl != null;
-            const proverToUse = useRemoteProver
-              ? window.TransactionProver.newRemoteProver(
-                  window.remoteProverUrl,
-                  null
-                )
-              : window.TransactionProver.newLocalProver();
+            const proverToUse =
+              prover ?? window.TransactionProver.newLocalProver();
 
             const proven = await client.proveTransaction(result, proverToUse);
             const submissionHeight = await client.submitProvenTransaction(
@@ -225,6 +220,7 @@ export const test = base.extend<{ forEachTest: void }>({
           rpcUrl: getRpcUrl(),
           proverUrl: getProverUrl() ?? null,
           storeName,
+          remoteProverTimeoutMs: REMOTE_PROVER_TIMEOUT_MS,
         }
       );
       await use();

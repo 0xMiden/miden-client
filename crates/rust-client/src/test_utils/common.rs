@@ -81,29 +81,8 @@ pub async fn insert_new_wallet_with_seed(
     init_seed: [u8; 32],
     auth_scheme: AuthSchemeId,
 ) -> Result<(Account, AuthSecretKey), ClientError> {
-    let (key_pair, auth_component) = match auth_scheme {
-        AuthSchemeId::Falcon512Poseidon2 => {
-            let key_pair = AuthSecretKey::new_falcon512_poseidon2();
-            let auth_component = AuthSingleSig::new(
-                key_pair.public_key().to_commitment(),
-                AuthSchemeId::Falcon512Poseidon2,
-            );
-            (key_pair, auth_component)
-        },
-        AuthSchemeId::EcdsaK256Keccak => {
-            let key_pair = AuthSecretKey::new_ecdsa_k256_keccak();
-            let auth_component = AuthSingleSig::new(
-                key_pair.public_key().to_commitment(),
-                AuthSchemeId::EcdsaK256Keccak,
-            );
-            (key_pair, auth_component)
-        },
-        scheme => {
-            return Err(ClientError::TransactionRequestError(
-                TransactionRequestError::UnsupportedAuthSchemeId(scheme.as_u8()),
-            ));
-        },
-    };
+    let key_pair = crate::auth::new_auth_secret_key(auth_scheme)?;
+    let auth_component = AuthSingleSig::new(key_pair.public_key().to_commitment(), auth_scheme);
 
     let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountImmutableCode)
@@ -129,29 +108,8 @@ pub async fn insert_new_fungible_faucet(
     keystore: &FilesystemKeyStore,
     auth_scheme: AuthSchemeId,
 ) -> Result<(Account, AuthSecretKey), ClientError> {
-    let (key_pair, auth_component) = match auth_scheme {
-        AuthSchemeId::Falcon512Poseidon2 => {
-            let key_pair = AuthSecretKey::new_falcon512_poseidon2();
-            let auth_component = AuthSingleSig::new(
-                key_pair.public_key().to_commitment(),
-                AuthSchemeId::Falcon512Poseidon2,
-            );
-            (key_pair, auth_component)
-        },
-        AuthSchemeId::EcdsaK256Keccak => {
-            let key_pair = AuthSecretKey::new_ecdsa_k256_keccak();
-            let auth_component = AuthSingleSig::new(
-                key_pair.public_key().to_commitment(),
-                AuthSchemeId::EcdsaK256Keccak,
-            );
-            (key_pair, auth_component)
-        },
-        scheme => {
-            return Err(ClientError::TransactionRequestError(
-                TransactionRequestError::UnsupportedAuthSchemeId(scheme.as_u8()),
-            ));
-        },
-    };
+    let key_pair = crate::auth::new_auth_secret_key(auth_scheme)?;
+    let auth_component = AuthSingleSig::new(key_pair.public_key().to_commitment(), auth_scheme);
 
     // we need to use an initial seed to create the faucet account
     let mut init_seed = [0u8; 32];

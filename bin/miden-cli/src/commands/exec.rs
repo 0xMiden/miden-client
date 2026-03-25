@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use clap::Parser;
@@ -88,7 +88,7 @@ impl ExecCmd {
         let tx_script = client.code_builder().compile_tx_script(&program)?;
 
         let result = client
-            .execute_program(account_id, tx_script, advice_inputs, BTreeSet::new())
+            .execute_program(account_id, tx_script, advice_inputs, BTreeMap::new())
             .await;
 
         match result {

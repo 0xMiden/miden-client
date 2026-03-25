@@ -343,6 +343,22 @@ fn separate_auth_components(
     Ok((auth_component, regular_components))
 }
 
+/// Returns `true` when the CLI should inject `AuthControlled::allow_all()` for a
+/// fungible faucet account built from package components.
+///
+/// Why this exists:
+/// - RC fungible faucets require a mint policy manager component in addition to
+///   `BasicFungibleFaucet`.
+/// - The CLI's built-in `basic-fungible-faucet` package only contributes the faucet component
+///   itself; it does not include `AuthControlled`.
+/// - Other faucet creation paths in this repo add `AuthControlled::allow_all()` explicitly, so the
+///   CLI adds it implicitly here to preserve the same behavior and keep the old UX working.
+///
+/// What it does:
+/// - only applies to `AccountType::FungibleFaucet`,
+/// - only triggers when `BasicFungibleFaucet` is present,
+/// - and skips injection if an `AuthControlled` component is already present so user-provided mint
+///   policy components are not duplicated or overridden.
 fn should_add_implicit_auth_controlled(
     account_type: AccountType,
     regular_components: &[AccountComponent],
@@ -398,9 +414,9 @@ async fn create_client_account<AUTH: Keystore + Sync + 'static>(
     let account_components = process_packages(packages, &init_storage_data)?;
     let (auth_component, mut regular_components) = separate_auth_components(account_components)?;
 
-    // RC faucet accounts require a mint policy manager component. The CLI's standard
+    // Faucet accounts require a mint policy manager component. The CLI's standard
     // `basic-fungible-faucet` package only provides the faucet component itself, so add the
-    // default `allow_all` policy manager implicitly to preserve the pre-RC UX.
+    // default `allow_all` policy manager implicitly.
     if should_add_implicit_auth_controlled(account_type, &regular_components) {
         debug!("Adding implicit AuthControlled mint policy component for fungible faucet");
         regular_components.push(AuthControlled::allow_all().into());

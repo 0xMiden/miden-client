@@ -99,10 +99,10 @@ pub struct TransactionRequest {
     advice_map: AdviceMap,
     /// Initial state of the `MerkleStore` that provides data during runtime.
     merkle_store: MerkleStore,
-    /// Foreign account data requirements. At execution time, account data will be retrieved from
-    /// the network, and injected as advice inputs. Additionally, the account's code will be
-    /// added to the executor and prover.
-    foreign_accounts: BTreeSet<ForeignAccount>,
+    /// Foreign account data requirements keyed by account ID. At execution time, account data
+    /// will be retrieved from the network, and injected as advice inputs. Additionally, the
+    /// account's code will be added to the executor and prover.
+    foreign_accounts: BTreeMap<AccountId, ForeignAccount>,
     /// The number of blocks in relation to the transaction's reference block after which the
     /// transaction will expire. If `None`, the transaction will not expire.
     expiration_delta: Option<u16>,
@@ -204,9 +204,8 @@ impl TransactionRequest {
         &self.merkle_store
     }
 
-    /// Returns the IDs of the required foreign accounts for the transaction request.
-    #[allow(clippy::mutable_key_type)]
-    pub fn foreign_accounts(&self) -> &BTreeSet<ForeignAccount> {
+    /// Returns the required foreign accounts keyed by account ID.
+    pub fn foreign_accounts(&self) -> &BTreeMap<AccountId, ForeignAccount> {
         &self.foreign_accounts
     }
 
@@ -355,7 +354,8 @@ impl Serializable for TransactionRequest {
         self.expected_future_notes.write_into(target);
         self.advice_map.write_into(target);
         self.merkle_store.write_into(target);
-        self.foreign_accounts.write_into(target);
+        let foreign_accounts: Vec<_> = self.foreign_accounts.values().cloned().collect();
+        foreign_accounts.write_into(target);
         self.expiration_delta.write_into(target);
         target.write_u8(u8::from(self.ignore_invalid_input_notes));
         self.script_arg.write_into(target);
@@ -365,7 +365,6 @@ impl Serializable for TransactionRequest {
 }
 
 impl Deserializable for TransactionRequest {
-    #[allow(clippy::mutable_key_type)]
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         let input_notes = Vec::<Note>::read_from(source)?;
         let input_notes_args = Vec::<(NoteId, Option<NoteArgs>)>::read_from(source)?;
@@ -392,7 +391,10 @@ impl Deserializable for TransactionRequest {
 
         let advice_map = AdviceMap::read_from(source)?;
         let merkle_store = MerkleStore::read_from(source)?;
-        let foreign_accounts = BTreeSet::<ForeignAccount>::read_from(source)?;
+        let mut foreign_accounts = BTreeMap::new();
+        for foreign_account in Vec::<ForeignAccount>::read_from(source)? {
+            foreign_accounts.entry(foreign_account.account_id()).or_insert(foreign_account);
+        }
         let expiration_delta = Option::<u16>::read_from(source)?;
         let ignore_invalid_input_notes = source.read_u8()? == 1;
         let script_arg = Option::<Word>::read_from(source)?;

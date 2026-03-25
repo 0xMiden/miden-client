@@ -478,7 +478,7 @@ impl TransactionRequestBuilder {
             expected_future_notes: self.expected_future_notes,
             advice_map: self.advice_map,
             merkle_store: self.merkle_store,
-            foreign_accounts: self.foreign_accounts.into_values().collect(),
+            foreign_accounts: self.foreign_accounts,
             expiration_delta: self.expiration_delta,
             ignore_invalid_input_notes: self.ignore_invalid_input_notes,
             script_arg: self.script_arg,

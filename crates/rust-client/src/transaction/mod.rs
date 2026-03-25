@@ -244,7 +244,6 @@ where
     ///   notes are not a subset of executor's output notes.
     /// - Returns a [`ClientError::TransactionExecutorError`] if the execution fails.
     /// - Returns a [`ClientError::TransactionRequestError`] if the request is invalid.
-    #[allow(clippy::mutable_key_type)]
     pub async fn execute_transaction(
         &mut self,
         account_id: AccountId,
@@ -464,13 +463,12 @@ where
     /// resulting stack. Advice inputs and foreign accounts can be provided for the execution.
     ///
     /// The transaction will use the current sync height as the block reference.
-    #[allow(clippy::mutable_key_type)]
     pub async fn execute_program(
         &mut self,
         account_id: AccountId,
         tx_script: TransactionScript,
         advice_inputs: AdviceInputs,
-        foreign_accounts: BTreeSet<ForeignAccount>,
+        foreign_accounts: BTreeMap<AccountId, ForeignAccount>,
     ) -> Result<[Felt; 16], ClientError> {
         let (fpi_block_number, foreign_account_inputs) =
             self.retrieve_foreign_account_inputs(foreign_accounts).await?;
@@ -745,10 +743,9 @@ where
     /// Account data is retrieved for the node's current chain tip, so we need to check whether we
     /// currently have the corresponding block header data. Otherwise, we additionally need to
     /// retrieve it, this implies a state sync call which may update the client in other ways.
-    #[allow(clippy::mutable_key_type)]
     async fn retrieve_foreign_account_inputs(
         &mut self,
-        foreign_accounts: BTreeSet<ForeignAccount>,
+        foreign_accounts: BTreeMap<AccountId, ForeignAccount>,
     ) -> Result<(Option<BlockNumber>, Vec<AccountInputs>), ClientError> {
         if foreign_accounts.is_empty() {
             return Ok((None, Vec::new()));
@@ -757,7 +754,7 @@ where
         let block_num = self.get_sync_height().await?;
         let mut return_foreign_account_inputs = Vec::with_capacity(foreign_accounts.len());
 
-        for foreign_account in foreign_accounts {
+        for foreign_account in foreign_accounts.into_values() {
             let foreign_account_inputs = match foreign_account {
                 ForeignAccount::Public(account_id, storage_requirements) => {
                     fetch_public_account_inputs(

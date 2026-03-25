@@ -351,18 +351,13 @@ fn create_custom_note(
     target_account_id: AccountId,
     rng: &mut RandomCoin,
 ) -> Result<Note> {
-    let expected_note_args =
-        NOTE_ARGS.iter().map(|x| x.as_canonical_u64().to_string()).collect::<Vec<_>>();
-
     let mem_addr: u32 = 1000;
 
-    // Note: push.a.b.c.d puts d on top of the stack, but mem_loadw_le puts Word[0]
-    // on top, so we need to reverse the order for the push to match.
-    let reversed_arg_1: Vec<_> = expected_note_args[0..=3].iter().rev().cloned().collect();
-    let reversed_arg_2: Vec<_> = expected_note_args[4..=7].iter().rev().cloned().collect();
+    let word_1: Word = NOTE_ARGS[0..4].try_into().unwrap();
+    let word_2: Word = NOTE_ARGS[4..8].try_into().unwrap();
     let note_script = include_str!("../asm/custom_p2id.masm")
-        .replace("{expected_note_arg_1}", &reversed_arg_1.join("."))
-        .replace("{expected_note_arg_2}", &reversed_arg_2.join("."))
+        .replace("{expected_note_arg_1}", &word_1.to_hex())
+        .replace("{expected_note_arg_2}", &word_2.to_hex())
         .replace("{mem_address}", &mem_addr.to_string())
         .replace("{mem_address_2}", &(mem_addr + 4).to_string());
     let note_script = client

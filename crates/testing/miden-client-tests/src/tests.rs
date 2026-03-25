@@ -1,7 +1,7 @@
 use core::future::Future;
 use core::pin::Pin;
 use std::boxed::Box;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::env::temp_dir;
 use std::println;
 use std::sync::Arc;
@@ -969,7 +969,7 @@ async fn execute_program() {
         wallet.id(),
         tx_script,
         AdviceInputs::default(),
-        BTreeSet::new(),
+        BTreeMap::new(),
     ))
     .await
     .unwrap();

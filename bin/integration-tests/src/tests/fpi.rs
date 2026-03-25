@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use anyhow::{Context, Result};
 use miden_client::account::component::{AccountComponent, AccountComponentMetadata};
 use miden_client::account::{
@@ -122,7 +124,10 @@ pub async fn test_fpi_execute_program(client_config: ClientConfig) -> Result<()>
             wallet.id(),
             tx_script,
             AdviceInputs::default(),
-            [ForeignAccount::public(foreign_account_id, storage_requirements)?].into(),
+            BTreeMap::from([(
+                foreign_account_id,
+                ForeignAccount::public(foreign_account_id, storage_requirements)?,
+            )]),
         )
         .await?;
 
