@@ -116,32 +116,31 @@ pub(super) fn note_filter_to_query_input_notes(filter: &NoteFilter) -> (String, 
 }
 
 /// Returns a query that fetches a single input note at the given offset from the filtered set,
-/// optionally restricted to a consumer account and/or block range.
+/// restricted to a consumer account and optionally to a block range.
 pub(super) fn note_filter_to_query_input_note_by_offset(
     filter: &NoteFilter,
-    consumer: Option<&str>,
+    consumer: &str,
     block_start: Option<BlockNumber>,
     block_end: Option<BlockNumber>,
     offset: u32,
 ) -> (String, NoteQueryParams) {
     use core::fmt::Write;
     let (mut condition, mut params) = note_filter_input_notes_condition(filter);
-    if let Some(consumer) = consumer {
-        params.push(Rc::new(vec![Value::Text(consumer.to_string())]));
-        condition.push_str(" AND note.consumer_account_id IN rarray(?)");
-        condition.push_str(" AND note.consumed_tx_order IS NOT NULL");
-    }
+
+    params.push(Rc::new(vec![Value::Text(consumer.to_string())]));
+    condition.push_str(" AND note.consumer_account_id IN rarray(?)");
+    condition.push_str(" AND note.consumed_tx_order IS NOT NULL");
+
     if let Some(start) = block_start {
         let _ = write!(condition, " AND note.consumed_block_height >= {}", start.as_u32());
     }
     if let Some(end) = block_end {
         let _ = write!(condition, " AND note.consumed_block_height <= {}", end.as_u32());
     }
+
     let query = format!(
         "{INPUT_NOTES_BASE_QUERY} WHERE {condition} \
-         ORDER BY note.consumed_block_height IS NULL, note.consumed_block_height ASC, \
-                  note.consumed_tx_order IS NULL, note.consumed_tx_order ASC, \
-                  note.note_id ASC \
+         ORDER BY note.consumed_block_height ASC, note.consumed_tx_order ASC, note.note_id ASC \
          LIMIT 1 OFFSET {offset}"
     );
 

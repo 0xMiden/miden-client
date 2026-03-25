@@ -224,7 +224,7 @@ impl Store for SqliteStore {
     async fn get_input_note_by_offset(
         &self,
         filter: NoteFilter,
-        consumer: Option<AccountId>,
+        consumer: AccountId,
         block_start: Option<BlockNumber>,
         block_end: Option<BlockNumber>,
         offset: u32,

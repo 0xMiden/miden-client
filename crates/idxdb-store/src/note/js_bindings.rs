@@ -58,7 +58,7 @@ extern "C" {
         state_discriminant: u8,
         state: Vec<u8>,
         consumed_block_height: Option<u32>,
-        consumed_tx_order: Option<u16>,
+        consumed_tx_order: Option<u32>,
         consumer_account_id: Option<String>,
     ) -> js_sys::Promise;
 
@@ -66,7 +66,7 @@ extern "C" {
     pub fn idxdb_get_input_note_by_offset(
         db_id: &str,
         states: Vec<u8>,
-        consumer_account_id: Option<String>,
+        consumer_account_id: String,
         block_start: Option<u32>,
         block_end: Option<u32>,
         offset: u32,
