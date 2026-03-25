@@ -27,7 +27,8 @@ impl NoteHeader {
     }
 
     /// Returns a commitment to the note ID and metadata.
-    pub fn commitment(&self) -> Word {
+    #[wasm_bindgen(js_name = "toCommitment")]
+    pub fn to_commitment(&self) -> Word {
         self.0.to_commitment().into()
     }
 }

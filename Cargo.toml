@@ -46,16 +46,16 @@ miden-testing   = { default-features = false, version = "0.14.0" }
 miden-tx        = { default-features = false, version = "0.14.0" }
 
 # Miden node dependencies (from git branch until compatible crates.io release)
-miden-node-block-producer = { branch = "mmagician-claude/update-base-to-beta", git = "https://github.com/0xMiden/miden-node" }
-miden-node-ntx-builder = { branch = "mmagician-claude/update-base-to-beta", git = "https://github.com/0xMiden/miden-node" }
-miden-node-proto = { branch = "mmagician-claude/update-base-to-beta", git = "https://github.com/0xMiden/miden-node" }
-miden-node-proto-build = { branch = "mmagician-claude/update-base-to-beta", default-features = false, git = "https://github.com/0xMiden/miden-node" }
-miden-node-rpc = { branch = "mmagician-claude/update-base-to-beta", git = "https://github.com/0xMiden/miden-node" }
-miden-node-store = { branch = "mmagician-claude/update-base-to-beta", git = "https://github.com/0xMiden/miden-node" }
-miden-node-utils = { branch = "mmagician-claude/update-base-to-beta", git = "https://github.com/0xMiden/miden-node" }
-miden-node-validator = { branch = "mmagician-claude/update-base-to-beta", git = "https://github.com/0xMiden/miden-node" }
+miden-node-block-producer = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
+miden-node-ntx-builder = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
+miden-node-proto = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
+miden-node-proto-build = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-node" }
+miden-node-rpc = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
+miden-node-store = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
+miden-node-utils = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
+miden-node-validator = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
 miden-note-transport-proto-build = { default-features = false, version = "0.2" }
-miden-remote-prover-client = { branch = "mmagician-claude/update-base-to-beta", default-features = false, features = [
+miden-remote-prover-client = { branch = "next", default-features = false, features = [
   "tx-prover",
 ], git = "https://github.com/0xMiden/miden-node" }
 
