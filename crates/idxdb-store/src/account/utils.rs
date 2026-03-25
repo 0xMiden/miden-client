@@ -330,7 +330,7 @@ pub async fn apply_transaction_delta(
 
     for vault_key in removed_vault_keys {
         changed_assets.push(JsVaultAsset {
-            vault_key: Word::from(*vault_key).to_hex(),
+            vault_key: vault_key.to_string(),
             faucet_id_prefix: vault_key.faucet_id().prefix().to_hex(),
             asset: String::new(),
         });

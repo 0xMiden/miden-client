@@ -88,16 +88,16 @@ pub mod note_storage;
 pub mod note_sync_info;
 pub mod note_tag;
 pub mod note_type;
-pub mod output_note;
 pub mod output_note_record;
 pub mod output_note_state;
-pub mod output_notes;
 pub mod package;
 pub mod partial_note;
 pub mod program;
 pub mod proven_transaction;
 pub mod provers;
 pub mod public_key;
+pub mod raw_output_note;
+pub mod raw_output_notes;
 pub mod rpo256;
 pub mod signature;
 pub mod signing_inputs;
@@ -127,11 +127,10 @@ declare_js_miden_arrays! {
     (crate::models::account_id::AccountId) -> AccountIdArray,
     (crate::models::foreign_account::ForeignAccount) -> ForeignAccountArray,
     (crate::models::note_recipient::NoteRecipient) -> NoteRecipientArray,
-    (crate::models::output_note::OutputNote) -> OutputNoteArray,
+    (crate::models::raw_output_note::RawOutputNote) -> RawOutputNoteArray,
     (crate::models::storage_slot::StorageSlot) -> StorageSlotArray,
     (crate::models::transaction_script_inputs::TransactionScriptInputPair) -> TransactionScriptInputPairArray,
     (crate::models::felt::Felt) -> FeltArray,
-    (crate::models::output_notes::OutputNotes) -> OutputNotesArray,
     (crate::models::transaction_request::note_and_args::NoteAndArgs) -> NoteAndArgsArray,
     (crate::models::transaction_request::note_details_and_tag::NoteDetailsAndTag) -> NoteDetailsAndTagArray,
     (crate::models::transaction_request::note_id_and_args::NoteIdAndArgs) -> NoteIdAndArgsArray

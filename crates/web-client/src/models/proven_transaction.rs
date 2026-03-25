@@ -50,9 +50,8 @@ impl ProvenTransaction {
         self.0.expiration_block_num().as_u32()
     }
 
-    // Note: output_notes() is not exposed in the web client because ProvenTransaction has
-    // OutputNotes (proven type) while the web OutputNotes wrapper wraps RawOutputNotes.
-    // If needed, this could be added by creating a separate wrapper type for proven notes.
+    // Note: proven output notes are not exposed in the web client yet.
+    // The web client only exposes raw executed output notes via RawOutputNote/RawOutputNotes.
 
     /// Returns the commitment of the reference block.
     #[wasm_bindgen(js_name = "refBlockCommitment")]

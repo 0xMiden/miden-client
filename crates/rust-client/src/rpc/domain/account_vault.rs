@@ -105,7 +105,7 @@ impl TryFrom<proto::rpc::AccountVaultUpdate> for AccountVaultUpdate {
         let asset = value.asset.map(Asset::try_from).transpose()?;
 
         if let Some(ref asset) = asset
-            && Word::from(asset.vault_key()) != vault_key_inner
+            && asset.vault_key() != vault_key
         {
             return Err(RpcError::InvalidResponse(
                 "account vault update returned mismatched asset key".to_string(),

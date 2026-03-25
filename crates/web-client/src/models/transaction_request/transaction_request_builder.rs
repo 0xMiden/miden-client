@@ -20,7 +20,7 @@ use crate::models::miden_arrays::{
     NoteAndArgsArray,
     NoteDetailsAndTagArray,
     NoteRecipientArray,
-    OutputNoteArray,
+    RawOutputNoteArray,
 };
 use crate::models::transaction_request::TransactionRequest;
 use crate::models::transaction_script::TransactionScript;
@@ -51,17 +51,20 @@ impl TransactionRequestBuilder {
         self
     }
 
-    /// Adds notes created by the sender that should be emitted by the transaction.
-    #[wasm_bindgen(js_name = "withOwnOutputNotes")]
-    pub fn with_own_output_notes(mut self, notes: &OutputNoteArray) -> Result<Self, JsValue> {
-        use miden_client::transaction::RawOutputNote;
+    /// Adds raw output notes created by the sender that should be emitted by the transaction.
+    #[wasm_bindgen(js_name = "withOwnRawOutputNotes")]
+    pub fn with_own_raw_output_notes(
+        mut self,
+        notes: &RawOutputNoteArray,
+    ) -> Result<Self, JsValue> {
+        use miden_client::transaction::RawOutputNote as NativeRawOutputNote;
 
-        let raw_output_notes: Vec<RawOutputNote> = notes.into();
+        let raw_output_notes: Vec<NativeRawOutputNote> = notes.into();
         let native_notes: Result<Vec<NativeNote>, _> = raw_output_notes
             .into_iter()
             .map(|raw_note| match raw_note {
-                RawOutputNote::Full(note) => Ok(note),
-                RawOutputNote::Partial(_) => {
+                NativeRawOutputNote::Full(note) => Ok(note),
+                NativeRawOutputNote::Partial(_) => {
                     Err(JsValue::from_str("Own output notes must contain full note data"))
                 },
             })

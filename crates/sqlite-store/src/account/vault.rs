@@ -93,8 +93,7 @@ impl SqliteStore {
         let nonce_val = u64_to_value(nonce);
 
         for asset in assets {
-            let vault_key_word: Word = asset.vault_key().into();
-            let vault_key_hex = vault_key_word.to_hex();
+            let vault_key_hex = asset.vault_key().to_string();
             let faucet_prefix_hex = asset.faucet_id().prefix().to_hex();
             let asset_hex = asset.to_value_word().to_hex();
 
@@ -226,7 +225,7 @@ impl SqliteStore {
                 Rc::new(
                     removed_vault_keys
                         .iter()
-                        .map(|k| Value::from(Word::from(*k).to_hex()))
+                        .map(|k| Value::from(k.to_string()))
                         .collect::<Vec<Value>>(),
                 ),
             ],
@@ -239,13 +238,12 @@ impl SqliteStore {
         let mut tombstone_stmt =
             tx.prepare_cached(HISTORICAL_TOMBSTONE_QUERY).into_store_error()?;
         for vault_key in removed_vault_keys {
-            let vault_key_word: Word = (*vault_key).into();
             let faucet_prefix_hex = vault_key.faucet_id().prefix().to_hex();
             tombstone_stmt
                 .execute(params![
                     account_id_hex,
                     nonce_val,
-                    vault_key_word.to_hex(),
+                    vault_key.to_string(),
                     faucet_prefix_hex
                 ])
                 .into_store_error()?;
@@ -274,8 +272,7 @@ impl SqliteStore {
         let mut hist_stmt = tx.prepare_cached(HISTORICAL_INSERT).into_store_error()?;
 
         for asset in updated_assets {
-            let vault_key_word: Word = asset.vault_key().into();
-            let vault_key_hex = vault_key_word.to_hex();
+            let vault_key_hex = asset.vault_key().to_string();
             let faucet_prefix_hex = asset.faucet_id().prefix().to_hex();
             let asset_hex = asset.to_value_word().to_hex();
 

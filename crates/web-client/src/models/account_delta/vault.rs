@@ -128,13 +128,8 @@ impl FungibleAssetDelta {
     /// Returns the delta amount for a given faucet, if present.
     pub fn amount(&self, faucet_id: &AccountId) -> Option<i64> {
         let native_faucet_id: NativeAccountId = faucet_id.into();
-        let asset_id = miden_protocol::asset::AssetId::new(
-            miden_protocol::Felt::ZERO,
-            miden_protocol::Felt::ZERO,
-        );
-        let vault_key =
-            miden_protocol::asset::AssetVaultKey::new_native(asset_id, native_faucet_id)
-                .expect("valid vault key for fungible faucet");
+        let vault_key = miden_protocol::asset::AssetVaultKey::new_fungible(native_faucet_id)
+            .expect("faucet_id should be a fungible faucet");
         self.0.amount(&vault_key)
     }
 

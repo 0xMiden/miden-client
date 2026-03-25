@@ -616,7 +616,7 @@ impl NodeRpcClient for GrpcClient {
                     updates.sort_by_key(|u| u.block_num);
                     updates
                         .into_iter()
-                        .map(|u| (Word::from(u.vault_key), u.asset))
+                        .map(|u| (u.vault_key, u.asset))
                         .collect::<BTreeMap<_, _>>()
                         .into_values()
                         .flatten()

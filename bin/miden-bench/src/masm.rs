@@ -18,7 +18,7 @@ const MAX_OPS_PER_BLOCK: usize = 7_000;
 /// Writes the MASM instructions for a single map entry read (push key, call reader, drop result).
 fn write_read_op_instructions(script: &mut String, op: &ReadOp) {
     // Push key (4 felts)
-    writeln!(script, "    push.{}", Word::from(op.key.as_word()).to_hex())
+    writeln!(script, "    push.{}", op.key.as_word().to_hex())
         .expect("write to string should not fail");
 
     // Call the account's reader procedure for this storage map slot.

@@ -1,5 +1,5 @@
 use miden_client::note::Note as NativeNote;
-use miden_client::transaction::RawOutputNote;
+use miden_client::transaction::RawOutputNote as NativeRawOutputNote;
 use wasm_bindgen::prelude::*;
 
 use super::note::Note;
@@ -7,19 +7,19 @@ use super::note_assets::NoteAssets;
 use super::note_id::NoteId;
 use super::note_metadata::NoteMetadata;
 use super::word::Word;
-use crate::models::miden_arrays::OutputNoteArray;
+use crate::models::miden_arrays::RawOutputNoteArray;
 
 /// Representation of a note produced by a transaction (full or partial).
 #[derive(Clone)]
 #[wasm_bindgen]
-pub struct OutputNote(RawOutputNote);
+pub struct RawOutputNote(NativeRawOutputNote);
 
 #[wasm_bindgen]
-impl OutputNote {
+impl RawOutputNote {
     /// Wraps a full note output.
-    pub fn full(note: &Note) -> OutputNote {
+    pub fn full(note: &Note) -> RawOutputNote {
         let native_note: NativeNote = note.into();
-        OutputNote(RawOutputNote::Full(native_note))
+        RawOutputNote(NativeRawOutputNote::Full(native_note))
     }
 
     /// Returns the assets if they are present.
@@ -47,12 +47,12 @@ impl OutputNote {
     #[wasm_bindgen(js_name = "intoFull")]
     pub fn into_full(self) -> Option<Note> {
         match self.0 {
-            RawOutputNote::Full(note) => Some(note.into()),
-            RawOutputNote::Partial(_) => None,
+            NativeRawOutputNote::Full(note) => Some(note.into()),
+            NativeRawOutputNote::Partial(_) => None,
         }
     }
 
-    pub(crate) fn note(&self) -> &RawOutputNote {
+    pub(crate) fn note(&self) -> &NativeRawOutputNote {
         &self.0
     }
 }
@@ -60,26 +60,26 @@ impl OutputNote {
 // CONVERSIONS
 // ================================================================================================
 
-impl From<RawOutputNote> for OutputNote {
-    fn from(raw_output_note: RawOutputNote) -> Self {
-        OutputNote(raw_output_note)
+impl From<NativeRawOutputNote> for RawOutputNote {
+    fn from(raw_output_note: NativeRawOutputNote) -> Self {
+        RawOutputNote(raw_output_note)
     }
 }
 
-impl From<&RawOutputNote> for OutputNote {
-    fn from(raw_output_note: &RawOutputNote) -> Self {
-        OutputNote(raw_output_note.clone())
+impl From<&NativeRawOutputNote> for RawOutputNote {
+    fn from(raw_output_note: &NativeRawOutputNote) -> Self {
+        RawOutputNote(raw_output_note.clone())
     }
 }
 
-impl From<OutputNote> for RawOutputNote {
-    fn from(output_note: OutputNote) -> Self {
+impl From<RawOutputNote> for NativeRawOutputNote {
+    fn from(output_note: RawOutputNote) -> Self {
         output_note.0
     }
 }
 
-impl From<&OutputNote> for RawOutputNote {
-    fn from(output_note: &OutputNote) -> Self {
+impl From<&RawOutputNote> for NativeRawOutputNote {
+    fn from(output_note: &RawOutputNote) -> Self {
         output_note.0.clone()
     }
 }
@@ -87,14 +87,14 @@ impl From<&OutputNote> for RawOutputNote {
 // CONVERSIONS
 // ================================================================================================
 
-impl From<OutputNoteArray> for Vec<RawOutputNote> {
-    fn from(output_notes_array: OutputNoteArray) -> Self {
+impl From<RawOutputNoteArray> for Vec<NativeRawOutputNote> {
+    fn from(output_notes_array: RawOutputNoteArray) -> Self {
         output_notes_array.__inner.into_iter().map(Into::into).collect()
     }
 }
 
-impl From<&OutputNoteArray> for Vec<RawOutputNote> {
-    fn from(output_notes_array: &OutputNoteArray) -> Self {
+impl From<&RawOutputNoteArray> for Vec<NativeRawOutputNote> {
+    fn from(output_notes_array: &RawOutputNoteArray) -> Self {
         output_notes_array.__inner.iter().cloned().map(Into::into).collect()
     }
 }
