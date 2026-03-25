@@ -331,53 +331,6 @@ pub(super) fn upsert_input_note_tx(
     Ok(())
 }
 
-/// Inserts the provided output note into the database.
-pub fn upsert_output_note_tx(
-    tx: &Transaction<'_>,
-    note: &OutputNoteRecord,
-) -> Result<(), StoreError> {
-    const NOTE_QUERY: &str = insert_sql!(
-        output_notes {
-            note_id,
-            assets,
-            recipient_digest,
-            metadata,
-            nullifier,
-            expected_height,
-            state_discriminant,
-            state
-        } | REPLACE
-    );
-
-    let SerializedOutputNoteData {
-        id,
-        assets,
-        metadata,
-        nullifier,
-        recipient_digest,
-        expected_height,
-        state_discriminant,
-        state,
-    } = serialize_output_note(note);
-
-    tx.execute(
-        NOTE_QUERY,
-        params![
-            id,
-            assets,
-            recipient_digest,
-            metadata,
-            nullifier,
-            expected_height,
-            state_discriminant,
-            state,
-        ],
-    )
-    .into_store_error()?;
-
-    Ok(())
-}
-
 /// Parse input note columns from the provided row into native types.
 fn parse_input_note_columns(
     row: &rusqlite::Row<'_>,
