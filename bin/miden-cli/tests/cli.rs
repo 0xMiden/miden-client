@@ -851,7 +851,8 @@ async fn list_addresses_remove() -> Result<()> {
 
     // Remove the Unspecified wallet from the account
     let mut remove_address_cmd = cargo_bin_cmd!("miden-client");
-    let unspecified_wallet_address = regex::Regex::new(r"mlcl1[0-9a-z]+")
+    // Match any bech32 Miden address (HRP varies by network: mlcl, mdev, mtst, mm, etc.)
+    let unspecified_wallet_address = regex::Regex::new(r"m[a-z]{1,4}1[0-9a-z]+")
         .unwrap()
         .find(&formatted_output)
         .unwrap()
@@ -919,10 +920,18 @@ async fn new_wallet_with_deploy_flag() -> Result<()> {
 /// Initializes a CLI with the network in the config file and returns the store path and the temp
 /// directory where the CLI is running.
 fn init_cli() -> (PathBuf, PathBuf, Endpoint) {
-    // Try to read from env first or default to localhost
-    let endpoint = match std::env::var("TEST_MIDEN_RPC_ENDPOINT") {
-        Ok(endpoint) => Endpoint::try_from(endpoint.as_str()).unwrap(),
-        Err(_) => Endpoint::localhost(),
+    // Try to read from env first or default to localhost.
+    // Accepts "devnet", "testnet", "localhost", or a custom RPC endpoint string.
+    let network = std::env::var("TEST_MIDEN_NETWORK").unwrap_or_else(|_| "localhost".to_string());
+    let network_lower = network.to_lowercase();
+    let endpoint = if network_lower == "devnet" {
+        Endpoint::devnet()
+    } else if network_lower == "testnet" {
+        Endpoint::testnet()
+    } else if network_lower == "localhost" {
+        Endpoint::localhost()
+    } else {
+        Endpoint::try_from(network_lower.as_str()).unwrap()
     };
 
     let store_path = create_test_store_path();

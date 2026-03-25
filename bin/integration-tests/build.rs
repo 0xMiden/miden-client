@@ -24,22 +24,26 @@ const INTEGRATION_TESTS_HEADER: &str = r#"// Auto-generated integration tests
 
 const INTEGRATION_TESTS_IMPORTS: &str = r#"use anyhow::{anyhow, Result};
 use miden_client_integration_tests::tests::config::ClientConfig;
-use miden_client::rpc::Endpoint;
-use url::Url;"#;
+use miden_client::rpc::Endpoint;"#;
 
 const TOKIO_TEST_WRAPPER: &str = r#"/// Auto-generated tokio test wrapper for {ORIGINAL_FUNCTION_NAME}
 #[tokio::test]
 async fn {TEST_FUNCTION_NAME}() -> Result<()> {{
-    // Use default test configuration
-    let endpoint_url = std::env::var("TEST_MIDEN_RPC_ENDPOINT")
-        .unwrap_or_else(|_| Endpoint::localhost().to_string());
-    let url = Url::parse(&endpoint_url).map_err(|_| anyhow!("Invalid RPC endpoint URL"))?;
-    let host = url
-        .host_str()
-        .ok_or_else(|| anyhow!("RPC endpoint URL is missing a host"))?
-        .to_string();
-    let port = url.port().ok_or_else(|| anyhow!("RPC endpoint URL is missing a port"))?;
-    let endpoint = Endpoint::new(url.scheme().to_string(), host, Some(port));
+    // Use TEST_MIDEN_NETWORK to determine the endpoint (matches the binary's behavior).
+    // Accepted values: "devnet", "testnet", "localhost", or a custom RPC endpoint string.
+    let network = std::env::var("TEST_MIDEN_NETWORK")
+        .unwrap_or_else(|_| "localhost".to_string());
+    let network_lower = network.to_lowercase();
+    let endpoint = if network_lower == "devnet" {{
+        Endpoint::devnet()
+    }} else if network_lower == "testnet" {{
+        Endpoint::testnet()
+    }} else if network_lower == "localhost" {{
+        Endpoint::localhost()
+    }} else {{
+        Endpoint::try_from(network_lower.as_str())
+            .map_err(|e| anyhow!("Invalid network: {}", e))?
+    }};
     let timeout = std::env::var("TEST_TIMEOUT")
         .unwrap_or_else(|_| "10000".to_string())
         .parse::<u64>()
