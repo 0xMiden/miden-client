@@ -75,6 +75,7 @@ mod web_keystore_db;
 #[cfg(feature = "browser")]
 pub use web_keystore::WebKeyStore;
 
+#[cfg(feature = "browser")]
 const BASE_STORE_NAME: &str = "MidenClientDB";
 
 /// Initializes the `tracing` subscriber that routes Rust log output to the
@@ -116,11 +117,11 @@ pub struct WebClient {
     mock_note_transport_api: AsyncCell<Option<Arc<MockNoteTransportApi>>>,
 }
 
-// SAFETY: WebClient is only used from JavaScript's single-threaded runtime (Node.js).
-// The inner Client and Store are behind an AsyncCell (tokio::Mutex) and won't be accessed
-// from multiple threads. This is needed because napi-rs requires Send + Sync for types
-// used in async functions, and several inner trait objects (TransactionProver, OnNoteReceived,
-// StoreFactory) are not Send/Sync.
+// SAFETY: napi-rs with `tokio_rt` uses a multi-threaded tokio runtime, so async napi
+// functions run on worker threads. This is sound because the concrete types behind
+// trait objects (`SqliteStore`, `GrpcClient`, `FilesystemKeyStore`) are all Send + Sync
+// — only the `dyn Trait` bounds lack Send. All mutable state is behind `AsyncCell`
+// (tokio::sync::Mutex), which serializes access.
 #[cfg(feature = "nodejs")]
 unsafe impl Send for WebClient {}
 #[cfg(feature = "nodejs")]

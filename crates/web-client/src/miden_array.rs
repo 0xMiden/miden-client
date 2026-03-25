@@ -1,4 +1,7 @@
+#[cfg(feature = "browser")]
 use thiserror::Error;
+
+#[cfg(feature = "browser")]
 #[derive(Debug, Error)]
 pub enum ArrayError {
     #[error("out of bounds access -- tried to access at index: {index} with length {length}")]

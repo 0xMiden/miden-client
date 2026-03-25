@@ -92,10 +92,11 @@ impl<T> AsyncCell<T> {
 
 /// Wrapper that unsafely implements `Send` and `Sync` for its inner value.
 ///
-/// SAFETY: This is only used in the Node.js (napi-rs) build, where the JavaScript
-/// runtime is single-threaded. The inner value is protected by a `tokio::sync::Mutex`
-/// and will never be truly accessed from multiple threads concurrently. napi-rs requires
-/// `Send` bounds on futures and return types, but the actual execution is sequential.
+/// SAFETY: napi-rs with `tokio_rt` uses a multi-threaded tokio runtime, so futures
+/// spawned from async napi functions can be polled on different worker threads.
+/// This is sound because the concrete types behind our trait objects (`SqliteStore`,
+/// `GrpcClient`, `FilesystemKeyStore`) are all `Send + Sync` — only the `dyn Trait`
+/// bounds lack `Send`. Access is further serialized by `tokio::sync::Mutex` in `AsyncCell`.
 #[cfg(feature = "nodejs")]
 pub(crate) struct SendWrapper<T>(pub T);
 
@@ -138,9 +139,10 @@ pub(crate) fn maybe_wrap_send<F: std::future::Future>(
     future
 }
 
-/// On Node.js, napi-rs requires `Send` futures for its tokio runtime.
-/// This unsafely asserts `Send` — safe because napi's JS runtime is single-threaded,
-/// so the non-Send trait objects never actually cross thread boundaries.
+/// On Node.js, napi-rs requires `Send` futures for its multi-threaded tokio runtime.
+/// This unsafely asserts `Send` — sound because the concrete types behind trait objects
+/// (`SqliteStore`, `GrpcClient`, `FilesystemKeyStore`) are all `Send + Sync`; only the
+/// `dyn Trait` bounds lack `Send`.
 #[cfg(feature = "nodejs")]
 pub(crate) fn maybe_wrap_send<F: std::future::Future>(
     future: F,
