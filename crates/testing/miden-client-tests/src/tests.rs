@@ -815,7 +815,7 @@ async fn transaction_request_expiration() {
 
     let (_, tx_outputs, ..) = transaction_result.executed_transaction().clone().into_parts();
 
-    assert_eq!(tx_outputs.expiration_block_num, current_height + 5);
+    assert_eq!(tx_outputs.expiration_block_num(), current_height + 5);
 }
 
 #[tokio::test]

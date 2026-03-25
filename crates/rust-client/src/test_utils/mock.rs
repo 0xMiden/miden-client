@@ -261,7 +261,7 @@ impl MockRpcApi {
                         let storage_map_info = StorageMapUpdate {
                             block_num: block_number,
                             slot_name: slot_name.clone(),
-                            key: *key.inner(),
+                            key: *key,
                             value: *value,
                         };
                         updates.push(storage_map_info);
@@ -295,7 +295,7 @@ impl MockRpcApi {
                 {
                     Some(NoteSyncRecord {
                         note_index_in_block: u32::from(
-                            note.inclusion_proof().location().node_index_in_block(),
+                            note.inclusion_proof().location().block_note_tree_index(),
                         ),
                         note_id: Some(note.id().into()),
                         metadata: Some(note.metadata().clone().into()),

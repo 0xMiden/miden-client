@@ -212,7 +212,7 @@ pub fn compute_storage_delta(
         let old_root = old_map_roots.get(slot_name).copied().unwrap_or(default_map_root);
         let new_root = smt_forest.update_storage_map_nodes(
             old_root,
-            map_delta.entries().iter().map(|(key, value)| (*key.inner(), *value)),
+            map_delta.entries().iter().map(|(key, value)| (*key, *value)),
         )?;
         updated_slots.insert(slot_name.clone(), (new_root, StorageSlotType::Map));
     }
@@ -318,7 +318,7 @@ pub async fn apply_transaction_delta(
 
             changed_map_entries.push(JsStorageMapEntry {
                 slot_name: slot_name.to_string(),
-                key: key.inner().to_hex(),
+                key: Word::from(*key).to_hex(),
                 value: value_str,
             });
         }

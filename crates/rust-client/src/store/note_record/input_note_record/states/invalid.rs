@@ -51,7 +51,7 @@ impl NoteStateHandler for InvalidNoteState {
             .invalid_inclusion_proof
             .note_path()
             .verify(
-                self.invalid_inclusion_proof.location().node_index_in_block().into(),
+                self.invalid_inclusion_proof.location().block_note_tree_index().into(),
                 compute_note_commitment(note_id, &self.metadata),
                 &block_header.note_root(),
             )

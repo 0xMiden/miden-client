@@ -50,7 +50,7 @@ impl NoteStateHandler for UnverifiedNoteState {
             .inclusion_proof
             .note_path()
             .verify(
-                self.inclusion_proof.location().node_index_in_block().into(),
+                self.inclusion_proof.location().block_note_tree_index().into(),
                 compute_note_commitment(note_id, &self.metadata),
                 &block_header.note_root(),
             )

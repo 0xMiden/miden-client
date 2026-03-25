@@ -17,7 +17,7 @@ impl NoteLocation {
     /// Returns the index of the note leaf within the block's note tree.
     #[wasm_bindgen(js_name = "nodeIndexInBlock")]
     pub fn node_index_in_block(&self) -> u16 {
-        self.0.node_index_in_block()
+        self.0.block_note_tree_index()
     }
 }
 
