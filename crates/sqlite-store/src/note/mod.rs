@@ -102,8 +102,18 @@ struct SerializedOutputNoteParts {
     pub state: Vec<u8>,
 }
 
-/// Represents the fields needed to update an existing note's state without rewriting all columns.
-struct SerializedNoteStateUpdate {
+/// Represents the fields needed to update an existing input note's state.
+struct SerializedInputNoteStateUpdate {
+    pub id: String,
+    pub state_discriminant: u8,
+    pub state: Vec<u8>,
+    pub consumed_block_height: Option<u32>,
+    pub consumed_tx_order: Option<u16>,
+    pub consumer_account_id: Option<String>,
+}
+
+/// Represents the fields needed to update an existing output note's state.
+struct SerializedOutputNoteStateUpdate {
     pub id: String,
     pub state_discriminant: u8,
     pub state: Vec<u8>,
@@ -472,18 +482,32 @@ fn parse_output_note(
     ))
 }
 
-/// Serialize the provided input note state into a lightweight state-only update.
-fn serialize_input_note_state(note: &InputNoteRecord) -> SerializedNoteStateUpdate {
-    SerializedNoteStateUpdate {
+/// Serialize the provided input note state into a lightweight update.
+fn serialize_input_note_state(
+    note: &InputNoteRecord,
+    consumed_tx_order: Option<u16>,
+) -> SerializedInputNoteStateUpdate {
+    let consumed_block_height = match note.state() {
+        InputNoteState::ConsumedAuthenticatedLocal(s) => Some(s.nullifier_block_height.as_u32()),
+        InputNoteState::ConsumedUnauthenticatedLocal(s) => Some(s.nullifier_block_height.as_u32()),
+        InputNoteState::ConsumedExternal(s) => Some(s.nullifier_block_height.as_u32()),
+        _ => None,
+    };
+    let consumer_account_id = note.consumer_account().map(AccountId::to_hex);
+
+    SerializedInputNoteStateUpdate {
         id: note.id().as_word().to_string(),
         state_discriminant: note.state().discriminant(),
         state: note.state().to_bytes(),
+        consumed_block_height,
+        consumed_tx_order,
+        consumer_account_id,
     }
 }
 
 /// Serialize the provided output note state into a lightweight state-only update.
-fn serialize_output_note_state(note: &OutputNoteRecord) -> SerializedNoteStateUpdate {
-    SerializedNoteStateUpdate {
+fn serialize_output_note_state(note: &OutputNoteRecord) -> SerializedOutputNoteStateUpdate {
+    SerializedOutputNoteStateUpdate {
         id: note.id().as_word().to_string(),
         state_discriminant: note.state().discriminant(),
         state: note.state().to_bytes(),
@@ -532,7 +556,7 @@ pub(crate) fn apply_note_updates_tx(
                 input_inserts.push(serialized);
             },
             NoteUpdateType::Update => {
-                input_updates.push(serialize_input_note_state(input_note.inner()));
+                input_updates.push(serialize_input_note_state(input_note.inner(), input_note.consumed_tx_order()));
             },
             NoteUpdateType::None => {},
         }
@@ -645,7 +669,7 @@ fn batch_insert_input_notes(
 /// Batch-update input note states using a prepared cached statement.
 fn batch_update_input_note_states(
     tx: &Transaction,
-    updates: &[SerializedNoteStateUpdate],
+    updates: &[SerializedInputNoteStateUpdate],
 ) -> Result<(), StoreError> {
     if updates.is_empty() {
         return Ok(());
@@ -653,13 +677,22 @@ fn batch_update_input_note_states(
 
     let mut stmt = tx
         .prepare_cached(
-            "UPDATE `input_notes` SET state_discriminant = ?, state = ? WHERE note_id = ?",
+            "UPDATE `input_notes` SET state_discriminant = ?, state = ?, \
+             consumed_block_height = ?, consumed_tx_order = ?, consumer_account_id = ? \
+             WHERE note_id = ?",
         )
         .into_store_error()?;
 
     for update in updates {
-        stmt.execute(params![update.state_discriminant, update.state, update.id])
-            .into_store_error()?;
+        stmt.execute(params![
+            update.state_discriminant,
+            update.state,
+            update.consumed_block_height,
+            update.consumed_tx_order,
+            update.consumer_account_id,
+            update.id,
+        ])
+        .into_store_error()?;
     }
 
     Ok(())
@@ -705,7 +738,7 @@ fn batch_insert_output_notes(
 /// Batch-update output note states using a prepared cached statement.
 fn batch_update_output_note_states(
     tx: &Transaction,
-    updates: &[SerializedNoteStateUpdate],
+    updates: &[SerializedOutputNoteStateUpdate],
 ) -> Result<(), StoreError> {
     if updates.is_empty() {
         return Ok(());
