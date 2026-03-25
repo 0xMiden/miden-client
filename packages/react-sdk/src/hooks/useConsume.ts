@@ -30,14 +30,14 @@ export interface UseConsumeResult {
  *
  * @example
  * ```tsx
- * function ConsumeNotesButton({ accountId, noteIds }: Props) {
+ * function ConsumeNotesButton({ accountId, notes }: Props) {
  *   const { consume, isLoading, stage, error } = useConsume();
  *
  *   const handleConsume = async () => {
  *     try {
  *       const result = await consume({
  *         accountId,
- *         noteIds,
+ *         notes,
  *       });
  *       console.log('Consumed! TX:', result.transactionId);
  *     } catch (err) {

@@ -221,6 +221,27 @@ impl Store for SqliteStore {
             .await
     }
 
+    async fn get_input_note_by_offset(
+        &self,
+        filter: NoteFilter,
+        consumer: Option<AccountId>,
+        block_start: Option<BlockNumber>,
+        block_end: Option<BlockNumber>,
+        offset: u32,
+    ) -> Result<Option<InputNoteRecord>, StoreError> {
+        self.interact_with_connection(move |conn| {
+            SqliteStore::get_input_note_by_offset(
+                conn,
+                &filter,
+                consumer,
+                block_start,
+                block_end,
+                offset,
+            )
+        })
+        .await
+    }
+
     async fn upsert_input_notes(&self, notes: &[InputNoteRecord]) -> Result<(), StoreError> {
         let notes = notes.to_vec();
         self.interact_with_connection(move |conn| SqliteStore::upsert_input_notes(conn, &notes))

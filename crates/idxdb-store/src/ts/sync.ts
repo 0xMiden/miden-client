@@ -119,6 +119,9 @@ interface SerializedInputNoteData {
   createdAt: string;
   stateDiscriminant: number;
   state: Uint8Array;
+  consumedBlockHeight?: number;
+  consumedTxOrder?: number;
+  consumerAccountId?: string;
 }
 
 interface SerializedOutputNoteData {
@@ -231,7 +234,10 @@ export async function applyStateSync(
             note.nullifier,
             note.createdAt,
             note.stateDiscriminant,
-            note.state
+            note.state,
+            note.consumedBlockHeight,
+            note.consumedTxOrder,
+            note.consumerAccountId
           );
         })
       ),

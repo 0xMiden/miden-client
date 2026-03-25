@@ -3,6 +3,10 @@ import * as semver from "semver";
 import { logWebStoreError } from "./utils.js";
 
 export const CLIENT_VERSION_SETTING_KEY = "clientVersion";
+
+/** Mirrors `StorageSlotType::Map`, originally defined in miden-protocol. */
+export const STORAGE_SLOT_TYPE_MAP = 1;
+
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 
@@ -166,6 +170,9 @@ export interface IInputNote {
   nullifier: string;
   serializedCreatedAt: string;
   state: Uint8Array;
+  consumedBlockHeight?: number;
+  consumedTxOrder?: number;
+  consumerAccountId?: string;
 }
 
 export interface IOutputNote {
@@ -285,7 +292,12 @@ const V1_STORES: Record<string, string> = {
   [Table.Addresses]: indexes("address", "id"),
   [Table.Transactions]: indexes("id", "statusVariant"),
   [Table.TransactionScripts]: indexes("scriptRoot"),
-  [Table.InputNotes]: indexes("noteId", "nullifier", "stateDiscriminant"),
+  [Table.InputNotes]: indexes(
+    "noteId",
+    "nullifier",
+    "stateDiscriminant",
+    "[consumedBlockHeight+consumedTxOrder+noteId]"
+  ),
   [Table.OutputNotes]: indexes(
     "noteId",
     "recipientDigest",
@@ -300,6 +312,37 @@ const V1_STORES: Record<string, string> = {
   [Table.ForeignAccountCode]: indexes("accountId"),
   [Table.Settings]: indexes("key"),
 };
+
+// Dexie dynamically adds table accessors to Transaction objects at runtime,
+// but the Transaction type doesn't declare them. This augmentation bridges that gap
+// so that code passing a Transaction (e.g. `await t.inputNotes.put(...)`) type-checks.
+declare module "dexie" {
+  interface Transaction {
+    inputNotes: Table<IInputNote, string>;
+    outputNotes: Table<IOutputNote, string>;
+    notesScripts: Table<INotesScript, string>;
+    transactions: Table<ITransaction, string>;
+    transactionScripts: Table<ITransactionScript, string>;
+    tags: Table<ITag, number>;
+    latestAccountHeaders: Table<IAccount, string>;
+    historicalAccountHeaders: Table<IAccount, string>;
+    latestAccountStorages: Table<ILatestAccountStorage, string>;
+    historicalAccountStorages: Table<IHistoricalAccountStorage, string>;
+    latestStorageMapEntries: Table<ILatestStorageMapEntry, string>;
+    historicalStorageMapEntries: Table<IHistoricalStorageMapEntry, string>;
+    latestAccountAssets: Table<ILatestAccountAsset, string>;
+    historicalAccountAssets: Table<IHistoricalAccountAsset, string>;
+    accountCodes: Table<IAccountCode, string>;
+    accountAuths: Table<IAccountAuth, string>;
+    accountKeyMappings: Table<IAccountKeyMapping, string>;
+    addresses: Table<IAddress, string>;
+    stateSync: Table<IStateSync, number>;
+    blockHeaders: Table<IBlockHeader, number>;
+    partialBlockchainNodes: Table<IPartialBlockchainNode, number>;
+    foreignAccountCode: Table<IForeignAccountCode, string>;
+    settings: Table<ISetting, string>;
+  }
+}
 
 export type MidenDexie = Dexie & {
   accountCodes: Dexie.Table<IAccountCode, string>;
