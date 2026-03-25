@@ -1271,7 +1271,9 @@ export const counterAccountComponent = async (
 
     let transactionRequest = new window.TransactionRequestBuilder()
       .withOwnRawOutputNotes(
-        new window.MidenArrays.RawOutputNoteArray([window.RawOutputNote.full(note)])
+        new window.MidenArrays.RawOutputNoteArray([
+          window.RawOutputNote.full(note),
+        ])
       )
       .build();
 
