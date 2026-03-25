@@ -7,8 +7,6 @@ use miden_protocol::account::{
     AccountCode,
     AccountId,
     PartialAccount,
-    PartialStorageMap,
-    StorageMap,
     StorageMapKey,
     StorageMapWitness,
     StorageSlot,
@@ -144,14 +142,15 @@ impl ClientDataStore {
         Ok(account_inputs)
     }
 
-    /// Fetches storage map entries from the network via RPC.
-    async fn fetch_storage_map_entries(
+    /// Fetches a storage map witness for a specific key from the network via RPC and caches it.
+    async fn fetch_and_cache_storage_map_witness(
         &self,
         account_id: AccountId,
+        map_root: Word,
         slot_name: StorageSlotName,
         map_key: StorageMapKey,
         known_code: AccountCode,
-    ) -> Result<StorageMapEntries, DataStoreError> {
+    ) -> Result<StorageMapWitness, DataStoreError> {
         let storage_requirements = AccountStorageRequirements::new([(slot_name, &[map_key])]);
         let (_, account_proof): (BlockNumber, _) = self
             .rpc_api
@@ -180,7 +179,25 @@ impl ClientDataStore {
                 ))
             })?;
 
-        Ok(map_detail.entries)
+        let proof = match map_detail.entries {
+            StorageMapEntries::EntriesWithProofs(proofs) => {
+                // We requested a single key, so we expect a single proof.
+                proofs.into_iter().next().ok_or_else(|| {
+                    DataStoreError::other("RPC returned no proofs for the requested key")
+                })?
+            },
+            StorageMapEntries::AllEntries(_) => {
+                return Err(DataStoreError::other(
+                    "unexpected AllEntries response; specific keys were requested",
+                ));
+            },
+        };
+
+        let witness = StorageMapWitness::new(proof, [map_key]).map_err(|err| {
+            DataStoreError::other_with_source("failed to create storage map witness", err)
+        })?;
+        self.storage_map_cache.write().insert((map_root, map_key), witness.clone());
+        Ok(witness)
     }
 
     /// Resolves the slot name and account code for a map root from the cached foreign account
@@ -208,33 +225,6 @@ impl ClientDataStore {
             })?;
 
         Ok((slot_name, inputs.code().clone()))
-    }
-}
-
-/// Converts [`StorageMapEntries`] into a [`StorageMapWitness`] for the given key.
-fn storage_map_entries_into_witness(
-    entries: StorageMapEntries,
-    map_key: StorageMapKey,
-) -> Result<StorageMapWitness, DataStoreError> {
-    match entries {
-        StorageMapEntries::AllEntries(entries) => {
-            let storage_entries_iter = entries.iter().map(|e| (e.key, e.value));
-            let map = StorageMap::with_entries(storage_entries_iter).map_err(|err| {
-                DataStoreError::other_with_source("failed to build storage map from entries", err)
-            })?;
-            Ok(map.open(&map_key))
-        },
-        StorageMapEntries::EntriesWithProofs(witnesses) => {
-            let partial_map = PartialStorageMap::with_witnesses(witnesses).map_err(|err| {
-                DataStoreError::other_with_source(
-                    "failed to build partial storage map from witnesses",
-                    err,
-                )
-            })?;
-            partial_map.open(&map_key).map_err(|err| {
-                DataStoreError::other_with_source("failed to open storage map witness", err)
-            })
-        },
     }
 }
 
@@ -371,19 +361,25 @@ impl DataStore for ClientDataStore {
                 .ref_block
                 .read()
                 .map(AccountStateAt::Block)
-                .unwrap_or(AccountStateAt::ChainTip);
+                .expect("reference block should be set");
             self.fetch_and_cache_foreign_account(account_id, account_state_at).await?;
+        }
+
+        // Try to get the witness from the cached account inputs. It will miss if the account's
+        // storage is too big.
+        if let Some(inputs) = self.foreign_account_inputs.read().get(&account_id)
+            && let Some(partial_map) = inputs.storage().maps().find(|m| m.root() == map_root)
+            && let Ok(witness) = partial_map.open(&map_key)
+        {
+            return Ok(witness);
         }
 
         let (slot_name, known_code) = self.resolve_slot_name_and_code(account_id, map_root)?;
 
-        let map_entries = self
-            .fetch_storage_map_entries(account_id, slot_name, map_key, known_code)
-            .await?;
-
-        let witness = storage_map_entries_into_witness(map_entries, map_key)?;
-        self.storage_map_cache.write().insert(cache_key, witness.clone());
-        Ok(witness)
+        self.fetch_and_cache_storage_map_witness(
+            account_id, map_root, slot_name, map_key, known_code,
+        )
+        .await
     }
 
     /// Returns the [`AccountInputs`] for the given foreign account from the cache or alternatively

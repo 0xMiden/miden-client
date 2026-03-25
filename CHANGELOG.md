@@ -32,7 +32,7 @@
 * [BREAKING] Made the nullifiers sync optional on the `StateSync` component ([#1756](https://github.com/0xMiden/miden-client/pull/1756)).
 * Decoupled keystore functionality from `WebStore` by moving keystore helper logic from `idxdb-store` into the `web-client` crate, also added `export_store` and `import_store` methods to the `Store` trait, enabling usage of different stores ([#1795](https://github.com/0xMiden/miden-client/pull/1795)).
 * [BREAKING] Added `SyncStateInputs` to bundle the parameters needed to perform the sync state ([#1778](https://github.com/0xMiden/miden-client/pull/1778)).
-* Added lazy loading for foreign accounts. Specifying `TransactionRequestBuilder::foreign_accounts()` for public accounts is no longer required ([#1812](https://github.com/0xMiden/miden-client/pull/1812)).
+* Added lazy loading for foreign accounts. Specifying `TransactionRequestBuilder::foreign_accounts()` for public accounts is no longer required ([#1812](https://github.com/0xMiden/miden-client/pull/1812), [#1892](https://github.com/0xMiden/miden-client/pull/1892)).
 * [BREAKING][type][web] `AuthSecretKey.getRpoFalcon512SecretKeyAsFelts()` and `getEcdsaK256KeccakSecretKeyAsFelts()` now return `Result<Vec<Felt>, JsValue>` instead of panicking on key type mismatch ([#1833](https://github.com/0xMiden/miden-client/pull/1833)).
 * [BREAKING][rename][cli] Renamed `CliConfig::from_system()` to `CliConfig::load()` and `CliClient::from_system_user_config()` to `CliClient::new()` for better discoverability ([#1848](https://github.com/0xMiden/miden-client/pull/1848)).
 * Removed `SmtForest` empty-root workaround in `AccountSmtForest::safe_pop_smts`, now that the upstream fix has landed in miden-crypto v0.19.7 ([#1864](https://github.com/0xMiden/miden-client/pull/1864)).
