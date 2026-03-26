@@ -60,7 +60,7 @@ miden-remote-prover-client = { branch = "next", default-features = false, featur
 ], git = "https://github.com/0xMiden/miden-node" }
 
 # Miden debug dependency
-miden-debug = { default-features = false, features = ["dap", "std"], path = "../miden-debug" }
+miden-debug = { default-features = false, features = ["dap", "std"], git = "https://github.com/0xMiden/miden-debug.git", rev = "047592ec38b7f0d9a0ac0e012766b49cdd48f2eb" }
 
 # External dependencies
 anyhow      = { default-features = false, version = "1.0" }
