@@ -161,9 +161,7 @@ impl SqliteStore {
             conn,
             "commitment = ?",
             params![header.storage_commitment().to_hex()],
-        )?
-        .into_values()
-        .collect();
+        )?;
 
         let storage = AccountStorage::new(slots)?;
 
@@ -304,7 +302,7 @@ impl SqliteStore {
             ),
         };
 
-        let slots = query_storage_slots(conn, where_clause, params)?.into_values().collect();
+        let slots = query_storage_slots(conn, where_clause, params)?;
 
         Ok(AccountStorage::new(slots)?)
     }
@@ -413,7 +411,11 @@ impl SqliteStore {
         tx.commit().into_store_error()?;
 
         let mut smt_forest = smt_forest.write().expect("smt_forest write lock not poisoned");
-        smt_forest.insert_account_state(account.vault(), account.storage())?;
+        smt_forest.insert_and_register_account_state(
+            account.id(),
+            account.vault(),
+            account.storage(),
+        )?;
 
         Ok(())
     }
@@ -540,79 +542,81 @@ impl SqliteStore {
             delta,
         )?;
 
-        let updated_storage_slots =
-            Self::apply_account_storage_delta(smt_forest, updated_storage_maps, delta)?;
+        // Build the final roots from the init state's registered roots:
+        // - Replace vault root with the final one
+        // - Replace changed map roots with their new values (done by apply_account_storage_delta)
+        // - Unchanged map roots continue as they were
+        let mut final_roots = smt_forest
+            .get_roots(&init_account_state.id())
+            .cloned()
+            .ok_or(StoreError::AccountDataNotFound(init_account_state.id()))?;
+
+        // First element is always the vault root
+        if let Some(vault_root) = final_roots.first_mut() {
+            *vault_root = final_account_state.vault_root();
+        }
+
+        let updated_storage_slots = Self::apply_account_storage_delta(
+            smt_forest,
+            &mut final_roots,
+            updated_storage_maps,
+            delta,
+        )?;
 
         Self::insert_storage_slots(
             tx,
             final_account_state.storage_commitment(),
-            updated_storage_slots.values(),
+            updated_storage_slots.iter(),
         )?;
+
+        smt_forest.stage_roots(final_account_state.id(), final_roots);
 
         Ok(())
     }
 
-    /// Removes account states with the specified hashes from the database and pops their
-    /// SMT roots from the forest to free up memory.
-    ///
-    /// This is used to rollback account changes when a transaction is discarded,
-    /// effectively undoing the account state changes that were applied by the transaction.
-    ///
-    /// Note: This is not part of the Store trait and is only used internally by the `SQLite` store
-    /// implementation to handle transaction rollbacks.
+    /// Removes discarded account states from the database and restores previous
+    /// roots in the SMT forest.
     pub(crate) fn undo_account_state(
         tx: &Transaction<'_>,
         smt_forest: &mut AccountSmtForest,
-        account_commitments: &[Word],
+        discarded_states: &[(AccountId, Word)],
     ) -> Result<(), StoreError> {
-        if account_commitments.is_empty() {
+        if discarded_states.is_empty() {
             return Ok(());
         }
 
-        let account_hash_params = Rc::new(
-            account_commitments.iter().map(|h| Value::from(h.to_hex())).collect::<Vec<_>>(),
+        let commitment_params = Rc::new(
+            discarded_states
+                .iter()
+                .map(|(_, commitment)| Value::from(commitment.to_hex()))
+                .collect::<Vec<_>>(),
         );
 
-        // Query all SMT roots before deletion so we can pop them from the forest
-        let smt_roots = Self::get_smt_roots_by_account_commitment(tx, &account_hash_params)?;
-
         const DELETE_QUERY: &str = "DELETE FROM accounts WHERE account_commitment IN rarray(?)";
-        tx.execute(DELETE_QUERY, params![account_hash_params]).into_store_error()?;
+        tx.execute(DELETE_QUERY, params![commitment_params]).into_store_error()?;
 
-        // Pop the roots from the forest to release memory for nodes that are no longer reachable
-        smt_forest.pop_roots(smt_roots);
+        // Discard each rolled-back state from the in-memory forest,
+        // restoring the previous roots for each account.
+        for (account_id, _) in discarded_states {
+            smt_forest.discard_roots(*account_id);
+        }
 
         Ok(())
     }
 
-    /// Updates the account state in the database to a new complete account state.
+    /// Replaces the account state with a completely new one from the network.
     ///
-    /// This function replaces the current account state with a completely new one. It:
-    /// - Inserts the new account header
-    /// - Stores all storage slots and their maps
-    /// - Stores all vault assets
-    /// - Updates the SMT forest with the new state
-    /// - Pops old SMT roots from the forest to free memory
-    ///
-    /// This is typically used for replacing a full account state, as opposed to applying
-    /// incremental deltas via `apply_account_delta`.
-    ///
-    /// # Arguments
-    /// * `tx` - Database transaction
-    /// * `smt_forest` - SMT forest for updating and pruning
-    /// * `new_account_state` - The new complete account state to persist
-    ///
-    /// # Returns
-    /// `Ok(())` if the update was successful, or an error if any operation fails.
+    /// Inserts all vault/storage data and atomically replaces the SMT forest roots.
     pub(crate) fn update_account_state(
         tx: &Transaction<'_>,
         smt_forest: &mut AccountSmtForest,
         new_account_state: &Account,
     ) -> Result<(), StoreError> {
-        // Get old SMT roots before updating so we can prune them after
-        let old_roots = Self::get_smt_roots_by_account_id(tx, new_account_state.id())?;
-
-        smt_forest.insert_account_state(new_account_state.vault(), new_account_state.storage())?;
+        smt_forest.insert_and_register_account_state(
+            new_account_state.id(),
+            new_account_state.vault(),
+            new_account_state.storage(),
+        )?;
         Self::insert_storage_slots(
             tx,
             new_account_state.storage().to_commitment(),
@@ -624,9 +628,6 @@ impl SqliteStore {
             new_account_state.vault().assets(),
         )?;
         Self::insert_account_header(tx, &new_account_state.into(), None)?;
-
-        // Pop old roots to free memory for nodes no longer reachable
-        smt_forest.pop_roots(old_roots);
 
         Ok(())
     }
@@ -718,83 +719,6 @@ impl SqliteStore {
         }
 
         Ok(())
-    }
-
-    /// Returns all SMT roots for a given account ID's latest state.
-    ///
-    /// This function retrieves all Merkle tree roots needed for the SMT forest, including:
-    /// - The vault root for all asset nodes
-    /// - All storage map roots for storage slot map nodes
-    fn get_smt_roots_by_account_id(
-        tx: &Transaction<'_>,
-        account_id: AccountId,
-    ) -> Result<Vec<Word>, StoreError> {
-        const LATEST_ACCOUNT_QUERY: &str = r"
-        SELECT vault_root, storage_commitment
-        FROM accounts
-        WHERE id = ?1
-        ORDER BY nonce DESC
-        LIMIT 1
-    ";
-
-        const STORAGE_MAP_ROOTS_QUERY: &str = r"
-        SELECT slot_value
-        FROM account_storage
-        WHERE commitment = ?1
-          AND slot_type = ?2
-          AND slot_value IS NOT NULL
-    ";
-
-        let map_slot_type = StorageSlotType::Map as u8;
-
-        // 1) Fetch latest vault root + storage commitment.
-        let (vault_root, storage_commitment): (String, String) = tx
-            .query_row(LATEST_ACCOUNT_QUERY, params![account_id.to_hex()], |row| {
-                Ok((row.get(0)?, row.get(1)?))
-            })
-            .into_store_error()?;
-
-        let mut roots = Vec::new();
-
-        // Always include the vault root.
-        if let Ok(root) = Word::try_from(vault_root.as_str()) {
-            roots.push(root);
-        }
-
-        // 2) Fetch storage map roots for the latest storage commitment.
-        let mut stmt = tx.prepare(STORAGE_MAP_ROOTS_QUERY).into_store_error()?;
-        let iter = stmt
-            .query_map(params![storage_commitment, map_slot_type], |row| row.get::<_, String>(0))
-            .into_store_error()?;
-
-        roots.extend(iter.filter_map(Result::ok).filter_map(|r| Word::try_from(r.as_str()).ok()));
-
-        Ok(roots)
-    }
-
-    /// Returns all SMT roots (vault root + storage map roots) for the given account commitments.
-    fn get_smt_roots_by_account_commitment(
-        tx: &Transaction<'_>,
-        account_hash_params: &Rc<Vec<Value>>,
-    ) -> Result<Vec<Word>, StoreError> {
-        const ROOTS_QUERY: &str = "
-            SELECT vault_root FROM accounts WHERE account_commitment IN rarray(?1)
-            UNION ALL
-            SELECT slot_value FROM account_storage
-            WHERE commitment IN (
-                SELECT storage_commitment FROM accounts WHERE account_commitment IN rarray(?1)
-            ) AND slot_type = ?2";
-
-        let map_slot_type = StorageSlotType::Map as u8;
-        let mut stmt = tx.prepare(ROOTS_QUERY).into_store_error()?;
-        let roots = stmt
-            .query_map(params![account_hash_params, map_slot_type], |row| row.get::<_, String>(0))
-            .into_store_error()?
-            .filter_map(Result::ok)
-            .filter_map(|r| Word::try_from(r.as_str()).ok())
-            .collect();
-
-        Ok(roots)
     }
 
     /// Inserts a new account record into the database.

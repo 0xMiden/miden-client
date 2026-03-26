@@ -170,7 +170,7 @@ pub(crate) fn query_storage_slots(
     conn: &Connection,
     where_clause: &str,
     params: impl Params,
-) -> Result<BTreeMap<StorageSlotName, StorageSlot>, StoreError> {
+) -> Result<Vec<StorageSlot>, StoreError> {
     const STORAGE_QUERY: &str = "SELECT slot_name, slot_value, slot_type FROM account_storage";
 
     let query = format!("{STORAGE_QUERY} WHERE {where_clause}");
@@ -202,16 +202,12 @@ pub(crate) fn query_storage_slots(
 
     Ok(storage_values
         .into_iter()
-        .map(|(slot_name, value, slot_type)| {
-            let key = slot_name.clone();
-            let slot = match slot_type {
-                StorageSlotType::Value => StorageSlot::with_value(slot_name, value),
-                StorageSlotType::Map => StorageSlot::with_map(
-                    slot_name,
-                    storage_maps.remove(&value).unwrap_or(StorageMap::new()),
-                ),
-            };
-            (key, slot)
+        .map(|(slot_name, value, slot_type)| match slot_type {
+            StorageSlotType::Value => StorageSlot::with_value(slot_name, value),
+            StorageSlotType::Map => StorageSlot::with_map(
+                slot_name,
+                storage_maps.remove(&value).unwrap_or(StorageMap::new()),
+            ),
         })
         .collect())
 }

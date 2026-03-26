@@ -58,9 +58,6 @@ pub enum NoteRecordError {
     /// Note record isn't consumable.
     #[error("note not consumable: {0}")]
     NoteNotConsumable(String),
-    /// Invalid inclusion proof.
-    #[error("invalid inclusion proof")]
-    InvalidInclusionProof,
     /// Invalid state transition.
     #[error("invalid state transition: {0}")]
     InvalidStateTransition(String),

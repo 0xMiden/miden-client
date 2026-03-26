@@ -143,11 +143,15 @@ export function useMultiSend(): UseMultiSendResult {
         const submissionHeight = await runExclusiveSafe(() =>
           client.submitProvenTransaction(provenTransaction, txResult)
         );
+
+        // Save txId BEFORE applyTransaction, which consumes the WASM pointer
+        // inside txResult.
+        const txId = txResult.id();
+        const txIdString = txId.toString();
+
         await runExclusiveSafe(() =>
           client.applyTransaction(txResult, submissionHeight)
         );
-
-        const txId = txResult.id();
 
         if (noteType === NoteType.Private) {
           await waitForTransactionCommit(
@@ -163,7 +167,7 @@ export function useMultiSend(): UseMultiSendResult {
           }
         }
 
-        const txSummary = { transactionId: txId.toString() };
+        const txSummary = { transactionId: txIdString };
 
         setStage("complete");
         setResult(txSummary);

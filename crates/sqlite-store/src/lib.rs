@@ -107,9 +107,14 @@ impl SqliteStore {
         for id in store.get_account_ids().await? {
             let vault = store.get_account_vault(id).await?;
             let storage = store.get_account_storage(id, AccountStorageFilter::All).await?;
+            let header = store.get_account_header(id).await?;
 
             let mut smt_forest = store.smt_forest.write().expect("smt write lock not poisoned");
-            smt_forest.insert_account_state(&vault, &storage)?;
+            if header.is_some() {
+                smt_forest.insert_and_register_account_state(id, &vault, &storage)?;
+            } else {
+                smt_forest.insert_account_state(&vault, &storage)?;
+            }
         }
 
         Ok(store)

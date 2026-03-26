@@ -1686,7 +1686,7 @@ client.terminate();
 
 ### createClient()
 
-> `static` **createClient**(`serializedMockChain?`, `serializedMockNoteTransportNode?`, `seed?`): `Promise`\<`MockWebClient`\>
+> `static` **createClient**(`serializedMockChain?`, `serializedMockNoteTransportNode?`, `seed?`, `logLevel?`): `Promise`\<`MockWebClient`\>
 
 Factory method to create and initialize a new wrapped MockWebClient.
 
@@ -1710,6 +1710,10 @@ Serialized mock note transport node (optional).
 
 Seed for account initialization (optional).
 
+##### logLevel?
+
+[`LogLevel`](../type-aliases/LogLevel.md)
+
 #### Returns
 
 `Promise`\<`MockWebClient`\>
@@ -1724,7 +1728,7 @@ A promise that resolves to a fully initialized MockWebClient.
 
 ### createClientWithExternalKeystore()
 
-> `static` **createClientWithExternalKeystore**(`rpcUrl?`, `noteTransportUrl?`, `seed?`, `storeName?`, `getKeyCb?`, `insertKeyCb?`, `signCb?`): `Promise`\<[`WebClient`](WebClient.md)\>
+> `static` **createClientWithExternalKeystore**(`rpcUrl?`, `noteTransportUrl?`, `seed?`, `storeName?`, `getKeyCb?`, `insertKeyCb?`, `signCb?`, `logLevel?`): `Promise`\<[`WebClient`](WebClient.md)\>
 
 Factory method to create and initialize a new wrapped WebClient with a remote keystore.
 
@@ -1771,6 +1775,10 @@ Callback used to persist secret keys in the external store.
 [`SignCallback`](../type-aliases/SignCallback.md)
 
 Callback used to create signatures for the provided inputs.
+
+##### logLevel?
+
+[`LogLevel`](../type-aliases/LogLevel.md)
 
 #### Returns
 

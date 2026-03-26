@@ -5,6 +5,7 @@ use alloc::vec::Vec;
 
 use async_trait::async_trait;
 use miden_protocol::account::{AccountCode, AccountId};
+use miden_protocol::errors::{AccountError, AssetError};
 use miden_protocol::note::{Note, NoteId};
 use miden_standards::note::{NoteConsumptionStatus, StandardNote};
 use miden_tx::auth::TransactionAuthenticator;
@@ -279,12 +280,26 @@ where
 /// Error when screening notes to check relevance to a client.
 #[derive(Debug, Error)]
 pub enum NoteScreenerError {
-    #[error("account data wasn't found for account id {0}")]
+    #[error("failed to process note inputs")]
+    InvalidNoteInputsError(#[from] InvalidNoteInputsError),
+    #[error("account {0} data not found in the store")]
     AccountDataNotFound(AccountId),
-    #[error("error while fetching data from the store")]
+    #[error("failed to fetch data from the store")]
     StoreError(#[from] StoreError),
-    #[error("error while checking note")]
+    #[error("note consumption check failed")]
     NoteCheckerError(#[from] NoteCheckerError),
-    #[error("error while building transaction request")]
+    #[error("failed to build transaction request")]
     TransactionRequestError(#[from] TransactionRequestError),
+}
+
+#[derive(Debug, Error)]
+pub enum InvalidNoteInputsError {
+    #[error("account error for note with id {0}: {1}")]
+    AccountError(NoteId, AccountError),
+    #[error("asset error for note with id {0}: {1}")]
+    AssetError(NoteId, AssetError),
+    #[error("expected {1} note inputs for note with id {0}")]
+    WrongNumInputs(NoteId, usize),
+    #[error("note input representing block with value {1} for note with id {0}")]
+    BlockNumberError(NoteId, u64),
 }

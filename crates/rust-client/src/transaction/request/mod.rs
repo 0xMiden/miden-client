@@ -429,47 +429,53 @@ pub enum TransactionRequestError {
     AccountInterfaceError(#[from] AccountInterfaceError),
     #[error("account error")]
     AccountError(#[from] AccountError),
-    #[error("duplicate input note with IDs: {0}")]
+    #[error("duplicate input note: note {0} was added more than once to the transaction")]
     DuplicateInputNote(NoteId),
-    #[error("foreign account data missing in the account proof")]
+    #[error(
+        "the account proof does not contain the required foreign account data; re-fetch the proof and retry"
+    )]
     ForeignAccountDataMissing,
-    #[error("foreign account storage slot {0} is not a map type")]
-    ForeignAccountStorageSlotInvalidIndex(u8),
-    #[error("requested foreign account with ID {0} does not have an expected storage mode")]
+    #[error(
+        "foreign account {0} has an incompatible storage mode; use `ForeignAccount::public()` for public accounts and `ForeignAccount::private()` for private accounts"
+    )]
     InvalidForeignAccountId(AccountId),
-    #[error("note {0} does not contain a valid inclusion proof")]
+    #[error(
+        "note {0} cannot be used as an authenticated input: it does not have a valid inclusion proof"
+    )]
     InputNoteNotAuthenticated(NoteId),
     #[error("note {0} has already been consumed")]
     InputNoteAlreadyConsumed(NoteId),
-    #[error("own notes shouldn't be of the header variant")]
+    #[error("internal error: own notes must contain full note data, not just a header")]
     InvalidNoteVariant,
-    #[error("invalid sender account id: {0}")]
+    #[error("sender account {0} is not tracked by this client or does not exist")]
     InvalidSenderAccount(AccountId),
     #[error("invalid transaction script")]
     InvalidTransactionScript(#[from] TransactionScriptError),
-    #[error("merkle error")]
+    #[error("merkle proof error")]
     MerkleError(#[from] MerkleError),
-    #[error("a transaction without output notes must have at least one input note")]
+    #[error("empty transaction: the request has no input notes and no account state changes")]
     NoInputNotesNorAccountChange,
     #[error("note not found: {0}")]
     NoteNotFound(String),
-    #[error("note creation error")]
+    #[error("failed to create note")]
     NoteCreationError(#[from] NoteError),
-    #[error("pay to id note doesn't contain at least one asset")]
+    #[error("pay-to-ID note must contain at least one asset to transfer")]
     P2IDNoteWithoutAsset,
-    #[error("error building script: {0}")]
+    #[error("error building script")]
     CodeBuilderError(#[from] CodeBuilderError),
     #[error("transaction script template error: {0}")]
     ScriptTemplateError(String),
     #[error("storage slot {0} not found in account ID {1}")]
     StorageSlotNotFound(u8, AccountId),
-    #[error("error while building the input notes: {0}")]
+    #[error("error while building the input notes")]
     TransactionInputError(#[from] TransactionInputError),
-    #[error("storage map error")]
+    #[error("account storage map error")]
     StorageMapError(#[from] StorageMapError),
     #[error("asset vault error")]
     AssetVaultError(#[from] AssetVaultError),
-    #[error("unsupported authentication scheme ID: {0}")]
+    #[error(
+        "unsupported authentication scheme ID {0}; supported schemes are: RpoFalcon512 (0) and EcdsaK256Keccak (1)"
+    )]
     UnsupportedAuthSchemeId(u8),
 }
 

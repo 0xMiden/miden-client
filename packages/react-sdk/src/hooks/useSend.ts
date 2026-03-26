@@ -128,26 +128,42 @@ export function useSend(): UseSendResult {
           client.submitProvenTransaction(provenTransaction, txResult)
         );
 
+        // Save txIdString BEFORE applyTransaction, which consumes the WASM
+        // pointer inside txResult (and any child objects like TransactionId).
+        const txIdString = txResult.id().toString();
+
+        // For private notes we need to wait for commit before sending the
+        // note via the transport. Extract the full note and the txId for
+        // the commit-wait loop BEFORE applyTransaction invalidates them.
+        let fullNote: Note | null = null;
+        let txIdForWait: TransactionId | undefined;
+        if (noteType === NoteType.Private) {
+          fullNote = extractFullNote(txResult);
+          txIdForWait = txResult.id();
+        }
+
         await runExclusiveSafe(() =>
           client.applyTransaction(txResult, submissionHeight)
         );
 
-        const txId = txResult.id();
-        await waitForTransactionCommit(client, runExclusiveSafe, txId);
-
         if (noteType === NoteType.Private) {
-          const fullNote = extractFullNote(txResult);
-          if (!fullNote) {
+          if (!fullNote || !txIdForWait) {
             throw new Error("Missing full note for private send");
           }
 
+          await waitForTransactionCommit(
+            client as ClientWithTransactions,
+            runExclusiveSafe,
+            txIdForWait
+          );
+
           const recipientAddress = parseAddress(options.to, toAccountId);
           await runExclusiveSafe(() =>
-            client.sendPrivateNote(fullNote, recipientAddress)
+            client.sendPrivateNote(fullNote!, recipientAddress)
           );
         }
 
-        const txSummary = { transactionId: txResult.id().toString() };
+        const txSummary = { transactionId: txIdString };
 
         setStage("complete");
         setResult(txSummary);
