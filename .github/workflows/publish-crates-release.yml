@@ -67,7 +67,6 @@ jobs:
   # This is used by midenup to speed installs up.
   upload-artifacts:
     name: upload pre-built miden-client executable artifacts
-    if: ${{ github.repository_owner == '0xMiden' }}
     permissions:
       contents: write
       id-token: write
