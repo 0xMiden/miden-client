@@ -55,8 +55,11 @@ async fn account_code_insertion_no_duplicates() -> anyhow::Result<()> {
     )?;
     let account_code = AccountCode::from_components(
         &[
-            AuthSingleSig::new(PublicKeyCommitment::from(EMPTY_WORD), AuthSchemeId::Falcon512Rpo)
-                .into(),
+            AuthSingleSig::new(
+                PublicKeyCommitment::from(EMPTY_WORD),
+                AuthSchemeId::Falcon512Poseidon2,
+            )
+            .into(),
             account_component,
         ],
         AccountType::RegularAccountUpdatableCode,
@@ -121,7 +124,7 @@ async fn apply_account_delta_additions() -> anyhow::Result<()> {
         .account_type(AccountType::RegularAccountImmutableCode)
         .with_auth_component(AuthSingleSig::new(
             PublicKeyCommitment::from(EMPTY_WORD),
-            AuthSchemeId::Falcon512Rpo,
+            AuthSchemeId::Falcon512Poseidon2,
         ))
         .with_component(dummy_component)
         .build()?;
@@ -237,7 +240,7 @@ async fn apply_account_delta_removals() -> anyhow::Result<()> {
         .account_type(AccountType::RegularAccountImmutableCode)
         .with_auth_component(AuthSingleSig::new(
             PublicKeyCommitment::from(EMPTY_WORD),
-            AuthSchemeId::Falcon512Rpo,
+            AuthSchemeId::Falcon512Poseidon2,
         ))
         .with_component(dummy_component)
         .with_assets(assets.clone())
@@ -329,7 +332,7 @@ async fn get_account_storage_item_success() -> anyhow::Result<()> {
         .account_type(AccountType::RegularAccountImmutableCode)
         .with_auth_component(AuthSingleSig::new(
             PublicKeyCommitment::from(EMPTY_WORD),
-            AuthSchemeId::Falcon512Rpo,
+            AuthSchemeId::Falcon512Poseidon2,
         ))
         .with_component(dummy_component)
         .build_existing()?;
@@ -362,7 +365,7 @@ async fn get_account_storage_item_not_found() -> anyhow::Result<()> {
         .account_type(AccountType::RegularAccountImmutableCode)
         .with_auth_component(AuthSingleSig::new(
             PublicKeyCommitment::from(EMPTY_WORD),
-            AuthSchemeId::Falcon512Rpo,
+            AuthSchemeId::Falcon512Poseidon2,
         ))
         .with_component(dummy_component)
         .build_existing()?;
@@ -403,7 +406,7 @@ async fn get_account_map_item_success() -> anyhow::Result<()> {
         .account_type(AccountType::RegularAccountImmutableCode)
         .with_auth_component(AuthSingleSig::new(
             PublicKeyCommitment::from(EMPTY_WORD),
-            AuthSchemeId::Falcon512Rpo,
+            AuthSchemeId::Falcon512Poseidon2,
         ))
         .with_component(dummy_component)
         .build_existing()?;
@@ -437,7 +440,7 @@ async fn get_account_map_item_value_slot_error() -> anyhow::Result<()> {
         .account_type(AccountType::RegularAccountImmutableCode)
         .with_auth_component(AuthSingleSig::new(
             PublicKeyCommitment::from(EMPTY_WORD),
-            AuthSchemeId::Falcon512Rpo,
+            AuthSchemeId::Falcon512Poseidon2,
         ))
         .with_component(dummy_component)
         .build_existing()?;
@@ -468,7 +471,7 @@ async fn get_account_code() -> anyhow::Result<()> {
         .account_type(AccountType::RegularAccountImmutableCode)
         .with_auth_component(AuthSingleSig::new(
             PublicKeyCommitment::from(EMPTY_WORD),
-            AuthSchemeId::Falcon512Rpo,
+            AuthSchemeId::Falcon512Poseidon2,
         ))
         .with_component(dummy_component)
         .build_existing()?;
@@ -521,7 +524,7 @@ async fn account_reader_nonce_and_status() -> anyhow::Result<()> {
         .account_type(AccountType::RegularAccountImmutableCode)
         .with_auth_component(AuthSingleSig::new(
             PublicKeyCommitment::from(EMPTY_WORD),
-            AuthSchemeId::Falcon512Rpo,
+            AuthSchemeId::Falcon512Poseidon2,
         ))
         .with_component(dummy_component)
         .build()?;
@@ -597,7 +600,7 @@ async fn account_reader_storage_access() -> anyhow::Result<()> {
         .account_type(AccountType::RegularAccountImmutableCode)
         .with_auth_component(AuthSingleSig::new(
             PublicKeyCommitment::from(EMPTY_WORD),
-            AuthSchemeId::Falcon512Rpo,
+            AuthSchemeId::Falcon512Poseidon2,
         ))
         .with_component(dummy_component)
         .build_existing()?;
@@ -634,7 +637,7 @@ async fn account_reader_addresses_access() -> anyhow::Result<()> {
         .account_type(AccountType::RegularAccountImmutableCode)
         .with_auth_component(AuthSingleSig::new(
             PublicKeyCommitment::from(EMPTY_WORD),
-            AuthSchemeId::Falcon512Rpo,
+            AuthSchemeId::Falcon512Poseidon2,
         ))
         .with_component(dummy_component)
         .build_existing()?;
@@ -733,7 +736,7 @@ async fn setup_account_with_map(
         .account_type(AccountType::RegularAccountImmutableCode)
         .with_auth_component(AuthSingleSig::new(
             PublicKeyCommitment::from(EMPTY_WORD),
-            AuthSchemeId::Falcon512Rpo,
+            AuthSchemeId::Falcon512Poseidon2,
         ))
         .with_component(component)
         .build()?;
@@ -893,7 +896,7 @@ async fn undo_account_state_restores_previous_latest() -> anyhow::Result<()> {
         .interact_with_connection(move |conn| SqliteStore::get_account_header(conn, account_id))
         .await?
         .expect("account should still exist after undo");
-    assert_eq!(header.nonce().as_int(), 0);
+    assert_eq!(header.nonce().as_canonical_u64(), 0);
     assert_eq!(header.to_commitment(), initial_commitment);
 
     Ok(())
@@ -927,7 +930,7 @@ async fn undo_account_state_deletes_account_entirely() -> anyhow::Result<()> {
         .account_type(AccountType::RegularAccountImmutableCode)
         .with_auth_component(AuthSingleSig::new(
             PublicKeyCommitment::from(EMPTY_WORD),
-            AuthSchemeId::Falcon512Rpo,
+            AuthSchemeId::Falcon512Poseidon2,
         ))
         .with_component(component)
         .with_assets(vec![
@@ -1119,7 +1122,7 @@ async fn undo_after_update_account_state_does_not_resurrect_removed_entries() ->
         .account_type(AccountType::RegularAccountImmutableCode)
         .with_auth_component(AuthSingleSig::new(
             PublicKeyCommitment::from(EMPTY_WORD),
-            AuthSchemeId::Falcon512Rpo,
+            AuthSchemeId::Falcon512Poseidon2,
         ))
         .with_component(component)
         .build()?;
@@ -1176,7 +1179,7 @@ async fn undo_after_update_account_state_does_not_resurrect_removed_entries() ->
 
     let mut account_updated = account_nonce1.clone();
     account_updated.apply_delta(&delta_remove)?;
-    let updated_nonce = account_updated.nonce().as_int();
+    let updated_nonce = account_updated.nonce().as_canonical_u64();
 
     // Call update_account_state with the updated state
     let smt_forest = store.smt_forest.clone();
@@ -1275,7 +1278,7 @@ async fn undo_after_update_account_state_does_not_resurrect_removed_entries() ->
         .interact_with_connection(move |conn| SqliteStore::get_account_header(conn, account_id))
         .await?
         .expect("account should exist");
-    assert_eq!(header.nonce().as_int(), updated_nonce);
+    assert_eq!(header.nonce().as_canonical_u64(), updated_nonce);
 
     Ok(())
 }
@@ -1303,7 +1306,7 @@ async fn get_account_header_by_commitment_returns_historical() -> anyhow::Result
         })
         .await?
         .expect("Initial commitment should exist in historical");
-    assert_eq!(header.nonce().as_int(), 0);
+    assert_eq!(header.nonce().as_canonical_u64(), 0);
     assert_eq!(header.to_commitment(), initial_commitment);
 
     // Look up the post-delta commitment — should find the nonce-1 state in historical
@@ -1314,7 +1317,7 @@ async fn get_account_header_by_commitment_returns_historical() -> anyhow::Result
         })
         .await?
         .expect("Post-delta commitment should exist in historical");
-    assert_eq!(header.nonce().as_int(), 1);
+    assert_eq!(header.nonce().as_canonical_u64(), 1);
     assert_eq!(header.to_commitment(), post_delta_commitment);
 
     Ok(())
