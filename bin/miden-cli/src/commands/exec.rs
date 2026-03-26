@@ -141,7 +141,7 @@ impl ExecCmd {
         tx_script: TransactionScript,
         advice_inputs: AdviceInputs,
     ) -> Result<[Felt; 16], CliError> {
-        let foreign_accounts = BTreeSet::<ForeignAccount>::new();
+        let foreign_accounts = BTreeMap::<AccountId, ForeignAccount>::new();
 
         #[cfg(feature = "dap")]
         if let Some(addr) = self.start_debug_adapter.as_ref() {

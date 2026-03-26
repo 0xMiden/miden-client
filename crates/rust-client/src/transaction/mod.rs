@@ -132,6 +132,7 @@ pub use miden_protocol::transaction::{
     OutputNote,
     OutputNotes,
     ProvenTransaction,
+    PublicOutputNote,
     RawOutputNote,
     RawOutputNotes,
     TransactionArgs,
@@ -511,7 +512,7 @@ where
         account_id: AccountId,
         tx_script: TransactionScript,
         advice_inputs: AdviceInputs,
-        foreign_accounts: BTreeSet<ForeignAccount>,
+        foreign_accounts: BTreeMap<AccountId, ForeignAccount>,
     ) -> Result<[Felt; 16], ClientError> {
         let (fpi_block_number, foreign_account_inputs) =
             self.retrieve_foreign_account_inputs(foreign_accounts).await?;

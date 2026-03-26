@@ -513,21 +513,6 @@ pub trait Store: Send + Sync {
             ))
             .await?;
 
-        let mut tracked_leaves = tracked_nodes
-            .keys()
-            .filter_map(|idx| idx.to_leaf_pos())
-            .collect::<BTreeSet<_>>();
-
-        // The latest block used to be tracked out-of-band via `track_latest`; in miden-crypto
-        // 0.23 we need to materialize it as an explicit tracked leaf entry.
-        if has_client_notes && current_partial_mmr.forest().has_single_leaf_tree() {
-            let latest_pos = current_partial_mmr.forest().num_leaves().saturating_sub(1);
-            tracked_nodes
-                .entry(InOrderIndex::from_leaf_pos(latest_pos))
-                .or_insert(current_block.commitment());
-            tracked_leaves.insert(latest_pos);
-        }
-
         let current_partial_mmr =
             PartialMmr::from_parts(current_partial_mmr.peaks(), tracked_nodes, tracked_leaves)?;
 
