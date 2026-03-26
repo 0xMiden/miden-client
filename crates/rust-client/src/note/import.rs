@@ -385,41 +385,42 @@ where
             let sync_notes =
                 self.rpc_api.sync_notes(request_block_num, None, &tracked_tags).await?;
 
-            for sync_note in sync_notes.notes {
-                if !expected_notes.iter().any(|(id, _)| id == sync_note.note_id()) {
-                    continue;
-                }
-
-                // This means that a note with the same id was found.
-                // Therefore, we should mark the note as committed.
-                let note_block_num = sync_notes.block_header.block_num();
+            for block in &sync_notes.blocks {
+                let note_block_num = block.block_header.block_num();
 
                 if note_block_num > current_block_num {
                     break;
                 }
 
-                let note_inclusion_proof = NoteInclusionProof::new(
-                    note_block_num,
-                    sync_note.note_index(),
-                    sync_note.inclusion_path().clone(),
-                )?;
+                for sync_note in &block.notes {
+                    if !expected_notes.iter().any(|(id, _)| id == sync_note.note_id()) {
+                        continue;
+                    }
 
-                retrieved_proofs.insert(
-                    *sync_note.note_id(),
-                    Some((sync_note.metadata(), note_inclusion_proof)),
-                );
+                    let note_inclusion_proof = NoteInclusionProof::new(
+                        note_block_num,
+                        sync_note.note_index(),
+                        sync_note.inclusion_path().clone(),
+                    )?;
+
+                    retrieved_proofs.insert(
+                        *sync_note.note_id(),
+                        Some((sync_note.metadata(), note_inclusion_proof)),
+                    );
+                }
             }
 
             // We might have reached the chain tip without having found some notes, bail if so
-            if sync_notes.block_header.block_num() == sync_notes.chain_tip {
+            if sync_notes.block_to == request_block_num {
                 break;
             }
 
-            // This means that a note with the same id was not found.
-            // Therefore, we should request again for sync_notes with the same note_tag
-            // and with the block_num of the last block header
-            // (sync_notes.block_header.unwrap()).
-            request_block_num = sync_notes.block_header.block_num();
+            // Advance to the last block we received or the end of the scanned range
+            request_block_num = sync_notes
+                .blocks
+                .last()
+                .map(|b| b.block_header.block_num())
+                .unwrap_or(sync_notes.block_to);
         }
         Ok(retrieved_proofs)
     }
