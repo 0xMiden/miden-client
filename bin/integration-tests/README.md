@@ -32,9 +32,10 @@ miden-client-integration-tests [OPTIONS]
 
 ### Command-Line Options
 
-- `-n, --network <NETWORK>` - The network to use. Options are `devnet`, `testnet`, `localhost` or a custom RPC endpoint (default: `localhost`)
+- `-n, --network <NETWORK>` - Network preset: `devnet`, `testnet`, `localhost`, or a custom RPC endpoint (default: `localhost`). Sets defaults for all components (RPC, prover, note transport)
 - `-t, --timeout <MILLISECONDS>` - Timeout for RPC requests in milliseconds (default: `10000`)
-- `--prover-url <URL>` - Remote prover endpoint. Accepts `devnet`, `testnet`, or a custom URL. If unset, the local prover is used
+- `--prover-url <URL>` - Override prover endpoint. Accepts `devnet`, `testnet`, `local`, or a custom URL. If unset, defaults based on network
+- `--note-transport-url <URL>` - Override note transport endpoint. Accepts `testnet` or a custom URL. If unset, defaults based on network
 - `-j, --jobs <NUMBER>` - Number of tests to run in parallel (default: auto-detected CPU cores, set to `1` for sequential execution)
 - `-f, --filter <REGEX>` - Filter tests by name using regex patterns
 - `--contains <STRING>` - Only run tests whose names contain this substring
@@ -91,9 +92,14 @@ Run tests against testnet:
 miden-client-integration-tests --network testnet
 ```
 
-Run tests against devnet with its remote prover:
+Run tests against devnet (auto-configures remote prover):
 ```bash
-miden-client-integration-tests --network devnet --prover-url devnet
+miden-client-integration-tests --network devnet
+```
+
+Run tests against testnet with a local prover override:
+```bash
+miden-client-integration-tests --network testnet --prover-url local
 ```
 
 Run tests against a custom RPC endpoint with timeout:
@@ -115,11 +121,31 @@ miden-client-integration-tests --help
 
 The following environment variables configure both the standalone binary and the `cargo test` generated wrappers:
 
-- `TEST_MIDEN_NETWORK` - Network to use: `devnet`, `testnet`, `localhost`, or a custom RPC endpoint URL (default: `localhost`)
-- `TEST_MIDEN_PROVER_URL` - Remote prover endpoint: `devnet`, `testnet`, or a custom URL (default: unset, uses local prover)
+- `TEST_MIDEN_NETWORK` - Network preset: `devnet`, `testnet`, `localhost`, or a custom RPC endpoint URL (default: `localhost`). Sets defaults for **all** components
+- `TEST_MIDEN_RPC_URL` - Overrides the RPC endpoint from the network preset
+- `TEST_MIDEN_PROVER_URL` - Overrides the prover: `devnet`, `testnet`, `local`, or a custom URL (default: derived from network)
+- `TEST_MIDEN_NOTE_TRANSPORT_URL` - Overrides note transport: `testnet` or a custom URL (default: derived from network)
 - `TEST_TIMEOUT` - Test timeout in milliseconds (default: `10000`)
 
-For the standalone binary, the `--network`, `--prover-url`, and `--timeout` CLI flags take precedence over environment variables.
+### Network Presets
+
+| Network | RPC | Prover | Note Transport |
+|---------|-----|--------|----------------|
+| `testnet` | `rpc.testnet.miden.io` | `tx-prover.testnet.miden.io` | `transport.miden.io` |
+| `devnet` | `rpc.devnet.miden.io` | `tx-prover.devnet.miden.io` | *(none)* |
+| `localhost` | `localhost:57291` | local | *(none)* |
+
+Any individual env var overrides the corresponding component from the preset. For example:
+
+```bash
+# Use testnet defaults but force local prover
+TEST_MIDEN_NETWORK=testnet TEST_MIDEN_PROVER_URL=local cargo test
+
+# Use devnet RPC with a custom note transport
+TEST_MIDEN_NETWORK=devnet TEST_MIDEN_NOTE_TRANSPORT_URL=http://localhost:57292 cargo test
+```
+
+For the standalone binary, CLI flags (`--network`, `--prover-url`, `--note-transport-url`, `--timeout`) take precedence over environment variables.
 
 ## Test Categories
 

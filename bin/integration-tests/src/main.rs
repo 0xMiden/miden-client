@@ -10,6 +10,7 @@ use std::time::{Duration, Instant};
 
 use clap::Parser;
 use miden_client::grpc_support::{DEVNET_PROVER_ENDPOINT, TESTNET_PROVER_ENDPOINT};
+use miden_client::note_transport::NOTE_TRANSPORT_DEFAULT_ENDPOINT;
 use miden_client::rpc::Endpoint;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -115,11 +116,14 @@ fn init_tracing(verbose: bool) {
     version
 )]
 struct Args {
-    /// The URL of the RPC endpoint to use.
-    ///
-    /// The network to use. Options are `devnet`, `testnet`, `localhost` or a custom RPC endpoint.
+    /// Network preset: sets defaults for all components (RPC, prover, note transport).
+    /// Options: `devnet`, `testnet`, `localhost`, or a custom RPC endpoint.
     #[arg(short, long, default_value = "localhost", env = "TEST_MIDEN_NETWORK")]
     network: Network,
+
+    /// Override the RPC endpoint from the network preset.
+    #[arg(long, env = "TEST_MIDEN_RPC_URL")]
+    rpc_url: Option<String>,
 
     /// Timeout for the RPC requests in milliseconds.
     #[arg(short, long, default_value = "10000")]
@@ -149,10 +153,15 @@ struct Args {
     #[arg(long, default_value = "3")]
     retry_count: usize,
 
-    /// Remote prover endpoint. Accepts "devnet", "testnet", or a custom URL.
-    /// If unset, the local prover is used.
+    /// Remote prover endpoint. Accepts "devnet", "testnet", "local", or a custom URL.
+    /// If unset, defaults based on --network (testnet/devnet use remote provers).
     #[arg(long, env = "TEST_MIDEN_PROVER_URL")]
     prover_url: Option<String>,
+
+    /// Note transport endpoint. Accepts "testnet" or a custom URL.
+    /// If unset, defaults based on --network (testnet uses transport.miden.io).
+    #[arg(long, env = "TEST_MIDEN_NOTE_TRANSPORT_URL")]
+    note_transport_url: Option<String>,
 
     /// Enable verbose tracing output (info-level logs from tests and client).
     #[arg(short, long)]
@@ -170,6 +179,7 @@ struct BaseConfig {
     rpc_endpoint: Endpoint,
     timeout: u64,
     prover_endpoint: Option<String>,
+    note_transport_endpoint: Option<String>,
     verbose: bool,
 }
 
@@ -177,23 +187,57 @@ impl TryFrom<Args> for BaseConfig {
     type Error = anyhow::Error;
 
     /// Creates a BaseConfig from command line arguments.
+    ///
+    /// The `--network` flag sets defaults for all components. Individual flags
+    /// (`--prover-url`, `--note-transport-url`) override specific components.
     fn try_from(args: Args) -> Result<Self, Self::Error> {
-        let endpoint = Endpoint::try_from(args.network.to_rpc_endpoint().as_str())
-            .map_err(|e| anyhow::anyhow!("Invalid network: {:?}: {}", args.network, e))?;
+        // --rpc-url overrides the network preset for RPC.
+        let endpoint = if let Some(ref rpc_url) = args.rpc_url {
+            Endpoint::try_from(rpc_url.as_str())
+                .map_err(|e| anyhow::anyhow!("Invalid RPC URL: {rpc_url}: {e}"))?
+        } else {
+            Endpoint::try_from(args.network.to_rpc_endpoint().as_str())
+                .map_err(|e| anyhow::anyhow!("Invalid network: {:?}: {}", args.network, e))?
+        };
 
         let timeout_ms = args.timeout;
 
-        // Resolve named prover URLs to their actual endpoints.
-        let prover_endpoint = args.prover_url.map(|url| match url.to_lowercase().as_str() {
-            "devnet" => DEVNET_PROVER_ENDPOINT.to_string(),
-            "testnet" => TESTNET_PROVER_ENDPOINT.to_string(),
-            _ => url,
-        });
+        // Resolve prover: explicit flag overrides network preset.
+        let prover_endpoint = if let Some(url) = args.prover_url {
+            match url.to_lowercase().as_str() {
+                "local" => None,
+                "devnet" => Some(DEVNET_PROVER_ENDPOINT.to_string()),
+                "testnet" => Some(TESTNET_PROVER_ENDPOINT.to_string()),
+                _ => Some(url),
+            }
+        } else {
+            // Network preset defaults
+            match &args.network {
+                Network::Testnet => Some(TESTNET_PROVER_ENDPOINT.to_string()),
+                Network::Devnet => Some(DEVNET_PROVER_ENDPOINT.to_string()),
+                _ => None,
+            }
+        };
+
+        // Resolve note transport: explicit flag overrides network preset.
+        let note_transport_endpoint = if let Some(url) = args.note_transport_url {
+            match url.to_lowercase().as_str() {
+                "testnet" => Some(NOTE_TRANSPORT_DEFAULT_ENDPOINT.to_string()),
+                _ => Some(url),
+            }
+        } else {
+            // Network preset defaults
+            match &args.network {
+                Network::Testnet => Some(NOTE_TRANSPORT_DEFAULT_ENDPOINT.to_string()),
+                _ => None,
+            }
+        };
 
         Ok(BaseConfig {
             rpc_endpoint: endpoint,
             timeout: timeout_ms,
             prover_endpoint,
+            note_transport_endpoint,
             verbose: args.verbose,
         })
     }
@@ -404,7 +448,8 @@ fn run_single_test_subprocess(args: &Args, test_name: &str) {
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         rt.block_on(async {
             let config = ClientConfig::new(base_config.rpc_endpoint.clone(), base_config.timeout)
-                .with_prover_endpoint(base_config.prover_endpoint.clone());
+                .with_prover_endpoint(base_config.prover_endpoint.clone())
+                .with_note_transport_endpoint(base_config.note_transport_endpoint.clone());
             (test.function)(config).await
         })
     }));
@@ -570,6 +615,10 @@ fn run_tests_parallel(
         println!("─────────────────────────────────────────────────────────");
         println!("  RPC endpoint: {}", base_config.rpc_endpoint);
         println!("  Prover:       {}", base_config.prover_endpoint.as_deref().unwrap_or("local"));
+        println!(
+            "  Transport:    {}",
+            base_config.note_transport_endpoint.as_deref().unwrap_or("none")
+        );
         println!("  Timeout:      {}ms", base_config.timeout);
         println!("─────────────────────────────────────────────────────────");
     }
@@ -593,6 +642,7 @@ fn run_tests_parallel(
     // Get network endpoint string for passing to subprocess
     let network_endpoint = base_config.rpc_endpoint.to_string();
     let prover_endpoint = base_config.prover_endpoint.clone();
+    let note_transport_endpoint = base_config.note_transport_endpoint.clone();
     let timeout = base_config.timeout;
     let verbose = base_config.verbose;
 
@@ -606,6 +656,7 @@ fn run_tests_parallel(
         let current_exe = current_exe.clone();
         let network_endpoint = network_endpoint.clone();
         let prover_endpoint = prover_endpoint.clone();
+        let note_transport_endpoint = note_transport_endpoint.clone();
 
         let handle = thread::spawn(move || {
             loop {
@@ -637,6 +688,11 @@ fn run_tests_parallel(
                 // Forward prover URL if set
                 if let Some(ref prover_url) = prover_endpoint {
                     cmd.arg("--prover-url").arg(prover_url);
+                }
+
+                // Forward note transport URL if set
+                if let Some(ref transport_url) = note_transport_endpoint {
+                    cmd.arg("--note-transport-url").arg(transport_url);
                 }
 
                 // Forward verbosity flag

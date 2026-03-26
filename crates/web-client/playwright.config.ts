@@ -16,7 +16,7 @@ export default defineConfig({
   timeout: 240_000,
   testDir: "./test",
   /* Run tests in files in parallel */
-  fullyParallel: process.env.REMOTE_PROVER ? false : true,
+  fullyParallel: process.env.TEST_MIDEN_PROVER_URL ? false : true,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
   forbidOnly: !!process.env.CI,
   /* Retry on CI only */

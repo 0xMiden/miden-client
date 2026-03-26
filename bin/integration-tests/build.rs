@@ -25,17 +25,21 @@ const INTEGRATION_TESTS_HEADER: &str = r#"// Auto-generated integration tests
 const INTEGRATION_TESTS_IMPORTS: &str = r#"use anyhow::{anyhow, Result};
 use miden_client_integration_tests::tests::config::ClientConfig;
 use miden_client::grpc_support::{DEVNET_PROVER_ENDPOINT, TESTNET_PROVER_ENDPOINT};
+use miden_client::note_transport::NOTE_TRANSPORT_DEFAULT_ENDPOINT;
 use miden_client::rpc::Endpoint;"#;
 
 const TOKIO_TEST_WRAPPER: &str = r#"/// Auto-generated tokio test wrapper for {ORIGINAL_FUNCTION_NAME}
 #[tokio::test]
 async fn {TEST_FUNCTION_NAME}() -> Result<()> {{
     // Use TEST_MIDEN_NETWORK to determine the endpoint (matches the binary's behavior).
-    // Accepted values: "devnet", "testnet", "localhost", or a custom RPC endpoint string.
+    // TEST_MIDEN_RPC_URL overrides the RPC endpoint from the network preset.
     let network = std::env::var("TEST_MIDEN_NETWORK")
         .unwrap_or_else(|_| "localhost".to_string());
     let network_lower = network.to_lowercase();
-    let endpoint = if network_lower == "devnet" {{
+    let endpoint = if let Ok(rpc_url) = std::env::var("TEST_MIDEN_RPC_URL") {{
+        Endpoint::try_from(rpc_url.as_str())
+            .map_err(|e| anyhow!("Invalid RPC URL: {}", e))?
+    }} else if network_lower == "devnet" {{
         Endpoint::devnet()
     }} else if network_lower == "testnet" {{
         Endpoint::testnet()
@@ -50,21 +54,43 @@ async fn {TEST_FUNCTION_NAME}() -> Result<()> {{
         .parse::<u64>()
         .map_err(|_| anyhow!("Invalid timeout value"))?;
 
-    // Use TEST_MIDEN_PROVER_URL to optionally configure a remote prover.
-    // Accepts "devnet", "testnet", or a custom prover endpoint URL.
-    let prover_endpoint = std::env::var("TEST_MIDEN_PROVER_URL").ok().map(|url| {{
+    // Resolve prover: TEST_MIDEN_PROVER_URL overrides network preset.
+    let prover_endpoint = if let Ok(url) = std::env::var("TEST_MIDEN_PROVER_URL") {{
         let lower = url.to_lowercase();
-        if lower == "devnet" {{
-            DEVNET_PROVER_ENDPOINT.to_string()
+        if lower == "local" {{
+            None
+        }} else if lower == "devnet" {{
+            Some(DEVNET_PROVER_ENDPOINT.to_string())
         }} else if lower == "testnet" {{
-            TESTNET_PROVER_ENDPOINT.to_string()
+            Some(TESTNET_PROVER_ENDPOINT.to_string())
         }} else {{
-            url
+            Some(url)
         }}
-    }});
+    }} else if network_lower == "testnet" {{
+        Some(TESTNET_PROVER_ENDPOINT.to_string())
+    }} else if network_lower == "devnet" {{
+        Some(DEVNET_PROVER_ENDPOINT.to_string())
+    }} else {{
+        None
+    }};
+
+    // Resolve note transport: TEST_MIDEN_NOTE_TRANSPORT_URL overrides network preset.
+    let note_transport_endpoint = if let Ok(url) = std::env::var("TEST_MIDEN_NOTE_TRANSPORT_URL") {{
+        let lower = url.to_lowercase();
+        if lower == "testnet" {{
+            Some(NOTE_TRANSPORT_DEFAULT_ENDPOINT.to_string())
+        }} else {{
+            Some(url)
+        }}
+    }} else if network_lower == "testnet" {{
+        Some(NOTE_TRANSPORT_DEFAULT_ENDPOINT.to_string())
+    }} else {{
+        None
+    }};
 
     let client_config = ClientConfig::new(endpoint, timeout)
-        .with_prover_endpoint(prover_endpoint);
+        .with_prover_endpoint(prover_endpoint)
+        .with_note_transport_endpoint(note_transport_endpoint);
     {ORIGINAL_FUNCTION_NAME}(client_config).await
 }}"#;
 
@@ -353,10 +379,13 @@ fn parse_test_function_name(line: &str) -> Option<String> {
 /// # Environment Variables
 ///
 /// The generated tests respect these environment variables:
-/// - `TEST_MIDEN_NETWORK` - Network to use: "devnet", "testnet", "localhost", or a custom RPC
-///   endpoint (default: localhost)
-/// - `TEST_MIDEN_PROVER_URL` - Remote prover endpoint: "devnet", "testnet", or a custom URL
-///   (default: unset, uses local prover)
+/// - `TEST_MIDEN_NETWORK` - Network preset: "devnet", "testnet", "localhost", or a custom RPC
+///   endpoint (default: localhost). Sets defaults for all components.
+/// - `TEST_MIDEN_RPC_URL` - Overrides the RPC endpoint from the network preset
+/// - `TEST_MIDEN_PROVER_URL` - Overrides the prover: "devnet", "testnet", "local", or a custom URL
+///   (default: derived from network)
+/// - `TEST_MIDEN_NOTE_TRANSPORT_URL` - Overrides note transport: "testnet" or a custom URL
+///   (default: derived from network)
 /// - `TEST_TIMEOUT` - Test timeout in milliseconds (default: 10000)
 fn generate_integration_tests(test_cases: &[TestCaseInfo]) -> String {
     let mut result = String::new();

@@ -49,6 +49,7 @@ pub async fn test_pass_through(client_config: ClientConfig) -> Result<()> {
         store_config: client_config_2.2,
         auth_path: client_config_2.3,
         prover_endpoint: client_config.prover_endpoint.clone(),
+        note_transport_endpoint: client_config.note_transport_endpoint.clone(),
     };
     let (mut client_2, authenticator_2) = client_config_2.into_client().await?;
 
