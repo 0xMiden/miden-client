@@ -25,7 +25,6 @@ const INTEGRATION_TESTS_HEADER: &str = r#"// Auto-generated integration tests
 const INTEGRATION_TESTS_IMPORTS: &str = r#"use anyhow::{anyhow, Result};
 use miden_client_integration_tests::tests::config::ClientConfig;
 use miden_client::grpc_support::{DEVNET_PROVER_ENDPOINT, TESTNET_PROVER_ENDPOINT};
-use miden_client::note_transport::NOTE_TRANSPORT_DEFAULT_ENDPOINT;
 use miden_client::rpc::Endpoint;"#;
 
 const TOKIO_TEST_WRAPPER: &str = r#"/// Auto-generated tokio test wrapper for {ORIGINAL_FUNCTION_NAME}
@@ -74,23 +73,11 @@ async fn {TEST_FUNCTION_NAME}() -> Result<()> {{
         None
     }};
 
-    // Resolve note transport: TEST_MIDEN_NOTE_TRANSPORT_URL overrides network preset.
-    let note_transport_endpoint = if let Ok(url) = std::env::var("TEST_MIDEN_NOTE_TRANSPORT_URL") {{
-        let lower = url.to_lowercase();
-        if lower == "testnet" {{
-            Some(NOTE_TRANSPORT_DEFAULT_ENDPOINT.to_string())
-        }} else {{
-            Some(url)
-        }}
-    }} else if network_lower == "testnet" {{
-        Some(NOTE_TRANSPORT_DEFAULT_ENDPOINT.to_string())
-    }} else {{
-        None
-    }};
-
+    // Note: note_transport_endpoint is NOT set here to avoid creating eager gRPC
+    // connections to the transport service for every test. Transport tests read
+    // TEST_MIDEN_NOTE_TRANSPORT_URL directly and configure transport on their own configs.
     let client_config = ClientConfig::new(endpoint, timeout)
-        .with_prover_endpoint(prover_endpoint)
-        .with_note_transport_endpoint(note_transport_endpoint);
+        .with_prover_endpoint(prover_endpoint);
     {ORIGINAL_FUNCTION_NAME}(client_config).await
 }}"#;
 
@@ -384,8 +371,7 @@ fn parse_test_function_name(line: &str) -> Option<String> {
 /// - `TEST_MIDEN_RPC_URL` - Overrides the RPC endpoint from the network preset
 /// - `TEST_MIDEN_PROVER_URL` - Overrides the prover: "devnet", "testnet", "local", or a custom URL
 ///   (default: derived from network)
-/// - `TEST_MIDEN_NOTE_TRANSPORT_URL` - Overrides note transport: "testnet" or a custom URL
-///   (default: derived from network)
+/// - `TEST_MIDEN_NOTE_TRANSPORT_URL` - Used by transport tests directly (not in generated wrappers)
 /// - `TEST_TIMEOUT` - Test timeout in milliseconds (default: 10000)
 fn generate_integration_tests(test_cases: &[TestCaseInfo]) -> String {
     let mut result = String::new();

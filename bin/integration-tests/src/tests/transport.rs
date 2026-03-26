@@ -4,6 +4,7 @@ use miden_client::address::{Address, AddressInterface, RoutingParameters};
 use miden_client::asset::FungibleAsset;
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
 use miden_client::note::NoteType;
+use miden_client::note_transport::NOTE_TRANSPORT_DEFAULT_ENDPOINT;
 use miden_client::store::{InputNoteState, NoteFilter};
 use miden_client::testing::common::{
     assert_account_has_single_asset,
@@ -18,6 +19,29 @@ use miden_client::transaction::TransactionRequestBuilder;
 
 use crate::tests::config::ClientConfig;
 
+/// Resolves the note transport endpoint from the environment.
+///
+/// Reads `TEST_MIDEN_NOTE_TRANSPORT_URL` directly so that only transport tests create
+/// eager gRPC connections to the transport service.
+fn resolve_transport_endpoint() -> Option<String> {
+    if let Ok(url) = std::env::var("TEST_MIDEN_NOTE_TRANSPORT_URL") {
+        let lower = url.to_lowercase();
+        if lower == "testnet" {
+            Some(NOTE_TRANSPORT_DEFAULT_ENDPOINT.to_string())
+        } else {
+            Some(url)
+        }
+    } else {
+        let network =
+            std::env::var("TEST_MIDEN_NETWORK").unwrap_or_else(|_| "localhost".to_string());
+        if network.to_lowercase() == "testnet" {
+            Some(NOTE_TRANSPORT_DEFAULT_ENDPOINT.to_string())
+        } else {
+            None
+        }
+    }
+}
+
 // TRANSPORT NOTE INCLUSION PROOF AND CONSUMPTION TESTS
 // ================================================================================================
 
@@ -25,7 +49,8 @@ use crate::tests::config::ClientConfig;
 pub async fn test_transport_note_inclusion_proof_and_consumption(
     client_config: ClientConfig,
 ) -> Result<()> {
-    if client_config.note_transport_endpoint.is_none() {
+    let transport_endpoint = resolve_transport_endpoint();
+    if transport_endpoint.is_none() {
         eprintln!(
             "Skipping note transport test (set TEST_MIDEN_NOTE_TRANSPORT_URL or use \
              --note-transport-url to enable)"
@@ -35,9 +60,9 @@ pub async fn test_transport_note_inclusion_proof_and_consumption(
 
     let (rpc_endpoint, rpc_timeout, ..) = client_config.as_parts();
     let sender_config = ClientConfig::new(rpc_endpoint.clone(), rpc_timeout)
-        .with_note_transport_endpoint(client_config.note_transport_endpoint.clone());
+        .with_note_transport_endpoint(transport_endpoint.clone());
     let recipient_config = ClientConfig::new(rpc_endpoint, rpc_timeout)
-        .with_note_transport_endpoint(client_config.note_transport_endpoint.clone());
+        .with_note_transport_endpoint(transport_endpoint);
 
     let (sender_builder, sender_keystore) = sender_config
         .into_client_builder()
@@ -134,7 +159,8 @@ pub async fn test_transport_note_inclusion_proof_and_consumption(
 pub async fn test_transport_multiple_notes_different_blocks(
     client_config: ClientConfig,
 ) -> Result<()> {
-    if client_config.note_transport_endpoint.is_none() {
+    let transport_endpoint = resolve_transport_endpoint();
+    if transport_endpoint.is_none() {
         eprintln!(
             "Skipping note transport test (set TEST_MIDEN_NOTE_TRANSPORT_URL or use \
              --note-transport-url to enable)"
@@ -144,9 +170,9 @@ pub async fn test_transport_multiple_notes_different_blocks(
 
     let (rpc_endpoint, rpc_timeout, ..) = client_config.as_parts();
     let sender_config = ClientConfig::new(rpc_endpoint.clone(), rpc_timeout)
-        .with_note_transport_endpoint(client_config.note_transport_endpoint.clone());
+        .with_note_transport_endpoint(transport_endpoint.clone());
     let recipient_config = ClientConfig::new(rpc_endpoint, rpc_timeout)
-        .with_note_transport_endpoint(client_config.note_transport_endpoint.clone());
+        .with_note_transport_endpoint(transport_endpoint);
 
     let (sender_builder, sender_keystore) = sender_config
         .into_client_builder()
@@ -265,7 +291,8 @@ pub async fn test_transport_multiple_notes_different_blocks(
 /// Tests that a note sent via transport before being committed on-chain starts as Expected,
 /// then transitions to Committed once the mint tx is executed and synced.
 pub async fn test_transport_note_not_yet_committed(client_config: ClientConfig) -> Result<()> {
-    if client_config.note_transport_endpoint.is_none() {
+    let transport_endpoint = resolve_transport_endpoint();
+    if transport_endpoint.is_none() {
         eprintln!(
             "Skipping note transport test (set TEST_MIDEN_NOTE_TRANSPORT_URL or use \
              --note-transport-url to enable)"
@@ -275,9 +302,9 @@ pub async fn test_transport_note_not_yet_committed(client_config: ClientConfig) 
 
     let (rpc_endpoint, rpc_timeout, ..) = client_config.as_parts();
     let sender_config = ClientConfig::new(rpc_endpoint.clone(), rpc_timeout)
-        .with_note_transport_endpoint(client_config.note_transport_endpoint.clone());
+        .with_note_transport_endpoint(transport_endpoint.clone());
     let recipient_config = ClientConfig::new(rpc_endpoint, rpc_timeout)
-        .with_note_transport_endpoint(client_config.note_transport_endpoint.clone());
+        .with_note_transport_endpoint(transport_endpoint);
 
     let (sender_builder, sender_keystore) = sender_config
         .into_client_builder()
