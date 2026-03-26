@@ -62,6 +62,7 @@
 //! For more detailed information about each function and error type, refer to the specific API
 //! documentation.
 
+use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
@@ -81,7 +82,7 @@ use super::Client;
 use crate::ClientError;
 use crate::note::NoteUpdateTracker;
 use crate::rpc::domain::account::AccountStorageRequirements;
-use crate::rpc::{AccountStateAt, NodeRpcClient};
+use crate::rpc::{AccountStateAt, GrpcError, NodeRpcClient, RpcError};
 use crate::store::data_store::ClientDataStore;
 use crate::store::input_note_states::ExpectedNoteState;
 use crate::store::{
@@ -204,6 +205,17 @@ where
         transaction_request: TransactionRequest,
         tx_prover: Arc<dyn TransactionProver>,
     ) -> Result<TransactionId, ClientError> {
+        // Register any missing NTX scripts before the main transaction.
+        // The registration path contains its own full execute -> prove -> submit pipeline.
+        if !transaction_request.expected_ntx_scripts().is_empty() {
+            Box::pin(self.ensure_ntx_scripts_registered(
+                account_id,
+                transaction_request.expected_ntx_scripts(),
+                tx_prover.clone(),
+            ))
+            .await?;
+        }
+
         let tx_result = self.execute_transaction(account_id, transaction_request).await?;
         let tx_id = tx_result.executed_transaction().id();
 
@@ -615,6 +627,59 @@ where
         }
     }
 
+    /// Checks whether the node's `note_scripts` registry already has each of the expected NTX
+    /// scripts. For any script that is missing, creates and submits a registration transaction
+    /// that produces a public note carrying that script.
+    ///
+    /// `account_id` is the account that will execute the registration transaction.
+    ///
+    /// This method is called automatically by [`Self::submit_new_transaction_with_prover`] when the
+    /// [`TransactionRequest`] contains expected NTX scripts. It can also be called directly if
+    /// you want to register scripts ahead of time.
+    pub async fn ensure_ntx_scripts_registered(
+        &mut self,
+        account_id: AccountId,
+        scripts: &[NoteScript],
+        tx_prover: Arc<dyn TransactionProver>,
+    ) -> Result<(), ClientError> {
+        let mut missing_scripts = Vec::new();
+
+        for script in scripts {
+            let script_root = script.root();
+
+            // Check if the node already has this script registered.
+            match self.rpc_api.get_note_script_by_root(script_root).await {
+                Ok(_) => {},
+                Err(RpcError::RequestError { error_kind: GrpcError::NotFound, .. }) => {
+                    missing_scripts.push(script.clone());
+                },
+                Err(other) => {
+                    return Err(ClientError::NtxScriptRegistrationFailed {
+                        script_root,
+                        source: other,
+                    });
+                },
+            }
+        }
+
+        if missing_scripts.is_empty() {
+            return Ok(());
+        }
+
+        let registration_request = TransactionRequestBuilder::new().build_register_note_scripts(
+            account_id,
+            missing_scripts,
+            self.rng(),
+        )?;
+
+        let tx_result = self.execute_transaction(account_id, registration_request).await?;
+        let proven = self.prove_transaction_with(&tx_result, tx_prover).await?;
+        let submission_height = self.submit_proven_transaction(proven, &tx_result).await?;
+        self.apply_transaction(&tx_result, submission_height).await?;
+
+        Ok(())
+    }
+
     /// Filters out invalid or non-consumable input notes by simulating
     /// note consumption and removing any that fail validation.
     async fn get_valid_input_notes(
@@ -839,10 +904,15 @@ pub(crate) async fn fetch_public_account_inputs(
         store.get_foreign_account_code(vec![account_id]).await?.into_values().next();
 
     let (_, account_proof) = rpc_api
-        .get_account_proof(account_id, storage_requirements, account_state_at, known_account_code)
+        .get_account_proof(
+            account_id,
+            storage_requirements.clone(),
+            account_state_at,
+            known_account_code,
+        )
         .await?;
 
-    let account_inputs = request::account_proof_into_inputs(account_proof)?;
+    let account_inputs = request::account_proof_into_inputs(account_proof, &storage_requirements)?;
 
     let _ = store
         .upsert_foreign_account_code(account_id, account_inputs.code().clone())

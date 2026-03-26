@@ -76,7 +76,7 @@ impl MockRpcApi {
     }
 
     /// Sets the oversize threshold for determining when `get_account_details` returns
-    /// `PublicOversize` instead of `Public`. Any storage map with more entries than this
+    /// `PublicLarge` instead of `Public`. Any storage map with more entries than this
     /// threshold, or a vault with more assets, will trigger the oversize response.
     #[must_use]
     pub fn with_oversize_threshold(mut self, threshold: usize) -> Self {
@@ -527,7 +527,7 @@ impl NodeRpcClient for MockRpcApi {
 
     /// Returns the node's tracked account details for the specified account ID.
     /// When the account exceeds the oversize threshold (storage maps with more entries
-    /// or vault with more assets), returns `PublicOversize` instead of `Public`.
+    /// or vault with more assets), returns `PublicLarge` instead of `Public`.
     async fn get_account_details(&self, account_id: AccountId) -> Result<FetchedAccount, RpcError> {
         let summary = self
             .account_commitment_updates
@@ -552,7 +552,7 @@ impl NodeRpcClient for MockRpcApi {
 
             if has_oversized_map || has_oversized_vault {
                 let details = Self::build_account_details(account, threshold);
-                Ok(FetchedAccount::new_public_oversize(summary, details))
+                Ok(FetchedAccount::new_public_large(summary, details))
             } else {
                 Ok(FetchedAccount::new_public(account.clone(), summary))
             }

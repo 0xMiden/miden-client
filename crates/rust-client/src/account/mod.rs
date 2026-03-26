@@ -238,7 +238,7 @@ impl<AUTH> Client<AUTH> {
                 return Err(ClientError::AccountIsPrivate(account_id));
             },
             FetchedAccount::Public(account, ..) => *account,
-            FetchedAccount::PublicOversize { details, .. } => {
+            FetchedAccount::PublicLarge(details, _) => {
                 // For import, we need the full account. Build it from the already-fetched
                 // details by downloading oversized data via sync endpoints.
                 self.rpc_api

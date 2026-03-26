@@ -335,15 +335,29 @@ impl GrpcClient {
                                 self.sync_storage_maps(0_u32.into(), None, account_id).await?;
                             map_cache.insert(fetched_data)
                         };
-                        let map_entries: Vec<_> = map_info
+                        // The sync endpoint may return multiple updates for the same key
+                        // across different blocks. We sort by block number so that
+                        // inserting into the map keeps only the latest value per key.
+                        let mut sorted_updates: Vec<_> = map_info
                             .updates
                             .iter()
                             .filter(|slot_info| slot_info.slot_name == *slot_header.name())
-                            .map(|slot_info| (slot_info.key, slot_info.value))
+                            .collect();
+                        sorted_updates.sort_by_key(|u| u.block_num);
+                        let map_entries: Vec<_> = sorted_updates
+                            .into_iter()
+                            .map(|u| (u.key, u.value))
+                            .collect::<BTreeMap<_, _>>()
+                            .into_iter()
                             .collect();
                         StorageMap::with_entries(map_entries)
                     } else {
-                        map_details.entries.clone().into_storage_map()
+                        map_details.entries.clone().into_storage_map().ok_or_else(|| {
+                            RpcError::ExpectedDataMissing(
+                                "expected AllEntries for full account fetch, got EntriesWithProofs"
+                                    .into(),
+                            )
+                        })?
                     }
                     .map_err(|err| {
                         RpcError::InvalidResponse(format!(
@@ -541,7 +555,7 @@ impl NodeRpcClient for GrpcClient {
                 || details.storage_details.map_details.iter().any(|m| m.too_many_entries);
 
             if is_oversize {
-                return Ok(FetchedAccount::new_public_oversize(update_summary, details));
+                return Ok(FetchedAccount::new_public_large(update_summary, details));
             }
 
             // Small account: build the full Account directly.

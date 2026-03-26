@@ -17,11 +17,13 @@ import type {
 } from "../types";
 import { DEFAULTS } from "../types";
 import { parseAccountId, parseAddress } from "../utils/accountParsing";
-import { runExclusiveDirect } from "../utils/runExclusive";
 import { createNoteAttachment } from "../utils/noteAttachment";
-import { MidenError } from "../utils/errors";
+import { MidenError, assertSignerConnected } from "../utils/errors";
 import { getNoteType, waitForTransactionCommit } from "../utils/noteFilters";
 import type { ClientWithTransactions } from "../utils/noteFilters";
+import { proveWithFallback } from "../utils/prover";
+import { useMidenStore } from "../store/MidenStore";
+import { runExclusiveDirect } from "../utils/runExclusive";
 
 export interface UseMultiSendResult {
   /** Create multiple P2ID output notes in one transaction */
@@ -67,8 +69,7 @@ export interface UseMultiSendResult {
  * ```
  */
 export function useMultiSend(): UseMultiSendResult {
-  const { client, isReady, sync, runExclusive, prover } = useMiden();
-  const runExclusiveSafe = runExclusive ?? runExclusiveDirect;
+  const { client, isReady, sync, prover, signerConnected } = useMiden();
   const isBusyRef = useRef(false);
 
   const [result, setResult] = useState<TransactionResult | null>(null);
@@ -81,6 +82,8 @@ export function useMultiSend(): UseMultiSendResult {
       if (!client || !isReady) {
         throw new Error("Miden client is not ready");
       }
+
+      assertSignerConnected(signerConnected);
 
       if (options.recipients.length === 0) {
         throw new Error("No recipients provided");
@@ -146,18 +149,22 @@ export function useMultiSend(): UseMultiSendResult {
           .build();
 
         const txSenderId = parseAccountId(options.from);
-        const txResult = await runExclusiveSafe(() =>
-          client.executeTransaction(txSenderId, txRequest)
-        );
+        const txResult = await client.executeTransaction(txSenderId, txRequest);
 
         setStage("proving");
-        const provenTransaction = await runExclusiveSafe(() =>
-          client.proveTransaction(txResult, prover ?? undefined)
+        const proverConfig = useMidenStore.getState().config;
+        const provenTransaction = await proveWithFallback(
+          (resolvedProver) =>
+            runExclusiveDirect(() =>
+              client.proveTransaction(txResult, resolvedProver)
+            ),
+          proverConfig
         );
 
         setStage("submitting");
-        const submissionHeight = await runExclusiveSafe(() =>
-          client.submitProvenTransaction(provenTransaction, txResult)
+        const submissionHeight = await client.submitProvenTransaction(
+          provenTransaction,
+          txResult
         );
 
         // Save txId hex/string BEFORE applyTransaction, which consumes the
@@ -165,23 +172,22 @@ export function useMultiSend(): UseMultiSendResult {
         const txIdHex = txResult.id().toHex();
         const txIdString = txResult.id().toString();
 
-        await runExclusiveSafe(() =>
-          client.applyTransaction(txResult, submissionHeight)
-        );
+        await client.applyTransaction(txResult, submissionHeight);
 
         // Send private notes after commit
         const hasPrivate = outputs.some((o) => o.noteType === NoteType.Private);
         if (hasPrivate) {
           await waitForTransactionCommit(
             client as unknown as ClientWithTransactions,
-            runExclusiveSafe,
+            runExclusiveDirect,
             txIdHex
           );
 
           for (const output of outputs) {
             if (output.noteType === NoteType.Private) {
-              await runExclusiveSafe(() =>
-                client.sendPrivateNote(output.note, output.recipientAddress)
+              await client.sendPrivateNote(
+                output.note,
+                output.recipientAddress
               );
             }
           }
@@ -205,7 +211,7 @@ export function useMultiSend(): UseMultiSendResult {
         isBusyRef.current = false;
       }
     },
-    [client, isReady, prover, runExclusive, sync]
+    [client, isReady, prover, signerConnected, sync]
   );
 
   const reset = useCallback(() => {

@@ -32,14 +32,18 @@ impl NoteExecutionHint {
 
     /// Reconstructs a hint from its encoded tag and payload.
     #[wasm_bindgen(js_name = "fromParts")]
-    pub fn from_parts(tag: u8, payload: u32) -> NoteExecutionHint {
-        NoteExecutionHint(NativeNoteExecutionHint::from_parts(tag, payload).unwrap())
+    pub fn from_parts(tag: u8, payload: u32) -> Result<NoteExecutionHint, JsValue> {
+        let hint = NativeNoteExecutionHint::from_parts(tag, payload)
+            .map_err(|err| JsValue::from_str(&format!("Invalid execution hint: {err}")))?;
+        Ok(NoteExecutionHint(hint))
     }
 
     /// Returns whether the note can be consumed at the provided block height.
     #[wasm_bindgen(js_name = "canBeConsumed")]
-    pub fn can_be_consumed(&self, block_num: u32) -> bool {
-        self.0.can_be_consumed(block_num.into()).unwrap()
+    pub fn can_be_consumed(&self, block_num: u32) -> Result<bool, JsValue> {
+        self.0
+            .can_be_consumed(block_num.into())
+            .ok_or_else(|| JsValue::from_str("Cannot determine consumability for this hint type"))
     }
 }
 

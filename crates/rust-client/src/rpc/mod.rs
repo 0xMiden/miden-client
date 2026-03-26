@@ -299,7 +299,7 @@ pub trait NodeRpcClient: Send + Sync {
         let response = self.get_account_details(account_id).await?;
         match response {
             FetchedAccount::Public(account, _) => Ok(*account),
-            FetchedAccount::PublicOversize { details, .. } => {
+            FetchedAccount::PublicLarge(details, _) => {
                 self.build_full_account_from_details(*details).await
             },
             FetchedAccount::Private(..) => Err(RpcError::ExpectedDataMissing(
@@ -310,7 +310,7 @@ pub trait NodeRpcClient: Send + Sync {
 
     /// Builds a full [`Account`] from [`AccountDetails`] by fetching oversized data via
     /// sync endpoints. This is the fallback path when `get_account_details` returns
-    /// `PublicOversize`.
+    /// `PublicLarge`.
     async fn build_full_account_from_details(
         &self,
         details: AccountDetails,
@@ -348,29 +348,32 @@ pub trait NodeRpcClient: Send + Sync {
                             slot_header.name(),
                         )))?;
 
-                    let storage_map = if map_details.too_many_entries {
-                        let map_info = if let Some(ref info) = map_cache {
-                            info
+                    let storage_map =
+                        if map_details.too_many_entries {
+                            let map_info = if let Some(ref info) = map_cache {
+                                info
+                            } else {
+                                let fetched_data =
+                                    self.sync_storage_maps(0_u32.into(), None, account_id).await?;
+                                map_cache.insert(fetched_data)
+                            };
+                            let map_entries: Vec<_> = map_info
+                                .updates
+                                .iter()
+                                .filter(|slot_info| slot_info.slot_name == *slot_header.name())
+                                .map(|slot_info| (slot_info.key, slot_info.value))
+                                .collect();
+                            StorageMap::with_entries(map_entries)
                         } else {
-                            let fetched_data =
-                                self.sync_storage_maps(0_u32.into(), None, account_id).await?;
-                            map_cache.insert(fetched_data)
-                        };
-                        let map_entries: Vec<_> = map_info
-                            .updates
-                            .iter()
-                            .filter(|slot_info| slot_info.slot_name == *slot_header.name())
-                            .map(|slot_info| (slot_info.key, slot_info.value))
-                            .collect();
-                        StorageMap::with_entries(map_entries)
-                    } else {
-                        map_details.entries.clone().into_storage_map()
-                    }
-                    .map_err(|err| {
-                        RpcError::InvalidResponse(format!(
-                            "the rpc api returned a non-valid map entry: {err}"
-                        ))
-                    })?;
+                            map_details.entries.clone().into_storage_map().expect(
+                                "non-oversized map entries should always be AllEntries variant",
+                            )
+                        }
+                        .map_err(|err| {
+                            RpcError::InvalidResponse(format!(
+                                "the rpc api returned a non-valid map entry: {err}"
+                            ))
+                        })?;
 
                     slots.push(miden_protocol::account::StorageSlot::with_map(
                         slot_header.name().clone(),

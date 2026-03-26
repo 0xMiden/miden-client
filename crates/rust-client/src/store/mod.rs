@@ -137,6 +137,9 @@ pub trait Store: Send + Sync {
     // --------------------------------------------------------------------------------------------
 
     /// Retrieves the input notes from the store.
+    ///
+    /// When `filter` is [`NoteFilter::Consumed`], notes are sorted by their on-chain execution
+    /// order.
     async fn get_input_notes(&self, filter: NoteFilter)
     -> Result<Vec<InputNoteRecord>, StoreError>;
 
@@ -145,6 +148,22 @@ pub trait Store: Send + Sync {
         &self,
         filter: NoteFilter,
     ) -> Result<Vec<OutputNoteRecord>, StoreError>;
+
+    /// Retrieves a single input note at the given offset from the filtered set for the given
+    /// consumer account. Optionally restricts to a block range via `block_start` and
+    /// `block_end`. Returns `None` when the offset is past the end of the matching notes.
+    ///
+    /// # Ordering
+    ///
+    /// Notes are sorted by their per-account on-chain execution order.
+    async fn get_input_note_by_offset(
+        &self,
+        filter: NoteFilter,
+        consumer: AccountId,
+        block_start: Option<BlockNumber>,
+        block_end: Option<BlockNumber>,
+        offset: u32,
+    ) -> Result<Option<InputNoteRecord>, StoreError>;
 
     /// Returns the nullifiers of all unspent input notes.
     ///
@@ -379,7 +398,10 @@ pub trait Store: Send + Sync {
     /// Applies the state sync update to the store. An update involves:
     ///
     /// - Inserting the new block header to the store alongside new MMR peaks information.
-    /// - Updating the corresponding tracked input/output notes.
+    /// - Updating the corresponding tracked input/output notes. Consumed notes carry consumption
+    ///   metadata — `consumed_block_height`, `consumed_tx_order`, and `consumer_account_id` — in
+    ///   their note state. Implementations must persist these fields so that ordered queries (see
+    ///   [`Store::get_input_note_by_offset`]) work correctly.
     /// - Removing note tags that are no longer relevant.
     /// - Updating transactions in the store, marking as `committed` or `discarded`.
     ///   - In turn, validating private account's state transitions. If a private account's

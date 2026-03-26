@@ -22,7 +22,7 @@
 
 ### storage?
 
-> `optional` **storage**: `"public"` \| `"private"`
+> `optional` **storage**: [`StorageMode`](../type-aliases/StorageMode.md)
 
 ***
 
