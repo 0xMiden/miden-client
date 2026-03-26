@@ -196,16 +196,18 @@ impl StateSync {
         let account_ids: Vec<AccountId> = accounts.iter().map(AccountHeader::id).collect();
         let mut state_sync_steps = Vec::new();
 
-        while let Some(step) = self
-            .sync_state_step(state_sync_update.block_num, &account_ids, &note_tags)
-            .await?
-        {
-            let sync_block_num = step.block_header.block_num();
+        loop {
+            let (steps, advanced_to) = self
+                .sync_state_step(state_sync_update.block_num, &account_ids, &note_tags)
+                .await?;
 
-            let reached_tip = step.chain_tip == sync_block_num;
+            if advanced_to == state_sync_update.block_num {
+                break; // No progress, we're at the tip
+            }
 
-            state_sync_update.block_num = sync_block_num;
-            state_sync_steps.push(step);
+            state_sync_update.block_num = advanced_to;
+            let reached_tip = steps.last().is_some_and(|s| s.chain_tip == s.block_header.block_num());
+            state_sync_steps.extend(steps);
 
             if reached_tip {
                 break;
@@ -263,74 +265,141 @@ impl StateSync {
     /// Executes a single sync step by composing calls to `sync_notes`, `sync_chain_mmr`, and
     /// `sync_transactions`.
     ///
-    /// `sync_notes` drives the loop: it determines the target block (the first block containing
-    /// a matching note, or the chain tip). If the target block equals `current_block_num`, `None`
-    /// is returned, signalling that the client is already at the requested height.
+    /// Returns a list of `StateSyncInfo` steps (one per block with matching notes, plus a
+    /// tail step if needed to advance to the chain tip) and the block number advanced to.
     ///
-    /// The other two calls use the same target block to ensure a consistent range.
+    /// When the chain has not advanced, returns `(vec![], current_block_num)`.
     async fn sync_state_step(
         &self,
         current_block_num: BlockNumber,
         account_ids: &[AccountId],
         note_tags: &Arc<BTreeSet<NoteTag>>,
-    ) -> Result<Option<StateSyncInfo>, ClientError> {
+    ) -> Result<(Vec<StateSyncInfo>, BlockNumber), ClientError> {
         info!("Performing sync state step.");
 
-        // Retrieve sync_notes
         let note_sync =
             self.rpc_api.sync_notes(current_block_num, None, note_tags.as_ref()).await?;
 
-        let target_block = note_sync.block_header.block_num();
+        let chain_tip = note_sync.block_to;
 
-        // We don't need to continue if the chain has not advanced
-        if target_block == current_block_num {
-            return Ok(None);
+        // No progress — already at the tip
+        if chain_tip == current_block_num {
+            return Ok((vec![], current_block_num));
         }
 
-        // Get MMR delta for the same range
-        let mmr_delta = self
-            .rpc_api
-            .sync_chain_mmr(current_block_num, Some(target_block))
-            .await?
-            .mmr_delta;
+        // Determine if the response was truncated (payload limit hit on the node side).
+        // If truncated, we only advance to the last returned block and don't add a tail step.
+        let truncated = note_sync
+            .blocks
+            .last()
+            .is_some_and(|b| b.block_header.block_num() < chain_tip);
 
-        // Gather transactions for tracked accounts (skip if none)
-        let (account_commitment_updates, transactions, nullifiers) = if account_ids.is_empty() {
-            (vec![], vec![], vec![])
+        // The block we'll advance to after this step
+        let advanced_to = if truncated {
+            note_sync.blocks.last().unwrap().block_header.block_num()
         } else {
-            let tx_info = self
-                .rpc_api
-                .sync_transactions(current_block_num, Some(target_block), account_ids.to_vec())
-                .await?;
-
-            let account_updates = derive_account_commitment_updates(&tx_info.transaction_records);
-
-            let tx_inclusions = tx_info
-                .transaction_records
-                .iter()
-                .map(|r| TransactionInclusion {
-                    transaction_id: r.transaction_header.id(),
-                    block_num: r.block_num,
-                    account_id: r.transaction_header.account_id(),
-                    initial_state_commitment: r.transaction_header.initial_state_commitment(),
-                })
-                .collect();
-
-            let nullifiers = compute_ordered_nullifiers(&tx_info.transaction_records);
-
-            (account_updates, tx_inclusions, nullifiers)
+            chain_tip
         };
 
-        // Compose StateSyncInfo with sync results
-        Ok(Some(StateSyncInfo {
-            chain_tip: note_sync.chain_tip,
-            block_header: note_sync.block_header,
-            mmr_delta,
-            account_commitment_updates,
-            note_inclusions: note_sync.notes,
-            transactions,
-            nullifiers,
-        }))
+        // Gather transactions for tracked accounts over the full range
+        let (all_account_updates, all_tx_inclusions, all_nullifiers) =
+            self.fetch_transaction_data(current_block_num, advanced_to, account_ids).await?;
+
+        let mut steps = Vec::with_capacity(note_sync.blocks.len() + 1);
+        let mut prev_block = current_block_num;
+
+        for note_block in note_sync.blocks {
+            let target = note_block.block_header.block_num();
+
+            let mmr_delta = self
+                .rpc_api
+                .sync_chain_mmr(prev_block, Some(target))
+                .await?
+                .mmr_delta;
+
+            steps.push(StateSyncInfo {
+                chain_tip,
+                block_header: note_block.block_header,
+                mmr_delta,
+                account_commitment_updates: vec![],
+                note_inclusions: note_block.notes,
+                transactions: vec![],
+                nullifiers: vec![],
+            });
+
+            prev_block = target;
+        }
+
+        // Add a tail step to advance to `advanced_to` if we haven't reached it yet.
+        // This happens when blocks is empty or when the last note block is before advanced_to.
+        if prev_block < advanced_to {
+            let mmr_delta = self
+                .rpc_api
+                .sync_chain_mmr(prev_block, Some(advanced_to))
+                .await?
+                .mmr_delta;
+
+            let (block_header, _) = self
+                .rpc_api
+                .get_block_header_by_number(Some(advanced_to), false)
+                .await?;
+
+            steps.push(StateSyncInfo {
+                chain_tip,
+                block_header,
+                mmr_delta,
+                account_commitment_updates: vec![],
+                note_inclusions: vec![],
+                transactions: vec![],
+                nullifiers: vec![],
+            });
+        }
+
+        // Put transactions, account updates, and nullifiers on the last step.
+        // They're all merged across steps by the caller, and `transaction_state_sync`
+        // uses each TransactionInclusion's own block_num anyway.
+        if let Some(last) = steps.last_mut() {
+            last.account_commitment_updates = all_account_updates;
+            last.transactions = all_tx_inclusions;
+            last.nullifiers = all_nullifiers;
+        }
+
+        Ok((steps, advanced_to))
+    }
+
+    /// Fetches transaction data for the given range and account IDs.
+    async fn fetch_transaction_data(
+        &self,
+        block_from: BlockNumber,
+        block_to: BlockNumber,
+        account_ids: &[AccountId],
+    ) -> Result<(Vec<(AccountId, Word)>, Vec<TransactionInclusion>, Vec<Nullifier>), ClientError>
+    {
+        if account_ids.is_empty() {
+            return Ok((vec![], vec![], vec![]));
+        }
+
+        let tx_info = self
+            .rpc_api
+            .sync_transactions(block_from, Some(block_to), account_ids.to_vec())
+            .await?;
+
+        let account_updates = derive_account_commitment_updates(&tx_info.transaction_records);
+
+        let tx_inclusions = tx_info
+            .transaction_records
+            .iter()
+            .map(|r| TransactionInclusion {
+                transaction_id: r.transaction_header.id(),
+                block_num: r.block_num,
+                account_id: r.transaction_header.account_id(),
+                initial_state_commitment: r.transaction_header.initial_state_commitment(),
+            })
+            .collect();
+
+        let nullifiers = compute_ordered_nullifiers(&tx_info.transaction_records);
+
+        Ok((account_updates, tx_inclusions, nullifiers))
     }
 
     // HELPERS
