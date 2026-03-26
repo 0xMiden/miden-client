@@ -34,6 +34,7 @@ miden-client-integration-tests [OPTIONS]
 
 - `-n, --network <NETWORK>` - The network to use. Options are `devnet`, `testnet`, `localhost` or a custom RPC endpoint (default: `localhost`)
 - `-t, --timeout <MILLISECONDS>` - Timeout for RPC requests in milliseconds (default: `10000`)
+- `--prover-url <URL>` - Remote prover endpoint. Accepts `devnet`, `testnet`, or a custom URL. If unset, the local prover is used
 - `-j, --jobs <NUMBER>` - Number of tests to run in parallel (default: auto-detected CPU cores, set to `1` for sequential execution)
 - `-f, --filter <REGEX>` - Filter tests by name using regex patterns
 - `--contains <STRING>` - Only run tests whose names contain this substring
@@ -90,6 +91,11 @@ Run tests against testnet:
 miden-client-integration-tests --network testnet
 ```
 
+Run tests against devnet with its remote prover:
+```bash
+miden-client-integration-tests --network devnet --prover-url devnet
+```
+
 Run tests against a custom RPC endpoint with timeout:
 ```bash
 miden-client-integration-tests --network http://192.168.1.100:57291 --timeout 30000
@@ -104,6 +110,16 @@ Show help:
 ```bash
 miden-client-integration-tests --help
 ```
+
+## Environment Variables
+
+The following environment variables configure both the standalone binary and the `cargo test` generated wrappers:
+
+- `TEST_MIDEN_NETWORK` - Network to use: `devnet`, `testnet`, `localhost`, or a custom RPC endpoint URL (default: `localhost`)
+- `TEST_MIDEN_PROVER_URL` - Remote prover endpoint: `devnet`, `testnet`, or a custom URL (default: unset, uses local prover)
+- `TEST_TIMEOUT` - Test timeout in milliseconds (default: `10000`)
+
+For the standalone binary, the `--network`, `--prover-url`, and `--timeout` CLI flags take precedence over environment variables.
 
 ## Test Categories
 

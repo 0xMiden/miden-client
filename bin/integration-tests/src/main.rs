@@ -9,6 +9,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use clap::Parser;
+use miden_client::grpc_support::{DEVNET_PROVER_ENDPOINT, TESTNET_PROVER_ENDPOINT};
 use miden_client::rpc::Endpoint;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -148,6 +149,11 @@ struct Args {
     #[arg(long, default_value = "3")]
     retry_count: usize,
 
+    /// Remote prover endpoint. Accepts "devnet", "testnet", or a custom URL.
+    /// If unset, the local prover is used.
+    #[arg(long, env = "TEST_MIDEN_PROVER_URL")]
+    prover_url: Option<String>,
+
     /// Enable verbose tracing output (info-level logs from tests and client).
     #[arg(short, long)]
     verbose: bool,
@@ -163,6 +169,7 @@ struct Args {
 struct BaseConfig {
     rpc_endpoint: Endpoint,
     timeout: u64,
+    prover_endpoint: Option<String>,
     verbose: bool,
 }
 
@@ -176,9 +183,17 @@ impl TryFrom<Args> for BaseConfig {
 
         let timeout_ms = args.timeout;
 
+        // Resolve named prover URLs to their actual endpoints.
+        let prover_endpoint = args.prover_url.map(|url| match url.to_lowercase().as_str() {
+            "devnet" => DEVNET_PROVER_ENDPOINT.to_string(),
+            "testnet" => TESTNET_PROVER_ENDPOINT.to_string(),
+            _ => url,
+        });
+
         Ok(BaseConfig {
             rpc_endpoint: endpoint,
             timeout: timeout_ms,
+            prover_endpoint,
             verbose: args.verbose,
         })
     }
@@ -388,7 +403,8 @@ fn run_single_test_subprocess(args: &Args, test_name: &str) {
 
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         rt.block_on(async {
-            let config = ClientConfig::new(base_config.rpc_endpoint.clone(), base_config.timeout);
+            let config = ClientConfig::new(base_config.rpc_endpoint.clone(), base_config.timeout)
+                .with_prover_endpoint(base_config.prover_endpoint.clone());
             (test.function)(config).await
         })
     }));
@@ -553,6 +569,7 @@ fn run_tests_parallel(
     if !is_retry {
         println!("─────────────────────────────────────────────────────────");
         println!("  RPC endpoint: {}", base_config.rpc_endpoint);
+        println!("  Prover:       {}", base_config.prover_endpoint.as_deref().unwrap_or("local"));
         println!("  Timeout:      {}ms", base_config.timeout);
         println!("─────────────────────────────────────────────────────────");
     }
@@ -575,6 +592,7 @@ fn run_tests_parallel(
 
     // Get network endpoint string for passing to subprocess
     let network_endpoint = base_config.rpc_endpoint.to_string();
+    let prover_endpoint = base_config.prover_endpoint.clone();
     let timeout = base_config.timeout;
     let verbose = base_config.verbose;
 
@@ -587,6 +605,7 @@ fn run_tests_parallel(
         let output_mutex = Arc::clone(&output_mutex);
         let current_exe = current_exe.clone();
         let network_endpoint = network_endpoint.clone();
+        let prover_endpoint = prover_endpoint.clone();
 
         let handle = thread::spawn(move || {
             loop {
@@ -614,6 +633,11 @@ fn run_tests_parallel(
                     .arg(&network_endpoint)
                     .arg("--timeout")
                     .arg(timeout.to_string());
+
+                // Forward prover URL if set
+                if let Some(ref prover_url) = prover_endpoint {
+                    cmd.arg("--prover-url").arg(prover_url);
+                }
 
                 // Forward verbosity flag
                 if verbose {

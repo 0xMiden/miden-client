@@ -5,9 +5,10 @@ use std::sync::Arc;
 use anyhow::{Context, Result};
 use miden_client::builder::ClientBuilder;
 use miden_client::crypto::RpoRandomCoin;
+use miden_client::grpc_support::{DEVNET_PROVER_ENDPOINT, TESTNET_PROVER_ENDPOINT};
 use miden_client::rpc::{Endpoint, GrpcClient};
 use miden_client::testing::common::{FilesystemKeyStore, TestClient, create_test_store_path};
-use miden_client::{DebugMode, Felt};
+use miden_client::{DebugMode, Felt, RemoteTransactionProver};
 use miden_client_sqlite_store::ClientBuilderSqliteExt;
 use rand::Rng;
 use uuid::Uuid;
@@ -18,6 +19,9 @@ pub struct ClientConfig {
     pub rpc_timeout_ms: u64,
     pub store_config: PathBuf,
     pub auth_path: PathBuf,
+    /// Optional remote prover endpoint. If set, the client will use a remote prover instead of the
+    /// default local prover.
+    pub prover_endpoint: Option<String>,
 }
 
 impl ClientConfig {
@@ -27,6 +31,7 @@ impl ClientConfig {
             rpc_timeout_ms,
             auth_path: create_test_auth_path(),
             store_config: create_test_store_path(),
+            prover_endpoint: None,
         }
     }
 
@@ -37,6 +42,12 @@ impl ClientConfig {
             self.store_config.clone(),
             self.auth_path.clone(),
         )
+    }
+
+    #[allow(clippy::return_self_not_must_use)]
+    pub fn with_prover_endpoint(mut self, prover_endpoint: Option<String>) -> Self {
+        self.prover_endpoint = prover_endpoint;
+        self
     }
 
     #[allow(clippy::return_self_not_must_use)]
@@ -69,13 +80,17 @@ impl ClientConfig {
 
         let rpc_client = Arc::new(GrpcClient::new(&rpc_endpoint, rpc_timeout));
 
-        let builder = ClientBuilder::new()
+        let mut builder = ClientBuilder::new()
             .rpc(rpc_client)
             .rng(Box::new(rng))
             .sqlite_store(store_config)
             .authenticator(Arc::new(keystore.clone()))
             .in_debug_mode(DebugMode::Disabled)
             .tx_discard_delta(None);
+
+        if let Some(prover_url) = &self.prover_endpoint {
+            builder = builder.prover(Arc::new(RemoteTransactionProver::new(prover_url)));
+        }
 
         Ok((builder, keystore))
     }
@@ -99,22 +114,46 @@ impl ClientConfig {
 impl Default for ClientConfig {
     /// Creates a default client config.
     ///
-    /// The RPC endpoint is read from the `TEST_MIDEN_RPC_ENDPOINT` environment variable, or
+    /// The network is read from the `TEST_MIDEN_NETWORK` environment variable, or
     /// defaults to `localhost` if the environment variable is not set.
+    /// Accepted values: "devnet", "testnet", "localhost", or a custom RPC endpoint string.
+    ///
+    /// The remote prover is read from the `TEST_MIDEN_PROVER_URL` environment variable.
+    /// Accepted values: "devnet", "testnet", or a custom prover endpoint URL.
+    /// If unset, the local prover is used.
     ///
     /// The timeout is set to 10 seconds.
     ///
     /// The store and auth paths are a temporary directory.
     fn default() -> Self {
-        // Try to read from env first or default to localhost
-        let endpoint = match std::env::var("TEST_MIDEN_RPC_ENDPOINT") {
-            Ok(endpoint) => Endpoint::try_from(endpoint.as_str()).unwrap(),
-            Err(_) => Endpoint::localhost(),
+        // Use TEST_MIDEN_NETWORK to determine the endpoint.
+        // Accepts "devnet", "testnet", "localhost", or a custom RPC endpoint string.
+        let network =
+            std::env::var("TEST_MIDEN_NETWORK").unwrap_or_else(|_| "localhost".to_string());
+        let network_lower = network.to_lowercase();
+        let endpoint = if network_lower == "devnet" {
+            Endpoint::devnet()
+        } else if network_lower == "testnet" {
+            Endpoint::testnet()
+        } else if network_lower == "localhost" {
+            Endpoint::localhost()
+        } else {
+            Endpoint::try_from(network_lower.as_str()).unwrap()
         };
+
+        // Use TEST_MIDEN_PROVER_URL to optionally configure a remote prover.
+        // Accepts "devnet", "testnet", or a custom prover endpoint URL.
+        let prover_endpoint = std::env::var("TEST_MIDEN_PROVER_URL").ok().map(|url| {
+            match url.to_lowercase().as_str() {
+                "devnet" => DEVNET_PROVER_ENDPOINT.to_string(),
+                "testnet" => TESTNET_PROVER_ENDPOINT.to_string(),
+                _ => url,
+            }
+        });
 
         let timeout_ms = 10000;
 
-        Self::new(endpoint, timeout_ms)
+        Self::new(endpoint, timeout_ms).with_prover_endpoint(prover_endpoint)
     }
 }
 
