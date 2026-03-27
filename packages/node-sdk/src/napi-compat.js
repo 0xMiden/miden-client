@@ -125,6 +125,7 @@ export function wrapClient(rawClient, storeName) {
  */
 export function patchSdkPrototypes(rawSdk) {
   // snake_case aliases for instance methods
+  /* eslint-disable camelcase */
   for (const [cls, aliases] of [
     [rawSdk.Account, { to_commitment: "toCommitment" }],
     [rawSdk.AccountHeader, { to_commitment: "toCommitment" }],
@@ -136,6 +137,7 @@ export function patchSdkPrototypes(rawSdk) {
       }
     }
   }
+  /* eslint-enable camelcase */
 
   // null -> undefined for Option<T> return methods
   for (const [cls, methods] of [
