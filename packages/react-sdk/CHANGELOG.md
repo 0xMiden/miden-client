@@ -23,6 +23,8 @@
 * [FEATURE][web] Added `MultiSignerProvider` and `SignerSlot` components for dapps that support multiple external signers (Para, Turnkey, MidenFi). Users can switch between signers at runtime via `useMultiSigner()`. ([#1872](https://github.com/0xMiden/miden-client/pull/1872))
 * [FEATURE][web] `midenVitePlugin()` now handles esbuild externalization of `@miden-sdk/react`, React deduplication, and `esnext` esbuild target automatically — consuming apps no longer need manual config for these. ([#1872](https://github.com/0xMiden/miden-client/pull/1872))
 * [FEATURE][web] `midenVitePlugin()` `crossOriginIsolation` option now defaults to `false`, avoiding breakage of OAuth popup flows (e.g. Para) that rely on `window.opener`. ([#1872](https://github.com/0xMiden/miden-client/pull/1872))
+* [FEATURE][web] Exposed `getAccountProof` in the `RpcClient`, accepting optional `AccountStorageRequirements` and block number parameters to fetch specific storage maps without full account reconstruction ([#1917](https://github.com/0xMiden/miden-client/pull/1917)).
+* [FEATURE][web] Exposed `syncStorageMaps` in the `RpcClient` for paginated retrieval of large storage maps ([#1917](https://github.com/0xMiden/miden-client/pull/1917)).
 
 ### Fixes
 * [FIX][web] Fixed signer disconnect destroying WebClient and wiping cached state. The client now stays alive for reads on disconnect, hot-swaps `signCb` on same-identity reconnect (no WASM reinit), and only creates a new client when a different identity connects. All mutation hooks block with a clear error while disconnected ([#1842](https://github.com/0xMiden/miden-client/pull/1842)).
