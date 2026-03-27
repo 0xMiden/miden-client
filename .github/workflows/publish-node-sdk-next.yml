@@ -1,0 +1,141 @@
+# Publishes @miden-sdk/node and its platform packages to npm when a PR with
+# the 'patch release' label is merged to next and the version is bumped.
+#
+# Flow:
+# 1. Check if the node-sdk version was bumped
+# 2. Build the napi binary on 3 platforms (matrix)
+# 3. Publish all 4 packages (3 platform + 1 root) to npm
+
+name: Publish Node SDK to NPM on Next
+
+on:
+  pull_request:
+    branches:
+      - next
+    types:
+      - closed
+
+permissions:
+  contents: read
+
+jobs:
+  check-version:
+    if: >
+      github.event.pull_request.merged == true &&
+      contains(github.event.pull_request.labels.*.name, 'patch release')
+    runs-on: ubuntu-24.04
+    outputs:
+      should_publish: ${{ steps.check.outputs.should_publish }}
+      current_version: ${{ steps.check.outputs.current_version }}
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: next
+
+      - name: Verify node-sdk version bump
+        id: check
+        run: ./scripts/check-node-sdk-version-pr.sh "${{ github.event.pull_request.base.sha }}"
+
+  build:
+    needs: check-version
+    if: needs.check-version.outputs.should_publish == 'true'
+    strategy:
+      matrix:
+        include:
+          - os: macos-14
+            target: aarch64-apple-darwin
+            platform-package: node-sdk-darwin-arm64
+          - os: macos-13
+            target: x86_64-apple-darwin
+            platform-package: node-sdk-darwin-x64
+          - os: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+            platform-package: node-sdk-linux-x64-gnu
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v6
+        with:
+          ref: next
+
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+
+      - name: Build napi binary
+        run: |
+          cargo build -p miden-client-web --no-default-features --features nodejs --release
+
+      - name: Prepare .node binary
+        run: |
+          if [ "${{ runner.os }}" = "macOS" ]; then
+            EXT="dylib"
+          else
+            EXT="so"
+          fi
+          BINARY="target/release/libmiden_client_web.${EXT}"
+          if [ ! -f "$BINARY" ]; then
+            BINARY="target/${{ matrix.target }}/release/libmiden_client_web.${EXT}"
+          fi
+          cp "$BINARY" "packages/${{ matrix.platform-package }}/miden_client_web.node"
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.platform-package }}
+          path: packages/${{ matrix.platform-package }}/miden_client_web.node
+
+  publish:
+    needs: [check-version, build]
+    if: needs.check-version.outputs.should_publish == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v6
+        with:
+          ref: next
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org/'
+
+      - name: Download all binary artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Place binaries in platform packages
+        run: |
+          for pkg in node-sdk-darwin-arm64 node-sdk-darwin-x64 node-sdk-linux-x64-gnu; do
+            cp "artifacts/${pkg}/miden_client_web.node" "packages/${pkg}/miden_client_web.node"
+          done
+
+      - name: Publish platform packages
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_WEBCLIENT_TOKEN }}
+        run: |
+          for pkg in node-sdk-darwin-arm64 node-sdk-darwin-x64 node-sdk-linux-x64-gnu; do
+            echo "Publishing @miden-sdk/${pkg}..."
+            cd "packages/${pkg}"
+            npm publish --tag next --access public
+            cd ../..
+          done
+
+      - name: Publish root package
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_WEBCLIENT_TOKEN }}
+        run: |
+          cd packages/node-sdk
+          npm publish --tag next --access public
+
+      - name: Done
+        env:
+          CURRENT_VERSION: ${{ needs.check-version.outputs.current_version }}
+        run: echo "Published @miden-sdk/node v${CURRENT_VERSION} with platform binaries."

@@ -3,8 +3,9 @@
  *
  * Search order:
  * 1. MIDEN_MODULE_PATH environment variable (explicit override)
- * 2. Package prebuilds directory (for published packages)
- * 3. Repo target directory (for local development)
+ * 2. Platform-specific npm package (@miden-sdk/node-darwin-arm64, etc.)
+ * 3. Package prebuilds directory
+ * 4. Repo target directory (for local development)
  */
 import { createRequire } from "module";
 import path from "path";
@@ -32,6 +33,17 @@ export function loadNativeModule(options) {
     return _sdk;
   }
 
+  // 2. Platform-specific npm package (installed via optionalDependencies)
+  const platformPackage = getPlatformPackageName();
+  if (platformPackage) {
+    try {
+      _sdk = require(platformPackage);
+      return _sdk;
+    } catch {
+      // Not installed -- fall through to other methods
+    }
+  }
+
   const arch = os.arch() === "arm64" ? "aarch64" : os.arch();
   const platform =
     os.platform() === "darwin" ? "apple-darwin" : "unknown-linux-gnu";
@@ -39,7 +51,7 @@ export function loadNativeModule(options) {
   const ext = os.platform() === "darwin" ? "dylib" : "so";
   const libName = `libmiden_client_web.${ext}`;
 
-  // 2. Package prebuilds directory
+  // 3. Package prebuilds directory
   const packageRoot = path.resolve(import.meta.dirname, "..");
   const prebuildCandidates = [
     path.join(packageRoot, "prebuilds", `${os.platform()}-${os.arch()}`, "miden_client_web.node"),
@@ -53,7 +65,7 @@ export function loadNativeModule(options) {
     }
   }
 
-  // 3. Repo target directory (development)
+  // 4. Repo target directory (development)
   const repoRoot = findRepoRoot(packageRoot);
   if (repoRoot) {
     const targetCandidates = [
@@ -85,6 +97,19 @@ export function loadNativeModule(options) {
       `  cargo build -p miden-client-web --no-default-features --features nodejs --release\n\n` +
       `Or set MIDEN_MODULE_PATH to the .node file location.`
   );
+}
+
+/**
+ * Returns the platform-specific npm package name for the current OS/arch,
+ * or null if the platform is not supported.
+ */
+function getPlatformPackageName() {
+  const platformMap = {
+    "darwin-arm64": "@miden-sdk/node-darwin-arm64",
+    "darwin-x64": "@miden-sdk/node-darwin-x64",
+    "linux-x64": "@miden-sdk/node-linux-x64-gnu",
+  };
+  return platformMap[`${os.platform()}-${os.arch()}`] || null;
 }
 
 /**

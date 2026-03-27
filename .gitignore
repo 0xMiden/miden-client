@@ -50,6 +50,15 @@ packages/vite-plugin/node_modules/
 !packages/node-sdk/
 !packages/node-sdk/**
 packages/node-sdk/node_modules/
+!packages/node-sdk-darwin-arm64/
+!packages/node-sdk-darwin-arm64/**
+packages/node-sdk-darwin-arm64/*.node
+!packages/node-sdk-darwin-x64/
+!packages/node-sdk-darwin-x64/**
+packages/node-sdk-darwin-x64/*.node
+!packages/node-sdk-linux-x64-gnu/
+!packages/node-sdk-linux-x64-gnu/**
+packages/node-sdk-linux-x64-gnu/*.node
 keystore/
 
 # Ignore files that spawn using `cargo run`

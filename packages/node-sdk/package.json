@@ -14,6 +14,11 @@
   "engines": {
     "node": ">=18"
   },
+  "optionalDependencies": {
+    "@miden-sdk/node-darwin-arm64": "0.14.0-alpha.1",
+    "@miden-sdk/node-darwin-x64": "0.14.0-alpha.1",
+    "@miden-sdk/node-linux-x64-gnu": "0.14.0-alpha.1"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",
