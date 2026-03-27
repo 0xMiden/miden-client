@@ -47,9 +47,6 @@ packages/react-sdk/dist/
 !packages/vite-plugin/**
 packages/vite-plugin/dist/
 packages/vite-plugin/node_modules/
-!packages/node-sdk/
-!packages/node-sdk/**
-packages/node-sdk/node_modules/
 !packages/node-sdk-darwin-arm64/
 !packages/node-sdk-darwin-arm64/**
 packages/node-sdk-darwin-arm64/*.node

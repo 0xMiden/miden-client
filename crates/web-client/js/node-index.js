@@ -1,30 +1,29 @@
 /**
- * @miden-sdk/node - Miden Client SDK for Node.js
+ * Node.js entry point for @miden-sdk/miden-sdk.
  *
- * Provides the same MidenClient API as the browser SDK (@miden-sdk/miden-sdk),
+ * Loaded automatically when Node.js resolves the package import
+ * (via the "node" condition in package.json exports).
+ *
+ * Provides the same API as the browser entry point (index.js),
  * backed by a native napi addon with SQLite storage.
- *
- * Usage:
- *   import { MidenClient, AccountType } from "@miden-sdk/node";
- *   const client = await MidenClient.create({ rpcUrl: "testnet" });
  */
 
-import { loadNativeModule } from "./loader.js";
-import { createSdkWrapper } from "./napi-compat.js";
+import { loadNativeModule } from "./node/loader.js";
+import { createSdkWrapper } from "./node/napi-compat.js";
 import {
   createWasmWebClient,
   createMockWasmWebClient,
-} from "./client-factory.js";
-import { MidenClient } from "./js/client.js";
+} from "./node/client-factory.js";
+import { MidenClient } from "./client.js";
 import {
   createP2IDNote,
   createP2IDENote,
   buildSwapTag,
-  _setWasm,
-  _setWebClient,
-} from "./js/standalone.js";
+  _setWasm as _setStandaloneWasm,
+  _setWebClient as _setStandaloneWebClient,
+} from "./standalone.js";
 
-// ── Lazy initialization ──────────────────────────────────────────────
+// ── Initialization ───────────────────────────────────────────────────
 
 let _initialized = false;
 let _rawSdk = null;
@@ -46,8 +45,8 @@ function ensureInitialized() {
   MidenClient._getWasmOrThrow = async () => _wrappedSdk;
 
   // Wire standalone functions
-  _setWasm(_wrappedSdk);
-  _setWebClient(_WasmWebClient);
+  _setStandaloneWasm(_wrappedSdk);
+  _setStandaloneWebClient(_WasmWebClient);
 
   _initialized = true;
 }
@@ -55,7 +54,7 @@ function ensureInitialized() {
 // Initialize on import
 ensureInitialized();
 
-// ── Enum constants (matching browser SDK) ────────────────────────────
+// ── Enum constants (matching browser entry point) ────────────────────
 
 export const AccountType = Object.freeze({
   MutableWallet: "MutableWallet",
@@ -86,13 +85,18 @@ export const StorageMode = Object.freeze({
 export { MidenClient };
 export { createP2IDNote, createP2IDENote, buildSwapTag };
 
-// Re-export the raw SDK module for advanced usage
+// Internal exports (matching browser entry point)
+export {
+  _WasmWebClient as WasmWebClient,
+  _MockWasmWebClient as MockWasmWebClient,
+};
+
+// Re-export all napi SDK types (equivalent to browser's `export * from "../Cargo.toml"`)
 export function getNativeModule() {
   ensureInitialized();
   return _rawSdk;
 }
 
-// Re-export the wrapped SDK (with normalized classes) for advanced usage
 export function getWrappedSdk() {
   ensureInitialized();
   return _wrappedSdk;

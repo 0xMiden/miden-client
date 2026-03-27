@@ -8,7 +8,76 @@ permissions:
   contents: read
 
 jobs:
+  check-version:
+    runs-on: ubuntu-24.04
+    outputs:
+      should_publish: ${{ steps.check_version.outputs.should_publish }}
+      current_version: ${{ steps.check_version.outputs.current_version }}
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: refs/tags/${{ github.event.release.tag_name }}
+
+      - name: Ensure release tag has version bump
+        id: check_version
+        run: ./scripts/check-web-client-version-release.sh "$GITHUB_SHA"
+
+  # Build native Node.js binaries for each platform
+  build-native:
+    needs: check-version
+    if: needs.check-version.outputs.should_publish == 'true'
+    strategy:
+      matrix:
+        include:
+          - os: macos-14
+            platform-package: node-sdk-darwin-arm64
+          - os: macos-13
+            platform-package: node-sdk-darwin-x64
+          - os: ubuntu-24.04
+            platform-package: node-sdk-linux-x64-gnu
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v6
+        with:
+          ref: refs/tags/${{ github.event.release.tag_name }}
+
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+
+      - name: Build napi binary
+        run: cargo build -p miden-client-web --no-default-features --features nodejs --release
+
+      - name: Prepare .node binary
+        run: |
+          if [ "${{ runner.os }}" = "macOS" ]; then
+            EXT="dylib"
+          else
+            EXT="so"
+          fi
+          BINARY=$(find target -name "libmiden_client_web.${EXT}" -path "*/release/*" | head -1)
+          if [ -z "$BINARY" ]; then
+            echo "Binary not found"
+            exit 1
+          fi
+          cp "$BINARY" "packages/${{ matrix.platform-package }}/miden_client_web.node"
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.platform-package }}
+          path: packages/${{ matrix.platform-package }}/miden_client_web.node
+
+  # Publish all packages to npm
   publish:
+    needs: [check-version, build-native]
+    if: needs.check-version.outputs.should_publish == 'true' && needs.build-native.result == 'success'
     runs-on: ubuntu-24.04
     steps:
       - name: Check out code
@@ -33,22 +102,34 @@ jobs:
           components: rust-src
 
       - name: Install binaryen (wasm-opt)
+        run: sudo apt-get update && sudo apt-get install -y binaryen
+
+      # ── Publish Node.js platform packages ──
+      - name: Download native binary artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Publish Node.js platform packages
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_WEBCLIENT_TOKEN }}
         run: |
-          sudo apt-get update && sudo apt-get install -y binaryen
+          for pkg in node-sdk-darwin-arm64 node-sdk-darwin-x64 node-sdk-linux-x64-gnu; do
+            cp "artifacts/${pkg}/miden_client_web.node" "packages/${pkg}/miden_client_web.node"
+            echo "Publishing @miden-sdk/${pkg}..."
+            cd "packages/${pkg}"
+            npm publish --access public
+            cd ../..
+          done
 
-      - name: Ensure release tag has version bump
-        id: check_version
-        run: ./scripts/check-web-client-version-release.sh "$GITHUB_SHA"
-
+      # ── Build and publish web-client ──
       - name: Install & build web-client
-        if: steps.check_version.outputs.should_publish == 'true'
         run: |
           cd crates/web-client
           yarn install --frozen-lockfile
           yarn build
 
-      - name: Publish to npm
-        if: steps.check_version.outputs.should_publish == 'true'
+      - name: Publish web-client to npm
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_WEBCLIENT_TOKEN }}
         run: |
@@ -56,18 +137,8 @@ jobs:
           npm publish
 
       - name: Done
-        if: steps.check_version.outputs.should_publish == 'true'
-        env:
-          CURRENT_VERSION: ${{ steps.check_version.outputs.current_version }}
-        run: echo "✅ Build complete; published version $CURRENT_VERSION."
+        run: echo "Published @miden-sdk/miden-sdk v${{ needs.check-version.outputs.current_version }} with Node.js platform binaries."
 
       - name: Skipped publish
-        if: steps.check_version.outputs.should_publish != 'true'
-        env:
-          SHOULD_PUBLISH: ${{ steps.check_version.outputs.should_publish }}
-          CURRENT_VERSION: ${{ steps.check_version.outputs.current_version }}
-        run: |
-          echo "ℹ️ Publish skipped; should_publish=$SHOULD_PUBLISH"
-          if [ -n "$CURRENT_VERSION" ]; then
-            echo "Current version: $CURRENT_VERSION"
-          fi
+        if: failure() || cancelled()
+        run: echo "Publish failed or was cancelled."
