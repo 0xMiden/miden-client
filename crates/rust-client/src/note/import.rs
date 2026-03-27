@@ -13,15 +13,7 @@ use alloc::string::ToString;
 use alloc::vec::Vec;
 
 use miden_protocol::block::BlockNumber;
-use miden_protocol::note::{
-    Note,
-    NoteDetails,
-    NoteFile,
-    NoteId,
-    NoteInclusionProof,
-    NoteMetadata,
-    NoteTag,
-};
+use miden_protocol::note::{Note, NoteDetails, NoteFile, NoteId, NoteInclusionProof, NoteTag};
 use miden_tx::auth::TransactionAuthenticator;
 
 use crate::rpc::RpcError;
@@ -173,9 +165,10 @@ where
                     "Failed to retrieve note with id {note_id} from node"
                 )))?;
             if let Some(mut previous_note) = previous_note {
-                if previous_note
-                    .inclusion_proof_received(inclusion_proof, fetched_note.metadata().clone())?
-                {
+                if previous_note.inclusion_proof_received(
+                    inclusion_proof,
+                    Some(fetched_note.metadata().clone()),
+                )? {
                     self.store.remove_note_tag((&previous_note).try_into()?).await?;
 
                     note_records.insert(note_id, Some(previous_note));
@@ -267,7 +260,7 @@ where
 
                 let tag = metadata.tag();
                 let mut note_changed =
-                    note_record.inclusion_proof_received(inclusion_proof, metadata)?;
+                    note_record.inclusion_proof_received(inclusion_proof, Some(metadata))?;
 
                 if block_height <= current_block_num {
                     // FIXME: We should be able to build the mmr only once (outside the for loop).
@@ -330,7 +323,7 @@ where
             });
 
             match committed_notes_data.remove(&note_record.id()) {
-                Some(Some((metadata, inclusion_proof))) => {
+                Some(Some((tag, inclusion_proof))) => {
                     // FIXME: We should be able to build the mmr only once (outside the for loop).
                     // For some reason this leads to error, probably related to:
                     // https://github.com/0xMiden/miden-client/issues/1205
@@ -342,9 +335,12 @@ where
                         )
                         .await?;
 
-                    let tag = metadata.tag();
+                    // Use the metadata already stored in the note record (if available).
+                    // The sync response only provides a fixed-size header without attachment
+                    // data, so full metadata must come from the local record.
+                    let local_metadata = note_record.metadata().cloned();
                     let note_changed =
-                        note_record.inclusion_proof_received(inclusion_proof, metadata)?;
+                        note_record.inclusion_proof_received(inclusion_proof, local_metadata)?;
 
                     if note_record.block_header_received(&block_header)? | note_changed {
                         self.store
@@ -373,7 +369,7 @@ where
         mut request_block_num: BlockNumber,
         // Expected notes with their tags
         expected_notes: Vec<(NoteId, &NoteTag)>,
-    ) -> Result<BTreeMap<NoteId, Option<(NoteMetadata, NoteInclusionProof)>>, ClientError> {
+    ) -> Result<BTreeMap<NoteId, Option<(NoteTag, NoteInclusionProof)>>, ClientError> {
         let tracked_tags: BTreeSet<NoteTag> = expected_notes.iter().map(|(_, tag)| **tag).collect();
         let mut retrieved_proofs = BTreeMap::new();
         let current_block_num = self.get_sync_height().await?;
@@ -398,16 +394,10 @@ where
                     break;
                 }
 
-                let note_inclusion_proof = NoteInclusionProof::new(
-                    note_block_num,
-                    sync_note.note_index(),
-                    sync_note.inclusion_path().clone(),
-                )?;
+                let inclusion_proof = sync_note.inclusion_proof().clone();
 
-                retrieved_proofs.insert(
-                    *sync_note.note_id(),
-                    Some((sync_note.metadata(), note_inclusion_proof)),
-                );
+                retrieved_proofs
+                    .insert(*sync_note.note_id(), Some((sync_note.tag(), inclusion_proof)));
             }
 
             // We might have reached the chain tip without having found some notes, bail if so

@@ -200,28 +200,3 @@ impl TryFrom<proto::transaction::TransactionHeader> for TransactionHeader {
         Ok(transaction_header)
     }
 }
-
-impl TryFrom<proto::note::NoteSyncRecord> for NoteHeader {
-    type Error = RpcError;
-
-    fn try_from(value: proto::note::NoteSyncRecord) -> Result<Self, Self::Error> {
-        let note_id = value
-            .note_id
-            .ok_or(RpcConversionError::MissingFieldInProtobufRepresentation {
-                entity: "NoteSyncRecord",
-                field_name: "note_id",
-            })?
-            .try_into()?;
-
-        let note_metadata = value
-            .metadata
-            .ok_or(RpcConversionError::MissingFieldInProtobufRepresentation {
-                entity: "NoteSyncRecord",
-                field_name: "metadata",
-            })?
-            .try_into()?;
-
-        let note_header = Self::new(note_id, note_metadata);
-        Ok(note_header)
-    }
-}

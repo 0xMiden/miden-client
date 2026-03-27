@@ -33,9 +33,10 @@ impl NoteStateHandler for ProcessingAuthenticatedNoteState {
     fn inclusion_proof_received(
         &self,
         inclusion_proof: NoteInclusionProof,
-        metadata: NoteMetadata,
+        metadata: Option<NoteMetadata>,
     ) -> Result<Option<InputNoteState>, NoteRecordError> {
-        if self.inclusion_proof != inclusion_proof || self.metadata != metadata {
+        let metadata_matches = metadata.as_ref().is_none_or(|metadata| *metadata == self.metadata);
+        if self.inclusion_proof != inclusion_proof || !metadata_matches {
             return Err(NoteRecordError::StateTransitionError(
                 "Inclusion proof or metadata do not match the expected values".to_string(),
             ));

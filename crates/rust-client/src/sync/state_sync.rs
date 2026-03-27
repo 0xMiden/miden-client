@@ -8,7 +8,7 @@ use miden_protocol::Word;
 use miden_protocol::account::{Account, AccountHeader, AccountId};
 use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::crypto::merkle::mmr::{InOrderIndex, MmrDelta, MmrPeaks, PartialMmr};
-use miden_protocol::note::{NoteId, NoteTag, Nullifier};
+use miden_protocol::note::{NoteId, NoteTag, NoteType, Nullifier};
 use tracing::info;
 
 use super::state_sync_update::TransactionUpdateTracker;
@@ -217,7 +217,7 @@ impl StateSync {
         let public_note_ids: Vec<NoteId> = state_sync_steps
             .iter()
             .flat_map(|s| s.note_inclusions.iter())
-            .filter(|n| !n.metadata().is_private())
+            .filter(|n| n.note_type() != NoteType::Private)
             .map(|n| *n.note_id())
             .collect();
 
@@ -491,7 +491,7 @@ impl StateSync {
         let mut found_relevant_note = false;
 
         for committed_note in note_inclusions {
-            let public_note = (!committed_note.metadata().is_private())
+            let public_note = (committed_note.note_type() != NoteType::Private)
                 .then(|| public_notes.get(committed_note.note_id()))
                 .flatten()
                 .cloned();

@@ -156,7 +156,7 @@ impl InputNoteState {
     pub(crate) fn inclusion_proof_received(
         &self,
         inclusion_proof: NoteInclusionProof,
-        metadata: NoteMetadata,
+        metadata: Option<NoteMetadata>,
     ) -> Result<Option<InputNoteState>, NoteRecordError> {
         self.inner().inclusion_proof_received(inclusion_proof, metadata)
     }
@@ -338,7 +338,7 @@ pub trait NoteStateHandler {
     fn inclusion_proof_received(
         &self,
         inclusion_proof: NoteInclusionProof,
-        metadata: NoteMetadata,
+        metadata: Option<NoteMetadata>,
     ) -> Result<Option<InputNoteState>, NoteRecordError>;
 
     fn consumed_externally(
