@@ -504,6 +504,50 @@ where
             .await?)
     }
 
+    /// Executes the provided transaction script with a DAP debug adapter listening for
+    /// connections, allowing interactive debugging via any DAP-compatible client.
+    #[cfg(feature = "dap")]
+    pub async fn execute_program_with_dap(
+        &mut self,
+        account_id: AccountId,
+        tx_script: TransactionScript,
+        advice_inputs: AdviceInputs,
+        foreign_accounts: BTreeMap<AccountId, ForeignAccount>,
+    ) -> Result<[Felt; 16], ClientError> {
+        let (fpi_block_number, foreign_account_inputs) =
+            self.retrieve_foreign_account_inputs(foreign_accounts).await?;
+
+        let block_ref = if let Some(block_number) = fpi_block_number {
+            block_number
+        } else {
+            self.get_sync_height().await?
+        };
+
+        let account_record = self
+            .store
+            .get_account(account_id)
+            .await?
+            .ok_or(ClientError::AccountDataNotFound(account_id))?;
+
+        let account: Account = account_record.try_into()?;
+
+        let data_store = ClientDataStore::new(self.store.clone(), self.rpc_api.clone());
+
+        data_store.register_foreign_account_inputs(foreign_account_inputs.iter().cloned());
+
+        // Ensure code is loaded on MAST store
+        data_store.mast_store().load_account_code(account.code());
+
+        for fpi_account in &foreign_account_inputs {
+            data_store.mast_store().load_account_code(fpi_account.code());
+        }
+
+        Ok(self
+            .build_dap_executor(&data_store)?
+            .execute_tx_view_script(account_id, block_ref, tx_script, advice_inputs)
+            .await?)
+    }
+
     // HELPERS
     // --------------------------------------------------------------------------------------------
 
@@ -795,6 +839,26 @@ where
         data_store: &'store STORE,
     ) -> Result<TransactionExecutor<'store, 'auth, STORE, AUTH>, TransactionExecutorError> {
         let mut executor = TransactionExecutor::new(data_store).with_options(self.exec_options)?;
+        if let Some(authenticator) = self.authenticator.as_deref() {
+            executor = executor.with_authenticator(authenticator);
+        }
+        executor = executor.with_source_manager(self.source_manager.clone());
+
+        Ok(executor)
+    }
+
+    /// Creates a transaction executor configured for DAP (Debug Adapter Protocol) debugging.
+    #[cfg(feature = "dap")]
+    pub(crate) fn build_dap_executor<'store, 'auth, STORE: DataStore + Sync>(
+        &'auth self,
+        data_store: &'store STORE,
+    ) -> Result<
+        TransactionExecutor<'store, 'auth, STORE, AUTH, miden_debug::DapExecutor>,
+        TransactionExecutorError,
+    > {
+        let mut executor = TransactionExecutor::new(data_store)
+            .with_program_executor::<miden_debug::DapExecutor>()
+            .with_options(self.exec_options)?;
         if let Some(authenticator) = self.authenticator.as_deref() {
             executor = executor.with_authenticator(authenticator);
         }

@@ -17,6 +17,7 @@
 * Added `getAccountByKeyCommitment` method to `WebClient` for retrieving accounts by public key commitment ([#1729](https://github.com/0xMiden/miden-client/pull/1729)).
 * Added automatic registration of note scripts required by network transactions (NTX). The client now checks the node's script registry before submitting a transaction and registers any missing scripts via a separate registration transaction ([#1840](https://github.com/0xMiden/miden-client/pull/1840)).
 * Added automatic retry for rate-limited (`ResourceExhausted`) and transiently unavailable RPC calls in `GrpcClient`, with up to 5 attempts and `retry-after` header support ([#1928](https://github.com/0xMiden/miden-client/pull/1928)).
+* [FEATURE][cli] Added `--offline` flag to `new-account` command for creating accounts without a running node, using a synthetic genesis header for local-only execution and debugging ([#1883](https://github.com/0xMiden/miden-client/pull/1883)).
 
 ### Changes
 
@@ -52,6 +53,7 @@
 * [FEATURE][web] Account import improvements: `accounts.getOrImport(ref)` convenience method, and `accounts.import()` now accepts full `AccountRef` (string, `AccountId`, `Account`, `AccountHeader`) in addition to `{ file }` and `{ seed }` forms. ([#1828](https://github.com/0xMiden/miden-client/pull/1828))
 * [FEATURE][web] Added `AccountId.fromPrefixSuffix(prefix, suffix)` constructor for building an `AccountId` from its two felt components, useful when prefix/suffix are stored separately in storage maps. ([#1889](https://github.com/0xMiden/miden-client/pull/1889))
 * [FEATURE][web] Added `TransactionRequestBuilder.withExpirationDelta()` for expiring manual transaction requests ([#1904](https://github.com/0xMiden/miden-client/pull/1904))
+* [FEATURE][cli] Added DAP (Debug Adapter Protocol) support for interactive transaction script debugging. New `--start-debug-adapter` flag on the `exec` command launches a DAP server, allowing any DAP-compatible client to set breakpoints, step through, and inspect Miden transaction scripts ([#1883](https://github.com/0xMiden/miden-client/pull/1883)).
 
 ### Fixes
 

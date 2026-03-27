@@ -16,10 +16,14 @@ version.workspace      = true
 name = "miden-client"
 path = "src/main.rs"
 
+[features]
+dap = ["dep:miden-debug", "miden-client/dap"]
+
 [dependencies]
 # Workspace dependencies
 miden-client              = { features = ["tonic"], workspace = true }
 miden-client-sqlite-store = { workspace = true }
+miden-debug               = { optional = true, workspace = true }
 
 # External dependencies
 clap               = { features = ["derive"], version = "4.5" }
