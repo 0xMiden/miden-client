@@ -20,7 +20,7 @@ path = "src/main.rs"
 # Keep debugger integration optional while `miden-debug` requires a newer Rust version than the
 # rest of the client workspace. The CLI flag remains available either way and errors clearly when
 # used in a non-DAP build.
-dap = ["miden-client/dap", "dep:miden-debug"]
+dap = ["dep:miden-debug", "miden-client/dap"]
 
 [dependencies]
 # Workspace dependencies
