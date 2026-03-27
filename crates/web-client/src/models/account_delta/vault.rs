@@ -50,8 +50,8 @@ impl AccountVaultDelta {
             .fungible()
             .iter()
             .filter(|&(_, &value)| value > 0)
-            .map(|(faucet_id, &diff)| {
-                FungibleAsset::new_inner(&faucet_id.into(), diff.unsigned_abs())
+            .filter_map(|(faucet_id, &diff)| {
+                FungibleAsset::new_inner(&faucet_id.into(), diff.unsigned_abs()).ok()
             })
             .collect()
     }
@@ -63,8 +63,8 @@ impl AccountVaultDelta {
             .fungible()
             .iter()
             .filter(|&(_, &value)| value < 0)
-            .map(|(faucet_id, &diff)| {
-                FungibleAsset::new_inner(&faucet_id.into(), diff.unsigned_abs())
+            .filter_map(|(faucet_id, &diff)| {
+                FungibleAsset::new_inner(&faucet_id.into(), diff.unsigned_abs()).ok()
             })
             .collect()
     }

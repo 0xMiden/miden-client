@@ -5,7 +5,7 @@ use miden_client::asset::{Asset as NativeAsset, FungibleAsset as FungibleAssetNa
 
 use super::account_id::AccountId;
 use super::word::Word;
-use crate::platform::{JsU64, js_u64_to_u64};
+use crate::platform::{JsErr, JsU64, from_str_err, js_u64_to_u64};
 
 /// A fungible asset.
 ///
@@ -21,6 +21,7 @@ impl FungibleAsset {
     #[js_export(constructor)]
     pub fn new(faucet_id: &AccountId, amount: JsU64) -> FungibleAsset {
         FungibleAsset::new_inner(faucet_id, js_u64_to_u64(amount))
+            .expect("Failed to create FungibleAsset (invalid faucet ID or amount exceeds max)")
     }
 
     /// Returns the amount of fungible units.
@@ -44,10 +45,11 @@ impl FungibleAsset {
 
 impl FungibleAsset {
     /// Internal constructor that takes a native u64 amount, usable from both platforms.
-    pub(crate) fn new_inner(faucet_id: &AccountId, amount: u64) -> FungibleAsset {
+    pub(crate) fn new_inner(faucet_id: &AccountId, amount: u64) -> Result<FungibleAsset, JsErr> {
         let native_faucet_id: NativeAccountId = faucet_id.into();
-        let native_asset = FungibleAssetNative::new(native_faucet_id, amount).unwrap();
-        FungibleAsset(native_asset)
+        let native_asset = FungibleAssetNative::new(native_faucet_id, amount)
+            .map_err(|e| from_str_err(&format!("Failed to create FungibleAsset: {e}")))?;
+        Ok(FungibleAsset(native_asset))
     }
 }
 

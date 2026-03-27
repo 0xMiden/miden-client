@@ -223,6 +223,9 @@ macro_rules! declare_js_miden_arrays {
                 ) -> napi::Result<&'static Self> {
                     // Deserialize the JS array into a Vec, wrap it, leak it so we can return &'static Self.
                     // This mirrors how napi class types handle FromNapiRef (they unwrap a pointer).
+                    // NOTE: This leaks memory on every call. Acceptable for short-lived operations
+                    // but will accumulate in long-running Node.js servers. This is a napi-rs
+                    // limitation for reference types.
                     let vec = unsafe { <Vec<$miden_type_name> as napi::bindgen_prelude::FromNapiValue>::from_napi_value(env, napi_val)? };
                     let boxed = Box::new(Self(vec));
                     Ok(Box::leak(boxed))

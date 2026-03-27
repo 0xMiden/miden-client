@@ -14,18 +14,19 @@ impl Word {
     /// Creates a word from four numeric values.
     #[js_export(constructor)]
     pub fn new(u64_vec: Vec<JsU64>) -> Word {
+        assert!(u64_vec.len() == 4, "Word requires exactly 4 elements, got {}", u64_vec.len());
         let fixed_array_u64: [u64; 4] = u64_vec
             .iter()
             .map(|&v| js_u64_to_u64(v))
             .collect::<Vec<u64>>()
             .try_into()
-            .unwrap();
+            .expect("Word requires exactly 4 elements");
         let native_felt_vec: [NativeFelt; 4] = fixed_array_u64
             .iter()
             .map(|&v| NativeFelt::new(v))
             .collect::<Vec<NativeFelt>>()
             .try_into()
-            .unwrap();
+            .expect("Word requires exactly 4 field elements");
         Word(native_felt_vec.into())
     }
 
@@ -47,12 +48,13 @@ impl Word {
     #[js_export(js_name = "newFromFelts")]
     #[allow(clippy::needless_pass_by_value)]
     pub fn new_from_felts(felt_vec: Vec<Felt>) -> Word {
+        assert!(felt_vec.len() == 4, "Word requires exactly 4 field elements, got {}", felt_vec.len());
         let native_felt_vec: [NativeFelt; 4] = felt_vec
             .iter()
             .map(|felt: &Felt| felt.into())
             .collect::<Vec<NativeFelt>>()
             .try_into()
-            .unwrap();
+            .expect("Word requires exactly 4 field elements");
         Word(native_felt_vec.into())
     }
 
