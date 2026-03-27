@@ -72,3 +72,4 @@ crates/web-client/playwright-report
 # JS metadata generated from idxdb-store TypeScript build
 crates/idxdb-store/src/js/**/*.d.ts
 crates/idxdb-store/src/js/**/*.js.map
+.claude/scheduled_tasks.lock
