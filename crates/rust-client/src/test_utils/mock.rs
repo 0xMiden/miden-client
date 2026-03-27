@@ -34,7 +34,6 @@ use crate::rpc::domain::nullifier::NullifierUpdate;
 use crate::rpc::domain::storage_map::{StorageMapInfo, StorageMapUpdate};
 use crate::rpc::domain::sync::ChainMmrInfo;
 use crate::rpc::domain::transaction::{TransactionRecord, TransactionsInfo};
-use crate::rpc::generated::note::NoteSyncRecord;
 use crate::rpc::{AccountStateAt, NodeRpcClient, RpcError, RpcStatusInfo};
 
 pub type MockClient<AUTH> = Client<AUTH>;
@@ -283,7 +282,7 @@ impl MockRpcApi {
         block_num: BlockNumber,
         note_tags: &BTreeSet<NoteTag>,
         account_ids: &[AccountId],
-    ) -> Vec<NoteSyncRecord> {
+    ) -> Vec<CommittedNote> {
         self.mock_chain
             .read()
             .committed_notes()
@@ -293,14 +292,12 @@ impl MockRpcApi {
                     && (note_tags.contains(&note.metadata().tag())
                         || account_ids.contains(&note.metadata().sender()))
                 {
-                    Some(NoteSyncRecord {
-                        note_index_in_block: u32::from(
-                            note.inclusion_proof().location().block_note_tree_index(),
-                        ),
-                        note_id: Some(note.id().into()),
-                        metadata: Some(note.metadata().clone().into()),
-                        inclusion_path: Some(note.inclusion_proof().note_path().clone().into()),
-                    })
+                    Some(CommittedNote::new(
+                        note.id(),
+                        note.metadata().note_type(),
+                        note.metadata().tag(),
+                        note.inclusion_proof().clone(),
+                    ))
                 } else {
                     None
                 }
@@ -361,19 +358,7 @@ impl NodeRpcClient for MockRpcApi {
         let next_block_num = self.find_next_block_with_notes(block_num.as_u32(), note_tags);
         let next_block = self.get_block_by_num(next_block_num);
 
-        let note_records = self.get_notes_in_block(next_block_num, note_tags, &[]);
-
-        let notes = note_records
-            .into_iter()
-            .map(|note| {
-                let note_id: NoteId = note.note_id.unwrap().try_into().unwrap();
-                let note_index = u16::try_from(note.note_index_in_block).unwrap();
-                let merkle_path = note.inclusion_path.unwrap().try_into().unwrap();
-                let metadata = note.metadata.unwrap().try_into().unwrap();
-
-                CommittedNote::new(note_id, note_index, merkle_path, metadata)
-            })
-            .collect();
+        let notes = self.get_notes_in_block(next_block_num, note_tags, &[]);
 
         Ok(NoteSyncInfo {
             chain_tip: self.get_chain_tip_block_num(),

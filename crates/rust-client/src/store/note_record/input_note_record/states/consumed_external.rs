@@ -21,7 +21,7 @@ impl NoteStateHandler for ConsumedExternalNoteState {
     fn inclusion_proof_received(
         &self,
         _inclusion_proof: NoteInclusionProof,
-        _metadata: NoteMetadata,
+        _metadata: Option<NoteMetadata>,
     ) -> Result<Option<InputNoteState>, NoteRecordError> {
         Ok(None)
     }
