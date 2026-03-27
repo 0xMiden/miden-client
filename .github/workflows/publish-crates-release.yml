@@ -1,3 +1,5 @@
+# This action will be triggered when a new github release is made.
+# Sidenote: Currently github releases are created manually.
 name: Publish Rust Crates on Release
 
 on:
@@ -10,6 +12,7 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-24.04
+    if: ${{ github.repository_owner == '0xMiden' }}
     env:
       CARGO_TERM_COLOR: always
       # Important: use an absolute path so `cargo publish` verification builds
@@ -59,3 +62,53 @@ jobs:
           cargo publish
           cd ../web-client
           cargo publish
+
+  # Upload the miden-client CLI as an artifact on the Github release.
+  # This is used by midenup to speed installs up.
+  upload-artifacts:
+    name: upload pre-built miden-client executable artifacts
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    strategy:
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+        target: [aarch64-apple-darwin, x86_64-unknown-linux-gnu]
+        exclude:
+          - os: macos-latest
+            target: x86_64-unknown-linux-gnu
+          - os: ubuntu-latest
+            target: aarch64-apple-darwin
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.release.tag_name }}
+      - uses: ./.github/actions/cleanup-runner
+      - name: Install Rust
+        run: |
+          rustup update --no-self-update
+          rustc --version
+      - name: Add target
+        run: |
+          rustup target add ${{ matrix.target }}
+      - name: Build miden-client
+        run: |
+          BUILD_TARGET=${{ matrix.target }} make build-cli 
+      - name: Prepare artifact
+        run: |
+          mv target/${{ matrix.target }}/release/miden-client miden-client-${{ matrix.target }}
+      - name: Attest miden-client
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: miden-client-${{ matrix.target }}
+      - name: Upload
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          gh release upload ${RELEASE_TAG} miden-client-${{ matrix.target }}

@@ -6,6 +6,8 @@ help: ## Show description of all commands
 
 # --- Variables -----------------------------------------------------------------------------------
 
+# The build target defaults to rust's host.
+BUILD_TARGET ?= $(shell rustc -vV | grep host | awk '{print $$2}')
 FEATURES_CLIENT=--features "std"
 WARNINGS=RUSTDOCFLAGS="-D warnings"
 
@@ -195,8 +197,14 @@ install-tests: ## Install the tests binary
 
 # --- Building ------------------------------------------------------------------------------------
 
-build: ## Build the CLI binary, client library and tests binary in release mode
-	cargo build --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --release
+## Build the CLI binary. This is done separately in order to save time during
+## artifact generation for releases.
+build-cli:
+	cargo build --release --target $(BUILD_TARGET) -p miden-client-cli
+
+## Client library and tests binary in release mode
+build: build-cli
+	cargo build --workspace $(EXCLUDE_WASM_PACKAGES) --exclude miden-client-cli --exclude testing-remote-prover --release
 	cargo build --package testing-remote-prover --release --locked
 	cargo build --package miden-client-integration-tests --release --locked
 
