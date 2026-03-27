@@ -91,12 +91,10 @@ should_panic_without_expect = "allow" # We don't care about the specific panic m
 # End of pedantic lints.
 
 [patch.crates-io]
-# Protocol patches (ae4b4577 = v0.14.0 release merge, includes DAP support from 163c549)
 miden-protocol  = { git = "https://github.com/0xMiden/protocol", rev = "ae4b45778c7e2c73be87b67906b7fa1ae8e2a285" }
 miden-standards = { git = "https://github.com/0xMiden/protocol", rev = "ae4b45778c7e2c73be87b67906b7fa1ae8e2a285" }
 miden-testing   = { git = "https://github.com/0xMiden/protocol", rev = "ae4b45778c7e2c73be87b67906b7fa1ae8e2a285" }
 miden-tx        = { git = "https://github.com/0xMiden/protocol", rev = "ae4b45778c7e2c73be87b67906b7fa1ae8e2a285" }
-# VM patches (1b60fa4 = into_parts() for DAP debugger)
 miden-air               = { git = "https://github.com/0xMiden/miden-vm.git", rev = "1b60fa4b54e60075cad7a761b593d5c00c6aaf46" }
 miden-core              = { git = "https://github.com/0xMiden/miden-vm.git", rev = "1b60fa4b54e60075cad7a761b593d5c00c6aaf46" }
 miden-debug-types       = { git = "https://github.com/0xMiden/miden-vm.git", rev = "1b60fa4b54e60075cad7a761b593d5c00c6aaf46" }
