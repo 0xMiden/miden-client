@@ -244,15 +244,11 @@ export const MockFungibleAsset = class FungibleAsset {
 
 export const MockNoteAttachment = class NoteAttachment {};
 
-export const MockOutputNoteArray = class OutputNoteArray {
+export const MockNoteArray = class NoteArray {
   notes: unknown[];
   constructor(notes: unknown[]) {
     this.notes = notes;
   }
-};
-
-export const MockOutputNote = {
-  full: vi.fn((note: unknown) => ({ note })),
 };
 
 export const MockNoteAndArgs = class NoteAndArgs {
@@ -441,8 +437,7 @@ export const createMockSdkModule = (
     NoteAssets: MockNoteAssets,
     FungibleAsset: MockFungibleAsset,
     NoteAttachment: MockNoteAttachment,
-    OutputNoteArray: MockOutputNoteArray,
-    OutputNote: MockOutputNote,
+    NoteArray: MockNoteArray,
     NoteAndArgs: MockNoteAndArgs,
     NoteAndArgsArray: MockNoteAndArgsArray,
     TransactionRequestBuilder: MockTransactionRequestBuilder,

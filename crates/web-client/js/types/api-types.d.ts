@@ -662,10 +662,10 @@ export declare class MidenClient {
 // ════════════════════════════════════════════════════════════════
 
 /** Creates a P2ID (Pay-to-ID) note. */
-export declare function createP2IDNote(options: NoteOptions): RawOutputNote;
+export declare function createP2IDNote(options: NoteOptions): Note;
 
 /** Creates a P2IDE (Pay-to-ID with Expiration) note. */
-export declare function createP2IDENote(options: P2IDEOptions): RawOutputNote;
+export declare function createP2IDENote(options: P2IDEOptions): Note;
 
 /** Builds a swap tag for note matching. Returns a NoteTag (use `.asU32()` for the numeric value). */
 export declare function buildSwapTag(options: BuildSwapTagOptions): NoteTag;

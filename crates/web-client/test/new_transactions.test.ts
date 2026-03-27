@@ -447,11 +447,8 @@ export const customTransaction = async (
 
       // Creating First Custom Transaction Request to Mint the Custom Note
 
-      const rawOutputNote = window.RawOutputNote.full(note);
       let transactionRequest = new window.TransactionRequestBuilder()
-        .withOwnRawOutputNotes(
-          new window.MidenArrays.RawOutputNoteArray([rawOutputNote])
-        )
+        .withOwnOutputNotes(new window.MidenArrays.NoteArray([note]))
         .build();
 
       // Execute and Submit Transaction
@@ -578,15 +575,8 @@ const customTxWithMultipleNotes = async (
       let note1 = new window.Note(noteAssets1, noteMetadata, noteRecipient1);
       let note2 = new window.Note(noteAssets2, noteMetadata, noteRecipient2);
 
-      const notes = [
-        window.RawOutputNote.full(note1),
-        window.RawOutputNote.full(note2),
-      ];
-
-      const rawOutputNotes = new window.MidenArrays.RawOutputNoteArray(notes);
-
       let transactionRequest = new window.TransactionRequestBuilder()
-        .withOwnRawOutputNotes(rawOutputNotes)
+        .withOwnOutputNotes(new window.MidenArrays.NoteArray([note1, note2]))
         .build();
 
       let transactionUpdate = await window.helpers.executeAndApplyTransaction(
@@ -622,20 +612,16 @@ const submitExpiredTransaction = async (
       const noteAssets = new window.NoteAssets([
         new window.FungibleAsset(faucetAccountId, BigInt(10)),
       ]);
-      const rawOutputNote = window.RawOutputNote.full(
-        window.Note.createP2IDNote(
-          senderAccountId,
-          targetAccountId,
-          noteAssets,
-          window.NoteType.Public,
-          new window.Felt(0n)
-        )
+      const note = window.Note.createP2IDNote(
+        senderAccountId,
+        targetAccountId,
+        noteAssets,
+        window.NoteType.Public,
+        new window.Felt(0n)
       );
 
       const transactionRequest = new window.TransactionRequestBuilder()
-        .withOwnRawOutputNotes(
-          new window.MidenArrays.RawOutputNoteArray([rawOutputNote])
-        )
+        .withOwnOutputNotes(new window.MidenArrays.NoteArray([note]))
         .withExpirationDelta(2)
         .build();
 
@@ -1270,11 +1256,7 @@ export const counterAccountComponent = async (
     let note = new window.Note(noteAssets, noteMetadata, noteRecipient);
 
     let transactionRequest = new window.TransactionRequestBuilder()
-      .withOwnRawOutputNotes(
-        new window.MidenArrays.RawOutputNoteArray([
-          window.RawOutputNote.full(note),
-        ])
-      )
+      .withOwnOutputNotes(new window.MidenArrays.NoteArray([note]))
       .build();
 
     let transactionUpdate = await window.helpers.executeAndApplyTransaction(
