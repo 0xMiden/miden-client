@@ -20,6 +20,8 @@ use miden_client::account::{
     PartialStorageMap,
     StorageMap,
     StorageMapKey,
+    StorageSlot,
+    StorageSlotContent,
     StorageSlotName,
     StorageSlotType,
 };
@@ -656,10 +658,8 @@ impl SqliteStore {
     /// during sync.
     ///
     /// Unlike `update_account_state` which does a full wipe-and-reinsert, this method applies
-    /// only the changes received from the node's delta sync endpoints:
-    ///
-    /// NOTE: As the SMT forest holds full account state, this method internally reconstructs
-    /// the full state from the DB to update the SMT forest.
+    /// only the changes received from the node's delta sync endpoints. The SMT forest is updated
+    /// incrementally rather than rebuilt from scratch.
     pub(crate) fn apply_sync_account_delta(
         tx: &Transaction<'_>,
         smt_forest: &mut AccountSmtForest,
@@ -670,13 +670,31 @@ impl SqliteStore {
         let nonce = delta.header.nonce().as_int();
         let nonce_val = u64_to_value(nonce);
 
-        Self::apply_vault_updates(tx, &account_id_hex, &nonce_val, &delta.vault_updates)?;
-        Self::apply_storage_map_updates(
+        // Decompose vault updates into additions and removals.
+        let mut removed_vault_keys: Vec<AssetVaultKey> = Vec::new();
+        let mut updated_assets: Vec<Asset> = Vec::new();
+        for vault_update in &delta.vault_updates {
+            if let Some(asset) = vault_update.asset {
+                updated_assets.push(asset);
+            } else {
+                removed_vault_keys.push(vault_update.vault_key);
+            }
+        }
+        Self::persist_vault_delta(
             tx,
             &account_id_hex,
             &nonce_val,
-            &delta.storage_map_updates,
+            &removed_vault_keys,
+            &updated_assets,
         )?;
+
+        // Decompose storage map updates into (slot_name, key_word, value) triples.
+        let map_entries: Vec<(StorageSlotName, Word, Word)> = delta
+            .storage_map_updates
+            .iter()
+            .map(|u| (u.slot_name.clone(), Word::from(u.key), u.value))
+            .collect();
+        Self::persist_storage_map_delta(tx, &account_id_hex, &nonce_val, &map_entries)?;
 
         // Replace non-oversized storage slots (value slots + small maps).
         for slot in &delta.non_oversized_slots {
@@ -693,123 +711,69 @@ impl SqliteStore {
         Self::insert_account_header(tx, &delta.header, None)?;
         Self::insert_account_code(tx, &delta.code)?;
 
-        // Reconstruct the full account state from the DB to update the SMT forest.
-        let assets = query_vault_assets(tx, account_id)?;
-        let vault = AssetVault::new(&assets).map_err(StoreError::AssetVaultError)?;
+        let old_roots = smt_forest.get_roots(&account_id).cloned().unwrap_or_default();
+        let old_vault_root = old_roots.first().copied().unwrap_or_default();
 
-        let slots: Vec<_> = query_storage_slots(tx, account_id, &AccountStorageFilter::All)?
-            .into_values()
+        // Compute new vault root by applying asset additions and removals.
+        let new_vault_root = smt_forest.update_asset_nodes(
+            old_vault_root,
+            updated_assets.into_iter(),
+            removed_vault_keys.into_iter(),
+        )?;
+
+        // Build a set of slot names that have map updates (for efficient lookup).
+        let updated_map_slot_names: std::collections::BTreeSet<&StorageSlotName> =
+            delta.storage_map_updates.iter().map(|u| &u.slot_name).collect();
+
+        // Build a set of slot names in non_oversized_slots that are map-type slots.
+        let replaced_map_slot_names: std::collections::BTreeSet<&StorageSlotName> = delta
+            .non_oversized_slots
+            .iter()
+            .filter(|s| matches!(s.content(), StorageSlotContent::Map(_)))
+            .map(StorageSlot::name)
             .collect();
-        let storage = AccountStorage::new(slots).map_err(StoreError::AccountError)?;
 
-        smt_forest.insert_and_register_account_state(account_id, &vault, &storage)?;
+        // Query all storage slots from DB (name-sorted), filter to map-type slots.
+        let all_slots = query_storage_slots(tx, account_id, &AccountStorageFilter::All)?;
+        let map_slots: Vec<_> = all_slots
+            .iter()
+            .filter(|(_, slot)| slot.slot_type() == StorageSlotType::Map)
+            .collect();
 
-        Ok(())
-    }
+        // old_roots[1..] are the map roots in the same name-sorted order.
+        let old_map_roots: Vec<Word> = old_roots.into_iter().skip(1).collect();
 
-    /// Applies individual vault asset updates (upserts and removals) to the database.
-    fn apply_vault_updates(
-        tx: &Transaction<'_>,
-        account_id_hex: &str,
-        nonce_val: &Value,
-        vault_updates: &[miden_client::rpc::domain::account_vault::AccountVaultUpdate],
-    ) -> Result<(), StoreError> {
-        for vault_update in vault_updates {
-            let vault_key_word: Word = vault_update.vault_key.into();
-            let vault_key_hex = vault_key_word.to_hex();
+        let mut new_roots = vec![new_vault_root];
+        for (idx, (slot_name, slot)) in map_slots.iter().enumerate() {
+            let old_map_root = old_map_roots.get(idx).copied().unwrap_or_default();
 
-            if let Some(asset) = &vault_update.asset {
-                let faucet_prefix_hex = asset.faucet_id_prefix().to_hex();
-                let asset_hex = Word::from(*asset).to_hex();
-
-                tx.execute(
-                    "INSERT OR REPLACE INTO latest_account_assets \
-                     (account_id, vault_key, faucet_id_prefix, asset) \
-                     VALUES (?, ?, ?, ?)",
-                    params![account_id_hex, &vault_key_hex, &faucet_prefix_hex, &asset_hex],
-                )
-                .into_store_error()?;
-
-                tx.execute(
-                    "INSERT OR REPLACE INTO historical_account_assets \
-                     (account_id, nonce, vault_key, faucet_id_prefix, asset) \
-                     VALUES (?, ?, ?, ?, ?)",
-                    params![
-                        account_id_hex,
-                        nonce_val,
-                        &vault_key_hex,
-                        &faucet_prefix_hex,
-                        &asset_hex,
-                    ],
-                )
-                .into_store_error()?;
+            if replaced_map_slot_names.contains(slot_name) {
+                // This map was fully replaced — insert full map nodes and use new root.
+                if let StorageSlotContent::Map(map) = slot.content() {
+                    smt_forest.insert_storage_map_nodes_for_map(map)?;
+                    new_roots.push(map.root());
+                } else {
+                    new_roots.push(old_map_root);
+                }
+            } else if updated_map_slot_names.contains(slot_name) {
+                // This map had delta updates — apply them incrementally.
+                let slot_updates: Vec<(StorageMapKey, Word)> = delta
+                    .storage_map_updates
+                    .iter()
+                    .filter(|u| &u.slot_name == *slot_name)
+                    .map(|u| (u.key, u.value))
+                    .collect();
+                let new_map_root =
+                    smt_forest.update_storage_map_nodes(old_map_root, slot_updates.into_iter())?;
+                new_roots.push(new_map_root);
             } else {
-                tx.execute(
-                    "DELETE FROM latest_account_assets \
-                     WHERE account_id = ? AND vault_key = ?",
-                    params![account_id_hex, &vault_key_hex],
-                )
-                .into_store_error()?;
-
-                tx.execute(
-                    "INSERT OR REPLACE INTO historical_account_assets \
-                     (account_id, nonce, vault_key, faucet_id_prefix, asset) \
-                     VALUES (?, ?, ?, '', NULL)",
-                    params![account_id_hex, nonce_val, &vault_key_hex],
-                )
-                .into_store_error()?;
+                // No changes to this map — keep old root.
+                new_roots.push(old_map_root);
             }
         }
-        Ok(())
-    }
 
-    /// Applies individual storage map entry updates (upserts and removals) to the database.
-    fn apply_storage_map_updates(
-        tx: &Transaction<'_>,
-        account_id_hex: &str,
-        nonce_val: &Value,
-        storage_map_updates: &[miden_client::rpc::domain::storage_map::StorageMapUpdate],
-    ) -> Result<(), StoreError> {
-        let empty_word = Word::default();
-        for map_update in storage_map_updates {
-            let slot_name_str = map_update.slot_name.to_string();
-            let key_hex = map_update.key.to_hex();
+        smt_forest.replace_roots(account_id, new_roots);
 
-            if map_update.value == empty_word {
-                tx.execute(
-                    "DELETE FROM latest_storage_map_entries \
-                     WHERE account_id = ? AND slot_name = ? AND key = ?",
-                    params![account_id_hex, &slot_name_str, &key_hex],
-                )
-                .into_store_error()?;
-
-                tx.execute(
-                    "INSERT OR REPLACE INTO historical_storage_map_entries \
-                     (account_id, nonce, slot_name, key, value) \
-                     VALUES (?, ?, ?, ?, NULL)",
-                    params![account_id_hex, nonce_val, &slot_name_str, &key_hex],
-                )
-                .into_store_error()?;
-            } else {
-                let value_hex = map_update.value.to_hex();
-
-                tx.execute(
-                    "INSERT OR REPLACE INTO latest_storage_map_entries \
-                     (account_id, slot_name, key, value) \
-                     VALUES (?, ?, ?, ?)",
-                    params![account_id_hex, &slot_name_str, &key_hex, &value_hex],
-                )
-                .into_store_error()?;
-
-                tx.execute(
-                    "INSERT OR REPLACE INTO historical_storage_map_entries \
-                     (account_id, nonce, slot_name, key, value) \
-                     VALUES (?, ?, ?, ?, ?)",
-                    params![account_id_hex, nonce_val, &slot_name_str, &key_hex, &value_hex],
-                )
-                .into_store_error()?;
-            }
-        }
         Ok(())
     }
 

@@ -183,17 +183,8 @@ impl SqliteStore {
                 slot_type
             } | REPLACE
         );
-        const LATEST_MAP_ENTRY_QUERY: &str =
-            insert_sql!(latest_storage_map_entries { account_id, slot_name, key, value } | REPLACE);
-        const HISTORICAL_MAP_ENTRY_QUERY: &str = insert_sql!(
-            historical_storage_map_entries { account_id, nonce, slot_name, key, value } | REPLACE
-        );
-        const DELETE_LATEST_MAP_ENTRY: &str = "DELETE FROM latest_storage_map_entries WHERE account_id = ? AND slot_name = ? AND key = ?";
-
         let mut latest_slot_stmt = tx.prepare_cached(LATEST_SLOT_QUERY).into_store_error()?;
         let mut hist_slot_stmt = tx.prepare_cached(HISTORICAL_SLOT_QUERY).into_store_error()?;
-        let mut latest_map_stmt = tx.prepare_cached(LATEST_MAP_ENTRY_QUERY).into_store_error()?;
-        let mut hist_map_stmt = tx.prepare_cached(HISTORICAL_MAP_ENTRY_QUERY).into_store_error()?;
         let account_id_hex = account_id.to_hex();
         let nonce_val = u64_to_value(nonce);
 
@@ -233,47 +224,66 @@ impl SqliteStore {
                 .into_store_error()?;
 
             if let Some(changed_entries) = delta_map_entries.get(slot_name) {
-                for (key, value) in changed_entries {
-                    // Latest: write only the delta entries (REPLACE for updates, DELETE
-                    // for removals)
-                    if *value == EMPTY_WORD {
-                        tx.execute(
-                            DELETE_LATEST_MAP_ENTRY,
-                            params![&account_id_hex, &slot_name_str, key.to_hex()],
-                        )
-                        .into_store_error()?;
-                    } else {
-                        latest_map_stmt
-                            .execute(params![
-                                &account_id_hex,
-                                &slot_name_str,
-                                key.to_hex(),
-                                value.to_hex(),
-                            ])
-                            .into_store_error()?;
-                    }
-
-                    // Historical: write ONLY the delta's changed entries.
-                    // Use NULL as tombstone for removed entries (EMPTY_WORD) so that
-                    // rebuild_latest_for_account can filter them out, matching the
-                    // behavior of StorageMap::entries() which excludes zero-valued
-                    // entries.
-                    let value_param: Option<String> = if *value == EMPTY_WORD {
-                        None
-                    } else {
-                        Some(value.to_hex())
-                    };
-                    hist_map_stmt
-                        .execute(params![
-                            &account_id_hex,
-                            &nonce_val,
-                            &slot_name_str,
-                            key.to_hex(),
-                            value_param,
-                        ])
-                        .into_store_error()?;
-                }
+                let entries: Vec<(StorageSlotName, Word, Word)> = changed_entries
+                    .iter()
+                    .map(|(key, value)| (slot_name.clone(), *key, *value))
+                    .collect();
+                Self::persist_storage_map_delta(tx, &account_id_hex, &nonce_val, &entries)?;
             }
+        }
+
+        Ok(())
+    }
+
+    /// Persists map-entry delta changes for a single storage slot to both the latest and historical
+    /// tables.
+    pub(crate) fn persist_storage_map_delta(
+        tx: &Transaction<'_>,
+        account_id_hex: &str,
+        nonce_val: &rusqlite::types::Value,
+        entries: &[(StorageSlotName, Word, Word)],
+    ) -> Result<(), StoreError> {
+        const LATEST_MAP_ENTRY_QUERY: &str =
+            insert_sql!(latest_storage_map_entries { account_id, slot_name, key, value } | REPLACE);
+        const HISTORICAL_MAP_ENTRY_QUERY: &str = insert_sql!(
+            historical_storage_map_entries { account_id, nonce, slot_name, key, value } | REPLACE
+        );
+        const DELETE_LATEST_MAP_ENTRY: &str = "DELETE FROM latest_storage_map_entries WHERE account_id = ? AND slot_name = ? AND key = ?";
+
+        let mut latest_map_stmt = tx.prepare_cached(LATEST_MAP_ENTRY_QUERY).into_store_error()?;
+        let mut hist_map_stmt = tx.prepare_cached(HISTORICAL_MAP_ENTRY_QUERY).into_store_error()?;
+
+        for (slot_name, key, value) in entries {
+            let slot_name_str = slot_name.to_string();
+
+            // Latest: write only the delta entries
+            if *value == EMPTY_WORD {
+                tx.execute(
+                    DELETE_LATEST_MAP_ENTRY,
+                    params![account_id_hex, &slot_name_str, key.to_hex()],
+                )
+                .into_store_error()?;
+            } else {
+                latest_map_stmt
+                    .execute(params![account_id_hex, &slot_name_str, key.to_hex(), value.to_hex(),])
+                    .into_store_error()?;
+            }
+
+            // Historical: write ONLY the delta's changed entries.
+            let value_param: Option<String> = if *value == EMPTY_WORD {
+                None
+            } else {
+                Some(value.to_hex())
+            };
+            hist_map_stmt
+                .execute(params![
+                    account_id_hex,
+                    nonce_val,
+                    &slot_name_str,
+                    key.to_hex(),
+                    value_param,
+                ])
+                .into_store_error()?;
         }
 
         Ok(())

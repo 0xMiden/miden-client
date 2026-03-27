@@ -16,6 +16,7 @@
 * [FEATURE][web] Added `getAccountProof` method to the web client's `RpcClient`, allowing lightweight retrieval of account header, storage slot values, and code via a single RPC call. Refactored the `NodeRpcClient::get_account_proof` signature to allow requesting just private account proofs ([#1794](https://github.com/0xMiden/miden-client/pull/1794), [#1814](https://github.com/0xMiden/miden-client/pull/1814)).
 * Added `getAccountByKeyCommitment` method to `WebClient` for retrieving accounts by public key commitment ([#1729](https://github.com/0xMiden/miden-client/pull/1729)).
 * Added automatic registration of note scripts required by network transactions (NTX). The client now checks the node's script registry before submitting a transaction and registers any missing scripts via a separate registration transaction ([#1840](https://github.com/0xMiden/miden-client/pull/1840)).
+* Large public accounts (those exceeding node size thresholds for vault assets or storage map entries) are now synced incrementally via delta endpoints (`SyncAccountVault`, `SyncAccountStorageMaps`) instead of downloading the full account state ([#1916](https://github.com/0xMiden/miden-client/pull/1916)).
 
 ### Changes
 
@@ -38,6 +39,7 @@
 * Removed `SmtForest` empty-root workaround in `AccountSmtForest::safe_pop_smts`, now that the upstream fix has landed in miden-crypto v0.19.7 ([#1864](https://github.com/0xMiden/miden-client/pull/1864)).
 * Added an `InputNoteReader` accessible through `client.input_note_reader()` that allows for lazy iterator over all the consumed input notes ([#1843](https://github.com/0xMiden/miden-client/pull/1843), ([#1925](https://github.com/0xMiden/miden-client/pull/1925))).
 * Removed miden-cli template TOMLs in favor of direct serialization into packages ([#1879](https://github.com/0xMiden/miden-client/pull/1879)).
+* [BREAKING][type][rust,web] Added `FetchedAccount::PublicLarge` variant for public accounts that exceed node size thresholds ([#1916](https://github.com/0xMiden/miden-client/pull/1916)).
 
 ### Features
 

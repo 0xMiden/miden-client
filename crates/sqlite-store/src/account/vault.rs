@@ -206,7 +206,7 @@ impl SqliteStore {
 
     /// Persists vault delta changes to the database: deletes removed assets from latest,
     /// writes tombstones to historical, and inserts updated assets into both tables.
-    fn persist_vault_delta(
+    pub(crate) fn persist_vault_delta(
         tx: &Transaction<'_>,
         account_id_hex: &str,
         nonce_val: &rusqlite::types::Value,
