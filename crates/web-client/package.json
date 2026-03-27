@@ -16,11 +16,6 @@
       "default": "./dist/index.js"
     }
   },
-  "optionalDependencies": {
-    "@miden-sdk/node-darwin-arm64": "0.14.0-alpha.1",
-    "@miden-sdk/node-darwin-x64": "0.14.0-alpha.1",
-    "@miden-sdk/node-linux-x64-gnu": "0.14.0-alpha.1"
-  },
   "files": [
     "dist",
     "js/node-index.js",

@@ -2,7 +2,7 @@
 authors.workspace    = true
 description          = "Proc macro for dual wasm-bindgen/napi annotations via #[js_export]"
 edition.workspace    = true
-keywords             = ["miden", "wasm", "napi", "macro"]
+keywords             = ["macro", "miden", "napi", "wasm"]
 license.workspace    = true
 name                 = "js-export-macro"
 repository.workspace = true
