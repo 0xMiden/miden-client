@@ -21,6 +21,16 @@ function createTempDir(label) {
   return dir;
 }
 
+/**
+ * Returns a deterministic data directory for a given store name.
+ * Uses ~/.miden/stores/<storeName>/ so data persists across runs.
+ */
+function defaultDataDir(storeName) {
+  const dir = path.join(os.homedir(), ".miden", "stores", storeName);
+  fs.mkdirSync(path.join(dir, "keystore"), { recursive: true });
+  return dir;
+}
+
 function normBytes(val) {
   if (val instanceof Uint8Array || Buffer.isBuffer(val)) return Array.from(val);
   return val;
@@ -52,11 +62,9 @@ export function createWasmWebClient(rawSdk, options) {
     ) => {
       const dir = options?.dataDir
         ? path.join(options.dataDir, storeName || "default")
-        : createTempDir(storeName || "client");
-
-      if (options?.dataDir) {
-        fs.mkdirSync(path.join(dir, "keystore"), { recursive: true });
-      }
+        : storeName
+          ? defaultDataDir(storeName)
+          : createTempDir("client");
 
       const client = new rawSdk.WebClient();
       await client.createClient(
@@ -70,36 +78,11 @@ export function createWasmWebClient(rawSdk, options) {
       return wrapClient(client, storeName);
     },
 
-    createClientWithExternalKeystore: async (
-      rpcUrl,
-      noteTransportUrl,
-      seed,
-      storeName,
-      _getKey,
-      _insertKey,
-      _sign,
-      debugMode
-    ) => {
-      // Node.js uses filesystem keystore -- external keystore callbacks are not supported.
-      // Fall back to regular client creation.
-      const dir = options?.dataDir
-        ? path.join(options.dataDir, storeName || "default")
-        : createTempDir(storeName || "client");
-
-      if (options?.dataDir) {
-        fs.mkdirSync(path.join(dir, "keystore"), { recursive: true });
-      }
-
-      const client = new rawSdk.WebClient();
-      await client.createClient(
-        rpcUrl ?? null,
-        noteTransportUrl ?? null,
-        normBytes(seed) ?? null,
-        path.join(dir, `${storeName || "store"}.db`),
-        path.join(dir, "keystore"),
-        debugMode ?? false
+    createClientWithExternalKeystore: async () => {
+      throw new Error(
+        "External keystores are not supported on Node.js. " +
+          "The Node.js backend uses a filesystem keystore automatically."
       );
-      return wrapClient(client, storeName);
     },
   };
 }

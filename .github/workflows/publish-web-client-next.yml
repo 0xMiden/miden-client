@@ -94,7 +94,9 @@ jobs:
   # Publish all packages to npm
   publish:
     needs: [check-version, build-native]
-    if: always() && needs.check-version.result == 'success'
+    if: >
+      needs.check-version.result == 'success' &&
+      (needs.build-native.result == 'success' || needs.build-native.result == 'skipped')
     runs-on: ubuntu-24.04
     steps:
       - name: Check out code
