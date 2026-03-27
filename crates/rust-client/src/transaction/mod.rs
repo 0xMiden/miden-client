@@ -853,13 +853,7 @@ where
         &'auth self,
         data_store: &'store STORE,
     ) -> Result<
-        TransactionExecutor<
-            'store,
-            'auth,
-            STORE,
-            AUTH,
-            miden_debug::DapExecutor,
-        >,
+        TransactionExecutor<'store, 'auth, STORE, AUTH, miden_debug::DapExecutor>,
         TransactionExecutorError,
     > {
         let mut executor = TransactionExecutor::new(data_store)
