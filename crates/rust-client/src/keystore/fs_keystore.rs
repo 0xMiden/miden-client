@@ -13,8 +13,8 @@ use miden_protocol::account::AccountId;
 use miden_protocol::account::auth::{AuthSecretKey, PublicKey, PublicKeyCommitment, Signature};
 use miden_tx::AuthenticationError;
 use miden_tx::auth::{SigningInputs, TransactionAuthenticator};
+use miden_tx::utils::serde::{Deserializable, Serializable};
 use miden_tx::utils::sync::RwLock;
-use miden_tx::utils::{Deserializable, Serializable};
 use serde::{Deserialize, Serialize};
 
 use super::{KeyStoreError, Keystore};
@@ -79,14 +79,18 @@ impl KeyIndex {
     /// Saves the index to disk atomically (write to temp file, then rename).
     fn write_to_file(&self, keys_directory: &Path) -> Result<(), KeyStoreError> {
         let index_path = keys_directory.join(INDEX_FILE_NAME);
-        let temp_path = std::env::temp_dir().join(INDEX_FILE_NAME);
-
         let contents = serde_json::to_string_pretty(self).map_err(|err| {
             KeyStoreError::StorageError(format!("error serializing index: {err:?}"))
         })?;
 
-        // Write to temp file
-        let mut file = fs::File::create(&temp_path)
+        let temp_path = unique_temp_index_path(keys_directory);
+
+        // Write to a temp file in the keystore directory so the final rename is isolated from
+        // other test runs and stays on the same filesystem.
+        let mut file = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&temp_path)
             .map_err(keystore_error("error creating temp index file"))?;
         file.write_all(contents.as_bytes())
             .map_err(keystore_error("error writing temp index file"))?;
@@ -329,6 +333,10 @@ impl Keystore for FilesystemKeyStore {
 fn key_file_path(keys_directory: &Path, pub_key: PublicKeyCommitment) -> PathBuf {
     let filename = hash_pub_key(pub_key.into());
     keys_directory.join(filename)
+}
+
+fn unique_temp_index_path(keys_directory: &Path) -> PathBuf {
+    keys_directory.join(format!(".{INDEX_FILE_NAME}.tmp-{}", rand::random::<u64>()))
 }
 
 /// Writes an [`AuthSecretKey`] into a file with restrictive permissions (0600 on Unix).

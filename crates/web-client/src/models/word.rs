@@ -74,7 +74,7 @@ impl Word {
     /// Returns the word as an array of u64 values.
     #[wasm_bindgen(js_name = "toU64s")]
     pub fn to_u64s(&self) -> Vec<u64> {
-        self.0.iter().map(NativeFelt::as_int).collect::<Vec<u64>>()
+        self.0.iter().map(NativeFelt::as_canonical_u64).collect::<Vec<u64>>()
     }
 
     /// Returns the word as an array of field elements.

@@ -59,7 +59,7 @@ impl AccountSmtForest {
             return Err(MerkleError::UntrackedKey(vault_key_word).into());
         }
 
-        let asset = Asset::try_from(asset_word)?;
+        let asset = Asset::from_key_value_words(vault_key_word, asset_word)?;
         let witness = AssetWitness::new(proof)?;
         Ok((asset, witness))
     }
@@ -158,10 +158,10 @@ impl AccountSmtForest {
         let entries: Vec<(Word, Word)> = new_assets
             .map(|asset| {
                 let key: Word = asset.vault_key().into();
-                let value: Word = asset.into();
+                let value = asset.to_value_word();
                 (key, value)
             })
-            .chain(removed_vault_keys.map(|key| (key.into(), EMPTY_WORD)))
+            .chain(removed_vault_keys.map(|vault_key| (vault_key.into(), EMPTY_WORD)))
             .collect();
 
         if entries.is_empty() {
@@ -193,7 +193,7 @@ impl AccountSmtForest {
     pub fn insert_asset_nodes(&mut self, vault: &AssetVault) -> Result<(), StoreError> {
         let smt = Smt::with_entries(vault.assets().map(|asset| {
             let key: Word = asset.vault_key().into();
-            let value: Word = asset.into();
+            let value = asset.to_value_word();
             (key, value)
         }))
         .map_err(StoreError::from)?;

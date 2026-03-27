@@ -132,6 +132,9 @@ pub use miden_protocol::transaction::{
     OutputNote,
     OutputNotes,
     ProvenTransaction,
+    PublicOutputNote,
+    RawOutputNote,
+    RawOutputNotes,
     TransactionArgs,
     TransactionId,
     TransactionInputs,
@@ -465,7 +468,7 @@ where
         account_id: AccountId,
         tx_script: TransactionScript,
         advice_inputs: AdviceInputs,
-        foreign_accounts: BTreeSet<ForeignAccount>,
+        foreign_accounts: BTreeMap<AccountId, ForeignAccount>,
     ) -> Result<[Felt; 16], ClientError> {
         let (fpi_block_number, foreign_account_inputs) =
             self.retrieve_foreign_account_inputs(foreign_accounts).await?;
@@ -742,7 +745,7 @@ where
     /// retrieve it, this implies a state sync call which may update the client in other ways.
     async fn retrieve_foreign_account_inputs(
         &mut self,
-        foreign_accounts: BTreeSet<ForeignAccount>,
+        foreign_accounts: BTreeMap<AccountId, ForeignAccount>,
     ) -> Result<(Option<BlockNumber>, Vec<AccountInputs>), ClientError> {
         if foreign_accounts.is_empty() {
             return Ok((None, Vec::new()));
@@ -751,7 +754,7 @@ where
         let block_num = self.get_sync_height().await?;
         let mut return_foreign_account_inputs = Vec::with_capacity(foreign_accounts.len());
 
-        for foreign_account in foreign_accounts {
+        for foreign_account in foreign_accounts.into_values() {
             let foreign_account_inputs = match foreign_account {
                 ForeignAccount::Public(account_id, storage_requirements) => {
                     fetch_public_account_inputs(
@@ -810,7 +813,7 @@ where
 /// notes wouldn't be included.
 fn get_outgoing_assets(
     transaction_request: &TransactionRequest,
-) -> (BTreeMap<AccountId, u64>, BTreeSet<NonFungibleAsset>) {
+) -> (BTreeMap<AccountId, u64>, Vec<NonFungibleAsset>) {
     // Get own notes assets
     let mut own_notes_assets = match transaction_request.script_template() {
         Some(TransactionScriptTemplate::SendNotes(notes)) => notes
@@ -863,22 +866,20 @@ fn validate_basic_account_request(
 
     // Check if the account balance plus incoming assets is greater than or equal to the
     // outgoing non fungible assets
-    for non_fungible in non_fungible_set {
-        match account.vault().has_non_fungible_asset(non_fungible) {
+    for non_fungible in &non_fungible_set {
+        match account.vault().has_non_fungible_asset(*non_fungible) {
             Ok(true) => (),
             Ok(false) => {
                 // Check if the non fungible asset is in the incoming assets
-                if !incoming_non_fungible_balance_set.contains(&non_fungible) {
+                if !incoming_non_fungible_balance_set.contains(non_fungible) {
                     return Err(ClientError::AssetError(
-                        AssetError::NonFungibleFaucetIdTypeMismatch(
-                            non_fungible.faucet_id_prefix(),
-                        ),
+                        AssetError::NonFungibleFaucetIdTypeMismatch(non_fungible.faucet_id()),
                     ));
                 }
             },
             _ => {
                 return Err(ClientError::AssetError(AssetError::NonFungibleFaucetIdTypeMismatch(
-                    non_fungible.faucet_id_prefix(),
+                    non_fungible.faucet_id(),
                 )));
             },
         }
@@ -928,14 +929,14 @@ pub(crate) async fn fetch_public_account_inputs(
     Ok(account_inputs)
 }
 
-/// Extracts notes from [`OutputNotes`].
+/// Extracts notes from [`RawOutputNotes`].
 /// Used for:
 /// - Checking the relevance of notes to save them as input notes.
 /// - Validate hashes versus expected output notes after a transaction is executed.
-pub fn notes_from_output(output_notes: &OutputNotes) -> impl Iterator<Item = &Note> {
+pub fn notes_from_output(output_notes: &RawOutputNotes) -> impl Iterator<Item = &Note> {
     output_notes.iter().filter_map(|n| match n {
-        OutputNote::Full(n) => Some(n),
-        OutputNote::Header(_) | OutputNote::Partial(_) => None,
+        RawOutputNote::Full(n) => Some(n),
+        RawOutputNote::Partial(_) => None,
     })
 }
 

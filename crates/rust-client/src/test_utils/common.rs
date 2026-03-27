@@ -14,14 +14,19 @@ use miden_protocol::account::{Account, AccountComponentMetadata, AccountId, Acco
 use miden_protocol::asset::{FungibleAsset, TokenSymbol};
 use miden_protocol::note::NoteType;
 use miden_protocol::testing::account_id::ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE;
-use miden_protocol::transaction::{OutputNote, TransactionId};
+use miden_protocol::transaction::TransactionId;
 use miden_standards::account::auth::AuthSingleSig;
 use miden_standards::code_builder::CodeBuilder;
 use rand::RngCore;
 use tracing::{debug, info};
 use uuid::Uuid;
 
-use crate::account::component::{AccountComponent, BasicFungibleFaucet, BasicWallet};
+use crate::account::component::{
+    AccountComponent,
+    AuthControlled,
+    BasicFungibleFaucet,
+    BasicWallet,
+};
 use crate::account::{AccountBuilder, AccountType, StorageSlot};
 use crate::auth::AuthSchemeId;
 use crate::crypto::FeltRng;
@@ -76,29 +81,8 @@ pub async fn insert_new_wallet_with_seed(
     init_seed: [u8; 32],
     auth_scheme: AuthSchemeId,
 ) -> Result<(Account, AuthSecretKey), ClientError> {
-    let (key_pair, auth_component) = match auth_scheme {
-        AuthSchemeId::Falcon512Rpo => {
-            let key_pair = AuthSecretKey::new_falcon512_rpo();
-            let auth_component = AuthSingleSig::new(
-                key_pair.public_key().to_commitment(),
-                AuthSchemeId::Falcon512Rpo,
-            );
-            (key_pair, auth_component)
-        },
-        AuthSchemeId::EcdsaK256Keccak => {
-            let key_pair = AuthSecretKey::new_ecdsa_k256_keccak();
-            let auth_component = AuthSingleSig::new(
-                key_pair.public_key().to_commitment(),
-                AuthSchemeId::EcdsaK256Keccak,
-            );
-            (key_pair, auth_component)
-        },
-        scheme => {
-            return Err(ClientError::TransactionRequestError(
-                TransactionRequestError::UnsupportedAuthSchemeId(scheme.as_u8()),
-            ));
-        },
-    };
+    let key_pair = crate::auth::new_auth_secret_key(auth_scheme)?;
+    let auth_component = AuthSingleSig::new(key_pair.public_key().to_commitment(), auth_scheme);
 
     let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountImmutableCode)
@@ -124,43 +108,22 @@ pub async fn insert_new_fungible_faucet(
     keystore: &FilesystemKeyStore,
     auth_scheme: AuthSchemeId,
 ) -> Result<(Account, AuthSecretKey), ClientError> {
-    let (key_pair, auth_component) = match auth_scheme {
-        AuthSchemeId::Falcon512Rpo => {
-            let key_pair = AuthSecretKey::new_falcon512_rpo();
-            let auth_component = AuthSingleSig::new(
-                key_pair.public_key().to_commitment(),
-                AuthSchemeId::Falcon512Rpo,
-            );
-            (key_pair, auth_component)
-        },
-        AuthSchemeId::EcdsaK256Keccak => {
-            let key_pair = AuthSecretKey::new_ecdsa_k256_keccak();
-            let auth_component = AuthSingleSig::new(
-                key_pair.public_key().to_commitment(),
-                AuthSchemeId::EcdsaK256Keccak,
-            );
-            (key_pair, auth_component)
-        },
-        scheme => {
-            return Err(ClientError::TransactionRequestError(
-                TransactionRequestError::UnsupportedAuthSchemeId(scheme.as_u8()),
-            ));
-        },
-    };
+    let key_pair = crate::auth::new_auth_secret_key(auth_scheme)?;
+    let auth_component = AuthSingleSig::new(key_pair.public_key().to_commitment(), auth_scheme);
 
     // we need to use an initial seed to create the faucet account
     let mut init_seed = [0u8; 32];
     client.rng().fill_bytes(&mut init_seed);
 
     let symbol = TokenSymbol::new("TEST").unwrap();
-    let max_supply = Felt::try_from(9_999_999_u64.to_le_bytes().as_slice())
-        .expect("u64 can be safely converted to a field element");
+    let max_supply = Felt::new(9_999_999_u64);
 
     let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::FungibleFaucet)
         .storage_mode(storage_mode)
         .with_auth_component(auth_component)
         .with_component(BasicFungibleFaucet::new(symbol, 10, max_supply).unwrap())
+        .with_component(AuthControlled::allow_all())
         .build()
         .unwrap();
 
@@ -228,7 +191,9 @@ pub async fn wait_for_tx(client: &mut TestClient, transaction_id: TransactionId)
                 break;
             },
             TransactionStatus::Pending => {
-                std::thread::sleep(Duration::from_secs(1));
+                // Cooldown between polling iterations to reduce pressure on the node's
+                // rate limiter when many integration tests poll concurrently.
+                tokio::time::sleep(Duration::from_secs(2)).await;
             },
             TransactionStatus::Discarded(cause) => {
                 anyhow::bail!("transaction was discarded with cause: {cause:?}");
@@ -271,7 +236,7 @@ pub async fn wait_for_blocks(client: &mut TestClient, amount_of_blocks: u32) -> 
             return summary;
         }
 
-        std::thread::sleep(Duration::from_secs(3));
+        tokio::time::sleep(Duration::from_secs(3)).await;
     }
 }
 
@@ -294,7 +259,7 @@ pub async fn wait_for_blocks_no_sync(client: &mut TestClient, amount_of_blocks: 
             return;
         }
 
-        std::thread::sleep(Duration::from_secs(3));
+        tokio::time::sleep(Duration::from_secs(3)).await;
     }
 }
 
@@ -312,8 +277,10 @@ pub async fn wait_for_node(client: &mut TestClient) {
     );
     for _try_number in 0..NUMBER_OF_NODE_ATTEMPTS {
         match client.sync_state().await {
-            Err(ClientError::RpcError(RpcError::ConnectionError(_))) => {
-                std::thread::sleep(Duration::from_secs(NODE_TIME_BETWEEN_ATTEMPTS));
+            Err(ClientError::RpcError(
+                RpcError::ConnectionError(_) | RpcError::RequestError { .. },
+            )) => {
+                tokio::time::sleep(Duration::from_secs(NODE_TIME_BETWEEN_ATTEMPTS)).await;
             },
             Err(other_error) => {
                 panic!("Unexpected error: {other_error}");
@@ -491,19 +458,17 @@ pub fn mint_multiple_fungible_asset(
     let notes = target_id
         .iter()
         .map(|account_id| {
-            OutputNote::Full(
-                P2idNote::create(
-                    asset.faucet_id(),
-                    *account_id,
-                    vec![asset.into()],
-                    note_type,
-                    NoteAttachment::default(),
-                    rng,
-                )
-                .unwrap(),
+            P2idNote::create(
+                asset.faucet_id(),
+                *account_id,
+                vec![asset.into()],
+                note_type,
+                NoteAttachment::default(),
+                rng,
             )
+            .unwrap()
         })
-        .collect::<Vec<OutputNote>>();
+        .collect::<Vec<Note>>();
 
     TransactionRequestBuilder::new().own_output_notes(notes).build().unwrap()
 }
@@ -523,6 +488,10 @@ pub async fn execute_tx_and_consume_output_notes(
         .collect::<Vec<(Note, Option<NoteArgs>)>>();
 
     Box::pin(client.submit_new_transaction(executor, tx_request)).await.unwrap();
+
+    // Brief pause to allow the node to register the first transaction as in-flight before the
+    // second transaction references its output notes.
+    tokio::time::sleep(Duration::from_millis(500)).await;
 
     let tx_request = TransactionRequestBuilder::new().input_notes(output_notes).build().unwrap();
     Box::pin(client.submit_new_transaction(consumer, tx_request)).await.unwrap()
@@ -576,14 +545,14 @@ pub async fn insert_account_with_custom_component(
     let custom_component = AccountComponent::new(
         component_code,
         storage_slots,
-        AccountComponentMetadata::new("miden::testing::custom_component").with_supports_all_types(),
+        AccountComponentMetadata::new("miden::testing::custom_component", AccountType::all()),
     )
     .map_err(ClientError::AccountError)?;
 
     let mut init_seed = [0u8; 32];
     client.rng().fill_bytes(&mut init_seed);
 
-    let key_pair = AuthSecretKey::new_falcon512_rpo_with_rng(client.rng());
+    let key_pair = AuthSecretKey::new_falcon512_poseidon2_with_rng(client.rng());
     let pub_key = key_pair.public_key();
 
     let account = AccountBuilder::new(init_seed)
@@ -591,7 +560,7 @@ pub async fn insert_account_with_custom_component(
         .storage_mode(storage_mode)
         .with_auth_component(AuthSingleSig::new(
             pub_key.to_commitment(),
-            AuthSchemeId::Falcon512Rpo,
+            AuthSchemeId::Falcon512Poseidon2,
         ))
         .with_component(BasicWallet)
         .with_component(custom_component)

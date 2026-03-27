@@ -301,7 +301,7 @@ impl SqliteStore {
         for (slot_name, map_delta) in delta.storage().maps() {
             let old_root = old_map_roots.get(slot_name).copied().unwrap_or(default_map_root);
             let entries: Vec<_> =
-                map_delta.entries().iter().map(|(key, value)| (*key.inner(), *value)).collect();
+                map_delta.entries().iter().map(|(key, value)| (*key, *value)).collect();
 
             let new_root = smt_forest.update_storage_map_nodes(old_root, entries.into_iter())?;
             updated_slots.insert(slot_name.clone(), (new_root, StorageSlotType::Map));

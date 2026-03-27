@@ -74,12 +74,13 @@ impl<AUTH> Client<AUTH> {
         // Fetch the block header and MMR proof from the node
         let (block_header, path_nodes) =
             fetch_block_header(self.rpc_api.clone(), block_num, current_partial_mmr).await?;
+        let tracked_nodes = authenticated_block_nodes(&block_header, path_nodes);
 
         // Insert header and MMR nodes
         self.store
             .insert_block_header(&block_header, current_partial_mmr.peaks(), true)
             .await?;
-        self.store.insert_partial_blockchain_nodes(&path_nodes).await?;
+        self.store.insert_partial_blockchain_nodes(&tracked_nodes).await?;
 
         Ok(block_header)
     }
@@ -116,6 +117,19 @@ pub(crate) fn adjust_merkle_path_for_forest(
     path_nodes
 }
 
+fn authenticated_block_nodes(
+    block_header: &BlockHeader,
+    mut path_nodes: Vec<(InOrderIndex, Word)>,
+) -> Vec<(InOrderIndex, Word)> {
+    let mut nodes = Vec::with_capacity(path_nodes.len() + 1);
+    nodes.push((
+        InOrderIndex::from_leaf_pos(block_header.block_num().as_usize()),
+        block_header.commitment(),
+    ));
+    nodes.append(&mut path_nodes);
+    nodes
+}
+
 pub(crate) async fn fetch_block_header(
     rpc_api: Arc<dyn NodeRpcClient>,
     block_num: BlockNumber,
@@ -126,7 +140,7 @@ pub(crate) async fn fetch_block_header(
     // Trim merkle path to keep nodes relevant to our current PartialMmr since the node's MMR
     // might be of a forest arbitrarily higher
     let path_nodes = adjust_merkle_path_for_forest(
-        &mmr_proof.merkle_path,
+        mmr_proof.merkle_path(),
         block_num,
         current_partial_mmr.forest(),
     );
@@ -142,12 +156,13 @@ pub(crate) async fn fetch_block_header(
 
 #[cfg(test)]
 mod tests {
-    use miden_protocol::block::BlockNumber;
+    use miden_protocol::block::{BlockHeader, BlockNumber};
     use miden_protocol::crypto::merkle::MerklePath;
     use miden_protocol::crypto::merkle::mmr::{Forest, InOrderIndex, Mmr, PartialMmr};
+    use miden_protocol::transaction::TransactionKernel;
     use miden_protocol::{Felt, Word};
 
-    use super::adjust_merkle_path_for_forest;
+    use super::{adjust_merkle_path_for_forest, authenticated_block_nodes};
 
     fn word(n: u64) -> Word {
         Word::new([Felt::new(n), Felt::new(0), Felt::new(0), Felt::new(0)])
@@ -181,7 +196,7 @@ mod tests {
 
         let proof = mmr.open_at(leaf_pos, large_forest).expect("valid proof");
         let adjusted_nodes =
-            adjust_merkle_path_for_forest(&proof.merkle_path, block_num, small_forest);
+            adjust_merkle_path_for_forest(proof.merkle_path(), block_num, small_forest);
         let adjusted_path = MerklePath::new(adjusted_nodes.iter().map(|(_, n)| *n).collect());
 
         let peaks = mmr.peaks_at(small_forest).unwrap();
@@ -243,13 +258,27 @@ mod tests {
         let next_sibling = idx.sibling();
         let rightmost = InOrderIndex::from_leaf_pos(small_leaves - 1);
         assert!(next_sibling <= rightmost);
-        assert!(proof.merkle_path.depth() as usize > expected_depth);
+        assert!(proof.merkle_path().depth() as usize > expected_depth);
 
         let adjusted = adjust_merkle_path_for_forest(
-            &proof.merkle_path,
+            proof.merkle_path(),
             BlockNumber::from(u32::try_from(leaf_pos).unwrap()),
             small_forest,
         );
         assert_eq!(adjusted.len(), expected_depth);
+    }
+
+    #[test]
+    fn authenticated_block_nodes_include_leaf_commitment() {
+        let block_header = BlockHeader::mock(4, None, None, &[], TransactionKernel.to_commitment());
+        let path_nodes = vec![
+            (InOrderIndex::from_leaf_pos(4).sibling(), word(10)),
+            (InOrderIndex::from_leaf_pos(4).parent().sibling(), word(11)),
+        ];
+
+        let nodes = authenticated_block_nodes(&block_header, path_nodes.clone());
+
+        assert_eq!(nodes[0], (InOrderIndex::from_leaf_pos(4), block_header.commitment()));
+        assert_eq!(&nodes[1..], path_nodes.as_slice());
     }
 }

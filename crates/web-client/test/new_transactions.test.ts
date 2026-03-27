@@ -77,7 +77,7 @@ const multipleMintsTest = async (
         result.createdNoteIds.push(
           mintTransactionUpdate
             .executedTransaction()
-            .outputNotes()
+            .rawOutputNotes()
             .notes()[0]
             .id()
             .toString()
@@ -87,7 +87,7 @@ const multipleMintsTest = async (
         );
         result.numOutputNotesCreated += mintTransactionUpdate
           .executedTransaction()
-          .outputNotes()
+          .rawOutputNotes()
           .numNotes();
       }
 
@@ -447,11 +447,8 @@ export const customTransaction = async (
 
       // Creating First Custom Transaction Request to Mint the Custom Note
 
-      const outputNote = window.OutputNote.full(note);
       let transactionRequest = new window.TransactionRequestBuilder()
-        .withOwnOutputNotes(
-          new window.MidenArrays.OutputNoteArray([outputNote])
-        )
+        .withOwnOutputNotes(new window.MidenArrays.NoteArray([note]))
         .build();
 
       // Execute and Submit Transaction
@@ -578,15 +575,8 @@ const customTxWithMultipleNotes = async (
       let note1 = new window.Note(noteAssets1, noteMetadata, noteRecipient1);
       let note2 = new window.Note(noteAssets2, noteMetadata, noteRecipient2);
 
-      const notes = [
-        window.OutputNote.full(note1),
-        window.OutputNote.full(note2),
-      ];
-
-      const outputNotes = new window.MidenArrays.OutputNoteArray(notes);
-
       let transactionRequest = new window.TransactionRequestBuilder()
-        .withOwnOutputNotes(outputNotes)
+        .withOwnOutputNotes(new window.MidenArrays.NoteArray([note1, note2]))
         .build();
 
       let transactionUpdate = await window.helpers.executeAndApplyTransaction(
@@ -622,18 +612,16 @@ const submitExpiredTransaction = async (
       const noteAssets = new window.NoteAssets([
         new window.FungibleAsset(faucetAccountId, BigInt(10)),
       ]);
-      const outputNote = window.OutputNote.full(
-        window.Note.createP2IDNote(
-          senderAccountId,
-          targetAccountId,
-          noteAssets,
-          window.NoteType.Public,
-          new window.Felt(0n)
-        )
+      const note = window.Note.createP2IDNote(
+        senderAccountId,
+        targetAccountId,
+        noteAssets,
+        window.NoteType.Public,
+        new window.Felt(0n)
       );
 
       const transactionRequest = new window.TransactionRequestBuilder()
-        .withOwnOutputNotes(new window.OutputNotesArray([outputNote]))
+        .withOwnOutputNotes(new window.MidenArrays.NoteArray([note]))
         .withExpirationDelta(2)
         .build();
 
@@ -970,7 +958,7 @@ export const discardedTransaction = async (
     );
     let createdNotes = mintTransactionUpdate
       .executedTransaction()
-      .outputNotes()
+      .rawOutputNotes()
       .notes();
     let createdNoteIds = createdNotes.map((note: Note) => note.id().toString());
     await window.helpers.waitForTransaction(
@@ -1014,7 +1002,7 @@ export const discardedTransaction = async (
     );
     let sendCreatedNotes = sendTransactionUpdate
       .executedTransaction()
-      .outputNotes()
+      .rawOutputNotes()
       .notes();
     let sendCreatedNoteIds = sendCreatedNotes.map((note: Note) =>
       note.id().toString()
@@ -1268,9 +1256,7 @@ export const counterAccountComponent = async (
     let note = new window.Note(noteAssets, noteMetadata, noteRecipient);
 
     let transactionRequest = new window.TransactionRequestBuilder()
-      .withOwnOutputNotes(
-        new window.MidenArrays.OutputNoteArray([window.OutputNote.full(note)])
-      )
+      .withOwnOutputNotes(new window.MidenArrays.NoteArray([note]))
       .build();
 
     let transactionUpdate = await window.helpers.executeAndApplyTransaction(
@@ -1598,7 +1584,7 @@ test.describe("submitNewTransactionWithProver tests", () => {
 
         const createdNoteIds = mintTransactionUpdate
           .executedTransaction()
-          .outputNotes()
+          .rawOutputNotes()
           .notes()
           .map((note: Note) => note.id().toString());
 
@@ -1648,7 +1634,7 @@ test.describe("submitNewTransactionWithProver tests", () => {
 
         const sentNoteIds = sendTransactionUpdate
           .executedTransaction()
-          .outputNotes()
+          .rawOutputNotes()
           .notes()
           .map((note: Note) => note.id().toString());
 
@@ -1677,7 +1663,7 @@ test.describe("submitNewTransactionWithProver tests", () => {
 
         return {
           inputNotesCount: summary.inputNotes().numNotes(),
-          outputNotesCount: summary.outputNotes().numNotes(),
+          rawOutputNotesCount: summary.rawOutputNotes().numNotes(),
           inputNoteIds: summary
             .inputNotes()
             .notes()
@@ -1687,7 +1673,7 @@ test.describe("submitNewTransactionWithProver tests", () => {
       });
 
       expect(result.inputNotesCount).toBe(1);
-      expect(result.outputNotesCount).toBe(0);
+      expect(result.rawOutputNotesCount).toBe(0);
       expect(result.inputNoteIds).toEqual(result.sentNoteIds);
     });
 
@@ -1722,14 +1708,14 @@ test.describe("submitNewTransactionWithProver tests", () => {
 
         return {
           inputNotesCount: summary.inputNotes().numNotes(),
-          outputNotesCount: summary.outputNotes().numNotes(),
+          rawOutputNotesCount: summary.rawOutputNotes().numNotes(),
           saltHex: summary.salt().toHex(),
           expectedSaltHex: expectedSalt.toHex(),
         };
       });
 
       expect(result.inputNotesCount).toBe(0);
-      expect(result.outputNotesCount).toBe(0);
+      expect(result.rawOutputNotesCount).toBe(0);
       expect(result.saltHex).toBe(result.expectedSaltHex);
     });
   });

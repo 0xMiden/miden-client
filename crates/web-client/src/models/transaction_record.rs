@@ -2,7 +2,7 @@ use miden_client::transaction::TransactionRecord as NativeTransactionRecord;
 use wasm_bindgen::prelude::*;
 
 use super::account_id::AccountId;
-use super::output_notes::OutputNotes;
+use super::raw_output_notes::RawOutputNotes;
 use super::transaction_id::TransactionId;
 use super::transaction_status::TransactionStatus;
 use super::word::Word;
@@ -43,9 +43,9 @@ impl TransactionRecord {
         self.0.details.input_note_nullifiers.iter().map(Into::into).collect()
     }
 
-    /// Returns the output notes created by this transaction.
-    #[wasm_bindgen(js_name = "outputNotes")]
-    pub fn output_notes(&self) -> OutputNotes {
+    /// Returns the raw output notes created by this transaction.
+    #[wasm_bindgen(js_name = "rawOutputNotes")]
+    pub fn raw_output_notes(&self) -> RawOutputNotes {
         self.0.details.output_notes.clone().into()
     }
 

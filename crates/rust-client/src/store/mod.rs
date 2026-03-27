@@ -46,7 +46,7 @@ use miden_protocol::crypto::merkle::mmr::{Forest, InOrderIndex, MmrPeaks, Partia
 use miden_protocol::errors::AccountError;
 use miden_protocol::note::{NoteId, NoteScript, NoteTag, Nullifier};
 use miden_protocol::transaction::TransactionId;
-use miden_tx::utils::{Deserializable, Serializable};
+use miden_tx::utils::serde::{Deserializable, Serializable};
 
 use crate::note_transport::{NOTE_TRANSPORT_CURSOR_STORE_SETTING, NoteTransportCursor};
 use crate::rpc::{RPC_LIMITS_STORE_SETTING, RpcLimits};
@@ -493,9 +493,19 @@ pub trait Store: Send + Sync {
         let has_client_notes = has_client_notes.into();
         current_partial_mmr.add(current_block.commitment(), has_client_notes);
 
-        // Only track the latest leaf if it is relevant (it has client notes) _and_ the forest
-        // actually has a single leaf tree bit
-        let track_latest = has_client_notes && current_partial_mmr.forest().has_single_leaf_tree();
+        // Build tracked_leaves from blocks that have client notes.
+        let tracked_headers = self.get_tracked_block_headers().await?;
+        let mut tracked_leaves = alloc::collections::BTreeSet::new();
+        for header in &tracked_headers {
+            tracked_leaves.insert(header.block_num().as_usize());
+        }
+
+        // Also track the latest leaf if it is relevant (it has client notes) _and_ the forest
+        // actually has a single leaf tree bit.
+        if has_client_notes && current_partial_mmr.forest().has_single_leaf_tree() {
+            let latest_leaf = current_partial_mmr.forest().num_leaves().saturating_sub(1);
+            tracked_leaves.insert(latest_leaf);
+        }
 
         let tracked_nodes = self
             .get_partial_blockchain_nodes(PartialBlockchainFilter::Forest(
@@ -504,7 +514,7 @@ pub trait Store: Send + Sync {
             .await?;
 
         let current_partial_mmr =
-            PartialMmr::from_parts(current_partial_mmr.peaks(), tracked_nodes, track_latest);
+            PartialMmr::from_parts(current_partial_mmr.peaks(), tracked_nodes, tracked_leaves)?;
 
         Ok(current_partial_mmr)
     }

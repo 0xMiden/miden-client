@@ -1,7 +1,6 @@
 use alloc::string::String;
 use alloc::vec::Vec;
 
-use miden_client::Word;
 use miden_client::account::{StorageMap, StorageSlot};
 use miden_client::asset::Asset;
 use miden_client::utils::Serializable;
@@ -184,9 +183,9 @@ pub struct JsVaultAsset {
 impl JsVaultAsset {
     pub fn from_asset(asset: &Asset) -> Self {
         Self {
-            vault_key: Word::from(asset.vault_key()).to_hex(),
-            faucet_id_prefix: asset.faucet_id_prefix().to_hex(),
-            asset: Word::from(asset).to_hex(),
+            vault_key: asset.vault_key().to_string(),
+            faucet_id_prefix: asset.faucet_id().prefix().to_hex(),
+            asset: asset.to_value_word().to_hex(),
         }
     }
 }

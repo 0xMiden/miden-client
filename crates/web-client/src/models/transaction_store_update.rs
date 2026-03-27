@@ -4,7 +4,7 @@ use wasm_bindgen_futures::js_sys::Uint8Array;
 
 use crate::models::account_delta::AccountDelta;
 use crate::models::executed_transaction::ExecutedTransaction;
-use crate::models::output_notes::OutputNotes;
+use crate::models::raw_output_notes::RawOutputNotes;
 use crate::models::transaction_request::note_details_and_tag::NoteDetailsAndTag;
 use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
 
@@ -28,9 +28,9 @@ impl TransactionStoreUpdate {
         self.0.submission_height().as_u32()
     }
 
-    /// Returns the notes created by the transaction.
-    #[wasm_bindgen(js_name = "createdNotes")]
-    pub fn created_notes(&self) -> OutputNotes {
+    /// Returns the raw output notes created by the transaction.
+    #[wasm_bindgen(js_name = "createdRawOutputNotes")]
+    pub fn created_raw_output_notes(&self) -> RawOutputNotes {
         self.0.executed_transaction().output_notes().into()
     }
 

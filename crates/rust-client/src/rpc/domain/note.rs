@@ -15,7 +15,7 @@ use miden_protocol::note::{
     NoteType,
 };
 use miden_protocol::{MastForest, MastNodeId, Word};
-use miden_tx::utils::Deserializable;
+use miden_tx::utils::serde::Deserializable;
 
 use super::{MissingFieldHelper, RpcConversionError};
 use crate::rpc::{RpcError, generated as proto};
@@ -62,13 +62,29 @@ impl TryFrom<proto::note::NoteMetadata> for NoteMetadata {
 
 impl From<NoteMetadata> for proto::note::NoteMetadata {
     fn from(value: NoteMetadata) -> Self {
-        use miden_tx::utils::Serializable;
+        use miden_tx::utils::serde::Serializable;
         proto::note::NoteMetadata {
             sender: Some(value.sender().into()),
             note_type: value.note_type() as i32,
             tag: value.tag().as_u32(),
             attachment: value.attachment().to_bytes(),
         }
+    }
+}
+
+impl TryFrom<proto::note::NoteHeader> for NoteHeader {
+    type Error = RpcConversionError;
+
+    fn try_from(value: proto::note::NoteHeader) -> Result<Self, Self::Error> {
+        let note_id = value
+            .note_id
+            .ok_or(proto::note::NoteHeader::missing_field(stringify!(note_id)))?
+            .try_into()?;
+        let metadata = value
+            .metadata
+            .ok_or(proto::note::NoteHeader::missing_field(stringify!(metadata)))?
+            .try_into()?;
+        Ok(NoteHeader::new(note_id, metadata))
     }
 }
 

@@ -112,7 +112,8 @@ end
 fn create_large_account(config: &LargeAccountConfig) -> anyhow::Result<(Account, AuthSecretKey)> {
     use miden_client::account::component::AccountComponentMetadata;
 
-    let sk = AuthSecretKey::new_falcon512_rpo_with_rng(&mut ChaCha20Rng::from_seed(config.seed));
+    let sk =
+        AuthSecretKey::new_falcon512_poseidon2_with_rng(&mut ChaCha20Rng::from_seed(config.seed));
 
     // Create storage map slots
     let mut storage_slots = Vec::new();
@@ -139,7 +140,7 @@ fn create_large_account(config: &LargeAccountConfig) -> anyhow::Result<(Account,
     let reader_component = AccountComponent::new(
         reader_component_code,
         storage_slots,
-        AccountComponentMetadata::new("miden::testing::storage_reader").with_supports_all_types(),
+        AccountComponentMetadata::new("miden::testing::storage_reader", AccountType::all()),
     )
     .map_err(|e| anyhow::anyhow!("Failed to create reader component: {e}"))?;
 
@@ -147,14 +148,14 @@ fn create_large_account(config: &LargeAccountConfig) -> anyhow::Result<(Account,
     let wallet_component = AccountComponent::new(
         basic_wallet_library(),
         vec![],
-        AccountComponentMetadata::new("miden::testing::basic_wallet").with_supports_all_types(),
+        AccountComponentMetadata::new("miden::testing::basic_wallet", AccountType::all()),
     )
     .expect("basic wallet component should satisfy account component requirements");
 
     let account = AccountBuilder::new(config.seed)
         .with_auth_component(AuthSingleSig::new(
             sk.public_key().to_commitment(),
-            AuthSchemeId::Falcon512Rpo,
+            AuthSchemeId::Falcon512Poseidon2,
         ))
         .account_type(AccountType::RegularAccountUpdatableCode)
         .with_component(wallet_component)
@@ -173,7 +174,7 @@ fn create_large_account(config: &LargeAccountConfig) -> anyhow::Result<(Account,
 pub fn random_word(rng: &mut impl Rng) -> [Felt; 4] {
     loop {
         let word: [Felt; 4] = std::array::from_fn(|_| Felt::new(rng.random::<u64>() >> 1));
-        if word.iter().any(|f| f.as_int() != 0) {
+        if word.iter().any(|f| f.as_canonical_u64() != 0) {
             return word;
         }
     }

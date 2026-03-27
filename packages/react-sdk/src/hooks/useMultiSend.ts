@@ -6,8 +6,7 @@ import {
   NoteAssets,
   NoteAttachment,
   NoteType,
-  OutputNote,
-  OutputNoteArray,
+  NoteArray,
   TransactionRequestBuilder,
 } from "@miden-sdk/miden-sdk";
 import type {
@@ -134,7 +133,6 @@ export function useMultiSend(): UseMultiSendResult {
             );
             const recipientAddress = parseAddress(to, receiverId);
             return {
-              outputNote: OutputNote.full(note),
               note,
               recipientAddress,
               noteType: resolvedNoteType,
@@ -143,9 +141,7 @@ export function useMultiSend(): UseMultiSendResult {
         );
 
         const txRequest = new TransactionRequestBuilder()
-          .withOwnOutputNotes(
-            new OutputNoteArray(outputs.map((o) => o.outputNote))
-          )
+          .withOwnOutputNotes(new NoteArray(outputs.map((o) => o.note)))
           .build();
 
         const txSenderId = parseAccountId(options.from);

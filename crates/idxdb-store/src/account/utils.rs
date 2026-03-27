@@ -212,7 +212,7 @@ pub fn compute_storage_delta(
         let old_root = old_map_roots.get(slot_name).copied().unwrap_or(default_map_root);
         let new_root = smt_forest.update_storage_map_nodes(
             old_root,
-            map_delta.entries().iter().map(|(key, value)| (*key.inner(), *value)),
+            map_delta.entries().iter().map(|(key, value)| (*key, *value)),
         )?;
         updated_slots.insert(slot_name.clone(), (new_root, StorageSlotType::Map));
     }
@@ -236,16 +236,16 @@ pub fn compute_vault_delta(
     let mut fungible_map: BTreeMap<AccountIdPrefix, FungibleAsset> = old_vault_assets
         .iter()
         .filter_map(|asset| match asset {
-            Asset::Fungible(fa) => Some((fa.faucet_id_prefix(), *fa)),
+            Asset::Fungible(fa) => Some((fa.faucet_id().prefix(), *fa)),
             Asset::NonFungible(_) => None,
         })
         .collect();
 
     // Process fungible deltas
     for (faucet_id, delta_amount) in delta.vault().fungible().iter() {
-        let delta_asset = FungibleAsset::new(*faucet_id, delta_amount.unsigned_abs())?;
+        let delta_asset = FungibleAsset::new(faucet_id.faucet_id(), delta_amount.unsigned_abs())?;
 
-        let asset = match fungible_map.remove(&faucet_id.prefix()) {
+        let asset = match fungible_map.remove(&faucet_id.faucet_id().prefix()) {
             Some(existing) => {
                 if *delta_amount >= 0 {
                     existing.add(delta_asset)?
@@ -318,7 +318,7 @@ pub async fn apply_transaction_delta(
 
             changed_map_entries.push(JsStorageMapEntry {
                 slot_name: slot_name.to_string(),
-                key: key.inner().to_hex(),
+                key: Word::from(*key).to_hex(),
                 value: value_str,
             });
         }
@@ -330,8 +330,8 @@ pub async fn apply_transaction_delta(
 
     for vault_key in removed_vault_keys {
         changed_assets.push(JsVaultAsset {
-            vault_key: Word::from(*vault_key).to_hex(),
-            faucet_id_prefix: vault_key.faucet_id_prefix().to_hex(),
+            vault_key: vault_key.to_string(),
+            faucet_id_prefix: vault_key.faucet_id().prefix().to_hex(),
             asset: String::new(),
         });
     }

@@ -18,6 +18,7 @@ use miden_protocol::account::{
     AccountComponent,
     AccountComponentMetadata,
     AccountStorageMode,
+    AccountType,
     StorageMap,
     StorageMapKey,
     StorageSlot,
@@ -49,14 +50,14 @@ async fn transaction_creates_two_notes() {
             .unwrap()
             .into();
 
-    let secret_key = AuthSecretKey::new_falcon512_rpo();
+    let secret_key = AuthSecretKey::new_falcon512_poseidon2();
     let pub_key = secret_key.public_key();
 
     let account = AccountBuilder::new(Default::default())
         .with_component(BasicWallet)
         .with_auth_component(AuthSingleSig::new(
             pub_key.to_commitment(),
-            AuthSchemeId::Falcon512Rpo,
+            AuthSchemeId::Falcon512Poseidon2,
         ))
         .with_assets([asset_1, asset_2])
         .build_existing()
@@ -232,18 +233,17 @@ async fn lazy_foreign_account_loading() {
     let fpi_component = AccountComponent::new(
         component_code,
         vec![map_slot],
-        AccountComponentMetadata::new("miden::testing::fpi_lazy_component")
-            .with_supports_all_types(),
+        AccountComponentMetadata::new("miden::testing::fpi_lazy_component", AccountType::all()),
     )
     .unwrap();
     let proc_root = fpi_component.mast_forest().procedure_digests().next().unwrap();
 
-    let secret_key = AuthSecretKey::new_falcon512_rpo();
+    let secret_key = AuthSecretKey::new_falcon512_poseidon2();
     let foreign_account = AccountBuilder::new(Default::default())
         .with_component(fpi_component)
         .with_auth_component(AuthSingleSig::new(
             secret_key.public_key().to_commitment(),
-            AuthSchemeId::Falcon512Rpo,
+            AuthSchemeId::Falcon512Poseidon2,
         ))
         .storage_mode(AccountStorageMode::Public)
         .build()
@@ -290,7 +290,7 @@ async fn lazy_foreign_account_loading() {
             use miden::protocol::tx
             begin
                 push.{proc_root}
-                push.{suffix} push.{prefix}
+                push.{prefix} push.{suffix}
                 exec.tx::execute_foreign_procedure
                 push.{map_value} assert_eqw
             end

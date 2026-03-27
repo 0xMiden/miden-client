@@ -1,8 +1,8 @@
 use std::fmt::Write;
 
-use miden_client::Felt;
 use miden_client::keystore::FilesystemKeyStore;
 use miden_client::transaction::TransactionRequestBuilder;
+use miden_client::{Felt, Word};
 
 use crate::benchmarks::transaction::{ReadOp, StorageSlotInfo};
 use crate::generators::{SlotDescriptor, generate_reader_component_code};
@@ -18,16 +18,8 @@ const MAX_OPS_PER_BLOCK: usize = 7_000;
 /// Writes the MASM instructions for a single map entry read (push key, call reader, drop result).
 fn write_read_op_instructions(script: &mut String, op: &ReadOp) {
     // Push key (4 felts)
-    let key = op.key.as_word();
-    writeln!(
-        script,
-        "    push.{}.{}.{}.{}",
-        key[3].as_int(),
-        key[2].as_int(),
-        key[1].as_int(),
-        key[0].as_int()
-    )
-    .expect("write to string should not fail");
+    writeln!(script, "    push.{}", op.key.as_word().to_hex())
+        .expect("write to string should not fail");
 
     // Call the account's reader procedure for this storage map slot.
     // Stack input: [KEY]
@@ -139,9 +131,9 @@ pub fn generate_expansion_tx_script(slot_idx: usize, entries: &[([Felt; 4], [Fel
     for (key, value) in entries {
         write!(
             script,
-            "    push.{}.{}.{}.{}\n    push.{}.{}.{}.{}\n    call.storage_expander::{procedure_name}\n    dropw dropw dropw dropw\n\n",
-            value[3].as_int(), value[2].as_int(), value[1].as_int(), value[0].as_int(),
-            key[3].as_int(), key[2].as_int(), key[1].as_int(), key[0].as_int(),
+            "    push.{}\n    push.{}\n    call.storage_expander::{procedure_name}\n    dropw dropw dropw dropw\n\n",
+            Word::from(*value).to_hex(),
+            Word::from(*key).to_hex(),
         )
         .expect("write to string should not fail");
     }

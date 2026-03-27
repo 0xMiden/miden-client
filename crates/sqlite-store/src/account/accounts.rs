@@ -319,7 +319,7 @@ impl SqliteStore {
         Self::insert_account_code(&tx, account.code())?;
 
         let account_id = account.id();
-        let nonce = account.nonce().as_int();
+        let nonce = account.nonce().as_canonical_u64();
 
         Self::insert_storage_slots(&tx, account_id, nonce, account.storage().slots().iter())?;
 
@@ -495,7 +495,7 @@ impl SqliteStore {
         Self::write_storage_delta(
             tx,
             account_id,
-            final_account_state.nonce().as_int(),
+            final_account_state.nonce().as_canonical_u64(),
             &updated_storage_slots,
             delta,
         )?;
@@ -591,7 +591,7 @@ impl SqliteStore {
     ) -> Result<(), StoreError> {
         let account_id = new_account_state.id();
         let account_id_hex = account_id.to_hex();
-        let nonce = new_account_state.nonce().as_int();
+        let nonce = new_account_state.nonce().as_canonical_u64();
         let nonce_val = u64_to_value(nonce);
 
         // Insert and register account state in the SMT forest (handles old root cleanup)
@@ -792,7 +792,7 @@ impl SqliteStore {
         let code_commitment = account.code_commitment().to_string();
         let storage_commitment = account.storage_commitment().to_string();
         let vault_root = account.vault_root().to_string();
-        let nonce = u64_to_value(account.nonce().as_int());
+        let nonce = u64_to_value(account.nonce().as_canonical_u64());
         let commitment = account.to_commitment().to_string();
 
         let account_seed = account_seed.map(|seed| seed.to_bytes());

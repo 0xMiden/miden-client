@@ -1,5 +1,5 @@
 use miden_client::Felt;
-use miden_client::account::component::BasicFungibleFaucet;
+use miden_client::account::component::{AuthControlled, BasicFungibleFaucet};
 use miden_client::account::{AccountBuilder, AccountComponent, AccountType};
 use miden_client::asset::TokenSymbol;
 use miden_client::auth::{AuthSchemeId as NativeAuthScheme, AuthSecretKey, AuthSingleSig};
@@ -90,35 +90,24 @@ impl WebClient {
             let mut faucet_rng = StdRng::from_seed(seed);
 
             let native_scheme: NativeAuthScheme = auth_scheme.try_into()?;
-            let (key_pair, auth_component) = match native_scheme {
-                NativeAuthScheme::Falcon512Rpo => {
-                    let key_pair = AuthSecretKey::new_falcon512_rpo_with_rng(&mut faucet_rng);
-                    let auth_component: AccountComponent = AuthSingleSig::new(
-                        key_pair.public_key().to_commitment(),
-                        NativeAuthScheme::Falcon512Rpo,
-                    )
-                    .into();
-                    (key_pair, auth_component)
+            let key_pair = match native_scheme {
+                NativeAuthScheme::Falcon512Poseidon2 => {
+                    AuthSecretKey::new_falcon512_poseidon2_with_rng(&mut faucet_rng)
                 },
                 NativeAuthScheme::EcdsaK256Keccak => {
-                    let key_pair = AuthSecretKey::new_ecdsa_k256_keccak_with_rng(&mut faucet_rng);
-                    let auth_component: AccountComponent = AuthSingleSig::new(
-                        key_pair.public_key().to_commitment(),
-                        NativeAuthScheme::EcdsaK256Keccak,
-                    )
-                    .into();
-                    (key_pair, auth_component)
+                    AuthSecretKey::new_ecdsa_k256_keccak_with_rng(&mut faucet_rng)
                 },
                 _ => {
                     let message = format!("unsupported auth scheme: {native_scheme:?}");
                     return Err(JsValue::from_str(&message));
                 },
             };
+            let auth_component: AccountComponent =
+                AuthSingleSig::new(key_pair.public_key().to_commitment(), native_scheme).into();
 
             let symbol =
                 TokenSymbol::new(token_symbol).map_err(|e| JsValue::from_str(&e.to_string()))?;
-            let max_supply = Felt::try_from(max_supply.to_le_bytes().as_slice())
-                .expect("u64 can be safely converted to a field element");
+            let max_supply = Felt::new(max_supply);
 
             let mut init_seed = [0u8; 32];
             faucet_rng.fill_bytes(&mut init_seed);
@@ -131,6 +120,7 @@ impl WebClient {
                     BasicFungibleFaucet::new(symbol, decimals, max_supply)
                         .map_err(|err| js_error_with_context(err, "failed to create new faucet"))?,
                 )
+                .with_component(AuthControlled::allow_all())
                 .build()
             {
                 Ok(result) => result,

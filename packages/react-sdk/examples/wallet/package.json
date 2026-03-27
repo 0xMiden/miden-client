@@ -9,13 +9,13 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@miden-sdk/miden-sdk": "^0.13.0",
-    "@miden-sdk/react": "^0.13.3",
+    "@miden-sdk/miden-sdk": "^0.14.0",
+    "@miden-sdk/react": "^0.14.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
   "devDependencies": {
-    "@miden-sdk/vite-plugin": "^0.13.4",
+    "@miden-sdk/vite-plugin": "^0.14.0",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
     "@vitejs/plugin-react": "^4.2.0",

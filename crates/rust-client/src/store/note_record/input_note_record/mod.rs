@@ -14,7 +14,7 @@ use miden_protocol::note::{
     Nullifier,
 };
 use miden_protocol::transaction::{InputNote, TransactionId};
-use miden_protocol::utils::{
+use miden_protocol::utils::serde::{
     ByteReader,
     ByteWriter,
     Deserializable,
@@ -89,7 +89,7 @@ impl InputNoteRecord {
 
     /// Returns the note's commitment, if the record contains the [`NoteMetadata`].
     pub fn commitment(&self) -> Option<Word> {
-        self.metadata().map(|m| NoteHeader::new(self.id(), m.clone()).commitment())
+        self.metadata().map(|m| NoteHeader::new(self.id(), m.clone()).to_commitment())
     }
 
     /// Returns the note's assets.

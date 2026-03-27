@@ -2,11 +2,11 @@
 
 ***
 
-[@miden-sdk/miden-sdk](../README.md) / OutputNote
+[@miden-sdk/miden-sdk](../README.md) / RawOutputNote
 
-# Class: OutputNote
+# Class: RawOutputNote
 
-Representation of a note produced by a transaction (full, partial, or header-only).
+Representation of a note produced by a transaction (full or partial).
 
 ## Methods
 
@@ -82,7 +82,7 @@ Returns the metadata that accompanies this output.
 
 > **recipientDigest**(): [`Word`](Word.md)
 
-Returns the recipient digest if the recipient is known.
+Returns the recipient digest.
 
 #### Returns
 
@@ -90,21 +90,9 @@ Returns the recipient digest if the recipient is known.
 
 ***
 
-### shrink()
-
-> **shrink**(): `OutputNote`
-
-Returns a more compact representation if possible (e.g. dropping details).
-
-#### Returns
-
-`OutputNote`
-
-***
-
 ### full()
 
-> `static` **full**(`note`): `OutputNote`
+> `static` **full**(`note`): `RawOutputNote`
 
 Wraps a full note output.
 
@@ -116,40 +104,4 @@ Wraps a full note output.
 
 #### Returns
 
-`OutputNote`
-
-***
-
-### header()
-
-> `static` **header**(`note_header`): `OutputNote`
-
-Wraps only the header of a note.
-
-#### Parameters
-
-##### note\_header
-
-`NoteHeader`
-
-#### Returns
-
-`OutputNote`
-
-***
-
-### partial()
-
-> `static` **partial**(`partial_note`): `OutputNote`
-
-Wraps a partial note containing assets and recipient only.
-
-#### Parameters
-
-##### partial\_note
-
-`PartialNote`
-
-#### Returns
-
-`OutputNote`
+`RawOutputNote`

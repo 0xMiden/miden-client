@@ -3,7 +3,7 @@ use alloc::sync::Arc;
 
 use miden_protocol::assembly::{DefaultSourceManager, SourceManagerSync};
 use miden_protocol::block::BlockNumber;
-use miden_protocol::crypto::rand::RpoRandomCoin;
+use miden_protocol::crypto::rand::RandomCoin;
 use miden_protocol::{Felt, MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES};
 use miden_tx::{ExecutionOptions, LocalTransactionProver};
 use rand::Rng;
@@ -412,7 +412,7 @@ where
         } else {
             let mut seed_rng = rand::rng();
             let coin_seed: [u64; 4] = seed_rng.random();
-            Box::new(RpoRandomCoin::new(coin_seed.map(Felt::new).into()))
+            Box::new(RandomCoin::new(coin_seed.map(Felt::new).into()))
         };
 
         // Set default prover if not provided
@@ -468,6 +468,7 @@ where
             exec_options: ExecutionOptions::new(
                 Some(MAX_TX_EXECUTION_CYCLES),
                 MIN_TX_EXECUTION_CYCLES,
+                ExecutionOptions::DEFAULT_CORE_TRACE_FRAGMENT_SIZE,
                 false,
                 self.in_debug_mode.into(),
             )

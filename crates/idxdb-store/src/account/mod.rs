@@ -396,9 +396,10 @@ impl IdxdbStore {
 
         let assets = vault_assets_idxdb
             .into_iter()
-            .map(|asset| {
-                let word = Word::try_from(&asset.asset)?;
-                Ok(Asset::try_from(word)?)
+            .map(|entry| {
+                let key_word = Word::try_from(&entry.vault_key)?;
+                let value_word = Word::try_from(&entry.asset)?;
+                Ok(Asset::from_key_value_words(key_word, value_word)?)
             })
             .collect::<Result<Vec<_>, StoreError>>()?;
 
@@ -436,24 +437,24 @@ impl IdxdbStore {
         initial_address: Address,
     ) -> Result<(), StoreError> {
         upsert_account_code(self.db_id(), account.code()).await.map_err(|js_error| {
-            StoreError::DatabaseError(format!("failed to insert account code: {js_error:?}",))
+            StoreError::DatabaseError(format!("failed to insert account code: {js_error:?}"))
         })?;
 
-        let nonce = account.nonce().as_int();
+        let nonce = account.nonce().as_canonical_u64();
         upsert_account_storage(self.db_id(), &account.id(), nonce, account.storage())
             .await
             .map_err(|js_error| {
-                StoreError::DatabaseError(format!("failed to insert account storage:{js_error:?}",))
+                StoreError::DatabaseError(format!("failed to insert account storage:{js_error:?}"))
             })?;
 
         upsert_account_asset_vault(self.db_id(), &account.id(), nonce, account.vault())
             .await
             .map_err(|js_error| {
-                StoreError::DatabaseError(format!("failed to insert account vault:{js_error:?}",))
+                StoreError::DatabaseError(format!("failed to insert account vault:{js_error:?}"))
             })?;
 
         upsert_account_record(self.db_id(), account).await.map_err(|js_error| {
-            StoreError::DatabaseError(format!("failed to insert account record: {js_error:?}",))
+            StoreError::DatabaseError(format!("failed to insert account record: {js_error:?}"))
         })?;
 
         insert_account_address(self.db_id(), &account.id(), initial_address)

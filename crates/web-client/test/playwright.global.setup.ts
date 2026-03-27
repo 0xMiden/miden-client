@@ -11,6 +11,7 @@ function generateStoreName(testInfo: TestInfo): string {
 const TEST_SERVER_PORT = 8080;
 const MIDEN_NODE_PORT = 57291;
 const REMOTE_TX_PROVER_PORT = 50051;
+const REMOTE_PROVER_TIMEOUT_MS = 120_000;
 
 // Check if running against localhost (vs devnet/testnet)
 export function isLocalhost(): boolean {
@@ -83,7 +84,7 @@ export const test = base.extend<{ forEachTest: void }>({
       await page.goto("http://localhost:8080");
 
       await page.evaluate(
-        async ({ rpcUrl, proverUrl, storeName }) => {
+        async ({ rpcUrl, proverUrl, storeName, remoteProverTimeoutMs }) => {
           // Import the sdk classes and attach them
           // to the window object for testing
           const sdkExports = await import("./index.js");
@@ -114,7 +115,7 @@ export const test = base.extend<{ forEachTest: void }>({
             window.remoteProverInstance =
               window.TransactionProver.newRemoteProver(
                 window.remoteProverUrl,
-                BigInt(20_000)
+                BigInt(remoteProverTimeoutMs)
               );
           }
 
@@ -150,26 +151,49 @@ export const test = base.extend<{ forEachTest: void }>({
             prover
           ) => {
             const client = window.client;
+
+            const t0 = performance.now();
             const result = await client.executeTransaction(
               accountId,
               transactionRequest
             );
+            const t1 = performance.now();
+            console.debug(
+              `[timing] executeTransaction: ${(t1 - t0).toFixed(0)}ms`
+            );
 
-            const useRemoteProver =
-              prover != null && window.remoteProverUrl != null;
-            const proverToUse = useRemoteProver
-              ? window.TransactionProver.newRemoteProver(
-                  window.remoteProverUrl,
-                  null
-                )
-              : window.TransactionProver.newLocalProver();
+            const proverToUse =
+              prover ?? window.TransactionProver.newLocalProver();
 
+            const t2 = performance.now();
             const proven = await client.proveTransaction(result, proverToUse);
+            const t3 = performance.now();
+            console.debug(
+              `[timing] proveTransaction: ${(t3 - t2).toFixed(0)}ms`
+            );
+
+            const t4 = performance.now();
             const submissionHeight = await client.submitProvenTransaction(
               proven,
               result
             );
-            return await client.applyTransaction(result, submissionHeight);
+            const t5 = performance.now();
+            console.debug(
+              `[timing] submitProvenTransaction: ${(t5 - t4).toFixed(0)}ms`
+            );
+
+            const t6 = performance.now();
+            const txUpdate = await client.applyTransaction(
+              result,
+              submissionHeight
+            );
+            const t7 = performance.now();
+            console.debug(
+              `[timing] applyTransaction: ${(t7 - t6).toFixed(0)}ms`
+            );
+            console.debug(`[timing] total: ${(t7 - t0).toFixed(0)}ms`);
+
+            return txUpdate;
           };
 
           window.helpers.waitForBlocks = async (amountOfBlocks) => {
@@ -225,6 +249,7 @@ export const test = base.extend<{ forEachTest: void }>({
           rpcUrl: getRpcUrl(),
           proverUrl: getProverUrl() ?? null,
           storeName,
+          remoteProverTimeoutMs: REMOTE_PROVER_TIMEOUT_MS,
         }
       );
       await use();
