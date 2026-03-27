@@ -1,17 +1,11 @@
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
-use miden_protocol::account::AccountId;
 use miden_protocol::Word;
-use miden_protocol::block::{
-    BlockHeader,
-    BlockNoteTree,
-    BlockNumber,
-    Blockchain,
-    FeeParameters,
-    account_tree::AccountTree,
-    nullifier_tree::NullifierTree,
-};
+use miden_protocol::account::AccountId;
+use miden_protocol::block::account_tree::AccountTree;
+use miden_protocol::block::nullifier_tree::NullifierTree;
+use miden_protocol::block::{BlockHeader, BlockNoteTree, BlockNumber, Blockchain, FeeParameters};
 use miden_protocol::crypto::dsa::ecdsa_k256_keccak::SecretKey;
 use miden_protocol::crypto::merkle::MerklePath;
 use miden_protocol::crypto::merkle::mmr::{Forest, InOrderIndex, MmrPeaks, PartialMmr};
@@ -222,10 +216,9 @@ pub(crate) async fn fetch_block_header(
 mod tests {
     use alloc::vec::Vec;
 
-    use miden_protocol::block::{
-        BlockHeader, BlockNoteTree, BlockNumber, Blockchain, account_tree::AccountTree,
-        nullifier_tree::NullifierTree,
-    };
+    use miden_protocol::block::account_tree::AccountTree;
+    use miden_protocol::block::nullifier_tree::NullifierTree;
+    use miden_protocol::block::{BlockHeader, BlockNoteTree, BlockNumber, Blockchain};
     use miden_protocol::crypto::merkle::MerklePath;
     use miden_protocol::crypto::merkle::mmr::{Forest, InOrderIndex, Mmr, PartialMmr};
     use miden_protocol::crypto::merkle::smt::Smt;
@@ -233,7 +226,9 @@ mod tests {
     use miden_protocol::{Felt, Word};
 
     use super::{
-        adjust_merkle_path_for_forest, authenticated_block_nodes, synthetic_offline_genesis_header,
+        adjust_merkle_path_for_forest,
+        authenticated_block_nodes,
+        synthetic_offline_genesis_header,
     };
 
     fn word(n: u64) -> Word {
