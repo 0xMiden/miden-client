@@ -82,6 +82,11 @@ export class AccountsResource {
     return account;
   }
 
+  async insert({ account, overwrite = false }) {
+    this.#client.assertNotTerminated();
+    await this.#inner.newAccount(account, overwrite);
+  }
+
   async getOrImport(ref) {
     this.#client.assertNotTerminated();
     return (await this.get(ref)) ?? (await this.import(ref));
