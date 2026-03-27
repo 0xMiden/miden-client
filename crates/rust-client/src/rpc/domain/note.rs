@@ -111,84 +111,103 @@ impl TryFrom<proto::note::NoteInclusionInBlockProof> for NoteInclusionProof {
 // SYNC NOTE
 // ================================================================================================
 
-/// Represents a `roto::rpc_store::SyncNotesResponse` with fields converted into domain types.
+/// Represents a single block's worth of note sync data from the `SyncNotesResponse`.
+#[derive(Debug, Clone)]
+pub struct NoteSyncBlock {
+    /// Block header containing the matching notes.
+    pub block_header: BlockHeader,
+    /// MMR path for verifying the block's inclusion in the MMR at `block_to`.
+    pub mmr_path: MerklePath,
+    /// Notes matching the requested tags in this block.
+    pub notes: Vec<CommittedNote>,
+}
+
+/// Represents a `SyncNotesResponse` with fields converted into domain types.
+///
+/// The response may contain multiple blocks with matching notes. When `blocks` is empty,
+/// no notes matched in the scanned range.
 #[derive(Debug)]
 pub struct NoteSyncInfo {
-    /// Number of the latest block in the chain.
-    pub chain_tip: BlockNumber,
-    /// Block header of the block with the first note matching the specified criteria.
-    pub block_header: BlockHeader,
-    /// Proof for block header's MMR with respect to the chain tip.
-    ///
-    /// More specifically, the full proof consists of `forest`, `position` and `path` components.
-    /// This value constitutes the `path`. The other two components can be obtained as follows:
-    ///    - `position` is simply `response.block_header.block_num`.
-    ///    - `forest` is the same as `response.chain_tip + 1`.
-    pub mmr_path: MerklePath,
-    /// List of all notes together with the Merkle paths from `response.block_header.note_root`.
-    pub notes: Vec<CommittedNote>,
+    /// The start of the scanned block range (matches the request's `block_from`).
+    pub block_from: BlockNumber,
+    /// The end of the scanned block range. Equals the chain tip when the client sends
+    /// `block_to: None`, or the requested `block_to` otherwise.
+    pub block_to: BlockNumber,
+    /// Blocks containing matching notes, ordered by block number ascending.
+    /// May be empty if no notes matched in the range.
+    pub blocks: Vec<NoteSyncBlock>,
+}
+
+fn convert_note_sync_record(
+    note: proto::note::NoteSyncRecord,
+) -> Result<CommittedNote, RpcError> {
+    let note_id: NoteId = note
+        .note_id
+        .ok_or(proto::rpc::SyncNotesResponse::missing_field(stringify!(notes.note_id)))?
+        .try_into()?;
+
+    let inclusion_path = note
+        .inclusion_path
+        .ok_or(proto::rpc::SyncNotesResponse::missing_field(stringify!(notes.inclusion_path)))?
+        .try_into()?;
+
+    let metadata = note
+        .metadata
+        .ok_or(proto::rpc::SyncNotesResponse::missing_field(stringify!(notes.metadata)))?
+        .try_into()?;
+
+    Ok(CommittedNote::new(
+        note_id,
+        u16::try_from(note.note_index_in_block).map_err(|_| {
+            RpcConversionError::InvalidField("note_index_in_block value out of u16 range".into())
+        })?,
+        inclusion_path,
+        metadata,
+    ))
 }
 
 impl TryFrom<proto::rpc::SyncNotesResponse> for NoteSyncInfo {
     type Error = RpcError;
 
     fn try_from(value: proto::rpc::SyncNotesResponse) -> Result<Self, Self::Error> {
-        let chain_tip = value
-            .pagination_info
-            .ok_or(proto::rpc::SyncNotesResponse::missing_field(stringify!(pagination_info)))?
-            .chain_tip;
+        let block_range = value
+            .block_range
+            .ok_or(proto::rpc::SyncNotesResponse::missing_field(stringify!(block_range)))?;
 
-        // Validate and convert block header
-        let block_header = value
-            .block_header
-            .ok_or(proto::rpc::SyncNotesResponse::missing_field(stringify!(block_header)))?
-            .try_into()?;
+        let block_from = BlockNumber::from(block_range.block_from);
+        let block_to = BlockNumber::from(block_range.block_to.ok_or(
+            proto::rpc::SyncNotesResponse::missing_field(stringify!(block_range.block_to)),
+        )?);
 
-        let mmr_path = value
-            .mmr_path
-            .ok_or(proto::rpc::SyncNotesResponse::missing_field(stringify!(mmr_path)))?
-            .try_into()?;
+        let blocks = value
+            .blocks
+            .into_iter()
+            .map(|block| {
+                let block_header = block
+                    .block_header
+                    .ok_or(proto::rpc::SyncNotesResponse::missing_field(stringify!(
+                        blocks.block_header
+                    )))?
+                    .try_into()?;
 
-        // Validate and convert account note inclusions into an (AccountId, Word) tuple
-        let mut notes = vec![];
-        for note in value.notes {
-            let note_id: NoteId = note
-                .note_id
-                .ok_or(proto::rpc::SyncNotesResponse::missing_field(stringify!(notes.note_id)))?
-                .try_into()?;
+                let mmr_path = block
+                    .mmr_path
+                    .ok_or(proto::rpc::SyncNotesResponse::missing_field(stringify!(
+                        blocks.mmr_path
+                    )))?
+                    .try_into()?;
 
-            let inclusion_path = note
-                .inclusion_path
-                .ok_or(proto::rpc::SyncNotesResponse::missing_field(stringify!(
-                    notes.inclusion_path
-                )))?
-                .try_into()?;
+                let notes = block
+                    .notes
+                    .into_iter()
+                    .map(convert_note_sync_record)
+                    .collect::<Result<Vec<_>, _>>()?;
 
-            let metadata = note
-                .metadata
-                .ok_or(proto::rpc::SyncNotesResponse::missing_field(stringify!(notes.metadata)))?
-                .try_into()?;
+                Ok(NoteSyncBlock { block_header, mmr_path, notes })
+            })
+            .collect::<Result<Vec<_>, RpcError>>()?;
 
-            let committed_note = CommittedNote::new(
-                note_id,
-                u16::try_from(note.note_index_in_block).map_err(|_| {
-                    RpcConversionError::InvalidField(
-                        "note_index_in_block value out of u16 range".into(),
-                    )
-                })?,
-                inclusion_path,
-                metadata,
-            );
-
-            notes.push(committed_note);
-        }
-
-        Ok(NoteSyncInfo {
-            chain_tip: chain_tip.into(),
-            block_header,
-            mmr_path,
-            notes,
-        })
+        Ok(NoteSyncInfo { block_from, block_to, blocks })
     }
 }
 
