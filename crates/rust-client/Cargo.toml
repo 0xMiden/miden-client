@@ -24,6 +24,7 @@ ignored = ["getrandom", "prost-types", "tonic-prost"]
 crate-type = ["lib"]
 
 [features]
+dap = ["dep:miden-debug"]
 default = ["std"]
 std = [
   "dep:tokio",
@@ -36,7 +37,6 @@ std = [
   "tonic/transport",
 ]
 testing = ["dep:miden-testing", "dep:uuid", "miden-protocol/testing", "miden-standards/testing", "miden-tx/testing"]
-dap = ["dep:miden-debug"]
 tonic = []
 
 [dependencies]
