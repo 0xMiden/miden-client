@@ -7,7 +7,10 @@ use std::time::Duration;
 use figment::providers::{Format, Toml};
 use figment::value::{Dict, Map};
 use figment::{Figment, Metadata, Profile, Provider};
-use miden_client::note_transport::NOTE_TRANSPORT_DEFAULT_ENDPOINT;
+use miden_client::note_transport::{
+    NOTE_TRANSPORT_DEFAULT_ENDPOINT,
+    NOTE_TRANSPORT_DEVNET_ENDPOINT,
+};
 use miden_client::rpc::Endpoint;
 use serde::{Deserialize, Serialize};
 
@@ -432,6 +435,16 @@ impl Default for NoteTransportConfig {
     fn default() -> Self {
         Self {
             endpoint: NOTE_TRANSPORT_DEFAULT_ENDPOINT.to_string(),
+            timeout_ms: 10000,
+        }
+    }
+}
+
+impl NoteTransportConfig {
+    /// Returns a `NoteTransportConfig` for the devnet network.
+    pub fn devnet() -> Self {
+        Self {
+            endpoint: NOTE_TRANSPORT_DEVNET_ENDPOINT.to_string(),
             timeout_ms: 10000,
         }
     }

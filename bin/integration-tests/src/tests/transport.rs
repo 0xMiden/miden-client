@@ -4,7 +4,10 @@ use miden_client::address::{Address, AddressInterface, RoutingParameters};
 use miden_client::asset::FungibleAsset;
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
 use miden_client::note::NoteType;
-use miden_client::note_transport::NOTE_TRANSPORT_DEFAULT_ENDPOINT;
+use miden_client::note_transport::{
+    NOTE_TRANSPORT_DEFAULT_ENDPOINT,
+    NOTE_TRANSPORT_DEVNET_ENDPOINT,
+};
 use miden_client::store::{InputNoteState, NoteFilter};
 use miden_client::testing::common::{
     assert_account_has_single_asset,
@@ -28,14 +31,19 @@ fn resolve_transport_endpoint() -> Option<String> {
         let lower = url.to_lowercase();
         if lower == "testnet" {
             Some(NOTE_TRANSPORT_DEFAULT_ENDPOINT.to_string())
+        } else if lower == "devnet" {
+            Some(NOTE_TRANSPORT_DEVNET_ENDPOINT.to_string())
         } else {
             Some(url)
         }
     } else {
         let network =
             std::env::var("TEST_MIDEN_NETWORK").unwrap_or_else(|_| "localhost".to_string());
-        if network.to_lowercase() == "testnet" {
+        let lower = network.to_lowercase();
+        if lower == "testnet" {
             Some(NOTE_TRANSPORT_DEFAULT_ENDPOINT.to_string())
+        } else if lower == "devnet" {
+            Some(NOTE_TRANSPORT_DEVNET_ENDPOINT.to_string())
         } else {
             None
         }

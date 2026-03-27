@@ -200,8 +200,7 @@ where
     /// This automatically configures:
     /// - **RPC**: `https://rpc.devnet.miden.io`
     /// - **Prover**: Remote prover at `https://tx-prover.devnet.miden.io`
-    ///
-    /// Note transport is not configured by default for devnet.
+    /// - **Note transport**: `https://transport.devnet.miden.io`
     ///
     /// You still need to provide:
     /// - A store (via `.store()`)
@@ -227,6 +226,10 @@ where
             tx_prover: Some(Arc::new(RemoteTransactionProver::new(
                 DEVNET_PROVER_ENDPOINT.to_string(),
             ))),
+            note_transport_config: Some(NoteTransportConfig {
+                endpoint: crate::note_transport::NOTE_TRANSPORT_DEVNET_ENDPOINT.to_string(),
+                timeout_ms: NOTE_TRANSPORT_DEFAULT_TIMEOUT_MS,
+            }),
             endpoint: Some(endpoint),
             ..Self::default()
         }

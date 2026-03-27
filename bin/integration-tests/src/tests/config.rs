@@ -6,8 +6,11 @@ use anyhow::{Context, Result};
 use miden_client::builder::ClientBuilder;
 use miden_client::crypto::RpoRandomCoin;
 use miden_client::grpc_support::{DEVNET_PROVER_ENDPOINT, TESTNET_PROVER_ENDPOINT};
-use miden_client::note_transport::NOTE_TRANSPORT_DEFAULT_ENDPOINT;
 use miden_client::note_transport::grpc::GrpcNoteTransportClient;
+use miden_client::note_transport::{
+    NOTE_TRANSPORT_DEFAULT_ENDPOINT,
+    NOTE_TRANSPORT_DEVNET_ENDPOINT,
+};
 use miden_client::rpc::{Endpoint, GrpcClient};
 use miden_client::testing::common::{FilesystemKeyStore, TestClient, create_test_store_path};
 use miden_client::{DebugMode, Felt, RemoteTransactionProver};
@@ -191,12 +194,14 @@ impl Default for ClientConfig {
             if let Ok(url) = std::env::var("TEST_MIDEN_NOTE_TRANSPORT_URL") {
                 match url.to_lowercase().as_str() {
                     "testnet" => Some(NOTE_TRANSPORT_DEFAULT_ENDPOINT.to_string()),
+                    "devnet" => Some(NOTE_TRANSPORT_DEVNET_ENDPOINT.to_string()),
                     _ => Some(url),
                 }
             } else {
                 // Network preset defaults
                 match network_lower.as_str() {
                     "testnet" => Some(NOTE_TRANSPORT_DEFAULT_ENDPOINT.to_string()),
+                    "devnet" => Some(NOTE_TRANSPORT_DEVNET_ENDPOINT.to_string()),
                     _ => None,
                 }
             };

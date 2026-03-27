@@ -10,7 +10,10 @@ use std::time::{Duration, Instant};
 
 use clap::Parser;
 use miden_client::grpc_support::{DEVNET_PROVER_ENDPOINT, TESTNET_PROVER_ENDPOINT};
-use miden_client::note_transport::NOTE_TRANSPORT_DEFAULT_ENDPOINT;
+use miden_client::note_transport::{
+    NOTE_TRANSPORT_DEFAULT_ENDPOINT,
+    NOTE_TRANSPORT_DEVNET_ENDPOINT,
+};
 use miden_client::rpc::Endpoint;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -223,12 +226,14 @@ impl TryFrom<Args> for BaseConfig {
         let note_transport_endpoint = if let Some(url) = args.note_transport_url {
             match url.to_lowercase().as_str() {
                 "testnet" => Some(NOTE_TRANSPORT_DEFAULT_ENDPOINT.to_string()),
+                "devnet" => Some(NOTE_TRANSPORT_DEVNET_ENDPOINT.to_string()),
                 _ => Some(url),
             }
         } else {
             // Network preset defaults
             match &args.network {
                 Network::Testnet => Some(NOTE_TRANSPORT_DEFAULT_ENDPOINT.to_string()),
+                Network::Devnet => Some(NOTE_TRANSPORT_DEVNET_ENDPOINT.to_string()),
                 _ => None,
             }
         };
