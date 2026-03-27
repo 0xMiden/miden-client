@@ -1,5 +1,6 @@
 use alloc::str::FromStr;
 
+use js_export_macro::js_export;
 use miden_client::Felt as NativeFelt;
 use miden_client::account::{AccountId as NativeAccountId, NetworkId as NativeNetworkId};
 use miden_client::address::{
@@ -9,21 +10,22 @@ use miden_client::address::{
     CustomNetworkId,
     RoutingParameters,
 };
-use wasm_bindgen::prelude::*;
 
 use super::felt::Felt;
 use crate::js_error_with_context;
+use crate::platform::{JsErr, from_str_err};
 
 /// Uniquely identifies a specific account.
 ///
 /// A Miden account ID is a 120-bit value derived from the commitments to account code and storage,
 /// and a random user-provided seed.
-#[wasm_bindgen]
+#[js_export]
 #[derive(Clone, Copy, Debug)]
 pub struct AccountId(NativeAccountId);
 
 /// The type of a Miden network.
-#[wasm_bindgen]
+#[derive(Clone, Copy)]
+#[js_export]
 pub enum NetworkType {
     /// Main network prefix (`mm`).
     Mainnet = 0,
@@ -36,7 +38,8 @@ pub enum NetworkType {
 }
 
 /// The identifier of a Miden network.
-#[wasm_bindgen]
+#[derive(Clone)]
+#[js_export]
 pub struct NetworkId {
     // Specific type of the network ID.
     network_type: NetworkType,
@@ -44,7 +47,7 @@ pub struct NetworkId {
     custom: Option<CustomNetworkId>,
 }
 
-#[wasm_bindgen]
+#[js_export]
 impl NetworkId {
     pub fn mainnet() -> NetworkId {
         NetworkId {
@@ -70,8 +73,8 @@ impl NetworkId {
     /// Builds a custom network ID from a provided custom prefix.
     ///
     /// Returns an error if the prefix is invalid.
-    pub fn custom(custom_prefix: &str) -> Result<NetworkId, JsValue> {
-        let custom = CustomNetworkId::from_str(custom_prefix)
+    pub fn custom(custom_prefix: String) -> Result<NetworkId, JsErr> {
+        let custom = CustomNetworkId::from_str(&custom_prefix)
             .map_err(|err| js_error_with_context(err, "Error building custom id prefix"))?;
 
         Ok(NetworkId {
@@ -81,21 +84,43 @@ impl NetworkId {
     }
 }
 
-#[wasm_bindgen]
+#[js_export]
 #[repr(u8)]
 pub enum AccountInterface {
     /// Basic wallet address interface.
     BasicWallet = 0,
 }
 
-#[wasm_bindgen]
+// Internal methods accessible from Rust code (not processed by napi/wasm_bindgen).
+impl AccountId {
+    /// Returns true if the account uses public storage.
+    pub(crate) fn is_public(&self) -> bool {
+        self.0.is_public()
+    }
+
+    /// Returns true if the account uses private storage.
+    pub(crate) fn is_private(&self) -> bool {
+        self.0.is_private()
+    }
+
+    /// Returns true if the ID is reserved for network accounts.
+    pub(crate) fn is_network(&self) -> bool {
+        self.0.is_network()
+    }
+
+    pub(crate) fn as_native(&self) -> &NativeAccountId {
+        &self.0
+    }
+}
+
+#[js_export]
 impl AccountId {
     /// Builds an account ID from its hex string representation.
     ///
     /// Returns an error if the provided string is not a valid hex-encoded account ID.
-    #[wasm_bindgen(js_name = "fromHex")]
-    pub fn from_hex(hex: &str) -> Result<AccountId, JsValue> {
-        let native_account_id = NativeAccountId::from_hex(hex)
+    #[js_export(js_name = "fromHex")]
+    pub fn from_hex(hex: String) -> Result<AccountId, JsErr> {
+        let native_account_id = NativeAccountId::from_hex(&hex)
             .map_err(|err| js_error_with_context(err, "error instantiating AccountId from hex"))?;
         Ok(AccountId(native_account_id))
     }
@@ -106,8 +131,8 @@ impl AccountId {
     /// maps) and need to be recombined into an `AccountId`.
     ///
     /// Returns an error if the provided felts do not form a valid account ID.
-    #[wasm_bindgen(js_name = "fromPrefixSuffix")]
-    pub fn from_prefix_suffix(prefix: &Felt, suffix: &Felt) -> Result<AccountId, JsValue> {
+    #[js_export(js_name = "fromPrefixSuffix")]
+    pub fn from_prefix_suffix(prefix: &Felt, suffix: &Felt) -> Result<AccountId, JsErr> {
         let prefix_felt: NativeFelt = (*prefix).into();
         let suffix_felt: NativeFelt = (*suffix).into();
         let native_account_id =
@@ -118,49 +143,49 @@ impl AccountId {
     }
 
     /// Returns true if the ID refers to a faucet.
-    #[wasm_bindgen(js_name = "isFaucet")]
+    #[js_export(js_name = "isFaucet")]
     pub fn is_faucet(&self) -> bool {
         self.0.is_faucet()
     }
 
     /// Returns true if the ID refers to a regular account.
-    #[wasm_bindgen(js_name = "isRegularAccount")]
+    #[js_export(js_name = "isRegularAccount")]
     pub fn is_regular_account(&self) -> bool {
         self.0.is_regular_account()
     }
 
     /// Returns true if the account uses public storage.
-    #[wasm_bindgen(js_name = "isPublic")]
-    pub fn is_public(&self) -> bool {
+    #[js_export(js_name = "isPublic")]
+    pub fn js_is_public(&self) -> bool {
         self.0.is_public()
     }
 
     /// Returns true if the account uses private storage.
-    #[wasm_bindgen(js_name = "isPrivate")]
-    pub fn is_private(&self) -> bool {
+    #[js_export(js_name = "isPrivate")]
+    pub fn js_is_private(&self) -> bool {
         self.0.is_private()
     }
 
     /// Returns true if the ID is reserved for network accounts.
-    #[wasm_bindgen(js_name = "isNetwork")]
-    pub fn is_network(&self) -> bool {
+    #[js_export(js_name = "isNetwork")]
+    pub fn js_is_network(&self) -> bool {
         self.0.is_network()
     }
 
     /// Returns the canonical hex representation of the account ID.
-    #[wasm_bindgen(js_name = "toString")]
+    #[js_export(js_name = "toString")]
     #[allow(clippy::inherent_to_string)]
     pub fn to_string(&self) -> String {
         self.0.to_string()
     }
 
     /// Will turn the Account ID into its bech32 string representation.
-    #[wasm_bindgen(js_name = "toBech32")]
+    #[js_export(js_name = "toBech32")]
     pub fn to_bech32(
         &self,
         network_id: NetworkId,
         account_interface: AccountInterface,
-    ) -> Result<String, JsValue> {
+    ) -> Result<String, JsErr> {
         let network_id: NativeNetworkId = network_id.into();
 
         let routing_params = RoutingParameters::new(account_interface.into());
@@ -169,18 +194,18 @@ impl AccountId {
     }
 
     /// Given a bech32 encoded string, return the matching Account ID for it.
-    #[wasm_bindgen(js_name = "fromBech32")]
-    pub fn from_bech32(bech_32_encoded_id: &str) -> Result<AccountId, JsValue> {
+    #[js_export(js_name = "fromBech32")]
+    pub fn from_bech32(bech_32_encoded_id: String) -> Result<AccountId, JsErr> {
         // Since a bech32 encodes an account id + a routing parameter,
         // we can use Address::decode to fetch the account id.
         // Reference: https://github.com/0xMiden/miden-base/blob/150a8066c5a4b4011c4f3e55f9435921ad3835f3/docs/src/account/address.md#structure
-        let (_, address) = Address::decode(bech_32_encoded_id).map_err(|err| {
+        let (_, address) = Address::decode(&bech_32_encoded_id).map_err(|err| {
             js_error_with_context(err, "could not interpret input as a bech32-encoded account id")
         })?;
         match address.id() {
             AddressId::AccountId(account_id) => Ok(account_id.into()),
             _unsupported => {
-                Err(JsValue::from_str("bech32 string decoded into an unsupported address kind"))
+                Err(from_str_err("bech32 string decoded into an unsupported address kind"))
             },
         }
     }
@@ -195,10 +220,6 @@ impl AccountId {
     pub fn suffix(&self) -> Felt {
         let native_felt: NativeFelt = self.0.suffix();
         native_felt.into()
-    }
-
-    pub(crate) fn as_native(&self) -> &NativeAccountId {
-        &self.0
     }
 }
 
@@ -252,3 +273,6 @@ impl From<AccountInterface> for NativeAccountInterface {
         }
     }
 }
+
+impl_napi_from_value!(AccountId);
+impl_napi_from_value!(NetworkId);

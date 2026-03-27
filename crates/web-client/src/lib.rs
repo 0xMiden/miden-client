@@ -1,12 +1,29 @@
+// All `#[js_export]` methods must accept arguments by value (not by reference) because
+// wasm_bindgen and napi-rs require owned parameters for JS interop. Suppress the lint
+// crate-wide rather than annotating every individual function.
+#![allow(clippy::needless_pass_by_value)]
+
 extern crate alloc;
+
+#[cfg(all(feature = "browser", feature = "nodejs"))]
+compile_error!("Features `browser` and `nodejs` are mutually exclusive. Enable only one.");
+
+#[cfg(not(any(feature = "browser", feature = "nodejs")))]
+compile_error!("Either `browser` or `nodejs` feature must be enabled.");
+
 use alloc::sync::Arc;
 use core::error::Error;
 use core::fmt::Write;
 
+#[cfg(feature = "browser")]
 use idxdb_store::IdxdbStore;
+use js_export_macro::js_export;
+#[cfg(feature = "browser")]
 use js_sys::{Function, Reflect};
 use miden_client::builder::ClientBuilder;
 use miden_client::crypto::RpoRandomCoin;
+#[cfg(feature = "nodejs")]
+use miden_client::keystore::FilesystemKeyStore;
 use miden_client::note_transport::NoteTransportClient;
 use miden_client::note_transport::grpc::GrpcNoteTransportClient;
 use miden_client::rpc::{Endpoint, GrpcClient, NodeRpcClient};
@@ -15,8 +32,18 @@ use miden_client::testing::mock::MockRpcApi;
 use miden_client::testing::note_transport::MockNoteTransportApi;
 use miden_client::{Client, ClientError, DebugMode, ErrorHint, Felt};
 use models::code_builder::CodeBuilder;
+#[cfg(feature = "nodejs")]
+use napi_derive::napi;
+#[cfg(feature = "nodejs")]
+use platform::maybe_wrap_send;
+use platform::{AsyncCell, ClientAuth, JsErr, from_str_err};
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
+#[cfg(feature = "browser")]
+use tracing::Level;
+#[cfg(feature = "browser")]
+use tracing_subscriber::layer::SubscriberExt;
+#[cfg(feature = "browser")]
 use wasm_bindgen::prelude::*;
 
 pub mod account;
@@ -31,6 +58,7 @@ pub mod new_account;
 pub mod new_transactions;
 pub mod note_transport;
 pub mod notes;
+pub(crate) mod platform;
 pub mod rpc_client;
 pub mod settings;
 pub mod sync;
@@ -38,17 +66,16 @@ pub mod tags;
 pub mod transactions;
 pub mod utils;
 
+#[cfg(feature = "browser")]
 mod web_keystore;
+#[cfg(feature = "browser")]
 mod web_keystore_callbacks;
+#[cfg(feature = "browser")]
 mod web_keystore_db;
-use tracing::Level;
-use tracing_subscriber::layer::SubscriberExt;
+#[cfg(feature = "browser")]
 pub use web_keystore::WebKeyStore;
 
-/// Client authenticator type. Gate with `#[cfg]` to support other keystores, e.g.
-/// `FilesystemKeyStore` for Node.js.
-pub(crate) type ClientAuth = WebKeyStore<RpoRandomCoin>;
-
+#[cfg(feature = "browser")]
 const BASE_STORE_NAME: &str = "MidenClientDB";
 
 /// Initializes the `tracing` subscriber that routes Rust log output to the
@@ -61,6 +88,7 @@ const BASE_STORE_NAME: &str = "MidenClientDB";
 /// This is a **per-thread global** — call it once on the main thread and, if
 /// you use a Web Worker, once inside the worker. Subsequent calls on the same
 /// thread are harmless no-ops.
+#[cfg(feature = "browser")]
 #[wasm_bindgen(js_name = "setupLogging")]
 pub fn setup_logging(log_level: &str) {
     let level = match log_level.to_lowercase().as_str() {
@@ -82,11 +110,36 @@ pub fn setup_logging(log_level: &str) {
     }
 }
 
-#[wasm_bindgen]
+#[js_export]
 pub struct WebClient {
-    inner: Option<Client<ClientAuth>>,
-    mock_rpc_api: Option<Arc<MockRpcApi>>,
-    mock_note_transport_api: Option<Arc<MockNoteTransportApi>>,
+    inner: AsyncCell<Option<Client<ClientAuth>>>,
+    mock_rpc_api: AsyncCell<Option<Arc<MockRpcApi>>>,
+    mock_note_transport_api: AsyncCell<Option<Arc<MockNoteTransportApi>>>,
+}
+
+// SAFETY: napi-rs with `tokio_rt` uses a multi-threaded tokio runtime, so async napi
+// functions run on worker threads. This is sound because the concrete types behind
+// trait objects (`SqliteStore`, `GrpcClient`, `FilesystemKeyStore`) are all Send + Sync
+// — only the `dyn Trait` bounds lack Send. All mutable state is behind `AsyncCell`
+// (tokio::sync::Mutex), which serializes access.
+#[cfg(feature = "nodejs")]
+unsafe impl Send for WebClient {}
+#[cfg(feature = "nodejs")]
+unsafe impl Sync for WebClient {}
+
+// Prevent deadpool's Drop from panicking on Node.js process exit.
+// When napi's Tokio runtime shuts down, the SQLite connection pool tries to
+// spawn_blocking during Drop, but the runtime is already gone. This causes a
+// panic-in-panic (SIGABRT). Since the OS reclaims all resources on exit anyway,
+// we intentionally leak the client to avoid the crash.
+#[cfg(feature = "nodejs")]
+impl Drop for WebClient {
+    fn drop(&mut self) {
+        // Take ownership of the inner Mutex contents and forget them,
+        // preventing the deadpool Drop chain from running.
+        let inner = std::mem::replace(&mut self.inner, AsyncCell::new(None));
+        std::mem::forget(inner);
+    }
 }
 
 impl Default for WebClient {
@@ -95,39 +148,61 @@ impl Default for WebClient {
     }
 }
 
-#[wasm_bindgen]
+// Common methods shared between browser and Node.js
+#[js_export]
 impl WebClient {
-    #[wasm_bindgen(constructor)]
+    #[js_export(constructor)]
     pub fn new() -> Self {
+        #[cfg(feature = "browser")]
         console_error_panic_hook::set_once();
+
         WebClient {
-            inner: None,
-            mock_rpc_api: None,
-            mock_note_transport_api: None,
+            inner: AsyncCell::new(None),
+            mock_rpc_api: AsyncCell::new(None),
+            mock_note_transport_api: AsyncCell::new(None),
         }
     }
 
     /// Returns the identifier of the underlying store (e.g. `IndexedDB` database name, file path).
-    #[wasm_bindgen(js_name = "storeIdentifier")]
-    pub fn store_identifier(&self) -> Result<String, JsValue> {
-        Ok(self.get_inner()?.store_identifier().to_string())
+    #[js_export(js_name = "storeIdentifier")]
+    pub async fn store_identifier(&self) -> Result<String, JsErr> {
+        let guard = self.inner.lock().await;
+        let client = guard.as_ref().ok_or_else(|| from_str_err("Client not initialized"))?;
+        Ok(client.store_identifier().to_string())
     }
 
-    pub(crate) fn get_inner(&self) -> Result<&Client<ClientAuth>, JsValue> {
-        self.inner.as_ref().ok_or_else(|| JsValue::from_str("Client not initialized"))
+    #[js_export(js_name = "createCodeBuilder")]
+    pub async fn create_code_builder(&self) -> Result<CodeBuilder, JsErr> {
+        let guard = self.inner.lock().await;
+        let client = guard.as_ref().ok_or_else(|| {
+            from_str_err("client was not initialized before instancing CodeBuilder")
+        })?;
+        Ok(CodeBuilder::from_source_manager(client.code_builder().source_manager().clone()))
+    }
+}
+
+// Internal helpers
+impl WebClient {
+    pub(crate) async fn get_mut_inner(
+        &self,
+    ) -> impl core::ops::DerefMut<Target = Option<Client<ClientAuth>>> + '_ {
+        self.inner.lock().await
     }
 
-    pub(crate) fn get_mut_inner(&mut self) -> Option<&mut Client<ClientAuth>> {
-        self.inner.as_mut()
-    }
-
-    pub(crate) fn keystore(&self) -> Result<&Arc<ClientAuth>, JsValue> {
-        self.inner
+    pub(crate) async fn keystore(&self) -> Result<Arc<ClientAuth>, JsErr> {
+        let guard = self.inner.lock().await;
+        guard
             .as_ref()
             .and_then(|c| c.authenticator())
-            .ok_or_else(|| JsValue::from_str("Client not initialized"))
+            .cloned()
+            .ok_or_else(|| from_str_err("Client not initialized"))
     }
+}
 
+// Browser-specific client creation
+#[cfg(feature = "browser")]
+#[wasm_bindgen]
+impl WebClient {
     /// Creates a new `WebClient` instance with the specified configuration.
     ///
     /// # Arguments
@@ -137,9 +212,12 @@ impl WebClient {
     /// * `store_name`: Optional name for the web store. If `None`, the store name defaults to
     ///   `MidenClientDB_{network_id}`, where `network_id` is derived from the `node_url`.
     ///   Explicitly setting this allows for creating multiple isolated clients.
+    /// * `debug_mode`: Optional flag to enable debug mode for transaction execution. When enabled,
+    ///   the transaction executor records additional information useful for debugging. Defaults to
+    ///   disabled.
     #[wasm_bindgen(js_name = "createClient")]
     pub async fn create_client(
-        &mut self,
+        &self,
         node_url: Option<String>,
         node_note_transport_url: Option<String>,
         seed: Option<Vec<u8>>,
@@ -158,25 +236,16 @@ impl WebClient {
         let store_name =
             store_name.unwrap_or(format!("{}_{}", BASE_STORE_NAME, endpoint.to_network_id()));
 
-        let store = Arc::new(
+        let rng = create_rng(seed)?;
+        let store: Arc<dyn Store> = Arc::new(
             IdxdbStore::new(store_name.clone())
                 .await
                 .map_err(|_| JsValue::from_str("Failed to initialize IdxdbStore"))?,
         );
+        let keystore = WebKeyStore::new_with_callbacks(rng, store_name.clone(), None, None, None);
 
-        let rng = create_rng(seed)?;
-        let keystore =
-            Arc::new(WebKeyStore::new_with_callbacks(rng, store_name.clone(), None, None, None));
-
-        self.setup_client(
-            web_rpc_client,
-            store,
-            keystore,
-            rng,
-            note_transport_client,
-            debug_mode.unwrap_or(false),
-        )
-        .await?;
+        self.setup_client(web_rpc_client, store, keystore, rng, note_transport_client, debug_mode)
+            .await?;
 
         Ok(JsValue::from_str("Client created successfully"))
     }
@@ -193,10 +262,12 @@ impl WebClient {
     /// * `get_key_cb`: Callback to retrieve the secret key bytes for a given public key.
     /// * `insert_key_cb`: Callback to persist a secret key.
     /// * `sign_cb`: Callback to produce serialized signature bytes for the provided inputs.
+    /// * `debug_mode`: Optional flag to enable debug mode for transaction execution. Defaults to
+    ///   disabled.
     #[wasm_bindgen(js_name = "createClientWithExternalKeystore")]
     #[allow(clippy::too_many_arguments)]
     pub async fn create_client_with_external_keystore(
-        &mut self,
+        &self,
         node_url: Option<String>,
         node_note_transport_url: Option<String>,
         seed: Option<Vec<u8>>,
@@ -218,51 +289,36 @@ impl WebClient {
         let store_name =
             store_name.unwrap_or(format!("{}_{}", BASE_STORE_NAME, endpoint.to_network_id()));
 
-        let store = Arc::new(
+        let rng = create_rng(seed)?;
+        let store: Arc<dyn Store> = Arc::new(
             IdxdbStore::new(store_name.clone())
                 .await
                 .map_err(|_| JsValue::from_str("Failed to initialize IdxdbStore"))?,
         );
+        let keystore =
+            WebKeyStore::new_with_callbacks(rng, store_name, get_key_cb, insert_key_cb, sign_cb);
 
-        let rng = create_rng(seed)?;
-        let keystore = Arc::new(WebKeyStore::new_with_callbacks(
-            rng,
-            store_name.clone(),
-            get_key_cb,
-            insert_key_cb,
-            sign_cb,
-        ));
-
-        self.setup_client(
-            web_rpc_client,
-            store,
-            keystore,
-            rng,
-            note_transport_client,
-            debug_mode.unwrap_or(false),
-        )
-        .await?;
+        self.setup_client(web_rpc_client, store, keystore, rng, note_transport_client, debug_mode)
+            .await?;
 
         Ok(JsValue::from_str("Client created successfully"))
     }
 
-    /// Shared client setup. Platform-specific callers create the store and keystore,
-    /// then pass them here for the common `ClientBuilder` logic.
     async fn setup_client(
-        &mut self,
+        &self,
         rpc_client: Arc<dyn NodeRpcClient>,
         store: Arc<dyn Store>,
-        keystore: Arc<ClientAuth>,
+        keystore: WebKeyStore<RpoRandomCoin>,
         rng: RpoRandomCoin,
         note_transport_client: Option<Arc<dyn NoteTransportClient>>,
-        debug_mode: bool,
+        debug_mode: Option<bool>,
     ) -> Result<(), JsValue> {
         let mut builder = ClientBuilder::new()
             .rpc(rpc_client)
             .rng(Box::new(rng))
             .store(store)
-            .authenticator(keystore)
-            .in_debug_mode(if debug_mode {
+            .authenticator(Arc::new(keystore))
+            .in_debug_mode(if debug_mode.unwrap_or(false) {
                 DebugMode::Enabled
             } else {
                 DebugMode::Disabled
@@ -277,33 +333,119 @@ impl WebClient {
             .await
             .map_err(|err| js_error_with_context(err, "Failed to create client"))?;
 
-        // Ensure genesis block is fetched and stored in IndexedDB.
-        // This is important for web workers that create their own client instances -
-        // they will read the genesis from the shared IndexedDB and automatically
-        // set the genesis commitment on their RPC client.
         client
             .ensure_genesis_in_place()
             .await
             .map_err(|err| js_error_with_context(err, "Failed to ensure genesis in place"))?;
 
-        self.inner = Some(client);
+        *self.inner.lock().await = Some(client);
 
         Ok(())
     }
+}
 
-    #[wasm_bindgen(js_name = "createCodeBuilder")]
-    pub fn create_code_builder(&self) -> Result<CodeBuilder, JsValue> {
-        let Some(client) = &self.inner else {
-            return Err("client was not initialized before instancing CodeBuilder".into());
+// Node.js-specific client creation
+#[cfg(feature = "nodejs")]
+#[napi]
+impl WebClient {
+    /// Creates a new `WebClient` instance with the specified configuration.
+    ///
+    /// # Arguments
+    /// * `node_url`: The URL of the node RPC endpoint. If `None`, defaults to the testnet endpoint.
+    /// * `node_note_transport_url`: Optional URL of the note transport service.
+    /// * `seed`: Optional seed for account initialization.
+    /// * `db_path`: Path to the SQLite database file.
+    /// * `keystore_path`: Path to the directory for storing keys.
+    /// * `debug_mode`: Optional flag to enable debug mode for transaction execution. Defaults to
+    ///   disabled.
+    #[napi(js_name = "createClient")]
+    pub async fn create_client(
+        &self,
+        node_url: Option<String>,
+        node_note_transport_url: Option<String>,
+        seed: Option<Vec<u8>>,
+        db_path: String,
+        keystore_path: String,
+        debug_mode: Option<bool>,
+    ) -> Result<String, JsErr> {
+        let endpoint = node_url.map_or(Ok(Endpoint::testnet()), |url| {
+            Endpoint::try_from(url.as_str()).map_err(|_| from_str_err("Invalid node URL"))
+        })?;
+
+        let rpc_client = Arc::new(GrpcClient::new(&endpoint, 10_000));
+
+        let note_transport_client = if let Some(url) = node_note_transport_url {
+            let client = GrpcNoteTransportClient::connect(url, 10_000)
+                .await
+                .map_err(|e| from_str_err(&format!("Failed to connect note transport: {e}")))?;
+            Some(Arc::new(client) as Arc<dyn NoteTransportClient>)
+        } else {
+            None
         };
-        Ok(CodeBuilder::from_source_manager(client.code_builder().source_manager().clone()))
+
+        let rng = create_rng(seed)?;
+
+        let store: Arc<dyn Store> = Arc::new(
+            miden_client_sqlite_store::SqliteStore::new(db_path.into())
+                .await
+                .map_err(|e| from_str_err(&format!("Failed to initialize SqliteStore: {e}")))?,
+        );
+
+        let keystore = FilesystemKeyStore::new(keystore_path.into())
+            .map_err(|e| from_str_err(&format!("Failed to initialize keystore: {e}")))?;
+
+        self.setup_client(rpc_client, store, keystore, rng, note_transport_client, debug_mode)
+            .await?;
+
+        Ok("Client created successfully".to_string())
+    }
+
+    async fn setup_client(
+        &self,
+        rpc_client: Arc<dyn NodeRpcClient>,
+        store: Arc<dyn Store>,
+        keystore: FilesystemKeyStore,
+        rng: RpoRandomCoin,
+        note_transport_client: Option<Arc<dyn NoteTransportClient>>,
+        debug_mode: Option<bool>,
+    ) -> Result<(), JsErr> {
+        let client = maybe_wrap_send(async move {
+            let mut builder = ClientBuilder::new()
+                .rpc(rpc_client)
+                .rng(Box::new(rng))
+                .store(store)
+                .authenticator(Arc::new(keystore))
+                .in_debug_mode(if debug_mode.unwrap_or(false) {
+                    DebugMode::Enabled
+                } else {
+                    DebugMode::Disabled
+                });
+
+            if let Some(transport) = note_transport_client {
+                builder = builder.note_transport(transport);
+            }
+
+            let mut client = builder
+                .build()
+                .await
+                .map_err(|err| js_error_with_context(err, "Failed to create client"))?;
+
+            client
+                .ensure_genesis_in_place()
+                .await
+                .map_err(|err| js_error_with_context(err, "Failed to ensure genesis in place"))?;
+
+            Ok::<_, JsErr>(client)
+        })
+        .await?;
+
+        *self.inner.lock().await = Some(client);
+
+        Ok(())
     }
 }
 
-// HELPERS
-// ================================================================================================
-
-pub(crate) fn create_rng(seed: Option<Vec<u8>>) -> Result<RpoRandomCoin, JsValue> {
+pub(crate) fn create_rng(seed: Option<Vec<u8>>) -> Result<RpoRandomCoin, JsErr> {
     let mut rng = match seed {
         Some(seed_bytes) => {
             if seed_bytes.len() == 32 {
@@ -311,7 +453,7 @@ pub(crate) fn create_rng(seed: Option<Vec<u8>>) -> Result<RpoRandomCoin, JsValue
                 seed_array.copy_from_slice(&seed_bytes);
                 StdRng::from_seed(seed_array)
             } else {
-                return Err(JsValue::from_str("Seed must be exactly 32 bytes"));
+                return Err(from_str_err("Seed must be exactly 32 bytes"));
             }
         },
         None => StdRng::from_os_rng(),
@@ -323,25 +465,41 @@ pub(crate) fn create_rng(seed: Option<Vec<u8>>) -> Result<RpoRandomCoin, JsValue
 // ERROR HANDLING HELPERS
 // ================================================================================================
 
-fn js_error_with_context<T>(err: T, context: &str) -> JsValue
+pub(crate) fn js_error_with_context<T>(err: T, context: &str) -> JsErr
 where
     T: Error + 'static,
 {
-    let mut error_string = context.to_string();
-    let mut source = Some(&err as &dyn Error);
-    while let Some(err) = source {
-        write!(error_string, ": {err}").expect("writing to string should always succeed");
-        source = err.source();
-    }
-
+    let error_message = build_error_chain(context, &err);
     let help = hint_from_error(&err);
-    let js_error: JsValue = JsError::new(&error_string).into();
 
-    if let Some(help) = help {
-        let _ = Reflect::set(&js_error, &JsValue::from_str("help"), &JsValue::from_str(&help));
+    #[cfg(feature = "browser")]
+    {
+        let js_error: JsValue = JsError::new(&error_message).into();
+        if let Some(help) = help {
+            let _ = Reflect::set(&js_error, &JsValue::from_str("help"), &JsValue::from_str(&help));
+        }
+        js_error
     }
 
-    js_error
+    #[cfg(feature = "nodejs")]
+    {
+        let message = match help {
+            Some(help) => format!("{error_message} [help: {help}]"),
+            None => error_message,
+        };
+        napi::Error::from_reason(message)
+    }
+}
+
+/// Walks the error chain and builds a `context: err1: err2: ...` message.
+fn build_error_chain(context: &str, err: &(dyn Error + 'static)) -> String {
+    let mut msg = context.to_string();
+    let mut source = Some(err);
+    while let Some(e) = source {
+        write!(msg, ": {e}").expect("writing to string should always succeed");
+        source = e.source();
+    }
+    msg
 }
 
 fn hint_from_error(err: &(dyn Error + 'static)) -> Option<String> {

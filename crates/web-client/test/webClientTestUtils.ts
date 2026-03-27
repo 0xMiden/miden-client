@@ -46,7 +46,7 @@ export const mintTransaction = async (
       const targetAccountId = window.AccountId.fromHex(_targetAccountId);
       const faucetAccountId = window.AccountId.fromHex(_faucetAccountId);
 
-      const mintTransactionRequest = client.newMintTransactionRequest(
+      const mintTransactionRequest = await client.newMintTransactionRequest(
         targetAccountId,
         faucetAccountId,
         _publicNote ? window.NoteType.Public : window.NoteType.Private,
@@ -116,7 +116,7 @@ export const mintPublicTransaction = async (
       const targetAccountId = window.AccountId.fromHex(_targetAccountId);
       const faucetAccountId = window.AccountId.fromHex(_faucetAccountId);
 
-      const mintTransactionRequest = client.newMintTransactionRequest(
+      const mintTransactionRequest = await client.newMintTransactionRequest(
         targetAccountId,
         faucetAccountId,
         window.NoteType.Public,
@@ -205,7 +205,7 @@ export const sendTransaction = async (
       const targetAccountId = window.AccountId.fromHex(_targetAccountId);
       const faucetAccountId = window.AccountId.fromHex(_faucetAccountId);
 
-      let mintTransactionRequest = client.newMintTransactionRequest(
+      let mintTransactionRequest = await client.newMintTransactionRequest(
         senderAccountId,
         faucetAccountId,
         window.NoteType.Private,
@@ -248,7 +248,7 @@ export const sendTransaction = async (
           prover
         );
 
-      let sendTransactionRequest = client.newSendTransactionRequest(
+      let sendTransactionRequest = await client.newSendTransactionRequest(
         senderAccountId,
         targetAccountId,
         faucetAccountId,
@@ -351,7 +351,7 @@ export const swapTransaction = async (
 
       // Swap transaction
 
-      let swapTransactionRequest = client.newSwapTransactionRequest(
+      let swapTransactionRequest = await client.newSwapTransactionRequest(
         accountAId,
         assetAFaucetId,
         _assetAAmount,

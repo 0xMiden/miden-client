@@ -1,78 +1,71 @@
-import test from "./playwright.global.setup";
-import { Page, expect } from "@playwright/test";
+// @ts-nocheck
+import { test, expect } from "./test-setup";
 
-test("transport basic", async ({ page }) => {
-  const result = await page.evaluate(async () => {
-    const client = await window.MockWasmWebClient.createClient();
+test("transport basic", async ({ run }) => {
+  const result = await run(async ({ client, sdk, helpers }) => {
+    const mockClient = await helpers.createFreshMockClient();
 
     // Create 32-byte seeds
     const senderSeed = new Uint8Array(32).fill(1);
     const recipientSeed = new Uint8Array(32).fill(2);
 
     // Create accounts on the same client
-    const senderAccount = await client.newWallet(
-      window.AccountStorageMode.private(),
+    const senderAccount = await mockClient.newWallet(
+      sdk.AccountStorageMode.private(),
       true,
-      window.AuthScheme.AuthRpoFalcon512,
+      sdk.AuthScheme.AuthRpoFalcon512,
       senderSeed
     );
-    const recipientAccount = await client.newWallet(
-      window.AccountStorageMode.private(),
+    const recipientAccount = await mockClient.newWallet(
+      sdk.AccountStorageMode.private(),
       true,
-      window.AuthScheme.AuthRpoFalcon512,
+      sdk.AuthScheme.AuthRpoFalcon512,
       recipientSeed
     );
 
     // Create recipient address
-    const recipientAddress = window.Address.fromAccountId(
+    const recipientAddress = sdk.Address.fromAccountId(
       recipientAccount.id(),
       "BasicWallet"
     );
 
     // Create note
-    const noteAssets = new window.NoteAssets([]);
-    const note = window.Note.createP2IDNote(
+    const noteAssets = new sdk.NoteAssets([]);
+    const note = sdk.Note.createP2IDNote(
       senderAccount.id(),
       recipientAccount.id(),
       noteAssets,
-      window.NoteType.Private,
-      new window.NoteAttachment()
+      sdk.NoteType.Private,
+      new sdk.NoteAttachment()
     );
 
-    // Sync-state / fetch notes
     // No notes before sending
-    await client.fetchPrivateNotes();
-    let notes = await client.getInputNotes(
-      new window.NoteFilter(window.NoteFilterTypes.All)
+    await mockClient.fetchPrivateNotes();
+    let notes = await mockClient.getInputNotes(
+      new sdk.NoteFilter(sdk.NoteFilterTypes.All)
     );
     const notesBeforeSending = notes.length;
 
     // Send note
-    await client.sendPrivateNote(note, recipientAddress);
+    await mockClient.sendPrivateNote(note, recipientAddress);
 
-    // Sync-state / fetch notes
     // 1 note stored
-    await client.fetchPrivateNotes();
-    notes = await client.getInputNotes(
-      new window.NoteFilter(window.NoteFilterTypes.All)
+    await mockClient.fetchPrivateNotes();
+    notes = await mockClient.getInputNotes(
+      new sdk.NoteFilter(sdk.NoteFilterTypes.All)
     );
     const notesAfterSending = notes.length;
 
     // Sync again, should be only 1 note stored
-    await client.fetchPrivateNotes();
-    notes = await client.getInputNotes(
-      new window.NoteFilter(window.NoteFilterTypes.All)
+    await mockClient.fetchPrivateNotes();
+    notes = await mockClient.getInputNotes(
+      new sdk.NoteFilter(sdk.NoteFilterTypes.All)
     );
     const notesAfterSecondSync = notes.length;
 
-    return {
-      notesBeforeSending,
-      notesAfterSending,
-      notesAfterSecondSync,
-    };
+    return { notesBeforeSending, notesAfterSending, notesAfterSecondSync };
   });
 
-  // Assertions in the main test context
   expect(result.notesBeforeSending).toBe(0);
   expect(result.notesAfterSending).toBe(1);
   expect(result.notesAfterSecondSync).toBe(1);

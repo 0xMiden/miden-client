@@ -1,3 +1,4 @@
+use js_export_macro::js_export;
 use miden_client::Word as NativeWord;
 use miden_client::account::component::{
     AccountComponent as NativeAccountComponent,
@@ -15,7 +16,6 @@ use miden_client::auth::{
     PublicKeyCommitment,
 };
 use miden_client::vm::Package as NativePackage;
-use wasm_bindgen::prelude::*;
 
 use crate::js_error_with_context;
 use crate::models::account_component_code::AccountComponentCode;
@@ -26,25 +26,26 @@ use crate::models::miden_arrays::StorageSlotArray;
 use crate::models::package::Package;
 use crate::models::storage_slot::StorageSlot;
 use crate::models::word::Word;
+use crate::platform::{JsErr, from_str_err};
 
 /// Procedure digest paired with whether it is an auth procedure.
 #[derive(Clone)]
-#[wasm_bindgen]
+#[js_export]
 pub struct GetProceduresResultItem {
     digest: Word,
     is_auth: bool,
 }
 
-#[wasm_bindgen]
+#[js_export]
 impl GetProceduresResultItem {
     /// Returns the MAST root digest for the procedure.
-    #[wasm_bindgen(getter)]
+    #[js_export(getter)]
     pub fn digest(&self) -> Word {
         self.digest.clone()
     }
 
     /// Returns true if the procedure is used for authentication.
-    #[wasm_bindgen(getter, js_name = "isAuth")]
+    #[js_export(getter, js_name = "isAuth")]
     pub fn is_auth(&self) -> bool {
         self.is_auth
     }
@@ -59,17 +60,17 @@ impl From<&(NativeWord, bool)> for GetProceduresResultItem {
     }
 }
 
-#[wasm_bindgen]
+#[js_export]
 #[derive(Clone)]
 pub struct AccountComponent(NativeAccountComponent);
 
-#[wasm_bindgen]
+#[js_export]
 impl AccountComponent {
     /// Compiles account code with the given storage slots using the provided assembler.
     pub fn compile(
         account_code: AccountComponentCode,
         storage_slots: Vec<StorageSlot>,
-    ) -> Result<AccountComponent, JsValue> {
+    ) -> Result<AccountComponent, JsErr> {
         let native_slots: Vec<NativeStorageSlot> =
             storage_slots.into_iter().map(Into::into).collect();
 
@@ -85,8 +86,8 @@ impl AccountComponent {
     }
 
     /// Marks the component as supporting all account types.
-    #[wasm_bindgen(js_name = "withSupportsAllTypes")]
-    pub fn with_supports_all_types(self) -> Self {
+    #[js_export(js_name = "withSupportsAllTypes")]
+    pub fn with_supports_all_types(&self) -> Self {
         let metadata = self.0.metadata().clone().with_supports_all_types();
         let code = self.0.component_code().clone();
         let slots = self.0.storage_slots().to_vec();
@@ -101,8 +102,8 @@ impl AccountComponent {
     /// Matches by full path, relative path, or local name (after the last `::`).
     /// When matching by local name, if multiple procedures share the same local
     /// name across modules, the first match is returned.
-    #[wasm_bindgen(js_name = "getProcedureHash")]
-    pub fn get_procedure_hash(&self, procedure_name: &str) -> Result<String, JsValue> {
+    #[js_export(js_name = "getProcedureHash")]
+    pub fn get_procedure_hash(&self, procedure_name: String) -> Result<String, JsErr> {
         let library = self.0.component_code().as_library();
 
         let get_proc_export = library
@@ -113,12 +114,14 @@ impl AccountComponent {
                 }
                 let export_path = export.path();
                 let path_str = export_path.as_ref().as_str();
-                path_str == procedure_name
-                    || export_path.as_ref().to_relative().as_str() == procedure_name
-                    || path_str.rsplit_once("::").is_some_and(|(_, local)| local == procedure_name)
+                path_str == procedure_name.as_str()
+                    || export_path.as_ref().to_relative().as_str() == procedure_name.as_str()
+                    || path_str
+                        .rsplit_once("::")
+                        .is_some_and(|(_, local)| local == procedure_name.as_str())
             })
             .ok_or_else(|| {
-                JsValue::from_str(&format!(
+                from_str_err(&format!(
                     "Procedure {procedure_name} not found in the account component library"
                 ))
             })?;
@@ -129,7 +132,7 @@ impl AccountComponent {
             .mast_forest()
             .get_node_by_id(get_proc_mast_id)
             .ok_or_else(|| {
-                JsValue::from_str(&format!("Mast node for procedure {procedure_name} not found"))
+                from_str_err(&format!("Mast node for procedure {procedure_name} not found"))
             })?
             .digest()
             .to_hex();
@@ -138,11 +141,88 @@ impl AccountComponent {
     }
 
     /// Returns all procedures exported by this component.
-    #[wasm_bindgen(js_name = "getProcedures")]
+    #[js_export(js_name = "getProcedures")]
     pub fn get_procedures(&self) -> Vec<GetProceduresResultItem> {
         self.0.get_procedures().iter().map(Into::into).collect()
     }
 
+    /// Builds an auth component from a secret key, inferring the auth scheme from the key type.
+    #[js_export(js_name = "createAuthComponentFromSecretKey")]
+    pub fn create_auth_component_from_secret_key(
+        secret_key: &AuthSecretKey,
+    ) -> Result<AccountComponent, JsErr> {
+        let native_secret_key: NativeSecretKey = secret_key.into();
+        let commitment = native_secret_key.public_key().to_commitment();
+
+        let auth_scheme = match native_secret_key {
+            NativeSecretKey::EcdsaK256Keccak(_) => AuthScheme::AuthEcdsaK256Keccak,
+            NativeSecretKey::Falcon512Rpo(_) => AuthScheme::AuthRpoFalcon512,
+            // This is because the definition of NativeSecretKey has the
+            // '#[non_exhaustive]' attribute, without this catch-all clause,
+            // this is a compiler error.
+            _unimplemented => {
+                return Err(from_str_err(
+                    "building auth component for this auth scheme is not supported yet",
+                ));
+            },
+        };
+
+        Ok(AccountComponent::create_auth_component(commitment, auth_scheme))
+    }
+
+    #[js_export(js_name = "createAuthComponentFromCommitment")]
+    pub fn create_auth_component_from_commitment(
+        commitment: &Word,
+        auth_scheme: AuthScheme,
+    ) -> Result<AccountComponent, JsErr> {
+        let native_word: NativeWord = commitment.into();
+        let pkc = PublicKeyCommitment::from(native_word);
+
+        Ok(AccountComponent::create_auth_component(pkc, auth_scheme))
+    }
+
+    /// Creates an account component from a compiled package and storage slots.
+    #[js_export(js_name = "fromPackage")]
+    pub fn from_package(
+        package: &Package,
+        storage_slots: StorageSlotArray,
+    ) -> Result<AccountComponent, JsErr> {
+        let native_package: NativePackage = package.into();
+        let native_library = native_package.unwrap_library().as_ref().clone();
+        let items: Vec<StorageSlot> = storage_slots.into();
+        let native_slots: Vec<NativeStorageSlot> =
+            items.into_iter().map(std::convert::Into::into).collect();
+
+        NativeAccountComponent::new(
+            native_library,
+            native_slots,
+            AccountComponentMetadata::new("custom"),
+        )
+        .map(AccountComponent)
+        .map_err(|e| js_error_with_context(e, "Failed to create account component from package"))
+    }
+
+    /// Creates an account component from a compiled library and storage slots.
+    #[js_export(js_name = "fromLibrary")]
+    pub fn from_library(
+        library: &Library,
+        storage_slots: Vec<StorageSlot>,
+    ) -> Result<AccountComponent, JsErr> {
+        let native_library: NativeLibrary = library.into();
+        let native_slots: Vec<NativeStorageSlot> =
+            storage_slots.into_iter().map(Into::into).collect();
+
+        NativeAccountComponent::new(
+            native_library,
+            native_slots,
+            AccountComponentMetadata::new("custom"),
+        )
+        .map(AccountComponent)
+        .map_err(|e| js_error_with_context(e, "Failed to create account component from library"))
+    }
+}
+
+impl AccountComponent {
     fn create_auth_component(
         commitment: PublicKeyCommitment,
         auth_scheme: AuthScheme,
@@ -157,83 +237,6 @@ impl AccountComponent {
                 AccountComponent(auth.into())
             },
         }
-    }
-
-    /// Builds an auth component from a secret key, inferring the auth scheme from the key type.
-    #[wasm_bindgen(js_name = "createAuthComponentFromSecretKey")]
-    pub fn create_auth_component_from_secret_key(
-        secret_key: &AuthSecretKey,
-    ) -> Result<AccountComponent, JsValue> {
-        let native_secret_key: NativeSecretKey = secret_key.into();
-        let commitment = native_secret_key.public_key().to_commitment();
-
-        let auth_scheme = match native_secret_key {
-            NativeSecretKey::EcdsaK256Keccak(_) => AuthScheme::AuthEcdsaK256Keccak,
-            NativeSecretKey::Falcon512Rpo(_) => AuthScheme::AuthRpoFalcon512,
-            // This is because the definition of NativeSecretKey has the
-            // '#[non_exhaustive]' attribute, without this catch-all clause,
-            // this is a compiler error.
-            _unimplemented => {
-                return Err(JsValue::from_str(
-                    "building auth component for this auth scheme is not supported yet",
-                ));
-            },
-        };
-
-        Ok(AccountComponent::create_auth_component(commitment, auth_scheme))
-    }
-
-    #[wasm_bindgen(js_name = "createAuthComponentFromCommitment")]
-    pub fn create_auth_component_from_commitment(
-        commitment: &Word,
-        auth_scheme: AuthScheme,
-    ) -> Result<AccountComponent, JsValue> {
-        let native_word: NativeWord = commitment.into();
-        let pkc = PublicKeyCommitment::from(native_word);
-
-        Ok(AccountComponent::create_auth_component(pkc, auth_scheme))
-    }
-
-    /// Creates an account component from a compiled package and storage slots.
-    #[wasm_bindgen(js_name = "fromPackage")]
-    pub fn from_package(
-        package: &Package,
-        storage_slots: &StorageSlotArray,
-    ) -> Result<AccountComponent, JsValue> {
-        let native_package: NativePackage = package.into();
-        let native_library = native_package.unwrap_library().as_ref().clone();
-        let native_slots: Vec<NativeStorageSlot> = storage_slots
-            .__inner
-            .iter()
-            .map(|storage_slot| storage_slot.clone().into())
-            .collect();
-
-        NativeAccountComponent::new(
-            native_library,
-            native_slots,
-            AccountComponentMetadata::new("custom"),
-        )
-        .map(AccountComponent)
-        .map_err(|e| js_error_with_context(e, "Failed to create account component from package"))
-    }
-
-    /// Creates an account component from a compiled library and storage slots.
-    #[wasm_bindgen(js_name = "fromLibrary")]
-    pub fn from_library(
-        library: &Library,
-        storage_slots: Vec<StorageSlot>,
-    ) -> Result<AccountComponent, JsValue> {
-        let native_library: NativeLibrary = library.into();
-        let native_slots: Vec<NativeStorageSlot> =
-            storage_slots.into_iter().map(Into::into).collect();
-
-        NativeAccountComponent::new(
-            native_library,
-            native_slots,
-            AccountComponentMetadata::new("custom"),
-        )
-        .map(AccountComponent)
-        .map_err(|e| js_error_with_context(e, "Failed to create account component from library"))
     }
 }
 

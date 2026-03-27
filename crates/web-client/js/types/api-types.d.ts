@@ -159,6 +159,8 @@ export interface ClientOptions {
   storeName?: string;
   /** Sync state on creation (default: false). */
   autoSync?: boolean;
+  /** Enable debug mode for transaction execution (default: false). */
+  debugMode?: boolean;
   /** External keystore callbacks. */
   keystore?: {
     getKey: GetKeyCallback;
@@ -467,12 +469,6 @@ export interface MockOptions {
   seed?: string | Uint8Array;
   serializedMockChain?: Uint8Array;
   serializedNoteTransport?: Uint8Array;
-}
-
-/** Versioned store snapshot for backup/restore. */
-export interface StoreSnapshot {
-  version: number;
-  data: unknown;
 }
 
 // ════════════════════════════════════════════════════════════════

@@ -1,28 +1,29 @@
+use js_export_macro::js_export;
 use miden_client::auth::{PublicKey as NativePublicKey, Signature as NativeSignature};
 use miden_client::{Deserializable, Word as NativeWord};
-use wasm_bindgen::prelude::*;
-use wasm_bindgen_futures::js_sys::Uint8Array;
 
 use crate::js_error_with_context;
 use crate::models::signature::Signature;
 use crate::models::signing_inputs::SigningInputs;
 use crate::models::word::Word;
-use crate::utils::serialize_to_uint8array;
+use crate::platform::{JsBytes, JsErr, from_str_err};
+use crate::utils::serialize_to_bytes;
 
-#[wasm_bindgen]
+#[js_export]
 #[derive(Clone)]
 pub struct PublicKey(pub(crate) NativePublicKey);
 
-#[wasm_bindgen]
+#[js_export]
 impl PublicKey {
     /// Serializes the public key into bytes.
-    pub fn serialize(&self) -> Uint8Array {
-        serialize_to_uint8array(&self.0)
+    pub fn serialize(&self) -> JsBytes {
+        serialize_to_bytes(&self.0)
     }
 
     /// Deserializes a public key from bytes.
-    pub fn deserialize(bytes: &Uint8Array) -> Result<PublicKey, JsValue> {
-        let native_public_key = NativePublicKey::read_from_bytes(&bytes.to_vec())
+    pub fn deserialize(bytes: JsBytes) -> Result<PublicKey, JsErr> {
+        let vec = crate::platform::js_to_bytes(&bytes);
+        let native_public_key = NativePublicKey::read_from_bytes(&vec)
             .map_err(|e| js_error_with_context(e, "Failed to deserialize public key"))?;
         Ok(PublicKey(native_public_key))
     }
@@ -33,7 +34,7 @@ impl PublicKey {
     }
 
     /// Returns the commitment corresponding to this public key.
-    #[wasm_bindgen(js_name = "toCommitment")]
+    #[js_export(js_name = "toCommitment")]
     pub fn to_commitment(&self) -> Word {
         let commitment = self.0.to_commitment();
         let native_word: NativeWord = commitment.into();
@@ -41,8 +42,8 @@ impl PublicKey {
     }
 
     /// Recovers a public key from a signature (only supported for `RpoFalcon512`).
-    #[wasm_bindgen(js_name = "recoverFrom")]
-    pub fn recover_from(message: &Word, signature: &Signature) -> Result<PublicKey, JsValue> {
+    #[js_export(js_name = "recoverFrom")]
+    pub fn recover_from(message: &Word, signature: &Signature) -> Result<PublicKey, JsErr> {
         let native_message: NativeWord = message.into();
         let native_signature: NativeSignature = signature.into();
 
@@ -54,14 +55,14 @@ impl PublicKey {
                 );
                 Ok(NativePublicKey::Falcon512Rpo(public_key).into())
             },
-            NativeSignature::EcdsaK256Keccak(_) => Err(JsValue::from_str(
+            NativeSignature::EcdsaK256Keccak(_) => Err(from_str_err(
                 "Recovering a public key from an EcdsaK256Keccak signature is not supported yet",
             )),
         }
     }
 
     /// Verifies a signature over arbitrary signing inputs.
-    #[wasm_bindgen(js_name = "verifyData")]
+    #[js_export(js_name = "verifyData")]
     pub fn verify_data(&self, signing_inputs: &SigningInputs, signature: &Signature) -> bool {
         let native_public_key: NativePublicKey = self.into();
         let message = signing_inputs.to_commitment().into();

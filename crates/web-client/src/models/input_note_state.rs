@@ -1,8 +1,8 @@
+use js_export_macro::js_export;
 use miden_client::store::InputNoteState as NativeNoteState;
-use wasm_bindgen::prelude::*;
 
 #[derive(Clone)]
-#[wasm_bindgen]
+#[js_export]
 pub enum InputNoteState {
     Expected,
     Unverified,

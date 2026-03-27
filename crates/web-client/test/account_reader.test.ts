@@ -1,20 +1,18 @@
-import test from "./playwright.global.setup";
-import { expect } from "@playwright/test";
+// @ts-nocheck
+import { test, expect } from "./test-setup";
 
 test.describe("AccountReader tests", () => {
   test("creates account reader and reads account data correctly", async ({
-    page,
+    run,
   }) => {
-    const result = await page.evaluate(async () => {
-      const client = window.client;
-
+    const result = await run(async ({ client, sdk }) => {
       const account = await client.newWallet(
-        window.AccountStorageMode.private(),
+        sdk.AccountStorageMode.private(),
         true,
-        window.AuthScheme.AuthRpoFalcon512
+        sdk.AuthScheme.AuthRpoFalcon512
       );
 
-      const reader = client.accountReader(account.id());
+      const reader = await client.accountReader(account.id());
 
       const nonce = await reader.nonce();
       const commitment = await reader.commitment();
@@ -22,7 +20,7 @@ test.describe("AccountReader tests", () => {
       const codeCommitment = await reader.codeCommitment();
 
       return {
-        originalId: account.id().toString(),
+        accountId: account.id().toString(),
         readerId: reader.accountId().toString(),
         accountNonce: account.nonce().toString(),
         readerNonce: nonce.toString(),
@@ -33,8 +31,7 @@ test.describe("AccountReader tests", () => {
         isNew,
       };
     });
-
-    expect(result.originalId).toEqual(result.readerId);
+    expect(result.accountId).toEqual(result.readerId);
     expect(result.accountNonce).toEqual(result.readerNonce);
     expect(result.accountCommitment).toEqual(result.readerCommitment);
     expect(result.accountCodeCommitment).toEqual(result.readerCodeCommitment);

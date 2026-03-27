@@ -123,7 +123,7 @@ export class AccountsResource {
     const wasm = await this.#getWasm();
     const accountId = resolveAccountRef(accountRef, wasm);
     const faucetId = resolveAccountRef(tokenRef, wasm);
-    const reader = this.#inner.accountReader(accountId);
+    const reader = await this.#inner.accountReader(accountId);
     return await reader.getBalance(faucetId);
   }
 

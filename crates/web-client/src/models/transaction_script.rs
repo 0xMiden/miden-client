@@ -1,8 +1,9 @@
+use js_export_macro::js_export;
 use miden_client::transaction::TransactionScript as NativeTransactionScript;
-use wasm_bindgen::prelude::*;
 
 use crate::models::package::Package;
 use crate::models::word::Word;
+use crate::platform::JsErr;
 
 /// A transaction script is a program that is executed in a transaction after all input notes have
 /// been executed.
@@ -12,10 +13,10 @@ use crate::models::word::Word;
 /// - A set of transaction script inputs defined by a map of key-value inputs that are loaded into
 ///   the advice inputs' map such that the transaction script can access them.
 #[derive(Clone)]
-#[wasm_bindgen]
+#[js_export]
 pub struct TransactionScript(NativeTransactionScript);
 
-#[wasm_bindgen]
+#[js_export]
 impl TransactionScript {
     /// Returns the MAST root commitment of the transaction script.
     pub fn root(&self) -> Word {
@@ -24,8 +25,8 @@ impl TransactionScript {
 
     /// Creates a `NoteScript` from the given `Package`.
     /// Throws if the package is invalid.
-    #[wasm_bindgen(js_name = "fromPackage")]
-    pub fn from_package(package: &Package) -> Result<TransactionScript, JsValue> {
+    #[js_export(js_name = "fromPackage")]
+    pub fn from_package(package: &Package) -> Result<TransactionScript, JsErr> {
         let program = package.as_program()?;
         let native_transaction_script = NativeTransactionScript::new(program.into());
         Ok(native_transaction_script.into())

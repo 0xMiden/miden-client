@@ -1,9 +1,9 @@
+use js_export_macro::js_export;
 use miden_client::asset::AccountStorageDelta as NativeAccountStorageDelta;
-use wasm_bindgen::prelude::*;
-use wasm_bindgen_futures::js_sys::Uint8Array;
 
 use crate::models::word::Word;
-use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
+use crate::platform::{JsBytes, JsErr};
+use crate::utils::{deserialize_from_bytes, serialize_to_bytes};
 
 /// `AccountStorageDelta` stores the differences between two states of account storage.
 ///
@@ -13,23 +13,23 @@ use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
 /// - A map containing updates to storage maps. The keys in this map are indexes of the updated
 ///   storage slots and the values are corresponding storage map delta objects.
 #[derive(Clone)]
-#[wasm_bindgen]
+#[js_export]
 pub struct AccountStorageDelta(NativeAccountStorageDelta);
 
-#[wasm_bindgen]
+#[js_export]
 impl AccountStorageDelta {
     /// Serializes the storage delta into bytes.
-    pub fn serialize(&self) -> Uint8Array {
-        serialize_to_uint8array(&self.0)
+    pub fn serialize(&self) -> JsBytes {
+        serialize_to_bytes(&self.0)
     }
 
     /// Deserializes a storage delta from bytes.
-    pub fn deserialize(bytes: &Uint8Array) -> Result<AccountStorageDelta, JsValue> {
-        deserialize_from_uint8array::<NativeAccountStorageDelta>(bytes).map(AccountStorageDelta)
+    pub fn deserialize(bytes: JsBytes) -> Result<AccountStorageDelta, JsErr> {
+        deserialize_from_bytes::<NativeAccountStorageDelta>(&bytes).map(AccountStorageDelta)
     }
 
     /// Returns true if no storage slots are changed.
-    #[wasm_bindgen(js_name = "isEmpty")]
+    #[js_export(js_name = "isEmpty")]
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
