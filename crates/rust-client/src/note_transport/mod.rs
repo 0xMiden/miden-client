@@ -18,6 +18,7 @@ pub use self::errors::NoteTransportError;
 use crate::{Client, ClientError};
 
 pub const NOTE_TRANSPORT_DEFAULT_ENDPOINT: &str = "https://transport.miden.io";
+pub const NOTE_TRANSPORT_DEVNET_ENDPOINT: &str = "https://transport.devnet.miden.io";
 pub const NOTE_TRANSPORT_CURSOR_STORE_SETTING: &str = "note_transport_cursor";
 
 /// Client note transport methods.
