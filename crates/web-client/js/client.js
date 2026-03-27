@@ -185,9 +185,9 @@ export class MidenClient {
    *
    * @returns {string} The store identifier.
    */
-  storeIdentifier() {
+  async storeIdentifier() {
     this.assertNotTerminated();
-    return this.#inner.storeIdentifier();
+    return await this.#inner.storeIdentifier();
   }
 
   // ── Mock-only methods ──

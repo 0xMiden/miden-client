@@ -44,7 +44,8 @@ export function loadNativeModule(options) {
     }
   }
 
-  const arch = os.arch() === "arm64" ? "aarch64" : os.arch();
+  const archMap = { arm64: "aarch64", x64: "x86_64" };
+  const arch = archMap[os.arch()] || os.arch();
   const platform =
     os.platform() === "darwin" ? "apple-darwin" : "unknown-linux-gnu";
   const target = `${arch}-${platform}`;

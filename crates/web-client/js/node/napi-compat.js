@@ -18,9 +18,19 @@
  * Normalizes a single argument for napi compatibility.
  */
 export function normalizeArg(val) {
-  if (typeof val === "bigint") return Number(val);
-  if (val instanceof BigUint64Array) return Array.from(val, (v) => Number(v));
-  if (val instanceof BigInt64Array) return Array.from(val, (v) => Number(v));
+  if (typeof val === "bigint") {
+    if (val > Number.MAX_SAFE_INTEGER || val < 0n) {
+      throw new RangeError(
+        `Value ${val} exceeds Number.MAX_SAFE_INTEGER (2^53). ` +
+          `Use string-based APIs for large values.`
+      );
+    }
+    return Number(val);
+  }
+  if (val instanceof BigUint64Array)
+    return Array.from(val, (v) => normalizeArg(v));
+  if (val instanceof BigInt64Array)
+    return Array.from(val, (v) => normalizeArg(v));
   if (val instanceof Uint8Array || Buffer.isBuffer(val)) return Array.from(val);
   return val;
 }
