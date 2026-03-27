@@ -1,10 +1,12 @@
 [package]
-authors.workspace = true
-edition.workspace = true
-license.workspace = true
-name              = "js-export-macro"
-publish           = false
-version.workspace = true
+authors.workspace    = true
+description          = "Proc macro for dual wasm-bindgen/napi annotations via #[js_export]"
+edition.workspace    = true
+keywords             = ["miden", "wasm", "napi", "macro"]
+license.workspace    = true
+name                 = "js-export-macro"
+repository.workspace = true
+version.workspace    = true
 
 [lib]
 proc-macro = true
