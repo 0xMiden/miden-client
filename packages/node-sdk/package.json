@@ -1,0 +1,23 @@
+{
+  "name": "@miden-sdk/node",
+  "version": "0.14.0-alpha.1",
+  "description": "Miden Client SDK for Node.js (napi native addon)",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/0xMiden/miden-client.git",
+    "directory": "packages/node-sdk"
+  }
+}

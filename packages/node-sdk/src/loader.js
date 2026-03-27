@@ -1,0 +1,107 @@
+/**
+ * Finds and loads the napi native module (.node binary).
+ *
+ * Search order:
+ * 1. MIDEN_MODULE_PATH environment variable (explicit override)
+ * 2. Package prebuilds directory (for published packages)
+ * 3. Repo target directory (for local development)
+ */
+import { createRequire } from "module";
+import path from "path";
+import fs from "fs";
+import os from "os";
+
+const require = createRequire(import.meta.url);
+
+let _sdk = null;
+
+/**
+ * Loads the napi SDK module. Caches the result after first load.
+ *
+ * @param {object} [options]
+ * @param {string} [options.modulePath] - Explicit path to the .node file.
+ * @returns {object} The napi SDK module.
+ */
+export function loadNativeModule(options) {
+  if (_sdk) return _sdk;
+
+  // 1. Explicit path (option or env var)
+  const explicit = options?.modulePath || process.env.MIDEN_MODULE_PATH;
+  if (explicit) {
+    _sdk = require(explicit);
+    return _sdk;
+  }
+
+  const arch = os.arch() === "arm64" ? "aarch64" : os.arch();
+  const platform =
+    os.platform() === "darwin" ? "apple-darwin" : "unknown-linux-gnu";
+  const target = `${arch}-${platform}`;
+  const ext = os.platform() === "darwin" ? "dylib" : "so";
+  const libName = `libmiden_client_web.${ext}`;
+
+  // 2. Package prebuilds directory
+  const packageRoot = path.resolve(import.meta.dirname, "..");
+  const prebuildCandidates = [
+    path.join(packageRoot, "prebuilds", `${os.platform()}-${os.arch()}`, "miden_client_web.node"),
+    path.join(packageRoot, "prebuilds", "miden_client_web.node"),
+  ];
+
+  for (const p of prebuildCandidates) {
+    if (fs.existsSync(p)) {
+      _sdk = require(p);
+      return _sdk;
+    }
+  }
+
+  // 3. Repo target directory (development)
+  const repoRoot = findRepoRoot(packageRoot);
+  if (repoRoot) {
+    const targetCandidates = [
+      path.join(repoRoot, "target", target, "release", libName),
+      path.join(repoRoot, "target", "release", libName),
+      path.join(repoRoot, "target", target, "debug", libName),
+      path.join(repoRoot, "target", "debug", libName),
+    ];
+
+    for (const p of targetCandidates) {
+      if (fs.existsSync(p)) {
+        // napi requires a .node extension -- copy if needed
+        const nodeFile = path.join(path.dirname(p), "miden_client_web.node");
+        if (
+          !fs.existsSync(nodeFile) ||
+          fs.statSync(p).mtimeMs > fs.statSync(nodeFile).mtimeMs
+        ) {
+          fs.copyFileSync(p, nodeFile);
+        }
+        _sdk = require(nodeFile);
+        return _sdk;
+      }
+    }
+  }
+
+  throw new Error(
+    `Miden napi module not found.\n\n` +
+      `Build it with:\n` +
+      `  cargo build -p miden-client-web --no-default-features --features nodejs --release\n\n` +
+      `Or set MIDEN_MODULE_PATH to the .node file location.`
+  );
+}
+
+/**
+ * Walks up from startDir looking for the repo root (has Cargo.toml + crates/).
+ */
+function findRepoRoot(startDir) {
+  let dir = startDir;
+  for (let i = 0; i < 10; i++) {
+    if (
+      fs.existsSync(path.join(dir, "Cargo.toml")) &&
+      fs.existsSync(path.join(dir, "crates"))
+    ) {
+      return dir;
+    }
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return null;
+}

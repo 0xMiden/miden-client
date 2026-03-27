@@ -47,6 +47,9 @@ packages/react-sdk/dist/
 !packages/vite-plugin/**
 packages/vite-plugin/dist/
 packages/vite-plugin/node_modules/
+!packages/node-sdk/
+!packages/node-sdk/**
+packages/node-sdk/node_modules/
 keystore/
 
 # Ignore files that spawn using `cargo run`
