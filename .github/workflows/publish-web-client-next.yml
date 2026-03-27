@@ -149,6 +149,22 @@ jobs:
           yarn install --frozen-lockfile
           yarn build
 
+      - name: Inject Node.js optionalDependencies before publish
+        if: needs.check-version.outputs.should_publish_web == 'true' && needs.build-native.result == 'success'
+        run: |
+          cd crates/web-client
+          node -e "
+            const pkg = JSON.parse(require('fs').readFileSync('package.json', 'utf8'));
+            const v = pkg.version;
+            pkg.optionalDependencies = {
+              '@miden-sdk/node-darwin-arm64': v,
+              '@miden-sdk/node-darwin-x64': v,
+              '@miden-sdk/node-linux-x64-gnu': v,
+            };
+            require('fs').writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+            console.log('Injected optionalDependencies with version ' + v);
+          "
+
       - name: Publish web-client to npm
         if: needs.check-version.outputs.should_publish_web == 'true'
         env:
