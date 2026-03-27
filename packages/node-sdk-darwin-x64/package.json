@@ -2,10 +2,16 @@
   "name": "@miden-sdk/node-darwin-x64",
   "version": "0.14.0-alpha.1",
   "description": "Miden Client SDK native module for macOS x64 (Intel)",
-  "os": ["darwin"],
-  "cpu": ["x64"],
+  "os": [
+    "darwin"
+  ],
+  "cpu": [
+    "x64"
+  ],
   "main": "miden_client_web.node",
-  "files": ["miden_client_web.node"],
+  "files": [
+    "miden_client_web.node"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",

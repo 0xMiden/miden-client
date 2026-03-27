@@ -40,8 +40,7 @@ export function wrapClass(Cls) {
     if (key === "prototype" || key === "length" || key === "name") continue;
     const desc = Object.getOwnPropertyDescriptor(Cls, key);
     if (desc && typeof desc.value === "function") {
-      Wrapper[key] = (...args) =>
-        desc.value.apply(Cls, args.map(normalizeArg));
+      Wrapper[key] = (...args) => desc.value.apply(Cls, args.map(normalizeArg));
     } else if (desc) {
       try {
         Object.defineProperty(Wrapper, key, desc);

@@ -22,8 +22,7 @@ function createTempDir(label) {
 }
 
 function normBytes(val) {
-  if (val instanceof Uint8Array || Buffer.isBuffer(val))
-    return Array.from(val);
+  if (val instanceof Uint8Array || Buffer.isBuffer(val)) return Array.from(val);
   return val;
 }
 
@@ -44,7 +43,13 @@ export function createWasmWebClient(rawSdk, options) {
     buildSwapTag: (...args) =>
       rawSdk.WebClient.buildSwapTag(...args.map(normalizeArg)),
 
-    createClient: async (rpcUrl, noteTransportUrl, seed, storeName, debugMode) => {
+    createClient: async (
+      rpcUrl,
+      noteTransportUrl,
+      seed,
+      storeName,
+      debugMode
+    ) => {
       const dir = options?.dataDir
         ? path.join(options.dataDir, storeName || "default")
         : createTempDir(storeName || "client");
@@ -109,7 +114,11 @@ export function createWasmWebClient(rawSdk, options) {
  */
 export function createMockWasmWebClient(rawSdk) {
   return {
-    createClient: async (serializedMockChain, serializedNoteTransport, seed) => {
+    createClient: async (
+      serializedMockChain,
+      serializedNoteTransport,
+      seed
+    ) => {
       const dir = createTempDir("mock");
       const client = new rawSdk.WebClient();
       await client.createMockClient(

@@ -11,7 +11,10 @@
 
 import { loadNativeModule } from "./loader.js";
 import { createSdkWrapper } from "./napi-compat.js";
-import { createWasmWebClient, createMockWasmWebClient } from "./client-factory.js";
+import {
+  createWasmWebClient,
+  createMockWasmWebClient,
+} from "./client-factory.js";
 import { MidenClient } from "./js/client.js";
 import {
   createP2IDNote,

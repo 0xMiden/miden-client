@@ -54,7 +54,12 @@ export function loadNativeModule(options) {
   // 3. Package prebuilds directory
   const packageRoot = path.resolve(import.meta.dirname, "..");
   const prebuildCandidates = [
-    path.join(packageRoot, "prebuilds", `${os.platform()}-${os.arch()}`, "miden_client_web.node"),
+    path.join(
+      packageRoot,
+      "prebuilds",
+      `${os.platform()}-${os.arch()}`,
+      "miden_client_web.node"
+    ),
     path.join(packageRoot, "prebuilds", "miden_client_web.node"),
   ];
 
