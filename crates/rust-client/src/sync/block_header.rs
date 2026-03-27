@@ -131,7 +131,7 @@ fn synthetic_offline_genesis_header() -> BlockHeader {
         .expect("offline native asset faucet ID should be valid");
     let fee_parameters =
         FeeParameters::new(native_asset_id, 500).expect("offline fee params should be valid");
-    let validator_key = SecretKey::new().public_key();
+    let validator_key = SecretKey::with_rng(&mut rand::rng()).public_key();
     let transactions = OrderedTransactionHeaders::new_unchecked(Vec::new());
 
     BlockHeader::new(
