@@ -48,7 +48,11 @@ impl Word {
     #[js_export(js_name = "newFromFelts")]
     #[allow(clippy::needless_pass_by_value)]
     pub fn new_from_felts(felt_vec: Vec<Felt>) -> Word {
-        assert!(felt_vec.len() == 4, "Word requires exactly 4 field elements, got {}", felt_vec.len());
+        assert!(
+            felt_vec.len() == 4,
+            "Word requires exactly 4 field elements, got {}",
+            felt_vec.len()
+        );
         let native_felt_vec: [NativeFelt; 4] = felt_vec
             .iter()
             .map(|felt: &Felt| felt.into())
