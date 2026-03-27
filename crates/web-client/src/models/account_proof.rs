@@ -160,7 +160,7 @@ pub struct StorageMapEntryJs {
     value: Word,
 }
 
-#[js_export(js_name = "StorageMapEntryJs")]
+#[js_export]
 impl StorageMapEntryJs {
     /// Returns the storage map key.
     pub fn key(&self) -> Word {

@@ -19,7 +19,7 @@ pub struct StorageMapInfo {
     updates: Vec<StorageMapUpdate>,
 }
 
-#[js_export(js_name = "StorageMapInfo")]
+#[js_export]
 impl StorageMapInfo {
     /// Returns the current chain tip block number.
     #[js_export(js_name = "chainTip")]
@@ -53,7 +53,7 @@ pub struct StorageMapUpdate {
     value: Word,
 }
 
-#[js_export(js_name = "StorageMapUpdate")]
+#[js_export]
 impl StorageMapUpdate {
     /// Returns the block number in which this update occurred.
     #[js_export(js_name = "blockNum")]
