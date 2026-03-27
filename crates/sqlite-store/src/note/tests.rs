@@ -46,6 +46,7 @@ fn create_consumed_external_input_note(index: u32, block_height: u32) -> InputNo
 
     let state = ConsumedExternalNoteState {
         nullifier_block_height: BlockNumber::from(block_height),
+        consumed_tx_order: None,
     };
 
     InputNoteRecord::new(details, Some(0), state.into())
@@ -76,6 +77,7 @@ fn create_consumed_input_note_with_consumer(
     consumer: AccountId,
     index: u32,
     block_height: u32,
+    consumed_tx_order: u32,
 ) -> InputNoteRecord {
     let serial_number: Word = [Felt::new(u64::from(index) + 5000), ZERO, ZERO, ZERO].into();
     let assets = NoteAssets::new(vec![]).unwrap();
@@ -96,31 +98,10 @@ fn create_consumed_input_note_with_consumer(
             consumer_account: consumer,
             consumer_transaction: TransactionId::from_raw(Word::default()),
         },
+        consumed_tx_order: Some(consumed_tx_order),
     };
 
     InputNoteRecord::new(details, Some(0), state.into())
-}
-
-/// Insert input notes into the store with an optional `consumed_tx_order`.
-async fn insert_input_notes_with_tx_order(
-    store: &crate::SqliteStore,
-    notes: &[InputNoteRecord],
-    consumed_tx_order: Option<u16>,
-) {
-    let notes = notes.to_vec();
-    store
-        .interact_with_connection(move |conn| {
-            let tx = conn
-                .transaction()
-                .map_err(|e| miden_client::store::StoreError::QueryError(e.to_string()))?;
-            for note in &notes {
-                super::upsert_input_note_tx(&tx, note, consumed_tx_order)?;
-            }
-            tx.commit()
-                .map_err(|e| miden_client::store::StoreError::QueryError(e.to_string()))
-        })
-        .await
-        .unwrap();
 }
 
 // INPUT NOTE READER TESTS
@@ -130,8 +111,9 @@ async fn insert_input_notes_with_tx_order(
 async fn input_note_reader_returns_none_on_empty_store() {
     let store = create_test_store().await;
     let store: Arc<dyn Store> = Arc::new(store);
+    let consumer = AccountId::try_from(ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE).unwrap();
 
-    let mut reader = InputNoteReader::new(store);
+    let mut reader = InputNoteReader::new(store, consumer);
     let result = reader.next().await.unwrap();
     assert!(result.is_none());
 }
@@ -139,12 +121,15 @@ async fn input_note_reader_returns_none_on_empty_store() {
 #[tokio::test]
 async fn input_note_reader_iterates_all_consumed_notes() {
     let store = create_test_store().await;
+    let consumer = AccountId::try_from(ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE).unwrap();
 
-    let notes: Vec<_> = (0..3u32).map(|i| create_consumed_external_input_note(i, 1)).collect();
+    let notes: Vec<_> = (0..3u32)
+        .map(|i| create_consumed_input_note_with_consumer(consumer, i, 1, 0))
+        .collect();
     store.upsert_input_notes(&notes).await.unwrap();
 
     let store: Arc<dyn Store> = Arc::new(store);
-    let mut reader = InputNoteReader::new(store);
+    let mut reader = InputNoteReader::new(store, consumer);
 
     let mut collected = Vec::new();
     while let Some(note) = reader.next().await.unwrap() {
@@ -157,16 +142,17 @@ async fn input_note_reader_iterates_all_consumed_notes() {
 #[tokio::test]
 async fn input_note_reader_skips_non_consumed_notes() {
     let store = create_test_store().await;
+    let consumer = AccountId::try_from(ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE).unwrap();
 
     // Insert 2 consumed notes and 1 expected note.
-    let consumed1 = create_consumed_external_input_note(0, 1);
+    let consumed1 = create_consumed_input_note_with_consumer(consumer, 0, 1, 0);
     let expected = create_expected_input_note(1);
-    let consumed2 = create_consumed_external_input_note(2, 1);
+    let consumed2 = create_consumed_input_note_with_consumer(consumer, 2, 1, 1);
 
     store.upsert_input_notes(&[consumed1, expected, consumed2]).await.unwrap();
 
     let store: Arc<dyn Store> = Arc::new(store);
-    let mut reader = InputNoteReader::new(store);
+    let mut reader = InputNoteReader::new(store, consumer);
 
     let mut collected = Vec::new();
     while let Some(note) = reader.next().await.unwrap() {
@@ -185,16 +171,14 @@ async fn input_note_reader_filters_by_consumer() {
     let consumer_b = AccountId::try_from(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET).unwrap();
 
     // Two notes for consumer_a with tx_order, one for consumer_b with tx_order.
-    let note_a1 = create_consumed_input_note_with_consumer(consumer_a, 10, 1);
-    let note_b = create_consumed_input_note_with_consumer(consumer_b, 11, 1);
-    let note_a2 = create_consumed_input_note_with_consumer(consumer_a, 12, 1);
+    let note_a1 = create_consumed_input_note_with_consumer(consumer_a, 10, 1, 0);
+    let note_b = create_consumed_input_note_with_consumer(consumer_b, 11, 1, 0);
+    let note_a2 = create_consumed_input_note_with_consumer(consumer_a, 12, 1, 1);
 
-    insert_input_notes_with_tx_order(&store, std::slice::from_ref(&note_a1), Some(0)).await;
-    insert_input_notes_with_tx_order(&store, std::slice::from_ref(&note_b), Some(0)).await;
-    insert_input_notes_with_tx_order(&store, std::slice::from_ref(&note_a2), Some(1)).await;
+    store.upsert_input_notes(&[note_a1, note_b, note_a2]).await.unwrap();
 
     let store: Arc<dyn Store> = Arc::new(store);
-    let mut reader = InputNoteReader::new(store).for_consumer(consumer_a);
+    let mut reader = InputNoteReader::new(store, consumer_a);
 
     let mut collected = Vec::new();
     while let Some(note) = reader.next().await.unwrap() {
@@ -213,14 +197,17 @@ async fn input_note_reader_excludes_notes_without_tx_order_when_consumer_is_set(
     let consumer = AccountId::try_from(ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE).unwrap();
 
     // Insert two notes for the same consumer: one with tx_order, one without.
-    let note_with_order = create_consumed_input_note_with_consumer(consumer, 30, 1);
-    let note_without_order = create_consumed_input_note_with_consumer(consumer, 31, 1);
+    let note_with_order = create_consumed_input_note_with_consumer(consumer, 30, 1, 0);
+    let mut note_without_order = create_consumed_input_note_with_consumer(consumer, 31, 1, 0);
+    note_without_order.set_consumed_tx_order(None);
 
-    insert_input_notes_with_tx_order(&store, std::slice::from_ref(&note_with_order), Some(0)).await;
-    insert_input_notes_with_tx_order(&store, std::slice::from_ref(&note_without_order), None).await;
+    store
+        .upsert_input_notes(&[note_with_order.clone(), note_without_order])
+        .await
+        .unwrap();
 
     let store: Arc<dyn Store> = Arc::new(store);
-    let mut reader = InputNoteReader::new(store).for_consumer(consumer);
+    let mut reader = InputNoteReader::new(store, consumer);
 
     let mut collected = Vec::new();
     while let Some(note) = reader.next().await.unwrap() {
@@ -235,12 +222,13 @@ async fn input_note_reader_excludes_notes_without_tx_order_when_consumer_is_set(
 #[tokio::test]
 async fn input_note_reader_filters_by_block_range() {
     let store = create_test_store().await;
+    let consumer = AccountId::try_from(ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE).unwrap();
 
     // Create consumed notes at different block heights.
-    let note_b1 = create_consumed_external_input_note(0, 1);
-    let note_b3 = create_consumed_external_input_note(1, 3);
-    let note_b5 = create_consumed_external_input_note(2, 5);
-    let note_b7 = create_consumed_external_input_note(3, 7);
+    let note_b1 = create_consumed_input_note_with_consumer(consumer, 0, 1, 0);
+    let note_b3 = create_consumed_input_note_with_consumer(consumer, 1, 3, 0);
+    let note_b5 = create_consumed_input_note_with_consumer(consumer, 2, 5, 0);
+    let note_b7 = create_consumed_input_note_with_consumer(consumer, 3, 7, 0);
 
     store
         .upsert_input_notes(&[note_b1, note_b3.clone(), note_b5.clone(), note_b7])
@@ -250,7 +238,7 @@ async fn input_note_reader_filters_by_block_range() {
     let store: Arc<dyn Store> = Arc::new(store);
 
     // Filter to blocks 3..=5
-    let mut reader = InputNoteReader::new(store)
+    let mut reader = InputNoteReader::new(store, consumer)
         .in_block_range(BlockNumber::from(3u32), BlockNumber::from(5u32));
 
     let mut collected = Vec::new();
@@ -271,21 +259,20 @@ async fn input_note_reader_filters_by_consumer_and_block_range() {
     let consumer_b = AccountId::try_from(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET).unwrap();
 
     // consumer_a at blocks 1, 3, 5; consumer_b at block 3.
-    let alice_at_1 = create_consumed_input_note_with_consumer(consumer_a, 20, 1);
-    let alice_at_3 = create_consumed_input_note_with_consumer(consumer_a, 21, 3);
-    let bob_at_3 = create_consumed_input_note_with_consumer(consumer_b, 22, 3);
-    let alice_at_5 = create_consumed_input_note_with_consumer(consumer_a, 23, 5);
+    let alice_at_1 = create_consumed_input_note_with_consumer(consumer_a, 20, 1, 0);
+    let alice_at_3 = create_consumed_input_note_with_consumer(consumer_a, 21, 3, 0);
+    let bob_at_3 = create_consumed_input_note_with_consumer(consumer_b, 22, 3, 1);
+    let alice_at_5 = create_consumed_input_note_with_consumer(consumer_a, 23, 5, 0);
 
-    insert_input_notes_with_tx_order(&store, std::slice::from_ref(&alice_at_1), Some(0)).await;
-    insert_input_notes_with_tx_order(&store, std::slice::from_ref(&alice_at_3), Some(0)).await;
-    insert_input_notes_with_tx_order(&store, std::slice::from_ref(&bob_at_3), Some(1)).await;
-    insert_input_notes_with_tx_order(&store, std::slice::from_ref(&alice_at_5), Some(0)).await;
+    store
+        .upsert_input_notes(&[alice_at_1, alice_at_3.clone(), bob_at_3, alice_at_5.clone()])
+        .await
+        .unwrap();
 
     let store: Arc<dyn Store> = Arc::new(store);
 
     // Filter to consumer_a in blocks 3..=5 — should return alice_at_3 and alice_at_5 only.
-    let mut reader = InputNoteReader::new(store)
-        .for_consumer(consumer_a)
+    let mut reader = InputNoteReader::new(store, consumer_a)
         .in_block_range(BlockNumber::from(3u32), BlockNumber::from(5u32));
 
     let mut collected = Vec::new();
@@ -308,15 +295,19 @@ async fn input_note_reader_filters_by_consumer_and_block_range() {
 async fn consumed_input_notes_ordered_by_block_height_then_tx_order() {
     let store = create_test_store().await;
 
-    // Create consumed notes at different block heights.
-    let note_block3 = create_consumed_external_input_note(0, 3);
-    let note_block1 = create_consumed_external_input_note(1, 1);
-    let note_block2 = create_consumed_external_input_note(2, 2);
+    // Create consumed notes at different block heights with tx_order set.
+    let mut note_block3 = create_consumed_external_input_note(0, 3);
+    let mut note_block1 = create_consumed_external_input_note(1, 1);
+    let mut note_block2 = create_consumed_external_input_note(2, 2);
+    note_block3.set_consumed_tx_order(Some(0));
+    note_block1.set_consumed_tx_order(Some(1));
+    note_block2.set_consumed_tx_order(Some(0));
 
-    // Insert in non-sorted order, each with a tx_order.
-    insert_input_notes_with_tx_order(&store, std::slice::from_ref(&note_block3), Some(0)).await;
-    insert_input_notes_with_tx_order(&store, std::slice::from_ref(&note_block1), Some(1)).await;
-    insert_input_notes_with_tx_order(&store, std::slice::from_ref(&note_block2), Some(0)).await;
+    // Insert in non-sorted order.
+    store
+        .upsert_input_notes(&[note_block3.clone(), note_block1.clone(), note_block2.clone()])
+        .await
+        .unwrap();
 
     // Retrieve consumed notes — should be ordered by block_height ASC, tx_order ASC.
     let notes = store.get_input_notes(NoteFilter::Consumed).await.unwrap();
@@ -331,13 +322,17 @@ async fn consumed_input_notes_same_block_ordered_by_tx_order() {
     let store = create_test_store().await;
 
     // All notes consumed at the same block height, different tx_order.
-    let note_tx2 = create_consumed_external_input_note(10, 5);
-    let note_tx0 = create_consumed_external_input_note(11, 5);
-    let note_tx1 = create_consumed_external_input_note(12, 5);
+    let mut note_tx2 = create_consumed_external_input_note(10, 5);
+    let mut note_tx0 = create_consumed_external_input_note(11, 5);
+    let mut note_tx1 = create_consumed_external_input_note(12, 5);
+    note_tx2.set_consumed_tx_order(Some(2));
+    note_tx0.set_consumed_tx_order(Some(0));
+    note_tx1.set_consumed_tx_order(Some(1));
 
-    insert_input_notes_with_tx_order(&store, std::slice::from_ref(&note_tx2), Some(2)).await;
-    insert_input_notes_with_tx_order(&store, std::slice::from_ref(&note_tx0), Some(0)).await;
-    insert_input_notes_with_tx_order(&store, std::slice::from_ref(&note_tx1), Some(1)).await;
+    store
+        .upsert_input_notes(&[note_tx2.clone(), note_tx0.clone(), note_tx1.clone()])
+        .await
+        .unwrap();
 
     let notes = store.get_input_notes(NoteFilter::Consumed).await.unwrap();
     assert_eq!(notes.len(), 3);
@@ -351,11 +346,14 @@ async fn consumed_input_notes_null_tx_order_sort_last_within_block() {
     let store = create_test_store().await;
 
     // Two notes at the same block: one with tx_order, one without (external consumption).
-    let note_with_order = create_consumed_external_input_note(20, 5);
+    let mut note_with_order = create_consumed_external_input_note(20, 5);
     let note_without_order = create_consumed_external_input_note(21, 5);
+    note_with_order.set_consumed_tx_order(Some(0));
 
-    insert_input_notes_with_tx_order(&store, std::slice::from_ref(&note_with_order), Some(0)).await;
-    insert_input_notes_with_tx_order(&store, std::slice::from_ref(&note_without_order), None).await;
+    store
+        .upsert_input_notes(&[note_with_order.clone(), note_without_order.clone()])
+        .await
+        .unwrap();
 
     let notes = store.get_input_notes(NoteFilter::Consumed).await.unwrap();
     assert_eq!(notes.len(), 2);
