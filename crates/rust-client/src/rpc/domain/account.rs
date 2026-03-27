@@ -263,10 +263,18 @@ impl proto::rpc::account_response::AccountDetails {
                 .map(Vec::as_slice)
                 .unwrap_or_default();
 
-            if let StorageMapEntries::EntriesWithProofs(witnesses) = &map_detail.entries {
-                for (witness, raw_key) in witnesses.iter().zip(requested_keys.iter()) {
+            if let StorageMapEntries::EntriesWithProofs(proofs) = &map_detail.entries {
+                if proofs.len() != requested_keys.len() {
+                    return Err(RpcError::InvalidResponse(format!(
+                        "expected {} proofs for storage map slot '{}', got {}",
+                        requested_keys.len(),
+                        map_detail.slot_name,
+                        proofs.len(),
+                    )));
+                }
+                for (proof, raw_key) in proofs.iter().zip(requested_keys.iter()) {
                     let hashed_key = raw_key.hash().as_word();
-                    if witness.get(&hashed_key).is_none() {
+                    if proof.get(&hashed_key).is_none() {
                         return Err(RpcError::InvalidResponse(format!(
                             "proof for storage map key {} does not match the requested key",
                             raw_key.to_hex(),

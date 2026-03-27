@@ -1,6 +1,7 @@
 use std::env::temp_dir;
 use std::sync::Arc;
 
+use miden_client::DebugMode;
 use miden_client::account::{Account, AccountStorageMode};
 use miden_client::address::{Address, AddressInterface, RoutingParameters};
 use miden_client::builder::ClientBuilder;
@@ -11,13 +12,12 @@ use miden_client::testing::common::create_test_store_path;
 use miden_client::testing::mock::{MockClient, MockRpcApi};
 use miden_client::testing::note_transport::{MockNoteTransportApi, MockNoteTransportNode};
 use miden_client::utils::RwLock;
-use miden_client::DebugMode;
 use miden_client_sqlite_store::ClientBuilderSqliteExt;
+use miden_protocol::Felt;
 use miden_protocol::crypto::rand::RpoRandomCoin;
 use miden_protocol::note::NoteType as ProtocolNoteType;
 use miden_protocol::transaction::OutputNote;
 use miden_protocol::utils::Serializable;
-use miden_protocol::Felt;
 use miden_standards::note::P2idNote;
 use miden_standards::testing::note::NoteBuilder;
 use miden_testing::{MockChainBuilder, TxContextInput};
@@ -243,7 +243,7 @@ async fn fetch_private_notes_finds_note_committed_at_sync_height() {
         .sqlite_store(create_test_store_path())
         .authenticator(Arc::new(keystore))
         .in_debug_mode(DebugMode::Enabled)
-        .tx_graceful_blocks(None)
+        .tx_discard_delta(None)
         .note_transport(Arc::new(transport_client));
 
     let mut client = builder.build().await.unwrap();

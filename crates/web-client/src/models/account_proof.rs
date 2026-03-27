@@ -1,10 +1,10 @@
 use alloc::string::String;
 use alloc::vec::Vec;
 
+use miden_client::Word as NativeWord;
 use miden_client::account::StorageSlotName;
 use miden_client::block::BlockNumber;
 use miden_client::rpc::domain::account::{AccountProof as NativeAccountProof, StorageMapEntries};
-use miden_client::Word as NativeWord;
 use miden_protocol::account::AccountStorageHeader;
 use wasm_bindgen::prelude::*;
 

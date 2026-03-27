@@ -1,8 +1,8 @@
 use alloc::string::String;
 use alloc::vec::Vec;
 
-use miden_client::rpc::domain::storage_map::StorageMapInfo as NativeStorageMapInfo;
 use miden_client::Word as NativeWord;
+use miden_client::rpc::domain::storage_map::StorageMapInfo as NativeStorageMapInfo;
 use wasm_bindgen::prelude::*;
 
 use super::word::Word;

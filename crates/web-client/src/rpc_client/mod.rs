@@ -172,12 +172,7 @@ impl RpcClient {
 
         let (block_num, proof) = self
             .inner
-            .get_account_proof(
-                native_id,
-                native_requirements,
-                account_state,
-                None,
-            )
+            .get_account_proof(native_id, native_requirements, account_state, None)
             .await
             .map_err(|err| js_error_with_context(err, "failed to get account proof"))?;
 

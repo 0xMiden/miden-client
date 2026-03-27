@@ -26,8 +26,12 @@ use miden_client::auth::{AuthSchemeId, AuthSecretKey, AuthSingleSig, RPO_FALCON_
 use miden_client::builder::ClientBuilder;
 use miden_client::keystore::FilesystemKeyStore;
 use miden_client::note::{NoteFile, NoteScript, NoteType};
-use miden_client::rpc::domain::account::{AccountStorageRequirements, FetchedAccount, StorageMapEntries};
-use miden_client::rpc::{AccountStateAt, NodeRpcClient};
+use miden_client::rpc::AccountStateAt;
+use miden_client::rpc::domain::account::{
+    AccountStorageRequirements,
+    FetchedAccount,
+    StorageMapEntries,
+};
 use miden_client::store::{
     InputNoteRecord,
     InputNoteState,
@@ -1568,13 +1572,11 @@ pub async fn test_get_account_storage_map_key_filtering(client_config: ClientCon
 
     let map_slot_name =
         StorageSlotName::new("miden::testing::client::map").expect("valid slot name");
-    let map_key_1 = StorageMapKey::new(
-        [Felt::new(15), Felt::new(15), Felt::new(15), Felt::new(15)].into(),
-    );
+    let map_key_1 =
+        StorageMapKey::new([Felt::new(15), Felt::new(15), Felt::new(15), Felt::new(15)].into());
     let map_value_1 = Word::from([Felt::new(9), Felt::new(12), Felt::new(18), Felt::new(30)]);
-    let map_key_2 = StorageMapKey::new(
-        [Felt::new(20), Felt::new(20), Felt::new(20), Felt::new(20)].into(),
-    );
+    let map_key_2 =
+        StorageMapKey::new([Felt::new(20), Felt::new(20), Felt::new(20), Felt::new(20)].into());
     let map_value_2 = Word::from([Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)]);
 
     let mut storage_map = StorageMap::new();
@@ -1636,8 +1638,7 @@ pub async fn test_get_account_storage_map_key_filtering(client_config: ClientCon
     );
 
     // Request one specific key
-    let requirements_one =
-        AccountStorageRequirements::new([(map_slot_name.clone(), [&map_key_1])]);
+    let requirements_one = AccountStorageRequirements::new([(map_slot_name.clone(), [&map_key_1])]);
     let (_, proof_one) = rpc
         .get_account_proof(account_id, requirements_one, AccountStateAt::ChainTip, None)
         .await?;
