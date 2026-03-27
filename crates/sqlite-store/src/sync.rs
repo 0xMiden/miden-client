@@ -181,6 +181,11 @@ impl SqliteStore {
         for account in account_updates.updated_public_accounts() {
             Self::update_account_state(&tx, &mut smt_forest, account)?;
         }
+
+        // Apply delta updates for large public accounts
+        for delta in account_updates.delta_updated_accounts() {
+            Self::apply_sync_account_delta(&tx, &mut smt_forest, delta)?;
+        }
         drop(smt_forest);
 
         for (account_id, digest) in account_updates.mismatched_private_accounts() {

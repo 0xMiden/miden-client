@@ -36,6 +36,11 @@ pub enum FetchedAccount {
     /// Public accounts are recorded on-chain. As such, its state is shared with the network and
     /// can always be retrieved through the appropriate RPC method.
     Public(Box<Account>, AccountUpdateSummary),
+    /// Public account that exceeded size thresholds (`too_many_entries` or `too_many_assets`).
+    /// Contains the account's metadata but not the full vault/storage data. The caller should
+    /// use delta sync endpoints (`SyncAccountVault`, `SyncAccountStorageMaps`) to update local
+    /// state incrementally.
+    PublicLarge(Box<AccountDetails>, AccountUpdateSummary),
 }
 
 impl FetchedAccount {
@@ -50,25 +55,33 @@ impl FetchedAccount {
         Self::Public(Box::new(account), summary)
     }
 
+    /// Creates a [`FetchedAccount`] for a public account that exceeded size thresholds.
+    pub fn new_public_large(summary: AccountUpdateSummary, details: AccountDetails) -> Self {
+        Self::PublicLarge(Box::new(details), summary)
+    }
+
     /// Returns the account ID.
     pub fn account_id(&self) -> AccountId {
         match self {
             Self::Private(account_id, _) => *account_id,
             Self::Public(account, _) => account.id(),
+            Self::PublicLarge(details, _) => details.header.id(),
         }
     }
 
     // Returns the account update summary commitment
     pub fn commitment(&self) -> Word {
         match self {
-            Self::Private(_, summary) | Self::Public(_, summary) => summary.commitment,
+            Self::Private(_, summary)
+            | Self::Public(_, summary)
+            | Self::PublicLarge(_, summary) => summary.commitment,
         }
     }
 
     // Returns the associated account if the account is public, otherwise none
     pub fn account(&self) -> Option<&Account> {
         match self {
-            Self::Private(..) => None,
+            Self::Private(..) | Self::PublicLarge(..) => None,
             Self::Public(account, _) => Some(account.as_ref()),
         }
     }
@@ -77,7 +90,7 @@ impl FetchedAccount {
 impl From<FetchedAccount> for Option<Account> {
     fn from(acc: FetchedAccount) -> Self {
         match acc {
-            FetchedAccount::Private(..) => None,
+            FetchedAccount::Private(..) | FetchedAccount::PublicLarge(..) => None,
             FetchedAccount::Public(account, _) => Some(*account),
         }
     }

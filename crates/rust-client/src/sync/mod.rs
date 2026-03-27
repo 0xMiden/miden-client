@@ -79,6 +79,7 @@ pub use state_sync::{NoteUpdateAction, OnNoteReceived, StateSync, StateSyncInput
 
 mod state_sync_update;
 pub use state_sync_update::{
+    AccountDeltaUpdate,
     AccountUpdates,
     BlockUpdates,
     StateSyncUpdate,
