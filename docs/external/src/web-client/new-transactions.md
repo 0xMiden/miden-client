@@ -406,5 +406,5 @@ try {
 ```
 
 :::note
-`withExpirationDelta()` is intended for builder flows that derive the transaction script from the request. It cannot be combined with `withCustomScript()`.
+`withExpirationDelta()` is intended for builder flows that derive the transaction script from the request. It cannot be combined with `withCustomScript()`. When using a custom script, the expiration can be set manually within the script itself.
 :::
