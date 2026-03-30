@@ -733,7 +733,7 @@ impl SqliteStore {
     ) -> Result<(), StoreError> {
         let account_id = new_account_state.id();
         let account_id_hex = account_id.to_hex();
-        let nonce_val = u64_to_value(new_account_state.nonce().as_int());
+        let nonce_val = u64_to_value(new_account_state.nonce().as_canonical_u64());
 
         // Insert and register account state in the SMT forest (handles old root cleanup)
         smt_forest.insert_and_register_account_state(
@@ -875,9 +875,9 @@ impl SqliteStore {
             let old_code_commitment = old.code_commitment().to_string();
             let old_storage_commitment = old.storage_commitment().to_string();
             let old_vault_root = old.vault_root().to_string();
-            let old_nonce = u64_to_value(old.nonce().as_int());
+            let old_nonce = u64_to_value(old.nonce().as_canonical_u64());
             let old_commitment = old.to_commitment().to_string();
-            let replaced_at_nonce = u64_to_value(new_header.nonce().as_int());
+            let replaced_at_nonce = u64_to_value(new_header.nonce().as_canonical_u64());
 
             // Read the old seed and locked status from latest (if any)
             let (old_seed, old_locked): (Option<Vec<u8>>, bool) = tx
@@ -926,7 +926,7 @@ impl SqliteStore {
         let code_commitment = new_header.code_commitment().to_string();
         let storage_commitment = new_header.storage_commitment().to_string();
         let vault_root = new_header.vault_root().to_string();
-        let nonce = u64_to_value(new_header.nonce().as_int());
+        let nonce = u64_to_value(new_header.nonce().as_canonical_u64());
         let commitment = new_header.to_commitment().to_string();
         let account_seed = account_seed.map(|seed| seed.to_bytes());
 

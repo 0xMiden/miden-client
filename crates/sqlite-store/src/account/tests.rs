@@ -1396,7 +1396,7 @@ async fn undo_multiple_nonces_at_once() -> anyhow::Result<()> {
         [Felt::new(2000), ZERO, ZERO, ZERO].into(),
     )?;
     let asset_2 = NonFungibleAsset::new(&NonFungibleAssetDetails::new(
-        nf_faucet_id.prefix(),
+        nf_faucet_id,
         NON_FUNGIBLE_ASSET_DATA.into(),
     )?)?;
     let vault_delta_2 = AccountVaultDelta::from_iters(vec![asset_2.into()], []);
@@ -1464,7 +1464,7 @@ async fn undo_multiple_nonces_at_once() -> anyhow::Result<()> {
         .interact_with_connection(move |conn| SqliteStore::get_account_header(conn, account_id))
         .await?
         .expect("account should exist after undo");
-    assert_eq!(header.nonce().as_int(), 0);
+    assert_eq!(header.nonce().as_canonical_u64(), 0);
     assert_eq!(header.to_commitment(), initial_commitment);
 
     Ok(())
@@ -1496,14 +1496,14 @@ async fn undo_after_update_removes_genuinely_new_entries() -> anyhow::Result<()>
     let component = AccountComponent::new(
         basic_wallet_library(),
         vec![StorageSlot::with_map(map_slot_name.clone(), initial_map)],
-        AccountComponentMetadata::new("miden::testing::dummy_component").with_supports_all_types(),
+        AccountComponentMetadata::new("miden::testing::dummy_component", AccountType::all()),
     )?;
 
     let account = AccountBuilder::new([0; 32])
         .account_type(AccountType::RegularAccountImmutableCode)
         .with_auth_component(AuthSingleSig::new(
             PublicKeyCommitment::from(EMPTY_WORD),
-            AuthSchemeId::Falcon512Rpo,
+            AuthSchemeId::Falcon512Poseidon2,
         ))
         .with_component(component)
         .build()?;
@@ -1602,7 +1602,7 @@ async fn undo_after_update_removes_genuinely_new_entries() -> anyhow::Result<()>
         .interact_with_connection(move |conn| SqliteStore::get_account_header(conn, account_id))
         .await?
         .expect("account should exist after undo");
-    assert_eq!(header.nonce().as_int(), 0);
+    assert_eq!(header.nonce().as_canonical_u64(), 0);
 
     Ok(())
 }

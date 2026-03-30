@@ -220,7 +220,7 @@ impl SqliteStore {
         for vault_key in removed_vault_keys {
             let vault_key_word: Word = (*vault_key).into();
             let vault_key_hex = vault_key_word.to_hex();
-            let faucet_prefix_hex = vault_key.faucet_id_prefix().to_hex();
+            let faucet_prefix_hex = vault_key.faucet_id().to_hex();
 
             // Read old asset value from latest (should exist since we're removing it)
             let old_asset: Option<String> = tx
@@ -266,8 +266,8 @@ impl SqliteStore {
         for asset in updated_assets {
             let vault_key_word: Word = asset.vault_key().into();
             let vault_key_hex = vault_key_word.to_hex();
-            let faucet_prefix_hex = asset.faucet_id_prefix().to_hex();
-            let asset_hex = Word::from(*asset).to_hex();
+            let faucet_prefix_hex = asset.faucet_id().to_hex();
+            let asset_hex = asset.to_value_word().to_hex();
 
             // Read old asset value from latest (NULL if asset is new)
             let old_asset: Option<String> = tx

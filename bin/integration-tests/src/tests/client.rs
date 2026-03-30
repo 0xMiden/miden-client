@@ -8,6 +8,7 @@ use miden_client::account::{
     AccountBuilder,
     AccountId,
     AccountStorageMode,
+    AccountType,
     StorageMap,
     StorageMapKey,
     StorageSlot,
@@ -18,7 +19,7 @@ use miden_client::asset::{Asset, FungibleAsset};
 use miden_client::auth::{AuthSchemeId, AuthSecretKey, AuthSingleSig, RPO_FALCON_SCHEME_ID};
 use miden_client::builder::ClientBuilder;
 use miden_client::keystore::FilesystemKeyStore;
-use miden_client::note::{NoteFile, NoteScript, NoteType};
+use miden_client::note::{NoteFile, NoteType};
 use miden_client::rpc::AccountStateAt;
 use miden_client::rpc::domain::account::{
     AccountStorageRequirements,
@@ -44,7 +45,7 @@ use miden_client::transaction::{
     TransactionRequestBuilder,
     TransactionStatus,
 };
-use miden_client::{ClientError, Deserializable, Felt, Serializable, Word};
+use miden_client::{ClientError, Felt, Word};
 use miden_client_sqlite_store::ClientBuilderSqliteExt;
 use tracing::info;
 
@@ -1576,14 +1577,13 @@ pub async fn test_get_account_storage_map_key_filtering(client_config: ClientCon
     let component = AccountComponent::new(
         component_code,
         vec![map_slot],
-        AccountComponentMetadata::new("miden::testing::map_key_filtering")
-            .with_supports_all_types(),
+        AccountComponentMetadata::new("miden::testing::map_key_filtering", AccountType::all()),
     )
     .map_err(|err| anyhow::anyhow!(err))?;
 
-    let key_pair = AuthSecretKey::new_falcon512_rpo();
+    let key_pair = AuthSecretKey::new_falcon512_poseidon2();
     let auth_component: AccountComponent =
-        AuthSingleSig::new(key_pair.public_key().to_commitment(), AuthSchemeId::Falcon512Rpo)
+        AuthSingleSig::new(key_pair.public_key().to_commitment(), AuthSchemeId::Falcon512Poseidon2)
             .into();
 
     let account = AccountBuilder::new(Default::default())
