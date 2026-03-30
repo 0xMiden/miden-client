@@ -249,12 +249,8 @@ pub async fn test_agglayer_bridge_in_out(client_config: ClientConfig) -> Result<
         leaf_data,
         miden_claim_amount,
     };
-    let claim_note = create_claim_note(
-        claim_inputs,
-        agglayer_faucet_id,
-        ger_manager_id,
-        ger_manager.client.rng(),
-    )?;
+    let claim_note =
+        create_claim_note(claim_inputs, bridge_id, ger_manager_id, ger_manager.client.rng())?;
     let tx_request = TransactionRequestBuilder::new().own_output_notes(vec![claim_note]).build()?;
     let tx_id = ger_manager.client.submit_new_transaction(ger_manager_id, tx_request).await?;
     wait_for_tx(&mut ger_manager.client, tx_id).await?;
