@@ -1,5 +1,7 @@
 #![recursion_limit = "256"]
 
+pub mod agglayer;
+
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
@@ -59,6 +61,7 @@ pub struct NodeBuilder {
     block_interval: Duration,
     batch_interval: Duration,
     rpc_port: u16,
+    include_agglayer: bool,
 }
 
 impl NodeBuilder {
@@ -72,6 +75,7 @@ impl NodeBuilder {
             block_interval: Duration::from_millis(DEFAULT_BLOCK_INTERVAL),
             batch_interval: Duration::from_millis(DEFAULT_BATCH_INTERVAL),
             rpc_port: DEFAULT_RPC_PORT,
+            include_agglayer: false,
         }
     }
 
@@ -92,6 +96,16 @@ impl NodeBuilder {
     #[must_use]
     pub fn with_rpc_port(mut self, port: u16) -> Self {
         self.rpc_port = port;
+        self
+    }
+
+    /// Enables agglayer genesis accounts (bridge admin, GER manager, bridge, faucet).
+    ///
+    /// When enabled, the node is bootstrapped with pre-deployed agglayer accounts.
+    /// Account files (with secret keys where applicable) are written to the data directory.
+    #[must_use]
+    pub fn with_agglayer_accounts(mut self) -> Self {
+        self.include_agglayer = true;
         self
     }
     // START
@@ -120,6 +134,24 @@ impl NodeBuilder {
                 format!("failed to write data for genesis account to file {}", filepath.display())
             })?;
 
+        // Optionally create agglayer genesis accounts
+        let mut agglayer_accounts = Vec::new();
+        if self.include_agglayer {
+            let agglayer = agglayer::create_agglayer_genesis_accounts()
+                .context("failed to create agglayer genesis accounts")?;
+
+            for (filename, acc_file) in &agglayer.account_files {
+                let filepath = self.data_directory.join(filename);
+                File::create_new(&filepath)
+                    .and_then(|mut file| file.write_all(&acc_file.to_bytes()))
+                    .with_context(|| {
+                        format!("failed to write agglayer account to {}", filepath.display())
+                    })?;
+            }
+
+            agglayer_accounts = agglayer.accounts;
+        }
+
         let version = 1;
         let timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -130,7 +162,12 @@ impl NodeBuilder {
         let validator_signer = ecdsa_k256_keccak::SecretKey::new();
 
         let genesis_state = GenesisState::new(
-            [&[account_file.account][..], &test_faucets_and_account[..]].concat(),
+            [
+                &[account_file.account][..],
+                &test_faucets_and_account[..],
+                &agglayer_accounts[..],
+            ]
+            .concat(),
             FeeParameters::new(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET.try_into().unwrap(), 0u32)
                 .unwrap(),
             version,

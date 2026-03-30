@@ -31,9 +31,9 @@ use crate::account::{AccountBuilder, AccountType, StorageSlot};
 use crate::auth::AuthSchemeId;
 use crate::crypto::FeltRng;
 pub use crate::keystore::{FilesystemKeyStore, Keystore};
-use crate::note::{Note, NoteAttachment, P2idNote};
+use crate::note::{Note, NoteAttachment, NoteConsumability, P2idNote};
 use crate::rpc::RpcError;
-use crate::store::{NoteFilter, TransactionFilter};
+use crate::store::{InputNoteRecord, NoteFilter, TransactionFilter};
 use crate::sync::SyncSummary;
 use crate::transaction::{
     NoteArgs,
@@ -260,6 +260,61 @@ pub async fn wait_for_blocks_no_sync(client: &mut TestClient, amount_of_blocks: 
         }
 
         tokio::time::sleep(Duration::from_secs(3)).await;
+    }
+}
+
+/// Syncs repeatedly until the given account has at least one consumable note, or until
+/// `max_blocks` have elapsed since the call. Returns the list of consumable notes once found.
+///
+/// This is useful when waiting for a network transaction to produce an output note (e.g., a
+/// P2ID note created by a faucet after consuming a CLAIM note), where the exact number of
+/// blocks needed is unpredictable.
+///
+/// # Panics
+///
+/// Panics if `max_blocks` elapse without any consumable notes appearing.
+pub async fn wait_for_consumable_notes(
+    client: &mut TestClient,
+    account_id: AccountId,
+    max_blocks: u32,
+) -> Vec<(InputNoteRecord, Vec<NoteConsumability>)> {
+    let start_block = client.get_sync_height().await.unwrap();
+    let deadline_block = start_block + max_blocks;
+    debug!(
+        %account_id,
+        %start_block,
+        %deadline_block,
+        "Waiting for consumable notes"
+    );
+
+    loop {
+        client.sync_state().await.unwrap();
+        let notes = client.get_consumable_notes(Some(account_id)).await.unwrap();
+        if !notes.is_empty() {
+            let current_block = client.get_sync_height().await.unwrap();
+            debug!(
+                %account_id,
+                count = notes.len(),
+                %current_block,
+                "Found consumable notes"
+            );
+            return notes;
+        }
+
+        let current_block = client.get_sync_height().await.unwrap();
+        assert!(
+            current_block < deadline_block,
+            "account {account_id} has no consumable notes after waiting {max_blocks} blocks \
+             (from block {start_block} to {current_block})"
+        );
+
+        debug!(
+            %account_id,
+            %current_block,
+            %deadline_block,
+            "No consumable notes yet, waiting..."
+        );
+        std::thread::sleep(Duration::from_secs(3));
     }
 }
 
