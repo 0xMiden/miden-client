@@ -56,9 +56,7 @@ begin
     # => [storage_ptr]
 
     # read the target account ID from the note storage
-    drop
-    mem_load.1
-    mem_load.0
+    dup add.1 mem_load swap mem_load
     # => [target_account_id_suffix, target_account_id_prefix]
 
     exec.active_account::get_id

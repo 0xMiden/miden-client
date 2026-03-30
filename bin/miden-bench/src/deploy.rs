@@ -4,9 +4,7 @@ use std::path::Path;
 use std::time::Instant;
 
 use miden_client::account::component::{
-    AccountComponent,
-    AccountComponentMetadata,
-    basic_wallet_library,
+    AccountComponent, AccountComponentMetadata, BasicWallet, basic_wallet_library,
 };
 use miden_client::account::{
     Account,
@@ -102,7 +100,7 @@ fn create_account_with_empty_maps(
     let wallet_component = AccountComponent::new(
         basic_wallet_library(),
         vec![],
-        AccountComponentMetadata::new("miden::testing::basic_wallet", AccountType::all()),
+        BasicWallet::component_metadata(),
     )
     .expect("basic wallet component should satisfy account component requirements");
 

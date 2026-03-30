@@ -41,9 +41,7 @@ const PACKAGE_DIR: &str = "packages";
 
 fn main() {
     // Basic wallet (no storage schema)
-    let basic_wallet_metadata =
-        AccountComponentMetadata::new(BasicWallet::NAME, AccountType::all())
-            .with_description("Basic wallet component for receiving and sending assets");
+    let basic_wallet_metadata = BasicWallet::component_metadata();
     build_package("basic-wallet", basic_wallet_library(), &basic_wallet_metadata, None);
 
     // Basic fungible faucet
@@ -80,17 +78,7 @@ fn main() {
     );
 
     // Basic auth (singlesig - supports both RPO Falcon and ECDSA)
-    let singlesig_metadata = AccountComponentMetadata::new(AuthSingleSig::NAME, AccountType::all())
-        .with_description(
-            "Authentication component using ECDSA K256 Keccak or Rpo Falcon 512 signature scheme",
-        )
-        .with_storage_schema(
-            StorageSchema::new([
-                AuthSingleSig::public_key_slot_schema(),
-                AuthSingleSig::auth_scheme_slot_schema(),
-            ])
-            .expect("storage schema should be valid"),
-        );
+    let singlesig_metadata = AuthSingleSig::component_metadata();
 
     build_package("basic-auth", singlesig_library(), &singlesig_metadata, Some("auth"));
 
@@ -99,8 +87,7 @@ fn main() {
 
     // No authentication component. Nonce is incremented on first transaction and when the account
     // state is changed. Provides no cryptographic authentication.
-    let no_auth_metadata = AccountComponentMetadata::new(NoAuth::NAME, AccountType::all())
-        .with_description("No authentication component");
+    let no_auth_metadata = NoAuth::component_metadata();
     build_package("no-auth", no_auth_library(), &no_auth_metadata, Some("auth"));
 
     // Multisig auth
@@ -130,20 +117,7 @@ fn main() {
     build_package("multisig-auth", multisig_library(), &multisig_metadata, Some("auth"));
 
     // ACL auth
-    let acl_metadata =
-        AccountComponentMetadata::new(AuthSingleSigAcl::NAME, AccountType::all())
-            .with_description(
-                "Authentication component with procedure-based ACL using ECDSA K256 Keccak or Rpo Falcon 512 signature scheme",
-            )
-            .with_storage_schema(
-                StorageSchema::new([
-                    AuthSingleSigAcl::public_key_slot_schema(),
-                    AuthSingleSigAcl::auth_scheme_slot_schema(),
-                    AuthSingleSigAcl::config_slot_schema(),
-                    AuthSingleSigAcl::trigger_procedure_roots_slot_schema(),
-                ])
-                .expect("storage schema should be valid"),
-            );
+    let acl_metadata = AuthSingleSigAcl::component_metadata();
     build_package("acl-auth", singlesig_acl_library(), &acl_metadata, Some("auth"));
 }
 
